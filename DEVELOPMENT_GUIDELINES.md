@@ -60,33 +60,29 @@ type SessionManager interface {
 
 #### Error Handling Standards
 - Always handle errors explicitly - never ignore with `_`
-- Use `fmt.Errorf` with `%w` verb for error wrapping
-- Create custom error types for domain-specific errors
+- Use the unified RichError system from `pkg/mcp/domain/errors/rich.go`
+- Follow ADR-004 patterns for structured error handling
 - Use `errors.Is()` and `errors.As()` for error checking
 
 ```go
-// Good error handling
-result, err := someOperation()
-if err != nil {
-    return fmt.Errorf("failed to execute operation: %w", err)
-}
-
-// Custom error types
-type ValidationError struct {
-    Field   string
-    Message string
-}
-
-func (e *ValidationError) Error() string {
-    return fmt.Sprintf("validation failed for %s: %s", e.Field, e.Message)
-}
+// Use RichError system (ADR-004)
+return errors.NewError().
+    Code(errors.CodeValidationFailed).
+    Type(errors.ErrTypeValidation).
+    Severity(errors.SeverityMedium).
+    Message("validation failed for field").
+    Context("field", fieldName).
+    Context("value", fieldValue).
+    Suggestion("Check field format and try again").
+    WithLocation().
+    Build()
 ```
 
 ### Code Quality Standards
 
 #### No Print Statements
 - **NEVER** use `fmt.Print*`, `log.Print*`, or `print()` statements
-- Use structured logging with `zerolog` consistently
+- Use structured logging with `zerolog` (actual implementation)
 ```go
 // Bad
 fmt.Println("Starting build process")
@@ -228,35 +224,21 @@ func sanitizePath(path string) string {
 
 ## Error Handling
 
-### RichError Pattern (In Progress)
+### RichError Pattern (ADR-004)
 ```go
-// Custom error type with structured context
-type RichError struct {
-    Code    string
-    Message string
-    Context map[string]interface{}
-    Err     error
-}
-
-func (e *RichError) Error() string {
-    return e.Message
-}
-
-func (e *RichError) Unwrap() error {
-    return e.Err
-}
-
-// Usage
-return &RichError{
-    Code:    "BUILD_FAILED",
-    Message: "Docker build failed during RUN step",
-    Context: map[string]interface{}{
-        "dockerfile_line": 15,
-        "command":        "RUN npm install",
-        "exit_code":      1,
-    },
-    Err: originalError,
-}
+// Use unified RichError system from pkg/mcp/domain/errors/rich.go
+return errors.NewError().
+    Code(errors.CodeBuildFailed).
+    Type(errors.ErrTypeBuild).
+    Severity(errors.SeverityHigh).
+    Message("Docker build failed during RUN step").
+    Context("dockerfile_line", 15).
+    Context("command", "RUN npm install").
+    Context("exit_code", 1).
+    Suggestion("Check package.json and dependency versions").
+    WithLocation().
+    Cause(originalError).
+    Build()
 ```
 
 ### Error Context
@@ -290,15 +272,33 @@ return &RichError{
   - Split by functional areas (e.g., `tool_validation.go`, `tool_execution.go`)
   - Create focused sub-packages
 
-### Directory Structure
+### Three-Layer Architecture (ADR-001)
 ```
-pkg/mcp/internal/
-├── tools/           # Tool implementations
-├── core/           # Core server functionality
-├── types/          # Shared type definitions
-├── utils/          # Shared utilities
-├── transport/      # Transport layer
-└── orchestration/  # Workflow orchestration
+pkg/mcp/
+├── domain/              # Domain layer - business logic (no dependencies)
+│   ├── config/         # Configuration entities and validation
+│   ├── containerization/ # Container operations (analyze, build, deploy, scan)
+│   ├── errors/         # Rich error handling system
+│   ├── security/       # Security policies and validation
+│   ├── session/        # Session entities and rules
+│   └── internal/       # Shared utilities
+├── application/         # Application layer - orchestration (depends on domain)
+│   ├── api/            # Canonical interface definitions
+│   ├── commands/       # Command implementations
+│   ├── core/           # Server lifecycle & registry
+│   ├── orchestration/  # Tool coordination & workflows
+│   ├── services/       # Service interfaces
+│   ├── state/          # Application state management
+│   ├── tools/          # Tool implementations
+│   └── workflows/      # Workflow management
+└── infra/              # Infrastructure layer - external integrations
+    ├── persistence/    # BoltDB storage
+    ├── transport/      # MCP protocol transports
+    ├── templates/      # YAML templates
+    ├── retry/          # Retry coordination
+    ├── docker_*.go     # Docker integration files
+    ├── k8s_*.go        # Kubernetes integration files
+    └── internal/       # Infrastructure utilities
 ```
 
 ### Import Organization
@@ -314,8 +314,8 @@ import (
     "github.com/stretchr/testify/assert"
 
     // Internal
-    "github.com/Azure/container-kit/pkg/mcp/internal/types"
-    "github.com/Azure/container-kit/pkg/mcp/utils"
+    "github.com/Azure/container-kit/pkg/mcp/domain/internal/types"
+    "github.com/Azure/container-kit/pkg/mcp/domain/internal/utils"
 )
 ```
 
@@ -333,7 +333,7 @@ make bench                 # Performance benchmarks
 ### Quality Gates
 - No `fmt.Print*` or `log.Print*` statements
 - No security issues (gosec)
-- Error budget compliance (see `docs/LINTING.md`)
+- Error budget compliance (see `docs/QUALITY_STANDARDS.md`)
 - Test coverage ≥70% for new code
 
 ### Git Workflow
@@ -360,6 +360,63 @@ make bench                 # Performance benchmarks
 4. **Maintainability**: Is the code easy to understand and modify?
 5. **Testing**: Are all scenarios adequately tested?
 
+## Architecture Patterns
+
+### 1. Template Method Pattern
+Use when multiple implementations share common algorithm structure but differ in specific steps.
+
+**Example**: Database detectors with shared detection logic
+```go
+// Base template
+type BaseDetector struct {
+    config    DatabaseDetectorConfig
+    extractor ConnectionInfoExtractor
+}
+
+func (d *BaseDetector) Detect(repoPath string) ([]DetectedDatabase, error) {
+    // Template method defining algorithm skeleton
+    databases := d.detectFromDocker(repoPath, databases)
+    databases = d.detectFromEnvironment(repoPath, databases)
+    databases = d.detectFromConfigFiles(repoPath, databases)
+    return databases, nil
+}
+```
+
+### 2. Factory Pattern
+Use for complex object creation with multiple variants.
+
+### 3. Pipeline Pattern
+Use for sequential processing steps where each step transforms data.
+
+### 4. Service Container Pattern (ADR-006)
+Use manual dependency injection for focused services:
+```go
+type ServiceContainer interface {
+    SessionStore() SessionStore
+    SessionState() SessionState
+    BuildExecutor() BuildExecutor
+    ToolRegistry() ToolRegistry
+    WorkflowExecutor() WorkflowExecutor
+    Scanner() Scanner
+    ConfigValidator() ConfigValidator
+    ErrorReporter() ErrorReporter
+}
+```
+
+## Function Design Principles
+
+### 1. Single Responsibility
+Each function should have one clear purpose.
+
+### 2. Cyclomatic Complexity < 10
+Keep functions simple with minimal branching.
+
+### 3. Parameter Limits
+Use options pattern for functions with >5 parameters.
+
+### 4. Safe Type Assertions
+Always check type assertions to prevent panics.
+
 ## Enforcement
 
 ### Automated Checks
@@ -383,11 +440,10 @@ make bench                 # Performance benchmarks
 
 - For clarification on guidelines: Open an issue with label `guidelines`
 - For tool setup: See `.devcontainer/README.md`
-- For linting issues: See `docs/LINTING.md`
-- For architecture questions: See `ARCHITECTURE.md`
+- For architecture questions: See `docs/THREE_LAYER_ARCHITECTURE.md`
 
 ---
 
-**Version**: 1.0
-**Last Updated**: 2025-06-24
-**Next Review**: Quarterly (2025-09-24)
+**Version**: 1.1
+**Last Updated**: 2025-07-07
+**Next Review**: Quarterly (2025-10-07)

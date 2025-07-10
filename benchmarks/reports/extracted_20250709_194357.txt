@@ -1,0 +1,28 @@
+BenchmarkHandleConversation-20    	time=2025-07-09T19:43:58.288-04:00 level=INFO msg="Using provided canonical orchestrator for conversation handler"
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/application/internal/conversation	2.245s
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/application/internal/retry	2.075s
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/application/internal/runtime	0.022s
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/application/workflows	0.009s
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/containerization/analyze	0.002s
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/containerization/build	0.002s
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/containerization/deploy	0.002s
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/containerization/scan	0.002s
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/errors	0.003s
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/internal/utils	0.002s
+BenchmarkStructValidation-20    	  137202	      8823 ns/op	   16237 B/op	     154 allocs/op
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/security	1.315s
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/session	0.003s
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/infra/retry	2.108s

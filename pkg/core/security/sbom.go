@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -147,7 +148,7 @@ func (s *SBOMGenerator) GenerateSBOM(ctx context.Context, source string, format 
 	// In a real implementation, this would call syft or another tool
 	packages, err := s.discoverPackages(ctx, source)
 	if err != nil {
-		return nil, fmt.Errorf("failed to discover packages: %w", err)
+		return nil, mcperrors.NewError().Messagef("failed to discover packages: %w", err).WithLocation().Build()
 	}
 
 	var result interface{}
@@ -158,7 +159,7 @@ func (s *SBOMGenerator) GenerateSBOM(ctx context.Context, source string, format 
 	case SBOMFormatCycloneDX:
 		result = s.GenerateCycloneDXBOM(source, packages)
 	default:
-		return nil, fmt.Errorf("unsupported SBOM format: %s", format)
+		return nil, mcperrors.NewError().Messagef("unsupported SBOM format: %s", format).WithLocation().Build()
 	}
 
 	duration := time.Since(startTime)
@@ -549,39 +550,43 @@ func (s *SBOMGenerator) WriteSPDX(doc *SPDXDocument, w io.Writer) error {
 func (s *SBOMGenerator) ValidateSBOM(doc *SPDXDocument) error {
 	// Basic validation
 	if doc.SPDXVersion == "" {
-		return fmt.Errorf("SPDX version is required")
+		return mcperrors.NewError().Messagef("SPDX version is required").WithLocation().Build()
 	}
 
 	if doc.DataLicense == "" {
-		return fmt.Errorf("data license is required")
+		return mcperrors.NewError().Messagef("data license is required").WithLocation().Build()
 	}
 
 	if doc.Name == "" {
-		return fmt.Errorf("document name is required")
+		return mcperrors.NewError().Messagef("document name is required").WithLocation().Build()
 	}
 
 	if doc.DocumentNamespace == "" {
-		return fmt.Errorf("document namespace is required")
+		return mcperrors.NewError().Messagef("document namespace is required").WithLocation().Build()
 	}
 
 	if len(doc.Packages) == 0 {
-		return fmt.Errorf("at least one package is required")
+		return mcperrors.NewError().Messagef("at least one package is required").WithLocation(
+
+		// Validate packages
+		).Build()
 	}
 
-	// Validate packages
 	for i, pkg := range doc.Packages {
 		if pkg.SPDXID == "" {
-			return fmt.Errorf("package %d: SPDX ID is required", i)
+			return mcperrors.NewError().Messagef("package %d: SPDX ID is required", i).WithLocation().Build()
 		}
 		if pkg.Name == "" {
-			return fmt.Errorf("package %d: name is required", i)
+			return mcperrors.NewError().Messagef("package %d: name is required", i).WithLocation().Build()
 		}
 		if pkg.DownloadLocation == "" {
-			return fmt.Errorf("package %d: download location is required", i)
+			return mcperrors.NewError().Messagef("package %d: download location is required", i).WithLocation(
+
+			// Validate relationships
+			).Build()
 		}
 	}
 
-	// Validate relationships
 	packageIDs := make(map[string]bool)
 	packageIDs["SPDXRef-DOCUMENT"] = true
 	for _, pkg := range doc.Packages {
@@ -590,10 +595,10 @@ func (s *SBOMGenerator) ValidateSBOM(doc *SPDXDocument) error {
 
 	for i, rel := range doc.Relationships {
 		if !packageIDs[rel.SPDXElementID] {
-			return fmt.Errorf("relationship %d: invalid SPDX element ID: %s", i, rel.SPDXElementID)
+			return mcperrors.NewError().Messagef("relationship %d: invalid SPDX element ID: %s", i, rel.SPDXElementID).WithLocation().Build()
 		}
 		if !packageIDs[rel.RelatedSPDXElement] {
-			return fmt.Errorf("relationship %d: invalid related SPDX element: %s", i, rel.RelatedSPDXElement)
+			return mcperrors.NewError().Messagef("relationship %d: invalid related SPDX element: %s", i, rel.RelatedSPDXElement).WithLocation().Build()
 		}
 	}
 

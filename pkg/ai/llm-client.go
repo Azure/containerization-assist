@@ -10,6 +10,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/container-kit/pkg/logger"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 type AzOpenAIClient struct {
@@ -61,7 +63,7 @@ func NewAzOpenAIClient(endpoint, apiKey, deploymentID string) (*AzOpenAIClient, 
 	keyCredential := azcore.NewKeyCredential(apiKey)
 	client, err := azopenai.NewClientWithKeyCredential(endpoint, keyCredential, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating Azure OpenAI client: %v", err)
+		return nil, mcperrors.NewError().Messagef("error creating Azure OpenAI client: %v", err).WithLocation().Build()
 	}
 	return &AzOpenAIClient{
 		client:       client,
@@ -104,13 +106,15 @@ func (c *AzOpenAIClient) GetChatCompletion(ctx context.Context, promptText strin
 		return *resp.Choices[0].Message.Content, tokenUsage, nil
 	}
 
-	return "", tokenUsage, fmt.Errorf("no completion received from LLM")
+	return "", tokenUsage, errors.NewError().Messagef("no completion received from LLM").WithLocation(
+
+	// GetChatCompletionWithFileTools sends a prompt with file‐system tools (read_file, list_directory, file_exists)
+	// LLM is given a certaim number of turns to respond, the final assistant message is returned when the final llm reply does not contain any tool calls.
+	// LLM maintains the conversation history, including the tool calls and their responses.
+	// Returns the generated response, token usage statistics, and any error that occurred.
+	).Build()
 }
 
-// GetChatCompletionWithFileTools sends a prompt with file‐system tools (read_file, list_directory, file_exists)
-// LLM is given a certaim number of turns to respond, the final assistant message is returned when the final llm reply does not contain any tool calls.
-// LLM maintains the conversation history, including the tool calls and their responses.
-// Returns the generated response, token usage statistics, and any error that occurred.
 func (c *AzOpenAIClient) GetChatCompletionWithFileTools(
 	ctx context.Context,
 	prompt, baseDir string,
@@ -140,10 +144,12 @@ func (c *AzOpenAIClient) GetChatCompletionWithFileTools(
 		logger.Debugf("    tool calls turn %d", turn)
 		resp, err := c.client.GetChatCompletions(ctx, opts, nil)
 		if err != nil {
-			return "", thisCallUsage, fmt.Errorf("chat completion failed on turn %d: %w, in GetChatCompletionWithFileTools", turn+1, err)
+			return "", thisCallUsage, mcperrors.NewError().Messagef("chat completion failed on turn %d: %w, in GetChatCompletionWithFileTools", turn+1, err).WithLocation(
+
+			// Increment token usage from this API call
+			).Build()
 		}
 
-		// Increment token usage from this API call
 		if resp.Usage != nil {
 			c.IncrementTokenUsage(resp.Usage) //Increments the global token usage
 			thisCallUsage.CompletionTokens += int(*resp.Usage.CompletionTokens)
@@ -159,10 +165,12 @@ func (c *AzOpenAIClient) GetChatCompletionWithFileTools(
 			if msg.Content != nil {
 				return *msg.Content, thisCallUsage, nil
 			}
-			return "", thisCallUsage, fmt.Errorf("empty response from LLM")
+			return "", thisCallUsage, mcperrors.NewError().Messagef("empty response from LLM").WithLocation(
+
+			// Tools were invoked
+			).Build()
 		}
 
-		// Tools were invoked
 		logger.Debugf("    invoked %d tools", len(tcalls))
 
 		// a) echo the assistant's message with tool calls into our history
@@ -237,10 +245,12 @@ func (c *AzOpenAIClient) GetChatCompletionWithFileTools(
 		opts.Messages = messages
 	}
 
-	return "", thisCallUsage, fmt.Errorf("maximum turns reached without final response")
+	return "", thisCallUsage, mcperrors.NewError().Messagef("maximum turns reached without final response").WithLocation(
+
+	// Does a GetChatCompletion but fills the promptText in %s and returns token usage
+	).Build()
 }
 
-// Does a GetChatCompletion but fills the promptText in %s and returns token usage
 func (c *AzOpenAIClient) GetChatCompletionWithFormat(ctx context.Context, promptText string, args ...interface{}) (string, TokenUsage, error) {
 	promptText = fmt.Sprintf(promptText, args...)
 	return c.GetChatCompletion(ctx, promptText)

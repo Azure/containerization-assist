@@ -517,9 +517,13 @@ func (suite *MCPWorkflowIntegrationSuite) executeWorkflowSteps(ctx context.Conte
 		"params": map[string]interface{}{
 			"name": "generate_manifests",
 			"arguments": map[string]interface{}{
-				"session_id":             sessionID,
-				"app_name":               repo.Name,
-				"image_ref":              map[string]interface{}{"image": fmt.Sprintf("localhost:5000/%s:latest", repo.Name)},
+				"session_id": sessionID,
+				"app_name":   repo.Name,
+				"image_ref": map[string]interface{}{
+					"registry":   "localhost:5000",
+					"repository": repo.Name,
+					"tag":        "latest",
+				},
 				"namespace":              "default",
 				"service_type":           "ClusterIP",
 				"replicas":               1,

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/google/uuid"
 )
 
@@ -326,37 +327,41 @@ func (s *SBOMGenerator) WriteCycloneDX(bom *CycloneDXBOM, w io.Writer) error {
 func (s *SBOMGenerator) ValidateCycloneDXBOM(bom *CycloneDXBOM) error {
 	// Basic validation
 	if bom.BOMFormat != "CycloneDX" {
-		return fmt.Errorf("invalid BOM format: %s", bom.BOMFormat)
+		return mcperrors.NewError().Messagef("invalid BOM format: %s", bom.BOMFormat).WithLocation().Build()
 	}
 
 	if bom.SpecVersion == "" {
-		return fmt.Errorf("spec version is required")
+		return mcperrors.NewError().Messagef("spec version is required").WithLocation().Build()
 	}
 
 	if bom.SerialNumber == "" {
-		return fmt.Errorf("serial number is required")
+		return mcperrors.NewError().Messagef("serial number is required").WithLocation().Build()
 	}
 
 	if bom.Version < 1 {
-		return fmt.Errorf("version must be >= 1")
+		return mcperrors.NewError().Messagef("version must be >= 1").WithLocation(
+
+		// Validate components
+		).Build()
 	}
 
-	// Validate components
 	bomRefs := make(map[string]bool)
 	for i, component := range bom.Components {
 		if component.Type == "" {
-			return fmt.Errorf("component %d: type is required", i)
+			return mcperrors.NewError().Messagef("component %d: type is required", i).WithLocation().Build()
 		}
 		if component.BOMRef == "" {
-			return fmt.Errorf("component %d: bom-ref is required", i)
+			return mcperrors.NewError().Messagef("component %d: bom-ref is required", i).WithLocation().Build()
 		}
 		if component.Name == "" {
-			return fmt.Errorf("component %d: name is required", i)
+			return mcperrors.NewError().Messagef("component %d: name is required", i).WithLocation(
+
+			// Check for duplicate BOM refs
+			).Build()
 		}
 
-		// Check for duplicate BOM refs
 		if bomRefs[component.BOMRef] {
-			return fmt.Errorf("duplicate bom-ref: %s", component.BOMRef)
+			return mcperrors.NewError().Messagef("duplicate bom-ref: %s", component.BOMRef).WithLocation().Build()
 		}
 		bomRefs[component.BOMRef] = true
 	}
@@ -369,12 +374,12 @@ func (s *SBOMGenerator) ValidateCycloneDXBOM(bom *CycloneDXBOM) error {
 	// Validate dependencies
 	for i, dep := range bom.Dependencies {
 		if !bomRefs[dep.Ref] {
-			return fmt.Errorf("dependency %d: unknown ref: %s", i, dep.Ref)
+			return mcperrors.NewError().Messagef("dependency %d: unknown ref: %s", i, dep.Ref).WithLocation().Build()
 		}
 
 		for j, depRef := range dep.DependsOn {
 			if !bomRefs[depRef] {
-				return fmt.Errorf("dependency %d, dependsOn %d: unknown ref: %s", i, j, depRef)
+				return mcperrors.NewError().Messagef("dependency %d, dependsOn %d: unknown ref: %s", i, j, depRef).WithLocation().Build()
 			}
 		}
 	}

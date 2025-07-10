@@ -114,8 +114,14 @@ func ReadFileTree(root string, maxDepth int) (string, error) {
 				if _, exists := current[part]; !exists {
 					current[part] = make(map[string]interface{})
 				}
-				// Move deeper into the tree
-				current = current[part].(map[string]interface{})
+				// Move deeper into the tree - safely check type assertion
+				if nextLevel, ok := current[part].(map[string]interface{}); ok {
+					current = nextLevel
+				} else {
+					// Handle unexpected type - create a new map
+					current[part] = make(map[string]interface{})
+					current = current[part].(map[string]interface{})
+				}
 			}
 		}
 

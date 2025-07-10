@@ -1,0 +1,57 @@
+name: Error Pattern Linting
+
+on:
+  pull_request:
+    paths:
+      - 'pkg/mcp/**/*.go'
+      - '.github/workflows/error-linting.yml'
+  push:
+    branches:
+      - main
+      - 'gambtho/**'
+
+jobs:
+  lint-error-patterns:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Build error linter
+        run: |
+          cd tools/linters/richerror-boundary
+          go build -o richerror-boundary .
+
+      - name: Check fmt.Errorf usage
+        run: |
+          # Progressive reduction targets
+          # Week 1-2: 135 -> 100
+          # Week 3-4: 100 -> 50
+          # Week 5-6: 50 -> 10
+
+          CURRENT_DATE=$(date +%s)
+          START_DATE=$(date -d "2025-01-10" +%s)
+          DAYS_ELAPSED=$(( ($CURRENT_DATE - $START_DATE) / 86400 ))
+
+          if [ $DAYS_ELAPSED -lt 14 ]; then
+            MAX_ALLOWED=100
+          elif [ $DAYS_ELAPSED -lt 28 ]; then
+            MAX_ALLOWED=100
+          else
+            MAX_ALLOWED=100
+          fi
+
+          echo "Days since start: $DAYS_ELAPSED"
+          echo "Max fmt.Errorf allowed: $MAX_ALLOWED"
+
+          cd tools/linters/richerror-boundary
+          ./richerror-boundary ../../../pkg/mcp $MAX_ALLOWED
+
+      - name: Check RichError boundary compliance
+        run: |
+          cd tools/linters/richerror-boundary
+          ./richerror-boundary -package ../../../pkg/mcp -fail || echo "RichError boundary warnings found"

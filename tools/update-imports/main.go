@@ -20,29 +20,30 @@ var (
 	file    = flag.String("file", "", "Update specific file")
 	dryRun  = flag.Bool("dry-run", false, "Show changes without applying them")
 	verbose = flag.Bool("verbose", false, "Verbose output")
+	mcpOnly = flag.Bool("mcp-only", true, "Only update MCP package files (default: true)")
 )
 
 // Import path mappings based on the new package structure
 var importMappings = map[string]string{
 	// Package restructuring - flattened structure
-	"github.com/tng/workspace/prod/pkg/mcp/internal/engine":               "github.com/tng/workspace/prod/pkg/mcp/internal/runtime",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/runtime/conversation": "github.com/tng/workspace/prod/pkg/mcp/internal/runtime/conversation",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/security":       "github.com/tng/workspace/prod/pkg/mcp/internal/scan",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/analysis":       "github.com/tng/workspace/prod/pkg/mcp/internal/analyze",
+	"github.com/Azure/container-kit/pkg/mcp/internal/engine":                   "github.com/Azure/container-kit/pkg/mcp/application/internal/runtime",
+	"github.com/Azure/container-kit/pkg/mcp/application/internal/conversation": "github.com/Azure/container-kit/pkg/mcp/application/internal/conversation",
+	"github.com/Azure/container-kit/pkg/mcp/internal/tools/security":           "github.com/Azure/container-kit/pkg/mcp/internal/scan",
+	"github.com/Azure/container-kit/pkg/mcp/internal/tools/analysis":           "github.com/Azure/container-kit/pkg/mcp/internal/analyze",
 
 	// Session consolidation
-	"github.com/tng/workspace/prod/pkg/mcp/internal/store/session": "github.com/tng/workspace/prod/pkg/mcp/internal/session",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/types/session": "github.com/tng/workspace/prod/pkg/mcp/internal/session",
+	"github.com/Azure/container-kit/pkg/mcp/internal/store/session": "github.com/Azure/container-kit/pkg/mcp/internal/session",
+	"github.com/Azure/container-kit/pkg/mcp/shared/session":         "github.com/Azure/container-kit/pkg/mcp/internal/session",
 
 	// Workflow simplification
-	"github.com/tng/workspace/prod/pkg/mcp/internal/orchestration/workflow": "github.com/tng/workspace/prod/pkg/mcp/internal/workflow",
+	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration/workflow": "github.com/Azure/container-kit/pkg/mcp/internal/workflow",
 
 	// Observability package
-	"github.com/tng/workspace/prod/pkg/logger":           "github.com/tng/workspace/prod/pkg/mcp/internal/observability",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/ops": "github.com/tng/workspace/prod/pkg/mcp/internal/observability",
+	"github.com/Azure/container-kit/pkg/logger":           "github.com/Azure/container-kit/pkg/mcp/internal/observability",
+	"github.com/Azure/container-kit/pkg/mcp/internal/ops": "github.com/Azure/container-kit/pkg/mcp/internal/observability",
 
 	// Validation package
-	"github.com/tng/workspace/prod/pkg/mcp/internal/validate": "github.com/tng/workspace/prod/pkg/mcp/internal/validate",
+	"github.com/Azure/container-kit/pkg/mcp/internal/validate": "github.com/Azure/container-kit/pkg/mcp/internal/validate",
 }
 
 func main() {
@@ -113,7 +114,13 @@ func main() {
 func findAllGoFiles() ([]string, error) {
 	var files []string
 
-	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
+	// Start from pkg/mcp if mcp-only is enabled
+	startPath := "."
+	if *mcpOnly && !*all {
+		startPath = "pkg/mcp"
+	}
+
+	err := filepath.WalkDir(startPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -121,6 +128,14 @@ func findAllGoFiles() ([]string, error) {
 		// Skip vendor and .git directories
 		if d.IsDir() && (d.Name() == "vendor" || d.Name() == ".git") {
 			return filepath.SkipDir
+		}
+
+		// If mcp-only is enabled and -all is not set, only include MCP files
+		if *mcpOnly && !*all && !strings.Contains(path, "pkg/mcp") {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 
 		if !d.IsDir() && strings.HasSuffix(path, ".go") {

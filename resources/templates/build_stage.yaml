@@ -1,0 +1,43 @@
+name: build_stage
+description: Reusable build stage template
+version: 1.0.0
+type: build
+
+parameters:
+  - name: context
+    type: string
+    required: true
+  - name: dockerfile
+    type: string
+    default: Dockerfile
+  - name: build_args
+    type: map
+    default: {}
+  - name: target
+    type: string
+    required: false
+
+steps:
+  - name: validate_context
+    action: validate_path
+    parameters:
+      path: "{{ .context }}"
+
+  - name: check_dockerfile
+    action: validate_file
+    parameters:
+      file: "{{ .context }}/{{ .dockerfile }}"
+
+  - name: execute_build
+    action: docker_build
+    parameters:
+      context: "{{ .context }}"
+      dockerfile: "{{ .dockerfile }}"
+      args: "{{ .build_args }}"
+      target: "{{ .target }}"
+
+retry:
+  max_attempts: 3
+  backoff: exponential
+
+timeout: 30m

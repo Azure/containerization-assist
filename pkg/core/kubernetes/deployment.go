@@ -9,8 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"log/slog"
+
 	"github.com/Azure/container-kit/pkg/clients"
-	"github.com/rs/zerolog"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"sigs.k8s.io/yaml"
 )
 
@@ -63,17 +65,29 @@ type RollbackConfig struct {
 	ToRevision   int // Optional - if 0, rollback to previous revision
 }
 
-// DeploymentManager provides mechanical Kubernetes deployment operations
-type DeploymentManager struct {
-	clients *clients.Clients
-	logger  zerolog.Logger
+// Service provides a unified interface to Kubernetes deployment operations
+type Service interface {
+	// Deployment operations
+	DeployManifest(ctx context.Context, manifestPath string, options DeploymentOptions) (*DeploymentResult, error)
+	ValidateDeployment(ctx context.Context, manifestPath string, namespace string) (*ValidationResult, error)
+	DeleteDeployment(ctx context.Context, manifestPath string) (*DeploymentResult, error)
+
+	// Cluster operations
+	CheckClusterConnection(ctx context.Context) error
+	PreviewChanges(ctx context.Context, manifestPath string, namespace string) (string, error)
 }
 
-// NewDeploymentManager creates a new deployment manager
-func NewDeploymentManager(clients *clients.Clients, logger zerolog.Logger) *DeploymentManager {
-	return &DeploymentManager{
+// ServiceImpl implements the deployment Service interface
+type ServiceImpl struct {
+	clients *clients.Clients
+	logger  *slog.Logger
+}
+
+// NewService creates a new deployment service
+func NewService(clients *clients.Clients, logger *slog.Logger) Service {
+	return &ServiceImpl{
 		clients: clients,
-		logger:  logger.With().Str("component", "k8s_deployment_manager").Logger(),
+		logger:  logger.With("component", "k8s_deployment_service"),
 	}
 }
 
@@ -152,8 +166,10 @@ type DeploymentOptions struct {
 	Validate    bool
 }
 
+// Service methods implementing the Service interface
+
 // DeployManifest deploys a Kubernetes manifest file
-func (dm *DeploymentManager) DeployManifest(ctx context.Context, manifestPath string, options DeploymentOptions) (*DeploymentResult, error) {
+func (s *ServiceImpl) DeployManifest(ctx context.Context, manifestPath string, options DeploymentOptions) (*DeploymentResult, error) {
 	startTime := time.Now()
 
 	result := &DeploymentResult{
@@ -163,14 +179,13 @@ func (dm *DeploymentManager) DeployManifest(ctx context.Context, manifestPath st
 		Context:      make(map[string]interface{}),
 	}
 
-	dm.logger.Info().
-		Str("manifest_path", manifestPath).
-		Str("namespace", options.Namespace).
-		Bool("dry_run", options.DryRun).
-		Msg("Starting manifest deployment")
+	s.logger.Info("Starting manifest deployment",
+		"manifest_path", manifestPath,
+		"namespace", options.Namespace,
+		"dry_run", options.DryRun)
 
 	// Validate inputs
-	if err := dm.validateDeploymentInputs(manifestPath, options); err != nil {
+	if err := s.validateDeploymentInputs(manifestPath, options); err != nil {
 		result.Error = &DeploymentError{
 			Type:         "validation_error",
 			Message:      err.Error(),
@@ -184,7 +199,7 @@ func (dm *DeploymentManager) DeployManifest(ctx context.Context, manifestPath st
 	}
 
 	// Check kubectl installation
-	if err := dm.checkKubectlInstalled(); err != nil {
+	if err := s.checkKubectlInstalled(); err != nil {
 		result.Error = &DeploymentError{
 			Type:         "kubectl_error",
 			Message:      err.Error(),
@@ -206,15 +221,15 @@ func (dm *DeploymentManager) DeployManifest(ctx context.Context, manifestPath st
 	}
 
 	// Execute deployment using the existing clients
-	output, err := dm.clients.Kube.Apply(deployCtx, manifestPath)
+	output, err := s.clients.Kube.Apply(deployCtx, manifestPath)
 	result.Output = output
 	result.Duration = time.Since(startTime)
 
 	if err != nil {
-		dm.logger.Error().Err(err).Str("output", output).Msg("Manifest deployment failed")
+		s.logger.Error("Manifest deployment failed", "error", err, "output", output)
 
 		result.Error = &DeploymentError{
-			Type:         dm.categorizeError(err, output),
+			Type:         s.categorizeError(err, output),
 			Message:      fmt.Sprintf("Deployment failed: %v", err),
 			ManifestPath: manifestPath,
 			Output:       output,
@@ -227,13 +242,13 @@ func (dm *DeploymentManager) DeployManifest(ctx context.Context, manifestPath st
 	}
 
 	// Extract deployed resources from output
-	result.Resources = dm.parseDeploymentOutput(output)
+	result.Resources = s.parseDeploymentOutput(output)
 
 	// If validation is requested, validate the deployment
 	if options.Validate {
-		validationResult, err := dm.ValidateDeployment(ctx, manifestPath, options.Namespace)
+		validationResult, err := s.ValidateDeployment(ctx, manifestPath, options.Namespace)
 		if err != nil {
-			dm.logger.Warn().Err(err).Msg("Failed to validate deployment")
+			s.logger.Warn("Failed to validate deployment", "error", err)
 		} else {
 			result.Context["validation"] = validationResult
 			result.Success = validationResult.Success
@@ -249,18 +264,17 @@ func (dm *DeploymentManager) DeployManifest(ctx context.Context, manifestPath st
 		"dry_run":         options.DryRun,
 	}
 
-	dm.logger.Info().
-		Str("manifest_path", manifestPath).
-		Int("resource_count", len(result.Resources)).
-		Bool("success", result.Success).
-		Dur("duration", result.Duration).
-		Msg("Manifest deployment completed")
+	s.logger.Info("Manifest deployment completed",
+		"manifest_path", manifestPath,
+		"resource_count", len(result.Resources),
+		"success", result.Success,
+		"duration", result.Duration)
 
 	return result, nil
 }
 
 // ValidateDeployment validates that deployed resources are healthy
-func (dm *DeploymentManager) ValidateDeployment(ctx context.Context, manifestPath string, namespace string) (*ValidationResult, error) {
+func (s *ServiceImpl) ValidateDeployment(ctx context.Context, manifestPath string, namespace string) (*ValidationResult, error) {
 	startTime := time.Now()
 
 	result := &ValidationResult{
@@ -273,13 +287,12 @@ func (dm *DeploymentManager) ValidateDeployment(ctx context.Context, manifestPat
 		namespace = "default"
 	}
 
-	dm.logger.Info().
-		Str("manifest_path", manifestPath).
-		Str("namespace", namespace).
-		Msg("Starting deployment validation")
+	s.logger.Info("Starting deployment validation",
+		"manifest_path", manifestPath,
+		"namespace", namespace)
 
 	// Get pod status
-	podsOutput, err := dm.clients.Kube.GetPods(ctx, namespace, "")
+	podsOutput, err := s.clients.Kube.GetPods(ctx, namespace, "")
 	if err != nil {
 		result.Error = &DeploymentError{
 			Type:    "kubectl_error",
@@ -291,7 +304,7 @@ func (dm *DeploymentManager) ValidateDeployment(ctx context.Context, manifestPat
 	}
 
 	// Parse pod information
-	result.Pods = dm.parsePodStatus(podsOutput)
+	result.Pods = s.parsePodStatus(podsOutput)
 
 	// Count ready pods
 	for _, pod := range result.Pods {
@@ -312,18 +325,17 @@ func (dm *DeploymentManager) ValidateDeployment(ctx context.Context, manifestPat
 		"pods_total":      result.PodsTotal,
 	}
 
-	dm.logger.Info().
-		Int("pods_ready", result.PodsReady).
-		Int("pods_total", result.PodsTotal).
-		Bool("success", result.Success).
-		Dur("duration", result.Duration).
-		Msg("Deployment validation completed")
+	s.logger.Info("Deployment validation completed",
+		"pods_ready", result.PodsReady,
+		"pods_total", result.PodsTotal,
+		"success", result.Success,
+		"duration", result.Duration)
 
 	return result, nil
 }
 
 // DeleteDeployment deletes a deployed manifest
-func (dm *DeploymentManager) DeleteDeployment(ctx context.Context, manifestPath string) (*DeploymentResult, error) {
+func (s *ServiceImpl) DeleteDeployment(ctx context.Context, manifestPath string) (*DeploymentResult, error) {
 	startTime := time.Now()
 
 	result := &DeploymentResult{
@@ -332,18 +344,18 @@ func (dm *DeploymentManager) DeleteDeployment(ctx context.Context, manifestPath 
 		Context:      make(map[string]interface{}),
 	}
 
-	dm.logger.Info().Str("manifest_path", manifestPath).Msg("Starting deployment deletion")
+	s.logger.Info("Starting deployment deletion", "manifest_path", manifestPath)
 
 	// Execute deletion using the existing clients
-	output, err := dm.clients.Kube.DeleteDeployment(ctx, manifestPath)
+	output, err := s.clients.Kube.DeleteDeployment(ctx, manifestPath)
 	result.Output = output
 	result.Duration = time.Since(startTime)
 
 	if err != nil {
-		dm.logger.Error().Err(err).Str("output", output).Msg("Deployment deletion failed")
+		s.logger.Error("Deployment deletion failed", "error", err, "output", output)
 
 		result.Error = &DeploymentError{
-			Type:         dm.categorizeError(err, output),
+			Type:         s.categorizeError(err, output),
 			Message:      fmt.Sprintf("Deletion failed: %v", err),
 			ManifestPath: manifestPath,
 			Output:       output,
@@ -356,66 +368,64 @@ func (dm *DeploymentManager) DeleteDeployment(ctx context.Context, manifestPath 
 		"deletion_time": result.Duration.Seconds(),
 	}
 
-	dm.logger.Info().
-		Str("manifest_path", manifestPath).
-		Dur("duration", result.Duration).
-		Msg("Deployment deletion completed successfully")
+	s.logger.Info("Deployment deletion completed successfully",
+		"manifest_path", manifestPath,
+		"duration", result.Duration)
 
 	return result, nil
 }
 
 // CheckClusterConnection verifies connection to the Kubernetes cluster
-func (dm *DeploymentManager) CheckClusterConnection(ctx context.Context) error {
+func (s *ServiceImpl) CheckClusterConnection(ctx context.Context) error {
 	// Try a simple kubectl command to verify cluster connection
-	output, err := dm.clients.Kube.GetPods(ctx, "kube-system", "")
+	output, err := s.clients.Kube.GetPods(ctx, "kube-system", "")
 	if err != nil {
-		return fmt.Errorf("cannot connect to Kubernetes cluster: %v (output: %s)", err, output)
+		return mcperrors.NewError().Messagef("cannot connect to Kubernetes cluster: %v (output: %s)", err, output).WithLocation().Build()
 	}
 	return nil
 }
 
 // PreviewChanges runs kubectl diff to preview what would change
-func (dm *DeploymentManager) PreviewChanges(ctx context.Context, manifestPath string, namespace string) (string, error) {
-	dm.logger.Info().
-		Str("manifest_path", manifestPath).
-		Str("namespace", namespace).
-		Msg("Running kubectl diff to preview changes")
+func (s *ServiceImpl) PreviewChanges(ctx context.Context, manifestPath string, namespace string) (string, error) {
+	s.logger.Info("Running kubectl diff to preview changes",
+		"manifest_path", manifestPath,
+		"namespace", namespace)
 
 	// kubectl diff shows what would change if the manifest were applied
-	output, err := dm.executeKubectlDiff(ctx, manifestPath, namespace)
+	output, err := s.executeKubectlDiff(ctx, manifestPath, namespace)
 
 	// kubectl diff returns exit code 1 when there are differences (normal behavior)
 	// Only log as error if output is empty (real failure)
 	if err != nil && output == "" {
-		dm.logger.Error().Err(err).Msg("kubectl diff failed")
-		return "", fmt.Errorf("failed to preview changes: %w", err)
+		s.logger.Error("kubectl diff failed", "error", err)
+		return "", mcperrors.NewError().Messagef("failed to preview changes: %w", err).WithLocation().Build()
 	}
 
 	if output == "" {
-		dm.logger.Info().Msg("No changes detected by kubectl diff")
+		s.logger.Info("No changes detected by kubectl diff")
 	} else {
-		dm.logger.Info().Msg("kubectl diff found changes")
+		s.logger.Info("kubectl diff found changes")
 	}
 
 	return output, nil
 }
 
-// Helper methods
+// Service helper methods
 
-func (dm *DeploymentManager) validateDeploymentInputs(manifestPath string, options DeploymentOptions) error {
+func (s *ServiceImpl) validateDeploymentInputs(manifestPath string, _ DeploymentOptions) error {
 	if manifestPath == "" {
 		return fmt.Errorf("manifest path is required")
 	}
 
 	// Check if manifest file exists
-	if err := dm.validateManifestFile(manifestPath); err != nil {
+	if err := s.validateManifestFile(manifestPath); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (dm *DeploymentManager) validateManifestFile(manifestPath string) error {
+func (s *ServiceImpl) validateManifestFile(manifestPath string) error {
 	info, err := os.Stat(manifestPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -463,7 +473,7 @@ func (dm *DeploymentManager) validateManifestFile(manifestPath string) error {
 	return nil
 }
 
-func (dm *DeploymentManager) checkKubectlInstalled() error {
+func (s *ServiceImpl) checkKubectlInstalled() error {
 	if _, err := exec.LookPath("kubectl"); err != nil {
 		return fmt.Errorf("kubectl executable not found in PATH. Please install kubectl")
 	}
@@ -477,7 +487,7 @@ func (dm *DeploymentManager) checkKubectlInstalled() error {
 	return nil
 }
 
-func (dm *DeploymentManager) categorizeError(err error, output string) string {
+func (s *ServiceImpl) categorizeError(err error, output string) string {
 	errStr := strings.ToLower(err.Error())
 	outputStr := strings.ToLower(output)
 
@@ -508,7 +518,7 @@ func (dm *DeploymentManager) categorizeError(err error, output string) string {
 	return "kubectl_error"
 }
 
-func (dm *DeploymentManager) parseDeploymentOutput(output string) []DeployedResource {
+func (s *ServiceImpl) parseDeploymentOutput(output string) []DeployedResource {
 	resources := make([]DeployedResource, 0)
 
 	lines := strings.Split(output, "\n")
@@ -548,7 +558,7 @@ func (dm *DeploymentManager) parseDeploymentOutput(output string) []DeployedReso
 	return resources
 }
 
-func (dm *DeploymentManager) parsePodStatus(output string) []PodStatus {
+func (s *ServiceImpl) parsePodStatus(output string) []PodStatus {
 	pods := make([]PodStatus, 0)
 
 	lines := strings.Split(output, "\n")
@@ -584,7 +594,7 @@ func (dm *DeploymentManager) parsePodStatus(output string) []PodStatus {
 }
 
 // executeKubectlDiff runs kubectl diff to preview deployment changes
-func (dm *DeploymentManager) executeKubectlDiff(ctx context.Context, manifestPath, namespace string) (string, error) {
+func (s *ServiceImpl) executeKubectlDiff(ctx context.Context, manifestPath, namespace string) (string, error) {
 	args := []string{"diff", "-f", manifestPath}
 	if namespace != "" && namespace != "default" {
 		args = append(args, "-n", namespace)

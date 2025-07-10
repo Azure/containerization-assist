@@ -6,37 +6,38 @@ package git
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/rs/zerolog"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // Manager provides Git operations for repository management
 type Manager struct {
-	logger zerolog.Logger
+	logger *slog.Logger
 	jail   *FilesystemJail
 }
 
 // NewManager creates a new Git manager
-func NewManager(logger zerolog.Logger) *Manager {
+func NewManager(logger *slog.Logger) *Manager {
 	return &Manager{
-		logger: logger.With().Str("component", "git_manager").Logger(),
+		logger: logger.With("component", "git_manager"),
 	}
 }
 
 // NewSecureManager creates a new Git manager with filesystem jail
-func NewSecureManager(logger zerolog.Logger, securityOpts *SecurityOptions) (*Manager, error) {
+func NewSecureManager(logger *slog.Logger, securityOpts *SecurityOptions) (*Manager, error) {
 	jail, err := NewFilesystemJail(securityOpts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create filesystem jail: %w", err)
+		return nil, mcperrors.NewError().Messagef("failed to create filesystem jail: %w", err).WithLocation().Build()
 	}
 
 	return &Manager{
-		logger: logger.With().Str("component", "git_manager").Logger(),
+		logger: logger.With("component", "git_manager"),
 		jail:   jail,
 	}, nil
 }
@@ -52,6 +53,7 @@ type CloneOptions struct {
 	AuthToken    string
 	AuthUsername string
 	AuthPassword string
+	TargetDir    string
 }
 
 // CloneResult contains the result of a clone operation
@@ -84,11 +86,10 @@ func (gm *Manager) CloneRepository(ctx context.Context, targetDir string, option
 		Context:   make(map[string]interface{}),
 	}
 
-	gm.logger.Info().
-		Str("repo_url", options.URL).
-		Str("target_dir", targetDir).
-		Str("branch", options.Branch).
-		Msg("Starting Git clone")
+	gm.logger.Info("Starting Git clone",
+		"repo_url", options.URL,
+		"target_dir", targetDir,
+		"branch", options.Branch)
 
 	// Validate inputs
 	if err := gm.validateCloneInputs(targetDir, options); err != nil {
@@ -137,7 +138,7 @@ func (gm *Manager) CloneRepository(ctx context.Context, targetDir string, option
 			return result, nil
 		}
 		targetDir = securePath
-		gm.logger.Debug().Str("secure_path", targetDir).Msg("Using secured target path")
+		gm.logger.Debug("Using secured target path", "secure_path", targetDir)
 	}
 
 	// Check Git installation
@@ -179,7 +180,7 @@ func (gm *Manager) CloneRepository(ctx context.Context, targetDir string, option
 	// Perform the clone
 	output, err := gm.executeClone(cloneCtx, targetDir, options)
 	if err != nil {
-		gm.logger.Error().Err(err).Str("output", output).Msg("Git clone failed")
+		gm.logger.Error("Git clone failed", "error", err, "output", output)
 
 		result.Error = &GitError{
 			Type:    gm.categorizeError(err, output),
@@ -198,7 +199,7 @@ func (gm *Manager) CloneRepository(ctx context.Context, targetDir string, option
 	// Get repository information
 	repoInfo, err := gm.getRepositoryInfo(targetDir)
 	if err != nil {
-		gm.logger.Warn().Err(err).Msg("Failed to get repository info after clone")
+		gm.logger.Warn("Failed to get repository info after clone", "error", err)
 		// Don't fail the clone for this
 	} else {
 		result.Branch = repoInfo.Branch
@@ -217,12 +218,11 @@ func (gm *Manager) CloneRepository(ctx context.Context, targetDir string, option
 		"single_branch": options.SingleBranch,
 	}
 
-	gm.logger.Info().
-		Str("repo_url", options.URL).
-		Str("repo_path", result.RepoPath).
-		Str("branch", result.Branch).
-		Dur("duration", result.Duration).
-		Msg("Git clone completed successfully")
+	gm.logger.Info("Git clone completed successfully",
+		"repo_url", options.URL,
+		"repo_path", result.RepoPath,
+		"branch", result.Branch,
+		"duration", result.Duration)
 
 	return result, nil
 }

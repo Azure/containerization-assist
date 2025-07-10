@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/rs/zerolog"
 	"gopkg.in/yaml.v3"
 )
@@ -37,78 +38,96 @@ type CustomizeOptions struct {
 func (mc *ManifestCustomizer) CustomizeDeployment(manifestPath string, options CustomizeOptions) error {
 	content, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return fmt.Errorf("reading deployment manifest: %w", err)
+		return mcperrors.NewError().Messagef("reading deployment manifest: %w", err).WithLocation().Build()
 	}
 
 	var deployment map[string]interface{}
 	if err := yaml.Unmarshal(content, &deployment); err != nil {
-		return fmt.Errorf("parsing deployment YAML: %w", err)
+		return mcperrors.NewError().Messagef("parsing deployment YAML: %w", err).WithLocation(
+
+		// Update image reference
+		).Build()
 	}
 
-	// Update image reference
 	if options.ImageRef != "" {
 		if err := mc.updateImageInDeployment(deployment, options.ImageRef); err != nil {
-			return fmt.Errorf("updating image reference: %w", err)
+			return mcperrors.NewError().Messagef("updating image reference: %w", err).WithLocation(
+
+			// Update app name
+			).Build()
 		}
 	}
 
-	// Update app name
 	if options.AppName != "" {
 		if err := mc.updateAppNameInDeployment(deployment, options.AppName); err != nil {
-			return fmt.Errorf("updating app name: %w", err)
+			return mcperrors.NewError().Messagef("updating app name: %w", err).WithLocation(
+
+			// Update namespace
+			).Build()
 		}
 	}
 
-	// Update namespace
 	if options.Namespace != "" {
 		if err := mc.updateNamespaceInManifest(deployment, options.Namespace); err != nil {
-			return fmt.Errorf("updating namespace: %w", err)
+			return mcperrors.NewError().Messagef("updating namespace: %w", err).WithLocation(
+
+			// Update replicas
+			).Build()
 		}
 	}
 
-	// Update replicas
 	if options.Replicas > 0 {
 		if err := mc.updateReplicasInDeployment(deployment, options.Replicas); err != nil {
-			return fmt.Errorf("updating replicas: %w", err)
+			return mcperrors.NewError().Messagef("updating replicas: %w", err).WithLocation(
+
+			// Update port
+			).Build()
 		}
 	}
 
-	// Update port
 	if options.Port > 0 {
 		if err := mc.updatePortInDeployment(deployment, options.Port); err != nil {
-			return fmt.Errorf("updating port: %w", err)
+			return mcperrors.NewError().Messagef("updating port: %w", err).WithLocation(
+
+			// Update labels
+			).Build()
 		}
 	}
 
-	// Update labels
 	if len(options.Labels) > 0 {
 		if err := mc.updateLabelsInDeployment(deployment, options.Labels); err != nil {
-			return fmt.Errorf("updating labels: %w", err)
+			return mcperrors.NewError().Messagef("updating labels: %w", err).WithLocation(
+
+			// Update annotations
+			).Build()
 		}
 	}
 
-	// Update annotations
 	if len(options.Annotations) > 0 {
 		if err := mc.updateAnnotationsInDeployment(deployment, options.Annotations); err != nil {
-			return fmt.Errorf("updating annotations: %w", err)
+			return mcperrors.NewError().Messagef("updating annotations: %w", err).WithLocation(
+
+			// Update environment variables
+			).Build()
 		}
 	}
 
-	// Update environment variables
 	if len(options.EnvVars) > 0 {
 		if err := mc.updateEnvVarsInDeployment(deployment, options.EnvVars); err != nil {
-			return fmt.Errorf("updating environment variables: %w", err)
+			return mcperrors.NewError().Messagef("updating environment variables: %w", err).WithLocation(
+
+			// Write back the updated manifest
+			).Build()
 		}
 	}
 
-	// Write back the updated manifest
 	updatedContent, err := yaml.Marshal(deployment)
 	if err != nil {
-		return fmt.Errorf("marshaling updated deployment YAML: %w", err)
+		return mcperrors.NewError().Messagef("marshaling updated deployment YAML: %w", err).WithLocation().Build()
 	}
 
 	if err := os.WriteFile(manifestPath, updatedContent, 0644); err != nil {
-		return fmt.Errorf("writing updated deployment manifest: %w", err)
+		return mcperrors.NewError().Messagef("writing updated deployment manifest: %w", err).WithLocation().Build()
 	}
 
 	mc.logger.Debug().
@@ -123,57 +142,69 @@ func (mc *ManifestCustomizer) CustomizeDeployment(manifestPath string, options C
 func (mc *ManifestCustomizer) CustomizeService(manifestPath string, options CustomizeOptions) error {
 	content, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return fmt.Errorf("reading service manifest: %w", err)
+		return mcperrors.NewError().Messagef("reading service manifest: %w", err).WithLocation().Build()
 	}
 
 	var service map[string]interface{}
 	if err := yaml.Unmarshal(content, &service); err != nil {
-		return fmt.Errorf("parsing service YAML: %w", err)
+		return mcperrors.NewError().Messagef("parsing service YAML: %w", err).WithLocation(
+
+		// Update app name
+		).Build()
 	}
 
-	// Update app name
 	if options.AppName != "" {
 		if err := mc.updateAppNameInService(service, options.AppName); err != nil {
-			return fmt.Errorf("updating app name: %w", err)
+			return mcperrors.NewError().Messagef("updating app name: %w", err).WithLocation(
+
+			// Update namespace
+			).Build()
 		}
 	}
 
-	// Update namespace
 	if options.Namespace != "" {
 		if err := mc.updateNamespaceInManifest(service, options.Namespace); err != nil {
-			return fmt.Errorf("updating namespace: %w", err)
+			return mcperrors.NewError().Messagef("updating namespace: %w", err).WithLocation(
+
+			// Update service type
+			).Build()
 		}
 	}
 
-	// Update service type
 	if options.ServiceType != "" {
 		if err := mc.updateServiceType(service, options.ServiceType); err != nil {
-			return fmt.Errorf("updating service type: %w", err)
+			return mcperrors.NewError().Messagef("updating service type: %w", err).WithLocation(
+
+			// Update port
+			).Build()
 		}
 	}
 
-	// Update port
 	if options.Port > 0 {
 		if err := mc.updatePortInService(service, options.Port); err != nil {
-			return fmt.Errorf("updating port: %w", err)
+			return mcperrors.NewError().Messagef("updating port: %w", err).WithLocation(
+
+			// Update labels
+			).Build()
 		}
 	}
 
-	// Update labels
 	if len(options.Labels) > 0 {
 		if err := mc.updateLabelsInService(service, options.Labels); err != nil {
-			return fmt.Errorf("updating labels: %w", err)
+			return mcperrors.NewError().Messagef("updating labels: %w", err).WithLocation(
+
+			// Write back the updated manifest
+			).Build()
 		}
 	}
 
-	// Write back the updated manifest
 	updatedContent, err := yaml.Marshal(service)
 	if err != nil {
-		return fmt.Errorf("marshaling updated service YAML: %w", err)
+		return mcperrors.NewError().Messagef("marshaling updated service YAML: %w", err).WithLocation().Build()
 	}
 
 	if err := os.WriteFile(manifestPath, updatedContent, 0644); err != nil {
-		return fmt.Errorf("writing updated service manifest: %w", err)
+		return mcperrors.NewError().Messagef("writing updated service manifest: %w", err).WithLocation().Build()
 	}
 
 	mc.logger.Debug().
@@ -342,50 +373,60 @@ func (mc *ManifestCustomizer) updateEnvVarsInDeployment(deployment map[string]in
 func (mc *ManifestCustomizer) CustomizeConfigMap(manifestPath string, options CustomizeOptions) error {
 	content, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return fmt.Errorf("reading configmap manifest: %w", err)
+		return mcperrors.NewError().Messagef("reading configmap manifest: %w", err).WithLocation().Build()
 	}
 
 	var configMap map[string]interface{}
 	if err := yaml.Unmarshal(content, &configMap); err != nil {
-		return fmt.Errorf("parsing configmap YAML: %w", err)
+		return mcperrors.NewError().Messagef("parsing configmap YAML: %w", err).WithLocation(
+
+		// Update app name
+		).Build()
 	}
 
-	// Update app name
 	if options.AppName != "" {
 		if err := mc.updateAppNameInConfigMap(configMap, options.AppName); err != nil {
-			return fmt.Errorf("updating app name: %w", err)
+			return mcperrors.NewError().Messagef("updating app name: %w", err).WithLocation(
+
+			// Update namespace
+			).Build()
 		}
 	}
 
-	// Update namespace
 	if options.Namespace != "" {
 		if err := mc.updateNamespaceInManifest(configMap, options.Namespace); err != nil {
-			return fmt.Errorf("updating namespace: %w", err)
+			return mcperrors.NewError().Messagef("updating namespace: %w", err).WithLocation(
+
+			// Update labels
+			).Build()
 		}
 	}
 
-	// Update labels
 	if len(options.Labels) > 0 {
 		if err := mc.updateLabelsInConfigMap(configMap, options.Labels); err != nil {
-			return fmt.Errorf("updating labels: %w", err)
+			return mcperrors.NewError().Messagef("updating labels: %w", err).WithLocation(
+
+			// Update data from environment variables
+			).Build()
 		}
 	}
 
-	// Update data from environment variables
 	if len(options.EnvVars) > 0 {
 		if err := mc.updateDataInConfigMap(configMap, options.EnvVars); err != nil {
-			return fmt.Errorf("updating configmap data: %w", err)
+			return mcperrors.NewError().Messagef("updating configmap data: %w", err).WithLocation(
+
+			// Write back the updated manifest
+			).Build()
 		}
 	}
 
-	// Write back the updated manifest
 	updatedContent, err := yaml.Marshal(configMap)
 	if err != nil {
-		return fmt.Errorf("marshaling updated configmap YAML: %w", err)
+		return mcperrors.NewError().Messagef("marshaling updated configmap YAML: %w", err).WithLocation().Build()
 	}
 
 	if err := os.WriteFile(manifestPath, updatedContent, 0644); err != nil {
-		return fmt.Errorf("writing updated configmap manifest: %w", err)
+		return mcperrors.NewError().Messagef("writing updated configmap manifest: %w", err).WithLocation().Build()
 	}
 
 	mc.logger.Debug().
@@ -399,57 +440,69 @@ func (mc *ManifestCustomizer) CustomizeConfigMap(manifestPath string, options Cu
 func (mc *ManifestCustomizer) CustomizeIngress(manifestPath string, options CustomizeOptions) error {
 	content, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return fmt.Errorf("reading ingress manifest: %w", err)
+		return mcperrors.NewError().Messagef("reading ingress manifest: %w", err).WithLocation().Build()
 	}
 
 	var ingress map[string]interface{}
 	if err := yaml.Unmarshal(content, &ingress); err != nil {
-		return fmt.Errorf("parsing ingress YAML: %w", err)
+		return mcperrors.NewError().Messagef("parsing ingress YAML: %w", err).WithLocation(
+
+		// Update app name
+		).Build()
 	}
 
-	// Update app name
 	if options.AppName != "" {
 		if err := mc.updateAppNameInIngress(ingress, options.AppName); err != nil {
-			return fmt.Errorf("updating app name: %w", err)
+			return mcperrors.NewError().Messagef("updating app name: %w", err).WithLocation(
+
+			// Update namespace
+			).Build()
 		}
 	}
 
-	// Update namespace
 	if options.Namespace != "" {
 		if err := mc.updateNamespaceInManifest(ingress, options.Namespace); err != nil {
-			return fmt.Errorf("updating namespace: %w", err)
+			return mcperrors.NewError().Messagef("updating namespace: %w", err).WithLocation(
+
+			// Update labels
+			).Build()
 		}
 	}
 
-	// Update labels
 	if len(options.Labels) > 0 {
 		if err := mc.updateLabelsInIngress(ingress, options.Labels); err != nil {
-			return fmt.Errorf("updating labels: %w", err)
+			return mcperrors.NewError().Messagef("updating labels: %w", err).WithLocation(
+
+			// Update annotations
+			).Build()
 		}
 	}
 
-	// Update annotations
 	if len(options.Annotations) > 0 {
 		if err := mc.updateAnnotationsInIngress(ingress, options.Annotations); err != nil {
-			return fmt.Errorf("updating annotations: %w", err)
+			return mcperrors.NewError().Messagef("updating annotations: %w", err).WithLocation(
+
+			// Update port in ingress service backend
+			).Build()
 		}
 	}
 
-	// Update port in ingress service backend
 	if options.Port > 0 {
 		if err := mc.updatePortInIngress(ingress, options.Port); err != nil {
-			return fmt.Errorf("updating port: %w", err)
+			return mcperrors.NewError().Messagef("updating port: %w", err).WithLocation(
+
+			// Write back the updated manifest
+			).Build()
 		}
 	}
 
-	// Write back the updated manifest
 	updatedContent, err := yaml.Marshal(ingress)
 	if err != nil {
-		return fmt.Errorf("marshaling updated ingress YAML: %w", err)
+		return mcperrors.NewError().Messagef("marshaling updated ingress YAML: %w", err).WithLocation().Build()
 	}
 
 	if err := os.WriteFile(manifestPath, updatedContent, 0644); err != nil {
-		return fmt.Errorf("writing updated ingress manifest: %w", err)
+		return mcperrors.NewError().Messagef("writing updated ingress manifest: %w", err).WithLocation().Build()
 	}
 
 	mc.logger.Debug().

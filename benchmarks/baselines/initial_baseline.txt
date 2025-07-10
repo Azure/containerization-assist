@@ -1,0 +1,186 @@
+=== PERFORMANCE BASELINE ESTABLISHMENT ===
+Date: Wed Jul  9 19:33:32 EDT 2025
+Commit: 8dc7cf4cc9b9c84a832116d75fa8801dd50b22ac
+
+MCP Tool Benchmarks:
+go: warning: "./pkg/mcp/application/tools/..." matched no packages
+no packages to test
+No benchmarks found in tools package
+
+All MCP Package Benchmarks:
+# github.com/Azure/container-kit/pkg/mcp/application/orchestration/pipeline
+pkg/mcp/application/orchestration/pipeline/job_scheduler.go:31:29: not enough arguments in call to j.service.SubmitJob
+	have (*Job)
+	want (context.Context, *Job)
+pkg/mcp/application/orchestration/pipeline/job_scheduler.go:35:33: not enough arguments in call to j.service.GetJob
+	have (string)
+	want (context.Context, string)
+pkg/mcp/application/orchestration/pipeline/job_scheduler.go:43:28: not enough arguments in call to j.service.ListJobs
+	have (JobStatus)
+	want (context.Context, JobStatus)
+pkg/mcp/application/orchestration/pipeline/job_scheduler.go:47:29: not enough arguments in call to j.service.CancelJob
+	have (string)
+	want (context.Context, string)
+pkg/mcp/application/orchestration/pipeline/lifecycle.go:32:9: not enough arguments in call to p.service.Start
+	have ()
+	want (context.Context)
+pkg/mcp/application/orchestration/pipeline/lifecycle.go:36:9: not enough arguments in call to p.service.Stop
+	have ()
+	want (context.Context)
+pkg/mcp/application/orchestration/pipeline/monitor.go:36:9: not enough arguments in call to p.service.GetManagerStats
+	have ()
+	want (context.Context)
+pkg/mcp/application/orchestration/pipeline/monitor.go:40:9: not enough arguments in call to p.service.GetOrchestratorStats
+	have ()
+	want (context.Context)
+pkg/mcp/application/orchestration/pipeline/pipeline_legacy.go:73:12: not enough arguments in call to m.jobOrchestrator.Start
+	have ()
+	want (context.Context)
+pkg/mcp/application/orchestration/pipeline/pipeline_legacy.go:94:12: not enough arguments in call to m.jobOrchestrator.Stop
+	have ()
+	want (context.Context)
+pkg/mcp/application/orchestration/pipeline/pipeline_legacy.go:94:12: too many errors
+FAIL	github.com/Azure/container-kit/pkg/mcp/application [build failed]
+?   	github.com/Azure/container-kit/pkg/mcp/application/api	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/application/commands	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/application/conversation	[no test files]
+FAIL	github.com/Azure/container-kit/pkg/mcp/application/core [build failed]
+?   	github.com/Azure/container-kit/pkg/mcp/application/internal	[no test files]
+{"time":"2025-07-09T19:39:14.519659531-04:00","level":"DEBUG","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"Executing chat tool","message":"Hello, world!","session_id":""}
+{"time":"2025-07-09T19:39:14.519784943-04:00","level":"DEBUG","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"Executing chat tool","message":"Test message","session_id":"test-session"}
+{"time":"2025-07-09T19:39:14.51981929-04:00","level":"DEBUG","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"Executing chat tool","message":"Test message","session_id":"test-session"}
+{"time":"2025-07-09T19:39:14.519841584-04:00","level":"ERROR","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"Chat handler error","error":"mcp/test: handler error"}
+{"time":"2025-07-09T19:39:14.519875969-04:00","level":"DEBUG","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"Executing chat tool","message":"Test message","session_id":"chat-session-123"}
+time=2025-07-09T19:39:14.520-04:00 level=INFO msg="Using provided canonical orchestrator for conversation handler"
+time=2025-07-09T19:39:14.520-04:00 level=INFO msg="Using provided canonical orchestrator for conversation handler"
+time=2025-07-09T19:39:14.520-04:00 level=INFO msg="Using provided canonical orchestrator for conversation handler"
+time=2025-07-09T19:39:14.520-04:00 level=INFO msg="Using provided canonical orchestrator for conversation handler"
+time=2025-07-09T19:39:14.520-04:00 level=INFO msg="Using provided canonical orchestrator for conversation handler"
+time=2025-07-09T19:39:14.520-04:00 level=INFO msg="Using provided canonical orchestrator for conversation handler"
+time=2025-07-09T19:39:14.520-04:00 level=INFO msg="Using provided canonical orchestrator for conversation handler"
+time=2025-07-09T19:39:14.520-04:00 level=INFO msg="Using provided canonical orchestrator for conversation handler"
+time=2025-07-09T19:39:14.520-04:00 level=INFO msg="Using provided canonical orchestrator for conversation handler"
+time=2025-07-09T19:39:14.520-04:00 level=INFO msg="Using provided canonical orchestrator for conversation handler"
+time=2025-07-09T19:39:14.623-04:00 level=INFO msg="Using provided canonical orchestrator for conversation handler"
+goos: linux
+goarch: amd64
+pkg: github.com/Azure/container-kit/pkg/mcp/application/internal/conversation
+cpu: 13th Gen Intel(R) Core(TM) i9-13900H
+BenchmarkHandleConversation-20    	time=2025-07-09T19:39:14.624-04:00 level=INFO msg="Using provided canonical orchestrator for conversation handler"
+time=2025-07-09T19:39:14.624-04:00 level=INFO msg="Using provided canonical orchestrator for conversation handler"
+time=2025-07-09T19:39:14.635-04:00 level=INFO msg="Using provided canonical orchestrator for conversation handler"
+time=2025-07-09T19:39:15.574-04:00 level=INFO msg="Using provided canonical orchestrator for conversation handler"
+ 1279552	       914.2 ns/op	    2344 B/op	      17 allocs/op
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/application/internal/conversation	2.234s
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/application/internal/retry	2.026s
+{"time":"2025-07-09T19:39:18.785160972-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"🔧 Using invopop/jsonschema for schema generation with array fixes","component":"tool_registry","tool":"concurrent_tool"}
+{"time":"2025-07-09T19:39:18.785341462-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"✅ Generated schema with proper array items using invopop/jsonschema","component":"tool_registry","tool":"concurrent_tool"}
+{"time":"2025-07-09T19:39:18.785350095-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"registered","component":"tool_registry","tool":"concurrent_tool","version":"1.0.0"}
+{"time":"2025-07-09T19:39:18.785471156-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"🔧 Using invopop/jsonschema for schema generation with array fixes","component":"tool_registry","tool":"tool_4"}
+{"time":"2025-07-09T19:39:18.785510659-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"✅ Generated schema with proper array items using invopop/jsonschema","component":"tool_registry","tool":"tool_4"}
+{"time":"2025-07-09T19:39:18.785513554-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"registered","component":"tool_registry","tool":"tool_4","version":"1.0.0"}
+{"time":"2025-07-09T19:39:18.785523248-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"🔧 Using invopop/jsonschema for schema generation with array fixes","component":"tool_registry","tool":"tool_0"}
+{"time":"2025-07-09T19:39:18.785556802-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"✅ Generated schema with proper array items using invopop/jsonschema","component":"tool_registry","tool":"tool_0"}
+{"time":"2025-07-09T19:39:18.785560871-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"registered","component":"tool_registry","tool":"tool_0","version":"1.0.0"}
+{"time":"2025-07-09T19:39:18.785565565-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"🔧 Using invopop/jsonschema for schema generation with array fixes","component":"tool_registry","tool":"tool_1"}
+{"time":"2025-07-09T19:39:18.785594576-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"✅ Generated schema with proper array items using invopop/jsonschema","component":"tool_registry","tool":"tool_1"}
+{"time":"2025-07-09T19:39:18.785597093-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"registered","component":"tool_registry","tool":"tool_1","version":"1.0.0"}
+{"time":"2025-07-09T19:39:18.785600529-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"🔧 Using invopop/jsonschema for schema generation with array fixes","component":"tool_registry","tool":"tool_2"}
+{"time":"2025-07-09T19:39:18.785626999-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"✅ Generated schema with proper array items using invopop/jsonschema","component":"tool_registry","tool":"tool_2"}
+{"time":"2025-07-09T19:39:18.785629385-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"registered","component":"tool_registry","tool":"tool_2","version":"1.0.0"}
+{"time":"2025-07-09T19:39:18.785632684-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"🔧 Using invopop/jsonschema for schema generation with array fixes","component":"tool_registry","tool":"tool_3"}
+{"time":"2025-07-09T19:39:18.785663976-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"✅ Generated schema with proper array items using invopop/jsonschema","component":"tool_registry","tool":"tool_3"}
+{"time":"2025-07-09T19:39:18.78566978-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"registered","component":"tool_registry","tool":"tool_3","version":"1.0.0"}
+{"time":"2025-07-09T19:39:18.785857346-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"🔧 Using invopop/jsonschema for schema generation with array fixes","component":"tool_registry","tool":"error_tool"}
+{"time":"2025-07-09T19:39:18.785896181-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"✅ Generated schema with proper array items using invopop/jsonschema","component":"tool_registry","tool":"error_tool"}
+{"time":"2025-07-09T19:39:18.785899425-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"registered","component":"tool_registry","tool":"error_tool","version":"1.0.0"}
+{"time":"2025-07-09T19:39:18.785906884-04:00","level":"DEBUG","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"executing tool","component":"tool_registry","tool":"error_tool"}
+{"time":"2025-07-09T19:39:18.785912248-04:00","level":"ERROR","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"tool execution failed","component":"tool_registry","error":"test operation failed","tool":"error_tool"}
+{"time":"2025-07-09T19:39:18.785928211-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"🔧 Using invopop/jsonschema for schema generation with array fixes","component":"tool_registry","tool":"validation_tool"}
+{"time":"2025-07-09T19:39:18.785957838-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"✅ Generated schema with proper array items using invopop/jsonschema","component":"tool_registry","tool":"validation_tool"}
+{"time":"2025-07-09T19:39:18.785960487-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"registered","component":"tool_registry","tool":"validation_tool","version":"1.0.0"}
+{"time":"2025-07-09T19:39:18.785964195-04:00","level":"DEBUG","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"executing tool","component":"tool_registry","tool":"validation_tool"}
+{"time":"2025-07-09T19:39:18.785967968-04:00","level":"ERROR","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"tool execution failed","component":"tool_registry","error":"test operation failed","tool":"validation_tool"}
+{"time":"2025-07-09T19:39:18.785978286-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"🔧 Using invopop/jsonschema for schema generation with array fixes","component":"tool_registry","tool":"json_tool"}
+{"time":"2025-07-09T19:39:18.786004879-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"✅ Generated schema with proper array items using invopop/jsonschema","component":"tool_registry","tool":"json_tool"}
+{"time":"2025-07-09T19:39:18.786007329-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"registered","component":"tool_registry","tool":"json_tool","version":"1.0.0"}
+{"time":"2025-07-09T19:39:18.786010051-04:00","level":"DEBUG","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"executing tool","component":"tool_registry","tool":"json_tool"}
+{"time":"2025-07-09T19:39:18.786015102-04:00","level":"ERROR","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"tool execution failed","component":"tool_registry","error":{"code":"TOOL_PARAMETER_UNMARSHAL_FAILED","message":"Failed to unmarshal tool parameters","type":"validation","severity":"medium","context":{"raw_args":"{\"message\": \"unclosed quote}","tool_name":"json_tool"},"timestamp":"2025-07-09T19:39:18.786012209-04:00","location":{"file":"/home/tng/workspace/container-kit/pkg/mcp/application/internal/runtime/registry.go","line":188,"function":"github.com/Azure/container-kit/pkg/mcp/application/internal/runtime.(*ToolRegistry).ExecuteTool"},"suggestions":["Check parameter format matches the tool's expected schema"],"cause":"unexpected end of JSON input"},"tool":"json_tool"}
+{"time":"2025-07-09T19:39:18.786063534-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"🔧 Using invopop/jsonschema for schema generation with array fixes","component":"tool_registry","tool":"execute_tool"}
+{"time":"2025-07-09T19:39:18.786102526-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"✅ Generated schema with proper array items using invopop/jsonschema","component":"tool_registry","tool":"execute_tool"}
+{"time":"2025-07-09T19:39:18.786107508-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"registered","component":"tool_registry","tool":"execute_tool","version":"1.0.0"}
+{"time":"2025-07-09T19:39:18.786111238-04:00","level":"DEBUG","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"executing tool","component":"tool_registry","tool":"execute_tool"}
+{"time":"2025-07-09T19:39:18.786118723-04:00","level":"DEBUG","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"tool execution completed","component":"tool_registry","tool":"execute_tool"}
+{"time":"2025-07-09T19:39:18.786135137-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"🔧 Using invopop/jsonschema for schema generation with array fixes","component":"tool_registry","tool":"tool1"}
+{"time":"2025-07-09T19:39:18.786164411-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"✅ Generated schema with proper array items using invopop/jsonschema","component":"tool_registry","tool":"tool1"}
+{"time":"2025-07-09T19:39:18.786167542-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"registered","component":"tool_registry","tool":"tool1","version":"1.0.0"}
+{"time":"2025-07-09T19:39:18.786171154-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"🔧 Using invopop/jsonschema for schema generation with array fixes","component":"tool_registry","tool":"tool2"}
+{"time":"2025-07-09T19:39:18.786210368-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"✅ Generated schema with proper array items using invopop/jsonschema","component":"tool_registry","tool":"tool2"}
+{"time":"2025-07-09T19:39:18.786215526-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"registered","component":"tool_registry","tool":"tool2","version":"1.0.0"}
+{"time":"2025-07-09T19:39:18.786224514-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"🔧 Using invopop/jsonschema for schema generation with array fixes","component":"tool_registry","tool":"get_tool"}
+{"time":"2025-07-09T19:39:18.786251682-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"✅ Generated schema with proper array items using invopop/jsonschema","component":"tool_registry","tool":"get_tool"}
+{"time":"2025-07-09T19:39:18.786254116-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"registered","component":"tool_registry","tool":"get_tool","version":"1.0.0"}
+{"time":"2025-07-09T19:39:18.786259981-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"🔧 Using invopop/jsonschema for schema generation with array fixes","component":"tool_registry","tool":"schema_tool"}
+{"time":"2025-07-09T19:39:18.786286313-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"✅ Generated schema with proper array items using invopop/jsonschema","component":"tool_registry","tool":"schema_tool"}
+{"time":"2025-07-09T19:39:18.78629026-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"registered","component":"tool_registry","tool":"schema_tool","version":"1.0.0"}
+{"time":"2025-07-09T19:39:18.786317514-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"🔧 Using invopop/jsonschema for schema generation with array fixes","component":"tool_registry","tool":"duplicate_tool"}
+{"time":"2025-07-09T19:39:18.786347669-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"✅ Generated schema with proper array items using invopop/jsonschema","component":"tool_registry","tool":"duplicate_tool"}
+{"time":"2025-07-09T19:39:18.786350222-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"registered","component":"tool_registry","tool":"duplicate_tool","version":"1.0.0"}
+{"time":"2025-07-09T19:39:18.786364398-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"🔧 Using invopop/jsonschema for schema generation with array fixes","component":"tool_registry","tool":"test_tool"}
+{"time":"2025-07-09T19:39:18.786408261-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"✅ Generated schema with proper array items using invopop/jsonschema","component":"tool_registry","tool":"test_tool"}
+{"time":"2025-07-09T19:39:18.786411784-04:00","level":"INFO","source":{"function":"github.com/Azure/container-kit/pkg/mcp/application/logging.(*EventAdapter).Msg","file":"/home/tng/workspace/container-kit/pkg/mcp/application/logging/logger.go","line":63},"msg":"registered","component":"tool_registry","tool":"test_tool","version":"1.0.0"}
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/application/internal/runtime	0.022s
+?   	github.com/Azure/container-kit/pkg/mcp/application/knowledge	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/application/logging	[no test files]
+FAIL	github.com/Azure/container-kit/pkg/mcp/application/orchestration/pipeline [build failed]
+?   	github.com/Azure/container-kit/pkg/mcp/application/services	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/application/state	[no test files]
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/application/workflows	0.010s
+?   	github.com/Azure/container-kit/pkg/mcp/domain	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/domain/config	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/domain/constants	[no test files]
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/containerization/analyze	0.002s
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/containerization/build	0.003s
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/containerization/deploy	0.002s
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/containerization/scan	0.002s
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/errors	0.004s
+?   	github.com/Azure/container-kit/pkg/mcp/domain/errors/codes	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/domain/internal/common	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/domain/internal/constants	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/domain/internal/types	[no test files]
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/internal/utils	0.002s
+goos: linux
+goarch: amd64
+pkg: github.com/Azure/container-kit/pkg/mcp/domain/security
+cpu: 13th Gen Intel(R) Core(TM) i9-13900H
+BenchmarkStructValidation-20    	  133648	      8700 ns/op	   16229 B/op	     154 allocs/op
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/security	1.270s
+?   	github.com/Azure/container-kit/pkg/mcp/domain/security/validators	[no test files]
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/session	0.003s
+?   	github.com/Azure/container-kit/pkg/mcp/domain/shared	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/domain/tools	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/domain/types	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/infra	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/infra/internal/migration	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/infra/persistence	[no test files]
+PASS
+ok  	github.com/Azure/container-kit/pkg/mcp/infra/retry	2.190s
+?   	github.com/Azure/container-kit/pkg/mcp/infra/templates	[no test files]
+FAIL	github.com/Azure/container-kit/pkg/mcp/infra/transport [build failed]
+FAIL
+
+=== SUCCESSFUL BENCHMARKS ===
+BenchmarkHandleConversation-20    	 1279552	       914.2 ns/op	    2344 B/op	      17 allocs/op
+BenchmarkStructValidation-20    	  133648	      8700 ns/op	   16229 B/op	     154 allocs/op

@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // SecurityOptions contains security settings for Git operations
@@ -55,20 +57,24 @@ type FilesystemJail struct {
 // NewFilesystemJail creates a new filesystem jail
 func NewFilesystemJail(opts *SecurityOptions) (*FilesystemJail, error) {
 	if opts.WorkspaceRoot == "" {
-		return nil, fmt.Errorf("workspace root is required for filesystem jail")
+		return nil, mcperrors.NewError().Messagef("workspace root is required for filesystem jail").WithLocation(
+
+		// Resolve workspace root to absolute path
+		).Build()
 	}
 
-	// Resolve workspace root to absolute path
 	absRoot, err := filepath.Abs(opts.WorkspaceRoot)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve workspace root: %w", err)
+		return nil, mcperrors.NewError().Messagef("failed to resolve workspace root: %w", err).WithLocation(
+
+		// Ensure workspace root exists
+		).Build()
 	}
 
-	// Ensure workspace root exists
 	if stat, err := os.Stat(absRoot); err != nil {
-		return nil, fmt.Errorf("workspace root does not exist: %w", err)
+		return nil, mcperrors.NewError().Messagef("workspace root does not exist: %w", err).WithLocation().Build()
 	} else if !stat.IsDir() {
-		return nil, fmt.Errorf("workspace root is not a directory: %s", absRoot)
+		return nil, mcperrors.NewError().Messagef("workspace root is not a directory: %s", absRoot).WithLocation().Build()
 	}
 
 	return &FilesystemJail{
@@ -83,38 +89,46 @@ func (j *FilesystemJail) ValidatePath(path string) error {
 	// Convert to absolute path
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return fmt.Errorf("failed to resolve path: %w", err)
+		return mcperrors.NewError().Messagef("failed to resolve path: %w", err).WithLocation(
+
+		// Check if path contains any blocked patterns
+		).Build()
 	}
 
-	// Check if path contains any blocked patterns
 	for _, blocked := range j.blockedPaths {
 		if strings.Contains(absPath, blocked) {
-			return fmt.Errorf("path contains blocked pattern '%s': %s", blocked, absPath)
+			return mcperrors.NewError().Messagef("path contains blocked pattern '%s': %s", blocked, absPath).WithLocation(
+
+			// Check if path is within workspace root
+			).Build()
 		}
 	}
 
-	// Check if path is within workspace root
 	if !strings.HasPrefix(absPath, j.workspaceRoot) {
 		// If path is outside workspace, check against restricted prefixes
 		for _, restricted := range RestrictedPathPrefixes {
 			if strings.HasPrefix(absPath, restricted) {
-				return fmt.Errorf("path is in restricted location '%s': %s", restricted, absPath)
+				return mcperrors.NewError().Messagef("path is in restricted location '%s': %s", restricted, absPath).WithLocation().Build()
 			}
 		}
-		return fmt.Errorf("path is outside workspace root: %s", absPath)
+		return mcperrors.NewError().Messagef("path is outside workspace root: %s", absPath).WithLocation(
+
+		// Check for path traversal attempts
+		).Build()
 	}
 
-	// Check for path traversal attempts
 	cleanPath := filepath.Clean(absPath)
 	if cleanPath != absPath {
 		// Additional check for sneaky traversal attempts
 		rel, err := filepath.Rel(j.workspaceRoot, cleanPath)
 		if err != nil || strings.HasPrefix(rel, "..") {
-			return fmt.Errorf("path traversal detected: %s", path)
+			return mcperrors.NewError().Messagef("path traversal detected: %s", path).WithLocation(
+
+			// Check symlinks if not allowed
+			).Build()
 		}
 	}
 
-	// Check symlinks if not allowed
 	if !j.allowSymlinks {
 		if err := j.checkSymlinks(absPath); err != nil {
 			return err
@@ -128,10 +142,12 @@ func (j *FilesystemJail) ValidatePath(path string) error {
 func (j *FilesystemJail) ValidateURL(url string) error {
 	// Block file:// URLs that could access local filesystem
 	if strings.HasPrefix(strings.ToLower(url), "file://") {
-		return fmt.Errorf("file:// URLs are not allowed for security reasons")
+		return mcperrors.NewError().Messagef("file:// URLs are not allowed for security reasons").WithLocation(
+
+		// Block URLs with suspicious patterns
+		).Build()
 	}
 
-	// Block URLs with suspicious patterns
 	suspiciousPatterns := []string{
 		"..",
 		"~",
@@ -147,7 +163,7 @@ func (j *FilesystemJail) ValidateURL(url string) error {
 
 	for _, pattern := range suspiciousPatterns {
 		if strings.Contains(url, pattern) {
-			return fmt.Errorf("URL contains suspicious pattern '%s'", pattern)
+			return mcperrors.NewError().Messagef("URL contains suspicious pattern '%s'", pattern).WithLocation().Build()
 		}
 	}
 
@@ -212,7 +228,7 @@ func (j *FilesystemJail) RestrictGitCommand(args []string) ([]string, error) {
 	for i, arg := range args {
 		// Check for suspicious patterns in all arguments
 		if strings.Contains(arg, "..") || strings.Contains(arg, "~") {
-			return nil, fmt.Errorf("suspicious pattern in argument[%d]: %s", i, arg)
+			return nil, mcperrors.NewError().Messagef("suspicious pattern in argument[%d]: %s", i, arg).WithLocation().Build()
 		}
 	}
 

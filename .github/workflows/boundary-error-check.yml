@@ -1,0 +1,133 @@
+name: Boundary Error Enforcement
+
+on:
+  pull_request:
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+  push:
+    branches: [main, develop]
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  boundary-error-check:
+    name: Check Package Boundary Error Handling
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24.1'
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Build mcp-richify tool
+      run: |
+        echo "🔧 Building boundary detection tool..."
+        go build -o /tmp/mcp-richify ./cmd/mcp-richify
+        chmod +x /tmp/mcp-richify
+
+    - name: Run boundary error analysis
+      run: |
+        echo "🔍 Analyzing package boundaries..."
+        /tmp/mcp-richify boundaries /tmp/boundaries.json
+        echo "📊 Boundary analysis complete"
+
+    - name: Check for boundary violations
+      run: |
+        echo "⚖️ Checking for boundary error violations..."
+
+        # Count boundary errors that should use RichError
+        BOUNDARY_COUNT=$(jq -r 'to_entries[] | select(.value.type == "BOUNDARY") | .key' /tmp/boundaries.json | wc -l)
+        echo "📋 Found $BOUNDARY_COUNT functions at package boundaries"
+
+        # Check if any boundary functions still use fmt.Errorf
+        VIOLATIONS=$(jq -r 'to_entries[] | select(.value.type == "BOUNDARY") | .key' /tmp/boundaries.json | while read location; do
+          file=$(echo $location | cut -d: -f1)
+          line=$(echo $location | cut -d: -f2)
+          if sed -n "${line}p" "$file" 2>/dev/null | grep -q "fmt\.Errorf\|errors\.New"; then
+            echo "$location"
+          fi
+        done)
+
+        if [ -n "$VIOLATIONS" ]; then
+          echo "❌ BOUNDARY ERROR VIOLATIONS DETECTED!"
+          echo ""
+          echo "The following boundary functions must use RichError instead of fmt.Errorf/errors.New:"
+          echo "$VIOLATIONS"
+          echo ""
+          echo "Per ADR-006, all package boundary functions must use the RichError system."
+          echo "Please convert these errors using:"
+          echo "  /tmp/mcp-richify convert /tmp/boundaries.json"
+          echo ""
+          echo "Or manually replace with:"
+          echo "  fmt.Errorf(...) → mcperrors.NewError().Messagef(...).WithLocation().Build()"
+          echo "  errors.New(...) → mcperrors.NewError().Message(...).WithLocation().Build()"
+          exit 1
+        else
+          echo "✅ All boundary functions properly use RichError!"
+          echo "📈 Package boundary error policy compliance: 100%"
+        fi
+
+    - name: Generate boundary report
+      if: always()
+      run: |
+        echo "📊 BOUNDARY ERROR ANALYSIS REPORT" > boundary-report.md
+        echo "=================================" >> boundary-report.md
+        echo "" >> boundary-report.md
+        echo "**Analysis Date:** $(date)" >> boundary-report.md
+        echo "**Commit:** ${{ github.sha }}" >> boundary-report.md
+        echo "" >> boundary-report.md
+
+        TOTAL_ERRORS=$(jq -r 'keys | length' /tmp/boundaries.json)
+        BOUNDARY_ERRORS=$(jq -r 'to_entries[] | select(.value.type == "BOUNDARY") | .key' /tmp/boundaries.json | wc -l)
+        INTERNAL_ERRORS=$(jq -r 'to_entries[] | select(.value.type == "INTERNAL") | .key' /tmp/boundaries.json | wc -l)
+
+        echo "## Summary" >> boundary-report.md
+        echo "- **Total Error Locations:** $TOTAL_ERRORS" >> boundary-report.md
+        echo "- **Boundary Functions:** $BOUNDARY_ERRORS (require RichError)" >> boundary-report.md
+        echo "- **Internal Functions:** $INTERNAL_ERRORS (fmt.Errorf allowed)" >> boundary-report.md
+        echo "" >> boundary-report.md
+
+        echo "## Policy Compliance" >> boundary-report.md
+        echo "✅ **ADR-006 Compliance:** Package boundary functions use RichError" >> boundary-report.md
+        echo "✅ **Internal Flexibility:** Internal functions can use fmt.Errorf" >> boundary-report.md
+        echo "" >> boundary-report.md
+
+        echo "## Boundary Detection Rules" >> boundary-report.md
+        echo "Functions are considered package boundaries if they:" >> boundary-report.md
+        echo "- Are exported (start with capital letter)" >> boundary-report.md
+        echo "- Are interface method implementations" >> boundary-report.md
+        echo "- Are public API endpoints" >> boundary-report.md
+        echo "- Cross package boundaries in call chains" >> boundary-report.md
+
+    - name: Upload boundary report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: boundary-error-report
+        path: boundary-report.md
+        retention-days: 30

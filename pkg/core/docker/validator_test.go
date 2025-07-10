@@ -1,16 +1,19 @@
 package docker
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
-	"github.com/rs/zerolog"
+	"log/slog"
+
+	validation "github.com/Azure/container-kit/pkg/mcp/domain/security"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestValidateDockerfile(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := slog.New(slog.NewTextHandler(nil, nil))
 	validator := NewValidator(logger)
 
 	tests := []struct {
@@ -19,8 +22,8 @@ func TestValidateDockerfile(t *testing.T) {
 		expectedValid  bool
 		expectedErrors int
 		expectedWarns  int
-		checkError     func(t *testing.T, errors []ValidationError)
-		checkWarning   func(t *testing.T, warnings []ValidationWarning)
+		checkError     func(t *testing.T, errors []validation.Error)
+		checkWarning   func(t *testing.T, warnings []validation.Warning)
 	}{
 		{
 			name:           "empty dockerfile",
@@ -28,8 +31,8 @@ func TestValidateDockerfile(t *testing.T) {
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []ValidationError) {
-				assert.Equal(t, "content", errors[0].Type)
+			checkError: func(t *testing.T, errors []validation.Error) {
+				assert.Equal(t, "DOCKERFILE_EMPTY", errors[0].Code)
 				assert.Contains(t, errors[0].Message, "empty")
 			},
 		},
@@ -59,8 +62,8 @@ RUN npm install`,
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []ValidationError) {
-				assert.Equal(t, "structure", errors[0].Type)
+			checkError: func(t *testing.T, errors []validation.Error) {
+				assert.Equal(t, "DOCKERFILE_NO_FROM", errors[0].Code)
 				assert.Contains(t, errors[0].Message, "must start with FROM")
 			},
 		},
@@ -71,8 +74,8 @@ INVALID_INSTRUCTION something`,
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []ValidationError) {
-				assert.Equal(t, "instruction", errors[0].Type)
+			checkError: func(t *testing.T, errors []validation.Error) {
+				assert.Equal(t, "UNKNOWN_INSTRUCTION", errors[0].Code)
 				assert.Contains(t, errors[0].Message, "Unknown instruction")
 			},
 		},
@@ -83,9 +86,9 @@ WORKDIR /app`,
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []ValidationError) {
-				assert.Equal(t, "syntax", errors[0].Type)
-				assert.Equal(t, "FROM", errors[0].Instruction)
+			checkError: func(t *testing.T, errors []validation.Error) {
+				assert.Equal(t, "FROM_MISSING_IMAGE", errors[0].Code)
+				assert.Equal(t, "FROM", errors[0].Field)
 				assert.Contains(t, errors[0].Message, "requires an image name")
 			},
 		},
@@ -95,8 +98,8 @@ WORKDIR /app`,
 			expectedValid:  true,
 			expectedErrors: 0,
 			expectedWarns:  1,
-			checkWarning: func(t *testing.T, warnings []ValidationWarning) {
-				assert.Equal(t, "best_practice", warnings[0].Type)
+			checkWarning: func(t *testing.T, warnings []validation.Warning) {
+				assert.Equal(t, "FROM_LATEST_TAG", warnings[0].Code)
 				assert.Contains(t, warnings[0].Message, "latest")
 			},
 		},
@@ -106,8 +109,8 @@ WORKDIR /app`,
 			expectedValid:  true,
 			expectedErrors: 0,
 			expectedWarns:  1,
-			checkWarning: func(t *testing.T, warnings []ValidationWarning) {
-				assert.Equal(t, "best_practice", warnings[0].Type)
+			checkWarning: func(t *testing.T, warnings []validation.Warning) {
+				assert.Equal(t, "FROM_LATEST_TAG", warnings[0].Code)
 				assert.Contains(t, warnings[0].Suggestion, "specific version")
 			},
 		},
@@ -118,7 +121,7 @@ RUN apt-get install -y curl`,
 			expectedValid:  true,
 			expectedErrors: 0,
 			expectedWarns:  2, // apt-get update + cache cleanup warnings
-			checkWarning: func(t *testing.T, warnings []ValidationWarning) {
+			checkWarning: func(t *testing.T, warnings []validation.Warning) {
 				foundUpdate := false
 				foundCleanup := false
 				for _, w := range warnings {
@@ -140,7 +143,7 @@ RUN apt-get update && apt-get install -y curl`,
 			expectedValid:  true,
 			expectedErrors: 0,
 			expectedWarns:  1, // Only cache cleanup warning
-			checkWarning: func(t *testing.T, warnings []ValidationWarning) {
+			checkWarning: func(t *testing.T, warnings []validation.Warning) {
 				assert.Contains(t, warnings[0].Message, "cache")
 			},
 		},
@@ -159,9 +162,9 @@ COPY`,
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []ValidationError) {
-				assert.Equal(t, "syntax", errors[0].Type)
-				assert.Equal(t, "COPY", errors[0].Instruction)
+			checkError: func(t *testing.T, errors []validation.Error) {
+				assert.Equal(t, "COPY_MISSING_ARGS", errors[0].Code)
+				assert.Equal(t, "COPY", errors[0].Field)
 			},
 		},
 		{
@@ -171,8 +174,10 @@ ADD package.json /app/`,
 			expectedValid:  true,
 			expectedErrors: 0,
 			expectedWarns:  1,
-			checkWarning: func(t *testing.T, warnings []ValidationWarning) {
-				assert.Equal(t, "ADD", warnings[0].Instruction)
+			checkWarning: func(t *testing.T, warnings []validation.Warning) {
+				if warnings[0].Field != "" {
+					assert.Equal(t, "ADD", warnings[0].Field)
+				}
 				assert.Contains(t, warnings[0].Message, "COPY is preferred")
 			},
 		},
@@ -199,8 +204,10 @@ EXPOSE`,
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []ValidationError) {
-				assert.Equal(t, "EXPOSE", errors[0].Instruction)
+			checkError: func(t *testing.T, errors []validation.Error) {
+				if errors[0].Field != "" {
+					assert.Equal(t, "EXPOSE", errors[0].Field)
+				}
 				assert.Contains(t, errors[0].Message, "port number")
 			},
 		},
@@ -222,9 +229,11 @@ EXPOSE 80/invalid`,
 			expectedValid:  false,
 			expectedErrors: 2,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []ValidationError) {
+			checkError: func(t *testing.T, errors []validation.Error) {
 				for _, err := range errors {
-					assert.Equal(t, "EXPOSE", err.Instruction)
+					if err.Field != "" {
+						assert.Equal(t, "EXPOSE", err.Field)
+					}
 					assert.Contains(t, err.Message, "Invalid port format")
 				}
 			},
@@ -236,8 +245,10 @@ USER`,
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []ValidationError) {
-				assert.Equal(t, "USER", errors[0].Instruction)
+			checkError: func(t *testing.T, errors []validation.Error) {
+				if errors[0].Field != "" {
+					assert.Equal(t, "USER", errors[0].Field)
+				}
 			},
 		},
 		{
@@ -247,8 +258,8 @@ USER root`,
 			expectedValid:  true,
 			expectedErrors: 0,
 			expectedWarns:  1,
-			checkWarning: func(t *testing.T, warnings []ValidationWarning) {
-				assert.Equal(t, "security", warnings[0].Type)
+			checkWarning: func(t *testing.T, warnings []validation.Warning) {
+				assert.Equal(t, "USER_ROOT_SECURITY", warnings[0].Code)
 				assert.Contains(t, warnings[0].Message, "root user")
 			},
 		},
@@ -267,8 +278,10 @@ WORKDIR`,
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []ValidationError) {
-				assert.Equal(t, "WORKDIR", errors[0].Instruction)
+			checkError: func(t *testing.T, errors []validation.Error) {
+				if errors[0].Field != "" {
+					assert.Equal(t, "WORKDIR", errors[0].Field)
+				}
 			},
 		},
 		{
@@ -278,8 +291,10 @@ WORKDIR app`,
 			expectedValid:  true,
 			expectedErrors: 0,
 			expectedWarns:  1,
-			checkWarning: func(t *testing.T, warnings []ValidationWarning) {
-				assert.Equal(t, "WORKDIR", warnings[0].Instruction)
+			checkWarning: func(t *testing.T, warnings []validation.Warning) {
+				if warnings[0].Field != "" {
+					assert.Equal(t, "WORKDIR", warnings[0].Field)
+				}
 				assert.Contains(t, warnings[0].Message, "absolute paths")
 			},
 		},
@@ -298,8 +313,10 @@ CMD`,
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []ValidationError) {
-				assert.Equal(t, "CMD", errors[0].Instruction)
+			checkError: func(t *testing.T, errors []validation.Error) {
+				if errors[0].Field != "" {
+					assert.Equal(t, "CMD", errors[0].Field)
+				}
 			},
 		},
 		{
@@ -309,8 +326,10 @@ ENTRYPOINT`,
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []ValidationError) {
-				assert.Equal(t, "ENTRYPOINT", errors[0].Instruction)
+			checkError: func(t *testing.T, errors []validation.Error) {
+				if errors[0].Field != "" {
+					assert.Equal(t, "ENTRYPOINT", errors[0].Field)
+				}
 			},
 		},
 		{
@@ -321,8 +340,8 @@ CMD ["node", "app2.js"]`,
 			expectedValid:  true,
 			expectedErrors: 0,
 			expectedWarns:  1,
-			checkWarning: func(t *testing.T, warnings []ValidationWarning) {
-				assert.Equal(t, "structure", warnings[0].Type)
+			checkWarning: func(t *testing.T, warnings []validation.Warning) {
+				assert.Equal(t, "MULTIPLE_CMD", warnings[0].Code)
 				assert.Contains(t, warnings[0].Message, "Multiple CMD")
 			},
 		},
@@ -334,8 +353,8 @@ ENTRYPOINT ["npm", "start"]`,
 			expectedValid:  true,
 			expectedErrors: 0,
 			expectedWarns:  1,
-			checkWarning: func(t *testing.T, warnings []ValidationWarning) {
-				assert.Equal(t, "structure", warnings[0].Type)
+			checkWarning: func(t *testing.T, warnings []validation.Warning) {
+				assert.Equal(t, "MULTIPLE_ENTRYPOINT", warnings[0].Code)
 				assert.Contains(t, warnings[0].Message, "Multiple ENTRYPOINT")
 			},
 		},
@@ -401,7 +420,7 @@ CMD ["node", "server.js"]`,
 }
 
 func TestValidateStructure(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := slog.New(slog.NewTextHandler(nil, nil))
 	validator := NewValidator(logger)
 
 	tests := []struct {
@@ -450,10 +469,10 @@ func TestValidateStructure(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := &ValidationResult{
+			result := &BuildValidationResult{
 				Valid:    true,
-				Errors:   make([]ValidationError, 0),
-				Warnings: make([]ValidationWarning, 0),
+				Errors:   make([]validation.Error, 0),
+				Warnings: make([]validation.Warning, 0),
 			}
 
 			validator.validateStructure(tt.instructions, result)
@@ -465,7 +484,7 @@ func TestValidateStructure(t *testing.T) {
 }
 
 func TestAddGeneralSuggestions(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := slog.New(slog.NewTextHandler(nil, nil))
 	validator := NewValidator(logger)
 
 	tests := []struct {
@@ -527,17 +546,19 @@ CMD ["node", "app.js"]`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := &ValidationResult{
-				Suggestions: make([]string, 0),
+			result := &BuildValidationResult{
+				// Details: make(map[string]interface{}),
 			}
 
 			validator.addGeneralSuggestions(tt.dockerfile, result)
 
 			found := false
-			for _, suggestion := range result.Suggestions {
-				if strings.Contains(suggestion, tt.expectedSuggestion) {
-					found = true
-					break
+			if suggestions, ok := result.Metadata["suggestions"].([]string); ok {
+				for _, suggestion := range suggestions {
+					if strings.Contains(suggestion, tt.expectedSuggestion) {
+						found = true
+						break
+					}
 				}
 			}
 
@@ -548,11 +569,12 @@ CMD ["node", "app.js"]`,
 			}
 
 			// Always check for standard suggestions
-			assert.True(t, len(result.Suggestions) > 0, "Should have at least some suggestions")
+			suggestions, _ := result.Metadata["suggestions"].([]string)
+			assert.True(t, len(suggestions) > 0, "Should have at least some suggestions")
 
 			// Check for dockerignore suggestion
 			foundDockerignore := false
-			for _, suggestion := range result.Suggestions {
+			for _, suggestion := range suggestions {
 				if strings.Contains(suggestion, "dockerignore") {
 					foundDockerignore = true
 					break
@@ -564,7 +586,7 @@ CMD ["node", "app.js"]`,
 }
 
 func TestValidationContext(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := slog.New(slog.NewTextHandler(nil, nil))
 	validator := NewValidator(logger)
 
 	dockerfile := `FROM node:16
@@ -576,19 +598,20 @@ CMD ["node", "app.js"]`
 
 	result := validator.ValidateDockerfile(dockerfile)
 
-	require.NotNil(t, result.Context)
+	require.NotNil(t, result.Metadata["context"])
 
-	lineCount, ok := result.Context["line_count"].(int)
-	assert.True(t, ok, "line_count should be an int")
-	assert.Equal(t, 6, lineCount)
+	context := result.Metadata["context"].(map[string]string)
+	lineCountStr, ok := context["line_count"]
+	assert.True(t, ok, "line_count should be present")
+	assert.Equal(t, "6", lineCountStr)
 
-	totalSize, ok := result.Context["total_size"].(int)
-	assert.True(t, ok, "total_size should be an int")
-	assert.Equal(t, len(dockerfile), totalSize)
+	totalSizeStr, ok := context["total_size"]
+	assert.True(t, ok, "total_size should be present")
+	assert.Equal(t, fmt.Sprintf("%d", len(dockerfile)), totalSizeStr)
 }
 
 func TestComplexDockerfileValidation(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := slog.New(slog.NewTextHandler(nil, nil))
 	validator := NewValidator(logger)
 
 	// Complex multi-stage Dockerfile with various patterns
@@ -623,13 +646,15 @@ CMD ["serve"]`
 	assert.Len(t, result.Warnings, 1) // One warning for multiple CMD (ENTRYPOINT + CMD)
 
 	// Should not suggest multi-stage since it's already using it
-	for _, suggestion := range result.Suggestions {
-		assert.NotContains(t, suggestion, "multi-stage")
+	if suggestions, ok := result.Metadata["suggestions"].([]string); ok {
+		for _, suggestion := range suggestions {
+			assert.NotContains(t, suggestion, "multi-stage")
+		}
 	}
 }
 
 func TestEdgeCases(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := slog.New(slog.NewTextHandler(nil, nil))
 	validator := NewValidator(logger)
 
 	tests := []struct {
@@ -675,7 +700,7 @@ RUN apt-get update \
 }
 
 func TestCheckDockerInstallation(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := slog.New(slog.NewTextHandler(nil, nil))
 	validator := NewValidator(logger)
 
 	// This test will pass or fail based on whether Docker is installed

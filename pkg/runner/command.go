@@ -2,11 +2,11 @@ package runner
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"os/exec"
 
 	"github.com/Azure/container-kit/pkg/logger"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // CommandRunner is an interface for executing commands and getting the output/error
@@ -34,7 +34,7 @@ func (d *DefaultCommandRunner) RunCommandStderr(args ...string) (string, error) 
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return "", fmt.Errorf("failed to get stderr pipe: %w", err)
+		return "", mcperrors.NewError().Messagef("failed to get stderr pipe: %w", err).WithLocation().Build()
 	}
 
 	cmd.Stdout = io.Discard
@@ -45,7 +45,7 @@ func (d *DefaultCommandRunner) RunCommandStderr(args ...string) (string, error) 
 
 	stderrBytes, err := io.ReadAll(stderr)
 	if err != nil {
-		return "", fmt.Errorf("failed to start command: %w", err)
+		return "", mcperrors.NewError().Messagef("failed to start command: %w", err).WithLocation().Build()
 	}
 
 	cmdErr := cmd.Wait()

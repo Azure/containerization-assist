@@ -3,26 +3,27 @@ package docker
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/clients"
-	"github.com/Azure/container-kit/pkg/mcp/utils"
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/common/utils"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // RegistryManager provides mechanical Docker registry operations
 type RegistryManager struct {
 	clients *clients.Clients
-	logger  zerolog.Logger
+	logger  *slog.Logger
 }
 
 // NewRegistryManager creates a new registry manager
-func NewRegistryManager(clients *clients.Clients, logger zerolog.Logger) *RegistryManager {
+func NewRegistryManager(clients *clients.Clients, logger *slog.Logger) *RegistryManager {
 	return &RegistryManager{
 		clients: clients,
-		logger:  logger.With().Str("component", "docker_registry_manager").Logger(),
+		logger:  logger.With("component", "docker_registry_manager"),
 	}
 }
 
@@ -77,10 +78,9 @@ func (rm *RegistryManager) PushImage(ctx context.Context, imageRef string, optio
 		Context:  make(map[string]interface{}),
 	}
 
-	rm.logger.Info().
-		Str("image_ref", imageRef).
-		Str("registry", result.Registry).
-		Msg("Starting Docker push")
+	rm.logger.Info("Starting Docker push",
+		"image_ref", imageRef,
+		"registry", result.Registry)
 
 	// Validate inputs
 	if err := rm.validatePushInputs(imageRef, options); err != nil {
@@ -114,10 +114,9 @@ func (rm *RegistryManager) PushImage(ctx context.Context, imageRef string, optio
 		// Sanitize error and output to remove sensitive information
 		sanitizedError, sanitizedOutput := utils.SanitizeRegistryError(err.Error(), output)
 
-		rm.logger.Error().
-			Str("error", sanitizedError).
-			Str("output", sanitizedOutput).
-			Msg("Docker push failed")
+		rm.logger.Error("Docker push failed",
+			"error", sanitizedError,
+			"output", sanitizedOutput)
 
 		errorType := rm.categorizeError(err, output)
 		errorContext := map[string]interface{}{
@@ -148,11 +147,10 @@ func (rm *RegistryManager) PushImage(ctx context.Context, imageRef string, optio
 		"registry":  result.Registry,
 	}
 
-	rm.logger.Info().
-		Str("image_ref", imageRef).
-		Str("registry", result.Registry).
-		Dur("duration", result.Duration).
-		Msg("Docker push completed successfully")
+	rm.logger.Info("Docker push completed successfully",
+		"image_ref", imageRef,
+		"registry", result.Registry,
+		"duration", result.Duration)
 
 	return result, nil
 }
@@ -167,10 +165,9 @@ func (rm *RegistryManager) PullImage(ctx context.Context, imageRef string) (*Pul
 		Context:  make(map[string]interface{}),
 	}
 
-	rm.logger.Info().
-		Str("image_ref", imageRef).
-		Str("registry", result.Registry).
-		Msg("Starting Docker pull")
+	rm.logger.Info("Starting Docker pull",
+		"image_ref", imageRef,
+		"registry", result.Registry)
 
 	// Validate inputs
 	if err := rm.validatePullInputs(imageRef); err != nil {
@@ -197,10 +194,9 @@ func (rm *RegistryManager) PullImage(ctx context.Context, imageRef string) (*Pul
 		// Sanitize error and output to remove sensitive information
 		sanitizedError, sanitizedOutput := utils.SanitizeRegistryError(err.Error(), output)
 
-		rm.logger.Error().
-			Str("error", sanitizedError).
-			Str("output", sanitizedOutput).
-			Msg("Docker pull failed")
+		rm.logger.Error("Docker pull failed",
+			"error", sanitizedError,
+			"output", sanitizedOutput)
 
 		errorType := rm.categorizePullError(err, output)
 		errorContext := map[string]interface{}{
@@ -231,11 +227,10 @@ func (rm *RegistryManager) PullImage(ctx context.Context, imageRef string) (*Pul
 		"registry":  result.Registry,
 	}
 
-	rm.logger.Info().
-		Str("image_ref", imageRef).
-		Str("registry", result.Registry).
-		Dur("duration", result.Duration).
-		Msg("Docker pull completed successfully")
+	rm.logger.Info("Docker pull completed successfully",
+		"image_ref", imageRef,
+		"registry", result.Registry,
+		"duration", result.Duration)
 
 	return result, nil
 }
@@ -261,10 +256,9 @@ func (rm *RegistryManager) TagImage(ctx context.Context, sourceImage, targetImag
 		Context:     make(map[string]interface{}),
 	}
 
-	rm.logger.Info().
-		Str("source", sourceImage).
-		Str("target", targetImage).
-		Msg("Tagging Docker image")
+	rm.logger.Info("Tagging Docker image",
+		"source", sourceImage,
+		"target", targetImage)
 
 	// Validate inputs
 	if err := rm.validateTagInputs(sourceImage, targetImage); err != nil {
@@ -289,10 +283,9 @@ func (rm *RegistryManager) TagImage(ctx context.Context, sourceImage, targetImag
 	result.Duration = time.Since(startTime)
 
 	if err != nil {
-		rm.logger.Error().
-			Str("error", err.Error()).
-			Str("output", output).
-			Msg("Docker tag failed")
+		rm.logger.Error("Docker tag failed",
+			"error", err.Error(),
+			"output", output)
 
 		result.Error = &RegistryError{
 			Type:     "tag_error",
@@ -316,11 +309,10 @@ func (rm *RegistryManager) TagImage(ctx context.Context, sourceImage, targetImag
 		"target_image": targetImage,
 	}
 
-	rm.logger.Info().
-		Str("source", sourceImage).
-		Str("target", targetImage).
-		Dur("duration", result.Duration).
-		Msg("Docker tag completed successfully")
+	rm.logger.Info("Docker tag completed successfully",
+		"source", sourceImage,
+		"target", targetImage,
+		"duration", result.Duration)
 
 	return result, nil
 }
@@ -329,18 +321,21 @@ func (rm *RegistryManager) TagImage(ctx context.Context, sourceImage, targetImag
 func (rm *RegistryManager) ValidateRegistryAccess(ctx context.Context, registry string) error {
 	// This is a basic validation - in practice, you might want to do a test push/pull
 	if registry == "" {
-		return fmt.Errorf("registry URL is required")
+		return mcperrors.NewError().Messagef("registry URL is required").WithLocation(
+
+		// Basic URL validation
+		).Build()
 	}
 
-	// Basic URL validation
 	if !strings.Contains(registry, ".") {
-		return fmt.Errorf("registry URL appears to be invalid: %s", registry)
+		return mcperrors.NewError().Messagef("registry URL appears to be invalid: %s", registry).WithLocation().Build(
+
+		// Helper methods
+		)
 	}
 
 	return nil
 }
-
-// Helper methods
 
 func (rm *RegistryManager) validatePushInputs(imageRef string, options PushOptions) error {
 	if imageRef == "" {

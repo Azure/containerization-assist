@@ -37,7 +37,7 @@ test-mcp:
 .PHONY: test-integration
 test-integration:
 	@echo "Running MCP integration tests..."
-	go test -tags=integration ./pkg/mcp/internal/test/integration/... -v
+	go test -tags=integration ./test/integration/... -v
 
 .PHONY: test-e2e
 test-e2e:
@@ -80,29 +80,29 @@ coverage-baseline:
 bench:
 	@echo "Running MCP performance benchmarks..."
 	@echo "Target: <300μs P95 per request"
-	go test -bench=. -benchmem -benchtime=5s ./pkg/mcp/tools
+	go test -bench=. -benchmem -benchtime=5s ./pkg/mcp/...
 
 .PHONY: bench-baseline
 bench-baseline:
 	@echo "Setting performance baseline..."
-	go test -bench=. -benchmem -benchtime=10s ./pkg/mcp/tools > bench-baseline.txt
+	go test -bench=. -benchmem -benchtime=10s ./pkg/mcp/... > bench-baseline.txt
 	@echo "Baseline saved to bench-baseline.txt"
 
 .PHONY: lint
 lint:
-	@which golangci-lint > /dev/null || (echo "❌ golangci-lint not found. Install with:"; echo "  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v1.55.2"; echo "  Or use the development container: see .devcontainer/README.md"; exit 1)
+	@which golangci-lint > /dev/null || (echo "❌ golangci-lint not found. Install with:"; echo "  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v2.0.0"; echo "  Or use the development container: see .devcontainer/README.md"; exit 1)
 	@echo "Running linter with error budget (threshold: 100)..."
 	@LINT_ERROR_THRESHOLD=100 LINT_WARN_THRESHOLD=50 ./scripts/lint-with-threshold.sh ./pkg/mcp/...
 
 .PHONY: lint-strict
 lint-strict:
-	@which golangci-lint > /dev/null || (echo "❌ golangci-lint not found. Install with:"; echo "  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v1.55.2"; echo "  Or use the development container: see .devcontainer/README.md"; exit 1)
+	@which golangci-lint > /dev/null || (echo "❌ golangci-lint not found. Install with:"; echo "  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v2.0.0"; echo "  Or use the development container: see .devcontainer/README.md"; exit 1)
 	@echo "Running linter in strict mode (all issues)..."
 	golangci-lint run ./pkg/mcp/...
 
 .PHONY: lint-all
 lint-all:
-	@which golangci-lint > /dev/null || (echo "❌ golangci-lint not found. Install with:"; echo "  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v1.55.2"; echo "  Or use the development container: see .devcontainer/README.md"; exit 1)
+	@which golangci-lint > /dev/null || (echo "❌ golangci-lint not found. Install with:"; echo "  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v2.0.0"; echo "  Or use the development container: see .devcontainer/README.md"; exit 1)
 	golangci-lint run ./...
 
 .PHONY: fmt
@@ -130,13 +130,83 @@ fmt-check:
 install-hooks:
 	@./scripts/install-precommit-hooks.sh
 
+.PHONY: validate-architecture
+validate-architecture:
+	@echo "Validating three-layer architecture..."
+	@./scripts/validate-architecture.sh
+
+# Quality Gates
+.PHONY: quality-gates
+quality-gates:
+	@echo "Running comprehensive quality gates..."
+	@scripts/quality/quality_gates.sh
+
+.PHONY: quality-gates-ci
+quality-gates-ci:
+	@echo "Running quality gates for CI..."
+	@COVERAGE_THRESHOLD=15.0 LINT_ERROR_BUDGET=100 scripts/quality/quality_gates.sh
+
+.PHONY: quality-dashboard
+quality-dashboard:
+	@echo "Generating quality metrics dashboard..."
+	@scripts/quality/generate_metrics_dashboard.sh
+
+
+.PHONY: pre-commit-hook
+pre-commit-hook:
+	@echo "Running pre-commit quality checks..."
+	@scripts/quality/pre_commit_hook.sh
+
+.PHONY: quality-all
+quality-all: fmt-check lint coverage quality-gates quality-dashboard
+	@echo "✅ All quality checks completed!"
+
 .PHONY: pre-commit
 pre-commit:
 	@pre-commit run --all-files
+	@$(MAKE) validate-architecture
+
+.PHONY: generate
+generate: build-schemaGen generate-pipelines
+	@echo "Generating tool schemas..."
+	@go generate ./...
+
+.PHONY: build-schemaGen
+build-schemaGen:
+	@echo "Building schema generator..."
+	@go build -o bin/schemaGen ./cmd/mcp-schema-gen
+
+# Pipeline code generation
+.PHONY: generate-pipelines clean-generated validate-generation
+
+generate-pipelines:
+	@echo "Generating pipelines from templates..."
+	@go build -o tools/pipeline-generator/pipeline-generator ./tools/pipeline-generator
+	@tools/pipeline-generator/pipeline-generator -template tools/pipeline-generator/templates/pipeline.go.tmpl -output pkg/mcp/application/pipeline/generated_pipeline.go -name ExamplePipeline -stages "ValidateInput,ProcessData,GenerateOutput"
+	@echo "✅ Pipeline generation complete"
+
+clean-generated:
+	@echo "Cleaning generated pipeline files..."
+	@find pkg/mcp/application/pipeline -name "generated_*.go" -type f -delete
+	@echo "✅ Generated files cleaned"
+
+validate-generation:
+	@echo "Validating code generation..."
+	@$(MAKE) generate-pipelines
+	@go build ./pkg/mcp/application/pipeline && echo "✅ Generated code builds successfully"
+	@go test ./pkg/mcp/application/pipeline && echo "✅ Generated code tests pass"
+
+.PHONY: check-schemas
+check-schemas:
+	@echo "Checking if schemas are up to date..."
+	@./scripts/check-schemas.sh
 
 .PHONY: clean
 clean:
 	rm -f container-kit-mcp
+	rm -f bin/schemaGen
+	rm -f tools/pipeline-generator/pipeline-generator
+	find . -name "generated_*.go" -type f -delete
 
 .PHONY: deps-update
 deps-update:
@@ -236,7 +306,7 @@ validate-structure:
 .PHONY: validate-interfaces
 validate-interfaces:
 	@echo "Running interface validation..."
-	@go run tools/validate-interfaces/main.go
+	@go run tools/validate-interfaces/*.go
 
 .PHONY: check-hygiene
 check-hygiene:
@@ -320,8 +390,15 @@ help:
 	@echo "  bench-performance    Compare performance to baseline"
 	@echo "  baseline-performance Establish new performance baseline"
 	@echo ""
+	@echo "Code generation targets:"
+	@echo "  generate          Generate tool schemas and pipelines"
+	@echo "  generate-pipelines Generate pipeline code from templates"
+	@echo "  clean-generated   Remove generated pipeline files"
+	@echo "  validate-generation Build and test generated code"
+	@echo "  check-schemas     Check if generated schemas are up to date"
+	@echo ""
 	@echo "Other targets:"
-	@echo "  clean             Remove built binaries"
+	@echo "  clean             Remove built binaries and generated files"
 	@echo "  version           Show version of built binary"
 	@echo "  help              Show this help message"
 	@echo ""

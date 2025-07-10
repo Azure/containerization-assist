@@ -2,13 +2,13 @@ package k8s
 
 import (
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/logger"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/templates"
 	"sigs.k8s.io/yaml"
 )
@@ -40,10 +40,10 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 
 	fileInfo, err := os.Stat(path)
 	if err != nil {
-		return nil, fmt.Errorf("error accessing directory %s: %v", path, err)
+		return nil, mcperrors.NewError().Messagef("error accessing directory %s: %v", path, err).WithLocation().Build()
 	}
 	if !fileInfo.IsDir() {
-		return nil, fmt.Errorf("%s is not a directory", path)
+		return nil, mcperrors.NewError().Messagef("%s is not a directory", path).WithLocation().Build()
 	}
 
 	logger.Infof("Finding Kubernetes manifest files in directory: %s", path)
@@ -60,7 +60,7 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 		if !d.IsDir() && (strings.HasSuffix(d.Name(), ".yaml") || strings.HasSuffix(d.Name(), ".yml")) {
 			fileContent, err := os.ReadFile(filePath)
 			if err != nil {
-				return fmt.Errorf("reading file %s: %w", filePath, err)
+				return mcperrors.NewError().Messagef("reading file %s: %w", filePath, err).WithLocation().Build()
 			}
 			o, err := ReadK8sObjects(fileContent)
 			if err != nil {
@@ -81,7 +81,7 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("error walking manifest directory: %v", err)
+		return nil, mcperrors.NewError().Messagef("error walking manifest directory: %v", err).WithLocation().Build()
 	}
 	return k8sObjects, nil
 }
@@ -89,11 +89,11 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 func ReadK8sObjects(content []byte) (K8sObject, error) {
 	var o K8sObject
 	if strings.Contains(string(content), ManifestObjectDelimiter) {
-		return o, fmt.Errorf("multi-object manifests are not yet supported")
+		return o, mcperrors.NewError().Messagef("multi-object manifests are not yet supported").WithLocation().Build()
 	}
 	err := yaml.Unmarshal(content, &o)
 	if err != nil {
-		return o, fmt.Errorf("unmarshaling yaml as k8s object: %w", err)
+		return o, mcperrors.NewError().Messagef("unmarshaling yaml as k8s object: %w", err).WithLocation().Build()
 	}
 	o.Content = content
 	return o, nil
@@ -129,7 +129,7 @@ func WriteManifestsFromTemplate(templateName ManifestsName, targetDir string, im
 
 	manifestsDir := filepath.Join(targetDir, MANIFEST_TARGET_DIR)
 	if err := os.MkdirAll(manifestsDir, 0755); err != nil {
-		return fmt.Errorf("creating manifests directory %q: %w", manifestsDir, err)
+		return mcperrors.NewError().Messagef("creating manifests directory %q: %w", manifestsDir, err).WithLocation().Build()
 	}
 
 	for _, filename := range filesToCopy {
@@ -140,7 +140,7 @@ func WriteManifestsFromTemplate(templateName ManifestsName, targetDir string, im
 				logger.Debugf("Template file %s does not exist, skipping", embeddedPath)
 				continue
 			}
-			return fmt.Errorf("reading embedded file %q: %w", embeddedPath, err)
+			return mcperrors.NewError().Messagef("reading embedded file %q: %w", embeddedPath, err).WithLocation().Build()
 		}
 
 		destPath := filepath.Join(manifestsDir, filename)
@@ -149,7 +149,7 @@ func WriteManifestsFromTemplate(templateName ManifestsName, targetDir string, im
 		logger.Debugf("Writing updated manifest to: %s", destPath)
 		data = []byte(updatedData)
 		if err := os.WriteFile(destPath, data, 0644); err != nil {
-			return fmt.Errorf("writing file %q: %w", destPath, err)
+			return mcperrors.NewError().Messagef("writing file %q: %w", destPath, err).WithLocation().Build()
 		}
 	}
 	return nil

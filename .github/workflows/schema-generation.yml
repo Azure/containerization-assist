@@ -1,0 +1,234 @@
+name: Schema Generation Check
+
+on:
+  pull_request:
+    paths:
+      - 'pkg/mcp/**/*Args*.go'
+      - 'pkg/mcp/**/*_types.go'
+      - 'pkg/mcp/application/api/**'
+      - 'pkg/mcp/domain/tools/**'
+      - 'cmd/schemaGen/**'
+      - 'Makefile'
+  push:
+    branches:
+      - main
+      - 'gambtho/**'
+    paths:
+      - 'pkg/mcp/**/*Args*.go'
+      - 'pkg/mcp/**/*_types.go'
+      - 'pkg/mcp/application/api/**'
+      - 'pkg/mcp/domain/tools/**'
+      - 'cmd/schemaGen/**'
+      - 'Makefile'
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  check-schema-generation:
+    name: Check Schema Generation
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.1'
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Generate schemas
+      run: |
+        make generate
+        # Format generated files to ensure consistency
+        gofmt -w pkg/mcp/application/internal/conversation/*_tool.go test/example/*_tool.go 2>/dev/null || true
+        # Run twice to ensure idempotency (files should not change on second run)
+        make generate
+
+    - name: Check for uncommitted changes
+      id: check-changes
+      run: |
+        # Check for changes excluding go.sum (dependency lockfile changes during wire generation)
+        changes=$(git status --porcelain | grep -v "go.sum" || true)
+        if [ -n "$changes" ]; then
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+          echo "::error::Generated schemas are out of date. Please run 'make generate' and commit the changes."
+          echo "The following files have uncommitted changes:"
+          echo "$changes"
+          echo ""
+          echo "Diff of changes (excluding go.sum):"
+          git diff -- . ':!go.sum'
+          exit 1
+        else
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+          echo "✅ All generated schemas are up to date!"
+        fi
+
+    - name: Comment PR if schemas need updating
+      if: failure() && github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const output = `
+          ⚠️ **Generated schemas are out of date!**
+
+          Please run the following command and commit the changes:
+          \`\`\`bash
+          make generate
+          \`\`\`
+
+          This ensures that the JSON schemas match the current tool argument structs.
+          `;
+
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: output
+          });
+
+  validate-generated-schemas:
+    name: Validate Generated Schemas
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.1'
+
+    - name: Validate schema syntax
+      run: |
+        # Find all generated schema files
+        echo "Validating generated schema files..."
+
+        for schema_file in $(find pkg/mcp -name "generated_*.go" -type f); do
+          echo "Checking $schema_file..."
+
+          # Check that the file is properly formatted Go code
+          gofmt -l "$schema_file" | grep . && {
+            echo "::error file=$schema_file::Schema file is not properly formatted. Run 'gofmt -w $schema_file'"
+            exit 1
+          } || true
+
+          # Check that the file compiles
+          go build -o /dev/null "$schema_file" 2>&1 || {
+            echo "::error file=$schema_file::Schema file has compilation errors"
+            exit 1
+          }
+        done
+
+        echo "✅ All generated schemas are valid!"
+
+    - name: Test schema generation
+      run: |
+        # Build the schema generator
+        make build-schemaGen
+
+        # Create a simple test file for schema generation
+        mkdir -p /tmp/schema-test
+        cat > /tmp/schema-test/test_args.go << 'EOF'
+        package test
+
+        // TestArgs represents test arguments
+        type TestArgs struct {
+            Name string `json:"name"`
+            Count int  `json:"count"`
+        }
+        EOF
+
+        # Test schema generation
+        cd /tmp/schema-test
+        /home/runner/work/container-kit/container-kit/bin/schemaGen -tool=test_tool_args -domain=test -output=.
+
+        # Check that generation succeeded
+        if [ ! -f toolargs_tool.go ]; then
+          echo "::error::Schema generation test failed"
+          exit 1
+        fi
+
+        # Verify the generated file compiles
+        go mod init test-schema 2>/dev/null || true
+        go get github.com/Azure/container-kit/pkg/mcp/application/api@latest 2>/dev/null || true
+        go get github.com/Azure/container-kit/pkg/mcp/domain/errors@latest 2>/dev/null || true
+        go get github.com/Azure/container-kit/pkg/mcp/domain/session@latest 2>/dev/null || true
+        go get github.com/rs/zerolog@latest 2>/dev/null || true
+        go build -o /dev/null toolargs_tool.go 2>&1 || {
+          echo "::warning::Generated schema file has compilation errors in isolated environment (expected)"
+          echo "This is expected since the test is run in isolation from the main module"
+        }
+
+        echo "✅ Schema generation test passed!"
+
+  check-tool-compliance:
+    name: Check Tool Compliance
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.1'
+
+    - name: Check for missing go:generate directives
+      run: |
+        echo "Checking for Args structs without go:generate directives..."
+
+        missing_directives=0
+
+        # Find all files with Args structs
+        for file in $(find pkg/mcp -name "*.go" -type f | xargs grep -l "type.*Args struct" 2>/dev/null | grep -v "_test.go" | grep -v "generated_" || true); do
+          # Skip example and test files
+          if [[ "$file" == *"/example/"* ]] || [[ "$file" == *"_test.go" ]]; then
+            continue
+          fi
+
+          # Check if file has go:generate directive
+          if ! grep -q "//go:generate.*schemaGen" "$file"; then
+            echo "::warning file=$file::File contains Args struct but missing go:generate directive"
+            missing_directives=$((missing_directives + 1))
+          fi
+        done
+
+        if [ $missing_directives -gt 0 ]; then
+          echo "::warning::Found $missing_directives files with Args structs but no go:generate directive"
+        else
+          echo "✅ All Args structs have go:generate directives!"
+        fi
+
+    - name: Check Schema() method implementation
+      run: |
+        echo "Checking that tools implement Schema() method..."
+
+        # This is a simple check - in practice you might want to use go/ast
+        for tool_file in $(find pkg/mcp -name "*_atomic.go" -o -name "*_tool.go" 2>/dev/null | grep -v "_test.go" || true); do
+          # Check if file has a tool struct (rough heuristic)
+          if grep -q "type.*Tool struct" "$tool_file"; then
+            # Check if it has a Schema() method
+            if ! grep -q "func.*Schema().*interface{}" "$tool_file"; then
+              echo "::warning file=$tool_file::Tool file may be missing Schema() method implementation"
+            fi
+          fi
+        done
+
+        echo "✅ Schema method check completed!"

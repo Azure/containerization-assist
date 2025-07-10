@@ -5,13 +5,19 @@ on:
     branches:
       - main
     paths:
-      - 'pkg/mcp/tools/**'
+      - 'pkg/mcp/domain/tools/**'
+      - 'pkg/mcp/application/tools/**'
+      - 'pkg/mcp/application/commands/**'
+      - 'pkg/mcp/application/api/**'
       - 'cmd/mcp-server/**'
   pull_request:
     branches:
       - main
     paths:
-      - 'pkg/mcp/tools/**'
+      - 'pkg/mcp/domain/tools/**'
+      - 'pkg/mcp/application/tools/**'
+      - 'pkg/mcp/application/commands/**'
+      - 'pkg/mcp/application/api/**'
       - 'cmd/mcp-server/**'
   workflow_dispatch: # Allow manual trigger
 
