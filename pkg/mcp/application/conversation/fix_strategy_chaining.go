@@ -23,14 +23,14 @@ type FixChain struct {
 
 // ChainedFixStrategy represents a single strategy in a fix chain
 type ChainedFixStrategy struct {
-	Name             string        `json:"name"`
-	Strategy         FixStrategy   `json:"-"`
-	Timeout          time.Duration `json:"timeout"`
-	MaxRetries       int           `json:"max_retries"`
-	ContinueOnError  bool          `json:"continue_on_error"`
-	Prerequisites    []string      `json:"prerequisites"`
-	PostConditions   []string      `json:"post_conditions"`
-	TransformArgs    ArgsTransform `json:"-"`
+	Name            string        `json:"name"`
+	Strategy        FixStrategy   `json:"-"`
+	Timeout         time.Duration `json:"timeout"`
+	MaxRetries      int           `json:"max_retries"`
+	ContinueOnError bool          `json:"continue_on_error"`
+	Prerequisites   []string      `json:"prerequisites"`
+	PostConditions  []string      `json:"post_conditions"`
+	TransformArgs   ArgsTransform `json:"-"`
 }
 
 // ChainCondition defines when a fix chain should be applied
@@ -57,13 +57,13 @@ const (
 
 // ChainResult represents the result of executing a fix chain
 type ChainResult struct {
-	ChainName       string                    `json:"chain_name"`
-	Success         bool                      `json:"success"`
-	ExecutedSteps   []ChainStepResult         `json:"executed_steps"`
-	FinalResult     interface{}               `json:"final_result"`
-	TotalDuration   time.Duration             `json:"total_duration"`
-	FailureReason   string                    `json:"failure_reason,omitempty"`
-	Suggestions     []string                  `json:"suggestions,omitempty"`
+	ChainName           string                 `json:"chain_name"`
+	Success             bool                   `json:"success"`
+	ExecutedSteps       []ChainStepResult      `json:"executed_steps"`
+	FinalResult         interface{}            `json:"final_result"`
+	TotalDuration       time.Duration          `json:"total_duration"`
+	FailureReason       string                 `json:"failure_reason,omitempty"`
+	Suggestions         []string               `json:"suggestions,omitempty"`
 	IntermediateResults map[string]interface{} `json:"intermediate_results"`
 }
 
@@ -331,17 +331,17 @@ func (e *FixChainExecutor) executeChainSteps(ctx context.Context, chain *FixChai
 		if stepResult.Success {
 			lastResult = stepResult.Result
 			result.IntermediateResults[strategy.Name] = stepResult.Result
-			
+
 			// Transform args for next step if transformer is provided
 			if strategy.TransformArgs != nil {
 				currentArgs = strategy.TransformArgs(lastResult, currentArgs)
 			}
-			
+
 			// Clear the error since this step succeeded
 			lastError = nil
 		} else {
 			lastError = fmt.Errorf(stepResult.Error)
-			
+
 			if !strategy.ContinueOnError {
 				result.Success = false
 				result.FailureReason = fmt.Sprintf("Step '%s' failed: %s", strategy.Name, stepResult.Error)
@@ -399,10 +399,10 @@ func (e *FixChainExecutor) executeChainStep(ctx context.Context, strategy *Chain
 	// Execute the strategy with retries
 	var result interface{}
 	var execErr error
-	
+
 	for retry := 0; retry <= strategy.MaxRetries; retry++ {
 		stepResult.RetryCount = retry
-		
+
 		// Get the actual fix strategy from the helper
 		if fixStrategy, exists := e.helper.fixes[strategy.Name]; exists {
 			result, execErr = fixStrategy(stepCtx, tool, args, err)
@@ -415,7 +415,7 @@ func (e *FixChainExecutor) executeChainStep(ctx context.Context, strategy *Chain
 			execErr = fmt.Errorf("fix strategy '%s' not found", strategy.Name)
 			break
 		}
-		
+
 		// Log retry attempt
 		if retry < strategy.MaxRetries {
 			e.logger.Debug("Fix strategy retry",
@@ -426,7 +426,7 @@ func (e *FixChainExecutor) executeChainStep(ctx context.Context, strategy *Chain
 	}
 
 	stepResult.Duration = time.Since(startTime)
-	
+
 	if !stepResult.Success {
 		stepResult.Error = execErr.Error()
 	}
@@ -440,7 +440,7 @@ func (e *FixChainExecutor) generateChainSuggestions(result *ChainResult, chain *
 
 	if !result.Success {
 		suggestions = append(suggestions, "Consider running the chain again with different parameters")
-		
+
 		// Analyze failed steps to provide specific suggestions
 		for _, step := range result.ExecutedSteps {
 			if !step.Success {

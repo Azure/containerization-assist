@@ -13,12 +13,12 @@ import (
 
 // AutoFixHelper provides automatic error recovery and fixing capabilities
 type AutoFixHelper struct {
-	logger       *slog.Logger
-	fixes        map[string]FixStrategy
-	sessionStore services.SessionStore
-	sessionState services.SessionState
-	fileAccess   services.FileAccessService
-	fixHistory   map[string][]FixAttempt
+	logger        *slog.Logger
+	fixes         map[string]FixStrategy
+	sessionStore  services.SessionStore
+	sessionState  services.SessionState
+	fileAccess    services.FileAccessService
+	fixHistory    map[string][]FixAttempt
 	chainExecutor *FixChainExecutor
 }
 

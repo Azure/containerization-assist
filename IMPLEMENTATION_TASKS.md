@@ -16,7 +16,7 @@ These can be implemented immediately with minimal risk:
 - Return real results
 ```
 
-#### 1.2 Fix list_sessions Tool  
+#### 1.2 Fix list_sessions Tool
 ```go
 // Query real SessionStore instead of returning mock data
 sessions, err := t.sessionStore.List(ctx, filter)
@@ -41,7 +41,7 @@ func (cmd *ConsolidatedAnalyzeCommand) detectLanguageByExtension(ctx context.Con
         ".go": "go", ".js": "javascript", ".py": "python",
         ".java": "java", ".cs": "csharp", ".rb": "ruby",
     }
-    
+
     counts := make(map[string]int)
     err := filepath.Walk(workspaceDir, func(path string, info os.FileInfo, err error) error {
         if err != nil || info.IsDir() {
@@ -53,7 +53,7 @@ func (cmd *ConsolidatedAnalyzeCommand) detectLanguageByExtension(ctx context.Con
         }
         return nil
     })
-    
+
     return counts, err
 }
 ```
@@ -85,14 +85,14 @@ func (cmd *ConsolidatedAnalyzeCommand) detectGoFramework(result *analyze.Analysi
     if err != nil {
         return nil // No go.mod, not a Go project
     }
-    
+
     frameworks := map[string]string{
         "gin-gonic/gin": "gin",
         "labstack/echo": "echo",
         "gofiber/fiber": "fiber",
         "gorilla/mux": "gorilla",
     }
-    
+
     for pattern, name := range frameworks {
         if strings.Contains(string(content), pattern) {
             result.Framework = analyze.Framework{
@@ -115,12 +115,12 @@ func (cmd *ConsolidatedAnalyzeCommand) detectJSFramework(result *analyze.Analysi
     if err != nil {
         return nil
     }
-    
+
     var pkg map[string]interface{}
     if err := json.Unmarshal(content, &pkg); err != nil {
         return err
     }
-    
+
     // Check dependencies
     deps := make(map[string]bool)
     if d, ok := pkg["dependencies"].(map[string]interface{}); ok {
@@ -133,7 +133,7 @@ func (cmd *ConsolidatedAnalyzeCommand) detectJSFramework(result *analyze.Analysi
             deps[k] = true
         }
     }
-    
+
     // Detect framework
     switch {
     case deps["react"]:
@@ -147,7 +147,7 @@ func (cmd *ConsolidatedAnalyzeCommand) detectJSFramework(result *analyze.Analysi
     case deps["next"]:
         result.Framework.Name = "nextjs"
     }
-    
+
     return nil
 }
 ```
@@ -163,14 +163,14 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeGoDependencies(workspaceDir string
     if err != nil {
         return nil, err
     }
-    
+
     var deps []analyze.Dependency
     lines := strings.Split(string(content), "\n")
     inRequire := false
-    
+
     for _, line := range lines {
         line = strings.TrimSpace(line)
-        
+
         if line == "require (" {
             inRequire = true
             continue
@@ -178,7 +178,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeGoDependencies(workspaceDir string
         if inRequire && line == ")" {
             break
         }
-        
+
         if inRequire && line != "" {
             parts := strings.Fields(line)
             if len(parts) >= 2 {
@@ -190,7 +190,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeGoDependencies(workspaceDir string
             }
         }
     }
-    
+
     return deps, nil
 }
 ```
@@ -208,20 +208,20 @@ func (cmd *ConsolidatedAnalyzeCommand) detectDatabases(ctx context.Context, work
         "redis://": "redis",
         "DATABASE_URL": "unknown",
     }
-    
+
     // Search for database connections in common files
     searchFiles := []string{
         ".env", ".env.example", "config.yaml", "config.json",
         "application.properties", "appsettings.json",
     }
-    
+
     for _, file := range searchFiles {
         path := filepath.Join(workspaceDir, file)
         content, err := os.ReadFile(path)
         if err != nil {
             continue
         }
-        
+
         contentStr := string(content)
         for pattern, dbType := range patterns {
             if strings.Contains(contentStr, pattern) {
@@ -232,10 +232,10 @@ func (cmd *ConsolidatedAnalyzeCommand) detectDatabases(ctx context.Context, work
             }
         }
     }
-    
+
     // Also check for ORM imports in code
     // ... implementation
-    
+
     return databases, nil
 }
 ```
@@ -282,24 +282,24 @@ func (t *LazyGenerateDockerfileTool) Execute(ctx context.Context, input api.Tool
     if language == "" {
         // Run analysis first to detect language
     }
-    
+
     // Get template service
     templateService := t.services.TemplateService()
-    
+
     // Generate Dockerfile using templates
     dockerfile, err := templateService.GenerateDockerfile(language, input.Data)
     if err != nil {
         return api.ToolOutput{Success: false, Error: err.Error()}, nil
     }
-    
+
     // Save to workspace
     workspaceDir := t.getWorkspaceDir(ctx, input.SessionID)
     dockerfilePath := filepath.Join(workspaceDir, "Dockerfile")
-    
+
     if err := os.WriteFile(dockerfilePath, []byte(dockerfile), 0644); err != nil {
         return api.ToolOutput{Success: false, Error: err.Error()}, nil
     }
-    
+
     return api.ToolOutput{
         Success: true,
         Data: map[string]interface{}{
@@ -318,7 +318,7 @@ func (t *LazyGenerateDockerfileTool) Execute(ctx context.Context, input api.Tool
 
 For each implementation:
 - [ ] Test happy path
-- [ ] Test error cases  
+- [ ] Test error cases
 - [ ] Test edge cases
 - [ ] Test security boundaries
 - [ ] Mock dependencies
@@ -363,7 +363,7 @@ func TestAnalyzeBuildDeployWorkflow(t *testing.T) {
 - [ ] Integrate with analyze command
 - [ ] Security testing
 
-### Week 3: Analysis Features  
+### Week 3: Analysis Features
 - [ ] Framework detection (Go, JS, Python, Java)
 - [ ] Dependency parsing
 - [ ] Database detection

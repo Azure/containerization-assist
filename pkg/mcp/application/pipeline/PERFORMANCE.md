@@ -4,7 +4,7 @@
 
 ### Pipeline Execution Performance
 - **Orchestration Pipeline**: Lightweight execution with fluent API
-- **Workflow Pipeline**: Sequential/parallel execution options  
+- **Workflow Pipeline**: Sequential/parallel execution options
 - **Atomic Pipeline**: Thread-safe atomic execution
 - **Command Router**: O(1) map-based command lookup
 

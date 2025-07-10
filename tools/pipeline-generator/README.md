@@ -5,7 +5,7 @@ Generates pipeline, stage, and router code from templates to achieve 80% boilerp
 ## Features
 
 - **Pipeline Generation**: Creates complete pipeline implementations with unified interface
-- **Stage Generation**: Generates stage boilerplate with configuration structures  
+- **Stage Generation**: Generates stage boilerplate with configuration structures
 - **Router Generation**: Creates command routers with automatic registration
 - **Template-Based**: Customizable templates for different pipeline patterns
 

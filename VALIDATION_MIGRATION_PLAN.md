@@ -102,7 +102,7 @@ func (v *MyValidator) Validate(ctx context.Context, data interface{}) *core.Resu
 
 // AFTER:
 type MyValidator struct {
-    // fields  
+    // fields
 }
 func (v *MyValidator) Validate(ctx context.Context, data interface{}) validation.ValidationResult
 func (v *MyValidator) Domain() string { return "my-domain" }
@@ -113,7 +113,7 @@ func (v *MyValidator) Dependencies() []string { return nil }
 
 ### Hard Migration Pattern:
 ```go
-// BEFORE: 
+// BEFORE:
 type ValidatorRegistry interface {
     Register(validator core.Validator) error
     // ... core methods
@@ -121,7 +121,7 @@ type ValidatorRegistry interface {
 
 // AFTER:
 type ValidatorRegistry interface {
-    Register(validator validation.DomainValidator[interface{}]) error  
+    Register(validator validation.DomainValidator[interface{}]) error
     // ... validation methods
 }
 ```
@@ -131,7 +131,7 @@ type ValidatorRegistry interface {
 ### From pkg/mcp/domain/security:
 - `security.ValidationResult[T]` - Type-safe validation results
 - `security.ValidationError` - Rich validation errors
-- `security.ValidationWarning` - Validation warnings  
+- `security.ValidationWarning` - Validation warnings
 - `security.Validator` - Main validator interface
 - `security.TypedValidator[T]` - Type-safe validator interface
 - `security.Result` - Untyped validation result for compatibility
@@ -167,12 +167,12 @@ type ValidatorRegistry interface {
 
 ## Time Estimate: 8-12 hours total
 - Phase 1: 1-2 hours (3 easy files)
-- Phase 2: 2-3 hours (2 medium files)  
+- Phase 2: 2-3 hours (2 medium files)
 - Phase 3: 4-6 hours (2 hard files)
 - Phase 4: 1 hour (cleanup & testing)
 
 ## Next Steps
 1. Start with Phase 1 easy migrations
-2. Test after each file migration  
+2. Test after each file migration
 3. Proceed through phases sequentially
 4. Complete with package removal and final testing

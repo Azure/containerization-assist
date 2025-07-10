@@ -58,7 +58,7 @@ func RegisterTool(name string, creator api.ToolCreator) {
 func GetAutoRegisteredTools() map[string]api.ToolCreator {
     autoMutex.RLock()
     defer autoMutex.RUnlock()
-    
+
     tools := make(map[string]api.ToolCreator)
     for k, v := range autoRegistry {
         tools[k] = v
@@ -98,7 +98,7 @@ EOF
 
 # Repeat for other tools:
 # - build_consolidated.go
-# - deploy_consolidated.go  
+# - deploy_consolidated.go
 # - scan_consolidated.go
 ```
 
@@ -126,7 +126,7 @@ find pkg/mcp -name "*session*.go" -type f | grep -v migrate_tools.go
 for file in pkg/mcp/application/commands/*_consolidated.go; do
     tool_name=$(basename $file | sed 's/_consolidated.go//')
     echo "Adding auto-registration to $file for tool: $tool_name"
-    
+
     # Check if init already exists
     if ! grep -q "func init()" "$file"; then
         cat >> "$file" << EOF
@@ -161,7 +161,7 @@ func main() {
     for name := range tools {
         fmt.Printf("  - %s\n", name)
     }
-    
+
     // Expected tools
     expected := []string{
         "containerization_analyze",
@@ -171,7 +171,7 @@ func main() {
         "session_create",
         "session_manage",
     }
-    
+
     for _, exp := range expected {
         if _, ok := tools[exp]; !ok {
             fmt.Printf("ERROR: Missing tool: %s\n", exp)
@@ -221,12 +221,12 @@ import (
 // InitializeRegistry creates and populates the registry with all tools
 func InitializeRegistry() (api.Registry, error) {
     reg := registry.NewUnifiedRegistry()
-    
+
     // Load all auto-registered tools
     if err := registry.LoadAutoRegisteredTools(reg); err != nil {
         return nil, err
     }
-    
+
     return reg, nil
 }
 EOF
@@ -259,20 +259,20 @@ import (
 
 func TestAutoRegistration(t *testing.T) {
     tools := registry.GetAutoRegisteredTools()
-    
+
     expectedTools := []string{
         "containerization_analyze",
         "containerization_build",
         "containerization_deploy",
         "containerization_scan",
     }
-    
+
     for _, expected := range expectedTools {
         if _, ok := tools[expected]; !ok {
             t.Errorf("Expected tool %s not found in auto-registry", expected)
         }
     }
-    
+
     if len(tools) < len(expectedTools) {
         t.Errorf("Expected at least %d tools, got %d", len(expectedTools), len(tools))
     }
@@ -280,12 +280,12 @@ func TestAutoRegistration(t *testing.T) {
 
 func TestLoadAutoRegisteredTools(t *testing.T) {
     reg := registry.NewUnifiedRegistry()
-    
+
     err := registry.LoadAutoRegisteredTools(reg)
     if err != nil {
         t.Fatalf("Failed to load auto-registered tools: %v", err)
     }
-    
+
     // Verify tools are accessible
     tools := reg.List()
     if len(tools) == 0 {

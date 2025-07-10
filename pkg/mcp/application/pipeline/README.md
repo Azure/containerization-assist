@@ -5,7 +5,7 @@ The unified pipeline system consolidates all pipeline implementations into a sin
 ## Pipeline Types
 
 - **AtomicPipeline**: Atomic execution with rollback capability
-- **WorkflowPipeline**: Sequential/parallel workflow execution  
+- **WorkflowPipeline**: Sequential/parallel workflow execution
 - **OrchestrationPipeline**: Full orchestration with timeout/retry
 
 ## Usage

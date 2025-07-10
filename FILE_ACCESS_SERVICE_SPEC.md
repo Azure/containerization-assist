@@ -32,22 +32,22 @@ type FileInfo struct {
 type FileAccessService interface {
     // ReadFile reads a file's contents within the session workspace
     ReadFile(ctx context.Context, sessionID, relativePath string) (string, error)
-    
+
     // ReadFileWithLimit reads up to maxBytes from a file
     ReadFileWithLimit(ctx context.Context, sessionID, relativePath string, maxBytes int64) (string, bool, error)
-    
+
     // ListDirectory lists files and directories
     ListDirectory(ctx context.Context, sessionID, relativePath string) ([]FileInfo, error)
-    
+
     // FileExists checks if a file exists
     FileExists(ctx context.Context, sessionID, relativePath string) (bool, error)
-    
+
     // GetFileInfo retrieves file metadata
     GetFileInfo(ctx context.Context, sessionID, relativePath string) (*FileInfo, error)
-    
+
     // GetFileTree generates a tree representation of a directory
     GetFileTree(ctx context.Context, sessionID, rootPath string, maxDepth int) (string, error)
-    
+
     // SearchFiles searches for files matching a pattern
     SearchFiles(ctx context.Context, sessionID, pattern string, searchPath string) ([]string, error)
 }
@@ -65,7 +65,7 @@ import (
     "os"
     "path/filepath"
     "strings"
-    
+
     "github.com/Azure/container-kit/pkg/mcp/application/services"
     "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
@@ -104,7 +104,7 @@ func (f *fileAccessService) validatePath(sessionID, relativePath string) (string
             Message("invalid session").
             Build()
     }
-    
+
     workspaceDir := session.WorkspaceDir
     if workspaceDir == "" {
         return "", errors.NewError().
@@ -112,10 +112,10 @@ func (f *fileAccessService) validatePath(sessionID, relativePath string) (string
             Message("session has no workspace").
             Build()
     }
-    
+
     // Clean and resolve the path
     cleanPath := filepath.Clean(relativePath)
-    
+
     // Prevent path traversal
     if strings.Contains(cleanPath, "..") {
         return "", errors.NewError().
@@ -123,10 +123,10 @@ func (f *fileAccessService) validatePath(sessionID, relativePath string) (string
             Message("path traversal not allowed").
             Build()
     }
-    
+
     // Build absolute path
     absPath := filepath.Join(workspaceDir, cleanPath)
-    
+
     // Verify the path is within workspace
     if !strings.HasPrefix(absPath, workspaceDir) {
         return "", errors.NewError().
@@ -134,7 +134,7 @@ func (f *fileAccessService) validatePath(sessionID, relativePath string) (string
             Message("path outside workspace").
             Build()
     }
-    
+
     // Check blocked paths
     for _, blocked := range f.blockedPaths {
         if strings.Contains(cleanPath, blocked) {
@@ -144,7 +144,7 @@ func (f *fileAccessService) validatePath(sessionID, relativePath string) (string
                 Build()
         }
     }
-    
+
     return absPath, nil
 }
 ```
@@ -157,18 +157,18 @@ func defaultAllowedExtensions() map[string]bool {
         // Source code
         ".go": true, ".js": true, ".ts": true, ".py": true, ".java": true,
         ".c": true, ".cpp": true, ".cs": true, ".rb": true, ".php": true,
-        
+
         // Config files
         ".json": true, ".yaml": true, ".yml": true, ".toml": true, ".ini": true,
         ".xml": true, ".properties": true, ".env": true, ".config": true,
-        
+
         // Build files
         ".dockerfile": true, "Dockerfile": true, ".dockerignore": true,
         "Makefile": true, ".makefile": true, ".gradle": true, ".maven": true,
-        
+
         // Documentation
         ".md": true, ".txt": true, ".rst": true, ".adoc": true,
-        
+
         // Package files
         "go.mod": true, "go.sum": true, "package.json": true, "package-lock.json": true,
         "requirements.txt": true, "pom.xml": true, "build.gradle": true,
@@ -216,7 +216,7 @@ func (t *ReadFileTool) Execute(ctx context.Context, input api.ToolInput) (api.To
             Error:   "path parameter is required",
         }, nil
     }
-    
+
     // Read file
     content, err := t.fileAccess.ReadFile(ctx, input.SessionID, filePath)
     if err != nil {
@@ -225,7 +225,7 @@ func (t *ReadFileTool) Execute(ctx context.Context, input api.ToolInput) (api.To
             Error:   err.Error(),
         }, nil
     }
-    
+
     return api.ToolOutput{
         Success: true,
         Data: map[string]interface{}{
@@ -251,7 +251,7 @@ func (t *ListDirectoryTool) Execute(ctx context.Context, input api.ToolInput) (a
     if dirPath == "" {
         dirPath = "." // Default to workspace root
     }
-    
+
     // List directory
     files, err := t.fileAccess.ListDirectory(ctx, input.SessionID, dirPath)
     if err != nil {
@@ -260,7 +260,7 @@ func (t *ListDirectoryTool) Execute(ctx context.Context, input api.ToolInput) (a
             Error:   err.Error(),
         }, nil
     }
-    
+
     // Convert to output format
     fileList := make([]map[string]interface{}, len(files))
     for i, f := range files {
@@ -272,7 +272,7 @@ func (t *ListDirectoryTool) Execute(ctx context.Context, input api.ToolInput) (a
             "modified": f.ModTime,
         }
     }
-    
+
     return api.ToolOutput{
         Success: true,
         Data: map[string]interface{}{
@@ -290,17 +290,17 @@ func (t *ListDirectoryTool) Execute(ctx context.Context, input api.ToolInput) (a
 // Updated analyze command using file access
 func (cmd *ConsolidatedAnalyzeCommand) detectLanguageByExtension(ctx context.Context, workspaceDir string) (map[string]int, error) {
     languageMap := make(map[string]int)
-    
+
     // Use file access service to scan directory
     files, err := cmd.fileAccess.SearchFiles(ctx, cmd.sessionID, "*", ".")
     if err != nil {
         return nil, err
     }
-    
+
     // Count files by extension
     for _, file := range files {
         ext := strings.ToLower(filepath.Ext(file))
-        
+
         // Map extensions to languages
         switch ext {
         case ".go":
@@ -327,7 +327,7 @@ func (cmd *ConsolidatedAnalyzeCommand) detectLanguageByExtension(ctx context.Con
             languageMap["c"]++
         }
     }
-    
+
     return languageMap, nil
 }
 
@@ -338,13 +338,13 @@ func (cmd *ConsolidatedAnalyzeCommand) detectGoFramework(result *analyze.Analysi
     if err != nil || !goModExists {
         return nil
     }
-    
+
     // Read go.mod
     goModContent, err := cmd.fileAccess.ReadFile(ctx, cmd.sessionID, "go.mod")
     if err != nil {
         return err
     }
-    
+
     // Check for common frameworks
     frameworks := map[string]string{
         "github.com/gin-gonic/gin":        "gin",
@@ -358,7 +358,7 @@ func (cmd *ConsolidatedAnalyzeCommand) detectGoFramework(result *analyze.Analysi
         "google.golang.org/grpc":          "grpc",
         "github.com/go-kit/kit":           "go-kit",
     }
-    
+
     for pkg, framework := range frameworks {
         if strings.Contains(goModContent, pkg) {
             result.Framework = analyze.Framework{
@@ -370,14 +370,14 @@ func (cmd *ConsolidatedAnalyzeCommand) detectGoFramework(result *analyze.Analysi
             return nil
         }
     }
-    
+
     // No framework detected, might be stdlib
     result.Framework = analyze.Framework{
         Name:       "stdlib",
         Type:       analyze.FrameworkTypeWeb,
         Confidence: analyze.ConfidenceMedium,
     }
-    
+
     return nil
 }
 ```
@@ -412,26 +412,26 @@ func (f *fileAccessService) GetFileTree(ctx context.Context, sessionID, rootPath
     var wg sync.WaitGroup
     var mu sync.Mutex
     var result strings.Builder
-    
+
     // Scan directories concurrently
     var scanDir func(path string, depth int)
     scanDir = func(path string, depth int) {
         if depth > maxDepth {
             return
         }
-        
+
         workerPool <- struct{}{}
         wg.Add(1)
-        
+
         go func() {
             defer wg.Done()
             defer func() { <-workerPool }()
-            
+
             files, err := f.ListDirectory(ctx, sessionID, path)
             if err != nil {
                 return
             }
-            
+
             mu.Lock()
             for _, file := range files {
                 indent := strings.Repeat("  ", depth)
@@ -442,7 +442,7 @@ func (f *fileAccessService) GetFileTree(ctx context.Context, sessionID, rootPath
                 }
             }
             mu.Unlock()
-            
+
             // Recursively scan subdirectories
             for _, file := range files {
                 if file.IsDir {
@@ -451,10 +451,10 @@ func (f *fileAccessService) GetFileTree(ctx context.Context, sessionID, rootPath
             }
         }()
     }
-    
+
     scanDir(rootPath, 0)
     wg.Wait()
-    
+
     return result.String(), nil
 }
 ```
@@ -495,7 +495,7 @@ func TestFileAccessService_Security(t *testing.T) {
             shouldError: false,
         },
     }
-    
+
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
             // Test implementation
@@ -510,7 +510,7 @@ func TestFileAccessService_Security(t *testing.T) {
 func TestFileAccessIntegration(t *testing.T) {
     // Create test workspace
     tmpDir := t.TempDir()
-    
+
     // Create test files
     testFiles := map[string]string{
         "main.go":           "package main\n\nfunc main() {}",
@@ -518,13 +518,13 @@ func TestFileAccessIntegration(t *testing.T) {
         "config/app.yaml":   "port: 8080",
         ".env":              "DATABASE_URL=postgres://localhost",
     }
-    
+
     for path, content := range testFiles {
         fullPath := filepath.Join(tmpDir, path)
         os.MkdirAll(filepath.Dir(fullPath), 0755)
         os.WriteFile(fullPath, []byte(content), 0644)
     }
-    
+
     // Test file operations
     // ...
 }
