@@ -19,8 +19,20 @@ type EnhancedSchemaGenerator struct {
 
 // NewEnhancedSchemaGenerator creates a new enhanced generator
 func NewEnhancedSchemaGenerator(outputDir string, verbose bool) (*EnhancedSchemaGenerator, error) {
+	// Find the template directory relative to the executable
+	exe, err := os.Executable()
+	if err != nil {
+		return nil, mcperrors.NewError().Messagef("failed to get executable path: %w", err).WithLocation().Build()
+	}
+	
+	// Get the directory containing the executable
+	exeDir := filepath.Dir(exe)
+	
+	// Look for templates in the project root relative to bin/
+	templatePath := filepath.Join(exeDir, "..", "cmd", "mcp-schema-gen", "templates", "canonical_tool.go.tmpl")
+	
 	// Load templates
-	tmpl, err := template.New("generator").Funcs(templateFuncs()).ParseFiles("cmd/mcp-schema-gen/templates/canonical_tool.go.tmpl")
+	tmpl, err := template.New("generator").Funcs(templateFuncs()).ParseFiles(templatePath)
 	if err != nil {
 		return nil, mcperrors.NewError().Messagef("failed to load templates: %w", err).WithLocation().Build()
 	}

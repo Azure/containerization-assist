@@ -1,6 +1,6 @@
 package conversation
 
-//go:generate ../../../../bin/schemaGen -input=canonical_tools.go -output=canonical_chat_schemas.go -package=conversation
+//go:generate ../../../../../bin/schemaGen -tool=conversation_chat_canonical -domain=conversation -output=.
 
 import (
 	"context"

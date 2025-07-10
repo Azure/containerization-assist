@@ -200,7 +200,7 @@ func TestFixChainExecutor_ChainTimeout(t *testing.T) {
 		MaxRetries:  1,
 		Timeout:     10 * time.Millisecond, // Very short timeout
 		Conditions: []ChainCondition{
-			{Type: ConditionTypeErrorPattern, Pattern: "timeout_test"},
+			{Type: ConditionTypeErrorPattern, Pattern: "timeout_test_unique"},
 		},
 		Strategies: []ChainedFixStrategy{
 			{
@@ -230,7 +230,7 @@ func TestFixChainExecutor_ChainTimeout(t *testing.T) {
 	}
 
 	args := map[string]interface{}{"session_id": "test-session"}
-	err := errors.NewError().Message("timeout_test error").Build()
+	err := errors.NewError().Message("timeout_test_unique_error").Build()
 
 	start := time.Now()
 	result, chainErr := executor.ExecuteChain(ctx, tool, args, err)

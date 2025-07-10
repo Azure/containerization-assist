@@ -19,21 +19,19 @@ func InitializeContainer() (*Container, error) {
 	sessionStore := NewSessionStore()
 	sessionState := NewSessionState()
 	buildExecutor := NewBuildExecutor()
-	servicesToolRegistry := NewToolRegistryService(toolRegistry)
 	workflowExecutor := NewWorkflowExecutor(toolRegistry)
 	scanner := NewScanner()
 	configValidator := NewConfigValidator()
 	errorReporter := NewErrorReporter()
 	container := &Container{
-		ToolRegistry:        toolRegistry,
-		SessionStore:        sessionStore,
-		SessionState:        sessionState,
-		BuildExecutor:       buildExecutor,
-		ToolRegistryService: servicesToolRegistry,
-		WorkflowExecutor:    workflowExecutor,
-		Scanner:             scanner,
-		ConfigValidator:     configValidator,
-		ErrorReporter:       errorReporter,
+		ToolRegistry:     toolRegistry,
+		SessionStore:     sessionStore,
+		SessionState:     sessionState,
+		BuildExecutor:    buildExecutor,
+		WorkflowExecutor: workflowExecutor,
+		Scanner:          scanner,
+		ConfigValidator:  configValidator,
+		ErrorReporter:    errorReporter,
 	}
 	return container, nil
 }
@@ -42,13 +40,12 @@ func InitializeContainer() (*Container, error) {
 
 // Container holds all application services with dependency injection
 type Container struct {
-	ToolRegistry        api.ToolRegistry
-	SessionStore        services.SessionStore
-	SessionState        services.SessionState
-	BuildExecutor       services.BuildExecutor
-	ToolRegistryService services.ToolRegistry
-	WorkflowExecutor    services.WorkflowExecutor
-	Scanner             services.Scanner
-	ConfigValidator     services.ConfigValidator
-	ErrorReporter       services.ErrorReporter
+	ToolRegistry     api.ToolRegistry
+	SessionStore     services.SessionStore
+	SessionState     services.SessionState
+	BuildExecutor    services.BuildExecutor
+	WorkflowExecutor services.WorkflowExecutor
+	Scanner          services.Scanner
+	ConfigValidator  services.ConfigValidator
+	ErrorReporter    services.ErrorReporter
 }

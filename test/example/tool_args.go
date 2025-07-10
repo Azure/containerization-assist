@@ -1,6 +1,6 @@
 package example
 
-//go:generate ../../../../bin/schemaGen -input=tool_args.go -output=generated_schemas.go -package=example
+//go:generate ../../bin/schemaGen -tool=example_tool_args -domain=example -output=.
 
 // ExampleToolArgs demonstrates schema generation from struct tags
 type ExampleToolArgs struct {

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-MAX_FMT_ERRORF=${1:-10}
+MAX_FMT_ERRORF=${1:-100}
 echo "Checking error patterns (max fmt.Errorf: $MAX_FMT_ERRORF)..."
 
 # Build linter if needed

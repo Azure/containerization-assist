@@ -151,10 +151,6 @@ quality-dashboard:
 	@echo "Generating quality metrics dashboard..."
 	@scripts/quality/generate_metrics_dashboard.sh
 
-.PHONY: coverage
-coverage:
-	@echo "Generating test coverage report..."
-	@scripts/quality/coverage_tracker.sh
 
 .PHONY: pre-commit-hook
 pre-commit-hook:

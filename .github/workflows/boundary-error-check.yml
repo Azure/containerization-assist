@@ -132,27 +132,3 @@ jobs:
         path: boundary-report.md
         retention-days: 30
 
-    - name: Comment on PR
-      if: github.event_name == 'pull_request' && always()
-      uses: actions/github-script@v6
-      with:
-        script: |
-          const fs = require('fs');
-
-          // Read the boundary report
-          let report = '## 🔍 Boundary Error Analysis\n\n';
-
-          try {
-            const boundaryReport = fs.readFileSync('boundary-report.md', 'utf8');
-            report += boundaryReport;
-          } catch (error) {
-            report += '❌ Failed to generate boundary report\n';
-          }
-
-          // Post comment
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: report
-          });

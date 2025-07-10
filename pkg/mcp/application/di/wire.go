@@ -13,15 +13,14 @@ import (
 
 // Container holds all application services with dependency injection
 type Container struct {
-	ToolRegistry        api.ToolRegistry
-	SessionStore        services.SessionStore
-	SessionState        services.SessionState
-	BuildExecutor       services.BuildExecutor
-	ToolRegistryService services.ToolRegistry
-	WorkflowExecutor    services.WorkflowExecutor
-	Scanner             services.Scanner
-	ConfigValidator     services.ConfigValidator
-	ErrorReporter       services.ErrorReporter
+	ToolRegistry     api.ToolRegistry
+	SessionStore     services.SessionStore
+	SessionState     services.SessionState
+	BuildExecutor    services.BuildExecutor
+	WorkflowExecutor services.WorkflowExecutor
+	Scanner          services.Scanner
+	ConfigValidator  services.ConfigValidator
+	ErrorReporter    services.ErrorReporter
 }
 
 // InitializeContainer creates a fully wired container with all dependencies
@@ -34,7 +33,6 @@ func InitializeContainer() (*Container, error) {
 		NewSessionStore,
 		NewSessionState,
 		NewBuildExecutor,
-		NewToolRegistryService,
 		NewWorkflowExecutor,
 		NewScanner,
 		NewConfigValidator,

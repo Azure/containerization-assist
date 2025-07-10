@@ -14,11 +14,16 @@
 git clone https://github.com/Azure/container-kit.git
 cd container-kit
 
+# Set up make alias (required for WSL/Linux)
+alias make='/usr/bin/make'
+
 # Build the MCP server
 make mcp
 
 # Run tests
-make test
+make test              # MCP package tests only
+make test-mcp          # MCP tests with build tags
+make test-all          # All packages
 ```
 
 ## Basic Usage
@@ -26,53 +31,51 @@ make test
 ### 1. Start the MCP Server
 
 ```bash
-# Run in chat mode (interactive)
-./bin/mcp-server --mode chat
+# Run the MCP server (main executable)
+./container-kit-mcp
 
-# Run in workflow mode (automation)
-./bin/mcp-server --mode workflow
-
-# Run in dual mode (both)
-./bin/mcp-server --mode dual
+# Or run specific command tools
+./cmd/mcp-server/mcp-server
+./cmd/mcp-richify/mcp-richify
+./cmd/mcp-schema-gen/mcp-schema-gen
 ```
 
 ### 2. Analyze a Repository
 
 ```bash
-# Using the CLI
-mcp-cli analyze --repo /path/to/your/app
+# Container Kit operates via MCP protocol
+# Connect via MCP client and use analyze tool
+# Available tools: analyze, build, deploy, scan
 
-# Using the API
-curl -X POST http://localhost:8080/tools/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"repository": "/path/to/your/app"}'
+# Tools are accessed through MCP protocol, not direct CLI
+# See MCP client documentation for integration
 ```
 
 ### 3. Build a Container
 
 ```bash
-# Build with automatic Dockerfile generation
-mcp-cli build --repo /path/to/your/app --tag myapp:latest
-
-# Build with existing Dockerfile
-mcp-cli build --dockerfile /path/to/Dockerfile --tag myapp:latest
+# Build operations are available through MCP tools
+# Use build tool via MCP client with parameters:
+# - repository: path to source code
+# - dockerfile: path to Dockerfile (optional)
+# - tag: container image tag
+# - platforms: target platforms (linux/amd64, linux/arm64)
 ```
 
 ### 4. Security Scanning
 
 ```bash
-# Scan for vulnerabilities
-mcp-cli scan --image myapp:latest --severity HIGH,CRITICAL
+# Security scanning via MCP scan tool
+# Supports Trivy and Grype scanners
+# Parameters: image, severity_filter, output_format
 ```
 
 ### 5. Deploy to Kubernetes
 
 ```bash
-# Generate manifests
-mcp-cli deploy --image myapp:latest --type kubernetes
-
-# Deploy directly
-mcp-cli deploy --image myapp:latest --kubeconfig ~/.kube/config
+# Deploy via MCP deploy tool
+# Generates Kubernetes manifests and applies them
+# Parameters: image, kubeconfig, namespace, replicas
 ```
 
 ## Configuration
@@ -88,30 +91,40 @@ export CONTAINER_KIT_TRACING_ENABLED=true
 
 # Set timeout
 export CONTAINER_KIT_TIMEOUT=5m
+
+# Storage path for BoltDB
+export CONTAINER_KIT_STORAGE_PATH=~/.container-kit/data
 ```
 
 ### Configuration File
 
-Create `~/.container-kit/config.yaml`:
+Container Kit uses configuration defined in the domain layer:
 
 ```yaml
-server:
-  mode: dual
-  port: 8080
+# Configuration is handled through domain/config package
+# with tag-based validation DSL
 
+# Example session configuration
+session:
+  workspace_dir: "/tmp/container-kit-sessions"
+  cleanup_interval: "1h"
+  max_sessions: 100
+
+# Tool configuration
 tools:
-  timeout: 30s
-  retry:
-    max_attempts: 3
-    backoff: exponential
+  timeout: "30s"
+  retry_attempts: 3
+  concurrent_limit: 10
 
+# Storage configuration
 storage:
-  type: boltdb
-  path: ~/.container-kit/data
+  type: "boltdb"
+  path: "~/.container-kit/data"
 
+# Monitoring
 monitoring:
-  metrics: true
-  tracing: true
+  metrics_enabled: true
+  tracing_enabled: true
   prometheus_port: 9090
 ```
 
@@ -120,58 +133,38 @@ monitoring:
 ### Containerize a Node.js Application
 
 ```bash
-# Analyze and generate Dockerfile
-mcp-cli analyze --repo ./my-node-app --framework node
+# Container Kit operates through MCP protocol
+# Connect your MCP client and use the following workflow:
 
-# Review generated Dockerfile
-cat ./my-node-app/Dockerfile
+# 1. Use analyze tool to examine repository
+# 2. Use build tool to create container image
+# 3. Use scan tool to check for vulnerabilities
+# 4. Use deploy tool to generate Kubernetes manifests
 
-# Build and scan
-mcp-cli build --repo ./my-node-app --tag my-node-app:latest
-mcp-cli scan --image my-node-app:latest
-
-# Deploy
-mcp-cli deploy --image my-node-app:latest --type kubernetes > k8s-manifests.yaml
-kubectl apply -f k8s-manifests.yaml
+# All operations are performed through MCP tool calls
+# See MCP client documentation for specific implementation
 ```
 
 ### Multi-Stage Python Build
 
 ```bash
-# Create a workflow file
-cat > containerize.yaml << EOF
-name: containerize-python
-stages:
-  - name: analyze
-    tool: analyze
-    args:
-      repository: ./my-python-app
-      framework: python
+# Multi-stage workflows are supported through the workflow engine
+# Located in pkg/mcp/application/workflows/
 
-  - name: optimize
-    tool: optimize
-    args:
-      dockerfile: ./my-python-app/Dockerfile
-      target_size: minimal
+# Workflow execution involves:
+# 1. Session management with BoltDB persistence
+# 2. Tool orchestration through the registry
+# 3. State management and checkpointing
+# 4. Error handling and recovery
 
-  - name: build
-    tool: build
-    args:
-      dockerfile: ./my-python-app/Dockerfile
-      tag: my-python-app:latest
-      platforms:
-        - linux/amd64
-        - linux/arm64
+# Example workflow structure:
+# - Stage 1: analyze tool (repository analysis)
+# - Stage 2: build tool (container creation)
+# - Stage 3: scan tool (security validation)
+# - Stage 4: deploy tool (Kubernetes deployment)
 
-  - name: scan
-    tool: scan
-    args:
-      image: my-python-app:latest
-      fail_on: CRITICAL
-EOF
-
-# Execute workflow
-mcp-cli workflow run containerize.yaml
+# Workflows are defined through the MCP protocol
+# and executed by the workflow engine
 ```
 
 ## Troubleshooting
@@ -189,16 +182,22 @@ mcp-cli workflow run containerize.yaml
 # Enable debug logging
 export CONTAINER_KIT_LOG_LEVEL=debug
 
-# Run with verbose output
-mcp-cli --verbose analyze --repo ./myapp
+# Run MCP server with debug output
+./container-kit-mcp --log-level debug
 
-# Check logs
+# Check logs (structured logging with zerolog)
 tail -f ~/.container-kit/logs/mcp-server.log
+
+# Performance monitoring
+make bench              # Run benchmarks
+make coverage-html      # Generate coverage report
 ```
 
 ## Next Steps
 
 - [API Documentation](../api/README.md)
 - [Examples](../examples/README.md)
-- [Advanced Configuration](./advanced-config.md)
-- [Custom Tool Development](./custom-tools.md)
+- [Architecture Guide](../architecture/README.md)
+- [Adding New Tools](../ADDING_NEW_TOOLS.md)
+- [Three-Layer Architecture](../THREE_LAYER_ARCHITECTURE.md)
+- [Tool Development Guide](../TOOL_GUIDE.md)
