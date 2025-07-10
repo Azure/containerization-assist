@@ -43,14 +43,11 @@ func (t *chatcanonicalTool) Schema() api.ToolSchema {
 			"properties": map[string]interface{}{
 				"session_id": map[string]interface{}{
 					"type":        "string",
-					"description": "Session ID for the operation",
-				},
-				"session_id": map[string]interface{}{
-					"type":        "string",
 					"description": "Session ID for correlation (auto-generated if not provided)",
 				},
+				
 			},
-			"required": []string{"session_id"},
+			"required": []string{},
 		},
 		OutputSchema: map[string]interface{}{
 			"type": "object",
@@ -67,6 +64,7 @@ func (t *chatcanonicalTool) Schema() api.ToolSchema {
 							"type":        "string",
 							"description": "Execution status",
 						},
+						
 					},
 				},
 				"error": map[string]interface{}{
@@ -101,17 +99,20 @@ func (t *chatcanonicalTool) Execute(ctx context.Context, input api.ToolInput) (a
 	// Extract and validate input parameters
 	var params struct {
 		Session_id string `json:"session_id",omitempty`
+		
 	}
 
 	// Parse parameters from input.Data
-
+	
 	if val, ok := input.Data["session_id"]; ok {
 		if strVal, ok := val.(string); ok {
 			params.Session_id = strVal
 		}
 	}
+	
 
 	// Validate required parameters
+	
 
 	// Log the execution
 	t.logger.Info().

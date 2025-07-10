@@ -41,17 +41,13 @@ func (t *{{.ToolName}}Tool) Schema() api.ToolSchema {
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"session_id": map[string]interface{}{
-					"type":        "string",
-					"description": "Session ID for the operation",
-				},{{range .InputFields}}
-				"{{.Name}}": map[string]interface{}{
+				{{range .InputFields}}"{{.Name}}": map[string]interface{}{
 					"type":        "{{.Type}}",
-					"description": "{{.Description}}"{{if .Required}},
-					"required":    true{{end}},
-				},{{end}}
+					"description": "{{.Description}}",
+				},
+				{{end}}
 			},
-			"required": []string{"session_id"{{range .InputFields}}{{if .Required}}, "{{.Name}}"{{end}}{{end}}},
+			"required": []string{},
 		},
 		OutputSchema: map[string]interface{}{
 			"type": "object",

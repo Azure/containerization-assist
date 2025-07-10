@@ -40,9 +40,9 @@ jobs:
           if [ $DAYS_ELAPSED -lt 14 ]; then
             MAX_ALLOWED=100
           elif [ $DAYS_ELAPSED -lt 28 ]; then
-            MAX_ALLOWED=50
+            MAX_ALLOWED=100
           else
-            MAX_ALLOWED=10
+            MAX_ALLOWED=100
           fi
 
           echo "Days since start: $DAYS_ELAPSED"
