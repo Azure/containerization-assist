@@ -154,3 +154,183 @@ func NewCoreError(code ErrorCode, message string) *CoreError {
 		Message: message,
 	}
 }
+
+// NewMissingParam creates a validation error for missing required parameters
+// This is an alias for MissingParameterError to match the naming in WORKSTREAM_GAMMA_PROMPT.md
+func NewMissingParam(field string) error {
+	return MissingParameterError(field)
+}
+
+// NewValidationFailed creates a validation error with context
+func NewValidationFailed(field, reason string) error {
+	return NewError().
+		Code(CodeValidationFailed).
+		Type(ErrTypeValidation).
+		Severity(SeverityMedium).
+		Messagef("validation failed for %s: %s", field, reason).
+		Context("field", field).
+		Context("reason", reason).
+		Suggestion("Check the field value and format").
+		WithLocation().
+		Build()
+}
+
+// NewInternalError creates an internal error wrapping a cause
+func NewInternalError(operation string, cause error) error {
+	return NewError().
+		Code(CodeInternalError).
+		Type(ErrTypeInternal).
+		Severity(SeverityHigh).
+		Messagef("internal error during %s", operation).
+		Context("operation", operation).
+		Cause(cause).
+		WithLocation().
+		Build()
+}
+
+// NewConfigurationError creates a configuration error
+func NewConfigurationError(component, issue string) error {
+	return NewError().
+		Code(CodeConfigurationInvalid).
+		Type(ErrTypeConfiguration).
+		Severity(SeverityHigh).
+		Messagef("configuration error in %s: %s", component, issue).
+		Context("component", component).
+		Context("issue", issue).
+		Suggestion("Check configuration file and environment variables").
+		WithLocation().
+		Build()
+}
+
+// NewNotFoundError creates a not found error
+func NewNotFoundError(resource, identifier string) error {
+	return NewError().
+		Code(CodeNotFound).
+		Type(ErrTypeNotFound).
+		Severity(SeverityMedium).
+		Messagef("%s not found: %s", resource, identifier).
+		Context("resource", resource).
+		Context("identifier", identifier).
+		WithLocation().
+		Build()
+}
+
+// NewPermissionDeniedError creates a permission denied error
+func NewPermissionDeniedError(resource, action string) error {
+	return NewError().
+		Code(CodePermissionDenied).
+		Type(ErrTypePermission).
+		Severity(SeverityHigh).
+		Messagef("permission denied for %s on %s", action, resource).
+		Context("resource", resource).
+		Context("action", action).
+		Suggestion("Check access permissions and authentication").
+		WithLocation().
+		Build()
+}
+
+// NewTimeoutError creates a timeout error
+func NewTimeoutError(operation string, duration string) error {
+	return NewError().
+		Code(CodeTimeoutError).
+		Type(ErrTypeTimeout).
+		Severity(SeverityHigh).
+		Messagef("operation %s timed out after %s", operation, duration).
+		Context("operation", operation).
+		Context("duration", duration).
+		Suggestion("Increase timeout or check operation performance").
+		WithLocation().
+		Build()
+}
+
+// NewNetworkError creates a network error
+func NewNetworkError(operation string, cause error) error {
+	return NewError().
+		Code(CodeNetworkError).
+		Type(ErrTypeNetwork).
+		Severity(SeverityHigh).
+		Messagef("network error during %s", operation).
+		Context("operation", operation).
+		Cause(cause).
+		Suggestion("Check network connectivity and firewall rules").
+		WithLocation().
+		Build()
+}
+
+// NewAlreadyExistsError creates an already exists error
+func NewAlreadyExistsError(resource, identifier string) error {
+	return NewError().
+		Code(CodeAlreadyExists).
+		Type(ErrTypeConflict).
+		Severity(SeverityMedium).
+		Messagef("%s already exists: %s", resource, identifier).
+		Context("resource", resource).
+		Context("identifier", identifier).
+		Suggestion("Use a different identifier or update the existing resource").
+		WithLocation().
+		Build()
+}
+
+// NewOperationFailedError creates a generic operation failed error
+func NewOperationFailedError(operation, reason string, cause error) error {
+	builder := NewError().
+		Code(CodeOperationFailed).
+		Type(ErrTypeOperation).
+		Severity(SeverityHigh).
+		Messagef("operation %s failed: %s", operation, reason).
+		Context("operation", operation).
+		Context("reason", reason).
+		WithLocation()
+	
+	if cause != nil {
+		builder = builder.Cause(cause)
+	}
+	
+	return builder.Build()
+}
+
+// NewSecurityError creates a security error
+func NewSecurityError(violation string, details map[string]interface{}) error {
+	builder := NewError().
+		Code(CodeSecurityViolation).
+		Type(ErrTypeSecurity).
+		Severity(SeverityCritical).
+		Messagef("security violation: %s", violation).
+		Context("violation", violation).
+		Suggestion("Review security policies and access controls").
+		WithLocation()
+	
+	for k, v := range details {
+		builder = builder.Context(k, v)
+	}
+	
+	return builder.Build()
+}
+
+// NewMultiError creates an error that aggregates multiple errors
+func NewMultiError(operation string, errors []error) error {
+	if len(errors) == 0 {
+		return nil
+	}
+	
+	if len(errors) == 1 {
+		return errors[0]
+	}
+	
+	errorMessages := make([]string, len(errors))
+	for i, err := range errors {
+		errorMessages[i] = err.Error()
+	}
+	
+	return NewError().
+		Code(CodeOperationFailed).
+		Type(ErrTypeOperation).
+		Severity(SeverityHigh).
+		Messagef("multiple errors during %s: %d errors occurred", operation, len(errors)).
+		Context("operation", operation).
+		Context("error_count", len(errors)).
+		Context("errors", errorMessages).
+		Suggestion("Review individual errors for specific issues").
+		WithLocation().
+		Build()
+}
