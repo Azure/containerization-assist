@@ -703,11 +703,11 @@ jobs:
             FAILED_JOBS="${FAILED_JOBS}canary "
           fi
 
-          # Build jobs must pass
-          if [ "${{ needs.build-cli.result }}" != "success" ]; then
+          # Build jobs must pass (or be skipped due to quality gate failures)
+          if [ "${{ needs.build-cli.result }}" != "success" ] && [ "${{ needs.build-cli.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}build-cli "
           fi
-          if [ "${{ needs.build-mcp.result }}" != "success" ]; then
+          if [ "${{ needs.build-mcp.result }}" != "success" ] && [ "${{ needs.build-mcp.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}build-mcp "
           fi
 
