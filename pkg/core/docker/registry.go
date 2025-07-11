@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/clients"
-	"github.com/Azure/container-kit/pkg/common/utils"
 	"github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
@@ -112,7 +111,7 @@ func (rm *RegistryManager) PushImage(ctx context.Context, imageRef string, optio
 
 	if err != nil {
 		// Sanitize error and output to remove sensitive information
-		sanitizedError, sanitizedOutput := utils.SanitizeRegistryError(err.Error(), output)
+		sanitizedError, sanitizedOutput := SanitizeRegistryError(err.Error(), output)
 
 		rm.logger.Error("Docker push failed",
 			"error", sanitizedError,
@@ -126,7 +125,7 @@ func (rm *RegistryManager) PushImage(ctx context.Context, imageRef string, optio
 
 		// Add authentication guidance if this is an auth error
 		if errorType == "auth_error" {
-			errorContext["auth_guidance"] = utils.GetAuthErrorGuidance(result.Registry)
+			errorContext["auth_guidance"] = GetAuthErrorGuidance(result.Registry)
 		}
 
 		result.Error = &RegistryError{
@@ -192,7 +191,7 @@ func (rm *RegistryManager) PullImage(ctx context.Context, imageRef string) (*Pul
 
 	if err != nil {
 		// Sanitize error and output to remove sensitive information
-		sanitizedError, sanitizedOutput := utils.SanitizeRegistryError(err.Error(), output)
+		sanitizedError, sanitizedOutput := SanitizeRegistryError(err.Error(), output)
 
 		rm.logger.Error("Docker pull failed",
 			"error", sanitizedError,
@@ -206,7 +205,7 @@ func (rm *RegistryManager) PullImage(ctx context.Context, imageRef string) (*Pul
 
 		// Add authentication guidance if this is an auth error
 		if errorType == "auth_error" {
-			errorContext["auth_guidance"] = utils.GetAuthErrorGuidance(result.Registry)
+			errorContext["auth_guidance"] = GetAuthErrorGuidance(result.Registry)
 		}
 
 		result.Error = &RegistryError{

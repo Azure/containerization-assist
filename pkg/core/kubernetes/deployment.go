@@ -478,8 +478,8 @@ func (s *ServiceImpl) checkKubectlInstalled() error {
 		return fmt.Errorf("kubectl executable not found in PATH. Please install kubectl")
 	}
 
-	// Check kubectl version
-	cmd := exec.Command("kubectl", "version", "--client", "--short")
+	// Check kubectl version (--short flag was deprecated and removed in newer versions)
+	cmd := exec.Command("kubectl", "version", "--client", "-o", "json")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("kubectl is not functioning properly: %v", err)
 	}

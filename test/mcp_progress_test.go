@@ -25,7 +25,7 @@ func TestMCPProgressNotifications(t *testing.T) {
 	// Build the MCP server
 	wd, _ := os.Getwd()
 	serverPath := filepath.Join(wd, "..", "container-kit-mcp")
-	
+
 	// Check if binary exists, build if not
 	if _, err := os.Stat(serverPath); os.IsNotExist(err) {
 		t.Log("Building MCP server...")
@@ -70,7 +70,7 @@ func TestMCPProgressNotifications(t *testing.T) {
 		var result map[string]interface{}
 		buf := make([]byte, 8192)
 		var data []byte
-		
+
 		deadline := time.Now().Add(5 * time.Second)
 		for time.Now().Before(deadline) {
 			n, err := stdout.Read(buf)
@@ -93,7 +93,7 @@ func TestMCPProgressNotifications(t *testing.T) {
 				time.Sleep(10 * time.Millisecond)
 			}
 		}
-		
+
 		t.Fatalf("Timeout reading response. Stderr: %s", stderrBuf.String())
 		return nil
 	}
@@ -127,7 +127,7 @@ func TestMCPProgressNotifications(t *testing.T) {
 
 	resp := readResponse()
 	assert.Contains(t, resp, "result")
-	
+
 	// Check server capabilities
 	if result, ok := resp["result"].(map[string]interface{}); ok {
 		if capabilities, ok := result["capabilities"].(map[string]interface{}); ok {
@@ -157,7 +157,7 @@ func main() { fmt.Println("Hello") }`
 
 	// Now call containerize_and_deploy with progress token
 	progressToken := fmt.Sprintf("progress-%d", time.Now().Unix())
-	
+
 	sendRequest(map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      2,
@@ -178,11 +178,11 @@ func main() { fmt.Println("Hello") }`
 	// Collect progress notifications
 	var progressNotifications []map[string]interface{}
 	progressSeen := make(map[string]bool)
-	
+
 	// Read responses for up to 60 seconds
 	timeout := time.After(60 * time.Second)
 	done := false
-	
+
 	for !done {
 		select {
 		case <-timeout:
@@ -193,7 +193,7 @@ func main() { fmt.Println("Hello") }`
 			buf := make([]byte, 8192)
 			stdout.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 			n, _ := stdout.Read(buf)
-			
+
 			if n > 0 {
 				lines := strings.Split(string(buf[:n]), "\n")
 				for _, line := range lines {
@@ -201,12 +201,12 @@ func main() { fmt.Println("Hello") }`
 					if line == "" {
 						continue
 					}
-					
+
 					if err := json.Unmarshal([]byte(line), &resp); err == nil {
 						// Check if this is a progress notification
 						if method, ok := resp["method"].(string); ok && method == "notifications/progress" {
 							progressNotifications = append(progressNotifications, resp)
-							
+
 							if params, ok := resp["params"].(map[string]interface{}); ok {
 								if token, ok := params["progressToken"].(string); ok && token == progressToken {
 									if progress, ok := params["progress"].(float64); ok {
@@ -218,7 +218,7 @@ func main() { fmt.Println("Hello") }`
 								}
 							}
 						}
-						
+
 						// Check if this is the final response
 						if id, ok := resp["id"].(float64); ok && id == 2 {
 							done = true
@@ -232,7 +232,7 @@ func main() { fmt.Println("Hello") }`
 
 	// Verify we received progress notifications
 	t.Logf("Total progress notifications received: %d", len(progressNotifications))
-	
+
 	// Check that we got notifications for key steps
 	expectedSteps := []string{
 		"Analyzing repository",
@@ -242,7 +242,7 @@ func main() { fmt.Println("Hello") }`
 		"Loading",
 		"Deploying",
 	}
-	
+
 	for _, step := range expectedSteps {
 		found := false
 		for msg := range progressSeen {
@@ -257,7 +257,7 @@ func main() { fmt.Println("Hello") }`
 			t.Logf("✗ Missing progress for: %s", step)
 		}
 	}
-	
+
 	// Even if we don't get progress notifications (client might not support it),
 	// the workflow should still complete successfully
 	if len(progressNotifications) == 0 {

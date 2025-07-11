@@ -88,5 +88,3 @@ require (
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.7.0 // indirect
 )
-
-replace github.com/localrivet/gomcp => github.com/gambtho/gomcp v0.0.0-20250626062144-6c7ed4c9d536

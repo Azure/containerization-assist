@@ -17,6 +17,9 @@ import (
 )
 
 // TestContainerizeAndDeployProgress tests the progress indicators in the containerize_and_deploy workflow
+// TODO: This test currently has deployment validation disabled due to pod startup timing issues.
+// The pods are created but validation happens too quickly before they can start.
+// Re-enable validation in pkg/mcp/internal/steps/k8s.go once this is resolved.
 func TestContainerizeAndDeployProgress(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")

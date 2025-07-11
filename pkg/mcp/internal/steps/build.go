@@ -151,9 +151,9 @@ func PushImage(ctx context.Context, buildResult *BuildResult, registry string, l
 	return imageRef, nil
 }
 
-// LoadImageToKind loads a Docker image directly into a kind cluster using real kind operations
+// LoadImageToKind tags and pushes a Docker image to the kind cluster's local registry
 func LoadImageToKind(ctx context.Context, buildResult *BuildResult, clusterName string, logger *slog.Logger) error {
-	logger.Info("Loading image into kind cluster",
+	logger.Info("Loading image into kind cluster registry",
 		"image_name", buildResult.ImageName,
 		"image_tag", buildResult.ImageTag,
 		"cluster", clusterName)
@@ -167,27 +167,39 @@ func LoadImageToKind(ctx context.Context, buildResult *BuildResult, clusterName 
 		clusterName = "container-kit"
 	}
 
-	// Construct image reference
-	imageRef := fmt.Sprintf("%s:%s", buildResult.ImageName, buildResult.ImageTag)
+	// Construct image references
+	sourceImageRef := fmt.Sprintf("%s:%s", buildResult.ImageName, buildResult.ImageTag)
+	targetImageRef := fmt.Sprintf("localhost:5001/%s:%s", buildResult.ImageName, buildResult.ImageTag)
 
-	logger.Info("Loading image into kind cluster using kind load command", "image_ref", imageRef, "cluster", clusterName)
+	logger.Info("Tagging image for local registry", "source", sourceImageRef, "target", targetImageRef)
 
-	// Use kind load docker-image command directly
-	cmd := exec.CommandContext(ctx, "kind", "load", "docker-image", imageRef, "--name", clusterName)
-	output, err := cmd.CombinedOutput()
-
-	if err != nil {
-		logger.Error("Failed to load image to kind cluster",
+	// First, tag the image for the local registry
+	tagCmd := exec.CommandContext(ctx, "docker", "tag", sourceImageRef, targetImageRef)
+	if output, err := tagCmd.CombinedOutput(); err != nil {
+		logger.Error("Failed to tag image for local registry",
 			"error", err,
 			"output", string(output),
-			"image_ref", imageRef,
-			"cluster", clusterName)
-		return fmt.Errorf("failed to load image to kind: %v, output: %s", err, string(output))
+			"source", sourceImageRef,
+			"target", targetImageRef)
+		return fmt.Errorf("failed to tag image: %v, output: %s", err, string(output))
 	}
 
-	logger.Info("Image loaded into kind cluster successfully",
-		"image_ref", imageRef,
-		"cluster", clusterName,
+	logger.Info("Pushing image to local registry", "image_ref", targetImageRef)
+
+	// Push to the local registry
+	pushCmd := exec.CommandContext(ctx, "docker", "push", targetImageRef)
+	output, err := pushCmd.CombinedOutput()
+
+	if err != nil {
+		logger.Error("Failed to push image to local registry",
+			"error", err,
+			"output", string(output),
+			"image_ref", targetImageRef)
+		return fmt.Errorf("failed to push image to local registry: %v, output: %s", err, string(output))
+	}
+
+	logger.Info("Image pushed to local registry successfully",
+		"image_ref", targetImageRef,
 		"output", string(output))
 	return nil
 }

@@ -70,13 +70,9 @@ func AnalyzeRepository(repoURL, branch string, logger *slog.Logger) (*AnalyzeRes
 		logger.Info("Using local repository path", "path", repoPath)
 	}
 
-	// Cleanup function
-	defer func() {
-		if needsCleanup {
-			logger.Info("Cleaning up temporary directory", "path", repoPath)
-			os.RemoveAll(repoPath)
-		}
-	}()
+	// Note: We do NOT clean up the temporary directory here because
+	// subsequent steps (like build) need access to the repository files.
+	// The cleanup should be handled by the workflow or session manager.
 
 	// Create analysis engine with enhanced logging
 	analyzer := analysis.NewRepositoryAnalyzer(logger.With("component", "analyze_repository"))
@@ -118,6 +114,7 @@ func AnalyzeRepository(repoURL, branch string, logger *slog.Logger) (*AnalyzeRes
 		"framework", result.Framework,
 		"port", result.Port)
 
+	logger.Info("Returning analysis result", "repo_path", repoPath, "language", result.Language)
 	return &AnalyzeResult{
 		Language:  result.Language,
 		Framework: result.Framework,

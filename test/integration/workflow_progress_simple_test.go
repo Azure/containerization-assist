@@ -95,16 +95,17 @@ func TestWorkflowProgressUpdate(t *testing.T) {
 		{10, 100, "10/10"},
 	}
 
-	for _, tc := range testCases {
-		percentage, progress := updateProgress()
-		assert.Equal(t, tc.expectedPercentage, percentage, "Percentage should match for step %d", tc.expectedStep)
-		assert.Equal(t, tc.expectedProgress, progress, "Progress string should match for step %d", tc.expectedStep)
-
-		if tc.expectedStep == 5 || tc.expectedStep == 10 {
-			// Skip ahead for specific test cases
+	for i, tc := range testCases {
+		// For non-sequential steps, skip ahead
+		if i > 0 && tc.expectedStep > testCases[i-1].expectedStep+1 {
+			// Skip to one step before the expected step
 			for currentStep < tc.expectedStep-1 {
 				updateProgress()
 			}
 		}
+
+		percentage, progress := updateProgress()
+		assert.Equal(t, tc.expectedPercentage, percentage, "Percentage should match for step %d", tc.expectedStep)
+		assert.Equal(t, tc.expectedProgress, progress, "Progress string should match for step %d", tc.expectedStep)
 	}
 }
