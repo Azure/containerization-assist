@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // Manager provides Git operations for repository management
@@ -33,7 +33,7 @@ func NewManager(logger *slog.Logger) *Manager {
 func NewSecureManager(logger *slog.Logger, securityOpts *SecurityOptions) (*Manager, error) {
 	jail, err := NewFilesystemJail(securityOpts)
 	if err != nil {
-		return nil, mcperrors.NewError().Messagef("failed to create filesystem jail: %w", err).WithLocation().Build()
+		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to create filesystem jail", err)
 	}
 
 	return &Manager{

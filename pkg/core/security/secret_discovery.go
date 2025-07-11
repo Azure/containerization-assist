@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // SecretDiscovery provides comprehensive secret detection capabilities
@@ -114,7 +114,7 @@ func (sd *SecretDiscovery) ScanDirectory(ctx context.Context, path string, optio
 
 	// Check if path exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, mcperrors.NewError().Messagef("directory does not exist: %s", path).WithLocation().Build()
+		return nil, mcperrors.New(mcperrors.CodeFileNotFound, "core", fmt.Sprintf("directory does not exist: %s", path), nil)
 	}
 
 	sd.logger.Info("Starting secret discovery scan",
@@ -168,7 +168,7 @@ func (sd *SecretDiscovery) ScanDirectory(ctx context.Context, path string, optio
 	})
 
 	if err != nil {
-		return nil, mcperrors.NewError().Messagef("failed to walk directory: %w", err).WithLocation().Build()
+		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to walk directory", err)
 	}
 
 	wg.Wait()

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -31,7 +31,7 @@ func (pe *PolicyEngine) LoadPolicies(policies []Policy) error {
 	// Validate policies
 	for _, policy := range policies {
 		if err := pe.validatePolicy(policy); err != nil {
-			return mcperrors.NewError().Messagef("invalid policy %s: %w", policy.ID, err).WithLocation().Build()
+			return mcperrors.New(mcperrors.CodeValidationFailed, "core", fmt.Sprintf("invalid policy %s: %v", policy.ID, err), err)
 		}
 	}
 
@@ -137,7 +137,7 @@ func (pe *PolicyEngine) validatePolicy(policy Policy) error {
 	// Validate each rule
 	for _, rule := range policy.Rules {
 		if err := pe.validateRule(rule); err != nil {
-			return fmt.Errorf("invalid rule %s: %w", rule.ID, err)
+			return fmt.Errorf("invalid rule %s: %v", rule.ID, err)
 		}
 	}
 
@@ -182,20 +182,14 @@ func (pe *PolicyEngine) GetPolicyByID(id string) (*Policy, error) {
 			return &policy, nil
 		}
 	}
-	return nil, mcperrors.NewError().Messagef("policy not found: %s", id).WithLocation(
-
-	// AddPolicy adds a new policy
-	).Build()
+	return nil, mcperrors.New(mcperrors.CodeNotFound, "security", fmt.Sprintf("policy not found: %s", id), nil)
 }
 
 func (pe *PolicyEngine) AddPolicy(policy Policy) error {
 	// Check for duplicate ID
 	for _, existing := range pe.policies {
 		if existing.ID == policy.ID {
-			return mcperrors.NewError().Messagef("policy with ID %s already exists", policy.ID).WithLocation(
-
-			// Validate the policy
-			).Build()
+			return mcperrors.New(mcperrors.CodeIoError, "security", fmt.Sprintf("policy with ID %s already exists", policy.ID), nil)
 		}
 	}
 
@@ -229,10 +223,7 @@ func (pe *PolicyEngine) UpdatePolicy(policy Policy) error {
 		}
 	}
 
-	return mcperrors.NewError().Messagef("policy not found: %s", policy.ID).WithLocation(
-
-	// RemovePolicy removes a policy by ID
-	).Build()
+	return mcperrors.New(mcperrors.CodeNotFound, "security", fmt.Sprintf("policy not found: %s", policy.ID), nil)
 }
 
 func (pe *PolicyEngine) RemovePolicy(id string) error {
@@ -243,10 +234,7 @@ func (pe *PolicyEngine) RemovePolicy(id string) error {
 			return nil
 		}
 	}
-	return mcperrors.NewError().Messagef("policy not found: %s", id).WithLocation(
-
-	// ShouldBlock determines if any policy violations should block deployment
-	).Build()
+	return mcperrors.New(mcperrors.CodeNotFound, "security", fmt.Sprintf("policy not found: %s", id), nil)
 }
 
 func (pe *PolicyEngine) ShouldBlock(results []PolicyEvaluationResult) bool {

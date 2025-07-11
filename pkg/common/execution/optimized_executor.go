@@ -9,8 +9,8 @@ import (
 
 	"github.com/Azure/container-kit/pkg/common/interfaces"
 	"github.com/Azure/container-kit/pkg/common/pools"
-	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/api"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // ============================================================================
@@ -185,10 +185,7 @@ func (e *OptimizedExecutor) ExecuteTool(ctx context.Context, tool api.Tool, inpu
 			e.recordMetric("tool_execution_validation_failures", 1, map[string]string{
 				"tool": tool.Name(),
 			})
-			return api.ToolOutput{}, mcperrors.NewError().Messagef("input validation failed: %w", err).WithLocation(
-
-			// Execute using worker pool if available
-			).Build()
+			return api.ToolOutput{}, mcperrors.New(mcperrors.CodeValidationFailed, "execution", "input validation failed", err)
 		}
 	}
 
@@ -207,10 +204,7 @@ func (e *OptimizedExecutor) ExecuteTool(ctx context.Context, tool api.Tool, inpu
 			e.recordMetric("tool_execution_output_validation_failures", 1, map[string]string{
 				"tool": tool.Name(),
 			})
-			return api.ToolOutput{}, mcperrors.NewError().Messagef("output validation failed: %w", err).WithLocation(
-
-			// Cache result if successful and caching is enabled
-			).Build()
+			return api.ToolOutput{}, mcperrors.New(mcperrors.CodeValidationFailed, "execution", "output validation failed", err)
 		}
 	}
 

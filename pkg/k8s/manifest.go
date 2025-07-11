@@ -2,13 +2,14 @@ package k8s
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/logger"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/templates"
 	"sigs.k8s.io/yaml"
 )
@@ -40,10 +41,10 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 
 	fileInfo, err := os.Stat(path)
 	if err != nil {
-		return nil, mcperrors.NewError().Messagef("error accessing directory %s: %v", path, err).WithLocation().Build()
+		return nil, mcperrors.New(mcperrors.CodeIoError, "k8s", fmt.Sprintf("error accessing directory %s: %v", path, err), err)
 	}
 	if !fileInfo.IsDir() {
-		return nil, mcperrors.NewError().Messagef("%s is not a directory", path).WithLocation().Build()
+		return nil, mcperrors.New(mcperrors.CodeValidationFailed, "k8s", fmt.Sprintf("%s is not a directory", path), nil)
 	}
 
 	logger.Infof("Finding Kubernetes manifest files in directory: %s", path)
@@ -60,7 +61,7 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 		if !d.IsDir() && (strings.HasSuffix(d.Name(), ".yaml") || strings.HasSuffix(d.Name(), ".yml")) {
 			fileContent, err := os.ReadFile(filePath)
 			if err != nil {
-				return mcperrors.NewError().Messagef("reading file %s: %w", filePath, err).WithLocation().Build()
+				return mcperrors.New(mcperrors.CodeIoError, "k8s", fmt.Sprintf("reading file %s: %v", filePath, err), err)
 			}
 			o, err := ReadK8sObjects(fileContent)
 			if err != nil {
@@ -81,7 +82,7 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 	})
 
 	if err != nil {
-		return nil, mcperrors.NewError().Messagef("error walking manifest directory: %v", err).WithLocation().Build()
+		return nil, mcperrors.New(mcperrors.CodeIoError, "k8s", fmt.Sprintf("error walking manifest directory: %v", err), err)
 	}
 	return k8sObjects, nil
 }
@@ -89,11 +90,11 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 func ReadK8sObjects(content []byte) (K8sObject, error) {
 	var o K8sObject
 	if strings.Contains(string(content), ManifestObjectDelimiter) {
-		return o, mcperrors.NewError().Messagef("multi-object manifests are not yet supported").WithLocation().Build()
+		return o, mcperrors.New(mcperrors.CodeNotImplemented, "k8s", "multi-object manifests are not yet supported", nil)
 	}
 	err := yaml.Unmarshal(content, &o)
 	if err != nil {
-		return o, mcperrors.NewError().Messagef("unmarshaling yaml as k8s object: %w", err).WithLocation().Build()
+		return o, mcperrors.New(mcperrors.CodeManifestInvalid, "k8s", fmt.Sprintf("unmarshaling yaml as k8s object: %v", err), err)
 	}
 	o.Content = content
 	return o, nil
@@ -129,7 +130,7 @@ func WriteManifestsFromTemplate(templateName ManifestsName, targetDir string, im
 
 	manifestsDir := filepath.Join(targetDir, MANIFEST_TARGET_DIR)
 	if err := os.MkdirAll(manifestsDir, 0755); err != nil {
-		return mcperrors.NewError().Messagef("creating manifests directory %q: %w", manifestsDir, err).WithLocation().Build()
+		return mcperrors.New(mcperrors.CodeIoError, "k8s", fmt.Sprintf("creating manifests directory %q: %w", manifestsDir), err)
 	}
 
 	for _, filename := range filesToCopy {
@@ -140,7 +141,7 @@ func WriteManifestsFromTemplate(templateName ManifestsName, targetDir string, im
 				logger.Debugf("Template file %s does not exist, skipping", embeddedPath)
 				continue
 			}
-			return mcperrors.NewError().Messagef("reading embedded file %q: %w", embeddedPath, err).WithLocation().Build()
+			return mcperrors.New(mcperrors.CodeIoError, "k8s", fmt.Sprintf("reading embedded file %q: %w", embeddedPath), err)
 		}
 
 		destPath := filepath.Join(manifestsDir, filename)
@@ -149,7 +150,7 @@ func WriteManifestsFromTemplate(templateName ManifestsName, targetDir string, im
 		logger.Debugf("Writing updated manifest to: %s", destPath)
 		data = []byte(updatedData)
 		if err := os.WriteFile(destPath, data, 0644); err != nil {
-			return mcperrors.NewError().Messagef("writing file %q: %w", destPath, err).WithLocation().Build()
+			return mcperrors.New(mcperrors.CodeIoError, "k8s", fmt.Sprintf("writing file %q: %w", destPath), err)
 		}
 	}
 	return nil

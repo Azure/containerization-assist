@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -165,7 +165,7 @@ func (hm *HealthMonitor) Start(ctx context.Context) error {
 	hm.mutex.Lock()
 	if hm.running {
 		hm.mutex.Unlock()
-		return mcperrors.NewError().Messagef("health monitor is already running").WithLocation().Build()
+		return mcperrors.New(mcperrors.CodeInvalidState, "core", "health monitor is already running", nil)
 	}
 	hm.running = true
 	hm.mutex.Unlock()
@@ -190,7 +190,7 @@ func (hm *HealthMonitor) Stop() error {
 	defer hm.mutex.Unlock()
 
 	if !hm.running {
-		return mcperrors.NewError().Messagef("health monitor is not running").WithLocation().Build()
+		return mcperrors.New(mcperrors.CodeInvalidState, "core", "health monitor is not running", nil)
 	}
 
 	hm.logger.Info().Msg("Stopping health monitor")

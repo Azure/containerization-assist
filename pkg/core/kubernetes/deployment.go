@@ -12,7 +12,7 @@ import (
 	"log/slog"
 
 	"github.com/Azure/container-kit/pkg/clients"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"sigs.k8s.io/yaml"
 )
 
@@ -380,7 +380,7 @@ func (s *ServiceImpl) CheckClusterConnection(ctx context.Context) error {
 	// Try a simple kubectl command to verify cluster connection
 	output, err := s.clients.Kube.GetPods(ctx, "kube-system", "")
 	if err != nil {
-		return mcperrors.NewError().Messagef("cannot connect to Kubernetes cluster: %v (output: %s)", err, output).WithLocation().Build()
+		return mcperrors.New(mcperrors.CodeKubernetesApiError, "core", fmt.Sprintf("cannot connect to Kubernetes cluster: %v (output: %s)", err, output), err)
 	}
 	return nil
 }
@@ -398,7 +398,7 @@ func (s *ServiceImpl) PreviewChanges(ctx context.Context, manifestPath string, n
 	// Only log as error if output is empty (real failure)
 	if err != nil && output == "" {
 		s.logger.Error("kubectl diff failed", "error", err)
-		return "", mcperrors.NewError().Messagef("failed to preview changes: %w", err).WithLocation().Build()
+		return "", mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to preview changes", err)
 	}
 
 	if output == "" {

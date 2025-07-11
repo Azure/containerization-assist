@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/api"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // Coordinator implements api.RetryCoordinator
@@ -43,17 +43,14 @@ func (c *Coordinator) Execute(ctx context.Context, name string, fn api.Retryable
 func (c *Coordinator) ExecuteWithPolicy(ctx context.Context, name string, policy api.RetryPolicy, fn api.RetryableFunc) error {
 	// Check circuit breaker
 	if cb := c.getCircuitBreaker(name); cb != nil && !cb.CanExecute() {
-		return mcperrors.NewError().Messagef("circuit breaker open for %s", name).WithLocation().Build()
+		return mcperrors.New(mcperrors.CodeInternalError, "common", fmt.Sprintf("circuit breaker open for %s", name), nil)
 	}
 
 	var lastErr error
 	for attempt := 0; attempt < policy.MaxAttempts; attempt++ {
 		// Check context
 		if err := ctx.Err(); err != nil {
-			return mcperrors.NewError().Messagef("context cancelled: %w", err).WithLocation(
-
-			// Execute function
-			).Build()
+			return mcperrors.New(mcperrors.CodeInternalError, "retry", "context cancelled", err)
 		}
 
 		err := fn(ctx)
@@ -89,10 +86,7 @@ func (c *Coordinator) ExecuteWithPolicy(ctx context.Context, name string, policy
 		}
 	}
 
-	return mcperrors.NewError().Messagef("all retry attempts failed: %w", lastErr).WithLocation(
-
-	// RegisterPolicy implements api.RetryCoordinator
-	).Build()
+	return mcperrors.New(mcperrors.CodeOperationFailed, "retry", "all retry attempts failed: %w", nil)
 }
 
 func (c *Coordinator) RegisterPolicy(name string, policy api.RetryPolicy) error {
@@ -110,7 +104,7 @@ func (c *Coordinator) GetPolicy(name string) (api.RetryPolicy, error) {
 
 	policy, ok := c.policies[name]
 	if !ok {
-		return api.RetryPolicy{}, mcperrors.NewError().Messagef("policy not found: %s", name).WithLocation().Build()
+		return api.RetryPolicy{}, mcperrors.New(mcperrors.CodeNotFound, "common", fmt.Sprintf("policy not found: %s", name), nil)
 	}
 
 	return policy, nil

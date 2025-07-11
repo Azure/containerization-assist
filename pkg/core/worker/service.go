@@ -3,10 +3,12 @@ package worker
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"fmt"
 )
 
 // Service provides a unified interface to worker management operations
@@ -205,11 +207,7 @@ func (s *ServiceImpl) RegisterWorker(worker Worker) error {
 
 	name := worker.Name()
 	if _, exists := s.workers[name]; exists {
-		return errors.NewError().
-			Messagef("worker already registered: %s", name).
-			Context("worker", name).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeIoError, "worker", fmt.Sprintf("worker already registered: %s", name), nil)
 	}
 
 	ctx, cancel := context.WithCancel(s.ctx)
@@ -243,11 +241,7 @@ func (s *ServiceImpl) UnregisterWorker(name string) error {
 
 	instance, exists := s.workers[name]
 	if !exists {
-		return errors.NewError().
-			Messagef("worker not found: %s", name).
-			Context("worker", name).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeNotFound, "worker", fmt.Sprintf("worker not found: %s", name), nil)
 	}
 
 	// Stop the worker if it's running
@@ -273,19 +267,11 @@ func (s *ServiceImpl) StartWorker(name string) error {
 
 	instance, exists := s.workers[name]
 	if !exists {
-		return errors.NewError().
-			Messagef("worker not found: %s", name).
-			Context("worker", name).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeNotFound, "worker", fmt.Sprintf("worker not found: %s", name), nil)
 	}
 
 	if instance.status == WorkerStatusRunning {
-		return errors.NewError().
-			Messagef("worker already running: %s", name).
-			Context("worker", name).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeIoError, "worker", fmt.Sprintf("worker already running: %s", name), nil)
 	}
 
 	return s.startWorkerInstance(instance)
@@ -300,19 +286,11 @@ func (s *ServiceImpl) StopWorker(name string) error {
 
 	instance, exists := s.workers[name]
 	if !exists {
-		return errors.NewError().
-			Messagef("worker not found: %s", name).
-			Context("worker", name).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeNotFound, "worker", fmt.Sprintf("worker not found: %s", name), nil)
 	}
 
 	if instance.status != WorkerStatusRunning {
-		return errors.NewError().
-			Messagef("worker not running: %s", name).
-			Context("worker", name).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeInternalError, "worker", fmt.Sprintf("worker not running: %s", name), nil)
 	}
 
 	return s.stopWorkerInstance(instance)
@@ -323,8 +301,11 @@ func (s *ServiceImpl) RestartWorker(name string) error {
 	s.logger.Info("Restarting worker", "name", name)
 
 	// Stop first if running
-	if err := s.StopWorker(name); err != nil && !errors.IsErrorType(err, "worker not running") {
-		return err
+	if err := s.StopWorker(name); err != nil {
+		// Check if the error is because the worker is not running
+		if !strings.Contains(err.Error(), "worker not running") {
+			return err
+		}
 	}
 
 	// Then start
@@ -351,11 +332,7 @@ func (s *ServiceImpl) StartAll() error {
 	}
 
 	if len(errs) > 0 {
-		return errors.NewError().
-			Message("failed to start some workers").
-			Context("errors", errs).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeOperationFailed, "worker", "failed to start some workers", nil)
 	}
 
 	s.logger.Info("Successfully started all workers")
@@ -382,11 +359,7 @@ func (s *ServiceImpl) StopAll() error {
 	}
 
 	if len(errs) > 0 {
-		return errors.NewError().
-			Message("failed to stop some workers").
-			Context("errors", errs).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeOperationFailed, "worker", "failed to stop some workers", nil)
 	}
 
 	s.logger.Info("Successfully stopped all workers")
@@ -411,11 +384,7 @@ func (s *ServiceImpl) GetWorkerStatus(name string) (WorkerStatus, error) {
 
 	instance, exists := s.workers[name]
 	if !exists {
-		return WorkerStatusUnknown, errors.NewError().
-			Messagef("worker not found: %s", name).
-			Context("worker", name).
-			WithLocation().
-			Build()
+		return WorkerStatusUnknown, errors.New(errors.CodeNotFound, "worker", fmt.Sprintf("worker not found: %s", name), nil)
 	}
 
 	instance.mutex.RLock()
@@ -447,11 +416,7 @@ func (s *ServiceImpl) GetWorkerHealth(name string) (WorkerHealth, error) {
 
 	instance, exists := s.workers[name]
 	if !exists {
-		return WorkerHealth{}, errors.NewError().
-			Messagef("worker not found: %s", name).
-			Context("worker", name).
-			WithLocation().
-			Build()
+		return WorkerHealth{}, errors.New(errors.CodeNotFound, "worker", fmt.Sprintf("worker not found: %s", name), nil)
 	}
 
 	instance.mutex.RLock()
@@ -514,11 +479,7 @@ func (s *ServiceImpl) GetWorkerInfo(name string) (*WorkerInfo, error) {
 
 	instance, exists := s.workers[name]
 	if !exists {
-		return nil, errors.NewError().
-			Messagef("worker not found: %s", name).
-			Context("worker", name).
-			WithLocation().
-			Build()
+		return nil, errors.New(errors.CodeNotFound, "worker", fmt.Sprintf("worker not found: %s", name), nil)
 	}
 
 	instance.mutex.RLock()
@@ -630,11 +591,7 @@ func (s *ServiceImpl) GetManagerStats() ManagerStats {
 
 func (s *ServiceImpl) startWorkerInstance(instance *workerInstance) error {
 	if !instance.worker.IsEnabled() {
-		return errors.NewError().
-			Messagef("worker is disabled: %s", instance.worker.Name()).
-			Context("worker", instance.worker.Name()).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeInternalError, "worker", fmt.Sprintf("worker is disabled: %s", instance.worker.Name()), nil)
 	}
 
 	instance.mutex.Lock()

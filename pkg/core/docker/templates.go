@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/templates"
 )
 
@@ -57,7 +57,7 @@ type GenerateError struct {
 func (te *TemplateEngine) ListAvailableTemplates() ([]TemplateInfo, error) {
 	templateNames, err := te.listEmbeddedSubdirNames("dockerfiles")
 	if err != nil {
-		return nil, mcperrors.NewError().Messagef("failed to list dockerfile templates: %w", err).WithLocation().Build()
+		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to list dockerfile templates", err)
 	}
 
 	templates := make([]TemplateInfo, 0, len(templateNames))

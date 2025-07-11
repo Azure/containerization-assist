@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // Service provides a unified interface to all Git operations
@@ -98,15 +98,9 @@ func (s *ServiceImpl) Clone(ctx context.Context, url, targetDir string, options 
 	args = append(args, url, targetDir)
 
 	cmd := exec.CommandContext(ctx, "git", args...)
-	output, err := cmd.CombinedOutput()
+	_, err := cmd.CombinedOutput()
 	if err != nil {
-		return errors.NewError().
-			Message("failed to clone Git repository").
-			Cause(err).
-			Context("url", url).
-			Context("output", string(output)).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeOperationFailed, "git", "failed to clone Git repository", err)
 	}
 
 	s.logger.Info("Successfully cloned Git repository", "url", url, "target", targetDir)
@@ -118,15 +112,9 @@ func (s *ServiceImpl) Init(ctx context.Context, dir string) error {
 	s.logger.Info("Initializing Git repository", "dir", dir)
 
 	cmd := exec.CommandContext(ctx, "git", "init", dir)
-	output, err := cmd.CombinedOutput()
+	_, err := cmd.CombinedOutput()
 	if err != nil {
-		return errors.NewError().
-			Message("failed to initialize Git repository").
-			Cause(err).
-			Context("dir", dir).
-			Context("output", string(output)).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeOperationFailed, "git", "failed to initialize Git repository", err)
 	}
 
 	return nil
@@ -135,34 +123,21 @@ func (s *ServiceImpl) Init(ctx context.Context, dir string) error {
 // Status returns the current status of the Git repository
 func (s *ServiceImpl) Status(ctx context.Context, dir string) (*StatusResult, error) {
 	if !s.IsGitRepo(ctx, dir) {
-		return nil, errors.NewError().
-			Messagef("directory is not a git repository: %s", dir).
-			WithLocation().
-			Build()
+		return nil, errors.New(errors.CodeNotFound, "git", fmt.Sprintf("directory is not a git repository: %s", dir), nil)
 	}
 
 	// Get status in porcelain format
 	cmd := exec.CommandContext(ctx, "git", "-C", dir, "status", "--porcelain")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, errors.NewError().
-			Message("failed to get Git status").
-			Cause(err).
-			Context("dir", dir).
-			WithLocation().
-			Build()
+		return nil, errors.New(errors.CodeOperationFailed, "git", "failed to get Git status", err)
 	}
 
 	// Get current branch
 	branchCmd := exec.CommandContext(ctx, "git", "-C", dir, "branch", "--show-current")
 	branchOutput, err := branchCmd.CombinedOutput()
 	if err != nil {
-		return nil, errors.NewError().
-			Message("failed to get current branch").
-			Cause(err).
-			Context("dir", dir).
-			WithLocation().
-			Build()
+		return nil, errors.New(errors.CodeOperationFailed, "git", "failed to get current branch", err)
 	}
 
 	result := &StatusResult{
@@ -198,16 +173,9 @@ func (s *ServiceImpl) CreateBranch(ctx context.Context, dir, branch string) erro
 	s.logger.Info("Creating Git branch", "dir", dir, "branch", branch)
 
 	cmd := exec.CommandContext(ctx, "git", "-C", dir, "checkout", "-b", branch)
-	output, err := cmd.CombinedOutput()
+	_, err := cmd.CombinedOutput()
 	if err != nil {
-		return errors.NewError().
-			Message("failed to create Git branch").
-			Cause(err).
-			Context("dir", dir).
-			Context("branch", branch).
-			Context("output", string(output)).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeOperationFailed, "git", "failed to create Git branch", err)
 	}
 
 	return nil
@@ -218,16 +186,9 @@ func (s *ServiceImpl) CheckoutBranch(ctx context.Context, dir, branch string) er
 	s.logger.Info("Checking out Git branch", "dir", dir, "branch", branch)
 
 	cmd := exec.CommandContext(ctx, "git", "-C", dir, "checkout", branch)
-	output, err := cmd.CombinedOutput()
+	_, err := cmd.CombinedOutput()
 	if err != nil {
-		return errors.NewError().
-			Message("failed to checkout Git branch").
-			Cause(err).
-			Context("dir", dir).
-			Context("branch", branch).
-			Context("output", string(output)).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeOperationFailed, "git", "failed to checkout Git branch", err)
 	}
 
 	return nil
@@ -238,12 +199,7 @@ func (s *ServiceImpl) ListBranches(ctx context.Context, dir string) ([]string, e
 	cmd := exec.CommandContext(ctx, "git", "-C", dir, "branch", "--list")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, errors.NewError().
-			Message("failed to list Git branches").
-			Cause(err).
-			Context("dir", dir).
-			WithLocation().
-			Build()
+		return nil, errors.New(errors.CodeOperationFailed, "git", "failed to list Git branches", err)
 	}
 
 	var branches []string
@@ -266,16 +222,9 @@ func (s *ServiceImpl) Add(ctx context.Context, dir string, files []string) error
 	args = append(args, files...)
 
 	cmd := exec.CommandContext(ctx, "git", args...)
-	output, err := cmd.CombinedOutput()
+	_, err := cmd.CombinedOutput()
 	if err != nil {
-		return errors.NewError().
-			Message("failed to stage files").
-			Cause(err).
-			Context("dir", dir).
-			Context("files", files).
-			Context("output", string(output)).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeOperationFailed, "git", "failed to stage files", err)
 	}
 
 	return nil
@@ -286,16 +235,9 @@ func (s *ServiceImpl) Commit(ctx context.Context, dir, message string) error {
 	s.logger.Info("Creating Git commit", "dir", dir, "message", message)
 
 	cmd := exec.CommandContext(ctx, "git", "-C", dir, "commit", "-m", message)
-	output, err := cmd.CombinedOutput()
+	_, err := cmd.CombinedOutput()
 	if err != nil {
-		return errors.NewError().
-			Message("failed to create commit").
-			Cause(err).
-			Context("dir", dir).
-			Context("message", message).
-			Context("output", string(output)).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeOperationFailed, "git", "failed to create commit", err)
 	}
 
 	return nil
@@ -320,15 +262,9 @@ func (s *ServiceImpl) Push(ctx context.Context, dir string, options PushOptions)
 	}
 
 	cmd := exec.CommandContext(ctx, "git", args...)
-	output, err := cmd.CombinedOutput()
+	_, err := cmd.CombinedOutput()
 	if err != nil {
-		return errors.NewError().
-			Message("failed to push to remote").
-			Cause(err).
-			Context("dir", dir).
-			Context("output", string(output)).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeOperationFailed, "git", "failed to push to remote", err)
 	}
 
 	return nil
@@ -349,15 +285,9 @@ func (s *ServiceImpl) Pull(ctx context.Context, dir string, options PullOptions)
 	}
 
 	cmd := exec.CommandContext(ctx, "git", args...)
-	output, err := cmd.CombinedOutput()
+	_, err := cmd.CombinedOutput()
 	if err != nil {
-		return errors.NewError().
-			Message("failed to pull from remote").
-			Cause(err).
-			Context("dir", dir).
-			Context("output", string(output)).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeOperationFailed, "git", "failed to pull from remote", err)
 	}
 
 	return nil
@@ -368,12 +298,7 @@ func (s *ServiceImpl) GetRemoteURL(ctx context.Context, dir string) (string, err
 	cmd := exec.CommandContext(ctx, "git", "-C", dir, "remote", "get-url", "origin")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", errors.NewError().
-			Message("failed to get remote URL").
-			Cause(err).
-			Context("dir", dir).
-			WithLocation().
-			Build()
+		return "", errors.New(errors.CodeOperationFailed, "git", "failed to get remote URL", err)
 	}
 
 	return strings.TrimSpace(string(output)), nil
@@ -384,12 +309,7 @@ func (s *ServiceImpl) GetCurrentBranch(ctx context.Context, dir string) (string,
 	cmd := exec.CommandContext(ctx, "git", "-C", dir, "branch", "--show-current")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", errors.NewError().
-			Message("failed to get current branch").
-			Cause(err).
-			Context("dir", dir).
-			WithLocation().
-			Build()
+		return "", errors.New(errors.CodeOperationFailed, "git", "failed to get current branch", err)
 	}
 
 	return strings.TrimSpace(string(output)), nil

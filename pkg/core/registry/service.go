@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // Service provides a unified interface to container registry operations
@@ -191,12 +191,7 @@ func (s *ServiceImpl) Login(ctx context.Context, registry string, auth AuthConfi
 
 	// Test the connection first
 	if err := s.testConnection(ctx, registry, &auth); err != nil {
-		return errors.NewError().
-			Message("failed to login to registry").
-			Cause(err).
-			WithField("registry", registry).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodePermissionDenied, "registry", fmt.Sprintf("failed to login to registry: %s", registry), err)
 	}
 
 	// Store the auth config
@@ -339,12 +334,7 @@ func (s *ServiceImpl) GetRepository(ctx context.Context, registry, name string) 
 		}
 	}
 
-	return nil, errors.NewError().
-		Messagef("repository not found: %s", name).
-		WithField("registry", registry).
-		WithField("repository", name).
-		WithLocation().
-		Build()
+	return nil, errors.New(errors.CodeNotFound, "registry", fmt.Sprintf("repository not found: %s/%s", registry, name), nil)
 }
 
 // CreateRepository creates a new repository
@@ -440,13 +430,7 @@ func (s *ServiceImpl) GetTagInfo(ctx context.Context, registry, repository, tag 
 		}
 	}
 
-	return nil, errors.NewError().
-		Messagef("tag not found: %s", tag).
-		WithField("registry", registry).
-		WithField("repository", repository).
-		WithField("tag", tag).
-		WithLocation().
-		Build()
+	return nil, errors.New(errors.CodeNotFound, "registry", fmt.Sprintf("tag not found: %s/%s:%s", registry, repository, tag), nil)
 }
 
 // DeleteTag deletes a tag
@@ -520,21 +504,13 @@ func (s *ServiceImpl) validateAuth(registry string, auth *AuthConfig) error {
 		s.authMutex.RUnlock()
 
 		if !exists {
-			return errors.NewError().
-				Messagef("no authentication configured for registry: %s", registry).
-				WithField("registry", registry).
-				WithLocation().
-				Build()
+			return errors.New(errors.CodePermissionDenied, "registry", fmt.Sprintf("no authentication configured for registry: %s", registry), nil)
 		}
 		auth = cachedAuth
 	}
 
 	if auth.Username == "" && auth.Token == "" && auth.IdentityToken == "" {
-		return errors.NewError().
-			Messagef("invalid authentication configuration for registry: %s", registry).
-			WithField("registry", registry).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodePermissionDenied, "registry", fmt.Sprintf("invalid authentication configuration for registry: %s", registry), nil)
 	}
 
 	return nil

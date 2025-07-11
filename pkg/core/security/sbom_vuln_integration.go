@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -106,23 +106,20 @@ func (s *SBOMVulnerabilityIntegrator) ScanWithSBOM(
 	sbomStartTime := time.Now()
 	sbom, err := s.sbomGenerator.GenerateSBOM(ctx, source, format)
 	if err != nil {
-		return nil, mcperrors.NewError().Messagef("failed to generate SBOM: %w", err).WithLocation().Build()
+		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to generate SBOM", err)
 	}
 	sbomDuration := time.Since(sbomStartTime)
 
 	// Extract packages from SBOM for vulnerability analysis
 	packages, err := s.extractPackagesFromSBOM(sbom, format)
 	if err != nil {
-		return nil, mcperrors.NewError().Messagef("failed to extract packages from SBOM: %w", err).WithLocation(
-
-		// Perform vulnerability scanning on packages
-		).Build()
+		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "security", "failed to extract packages from SBOM", err)
 	}
 
 	enrichStartTime := time.Now()
 	vulnReport, err := s.scanPackagesForVulnerabilities(ctx, packages, options)
 	if err != nil {
-		return nil, mcperrors.NewError().Messagef("failed to scan packages for vulnerabilities: %w", err).WithLocation().Build()
+		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to scan packages for vulnerabilities", err)
 	}
 	enrichDuration := time.Since(enrichStartTime)
 
@@ -620,7 +617,7 @@ func (s *SBOMVulnerabilityIntegrator) WriteEnrichedResult(result *EnrichedSBOMRe
 	// nolint:gosec // Filename is controlled by the function caller
 	file, err := os.Create(filename)
 	if err != nil {
-		return mcperrors.NewError().Messagef("failed to create file: %w", err).WithLocation().Build()
+		return mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to create file", err)
 	}
 	defer func() { _ = file.Close() }()
 

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // Service provides a unified interface to deployment operations
@@ -332,11 +332,7 @@ func (s *ServiceImpl) Deploy(_ context.Context, options DeployOptions) (*DeployR
 
 	// Check if deployment already exists
 	if _, exists := s.deployments[options.Name]; exists {
-		return nil, errors.NewError().
-			Messagef("deployment already exists: %s", options.Name).
-			WithField("deployment", options.Name).
-			WithLocation().
-			Build()
+		return nil, errors.New(errors.CodeAlreadyExists, "deployment", fmt.Sprintf("deployment already exists: %s", options.Name), nil)
 	}
 
 	// Create deployment
@@ -404,11 +400,7 @@ func (s *ServiceImpl) Update(_ context.Context, deployment string, options Updat
 
 	deploy, exists := s.deployments[deployment]
 	if !exists {
-		return nil, errors.NewError().
-			Messagef("deployment not found: %s", deployment).
-			WithField("deployment", deployment).
-			WithLocation().
-			Build()
+		return nil, errors.New(errors.CodeNotFound, "deployment", fmt.Sprintf("deployment not found: %s", deployment), nil)
 	}
 
 	// Update deployment
@@ -465,11 +457,7 @@ func (s *ServiceImpl) Rollback(_ context.Context, deployment string, options Rol
 
 	deploy, exists := s.deployments[deployment]
 	if !exists {
-		return nil, errors.NewError().
-			Messagef("deployment not found: %s", deployment).
-			WithField("deployment", deployment).
-			WithLocation().
-			Build()
+		return nil, errors.New(errors.CodeNotFound, "deployment", fmt.Sprintf("deployment not found: %s", deployment), nil)
 	}
 
 	// Find the revision to rollback to
@@ -482,12 +470,7 @@ func (s *ServiceImpl) Rollback(_ context.Context, deployment string, options Rol
 	}
 
 	if targetRevision == nil {
-		return nil, errors.NewError().
-			Messagef("revision not found: %d", options.Revision).
-			WithField("deployment", deployment).
-			WithField("revision", options.Revision).
-			WithLocation().
-			Build()
+		return nil, errors.New(errors.CodeNotFound, "deployment", fmt.Sprintf("revision not found: %d for deployment %s", options.Revision, deployment), nil)
 	}
 
 	fromRevision := len(deploy.History)
@@ -525,11 +508,7 @@ func (s *ServiceImpl) Delete(_ context.Context, deployment string, _ DeleteOptio
 	defer s.mutex.Unlock()
 
 	if _, exists := s.deployments[deployment]; !exists {
-		return errors.NewError().
-			Messagef("deployment not found: %s", deployment).
-			WithField("deployment", deployment).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeNotFound, "deployment", fmt.Sprintf("deployment not found: %s", deployment), nil)
 	}
 
 	delete(s.deployments, deployment)
@@ -545,11 +524,7 @@ func (s *ServiceImpl) GetStatus(_ context.Context, deployment string) (*Status, 
 
 	deploy, exists := s.deployments[deployment]
 	if !exists {
-		return nil, errors.NewError().
-			Messagef("deployment not found: %s", deployment).
-			WithField("deployment", deployment).
-			WithLocation().
-			Build()
+		return nil, errors.New(errors.CodeNotFound, "deployment", fmt.Sprintf("deployment not found: %s", deployment), nil)
 	}
 
 	return &deploy.Status, nil
@@ -563,11 +538,7 @@ func (s *ServiceImpl) GetLogs(_ context.Context, deployment string, options LogO
 	defer s.mutex.RUnlock()
 
 	if _, exists := s.deployments[deployment]; !exists {
-		return nil, errors.NewError().
-			Messagef("deployment not found: %s", deployment).
-			WithField("deployment", deployment).
-			WithLocation().
-			Build()
+		return nil, errors.New(errors.CodeNotFound, "deployment", fmt.Sprintf("deployment not found: %s", deployment), nil)
 	}
 
 	// Simulate log retrieval
@@ -609,11 +580,7 @@ func (s *ServiceImpl) GetEvents(_ context.Context, deployment string, _ EventOpt
 	defer s.mutex.RUnlock()
 
 	if _, exists := s.deployments[deployment]; !exists {
-		return nil, errors.NewError().
-			Messagef("deployment not found: %s", deployment).
-			WithField("deployment", deployment).
-			WithLocation().
-			Build()
+		return nil, errors.New(errors.CodeNotFound, "deployment", fmt.Sprintf("deployment not found: %s", deployment), nil)
 	}
 
 	// Simulate event retrieval
@@ -656,11 +623,7 @@ func (s *ServiceImpl) CheckHealth(_ context.Context, deployment string) (*Health
 
 	deploy, exists := s.deployments[deployment]
 	if !exists {
-		return nil, errors.NewError().
-			Messagef("deployment not found: %s", deployment).
-			WithField("deployment", deployment).
-			WithLocation().
-			Build()
+		return nil, errors.New(errors.CodeNotFound, "deployment", fmt.Sprintf("deployment not found: %s", deployment), nil)
 	}
 
 	// Simulate health check
@@ -697,11 +660,7 @@ func (s *ServiceImpl) Scale(_ context.Context, deployment string, replicas int) 
 
 	deploy, exists := s.deployments[deployment]
 	if !exists {
-		return errors.NewError().
-			Messagef("deployment not found: %s", deployment).
-			WithField("deployment", deployment).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeNotFound, "deployment", fmt.Sprintf("deployment not found: %s", deployment), nil)
 	}
 
 	deploy.Replicas = int32(replicas)
@@ -723,11 +682,7 @@ func (s *ServiceImpl) Restart(_ context.Context, deployment string) error {
 
 	deploy, exists := s.deployments[deployment]
 	if !exists {
-		return errors.NewError().
-			Messagef("deployment not found: %s", deployment).
-			WithField("deployment", deployment).
-			WithLocation().
-			Build()
+		return errors.New(errors.CodeNotFound, "deployment", fmt.Sprintf("deployment not found: %s", deployment), nil)
 	}
 
 	deploy.UpdatedAt = time.Now()
@@ -775,11 +730,7 @@ func (s *ServiceImpl) GetDeployment(_ context.Context, deployment string) (*Depl
 
 	deploy, exists := s.deployments[deployment]
 	if !exists {
-		return nil, errors.NewError().
-			Messagef("deployment not found: %s", deployment).
-			WithField("deployment", deployment).
-			WithLocation().
-			Build()
+		return nil, errors.New(errors.CodeNotFound, "deployment", fmt.Sprintf("deployment not found: %s", deployment), nil)
 	}
 
 	// Return a copy
@@ -794,11 +745,7 @@ func (s *ServiceImpl) GetDeploymentHistory(_ context.Context, deployment string)
 
 	deploy, exists := s.deployments[deployment]
 	if !exists {
-		return nil, errors.NewError().
-			Messagef("deployment not found: %s", deployment).
-			WithField("deployment", deployment).
-			WithLocation().
-			Build()
+		return nil, errors.New(errors.CodeNotFound, "deployment", fmt.Sprintf("deployment not found: %s", deployment), nil)
 	}
 
 	return deploy.History, nil

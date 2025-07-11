@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/ai"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/templates"
 )
 
@@ -58,7 +58,7 @@ Keep the tone neutral and factual, but feel free to raise a flag if something ne
 func GetDockerfileTemplateName(ctx context.Context, client ai.LLMClient, projectDir string, repoStructure string) (string, ai.TokenUsage, error) {
 	dockerfileTemplateNames, err := listEmbeddedSubdirNames("dockerfiles")
 	if err != nil {
-		return "", ai.TokenUsage{}, mcperrors.NewError().Messagef("failed to list dockerfile template names: %w", err).WithLocation().Build()
+		return "", ai.TokenUsage{}, mcperrors.New(mcperrors.CodeIoError, "docker", fmt.Sprintf("failed to list dockerfile template names: %v", err), err)
 	}
 
 	promptText := fmt.Sprintf(dockerTemplatePrompt, strings.Join(dockerfileTemplateNames, "\n"), repoStructure)
@@ -70,7 +70,7 @@ func GetDockerfileTemplateName(ctx context.Context, client ai.LLMClient, project
 
 	templateName := strings.TrimSpace(content)
 	if !slices.Contains(dockerfileTemplateNames, templateName) {
-		return "", tokenUsage, mcperrors.NewError().Messagef("invalid template name: %s", templateName).WithLocation().Build()
+		return "", tokenUsage, mcperrors.New(mcperrors.CodeValidationFailed, "docker", fmt.Sprintf("invalid template name: %s", templateName), nil)
 	}
 
 	return templateName, tokenUsage, nil
@@ -100,11 +100,11 @@ func WriteDockerfileFromTemplate(templateName, targetDir string) error {
 			if errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
-			return mcperrors.NewError().Messagef("reading embedded file %q: %w", embeddedPath, err).WithLocation().Build()
+			return mcperrors.New(mcperrors.CodeIoError, "docker", fmt.Sprintf("reading embedded file %q: %v", embeddedPath, err), err)
 		}
 		destPath := filepath.Join(targetDir, filename)
 		if err := os.WriteFile(destPath, data, 0644); err != nil {
-			return mcperrors.NewError().Messagef("writing file %q: %w", destPath, err).WithLocation().Build()
+			return mcperrors.New(mcperrors.CodeIoError, "docker", fmt.Sprintf("writing file %q: %v", destPath, err), err)
 		}
 	}
 	return nil

@@ -6,6 +6,7 @@ package docker
 import (
 	"context"
 	"log/slog"
+	"os/exec"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/clients"
@@ -34,21 +35,21 @@ type Service interface {
 
 // ServiceImpl implements the Docker service interface
 type ServiceImpl struct {
-	Builder         *Builder
-	TemplateEngine  *TemplateEngine
-	RegistryManager *RegistryManager
-	Validator       *Validator
-	logger          *slog.Logger
+	Builder           *Builder
+	TemplateEngine    *TemplateEngine
+	RegistryManager   *RegistryManager
+	HadolintValidator *HadolintValidator
+	logger            *slog.Logger
 }
 
 // NewService creates a new Docker operations service
 func NewService(clients *clients.Clients, logger *slog.Logger) Service {
 	return &ServiceImpl{
-		Builder:         NewBuilder(clients, logger),
-		TemplateEngine:  NewTemplateEngine(logger),
-		RegistryManager: NewRegistryManager(clients, logger),
-		Validator:       NewValidator(logger),
-		logger:          logger.With("component", "docker_service"),
+		Builder:           NewBuilder(clients, logger),
+		TemplateEngine:    NewTemplateEngine(logger),
+		RegistryManager:   NewRegistryManager(clients, logger),
+		HadolintValidator: NewHadolintValidator(logger),
+		logger:            logger.With("component", "docker_service"),
 	}
 }
 
@@ -101,7 +102,7 @@ func (s *ServiceImpl) Containerize(ctx context.Context, targetDir string, option
 	}
 
 	// Step 2: Validate the generated Dockerfile
-	validationResult := s.Validator.ValidateDockerfile(templateResult.Dockerfile)
+	validationResult, _ := s.HadolintValidator.ValidateWithHadolint(ctx, templateResult.Dockerfile)
 	result.Validation = validationResult
 
 	if !validationResult.Valid {
@@ -175,7 +176,9 @@ func (s *ServiceImpl) Containerize(ctx context.Context, targetDir string, option
 
 // CheckPrerequisites verifies that all Docker prerequisites are met
 func (s *ServiceImpl) CheckPrerequisites(_ context.Context) error {
-	return s.Validator.CheckDockerInstallation()
+	// Simple Docker check - verify docker command is available
+	_, err := exec.LookPath("docker")
+	return err
 }
 
 // GetAvailableTemplates returns all available Dockerfile templates

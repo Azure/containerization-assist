@@ -10,7 +10,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/clients"
 	"github.com/Azure/container-kit/pkg/common/utils"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // RegistryManager provides mechanical Docker registry operations
@@ -321,17 +321,11 @@ func (rm *RegistryManager) TagImage(ctx context.Context, sourceImage, targetImag
 func (rm *RegistryManager) ValidateRegistryAccess(ctx context.Context, registry string) error {
 	// This is a basic validation - in practice, you might want to do a test push/pull
 	if registry == "" {
-		return mcperrors.NewError().Messagef("registry URL is required").WithLocation(
-
-		// Basic URL validation
-		).Build()
+		return errors.New(errors.CodeValidationFailed, "registry", "registry URL is required", nil)
 	}
 
 	if !strings.Contains(registry, ".") {
-		return mcperrors.NewError().Messagef("registry URL appears to be invalid: %s", registry).WithLocation().Build(
-
-		// Helper methods
-		)
+		return errors.New(errors.CodeValidationFailed, "registry", fmt.Sprintf("registry URL appears to be invalid: %s", registry), nil)
 	}
 
 	return nil
