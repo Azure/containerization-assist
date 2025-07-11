@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -105,21 +106,20 @@ func (s *SBOMVulnerabilityIntegrator) ScanWithSBOM(
 	sbomStartTime := time.Now()
 	sbom, err := s.sbomGenerator.GenerateSBOM(ctx, source, format)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate SBOM: %w", err)
+		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to generate SBOM", err)
 	}
 	sbomDuration := time.Since(sbomStartTime)
 
 	// Extract packages from SBOM for vulnerability analysis
 	packages, err := s.extractPackagesFromSBOM(sbom, format)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract packages from SBOM: %w", err)
+		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "security", "failed to extract packages from SBOM", err)
 	}
 
-	// Perform vulnerability scanning on packages
 	enrichStartTime := time.Now()
 	vulnReport, err := s.scanPackagesForVulnerabilities(ctx, packages, options)
 	if err != nil {
-		return nil, fmt.Errorf("failed to scan packages for vulnerabilities: %w", err)
+		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to scan packages for vulnerabilities", err)
 	}
 	enrichDuration := time.Since(enrichStartTime)
 
@@ -535,9 +535,9 @@ func (s *SBOMVulnerabilityIntegrator) calculateVulnerabilitySummary(vulns []Vuln
 // evaluatePolicies evaluates security policies against the vulnerability report
 func (s *SBOMVulnerabilityIntegrator) evaluatePolicies(ctx context.Context, report *VulnerabilityReport) []PolicyEvaluationResult {
 	// Create security scan context for policy evaluation
-	scanCtx := &SecurityScanContext{
+	scanCtx := &ScanContext{
 		VulnSummary:    report.Summary,
-		SecretFindings: []SecretFinding{}, // No secrets found in SBOM scan
+		SecretFindings: []ExtendedSecretFinding{}, // No secrets found in SBOM scan
 	}
 
 	results, err := s.policyEngine.EvaluatePolicies(ctx, scanCtx)
@@ -617,7 +617,7 @@ func (s *SBOMVulnerabilityIntegrator) WriteEnrichedResult(result *EnrichedSBOMRe
 	// nolint:gosec // Filename is controlled by the function caller
 	file, err := os.Create(filename)
 	if err != nil {
-		return fmt.Errorf("failed to create file: %w", err)
+		return mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to create file", err)
 	}
 	defer func() { _ = file.Close() }()
 

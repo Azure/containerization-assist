@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -240,10 +241,9 @@ func (db *CVEDatabase) GetCVE(ctx context.Context, cveID string) (*CVEInfo, erro
 
 	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "security", "failed to create request", err)
 	}
 
-	// Add API key if available for higher rate limits
 	if db.apiKey != "" {
 		req.Header.Set("apiKey", db.apiKey)
 	}
@@ -251,12 +251,12 @@ func (db *CVEDatabase) GetCVE(ctx context.Context, cveID string) (*CVEInfo, erro
 
 	resp, err := db.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch CVE data: %w", err)
+		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to fetch CVE data", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("NVD API returned status %d", resp.StatusCode)
+		return nil, mcperrors.New(mcperrors.CodeInternalError, "core", "NVD API returned status %d", nil)
 	}
 
 	var nvdResponse struct {
@@ -357,14 +357,13 @@ func (db *CVEDatabase) GetCVE(ctx context.Context, cveID string) (*CVEInfo, erro
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&nvdResponse); err != nil {
-		return nil, fmt.Errorf("failed to decode NVD response: %w", err)
+		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to decode NVD response", err)
 	}
 
 	if len(nvdResponse.Vulnerabilities) == 0 {
-		return nil, fmt.Errorf("CVE %s not found", cveID)
+		return nil, mcperrors.New(mcperrors.CodeNotFound, "security", fmt.Sprintf("CVE %s not found", cveID), nil)
 	}
 
-	// Convert NVD format to our format
 	nvdCVE := nvdResponse.Vulnerabilities[0].CVE
 	cveInfo := &CVEInfo{
 		ID:               nvdCVE.ID,
@@ -793,6 +792,8 @@ func (db *CVEDatabase) GetCacheStats() map[string]interface{} {
 	return map[string]interface{}{
 		"total_entries": len(db.cache.cache),
 		"ttl_hours":     db.cache.ttl.Hours(),
+		"hit_count":     0, // TODO: Add hit counter to cache
+		"miss_count":    0, // TODO: Add miss counter to cache
 	}
 }
 

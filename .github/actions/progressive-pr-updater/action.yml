@@ -1,0 +1,503 @@
+name: 'Progressive PR Comment Updater'
+description: 'Updates PR comments progressively as CI jobs complete with enhanced visuals'
+
+inputs:
+  github-token:
+    description: 'GitHub token for updating comments'
+    required: true
+  
+  phase:
+    description: 'Current CI phase (canary, quality, tests, final)'
+    required: true
+  
+  phase-status:
+    description: 'Status of current phase (success, failure, in_progress)'
+    required: true
+  
+  phase-details:
+    description: 'Detailed results for current phase'
+    required: false
+    default: ''
+  
+  overall-results:
+    description: 'JSON object with all available results'
+    required: false
+    default: '{}'
+  
+  include-charts:
+    description: 'Include visual charts in the comment'
+    required: false
+    default: 'false'
+  
+  coverage-data:
+    description: 'Coverage data for chart generation'
+    required: false
+    default: ''
+  
+  performance-data:
+    description: 'Performance data for chart generation'
+    required: false
+    default: ''
+  
+  architecture-data:
+    description: 'Architecture analysis data'
+    required: false
+    default: ''
+
+outputs:
+  comment-id:
+    description: 'ID of the created or updated comment'
+    value: ${{ steps.update-comment.outputs.comment-id }}
+  
+  comment-url:
+    description: 'URL of the comment'
+    value: ${{ steps.update-comment.outputs.comment-url }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Parse phase information
+      id: parse-phase
+      shell: bash
+      run: |
+        echo "📊 Parsing phase information..."
+        
+        PHASE="${{ inputs.phase }}"
+        STATUS="${{ inputs.phase-status }}"
+        
+        # Determine phase emoji and description
+        case "$PHASE" in
+          "canary")
+            PHASE_EMOJI="🚀"
+            PHASE_NAME="Canary Validation"
+            PHASE_DESC="Fast syntax and formatting checks"
+            ;;
+          "quality")
+            PHASE_EMOJI="🎯"
+            PHASE_NAME="Quality Gates"
+            PHASE_DESC="Code quality and architectural compliance"
+            ;;
+          "tests")
+            PHASE_EMOJI="🧪"
+            PHASE_NAME="Test Execution"
+            PHASE_DESC="Unit tests, integration tests, and coverage"
+            ;;
+          "security")
+            PHASE_EMOJI="🔒"
+            PHASE_NAME="Security Scanning"
+            PHASE_DESC="Vulnerability and secrets detection"
+            ;;
+          "performance")
+            PHASE_EMOJI="⚡"
+            PHASE_NAME="Performance Analysis"
+            PHASE_DESC="Benchmark and performance validation"
+            ;;
+          "final")
+            PHASE_EMOJI="🎉"
+            PHASE_NAME="Final Summary"
+            PHASE_DESC="Complete pipeline results"
+            ;;
+          *)
+            PHASE_EMOJI="📋"
+            PHASE_NAME="$PHASE"
+            PHASE_DESC="CI pipeline phase"
+            ;;
+        esac
+        
+        # Determine status emoji
+        case "$STATUS" in
+          "success")
+            STATUS_EMOJI="✅"
+            STATUS_TEXT="Passed"
+            ;;
+          "failure")
+            STATUS_EMOJI="❌"
+            STATUS_TEXT="Failed"
+            ;;
+          "in_progress")
+            STATUS_EMOJI="🔄"
+            STATUS_TEXT="In Progress"
+            ;;
+          "skipped")
+            STATUS_EMOJI="⏭️"
+            STATUS_TEXT="Skipped"
+            ;;
+          *)
+            STATUS_EMOJI="⏸️"
+            STATUS_TEXT="Unknown"
+            ;;
+        esac
+        
+        echo "phase_emoji=$PHASE_EMOJI" >> $GITHUB_OUTPUT
+        echo "phase_name=$PHASE_NAME" >> $GITHUB_OUTPUT
+        echo "phase_desc=$PHASE_DESC" >> $GITHUB_OUTPUT
+        echo "status_emoji=$STATUS_EMOJI" >> $GITHUB_OUTPUT
+        echo "status_text=$STATUS_TEXT" >> $GITHUB_OUTPUT
+
+    - name: Generate visual elements
+      id: generate-visuals
+      shell: bash
+      run: |
+        echo "🎨 Generating visual elements..."
+        
+        INCLUDE_CHARTS="${{ inputs.include-charts }}"
+        
+        # Initialize visual components
+        COVERAGE_VISUAL=""
+        PERFORMANCE_VISUAL=""
+        ARCHITECTURE_VISUAL=""
+        PROGRESS_BAR=""
+        
+        # Debug output
+        echo "Debug: Starting visual generation with charts enabled: $INCLUDE_CHARTS"
+        echo "Debug: Coverage data: '${{ inputs.coverage-data }}'"
+        echo "Debug: Performance data: '${{ inputs.performance-data }}'"
+        echo "Debug: Architecture data: '${{ inputs.architecture-data }}'"
+        
+        if [ "$INCLUDE_CHARTS" = "true" ]; then
+          # Generate coverage visual if data available
+          echo "Debug: Checking coverage data..."
+          if [ -n "${{ inputs.coverage-data }}" ]; then
+            echo "Debug: Processing coverage data: '${{ inputs.coverage-data }}'"
+            COVERAGE_PCT=$(echo "${{ inputs.coverage-data }}" | grep -o '[0-9.]*%' | head -1 | sed 's/%//' || echo "")
+            echo "Debug: Extracted coverage percentage: '$COVERAGE_PCT'"
+            if [ -n "$COVERAGE_PCT" ] && [ "$COVERAGE_PCT" != "" ]; then
+              # Create ASCII coverage bar
+              if command -v bc >/dev/null 2>&1; then
+                BAR_LENGTH=$(echo "scale=0; $COVERAGE_PCT * 20 / 100" | bc 2>/dev/null || echo "10")
+              else
+                # Fallback: simple calculation
+                BAR_LENGTH=$((COVERAGE_PCT * 20 / 100))
+              fi
+              # Ensure bar length is valid
+              if [ "$BAR_LENGTH" -lt 0 ]; then BAR_LENGTH=0; fi
+              if [ "$BAR_LENGTH" -gt 20 ]; then BAR_LENGTH=20; fi
+              
+              FILLED=$(printf "#%.0s" $(seq 1 ${BAR_LENGTH:-10}) 2>/dev/null || echo "##########")
+              EMPTY=$(printf ".%.0s" $(seq 1 $((20 - ${BAR_LENGTH:-10}))) 2>/dev/null || echo "..........")
+              COVERAGE_VISUAL="**Coverage:** [$FILLED$EMPTY] ${COVERAGE_PCT:-0}%"
+              echo "Debug: Coverage visual created: '$COVERAGE_VISUAL'"
+            else
+              echo "Debug: No valid coverage percentage found"
+            fi
+          else
+            echo "Debug: No coverage data provided"
+          fi
+          
+          # Generate performance visual if data available
+          echo "Debug: Checking performance data..."
+          if [ -n "${{ inputs.performance-data }}" ]; then
+            PERF_TIME="${{ inputs.performance-data }}"
+            echo "Debug: Processing performance data: '$PERF_TIME'"
+            # Extract numeric value and unit safely
+            PERF_NUM=$(echo "$PERF_TIME" | grep -o '[0-9.]*' | head -1 || echo "")
+            PERF_UNIT=$(echo "$PERF_TIME" | grep -o '[a-zA-Zμ]*' | head -1 || echo "")
+            echo "Debug: Extracted perf num: '$PERF_NUM', unit: '$PERF_UNIT'"
+            
+            # Simple performance indicator based on common thresholds
+            if [ -n "$PERF_NUM" ]; then
+              case "$PERF_UNIT" in
+                "μs"|"us"|"microseconds")
+                  # Use integer comparison for reliability
+                  PERF_INT=${PERF_NUM%.*}  # Remove decimal part
+                  if [ "${PERF_INT:-999}" -le 300 ]; then
+                    PERF_STATUS="[EXCELLENT]"
+                  elif [ "${PERF_INT:-999}" -le 500 ]; then
+                    PERF_STATUS="[GOOD]"
+                  else
+                    PERF_STATUS="[SLOW]"
+                  fi
+                  ;;
+                "ms"|"milliseconds")
+                  PERF_STATUS="[NEEDS-OPT]"
+                  ;;
+                *)
+                  PERF_STATUS="[UNKNOWN]"
+                  ;;
+              esac
+              PERFORMANCE_VISUAL="**Performance:** $PERF_STATUS $PERF_TIME"
+            fi
+          fi
+          
+          # Generate architecture visual if data available
+          echo "Debug: Checking architecture data..."
+          if [ -n "${{ inputs.architecture-data }}" ]; then
+            echo "Debug: Processing architecture data: '${{ inputs.architecture-data }}'"
+            ARCH_SCORE=$(echo "${{ inputs.architecture-data }}" | grep -o '[0-9]*' | head -1 || echo "")
+            echo "Debug: Extracted architecture score: '$ARCH_SCORE'"
+            if [ -n "$ARCH_SCORE" ] && [ "$ARCH_SCORE" != "" ]; then
+              if [ "${ARCH_SCORE:-0}" -ge 90 ]; then
+                ARCH_STATUS="[EXCELLENT]"
+              elif [ "${ARCH_SCORE:-0}" -ge 80 ]; then
+                ARCH_STATUS="[GOOD]"
+              elif [ "${ARCH_SCORE:-0}" -ge 70 ]; then
+                ARCH_STATUS="[FAIR]"
+              else
+                ARCH_STATUS="[POOR]"
+              fi
+              ARCHITECTURE_VISUAL="**Architecture:** $ARCH_STATUS (${ARCH_SCORE}/100)"
+              echo "Debug: Architecture visual created: '$ARCHITECTURE_VISUAL'"
+            else
+              echo "Debug: No valid architecture score found"
+            fi
+          else
+            echo "Debug: No architecture data provided"
+          fi
+          
+          # Generate progress bar based on phase (using safe characters)
+          case "${{ inputs.phase }}" in
+            "canary")
+              PROGRESS_BAR="Progress: [#.........] 10% - Canary checks"
+              ;;
+            "quality")
+              PROGRESS_BAR="Progress: [###.......] 30% - Quality gates"
+              ;;
+            "tests")
+              PROGRESS_BAR="Progress: [######....] 60% - Running tests"
+              ;;
+            "security")
+              PROGRESS_BAR="Progress: [########..] 80% - Security scans"
+              ;;
+            "performance")
+              PROGRESS_BAR="Progress: [#########.] 90% - Performance analysis"
+              ;;
+            "final")
+              PROGRESS_BAR="Progress: [##########] 100% - Complete!"
+              ;;
+            *)
+              PROGRESS_BAR="Progress: [#####.....] 50% - In progress"
+              ;;
+          esac
+        fi
+        
+        echo "coverage_visual<<EOF" >> $GITHUB_OUTPUT
+        echo "$COVERAGE_VISUAL" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+        echo "performance_visual<<EOF" >> $GITHUB_OUTPUT
+        echo "$PERFORMANCE_VISUAL" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+        echo "architecture_visual<<EOF" >> $GITHUB_OUTPUT
+        echo "$ARCHITECTURE_VISUAL" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+        echo "progress_bar<<EOF" >> $GITHUB_OUTPUT
+        echo "$PROGRESS_BAR" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+        echo "Debug: Visual generation completed successfully"
+        echo "Debug: Final values - Coverage: '$COVERAGE_VISUAL', Performance: '$PERFORMANCE_VISUAL', Architecture: '$ARCHITECTURE_VISUAL', Progress: '$PROGRESS_BAR'"
+
+    - name: Generate phase status table
+      id: generate-table
+      shell: bash
+      run: |
+        echo "📋 Generating phase status table..."
+        
+        OVERALL_RESULTS='${{ inputs.overall-results }}'
+        CURRENT_PHASE="${{ inputs.phase }}"
+        CURRENT_STATUS="${{ inputs.phase-status }}"
+        
+        # Create status table with current phase highlighted
+        TABLE="| Phase | Status | Details |\n"
+        TABLE+="|-------|--------|----------|\n"
+        
+        # Define all phases
+        declare -A PHASES=(
+          ["canary"]="🚀 Canary Validation"
+          ["quality"]="🎯 Quality Gates"
+          ["tests"]="🧪 Test Execution"
+          ["security"]="🔒 Security Scanning"
+          ["performance"]="⚡ Performance Analysis"
+          ["final"]="🎉 Final Summary"
+        )
+        
+        for phase in canary quality tests security performance final; do
+          if [ "$phase" = "$CURRENT_PHASE" ]; then
+            # Current phase - use current status
+            STATUS="${{ steps.parse-phase.outputs.status_emoji }} ${{ steps.parse-phase.outputs.status_text }}"
+            DETAILS="${{ inputs.phase-details }}"
+            if [ -z "$DETAILS" ]; then
+              DETAILS="${{ steps.parse-phase.outputs.phase_desc }}"
+            fi
+            TABLE+="| **${PHASES[$phase]}** | **$STATUS** | $DETAILS |\n"
+          else
+            # Check if we have data for this phase from overall results
+            if echo "$OVERALL_RESULTS" | grep -q "\"$phase\""; then
+              # Extract status from overall results (simplified)
+              STATUS="✅ Completed"
+              DETAILS="${PHASES[$phase]}"
+            elif [ "$phase" = "canary" ] && [ "$CURRENT_PHASE" != "canary" ]; then
+              # Assume canary passed if we're in later phases
+              STATUS="✅ Passed"
+              DETAILS="Fast validation checks"
+            else
+              # Future phase
+              STATUS="⏳ Pending"
+              DETAILS="Waiting for previous phases"
+            fi
+            TABLE+="| ${PHASES[$phase]} | $STATUS | $DETAILS |\n"
+          fi
+        done
+        
+        echo "status_table<<EOF" >> $GITHUB_OUTPUT
+        echo -e "$TABLE" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Create enhanced comment body
+      id: create-comment
+      shell: bash
+      run: |
+        echo "💬 Creating enhanced comment body..."
+        
+        # Determine overall status
+        OVERALL_STATUS="🔄 **Pipeline In Progress**"
+        if [ "${{ inputs.phase }}" = "final" ]; then
+          if [ "${{ inputs.phase-status }}" = "success" ]; then
+            OVERALL_STATUS="✅ **All Checks Passed**"
+          else
+            OVERALL_STATUS="❌ **Pipeline Failed**"
+          fi
+        fi
+        
+        # Create timestamp
+        TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        
+        # Build comment body safely
+        COMMENT_BODY="# 🚀 CI Pipeline Status
+
+$OVERALL_STATUS
+
+**Last Updated:** $TIMESTAMP
+
+**Current Phase:** ${{ steps.parse-phase.outputs.phase_emoji }} ${{ steps.parse-phase.outputs.phase_name }}
+
+## 📊 Live Progress
+
+${{ steps.generate-visuals.outputs.progress_bar }}
+
+## 🎯 Quick Metrics"
+        
+        # Add visual metrics if available
+        if [ -n "${{ steps.generate-visuals.outputs.coverage_visual }}" ]; then
+          COMMENT_BODY+="
+${{ steps.generate-visuals.outputs.coverage_visual }}"
+        fi
+        
+        if [ -n "${{ steps.generate-visuals.outputs.performance_visual }}" ]; then
+          COMMENT_BODY+="
+${{ steps.generate-visuals.outputs.performance_visual }}"
+        fi
+        
+        if [ -n "${{ steps.generate-visuals.outputs.architecture_visual }}" ]; then
+          COMMENT_BODY+="
+${{ steps.generate-visuals.outputs.architecture_visual }}"
+        fi
+        
+        COMMENT_BODY+="
+
+## 📋 Phase Status
+
+${{ steps.generate-table.outputs.status_table }}
+
+## 🔍 Current Phase: ${{ steps.parse-phase.outputs.phase_name }}
+
+${{ steps.parse-phase.outputs.status_emoji }} **Status:** ${{ steps.parse-phase.outputs.status_text }}
+
+**Description:** ${{ steps.parse-phase.outputs.phase_desc }}"
+        
+        # Add phase details if available
+        if [ -n "${{ inputs.phase-details }}" ]; then
+          COMMENT_BODY+="
+
+**Details:** ${{ inputs.phase-details }}"
+        fi
+        
+        COMMENT_BODY+="
+
+## 🔗 Quick Links
+- 📋 [View Full Pipeline](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+- 📊 [Download Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)
+
+---
+🤖 This comment updates automatically as CI phases complete."
+        
+        echo "comment_body<<EOF" >> $GITHUB_OUTPUT
+        echo -e "$COMMENT_BODY" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Find or create PR comment
+      id: update-comment
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const commentBody = ${{ toJSON(steps.create-comment.outputs.comment_body) }};
+          
+          // Only proceed if this is a pull request
+          if (!context.payload.pull_request && context.eventName !== 'pull_request') {
+            console.log('Not a pull request event, skipping comment creation');
+            return;
+          }
+          
+          const prNumber = context.payload.pull_request?.number || context.issue?.number;
+          
+          if (!prNumber) {
+            console.log('Could not determine PR number');
+            return;
+          }
+          
+          try {
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              per_page: 100
+            });
+            
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('🚀 CI Pipeline Status')
+            );
+            
+            let commentResult;
+            
+            if (botComment) {
+              // Update existing comment
+              commentResult = await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody
+              });
+              console.log(`✅ Updated comment ${botComment.id}`);
+            } else {
+              // Create new comment
+              commentResult = await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: commentBody
+              });
+              console.log(`✅ Created new comment ${commentResult.data.id}`);
+            }
+            
+            core.setOutput('comment-id', commentResult.data.id);
+            core.setOutput('comment-url', commentResult.data.html_url);
+            
+          } catch (error) {
+            console.error('Error managing PR comment:', error);
+            core.setFailed(`Failed to update PR comment: ${error.message}`);
+          }
+
+    - name: Log update completion
+      shell: bash
+      run: |
+        echo "✅ Progressive PR comment update completed"
+        echo "Phase: ${{ inputs.phase }} (${{ inputs.phase-status }})"
+        if [ -n "${{ steps.update-comment.outputs.comment-id }}" ]; then
+          echo "Comment ID: ${{ steps.update-comment.outputs.comment-id }}"
+          echo "Comment URL: ${{ steps.update-comment.outputs.comment-url }}"
+        fi

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	coresecurity "github.com/Azure/container-kit/pkg/core/security"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -67,7 +68,7 @@ type ComparisonMetrics struct {
 // ScanImage performs a comprehensive security scan using all available scanners
 func (us *UnifiedSecurityScanner) ScanImage(ctx context.Context, imageRef string, severityThreshold string) (*UnifiedScanResult, error) {
 	if !us.enableTrivy && !us.enableGrype {
-		return nil, fmt.Errorf("no vulnerability scanners available. Install Trivy or Grype")
+		return nil, mcperrors.New(mcperrors.CodeInternalError, "core", "no vulnerability scanners available. Install Trivy or Grype", nil)
 	}
 
 	startTime := time.Now()
@@ -108,10 +109,9 @@ func (us *UnifiedSecurityScanner) ScanImage(ctx context.Context, imageRef string
 
 	// Handle errors
 	if trivyErr != nil && grypeErr != nil {
-		return result, fmt.Errorf("all scanners failed: trivy: %v, grype: %v", trivyErr, grypeErr)
+		return result, mcperrors.New(mcperrors.CodeOperationFailed, "docker", fmt.Sprintf("all scanners failed: trivy: %v, grype: %v", trivyErr, grypeErr), nil)
 	}
 
-	// Log non-fatal errors
 	if trivyErr != nil {
 		us.logger.Warn().Err(trivyErr).Msg("Trivy scan failed, using Grype results only")
 		result.Context["trivy_error"] = trivyErr.Error()

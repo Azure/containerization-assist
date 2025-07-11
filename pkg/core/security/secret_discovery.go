@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"math"
 	"os"
 	"path/filepath"
@@ -16,12 +17,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rs/zerolog"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // SecretDiscovery provides comprehensive secret detection capabilities
 type SecretDiscovery struct {
-	logger          zerolog.Logger
+	logger          *slog.Logger
 	patternDetector *PatternDetector
 	entropyDetector *EntropyDetector
 	fileTypeHandler *FileTypeHandler
@@ -30,9 +31,13 @@ type SecretDiscovery struct {
 }
 
 // NewSecretDiscovery creates a new secret discovery engine
-func NewSecretDiscovery(logger zerolog.Logger) *SecretDiscovery {
+func NewSecretDiscovery(logger *slog.Logger) *SecretDiscovery {
+	// If logger is nil, create a default one
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return &SecretDiscovery{
-		logger:          logger.With().Str("component", "secret_discovery").Logger(),
+		logger:          logger.With("component", "secret_discovery"),
 		patternDetector: NewPatternDetector(),
 		entropyDetector: NewEntropyDetector(),
 		fileTypeHandler: NewFileTypeHandler(),
@@ -43,24 +48,31 @@ func NewSecretDiscovery(logger zerolog.Logger) *SecretDiscovery {
 
 // DiscoveryResult represents the result of a secret discovery scan
 type DiscoveryResult struct {
-	StartTime    time.Time        `json:"start_time"`
-	EndTime      time.Time        `json:"end_time"`
-	Duration     time.Duration    `json:"duration"`
-	FilesScanned int              `json:"files_scanned"`
-	Findings     []SecretFinding  `json:"findings"`
-	Summary      DiscoverySummary `json:"summary"`
-	RiskScore    int              `json:"risk_score"`
+	StartTime    time.Time               `json:"start_time"`
+	EndTime      time.Time               `json:"end_time"`
+	Duration     time.Duration           `json:"duration"`
+	FilesScanned int                     `json:"files_scanned"`
+	Findings     []ExtendedSecretFinding `json:"findings"`
+	Summary      DiscoverySummary        `json:"summary"`
+	RiskScore    int                     `json:"risk_score"`
 }
 
 // SecretFinding represents a discovered secret
 type SecretFinding struct {
+	Type        string  `json:"type"`
+	File        string  `json:"file"`
+	Line        int     `json:"line"`
+	Description string  `json:"description"`
+	Confidence  float64 `json:"confidence"`
+	RuleID      string  `json:"rule_id"`
+}
+
+// ExtendedSecretFinding provides additional fields for rich secret detection
+type ExtendedSecretFinding struct {
+	SecretFinding
 	ID            string                 `json:"id"`
-	FilePath      string                 `json:"file_path"`
-	LineNumber    int                    `json:"line_number"`
 	Column        int                    `json:"column"`
-	SecretType    string                 `json:"secret_type"`
 	Severity      string                 `json:"severity"`
-	Confidence    float64                `json:"confidence"`
 	Match         string                 `json:"match"`
 	Redacted      string                 `json:"redacted"`
 	Context       string                 `json:"context"`
@@ -69,6 +81,11 @@ type SecretFinding struct {
 	Verified      bool                   `json:"verified"`
 	FalsePositive bool                   `json:"false_positive"`
 	Metadata      map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// ToSecretFinding converts ExtendedSecretFinding to SecretFinding
+func (esf ExtendedSecretFinding) ToSecretFinding() SecretFinding {
+	return esf.SecretFinding
 }
 
 // DiscoverySummary provides a summary of findings
@@ -87,7 +104,7 @@ func (sd *SecretDiscovery) ScanDirectory(ctx context.Context, path string, optio
 	startTime := time.Now()
 	result := &DiscoveryResult{
 		StartTime: startTime,
-		Findings:  make([]SecretFinding, 0),
+		Findings:  make([]ExtendedSecretFinding, 0),
 		Summary: DiscoverySummary{
 			BySeverity: make(map[string]int),
 			ByType:     make(map[string]int),
@@ -95,11 +112,15 @@ func (sd *SecretDiscovery) ScanDirectory(ctx context.Context, path string, optio
 		},
 	}
 
-	sd.logger.Info().
-		Str("path", path).
-		Bool("recursive", options.Recursive).
-		Strs("file_types", options.FileTypes).
-		Msg("Starting secret discovery scan")
+	// Check if path exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, mcperrors.New(mcperrors.CodeFileNotFound, "core", fmt.Sprintf("directory does not exist: %s", path), nil)
+	}
+
+	sd.logger.Info("Starting secret discovery scan",
+		"path", path,
+		"recursive", options.Recursive,
+		"file_types", options.FileTypes)
 
 	// Walk through directory
 	var wg sync.WaitGroup
@@ -109,6 +130,13 @@ func (sd *SecretDiscovery) ScanDirectory(ctx context.Context, path string, optio
 	err := filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // Skip files with errors
+		}
+
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
 		}
 
 		// Check if we should process this file
@@ -140,39 +168,37 @@ func (sd *SecretDiscovery) ScanDirectory(ctx context.Context, path string, optio
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to walk directory: %w", err)
+		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to walk directory", err)
 	}
 
 	wg.Wait()
 
-	// Process results
 	sd.processResults(result)
 
 	result.EndTime = time.Now()
 	result.Duration = result.EndTime.Sub(startTime)
 	result.RiskScore = sd.calculateRiskScore(result)
 
-	sd.logger.Info().
-		Int("files_scanned", result.FilesScanned).
-		Int("findings", len(result.Findings)).
-		Int("risk_score", result.RiskScore).
-		Dur("duration", result.Duration).
-		Msg("Secret discovery scan completed")
+	sd.logger.Info("Secret discovery scan completed",
+		"files_scanned", result.FilesScanned,
+		"findings", len(result.Findings),
+		"risk_score", result.RiskScore,
+		"duration", result.Duration)
 
 	return result, nil
 }
 
 // ScanFile scans a single file for secrets
-func (sd *SecretDiscovery) scanFile(_ context.Context, filePath string, options ScanOptions) []SecretFinding {
+func (sd *SecretDiscovery) scanFile(_ context.Context, filePath string, options ScanOptions) []ExtendedSecretFinding {
 	// nolint:gosec // filePath is controlled within the scanning logic
 	file, err := os.Open(filePath)
 	if err != nil {
-		sd.logger.Debug().Err(err).Str("file", filePath).Msg("Failed to open file")
+		sd.logger.Debug("Failed to open file", "error", err, "file", filePath)
 		return nil
 	}
 	defer func() { _ = file.Close() }()
 
-	var findings []SecretFinding
+	var findings []ExtendedSecretFinding
 	scanner := bufio.NewScanner(file)
 	lineNumber := 0
 
@@ -222,10 +248,9 @@ func (sd *SecretDiscovery) shouldProcessFile(filePath string, info os.FileInfo, 
 
 	// Check file size limit
 	if options.MaxFileSize > 0 && info.Size() > options.MaxFileSize {
-		sd.logger.Debug().
-			Str("file", filePath).
-			Int64("size", info.Size()).
-			Msg("Skipping file due to size limit")
+		sd.logger.Debug("Skipping file due to size limit",
+			"file", filePath,
+			"size", info.Size())
 		return false
 	}
 
@@ -248,13 +273,13 @@ func (sd *SecretDiscovery) shouldProcessFile(filePath string, info os.FileInfo, 
 }
 
 // filterFindings removes duplicates and false positives
-func (sd *SecretDiscovery) filterFindings(findings []SecretFinding, options ScanOptions) []SecretFinding {
-	filtered := make([]SecretFinding, 0)
+func (sd *SecretDiscovery) filterFindings(findings []ExtendedSecretFinding, options ScanOptions) []ExtendedSecretFinding {
+	filtered := make([]ExtendedSecretFinding, 0)
 	seen := make(map[string]bool)
 
 	for _, finding := range findings {
 		// Create unique key
-		key := fmt.Sprintf("%s:%d:%s", finding.FilePath, finding.LineNumber, finding.Match)
+		key := fmt.Sprintf("%s:%d:%s", finding.File, finding.Line, finding.Match)
 		if seen[key] {
 			continue
 		}
@@ -280,7 +305,7 @@ func (sd *SecretDiscovery) filterFindings(findings []SecretFinding, options Scan
 }
 
 // verifyFindings attempts to verify if findings are real secrets
-func (sd *SecretDiscovery) verifyFindings(findings []SecretFinding) {
+func (sd *SecretDiscovery) verifyFindings(findings []ExtendedSecretFinding) {
 	for i := range findings {
 		// Skip if already marked as false positive
 		if findings[i].FalsePositive {
@@ -288,7 +313,7 @@ func (sd *SecretDiscovery) verifyFindings(findings []SecretFinding) {
 		}
 
 		// Verification logic based on secret type
-		switch findings[i].SecretType {
+		switch findings[i].Type {
 		case "aws_access_key":
 			findings[i].Verified = sd.verifyAWSKey(findings[i].Match)
 		case "github_token":
@@ -311,10 +336,10 @@ func (sd *SecretDiscovery) processResults(result *DiscoveryResult) {
 		result.Summary.BySeverity[finding.Severity]++
 
 		// Count by type
-		result.Summary.ByType[finding.SecretType]++
+		result.Summary.ByType[finding.Type]++
 
 		// Count by file
-		result.Summary.ByFile[finding.FilePath]++
+		result.Summary.ByFile[finding.File]++
 
 		// Track unique secrets
 		secretHash := sd.hashSecret(finding.Match)
@@ -367,7 +392,7 @@ func (sd *SecretDiscovery) hashSecret(secret string) string {
 }
 
 // isFalsePositive checks if a finding is likely a false positive
-func (sd *SecretDiscovery) isFalsePositive(finding SecretFinding) bool {
+func (sd *SecretDiscovery) isFalsePositive(finding ExtendedSecretFinding) bool {
 	// Check for common false positive patterns
 	falsePositivePatterns := []string{
 		"example", "sample", "test", "demo", "dummy",
@@ -383,7 +408,7 @@ func (sd *SecretDiscovery) isFalsePositive(finding SecretFinding) bool {
 	}
 
 	// Check for low entropy in supposedly high-entropy secrets
-	if finding.SecretType == "generic_secret" && finding.Entropy < 2.5 {
+	if finding.Type == "generic_secret" && finding.Entropy < 2.5 {
 		return true
 	}
 
@@ -525,7 +550,7 @@ func (pd *PatternDetector) addBuiltInPatterns() {
 		// GitHub
 		{
 			Name:       "github_token",
-			Pattern:    regexp.MustCompile(`\b(gh[pousr]_[A-Za-z0-9_]{36})\b`),
+			Pattern:    regexp.MustCompile(`\b(gh[pousr]_[A-Za-z0-9_]{30,40})\b`),
 			Severity:   "high",
 			Confidence: 0.95,
 			SecretType: "github_token",
@@ -584,8 +609,8 @@ func (pd *PatternDetector) addBuiltInPatterns() {
 }
 
 // Scan scans a line for pattern matches
-func (pd *PatternDetector) Scan(line, filePath string, lineNumber int) []SecretFinding {
-	var findings []SecretFinding
+func (pd *PatternDetector) Scan(line, filePath string, lineNumber int) []ExtendedSecretFinding {
+	var findings []ExtendedSecretFinding
 
 	for _, pattern := range pd.patterns {
 		if matches := pattern.Pattern.FindAllStringSubmatch(line, -1); len(matches) > 0 {
@@ -595,18 +620,22 @@ func (pd *PatternDetector) Scan(line, filePath string, lineNumber int) []SecretF
 					secretValue = match[1] // First capture group if available
 				}
 
-				finding := SecretFinding{
-					ID:         fmt.Sprintf("%s:%d:%s", filePath, lineNumber, pattern.Name),
-					FilePath:   filePath,
-					LineNumber: lineNumber,
-					Column:     strings.Index(line, secretValue),
-					SecretType: pattern.SecretType,
-					Severity:   pattern.Severity,
-					Confidence: pattern.Confidence,
-					Match:      secretValue,
-					Redacted:   pd.redactSecret(secretValue),
-					Context:    line,
-					Pattern:    pattern.Name,
+				finding := ExtendedSecretFinding{
+					SecretFinding: SecretFinding{
+						Type:        pattern.SecretType,
+						File:        filePath,
+						Line:        lineNumber,
+						Description: pattern.Name,
+						Confidence:  pattern.Confidence,
+						RuleID:      pattern.Name,
+					},
+					ID:       fmt.Sprintf("%s:%d:%s", filePath, lineNumber, pattern.Name),
+					Column:   strings.Index(line, secretValue),
+					Severity: pattern.Severity,
+					Match:    secretValue,
+					Redacted: pd.redactSecret(secretValue),
+					Context:  line,
+					Pattern:  pattern.Name,
 				}
 
 				findings = append(findings, finding)
@@ -642,8 +671,8 @@ func NewEntropyDetector() *EntropyDetector {
 }
 
 // Scan scans a line for high-entropy strings
-func (ed *EntropyDetector) Scan(line, filePath string, lineNumber int) []SecretFinding {
-	var findings []SecretFinding
+func (ed *EntropyDetector) Scan(line, filePath string, lineNumber int) []ExtendedSecretFinding {
+	var findings []ExtendedSecretFinding
 
 	// Split line into tokens
 	tokens := ed.tokenize(line)
@@ -655,18 +684,22 @@ func (ed *EntropyDetector) Scan(line, filePath string, lineNumber int) []SecretF
 
 		entropy := ed.calculateEntropy(token)
 		if entropy >= ed.minEntropy {
-			finding := SecretFinding{
-				ID:         fmt.Sprintf("%s:%d:entropy:%s", filePath, lineNumber, token[:10]),
-				FilePath:   filePath,
-				LineNumber: lineNumber,
-				Column:     strings.Index(line, token),
-				SecretType: "generic_secret",
-				Severity:   ed.getSeverityByEntropy(entropy),
-				Confidence: ed.getConfidenceByEntropy(entropy),
-				Match:      token,
-				Redacted:   ed.redactSecret(token),
-				Context:    line,
-				Entropy:    entropy,
+			finding := ExtendedSecretFinding{
+				SecretFinding: SecretFinding{
+					Type:        "generic_secret",
+					File:        filePath,
+					Line:        lineNumber,
+					Description: "High entropy string detected",
+					Confidence:  ed.getConfidenceByEntropy(entropy),
+					RuleID:      "entropy_detection",
+				},
+				ID:       fmt.Sprintf("%s:%d:entropy:%s", filePath, lineNumber, token[:10]),
+				Column:   strings.Index(line, token),
+				Severity: ed.getSeverityByEntropy(entropy),
+				Match:    token,
+				Redacted: ed.redactSecret(token),
+				Context:  line,
+				Entropy:  entropy,
 			}
 
 			findings = append(findings, finding)

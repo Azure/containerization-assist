@@ -4,25 +4,58 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/api"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
+
+// Simple local validation types to replace deleted domain/security package
+type Error struct {
+	Code     string
+	Field    string
+	Message  string
+	Severity string
+	Context  map[string]interface{}
+}
+
+type Warning struct {
+	Field   string
+	Message string
+	Context map[string]interface{}
+}
+
+const (
+	SeverityHigh = "high"
+)
+
+// BuildValidationResult is a local type to avoid import cycles
+type BuildValidationResult = api.BuildValidationResult
+
+// NewBuildResult creates a new BuildValidationResult
+func NewBuildResult() *BuildValidationResult {
+	return &api.BuildValidationResult{
+		Valid:    true,
+		Errors:   make([]api.ValidationError, 0),
+		Warnings: make([]api.ValidationWarning, 0),
+		Metadata: make(map[string]interface{}),
+	}
+}
 
 // HadolintValidator provides Hadolint-based Dockerfile validation
 type HadolintValidator struct {
-	logger       zerolog.Logger
+	logger       *slog.Logger
 	hadolintPath string
-	configPath   string
 }
 
 // NewHadolintValidator creates a new Hadolint validator
-func NewHadolintValidator(logger zerolog.Logger) *HadolintValidator {
+func NewHadolintValidator(logger *slog.Logger) *HadolintValidator {
 	return &HadolintValidator{
-		logger: logger.With().Str("component", "hadolint_validator").Logger(),
+		logger: logger.With("component", "hadolint_validator"),
 	}
 }
 
@@ -37,12 +70,12 @@ type HadolintResult struct {
 }
 
 // ValidateWithHadolint validates a Dockerfile using Hadolint
-func (hv *HadolintValidator) ValidateWithHadolint(ctx context.Context, dockerfileContent string) (*ValidationResult, error) {
+func (hv *HadolintValidator) ValidateWithHadolint(ctx context.Context, dockerfileContent string) (*BuildValidationResult, error) {
 	// Check if Hadolint is installed
 	hadolintPath, err := hv.findHadolint()
 	if err != nil {
-		hv.logger.Warn().Err(err).Msg("Hadolint not found, falling back to basic validation")
-		return nil, fmt.Errorf("hadolint not available: %w", err)
+		hv.logger.Warn("Hadolint not found, falling back to basic validation", "error", err)
+		return nil, mcperrors.New(mcperrors.CodeInternalError, "core", "hadolint not available", err)
 	}
 	hv.hadolintPath = hadolintPath
 
@@ -50,7 +83,7 @@ func (hv *HadolintValidator) ValidateWithHadolint(ctx context.Context, dockerfil
 	tmpDir := os.TempDir()
 	tmpFile := filepath.Join(tmpDir, fmt.Sprintf("dockerfile_%d", os.Getpid()))
 	if err := os.WriteFile(tmpFile, []byte(dockerfileContent), 0644); err != nil {
-		return nil, fmt.Errorf("failed to write temporary Dockerfile: %w", err)
+		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to write temporary Dockerfile", err)
 	}
 	defer os.Remove(tmpFile)
 
@@ -61,10 +94,9 @@ func (hv *HadolintValidator) ValidateWithHadolint(ctx context.Context, dockerfil
 	// Hadolint returns non-zero exit code when it finds issues
 	// We need to check if we got valid output regardless of exit code
 	if err != nil && len(output) == 0 {
-		return nil, fmt.Errorf("hadolint execution failed: %w", err)
+		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "docker", "hadolint execution failed", err)
 	}
 
-	// Parse Hadolint JSON output
 	var hadolintResults []HadolintResult
 	if len(output) > 0 {
 		if err := json.Unmarshal(output, &hadolintResults); err != nil {
@@ -83,58 +115,51 @@ func (hv *HadolintValidator) ValidateWithHadolint(ctx context.Context, dockerfil
 		}
 	}
 
-	// Convert Hadolint results to ValidationResult
-	result := &ValidationResult{
-		Valid:       true,
-		Errors:      make([]ValidationError, 0),
-		Warnings:    make([]ValidationWarning, 0),
-		Suggestions: make([]string, 0),
-		Context:     make(map[string]interface{}),
-	}
+	// Convert Hadolint results to ValidationResult using factory function
+	result := NewBuildResult()
+	result.Metadata["validator_name"] = "hadolint"
+	result.Metadata["validator_version"] = hv.getHadolintVersion()
 
-	result.Context["hadolint_version"] = hv.getHadolintVersion()
-	result.Context["total_issues"] = len(hadolintResults)
+	result.Metadata["hadolint_version"] = hv.getHadolintVersion()
+	result.Metadata["total_issues"] = fmt.Sprintf("%d", len(hadolintResults))
 
 	// Process each Hadolint finding
 	criticalCount := 0
 	for _, hr := range hadolintResults {
 		switch hr.Level {
 		case "error":
-			result.Errors = append(result.Errors, ValidationError{
-				Type:     "hadolint",
-				Line:     hr.Line,
-				Column:   hr.Column,
-				Message:  fmt.Sprintf("[%s] %s", hr.Code, hr.Message),
-				Severity: "error",
-			})
+			hadolintError := api.ValidationError{
+				Code:    hr.Code,
+				Message: fmt.Sprintf("[%s] %s", hr.Code, hr.Message),
+				Field:   fmt.Sprintf("line:%d", hr.Line),
+			}
+			result.Errors = append(result.Errors, hadolintError)
 			criticalCount++
 
 		case "warning":
 			// Treat DL3008 (pin versions) and DL3009 (delete apt lists) as critical
 			if hr.Code == "DL3008" || hr.Code == "DL3009" {
-				result.Errors = append(result.Errors, ValidationError{
-					Type:     "hadolint_security",
-					Line:     hr.Line,
-					Column:   hr.Column,
-					Message:  fmt.Sprintf("[%s] %s", hr.Code, hr.Message),
-					Severity: "error",
-				})
+				securityError := api.ValidationError{
+					Code:    hr.Code,
+					Message: fmt.Sprintf("[%s] %s", hr.Code, hr.Message),
+					Field:   fmt.Sprintf("line:%d", hr.Line),
+				}
+				result.Errors = append(result.Errors, securityError)
 				criticalCount++
 			} else {
-				result.Warnings = append(result.Warnings, ValidationWarning{
-					Type:       "hadolint",
-					Line:       hr.Line,
-					Message:    fmt.Sprintf("[%s] %s", hr.Code, hr.Message),
-					Suggestion: hv.getSuggestionForCode(hr.Code),
-				})
+				hadolintWarning := api.ValidationWarning{
+					Field:   fmt.Sprintf("line:%d", hr.Line),
+					Message: fmt.Sprintf("[%s] %s", hr.Code, hr.Message),
+				}
+				result.Warnings = append(result.Warnings, hadolintWarning)
 			}
 
 		case "info", "style":
-			result.Warnings = append(result.Warnings, ValidationWarning{
-				Type:    "hadolint_style",
-				Line:    hr.Line,
+			styleWarning := api.ValidationWarning{
+				Field:   fmt.Sprintf("line:%d", hr.Line),
 				Message: fmt.Sprintf("[%s] %s", hr.Code, hr.Message),
-			})
+			}
+			result.Warnings = append(result.Warnings, styleWarning)
 		}
 	}
 
@@ -143,14 +168,13 @@ func (hv *HadolintValidator) ValidateWithHadolint(ctx context.Context, dockerfil
 
 	// Set validity based on critical errors
 	result.Valid = criticalCount == 0
-	result.Context["critical_issues"] = criticalCount
+	result.Metadata["critical_issues"] = fmt.Sprintf("%d", criticalCount)
 
-	hv.logger.Info().
-		Bool("valid", result.Valid).
-		Int("errors", len(result.Errors)).
-		Int("warnings", len(result.Warnings)).
-		Int("critical", criticalCount).
-		Msg("Hadolint validation completed")
+	hv.logger.Info("Hadolint validation completed",
+		"valid", result.Valid,
+		"errors", len(result.Errors),
+		"warnings", len(result.Warnings),
+		"critical", criticalCount)
 
 	return result, nil
 }
@@ -220,7 +244,7 @@ func (hv *HadolintValidator) getSuggestionForCode(code string) string {
 }
 
 // addHadolintSuggestions adds general suggestions based on Hadolint findings
-func (hv *HadolintValidator) addHadolintSuggestions(results []HadolintResult, validation *ValidationResult) {
+func (hv *HadolintValidator) addHadolintSuggestions(results []HadolintResult, result *BuildValidationResult) {
 	hasSecurityIssues := false
 	hasVersionPinning := false
 	hasRootUser := false
@@ -236,26 +260,35 @@ func (hv *HadolintValidator) addHadolintSuggestions(results []HadolintResult, va
 		}
 	}
 
+	// Store suggestions in Metadata map
+	if result.Metadata == nil {
+		result.Metadata = make(map[string]interface{})
+	}
+
+	suggestions := []string{}
+
 	if hasSecurityIssues {
-		validation.Suggestions = append(validation.Suggestions,
+		suggestions = append(suggestions,
 			"Security: Clean package manager cache and use --no-install-recommends to minimize attack surface")
 	}
 
 	if hasVersionPinning {
-		validation.Suggestions = append(validation.Suggestions,
+		suggestions = append(suggestions,
 			"Reproducibility: Pin all package versions and base image tags for consistent builds")
 	}
 
 	if hasRootUser {
-		validation.Suggestions = append(validation.Suggestions,
+		suggestions = append(suggestions,
 			"Security: Create and switch to a non-root user for running the application")
 	}
 
 	// General best practices
-	validation.Suggestions = append(validation.Suggestions,
+	suggestions = append(suggestions,
 		"Consider using multi-stage builds to reduce final image size",
 		"Add a .dockerignore file to exclude unnecessary files from the build context",
 	)
+
+	result.Metadata["suggestions"] = suggestions
 }
 
 // CheckHadolintInstalled checks if Hadolint is available

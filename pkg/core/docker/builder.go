@@ -6,26 +6,27 @@ package docker
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/clients"
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // Builder provides mechanical Docker build operations without AI
 type Builder struct {
 	clients *clients.Clients
-	logger  zerolog.Logger
+	logger  *slog.Logger
 }
 
 // NewBuilder creates a new Docker builder
-func NewBuilder(clients *clients.Clients, logger zerolog.Logger) *Builder {
+func NewBuilder(clients *clients.Clients, logger *slog.Logger) *Builder {
 	return &Builder{
 		clients: clients,
-		logger:  logger.With().Str("component", "docker_builder").Logger(),
+		logger:  logger.With("component", "docker_builder"),
 	}
 }
 
@@ -73,10 +74,9 @@ func (b *Builder) BuildImage(ctx context.Context, dockerfileContent string, cont
 		Context:  make(map[string]interface{}),
 	}
 
-	b.logger.Info().
-		Str("image_ref", result.ImageRef).
-		Str("context_path", contextPath).
-		Msg("Starting Docker build")
+	b.logger.Info("Starting Docker build",
+		"image_ref", result.ImageRef,
+		"context_path", contextPath)
 
 	// Validate inputs
 	if err := b.validateInputs(dockerfileContent, contextPath, options); err != nil {
@@ -125,7 +125,7 @@ func (b *Builder) BuildImage(ctx context.Context, dockerfileContent string, cont
 	// Perform the actual Docker build
 	buildOutput, err := b.clients.Docker.Build(ctx, dockerfilePath, result.ImageRef, contextPath)
 	if err != nil {
-		b.logger.Error().Err(err).Str("build_output", buildOutput).Msg("Docker build failed")
+		b.logger.Error("Docker build failed", "error", err, "build_output", buildOutput)
 
 		result.Error = &BuildError{
 			Type:       "build_error",
@@ -157,11 +157,10 @@ func (b *Builder) BuildImage(ctx context.Context, dockerfileContent string, cont
 		"dockerfile_size": len(dockerfileContent),
 	}
 
-	b.logger.Info().
-		Str("image_id", result.ImageID).
-		Str("image_ref", result.ImageRef).
-		Dur("duration", result.Duration).
-		Msg("Docker build completed successfully")
+	b.logger.Info("Docker build completed successfully",
+		"image_id", result.ImageID,
+		"image_ref", result.ImageRef,
+		"duration", result.Duration)
 
 	return result, nil
 }
@@ -169,21 +168,19 @@ func (b *Builder) BuildImage(ctx context.Context, dockerfileContent string, cont
 // ValidateDockerfile performs basic validation of Dockerfile content
 func (b *Builder) ValidateDockerfile(dockerfileContent string) error {
 	if strings.TrimSpace(dockerfileContent) == "" {
-		return fmt.Errorf("dockerfile is empty")
+		return errors.New(errors.CodeDockerfileSyntaxError, "docker", "dockerfile is empty", nil)
 	}
 
-	// Check for FROM instruction
 	if !strings.Contains(strings.ToUpper(dockerfileContent), "FROM") {
-		return fmt.Errorf("dockerfile missing FROM instruction")
+		return errors.New(errors.CodeDockerfileSyntaxError, "docker", "dockerfile missing FROM instruction", nil)
 	}
 
-	// Basic syntax validation could be added here
 	return nil
 }
 
 // PushImage pushes a Docker image to a registry
 func (b *Builder) PushImage(ctx context.Context, imageRef string) (*PushResult, error) {
-	b.logger.Info().Str("image_ref", imageRef).Msg("Starting Docker push")
+	b.logger.Info("Starting Docker push", "image_ref", imageRef)
 
 	output, err := b.clients.Docker.Push(ctx, imageRef)
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	coresecurity "github.com/Azure/container-kit/pkg/core/security"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -16,6 +17,20 @@ import (
 type TrivyScanner struct {
 	logger    zerolog.Logger
 	trivyPath string
+}
+
+// Vulnerability represents a general security vulnerability
+type Vulnerability struct {
+	ID          string                 `json:"id"`
+	Severity    string                 `json:"severity"`
+	Title       string                 `json:"title"`
+	Description string                 `json:"description"`
+	Package     string                 `json:"package"`
+	Version     string                 `json:"version"`
+	FixedIn     string                 `json:"fixed_in,omitempty"`
+	CVSS        map[string]interface{} `json:"cvss,omitempty"`
+	References  []string               `json:"references,omitempty"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // TrivyVulnerability represents a vulnerability from Trivy scan results
@@ -161,7 +176,7 @@ func (ts *TrivyScanner) ScanImage(ctx context.Context, imageRef string, severity
 	trivyPath, err := ts.findTrivy()
 	if err != nil {
 		ts.logger.Warn().Err(err).Msg("Trivy not found")
-		return nil, fmt.Errorf("trivy not available: %w", err)
+		return nil, errors.New(errors.CodeInternalError, "docker", "trivy not available", nil)
 	}
 	ts.trivyPath = trivyPath
 
@@ -207,17 +222,15 @@ func (ts *TrivyScanner) ScanImage(ctx context.Context, imageRef string, severity
 			// This is normal when vulnerabilities are found
 			ts.logger.Debug().Msg("Trivy found vulnerabilities (exit code 1)")
 		} else {
-			return result, fmt.Errorf("trivy scan failed: %w", err)
+			return result, errors.New(errors.CodeOperationFailed, "trivy", fmt.Sprintf("trivy scan failed: %v", err), err)
 		}
 	}
 
-	// Parse Trivy JSON output
 	var trivyResult TrivyResult
 	if err := json.Unmarshal(output, &trivyResult); err != nil {
-		return result, fmt.Errorf("failed to parse trivy output: %w", err)
+		return result, errors.New(errors.CodeOperationFailed, "trivy", fmt.Sprintf("failed to parse trivy output: %v", err), err)
 	}
 
-	// Convert Trivy results to our format
 	ts.processResults(&trivyResult, result)
 
 	// Generate remediation steps

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -13,8 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
-	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/server"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
@@ -31,255 +31,289 @@ var (
 	BuildTime = "unknown"
 )
 
-func main() {
-	// Parse command line flags
-	var (
-		configFile        = flag.String("config", "", "Path to configuration file")
-		workspaceDir      = flag.String("workspace-dir", "", "Workspace directory")
-		storePath         = flag.String("store-path", "", "Session store path")
-		maxSessions       = flag.Int("max-sessions", 0, "Maximum number of sessions")
-		sessionTTL        = flag.String("session-ttl", "", "Session TTL (e.g., '24h')")
-		maxDiskPerSession = flag.String("max-disk-per-session", "", "Max disk per session (bytes)")
-		totalDiskLimit    = flag.String("total-disk-limit", "", "Total disk limit (bytes)")
-		transportType     = flag.String("transport", "", "Transport type (stdio, http)")
-		httpAddr          = flag.String("http-addr", "", "HTTP address")
-		httpPort          = flag.Int("http-port", 0, "HTTP port")
-		logLevel          = flag.String("log-level", "", "Log level (debug, info, warn, error)")
-		logHTTPBodies     = flag.Bool("log-http-bodies", false, "Log HTTP request/response bodies")
-		maxBodyLogSize    = flag.String("max-body-log-size", "", "Maximum size of bodies to log (bytes)")
-		sandboxEnabled    = flag.Bool("sandbox", false, "Enable sandboxed execution")
-		conversationMode  = flag.Bool("conversation", false, "Enable conversation mode (chat tool)")
-		telemetryEnabled  = flag.Bool("telemetry", true, "Enable Prometheus metrics")
-		telemetryPort     = flag.Int("telemetry-port", 9090, "Port for Prometheus metrics endpoint")
-		otelEnabled       = flag.Bool("otel", false, "Enable OpenTelemetry tracing")
-		otelEndpoint      = flag.String("otel-endpoint", "", "OpenTelemetry OTLP endpoint (e.g., http://localhost:4318/v1/traces)")
-		otelHeaders       = flag.String("otel-headers", "", "OpenTelemetry OTLP headers (comma-separated key=value pairs)")
-		serviceName       = flag.String("service-name", "container-kit-mcp", "Service name for OpenTelemetry")
-		serviceVersion    = flag.String("service-version", "", "Service version for OpenTelemetry")
-		environment       = flag.String("environment", "development", "Environment name for OpenTelemetry")
-		traceSampleRate   = flag.Float64("trace-sample-rate", 1.0, "Trace sampling rate (0.0-1.0)")
-		version           = flag.Bool("version", false, "Show version information")
-		demo              = flag.String("demo", "", "Run demo mode: all, basic, errors, session, performance, metrics")
-		exportSchemas     = flag.Bool("export-schemas", false, "Export tool schemas to docs/tools.schema.json and exit")
-		schemaOutput      = flag.String("schema-output", "docs/tools.schema.json", "Output path for exported schemas")
-	)
-	flag.Parse()
+// FlagConfig holds all command line flags
+type FlagConfig struct {
+	configFile        *string
+	workspaceDir      *string
+	storePath         *string
+	maxSessions       *int
+	sessionTTL        *string
+	maxDiskPerSession *string
+	totalDiskLimit    *string
+	transportType     *string
+	httpAddr          *string
+	httpPort          *int
+	logLevel          *string
+	logHTTPBodies     *bool
+	maxBodyLogSize    *string
+	sandboxEnabled    *bool
+	telemetryEnabled  *bool
+	telemetryPort     *int
+	otelEnabled       *bool
+	otelEndpoint      *string
+	otelHeaders       *string
+	serviceName       *string
+	serviceVersion    *string
+	environment       *string
+	traceSampleRate   *float64
+	version           *bool
+	demo              *string
+	exportSchemas     *bool
+	schemaOutput      *string
+}
 
-	if *version {
+// parseFlags parses command line flags and returns configuration
+func parseFlags() *FlagConfig {
+	flags := &FlagConfig{
+		configFile:        flag.String("config", "", "Path to configuration file"),
+		workspaceDir:      flag.String("workspace-dir", "", "Workspace directory"),
+		storePath:         flag.String("store-path", "", "Session store path"),
+		maxSessions:       flag.Int("max-sessions", 0, "Maximum number of sessions"),
+		sessionTTL:        flag.String("session-ttl", "", "Session TTL (e.g., '24h')"),
+		maxDiskPerSession: flag.String("max-disk-per-session", "", "Max disk per session (bytes)"),
+		totalDiskLimit:    flag.String("total-disk-limit", "", "Total disk limit (bytes)"),
+		transportType:     flag.String("transport", "", "Transport type (stdio, http)"),
+		httpAddr:          flag.String("http-addr", "", "HTTP address"),
+		httpPort:          flag.Int("http-port", 0, "HTTP port"),
+		logLevel:          flag.String("log-level", "", "Log level (debug, info, warn, error)"),
+		logHTTPBodies:     flag.Bool("log-http-bodies", false, "Log HTTP request/response bodies"),
+		maxBodyLogSize:    flag.String("max-body-log-size", "", "Maximum size of bodies to log (bytes)"),
+		sandboxEnabled:    flag.Bool("sandbox", false, "Enable sandboxed execution"),
+		telemetryEnabled:  flag.Bool("telemetry", true, "Enable Prometheus metrics"),
+		telemetryPort:     flag.Int("telemetry-port", 9090, "Port for Prometheus metrics endpoint"),
+		otelEnabled:       flag.Bool("otel", false, "Enable OpenTelemetry tracing"),
+		otelEndpoint:      flag.String("otel-endpoint", "", "OpenTelemetry OTLP endpoint (e.g., http://localhost:4318/v1/traces)"),
+		otelHeaders:       flag.String("otel-headers", "", "OpenTelemetry OTLP headers (comma-separated key=value pairs)"),
+		serviceName:       flag.String("service-name", "container-kit-mcp", "Service name for OpenTelemetry"),
+		serviceVersion:    flag.String("service-version", "", "Service version for OpenTelemetry"),
+		environment:       flag.String("environment", "development", "Environment name for OpenTelemetry"),
+		traceSampleRate:   flag.Float64("trace-sample-rate", 1.0, "Trace sampling rate (0.0-1.0)"),
+		version:           flag.Bool("version", false, "Show version information"),
+		demo:              flag.String("demo", "", "Run demo mode: all, basic, errors, session, performance, metrics"),
+		exportSchemas:     flag.Bool("export-schemas", false, "Export tool schemas to docs/tools.schema.json and exit"),
+		schemaOutput:      flag.String("schema-output", "docs/tools.schema.json", "Output path for exported schemas"),
+	}
+	flag.Parse()
+	return flags
+}
+
+// handleSpecialFlags handles version and schema export flags that exit early
+func handleSpecialFlags(flags *FlagConfig) {
+	if *flags.version {
 		log.Info().Str("version", getVersion()).Msg("Container Kit MCP Server version")
 		os.Exit(0)
 	}
 
-	if *exportSchemas {
-		if err := exportToolSchemas(*schemaOutput); err != nil {
+	if *flags.exportSchemas {
+		if err := exportToolSchemas(*flags.schemaOutput); err != nil {
 			log.Error().Err(err).Msg("Failed to export schemas")
 			os.Exit(1)
 		}
-		log.Info().Str("output_file", *schemaOutput).Msg("Tool schemas exported successfully")
+		log.Info().Str("output_file", *flags.schemaOutput).Msg("Tool schemas exported successfully")
 		os.Exit(0)
 	}
+}
 
-	// Load configuration
-	config, err := loadConfig(*configFile, telemetryEnabled, telemetryPort)
+func main() {
+	// Parse command line flags
+	flags := parseFlags()
+
+	// Handle special flags that exit early
+	handleSpecialFlags(flags)
+
+	// Load and configure server
+	config, err := loadAndConfigureServer(flags)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to load configuration")
+		log.Error().Err(err).Msg("Failed to configure server")
 		os.Exit(1)
 	}
 
-	// Override config with command line flags
-	if *workspaceDir != "" {
-		config.WorkspaceDir = *workspaceDir
-	}
-	if *storePath != "" {
-		config.StorePath = *storePath
-	}
-	if *maxSessions > 0 {
-		config.MaxSessions = *maxSessions
-	}
-	if *sessionTTL != "" {
-		if ttl, err := time.ParseDuration(*sessionTTL); err == nil {
-			config.SessionTTL = ttl
-		}
-	}
-	if *maxDiskPerSession != "" {
-		if bytes, err := strconv.ParseInt(*maxDiskPerSession, 10, 64); err == nil {
-			config.MaxDiskPerSession = bytes
-		}
-	}
-	if *totalDiskLimit != "" {
-		if bytes, err := strconv.ParseInt(*totalDiskLimit, 10, 64); err == nil {
-			config.TotalDiskLimit = bytes
-		}
-	}
-	if *transportType != "" {
-		config.TransportType = *transportType
-	}
-	if *httpAddr != "" {
-		config.HTTPAddr = *httpAddr
-	}
-	if *httpPort > 0 {
-		config.HTTPPort = *httpPort
-	}
-	if *logHTTPBodies {
-		config.LogHTTPBodies = true
-	}
-	if *maxBodyLogSize != "" {
-		if bytes, err := strconv.ParseInt(*maxBodyLogSize, 10, 64); err == nil {
-			config.MaxBodyLogSize = bytes
-		}
-	}
-	if *logLevel != "" {
-		config.LogLevel = *logLevel
-	}
-	if *sandboxEnabled {
-		config.SandboxEnabled = true
+	// Create and configure server
+	mcpServer, err := createAndConfigureServer(config, flags)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to create server")
+		os.Exit(1)
 	}
 
-	// Apply OpenTelemetry flag overrides to the base config
-	if *otelEnabled {
-		config.EnableOTEL = true
-	}
-	if *otelEndpoint != "" {
-		config.OTELEndpoint = *otelEndpoint
-		config.EnableOTEL = true
-	}
-	if *serviceName != "" {
-		config.ServiceName = *serviceName
-	}
-	if *serviceVersion != "" {
-		config.ServiceVersion = *serviceVersion
-	}
-	if *environment != "" {
-		config.Environment = *environment
-	}
-	if *traceSampleRate != 1.0 {
-		config.TraceSampleRate = *traceSampleRate
+	// Handle demo mode
+	if *flags.demo != "" {
+		log.Warn().Msg("Demo mode temporarily disabled due to API restructuring")
+		return
 	}
 
-	// Parse OpenTelemetry headers if provided
-	if *otelHeaders != "" {
-		config.OTELHeaders = make(map[string]string)
-		pairs := strings.Split(*otelHeaders, ",")
-		for _, pair := range pairs {
-			if kv := strings.SplitN(strings.TrimSpace(pair), "=", 2); len(kv) == 2 {
-				config.OTELHeaders[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
-			}
-		}
+	// Run server with graceful shutdown handling
+	runServerWithShutdown(mcpServer)
+}
+
+// loadAndConfigureServer loads configuration and applies flag overrides
+func loadAndConfigureServer(flags *FlagConfig) (server.ServerConfig, error) {
+	// Load configuration
+	config, err := loadConfig(*flags.configFile, flags.telemetryEnabled, flags.telemetryPort)
+	if err != nil {
+		return config, fmt.Errorf("failed to load configuration: %w", err)
 	}
+
+	// Apply basic configuration overrides
+	applyBasicConfigOverrides(&config, flags)
+
+	// Apply OpenTelemetry configuration overrides
+	applyOTELConfigOverrides(&config, flags)
 
 	// Setup structured logging
 	setupLogging(config.LogLevel)
 
+	return config, nil
+}
+
+// applyBasicConfigOverrides applies basic flag overrides to configuration
+func applyBasicConfigOverrides(config *server.ServerConfig, flags *FlagConfig) {
+	if *flags.workspaceDir != "" {
+		config.WorkspaceDir = *flags.workspaceDir
+	}
+	if *flags.storePath != "" {
+		config.StorePath = *flags.storePath
+	}
+	if *flags.maxSessions > 0 {
+		config.MaxSessions = *flags.maxSessions
+	}
+	if *flags.sessionTTL != "" {
+		if ttl, err := time.ParseDuration(*flags.sessionTTL); err == nil {
+			config.SessionTTL = ttl
+		}
+	}
+	if *flags.maxDiskPerSession != "" {
+		if bytes, err := strconv.ParseInt(*flags.maxDiskPerSession, 10, 64); err == nil {
+			config.MaxDiskPerSession = bytes
+		}
+	}
+	if *flags.totalDiskLimit != "" {
+		if bytes, err := strconv.ParseInt(*flags.totalDiskLimit, 10, 64); err == nil {
+			config.TotalDiskLimit = bytes
+		}
+	}
+	if *flags.transportType != "" {
+		config.TransportType = *flags.transportType
+	}
+	if *flags.httpAddr != "" {
+		config.HTTPAddr = *flags.httpAddr
+	}
+	if *flags.httpPort > 0 {
+		config.HTTPPort = *flags.httpPort
+	}
+	if *flags.logHTTPBodies {
+		config.LogHTTPBodies = true
+	}
+	if *flags.maxBodyLogSize != "" {
+		if bytes, err := strconv.ParseInt(*flags.maxBodyLogSize, 10, 64); err == nil {
+			config.MaxBodyLogSize = bytes
+		}
+	}
+	if *flags.logLevel != "" {
+		config.LogLevel = *flags.logLevel
+	}
+	if *flags.sandboxEnabled {
+		config.SandboxEnabled = true
+	}
+}
+
+// applyOTELConfigOverrides applies OpenTelemetry flag overrides to configuration
+func applyOTELConfigOverrides(config *server.ServerConfig, flags *FlagConfig) {
+	// DELTA WORKSTREAM: Observability removed - only preserve service identification
+	if *flags.serviceName != "" {
+		config.ServiceName = *flags.serviceName
+	}
+	if *flags.serviceVersion != "" {
+		config.ServiceVersion = *flags.serviceVersion
+	}
+	if *flags.environment != "" {
+		config.Environment = *flags.environment
+	}
+	// Note: OTEL fields removed as part of DELTA observability cleanup
+}
+
+// parseOTELHeaders parses comma-separated key=value pairs into a map
+func parseOTELHeaders(headers string) map[string]string {
+	headerMap := make(map[string]string)
+	pairs := strings.Split(headers, ",")
+	for _, pair := range pairs {
+		if kv := strings.SplitN(strings.TrimSpace(pair), "=", 2); len(kv) == 2 {
+			headerMap[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+		}
+	}
+	return headerMap
+}
+
+// createAndConfigureServer creates the MCP server for workflow-only operation
+func createAndConfigureServer(config server.ServerConfig, flags *FlagConfig) (api.MCPServer, error) {
+	// Log startup information
 	log.Info().
 		Str("version", getVersion()).
 		Str("transport", config.TransportType).
 		Str("workspace_dir", config.WorkspaceDir).
 		Msg("Starting Container Kit MCP Server")
 
-	// Create server using bridge package
-	mcpServer, err := server.NewServer(context.Background(), config)
+	// Convert core config to server config format
+	// Create slog logger for dependency injection
+	slogLogger := createSlogLogger(config.LogLevel)
+
+	// Create server using functional options pattern
+	// The server will handle creating its own internal dependencies
+	mcpServer, err := server.NewServer(context.Background(), slogLogger,
+		server.WithWorkspace(config.WorkspaceDir),
+		server.WithMaxSessions(config.MaxSessions),
+		server.WithSessionTTL(config.SessionTTL),
+		server.WithMaxDiskPerSession(config.MaxDiskPerSession),
+		server.WithTotalDiskLimit(config.TotalDiskLimit),
+		server.WithStorePath(config.StorePath),
+		server.WithTransport(config.TransportType),
+		server.WithHTTPAddress(config.HTTPAddr),
+		server.WithHTTPPort(config.HTTPPort),
+		server.WithCORSOrigins(config.CORSOrigins),
+		server.WithLogLevel(config.LogLevel),
+	)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to create server")
-		os.Exit(1)
+		return nil, fmt.Errorf("failed to create server: %w", err)
 	}
 	if mcpServer == nil {
-		log.Error().Msg("Server is nil despite no error")
-		os.Exit(1)
+		return nil, fmt.Errorf("server is nil despite no error")
 	}
 
-	// Enable conversation mode if requested
-	if *conversationMode {
-		// Override OpenTelemetry flags with environment variables if not set
-		if *otelEnabled == false && os.Getenv("CONTAINER_KIT_OTEL_ENABLED") == "true" {
-			*otelEnabled = true
-		}
-		if *otelEndpoint == "" {
-			if val := os.Getenv("CONTAINER_KIT_OTEL_ENDPOINT"); val != "" {
-				*otelEndpoint = val
-			}
-		}
-		if *otelHeaders == "" {
-			if val := os.Getenv("CONTAINER_KIT_OTEL_HEADERS"); val != "" {
-				*otelHeaders = val
-			}
-		}
-		if *serviceName == "container-kit-mcp" {
-			if val := os.Getenv("CONTAINER_KIT_SERVICE_NAME"); val != "" {
-				*serviceName = val
-			}
-		}
-		if *serviceVersion == "" {
-			if val := os.Getenv("CONTAINER_KIT_SERVICE_VERSION"); val != "" {
-				*serviceVersion = val
-			}
-		}
-		if *environment == "development" {
-			if val := os.Getenv("CONTAINER_KIT_ENVIRONMENT"); val != "" {
-				*environment = val
-			}
-		}
-		if *traceSampleRate == 1.0 {
-			if val := os.Getenv("CONTAINER_KIT_TRACE_SAMPLE_RATE"); val != "" {
-				if parsed, err := strconv.ParseFloat(val, 64); err == nil {
-					*traceSampleRate = parsed
-				}
-			}
-		}
+	// Note: Conversation mode removed - focusing on workflow-only operation
 
-		// Parse OpenTelemetry headers if provided
-		otelHeadersMap := make(map[string]string)
-		if *otelHeaders != "" {
-			pairs := strings.Split(*otelHeaders, ",")
-			for _, pair := range pairs {
-				if kv := strings.SplitN(strings.TrimSpace(pair), "=", 2); len(kv) == 2 {
-					otelHeadersMap[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
-				}
-			}
-		}
+	return mcpServer, nil
+}
 
-		// Set service version from build version if not provided
-		svcVersion := *serviceVersion
-		if svcVersion == "" {
-			svcVersion = Version
-		}
+// createSlogLogger creates a structured logger for dependency injection
+func createSlogLogger(logLevel string) *slog.Logger {
+	// Parse log level
+	level := parseSlogLevel(logLevel)
 
-		conversationConfig := core.ConversationConfig{
-			EnableTelemetry:   *telemetryEnabled,
-			TelemetryPort:     *telemetryPort,
-			PreferencesDBPath: "", // Will use default workspace path
+	// Create handler with console output
+	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: level,
+	})
 
-			// OpenTelemetry configuration
-			EnableOTEL:      *otelEnabled,
-			OTELEndpoint:    *otelEndpoint,
-			OTELHeaders:     otelHeadersMap,
-			ServiceName:     *serviceName,
-			ServiceVersion:  svcVersion,
-			Environment:     *environment,
-			TraceSampleRate: *traceSampleRate,
-		}
+	return slog.New(handler)
+}
 
-		if err := mcpServer.EnableConversationMode(conversationConfig); err != nil {
-			log.Error().Err(err).Msg("Failed to enable conversation mode")
-			os.Exit(1)
-		}
-
-		log.Info().Msg("Conversation mode enabled - chat tool available")
-
-		if *telemetryEnabled {
-			log.Info().
-				Int("port", *telemetryPort).
-				Bool("otel_enabled", *otelEnabled).
-				Str("otel_endpoint", *otelEndpoint).
-				Msg("Prometheus metrics and OpenTelemetry enabled")
-		}
+// parseSlogLevel converts string log level to slog.Level
+func parseSlogLevel(level string) slog.Level {
+	switch level {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
 	}
+}
 
-	// Handle demo mode
-	if *demo != "" {
-		log.Warn().Msg("Demo mode temporarily disabled due to API restructuring")
-		return
-	}
-
+// runServerWithShutdown runs the server with graceful shutdown handling
+func runServerWithShutdown(mcpServer api.MCPServer) {
 	// Create context for server operation
 	ctx := context.Background()
 
@@ -301,7 +335,9 @@ func main() {
 		log.Info().Str("signal", sig.String()).Msg("Received shutdown signal")
 
 		// Gracefully shutdown the server
-		if err := mcpServer.Stop(); err != nil {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := mcpServer.Stop(shutdownCtx); err != nil {
 			log.Error().Err(err).Msg("Error during server shutdown")
 		}
 
@@ -314,21 +350,149 @@ func main() {
 
 	case <-ctx.Done():
 		log.Info().Msg("Context cancelled, shutting down")
-		if err := mcpServer.Stop(); err != nil {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := mcpServer.Stop(shutdownCtx); err != nil {
 			log.Error().Err(err).Msg("Error during server shutdown")
 		}
 	}
 }
 
+// EnvConfigMapping defines how environment variables map to configuration fields
+type EnvConfigMapping struct {
+	EnvKey string
+	Type   string // "string", "int", "int64", "bool", "duration", "float64"
+	Setter func(config *server.ServerConfig, value string) error
+}
+
+// buildEnvMappings creates the environment variable to config field mappings
+func buildEnvMappings() []EnvConfigMapping {
+	return []EnvConfigMapping{
+		{"CONTAINER_KIT_WORKSPACE_DIR", "string", func(config *server.ServerConfig, value string) error {
+			config.WorkspaceDir = value
+			return nil
+		}},
+		{"CONTAINER_KIT_STORE_PATH", "string", func(config *server.ServerConfig, value string) error {
+			config.StorePath = value
+			return nil
+		}},
+		{"CONTAINER_KIT_MAX_SESSIONS", "int", func(config *server.ServerConfig, value string) error {
+			if parsed, err := strconv.Atoi(value); err == nil {
+				config.MaxSessions = parsed
+			}
+			return nil
+		}},
+		{"CONTAINER_KIT_SESSION_TTL", "duration", func(config *server.ServerConfig, value string) error {
+			if parsed, err := time.ParseDuration(value); err == nil {
+				config.SessionTTL = parsed
+			}
+			return nil
+		}},
+		{"CONTAINER_KIT_MAX_DISK_PER_SESSION", "int64", func(config *server.ServerConfig, value string) error {
+			if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
+				config.MaxDiskPerSession = parsed
+			}
+			return nil
+		}},
+		{"CONTAINER_KIT_TOTAL_DISK_LIMIT", "int64", func(config *server.ServerConfig, value string) error {
+			if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
+				config.TotalDiskLimit = parsed
+			}
+			return nil
+		}},
+		{"CONTAINER_KIT_TRANSPORT", "string", func(config *server.ServerConfig, value string) error {
+			config.TransportType = value
+			return nil
+		}},
+		{"CONTAINER_KIT_HTTP_ADDR", "string", func(config *server.ServerConfig, value string) error {
+			config.HTTPAddr = value
+			return nil
+		}},
+		{"CONTAINER_KIT_HTTP_PORT", "int", func(config *server.ServerConfig, value string) error {
+			if parsed, err := strconv.Atoi(value); err == nil {
+				config.HTTPPort = parsed
+			}
+			return nil
+		}},
+		{"CONTAINER_KIT_LOG_LEVEL", "string", func(config *server.ServerConfig, value string) error {
+			config.LogLevel = value
+			return nil
+		}},
+		{"CONTAINER_KIT_LOG_HTTP_BODIES", "bool", func(config *server.ServerConfig, value string) error {
+			config.LogHTTPBodies = value == "true" || value == "1"
+			return nil
+		}},
+		{"CONTAINER_KIT_MAX_BODY_LOG_SIZE", "int64", func(config *server.ServerConfig, value string) error {
+			if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
+				config.MaxBodyLogSize = parsed
+			}
+			return nil
+		}},
+		{"CONTAINER_KIT_SANDBOX_ENABLED", "bool", func(config *server.ServerConfig, value string) error {
+			config.SandboxEnabled = value == "true" || value == "1"
+			return nil
+		}},
+		{"CONTAINER_KIT_CLEANUP_INTERVAL", "duration", func(config *server.ServerConfig, value string) error {
+			if parsed, err := time.ParseDuration(value); err == nil {
+				config.CleanupInterval = parsed
+			}
+			return nil
+		}},
+		{"CONTAINER_KIT_SERVICE_NAME", "string", func(config *server.ServerConfig, value string) error {
+			config.ServiceName = value
+			return nil
+		}},
+		{"CONTAINER_KIT_SERVICE_VERSION", "string", func(config *server.ServerConfig, value string) error {
+			config.ServiceVersion = value
+			return nil
+		}},
+		{"CONTAINER_KIT_ENVIRONMENT", "string", func(config *server.ServerConfig, value string) error {
+			config.Environment = value
+			return nil
+		}},
+		{"CONTAINER_KIT_TRACE_SAMPLE_RATE", "float64", func(config *server.ServerConfig, value string) error {
+			if parsed, err := strconv.ParseFloat(value, 64); err == nil {
+				config.TraceSampleRate = parsed
+			}
+			return nil
+		}},
+	}
+}
+
 // loadConfig loads configuration from environment variables and config file
-func loadConfig(configFile string, telemetryEnabled *bool, telemetryPort *int) (core.ServerConfig, error) {
+func loadConfig(configFile string, telemetryEnabled *bool, telemetryPort *int) (server.ServerConfig, error) {
 	// Start with defaults
-	config := mcp.DefaultServerConfig()
+	config := server.DefaultServerConfig()
 
 	// Load .env file if it exists
+	if err := loadEnvFile(configFile); err != nil {
+		return config, err
+	}
+
+	// Apply environment variable mappings
+	if err := applyEnvMappings(&config); err != nil {
+		return config, err
+	}
+
+	// Apply telemetry-specific overrides
+	applyTelemetryConfig(telemetryEnabled, telemetryPort)
+
+	// Apply OTEL headers if configured
+	applyOTELHeadersConfig(&config)
+
+	// Ensure required directories exist
+	if err := ensureDirectoriesExist(config); err != nil {
+		return config, err
+	}
+
+	return config, nil
+}
+
+// loadEnvFile loads environment variables from file
+func loadEnvFile(configFile string) error {
 	if configFile != "" {
 		if err := godotenv.Load(configFile); err != nil {
-			return config, fmt.Errorf("failed to load config file %s: %w", configFile, err)
+			return fmt.Errorf("failed to load config file %s: %w", configFile, err)
 		}
 	} else {
 		// Try to load default .env file
@@ -336,66 +500,24 @@ func loadConfig(configFile string, telemetryEnabled *bool, telemetryPort *int) (
 			godotenv.Load(".env")
 		}
 	}
+	return nil
+}
 
-	// Override with environment variables
-	if val := os.Getenv("CONTAINER_KIT_WORKSPACE_DIR"); val != "" {
-		config.WorkspaceDir = val
-	}
-	if val := os.Getenv("CONTAINER_KIT_STORE_PATH"); val != "" {
-		config.StorePath = val
-	}
-	if val := os.Getenv("CONTAINER_KIT_MAX_SESSIONS"); val != "" {
-		if parsed, err := strconv.Atoi(val); err == nil {
-			config.MaxSessions = parsed
+// applyEnvMappings applies environment variable mappings to configuration
+func applyEnvMappings(config *server.ServerConfig) error {
+	mappings := buildEnvMappings()
+	for _, mapping := range mappings {
+		if val := os.Getenv(mapping.EnvKey); val != "" {
+			if err := mapping.Setter(config, val); err != nil {
+				return fmt.Errorf("failed to set %s: %w", mapping.EnvKey, err)
+			}
 		}
 	}
-	if val := os.Getenv("CONTAINER_KIT_SESSION_TTL"); val != "" {
-		if parsed, err := time.ParseDuration(val); err == nil {
-			config.SessionTTL = parsed
-		}
-	}
-	if val := os.Getenv("CONTAINER_KIT_MAX_DISK_PER_SESSION"); val != "" {
-		if parsed, err := strconv.ParseInt(val, 10, 64); err == nil {
-			config.MaxDiskPerSession = parsed
-		}
-	}
-	if val := os.Getenv("CONTAINER_KIT_TOTAL_DISK_LIMIT"); val != "" {
-		if parsed, err := strconv.ParseInt(val, 10, 64); err == nil {
-			config.TotalDiskLimit = parsed
-		}
-	}
-	if val := os.Getenv("CONTAINER_KIT_TRANSPORT"); val != "" {
-		config.TransportType = val
-	}
-	if val := os.Getenv("CONTAINER_KIT_HTTP_ADDR"); val != "" {
-		config.HTTPAddr = val
-	}
-	if val := os.Getenv("CONTAINER_KIT_HTTP_PORT"); val != "" {
-		if parsed, err := strconv.Atoi(val); err == nil {
-			config.HTTPPort = parsed
-		}
-	}
-	if val := os.Getenv("CONTAINER_KIT_LOG_LEVEL"); val != "" {
-		config.LogLevel = val
-	}
-	if val := os.Getenv("CONTAINER_KIT_LOG_HTTP_BODIES"); val != "" {
-		config.LogHTTPBodies = val == "true" || val == "1"
-	}
-	if val := os.Getenv("CONTAINER_KIT_MAX_BODY_LOG_SIZE"); val != "" {
-		if parsed, err := strconv.ParseInt(val, 10, 64); err == nil {
-			config.MaxBodyLogSize = parsed
-		}
-	}
-	if val := os.Getenv("CONTAINER_KIT_SANDBOX_ENABLED"); val != "" {
-		config.SandboxEnabled = val == "true" || val == "1"
-	}
-	if val := os.Getenv("CONTAINER_KIT_CLEANUP_INTERVAL"); val != "" {
-		if parsed, err := time.ParseDuration(val); err == nil {
-			config.CleanupInterval = parsed
-		}
-	}
+	return nil
+}
 
-	// Telemetry configuration via environment variables
+// applyTelemetryConfig applies telemetry-specific environment variables
+func applyTelemetryConfig(telemetryEnabled *bool, telemetryPort *int) {
 	if val := os.Getenv("CONTAINER_KIT_TELEMETRY_ENABLED"); val != "" {
 		*telemetryEnabled = val == "true" || val == "1"
 	}
@@ -404,53 +526,28 @@ func loadConfig(configFile string, telemetryEnabled *bool, telemetryPort *int) (
 			*telemetryPort = parsed
 		}
 	}
+}
 
-	// OpenTelemetry configuration via environment variables
-	if val := os.Getenv("CONTAINER_KIT_OTEL_ENABLED"); val != "" {
-		config.EnableOTEL = val == "true" || val == "1"
-	}
-	if val := os.Getenv("CONTAINER_KIT_OTEL_ENDPOINT"); val != "" {
-		config.OTELEndpoint = val
-		config.EnableOTEL = true
-	}
-	if val := os.Getenv("CONTAINER_KIT_OTEL_HEADERS"); val != "" {
-		// Parse headers format: "key1=value1,key2=value2"
-		config.OTELHeaders = make(map[string]string)
-		pairs := strings.Split(val, ",")
-		for _, pair := range pairs {
-			if kv := strings.SplitN(strings.TrimSpace(pair), "=", 2); len(kv) == 2 {
-				config.OTELHeaders[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
-			}
-		}
-	}
-	if val := os.Getenv("CONTAINER_KIT_SERVICE_NAME"); val != "" {
-		config.ServiceName = val
-	}
-	if val := os.Getenv("CONTAINER_KIT_SERVICE_VERSION"); val != "" {
-		config.ServiceVersion = val
-	}
-	if val := os.Getenv("CONTAINER_KIT_ENVIRONMENT"); val != "" {
-		config.Environment = val
-	}
-	if val := os.Getenv("CONTAINER_KIT_TRACE_SAMPLE_RATE"); val != "" {
-		if parsed, err := strconv.ParseFloat(val, 64); err == nil {
-			config.TraceSampleRate = parsed
-		}
-	}
+// applyOTELHeadersConfig applies OTEL headers configuration
+func applyOTELHeadersConfig(config *server.ServerConfig) {
+	// DELTA WORKSTREAM: OTEL headers removed as part of observability cleanup
+	// Function kept for compatibility during migration but no longer applies headers
+}
 
-	// Ensure directories exist
+// ensureDirectoriesExist creates required directories
+func ensureDirectoriesExist(config server.ServerConfig) error {
 	if err := os.MkdirAll(config.WorkspaceDir, 0755); err != nil {
-		return config, fmt.Errorf("failed to create workspace directory: %w", err)
+		return fmt.Errorf("failed to create workspace directory: %w", err)
 	}
 
 	if config.StorePath != "" {
 		storeDir := filepath.Dir(config.StorePath)
 		if err := os.MkdirAll(storeDir, 0755); err != nil {
-			return config, fmt.Errorf("failed to create store directory: %w", err)
+			return fmt.Errorf("failed to create store directory: %w", err)
 		}
 	}
 
-	return config, nil
+	return nil
 }
 
 // setupLogging configures structured logging
@@ -480,37 +577,37 @@ func getVersion() string {
 }
 
 // runDemo runs the specified demo mode
-func runDemo(ctx context.Context, server core.Server, demoMode string) error {
+func runDemo(ctx context.Context, server api.MCPServer, demoMode string) error {
 	log.Warn().Str("mode", demoMode).Msg("Demo mode temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runAllDemos runs all demonstration scenarios
-func runAllDemos(ctx context.Context, server core.Server) error {
+func runAllDemos(ctx context.Context, server api.MCPServer) error {
 	log.Warn().Msg("All demos temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runBasicWorkflowDemo demonstrates standard containerization workflow
-func runBasicWorkflowDemo(ctx context.Context, server core.Server) error {
+func runBasicWorkflowDemo(ctx context.Context, server api.MCPServer) error {
 	log.Warn().Msg("Basic workflow demo temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runErrorHandlingDemo demonstrates error handling and recovery
-func runErrorHandlingDemo(ctx context.Context, server core.Server) error {
+func runErrorHandlingDemo(ctx context.Context, server api.MCPServer) error {
 	log.Warn().Msg("Error handling demo temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runSessionManagementDemo demonstrates session lifecycle
-func runSessionManagementDemo(ctx context.Context, server core.Server) error {
+func runSessionManagementDemo(ctx context.Context, server api.MCPServer) error {
 	log.Warn().Msg("Session management demo temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runPerformanceDemo demonstrates performance monitoring
-func runPerformanceDemo(ctx context.Context, server core.Server) error {
+func runPerformanceDemo(ctx context.Context, server api.MCPServer) error {
 	log.Warn().Msg("Performance demo temporarily disabled due to API restructuring")
 	return nil
 }

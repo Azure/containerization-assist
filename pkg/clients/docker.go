@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/Azure/container-kit/pkg/logger"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // buildDockerfileContent builds a Docker image from a string containing Dockerfile contents
@@ -14,14 +15,14 @@ func (c *Clients) BuildDockerfileContent(ctx context.Context, dockerfileContent 
 	// Create temporary directory
 	tmpDir, err := os.MkdirTemp("", "docker-build-*")
 	if err != nil {
-		return "", fmt.Errorf("failed to create temp directory: %v", err)
+		return "", errors.New(errors.CodeIoError, "docker", fmt.Sprintf("failed to create temp directory: %v", err), err)
 	}
 	defer os.RemoveAll(tmpDir) // Clean up
 
 	// Create temporary Dockerfile
 	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
 	if err := os.WriteFile(dockerfilePath, []byte(dockerfileContent), 0644); err != nil {
-		return "", fmt.Errorf("failed to write Dockerfile: %v", err)
+		return "", errors.New(errors.CodeIoError, "docker", fmt.Sprintf("failed to write Dockerfile: %v", err), err)
 	}
 
 	registryPrefix := ""
@@ -34,7 +35,7 @@ func (c *Clients) BuildDockerfileContent(ctx context.Context, dockerfileContent 
 	buildErrors, err := c.Docker.Build(ctx, dockerfilePath, registryPrefix+imageName+":latest", targetDir)
 
 	if err != nil {
-		return buildErrors, fmt.Errorf("docker build failed: %v", err)
+		return buildErrors, errors.New(errors.CodeImageBuildFailed, "docker", fmt.Sprintf("docker build failed: %v", err), err)
 	}
 
 	logger.Info("built docker image")
@@ -55,7 +56,7 @@ func (c *Clients) PushDockerImage(ctx context.Context, image string) error {
 
 	if err != nil {
 		logger.Errorf("Registry push failed with error: %s", err.Error())
-		return fmt.Errorf("error pushing to registry: %s", err.Error())
+		return errors.New(errors.CodeImagePushFailed, "docker", fmt.Sprintf("error pushing to registry: %s", err.Error()), err)
 	}
 
 	return nil

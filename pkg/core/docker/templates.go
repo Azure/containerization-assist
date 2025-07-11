@@ -4,23 +4,24 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/templates"
-	"github.com/rs/zerolog"
 )
 
 // TemplateEngine provides mechanical Dockerfile template operations
 type TemplateEngine struct {
-	logger zerolog.Logger
+	logger *slog.Logger
 }
 
 // NewTemplateEngine creates a new template engine
-func NewTemplateEngine(logger zerolog.Logger) *TemplateEngine {
+func NewTemplateEngine(logger *slog.Logger) *TemplateEngine {
 	return &TemplateEngine{
-		logger: logger.With().Str("component", "docker_template_engine").Logger(),
+		logger: logger.With("component", "docker_template_engine"),
 	}
 }
 
@@ -56,14 +57,14 @@ type GenerateError struct {
 func (te *TemplateEngine) ListAvailableTemplates() ([]TemplateInfo, error) {
 	templateNames, err := te.listEmbeddedSubdirNames("dockerfiles")
 	if err != nil {
-		return nil, fmt.Errorf("failed to list dockerfile templates: %w", err)
+		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to list dockerfile templates", err)
 	}
 
 	templates := make([]TemplateInfo, 0, len(templateNames))
 	for _, name := range templateNames {
 		info, err := te.getTemplateInfo(name)
 		if err != nil {
-			te.logger.Warn().Err(err).Str("template", name).Msg("Failed to get template info")
+			te.logger.Warn("Failed to get template info", "error", err, "template", name)
 			continue
 		}
 		templates = append(templates, info)
@@ -80,7 +81,7 @@ func (te *TemplateEngine) GenerateFromTemplate(templateName string, targetDir st
 		Context:     make(map[string]interface{}),
 	}
 
-	te.logger.Info().Str("template", templateName).Str("target_dir", targetDir).Msg("Generating Dockerfile from template")
+	te.logger.Info("Generating Dockerfile from template", "template", templateName, "target_dir", targetDir)
 
 	// Validate template exists
 	templates, err := te.ListAvailableTemplates()
@@ -165,10 +166,9 @@ func (te *TemplateEngine) GenerateFromTemplate(templateName string, targetDir st
 	// Add suggestions based on template
 	result.Suggestions = te.generateSuggestions(templateInfo, targetDir)
 
-	te.logger.Info().
-		Str("template", templateName).
-		Int("dockerfile_size", len(dockerfileContent)).
-		Msg("Successfully generated Dockerfile from template")
+	te.logger.Info("Successfully generated Dockerfile from template",
+		"template", templateName,
+		"dockerfile_size", len(dockerfileContent))
 
 	return result, nil
 }

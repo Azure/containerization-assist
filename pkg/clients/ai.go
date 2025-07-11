@@ -5,12 +5,13 @@ import (
 	"fmt"
 
 	"github.com/Azure/container-kit/pkg/logger"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 func (c *Clients) TestOpenAIConn(ctx context.Context) error {
 	content, tokenUsage, err := c.AzOpenAIClient.GetChatCompletion(ctx, "Hello Azure OpenAI! Tell me this is working in one short sentence.")
 	if err != nil {
-		return fmt.Errorf("failed to get chat completion: %w", err)
+		return errors.New(errors.CodeNetworkError, "ai", fmt.Sprintf("failed to get chat completion: %v", err), err)
 	}
 
 	logger.Info("Azure OpenAI Test")

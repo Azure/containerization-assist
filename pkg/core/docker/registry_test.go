@@ -4,8 +4,9 @@ import (
 	"errors"
 	"testing"
 
+	"log/slog"
+
 	"github.com/Azure/container-kit/pkg/clients"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -494,7 +495,7 @@ func TestRegistryManager_extractRegistry(t *testing.T) {
 // TestNewRegistryManager tests the constructor
 func TestNewRegistryManager(t *testing.T) {
 	mockClients := &clients.Clients{}
-	logger := zerolog.Nop()
+	logger := slog.New(slog.NewTextHandler(nil, nil))
 
 	rm := NewRegistryManager(mockClients, logger)
 

@@ -16,6 +16,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/k8s"
 	"github.com/Azure/container-kit/pkg/logger"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 const APP_LABEL = "app.kubernetes.io/name"
@@ -61,14 +62,13 @@ func (c *Clients) DeployAndVerifySingleManifest(ctx context.Context, manifestPat
 	logger.Debugf("    Source path: %s", manifestPath)
 	content, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return false, "", fmt.Errorf("reading manifest file: %w", err)
+		return false, "", errors.New(errors.CodeIoError, "k8s", fmt.Sprintf("reading manifest file: %v", err), err)
 	}
 	o, err := k8s.ReadK8sObjects(content)
 	if err != nil {
-		return false, "", fmt.Errorf("reading k8s objects from manifest file %s: %w", manifestPath, err)
+		return false, "", errors.New(errors.CodeManifestInvalid, "k8s", fmt.Sprintf("reading k8s objects from manifest file %s: %v", manifestPath, err), err)
 	}
 
-	// Apply the manifest
 	outputStr, err := c.Kube.Apply(ctx, manifestPath)
 
 	if err != nil {
@@ -93,7 +93,7 @@ func (c *Clients) DeployAndVerifySingleManifest(ctx context.Context, manifestPat
 	k8sAppName := o.Metadata.Labels[APP_LABEL]
 	if k8sAppName == "" {
 		logger.Errorf("    No app label found in manifest %s", manifestPath)
-		return false, "", fmt.Errorf("no app label found in manifest %s", manifestPath)
+		return false, "", errors.New(errors.CodeManifestInvalid, "k8s", fmt.Sprintf("no app label found in manifest %s", manifestPath), nil)
 	}
 	labelSelector := fmt.Sprintf("%s=%s", APP_LABEL, k8sAppName)
 
@@ -132,30 +132,25 @@ func (c *Clients) GetDeploymentLogs(ctx context.Context, labelSelector string, n
 	// Loading kubeconfig from default location
 	config, err := clientcmd.BuildConfigFromFlags("", clientcmd.RecommendedHomeFile)
 	if err != nil {
-		return "", fmt.Errorf("failed to load kubeconfig: %w", err)
+		return "", errors.New(errors.CodeConfigurationInvalid, "k8s", fmt.Sprintf("failed to load kubeconfig: %v", err), err)
 	}
 
-	// Create Kubernetes client
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return "", fmt.Errorf("failed to create k8s client: %w", err)
+		return "", errors.New(errors.CodeKubernetesApiError, "k8s", fmt.Sprintf("failed to create k8s client: %v", err), err)
 	}
 
-	// Get the Deployment
-	// Note only please: We may want to handle the case where the deployment does not exist
-	// or is not found in the specified namespace
-	// This is a simplified example and may need to be adjusted based on our needs
 	logger.Debugf("Getting pod logs using label selector: %s in namespace: %s", labelSelector, namespace)
 	pods, err := client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to list pods with selector %q: %w", labelSelector, err)
+		return "", errors.New(errors.CodeKubernetesApiError, "k8s", fmt.Sprintf("failed to list pods with selector %q: %v", labelSelector, err), err)
 	}
 
 	if len(pods.Items) == 0 {
 		logger.Debugf("No pods found for selector %q in namespace %q", labelSelector, namespace)
-		return "", fmt.Errorf("no pods found for selector %q in namespace %q", labelSelector, namespace)
+		return "", errors.New(errors.CodeResourceNotFound, "k8s", fmt.Sprintf("no pods found for selector %q in namespace %q", labelSelector, namespace), nil)
 	}
 
 	logger.Debugf("Found %d pod(s) matching selector %q", len(pods.Items), labelSelector)

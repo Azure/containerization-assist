@@ -128,5 +128,4 @@ exec "${MCP_BINARY}" \
     --store-path="${STORE_PATH}" \
     --transport=stdio \
     --log-level=info \
-    --conversation \
     "$@"

@@ -1,10 +1,10 @@
-[![CI Pipeline](https://github.com/Azure/container-kit/actions/workflows/ci-pipeline.yml/badge.svg)](https://github.com/Azure/container-kit/actions/workflows/ci-pipeline.yml)
+[![Simple CI](https://github.com/Azure/container-kit/actions/workflows/ci-simple.yml/badge.svg)](https://github.com/Azure/container-kit/actions/workflows/ci-simple.yml)
 
 # Container Kit
 
 AI-Powered Application Containerization and Kubernetes Deployment
 
-Container Kit automates the creation of Docker images and Kubernetes manifests using AI-guided workflows. It provides atomic tools for precise control and conversational workflows for guided assistance.
+Container Kit automates the complete containerization process from repository analysis to Kubernetes deployment using a unified workflow approach. After aggressive simplification, it now provides a single, powerful workflow tool that handles the entire process with built-in progress tracking.
 
 ## 🚀 Quick Install
 
@@ -22,10 +22,14 @@ Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-WebRequest -Uri https:/
 
 ### Verify Installation
 ```bash
-container-kit --version
+# Check executable
+./container-kit-mcp --version
+
+# Verify build
+make build
 ```
 
-For detailed installation options and troubleshooting, see the [Quickstart Guide](docs/quickstart.md).
+For detailed usage and troubleshooting, see the [Tool Guide](docs/TOOL_GUIDE.md).
 
 ## 🏃 Quick Start
 
@@ -36,11 +40,11 @@ For detailed installation options and troubleshooting, see the [Quickstart Guide
 
 ### Basic Usage
 ```bash
-# Containerize your application
-container-kit generate /path/to/your/app
+# Run MCP server (main executable)
+./container-kit-mcp
 
-# Use the guided setup
-container-kit setup --target-repo /path/to/your/app
+# Container Kit operates via MCP protocol
+# Connect with MCP client for guided containerization
 ```
 
 ### Building from Source
@@ -48,11 +52,19 @@ container-kit setup --target-repo /path/to/your/app
 git clone https://github.com/Azure/container-kit.git
 cd container-kit
 
-# Build the CLI
-go build -o container-kit .
+# Set up make alias (required for WSL/Linux)
+alias make='/usr/bin/make'
 
 # Build the MCP server
-make mcp
+make build
+
+# Run tests
+make test              # Unit tests
+make test-integration  # Integration tests
+
+# Code quality
+make fmt               # Format code
+make lint              # Run linter
 ```
 
 ## 📖 Documentation
@@ -62,36 +74,37 @@ make mcp
 - **[Examples](examples/)** - Working code examples and patterns
 
 ### For Developers
-- **[Architecture Guide](docs/mcp-architecture.md)** - Technical design and unified interface system
-- **[Tool Development Guide](docs/adding-new-tools.md)** - Building new tools and integrations
-- **[Interface Patterns](docs/interface-patterns.md)** - Design patterns and best practices
-- **[Technical Debt Inventory](docs/TECHNICAL_DEBT_INVENTORY.md)** - Current technical debt and cleanup tasks
+- **[Three-Layer Architecture](docs/THREE_LAYER_ARCHITECTURE.md)** - Clean architecture with domain/application/infra layers
+- **[Tool Development Guide](docs/ADDING_NEW_TOOLS.md)** - Building new tools and integrations
+- **[Architectural Decisions](docs/architecture/adr/)** - ADRs documenting key design decisions
+- **[MCP Tool Standards](docs/MCP_TOOL_STANDARDS.md)** - Canonical implementation patterns
 
 ### For Contributors
 - **[Contributing Guide](CONTRIBUTING.md)** - Development workflow and standards
 - **[Development Guidelines](DEVELOPMENT_GUIDELINES.md)** - Coding standards and practices
-- **[Migration Guide](docs/migration-guide.md)** - v1 to v2 migration instructions
-- **[Breaking Changes](docs/breaking-changes.md)** - Breaking changes in v2.0
+- **[Quality Standards](docs/QUALITY_STANDARDS.md)** - Code quality and testing requirements
 
 ## 🏗️ Architecture
 
-Container Kit provides atomic tools and conversational workflows through a unified interface system:
+Container Kit uses a simplified workflow-focused architecture after aggressive cleanup:
 
-- **Atomic Tools**: Individual containerization operations (analyze, build, deploy, scan)
-- **Conversation Mode**: Guided AI workflows for complete containerization
-- **Unified Interface**: Consistent tool patterns with auto-registration
+- **Single Workflow**: One unified tool handles the complete containerization process
+- **Progress Tracking**: Built-in progress indicators for each of the 10 workflow steps
+- **Simplified Codebase**: Reduced from 294 files to 25 core files (82% reduction)
+- **Error Recovery**: Centralized error handling with actionable messages
 
-> **📖 Technical Details**: See [Architecture Guide](docs/mcp-architecture.md) for complete system design.
+> **📖 Technical Details**: See [Development Guidelines](DEVELOPMENT_GUIDELINES.md) for the simplified architecture.
 
 ## 🛠️ Key Features
 
-- **AI-Guided Workflows**: Interactive containerization assistance
-- **Atomic Operations**: Precise control over each step
-- **Auto-Registration**: Zero-configuration tool discovery
+- **Unified Workflow**: Complete containerization in a single tool
+- **Progress Tracking**: Visual progress indicators for all 10 steps
+- **AI-Guided Process**: Interactive assistance throughout the workflow
 - **Session Persistence**: Maintain state across operations
 - **Multi-Transport**: stdio and HTTP support
 - **Kubernetes Integration**: Generate and deploy manifests
 - **Security Scanning**: Built-in vulnerability detection
+- **Simplified Architecture**: Dramatically reduced complexity
 
 ## 🧪 Quick Example
 
@@ -99,8 +112,21 @@ Container Kit provides atomic tools and conversational workflows through a unifi
 # Start MCP server
 ./container-kit-mcp
 
+# Container Kit provides a single powerful workflow tool:
+# - containerize_and_deploy: Complete containerization workflow
+#   ├── 1/10: Repository analysis
+#   ├── 2/10: Dockerfile generation
+#   ├── 3/10: Container building
+#   ├── 4/10: Security scanning
+#   ├── 5/10: Image tagging
+#   ├── 6/10: Registry push
+#   ├── 7/10: Kubernetes manifest generation
+#   ├── 8/10: Cluster setup
+#   ├── 9/10: Deployment
+#   └── 10/10: Health verification
+
 # Use through Claude Desktop or direct API calls
-# Ask: "Analyze my Python Flask app and create a Dockerfile"
+# Ask: "Containerize my Python Flask app and deploy to Kubernetes"
 ```
 
 ## 🤝 Contributing
@@ -122,4 +148,4 @@ See [SECURITY.md](SECURITY.md) for security policy and reporting vulnerabilities
 
 - **Issues**: Use GitHub Issues for bug reports and feature requests
 - **Discussions**: Use GitHub Discussions for questions and help
-- **Documentation**: Check the [Complete User Guide](MCP_DOCUMENTATION.md)
+- **Documentation**: Check the [Development Guidelines](DEVELOPMENT_GUIDELINES.md) and [MCP Documentation](MCP_DOCUMENTATION.md)

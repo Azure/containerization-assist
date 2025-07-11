@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/logger"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // validateKindInstalled checks if 'kind' is installed, installs it if missing based on OS.
@@ -20,12 +21,12 @@ func (c *Clients) ValidateKindInstalled(ctx context.Context) error {
 		scanner.Scan()
 		response := strings.ToLower(scanner.Text())
 		if response != "y" {
-			return fmt.Errorf("kind installation aborted")
+			return errors.New(errors.CodeOperationFailed, "kind", "kind installation aborted", nil)
 		}
 
 		logger.Info("Attempting to install kind now for you...")
 		if output, err := c.Kind.Install(ctx); err != nil {
-			return fmt.Errorf("failed to install kind: %s, error: %w", output, err)
+			return errors.New(errors.CodeOperationFailed, "kind", fmt.Sprintf("failed to install kind: %s, error: %v", output, err), err)
 		}
 	}
 	return nil
@@ -38,13 +39,12 @@ func (c *Clients) SetupLocalRegistryCluster(ctx context.Context) error {
 	}
 
 	if output, err := c.Kind.SetupRegistry(ctx); err != nil {
-		return fmt.Errorf("failed to set up local registry: %s, error: %w", output, err)
+		return errors.New(errors.CodeOperationFailed, "kind", fmt.Sprintf("failed to set up local registry: %s, error: %v", output, err), err)
 	}
 
 	return nil
 }
 
-// getKindCluster ensures a 'container-kit' kind cluster exists and sets kubectl context.
 func (c *Clients) GetKindCluster(ctx context.Context) (string, error) {
 	if err := c.checkDockerRunning(ctx); err != nil {
 		return "", err
@@ -55,7 +55,7 @@ func (c *Clients) GetKindCluster(ctx context.Context) (string, error) {
 
 	output, err := c.Kind.GetClusters(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to get kind clusters: %s, error: %w", output, err)
+		return "", errors.New(errors.CodeOperationFailed, "kind", fmt.Sprintf("failed to get kind clusters: %s, error: %v", output, err), err)
 	}
 
 	clusters := strings.Split(string(output), "\n")
@@ -71,17 +71,17 @@ func (c *Clients) GetKindCluster(ctx context.Context) (string, error) {
 	if exists {
 		logger.Warn("Deleting existing kind cluster 'container-kit'")
 		if output, err = c.Kind.DeleteCluster(ctx, "container-kit"); err != nil {
-			return "", fmt.Errorf("failed to delete existing kind cluster: %s, error: %w", output, err)
+			return "", errors.New(errors.CodeOperationFailed, "kind", fmt.Sprintf("failed to delete existing kind cluster: %s, error: %v", output, err), err)
 		}
 	}
 	logger.Info("Creating kind cluster 'container-kit'")
 	if err := c.SetupLocalRegistryCluster(ctx); err != nil {
-		return "", fmt.Errorf("setting up local registry cluster: %w", err)
+		return "", errors.New(errors.CodeOperationFailed, "kind", fmt.Sprintf("setting up local registry cluster: %v", err), err)
 	}
 
 	logger.Info("Setting kubectl context to 'kind-container-kit'")
 	if output, err = c.Kube.SetKubeContext(ctx, "kind-container-kit"); err != nil {
-		return "", fmt.Errorf("failed to set kubectl context: %s, error: %w", output, err)
+		return "", errors.New(errors.CodeOperationFailed, "kind", fmt.Sprintf("failed to set kubectl context: %s, error: %v", output, err), err)
 	}
 
 	return "localhost:5001", nil

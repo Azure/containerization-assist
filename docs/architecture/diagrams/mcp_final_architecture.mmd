@@ -1,0 +1,132 @@
+graph TD
+    %% Container Kit MCP - Simplified Workflow Architecture
+    %% Current state: 25 core files with workflow-focused design
+    %% Single unified workflow for complete containerization process
+
+    Client[MCP Client<br/>Claude Desktop / CLI] --> MCPProtocol[MCP Protocol<br/>Model Context Protocol]
+    MCPProtocol --> Server[MCP Server<br/>application/core/]
+
+    subgraph "Core Architecture (25 Files)"
+        Server --> WorkflowTool[Workflow Tool<br/>server/workflows.go]
+        
+        subgraph "Domain Layer"
+            ErrorSystem[Error System<br/>domain/errors/<br/>Rich error handling<br/>Used throughout codebase]
+        end
+
+        subgraph "Application Layer"
+            API[API Interfaces<br/>application/api/<br/>Tool definitions]
+            Core[Server Core<br/>application/core/<br/>MCP implementation]
+        end
+
+        subgraph "Workflow Implementation"
+            WorkflowTool --> Steps[Workflow Steps<br/>internal/steps/]
+            
+            subgraph "10-Step Process"
+                Analyze[1. Analyze<br/>Repository analysis<br/>Technology detection]
+                Dockerfile[2. Dockerfile<br/>Generate optimized<br/>Dockerfile]
+                Build[3. Build<br/>Docker image<br/>construction]
+                Scan[4. Scan<br/>Security vulnerability<br/>scanning]
+                Tag[5. Tag<br/>Image tagging<br/>with version info]
+                Push[6. Push<br/>Push to container<br/>registry]
+                Manifest[7. Manifest<br/>Generate Kubernetes<br/>manifests]
+                Cluster[8. Cluster<br/>Cluster setup<br/>and validation]
+                Deploy[9. Deploy<br/>Application<br/>deployment]
+                Verify[10. Verify<br/>Health check<br/>and validation]
+            end
+            
+            Steps --> Analyze
+            Steps --> Dockerfile
+            Steps --> Build
+            Steps --> Scan
+            Steps --> Tag
+            Steps --> Push
+            Steps --> Manifest
+            Steps --> Cluster
+            Steps --> Deploy
+            Steps --> Verify
+        end
+
+        subgraph "Step Implementations"
+            AnalyzeImpl[analyze.go<br/>Repository analysis logic]
+            BuildImpl[build.go<br/>Docker operations]
+            K8sImpl[k8s.go<br/>Kubernetes operations]
+        end
+
+        Analyze --> AnalyzeImpl
+        Build --> BuildImpl
+        Dockerfile --> BuildImpl
+        Tag --> BuildImpl
+        Push --> BuildImpl
+        Manifest --> K8sImpl
+        Cluster --> K8sImpl
+        Deploy --> K8sImpl
+        Verify --> K8sImpl
+        Scan --> BuildImpl
+    end
+
+    subgraph "Infrastructure Components"
+        SessionStore[Session Storage<br/>BoltDB persistence]
+        WorkspaceManager[Workspace Manager<br/>Isolated workspaces]
+        ProgressTracker[Progress Tracking<br/>Step monitoring]
+    end
+
+    subgraph "External Integrations"
+        Docker[Docker Engine<br/>Container runtime]
+        Registry[Container Registry<br/>Image storage]
+        Kubernetes[Kubernetes API<br/>Orchestration]
+        Scanner[Security Scanners<br/>Trivy/Grype]
+    end
+
+    %% Core connections
+    WorkflowTool --> SessionStore
+    WorkflowTool --> WorkspaceManager
+    WorkflowTool --> ProgressTracker
+    WorkflowTool --> ErrorSystem
+
+    %% External connections
+    BuildImpl --> Docker
+    BuildImpl --> Registry
+    BuildImpl --> Scanner
+    K8sImpl --> Kubernetes
+
+    %% Error handling flows through everything
+    AnalyzeImpl --> ErrorSystem
+    BuildImpl --> ErrorSystem
+    K8sImpl --> ErrorSystem
+
+    %% Progress tracking for all steps
+    Analyze --> ProgressTracker
+    Build --> ProgressTracker
+    Deploy --> ProgressTracker
+    Verify --> ProgressTracker
+
+    %% Session management
+    WorkflowTool --> SessionStore
+    SessionStore --> BoltDB[BoltDB<br/>Embedded storage]
+
+    %% Styling
+    classDef clientStyle fill:#e1f5fe,stroke:#0288d1,stroke-width:3px
+    classDef domainStyle fill:#e8f5e9,stroke:#2e7d32,stroke-width:3px
+    classDef applicationStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:3px
+    classDef workflowStyle fill:#f3e5f5,stroke:#6a1b9a,stroke-width:3px
+    classDef stepStyle fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    classDef infraStyle fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef externalStyle fill:#eceff1,stroke:#455a64,stroke-width:1px,stroke-dasharray: 5 5
+
+    class Client,MCPProtocol clientStyle
+    class ErrorSystem domainStyle
+    class API,Core,Server applicationStyle
+    class WorkflowTool,Steps workflowStyle
+    class Analyze,Dockerfile,Build,Scan,Tag,Push,Manifest,Cluster,Deploy,Verify stepStyle
+    class AnalyzeImpl,BuildImpl,K8sImpl stepStyle
+    class SessionStore,WorkspaceManager,ProgressTracker,BoltDB infraStyle
+    class Docker,Registry,Kubernetes,Scanner externalStyle
+
+    %% Architecture Notes
+    %% - 25 core files (reduced from 294)
+    %% - Single workflow tool instead of multiple atomic tools
+    %% - 10-step process with progress tracking
+    %% - Direct implementation without over-abstraction
+    %% - Essential error handling system retained
+    %% - Session-based workspace isolation
+    %% - Built-in progress indicators for user feedback

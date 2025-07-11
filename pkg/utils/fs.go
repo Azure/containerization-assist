@@ -11,6 +11,12 @@ import (
 	ignore "github.com/sabhiram/go-gitignore"
 )
 
+// FileExists checks if a file exists at the given path
+func FileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 // DefaultIgnorePatterns contains common directories and files to ignore when generating file trees
 var DefaultIgnorePatterns = []string{
 	"node_modules/",

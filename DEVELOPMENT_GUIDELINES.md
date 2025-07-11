@@ -1,6 +1,6 @@
 # Development Guidelines
 
-This document establishes coding standards and development practices for the Container Kit MCP project to ensure consistent, maintainable, and high-quality code across all workstreams.
+This document establishes coding standards and development practices for the Container Kit MCP project to ensure consistent, maintainable, and high-quality code.
 
 ## Table of Contents
 
@@ -60,33 +60,29 @@ type SessionManager interface {
 
 #### Error Handling Standards
 - Always handle errors explicitly - never ignore with `_`
-- Use `fmt.Errorf` with `%w` verb for error wrapping
-- Create custom error types for domain-specific errors
+- Use the unified RichError system from `pkg/mcp/domain/errors/rich.go`
+- Follow ADR-004 patterns for structured error handling
 - Use `errors.Is()` and `errors.As()` for error checking
 
 ```go
-// Good error handling
-result, err := someOperation()
-if err != nil {
-    return fmt.Errorf("failed to execute operation: %w", err)
-}
-
-// Custom error types
-type ValidationError struct {
-    Field   string
-    Message string
-}
-
-func (e *ValidationError) Error() string {
-    return fmt.Sprintf("validation failed for %s: %s", e.Field, e.Message)
-}
+// Use RichError system (ADR-004)
+return errors.NewError().
+    Code(errors.CodeValidationFailed).
+    Type(errors.ErrTypeValidation).
+    Severity(errors.SeverityMedium).
+    Message("validation failed for field").
+    Context("field", fieldName).
+    Context("value", fieldValue).
+    Suggestion("Check field format and try again").
+    WithLocation().
+    Build()
 ```
 
 ### Code Quality Standards
 
 #### No Print Statements
 - **NEVER** use `fmt.Print*`, `log.Print*`, or `print()` statements
-- Use structured logging with `zerolog` consistently
+- Use structured logging with `zerolog` (actual implementation)
 ```go
 // Bad
 fmt.Println("Starting build process")
@@ -228,35 +224,21 @@ func sanitizePath(path string) string {
 
 ## Error Handling
 
-### RichError Pattern (In Progress)
+### RichError Pattern (ADR-004)
 ```go
-// Custom error type with structured context
-type RichError struct {
-    Code    string
-    Message string
-    Context map[string]interface{}
-    Err     error
-}
-
-func (e *RichError) Error() string {
-    return e.Message
-}
-
-func (e *RichError) Unwrap() error {
-    return e.Err
-}
-
-// Usage
-return &RichError{
-    Code:    "BUILD_FAILED",
-    Message: "Docker build failed during RUN step",
-    Context: map[string]interface{}{
-        "dockerfile_line": 15,
-        "command":        "RUN npm install",
-        "exit_code":      1,
-    },
-    Err: originalError,
-}
+// Use unified RichError system from pkg/mcp/domain/errors/rich.go
+return errors.NewError().
+    Code(errors.CodeBuildFailed).
+    Type(errors.ErrTypeBuild).
+    Severity(errors.SeverityHigh).
+    Message("Docker build failed during RUN step").
+    Context("dockerfile_line", 15).
+    Context("command", "RUN npm install").
+    Context("exit_code", 1).
+    Suggestion("Check package.json and dependency versions").
+    WithLocation().
+    Cause(originalError).
+    Build()
 ```
 
 ### Error Context
@@ -290,16 +272,29 @@ return &RichError{
   - Split by functional areas (e.g., `tool_validation.go`, `tool_execution.go`)
   - Create focused sub-packages
 
-### Directory Structure
+### Architecture Overview
+The architecture focuses on core functionality with a clean, workflow-driven design:
+
 ```
-pkg/mcp/internal/
-├── tools/           # Tool implementations
-├── core/           # Core server functionality
-├── types/          # Shared type definitions
-├── utils/          # Shared utilities
-├── transport/      # Transport layer
-└── orchestration/  # Workflow orchestration
+pkg/mcp/
+├── domain/
+│   └── errors/         # Rich error handling system (kept - used by 54 files)
+├── application/
+│   ├── api/            # Interface definitions
+│   └── core/           # Server implementation
+├── server/             # Main workflow implementation
+└── internal/
+    └── steps/          # Individual workflow steps
+        ├── analyze.go  # Repository analysis
+        ├── build.go    # Docker operations
+        └── k8s.go      # Kubernetes operations
 ```
+
+**Key Architecture Features:**
+- 25 core files delivering complete functionality
+- Single workflow approach for unified experience
+- Essential validation and error handling
+- Clean, maintainable codebase
 
 ### Import Organization
 ```go
@@ -314,26 +309,37 @@ import (
     "github.com/stretchr/testify/assert"
 
     // Internal
-    "github.com/Azure/container-kit/pkg/mcp/internal/types"
-    "github.com/Azure/container-kit/pkg/mcp/utils"
+    "github.com/Azure/container-kit/pkg/mcp/domain/internal/types"
+    "github.com/Azure/container-kit/pkg/mcp/domain/internal/utils"
 )
 ```
 
 ## CI/CD Integration
 
-### Required Checks
-All code must pass:
+### Build System
+Use these essential commands for development:
+
 ```bash
-go build -tags mcp         # Compilation check
-go test -race ./...        # All tests with race detection
-golangci-lint run          # Linting (with error budget)
-make bench                 # Performance benchmarks
+# Build the MCP server
+make build
+
+# Run tests
+make test                  # MCP package tests
+make test-integration      # Integration tests
+
+# Code quality
+make fmt                   # Format code
+make lint                  # Run linter
+
+# Utility
+make clean                 # Remove binaries
+make version              # Show version
 ```
 
 ### Quality Gates
 - No `fmt.Print*` or `log.Print*` statements
 - No security issues (gosec)
-- Error budget compliance (see `docs/LINTING.md`)
+- Error budget compliance (see `docs/QUALITY_STANDARDS.md`)
 - Test coverage ≥70% for new code
 
 ### Git Workflow
@@ -360,6 +366,61 @@ make bench                 # Performance benchmarks
 4. **Maintainability**: Is the code easy to understand and modify?
 5. **Testing**: Are all scenarios adequately tested?
 
+## Architecture Patterns
+
+### Workflow-Focused Architecture
+The system uses a single workflow approach for the complete containerization process:
+
+```go
+// Single workflow tool that handles the entire containerization process
+type ContainerizeAndDeployTool struct {
+    workspaceDir string
+    logger       *slog.Logger
+}
+
+// Main workflow with 10 steps and progress tracking
+func (t *ContainerizeAndDeployTool) Execute(ctx context.Context, args ContainerizeAndDeployArgs) (interface{}, error) {
+    steps := []string{
+        "analyze",      // Repository analysis
+        "dockerfile",   // Dockerfile generation
+        "build",        // Docker build
+        "scan",         // Security scanning
+        "tag",          // Image tagging
+        "push",         // Registry push
+        "manifest",     // K8s manifest generation
+        "cluster",      // Cluster setup
+        "deploy",       // Deployment
+        "verify",       // Health check
+    }
+    
+    // Execute each step with progress tracking
+    for i, step := range steps {
+        progress := fmt.Sprintf("%d/%d", i+1, len(steps))
+        // ... step execution with progress updates
+    }
+}
+```
+
+### Key Architecture Benefits
+1. **Single Point of Entry**: One tool handles the entire workflow
+2. **Progress Tracking**: Built-in progress indicators for each step
+3. **Error Recovery**: Centralized error handling with actionable messages
+4. **State Management**: Clean session and state management
+
+## Function Design Principles
+
+### 1. Single Responsibility
+Each function should have one clear purpose.
+
+### 2. Cyclomatic Complexity < 10
+Keep functions simple with minimal branching.
+
+### 3. Parameter Limits
+Use options pattern for functions with >5 parameters.
+
+### 4. Safe Type Assertions
+Always check type assertions to prevent panics.
+
 ## Enforcement
 
 ### Automated Checks
@@ -383,11 +444,10 @@ make bench                 # Performance benchmarks
 
 - For clarification on guidelines: Open an issue with label `guidelines`
 - For tool setup: See `.devcontainer/README.md`
-- For linting issues: See `docs/LINTING.md`
-- For architecture questions: See `ARCHITECTURE.md`
+- For architecture questions: See `docs/THREE_LAYER_ARCHITECTURE.md`
 
 ---
 
-**Version**: 1.0
-**Last Updated**: 2025-06-24
-**Next Review**: Quarterly (2025-09-24)
+**Version**: 2.0
+**Last Updated**: 2025-07-10
+**Next Review**: Quarterly (2025-10-10)

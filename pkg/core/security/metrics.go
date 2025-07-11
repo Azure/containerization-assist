@@ -662,7 +662,7 @@ func (mc *MetricsCollector) UpdateFromScanResult(scanner string, result interfac
 	case UnifiedScanResultInterface:
 		mc.updateFromUnifiedScanResult(r)
 	default:
-		mc.logger.Warn().Interface("result_type", fmt.Sprintf("%T", result)).Msg("Unknown scan result type")
+		mc.logger.Warn().Str("result_type", fmt.Sprintf("%T", result)).Msg("Unknown scan result type")
 	}
 }
 

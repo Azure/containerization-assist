@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/rs/zerolog"
 	"gopkg.in/yaml.v3"
 )
@@ -37,78 +38,69 @@ type CustomizeOptions struct {
 func (mc *ManifestCustomizer) CustomizeDeployment(manifestPath string, options CustomizeOptions) error {
 	content, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return fmt.Errorf("reading deployment manifest: %w", err)
+		return mcperrors.New(mcperrors.CodeDeploymentFailed, "core", "reading deployment manifest", err)
 	}
 
 	var deployment map[string]interface{}
 	if err := yaml.Unmarshal(content, &deployment); err != nil {
-		return fmt.Errorf("parsing deployment YAML: %w", err)
+		return mcperrors.New(mcperrors.CodeInternalError, "k8s", "parsing deployment YAML", err)
 	}
 
-	// Update image reference
 	if options.ImageRef != "" {
 		if err := mc.updateImageInDeployment(deployment, options.ImageRef); err != nil {
-			return fmt.Errorf("updating image reference: %w", err)
+			return mcperrors.New(mcperrors.CodeDockerfileSyntaxError, "k8s", "updating image reference", err)
 		}
 	}
 
-	// Update app name
 	if options.AppName != "" {
 		if err := mc.updateAppNameInDeployment(deployment, options.AppName); err != nil {
-			return fmt.Errorf("updating app name: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating app name", err)
 		}
 	}
 
-	// Update namespace
 	if options.Namespace != "" {
 		if err := mc.updateNamespaceInManifest(deployment, options.Namespace); err != nil {
-			return fmt.Errorf("updating namespace: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating namespace", err)
 		}
 	}
 
-	// Update replicas
 	if options.Replicas > 0 {
 		if err := mc.updateReplicasInDeployment(deployment, options.Replicas); err != nil {
-			return fmt.Errorf("updating replicas: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating replicas", err)
 		}
 	}
 
-	// Update port
 	if options.Port > 0 {
 		if err := mc.updatePortInDeployment(deployment, options.Port); err != nil {
-			return fmt.Errorf("updating port: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating port", err)
 		}
 	}
 
-	// Update labels
 	if len(options.Labels) > 0 {
 		if err := mc.updateLabelsInDeployment(deployment, options.Labels); err != nil {
-			return fmt.Errorf("updating labels: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating labels", err)
 		}
 	}
 
-	// Update annotations
 	if len(options.Annotations) > 0 {
 		if err := mc.updateAnnotationsInDeployment(deployment, options.Annotations); err != nil {
-			return fmt.Errorf("updating annotations: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating annotations", err)
 		}
 	}
 
-	// Update environment variables
 	if len(options.EnvVars) > 0 {
 		if err := mc.updateEnvVarsInDeployment(deployment, options.EnvVars); err != nil {
-			return fmt.Errorf("updating environment variables: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating environment variables", err)
 		}
 	}
 
-	// Write back the updated manifest
 	updatedContent, err := yaml.Marshal(deployment)
 	if err != nil {
-		return fmt.Errorf("marshaling updated deployment YAML: %w", err)
+		return mcperrors.New(mcperrors.CodeDeploymentFailed, "core", "marshaling updated deployment YAML", err)
 	}
 
 	if err := os.WriteFile(manifestPath, updatedContent, 0644); err != nil {
-		return fmt.Errorf("writing updated deployment manifest: %w", err)
+		return mcperrors.New(mcperrors.CodeDeploymentFailed, "core", "writing updated deployment manifest", err)
 	}
 
 	mc.logger.Debug().
@@ -123,57 +115,51 @@ func (mc *ManifestCustomizer) CustomizeDeployment(manifestPath string, options C
 func (mc *ManifestCustomizer) CustomizeService(manifestPath string, options CustomizeOptions) error {
 	content, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return fmt.Errorf("reading service manifest: %w", err)
+		return mcperrors.New(mcperrors.CodeIoError, "core", "reading service manifest", err)
 	}
 
 	var service map[string]interface{}
 	if err := yaml.Unmarshal(content, &service); err != nil {
-		return fmt.Errorf("parsing service YAML: %w", err)
+		return mcperrors.New(mcperrors.CodeInternalError, "k8s", "parsing service YAML", err)
 	}
 
-	// Update app name
 	if options.AppName != "" {
 		if err := mc.updateAppNameInService(service, options.AppName); err != nil {
-			return fmt.Errorf("updating app name: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating app name", err)
 		}
 	}
 
-	// Update namespace
 	if options.Namespace != "" {
 		if err := mc.updateNamespaceInManifest(service, options.Namespace); err != nil {
-			return fmt.Errorf("updating namespace: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating namespace", err)
 		}
 	}
 
-	// Update service type
 	if options.ServiceType != "" {
 		if err := mc.updateServiceType(service, options.ServiceType); err != nil {
-			return fmt.Errorf("updating service type: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating service type", err)
 		}
 	}
 
-	// Update port
 	if options.Port > 0 {
 		if err := mc.updatePortInService(service, options.Port); err != nil {
-			return fmt.Errorf("updating port: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating port", err)
 		}
 	}
 
-	// Update labels
 	if len(options.Labels) > 0 {
 		if err := mc.updateLabelsInService(service, options.Labels); err != nil {
-			return fmt.Errorf("updating labels: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating labels", err)
 		}
 	}
 
-	// Write back the updated manifest
 	updatedContent, err := yaml.Marshal(service)
 	if err != nil {
-		return fmt.Errorf("marshaling updated service YAML: %w", err)
+		return mcperrors.New(mcperrors.CodeInternalError, "core", "marshaling updated service YAML", err)
 	}
 
 	if err := os.WriteFile(manifestPath, updatedContent, 0644); err != nil {
-		return fmt.Errorf("writing updated service manifest: %w", err)
+		return mcperrors.New(mcperrors.CodeInternalError, "core", "writing updated service manifest", err)
 	}
 
 	mc.logger.Debug().
@@ -342,50 +328,45 @@ func (mc *ManifestCustomizer) updateEnvVarsInDeployment(deployment map[string]in
 func (mc *ManifestCustomizer) CustomizeConfigMap(manifestPath string, options CustomizeOptions) error {
 	content, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return fmt.Errorf("reading configmap manifest: %w", err)
+		return mcperrors.New(mcperrors.CodeIoError, "core", "reading configmap manifest", err)
 	}
 
 	var configMap map[string]interface{}
 	if err := yaml.Unmarshal(content, &configMap); err != nil {
-		return fmt.Errorf("parsing configmap YAML: %w", err)
+		return mcperrors.New(mcperrors.CodeInternalError, "k8s", "parsing configmap YAML", err)
 	}
 
-	// Update app name
 	if options.AppName != "" {
 		if err := mc.updateAppNameInConfigMap(configMap, options.AppName); err != nil {
-			return fmt.Errorf("updating app name: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating app name", err)
 		}
 	}
 
-	// Update namespace
 	if options.Namespace != "" {
 		if err := mc.updateNamespaceInManifest(configMap, options.Namespace); err != nil {
-			return fmt.Errorf("updating namespace: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating namespace", err)
 		}
 	}
 
-	// Update labels
 	if len(options.Labels) > 0 {
 		if err := mc.updateLabelsInConfigMap(configMap, options.Labels); err != nil {
-			return fmt.Errorf("updating labels: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating labels", err)
 		}
 	}
 
-	// Update data from environment variables
 	if len(options.EnvVars) > 0 {
 		if err := mc.updateDataInConfigMap(configMap, options.EnvVars); err != nil {
-			return fmt.Errorf("updating configmap data: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating configmap data", err)
 		}
 	}
 
-	// Write back the updated manifest
 	updatedContent, err := yaml.Marshal(configMap)
 	if err != nil {
-		return fmt.Errorf("marshaling updated configmap YAML: %w", err)
+		return mcperrors.New(mcperrors.CodeInternalError, "core", "marshaling updated configmap YAML", err)
 	}
 
 	if err := os.WriteFile(manifestPath, updatedContent, 0644); err != nil {
-		return fmt.Errorf("writing updated configmap manifest: %w", err)
+		return mcperrors.New(mcperrors.CodeInternalError, "core", "writing updated configmap manifest", err)
 	}
 
 	mc.logger.Debug().
@@ -399,57 +380,51 @@ func (mc *ManifestCustomizer) CustomizeConfigMap(manifestPath string, options Cu
 func (mc *ManifestCustomizer) CustomizeIngress(manifestPath string, options CustomizeOptions) error {
 	content, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return fmt.Errorf("reading ingress manifest: %w", err)
+		return mcperrors.New(mcperrors.CodeIoError, "core", "reading ingress manifest", err)
 	}
 
 	var ingress map[string]interface{}
 	if err := yaml.Unmarshal(content, &ingress); err != nil {
-		return fmt.Errorf("parsing ingress YAML: %w", err)
+		return mcperrors.New(mcperrors.CodeInternalError, "k8s", "parsing ingress YAML", err)
 	}
 
-	// Update app name
 	if options.AppName != "" {
 		if err := mc.updateAppNameInIngress(ingress, options.AppName); err != nil {
-			return fmt.Errorf("updating app name: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating app name", err)
 		}
 	}
 
-	// Update namespace
 	if options.Namespace != "" {
 		if err := mc.updateNamespaceInManifest(ingress, options.Namespace); err != nil {
-			return fmt.Errorf("updating namespace: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating namespace", err)
 		}
 	}
 
-	// Update labels
 	if len(options.Labels) > 0 {
 		if err := mc.updateLabelsInIngress(ingress, options.Labels); err != nil {
-			return fmt.Errorf("updating labels: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating labels", err)
 		}
 	}
 
-	// Update annotations
 	if len(options.Annotations) > 0 {
 		if err := mc.updateAnnotationsInIngress(ingress, options.Annotations); err != nil {
-			return fmt.Errorf("updating annotations: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating annotations", err)
 		}
 	}
 
-	// Update port in ingress service backend
 	if options.Port > 0 {
 		if err := mc.updatePortInIngress(ingress, options.Port); err != nil {
-			return fmt.Errorf("updating port: %w", err)
+			return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", "updating port", err)
 		}
 	}
 
-	// Write back the updated manifest
 	updatedContent, err := yaml.Marshal(ingress)
 	if err != nil {
-		return fmt.Errorf("marshaling updated ingress YAML: %w", err)
+		return mcperrors.New(mcperrors.CodeInternalError, "core", "marshaling updated ingress YAML", err)
 	}
 
 	if err := os.WriteFile(manifestPath, updatedContent, 0644); err != nil {
-		return fmt.Errorf("writing updated ingress manifest: %w", err)
+		return mcperrors.New(mcperrors.CodeInternalError, "core", "writing updated ingress manifest", err)
 	}
 
 	mc.logger.Debug().

@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rs/zerolog"
+	"log/slog"
 )
 
 func TestNewRepositoryAnalyzer(t *testing.T) {
-	logger := zerolog.New(os.Stdout)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	analyzer := NewRepositoryAnalyzer(logger)
 
 	if analyzer == nil {
@@ -156,7 +156,7 @@ func TestAnalysisError_Structure(t *testing.T) {
 }
 
 func TestValidateInput(t *testing.T) {
-	logger := zerolog.New(os.Stdout)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	analyzer := NewRepositoryAnalyzer(logger)
 
 	tests := []struct {
@@ -195,7 +195,7 @@ func TestValidateInput(t *testing.T) {
 }
 
 func TestDetectLanguageByExtensions(t *testing.T) {
-	logger := zerolog.New(os.Stdout)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	analyzer := NewRepositoryAnalyzer(logger)
 
 	// Create a temporary directory with test files
@@ -230,7 +230,7 @@ func TestDetectLanguageByExtensions(t *testing.T) {
 }
 
 func TestParseJSONFile(t *testing.T) {
-	logger := zerolog.New(os.Stdout)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	analyzer := NewRepositoryAnalyzer(logger)
 
 	// Create a temporary JSON file
@@ -261,7 +261,7 @@ func TestParseJSONFile(t *testing.T) {
 }
 
 func TestExtractJSONDependencies(t *testing.T) {
-	logger := zerolog.New(os.Stdout)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	analyzer := NewRepositoryAnalyzer(logger)
 
 	packageJSON := map[string]interface{}{
@@ -299,7 +299,7 @@ func TestExtractJSONDependencies(t *testing.T) {
 }
 
 func TestExtractNpmDependencies(t *testing.T) {
-	logger := zerolog.New(os.Stdout)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	analyzer := NewRepositoryAnalyzer(logger)
 
 	// Create a temporary package.json
@@ -358,7 +358,7 @@ func TestExtractNpmDependencies(t *testing.T) {
 }
 
 func TestExtractPipDependencies(t *testing.T) {
-	logger := zerolog.New(os.Stdout)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	analyzer := NewRepositoryAnalyzer(logger)
 
 	// Create a temporary requirements.txt
@@ -408,7 +408,7 @@ pytest
 }
 
 func TestContains(t *testing.T) {
-	logger := zerolog.New(os.Stdout)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	analyzer := NewRepositoryAnalyzer(logger)
 
 	slice := []string{"apple", "banana", "cherry"}
@@ -427,7 +427,7 @@ func TestContains(t *testing.T) {
 }
 
 func TestExtractPortFromFile(t *testing.T) {
-	logger := zerolog.New(os.Stdout)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	analyzer := NewRepositoryAnalyzer(logger)
 
 	tests := []struct {
@@ -491,7 +491,7 @@ func TestExtractPortFromFile(t *testing.T) {
 }
 
 func TestContainsDatabaseConfig(t *testing.T) {
-	logger := zerolog.New(os.Stdout)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	analyzer := NewRepositoryAnalyzer(logger)
 
 	tests := []struct {
@@ -570,7 +570,7 @@ func TestContainsDatabaseConfig(t *testing.T) {
 }
 
 func TestGenerateSuggestions(t *testing.T) {
-	logger := zerolog.New(os.Stdout)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	analyzer := NewRepositoryAnalyzer(logger)
 
 	result := &AnalysisResult{

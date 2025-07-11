@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/runner"
 )
 
@@ -78,10 +79,9 @@ func (d *DockerCmdRunner) Login(ctx context.Context, registry, username, passwor
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return string(output), fmt.Errorf("docker login failed: %w", err)
+		return string(output), errors.New(errors.CodeOperationFailed, "docker", fmt.Sprintf("docker login failed: %v", err), err)
 	}
 
-	// Cache successful authentication
 	registryKey := registry
 	if registryKey == "" {
 		registryKey = "docker.io"
@@ -105,10 +105,9 @@ func (d *DockerCmdRunner) LoginWithToken(ctx context.Context, registry, token st
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return string(output), fmt.Errorf("docker login with token failed: %w", err)
+		return string(output), errors.New(errors.CodeOperationFailed, "docker", fmt.Sprintf("docker login with token failed: %v", err), err)
 	}
 
-	// Cache successful authentication
 	registryKey := registry
 	if registryKey == "" {
 		registryKey = "docker.io"
@@ -129,10 +128,9 @@ func (d *DockerCmdRunner) Logout(ctx context.Context, registry string) (string, 
 	}
 
 	if err != nil {
-		return output, fmt.Errorf("docker logout failed: %w", err)
+		return output, errors.New(errors.CodeOperationFailed, "docker", fmt.Sprintf("docker logout failed: %v", err), err)
 	}
 
-	// Remove from auth cache
 	registryKey := registry
 	if registryKey == "" {
 		registryKey = "docker.io"
@@ -171,7 +169,7 @@ func (d *DockerCmdRunner) IsLoggedIn(ctx context.Context, registry string) (bool
 
 func CheckDockerInstalled() error {
 	if _, err := exec.LookPath("docker"); err != nil {
-		return fmt.Errorf("docker executable not found in PATH. Please install Docker or ensure it's available in your PATH")
+		return errors.New(errors.CodeFileNotFound, "docker", "docker executable not found in PATH. Please install Docker or ensure it's available in your PATH", nil)
 	}
 	return nil
 }

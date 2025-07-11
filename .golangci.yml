@@ -4,11 +4,29 @@ run:
   tests: true
 linters:
   disable:
-    - errcheck
     - unused
     - ineffassign      # Disable ineffectual assignment checks
-    - staticcheck      # Temporarily disable advanced static analysis
-  settings:
+    - depguard         # Disable import restrictions after simplification
+  enable:
+    - revive
+    - staticcheck      # Enable advanced static analysis
+    - errcheck         # Enable error checking
+
+linters-settings:
+  depguard:
+    rules:
+      main:
+        files:
+          - "$all"
+        allow:
+          - "$gostd"
+          - "github.com/Azure/container-kit"
+          - "github.com/localrivet/gomcp"
+          - "github.com/rs/zerolog"
+          - "github.com/stretchr/testify"
+          - "github.com/joho/godotenv"
+          - "github.com/spf13/cobra"
+          - "go.etcd.io/bbolt"
   exclusions:
     generated: lax
     presets:
@@ -26,6 +44,10 @@ linters:
       - linters:
           - govet
         path: tools/
+      - linters:
+          - revive
+        path: pkg/mcp/security/types\.go
+        text: "stutters"
     paths:
       - .*\.pb\.go$
       - .*_gen\.go$
@@ -35,6 +57,7 @@ linters:
       - bin
       - dist
       - tools
+      - tools/linters
       - third_party$
       - builtin$
       - examples$
