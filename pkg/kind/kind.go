@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"runtime"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/runner"
 )
 
@@ -50,7 +49,7 @@ func (k *KindCmdRunner) Install(ctx context.Context) (string, error) {
 	case "windows":
 		return k.runner.RunCommand("powershell", "-Command", "winget install kind")
 	default:
-		return "", mcperrors.New(mcperrors.CodeNotImplemented, "kind", fmt.Sprintf("unsupported operating system: %s", runtime.GOOS), nil)
+		return "", fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
 	}
 }
 

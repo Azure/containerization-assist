@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/internal/retry"
 	"github.com/Azure/container-kit/pkg/mcp/internal/steps"
+	"github.com/localrivet/gomcp/mcp"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -50,8 +51,8 @@ func RegisterWorkflowTools(gomcpServer server.Server, logger *slog.Logger) error
 	// Register the single containerize_and_deploy workflow tool
 	gomcpServer.Tool("containerize_and_deploy",
 		"Complete end-to-end containerization and deployment with AI-powered error fixing",
-		func(_ *server.Context, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
-			return executeContainerizeAndDeploy(args, logger)
+		func(ctx *server.Context, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
+			return executeContainerizeAndDeploy(ctx, args, logger)
 		})
 
 	// Register individual atomic tools for AI assistant compatibility
@@ -80,7 +81,7 @@ func RegisterWorkflowTools(gomcpServer server.Server, logger *slog.Logger) error
 }
 
 // executeContainerizeAndDeploy implements the complete 10-step workflow from feedback.md
-func executeContainerizeAndDeploy(args *ContainerizeAndDeployArgs, logger *slog.Logger) (*ContainerizeAndDeployResult, error) {
+func executeContainerizeAndDeploy(mcpCtx *server.Context, args *ContainerizeAndDeployArgs, logger *slog.Logger) (*ContainerizeAndDeployResult, error) {
 	logger.Info("Starting containerize_and_deploy workflow",
 		"repo_url", args.RepoURL,
 		"branch", args.Branch,
@@ -96,6 +97,14 @@ func executeContainerizeAndDeploy(args *ContainerizeAndDeployArgs, logger *slog.
 	// Progress tracker
 	totalSteps := 10
 	currentStep := 0
+	totalStepsFloat := float64(totalSteps)
+
+	// Create a progress reporter if the client supports it
+	var progressReporter *mcp.ProgressReporter
+	if mcpCtx != nil && mcpCtx.HasProgressToken() {
+		progressReporter = mcpCtx.CreateSimpleProgressReporter(&totalStepsFloat)
+		logger.Info("Progress reporting enabled for workflow")
+	}
 
 	updateProgress := func() (int, string) {
 		currentStep++
@@ -125,7 +134,7 @@ func executeContainerizeAndDeploy(args *ContainerizeAndDeployArgs, logger *slog.
 			"framework", analyzeResult.Framework,
 			"port", analyzeResult.Port)
 		return nil
-	}, logger, updateProgress, "Analyzing repository structure and detecting language/framework"); err != nil {
+	}, logger, updateProgress, "Analyzing repository structure and detecting language/framework", mcpCtx, progressReporter); err != nil {
 		// Always return the result object to preserve progress information
 		// gomcp will discard the result if we return a non-nil error
 		result.Success = false
@@ -144,7 +153,7 @@ func executeContainerizeAndDeploy(args *ContainerizeAndDeployArgs, logger *slog.
 
 		logger.Info("Dockerfile generated successfully", "path", dockerfileResult.Path)
 		return nil
-	}, logger, updateProgress, "Generating optimized Dockerfile for detected language/framework"); err != nil {
+	}, logger, updateProgress, "Generating optimized Dockerfile for detected language/framework", mcpCtx, progressReporter); err != nil {
 		result.Success = false
 		return result, nil
 	}
@@ -167,7 +176,7 @@ func executeContainerizeAndDeploy(args *ContainerizeAndDeployArgs, logger *slog.
 			"image_tag", buildResult.ImageTag,
 			"image_id", buildResult.ImageID)
 		return nil
-	}, logger, updateProgress, "Building Docker image with AI-powered error fixing"); err != nil {
+	}, logger, updateProgress, "Building Docker image with AI-powered error fixing", mcpCtx, progressReporter); err != nil {
 		result.Success = false
 		return result, nil
 	}
@@ -185,7 +194,7 @@ func executeContainerizeAndDeploy(args *ContainerizeAndDeployArgs, logger *slog.
 
 		logger.Info("Kind cluster setup completed successfully", "registry_url", registryURL)
 		return nil
-	}, updateProgress, "Setting up local Kubernetes cluster with registry"); err != nil {
+	}, updateProgress, "Setting up local Kubernetes cluster with registry", mcpCtx, progressReporter); err != nil {
 		result.Success = false
 		return result, nil
 	}
@@ -201,7 +210,7 @@ func executeContainerizeAndDeploy(args *ContainerizeAndDeployArgs, logger *slog.
 
 		logger.Info("Image loaded into kind cluster successfully")
 		return nil
-	}, logger, updateProgress, "Loading Docker image into Kubernetes cluster"); err != nil {
+	}, logger, updateProgress, "Loading Docker image into Kubernetes cluster", mcpCtx, progressReporter); err != nil {
 		result.Success = false
 		return result, nil
 	}
@@ -219,7 +228,7 @@ func executeContainerizeAndDeploy(args *ContainerizeAndDeployArgs, logger *slog.
 
 		logger.Info("Kubernetes manifests generated successfully", "app_name", k8sResult.AppName)
 		return nil
-	}, logger, updateProgress, "Generating Kubernetes deployment manifests"); err != nil {
+	}, logger, updateProgress, "Generating Kubernetes deployment manifests", mcpCtx, progressReporter); err != nil {
 		result.Success = false
 		return result, nil
 	}
@@ -235,7 +244,7 @@ func executeContainerizeAndDeploy(args *ContainerizeAndDeployArgs, logger *slog.
 
 		logger.Info("Kubernetes deployment completed successfully")
 		return nil
-	}, logger, updateProgress, "Deploying application to Kubernetes cluster"); err != nil {
+	}, logger, updateProgress, "Deploying application to Kubernetes cluster", mcpCtx, progressReporter); err != nil {
 		result.Success = false
 		return result, nil
 	}
@@ -252,7 +261,7 @@ func executeContainerizeAndDeploy(args *ContainerizeAndDeployArgs, logger *slog.
 		result.Endpoint = endpoint
 		logger.Info("Health probe completed", "endpoint", endpoint)
 		return nil
-	}, logger, updateProgress, "Performing application health checks and endpoint discovery"); err != nil {
+	}, logger, updateProgress, "Performing application health checks and endpoint discovery", mcpCtx, progressReporter); err != nil {
 		result.Success = false
 		return result, nil
 	}
@@ -273,7 +282,7 @@ func executeContainerizeAndDeploy(args *ContainerizeAndDeployArgs, logger *slog.
 				"vulnerabilities", scanResult["vulnerabilities"],
 				"scanner", scanResult["scanner"])
 			return nil
-		}, logger, updateProgress, "Scanning Docker image for security vulnerabilities"); err != nil {
+		}, logger, updateProgress, "Scanning Docker image for security vulnerabilities", mcpCtx, progressReporter); err != nil {
 			result.Success = false
 			return result, nil
 		}
@@ -293,6 +302,14 @@ func executeContainerizeAndDeploy(args *ContainerizeAndDeployArgs, logger *slog.
 	}
 	result.Steps = append(result.Steps, finalStep)
 
+	// Send final progress notification
+	if mcpCtx != nil && progressReporter != nil {
+		finalMessage := fmt.Sprintf("[100%%] Workflow completed successfully! Application is running at %s", result.Endpoint)
+		if err := progressReporter.Complete(finalMessage); err != nil {
+			logger.Warn("Failed to send final progress notification", "error", err)
+		}
+	}
+
 	result.Success = true
 	result.ImageRef = fmt.Sprintf("localhost:5001/%s:%s", buildResult.ImageName, buildResult.ImageTag)
 	result.Namespace = k8sResult.Namespace
@@ -306,7 +323,7 @@ func executeContainerizeAndDeploy(args *ContainerizeAndDeployArgs, logger *slog.
 }
 
 // executeStep runs a workflow step and tracks its execution
-func executeStep(result *ContainerizeAndDeployResult, stepName string, stepFunc func() error, progressFunc func() (int, string), message string) error {
+func executeStep(result *ContainerizeAndDeployResult, stepName string, stepFunc func() error, progressFunc func() (int, string), message string, mcpCtx *server.Context, progressReporter *mcp.ProgressReporter) error {
 	startTime := time.Now()
 	percentage, progress := progressFunc()
 
@@ -315,6 +332,16 @@ func executeStep(result *ContainerizeAndDeployResult, stepName string, stepFunc 
 		Status:   "running",
 		Progress: progress,
 		Message:  fmt.Sprintf("[%d%%] %s", percentage, message),
+	}
+
+	// Send real-time progress notification to MCP client
+	if mcpCtx != nil && progressReporter != nil {
+		currentStepFloat := float64(len(result.Steps) + 1)
+		if err := progressReporter.Update(currentStepFloat, step.Message); err != nil {
+			// Log but don't fail on notification errors
+			// Use placeholder logger since we don't have logger in this function
+			fmt.Printf("Failed to send progress notification: %v\n", err)
+		}
 	}
 
 	// Execute the step
@@ -335,7 +362,7 @@ func executeStep(result *ContainerizeAndDeployResult, stepName string, stepFunc 
 }
 
 // executeStepWithRetry runs a workflow step with AI-powered retry logic
-func executeStepWithRetry(ctx context.Context, result *ContainerizeAndDeployResult, stepName string, maxRetries int, stepFunc func() error, logger *slog.Logger, progressFunc func() (int, string), message string) error {
+func executeStepWithRetry(ctx context.Context, result *ContainerizeAndDeployResult, stepName string, maxRetries int, stepFunc func() error, logger *slog.Logger, progressFunc func() (int, string), message string, mcpCtx *server.Context, progressReporter *mcp.ProgressReporter) error {
 	startTime := time.Now()
 	percentage, progress := progressFunc()
 
@@ -344,6 +371,14 @@ func executeStepWithRetry(ctx context.Context, result *ContainerizeAndDeployResu
 		Status:   "running",
 		Progress: progress,
 		Message:  fmt.Sprintf("[%d%%] %s", percentage, message),
+	}
+
+	// Send real-time progress notification to MCP client
+	if mcpCtx != nil && progressReporter != nil {
+		currentStepFloat := float64(len(result.Steps) + 1)
+		if err := progressReporter.Update(currentStepFloat, step.Message); err != nil {
+			logger.Warn("Failed to send progress notification", "error", err, "step", stepName)
+		}
 	}
 
 	// Execute the step with AI retry
