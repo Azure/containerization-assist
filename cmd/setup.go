@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/logger"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 )
@@ -82,12 +81,10 @@ func NormalizeTargetRepoPath(path string) (string, error) {
 	// Convert to absolute path
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return "", mcperrors.NewError().Messagef("error converting target repo path to absolute path: %w", err).WithLocation(
-
-		// Update environment variable
-		).Build()
+		return "", fmt.Errorf("error converting target repo path to absolute path: %w", err)
 	}
 
+	// Update environment variable
 	os.Setenv("TARGET_REPO", absPath)
 
 	return absPath, nil
@@ -168,15 +165,13 @@ func (c *SetupConfig) ValidateConfig() error {
 	}
 
 	if len(missing) > 0 {
-		return mcperrors.NewError().Messagef("missing required values: %s", strings.Join(missing, ", ")).WithLocation().Build(
-
-		// PrintConfig prints the configuration values
-		)
+		return fmt.Errorf("missing required values: %s", strings.Join(missing, ", "))
 	}
 
 	return nil
 }
 
+// PrintConfig prints the configuration values
 func (c *SetupConfig) PrintConfig() {
 	logger.Info("→ Configuration:\n")
 	logger.Infof("  RESOURCE_GROUP:        %s", c.ResourceGroup)
@@ -195,7 +190,7 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 	prereqs := []string{"az", "go", "kubectl", "docker", "kind"}
 	for _, prereq := range prereqs {
 		if _, err := exec.LookPath(prereq); err != nil {
-			return "", "", "", mcperrors.NewError().Messagef("prerequisite %s not found", prereq).WithLocation().Build()
+			return "", "", "", fmt.Errorf("prerequisite %s not found", prereq)
 		}
 		logger.Infof("✓ %s\n", prereq)
 	}
@@ -205,7 +200,7 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 	capacity := 10 // Use default capacity
 	if err != nil {
 		logger.Warnf("Failed to check RPM capacity: %v", err)
-		return "", "", "", mcperrors.NewError().Messagef("failed to determine optimal region: %w", err).WithLocation().Build()
+		return "", "", "", fmt.Errorf("failed to determine optimal region: %w", err)
 	} else if optimalRegion != config.Location {
 		logger.Infof("→ Using region '%s' instead of '%s' for better capacity", optimalRegion, config.Location)
 		config.Location = optimalRegion
@@ -225,7 +220,7 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 		rgCreateCmd.Stdout = os.Stdout
 		rgCreateCmd.Stderr = os.Stderr
 		if err := rgCreateCmd.Run(); err != nil {
-			return "", "", "", mcperrors.NewError().Messagef("failed to create resource group: %w", err).WithLocation().Build()
+			return "", "", "", fmt.Errorf("failed to create resource group: %w", err)
 		}
 		logger.Info("  ✓ Created")
 	} else {
@@ -252,7 +247,7 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 		csCreateCmd.Stdout = os.Stdout
 		csCreateCmd.Stderr = os.Stderr
 		if err := csCreateCmd.Run(); err != nil {
-			return "", "", "", mcperrors.NewError().Messagef("failed to create Cognitive Services account: %w", err).WithLocation().Build()
+			return "", "", "", fmt.Errorf("failed to create Cognitive Services account: %w", err)
 		}
 		logger.Info("  ✓ Created account")
 	} else {
@@ -267,7 +262,7 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 		"--query", "key1", "-o", "tsv")
 	keyOutput, err := keyCmd.Output()
 	if err != nil {
-		return "", "", "", mcperrors.NewError().Messagef("failed to retrieve API key: %w", err).WithLocation().Build()
+		return "", "", "", fmt.Errorf("failed to retrieve API key: %w", err)
 	}
 	apiKey := strings.TrimSpace(string(keyOutput))
 	logger.Info("  ✓ Key retrieved")
@@ -279,7 +274,7 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 		"--query", "properties.endpoint", "-o", "tsv")
 	endpointOutput, err := endpointCmd.Output()
 	if err != nil {
-		return "", "", "", mcperrors.NewError().Messagef("failed to retrieve endpoint: %w", err).WithLocation().Build()
+		return "", "", "", fmt.Errorf("failed to retrieve endpoint: %w", err)
 	}
 	endpoint := strings.TrimSpace(string(endpointOutput))
 	logger.Info("  ✓ Endpoint retrieved")
@@ -293,12 +288,10 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 	modelsCmd.Stdout = os.Stdout
 	modelsCmd.Stderr = os.Stderr
 	if err := modelsCmd.Run(); err != nil {
-		return "", "", "", mcperrors.NewError().Messagef("failed to list models: %w", err).WithLocation(
-
-		// Create/update deployment with optimal capacity
-		).Build()
+		return "", "", "", fmt.Errorf("failed to list models: %w", err)
 	}
 
+	// Create/update deployment with optimal capacity
 	logger.Infof("\n→ Creating/updating deployment '%s' with capacity %d…", config.DeploymentName, capacity)
 
 	// Check if deployment already exists
@@ -346,7 +339,7 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 	deployCmd.Stdout = os.Stdout
 	deployCmd.Stderr = os.Stderr
 	if err := deployCmd.Run(); err != nil {
-		return "", "", "", mcperrors.NewError().Messagef("failed to create/update deployment: %w", err).WithLocation().Build()
+		return "", "", "", fmt.Errorf("failed to create/update deployment: %w", err)
 	}
 	logger.Infof("  ✓ Deployment '%s' ready with capacity %d", config.DeploymentName, capacity)
 
@@ -485,7 +478,7 @@ func CheckRPMCapacityInRegions(modelID, modelVersion, preferredLocation string) 
 	subCmd := exec.Command("az", "account", "show", "--query", "id", "-o", "tsv")
 	subOutput, err := subCmd.Output()
 	if err != nil {
-		return "", mcperrors.NewError().Messagef("failed to get subscription ID: %v", err).WithLocation().Build()
+		return "", fmt.Errorf("failed to get subscription ID: %v", err)
 	}
 	subscriptionID := strings.TrimSpace(string(subOutput))
 
@@ -580,12 +573,10 @@ func CheckRPMCapacityInRegions(modelID, modelVersion, preferredLocation string) 
 
 	// If no region has sufficient capacity, fail
 	if len(regionInfo) == 0 {
-		return "", mcperrors.NewError().Messagef("no regions found with available capacity for model %s", modelID).WithLocation(
-
-		// Sort regions by available RPM and pick the best one
-		).Build()
+		return "", fmt.Errorf("no regions found with available capacity for model %s", modelID)
 	}
 
+	// Sort regions by available RPM and pick the best one
 	bestRegion := regionInfo[0]
 	for _, info := range regionInfo[1:] {
 		if info.AvailableRPM > bestRegion.AvailableRPM {
@@ -595,8 +586,8 @@ func CheckRPMCapacityInRegions(modelID, modelVersion, preferredLocation string) 
 
 	// Fail if the best region doesn't meet minimum requirements
 	if bestRegion.AvailableRPM < minRequiredRPM {
-		return "", mcperrors.NewError().Messagef("best available region '%s' has insufficient capacity (%d RPM) - minimum required is %d RPM for model %s",
-			bestRegion.Region, bestRegion.AvailableRPM, minRequiredRPM, modelID).WithLocation().Build()
+		return "", fmt.Errorf("best available region '%s' has insufficient capacity (%d RPM) - minimum required is %d RPM for model %s",
+			bestRegion.Region, bestRegion.AvailableRPM, minRequiredRPM, modelID)
 	}
 
 	logger.Infof("  ✓ Best available region: %s (available accounts: %d, available RPM: %d)",

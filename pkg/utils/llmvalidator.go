@@ -3,11 +3,11 @@ package utils
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
 
 	"github.com/Azure/container-kit/pkg/ai"
 	"github.com/Azure/container-kit/pkg/logger"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 type LLMConfig struct {
@@ -21,14 +21,7 @@ func ValidateLLM(ctx context.Context, llmConfig LLMConfig) error {
 
 	_, err := url.ParseRequestURI(llmConfig.Endpoint)
 	if err != nil {
-		return mcperrors.NewError().
-			Code(mcperrors.CodeValidationFailed).
-			Message("Invalid endpoint URL").
-			Cause(err).
-			Context("endpoint", llmConfig.Endpoint).
-			Context("component", "llm_validator").
-			Suggestion("Provide a valid URL for the LLM endpoint").
-			Build()
+		return fmt.Errorf("invalid endpoint URL: %w", err)
 	}
 
 	if llmConfig.APIKey == "" {
@@ -44,15 +37,7 @@ func ValidateLLM(ctx context.Context, llmConfig LLMConfig) error {
 	content, tokenUsage, err := llmConfig.AzOpenAIClient.GetChatCompletion(ctx, promptText)
 	if err != nil {
 		logger.Errorf("LLM validation failed: failed to get chat completion: %v", err)
-		return mcperrors.NewError().
-			Code(mcperrors.NETWORK_ERROR).
-			Message("Failed to get chat completion using AzOpenAIClient").
-			Cause(err).
-			Context("endpoint", llmConfig.Endpoint).
-			Context("deployment_id", llmConfig.DeploymentID).
-			Context("component", "llm_validator").
-			Suggestion("Check LLM service availability and credentials").
-			Build()
+		return fmt.Errorf("failed to get chat completion using AzOpenAIClient: %v", err)
 	}
 
 	if content == "" {

@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/logger"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // ReportDirectory is the directory where the iteration snapshots will be stored along with a report of the run
@@ -21,12 +20,10 @@ const ReportDirectory = ".container-kit"
 func WriteIterationSnapshot(state *PipelineState, targetDir string, snapshotCompletions bool, stages ...PipelineStage) error {
 	snapDir := filepath.Join(targetDir, ReportDirectory, fmt.Sprintf("iteration_%d", state.IterationCount))
 	if err := os.MkdirAll(snapDir, 0755); err != nil {
-		return mcperrors.NewError().Message("creating container-kit-snapshot directory").Cause(err).WithLocation(
-
-		// Collect errors from all stages
-		).Build()
+		return fmt.Errorf("creating container-kit-snapshot directory: %w", err)
 	}
 
+	// Collect errors from all stages
 	stageErrors := make(map[string]string)
 
 	// Each stage can contribute its errors
@@ -65,33 +62,33 @@ func WriteIterationSnapshot(state *PipelineState, targetDir string, snapshotComp
 
 		completionsJSON, err := json.MarshalIndent(state.LLMCompletions, "", "  ")
 		if err != nil {
-			return mcperrors.NewError().Message("marshal LLM completions").Cause(err).WithLocation().Build()
+			return fmt.Errorf("marshal LLM completions: %w", err)
 		}
 
 		path := filepath.Join(snapDir, "llm_completions.json")
 		if err := os.WriteFile(path, completionsJSON, 0644); err != nil {
-			return mcperrors.NewError().Message("write llm_completions.json").Cause(err).WithLocation().Build()
+			return fmt.Errorf("write llm_completions.json: %w", err)
 		}
 	}
 
 	metaJson, err := json.MarshalIndent(meta, "", "  ")
 	if err != nil {
-		return mcperrors.NewError().Message("marshaling metadata to JSON").Cause(err).WithLocation().Build()
+		return fmt.Errorf("marshaling metadata to JSON: %w", err)
 	}
 	if err := os.WriteFile(filepath.Join(snapDir, "metadata.json"), metaJson, 0644); err != nil {
-		return mcperrors.NewError().Message("writing metadata.json").Cause(err).WithLocation().Build()
+		return fmt.Errorf("writing metadata.json: %w", err)
 	}
 
 	if state.Dockerfile.Content != "" {
 		dockerPath := filepath.Join(snapDir, "Dockerfile")
 		if err := os.WriteFile(dockerPath, []byte(state.Dockerfile.Content), 0644); err != nil {
-			return mcperrors.NewError().Message("writing Dockerfile snapshot").Cause(err).WithLocation().Build()
+			return fmt.Errorf("writing Dockerfile snapshot: %w", err)
 		}
 	}
 
 	manifestDir := filepath.Join(snapDir, "manifests")
 	if err := os.MkdirAll(manifestDir, 0755); err != nil {
-		return mcperrors.NewError().Message("creating manifest directory").Cause(err).WithLocation().Build()
+		return fmt.Errorf("creating manifest directory: %w", err)
 	}
 
 	for name, obj := range state.K8sObjects {
@@ -100,7 +97,7 @@ func WriteIterationSnapshot(state *PipelineState, targetDir string, snapshotComp
 		}
 		path := filepath.Join(manifestDir, name+".yaml")
 		if err := os.WriteFile(path, []byte(obj.Content), 0644); err != nil {
-			return mcperrors.NewError().Message("writing manifest snapshot").Cause(err).WithLocation().Build()
+			return fmt.Errorf("writing manifest snapshot: %w", err)
 		}
 	}
 
