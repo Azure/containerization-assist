@@ -1,6 +1,6 @@
 module github.com/Azure/container-kit
 
-go 1.24.1
+go 1.24.4
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai v0.7.2

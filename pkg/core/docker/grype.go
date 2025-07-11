@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	mcperrors "github.com/Azure/container-kit/pkg/common/errors"
 	coresecurity "github.com/Azure/container-kit/pkg/core/security"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/rs/zerolog"
 )
 

@@ -6,7 +6,6 @@ import (
 
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/clients"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -494,12 +493,12 @@ func TestRegistryManager_extractRegistry(t *testing.T) {
 
 // TestNewRegistryManager tests the constructor
 func TestNewRegistryManager(t *testing.T) {
-	mockClients := &clients.Clients{}
+	mockDocker := &MockDockerClient{}
 	logger := slog.New(slog.NewTextHandler(nil, nil))
 
-	rm := NewRegistryManager(mockClients, logger)
+	rm := NewRegistryManager(mockDocker, logger)
 
 	assert.NotNil(t, rm)
-	assert.Equal(t, mockClients, rm.clients)
+	assert.Equal(t, mockDocker, rm.docker)
 	assert.NotNil(t, rm.logger)
 }

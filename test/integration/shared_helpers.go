@@ -87,8 +87,8 @@ func sendMCPRequest(stdin *os.File, stdout *os.File, request map[string]interfac
 	// Read response with timeout
 	responseData := make([]byte, 32768)
 
-	// Set read timeout
-	deadline := time.Now().Add(10 * time.Second)
+	// Set read timeout - allow enough time for full workflow including K8s deployment validation
+	deadline := time.Now().Add(90 * time.Second)
 	stdout.SetReadDeadline(deadline)
 
 	n, err := stdout.Read(responseData)

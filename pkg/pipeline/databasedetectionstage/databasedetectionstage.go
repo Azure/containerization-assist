@@ -8,9 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/logger"
+	"github.com/Azure/container-kit/pkg/common/logger"
 	"github.com/Azure/container-kit/pkg/pipeline"
-	"github.com/Azure/container-kit/pkg/utils"
 )
 
 // Ensure DatabaseDetectionStage implements pipeline.PipelineStage interface.
@@ -77,7 +76,7 @@ func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]pipeline.D
 	logger.Infof("Detecting databases in repository: %s", targetDir)
 
 	// Initialize progress tracker
-	progressTracker := utils.NewProgressTracker()
+	progressTracker := pipeline.NewProgressTracker()
 
 	totalFiles, _ := calculateTotalFiles(targetDir)
 	var processedFiles int

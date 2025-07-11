@@ -9,11 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/clients"
-	"github.com/Azure/container-kit/pkg/docker"
-	"github.com/Azure/container-kit/pkg/filetree"
-	"github.com/Azure/container-kit/pkg/k8s"
-	"github.com/Azure/container-kit/pkg/logger"
+	"github.com/Azure/container-kit/pkg/common/filesystem"
+	"github.com/Azure/container-kit/pkg/common/logger"
+	"github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/core/kubernetes"
 	"github.com/Azure/container-kit/pkg/pipeline"
 	"github.com/Azure/container-kit/pkg/pipeline/databasedetectionstage"
 	"github.com/Azure/container-kit/pkg/pipeline/dockerstage"
@@ -130,10 +129,10 @@ var generateCmd = &cobra.Command{
 	},
 }
 
-func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, generateReport bool, c *clients.Clients, extraContext string) error {
+func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, generateReport bool, c *Clients, extraContext string) error {
 	logger.Debugf("Generating artifacts in directory: %s", targetDir)
 	// Check for kind cluster before starting
-	kindClusterName, err := c.GetKindCluster(ctx)
+	kindClusterName, err := kubernetes.GetKindCluster(ctx, c.Kind, c.Docker)
 	if err != nil {
 		return fmt.Errorf("failed to get kind cluster: %w", err)
 	}
@@ -162,7 +161,7 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 
 	// Initialize pipeline state
 	state := &pipeline.PipelineState{
-		K8sObjects:     make(map[string]*k8s.K8sObject),
+		K8sObjects:     make(map[string]*kubernetes.K8sObject),
 		Success:        false,
 		IterationCount: 0,
 		Metadata:       make(map[pipeline.MetadataKey]any),
@@ -172,7 +171,7 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 	}
 
 	// Get file tree structure for context
-	repoStructure, err := filetree.ReadFileTree(targetDir, maxDepth)
+	repoStructure, err := filesystem.GenerateJSONFileTree(targetDir, maxDepth)
 	if err != nil {
 		return fmt.Errorf("failed to get file tree: %w", err)
 	}

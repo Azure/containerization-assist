@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/clients"
 	"github.com/Azure/container-kit/pkg/mcp/api"
 )
 
@@ -24,11 +23,11 @@ type Manager struct {
 
 // NewManager creates a new Docker operations manager
 // Deprecated: Use NewService instead for new code
-func NewManager(clients *clients.Clients, logger *slog.Logger) *Manager {
+func NewManager(docker DockerClient, logger *slog.Logger) *Manager {
 	return &Manager{
-		Builder:         NewBuilder(clients, logger),
+		Builder:         NewBuilder(docker, logger),
 		TemplateEngine:  NewTemplateEngine(logger),
-		RegistryManager: NewRegistryManager(clients, logger),
+		RegistryManager: NewRegistryManager(docker, logger),
 		logger:          logger.With("component", "docker_manager"),
 	}
 }

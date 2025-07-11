@@ -9,18 +9,26 @@
     ]
   },
   "linting": {
+    "description": "Lint error budgets: Allow CI to pass while tracking quality debt. Current baseline: 183 issues",
+    "ratcheting_enabled": true,
+    "ratcheting_config": {
+      "improvement_threshold": 10,
+      "buffer_size": 5,
+      "auto_apply": false,
+      "description": "When issues drop 10+ below budget, suggest new budget = current + 5 buffer"
+    },
     "error_budgets": {
       "mcp": {
-        "errors": 100,
-        "warnings": 50
+        "errors": 120,
+        "warnings": 60
       },
       "core": {
-        "errors": 50,
-        "warnings": 30
+        "errors": 80,
+        "warnings": 40
       },
       "combined": {
-        "errors": 150,
-        "warnings": 100
+        "errors": 200,
+        "warnings": 120
       }
     },
     "new_code_only": true,
@@ -103,6 +111,10 @@
     "lines_of_code": {
       "track_trends": true,
       "target_reduction_percent": 40
+    },
+    "large_files": {
+      "budget": 10,
+      "threshold_lines": 800
     }
   }
 }

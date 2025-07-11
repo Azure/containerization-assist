@@ -8,21 +8,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/clients"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/common/errors"
 )
 
 // RegistryManager provides mechanical Docker registry operations
 type RegistryManager struct {
-	clients *clients.Clients
-	logger  *slog.Logger
+	docker DockerClient
+	logger *slog.Logger
 }
 
 // NewRegistryManager creates a new registry manager
-func NewRegistryManager(clients *clients.Clients, logger *slog.Logger) *RegistryManager {
+func NewRegistryManager(docker DockerClient, logger *slog.Logger) *RegistryManager {
 	return &RegistryManager{
-		clients: clients,
-		logger:  logger.With("component", "docker_registry_manager"),
+		docker: docker,
+		logger: logger.With("component", "docker_registry_manager"),
 	}
 }
 
@@ -105,7 +104,7 @@ func (rm *RegistryManager) PushImage(ctx context.Context, imageRef string, optio
 	}
 
 	// Perform the push
-	output, err := rm.clients.Docker.Push(pushCtx, imageRef)
+	output, err := rm.docker.Push(pushCtx, imageRef)
 	result.Output = output
 	result.Duration = time.Since(startTime)
 

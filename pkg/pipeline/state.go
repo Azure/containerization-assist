@@ -2,8 +2,8 @@ package pipeline
 
 import (
 	"github.com/Azure/container-kit/pkg/ai"
-	"github.com/Azure/container-kit/pkg/docker"
-	"github.com/Azure/container-kit/pkg/k8s"
+	"github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/core/kubernetes"
 )
 
 // PipelineState holds state across steps and iterations
@@ -14,7 +14,7 @@ type PipelineState struct {
 	Dockerfile        docker.Dockerfile
 	RegistryURL       string
 	ImageName         string
-	K8sObjects        map[string]*k8s.K8sObject
+	K8sObjects        map[string]*kubernetes.K8sObject
 	Success           bool
 	TokenUsage        ai.TokenUsage
 	Metadata          map[MetadataKey]any //Flexible storage

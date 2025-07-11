@@ -1,0 +1,282 @@
+name: 'PR Comment'
+description: 'Posts beautiful CI/CD status comments on pull requests'
+
+inputs:
+  github-token:
+    description: 'GitHub token for commenting'
+    required: true
+  build-status:
+    description: 'Build job status'
+    required: true
+  quality-status:
+    description: 'Quality checks job status'
+    required: true
+  test-status:
+    description: 'Unit tests job status'
+    required: true
+  mcp-integration-status:
+    description: 'MCP integration tests status'
+    required: true
+  cli-integration-status:
+    description: 'CLI integration tests status'
+    required: true
+  architecture-score:
+    description: 'Architecture quality score (0-100)'
+    required: false
+    default: '0'
+  architecture-status:
+    description: 'Architecture status (excellent/good/needs-improvement)'
+    required: false
+    default: 'unknown'
+  format-status:
+    description: 'Code formatting status'
+    required: false
+    default: 'unknown'
+  lint-status:
+    description: 'Linting status'
+    required: false
+    default: 'unknown'
+  static-analysis-status:
+    description: 'Static analysis status'
+    required: false
+    default: 'unknown'
+  security-status:
+    description: 'Security scan status'
+    required: false
+    default: 'unknown'
+  cli-success-rate:
+    description: 'CLI integration test success rate'
+    required: false
+    default: '0'
+  cli-total-tests:
+    description: 'Total CLI integration tests'
+    required: false
+    default: '0'
+  cli-passed-tests:
+    description: 'Passed CLI integration tests'
+    required: false
+    default: '0'
+  ratchet-opportunity:
+    description: 'Whether a ratcheting opportunity exists'
+    required: false
+    default: 'false'
+  current-issues:
+    description: 'Current number of lint issues'
+    required: false
+    default: '0'
+  suggested-budget:
+    description: 'Suggested new error budget'
+    required: false
+    default: '0'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate PR Comment
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        # Status emoji mapping
+        get_status_emoji() {
+          case "$1" in
+            "success") echo "✅" ;;
+            "failure") echo "❌" ;;
+            "cancelled") echo "⏹️" ;;
+            "skipped") echo "⏭️" ;;
+            *) echo "⚠️" ;;
+          esac
+        }
+        
+        get_quality_emoji() {
+          case "$1" in
+            "pass") echo "✅" ;;
+            "fail") echo "⚠️" ;;
+            *) echo "❓" ;;
+          esac
+        }
+        
+        get_architecture_emoji() {
+          case "$1" in
+            "excellent") echo "🏆" ;;
+            "good") echo "✅" ;;
+            "needs-improvement") echo "⚠️" ;;
+            *) echo "❓" ;;
+          esac
+        }
+        
+        # Calculate overall status
+        overall_status="success"
+        if [[ "${{ inputs.build-status }}" != "success" ]] || 
+           [[ "${{ inputs.quality-status }}" != "success" ]] || 
+           [[ "${{ inputs.test-status }}" != "success" ]]; then
+          overall_status="failure"
+        elif [[ "${{ inputs.mcp-integration-status }}" == "failure" ]] ||
+             [[ "${{ inputs.cli-integration-status }}" == "failure" ]]; then
+          overall_status="failure"
+        fi
+        
+        # Set variables to avoid argument expansion issues
+        BUILD_STATUS="${{ inputs.build-status }}"
+        TEST_STATUS="${{ inputs.test-status }}"
+        MCP_STATUS="${{ inputs.mcp-integration-status }}"
+        CLI_STATUS="${{ inputs.cli-integration-status }}"
+        ARCH_STATUS="${{ inputs.architecture-status }}"
+        ARCH_SCORE="${{ inputs.architecture-score }}"
+        FORMAT_STATUS="${{ inputs.format-status }}"
+        LINT_STATUS="${{ inputs.lint-status }}"
+        STATIC_STATUS="${{ inputs.static-analysis-status }}"
+        SECURITY_STATUS="${{ inputs.security-status }}"
+        CLI_PASSED="${{ inputs.cli-passed-tests }}"
+        CLI_TOTAL="${{ inputs.cli-total-tests }}"
+        CLI_RATE="${{ inputs.cli-success-rate }}"
+        
+        # Generate beautiful comment
+        cat > pr_comment.md << EOF
+        ## 🚀 Container Kit CI/CD Status
+        
+        $(get_status_emoji "$overall_status") **Overall Status:** $([ "$overall_status" = "success" ] && echo "All checks passed!" || echo "Some checks failed")
+        
+        ---
+        
+        ### 📊 **Build & Test Results**
+        
+        | Check | Status | Details |
+        |-------|--------|---------|
+        | 🏗️ **Build** | $(get_status_emoji "$BUILD_STATUS") $BUILD_STATUS | Container Kit binaries |
+        | 🧪 **Unit Tests** | $(get_status_emoji "$TEST_STATUS") $TEST_STATUS | Core functionality tests |
+        | 🔄 **MCP Integration** | $(get_status_emoji "$MCP_STATUS") $MCP_STATUS | MCP server workflow |
+        EOF
+        
+        # Add CLI integration results if they exist
+        if [[ "$CLI_TOTAL" != "0" ]]; then
+          cat >> pr_comment.md << EOF
+        | 🖥️ **CLI Integration** | $(get_status_emoji "$CLI_STATUS") $CLI_STATUS | $CLI_PASSED/$CLI_TOTAL tests passed ($CLI_RATE%) |
+        EOF
+        fi
+        
+        cat >> pr_comment.md << EOF
+        
+        ---
+        
+        ### 🔍 **Quality Analysis**
+        
+        $(get_architecture_emoji "$ARCH_STATUS") **Architecture Score: $ARCH_SCORE/100** ($ARCH_STATUS)
+        
+        | Quality Check | Status | 
+        |---------------|--------|
+        | 📝 **Formatting** | $(get_quality_emoji "$FORMAT_STATUS") $FORMAT_STATUS |
+        | 🔍 **Linting** | $(get_quality_emoji "$LINT_STATUS") $LINT_STATUS |
+        | 🔬 **Static Analysis** | $(get_quality_emoji "$STATIC_STATUS") $STATIC_STATUS |
+        | 🛡️ **Security Scan** | $(get_quality_emoji "$SECURITY_STATUS") $SECURITY_STATUS |
+        
+        EOF
+        
+        # Add variables for ratcheting
+        RATCHET_OPP="${{ inputs.ratchet-opportunity }}"
+        CURRENT_ISSUES="${{ inputs.current-issues }}"
+        SUGGESTED_BUDGET="${{ inputs.suggested-budget }}"
+        
+        # Add ratcheting opportunity section if detected
+        if [[ "$RATCHET_OPP" == "true" ]]; then
+          cat >> pr_comment.md << EOF
+        
+        ### 🎯 **Quality Improvement Opportunity**
+        
+        > **🎉 Ratcheting Opportunity Detected!**
+        > 
+        > Your code quality improvements have created an opportunity to tighten the error budget:
+        > - **Current issues**: $CURRENT_ISSUES
+        > - **Current budget**: 200
+        > - **Suggested new budget**: $SUGGESTED_BUDGET
+        > 
+        > **To apply**: Update \`linting.error_budgets.combined.errors\` to \`$SUGGESTED_BUDGET\` in \`.github/quality-config.json\`
+        > 
+        > This locks in your quality improvements and prevents regression! 🔒✨
+        
+        EOF
+        fi
+        
+        # Add GitHub context variables
+        REPO="${{ github.repository }}"
+        RUN_ID="${{ github.run_id }}"
+        
+        # Add links to detailed logs
+        cat >> pr_comment.md << EOF
+        ---
+        
+        ### 🔗 **Detailed Reports**
+        
+        <details>
+        <summary>📋 View detailed CI logs</summary>
+        
+        - [📊 Workflow Run](https://github.com/$REPO/actions/runs/$RUN_ID)
+        - [🏗️ Build Logs](https://github.com/$REPO/actions/runs/$RUN_ID/job/)
+        - [🔍 Quality Analysis](https://github.com/$REPO/actions/runs/$RUN_ID/job/)
+        EOF
+        
+        # Add CLI integration links if they exist  
+        if [[ "$CLI_TOTAL" != "0" ]]; then
+          cat >> pr_comment.md << EOF
+        - [🖥️ CLI Integration Results](https://github.com/$REPO/actions/runs/$RUN_ID/job/)
+        EOF
+        fi
+        
+        cat >> pr_comment.md << 'EOF'
+        
+        </details>
+        
+        ---
+        
+        <sub>🤖 Automated report by Container Kit CI • Updated $(date -u +"%Y-%m-%d %H:%M UTC")</sub>
+        EOF
+        
+        # Read the generated comment content
+        comment_content=$(cat pr_comment.md)
+        
+        # Check if this is a pull request context
+        if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+          echo "⚠️ Not a pull request context, skipping comment creation"
+          exit 0
+        fi
+        
+        # Check if we have the necessary PR number
+        if [[ -z "${{ github.event.number }}" ]]; then
+          echo "⚠️ No PR number available, skipping comment creation"
+          exit 0
+        fi
+        
+        # Try to check for existing comment with error handling
+        echo "🔍 Checking for existing comments..."
+        existing_comment_id=""
+        if gh api repos/${{ github.repository }}/issues/${{ github.event.number }}/comments 2>/dev/null; then
+          existing_comment_id=$(gh api repos/${{ github.repository }}/issues/${{ github.event.number }}/comments \
+            --jq '.[] | select(.body | startswith("## 🚀 Container Kit CI/CD Status")) | .id' 2>/dev/null || echo "")
+        else
+          echo "⚠️ Cannot access existing comments, will try to create new comment"
+        fi
+        
+        if [[ -n "$existing_comment_id" ]]; then
+          # Update existing comment
+          echo "Updating existing comment ID: $existing_comment_id"
+          if ! gh api repos/${{ github.repository }}/issues/comments/$existing_comment_id \
+            --method PATCH \
+            --field body="$comment_content" 2>/dev/null; then
+            echo "❌ Failed to update existing comment, trying to create new one"
+            existing_comment_id=""
+          fi
+        fi
+        
+        if [[ -z "$existing_comment_id" ]]; then
+          # Create new comment
+          echo "Creating new PR comment"
+          if ! gh api repos/${{ github.repository }}/issues/${{ github.event.number }}/comments \
+            --field body="$comment_content" 2>/dev/null; then
+            echo "❌ Failed to create PR comment - insufficient permissions or API error"
+            echo "📝 Comment content would have been:"
+            echo "$comment_content"
+            exit 0
+          fi
+        fi
+        
+        echo "✅ PR comment posted successfully"

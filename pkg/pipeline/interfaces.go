@@ -3,6 +3,10 @@ package pipeline
 import (
 	"context"
 	"io"
+
+	"github.com/Azure/container-kit/pkg/ai"
+	"github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/core/kubernetes"
 )
 
 // PipelineStage defines a common interface for all pipeline types
@@ -64,4 +68,23 @@ type Runner struct {
 	stageConfigs []*StageConfig
 	id2Stage     map[string]*StageConfig
 	out          io.Writer
+}
+
+// DockerStageClients defines the dependencies needed by DockerStage
+type DockerStageClients interface {
+	GetAIClient() ai.LLMClient
+	GetDockerClient() docker.DockerClient
+}
+
+// ManifestStageClients defines the dependencies needed by ManifestStage
+type ManifestStageClients interface {
+	GetKubeClient() kubernetes.KubeRunner
+}
+
+// AllStageClients combines all stage client interfaces
+type AllStageClients interface {
+	DockerStageClients
+	ManifestStageClients
+	// SetAIClient allows replacing the AI client (for tracking)
+	SetAIClient(client ai.LLMClient)
 }

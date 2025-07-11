@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	mcperrors "github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/Azure/container-kit/pkg/mcp/api"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // Simple local validation types to replace deleted domain/security package
@@ -218,29 +218,6 @@ func (hv *HadolintValidator) getHadolintVersion() string {
 	}
 
 	return version
-}
-
-// getSuggestionForCode provides specific suggestions for Hadolint codes
-func (hv *HadolintValidator) getSuggestionForCode(code string) string {
-	suggestions := map[string]string{
-		"DL3000": "Use absolute WORKDIR paths for clarity",
-		"DL3001": "Consider using --no-install-recommends with apt-get install",
-		"DL3002": "Last USER should not be root for security",
-		"DL3003": "Use WORKDIR to switch to a directory",
-		"DL3006": "Always tag the version of an image explicitly",
-		"DL3007": "Using latest is prone to errors if the image updates",
-		"DL3008": "Pin versions in apt-get install for reproducibility",
-		"DL3009": "Delete the apt-get lists after installing packages",
-		"DL3015": "Avoid additional packages by specifying --no-install-recommends",
-		"DL3020": "Use COPY instead of ADD for files and folders",
-		"DL4006": "Set the SHELL option -o pipefail before RUN with pipe",
-		"SC2086": "Double quote variables to prevent globbing and word splitting",
-	}
-
-	if suggestion, ok := suggestions[code]; ok {
-		return suggestion
-	}
-	return ""
 }
 
 // addHadolintSuggestions adds general suggestions based on Hadolint findings

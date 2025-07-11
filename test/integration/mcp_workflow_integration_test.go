@@ -512,7 +512,7 @@ func (suite *MCPWorkflowIntegrationSuite) sendMCPRequest(stdin io.WriteCloser, s
 	scanner := bufio.NewScanner(stdout)
 
 	// Set a deadline for reading
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := time.Now().Add(120 * time.Second) // Allow enough time for K8s deployment + validation
 
 	for scanner.Scan() {
 		if time.Now().After(deadline) {

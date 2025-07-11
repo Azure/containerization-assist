@@ -7,22 +7,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/clients"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/rs/zerolog"
 )
 
 // HealthChecker provides mechanical Kubernetes health checking operations
 type HealthChecker struct {
-	clients *clients.Clients
-	logger  zerolog.Logger
+	kube   KubeRunner
+	logger zerolog.Logger
 }
 
 // NewHealthChecker creates a new health checker
-func NewHealthChecker(clients *clients.Clients, logger zerolog.Logger) *HealthChecker {
+func NewHealthChecker(kube KubeRunner, logger zerolog.Logger) *HealthChecker {
 	return &HealthChecker{
-		clients: clients,
-		logger:  logger.With().Str("component", "k8s_health_checker").Logger(),
+		kube:   kube,
+		logger: logger.With().Str("component", "k8s_health_checker").Logger(),
 	}
 }
 
@@ -265,7 +264,7 @@ func (hc *HealthChecker) WaitForPodReadiness(ctx context.Context, namespace stri
 
 func (hc *HealthChecker) getDetailedPodStatus(ctx context.Context, namespace string, labelSelector string) ([]DetailedPodStatus, error) {
 	// Get pods in JSON format for detailed information
-	output, err := hc.clients.Kube.GetPodsJSON(ctx, namespace, labelSelector)
+	output, err := hc.kube.GetPodsJSON(ctx, namespace, labelSelector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pods JSON: %v", err)
 	}

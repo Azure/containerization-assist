@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/mcp/server"
+	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -12,8 +12,8 @@ import (
 // TestWorkflowProgressStructure tests that workflow steps include progress information
 func TestWorkflowProgressStructure(t *testing.T) {
 	// Create a test workflow result
-	result := &server.ContainerizeAndDeployResult{
-		Steps: make([]server.WorkflowStep, 0, 10),
+	result := &workflow.ContainerizeAndDeployResult{
+		Steps: make([]workflow.WorkflowStep, 0, 10),
 	}
 
 	// Simulate progress tracking
@@ -39,7 +39,7 @@ func TestWorkflowProgressStructure(t *testing.T) {
 
 	for _, ts := range testSteps {
 		percentage, progress := updateProgress()
-		step := server.WorkflowStep{
+		step := workflow.WorkflowStep{
 			Name:     ts.name,
 			Status:   "completed",
 			Progress: progress,

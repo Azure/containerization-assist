@@ -39,19 +39,23 @@ Container Kit uses a focused, workflow-driven approach with just 25 core files d
 ### Architecture Overview
 
 ```
-pkg/mcp/
-├── domain/
-│   └── errors/         # Rich error handling system (kept - used by 54 files)
-├── application/
-│   ├── api/            # Interface definitions
-│   └── core/           # Server implementation
-├── server/             # Main workflow implementation
-│   └── workflows.go    # Single workflow tool
-└── internal/
-    └── steps/          # Individual workflow steps
-        ├── analyze.go  # Repository analysis
-        ├── build.go    # Docker operations
-        └── k8s.go      # Kubernetes operations
+pkg/
+├── mcp/             # Model Context Protocol server & workflow
+│   ├── application/     # Server implementation & session management
+│   ├── domain/          # Business logic (workflows, types)
+│   └── infrastructure/  # Workflow steps, analysis, retry
+├── core/            # Core containerization services
+│   ├── docker/          # Docker operations & services
+│   ├── kubernetes/      # Kubernetes operations & manifests
+│   ├── kind/            # Kind cluster management
+│   └── security/        # Security scanning & validation
+├── common/          # Shared utilities
+│   ├── errors/          # Rich error handling system
+│   ├── filesystem/      # File operations
+│   ├── logger/          # Logging utilities
+│   └── runner/          # Command execution
+├── ai/              # AI integration and analysis
+└── pipeline/        # Legacy pipeline stages
 ```
 
 ### Why This Architecture Works

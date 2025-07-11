@@ -1,0 +1,417 @@
+name: CI Pipeline
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Quick validation and path detection
+  setup:
+    name: Setup & Path Detection
+    runs-on: ubuntu-latest
+    outputs:
+      test-mcp: ${{ steps.detect-paths.outputs.test_mcp }}
+      test-cli: ${{ steps.detect-paths.outputs.test_cli }}
+      go-cache-key: ${{ steps.cache-keys.outputs.go-cache-key }}
+      tools-cache-key: ${{ steps.cache-keys.outputs.tools-cache-key }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Detect changed paths
+      id: detect-paths
+      run: |
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          echo "🔍 Detecting changes for PR #${{ github.event.number }}"
+          echo "Base SHA: ${{ github.event.pull_request.base.sha }}"
+          echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
+          
+          changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD)
+          echo "📝 Changed files ($(echo "$changed_files" | wc -l) total):"
+          echo "$changed_files"
+          
+          # Check for MCP changes
+          # MCP server depends on: cmd/mcp-server/, pkg/common/, pkg/core/, pkg/mcp/
+          mcp_changes=$(echo "$changed_files" | grep -E "^(cmd/mcp-server/|pkg/common/|pkg/core/|pkg/mcp/)" || true)
+          
+          # Check for CLI changes  
+          # CLI depends on: specific cmd files (cmd.go, clients.go, generate.go, setup.go), 
+          # pkg/ai/, pkg/core/, pkg/common/, pkg/pipeline/
+          cli_changes=$(echo "$changed_files" | grep -E "^(cmd/(cmd|clients|generate|setup)\.go|pkg/ai/|pkg/core/|pkg/common/|pkg/pipeline/)" || true)
+          
+          # Debug: show what was detected
+          echo "🔍 MCP changes detected:"
+          echo "$mcp_changes" | head -5
+          echo "🔍 CLI changes detected:"
+          echo "$cli_changes" | head -5
+          
+          # Set outputs with explicit true/false values
+          if [ -n "$mcp_changes" ]; then
+            echo "test_mcp=true" >> $GITHUB_OUTPUT
+          else
+            echo "test_mcp=false" >> $GITHUB_OUTPUT
+          fi
+          
+          if [ -n "$cli_changes" ]; then
+            echo "test_cli=true" >> $GITHUB_OUTPUT
+          else
+            echo "test_cli=false" >> $GITHUB_OUTPUT
+          fi
+          echo "MCP changes: $([ -n "$mcp_changes" ] && echo "yes ($(echo "$mcp_changes" | wc -l) files)" || echo "no")"
+          echo "CLI changes: $([ -n "$cli_changes" ] && echo "yes ($(echo "$cli_changes" | wc -l) files)" || echo "no")"
+          
+          # Debug: show the actual output values
+          echo "📌 GitHub Actions outputs:"
+          echo "  test_mcp output: $(cat $GITHUB_OUTPUT | grep test_mcp | cut -d= -f2)"
+          echo "  test_cli output: $(cat $GITHUB_OUTPUT | grep test_cli | cut -d= -f2)"
+          
+          # Show summary of what will be tested
+          echo "📊 Integration Test Plan:"
+          [ -n "$mcp_changes" ] && echo "  ✅ MCP integration tests WILL run (changes in cmd/mcp-server/, pkg/common/, pkg/core/, or pkg/mcp/)" || echo "  ⏭️ MCP integration tests will be SKIPPED"
+          [ -n "$cli_changes" ] && echo "  ✅ CLI integration tests WILL run (changes in cmd/*.go, pkg/ai/, pkg/core/, pkg/common/, or pkg/pipeline/)" || echo "  ⏭️ CLI integration tests will be SKIPPED"
+        else
+          echo "test_mcp=true" >> $GITHUB_OUTPUT
+          echo "test_cli=true" >> $GITHUB_OUTPUT
+          echo "Non-PR event: testing all packages"
+        fi
+        
+    - name: Generate cache keys
+      id: cache-keys
+      run: |
+        echo "go-cache-key=${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}" >> $GITHUB_OUTPUT
+        echo "tools-cache-key=${{ runner.os }}-quality-tools-v3" >> $GITHUB_OUTPUT
+
+  # Build job - fast and parallel
+  build:
+    name: Build Binaries
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.4'
+        
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ needs.setup.outputs.go-cache-key }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+        
+    - name: Download dependencies
+      run: go mod download
+      
+    - name: Build MCP Server
+      run: |
+        GOFLAGS=-trimpath go build -o container-kit-mcp ./cmd/mcp-server
+        ./container-kit-mcp --version
+        
+    - name: Build Legacy CLI
+      if: needs.setup.outputs.test-cli == 'true'
+      run: |
+        GOFLAGS=-trimpath go build -o container-kit ./main.go
+        ./container-kit --version
+        
+    - name: Upload CLI Binary
+      if: needs.setup.outputs.test-cli == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: container-kit-${{ runner.os }}-${{ github.run_id }}
+        path: ./container-kit
+        retention-days: 1
+
+  # Quality checks - parallel with build
+  quality:
+    name: Quality Analysis
+    runs-on: ubuntu-latest
+    needs: setup
+    outputs:
+      format-status: ${{ steps.quality-checks.outputs.format-status }}
+      lint-status: ${{ steps.quality-checks.outputs.lint-status }}
+      static-analysis-status: ${{ steps.quality-checks.outputs.static-analysis-status }}
+      security-status: ${{ steps.quality-checks.outputs.security-status }}
+      architecture-score: ${{ steps.quality-checks.outputs.architecture-score }}
+      architecture-status: ${{ steps.quality-checks.outputs.architecture-status }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.4'
+        
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ needs.setup.outputs.go-cache-key }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+          
+    - name: Cache Quality Tools
+      uses: actions/cache@v4
+      with:
+        path: ~/go/bin
+        key: ${{ needs.setup.outputs.tools-cache-key }}
+        restore-keys: |
+          ${{ runner.os }}-quality-tools-
+        
+    - name: Quality Checks
+      id: quality-checks
+      uses: ./.github/actions/quality-checks
+      with:
+        go-version: '1.24.4'
+        target-paths: './pkg/mcp/... ./pkg/core/...'
+
+  # Unit tests - depends on build completion
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: [setup, build]
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.4'
+        
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ needs.setup.outputs.go-cache-key }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+        
+    - name: Unit Tests
+      run: go test -race -coverprofile=coverage.out ./pkg/mcp/... ./pkg/core/...
+      
+    - name: Test Coverage
+      run: go tool cover -func=coverage.out
+
+  # MCP Integration tests - lightweight and fast
+  mcp-integration:
+    name: MCP Integration Tests
+    runs-on: ubuntu-latest
+    needs: [build, quality, setup]
+    if: needs.setup.outputs.test-mcp == 'true' && needs.quality.outputs.architecture-score >= 60
+    steps:
+    - name: Debug Integration Test Conditions
+      run: |
+        echo "🔍 MCP Integration Test Debug:"
+        echo "  test-mcp: '${{ needs.setup.outputs.test-mcp }}'"
+        echo "  architecture-score: '${{ needs.quality.outputs.architecture-score }}'"
+        echo "  Condition evaluation: ${{ needs.setup.outputs.test-mcp == 'true' && needs.quality.outputs.architecture-score >= '60' }}"
+        
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup Docker
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Setup Kind
+      uses: helm/kind-action@v1
+      with:
+        install_only: true
+        
+    - name: MCP Integration Tests
+      run: |
+        chmod +x ./test/integration/run_tests.sh
+        ./test/integration/run_tests.sh
+
+  # CLI Integration tests - optimized matrix
+  cli-integration:
+    name: CLI Integration Tests
+    runs-on: ubuntu-latest
+    needs: [build, quality, setup]
+    if: needs.setup.outputs.test-cli == 'true' && needs.quality.outputs.architecture-score >= 60
+    strategy:
+      max-parallel: 15
+      matrix:
+        test-repo:
+          - Azure-Samples/containerize-and-deploy-Java-app-to-Azure
+          - konveyor-ecosystem/coolstore
+          - aws-samples/aws-codedeploy-sample-tomcat
+        test-number: [1, 2, 3]
+      fail-fast: false
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download CLI binary
+      uses: actions/download-artifact@v4
+      with:
+        name: container-kit-${{ runner.os }}-${{ github.run_id }}
+        path: ./
+
+    - name: Run Integration Test
+      id: integration-test
+      uses: ./.github/actions/integration-test-runner
+      with:
+        repository: ${{ matrix.test-repo }}
+        test-number: ${{ matrix.test-number }}
+        binary-name: container-kit
+        azure-openai-key: ${{ secrets.AZURE_OPENAI_KEY }}
+        azure-openai-endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+        azure-openai-deployment-id: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
+
+    - name: Upload test artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: cc-run-${{ steps.integration-test.outputs.run-name }}
+        path: test-repo/artifacts/
+        retention-days: 7
+
+  # Aggregate CLI integration results
+  aggregate-cli-results:
+    name: CLI Integration Summary
+    needs: [cli-integration, setup]
+    runs-on: ubuntu-latest
+    if: always() && needs.setup.outputs.test-cli == 'true' && needs.cli-integration.result != 'skipped'
+    outputs:
+      success-rate: ${{ steps.aggregate.outputs.success-rate }}
+      total-tests: ${{ steps.aggregate.outputs.total-tests }}
+      passed-tests: ${{ steps.aggregate.outputs.passed-tests }}
+      
+    steps:
+    - name: Download all results
+      uses: actions/download-artifact@v4
+      with:
+        pattern: cc-run-*
+        path: results
+
+    - name: Aggregate Results
+      id: aggregate
+      run: |
+        tests_per_repo=3
+        total_tests=0
+        passed_tests=0
+        
+        if [ -d "results" ]; then
+          export REPOS="$(ls results | grep -oP 'cc-run-\K[^#]+' | uniq)"
+          echo "Processing repos: $REPOS"
+          
+          for repo in $REPOS; do
+            for ((i=1; i<=tests_per_repo; i++)); do
+              if [ -f "results/cc-run-$repo#$i/result.txt" ]; then
+                result=$(cat "results/cc-run-$repo#$i/result.txt")
+                total_tests=$((total_tests + 1))
+                if [ "$result" == "success" ]; then
+                  passed_tests=$((passed_tests + 1))
+                fi
+              fi
+            done
+          done
+        fi
+        
+        success_rate=0
+        if [ $total_tests -gt 0 ]; then
+          success_rate=$((passed_tests * 100 / total_tests))
+        fi
+        
+        echo "success-rate=$success_rate" >> $GITHUB_OUTPUT
+        echo "total-tests=$total_tests" >> $GITHUB_OUTPUT
+        echo "passed-tests=$passed_tests" >> $GITHUB_OUTPUT
+        
+        echo "📊 Integration Test Results: $passed_tests/$total_tests passed ($success_rate%)"
+
+  # Post PR comment with beautiful summary
+  pr-comment:
+    name: Post PR Summary
+    runs-on: ubuntu-latest
+    needs: [build, quality, test, mcp-integration, aggregate-cli-results]
+    if: always() && github.event_name == 'pull_request'
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Create PR Comment
+      uses: ./.github/actions/pr-comment
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        build-status: ${{ needs.build.result }}
+        quality-status: ${{ needs.quality.result }}
+        test-status: ${{ needs.test.result }}
+        mcp-integration-status: ${{ needs.mcp-integration.result }}
+        cli-integration-status: ${{ needs.aggregate-cli-results.result }}
+        architecture-score: ${{ needs.quality.outputs.architecture-score || '0' }}
+        architecture-status: ${{ needs.quality.outputs.architecture-status || 'unknown' }}
+        format-status: ${{ needs.quality.outputs.format-status || 'unknown' }}
+        lint-status: ${{ needs.quality.outputs.lint-status || 'unknown' }}
+        static-analysis-status: ${{ needs.quality.outputs.static-analysis-status || 'unknown' }}
+        security-status: ${{ needs.quality.outputs.security-status || 'unknown' }}
+        cli-success-rate: ${{ needs.aggregate-cli-results.outputs.success-rate || '0' }}
+        cli-total-tests: ${{ needs.aggregate-cli-results.outputs.total-tests || '0' }}
+        cli-passed-tests: ${{ needs.aggregate-cli-results.outputs.passed-tests || '0' }}
+        ratchet-opportunity: ${{ needs.quality.outputs.ratchet-opportunity || 'false' }}
+        current-issues: ${{ needs.quality.outputs.current-issues || '0' }}
+        suggested-budget: ${{ needs.quality.outputs.suggested-budget || '0' }}
+
+  # Final status check for branch protection
+  ci-status:
+    name: CI Status Check
+    runs-on: ubuntu-latest
+    needs: [build, quality, test, mcp-integration, aggregate-cli-results]
+    if: always()
+    
+    steps:
+    - name: Check CI Status
+      run: |
+        echo "🔍 Checking overall CI status..."
+        echo "Build: ${{ needs.build.result }}"
+        echo "Quality: ${{ needs.quality.result }}"
+        echo "Tests: ${{ needs.test.result }}"
+        echo "MCP Integration: ${{ needs.mcp-integration.result }}"
+        echo "CLI Integration: ${{ needs.aggregate-cli-results.result }}"
+        
+        # Required checks
+        if [[ "${{ needs.build.result }}" != "success" ]]; then
+          echo "❌ Build failed"
+          exit 1
+        fi
+        
+        if [[ "${{ needs.quality.result }}" != "success" ]]; then
+          echo "❌ Quality checks failed"
+          exit 1
+        fi
+        
+        if [[ "${{ needs.test.result }}" != "success" ]]; then
+          echo "❌ Unit tests failed"
+          exit 1
+        fi
+        
+        # MCP integration is required (if it ran)
+        if [[ "${{ needs.setup.outputs.test-mcp }}" == "true" ]] && [[ "${{ needs.mcp-integration.result }}" == "failure" ]]; then
+          echo "❌ MCP integration tests failed"
+          exit 1
+        elif [[ "${{ needs.setup.outputs.test-mcp }}" != "true" ]]; then
+          echo "⏭️ MCP integration tests skipped (no MCP changes detected)"
+        fi
+        
+        # CLI integration is optional (only runs on CLI changes)
+        if [[ "${{ needs.setup.outputs.test-cli }}" == "true" ]] && [[ "${{ needs.aggregate-cli-results.result }}" == "failure" ]]; then
+          echo "❌ CLI integration tests failed"
+          exit 1
+        elif [[ "${{ needs.setup.outputs.test-cli }}" != "true" ]]; then
+          echo "⏭️ CLI integration tests skipped (no CLI changes detected)"
+        fi
+        
+        echo "✅ All CI checks passed!"

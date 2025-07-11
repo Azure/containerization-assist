@@ -29,7 +29,7 @@ Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-WebRequest -Uri https:/
 make build
 ```
 
-For detailed usage and troubleshooting, see the [Tool Guide](docs/TOOL_GUIDE.md).
+For detailed usage and troubleshooting, see the examples directory and development guidelines.
 
 ## 🏃 Quick Start
 
@@ -70,41 +70,60 @@ make lint              # Run linter
 ## 📖 Documentation
 
 ### For Users
-- **[Complete User Guide](MCP_DOCUMENTATION.md)** - Setup, tools, configuration, and troubleshooting
 - **[Examples](examples/)** - Working code examples and patterns
 
 ### For Developers
-- **[Three-Layer Architecture](docs/THREE_LAYER_ARCHITECTURE.md)** - Clean architecture with domain/application/infra layers
-- **[Tool Development Guide](docs/ADDING_NEW_TOOLS.md)** - Building new tools and integrations
 - **[Architectural Decisions](docs/architecture/adr/)** - ADRs documenting key design decisions
-- **[MCP Tool Standards](docs/MCP_TOOL_STANDARDS.md)** - Canonical implementation patterns
+- **[Container Kit Design Document](docs/CONTAINER_KIT_DESIGN_DOCUMENT.md)** - Complete system design and architecture
+- **[New Developer Guide](docs/NEW_DEVELOPER_GUIDE.md)** - Getting started with development
 
 ### For Contributors
 - **[Contributing Guide](CONTRIBUTING.md)** - Development workflow and standards
 - **[Development Guidelines](DEVELOPMENT_GUIDELINES.md)** - Coding standards and practices
-- **[Quality Standards](docs/QUALITY_STANDARDS.md)** - Code quality and testing requirements
 
 ## 🏗️ Architecture
 
-Container Kit uses a simplified workflow-focused architecture after aggressive cleanup:
+Container Kit uses a **modular package architecture** with workflow-focused design after comprehensive refactoring:
 
+```
+pkg/
+├── mcp/             # Model Context Protocol server & workflow
+│   ├── application/     # Server implementation & session management
+│   ├── domain/          # Business logic (workflows, types)
+│   └── infrastructure/  # Workflow steps, analysis, retry
+├── core/            # Core containerization services
+│   ├── docker/          # Docker operations
+│   ├── kubernetes/      # Kubernetes operations
+│   ├── kind/            # Kind cluster management
+│   └── security/        # Security scanning
+├── common/          # Shared utilities
+│   ├── errors/          # Rich error handling
+│   ├── filesystem/      # File operations
+│   ├── logger/          # Logging utilities
+│   └── runner/          # Command execution
+├── ai/              # AI integration and analysis
+└── pipeline/        # Legacy pipeline stages
+```
+
+**Key Improvements:**
+- **Modular Design**: Clear separation between MCP, core services, and utilities
 - **Single Workflow**: One unified tool handles the complete containerization process
-- **Progress Tracking**: Built-in progress indicators for each of the 10 workflow steps
-- **Simplified Codebase**: Reduced from 294 files to 25 core files (82% reduction)
-- **Error Recovery**: Centralized error handling with actionable messages
+- **Progress Tracking**: Structured logging with real-time progress indicators
+- **Robust Testing**: Comprehensive test suite with proper timeout handling
+- **Error Recovery**: AI-powered retry logic with actionable error messages
 
-> **📖 Technical Details**: See [Development Guidelines](DEVELOPMENT_GUIDELINES.md) for the simplified architecture.
+> **📖 Technical Details**: See [Development Guidelines](DEVELOPMENT_GUIDELINES.md) and [Container Kit Design Document](docs/CONTAINER_KIT_DESIGN_DOCUMENT.md).
 
 ## 🛠️ Key Features
 
-- **Unified Workflow**: Complete containerization in a single tool
-- **Progress Tracking**: Visual progress indicators for all 10 steps
-- **AI-Guided Process**: Interactive assistance throughout the workflow
-- **Session Persistence**: Maintain state across operations
-- **Multi-Transport**: stdio and HTTP support
-- **Kubernetes Integration**: Generate and deploy manifests
-- **Security Scanning**: Built-in vulnerability detection
-- **Simplified Architecture**: Dramatically reduced complexity
+- **Unified Workflow**: Complete containerization in a single tool (`containerize_and_deploy`)
+- **Progress Monitoring**: Structured logging with emoji indicators (🚀🔄✅❌🎉)
+- **AI-Guided Process**: Interactive assistance with retry logic throughout workflow
+- **Session Persistence**: BoltDB-based state management across operations
+- **Multi-Transport**: stdio and HTTP support with proper error handling
+- **Kubernetes Integration**: Generate manifests and deploy with validation retry
+- **Security Scanning**: Built-in vulnerability detection with Trivy/Grype
+- **Clean Architecture**: Three-layer design with comprehensive test coverage
 
 ## 🧪 Quick Example
 
@@ -148,4 +167,4 @@ See [SECURITY.md](SECURITY.md) for security policy and reporting vulnerabilities
 
 - **Issues**: Use GitHub Issues for bug reports and feature requests
 - **Discussions**: Use GitHub Discussions for questions and help
-- **Documentation**: Check the [Development Guidelines](DEVELOPMENT_GUIDELINES.md) and [MCP Documentation](MCP_DOCUMENTATION.md)
+- **Documentation**: Check the [Development Guidelines](DEVELOPMENT_GUIDELINES.md) and [Container Kit Design Document](docs/CONTAINER_KIT_DESIGN_DOCUMENT.md)

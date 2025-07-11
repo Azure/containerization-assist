@@ -1,217 +1,110 @@
 # GitHub Actions Workflows
 
-This directory contains automated quality gates and CI pipelines for the Container Kit project with **beautiful, updatable PR comments**.
+This directory contains the CI/CD workflows for Container Kit.
 
-## 🚀 Enhanced PR Dashboard System
+## Active Workflows
 
-The workflows now provide a unified, visually appealing dashboard that **updates existing comments** rather than creating new ones on every push.
+Container Kit uses **2 workflows** for all CI/CD operations:
 
-### 🎯 Key Workflows
+### 1. `ci-pipeline.yml` - Main CI Pipeline
+**Runs on**: Every pull request and push to main branch
 
-| Workflow | Purpose | PR Comments | Status |
-|----------|---------|-------------|--------|
-| [pr-status-unified.yml](pr-status-unified.yml) | **🌟 Main PR Dashboard** | Single unified comment | ✅ Enhanced |
-| [quality-gates-combined.yml](quality-gates-combined.yml) | Quality enforcement | Integrated with dashboard | ✅ Enhanced |
-| [ci-dashboard.yml](ci-dashboard.yml) | CI pipeline tracking | Dedicated CI summary | ✅ Enhanced |
-| [quality-gates-enhanced.yml](quality-gates-enhanced.yml) | Detailed quality analysis | Rich quality breakdown | ✅ Enhanced |
+**What it does**:
+- **Parallel execution**: Build and quality checks run simultaneously
+- **Smart caching**: Go modules and quality tools cached across runs
+- **Comprehensive quality analysis**: Formatting, linting, static analysis, security, architecture scoring
+- **Ratcheting error budgets**: Automatically suggests tightening quality limits as code improves
+- **Conditional testing**: CLI integration tests only run when needed
+- **Beautiful PR comments**: Automated status summaries with detailed breakdowns
+- **Fast feedback**: Typically completes in 3-4 minutes (40-50% improvement)
+- **Optimized matrix**: Reduced integration tests from 30 to 9 parallel jobs
 
-### 🎨 PR Comment Features
+### 2. `release.yml` - Release Pipeline
+**Runs on**: Version tags (e.g., `v1.0.0`)
 
-**✨ Visual Excellence:**
-- 🏆 Status badges with color coding
-- 📊 Progress indicators and metrics
-- 🔍 Collapsible detailed sections
-- 📈 Quality scores and trends
+**What it does**:
+- Builds production binaries
+- Runs comprehensive tests
+- Creates GitHub release with artifacts
+- Publishes release notes
 
-**🔄 Smart Updates:**
-- Comments update in-place (no spam)
-- Real-time status changes
-- Comprehensive change analysis
-- Historical tracking
+## Ratcheting Error Budget System
 
-**📋 Unified Information:**
-- Overall PR health at a glance
-- Quality gate results with actionable fixes
-- CI pipeline status and links
-- Code change impact assessment
+Container Kit uses an intelligent **ratcheting error budget** that automatically suggests quality improvements:
 
-## 📊 Dashboard Components
+### How It Works
+1. **Current status**: 183 lint issues with 200-issue budget ✅
+2. **Improvement detection**: When issues drop 10+ below budget
+3. **Auto-suggestion**: Suggests new budget = current issues + 5 buffer
+4. **Example**: If issues drop to 170, suggests budget of 175 (170 + 5)
 
-### Main PR Dashboard (`pr-status-unified.yml`)
-```
-🎉 Container Kit PR Dashboard
-
-📊 Overall Status: 🎉 EXCELLENT
-🛡️ Quality Score: 85/100
-📝 Change Size: Small
-
-🔍 Quick Summary
-├── CI Pipeline: ✅ PASSED (8/8 checks)
-├── Code Quality: ✅ EXCELLENT (2 issues)
-├── Code Changes: 📝 Small (+45 -12 lines)
-└── Files Modified: 5 files (3 Go, 2 tests)
+### Configuration (`.github/quality-config.json`)
+```json
+"linting": {
+  "ratcheting_enabled": true,
+  "ratcheting_config": {
+    "improvement_threshold": 10,  // Ratchet when 10+ issues better
+    "buffer_size": 5,             // Keep 5-issue safety buffer
+    "auto_apply": false           // Manual review required
+  }
+}
 ```
 
-### Quality Gate Results
-- ✅/❌ Status for each quality check
-- 📁 Oversized files with line counts
-- 🧮 Complex functions requiring refactoring
-- 🔗 Context usage violations
-- 🚫 Print statement locations
+### Benefits
+- 🎯 **Prevents regression**: Can't exceed current budget
+- 📈 **Encourages improvement**: Rewards quality fixes with tighter budgets  
+- 🔒 **Locks in gains**: Quality improvements become permanent
+- 🚀 **Gradual progress**: Sustainable quality improvement over time
 
-### CI Pipeline Tracking
-- 🔄 Real-time build status
-- 📊 Test results and coverage
-- 🔍 Direct links to failing checks
-- ⚡ Performance metrics
+**Current Opportunity**: Issues at 183, budget at 200 → Can ratchet to 188! 🎉
 
-## Current Quality Status
+## Running Tests Locally
 
-### ✅ Passing Gates
-- **Import Cycles**: No cycles detected
-- **Context Usage**: Proper propagation maintained
-- **Package Depth**: All packages within 5-level limit
-- **Constructor Parameters**: Functional options pattern used
-- **Logging Standards**: Consistent key usage
-
-### ⚠️ Issues to Address
-
-**File Length Violations (5 files):**
-```
-pkg/mcp/internal/migration/analysis.go         (938 lines)
-pkg/mcp/internal/analyze/validate_dockerfile_atomic.go (984 lines)
-pkg/mcp/internal/pipeline/production_validation.go (838 lines)
-pkg/mcp/internal/pipeline/docker_optimizer.go  (804 lines)
-pkg/mcp/internal/server/server.go              (874 lines)
-```
-
-**Complexity Violations (Top 5):**
-```
-build.categorizeFailure                         (27 complexity)
-deploy.RecreateStrategy.Deploy                  (26 complexity)
-build.classifyFailure                          (26 complexity)
-transport.HTTPLLMTransport.InvokeTool          (26 complexity)
-tools.NumberConstraint.Validate               (25 complexity)
-```
-
-**Print Statement Violations:**
-```
-pkg/mcp/internal/observability/distributed_tracing.go (fmt.Printf comment)
-pkg/mcp/validation/utils/pattern_analysis.go          (debug printf)
-pkg/mcp/validation/doc.go                             (example printf)
-```
-
-## Usage
-
-### Automatic Execution
-All quality gates run automatically on pull requests. No manual intervention required.
-
-### Local Testing
-Test quality gates before pushing:
+Before pushing changes, you can run the same checks locally:
 
 ```bash
-# File length check
-find pkg/mcp -name '*.go' -exec wc -l {} + | awk '$1>800{print $2 " exceeds 800 lines"}'
+# Format code
+make fmt
 
-# Complexity check
-go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
-gocyclo -over 15 pkg/mcp
+# Run linter (will show current issue count)
+make lint
 
-# Import cycles
-go list -json ./pkg/mcp/... 2>&1 | grep "import cycle"
+# Run unit tests
+make test
 
-# Print statements
-grep -r -E '(fmt|log)\.Print' pkg/mcp --include="*.go" | grep -v '_test\.go'
+# Run integration tests
+make test-integration
 ```
 
-### Disabling Gates
-To temporarily disable a gate for emergency fixes:
+## Workflow Configuration
 
-```yaml
-# Add to pull request description:
-skip-quality-gates: file-length,complexity
-```
-
-## Customization
-
-### Adjusting Thresholds
-Edit the workflow files to modify limits:
-
-```yaml
-# In file-length-gate.yml
-THRESHOLD=800  # Change to your preferred limit
-
-# In complexity-gate.yml
-gocyclo -over 15  # Change 15 to your preferred complexity
-```
-
-### Adding New Gates
-1. Create new workflow file in this directory
-2. Use existing gates as templates
-3. Add entry to this README
-4. Test locally before committing
-
-## Integration with Existing Workflows
-
-### Sequential Execution
-```yaml
-jobs:
-  tests:
-    # ... existing test job
-
-  quality-gates:
-    needs: tests
-    uses: ./.github/workflows/quality-gates-combined.yml
-```
-
-### Parallel Execution
-```yaml
-jobs:
-  tests:
-    # ... existing test job
-
-  quality-gates:
-    uses: ./.github/workflows/quality-gates-combined.yml
-```
+Both workflows are designed to be:
+- **Fast**: Optimized parallel execution with Go module & tool caching
+- **Intelligent**: Early termination on failures, conditional test execution
+- **Comprehensive**: Detailed quality scoring and beautiful PR reporting
+- **Reliable**: Structured error handling and artifact management
+- **Efficient**: 70% reduction in integration test matrix size
 
 ## Troubleshooting
 
-### Common Issues
+If CI fails:
+1. Check the workflow logs in the GitHub Actions tab
+2. Run the failing command locally to reproduce
+3. Ensure all dependencies are properly declared in `go.mod`
 
-**Quality gate failing on unrelated changes:**
-- Gates only run on changes to `pkg/mcp/**` paths
-- Check if your changes modify files outside this scope
+For integration test failures:
+- Review Docker and Kubernetes requirements
+- Check that all required services are available
+- Look for timing-related issues in async operations
 
-**False positives:**
-- Review the specific threshold that's failing
-- Consider if the code genuinely needs refactoring
-- Use local testing to verify fixes before pushing
+## Branch Protection Configuration
 
-**Tool installation failures:**
-- GitHub runners use cached Go installations
-- Tools are installed fresh on each run to ensure latest versions
+To use the CI status check for branch protection:
 
-### Getting Help
+1. Go to Settings → Branches in your GitHub repository
+2. Add or edit a branch protection rule for `main`
+3. Enable "Require status checks to pass before merging"
+4. Search for and select: **"CI Status Check"**
+5. This ensures all CI checks pass before PRs can be merged
 
-1. **Check workflow logs**: Click on failed workflow in GitHub Actions tab
-2. **Test locally**: Use the local testing commands above
-3. **Review violations**: Focus on high-impact issues first (complexity, file length)
-4. **Gradual improvement**: Fix violations incrementally across multiple PRs
-
-## Maintenance
-
-### Monthly Review
-- Review threshold effectiveness
-- Check for new code patterns that need gates
-- Update tool versions in workflows
-
-### Quarterly Updates
-- Analyze quality trends
-- Adjust thresholds based on codebase evolution
-- Add new gates for emerging anti-patterns
-
-## Related Documentation
-
-- [CI Quality Gates Plan](../docs/notes/plan/CI_QUALITY_GATES.md) - Original requirements
-- [Dead Code Cleanup Guide](../docs/DEAD_CODE_CLEANUP_GUIDE.md) - Manual cleanup procedures
-- [Architecture Guidelines](../docs/ARCHITECTURE.md) - Coding standards and patterns
+The `CI Status Check` job aggregates results from all CI jobs and provides a single status that can be used as a required check.

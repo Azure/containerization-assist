@@ -15,7 +15,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
-	"github.com/Azure/container-kit/pkg/mcp/server"
+	"github.com/Azure/container-kit/pkg/mcp/application"
+	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -146,7 +147,7 @@ func main() {
 }
 
 // loadAndConfigureServer loads configuration and applies flag overrides
-func loadAndConfigureServer(flags *FlagConfig) (server.ServerConfig, error) {
+func loadAndConfigureServer(flags *FlagConfig) (workflow.ServerConfig, error) {
 	// Load configuration
 	config, err := loadConfig(*flags.configFile, flags.telemetryEnabled, flags.telemetryPort)
 	if err != nil {
@@ -166,7 +167,7 @@ func loadAndConfigureServer(flags *FlagConfig) (server.ServerConfig, error) {
 }
 
 // applyBasicConfigOverrides applies basic flag overrides to configuration
-func applyBasicConfigOverrides(config *server.ServerConfig, flags *FlagConfig) {
+func applyBasicConfigOverrides(config *workflow.ServerConfig, flags *FlagConfig) {
 	if *flags.workspaceDir != "" {
 		config.WorkspaceDir = *flags.workspaceDir
 	}
@@ -217,7 +218,7 @@ func applyBasicConfigOverrides(config *server.ServerConfig, flags *FlagConfig) {
 }
 
 // applyOTELConfigOverrides applies OpenTelemetry flag overrides to configuration
-func applyOTELConfigOverrides(config *server.ServerConfig, flags *FlagConfig) {
+func applyOTELConfigOverrides(config *workflow.ServerConfig, flags *FlagConfig) {
 	// DELTA WORKSTREAM: Observability removed - only preserve service identification
 	if *flags.serviceName != "" {
 		config.ServiceName = *flags.serviceName
@@ -244,7 +245,7 @@ func parseOTELHeaders(headers string) map[string]string {
 }
 
 // createAndConfigureServer creates the MCP server for workflow-only operation
-func createAndConfigureServer(config server.ServerConfig, flags *FlagConfig) (api.MCPServer, error) {
+func createAndConfigureServer(config workflow.ServerConfig, flags *FlagConfig) (api.MCPServer, error) {
 	// Log startup information
 	log.Info().
 		Str("version", getVersion()).
@@ -258,18 +259,18 @@ func createAndConfigureServer(config server.ServerConfig, flags *FlagConfig) (ap
 
 	// Create server using functional options pattern
 	// The server will handle creating its own internal dependencies
-	mcpServer, err := server.NewServer(context.Background(), slogLogger,
-		server.WithWorkspace(config.WorkspaceDir),
-		server.WithMaxSessions(config.MaxSessions),
-		server.WithSessionTTL(config.SessionTTL),
-		server.WithMaxDiskPerSession(config.MaxDiskPerSession),
-		server.WithTotalDiskLimit(config.TotalDiskLimit),
-		server.WithStorePath(config.StorePath),
-		server.WithTransport(config.TransportType),
-		server.WithHTTPAddress(config.HTTPAddr),
-		server.WithHTTPPort(config.HTTPPort),
-		server.WithCORSOrigins(config.CORSOrigins),
-		server.WithLogLevel(config.LogLevel),
+	mcpServer, err := application.NewServer(context.Background(), slogLogger,
+		application.WithWorkspace(config.WorkspaceDir),
+		application.WithMaxSessions(config.MaxSessions),
+		application.WithSessionTTL(config.SessionTTL),
+		application.WithMaxDiskPerSession(config.MaxDiskPerSession),
+		application.WithTotalDiskLimit(config.TotalDiskLimit),
+		application.WithStorePath(config.StorePath),
+		application.WithTransport(config.TransportType),
+		application.WithHTTPAddress(config.HTTPAddr),
+		application.WithHTTPPort(config.HTTPPort),
+		application.WithCORSOrigins(config.CORSOrigins),
+		application.WithLogLevel(config.LogLevel),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create server: %w", err)
@@ -362,95 +363,95 @@ func runServerWithShutdown(mcpServer api.MCPServer) {
 type EnvConfigMapping struct {
 	EnvKey string
 	Type   string // "string", "int", "int64", "bool", "duration", "float64"
-	Setter func(config *server.ServerConfig, value string) error
+	Setter func(config *workflow.ServerConfig, value string) error
 }
 
 // buildEnvMappings creates the environment variable to config field mappings
 func buildEnvMappings() []EnvConfigMapping {
 	return []EnvConfigMapping{
-		{"CONTAINER_KIT_WORKSPACE_DIR", "string", func(config *server.ServerConfig, value string) error {
+		{"CONTAINER_KIT_WORKSPACE_DIR", "string", func(config *workflow.ServerConfig, value string) error {
 			config.WorkspaceDir = value
 			return nil
 		}},
-		{"CONTAINER_KIT_STORE_PATH", "string", func(config *server.ServerConfig, value string) error {
+		{"CONTAINER_KIT_STORE_PATH", "string", func(config *workflow.ServerConfig, value string) error {
 			config.StorePath = value
 			return nil
 		}},
-		{"CONTAINER_KIT_MAX_SESSIONS", "int", func(config *server.ServerConfig, value string) error {
+		{"CONTAINER_KIT_MAX_SESSIONS", "int", func(config *workflow.ServerConfig, value string) error {
 			if parsed, err := strconv.Atoi(value); err == nil {
 				config.MaxSessions = parsed
 			}
 			return nil
 		}},
-		{"CONTAINER_KIT_SESSION_TTL", "duration", func(config *server.ServerConfig, value string) error {
+		{"CONTAINER_KIT_SESSION_TTL", "duration", func(config *workflow.ServerConfig, value string) error {
 			if parsed, err := time.ParseDuration(value); err == nil {
 				config.SessionTTL = parsed
 			}
 			return nil
 		}},
-		{"CONTAINER_KIT_MAX_DISK_PER_SESSION", "int64", func(config *server.ServerConfig, value string) error {
+		{"CONTAINER_KIT_MAX_DISK_PER_SESSION", "int64", func(config *workflow.ServerConfig, value string) error {
 			if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
 				config.MaxDiskPerSession = parsed
 			}
 			return nil
 		}},
-		{"CONTAINER_KIT_TOTAL_DISK_LIMIT", "int64", func(config *server.ServerConfig, value string) error {
+		{"CONTAINER_KIT_TOTAL_DISK_LIMIT", "int64", func(config *workflow.ServerConfig, value string) error {
 			if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
 				config.TotalDiskLimit = parsed
 			}
 			return nil
 		}},
-		{"CONTAINER_KIT_TRANSPORT", "string", func(config *server.ServerConfig, value string) error {
+		{"CONTAINER_KIT_TRANSPORT", "string", func(config *workflow.ServerConfig, value string) error {
 			config.TransportType = value
 			return nil
 		}},
-		{"CONTAINER_KIT_HTTP_ADDR", "string", func(config *server.ServerConfig, value string) error {
+		{"CONTAINER_KIT_HTTP_ADDR", "string", func(config *workflow.ServerConfig, value string) error {
 			config.HTTPAddr = value
 			return nil
 		}},
-		{"CONTAINER_KIT_HTTP_PORT", "int", func(config *server.ServerConfig, value string) error {
+		{"CONTAINER_KIT_HTTP_PORT", "int", func(config *workflow.ServerConfig, value string) error {
 			if parsed, err := strconv.Atoi(value); err == nil {
 				config.HTTPPort = parsed
 			}
 			return nil
 		}},
-		{"CONTAINER_KIT_LOG_LEVEL", "string", func(config *server.ServerConfig, value string) error {
+		{"CONTAINER_KIT_LOG_LEVEL", "string", func(config *workflow.ServerConfig, value string) error {
 			config.LogLevel = value
 			return nil
 		}},
-		{"CONTAINER_KIT_LOG_HTTP_BODIES", "bool", func(config *server.ServerConfig, value string) error {
+		{"CONTAINER_KIT_LOG_HTTP_BODIES", "bool", func(config *workflow.ServerConfig, value string) error {
 			config.LogHTTPBodies = value == "true" || value == "1"
 			return nil
 		}},
-		{"CONTAINER_KIT_MAX_BODY_LOG_SIZE", "int64", func(config *server.ServerConfig, value string) error {
+		{"CONTAINER_KIT_MAX_BODY_LOG_SIZE", "int64", func(config *workflow.ServerConfig, value string) error {
 			if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
 				config.MaxBodyLogSize = parsed
 			}
 			return nil
 		}},
-		{"CONTAINER_KIT_SANDBOX_ENABLED", "bool", func(config *server.ServerConfig, value string) error {
+		{"CONTAINER_KIT_SANDBOX_ENABLED", "bool", func(config *workflow.ServerConfig, value string) error {
 			config.SandboxEnabled = value == "true" || value == "1"
 			return nil
 		}},
-		{"CONTAINER_KIT_CLEANUP_INTERVAL", "duration", func(config *server.ServerConfig, value string) error {
+		{"CONTAINER_KIT_CLEANUP_INTERVAL", "duration", func(config *workflow.ServerConfig, value string) error {
 			if parsed, err := time.ParseDuration(value); err == nil {
 				config.CleanupInterval = parsed
 			}
 			return nil
 		}},
-		{"CONTAINER_KIT_SERVICE_NAME", "string", func(config *server.ServerConfig, value string) error {
+		{"CONTAINER_KIT_SERVICE_NAME", "string", func(config *workflow.ServerConfig, value string) error {
 			config.ServiceName = value
 			return nil
 		}},
-		{"CONTAINER_KIT_SERVICE_VERSION", "string", func(config *server.ServerConfig, value string) error {
+		{"CONTAINER_KIT_SERVICE_VERSION", "string", func(config *workflow.ServerConfig, value string) error {
 			config.ServiceVersion = value
 			return nil
 		}},
-		{"CONTAINER_KIT_ENVIRONMENT", "string", func(config *server.ServerConfig, value string) error {
+		{"CONTAINER_KIT_ENVIRONMENT", "string", func(config *workflow.ServerConfig, value string) error {
 			config.Environment = value
 			return nil
 		}},
-		{"CONTAINER_KIT_TRACE_SAMPLE_RATE", "float64", func(config *server.ServerConfig, value string) error {
+		{"CONTAINER_KIT_TRACE_SAMPLE_RATE", "float64", func(config *workflow.ServerConfig, value string) error {
 			if parsed, err := strconv.ParseFloat(value, 64); err == nil {
 				config.TraceSampleRate = parsed
 			}
@@ -460,9 +461,9 @@ func buildEnvMappings() []EnvConfigMapping {
 }
 
 // loadConfig loads configuration from environment variables and config file
-func loadConfig(configFile string, telemetryEnabled *bool, telemetryPort *int) (server.ServerConfig, error) {
+func loadConfig(configFile string, telemetryEnabled *bool, telemetryPort *int) (workflow.ServerConfig, error) {
 	// Start with defaults
-	config := server.DefaultServerConfig()
+	config := workflow.DefaultServerConfig()
 
 	// Load .env file if it exists
 	if err := loadEnvFile(configFile); err != nil {
@@ -504,7 +505,7 @@ func loadEnvFile(configFile string) error {
 }
 
 // applyEnvMappings applies environment variable mappings to configuration
-func applyEnvMappings(config *server.ServerConfig) error {
+func applyEnvMappings(config *workflow.ServerConfig) error {
 	mappings := buildEnvMappings()
 	for _, mapping := range mappings {
 		if val := os.Getenv(mapping.EnvKey); val != "" {
@@ -529,13 +530,13 @@ func applyTelemetryConfig(telemetryEnabled *bool, telemetryPort *int) {
 }
 
 // applyOTELHeadersConfig applies OTEL headers configuration
-func applyOTELHeadersConfig(config *server.ServerConfig) {
+func applyOTELHeadersConfig(config *workflow.ServerConfig) {
 	// DELTA WORKSTREAM: OTEL headers removed as part of observability cleanup
 	// Function kept for compatibility during migration but no longer applies headers
 }
 
 // ensureDirectoriesExist creates required directories
-func ensureDirectoriesExist(config server.ServerConfig) error {
+func ensureDirectoriesExist(config workflow.ServerConfig) error {
 	if err := os.MkdirAll(config.WorkspaceDir, 0755); err != nil {
 		return fmt.Errorf("failed to create workspace directory: %w", err)
 	}

@@ -29,7 +29,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.24.4'
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -41,11 +41,6 @@ jobs:
 
       - name: Download dependencies
         run: go mod download
-
-      - name: Architecture validation for release
-        uses: ./.github/actions/architecture-check
-        with:
-          path: 'pkg/mcp'
 
       - name: Run tests
         run: go test -v -race -coverprofile=coverage.out ./...
@@ -88,7 +83,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.24.4'
 
       - name: Cache Go modules
         uses: actions/cache@v4

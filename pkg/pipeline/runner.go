@@ -7,8 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/clients"
-	"github.com/Azure/container-kit/pkg/logger"
+	"github.com/Azure/container-kit/pkg/common/logger"
 )
 
 // NewRunner constructs a Runner. You must pass a non-empty order;
@@ -65,7 +64,7 @@ func (r *Runner) Run(
 	ctx context.Context,
 	state *PipelineState,
 	opts RunnerOptions,
-	clients *clients.Clients,
+	clients AllStageClients,
 ) error {
 	// Initialize the pipeline stages in order
 	for _, sc := range r.stageConfigs {
@@ -106,13 +105,14 @@ func (r *Runner) Run(
 		}
 		// If snapshot generation is enabled and an OpenAI client exists,
 		// wrap the client with tracking to capture token usage and completions.
-		if clients != nil && clients.AzOpenAIClient != nil {
-			clients.AzOpenAIClient = WrapForTracking(clients.AzOpenAIClient, state, "", opts)
+		if clients != nil && clients.GetAIClient() != nil {
+			wrappedClient := WrapForTracking(clients.GetAIClient(), state, "", opts)
+			clients.SetAIClient(wrappedClient)
 		}
 
 		// If the stage supports AI client injection, inject the client.
 		if injectable, ok := stage.(AIClientInjectable); ok {
-			injectable.SetAIClient(clients.AzOpenAIClient)
+			injectable.SetAIClient(clients.GetAIClient())
 		}
 
 		// Run the stage with the current state, clients, and options.

@@ -11,8 +11,7 @@ import (
 
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/clients"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/common/errors"
 	"sigs.k8s.io/yaml"
 )
 
@@ -79,15 +78,15 @@ type Service interface {
 
 // ServiceImpl implements the deployment Service interface
 type ServiceImpl struct {
-	clients *clients.Clients
-	logger  *slog.Logger
+	kube   KubeRunner
+	logger *slog.Logger
 }
 
 // NewService creates a new deployment service
-func NewService(clients *clients.Clients, logger *slog.Logger) Service {
+func NewService(kube KubeRunner, logger *slog.Logger) Service {
 	return &ServiceImpl{
-		clients: clients,
-		logger:  logger.With("component", "k8s_deployment_service"),
+		kube:   kube,
+		logger: logger.With("component", "k8s_deployment_service"),
 	}
 }
 
@@ -221,7 +220,7 @@ func (s *ServiceImpl) DeployManifest(ctx context.Context, manifestPath string, o
 	}
 
 	// Execute deployment using the existing clients
-	output, err := s.clients.Kube.Apply(deployCtx, manifestPath)
+	output, err := s.kube.Apply(deployCtx, manifestPath)
 	result.Output = output
 	result.Duration = time.Since(startTime)
 
@@ -292,7 +291,7 @@ func (s *ServiceImpl) ValidateDeployment(ctx context.Context, manifestPath strin
 		"namespace", namespace)
 
 	// Get pod status
-	podsOutput, err := s.clients.Kube.GetPods(ctx, namespace, "")
+	podsOutput, err := s.kube.GetPods(ctx, namespace, "")
 	if err != nil {
 		result.Error = &DeploymentError{
 			Type:    "kubectl_error",
@@ -347,7 +346,7 @@ func (s *ServiceImpl) DeleteDeployment(ctx context.Context, manifestPath string)
 	s.logger.Info("Starting deployment deletion", "manifest_path", manifestPath)
 
 	// Execute deletion using the existing clients
-	output, err := s.clients.Kube.DeleteDeployment(ctx, manifestPath)
+	output, err := s.kube.DeleteDeployment(ctx, manifestPath)
 	result.Output = output
 	result.Duration = time.Since(startTime)
 
@@ -378,7 +377,7 @@ func (s *ServiceImpl) DeleteDeployment(ctx context.Context, manifestPath string)
 // CheckClusterConnection verifies connection to the Kubernetes cluster
 func (s *ServiceImpl) CheckClusterConnection(ctx context.Context) error {
 	// Try a simple kubectl command to verify cluster connection
-	output, err := s.clients.Kube.GetPods(ctx, "kube-system", "")
+	output, err := s.kube.GetPods(ctx, "kube-system", "")
 	if err != nil {
 		return mcperrors.New(mcperrors.CodeKubernetesApiError, "core", fmt.Sprintf("cannot connect to Kubernetes cluster: %v (output: %s)", err, output), err)
 	}

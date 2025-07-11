@@ -7,7 +7,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/localrivet/gomcp/server"
 )
 
