@@ -7,15 +7,23 @@ COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_TIME := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS := -X main.Version=$(VERSION) -X main.GitCommit=$(COMMIT) -X main.BuildTime=$(BUILD_TIME)
 
-.PHONY: build mcp test test-integration fmt lint static-analysis security-scan check-all clean version help
+.PHONY: build cli mcp test test-integration fmt lint static-analysis security-scan check-all clean version help
 
-# Primary build target
-build: mcp
+# Primary build target - builds both CLI and MCP server
+build: cli mcp
+	@echo "✅ Build complete!"
+
+cli:
+	@echo "Building Container Kit CLI..."
+	@echo "Version: $(VERSION)"
+	GOFLAGS=-trimpath go build -ldflags "$(LDFLAGS)" -o container-kit ./main.go
+	@echo "✅ Built: container-kit"
+
 mcp:
 	@echo "Building Container Kit MCP Server..."
 	@echo "Version: $(VERSION)"
 	GOFLAGS=-trimpath go build -tags mcp -ldflags "$(LDFLAGS)" -o container-kit-mcp ./cmd/mcp-server
-	@echo "✅ Build complete: container-kit-mcp"
+	@echo "✅ Built: container-kit-mcp"
 
 # Essential development tasks
 test:
@@ -51,7 +59,7 @@ check-all: fmt lint static-analysis security-scan test
 
 # Utility tasks  
 clean:
-	rm -f container-kit-mcp
+	rm -f container-kit container-kit-mcp
 
 version:
 	@if [ -f "./container-kit-mcp" ]; then ./container-kit-mcp --version; else echo "❌ Run 'make build' first"; fi

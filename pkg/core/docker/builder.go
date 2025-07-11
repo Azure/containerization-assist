@@ -12,21 +12,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/clients"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/common/errors"
 )
 
 // Builder provides mechanical Docker build operations without AI
 type Builder struct {
-	clients *clients.Clients
-	logger  *slog.Logger
+	docker DockerClient
+	logger *slog.Logger
 }
 
 // NewBuilder creates a new Docker builder
-func NewBuilder(clients *clients.Clients, logger *slog.Logger) *Builder {
+func NewBuilder(docker DockerClient, logger *slog.Logger) *Builder {
 	return &Builder{
-		clients: clients,
-		logger:  logger.With("component", "docker_builder"),
+		docker: docker,
+		logger: logger.With("component", "docker_builder"),
 	}
 }
 
@@ -123,7 +122,7 @@ func (b *Builder) BuildImage(ctx context.Context, dockerfileContent string, cont
 	defer os.RemoveAll(tmpDir)
 
 	// Perform the actual Docker build
-	buildOutput, err := b.clients.Docker.Build(ctx, dockerfilePath, result.ImageRef, contextPath)
+	buildOutput, err := b.docker.Build(ctx, dockerfilePath, result.ImageRef, contextPath)
 	if err != nil {
 		b.logger.Error("Docker build failed", "error", err, "build_output", buildOutput)
 
@@ -182,7 +181,7 @@ func (b *Builder) ValidateDockerfile(dockerfileContent string) error {
 func (b *Builder) PushImage(ctx context.Context, imageRef string) (*PushResult, error) {
 	b.logger.Info("Starting Docker push", "image_ref", imageRef)
 
-	output, err := b.clients.Docker.Push(ctx, imageRef)
+	output, err := b.docker.Push(ctx, imageRef)
 	if err != nil {
 		return &PushResult{
 			Success: false,
@@ -249,7 +248,7 @@ func (b *Builder) checkDockerInstalled() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if _, err := b.clients.Docker.Info(ctx); err != nil {
+	if _, err := b.docker.Info(ctx); err != nil {
 		return fmt.Errorf("docker daemon is not running or not accessible: %v", err)
 	}
 

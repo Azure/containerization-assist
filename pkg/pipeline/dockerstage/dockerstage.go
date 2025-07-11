@@ -8,9 +8,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/ai"
-	"github.com/Azure/container-kit/pkg/clients"
-	"github.com/Azure/container-kit/pkg/docker"
-	"github.com/Azure/container-kit/pkg/logger"
+	"github.com/Azure/container-kit/pkg/common/logger"
+	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/pipeline"
 	"github.com/Azure/container-kit/pkg/pipeline/manifeststage"
 )
@@ -110,9 +109,9 @@ func (p *DockerStage) WriteSuccessfulFiles(state *pipeline.PipelineState) error 
 // Run executes the Dockerfile generation and build pipeline
 func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}, options pipeline.RunnerOptions) error {
 	// Type assertion for clients
-	c, ok := clientsObj.(*clients.Clients)
+	c, ok := clientsObj.(pipeline.DockerStageClients)
 	if !ok {
-		return fmt.Errorf("invalid clients type")
+		return fmt.Errorf("invalid clients type: expected DockerStageClients")
 	}
 
 	targetDir := options.TargetDirectory
@@ -138,7 +137,7 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 	logger.Info("Updated Dockerfile written. Attempting build again...")
 
 	// Try to build
-	buildErrors, err := c.BuildDockerfileContent(ctx, state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
+	buildErrors, err := docker.BuildDockerfileContent(ctx, c.GetDockerClient(), state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
 	if err == nil {
 		logger.Info("🎉 Docker build succeeded!")
 		logger.Debugf("Successful Dockerfile: \n%s", state.Dockerfile.Content)
@@ -154,7 +153,7 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 	state.Dockerfile.BuildErrors = buildErrors
 
 	// Update the previous attempts summary
-	runningSummary, _, err := c.AzOpenAIClient.GetChatCompletionWithFormat(ctx, docker.DockerfileRunningErrors, state.Dockerfile.PreviousAttemptsSummary, result.Analysis+"\n Current Build Errors"+buildErrors)
+	runningSummary, _, err := c.GetAIClient().GetChatCompletionWithFormat(ctx, docker.DockerfileRunningErrors, state.Dockerfile.PreviousAttemptsSummary, result.Analysis+"\n Current Build Errors"+buildErrors)
 	if err != nil {
 		logger.Errorf("Warning: Failed to generate dockerfile error summary: %v\n", err)
 	} else {
@@ -312,9 +311,9 @@ func (p *DockerStage) Initialize(ctx context.Context, state *pipeline.PipelineSt
 // Deploy pushes the Docker image to the specified registry using the provided clients.
 func (p *DockerStage) Deploy(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}) error {
 	// Type assertion for clients
-	c, ok := clientsObj.(*clients.Clients)
+	c, ok := clientsObj.(pipeline.DockerStageClients)
 	if !ok {
-		return fmt.Errorf("invalid clients type")
+		return fmt.Errorf("invalid clients type: expected DockerStageClients")
 	}
 
 	// Only deploy if the build was successful
@@ -327,7 +326,7 @@ func (p *DockerStage) Deploy(ctx context.Context, state *pipeline.PipelineState,
 	logger.Infof("Pushing Docker image %s to registry\n", registryAndImage)
 
 	// Push the Docker image
-	if err := c.PushDockerImage(ctx, registryAndImage); err != nil {
+	if err := docker.PushDockerImage(ctx, c.GetDockerClient(), registryAndImage); err != nil {
 		return fmt.Errorf("pushing image %s: %w", registryAndImage, err)
 	}
 

@@ -1,6 +1,6 @@
 version: "2"
 run:
-  go: "1.24"
+  go: "1.24.4"
   tests: true
 linters:
   disable:
@@ -62,8 +62,8 @@ linters-settings:
       - builtin$
       - examples$
 issues:
-  max-issues-per-linter: 0
-  max-same-issues: 0
+  max-issues-per-linter: 1000  # High limit - actual budget enforced by quality-checks action
+  max-same-issues: 200         # High limit - actual budget enforced by quality-checks action  
   new: false
 formatters:
   exclusions:

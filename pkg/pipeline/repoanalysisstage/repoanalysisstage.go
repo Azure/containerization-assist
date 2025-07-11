@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Azure/container-kit/pkg/ai"
-	"github.com/Azure/container-kit/pkg/logger"
+	"github.com/Azure/container-kit/pkg/common/logger"
 	"github.com/Azure/container-kit/pkg/pipeline"
 )
 

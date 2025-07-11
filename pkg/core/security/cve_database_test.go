@@ -1,8 +1,6 @@
 package security_test
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/Azure/container-kit/pkg/core/security"
@@ -98,12 +96,4 @@ func TestCVSSV3Metrics_Structure(t *testing.T) {
 	assert.Equal(t, "3.1", metrics.Version)
 	assert.Equal(t, 10.0, metrics.BaseScore)
 	assert.Equal(t, "CRITICAL", metrics.BaseSeverity)
-}
-
-// Mock server test helper - for future use when API supports configuration
-func createMockNVDServer(_ *testing.T, response string) *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(response))
-	}))
 }

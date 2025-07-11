@@ -9,13 +9,11 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/ai"
-	"github.com/Azure/container-kit/pkg/clients"
-	"github.com/Azure/container-kit/pkg/docker"
-	"github.com/Azure/container-kit/pkg/k8s"
-	"github.com/Azure/container-kit/pkg/kind"
-	"github.com/Azure/container-kit/pkg/logger"
-	"github.com/Azure/container-kit/pkg/runner"
-	llmvalidator "github.com/Azure/container-kit/pkg/utils"
+	"github.com/Azure/container-kit/pkg/common/logger"
+	"github.com/Azure/container-kit/pkg/common/runner"
+	"github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/core/kind"
+	"github.com/Azure/container-kit/pkg/core/kubernetes"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
@@ -100,7 +98,7 @@ var testCmd = &cobra.Command{
 			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
 		}
 
-		if err := c.TestOpenAIConn(ctx); err != nil {
+		if err := ai.TestOpenAIConn(ctx, c.AzOpenAIClient); err != nil {
 			return fmt.Errorf("error testing Azure OpenAI connection: %w", err)
 		}
 
@@ -192,7 +190,7 @@ func Execute() {
 	rootCmd.ExecuteContext(context.Background())
 }
 
-func initClients(ctx context.Context) (*clients.Clients, error) {
+func initClients(ctx context.Context) (*Clients, error) {
 	// Try to load values from .env file first
 	loadEnvFile()
 
@@ -234,24 +232,24 @@ func initClients(ctx context.Context) (*clients.Clients, error) {
 	}
 
 	// After ensuring env vars are present, validate the LLM configuration
-	llmConfig := llmvalidator.LLMConfig{
+	llmConfig := ai.LLMConfig{
 		Endpoint:       endpoint,
 		APIKey:         apiKey,
 		DeploymentID:   deploymentID,
 		AzOpenAIClient: azOpenAIClient, // This client is correctly set here for validation
 	}
 
-	if err := llmvalidator.ValidateLLM(ctx, llmConfig); err != nil {
+	if err := ai.ValidateLLM(ctx, llmConfig); err != nil {
 		return nil, fmt.Errorf("LLM configuration validation failed: %w", err)
 	}
 
 	cmdRunner := &runner.DefaultCommandRunner{}
 
-	clients := &clients.Clients{
+	clients := &Clients{
 		AzOpenAIClient: azOpenAIClient,
 		Docker:         docker.NewDockerCmdRunner(cmdRunner),
 		Kind:           kind.NewKindCmdRunner(cmdRunner),
-		Kube:           k8s.NewKubeCmdRunner(cmdRunner),
+		Kube:           kubernetes.NewKubeCmdRunner(cmdRunner),
 	}
 
 	return clients, nil

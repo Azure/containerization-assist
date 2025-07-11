@@ -25,9 +25,11 @@ test/reports
 # Coverage files
 coverage.out
 cover.out
+coverage.html
 coverage_final.out
 coverage_new.out
 coverage/
+lint-output.txt
 
 # Binary outputs (specific to avoid ignoring source files)
 /mcp-server

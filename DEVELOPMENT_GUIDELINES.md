@@ -60,22 +60,18 @@ type SessionManager interface {
 
 #### Error Handling Standards
 - Always handle errors explicitly - never ignore with `_`
-- Use the unified RichError system from `pkg/mcp/domain/errors/rich.go`
-- Follow ADR-004 patterns for structured error handling
+- Use the unified Rich error system from `pkg/common/errors/errors.go`
 - Use `errors.Is()` and `errors.As()` for error checking
+- Include domain context and proper error codes
 
 ```go
-// Use RichError system (ADR-004)
-return errors.NewError().
-    Code(errors.CodeValidationFailed).
-    Type(errors.ErrTypeValidation).
-    Severity(errors.SeverityMedium).
-    Message("validation failed for field").
-    Context("field", fieldName).
-    Context("value", fieldValue).
-    Suggestion("Check field format and try again").
-    WithLocation().
-    Build()
+// Use Rich error system
+return errors.New(
+    errors.CodeValidationFailed,
+    "validation",
+    "validation failed for field: " + fieldName,
+    originalError,
+).With("field", fieldName).With("value", fieldValue)
 ```
 
 ### Code Quality Standards
@@ -224,21 +220,17 @@ func sanitizePath(path string) string {
 
 ## Error Handling
 
-### RichError Pattern (ADR-004)
+### Rich Error Pattern
 ```go
-// Use unified RichError system from pkg/mcp/domain/errors/rich.go
-return errors.NewError().
-    Code(errors.CodeBuildFailed).
-    Type(errors.ErrTypeBuild).
-    Severity(errors.SeverityHigh).
-    Message("Docker build failed during RUN step").
-    Context("dockerfile_line", 15).
-    Context("command", "RUN npm install").
-    Context("exit_code", 1).
-    Suggestion("Check package.json and dependency versions").
-    WithLocation().
-    Cause(originalError).
-    Build()
+// Use unified Rich error system from pkg/common/errors/errors.go
+return errors.New(
+    errors.CodeBuildFailed,
+    "docker",
+    "Docker build failed during RUN step: npm install",
+    originalError,
+).With("dockerfile_line", 15).
+  With("command", "RUN npm install").
+  With("exit_code", 1)
 ```
 
 ### Error Context
@@ -273,28 +265,33 @@ return errors.NewError().
   - Create focused sub-packages
 
 ### Architecture Overview
-The architecture focuses on core functionality with a clean, workflow-driven design:
+The architecture focuses on core functionality with a clean, modular design:
 
 ```
-pkg/mcp/
-├── domain/
-│   └── errors/         # Rich error handling system (kept - used by 54 files)
-├── application/
-│   ├── api/            # Interface definitions
-│   └── core/           # Server implementation
-├── server/             # Main workflow implementation
-└── internal/
-    └── steps/          # Individual workflow steps
-        ├── analyze.go  # Repository analysis
-        ├── build.go    # Docker operations
-        └── k8s.go      # Kubernetes operations
+pkg/
+├── mcp/             # Model Context Protocol server & workflow
+│   ├── application/     # Server implementation & session management
+│   ├── domain/          # Business logic (workflows, types)
+│   └── infrastructure/  # Workflow steps, analysis, retry
+├── core/            # Core containerization services
+│   ├── docker/          # Docker operations & services
+│   ├── kubernetes/      # Kubernetes operations & manifests
+│   ├── kind/            # Kind cluster management
+│   └── security/        # Security scanning & validation
+├── common/          # Shared utilities
+│   ├── errors/          # Rich error handling system
+│   ├── filesystem/      # File operations
+│   ├── logger/          # Logging utilities
+│   └── runner/          # Command execution
+├── ai/              # AI integration and analysis
+└── pipeline/        # Legacy pipeline stages
 ```
 
 **Key Architecture Features:**
-- 25 core files delivering complete functionality
+- Modular package organization with clear responsibilities
 - Single workflow approach for unified experience
-- Essential validation and error handling
-- Clean, maintainable codebase
+- Rich error handling with structured context
+- Separation of MCP server, core services, and utilities
 
 ### Import Organization
 ```go

@@ -8,9 +8,8 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/ai"
-	"github.com/Azure/container-kit/pkg/clients"
-	"github.com/Azure/container-kit/pkg/k8s"
-	"github.com/Azure/container-kit/pkg/logger"
+	"github.com/Azure/container-kit/pkg/common/logger"
+	"github.com/Azure/container-kit/pkg/core/kubernetes"
 	"github.com/Azure/container-kit/pkg/pipeline"
 )
 
@@ -90,7 +89,7 @@ ADDITIONAL CONTEXT (You might not need to use this, so only use it if it is rele
 	promptText += `
 Output the fixed manifest content between <MANIFEST> and </MANIFEST> tags. These tags must not appear anywhere else in your response except for wrapping the corrected manifest content.`
 
-	content, _, err := client.GetChatCompletionWithFileTools(ctx, promptText, k8s.MANIFEST_TARGET_DIR)
+	content, _, err := client.GetChatCompletionWithFileTools(ctx, promptText, kubernetes.MANIFEST_TARGET_DIR)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +107,7 @@ Output the fixed manifest content between <MANIFEST> and </MANIFEST> tags. These
 }
 
 // DeployStateManifests deploys manifests from pipeline state
-func DeployStateManifests(ctx context.Context, state *pipeline.PipelineState, c *clients.Clients) error {
+func DeployStateManifests(ctx context.Context, state *pipeline.PipelineState, c pipeline.ManifestStageClients) error {
 	pendingManifests := GetPendingManifests(state)
 	if len(pendingManifests) == 0 {
 		logger.Info("No pending manifests to deploy")
@@ -129,7 +128,7 @@ func DeployStateManifests(ctx context.Context, state *pipeline.PipelineState, c 
 			return fmt.Errorf("failed to write manifest %s: %v", name, err)
 		}
 		logger.Infof("  %s", name)
-		success, output, err := c.DeployAndVerifySingleManifest(ctx, manifestPath, manifest.IsDeployment())
+		success, output, err := kubernetes.DeployAndVerifySingleManifest(ctx, c.GetKubeClient(), manifestPath, manifest.IsDeployment())
 		if err != nil {
 			return fmt.Errorf("error deploying manifest %s: %v", name, err)
 		}
@@ -169,7 +168,7 @@ func (p *ManifestStage) Generate(ctx context.Context, state *pipeline.PipelineSt
 	}
 
 	// Check if manifests already exist
-	k8sObjects, err := k8s.FindK8sObjects(manifestPath)
+	k8sObjects, err := kubernetes.FindK8sObjects(manifestPath)
 	if err != nil {
 		return fmt.Errorf("failed to find manifests: %w", err)
 	}
@@ -179,12 +178,12 @@ func (p *ManifestStage) Generate(ctx context.Context, state *pipeline.PipelineSt
 		logger.Info("No existing Kubernetes manifests found, generating manifests...")
 
 		imageNameAndTag := fmt.Sprintf("%s/%s:%s", state.RegistryURL, state.ImageName, "latest")
-		if err := k8s.WriteManifestsFromTemplate(k8s.ManifestsBasic, targetDir, imageNameAndTag); err != nil {
+		if err := kubernetes.WriteManifestsFromTemplate(kubernetes.ManifestsBasic, targetDir, imageNameAndTag); err != nil {
 			return fmt.Errorf("writing manifests from template: %w", err)
 		}
 
 		// Re-scan for the newly generated manifests
-		k8sObjects, err = k8s.FindK8sObjects(targetDir)
+		k8sObjects, err = kubernetes.FindK8sObjects(targetDir)
 		if err != nil {
 			return fmt.Errorf("failed to find generated manifests: %w", err)
 		}
@@ -235,12 +234,12 @@ func (p *ManifestStage) WriteSuccessfulFiles(state *pipeline.PipelineState) erro
 // Run executes the manifest deployment pipeline
 func (p *ManifestStage) Run(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}, options pipeline.RunnerOptions) error {
 	// Type assertion for clients
-	c, ok := clientsObj.(*clients.Clients)
+	c, ok := clientsObj.(pipeline.ManifestStageClients)
 	if !ok {
-		return fmt.Errorf("invalid clients type")
+		return fmt.Errorf("invalid clients type: expected ManifestStageClients")
 	}
 
-	if err := k8s.CheckKubectlInstalled(); err != nil {
+	if err := kubernetes.CheckKubectlInstalled(); err != nil {
 		return err
 	}
 
@@ -303,12 +302,12 @@ func (p *ManifestStage) Run(ctx context.Context, state *pipeline.PipelineState, 
 // InitializeManifests populates the K8sObjects field in PipelineState with manifests found in the specified path
 // If path is empty, the default manifest path will be used
 func InitializeManifests(state *pipeline.PipelineState, path string) error {
-	k8sObjects, err := k8s.FindK8sObjects(path)
+	k8sObjects, err := kubernetes.FindK8sObjects(path)
 	if err != nil {
 		return fmt.Errorf("failed to find manifests: %w", err)
 	}
 
-	state.K8sObjects = make(map[string]*k8s.K8sObject)
+	state.K8sObjects = make(map[string]*kubernetes.K8sObject)
 
 	if len(k8sObjects) == 0 {
 		// No manifests found, but that's okay - just return with empty map
@@ -351,9 +350,9 @@ func (p *ManifestStage) Initialize(ctx context.Context, state *pipeline.Pipeline
 // Deploy handles deploying Kubernetes manifests
 func (p *ManifestStage) Deploy(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}) error {
 	// Type assertion for clients
-	c, ok := clientsObj.(*clients.Clients)
+	c, ok := clientsObj.(pipeline.ManifestStageClients)
 	if !ok {
-		return fmt.Errorf("invalid clients type")
+		return fmt.Errorf("invalid clients type: expected ManifestStageClients")
 	}
 
 	logger.Info("Deploying Kubernetes manifests...\n")

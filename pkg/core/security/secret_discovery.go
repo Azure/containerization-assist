@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/common/errors"
 )
 
 // SecretDiscovery provides comprehensive secret detection capabilities

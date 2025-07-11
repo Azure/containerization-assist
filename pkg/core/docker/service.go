@@ -8,8 +8,6 @@ import (
 	"log/slog"
 	"os/exec"
 	"time"
-
-	"github.com/Azure/container-kit/pkg/clients"
 )
 
 // Service provides a unified interface to all Docker operations
@@ -43,11 +41,11 @@ type ServiceImpl struct {
 }
 
 // NewService creates a new Docker operations service
-func NewService(clients *clients.Clients, logger *slog.Logger) Service {
+func NewService(docker DockerClient, logger *slog.Logger) Service {
 	return &ServiceImpl{
-		Builder:           NewBuilder(clients, logger),
+		Builder:           NewBuilder(docker, logger),
 		TemplateEngine:    NewTemplateEngine(logger),
-		RegistryManager:   NewRegistryManager(clients, logger),
+		RegistryManager:   NewRegistryManager(docker, logger),
 		HadolintValidator: NewHadolintValidator(logger),
 		logger:            logger.With("component", "docker_service"),
 	}

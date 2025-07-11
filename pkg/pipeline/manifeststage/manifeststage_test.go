@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/k8s"
+	"github.com/Azure/container-kit/pkg/core/kubernetes"
 	"github.com/Azure/container-kit/pkg/pipeline"
 )
 
@@ -19,7 +19,7 @@ func TestManifestStage_Initialize(t *testing.T) {
 
 	// Create a test state
 	state := &pipeline.PipelineState{
-		K8sObjects: make(map[string]*k8s.K8sObject),
+		K8sObjects: make(map[string]*kubernetes.K8sObject),
 	}
 
 	// Create temp dir for testing
@@ -44,7 +44,7 @@ func TestManifestStage_GetErrors(t *testing.T) {
 
 	// Create a test state with errors
 	state := &pipeline.PipelineState{
-		K8sObjects: map[string]*k8s.K8sObject{
+		K8sObjects: map[string]*kubernetes.K8sObject{
 			"test-deployment": {
 				ErrorLog: "test error",
 			},
@@ -75,7 +75,7 @@ func TestManifestStage_WriteSuccessfulFiles(t *testing.T) {
 	// Test with unsuccessful state (should do nothing)
 	state := &pipeline.PipelineState{
 		Success: false,
-		K8sObjects: map[string]*k8s.K8sObject{
+		K8sObjects: map[string]*kubernetes.K8sObject{
 			"test-deployment": {
 				ManifestPath:           manifestPath,
 				Content:                []byte("apiVersion: apps/v1\nkind: Deployment"),
@@ -128,7 +128,7 @@ func TestManifestStage_Deploy(t *testing.T) {
 func TestGetPendingManifests(t *testing.T) {
 	// Create a test state with some manifests
 	state := &pipeline.PipelineState{
-		K8sObjects: make(map[string]*k8s.K8sObject),
+		K8sObjects: make(map[string]*kubernetes.K8sObject),
 	}
 
 	pending := GetPendingManifests(state)
@@ -137,7 +137,7 @@ func TestGetPendingManifests(t *testing.T) {
 	}
 
 	// Add a pending manifest
-	state.K8sObjects["test-deployment"] = &k8s.K8sObject{
+	state.K8sObjects["test-deployment"] = &kubernetes.K8sObject{
 		IsSuccessfullyDeployed: false,
 	}
 
