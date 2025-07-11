@@ -1,6 +1,6 @@
 # Container Kit Design Document
 
-**Version**: 1.0
+**Version**: 2.0
 **Date**: 2025-07-10
 **Status**: Current
 
@@ -20,198 +20,186 @@
 
 ## Executive Summary
 
-Container Kit is a production-ready, enterprise-grade AI-powered containerization platform that automates the complete Docker and Kubernetes workflow through an intelligent Model Context Protocol (MCP) server architecture. The system transforms traditional container operations from manual processes into AI-guided, automated workflows with comprehensive error recovery, security scanning, and deployment orchestration.
+Container Kit is a streamlined, AI-powered containerization platform that automates the complete Docker and Kubernetes workflow through a unified Model Context Protocol (MCP) server. The system focuses on simplicity and effectiveness with just 25 core files delivering all essential functionality.
 
 ### Key Capabilities
-- **AI-Powered Analysis**: Intelligent repository analysis and Dockerfile generation
-- **Automated Container Operations**: Build, scan, deploy with automated error fixing
-- **Multi-Mode Architecture**: Chat, workflow, and dual-mode operations
+- **Unified Workflow**: Single `containerize_and_deploy` tool handles complete process
+- **Progress Tracking**: Built-in progress indicators for all 10 workflow steps
+- **AI-Powered Process**: Intelligent automation with error recovery
 - **Enterprise Security**: Comprehensive vulnerability scanning with Trivy/Grype
 - **Session Management**: Persistent state with BoltDB storage
-- **Production Ready**: 159,570 lines of code across 606 files with comprehensive testing
-- **FileAccessService**: Secure file operations with session-based workspace isolation
+- **Simplified Architecture**: Essential functionality without over-engineering
 
 ### Technology Stack
-- **Core**: Go 1.24.1 with clean three-layer architecture
+- **Core**: Go 1.24.1 with simplified architecture
 - **Protocol**: Model Context Protocol (MCP) via gomcp library
 - **Storage**: BoltDB for session persistence
 - **Container Runtime**: Docker with full lifecycle management
 - **Orchestration**: Kubernetes client with manifest generation
-- **Monitoring**: Prometheus metrics, OpenTelemetry tracing
 - **Security**: Trivy/Grype vulnerability scanning
 
 ## System Overview
 
 ### Vision Statement
-Container Kit transforms containerization from a complex, error-prone manual process into an intelligent, automated workflow that guides users through analysis, building, scanning, and deployment with AI-powered assistance and comprehensive error recovery.
+Container Kit provides a simple, unified workflow that guides users through the complete containerization process from analysis to deployment with AI-powered assistance and built-in progress tracking.
 
 ### Core Principles
-1. **AI-First Design**: Every operation enhanced with intelligent automation
-2. **Clean Architecture**: Strict three-layer separation with dependency injection
-3. **Production Ready**: Enterprise-grade error handling, monitoring, and security
-4. **Developer Experience**: Intuitive interfaces with comprehensive tooling
-5. **Extensibility**: Plugin architecture for custom tools and workflows
+1. **Workflow-First Design**: Single unified process instead of atomic tools
+2. **Simplicity**: Eliminate over-engineering while maintaining functionality
+3. **Progress Transparency**: Visual feedback for every step
+4. **AI Integration**: Intelligent automation with error recovery
+5. **Developer Experience**: Intuitive interface with clear documentation
 
 ### System Boundaries
 - **Input**: Source code repositories, configuration parameters, user interactions
-- **Processing**: Repository analysis, container operations, security scanning, deployment
+- **Processing**: Complete containerization workflow with 10 steps
 - **Output**: Built containers, security reports, Kubernetes manifests, deployment status
 - **External Systems**: Docker Engine, Kubernetes clusters, container registries, security scanners
 
 ## Architecture
 
-### Three-Layer Architecture
+### Workflow-Driven Architecture
 
-Container Kit implements a clean three-layer architecture pattern ensuring proper separation of concerns, maintainability, and testability.
+Container Kit uses a focused, workflow-driven architecture:
 
 ```
 pkg/mcp/
-├── domain/              # Domain Layer (101 files)
-│   ├── config/         # Configuration entities and validation
-│   ├── containerization/ # Container operations domain logic
-│   ├── errors/         # Rich error handling system
-│   ├── security/       # Security policies and validation
-│   ├── session/        # Session entities and rules
-│   ├── types/          # Core domain types
-│   └── internal/       # Shared utilities
-├── application/         # Application Layer (153 files)
-│   ├── api/            # Canonical interface definitions
-│   ├── commands/       # Command implementations & tool registration
-│   ├── core/           # Server lifecycle & registry
-│   ├── orchestration/  # Tool coordination
-│   ├── services/       # Service interfaces (21 services)
-│   ├── state/          # Application state management
-│   └── workflows/      # Workflow management
-└── infra/              # Infrastructure Layer (38 files)
-    ├── file_access.go  # FileAccessService implementation
-    ├── persistence/    # BoltDB storage layer
-    ├── transport/      # MCP protocol transports
-    ├── telemetry/      # Monitoring and observability
-    └── templates/      # YAML templates
+├── domain/
+│   └── errors/         # Rich error handling system (kept - used by 54 files)
+├── application/
+│   ├── api/            # Interface definitions
+│   └── core/           # Server implementation
+├── server/             # Main workflow implementation
+│   └── workflows.go    # Single workflow tool
+└── internal/
+    └── steps/          # Individual workflow steps
+        ├── analyze.go  # Repository analysis
+        ├── build.go    # Docker operations
+        └── k8s.go      # Kubernetes operations
 ```
 
-#### Dependency Rules
-- **Domain Layer**: No external dependencies (pure business logic)
-- **Application Layer**: Depends on Domain only
-- **Infrastructure Layer**: Depends on Domain and Application
+### Key Architecture Benefits
+- **Focused Design**: Only 25 core files to maintain
+- **Single Workflow**: Unified process without coordination complexity
+- **Direct Implementation**: Clear, straightforward code paths
+- **Clear Structure**: Easy to understand and modify
+- **Essential Functionality**: Everything needed, nothing more
 
-### Service-Oriented Architecture
-
-#### Manual Dependency Injection
-The system implements manual dependency injection as defined in ADR-006, replacing 4 large Manager interfaces (65+ methods) with 8 focused service interfaces (32 methods total):
-
-```go
-type ServiceContainer interface {
-    // Core 8 services (32 methods total)
-    SessionStore() SessionStore        // Session CRUD operations (4 methods)
-    SessionState() SessionState        // State & checkpoint management (4 methods)
-    BuildExecutor() BuildExecutor      // Container build operations (5 methods)
-    ToolRegistry() ToolRegistry        // Tool registration & discovery (5 methods)
-    WorkflowExecutor() WorkflowExecutor // Multi-step workflows (4 methods)
-    Scanner() Scanner                  // Security scanning (3 methods)
-    ConfigValidator() ConfigValidator  // Configuration validation (4 methods)
-    ErrorReporter() ErrorReporter      // Unified error handling (3 methods)
-
-    // Additional 13 services including FileAccessService
-    FileAccessService() FileAccessService // Secure file operations (6 methods)
-    StateManager() StateManager        // Application state management
-    KnowledgeBase() KnowledgeBase      // Pattern storage and retrieval
-    ConversationService() ConversationService // Chat-based interactions
-    // ... 9 more specialized services
-}
-```
-
-#### Unified Interface System
-**Single Source of Truth**: `pkg/mcp/application/api/interfaces.go` (831 lines)
-- Contains ALL canonical interface definitions
-- Comprehensive Tool, Registry, Session, Workflow, and Server interfaces
-- Rich metadata, retry policies, and configuration options
-
-### Multi-Mode Server Architecture
-
-The unified MCP server supports three operation modes:
-
-1. **Chat Mode**: Direct conversational tool interaction
-2. **Workflow Mode**: Multi-step atomic operations
-3. **Dual Mode**: Both chat and workflow capabilities
-
-#### Key Server Features
-- Service container integration with dependency injection
-- Session management with BoltDB persistence
-- Tool registry with metrics and lifecycle management
-- AI-powered automation and error recovery
-- Graceful shutdown and signal handling
+### Dependency Rules
+- **Workflow Steps**: Can use domain/errors and core packages
+- **Server Core**: Handles MCP protocol and session management
+- **Error System**: Provides structured error handling across all components
 
 ## Core Components
 
-### 1. Containerization Domain
+### 1. Workflow Server (`pkg/mcp/server/`)
 
-#### Analyze Tools
-- **Repository Analysis**: Language detection via FileAccessService, dependency analysis, framework identification
-- **Dockerfile Generation**: AI-powered Dockerfile creation with best practices
-- **Template Management**: Language-specific templates with go:embed integration
-- **Validation**: Dockerfile syntax and security validation
-- **FileAccessService Integration**: Secure file operations with session-based workspace isolation
+**Single Workflow Tool**: `containerize_and_deploy`
 
-#### Build Tools
+The unified workflow tool handles the complete containerization process:
+
+```go
+// Complete 10-step workflow
+steps := []string{
+    "analyze",      // 1/10: Repository analysis
+    "dockerfile",   // 2/10: Dockerfile generation
+    "build",        // 3/10: Docker build
+    "scan",         // 4/10: Security scanning
+    "tag",          // 5/10: Image tagging
+    "push",         // 6/10: Registry push
+    "manifest",     // 7/10: K8s manifest generation
+    "cluster",      // 8/10: Cluster setup
+    "deploy",       // 9/10: Deployment
+    "verify",       // 10/10: Health verification
+}
+```
+
+**Features**:
+- Progress tracking with visual indicators
+- Error recovery with actionable messages
+- AI-powered automation throughout
+- Session management with BoltDB persistence
+
+### 2. Step Implementations (`pkg/mcp/internal/steps/`)
+
+#### Analyze Step (`analyze.go`)
+- **Repository Analysis**: Language detection, dependency analysis, framework identification
+- **Context Gathering**: Project structure understanding
+- **Technology Detection**: Automated technology stack identification
+- **Best Practices**: Framework-specific optimization recommendations
+
+#### Build Step (`build.go`)
 - **Docker Operations**: Build, push, pull, tag with comprehensive error handling
 - **AI-Powered Fixing**: Automatic build error detection and resolution
 - **Registry Integration**: Multi-registry support with health monitoring
 - **Build Optimization**: Layer caching and multi-stage build optimization
 
-#### Deploy Tools
-- **Kubernetes Manifest Generation**: Automated YAML generation with customization
+#### Kubernetes Step (`k8s.go`)
+- **Manifest Generation**: Automated YAML generation with customization
 - **Health Checks**: Application readiness and liveness probe configuration
 - **Secret Management**: Secure secret generation and injection
 - **Deployment Orchestration**: Rolling updates with rollback capabilities
 
-#### Scan Tools
-- **Security Scanning**: Trivy/Grype integration for vulnerability detection
-- **SBOM Generation**: Software Bill of Materials with CycloneDX format
-- **Policy Engine**: Configurable security policies and compliance checking
-- **Report Generation**: Comprehensive security reports with remediation guidance
+### 3. Error Handling (`pkg/mcp/domain/errors/`)
 
-#### File Access Tools
-- **Secure File Operations**: FileAccessService with session-based workspace isolation
-- **Path Validation**: Protection against path traversal attacks
-- **File Type Filtering**: Security validation for file types and sizes
-- **Directory Operations**: Recursive directory listing with filtering
-- **Content Reading**: Safe file content access within session boundaries
+**Rich Error System**:
+- **Structured Error Context**: Comprehensive error information
+- **Actionable Messages**: Clear guidance for resolution
+- **Core Infrastructure**: Essential component used throughout codebase
+- **Error Classification**: Severity and category-based handling
 
-### 2. Session Management
+### 4. Server Core (`pkg/mcp/application/core/`)
 
-#### Persistence Layer
-- **BoltDB Storage**: Efficient key-value storage for session state
-- **Session Lifecycle**: Creation, management, and cleanup
-- **Workspace Isolation**: Dedicated workspace directories per session
-- **Metadata Management**: Label-based organization and tracking
-
-#### State Management
-- **Context Preservation**: Maintains conversation and workflow context
-- **Checkpoint System**: Rollback capabilities for failed operations
-- **State Synchronization**: Consistent state across distributed operations
-- **Event Sourcing**: Audit trail for all state changes
-
-### 3. AI Integration
-
-#### Analysis Service
-- **Code Intelligence**: Repository structure and pattern analysis via FileAccessService
-- **Recommendation Engine**: Best practice suggestions and optimizations
-- **Error Classification**: Intelligent error categorization and resolution
-- **Context Enrichment**: Enhanced AI context for better decision making
-- **Secure Repository Access**: All file operations go through FileAccessService
-
-#### Conversation System
-- **Auto-Fix Helpers**: Intelligent error resolution with strategy chaining
-- **Prompt Engineering**: Optimized prompts for different scenarios
-- **Workflow Detection**: Automatic detection of multi-step workflows
-- **Progress Tracking**: Real-time progress updates with AI insights
+**MCP Server Implementation**:
+- **Protocol Handling**: MCP protocol implementation
+- **Session Management**: Simple session state management
+- **Tool Registration**: Workflow tool registration
+- **Transport Layer**: stdio and HTTP support
 
 ## Design Patterns
 
-### 1. Rich Error System (ADR-004)
+### 1. Unified Workflow Pattern
 
-Unified error handling with structured context and metadata:
+A single workflow tool handles the complete containerization process:
+
+```go
+type ContainerizeAndDeployTool struct {
+    workspaceDir string
+    logger       *slog.Logger
+}
+
+func (t *ContainerizeAndDeployTool) Execute(ctx context.Context, args ContainerizeAndDeployArgs) (interface{}, error) {
+    for i, step := range steps {
+        progress := fmt.Sprintf("%d/%d", i+1, len(steps))
+        message := fmt.Sprintf("Step %d: %s", i+1, getStepDescription(step))
+        
+        // Execute step with progress tracking
+        if err := t.executeStep(ctx, step, progress, message); err != nil {
+            return nil, err
+        }
+    }
+    return result, nil
+}
+```
+
+### 2. Progress Tracking Pattern
+
+Every step provides progress feedback:
+
+```go
+type WorkflowStep struct {
+    Name     string `json:"name"`
+    Status   string `json:"status"`
+    Duration string `json:"duration"`
+    Error    string `json:"error,omitempty"`
+    Progress string `json:"progress"`    // "3/10"
+    Message  string `json:"message"`     // Human-readable
+}
+```
+
+### 3. Rich Error System
+
+Unified error handling with structured context:
 
 ```go
 return errors.NewError().
@@ -225,228 +213,155 @@ return errors.NewError().
     Build()
 ```
 
-**Features**:
-- Structured error codes for unique identification
-- Error categorization (Validation, Network, Internal, etc.)
-- Severity levels (Low, Medium, High, Critical)
-- Rich context with key-value pairs
-- Automatic source location capture
-- Error chaining with proper cause tracking
-- Human-readable resolution guidance
+### 4. Direct Implementation Pattern
 
-### 2. Tag-Based Validation DSL (ADR-005)
-
-Declarative validation using struct tags:
+Straightforward, clear implementations:
 
 ```go
-type BuildConfig struct {
-    Repository string `validate:"required,git_url" security:"sanitize"`
-    Tag        string `validate:"required,docker_tag" security:"validate"`
-    Push       bool   `validate:"omitempty" security:"safe"`
-}
-```
-
-**Benefits**:
-- Declarative validation rules
-- Automatic code generation
-- Consistent validation patterns
-- Security integration
-- Reduced boilerplate
-
-### 3. Template Management with Go Embed
-
-YAML templates embedded at compile time:
-
-```go
-//go:embed templates/*.yaml
-var templateFS embed.FS
-
-func LoadTemplate(name string) (string, error) {
-    return templateFS.ReadFile(fmt.Sprintf("templates/%s.yaml", name))
-}
-```
-
-**Advantages**:
-- No external file dependencies
-- Version control integration
-- Atomic deployments
-- Better security
-
-### 4. Interface Segregation
-
-Small, focused interfaces following Single Responsibility Principle:
-
-```go
-type SessionStore interface {
-    Create(ctx context.Context, session *Session) error
-    Get(ctx context.Context, id string) (*Session, error)
-    Update(ctx context.Context, session *Session) error
-    Delete(ctx context.Context, id string) error
+// Instead of complex service containers, use direct implementation
+func (s *AnalyzeStep) Execute(ctx context.Context, args AnalyzeArgs) error {
+    // Direct implementation without abstraction layers
+    return s.analyzeRepository(ctx, args.RepoPath)
 }
 ```
 
 ## Data Flow
 
-### 1. Tool Execution Flow
+### 1. Unified Workflow Flow
 
 ```
-User Request → MCP Server → Tool Registry → Command Router →
-Tool Implementation → Service Container → Domain Logic →
-Infrastructure Services → External Systems → Response
+User Request → MCP Server → Workflow Tool → Step Execution →
+Progress Updates → Error Recovery → Completion Response
 ```
 
-### 2. Session Lifecycle
+### 2. Step Execution Flow
 
 ```
-Session Creation → Workspace Setup → Tool Registration →
-Execution Context → State Persistence → Cleanup
+Step Start → Progress Update → Implementation → Success/Error →
+Next Step / Error Recovery → Progress Update → Continue
 ```
 
 ### 3. Error Handling Flow
 
 ```
-Error Detection → Classification → Context Enrichment →
-Recovery Strategy → Auto-Fix Attempt → User Notification →
-Audit Logging
+Error Detection → Rich Error Creation → Context Enrichment →
+Recovery Strategy → User Notification → Retry/Abort
 ```
 
-### 4. AI Integration Flow
+### 4. Progress Tracking Flow
 
 ```
-User Input → Context Analysis → AI Service → Response Generation →
-Context Update → Action Execution → Result Validation
+Step Start → Progress Indicator → Message Update → Status Update →
+Duration Tracking → Completion Notification
 ```
 
 ## Security Architecture
 
 ### 1. Input Validation
-- **Struct Tag Validation**: Declarative validation rules
-- **Security Sanitization**: Automatic input cleaning
 - **Parameter Validation**: Type and format checking
-- **Path Traversal Protection**: FileAccessService prevents directory traversal attacks
-- **Session Isolation**: All file operations scoped to session workspace
+- **Path Validation**: Protection against traversal attacks
+- **Session Isolation**: Scoped operations within session boundaries
 
 ### 2. Vulnerability Scanning
 - **Multi-Scanner Support**: Trivy and Grype integration
-- **Policy Engine**: Configurable security policies
-- **SBOM Generation**: Complete dependency tracking
-- **Continuous Monitoring**: Automated security updates
+- **Comprehensive Scanning**: Full container vulnerability analysis
+- **Report Generation**: Detailed security reports with remediation guidance
 
-### 3. Secret Management
-- **Secure Generation**: Cryptographically secure secrets
-- **Environment Integration**: Kubernetes secret injection
-- **Rotation Support**: Automated secret rotation
-- **Access Control**: Role-based secret access
-
-### 4. Container Security
+### 3. Container Security
 - **Minimal Base Images**: Distroless and minimal containers
 - **Non-Root Execution**: Security context enforcement
 - **Resource Limits**: CPU and memory constraints
 - **Network Policies**: Traffic isolation and control
 
+### 4. Session Security
+- **Workspace Isolation**: Session-scoped operations
+- **State Protection**: Secure session state management
+- **Access Control**: Session-based access restrictions
+
 ## Quality Assurance
 
 ### 1. Testing Strategy
-- **Unit Tests**: Comprehensive test coverage with baselines
+- **Unit Tests**: Focus on individual workflow steps
 - **Integration Tests**: End-to-end workflow validation
-- **Performance Tests**: Benchmark testing with regression detection
-- **Security Tests**: Vulnerability and penetration testing
+- **Performance Tests**: Workflow execution benchmarks
 
 ### 2. Quality Gates
-- **Error Budget**: Maximum 100 lint issues
 - **Performance Target**: <300μs P95 per request
-- **Coverage Baseline**: Tracked coverage with enforcement
-- **Pre-commit Hooks**: Automated quality checks
+- **CI Pipeline**: Single workflow validation
+- **Code Quality**: Automated linting and formatting
 
 ### 3. Code Quality Tools
-- **Linting**: golangci-lint with custom rules
+- **Linting**: golangci-lint with essential rules
 - **Formatting**: gofmt and goimports
-- **Complexity Analysis**: Cyclomatic complexity limits
-- **Dependency Analysis**: Import cycle detection
+- **Simplicity**: Focus on maintainable code
 
 ### 4. Monitoring & Observability
-- **Metrics**: Prometheus metrics for all operations
-- **Tracing**: OpenTelemetry distributed tracing
-- **Logging**: Structured logging with slog
-- **Health Checks**: Comprehensive health endpoints
+- **Progress Tracking**: Built-in workflow progress monitoring
+- **Error Reporting**: Comprehensive error context
+- **Health Checks**: Simple health endpoints
 
 ## Deployment & Operations
 
-### 1. Container Deployment
-- **Multi-Architecture**: Support for AMD64 and ARM64
-- **Minimal Images**: Distroless base images for security
-- **Health Checks**: Readiness and liveness probes
-- **Resource Management**: CPU and memory limits
+### 1. Deployment Model
+- **Single Binary**: container-kit-mcp executable
+- **Minimal Dependencies**: Reduced external dependencies
+- **Easy Configuration**: Environment-based configuration
 
 ### 2. Kubernetes Integration
 - **Manifest Generation**: Automated YAML creation
-- **Service Discovery**: DNS-based service resolution
-- **Load Balancing**: Kubernetes native load balancing
+- **Health Checks**: Readiness and liveness probes
 - **Rolling Updates**: Zero-downtime deployments
 
 ### 3. Configuration Management
 - **Environment Variables**: 12-factor app configuration
-- **ConfigMaps**: Kubernetes-native configuration
-- **Secrets**: Secure credential management
-- **Hot Reloading**: Runtime configuration updates
+- **Session Storage**: BoltDB for state persistence
+- **Workspace Management**: Automatic workspace creation
 
-### 4. Monitoring Setup
-- **Prometheus**: Metrics collection and alerting
-- **Grafana**: Visualization and dashboards
-- **Jaeger**: Distributed tracing analysis
-- **ELK Stack**: Log aggregation and analysis
+### 4. Operations
+- **Single Process**: Simplified operational model
+- **Progress Monitoring**: Built-in progress tracking
+- **Error Recovery**: Automated error handling
 
 ## Development Guidelines
 
-### 1. Adding New Tools
-1. **Interface Definition**: Add to `pkg/mcp/application/api/interfaces.go`
-2. **Implementation**: Create in appropriate layer following three-layer architecture
-3. **Registration**: Auto-registration via unified interface system in `pkg/mcp/application/commands/tool_registration.go`
-4. **FileAccessService Integration**: Use FileAccessService for secure file operations
-5. **Testing**: Unit and integration tests with mocks
-6. **Documentation**: Update tool inventory and guides
+### 1. Adding New Workflow Steps
+1. **Step Implementation**: Create in `pkg/mcp/internal/steps/`
+2. **Error Handling**: Use unified RichError system
+3. **Progress Tracking**: Include progress indicators
+4. **Testing**: Unit and integration tests
 
 ### 2. Error Handling
-- Use unified RichError system from `pkg/mcp/domain/errors/rich.go`
+- Use unified RichError system from `pkg/mcp/domain/errors/`
 - Include structured context and actionable suggestions
 - Implement proper error classification and severity
-- Capture source location for debugging
 
-### 3. Validation
-- Use struct tag-based validation DSL
-- Generate validation code with `go generate`
-- Implement security validation alongside business validation
-- Follow declarative validation patterns
+### 3. Workflow Development
+- Follow the 10-step workflow pattern
+- Include progress tracking for all steps
+- Implement error recovery where possible
+- Maintain session state consistency
 
-### 4. Service Integration
-- Use service container pattern for dependency injection
-- Define focused interfaces following Single Responsibility Principle
-- Implement proper lifecycle management
-- Include comprehensive testing with mocks
-
+### 4. Quality Standards
+- Focus on simplicity and maintainability
+- Comprehensive testing for workflow steps
+- Clear documentation and progress messages
 
 ## Appendices
 
-### A. Architecture Decision Records (ADRs)
+### A. Key Metrics
 
-1. **ADR-001**: Three-Context Architecture - Simplified 30+ packages to 3 bounded contexts
-2. **ADR-002**: Go Embed for YAML Templates - Improved template management
-3. **ADR-003**: Zerolog to Slog Migration - Unified logging interface
-4. **ADR-004**: Unified Rich Error System - Consolidated error handling
-5. **ADR-005**: Tag-Based Validation DSL - Declarative validation
-6. **ADR-006**: Manual Dependency Injection - Focused service interfaces
+**Codebase Scale**:
+- **25 core files** delivering complete functionality
+- **Workflow-focused architecture** with clear design
+- **Single unified workflow** for the entire process
+- **Essential components** only
 
-### B. Key Metrics
+**Performance Targets**:
+- Response Time: <300μs P95 per request
+- Optimized Memory: Efficient memory usage
+- Fast Builds: Quick compilation time
 
-- **Codebase Size**: 606 Go files, 159,570 lines of code, 126MB total
-- **Architecture**: 3 layers (domain: 101 files, application: 153 files, infra: 38 files)
-- **Service Interfaces**: 21 services including FileAccessService
-- **Tools Implemented**: 12 production-ready tools (6 containerization + 3 file access + 3 utility)
-- **Error Reduction**: 51% method reduction from manager refactoring
-- **Quality Gates**: <100 lint issues, <300μs P95 performance
-- **Security Features**: Session isolation, path traversal protection, file validation
-
-### C. Technology Dependencies
+### B. Technology Dependencies
 
 - **Go**: 1.24.1 (core language)
 - **gomcp**: Model Context Protocol implementation
@@ -454,29 +369,24 @@ Context Update → Action Execution → Result Validation
 - **Docker Client**: Container operations
 - **Kubernetes Client**: Orchestration integration
 - **Trivy/Grype**: Security scanning
-- **Prometheus**: Metrics collection
-- **OpenTelemetry**: Distributed tracing
 
-### D. Development Commands
+### C. Development Commands
 
 ```bash
 # Build and test
-make mcp                # Build MCP server
-make test               # Run tests
-make test-all          # All packages
-make bench             # Performance benchmarks
+make build              # Build MCP server
+make test               # Unit tests
+make test-integration   # Integration tests
 
 # Code quality
-make fmt               # Format code
-make lint              # Lint with error budget
-make lint-strict       # Strict linting
-make pre-commit        # Pre-commit hooks
+make fmt                # Format code
+make lint               # Lint code
+make clean              # Clean build artifacts
 
-# Coverage and performance
-make coverage-html     # Generate coverage report
-make bench-baseline    # Set performance baseline
+# Utility
+make version            # Show version
 ```
 
 ---
 
-**Document Maintenance**: This design document should be updated when significant architectural changes are made. See ADRs for detailed decision rationale and implementation guidance.
+**Document Maintenance**: This design document reflects the current architecture. The system provides all essential functionality through a clean, unified workflow design focused on developer experience and reliability.

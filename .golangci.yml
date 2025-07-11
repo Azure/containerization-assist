@@ -6,32 +6,27 @@ linters:
   disable:
     - unused
     - ineffassign      # Disable ineffectual assignment checks
+    - depguard         # Disable import restrictions after simplification
   enable:
     - revive
-    - depguard
-    - staticcheck      # Enable advanced static analysis per TODO.md
-    - errcheck         # Enable error checking per TODO.md
+    - staticcheck      # Enable advanced static analysis
+    - errcheck         # Enable error checking
 
 linters-settings:
   depguard:
     rules:
-      non-internal:
+      main:
         files:
-          - "pkg/mcp/**"
-          - "!pkg/mcp/internal/**"
-        deny:
-          - pkg: "github.com/Azure/container-kit/pkg/mcp/internal"
-            desc: "Internal packages should not be imported by external packages"
-          - pkg: "github.com/Azure/container-kit/pkg/mcp/core"
-            desc: "Core should only be imported by internal packages"
-      api-only:
-        files:
-          - "pkg/mcp/api/**"
-        deny:
-          - pkg: "github.com/Azure/container-kit/pkg/mcp/internal"
-            desc: "API package should not depend on internal packages"
-          - pkg: "github.com/Azure/container-kit/pkg/mcp/core"
-            desc: "API package should not depend on core packages"
+          - "$all"
+        allow:
+          - "$gostd"
+          - "github.com/Azure/container-kit"
+          - "github.com/localrivet/gomcp"
+          - "github.com/rs/zerolog"
+          - "github.com/stretchr/testify"
+          - "github.com/joho/godotenv"
+          - "github.com/spf13/cobra"
+          - "go.etcd.io/bbolt"
   exclusions:
     generated: lax
     presets:

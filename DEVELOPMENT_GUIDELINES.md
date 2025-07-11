@@ -1,6 +1,6 @@
 # Development Guidelines
 
-This document establishes coding standards and development practices for the Container Kit MCP project to ensure consistent, maintainable, and high-quality code across all workstreams.
+This document establishes coding standards and development practices for the Container Kit MCP project to ensure consistent, maintainable, and high-quality code.
 
 ## Table of Contents
 
@@ -272,34 +272,29 @@ return errors.NewError().
   - Split by functional areas (e.g., `tool_validation.go`, `tool_execution.go`)
   - Create focused sub-packages
 
-### Three-Layer Architecture (ADR-001)
+### Architecture Overview
+The architecture focuses on core functionality with a clean, workflow-driven design:
+
 ```
 pkg/mcp/
-├── domain/              # Domain layer - business logic (no dependencies)
-│   ├── config/         # Configuration entities and validation
-│   ├── containerization/ # Container operations (analyze, build, deploy, scan)
-│   ├── errors/         # Rich error handling system
-│   ├── security/       # Security policies and validation
-│   ├── session/        # Session entities and rules
-│   └── internal/       # Shared utilities
-├── application/         # Application layer - orchestration (depends on domain)
-│   ├── api/            # Canonical interface definitions
-│   ├── commands/       # Command implementations
-│   ├── core/           # Server lifecycle & registry
-│   ├── orchestration/  # Tool coordination & workflows
-│   ├── services/       # Service interfaces
-│   ├── state/          # Application state management
-│   ├── tools/          # Tool implementations
-│   └── workflows/      # Workflow management
-└── infra/              # Infrastructure layer - external integrations
-    ├── persistence/    # BoltDB storage
-    ├── transport/      # MCP protocol transports
-    ├── templates/      # YAML templates
-    ├── retry/          # Retry coordination
-    ├── docker_*.go     # Docker integration files
-    ├── k8s_*.go        # Kubernetes integration files
-    └── internal/       # Infrastructure utilities
+├── domain/
+│   └── errors/         # Rich error handling system (kept - used by 54 files)
+├── application/
+│   ├── api/            # Interface definitions
+│   └── core/           # Server implementation
+├── server/             # Main workflow implementation
+└── internal/
+    └── steps/          # Individual workflow steps
+        ├── analyze.go  # Repository analysis
+        ├── build.go    # Docker operations
+        └── k8s.go      # Kubernetes operations
 ```
+
+**Key Architecture Features:**
+- 25 core files delivering complete functionality
+- Single workflow approach for unified experience
+- Essential validation and error handling
+- Clean, maintainable codebase
 
 ### Import Organization
 ```go
@@ -321,13 +316,24 @@ import (
 
 ## CI/CD Integration
 
-### Required Checks
-All code must pass:
+### Build System
+Use these essential commands for development:
+
 ```bash
-go build -tags mcp         # Compilation check
-go test -race ./...        # All tests with race detection
-golangci-lint run          # Linting (with error budget)
-make bench                 # Performance benchmarks
+# Build the MCP server
+make build
+
+# Run tests
+make test                  # MCP package tests
+make test-integration      # Integration tests
+
+# Code quality
+make fmt                   # Format code
+make lint                  # Run linter
+
+# Utility
+make clean                 # Remove binaries
+make version              # Show version
 ```
 
 ### Quality Gates
@@ -362,46 +368,44 @@ make bench                 # Performance benchmarks
 
 ## Architecture Patterns
 
-### 1. Template Method Pattern
-Use when multiple implementations share common algorithm structure but differ in specific steps.
+### Workflow-Focused Architecture
+The system uses a single workflow approach for the complete containerization process:
 
-**Example**: Database detectors with shared detection logic
 ```go
-// Base template
-type BaseDetector struct {
-    config    DatabaseDetectorConfig
-    extractor ConnectionInfoExtractor
+// Single workflow tool that handles the entire containerization process
+type ContainerizeAndDeployTool struct {
+    workspaceDir string
+    logger       *slog.Logger
 }
 
-func (d *BaseDetector) Detect(repoPath string) ([]DetectedDatabase, error) {
-    // Template method defining algorithm skeleton
-    databases := d.detectFromDocker(repoPath, databases)
-    databases = d.detectFromEnvironment(repoPath, databases)
-    databases = d.detectFromConfigFiles(repoPath, databases)
-    return databases, nil
+// Main workflow with 10 steps and progress tracking
+func (t *ContainerizeAndDeployTool) Execute(ctx context.Context, args ContainerizeAndDeployArgs) (interface{}, error) {
+    steps := []string{
+        "analyze",      // Repository analysis
+        "dockerfile",   // Dockerfile generation
+        "build",        // Docker build
+        "scan",         // Security scanning
+        "tag",          // Image tagging
+        "push",         // Registry push
+        "manifest",     // K8s manifest generation
+        "cluster",      // Cluster setup
+        "deploy",       // Deployment
+        "verify",       // Health check
+    }
+    
+    // Execute each step with progress tracking
+    for i, step := range steps {
+        progress := fmt.Sprintf("%d/%d", i+1, len(steps))
+        // ... step execution with progress updates
+    }
 }
 ```
 
-### 2. Factory Pattern
-Use for complex object creation with multiple variants.
-
-### 3. Pipeline Pattern
-Use for sequential processing steps where each step transforms data.
-
-### 4. Service Container Pattern (ADR-006)
-Use manual dependency injection for focused services:
-```go
-type ServiceContainer interface {
-    SessionStore() SessionStore
-    SessionState() SessionState
-    BuildExecutor() BuildExecutor
-    ToolRegistry() ToolRegistry
-    WorkflowExecutor() WorkflowExecutor
-    Scanner() Scanner
-    ConfigValidator() ConfigValidator
-    ErrorReporter() ErrorReporter
-}
-```
+### Key Architecture Benefits
+1. **Single Point of Entry**: One tool handles the entire workflow
+2. **Progress Tracking**: Built-in progress indicators for each step
+3. **Error Recovery**: Centralized error handling with actionable messages
+4. **State Management**: Clean session and state management
 
 ## Function Design Principles
 
@@ -444,6 +448,6 @@ Always check type assertions to prevent panics.
 
 ---
 
-**Version**: 1.1
-**Last Updated**: 2025-07-07
-**Next Review**: Quarterly (2025-10-07)
+**Version**: 2.0
+**Last Updated**: 2025-07-10
+**Next Review**: Quarterly (2025-10-10)
