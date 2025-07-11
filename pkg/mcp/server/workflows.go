@@ -101,9 +101,12 @@ func executeContainerizeAndDeploy(mcpCtx *server.Context, args *ContainerizeAndD
 
 	// Create a progress reporter if the client supports it
 	var progressReporter *mcp.ProgressReporter
+	logger.Info("Checking for progress support", "mcpCtx_nil", mcpCtx == nil, "has_progress_token", mcpCtx != nil && mcpCtx.HasProgressToken())
 	if mcpCtx != nil && mcpCtx.HasProgressToken() {
 		progressReporter = mcpCtx.CreateSimpleProgressReporter(&totalStepsFloat)
 		logger.Info("Progress reporting enabled for workflow")
+	} else {
+		logger.Info("No progress token found - progress notifications disabled")
 	}
 
 	updateProgress := func() (int, string) {
@@ -337,11 +340,14 @@ func executeStep(result *ContainerizeAndDeployResult, stepName string, stepFunc 
 	// Send real-time progress notification to MCP client
 	if mcpCtx != nil && progressReporter != nil {
 		currentStepFloat := float64(len(result.Steps) + 1)
+		fmt.Printf("Sending progress notification: step %.0f, message: %s\n", currentStepFloat, step.Message)
 		if err := progressReporter.Update(currentStepFloat, step.Message); err != nil {
-			// Log but don't fail on notification errors
-			// Use placeholder logger since we don't have logger in this function
 			fmt.Printf("Failed to send progress notification: %v\n", err)
+		} else {
+			fmt.Printf("Progress notification sent successfully\n")
 		}
+	} else {
+		fmt.Printf("No progress reporter available (mcpCtx_nil=%v, progressReporter_nil=%v)\n", mcpCtx == nil, progressReporter == nil)
 	}
 
 	// Execute the step
