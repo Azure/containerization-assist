@@ -186,13 +186,13 @@ func NewServer(ctx context.Context, logger *slog.Logger, opts ...Option) (api.MC
 	}
 	// Create server logger
 	serverLogger := logger.With("component", "mcp-server")
-	
+
 	// Create internal dependencies
 	sessionManager := newMemorySessionManager(logger, config.SessionTTL, config.MaxSessions)
-	serverLogger.Info("Created enhanced in-memory session manager", 
+	serverLogger.Info("Created enhanced in-memory session manager",
 		"default_ttl", config.SessionTTL,
 		"max_sessions", config.MaxSessions)
-	
+
 	deps := &dependencies{
 		sessionManager: sessionManager,
 		logger:         serverLogger,
@@ -429,4 +429,3 @@ func (s *serverImpl) GetOrchestrator() api.Orchestrator {
 	// No separate orchestrator needed
 	return nil
 }
-

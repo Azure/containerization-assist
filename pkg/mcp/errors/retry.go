@@ -39,7 +39,6 @@ func IsRetryable(err error) bool {
 	return false
 }
 
-
 // CalculateDelay calculates the delay for a retry attempt
 func CalculateDelay(attempt int, policy RetryPolicy) time.Duration {
 	if attempt <= 0 {

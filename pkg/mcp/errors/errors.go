@@ -27,15 +27,15 @@ const (
 
 // Rich wraps every error flowing through MCP.
 type Rich struct {
-	Code       Code            `json:"code"`
-	Domain     string          `json:"domain,omitempty"`
-	Severity   Severity        `json:"severity"`
-	Message    string          `json:"message"`
-	Retryable  bool            `json:"retryable"`
-	UserFacing bool            `json:"user_facing"`
-	Location   string          `json:"location"`
-	Cause      error           `json:"-"`
-	Fields     map[string]any  `json:"fields,omitempty"`
+	Code       Code           `json:"code"`
+	Domain     string         `json:"domain,omitempty"`
+	Severity   Severity       `json:"severity"`
+	Message    string         `json:"message"`
+	Retryable  bool           `json:"retryable"`
+	UserFacing bool           `json:"user_facing"`
+	Location   string         `json:"location"`
+	Cause      error          `json:"-"`
+	Fields     map[string]any `json:"fields,omitempty"`
 }
 
 // Error implements error.
@@ -47,7 +47,7 @@ func (r *Rich) Unwrap() error { return r.Cause }
 //	errors.New(CodeValidationFailed, "deploy", "invalid image", err)
 func New(code Code, domain, msg string, cause error) *Rich {
 	_, file, line, _ := runtime.Caller(1)
-	
+
 	// Get metadata from generated code, with sensible defaults
 	var severity Severity = SeverityMedium
 	var retryable bool = false
@@ -55,7 +55,7 @@ func New(code Code, domain, msg string, cause error) *Rich {
 		severity = sev
 		retryable = retry
 	}
-	
+
 	return &Rich{
 		Code:       code,
 		Domain:     domain,
@@ -80,4 +80,3 @@ func (r *Rich) JSON() string {
 	out, _ := json.Marshal(r)
 	return string(out)
 }
-

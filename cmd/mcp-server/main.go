@@ -312,7 +312,6 @@ func parseSlogLevel(level string) slog.Level {
 	}
 }
 
-
 // runServerWithShutdown runs the server with graceful shutdown handling
 func runServerWithShutdown(mcpServer api.MCPServer) {
 	// Create context for server operation

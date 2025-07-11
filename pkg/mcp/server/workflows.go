@@ -62,15 +62,15 @@ func RegisterWorkflowTools(gomcpServer server.Server, logger *slog.Logger) error
 			Branch  string `json:"branch,omitempty"`
 		}) (interface{}, error) {
 			logger.Info("Analyzing repository", "repo_url", args.RepoURL, "branch", args.Branch)
-			
+
 			// For now, return a simplified analysis result
 			// In a full implementation, this would call the actual analysis logic
 			return map[string]interface{}{
-				"language":     "java",
-				"framework":    "spring-boot",
-				"build_tool":   "maven",
+				"language":          "java",
+				"framework":         "spring-boot",
+				"build_tool":        "maven",
 				"dockerfile_exists": false,
-				"port":         8080,
+				"port":              8080,
 				"analysis_complete": true,
 			}, nil
 		})

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"fmt"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // Service provides a unified interface to worker management operations

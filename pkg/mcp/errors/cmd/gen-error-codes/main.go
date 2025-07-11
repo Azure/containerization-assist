@@ -137,7 +137,7 @@ func parseCodesYAML(filename string) ([]ErrorCode, error) {
 
 	var codes []ErrorCode
 	var currentCode *ErrorCode
-	
+
 	scanner := bufio.NewScanner(file)
 	codeRegex := regexp.MustCompile(`^\s*-\s+code:\s*(.+)$`)
 	descRegex := regexp.MustCompile(`^\s+description:\s*(.+)$`)
@@ -146,7 +146,7 @@ func parseCodesYAML(filename string) ([]ErrorCode, error) {
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		
+
 		if matches := codeRegex.FindStringSubmatch(line); len(matches) > 1 {
 			// Save previous code if exists
 			if currentCode != nil {
@@ -164,7 +164,7 @@ func parseCodesYAML(filename string) ([]ErrorCode, error) {
 			currentCode.Retryable = matches[1] == "true"
 		}
 	}
-	
+
 	// Add the last code
 	if currentCode != nil {
 		codes = append(codes, *currentCode)

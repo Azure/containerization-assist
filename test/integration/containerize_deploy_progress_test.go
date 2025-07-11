@@ -30,7 +30,7 @@ func TestContainerizeAndDeployProgress(t *testing.T) {
 	// Use the pre-built MCP server binary
 	wd, _ := os.Getwd()
 	serverBinaryPath := filepath.Join(wd, "..", "..", "container-kit-mcp")
-	
+
 	// Check if binary exists
 	if _, err := os.Stat(serverBinaryPath); os.IsNotExist(err) {
 		// Try to build it
@@ -116,7 +116,7 @@ func TestContainerizeAndDeployProgress(t *testing.T) {
 	// Check for content wrapper (MCP format)
 	var workflowResult map[string]interface{}
 	var isError bool
-	
+
 	if content, ok := result["content"].([]interface{}); ok && len(content) > 0 {
 		if contentItem, ok := content[0].(map[string]interface{}); ok {
 			if textStr, ok := contentItem["text"].(string); ok {
@@ -134,13 +134,13 @@ func TestContainerizeAndDeployProgress(t *testing.T) {
 		// Direct result format
 		workflowResult = result
 	}
-	
+
 	// Check if this is an error response
 	if errFlag, ok := result["isError"].(bool); ok && errFlag {
 		isError = true
 		t.Log("Workflow returned an error response")
 	}
-	
+
 	// For now, just log if it's an error
 	if isError {
 		t.Log("Workflow execution resulted in an error, but we can still check for partial progress")
@@ -156,31 +156,31 @@ func TestContainerizeAndDeployProgress(t *testing.T) {
 		// Check for steps with progress
 		if steps, ok := workflowResult["steps"].([]interface{}); ok {
 			t.Logf("Found %d workflow steps", len(steps))
-			
+
 			// Verify each step has progress information
 			progressFound := false
 			for i, stepRaw := range steps {
 				if step, ok := stepRaw.(map[string]interface{}); ok {
 					t.Logf("Step %d: %+v", i+1, step)
-					
+
 					// Check for progress field
 					if progress, ok := step["progress"].(string); ok && progress != "" {
 						progressFound = true
 						t.Logf("  Progress: %s", progress)
-						
+
 						// Verify progress format (e.g., "3/10")
 						parts := strings.Split(progress, "/")
 						assert.Equal(t, 2, len(parts), "Progress should be in format 'current/total'")
 					}
-					
+
 					// Check for message field
 					if message, ok := step["message"].(string); ok && message != "" {
 						t.Logf("  Message: %s", message)
-						
+
 						// Message should contain percentage
 						assert.Contains(t, message, "%", "Progress message should contain percentage")
 					}
-					
+
 					// Check step name and status
 					if name, ok := step["name"].(string); ok {
 						t.Logf("  Name: %s", name)
@@ -190,7 +190,7 @@ func TestContainerizeAndDeployProgress(t *testing.T) {
 					}
 				}
 			}
-			
+
 			assert.True(t, progressFound, "At least one step should have progress information")
 			assert.Greater(t, len(steps), 0, "Workflow should have at least one step")
 		} else {

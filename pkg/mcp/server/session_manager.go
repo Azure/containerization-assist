@@ -14,15 +14,15 @@ import (
 type memorySessionManager struct {
 	logger *slog.Logger
 	mu     sync.RWMutex
-	
+
 	// Core storage
 	sessions map[string]*sessionEntry
-	
+
 	// Configuration
 	defaultTTL      time.Duration
 	cleanupInterval time.Duration
 	maxSessions     int
-	
+
 	// Background cleanup
 	cleanupDone chan struct{}
 	cleanupStop chan struct{}
@@ -31,8 +31,8 @@ type memorySessionManager struct {
 // sessionEntry wraps SessionState with additional metadata for efficient management
 type sessionEntry struct {
 	*SessionState
-	expiresAt time.Time
-	labels    map[string]string
+	expiresAt  time.Time
+	labels     map[string]string
 	lastAccess time.Time
 }
 
@@ -47,7 +47,7 @@ func newMemorySessionManager(logger *slog.Logger, defaultTTL time.Duration, maxS
 		cleanupDone:     make(chan struct{}),
 		cleanupStop:     make(chan struct{}),
 	}
-	
+
 	return manager
 }
 
@@ -55,23 +55,23 @@ func newMemorySessionManager(logger *slog.Logger, defaultTTL time.Duration, maxS
 func (m *memorySessionManager) GetSession(ctx context.Context, sessionID string) (*SessionState, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	entry, exists := m.sessions[sessionID]
 	if !exists {
 		return nil, errors.New(errors.CodeNotFound, "session", "session not found", nil)
 	}
-	
+
 	// Check if expired
 	if time.Now().After(entry.expiresAt) {
 		delete(m.sessions, sessionID)
 		m.logger.Debug("Session expired and removed", "session_id", sessionID)
 		return nil, errors.New(errors.CodeNotFound, "session", "session expired", nil)
 	}
-	
+
 	// Update last access time
 	entry.lastAccess = time.Now()
 	entry.UpdatedAt = time.Now()
-	
+
 	return entry.SessionState, nil
 }
 
@@ -81,23 +81,23 @@ func (m *memorySessionManager) GetOrCreateSession(ctx context.Context, sessionID
 	if session, err := m.GetSession(ctx, sessionID); err == nil {
 		return session, nil
 	}
-	
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	// Double-check after acquiring lock
 	if entry, exists := m.sessions[sessionID]; exists && time.Now().Before(entry.expiresAt) {
 		entry.lastAccess = time.Now()
 		entry.UpdatedAt = time.Now()
 		return entry.SessionState, nil
 	}
-	
+
 	// Check session limit
 	if len(m.sessions) >= m.maxSessions {
 		// Remove oldest session to make room
 		m.evictOldestSession()
 	}
-	
+
 	// Create new session
 	now := time.Now()
 	sessionState := &SessionState{
@@ -110,20 +110,20 @@ func (m *memorySessionManager) GetOrCreateSession(ctx context.Context, sessionID
 		Labels:    make(map[string]string),
 		Metadata:  make(map[string]interface{}),
 	}
-	
+
 	entry := &sessionEntry{
 		SessionState: sessionState,
 		expiresAt:    now.Add(m.defaultTTL),
 		labels:       make(map[string]string),
 		lastAccess:   now,
 	}
-	
+
 	m.sessions[sessionID] = entry
-	m.logger.Debug("Created new session", 
-		"session_id", sessionID, 
+	m.logger.Debug("Created new session",
+		"session_id", sessionID,
 		"total_sessions", len(m.sessions),
 		"expires_at", entry.expiresAt)
-	
+
 	return sessionState, nil
 }
 
@@ -132,7 +132,7 @@ func (m *memorySessionManager) GetSessionTyped(ctx context.Context, sessionID st
 	return m.GetSession(ctx, sessionID)
 }
 
-// GetSessionConcrete implements SessionManager interface  
+// GetSessionConcrete implements SessionManager interface
 func (m *memorySessionManager) GetSessionConcrete(ctx context.Context, sessionID string) (*SessionState, error) {
 	return m.GetSession(ctx, sessionID)
 }
@@ -146,27 +146,27 @@ func (m *memorySessionManager) GetOrCreateSessionTyped(ctx context.Context, sess
 func (m *memorySessionManager) UpdateSession(ctx context.Context, sessionID string, updateFunc func(*SessionState) error) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	entry, exists := m.sessions[sessionID]
 	if !exists {
 		return errors.New(errors.CodeNotFound, "session", "session not found", nil)
 	}
-	
+
 	// Check if expired
 	if time.Now().After(entry.expiresAt) {
 		delete(m.sessions, sessionID)
 		return errors.New(errors.CodeNotFound, "session", "session expired", nil)
 	}
-	
+
 	// Apply update function
 	if err := updateFunc(entry.SessionState); err != nil {
 		return err
 	}
-	
+
 	// Update timestamps
 	entry.lastAccess = time.Now()
 	entry.SessionState.UpdatedAt = time.Now()
-	
+
 	m.logger.Debug("Updated session", "session_id", sessionID)
 	return nil
 }
@@ -175,10 +175,10 @@ func (m *memorySessionManager) UpdateSession(ctx context.Context, sessionID stri
 func (m *memorySessionManager) ListSessionsTyped(ctx context.Context) ([]*SessionState, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	now := time.Now()
 	sessions := make([]*SessionState, 0, len(m.sessions))
-	
+
 	for sessionID, entry := range m.sessions {
 		if now.Before(entry.expiresAt) {
 			sessions = append(sessions, entry.SessionState)
@@ -187,7 +187,7 @@ func (m *memorySessionManager) ListSessionsTyped(ctx context.Context) ([]*Sessio
 			m.logger.Debug("Found expired session during list", "session_id", sessionID)
 		}
 	}
-	
+
 	return sessions, nil
 }
 
@@ -195,10 +195,10 @@ func (m *memorySessionManager) ListSessionsTyped(ctx context.Context) ([]*Sessio
 func (m *memorySessionManager) ListSessionSummaries(ctx context.Context) ([]*SessionSummary, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	now := time.Now()
 	summaries := make([]*SessionSummary, 0, len(m.sessions))
-	
+
 	for sessionID, entry := range m.sessions {
 		if now.Before(entry.expiresAt) {
 			summaries = append(summaries, &SessionSummary{
@@ -207,7 +207,7 @@ func (m *memorySessionManager) ListSessionSummaries(ctx context.Context) ([]*Ses
 			})
 		}
 	}
-	
+
 	return summaries, nil
 }
 
@@ -217,26 +217,26 @@ func (m *memorySessionManager) UpdateJobStatus(ctx context.Context, sessionID, j
 		if session.Metadata == nil {
 			session.Metadata = make(map[string]interface{})
 		}
-		
+
 		jobs, exists := session.Metadata["jobs"]
 		if !exists {
 			jobs = make(map[string]interface{})
 			session.Metadata["jobs"] = jobs
 		}
-		
+
 		jobsMap := jobs.(map[string]interface{})
 		jobsMap[jobID] = map[string]interface{}{
-			"status": status,
-			"result": result,
-			"error":  err,
+			"status":     status,
+			"result":     result,
+			"error":      err,
 			"updated_at": time.Now(),
 		}
-		
-		m.logger.Debug("Updated job status", 
-			"session_id", sessionID, 
-			"job_id", jobID, 
+
+		m.logger.Debug("Updated job status",
+			"session_id", sessionID,
+			"job_id", jobID,
 			"status", status)
-		
+
 		return nil
 	})
 }
@@ -244,7 +244,7 @@ func (m *memorySessionManager) UpdateJobStatus(ctx context.Context, sessionID, j
 // StartCleanupRoutine starts the background cleanup goroutine
 func (m *memorySessionManager) StartCleanupRoutine(ctx context.Context) error {
 	go m.runCleanup()
-	m.logger.Info("Started session cleanup routine", 
+	m.logger.Info("Started session cleanup routine",
 		"interval", m.cleanupInterval,
 		"default_ttl", m.defaultTTL)
 	return nil
@@ -253,7 +253,7 @@ func (m *memorySessionManager) StartCleanupRoutine(ctx context.Context) error {
 // Stop gracefully shuts down the session manager
 func (m *memorySessionManager) Stop(ctx context.Context) error {
 	close(m.cleanupStop)
-	
+
 	// Wait for cleanup to finish or context timeout
 	select {
 	case <-m.cleanupDone:
@@ -261,17 +261,17 @@ func (m *memorySessionManager) Stop(ctx context.Context) error {
 	case <-ctx.Done():
 		m.logger.Warn("Session manager stop timed out")
 	}
-	
+
 	return nil
 }
 
 // runCleanup runs the background cleanup routine
 func (m *memorySessionManager) runCleanup() {
 	defer close(m.cleanupDone)
-	
+
 	ticker := time.NewTicker(m.cleanupInterval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -287,19 +287,19 @@ func (m *memorySessionManager) runCleanup() {
 func (m *memorySessionManager) cleanupExpiredSessions() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	now := time.Now()
 	expiredCount := 0
-	
+
 	for sessionID, entry := range m.sessions {
 		if now.After(entry.expiresAt) {
 			delete(m.sessions, sessionID)
 			expiredCount++
 		}
 	}
-	
+
 	if expiredCount > 0 {
-		m.logger.Debug("Cleaned up expired sessions", 
+		m.logger.Debug("Cleaned up expired sessions",
 			"expired_count", expiredCount,
 			"remaining_sessions", len(m.sessions))
 	}
@@ -310,20 +310,20 @@ func (m *memorySessionManager) evictOldestSession() {
 	if len(m.sessions) == 0 {
 		return
 	}
-	
+
 	var oldestID string
 	var oldestTime time.Time
-	
+
 	for sessionID, entry := range m.sessions {
 		if oldestID == "" || entry.lastAccess.Before(oldestTime) {
 			oldestID = sessionID
 			oldestTime = entry.lastAccess
 		}
 	}
-	
+
 	if oldestID != "" {
 		delete(m.sessions, oldestID)
-		m.logger.Debug("Evicted oldest session to make room", 
+		m.logger.Debug("Evicted oldest session to make room",
 			"evicted_session_id", oldestID,
 			"last_access", oldestTime)
 	}

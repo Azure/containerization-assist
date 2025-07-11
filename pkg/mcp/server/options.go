@@ -139,4 +139,3 @@ func WithTraceSampleRate(rate float64) Option {
 		c.TraceSampleRate = rate
 	}
 }
-

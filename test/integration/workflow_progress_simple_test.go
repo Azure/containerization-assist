@@ -19,7 +19,7 @@ func TestWorkflowProgressStructure(t *testing.T) {
 	// Simulate progress tracking
 	totalSteps := 10
 	currentStep := 0
-	
+
 	updateProgress := func() (int, string) {
 		currentStep++
 		progress := fmt.Sprintf("%d/%d", currentStep, totalSteps)
@@ -51,19 +51,19 @@ func TestWorkflowProgressStructure(t *testing.T) {
 
 	// Verify the structure
 	require.Len(t, result.Steps, 3)
-	
+
 	for i, step := range result.Steps {
 		t.Logf("Step %d: %+v", i+1, step)
-		
+
 		// Check progress format
 		assert.NotEmpty(t, step.Progress, "Step should have progress")
 		assert.Contains(t, step.Progress, "/", "Progress should be in format 'current/total'")
-		
+
 		// Check message format
 		assert.NotEmpty(t, step.Message, "Step should have message")
 		assert.Contains(t, step.Message, "%", "Message should contain percentage")
 		assert.Contains(t, step.Message, "[", "Message should start with percentage in brackets")
-		
+
 		// Verify specific progress values
 		expectedProgress := fmt.Sprintf("%d/%d", i+1, totalSteps)
 		assert.Equal(t, expectedProgress, step.Progress, "Progress should match expected value")
@@ -74,7 +74,7 @@ func TestWorkflowProgressStructure(t *testing.T) {
 func TestWorkflowProgressUpdate(t *testing.T) {
 	totalSteps := 10
 	currentStep := 0
-	
+
 	updateProgress := func() (int, string) {
 		currentStep++
 		progress := fmt.Sprintf("%d/%d", currentStep, totalSteps)
@@ -99,7 +99,7 @@ func TestWorkflowProgressUpdate(t *testing.T) {
 		percentage, progress := updateProgress()
 		assert.Equal(t, tc.expectedPercentage, percentage, "Percentage should match for step %d", tc.expectedStep)
 		assert.Equal(t, tc.expectedProgress, progress, "Progress string should match for step %d", tc.expectedStep)
-		
+
 		if tc.expectedStep == 5 || tc.expectedStep == 10 {
 			// Skip ahead for specific test cases
 			for currentStep < tc.expectedStep-1 {
