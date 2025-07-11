@@ -9,7 +9,7 @@ import (
 	"time"
 
 	coresecurity "github.com/Azure/container-kit/pkg/core/security"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -176,7 +176,7 @@ func (ts *TrivyScanner) ScanImage(ctx context.Context, imageRef string, severity
 	trivyPath, err := ts.findTrivy()
 	if err != nil {
 		ts.logger.Warn().Err(err).Msg("Trivy not found")
-		return nil, mcperrors.NewError().Messagef("trivy not available: %w", err).WithLocation().Build()
+		return nil, errors.New(errors.CodeInternalError, "docker", "trivy not available", nil)
 	}
 	ts.trivyPath = trivyPath
 
@@ -222,19 +222,13 @@ func (ts *TrivyScanner) ScanImage(ctx context.Context, imageRef string, severity
 			// This is normal when vulnerabilities are found
 			ts.logger.Debug().Msg("Trivy found vulnerabilities (exit code 1)")
 		} else {
-			return result, mcperrors.NewError().Messagef("trivy scan failed: %w", err).WithLocation(
-
-			// Parse Trivy JSON output
-			).Build()
+			return result, errors.New(errors.CodeOperationFailed, "trivy", fmt.Sprintf("trivy scan failed: %v", err), err)
 		}
 	}
 
 	var trivyResult TrivyResult
 	if err := json.Unmarshal(output, &trivyResult); err != nil {
-		return result, mcperrors.NewError().Messagef("failed to parse trivy output: %w", err).WithLocation(
-
-		// Convert Trivy results to our format
-		).Build()
+		return result, errors.New(errors.CodeOperationFailed, "trivy", fmt.Sprintf("failed to parse trivy output: %v", err), err)
 	}
 
 	ts.processResults(&trivyResult, result)

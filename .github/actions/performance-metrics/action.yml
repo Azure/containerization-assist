@@ -1,0 +1,379 @@
+name: 'Performance Metrics Visualization'
+description: 'Generates performance trend charts and provides optimization recommendations'
+
+inputs:
+  current-p95:
+    description: 'Current P95 performance time (e.g., "250μs", "1.2ms")'
+    required: true
+  
+  target-p95:
+    description: 'Target P95 performance time (e.g., "300μs")'
+    required: false
+    default: '300μs'
+  
+  baseline-p95:
+    description: 'Baseline P95 time to compare against'
+    required: false
+    default: ''
+  
+  benchmark-results:
+    description: 'Path to benchmark results file'
+    required: false
+    default: './benchmark-results.txt'
+  
+  chart-type:
+    description: 'Type of chart to generate (sparkline, bar, trend)'
+    required: false
+    default: 'sparkline'
+  
+  include-recommendations:
+    description: 'Include performance optimization recommendations'
+    required: false
+    default: 'true'
+
+outputs:
+  performance-status:
+    description: 'Performance status (excellent/good/warning/critical)'
+    value: ${{ steps.analyze.outputs.status }}
+  
+  performance-badge:
+    description: 'Performance badge SVG'
+    value: ${{ steps.generate-badge.outputs.badge }}
+  
+  performance-chart:
+    description: 'Performance trend visualization'
+    value: ${{ steps.generate-chart.outputs.chart }}
+  
+  recommendations:
+    description: 'Performance optimization recommendations'
+    value: ${{ steps.analyze.outputs.recommendations }}
+  
+  trend-analysis:
+    description: 'Performance trend analysis'
+    value: ${{ steps.analyze.outputs.trend }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Parse performance metrics
+      id: parse
+      shell: bash
+      run: |
+        echo "⚡ Parsing performance metrics..."
+        
+        CURRENT="${{ inputs.current-p95 }}"
+        TARGET="${{ inputs.target-p95 }}"
+        BASELINE="${{ inputs.baseline-p95 }}"
+        
+        # Function to convert time units to microseconds for comparison
+        convert_to_microseconds() {
+          local time_str="$1"
+          local number=$(echo "$time_str" | grep -o '[0-9.]*')
+          local unit=$(echo "$time_str" | grep -o '[a-zA-Zμ]*')
+          
+          case "$unit" in
+            "ns"|"nanoseconds") echo "scale=2; $number / 1000" | bc ;;
+            "μs"|"microseconds"|"us") echo "$number" ;;
+            "ms"|"milliseconds") echo "scale=2; $number * 1000" | bc ;;
+            "s"|"seconds") echo "scale=2; $number * 1000000" | bc ;;
+            *) echo "$number" ;; # assume microseconds if no unit
+          esac
+        }
+        
+        CURRENT_US=$(convert_to_microseconds "$CURRENT")
+        TARGET_US=$(convert_to_microseconds "$TARGET")
+        
+        echo "current_us=$CURRENT_US" >> $GITHUB_OUTPUT
+        echo "target_us=$TARGET_US" >> $GITHUB_OUTPUT
+        
+        if [ -n "$BASELINE" ]; then
+          BASELINE_US=$(convert_to_microseconds "$BASELINE")
+          echo "baseline_us=$BASELINE_US" >> $GITHUB_OUTPUT
+        fi
+        
+        echo "✅ Parsed: Current=$CURRENT_US μs, Target=$TARGET_US μs"
+
+    - name: Analyze performance status
+      id: analyze
+      shell: bash
+      run: |
+        echo "📊 Analyzing performance status..."
+        
+        CURRENT_US="${{ steps.parse.outputs.current_us }}"
+        TARGET_US="${{ steps.parse.outputs.target_us }}"
+        BASELINE_US="${{ steps.parse.outputs.baseline_us }}"
+        
+        # Determine performance status
+        if (( $(echo "$CURRENT_US <= $TARGET_US * 0.5" | bc -l) )); then
+          STATUS="excellent"
+          STATUS_EMOJI="🚀"
+          STATUS_COLOR="brightgreen"
+          PERFORMANCE_LEVEL="Excellent"
+        elif (( $(echo "$CURRENT_US <= $TARGET_US" | bc -l) )); then
+          STATUS="good"
+          STATUS_EMOJI="✅"
+          STATUS_COLOR="green"
+          PERFORMANCE_LEVEL="Good"
+        elif (( $(echo "$CURRENT_US <= $TARGET_US * 1.5" | bc -l) )); then
+          STATUS="warning"
+          STATUS_EMOJI="⚠️"
+          STATUS_COLOR="yellow"
+          PERFORMANCE_LEVEL="Warning"
+        else
+          STATUS="critical"
+          STATUS_EMOJI="🔥"
+          STATUS_COLOR="red"
+          PERFORMANCE_LEVEL="Critical"
+        fi
+        
+        echo "status=$STATUS" >> $GITHUB_OUTPUT
+        echo "status_emoji=$STATUS_EMOJI" >> $GITHUB_OUTPUT
+        echo "status_color=$STATUS_COLOR" >> $GITHUB_OUTPUT
+        echo "performance_level=$PERFORMANCE_LEVEL" >> $GITHUB_OUTPUT
+        
+        # Calculate trend if baseline is available
+        TREND_TEXT=""
+        TREND_SYMBOL=""
+        if [ -n "$BASELINE_US" ] && [ "$BASELINE_US" != "0" ]; then
+          IMPROVEMENT=$(echo "scale=2; (($BASELINE_US - $CURRENT_US) / $BASELINE_US) * 100" | bc)
+          
+          if (( $(echo "$IMPROVEMENT > 5" | bc -l) )); then
+            TREND_TEXT="📈 Improved by ${IMPROVEMENT}%"
+            TREND_SYMBOL="⬇️"  # Lower time is better
+          elif (( $(echo "$IMPROVEMENT < -5" | bc -l) )); then
+            IMPROVEMENT_ABS=$(echo "$IMPROVEMENT * -1" | bc)
+            TREND_TEXT="📉 Degraded by ${IMPROVEMENT_ABS}%"
+            TREND_SYMBOL="⬆️"  # Higher time is worse
+          else
+            TREND_TEXT="➡️ Stable performance"
+            TREND_SYMBOL="➡️"
+          fi
+        else
+          TREND_TEXT="📊 No baseline for comparison"
+          TREND_SYMBOL="📊"
+        fi
+        
+        echo "trend=$TREND_TEXT" >> $GITHUB_OUTPUT
+        echo "trend_symbol=$TREND_SYMBOL" >> $GITHUB_OUTPUT
+        
+        # Generate performance recommendations
+        RECOMMENDATIONS=""
+        
+        if [ "$STATUS" = "critical" ]; then
+          RECOMMENDATIONS+="- 🔥 **Critical**: Performance is significantly slower than target\n"
+          RECOMMENDATIONS+="- 🔍 **Profile**: Run detailed profiling to identify bottlenecks\n"
+          RECOMMENDATIONS+="- 🎯 **Priority**: Immediate optimization required\n"
+          RECOMMENDATIONS+="- 📊 **Tools**: Use \`go tool pprof\` for CPU/memory analysis\n"
+        elif [ "$STATUS" = "warning" ]; then
+          RECOMMENDATIONS+="- ⚠️ **Warning**: Performance approaching critical threshold\n"
+          RECOMMENDATIONS+="- 🔧 **Optimize**: Review hot paths and algorithm complexity\n"
+          RECOMMENDATIONS+="- 📈 **Monitor**: Track performance trends closely\n"
+        elif [ "$STATUS" = "good" ]; then
+          RECOMMENDATIONS+="- ✅ **Good**: Performance meets target requirements\n"
+          RECOMMENDATIONS+="- 🔄 **Maintain**: Continue monitoring for regressions\n"
+        else
+          RECOMMENDATIONS+="- 🚀 **Excellent**: Outstanding performance!\n"
+          RECOMMENDATIONS+="- 📚 **Share**: Document optimization techniques used\n"
+        fi
+        
+        # Add specific recommendations based on performance characteristics
+        RECOMMENDATIONS+="\n**General Optimization Tips:**\n"
+        RECOMMENDATIONS+="- 🏃 **Algorithms**: Review O(n) complexity of critical paths\n"
+        RECOMMENDATIONS+="- 💾 **Memory**: Minimize allocations in hot loops\n"
+        RECOMMENDATIONS+="- 🔄 **Concurrency**: Consider parallel processing for CPU-bound tasks\n"
+        RECOMMENDATIONS+="- 📦 **Caching**: Cache expensive computations\n"
+        
+        echo "recommendations<<EOF" >> $GITHUB_OUTPUT
+        echo -e "$RECOMMENDATIONS" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Generate performance badge
+      id: generate-badge
+      shell: bash
+      run: |
+        echo "🏷️ Generating performance badge..."
+        
+        CURRENT="${{ inputs.current-p95 }}"
+        COLOR="${{ steps.analyze.outputs.status_color }}"
+        LEVEL="${{ steps.analyze.outputs.performance_level }}"
+        
+        # Create SVG badge
+        BADGE_SVG="<svg xmlns='http://www.w3.org/2000/svg' width='140' height='20'>"
+        BADGE_SVG+="<linearGradient id='b' x2='0' y2='100%'>"
+        BADGE_SVG+="<stop offset='0' stop-color='#bbb' stop-opacity='.1'/>"
+        BADGE_SVG+="<stop offset='1' stop-opacity='.1'/>"
+        BADGE_SVG+="</linearGradient>"
+        BADGE_SVG+="<mask id='a'>"
+        BADGE_SVG+="<rect width='140' height='20' rx='3' fill='#fff'/>"
+        BADGE_SVG+="</mask>"
+        BADGE_SVG+="<g mask='url(#a)'>"
+        BADGE_SVG+="<path fill='#555' d='M0 0h80v20H0z'/>"
+        BADGE_SVG+="<path fill='$COLOR' d='M80 0h60v20H80z'/>"
+        BADGE_SVG+="<path fill='url(#b)' d='M0 0h140v20H0z'/>"
+        BADGE_SVG+="</g>"
+        BADGE_SVG+="<g fill='#fff' text-anchor='middle' font-family='DejaVu Sans,Verdana,Geneva,sans-serif' font-size='11'>"
+        BADGE_SVG+="<text x='40' y='15' fill='#010101' fill-opacity='.3'>performance</text>"
+        BADGE_SVG+="<text x='40' y='14'>performance</text>"
+        BADGE_SVG+="<text x='109' y='15' fill='#010101' fill-opacity='.3'>$CURRENT</text>"
+        BADGE_SVG+="<text x='109' y='14'>$CURRENT</text>"
+        BADGE_SVG+="</g>"
+        BADGE_SVG+="</svg>"
+        
+        echo "badge<<EOF" >> $GITHUB_OUTPUT
+        echo "$BADGE_SVG" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Generate performance chart
+      id: generate-chart
+      shell: bash
+      run: |
+        echo "📈 Generating performance chart..."
+        
+        CURRENT_US="${{ steps.parse.outputs.current_us }}"
+        TARGET_US="${{ steps.parse.outputs.target_us }}"
+        BASELINE_US="${{ steps.parse.outputs.baseline_us }}"
+        CHART_TYPE="${{ inputs.chart-type }}"
+        
+        if [ "$CHART_TYPE" = "sparkline" ]; then
+          # Generate ASCII sparkline for performance
+          CHART="Performance: "
+          
+          # Calculate performance ratio (lower is better)
+          RATIO=$(echo "scale=2; $CURRENT_US / $TARGET_US" | bc)
+          
+          if (( $(echo "$RATIO <= 0.5" | bc -l) )); then
+            CHART+="[EXCELLENT] ####"
+          elif (( $(echo "$RATIO <= 1.0" | bc -l) )); then
+            CHART+="[GOOD] ###."
+          elif (( $(echo "$RATIO <= 1.5" | bc -l) )); then
+            CHART+="[WARNING] ##.."
+          else
+            CHART+="[CRITICAL] #..."
+          fi
+          
+          CHART+=" | ${{ inputs.current-p95 }} ${{ steps.analyze.outputs.trend_symbol }}"
+          
+        elif [ "$CHART_TYPE" = "bar" ]; then
+          # Generate horizontal bar chart
+          CHART="Performance Comparison:\n"
+          CHART+="\`\`\`\n"
+          
+          # Calculate bar lengths (20 char max, lower time = longer bar)
+          MAX_TIME=$(echo "scale=0; $TARGET_US * 2" | bc)  # Use 2x target as max
+          CURRENT_BAR=$(echo "scale=0; 20 - ($CURRENT_US * 20 / $MAX_TIME)" | bc)
+          TARGET_BAR=$(echo "scale=0; 20 - ($TARGET_US * 20 / $MAX_TIME)" | bc)
+          
+          # Ensure bars are at least 1 and at most 20
+          CURRENT_BAR=$(echo "if ($CURRENT_BAR < 1) 1 else if ($CURRENT_BAR > 20) 20 else $CURRENT_BAR" | bc)
+          TARGET_BAR=$(echo "if ($TARGET_BAR < 1) 1 else if ($TARGET_BAR > 20) 20 else $TARGET_BAR" | bc)
+          
+          CURRENT_FILLED=$(printf "#%.0s" $(seq 1 $CURRENT_BAR))
+          CURRENT_EMPTY=$(printf ".%.0s" $(seq 1 $((20 - CURRENT_BAR))))
+          TARGET_FILLED=$(printf "#%.0s" $(seq 1 $TARGET_BAR))
+          TARGET_EMPTY=$(printf ".%.0s" $(seq 1 $((20 - TARGET_BAR))))
+          
+          CHART+="Current: [$CURRENT_FILLED$CURRENT_EMPTY] ${{ inputs.current-p95 }}\n"
+          CHART+="Target:  [$TARGET_FILLED$TARGET_EMPTY] ${{ inputs.target-p95 }}\n"
+          
+          if [ -n "$BASELINE_US" ]; then
+            BASELINE_BAR=$(echo "scale=0; 20 - ($BASELINE_US * 20 / $MAX_TIME)" | bc)
+            BASELINE_BAR=$(echo "if ($BASELINE_BAR < 1) 1 else if ($BASELINE_BAR > 20) 20 else $BASELINE_BAR" | bc)
+            BASELINE_FILLED=$(printf "#%.0s" $(seq 1 $BASELINE_BAR))
+            BASELINE_EMPTY=$(printf ".%.0s" $(seq 1 $((20 - BASELINE_BAR))))
+            CHART+="Baseline:[$BASELINE_FILLED$BASELINE_EMPTY] ${{ inputs.baseline-p95 }}\n"
+          fi
+          
+          CHART+="\`\`\`"
+          
+        else
+          # Simple trend visualization
+          CHART="Performance Trend: ${{ steps.analyze.outputs.trend }}\n"
+          CHART+="Current: ${{ inputs.current-p95 }} | Target: ${{ inputs.target-p95 }}"
+        fi
+        
+        echo "chart<<EOF" >> $GITHUB_OUTPUT
+        echo -e "$CHART" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Analyze benchmark results
+      id: benchmark-analysis
+      shell: bash
+      run: |
+        echo "🔍 Analyzing benchmark results..."
+        
+        BENCHMARK_FILE="${{ inputs.benchmark-results }}"
+        
+        if [ -f "$BENCHMARK_FILE" ]; then
+          echo "Processing benchmark file: $BENCHMARK_FILE"
+          
+          # Extract key metrics from Go benchmark output
+          ANALYSIS="## 📊 Benchmark Analysis\n\n"
+          
+          # Find the slowest operations
+          SLOWEST=$(grep -E "Benchmark.*-[0-9]+" "$BENCHMARK_FILE" | \
+                   awk '{print $3, $1}' | sort -nr | head -3)
+          
+          if [ -n "$SLOWEST" ]; then
+            ANALYSIS+="### 🐌 Slowest Operations:\n"
+            ANALYSIS+="\`\`\`\n"
+            echo "$SLOWEST" | while read -r time func; do
+              ANALYSIS+="$func: $time\n"
+            done
+            ANALYSIS+="\`\`\`\n\n"
+          fi
+          
+          # Check for memory allocations
+          MEMORY_HEAVY=$(grep -E "Benchmark.*B/op" "$BENCHMARK_FILE" | \
+                        awk '$4 > 1000 {print $1, $4}' | head -3)
+          
+          if [ -n "$MEMORY_HEAVY" ]; then
+            ANALYSIS+="### 💾 Memory-Heavy Operations:\n"
+            ANALYSIS+="\`\`\`\n"
+            echo "$MEMORY_HEAVY" | while read -r func memory; do
+              ANALYSIS+="$func: ${memory}B/op\n"
+            done
+            ANALYSIS+="\`\`\`\n\n"
+          fi
+          
+        else
+          ANALYSIS="⚠️ Benchmark results file not found: $BENCHMARK_FILE\n"
+          ANALYSIS+="Run \`make bench\` to generate benchmark data."
+        fi
+        
+        echo "benchmark_analysis<<EOF" >> $GITHUB_OUTPUT
+        echo -e "$ANALYSIS" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Create performance summary
+      shell: bash
+      run: |
+        echo "📊 Creating performance summary..."
+        
+        cat > performance-summary.md << EOF
+        # ⚡ Performance Analysis Report
+        
+        ## Overall Status: ${{ steps.analyze.outputs.status_emoji }} ${{ steps.analyze.outputs.performance_level }}
+        
+        **Current Performance:** ${{ inputs.current-p95 }}
+        **Target Performance:** ${{ inputs.target-p95 }}
+        **Trend:** ${{ steps.analyze.outputs.trend }}
+        
+        ${{ steps.generate-chart.outputs.chart }}
+        
+        ${{ steps.benchmark-analysis.outputs.benchmark_analysis }}
+        
+        ## 🎯 Optimization Recommendations
+        ${{ steps.analyze.outputs.recommendations }}
+        
+        ---
+        *Generated by Performance Metrics Action*
+        EOF
+        
+        echo "✅ Performance analysis complete!"
+
+    - name: Upload performance report
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-analysis-${{ github.run_id }}
+        path: performance-summary.md
+        retention-days: 7

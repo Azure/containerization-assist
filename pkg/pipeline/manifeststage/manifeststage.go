@@ -11,7 +11,6 @@ import (
 	"github.com/Azure/container-kit/pkg/clients"
 	"github.com/Azure/container-kit/pkg/k8s"
 	"github.com/Azure/container-kit/pkg/logger"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/pipeline"
 )
 
@@ -127,12 +126,12 @@ func DeployStateManifests(ctx context.Context, state *pipeline.PipelineState, c 
 		// Overwrite the original manifest file in place
 		manifestPath := manifest.ManifestPath
 		if err := os.WriteFile(manifestPath, manifest.Content, 0644); err != nil {
-			return mcperrors.NewError().Messagef("failed to write manifest %s: %v", name, err).WithLocation().Build()
+			return fmt.Errorf("failed to write manifest %s: %v", name, err)
 		}
 		logger.Infof("  %s", name)
 		success, output, err := c.DeployAndVerifySingleManifest(ctx, manifestPath, manifest.IsDeployment())
 		if err != nil {
-			return mcperrors.NewError().Messagef("error deploying manifest %s: %v", name, err).WithLocation().Build()
+			return fmt.Errorf("error deploying manifest %s: %v", name, err)
 		}
 
 		if !success {
@@ -150,15 +149,13 @@ func DeployStateManifests(ctx context.Context, state *pipeline.PipelineState, c 
 
 	// Return error if any manifests failed to deploy
 	if len(failedManifests) > 0 {
-		return mcperrors.NewError().Messagef("failed to deploy manifests: %v", failedManifests).WithLocation().Build(
-
-		// ManifestStage implements the pipeline.Pipeline interface for Kubernetes manifests
-		)
+		return fmt.Errorf("failed to deploy manifests: %v", failedManifests)
 	}
 
 	return nil
 }
 
+// ManifestStage implements the pipeline.Pipeline interface for Kubernetes manifests
 type ManifestStage struct {
 	AIClient ai.LLMClient
 	Parser   pipeline.Parser
@@ -168,38 +165,32 @@ type ManifestStage struct {
 func (p *ManifestStage) Generate(ctx context.Context, state *pipeline.PipelineState, targetDir string) error {
 	manifestPath := filepath.Join(targetDir)
 	if state.RegistryURL == "" || state.ImageName == "" {
-		return mcperrors.NewError().Messagef("registry URL or image name not provided in state").WithLocation(
-
-		// Check if manifests already exist
-		).Build()
+		return fmt.Errorf("registry URL or image name not provided in state")
 	}
 
+	// Check if manifests already exist
 	k8sObjects, err := k8s.FindK8sObjects(manifestPath)
 	if err != nil {
-		return mcperrors.NewError().Message("failed to find manifests").Cause(err).WithLocation(
-
-		// If no manifests exist, generate them using Draft
-		).Build()
+		return fmt.Errorf("failed to find manifests: %w", err)
 	}
 
+	// If no manifests exist, generate them using Draft
 	if len(k8sObjects) == 0 {
 		logger.Info("No existing Kubernetes manifests found, generating manifests...")
 
 		imageNameAndTag := fmt.Sprintf("%s/%s:%s", state.RegistryURL, state.ImageName, "latest")
 		if err := k8s.WriteManifestsFromTemplate(k8s.ManifestsBasic, targetDir, imageNameAndTag); err != nil {
-			return mcperrors.NewError().Message("writing manifests from template").Cause(err).WithLocation(
-
-			// Re-scan for the newly generated manifests
-			).Build()
+			return fmt.Errorf("writing manifests from template: %w", err)
 		}
 
+		// Re-scan for the newly generated manifests
 		k8sObjects, err = k8s.FindK8sObjects(targetDir)
 		if err != nil {
-			return mcperrors.NewError().Message("failed to find generated manifests").Cause(err).WithLocation().Build()
+			return fmt.Errorf("failed to find generated manifests: %w", err)
 		}
 
 		if len(k8sObjects) == 0 {
-			return mcperrors.NewError().Messagef("no Kubernetes manifests were generated").WithLocation().Build()
+			return fmt.Errorf("no Kubernetes manifests were generated")
 		}
 
 		logger.Infof("Successfully generated %d Kubernetes manifests", len(k8sObjects))
@@ -238,17 +229,15 @@ func (p *ManifestStage) WriteSuccessfulFiles(state *pipeline.PipelineState) erro
 	if anyWritten {
 		return nil
 	}
-	return mcperrors.NewError().Messagef("no successful manifests to write").WithLocation(
-
-	// Run executes the manifest deployment pipeline
-	).Build()
+	return fmt.Errorf("no successful manifests to write")
 }
 
+// Run executes the manifest deployment pipeline
 func (p *ManifestStage) Run(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}, options pipeline.RunnerOptions) error {
 	// Type assertion for clients
 	c, ok := clientsObj.(*clients.Clients)
 	if !ok {
-		return mcperrors.NewError().Messagef("invalid clients type").WithLocation().Build()
+		return fmt.Errorf("invalid clients type")
 	}
 
 	if err := k8s.CheckKubectlInstalled(); err != nil {
@@ -256,12 +245,10 @@ func (p *ManifestStage) Run(ctx context.Context, state *pipeline.PipelineState, 
 	}
 
 	if len(state.K8sObjects) == 0 {
-		return mcperrors.NewError().Messagef("no manifest files found in state").WithLocation(
-
-		// Fix each manifest that still has issues
-		).Build()
+		return fmt.Errorf("no manifest files found in state")
 	}
 
+	// Fix each manifest that still has issues
 	pendingObjects := GetPendingManifests(state)
 	for name := range pendingObjects {
 		thisObject := state.K8sObjects[name]
@@ -276,15 +263,13 @@ func (p *ManifestStage) Run(ctx context.Context, state *pipeline.PipelineState, 
 
 		failedImagePull := strings.Contains(thisObject.ErrorLog, "ImagePullBackOff")
 		if failedImagePull {
-			return mcperrors.NewError().Messagef("imagePullBackOff error detected in manifest %s. Skipping AI analysis", name).WithLocation(
-
-			// Pass the entire state instead of just the Dockerfile
-			).Build()
+			return fmt.Errorf("imagePullBackOff error detected in manifest %s. Skipping AI analysis", name)
 		}
 
+		// Pass the entire state instead of just the Dockerfile
 		result, err := analyzeKubernetesManifest(ctx, p.AIClient, input, state)
 		if err != nil {
-			return mcperrors.NewError().Messagef("error in AI analysis for %s: %v", name, err).WithLocation().Build()
+			return fmt.Errorf("error in AI analysis for %s: %v", name, err)
 		}
 
 		thisObject.Content = []byte(result.FixedContent)
@@ -312,17 +297,15 @@ func (p *ManifestStage) Run(ctx context.Context, state *pipeline.PipelineState, 
 		}
 	}
 
-	return mcperrors.NewError().Messagef("failed to fix Kubernetes manifests").WithLocation(
-
-	// InitializeManifests populates the K8sObjects field in PipelineState with manifests found in the specified path
-	// If path is empty, the default manifest path will be used
-	).Build()
+	return fmt.Errorf("failed to fix Kubernetes manifests")
 }
 
+// InitializeManifests populates the K8sObjects field in PipelineState with manifests found in the specified path
+// If path is empty, the default manifest path will be used
 func InitializeManifests(state *pipeline.PipelineState, path string) error {
 	k8sObjects, err := k8s.FindK8sObjects(path)
 	if err != nil {
-		return mcperrors.NewError().Message("failed to find manifests").Cause(err).WithLocation().Build()
+		return fmt.Errorf("failed to find manifests: %w", err)
 	}
 
 	state.K8sObjects = make(map[string]*k8s.K8sObject)
@@ -370,7 +353,7 @@ func (p *ManifestStage) Deploy(ctx context.Context, state *pipeline.PipelineStat
 	// Type assertion for clients
 	c, ok := clientsObj.(*clients.Clients)
 	if !ok {
-		return mcperrors.NewError().Messagef("invalid clients type").WithLocation().Build()
+		return fmt.Errorf("invalid clients type")
 	}
 
 	logger.Info("Deploying Kubernetes manifests...\n")

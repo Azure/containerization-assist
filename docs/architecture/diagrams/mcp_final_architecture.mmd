@@ -1,163 +1,132 @@
 graph TD
-    %% Container Kit MCP - Three-Layer Architecture
-    %% Updated to reflect actual codebase structure as of July 2025
-    %% 447 Go files, 132,625 lines of code, 179MB codebase
+    %% Container Kit MCP - Simplified Workflow Architecture
+    %% Current state: 25 core files with workflow-focused design
+    %% Single unified workflow for complete containerization process
 
-    Client[MCP Client] --> Transport[infra/transport/]
-    Transport --> Server[application/core/]
-    Server --> API[application/api/]
+    Client[MCP Client<br/>Claude Desktop / CLI] --> MCPProtocol[MCP Protocol<br/>Model Context Protocol]
+    MCPProtocol --> Server[MCP Server<br/>application/core/]
 
-    subgraph "Domain Layer (Business Logic)"
-        Domain[domain/]
-
-        subgraph "Domain Packages (96 Go files)"
-            Config[domain/config/<br/>Tag-based Validation DSL]
-            Containerization[domain/containerization/<br/>analyze/, build/, deploy/, scan/]
-            Errors[domain/errors/<br/>Unified RichError System]
-            Security[domain/security/<br/>Security Policies]
-            Session[domain/session/<br/>Session Entities]
-            Types[domain/types/<br/>Core Domain Types]
-            Workflow[domain/workflow/<br/>⚠️ Empty Directory]
-            Internal[domain/internal/<br/>common/, utils/, types/]
+    subgraph "Core Architecture (25 Files)"
+        Server --> WorkflowTool[Workflow Tool<br/>server/workflows.go]
+        
+        subgraph "Domain Layer"
+            ErrorSystem[Error System<br/>domain/errors/<br/>Rich error handling<br/>Used throughout codebase]
         end
 
-        Domain --> Config
-        Domain --> Containerization
-        Domain --> Errors
-        Domain --> Security
-        Domain --> Session
-        Domain --> Types
-        Domain --> Workflow
-        Domain --> Internal
-    end
-
-    subgraph "Application Layer (Use Cases & Orchestration)"
-        Application[application/]
-
-        subgraph "Application Packages (150 Go files)"
-            API[application/api/<br/>831 Lines - Canonical Interfaces<br/>Single Source of Truth]
-            Commands[application/commands/<br/>Consolidated Implementations]
-            Core[application/core/<br/>Server & Registry Management]
-            Conversation[application/conversation/<br/>Chat & Auto-fix]
-            Interfaces[application/interfaces/<br/>⚠️ Empty Directory<br/>Missing Compatibility Layer]
-            Knowledge[application/knowledge/<br/>Knowledge Management]
-            Orchestration[application/orchestration/<br/>Tool Coordination]
-            Services[application/services/<br/>Service Interfaces]
-            State[application/state/<br/>State Management]
-            Tools[application/tools/<br/>Tool Implementations]
-            Workflows[application/workflows/<br/>Workflow Engine]
-            AppInternal[application/internal/<br/>conversation/, runtime/, retry/]
+        subgraph "Application Layer"
+            API[API Interfaces<br/>application/api/<br/>Tool definitions]
+            Core[Server Core<br/>application/core/<br/>MCP implementation]
         end
 
-        Application --> API
-        Application --> Commands
-        Application --> Core
-        Application --> Conversation
-        Application --> Interfaces
-        Application --> Knowledge
-        Application --> Orchestration
-        Application --> Services
-        Application --> State
-        Application --> Tools
-        Application --> Workflows
-        Application --> AppInternal
-    end
-
-    subgraph "Infrastructure Layer (External Integrations)"
-        Infrastructure[infra/]
-
-        subgraph "Infrastructure Components (46 Go files)"
-            Persistence[infra/persistence/<br/>BoltDB Storage]
-            Templates[infra/templates/<br/>YAML Templates with go:embed]
-            Transport[infra/transport/<br/>MCP Protocol - stdio, HTTP]
-            Retry[infra/retry/<br/>Retry Coordination]
-            DockerInfra[infra/docker/<br/>Docker Client Integration]
-            K8sInfra[infra/k8s/<br/>Kubernetes Integration]
-            Telemetry[infra/telemetry/<br/>Prometheus & OpenTelemetry]
-            InfraInternal[infra/internal/<br/>logging/, migration/]
+        subgraph "Workflow Implementation"
+            WorkflowTool --> Steps[Workflow Steps<br/>internal/steps/]
+            
+            subgraph "10-Step Process"
+                Analyze[1. Analyze<br/>Repository analysis<br/>Technology detection]
+                Dockerfile[2. Dockerfile<br/>Generate optimized<br/>Dockerfile]
+                Build[3. Build<br/>Docker image<br/>construction]
+                Scan[4. Scan<br/>Security vulnerability<br/>scanning]
+                Tag[5. Tag<br/>Image tagging<br/>with version info]
+                Push[6. Push<br/>Push to container<br/>registry]
+                Manifest[7. Manifest<br/>Generate Kubernetes<br/>manifests]
+                Cluster[8. Cluster<br/>Cluster setup<br/>and validation]
+                Deploy[9. Deploy<br/>Application<br/>deployment]
+                Verify[10. Verify<br/>Health check<br/>and validation]
+            end
+            
+            Steps --> Analyze
+            Steps --> Dockerfile
+            Steps --> Build
+            Steps --> Scan
+            Steps --> Tag
+            Steps --> Push
+            Steps --> Manifest
+            Steps --> Cluster
+            Steps --> Deploy
+            Steps --> Verify
         end
 
-        Infrastructure --> Persistence
-        Infrastructure --> Templates
-        Infrastructure --> Transport
-        Infrastructure --> Retry
-        Infrastructure --> DockerInfra
-        Infrastructure --> K8sInfra
-        Infrastructure --> Telemetry
-        Infrastructure --> InfraInternal
+        subgraph "Step Implementations"
+            AnalyzeImpl[analyze.go<br/>Repository analysis logic]
+            BuildImpl[build.go<br/>Docker operations]
+            K8sImpl[k8s.go<br/>Kubernetes operations]
+        end
+
+        Analyze --> AnalyzeImpl
+        Build --> BuildImpl
+        Dockerfile --> BuildImpl
+        Tag --> BuildImpl
+        Push --> BuildImpl
+        Manifest --> K8sImpl
+        Cluster --> K8sImpl
+        Deploy --> K8sImpl
+        Verify --> K8sImpl
+        Scan --> BuildImpl
     end
 
-    %% Dependency Rules (per ADR-001)
-    %% Application can depend on Domain
-    API --> Domain
-    Commands --> Domain
-    Core --> Domain
-    Conversation --> Domain
-    Interfaces --> Domain
-    Knowledge --> Domain
-    Orchestration --> Domain
-    Services --> Domain
-    State --> Domain
-    Tools --> Domain
-    Workflows --> Domain
-    AppInternal --> Domain
-
-    %% Infrastructure can depend on Application and Domain
-    Persistence --> Application
-    Templates --> Application
-    Transport --> Application
-    Retry --> Application
-    DockerInfra --> Application
-    K8sInfra --> Application
-    Telemetry --> Application
-    InfraInternal --> Domain
-
-    %% Service Container Pattern (ADR-006)
-    subgraph "Service Container (Manual Dependency Injection)"
-        ServiceContainer[ServiceContainer<br/>8 Focused Services]
-        SessionStore[SessionStore<br/>Session CRUD]
-        SessionState[SessionState<br/>State & Checkpoints]
-        BuildExecutor[BuildExecutor<br/>Container Operations]
-        ToolRegistry[ToolRegistry<br/>Tool Management]
-        WorkflowExecutor[WorkflowExecutor<br/>Multi-step Workflows]
-        Scanner[Scanner<br/>Trivy & Grype]
-        ConfigValidator[ConfigValidator<br/>Tag-based Validation]
-        ErrorReporter[ErrorReporter<br/>Unified Error Handling]
+    subgraph "Infrastructure Components"
+        SessionStore[Session Storage<br/>BoltDB persistence]
+        WorkspaceManager[Workspace Manager<br/>Isolated workspaces]
+        ProgressTracker[Progress Tracking<br/>Step monitoring]
     end
 
-    Core --> ServiceContainer
-    ServiceContainer --> SessionStore
-    ServiceContainer --> SessionState
-    ServiceContainer --> BuildExecutor
-    ServiceContainer --> ToolRegistry
-    ServiceContainer --> WorkflowExecutor
-    ServiceContainer --> Scanner
-    ServiceContainer --> ConfigValidator
-    ServiceContainer --> ErrorReporter
+    subgraph "External Integrations"
+        Docker[Docker Engine<br/>Container runtime]
+        Registry[Container Registry<br/>Image storage]
+        Kubernetes[Kubernetes API<br/>Orchestration]
+        Scanner[Security Scanners<br/>Trivy/Grype]
+    end
 
-    %% External Systems Integration
-    DockerInfra --> DockerEngine[Docker Engine]
-    K8sInfra --> KubernetesAPI[Kubernetes API]
-    Persistence --> BoltDB[BoltDB Files<br/>Session Storage]
-    Scanner --> Trivy[Trivy Scanner]
-    Scanner --> Grype[Grype Scanner]
-    Telemetry --> Prometheus[Prometheus Metrics]
-    Telemetry --> OpenTelemetry[OpenTelemetry Tracing]
+    %% Core connections
+    WorkflowTool --> SessionStore
+    WorkflowTool --> WorkspaceManager
+    WorkflowTool --> ProgressTracker
+    WorkflowTool --> ErrorSystem
 
-    %% Architecture Validation (ADR-001)
-    %% - Domain: 96 files, no dependencies (pure business logic)
-    %% - Application: 150 files, depends only on Domain
-    %% - Infrastructure: 46 files, depends on Application and Domain
-    %% Total: 447 Go files, 132,625 lines of code
+    %% External connections
+    BuildImpl --> Docker
+    BuildImpl --> Registry
+    BuildImpl --> Scanner
+    K8sImpl --> Kubernetes
 
-    classDef domainLayer fill:#e8f5e9,stroke:#2e7d32,stroke-width:3px
-    classDef applicationLayer fill:#e3f2fd,stroke:#1565c0,stroke-width:3px
-    classDef infraLayer fill:#fff3e0,stroke:#ef6c00,stroke-width:3px
-    classDef serviceLayer fill:#e8eaf6,stroke:#3f51b5,stroke-width:2px
-    classDef externalSys fill:#eceff1,stroke:#455a64,stroke-width:1px,stroke-dasharray: 5 5
+    %% Error handling flows through everything
+    AnalyzeImpl --> ErrorSystem
+    BuildImpl --> ErrorSystem
+    K8sImpl --> ErrorSystem
 
-    class Domain,Config,Containerization,Errors,Security,Session,Types,Workflow,Internal domainLayer
-    class Application,API,Commands,Core,Conversation,Interfaces,Knowledge,Orchestration,Services,State,Tools,Workflows,AppInternal applicationLayer
-    class Infrastructure,Persistence,Templates,Transport,Retry,DockerInfra,K8sInfra,Telemetry,InfraInternal infraLayer
-    class ServiceContainer,SessionStore,SessionState,BuildExecutor,ToolRegistry,WorkflowExecutor,Scanner,ConfigValidator,ErrorReporter serviceLayer
-    class DockerEngine,KubernetesAPI,BoltDB,Trivy,Grype,Prometheus,OpenTelemetry externalSys
+    %% Progress tracking for all steps
+    Analyze --> ProgressTracker
+    Build --> ProgressTracker
+    Deploy --> ProgressTracker
+    Verify --> ProgressTracker
+
+    %% Session management
+    WorkflowTool --> SessionStore
+    SessionStore --> BoltDB[BoltDB<br/>Embedded storage]
+
+    %% Styling
+    classDef clientStyle fill:#e1f5fe,stroke:#0288d1,stroke-width:3px
+    classDef domainStyle fill:#e8f5e9,stroke:#2e7d32,stroke-width:3px
+    classDef applicationStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:3px
+    classDef workflowStyle fill:#f3e5f5,stroke:#6a1b9a,stroke-width:3px
+    classDef stepStyle fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    classDef infraStyle fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef externalStyle fill:#eceff1,stroke:#455a64,stroke-width:1px,stroke-dasharray: 5 5
+
+    class Client,MCPProtocol clientStyle
+    class ErrorSystem domainStyle
+    class API,Core,Server applicationStyle
+    class WorkflowTool,Steps workflowStyle
+    class Analyze,Dockerfile,Build,Scan,Tag,Push,Manifest,Cluster,Deploy,Verify stepStyle
+    class AnalyzeImpl,BuildImpl,K8sImpl stepStyle
+    class SessionStore,WorkspaceManager,ProgressTracker,BoltDB infraStyle
+    class Docker,Registry,Kubernetes,Scanner externalStyle
+
+    %% Architecture Notes
+    %% - 25 core files (reduced from 294)
+    %% - Single workflow tool instead of multiple atomic tools
+    %% - 10-step process with progress tracking
+    %% - Direct implementation without over-abstraction
+    %% - Essential error handling system retained
+    %% - Session-based workspace isolation
+    %% - Built-in progress indicators for user feedback

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // Parser defines an interface for extracting content from string responses
@@ -25,12 +23,12 @@ func (p *DefaultParser) ExtractContent(content string, tag string) (string, erro
 	matches := re.FindStringSubmatch(content)
 
 	if len(matches) < 2 {
-		return "", mcperrors.NewError().Messagef("content between tags <%s> not found", tag).WithLocation().Build()
+		return "", fmt.Errorf("content between tags <%s> not found", tag)
 	}
 
 	innerContent := strings.TrimSpace(matches[1])
 	if innerContent == "" {
-		return "", mcperrors.NewError().Messagef("content between tags <%s> is empty", tag).WithLocation().Build()
+		return "", fmt.Errorf("content between tags <%s> is empty", tag)
 	}
 
 	return innerContent, nil

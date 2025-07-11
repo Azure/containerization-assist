@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/clients"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // Builder provides mechanical Docker build operations without AI
@@ -168,17 +168,11 @@ func (b *Builder) BuildImage(ctx context.Context, dockerfileContent string, cont
 // ValidateDockerfile performs basic validation of Dockerfile content
 func (b *Builder) ValidateDockerfile(dockerfileContent string) error {
 	if strings.TrimSpace(dockerfileContent) == "" {
-		return mcperrors.NewError().Messagef("dockerfile is empty").WithLocation(
-
-		// Check for FROM instruction
-		).Build()
+		return errors.New(errors.CodeDockerfileSyntaxError, "docker", "dockerfile is empty", nil)
 	}
 
 	if !strings.Contains(strings.ToUpper(dockerfileContent), "FROM") {
-		return mcperrors.NewError().Messagef("dockerfile missing FROM instruction").WithLocation(
-
-		// Basic syntax validation could be added here
-		).Build()
+		return errors.New(errors.CodeDockerfileSyntaxError, "docker", "dockerfile missing FROM instruction", nil)
 	}
 
 	return nil

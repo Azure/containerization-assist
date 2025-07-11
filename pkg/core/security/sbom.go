@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -148,7 +148,7 @@ func (s *SBOMGenerator) GenerateSBOM(ctx context.Context, source string, format 
 	// In a real implementation, this would call syft or another tool
 	packages, err := s.discoverPackages(ctx, source)
 	if err != nil {
-		return nil, mcperrors.NewError().Messagef("failed to discover packages: %w", err).WithLocation().Build()
+		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to discover packages", err)
 	}
 
 	var result interface{}
@@ -159,7 +159,7 @@ func (s *SBOMGenerator) GenerateSBOM(ctx context.Context, source string, format 
 	case SBOMFormatCycloneDX:
 		result = s.GenerateCycloneDXBOM(source, packages)
 	default:
-		return nil, mcperrors.NewError().Messagef("unsupported SBOM format: %s", format).WithLocation().Build()
+		return nil, mcperrors.New(mcperrors.CodeInternalError, "core", fmt.Sprintf("unsupported SBOM format: %s", format), nil)
 	}
 
 	duration := time.Since(startTime)
@@ -550,40 +550,34 @@ func (s *SBOMGenerator) WriteSPDX(doc *SPDXDocument, w io.Writer) error {
 func (s *SBOMGenerator) ValidateSBOM(doc *SPDXDocument) error {
 	// Basic validation
 	if doc.SPDXVersion == "" {
-		return mcperrors.NewError().Messagef("SPDX version is required").WithLocation().Build()
+		return mcperrors.New(mcperrors.CodeValidationFailed, "core", "SPDX version is required", nil)
 	}
 
 	if doc.DataLicense == "" {
-		return mcperrors.NewError().Messagef("data license is required").WithLocation().Build()
+		return mcperrors.New(mcperrors.CodeValidationFailed, "core", "data license is required", nil)
 	}
 
 	if doc.Name == "" {
-		return mcperrors.NewError().Messagef("document name is required").WithLocation().Build()
+		return mcperrors.New(mcperrors.CodeValidationFailed, "core", "document name is required", nil)
 	}
 
 	if doc.DocumentNamespace == "" {
-		return mcperrors.NewError().Messagef("document namespace is required").WithLocation().Build()
+		return mcperrors.New(mcperrors.CodeValidationFailed, "core", "document namespace is required", nil)
 	}
 
 	if len(doc.Packages) == 0 {
-		return mcperrors.NewError().Messagef("at least one package is required").WithLocation(
-
-		// Validate packages
-		).Build()
+		return mcperrors.New(mcperrors.CodeValidationFailed, "core", "at least one package is required", nil)
 	}
 
 	for i, pkg := range doc.Packages {
 		if pkg.SPDXID == "" {
-			return mcperrors.NewError().Messagef("package %d: SPDX ID is required", i).WithLocation().Build()
+			return mcperrors.New(mcperrors.CodeValidationFailed, "core", "package %d: SPDX ID is required", nil)
 		}
 		if pkg.Name == "" {
-			return mcperrors.NewError().Messagef("package %d: name is required", i).WithLocation().Build()
+			return mcperrors.New(mcperrors.CodeValidationFailed, "core", "package %d: name is required", nil)
 		}
 		if pkg.DownloadLocation == "" {
-			return mcperrors.NewError().Messagef("package %d: download location is required", i).WithLocation(
-
-			// Validate relationships
-			).Build()
+			return mcperrors.New(mcperrors.CodeInternalError, "security", fmt.Sprintf("package %d: download location is required", i), nil)
 		}
 	}
 
@@ -595,10 +589,10 @@ func (s *SBOMGenerator) ValidateSBOM(doc *SPDXDocument) error {
 
 	for i, rel := range doc.Relationships {
 		if !packageIDs[rel.SPDXElementID] {
-			return mcperrors.NewError().Messagef("relationship %d: invalid SPDX element ID: %s", i, rel.SPDXElementID).WithLocation().Build()
+			return mcperrors.New(mcperrors.CodeValidationFailed, "core", fmt.Sprintf("relationship %d: invalid SPDX element ID: %s", i, rel.SPDXElementID), nil)
 		}
 		if !packageIDs[rel.RelatedSPDXElement] {
-			return mcperrors.NewError().Messagef("relationship %d: invalid related SPDX element: %s", i, rel.RelatedSPDXElement).WithLocation().Build()
+			return mcperrors.New(mcperrors.CodeValidationFailed, "core", fmt.Sprintf("relationship %d: invalid related SPDX element: %s", i, rel.RelatedSPDXElement), nil)
 		}
 	}
 

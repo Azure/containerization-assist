@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: app-config
-  namespace: default
-  labels:
-    app.kubernetes.io/name: app
-    kubernetes.azure.com/generator: container-kit
-data:

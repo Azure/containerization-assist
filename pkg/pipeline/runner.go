@@ -9,7 +9,6 @@ import (
 
 	"github.com/Azure/container-kit/pkg/clients"
 	"github.com/Azure/container-kit/pkg/logger"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // NewRunner constructs a Runner. You must pass a non-empty order;
@@ -71,24 +70,19 @@ func (r *Runner) Run(
 	// Initialize the pipeline stages in order
 	for _, sc := range r.stageConfigs {
 		if err := sc.Stage.Initialize(ctx, state, sc.Path); err != nil {
-			return mcperrors.NewError().Messagef("initializing stage %s", sc.Id).Cause(err).WithLocation(
-
-			// Generate artifacts for each stage in order
-			).Build()
+			return fmt.Errorf("initializing stage %s: %w", sc.Id, err)
 		}
 	}
-
+	// Generate artifacts for each stage in order
 	for _, sc := range r.stageConfigs {
 		logger.Infof("🔧 Generating artifacts for %s...", sc.Id)
 		// ensure the pipeline exists
 		if err := sc.Stage.Generate(ctx, state, opts.TargetDirectory); err != nil {
-			return mcperrors.NewError().Messagef("generate %s", sc.Id).Cause(err).WithLocation(
-
-			// Advance Stages until all are successful or max iterations reached
-			).Build()
+			return fmt.Errorf("generate %s: %w", sc.Id, err)
 		}
 	}
 
+	// Advance Stages until all are successful or max iterations reached
 	if r.stageConfigs == nil {
 		return errors.New("no stages to run")
 	}
@@ -102,7 +96,7 @@ func (r *Runner) Run(
 	for {
 		state.IterationCount++
 		if ctx.Err() != nil {
-			return mcperrors.NewError().Message("abort iterating with context err").Cause(ctx.Err()).WithLocation().Build()
+			return fmt.Errorf("abort iterating with context err: %w", ctx.Err())
 		}
 		stage := currentStageConfig.Stage
 		if state.RetryCount == 0 {
@@ -135,7 +129,7 @@ func (r *Runner) Run(
 			})
 			if opts.GenerateSnapshot {
 				if err := WriteIterationSnapshot(state, opts.TargetDirectory, opts.SnapshotCompletions, stage); err != nil {
-					return mcperrors.NewError().Message("writing iteration snapshot").Cause(err).WithLocation().Build()
+					return fmt.Errorf("writing iteration snapshot: %w", err)
 				}
 			}
 		}

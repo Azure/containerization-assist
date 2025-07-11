@@ -10,8 +10,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	validation "github.com/Azure/container-kit/pkg/mcp/domain/security"
+	"github.com/Azure/container-kit/pkg/mcp/api"
 	"sigs.k8s.io/yaml"
 )
 
@@ -168,9 +167,10 @@ func (s *ManifestServiceImpl) DiscoverManifests(_ context.Context, directory str
 // ValidateManifests validates Kubernetes manifests
 func (s *ManifestServiceImpl) ValidateManifests(_ context.Context, manifests []string) (*api.ManifestValidationResult, error) {
 	result := &api.ManifestValidationResult{
-		Valid:   true,
-		Errors:  make([]validation.Error, 0),
-		Context: make(map[string]string),
+		Valid:    true,
+		Errors:   make([]api.ValidationError, 0),
+		Warnings: make([]api.ValidationWarning, 0),
+		Metadata: make(map[string]interface{}),
 	}
 
 	s.logger.Info("Validating manifests", "count", len(manifests))
@@ -178,7 +178,7 @@ func (s *ManifestServiceImpl) ValidateManifests(_ context.Context, manifests []s
 	for _, manifest := range manifests {
 		if err := s.validateManifest(manifest); err != nil {
 			result.Valid = false
-			validationErr := validation.Error{
+			validationErr := api.ValidationError{
 				Message: err.Error(),
 				Field:   "manifest",
 				Code:    "MANIFEST_VALIDATION_ERROR",

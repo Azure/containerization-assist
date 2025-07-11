@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/logger"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 type RunOutcome string
@@ -104,31 +103,29 @@ func WriteReport(ctx context.Context, state *PipelineState, targetDir string) er
 	reportDirectoryPath := filepath.Join(targetDir, ReportDirectory)
 	if err := os.MkdirAll(reportDirectoryPath, 0755); err != nil {
 		logger.Errorf("Error creating report directory %s: %v", reportDirectoryPath, err)
-		return mcperrors.NewError().Message("creating report directory").Cause(err).WithLocation().Build()
+		return fmt.Errorf("creating report directory: %w", err)
 	}
 
 	report := NewReport(ctx, state)
 	reportJSON, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		logger.Warnf("Error marshalling stage history: %v", err)
-		return mcperrors.NewError().Message("marshalling stage history").Cause(err).WithLocation().Build()
+		return fmt.Errorf("marshalling stage history: %w", err)
 	}
 	reportFile := filepath.Join(reportDirectoryPath, RunReportFileName)
 	logger.Debugf("Writing stage history to %s", reportFile)
 	if err := os.WriteFile(reportFile, reportJSON, 0644); err != nil {
 		logger.Errorf("Error writing stage history to file: %v", err)
-		return mcperrors.NewError().Message("writing stage history to file").Cause(err).WithLocation(
-
-		// Generate and write the markdown report using context and pipeline state
-		).Build()
+		return fmt.Errorf("writing stage history to file: %w", err)
 	}
 
+	// Generate and write the markdown report using context and pipeline state
 	markdownReportContent := formatMarkdownReport(ctx, state)
 	reportMarkdownFile := filepath.Join(reportDirectoryPath, ReportMarkdownFileName)
 	logger.Debugf("Writing markdown report to %s", reportMarkdownFile)
 	if err := os.WriteFile(reportMarkdownFile, []byte(markdownReportContent), 0644); err != nil {
 		logger.Errorf("Error writing markdown report to file: %v", err)
-		return mcperrors.NewError().Message("writing markdown report to file").Cause(err).WithLocation().Build()
+		return fmt.Errorf("writing markdown report to file: %w", err)
 	}
 
 	return nil

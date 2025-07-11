@@ -11,7 +11,6 @@ import (
 	"github.com/Azure/container-kit/pkg/clients"
 	"github.com/Azure/container-kit/pkg/docker"
 	"github.com/Azure/container-kit/pkg/logger"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/pipeline"
 	"github.com/Azure/container-kit/pkg/pipeline/manifeststage"
 )
@@ -31,12 +30,10 @@ func InitializeDockerFileState(state *pipeline.PipelineState, dockerFilePath str
 	// Read the Dockerfile content
 	content, err := os.ReadFile(dockerFilePath)
 	if err != nil {
-		return mcperrors.NewError().Messagef("error reading Dockerfile at path %s: %v", dockerFilePath, err).WithLocation(
-
-		// Update pipeline state with Dockerfile information
-		).Build()
+		return fmt.Errorf("error reading Dockerfile at path %s: %v", dockerFilePath, err)
 	}
 
+	// Update pipeline state with Dockerfile information
 	state.Dockerfile.Content = string(content)
 	state.Dockerfile.Path = dockerFilePath
 	state.Dockerfile.BuildErrors = ""
@@ -57,20 +54,20 @@ func (p *DockerStage) Generate(ctx context.Context, state *pipeline.PipelineStat
 			// Use the existing function from the docker package
 			templateName, _, err := docker.GetDockerfileTemplateName(ctx, p.AIClient, targetDir, state.RepoFileTree)
 			if err != nil {
-				return mcperrors.NewError().Message("getting Dockerfile template name").Cause(err).WithLocation().Build()
+				return fmt.Errorf("getting Dockerfile template name: %w", err)
 			}
 
 			logger.Infof("Using Dockerfile template: %s\n", templateName)
 
 			// Generate the Dockerfile from template
 			if err := docker.WriteDockerfileFromTemplate(templateName, targetDir); err != nil {
-				return mcperrors.NewError().Message("writing Dockerfile from template").Cause(err).WithLocation().Build()
+				return fmt.Errorf("writing Dockerfile from template: %w", err)
 			}
 		} else {
 			logger.Info("Creating empty Dockerfile")
 			// Create an empty file
 			if err := os.WriteFile(dockerfilePath, []byte{}, 0644); err != nil {
-				return mcperrors.NewError().Message("writing empty Dockerfile").Cause(err).WithLocation().Build()
+				return fmt.Errorf("writing empty Dockerfile: %w", err)
 			}
 		}
 	} else {
@@ -80,7 +77,7 @@ func (p *DockerStage) Generate(ctx context.Context, state *pipeline.PipelineStat
 	// Read the content and update state
 	content, err := os.ReadFile(dockerfilePath)
 	if err != nil {
-		return mcperrors.NewError().Message("reading Dockerfile").Cause(err).WithLocation().Build()
+		return fmt.Errorf("reading Dockerfile: %w", err)
 	}
 
 	state.Dockerfile.Content = string(content)
@@ -103,21 +100,19 @@ func (p *DockerStage) WriteSuccessfulFiles(state *pipeline.PipelineState) error 
 	if state.Dockerfile.Path != "" && state.Dockerfile.Content != "" && state.Dockerfile.BuildErrors == "" {
 		logger.Infof("Writing final Dockerfile to %s\n", state.Dockerfile.Path)
 		if err := os.WriteFile(state.Dockerfile.Path, []byte(state.Dockerfile.Content), 0644); err != nil {
-			return mcperrors.NewError().Message("writing Dockerfile").Cause(err).WithLocation().Build()
+			return fmt.Errorf("writing Dockerfile: %w", err)
 		}
 		return nil
 	}
-	return mcperrors.NewError().Messagef("no successful Dockerfile to write").WithLocation(
-
-	// Run executes the Dockerfile generation and build pipeline
-	).Build()
+	return fmt.Errorf("no successful Dockerfile to write")
 }
 
+// Run executes the Dockerfile generation and build pipeline
 func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}, options pipeline.RunnerOptions) error {
 	// Type assertion for clients
 	c, ok := clientsObj.(*clients.Clients)
 	if !ok {
-		return mcperrors.NewError().Messagef("invalid clients type").WithLocation().Build()
+		return fmt.Errorf("invalid clients type")
 	}
 
 	targetDir := options.TargetDirectory
@@ -132,12 +127,10 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 	// Get AI to fix the Dockerfile
 	result, err := analyzeDockerfile(ctx, p.AIClient, state)
 	if err != nil {
-		return mcperrors.NewError().Messagef("error in AI analysis: %v", err).WithLocation(
-
-		// Update the Dockerfile
-		).Build()
+		return fmt.Errorf("error in AI analysis: %v", err)
 	}
 
+	// Update the Dockerfile
 	state.Dockerfile.Content = result.FixedContent
 	logger.Debug("AI suggested fixes:")
 	logger.Debug(result.Analysis)
@@ -171,12 +164,10 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 
 	time.Sleep(1 * time.Second) // Small delay for readability
 
-	return mcperrors.NewError().Messagef("failed to fix Dockerfile").WithLocation(
-
-	// analyzeDockerfile uses AI to analyze and fix Dockerfile content with file reading capabilities
-	).Build()
+	return fmt.Errorf("failed to fix Dockerfile")
 }
 
+// analyzeDockerfile uses AI to analyze and fix Dockerfile content with file reading capabilities
 func analyzeDockerfile(ctx context.Context, client ai.LLMClient, state *pipeline.PipelineState) (*pipeline.FileAnalysisResult, error) {
 	dockerfile := state.Dockerfile
 
@@ -323,25 +314,21 @@ func (p *DockerStage) Deploy(ctx context.Context, state *pipeline.PipelineState,
 	// Type assertion for clients
 	c, ok := clientsObj.(*clients.Clients)
 	if !ok {
-		return mcperrors.NewError().Messagef("invalid clients type").WithLocation(
-
-		// Only deploy if the build was successful
-		).Build()
+		return fmt.Errorf("invalid clients type")
 	}
 
+	// Only deploy if the build was successful
 	if state.Dockerfile.BuildErrors != "" {
-		return mcperrors.NewError().Messagef("cannot deploy Docker image with build errors").WithLocation(
-
-		// Build the image name with registry
-		).Build()
+		return fmt.Errorf("cannot deploy Docker image with build errors")
 	}
 
+	// Build the image name with registry
 	registryAndImage := fmt.Sprintf("%s/%s", state.RegistryURL, state.ImageName)
 	logger.Infof("Pushing Docker image %s to registry\n", registryAndImage)
 
 	// Push the Docker image
 	if err := c.PushDockerImage(ctx, registryAndImage); err != nil {
-		return mcperrors.NewError().Messagef("pushing image %s", registryAndImage).Cause(err).WithLocation().Build()
+		return fmt.Errorf("pushing image %s: %w", registryAndImage, err)
 	}
 
 	logger.Infof("Successfully pushed Docker image %s to registry\n", registryAndImage)

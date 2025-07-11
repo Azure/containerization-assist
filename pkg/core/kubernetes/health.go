@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/clients"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -226,7 +226,7 @@ func (hc *HealthChecker) WaitForPodReadiness(ctx context.Context, namespace stri
 				LabelSelector: labelSelector,
 			})
 			if err != nil {
-				return nil, mcperrors.NewError().Messagef("timeout waiting for pod readiness: %v", err).WithLocation().Build()
+				return nil, mcperrors.New(mcperrors.CodeIoError, "core", "timeout waiting for pod readiness: %v", err)
 			}
 			result.Error = &HealthCheckError{
 				Type:      "timeout_error",

@@ -46,6 +46,18 @@ inputs:
   mcp-tests-status:
     description: 'MCP test suite status'
     required: false
+  enable-charts:
+    description: 'Enable visual charts and enhanced metrics'
+    required: false
+    default: 'true'
+  baseline-coverage:
+    description: 'Baseline coverage for comparison'
+    required: false
+    default: '0'
+  baseline-performance:
+    description: 'Baseline performance for comparison'
+    required: false
+    default: ''
 runs:
   using: "composite"
   steps:
@@ -181,6 +193,28 @@ runs:
           echo "EOF"
         } >> $GITHUB_OUTPUT
 
+    - name: Generate coverage chart
+      id: coverage-chart
+      if: inputs.enable-charts == 'true' && inputs.coverage-total != ''
+      uses: ./.github/actions/coverage-chart
+      with:
+        current-coverage: ${{ inputs.coverage-total }}
+        baseline-coverage: ${{ inputs.baseline-coverage }}
+        chart-type: 'bar'
+        package-breakdown: 'true'
+      continue-on-error: true
+
+    - name: Generate performance chart
+      id: performance-chart
+      if: inputs.enable-charts == 'true' && inputs.canary-time != ''
+      uses: ./.github/actions/performance-metrics
+      with:
+        current-p95: ${{ inputs.canary-time }}
+        baseline-p95: ${{ inputs.baseline-performance }}
+        chart-type: 'sparkline'
+        include-recommendations: 'true'
+      continue-on-error: true
+
     - name: Create or Update PR Comment
       if: github.event_name == 'pull_request'
       uses: actions/github-script@v7
@@ -212,9 +246,28 @@ runs:
             overallEmoji = '⚠️';
           }
 
+          // Include visual elements if charts are enabled
+          const enableCharts = '${{ inputs.enable-charts }}' === 'true';
+          const coverageChart = '${{ steps.coverage-chart.outputs.coverage-chart }}' || '';
+          const performanceChart = '${{ steps.performance-chart.outputs.performance-chart }}' || '';
+          const coverageBreakdown = '${{ steps.coverage-chart.outputs.coverage-breakdown }}' || '';
+          const performanceRecommendations = '${{ steps.performance-chart.outputs.recommendations }}' || '';
+
+          let visualSection = '';
+          if (enableCharts && (coverageChart || performanceChart)) {
+            visualSection = `
+          ## 📈 Visual Metrics
+
+          ${coverageChart ? `**Coverage Trend:**\n${coverageChart}\n` : ''}
+          ${performanceChart ? `**Performance:**\n${performanceChart}\n` : ''}
+          `;
+          }
+
           const body = `# ${overallEmoji} CI Pipeline Status
 
           ${overallStatus}
+
+          ${visualSection}
 
           ## 📊 Quick Summary
           | Check | Status | Details |
@@ -238,6 +291,8 @@ runs:
           <summary><b>🧪 Test Coverage Report</b></summary>
 
           ${{ steps.ci-status.outputs.coverage_results }}
+
+          ${coverageBreakdown ? `\n### Package Coverage Breakdown\n${coverageBreakdown}\n` : ''}
 
           ${hasCoverageData && coverageValue < 20 ? '> ⚠️ **Warning:** Coverage is below 20%. Consider adding more tests.' : ''}
 
@@ -272,6 +327,8 @@ runs:
           <summary><b>⚡ Performance Metrics</b></summary>
 
           ${{ steps.ci-status.outputs.performance_results }}
+
+          ${performanceRecommendations ? `\n### Optimization Recommendations\n${performanceRecommendations}\n` : ''}
 
           </details>
 

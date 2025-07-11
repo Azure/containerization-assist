@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/rs/zerolog"
 	"sigs.k8s.io/yaml"
 )
@@ -198,22 +198,16 @@ func (sg *SecretGenerator) SaveSecretToFile(secret *Secret, outputPath string) e
 	// Marshal to YAML
 	yamlData, err := yaml.Marshal(secret)
 	if err != nil {
-		return mcperrors.NewError().Messagef("failed to marshal secret to YAML: %v", err).WithLocation(
-
-		// Ensure directory exists
-		).Build()
+		return mcperrors.New(mcperrors.CodeInternalError, "k8s", fmt.Sprintf("failed to marshal secret to YAML: %v", err), err)
 	}
 
 	dir := filepath.Dir(outputPath)
 	if err := sg.ensureDirectory(dir); err != nil {
-		return mcperrors.NewError().Messagef("failed to create directory: %v", err).WithLocation(
-
-		// Write to file
-		).Build()
+		return mcperrors.New(mcperrors.CodeOperationFailed, "k8s", fmt.Sprintf("failed to create directory: %v", err), err)
 	}
 
 	if err := sg.writeFile(outputPath, yamlData); err != nil {
-		return mcperrors.NewError().Messagef("failed to write secret file: %v", err).WithLocation().Build()
+		return mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to write secret file: %v", err)
 	}
 
 	sg.logger.Info().
@@ -239,7 +233,7 @@ func (sg *SecretGenerator) GenerateDockerRegistrySecret(ctx context.Context, nam
 
 	dockerConfigJSON, err := sg.marshalJSON(dockerConfig)
 	if err != nil {
-		return nil, mcperrors.NewError().Messagef("failed to marshal docker config: %v", err).WithLocation().Build()
+		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to marshal docker config: %v", err)
 	}
 
 	options := SecretOptions{

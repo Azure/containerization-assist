@@ -2,11 +2,12 @@ package docker
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"strings"
 	"time"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/runner"
 )
 
@@ -78,10 +79,7 @@ func (d *DockerCmdRunner) Login(ctx context.Context, registry, username, passwor
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return string(output), mcperrors.NewError().Messagef("docker login failed: %w", err).WithLocation(
-
-		// Cache successful authentication
-		).Build()
+		return string(output), errors.New(errors.CodeOperationFailed, "docker", fmt.Sprintf("docker login failed: %v", err), err)
 	}
 
 	registryKey := registry
@@ -107,10 +105,7 @@ func (d *DockerCmdRunner) LoginWithToken(ctx context.Context, registry, token st
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return string(output), mcperrors.NewError().Messagef("docker login with token failed: %w", err).WithLocation(
-
-		// Cache successful authentication
-		).Build()
+		return string(output), errors.New(errors.CodeOperationFailed, "docker", fmt.Sprintf("docker login with token failed: %v", err), err)
 	}
 
 	registryKey := registry
@@ -133,10 +128,7 @@ func (d *DockerCmdRunner) Logout(ctx context.Context, registry string) (string, 
 	}
 
 	if err != nil {
-		return output, mcperrors.NewError().Messagef("docker logout failed: %w", err).WithLocation(
-
-		// Remove from auth cache
-		).Build()
+		return output, errors.New(errors.CodeOperationFailed, "docker", fmt.Sprintf("docker logout failed: %v", err), err)
 	}
 
 	registryKey := registry
@@ -177,7 +169,7 @@ func (d *DockerCmdRunner) IsLoggedIn(ctx context.Context, registry string) (bool
 
 func CheckDockerInstalled() error {
 	if _, err := exec.LookPath("docker"); err != nil {
-		return mcperrors.NewError().Messagef("docker executable not found in PATH. Please install Docker or ensure it's available in your PATH").WithLocation().Build()
+		return errors.New(errors.CodeFileNotFound, "docker", "docker executable not found in PATH. Please install Docker or ensure it's available in your PATH", nil)
 	}
 	return nil
 }
