@@ -215,6 +215,14 @@ func (ra *RepositoryAnalyzer) detectLanguageAndFramework(repoPath string) (strin
 					framework = ra.detectJavaScriptFramework(filePath)
 				}
 
+				// For Java, detect specific frameworks
+				if check.language == "java" {
+					javaFramework := ra.detectJavaFramework(repoPath, framework)
+					if javaFramework != "" {
+						framework = javaFramework
+					}
+				}
+
 				return check.language, framework
 			}
 		}
@@ -265,6 +273,75 @@ func (ra *RepositoryAnalyzer) detectJavaScriptFramework(packageJsonPath string) 
 	}
 
 	return "nodejs"
+}
+
+// detectJavaFramework detects specific Java frameworks and application types
+func (ra *RepositoryAnalyzer) detectJavaFramework(repoPath string, buildTool string) string {
+	// Check for web.xml which indicates a servlet/WAR application
+	webXmlPath := filepath.Join(repoPath, "src", "main", "webapp", "WEB-INF", "web.xml")
+	if _, err := os.Stat(webXmlPath); err == nil {
+		ra.logger.Info("Detected Java servlet application (found web.xml)")
+		return buildTool + "-servlet"
+	}
+
+	// Alternative web.xml location
+	webXmlPath2 := filepath.Join(repoPath, "WebContent", "WEB-INF", "web.xml")
+	if _, err := os.Stat(webXmlPath2); err == nil {
+		ra.logger.Info("Detected Java servlet application (found web.xml in WebContent)")
+		return buildTool + "-servlet"
+	}
+
+	// Check for JSP files which indicate a web application
+	var hasJSP bool
+	filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		if strings.HasSuffix(strings.ToLower(path), ".jsp") {
+			hasJSP = true
+			return filepath.SkipDir // Stop walking once we find one
+		}
+		return nil
+	})
+
+	if hasJSP {
+		ra.logger.Info("Detected Java web application (found JSP files)")
+		return buildTool + "-servlet"
+	}
+
+	// Check pom.xml for packaging type
+	if buildTool == "maven" {
+		pomPath := filepath.Join(repoPath, "pom.xml")
+		if content, err := os.ReadFile(pomPath); err == nil {
+			// Simple XML parsing for packaging type
+			if strings.Contains(string(content), "<packaging>war</packaging>") {
+				ra.logger.Info("Detected Java WAR application from pom.xml")
+				return "maven-war"
+			}
+			// Check for servlet dependencies
+			if strings.Contains(string(content), "javax.servlet") || 
+			   strings.Contains(string(content), "jakarta.servlet") ||
+			   strings.Contains(string(content), "spring-boot-starter-web") {
+				ra.logger.Info("Detected Java web application from dependencies")
+				return "maven-servlet"
+			}
+		}
+	}
+
+	// Check build.gradle for war plugin
+	if buildTool == "gradle" {
+		gradlePath := filepath.Join(repoPath, "build.gradle")
+		if content, err := os.ReadFile(gradlePath); err == nil {
+			if strings.Contains(string(content), "war") || 
+			   strings.Contains(string(content), "org.springframework.boot") {
+				ra.logger.Info("Detected Java web application from build.gradle")
+				return "gradle-servlet"
+			}
+		}
+	}
+
+	// Return original build tool if no specific framework detected
+	return buildTool
 }
 
 // detectLanguageByExtensions detects language by counting file extensions
@@ -319,7 +396,7 @@ func (ra *RepositoryAnalyzer) detectLanguageByExtensions(repoPath string) string
 	return detectedLang
 }
 
-// analyzeConfigFiles finds and analyzes configuration files
+// analyzeConfigFiles finds and analyzes configuration files with graceful error handling
 func (ra *RepositoryAnalyzer) analyzeConfigFiles(repoPath string) []ConfigFile {
 	configFiles := make([]ConfigFile, 0)
 
@@ -331,6 +408,7 @@ func (ra *RepositoryAnalyzer) analyzeConfigFiles(repoPath string) []ConfigFile {
 		"pyproject.toml":         "package",
 		"pom.xml":                "build",
 		"build.gradle":           "build",
+		"build.gradle.kts":       "build",
 		"Cargo.toml":             "package",
 		"composer.json":          "package",
 		"Gemfile":                "package",
@@ -342,31 +420,65 @@ func (ra *RepositoryAnalyzer) analyzeConfigFiles(repoPath string) []ConfigFile {
 		"application.properties": "config",
 		"application.yml":        "config",
 		"docker-compose.yml":     "docker",
+		"docker-compose.yaml":    "docker",
 		"Dockerfile":             "docker",
 		"Makefile":               "build",
 		"tsconfig.json":          "config",
 		"webpack.config.js":      "build",
 	}
 
+	var filesChecked, filesFound int
+	
 	for fileName, fileType := range configPatterns {
+		filesChecked++
 		filePath := filepath.Join(repoPath, fileName)
-		if _, err := os.Stat(filePath); err == nil {
-			configFile := ConfigFile{
-				Path:     fileName,
-				Type:     fileType,
-				Relevant: true,
+		
+		info, err := os.Stat(filePath)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				// Log actual errors (not just missing files)
+				ra.logger.Debug("Failed to stat config file", 
+					"file", fileName, 
+					"error", err,
+					"path", filePath)
 			}
-
-			// Try to parse content for JSON files
-			if strings.HasSuffix(fileName, ".json") {
-				if content, err := ra.parseJSONFile(filePath); err == nil {
-					configFile.Content = content
-				}
-			}
-
-			configFiles = append(configFiles, configFile)
+			continue
 		}
+		
+		// Skip directories
+		if info.IsDir() {
+			ra.logger.Debug("Skipping directory with config name", "path", fileName)
+			continue
+		}
+		
+		filesFound++
+		configFile := ConfigFile{
+			Path:     fileName,
+			Type:     fileType,
+			Relevant: true,
+		}
+
+		// Try to parse content for JSON files with error handling
+		if strings.HasSuffix(fileName, ".json") {
+			content, err := ra.parseJSONFile(filePath)
+			if err != nil {
+				ra.logger.Warn("Failed to parse JSON config file",
+					"file", fileName,
+					"error", err,
+					"continuing", "yes")
+				// Still include the file even if parsing failed
+			} else {
+				configFile.Content = content
+			}
+		}
+
+		configFiles = append(configFiles, configFile)
 	}
+	
+	ra.logger.Debug("Config file analysis complete",
+		"files_checked", filesChecked,
+		"files_found", filesFound,
+		"config_files", len(configFiles))
 
 	return configFiles
 }
@@ -403,27 +515,51 @@ func (ra *RepositoryAnalyzer) findEntryPoints(repoPath, language, framework stri
 
 	// Common entry point patterns by language
 	patterns := map[string][]string{
-		"javascript": {"index.js", "app.js", "server.js", "main.js"},
-		"typescript": {"index.ts", "app.ts", "server.ts", "main.ts"},
-		"python":     {"main.py", "app.py", "server.py", "__main__.py", "run.py"},
-		"go":         {"main.go", "cmd/main.go"},
+		"javascript": {"index.js", "app.js", "server.js", "main.js", "src/index.js", "src/app.js"},
+		"typescript": {"index.ts", "app.ts", "server.ts", "main.ts", "src/index.ts", "src/app.ts"},
+		"python":     {"main.py", "app.py", "server.py", "__main__.py", "run.py", "wsgi.py", "manage.py"},
+		"go":         {"main.go", "cmd/main.go", "cmd/*/main.go"},
 		"java":       {"src/main/java/**/Application.java", "src/main/java/**/Main.java"},
+		"rust":       {"src/main.rs", "main.rs"},
+		"php":        {"index.php", "app.php", "public/index.php"},
 	}
 
 	if langPatterns, exists := patterns[language]; exists {
 		for _, pattern := range langPatterns {
-			if strings.Contains(pattern, "**") {
-				// Handle wildcard patterns
-				if ra.findFilesByPattern(repoPath, pattern) {
-					entryPoints = append(entryPoints, pattern)
+			if strings.Contains(pattern, "**") || strings.Contains(pattern, "*") {
+				// Handle wildcard patterns with basic glob support
+				matches, err := filepath.Glob(filepath.Join(repoPath, pattern))
+				if err != nil {
+					ra.logger.Debug("Error in glob pattern", "pattern", pattern, "error", err)
+					continue
+				}
+				for _, match := range matches {
+					relPath, err := filepath.Rel(repoPath, match)
+					if err != nil {
+						ra.logger.Debug("Failed to get relative path", "path", match, "error", err)
+						continue
+					}
+					entryPoints = append(entryPoints, relPath)
 				}
 			} else {
 				filePath := filepath.Join(repoPath, pattern)
-				if _, err := os.Stat(filePath); err == nil {
+				info, err := os.Stat(filePath)
+				if err != nil {
+					if !os.IsNotExist(err) {
+						ra.logger.Debug("Error checking entry point", "file", pattern, "error", err)
+					}
+					continue
+				}
+				if !info.IsDir() {
 					entryPoints = append(entryPoints, pattern)
 				}
 			}
 		}
+	}
+	
+	// If no entry points found, log a warning
+	if len(entryPoints) == 0 {
+		ra.logger.Debug("No standard entry points found", "language", language, "framework", framework)
 	}
 
 	return entryPoints
@@ -594,12 +730,32 @@ func (ra *RepositoryAnalyzer) findFilesByPattern(repoPath, pattern string) bool 
 func (ra *RepositoryAnalyzer) parseJSONFile(filePath string) (map[string]interface{}, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, err
+		ra.logger.Debug("Failed to read JSON file", "path", filePath, "error", err)
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Check if file is empty
+	if len(content) == 0 {
+		ra.logger.Debug("Empty JSON file", "path", filePath)
+		return make(map[string]interface{}), nil
 	}
 
 	var result map[string]interface{}
 	err = json.Unmarshal(content, &result)
-	return result, err
+	if err != nil {
+		// Try to provide more context about the JSON error
+		preview := string(content)
+		if len(preview) > 100 {
+			preview = preview[:100] + "..."
+		}
+		ra.logger.Debug("Failed to parse JSON", 
+			"path", filePath, 
+			"error", err,
+			"preview", preview)
+		return nil, fmt.Errorf("invalid JSON: %w", err)
+	}
+	
+	return result, nil
 }
 
 func (ra *RepositoryAnalyzer) extractJSONDependencies(packageJson map[string]interface{}, key string) []Dependency {

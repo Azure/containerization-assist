@@ -328,37 +328,45 @@ func GetServiceEndpoint(ctx context.Context, k8sResult *K8sResult, logger *slog.
 	return "", fmt.Errorf("could not determine service endpoint")
 }
 
-// CheckDeploymentHealth verifies that the deployment is healthy using kubectl
+// CheckDeploymentHealth verifies that the deployment is healthy with comprehensive diagnostics
 func CheckDeploymentHealth(ctx context.Context, k8sResult *K8sResult, logger *slog.Logger) error {
 	if k8sResult == nil {
 		return fmt.Errorf("k8s result is required")
 	}
 
-	logger.Info("Checking deployment health",
+	logger.Info("Checking deployment health with comprehensive diagnostics",
 		"app_name", k8sResult.AppName,
 		"namespace", k8sResult.Namespace)
 
-	// Use kubectl to check deployment status
-	cmd := exec.CommandContext(ctx, "kubectl", "get", "deployment", k8sResult.AppName,
-		"-n", k8sResult.Namespace,
-		"-o", "jsonpath={.status.readyReplicas}/{.status.replicas}")
-
-	output, err := cmd.CombinedOutput()
+	// Use the new comprehensive verification
+	diagnostics, err := VerifyDeploymentWithDiagnostics(ctx, k8sResult, logger)
 	if err != nil {
-		logger.Error("Failed to get deployment status", "error", err, "output", string(output))
-		return fmt.Errorf("failed to get deployment status: %v", err)
+		logger.Error("Failed to get deployment diagnostics", "error", err)
+		return fmt.Errorf("failed to get deployment diagnostics: %v", err)
 	}
 
-	statusStr := string(output)
-	logger.Info("Deployment status", "status", statusStr)
-
-	// Simple health check - more sophisticated checks could be added
-	if statusStr == "1/1" || statusStr == "/1" { // readyReplicas/replicas
+	// Generate diagnostic report
+	report := GenerateDiagnosticReport(diagnostics)
+	
+	if diagnostics.DeploymentOK {
 		logger.Info("Deployment health check passed",
 			"app_name", k8sResult.AppName,
-			"namespace", k8sResult.Namespace)
+			"namespace", k8sResult.Namespace,
+			"pods_ready", diagnostics.PodsReady,
+			"pods_total", diagnostics.PodsTotal)
+		logger.Debug("Deployment diagnostics", "report", report)
 		return nil
 	}
 
-	return fmt.Errorf("deployment not ready: %s", statusStr)
+	// Deployment is not healthy - provide detailed error with diagnostics
+	logger.Error("Deployment health check failed",
+		"app_name", k8sResult.AppName,
+		"namespace", k8sResult.Namespace,
+		"pods_ready", diagnostics.PodsReady,
+		"pods_total", diagnostics.PodsTotal,
+		"errors", diagnostics.Errors)
+	
+	// Include diagnostics in error for AI analysis
+	return fmt.Errorf("deployment not healthy: %d/%d pods ready\n\nDiagnostics:\n%s", 
+		diagnostics.PodsReady, diagnostics.PodsTotal, report)
 }

@@ -60,18 +60,22 @@ type SessionManager interface {
 
 #### Error Handling Standards
 - Always handle errors explicitly - never ignore with `_`
-- Use the unified Rich error system from `pkg/common/errors/errors.go`
+- Use the unified Rich error system from `pkg/mcp/domain/errors/rich.go`
 - Use `errors.Is()` and `errors.As()` for error checking
-- Include domain context and proper error codes
+- Include domain context and proper error codes using builder pattern
 
 ```go
-// Use Rich error system
-return errors.New(
-    errors.CodeValidationFailed,
-    "validation",
-    "validation failed for field: " + fieldName,
-    originalError,
-).With("field", fieldName).With("value", fieldValue)
+// Use Rich error system with builder pattern
+return errors.NewError().
+    Code(errors.CodeValidationFailed).
+    Type(errors.ErrTypeValidation).
+    Severity(errors.SeverityMedium).
+    Message("validation failed for field: " + fieldName).
+    Context("field", fieldName).
+    Context("value", fieldValue).
+    Suggestion("Check field format and constraints").
+    WithLocation().
+    Build()
 ```
 
 ### Code Quality Standards
@@ -222,15 +226,18 @@ func sanitizePath(path string) string {
 
 ### Rich Error Pattern
 ```go
-// Use unified Rich error system from pkg/common/errors/errors.go
-return errors.New(
-    errors.CodeBuildFailed,
-    "docker",
-    "Docker build failed during RUN step: npm install",
-    originalError,
-).With("dockerfile_line", 15).
-  With("command", "RUN npm install").
-  With("exit_code", 1)
+// Use unified Rich error system from pkg/mcp/domain/errors/rich.go
+return errors.NewError().
+    Code(errors.CodeBuildFailed).
+    Type(errors.ErrTypeBuild).
+    Severity(errors.SeverityHigh).
+    Message("Docker build failed during RUN step: npm install").
+    Context("dockerfile_line", 15).
+    Context("command", "RUN npm install").
+    Context("exit_code", 1).
+    Suggestion("Check npm dependencies and network connectivity").
+    WithLocation().
+    Build()
 ```
 
 ### Error Context
@@ -265,33 +272,37 @@ return errors.New(
   - Create focused sub-packages
 
 ### Architecture Overview
-The architecture focuses on core functionality with a clean, modular design:
+Container Kit follows a clean 4-layer Domain-Driven Design architecture:
 
 ```
-pkg/
-├── mcp/             # Model Context Protocol server & workflow
-│   ├── application/     # Server implementation & session management
-│   ├── domain/          # Business logic (workflows, types)
-│   └── infrastructure/  # Workflow steps, analysis, retry
-├── core/            # Core containerization services
-│   ├── docker/          # Docker operations & services
-│   ├── kubernetes/      # Kubernetes operations & manifests
-│   ├── kind/            # Kind cluster management
-│   └── security/        # Security scanning & validation
-├── common/          # Shared utilities
-│   ├── errors/          # Rich error handling system
-│   ├── filesystem/      # File operations
-│   ├── logger/          # Logging utilities
-│   └── runner/          # Command execution
-├── ai/              # AI integration and analysis
-└── pipeline/        # Legacy pipeline stages
+pkg/mcp/
+├── api/                    # Interface definitions and contracts
+│   └── interfaces.go       # Essential MCP tool interfaces
+├── application/            # Application services and orchestration
+│   ├── server.go          # MCP server implementation
+│   ├── chat_mode.go       # Chat mode integration
+│   └── session/           # Session management
+├── domain/                # Business logic and workflows
+│   ├── workflow/          # Core containerization workflow
+│   ├── errors/            # Rich error handling system
+│   ├── progress/          # Progress tracking (business concept)
+│   └── elicitation/       # User input gathering (business process)
+└── infrastructure/        # Technical implementations
+    ├── steps/             # Workflow step implementations
+    ├── analysis/          # Repository analysis
+    ├── retry/             # AI-powered retry logic
+    ├── security/          # Security utilities
+    ├── sampling/          # LLM integration
+    ├── prompts/           # MCP prompt management
+    └── resources/         # MCP resource providers
 ```
 
 **Key Architecture Features:**
-- Modular package organization with clear responsibilities
-- Single workflow approach for unified experience
-- Rich error handling with structured context
-- Separation of MCP server, core services, and utilities
+- **Clean Dependencies**: Infrastructure → Application → Domain → API
+- **Single Workflow**: `containerize_and_deploy` handles complete process
+- **Domain-Driven**: Core business logic isolated in domain layer
+- **AI-Enhanced**: Built-in AI error recovery and analysis capabilities
+- **Separation of Concerns**: Each layer has clear responsibilities
 
 ### Import Organization
 ```go
@@ -366,43 +377,40 @@ make version              # Show version
 ## Architecture Patterns
 
 ### Workflow-Focused Architecture
-The system uses a single workflow approach for the complete containerization process:
+The system uses a single workflow approach with AI orchestration for the complete containerization process:
 
 ```go
-// Single workflow tool that handles the entire containerization process
-type ContainerizeAndDeployTool struct {
-    workspaceDir string
-    logger       *slog.Logger
+// RegisterWorkflowTools registers the comprehensive containerization workflow
+func RegisterWorkflowTools(mcpServer *server.MCPServer, logger *slog.Logger) error {
+	tool := mcp.Tool{
+		Name:        "containerize_and_deploy",
+		Description: "Complete containerization workflow from analysis to deployment",
+	}
+
+	mcpServer.RegisterTool(tool, func(ctx context.Context, arguments map[string]interface{}) (*mcp.CallToolResult, error) {
+		// Use new orchestrator-based workflow
+		orchestrator := NewOrchestrator(logger)
+		result, err := orchestrator.Execute(ctx, &req, &args)
+		return result, err
+	})
 }
 
-// Main workflow with 10 steps and progress tracking
-func (t *ContainerizeAndDeployTool) Execute(ctx context.Context, args ContainerizeAndDeployArgs) (interface{}, error) {
-    steps := []string{
-        "analyze",      // Repository analysis
-        "dockerfile",   // Dockerfile generation
-        "build",        // Docker build
-        "scan",         // Security scanning
-        "tag",          // Image tagging
-        "push",         // Registry push
-        "manifest",     // K8s manifest generation
-        "cluster",      // Cluster setup
-        "deploy",       // Deployment
-        "verify",       // Health check
-    }
+// AI-powered orchestrator handles 9-step workflow execution
+func (o *Orchestrator) Execute(ctx context.Context, req *ContainerizeAndDeployRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
+    totalSteps := 9
+    progressTracker := progress.NewProgressTracker(ctx, req, totalSteps, o.logger)
     
-    // Execute each step with progress tracking
-    for i, step := range steps {
-        progress := fmt.Sprintf("%d/%d", i+1, len(steps))
-        // ... step execution with progress updates
-    }
+    // Execute workflow with AI-powered error recovery
+    return o.executeWorkflowWithProgress(ctx, req, args, progressTracker)
 }
 ```
 
 ### Key Architecture Benefits
-1. **Single Point of Entry**: One tool handles the entire workflow
-2. **Progress Tracking**: Built-in progress indicators for each step
-3. **Error Recovery**: Centralized error handling with actionable messages
-4. **State Management**: Clean session and state management
+1. **Single Point of Entry**: One tool handles the entire workflow with AI orchestration
+2. **Progress Tracking**: Built-in progress indicators with metadata and AI insights
+3. **AI-Powered Error Recovery**: Intelligent error analysis and automated retry logic
+4. **State Management**: Clean session and state management with BoltDB persistence
+5. **Layer Separation**: Clean dependencies prevent architectural violations
 
 ## Function Design Principles
 
@@ -441,10 +449,10 @@ Always check type assertions to prevent panics.
 
 - For clarification on guidelines: Open an issue with label `guidelines`
 - For tool setup: See `.devcontainer/README.md`
-- For architecture questions: See `docs/THREE_LAYER_ARCHITECTURE.md`
+- For architecture questions: See `docs/architecture/adr/2025-07-12-four-layer-mcp-architecture.md`
 
 ---
 
-**Version**: 2.0
-**Last Updated**: 2025-07-10
-**Next Review**: Quarterly (2025-10-10)
+**Version**: 3.0
+**Last Updated**: 2025-07-12
+**Next Review**: Quarterly (2025-10-12)

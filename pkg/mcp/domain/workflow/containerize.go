@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/utilities"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/validation"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rs/zerolog"
@@ -156,6 +158,36 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 
 	startTime := time.Now()
 
+	// Initialize state persistence (use temp dir if no workspace available)
+	workspaceDir := os.TempDir()
+	if envWorkspace := os.Getenv("CONTAINER_KIT_WORKSPACE"); envWorkspace != "" {
+		workspaceDir = envWorkspace
+	}
+	statePersistence := NewStatePersistence(workspaceDir, logger)
+	
+	// Create workflow state manager
+	workflowID := fmt.Sprintf("workflow-%d", time.Now().Unix())
+	stateManager := NewWorkflowStateManager(workflowID, *args, 10, statePersistence, logger)
+	
+	// Create progressive error context
+	errorContext := NewProgressiveErrorContext(20) // Keep last 20 errors
+
+	// Setup cleanup handler for temporary resources
+	var cleanupFuncs []func()
+	defer func() {
+		// Execute all cleanup functions in reverse order
+		for i := len(cleanupFuncs) - 1; i >= 0; i-- {
+			if cleanupFuncs[i] != nil {
+				cleanupFuncs[i]()
+			}
+		}
+		
+		// Cleanup old checkpoints (older than 24 hours)
+		if err := statePersistence.CleanupOldCheckpoints(24 * time.Hour); err != nil {
+			logger.Debug("Failed to cleanup old checkpoints", "error", err)
+		}
+	}()
+
 	// Create unified progress tracker
 	totalSteps := 10
 	progressTracker := progress.NewProgressTracker(ctx, req, totalSteps, logger)
@@ -164,8 +196,30 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 	// Begin progress tracking
 	progressTracker.Begin("Starting containerization and deployment workflow")
 
-	// Create workflow progress tracker
-	workflowID := fmt.Sprintf("workflow-%d", time.Now().Unix())
+	// Run preflight checks before starting workflow
+	preflightValidator := validation.NewPreflightValidator(logger)
+	preflightResult, err := preflightValidator.ValidateRequired(ctx)
+	if err != nil {
+		logger.Error("Preflight validation failed", "error", err, "errors", preflightResult.Errors)
+		result.Success = false
+		result.Error = fmt.Sprintf("Preflight validation failed: %v", err)
+		for _, checkErr := range preflightResult.Errors {
+			result.Steps = append(result.Steps, WorkflowStep{
+				Name:    "preflight_validation",
+				Status:  "failed",
+				Error:   checkErr,
+				Message: "Pre-execution validation failed",
+			})
+		}
+		return result, nil
+	}
+	
+	// Log any warnings
+	for _, warning := range preflightResult.Warnings {
+		logger.Warn("Preflight warning", "warning", warning)
+	}
+
+	// Create workflow progress tracker (use same ID as state manager)
 	workflowProgress := NewWorkflowProgress(workflowID, "containerize_and_deploy", totalSteps)
 
 	currentStep := 0
@@ -184,7 +238,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 	var k8sResult *steps.K8sResult
 
 	// Step 1: Analyze repository with AI retry
-	if err := executeStepWithRetry(ctx, result, "analyze_repository", 2, func() error {
+	if err := executeStepWithRetryEnhanced(ctx, result, "analyze_repository", 2, func() error {
 		logger.Info("Step 1: Analyzing repository", "repo_url", args.RepoURL)
 
 		var err error
@@ -212,15 +266,33 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 		}
 
 		return nil
-	}, logger, updateProgress, "Analyzing repository structure and detecting language/framework", progressTracker, workflowProgress); err != nil {
+	}, logger, updateProgress, "Analyzing repository structure and detecting language/framework", progressTracker, workflowProgress, errorContext, stateManager); err != nil {
 		// Always return the result object to preserve progress information
 		// gomcp will discard the result if we return a non-nil error
 		result.Success = false
 		return result, nil
 	}
+	
+	// Save state after successful analysis
+	stateManager.SetState("analyzeResult", analyzeResult)
+	stateManager.SetStepCompleted("analyze_repository")
+	if err := stateManager.SaveState("analyze_repository"); err != nil {
+		logger.Warn("Failed to save workflow state", "error", err)
+	}
+	
+	// Register cleanup for cloned repository if needed
+	if analyzeResult.RepoPath != "" && strings.Contains(analyzeResult.RepoPath, "/tmp/") {
+		repoPath := analyzeResult.RepoPath
+		cleanupFuncs = append(cleanupFuncs, func() {
+			logger.Debug("Cleaning up temporary repository", "path", repoPath)
+			if err := os.RemoveAll(repoPath); err != nil {
+				logger.Warn("Failed to cleanup temporary repository", "path", repoPath, "error", err)
+			}
+		})
+	}
 
 	// Step 2: Generate Dockerfile with AI retry on build errors
-	if err := executeStepWithRetry(ctx, result, "generate_dockerfile", 2, func() error {
+	if err := executeStepWithRetryEnhanced(ctx, result, "generate_dockerfile", 2, func() error {
 		logger.Info("Step 2: Generating Dockerfile")
 
 		var err error
@@ -231,9 +303,16 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 
 		logger.Info("Dockerfile generated successfully", "path", dockerfileResult.Path)
 		return nil
-	}, logger, updateProgress, "Generating optimized Dockerfile for detected language/framework", progressTracker, workflowProgress); err != nil {
+	}, logger, updateProgress, "Generating optimized Dockerfile for detected language/framework", progressTracker, workflowProgress, errorContext, stateManager); err != nil {
 		result.Success = false
 		return result, nil
+	}
+	
+	// Save state after successful Dockerfile generation
+	stateManager.SetState("dockerfileResult", dockerfileResult)
+	stateManager.SetStepCompleted("generate_dockerfile")
+	if err := stateManager.SaveState("generate_dockerfile"); err != nil {
+		logger.Warn("Failed to save workflow state", "error", err)
 	}
 
 	// Step 3: Build image with AI retry on Docker errors
@@ -257,6 +336,21 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 		"imageTag", buildResult.ImageTag,
 		"imageID", buildResult.ImageID,
 		"deploy", args.Deploy)
+	
+	// Register cleanup for Docker image if deployment is skipped
+	if buildResult != nil && buildResult.ImageID != "" {
+		imageID := buildResult.ImageID
+		cleanupFuncs = append(cleanupFuncs, func() {
+			// Only cleanup if deployment was not requested
+			if args.Deploy != nil && !*args.Deploy {
+				logger.Debug("Cleaning up Docker image", "imageID", imageID)
+				cmd := exec.Command("docker", "rmi", "-f", imageID)
+				if err := cmd.Run(); err != nil {
+					logger.Debug("Failed to cleanup Docker image", "imageID", imageID, "error", err)
+				}
+			}
+		})
+	}
 
 	// Check if deployment is requested (defaults to true for backward compatibility)
 	shouldDeploy := args.Deploy == nil || *args.Deploy

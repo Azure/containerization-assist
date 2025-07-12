@@ -34,125 +34,151 @@ When you use Container Kit with Claude Desktop or other MCP clients, you're usin
 
 ## Understanding the Simplified Architecture
 
-Container Kit uses a focused, workflow-driven approach with just 25 core files delivering complete containerization functionality.
+Container Kit uses a clean 4-layer architecture following Domain-Driven Design principles that delivers complete containerization functionality with AI-powered automation.
 
-### Architecture Overview
+### Four-Layer Clean Architecture
 
 ```
-pkg/
-├── mcp/             # Model Context Protocol server & workflow
-│   ├── application/     # Server implementation & session management
-│   ├── domain/          # Business logic (workflows, types)
-│   └── infrastructure/  # Workflow steps, analysis, retry
-├── core/            # Core containerization services
-│   ├── docker/          # Docker operations & services
-│   ├── kubernetes/      # Kubernetes operations & manifests
-│   ├── kind/            # Kind cluster management
-│   └── security/        # Security scanning & validation
-├── common/          # Shared utilities
-│   ├── errors/          # Rich error handling system
-│   ├── filesystem/      # File operations
-│   ├── logger/          # Logging utilities
-│   └── runner/          # Command execution
-├── ai/              # AI integration and analysis
-└── pipeline/        # Legacy pipeline stages
+pkg/mcp/
+├── api/                    # Interface definitions and contracts
+│   └── interfaces.go       # Essential MCP tool interfaces
+├── application/            # Application services and orchestration
+│   ├── server.go          # MCP server implementation
+│   ├── chat_mode.go       # Chat mode integration
+│   └── session/           # Session management
+├── domain/                # Business logic and workflows
+│   ├── workflow/          # Core containerization workflow
+│   ├── errors/            # Rich error handling system
+│   ├── progress/          # Progress tracking (business concept)
+│   └── elicitation/       # User input gathering (business process)
+└── infrastructure/        # Technical implementations
+    ├── steps/             # Workflow step implementations
+    ├── analysis/          # Repository analysis
+    ├── retry/             # AI-powered retry logic
+    ├── security/          # Security utilities
+    ├── sampling/          # LLM integration
+    ├── prompts/           # MCP prompt management
+    └── resources/         # MCP resource providers
 ```
 
 ### Why This Architecture Works
 
-1. **Focused Design**: Only 25 core files to maintain
-2. **Single Workflow**: Unified process without coordination complexity
-3. **Direct Implementation**: Clear, straightforward code paths
-4. **Clear Structure**: Easy to understand and modify
-5. **Essential Functionality**: Everything needed, nothing more
+1. **Clean Dependencies**: Infrastructure → Application → Domain → API
+2. **Single Workflow**: `containerize_and_deploy` handles complete process
+3. **Domain-Driven**: Core business logic isolated in domain layer
+4. **Separation of Concerns**: Each layer has clear responsibilities
+5. **AI-Enhanced**: Built-in AI error recovery and analysis capabilities
 
 ## How the Workflow Tool Works
 
 ### Unified Workflow Process
-Container Kit now provides a single, comprehensive workflow that handles the complete containerization process:
+Container Kit provides a single, comprehensive workflow with AI orchestration that handles the complete containerization process:
 
-1. **Analyze** (1/10): Repository structure and technology detection
-2. **Dockerfile** (2/10): Generate optimized Dockerfile
-3. **Build** (3/10): Docker image construction
-4. **Scan** (4/10): Security vulnerability scanning
-5. **Tag** (5/10): Image tagging with version info
-6. **Push** (6/10): Push to container registry
-7. **Manifest** (7/10): Generate Kubernetes manifests
-8. **Cluster** (8/10): Cluster setup and validation
-9. **Deploy** (9/10): Application deployment
-10. **Verify** (10/10): Health check and validation
+1. **Analyze** (1/9): Repository structure and technology detection
+2. **Dockerfile** (2/9): Generate optimized Dockerfile with AI assistance
+3. **Build** (3/9): Docker image construction with AI-powered error fixing
+4. **Scan** (4/9): Security vulnerability scanning with AI analysis
+5. **Setup Cluster** (5/9): Local Kubernetes cluster setup with registry
+6. **Load Image** (6/9): Load Docker image into Kubernetes cluster
+7. **Generate Manifests** (7/9): Generate Kubernetes deployment manifests
+8. **Deploy** (8/9): Application deployment with AI-powered error recovery
+9. **Verify** (9/9): Health check and endpoint validation
 
 ### Progress Tracking
 Each step provides:
-- **Progress indicator**: "3/10" style progress
-- **Human-readable message**: "Analyzing repository structure..."
-- **Error recovery**: Detailed error context if step fails
+- **Progress indicator**: "3/9" style progress with percentage
+- **Human-readable message**: "[33%] Analyzing repository structure..."
+- **AI-powered error recovery**: Detailed error context with AI suggestions
 - **Duration tracking**: Time spent on each step
+- **Metadata tracking**: Structured metadata for progress monitoring
 
 ### Workflow Tool Structure
 ```go
-type ContainerizeAndDeployTool struct {
-    workspaceDir string
-    logger       *slog.Logger
+// RegisterWorkflowTools registers the comprehensive containerization workflow
+func RegisterWorkflowTools(mcpServer *server.MCPServer, logger *slog.Logger) error {
+	tool := mcp.Tool{
+		Name:        "containerize_and_deploy",
+		Description: "Complete containerization workflow from analysis to deployment",
+	}
+
+	mcpServer.RegisterTool(tool, func(ctx context.Context, arguments map[string]interface{}) (*mcp.CallToolResult, error) {
+		// Use new orchestrator-based workflow
+		orchestrator := NewOrchestrator(logger)
+		result, err := orchestrator.Execute(ctx, &req, &args)
+		return result, err
+	})
 }
 
-func (t *ContainerizeAndDeployTool) Execute(ctx context.Context, args ContainerizeAndDeployArgs) (interface{}, error) {
-    steps := []string{
-        "analyze", "dockerfile", "build", "scan", "tag",
-        "push", "manifest", "cluster", "deploy", "verify"
-    }
+// AI-powered orchestrator handles workflow execution
+type Orchestrator struct {
+    logger *slog.Logger
+}
+
+func (o *Orchestrator) Execute(ctx context.Context, req *ContainerizeAndDeployRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
+    // Create unified progress tracker
+    totalSteps := 9
+    progressTracker := progress.NewProgressTracker(ctx, req, totalSteps, o.logger)
     
-    for i, step := range steps {
-        progress := fmt.Sprintf("%d/%d", i+1, len(steps))
-        message := fmt.Sprintf("Step %d: %s", i+1, getStepDescription(step))
-        
-        if err := t.executeStep(ctx, step, progress, message); err != nil {
-            return nil, err
-        }
-    }
-    
-    return result, nil
+    // Execute workflow with AI-powered error recovery
+    return o.executeWorkflowWithProgress(ctx, req, args, progressTracker)
 }
 ```
 
 ## Workflow Step Development
 
 ### Step Implementation Pattern
-Each workflow step is implemented in `pkg/mcp/internal/steps/`:
+Each workflow step is implemented in `pkg/mcp/infrastructure/steps/`:
 
 ```go
-// pkg/mcp/internal/steps/analyze.go
+// pkg/mcp/infrastructure/steps/analyze.go
 func AnalyzeRepository(ctx context.Context, args AnalyzeArgs) (*AnalyzeResult, error) {
-    // Repository analysis logic
-    return &AnalyzeResult{
-        TechnologyStack: detectedTech,
-        Recommendations: suggestions,
-    }, nil
+    // Repository analysis logic with optional AI enhancement
+    result := &AnalyzeResult{
+        Language:    detectedLanguage,
+        Framework:   detectedFramework,
+        Port:        detectedPort,
+        Dependencies: dependencies,
+    }
+    
+    // Optional AI enhancement for better recommendations
+    if aiAnalysis, err := enhanceWithAI(ctx, result); err == nil {
+        result.AIEnhanced = true
+        result.Recommendations = aiAnalysis.Recommendations
+    }
+    
+    return result, nil
 }
 ```
 
 ### Adding New Steps
-1. **Create step file**: Add to `pkg/mcp/internal/steps/`
-2. **Implement logic**: Focus on the specific operation
-3. **Error handling**: Use unified RichError system
-4. **Progress tracking**: Include progress indicators
-5. **Testing**: Unit tests for the step
+1. **Create step file**: Add to `pkg/mcp/infrastructure/steps/`
+2. **Implement logic**: Focus on the specific operation with AI integration
+3. **Error handling**: Use unified RichError system from `pkg/mcp/domain/errors/`
+4. **Progress tracking**: Include progress indicators with metadata
+5. **AI Integration**: Consider AI-powered error recovery where applicable
+6. **Testing**: Unit tests for the step with both success and failure scenarios
 
 ### Step Integration
-Steps are integrated into the main workflow:
+Steps are integrated into the orchestrator workflow with AI retry logic:
 
 ```go
-func (t *ContainerizeAndDeployTool) executeStep(ctx context.Context, stepName, progress, message string) error {
-    switch stepName {
-    case "analyze":
-        return steps.AnalyzeRepository(ctx, t.analyzeArgs)
-    case "build":
-        return steps.BuildImage(ctx, t.buildArgs)
-    case "k8s":
-        return steps.DeployToKubernetes(ctx, t.k8sArgs)
-    default:
-        return fmt.Errorf("unknown step: %s", stepName)
+// Execute step with AI-powered retry logic
+if err := executeStepWithRetry(ctx, result, "analyze", 2, func() error {
+    var err error
+    analyzeResult, err = steps.AnalyzeRepository(analyzeArgs, logger)
+    if err != nil {
+        return fmt.Errorf("repository analysis failed: %v", err)
     }
+    
+    // Optional AI enhancement
+    if enhanced, err := steps.AnalyzeEnhance(analyzeResult, logger); err == nil {
+        analyzeResult = enhanced
+        logger.Info("Repository analysis enhanced by AI")
+    }
+    
+    return nil
+}, logger, updateProgress, "Analyzing repository structure", progressTracker, workflowProgress); err != nil {
+    return result, nil
 }
 ```
 
@@ -199,21 +225,28 @@ Start by understanding the 10-step process:
 
 ### 2. Working with Existing Steps
 ```go
-// pkg/mcp/internal/steps/build.go
-func BuildImage(ctx context.Context, args BuildArgs) error {
-    // Add new build functionality here
-    
-    // Use error handling system
-    if err := performBuild(); err != nil {
-        return errors.NewError().
+// pkg/mcp/infrastructure/steps/build.go
+func BuildImage(ctx context.Context, args BuildArgs) (*BuildResult, error) {
+    // Docker build with AI-powered error recovery
+    if err := performBuild(args); err != nil {
+        // Use unified RichError system from domain layer
+        return nil, errors.NewError().
             Code(errors.CodeBuildFailed).
+            Type(errors.ErrTypeBuild).
+            Severity(errors.SeverityHigh).
             Message("Docker build failed").
             Context("image", args.ImageName).
-            Suggestion("Check Dockerfile syntax").
+            Context("dockerfile", args.DockerfilePath).
+            Suggestion("Check Dockerfile syntax and dependencies").
+            WithLocation().
             Build()
     }
     
-    return nil
+    return &BuildResult{
+        ImageName: args.ImageName,
+        ImageTag:  args.ImageTag,
+        Success:   true,
+    }, nil
 }
 ```
 
@@ -348,8 +381,9 @@ func (t *ContainerizeAndDeployTool) Execute(ctx context.Context, args Containeri
 
 #### Workflow Step Failures
 **Problem**: Specific step in workflow fails
-**Solution**: Check step-specific logs and error messages
-**Debug**: Look at step implementation in `pkg/mcp/internal/steps/`
+**Solution**: Check step-specific logs and AI error analysis
+**Debug**: Look at step implementation in `pkg/mcp/infrastructure/steps/`
+**AI Recovery**: Check if AI retry logic provided actionable suggestions
 
 #### Progress Not Updating
 **Problem**: Workflow progress seems stuck
@@ -411,10 +445,11 @@ make version            # Show version
 
 ### Resources
 - **Documentation**: `docs/` directory contains updated guides
-- **Examples**: `pkg/mcp/internal/steps/` has workflow step implementations
+- **Examples**: `pkg/mcp/infrastructure/steps/` has workflow step implementations
 - **Tests**: Look at `*_test.go` files for usage patterns
-- **Architecture**: See [Simplified Architecture](docs/architecture/three-layer-architecture.md)
+- **Architecture**: See [Four-Layer MCP Architecture](docs/architecture/adr/2025-07-12-four-layer-mcp-architecture.md)
+- **ADRs**: Review Architectural Decision Records in `docs/architecture/adr/`
 
 ---
 
-Welcome to Container Kit! The architecture focuses on providing a seamless, unified workflow for containerization with just 25 core files delivering all essential functionality. The workflow-focused approach makes it easy to understand, maintain, and extend. Take your time to understand the unified workflow pattern, and don't hesitate to ask questions or refer back to this guide as you work with the codebase.
+Welcome to Container Kit! The 4-layer clean architecture provides a seamless, unified workflow for containerization with AI-powered automation and error recovery. The Domain-Driven Design approach makes it easy to understand, maintain, and extend while keeping business logic separate from technical implementations. Take your time to understand the orchestrator-based workflow pattern, and don't hesitate to ask questions or refer back to this guide as you work with the codebase.
