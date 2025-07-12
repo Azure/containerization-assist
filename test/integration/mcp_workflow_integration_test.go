@@ -401,10 +401,11 @@ func (suite *MCPWorkflowIntegrationSuite) executeWorkflowSteps(ctx context.Conte
 		"params": map[string]interface{}{
 			"name": "containerize_and_deploy",
 			"arguments": map[string]interface{}{
-				"repo_url": "file://" + repo.LocalDir, // Use file:// prefix for local directories
-				"branch":   "main",
-				"scan":     false, // Skip scanning for faster tests
-				"deploy":   false, // Skip deployment in CI tests
+				"repo_url":  "file://" + repo.LocalDir, // Use file:// prefix for local directories
+				"branch":    "main",
+				"scan":      false, // Skip scanning for faster tests
+				"deploy":    false, // Skip deployment in CI tests
+				"test_mode": true,  // Skip actual Docker operations in CI
 			},
 		},
 	})

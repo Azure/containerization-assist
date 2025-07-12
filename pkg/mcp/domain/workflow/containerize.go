@@ -19,10 +19,11 @@ import (
 
 // ContainerizeAndDeployArgs represents the input for the complete workflow
 type ContainerizeAndDeployArgs struct {
-	RepoURL string `json:"repo_url"`
-	Branch  string `json:"branch,omitempty"`
-	Scan    bool   `json:"scan,omitempty"`
-	Deploy  *bool  `json:"deploy,omitempty"` // Pointer to distinguish unset from false
+	RepoURL  string `json:"repo_url"`
+	Branch   string `json:"branch,omitempty"`
+	Scan     bool   `json:"scan,omitempty"`
+	Deploy   *bool  `json:"deploy,omitempty"`    // Pointer to distinguish unset from false
+	TestMode bool   `json:"test_mode,omitempty"` // Skip actual Docker operations for testing
 }
 
 // ContainerizeAndDeployResult represents the complete workflow output
@@ -76,6 +77,10 @@ func RegisterWorkflowTools(mcpServer interface {
 					"type":        "boolean",
 					"description": "Deploy to Kubernetes (optional, defaults to true)",
 				},
+				"test_mode": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Test mode - skip actual Docker operations (optional)",
+				},
 			},
 			Required: []string{"repo_url"},
 		},
@@ -102,6 +107,10 @@ func RegisterWorkflowTools(mcpServer interface {
 
 		if deploy, ok := arguments["deploy"].(bool); ok {
 			args.Deploy = &deploy
+		}
+
+		if testMode, ok := arguments["test_mode"].(bool); ok {
+			args.TestMode = testMode
 		}
 
 		result, err := executeContainerizeAndDeploy(ctx, &req, &args, logger)
@@ -213,6 +222,17 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 
 		// Extract repo name from URL for image naming
 		imageName := extractRepoName(args.RepoURL)
+
+		if args.TestMode {
+			logger.Info("Test mode: Simulating Docker build")
+			// Simulate a successful build without actually building
+			buildResult = &steps.BuildResult{
+				ImageName: imageName,
+				ImageTag:  "latest",
+				ImageID:   "test-image-id-12345",
+			}
+			return nil
+		}
 
 		var err error
 		// Use the repository path from analysis as the build context
