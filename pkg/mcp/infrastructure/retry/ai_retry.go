@@ -186,6 +186,19 @@ func generateFixSuggestions(operation string, errorMsg string, logger *slog.Logg
 		suggestions = append(suggestions, "• Ensure build context includes necessary files")
 	}
 
+	// Java build tool errors
+	if containsPattern(errorMsg, "mvn", "command not found", "exit code: 127", "maven") {
+		suggestions = append(suggestions, "• Maven is not installed in the Docker image")
+		suggestions = append(suggestions, "• Use 'maven:3.9-eclipse-temurin-17' as base image")
+		suggestions = append(suggestions, "• Or install Maven in the Dockerfile: RUN apt-get update && apt-get install -y maven")
+	}
+
+	if containsPattern(errorMsg, "gradle", "command not found") {
+		suggestions = append(suggestions, "• Gradle is not installed in the Docker image")
+		suggestions = append(suggestions, "• Use 'gradle:8-jdk17' as base image")
+		suggestions = append(suggestions, "• Or install Gradle in the Dockerfile")
+	}
+
 	if containsPattern(errorMsg, "kubernetes", "deploy", "image pull") {
 		suggestions = append(suggestions, "• Verify image exists in local registry (localhost:5001)")
 		suggestions = append(suggestions, "• Check image name and tag format")

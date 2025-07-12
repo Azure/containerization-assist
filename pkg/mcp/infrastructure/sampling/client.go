@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -71,32 +72,84 @@ func (c *Client) Sample(ctx context.Context, request SamplingRequest) (*Sampling
 
 // sampleWithMCP delegates the sampling request to the calling AI assistant via MCP protocol
 func (c *Client) sampleWithMCP(ctx context.Context, request SamplingRequest) (*SamplingResponse, error) {
-	// Create a well-formatted prompt for the AI assistant
+	// Get the MCP server from context
+	srv := server.ServerFromContext(c.ctx)
+	if srv == nil {
+		return nil, fmt.Errorf("no MCP server in context")
+	}
+
+	// Build the messages for the sampling request
+	messages := []mcp.SamplingMessage{}
+
+	// Add system message if provided
+	if request.SystemPrompt != "" {
+		messages = append(messages, mcp.SamplingMessage{
+			Role: "system",
+			Content: mcp.TextContent{
+				Type: "text",
+				Text: request.SystemPrompt,
+			},
+		})
+	}
+
+	// Add user message
+	messages = append(messages, mcp.SamplingMessage{
+		Role: "user",
+		Content: mcp.TextContent{
+			Type: "text",
+			Text: request.Prompt,
+		},
+	})
+
+	// Create the MCP sampling request with properly embedded params
+	maxTokens := int(request.MaxTokens)
+	temperature := float64(request.Temperature)
+	createMsgReq := mcp.CreateMessageRequest{
+		CreateMessageParams: mcp.CreateMessageParams{
+			Messages:     messages,
+			MaxTokens:    maxTokens,
+			Temperature:  temperature,
+			SystemPrompt: request.SystemPrompt,
+		},
+	}
+
+	c.logger.Info("Requesting AI assistance via MCP sampling",
+		"max_tokens", request.MaxTokens,
+		"temperature", request.Temperature)
+
+	// Make the sampling request through the server
+	result, err := srv.RequestSampling(ctx, createMsgReq)
+	if err != nil {
+		c.logger.Warn("MCP sampling request failed, using fallback", "error", err)
+		return c.fallbackSample(request)
+	}
+
+	// Convert the result to our response format
+	var content string
+	if textContent, ok := result.Content.(mcp.TextContent); ok {
+		content = textContent.Text
+	} else {
+		content = fmt.Sprintf("%v", result.Content)
+	}
+
+	return &SamplingResponse{
+		Content:    content,
+		Model:      result.Model,
+		StopReason: result.StopReason,
+		TokensUsed: len(strings.Split(content, " ")), // Rough estimate
+	}, nil
+}
+
+// fallbackSample provides the old behavior when native sampling isn't available
+func (c *Client) fallbackSample(request SamplingRequest) (*SamplingResponse, error) {
 	prompt := request.Prompt
 	if request.SystemPrompt != "" {
 		prompt = fmt.Sprintf("%s\n\n%s", request.SystemPrompt, request.Prompt)
 	}
 
-	// Create a preview of the prompt for logging
-	promptPreview := prompt
-	if len(prompt) > 100 {
-		promptPreview = prompt[:100] + "..."
-	}
-
-	c.logger.Info("Requesting AI assistance for containerization task",
-		"prompt_preview", promptPreview,
-		"max_tokens", request.MaxTokens,
-		"temperature", request.Temperature)
-
-	// In a proper MCP implementation, this would send a sampling request
-	// to the AI assistant. For now, we format the request in a way that
-	// makes it clear to the AI what kind of help is needed.
-
-	// Since mcp-go doesn't have native sampling yet, we'll structure this
-	// as a clear request that the AI assistant can understand and respond to
 	return &SamplingResponse{
-		Content:    prompt,                          // Return the prompt directly for the AI to handle
-		TokensUsed: len(strings.Split(prompt, " ")), // Rough token estimate
+		Content:    prompt,
+		TokensUsed: len(strings.Split(prompt, " ")),
 		Model:      "mcp-delegated",
 		StopReason: "ai_assistance_requested",
 	}, nil

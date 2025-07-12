@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/retry"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -168,13 +171,14 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 		currentStep++
 		progress := fmt.Sprintf("%d/%d", currentStep, totalSteps)
 		percentage := int((float64(currentStep) / float64(totalSteps)) * 100)
+		// Also update the progress manager's internal counter
+		progressMgr.SetCurrent(currentStep)
 		return percentage, progress
 	}
 
 	// Workflow state variables
 	var analyzeResult *steps.AnalyzeResult
 	var dockerfileResult *steps.DockerfileResult
-	var buildResult *steps.BuildResult
 	var k8sResult *steps.K8sResult
 
 	// Step 1: Analyze repository with AI retry
@@ -191,6 +195,20 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 			"language", analyzeResult.Language,
 			"framework", analyzeResult.Framework,
 			"port", analyzeResult.Port)
+
+		// Enhance analysis with AI if available
+		if server.ServerFromContext(ctx) != nil {
+			logger.Info("Enhancing repository analysis with AI")
+			enhancedResult, enhanceErr := steps.EnhanceRepositoryAnalysis(ctx, analyzeResult, logger)
+			if enhanceErr == nil {
+				analyzeResult = enhancedResult
+				logger.Info("Repository analysis enhanced by AI",
+					"language", analyzeResult.Language,
+					"framework", analyzeResult.Framework,
+					"port", analyzeResult.Port)
+			}
+		}
+
 		return nil
 	}, logger, updateProgress, "Analyzing repository structure and detecting language/framework", progressMgr, workflowProgress); err != nil {
 		// Always return the result object to preserve progress information
@@ -217,44 +235,26 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 	}
 
 	// Step 3: Build image with AI retry on Docker errors
-	if err := executeStepWithRetry(ctx, result, "build_image", 2, func() error {
-		logger.Info("Step 3: Building Docker image")
-
-		// Extract repo name from URL for image naming
-		imageName := extractRepoName(args.RepoURL)
-
-		if args.TestMode {
-			logger.Info("Test mode: Simulating Docker build")
-			// Simulate a successful build without actually building
-			buildResult = &steps.BuildResult{
-				ImageName: imageName,
-				ImageTag:  "latest",
-				ImageID:   "test-image-id-12345",
-			}
-			return nil
-		}
-
-		var err error
-		// Use the repository path from analysis as the build context
-		buildContext := analyzeResult.RepoPath
-		if buildContext == "" {
-			buildContext = "."
-		}
-		logger.Info("Using build context", "buildContext", buildContext, "repoPath", analyzeResult.RepoPath)
-		buildResult, err = steps.BuildImage(ctx, dockerfileResult, imageName, "latest", buildContext, logger)
-		if err != nil {
-			return fmt.Errorf("docker build failed: %v", err)
-		}
-
-		logger.Info("Docker image built successfully",
-			"image_name", buildResult.ImageName,
-			"image_tag", buildResult.ImageTag,
-			"image_id", buildResult.ImageID)
-		return nil
-	}, logger, updateProgress, "Building Docker image with AI-powered error fixing", progressMgr, workflowProgress); err != nil {
+	buildResult, err := executeDockerBuildWithAIFix(ctx, result, dockerfileResult, analyzeResult, args, logger, updateProgress, progressMgr, workflowProgress)
+	if err != nil {
+		logger.Error("Build step failed", "error", err)
 		result.Success = false
 		return result, nil
 	}
+
+	if buildResult == nil {
+		logger.Error("Build result is nil after successful build")
+		result.Success = false
+		result.Error = "Internal error: build result is nil"
+		return result, nil
+	}
+
+	logger.Info("Build step completed, checking deployment flag",
+		"buildResult", buildResult != nil,
+		"imageName", buildResult.ImageName,
+		"imageTag", buildResult.ImageTag,
+		"imageID", buildResult.ImageID,
+		"deploy", args.Deploy)
 
 	// Check if deployment is requested (defaults to true for backward compatibility)
 	shouldDeploy := args.Deploy == nil || *args.Deploy
@@ -275,8 +275,18 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 
 	// Step 4: Create/refresh local kind cluster (no AI retry needed per feedback.md)
 	var registryURL string
+	logger.Info("Proceeding to Step 4: Kind cluster setup", "shouldDeploy", shouldDeploy)
 	if err := executeStep(result, "setup_kind_cluster", func() error {
 		logger.Info("Step 4: Setting up kind cluster")
+
+		// Check if context is still valid
+		select {
+		case <-ctx.Done():
+			logger.Error("Context cancelled before kind cluster setup", "error", ctx.Err())
+			return fmt.Errorf("context cancelled: %v", ctx.Err())
+		default:
+			// Continue
+		}
 
 		var err error
 		registryURL, err = steps.SetupKindCluster(ctx, "container-kit", logger)
@@ -287,6 +297,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 		logger.Info("Kind cluster setup completed successfully", "registry_url", registryURL)
 		return nil
 	}, updateProgress, "Setting up local Kubernetes cluster with registry", progressMgr, workflowProgress); err != nil {
+		logger.Error("Kind cluster setup failed", "error", err)
 		result.Success = false
 		return result, nil
 	}
@@ -326,17 +337,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 	}
 
 	// Step 7: kubectl apply with AI retry on pod crash loops
-	if err := executeStepWithRetry(ctx, result, "deploy_to_k8s", 2, func() error {
-		logger.Info("Step 7: Deploying to Kubernetes")
-
-		err := steps.DeployToKubernetes(ctx, k8sResult, logger)
-		if err != nil {
-			return fmt.Errorf("kubernetes deployment failed: %v", err)
-		}
-
-		logger.Info("Kubernetes deployment completed successfully")
-		return nil
-	}, logger, updateProgress, "Deploying application to Kubernetes cluster", progressMgr, workflowProgress); err != nil {
+	if err := executeDeployWithAIFix(ctx, result, k8sResult, dockerfileResult, analyzeResult, logger, updateProgress, progressMgr, workflowProgress); err != nil {
 		result.Success = false
 		return result, nil
 	}
@@ -377,6 +378,28 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 			logger.Info("Vulnerability scan completed",
 				"vulnerabilities", scanResult["vulnerabilities"],
 				"scanner", scanResult["scanner"])
+
+			// If critical vulnerabilities found, get AI analysis
+			if criticalVulns, ok := scanResult["critical_vulns"].(int); ok && criticalVulns > 0 {
+				logger.Info("Critical vulnerabilities found, requesting AI analysis")
+
+				samplingClient := sampling.NewClient(ctx, logger)
+				scanResultsJSON, _ := json.Marshal(scanResult)
+
+				analysis, err := samplingClient.AnalyzeSecurityScan(
+					ctx,
+					string(scanResultsJSON),
+					dockerfileResult.Content,
+					true, // Focus on critical issues
+				)
+				if err != nil {
+					logger.Warn("Failed to get AI security analysis", "error", err)
+				} else {
+					logger.Info("AI Security Analysis", "analysis", analysis)
+					result.ScanReport["ai_analysis"] = analysis
+				}
+			}
+
 			return nil
 		}, logger, updateProgress, "Scanning Docker image for security vulnerabilities", progressMgr, workflowProgress); err != nil {
 			result.Success = false
@@ -398,6 +421,12 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 	}
 	result.Steps = append(result.Steps, finalStep)
 
+	// Log final progress for debugging
+	logger.Info("Workflow progress summary",
+		"total_steps", len(result.Steps),
+		"final_progress", progressStr,
+		"final_percentage", percentage)
+
 	// Update with final step
 	metadata := map[string]interface{}{
 		"step_name": "finalize_result",
@@ -406,7 +435,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 		"image_ref": fmt.Sprintf("localhost:5001/%s:%s", buildResult.ImageName, buildResult.ImageTag),
 		"namespace": k8sResult.Namespace,
 	}
-	progressMgr.Update(totalSteps, "Finalizing workflow results", metadata)
+	progressMgr.Update(progressMgr.GetCurrent(), "Finalizing workflow results", metadata)
 
 	result.Success = true
 	result.ImageRef = fmt.Sprintf("localhost:5001/%s:%s", buildResult.ImageName, buildResult.ImageTag)
@@ -434,7 +463,7 @@ func executeStep(result *ContainerizeAndDeployResult, stepName string, stepFunc 
 	percentage, progressStr := progressFunc()
 
 	// Create step info
-	stepInfo := progress.NewStepInfo(stepName, message, progressMgr.GetCurrent()+1, progressMgr.GetTotal())
+	stepInfo := progress.NewStepInfo(stepName, message, progressMgr.GetCurrent(), progressMgr.GetTotal())
 	workflowProgress.AddStep(stepInfo)
 
 	step := WorkflowStep{
@@ -449,7 +478,7 @@ func executeStep(result *ContainerizeAndDeployResult, stepName string, stepFunc 
 		"step_name": stepName,
 		"status":    "running",
 	}
-	progressMgr.Update(progressMgr.GetCurrent()+1, message, metadata)
+	progressMgr.Update(progressMgr.GetCurrent(), message, metadata)
 
 	// Execute the step
 	err := stepFunc()
@@ -476,7 +505,7 @@ func executeStepWithRetry(ctx context.Context, result *ContainerizeAndDeployResu
 	percentage, progressStr := progressFunc()
 
 	// Create step info
-	stepInfo := progress.NewStepInfo(stepName, message, progressMgr.GetCurrent()+1, progressMgr.GetTotal())
+	stepInfo := progress.NewStepInfo(stepName, message, progressMgr.GetCurrent(), progressMgr.GetTotal())
 	workflowProgress.AddStep(stepInfo)
 
 	step := WorkflowStep{
@@ -492,7 +521,7 @@ func executeStepWithRetry(ctx context.Context, result *ContainerizeAndDeployResu
 		"status":      "running",
 		"max_retries": maxRetries,
 	}
-	progressMgr.Update(progressMgr.GetCurrent()+1, message, metadata)
+	progressMgr.Update(progressMgr.GetCurrent(), message, metadata)
 
 	// Execute the step with AI retry
 	err := retry.WithAIRetry(ctx, stepName, maxRetries, stepFunc, logger)
@@ -675,4 +704,301 @@ func scanImageForVulnerabilities(ctx context.Context, buildResult *steps.BuildRe
 		"duration", scanResult.Duration)
 
 	return report, nil
+}
+
+// executeDockerBuildWithAIFix executes the Docker build step with AI-powered Dockerfile fixing
+func executeDockerBuildWithAIFix(ctx context.Context, result *ContainerizeAndDeployResult, dockerfileResult *steps.DockerfileResult, analyzeResult *steps.AnalyzeResult, args *ContainerizeAndDeployArgs, logger *slog.Logger, progressFunc func() (int, string), progressMgr *progress.Manager, workflowProgress *progress.WorkflowProgress) (*steps.BuildResult, error) {
+	startTime := time.Now()
+	percentage, progressStr := progressFunc()
+	maxRetries := 2
+
+	// Create step info
+	stepInfo := progress.NewStepInfo("build_image", "Building Docker image with AI-powered error fixing", progressMgr.GetCurrent()+1, progressMgr.GetTotal())
+	workflowProgress.AddStep(stepInfo)
+
+	step := WorkflowStep{
+		Name:     "build_image",
+		Status:   "running",
+		Progress: progressStr,
+		Message:  fmt.Sprintf("[%d%%] Building Docker image with AI-powered error fixing", percentage),
+	}
+
+	// Update progress through unified manager
+	metadata := map[string]interface{}{
+		"step_name":   "build_image",
+		"status":      "running",
+		"max_retries": maxRetries,
+	}
+	progressMgr.Update(progressMgr.GetCurrent(), "Building Docker image with AI-powered error fixing", metadata)
+
+	// Extract repo name from URL for image naming
+	imageName := extractRepoName(args.RepoURL)
+
+	// Track the buildResult across retries
+	var buildResult *steps.BuildResult
+	var lastBuildError error
+	currentDockerfile := dockerfileResult
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		logger.Info("Step 3: Building Docker image", "attempt", attempt, "max", maxRetries)
+
+		if args.TestMode {
+			logger.Info("Test mode: Simulating Docker build")
+			// Simulate a successful build without actually building
+			buildResult = &steps.BuildResult{
+				ImageName: imageName,
+				ImageTag:  "latest",
+				ImageID:   "test-image-id-12345",
+			}
+			break
+		}
+
+		// Use the repository path from analysis as the build context
+		buildContext := analyzeResult.RepoPath
+		if buildContext == "" {
+			buildContext = "."
+		}
+		logger.Info("Using build context", "buildContext", buildContext, "repoPath", analyzeResult.RepoPath)
+
+		var err error
+		buildResult, err = steps.BuildImage(ctx, currentDockerfile, imageName, "latest", buildContext, logger)
+		if err == nil {
+			logger.Info("Docker image built successfully",
+				"image_name", buildResult.ImageName,
+				"image_tag", buildResult.ImageTag,
+				"image_id", buildResult.ImageID)
+			break
+		}
+
+		// Build failed
+		lastBuildError = err
+		logger.Error("Docker build failed", "attempt", attempt, "error", err)
+
+		// If this was the last attempt, don't try to fix
+		if attempt >= maxRetries {
+			break
+		}
+
+		// Try to fix the Dockerfile using AI
+		logger.Info("Attempting to fix Dockerfile using AI sampling")
+		fixedDockerfile, fixErr := requestDockerfileFix(ctx, currentDockerfile.Content, err, analyzeResult, logger)
+		if fixErr != nil {
+			logger.Error("Failed to get AI fix for Dockerfile", "error", fixErr)
+			continue
+		}
+
+		// Write the fixed Dockerfile
+		if err := steps.WriteDockerfile(analyzeResult.RepoPath, fixedDockerfile, logger); err != nil {
+			logger.Error("Failed to write fixed Dockerfile", "error", err)
+			continue
+		}
+
+		// Update currentDockerfile for next attempt
+		currentDockerfile = &steps.DockerfileResult{
+			Content:     fixedDockerfile,
+			Path:        dockerfileResult.Path,
+			BaseImage:   dockerfileResult.BaseImage,
+			ExposedPort: dockerfileResult.ExposedPort,
+		}
+
+		logger.Info("Applied AI fix to Dockerfile, retrying build")
+		step.Retries = attempt
+	}
+
+	step.Duration = time.Since(startTime).String()
+
+	// Check if we succeeded
+	if buildResult == nil || lastBuildError != nil {
+		step.Status = "failed"
+		step.Error = lastBuildError.Error()
+		result.Steps = append(result.Steps, step)
+		result.Error = fmt.Sprintf("Step build_image failed: %v", lastBuildError)
+
+		// Update progress with failure
+		metadata["status"] = "failed"
+		metadata["error"] = lastBuildError.Error()
+		metadata["duration"] = step.Duration
+		progressMgr.Update(progressMgr.GetCurrent(), "Failed: Building Docker image", metadata)
+
+		stepInfo.Fail(lastBuildError)
+		return nil, lastBuildError
+	}
+
+	// Success!
+	step.Status = "completed"
+	result.Steps = append(result.Steps, step)
+
+	// Update progress with completion
+	metadata["status"] = "completed"
+	metadata["duration"] = step.Duration
+	progressMgr.Update(progressMgr.GetCurrent(), "Completed: Building Docker image", metadata)
+
+	stepInfo.Complete()
+	return buildResult, nil
+}
+
+// executeDeployWithAIFix executes Kubernetes deployment with AI-powered manifest fixing
+func executeDeployWithAIFix(ctx context.Context, result *ContainerizeAndDeployResult, k8sResult *steps.K8sResult, dockerfileResult *steps.DockerfileResult, analyzeResult *steps.AnalyzeResult, logger *slog.Logger, progressFunc func() (int, string), progressMgr *progress.Manager, workflowProgress *progress.WorkflowProgress) error {
+	startTime := time.Now()
+	percentage, progressStr := progressFunc()
+	maxRetries := 2
+
+	// Create step info
+	stepInfo := progress.NewStepInfo("deploy_to_k8s", "Deploying application to Kubernetes cluster", progressMgr.GetCurrent(), progressMgr.GetTotal())
+	workflowProgress.AddStep(stepInfo)
+
+	step := WorkflowStep{
+		Name:     "deploy_to_k8s",
+		Status:   "running",
+		Progress: progressStr,
+		Message:  fmt.Sprintf("[%d%%] Deploying application to Kubernetes cluster", percentage),
+	}
+
+	// Update progress through unified manager
+	metadata := map[string]interface{}{
+		"step_name":   "deploy_to_k8s",
+		"status":      "running",
+		"max_retries": maxRetries,
+	}
+	progressMgr.Update(progressMgr.GetCurrent(), "Deploying application to Kubernetes cluster", metadata)
+
+	var lastDeployError error
+	manifestPath := filepath.Join(k8sResult.Manifests["deployment_path"].(string))
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		logger.Info("Step 7: Deploying to Kubernetes", "attempt", attempt, "max", maxRetries)
+
+		err := steps.DeployToKubernetes(ctx, k8sResult, logger)
+		if err == nil {
+			logger.Info("Kubernetes deployment completed successfully")
+			break
+		}
+
+		// Deployment failed
+		lastDeployError = err
+		logger.Error("Kubernetes deployment failed", "attempt", attempt, "error", err)
+
+		// If this was the last attempt, don't try to fix
+		if attempt >= maxRetries {
+			break
+		}
+
+		// Try to fix the manifest using AI
+		logger.Info("Attempting to fix Kubernetes manifest using AI sampling")
+		fixErr := steps.FixManifestWithAI(ctx, manifestPath, err, dockerfileResult.Content, analyzeResult, logger)
+		if fixErr != nil {
+			logger.Error("Failed to get AI fix for manifest", "error", fixErr)
+			continue
+		}
+
+		// Reload the K8s result with the fixed manifest
+		manifestContent, err := os.ReadFile(manifestPath)
+		if err == nil {
+			k8sResult.Manifests["deployment"] = string(manifestContent)
+		}
+
+		logger.Info("Applied AI fix to manifest, retrying deployment")
+		step.Retries = attempt
+	}
+
+	step.Duration = time.Since(startTime).String()
+
+	// Check if we succeeded
+	if lastDeployError != nil {
+		step.Status = "failed"
+		step.Error = lastDeployError.Error()
+		result.Steps = append(result.Steps, step)
+		result.Error = fmt.Sprintf("Step deploy_to_k8s failed: %v", lastDeployError)
+
+		// Update progress with failure
+		metadata["status"] = "failed"
+		metadata["error"] = lastDeployError.Error()
+		metadata["duration"] = step.Duration
+		progressMgr.Update(progressMgr.GetCurrent(), "Failed: Deploying to Kubernetes", metadata)
+
+		stepInfo.Fail(lastDeployError)
+		return lastDeployError
+	}
+
+	// Success!
+	step.Status = "completed"
+	result.Steps = append(result.Steps, step)
+
+	// Update progress with completion
+	metadata["status"] = "completed"
+	metadata["duration"] = step.Duration
+	progressMgr.Update(progressMgr.GetCurrent(), "Completed: Deploying to Kubernetes", metadata)
+
+	stepInfo.Complete()
+	return nil
+}
+
+// requestDockerfileFix uses MCP sampling to fix a broken Dockerfile
+func requestDockerfileFix(ctx context.Context, dockerfileContent string, buildError error, analyzeResult *steps.AnalyzeResult, logger *slog.Logger) (string, error) {
+	logger.Info("Requesting AI assistance to fix Dockerfile",
+		"language", analyzeResult.Language,
+		"framework", analyzeResult.Framework,
+		"error_preview", buildError.Error()[:min(100, len(buildError.Error()))])
+
+	samplingClient := sampling.NewClient(ctx, logger)
+
+	prompt := fmt.Sprintf(`Please fix this Dockerfile that is failing to build.
+
+Language: %s
+Framework: %s
+Port: %d
+
+Current Dockerfile:
+%s
+
+Build Error:
+%s
+
+Please provide a corrected Dockerfile that:
+1. Fixes the specific error mentioned
+2. Uses appropriate base images for the detected language/framework
+3. Includes proper dependency installation
+4. Follows Docker best practices
+5. Uses multi-stage builds when appropriate
+
+Return ONLY the corrected Dockerfile content without any explanation or markdown formatting.`,
+		analyzeResult.Language,
+		analyzeResult.Framework,
+		analyzeResult.Port,
+		dockerfileContent,
+		buildError.Error())
+
+	request := sampling.SamplingRequest{
+		Prompt:       prompt,
+		MaxTokens:    2048,
+		Temperature:  0.3,
+		SystemPrompt: "You are a Docker and containerization expert. Fix the Dockerfile to resolve build errors while following best practices.",
+	}
+
+	response, err := samplingClient.Sample(ctx, request)
+	if err != nil {
+		return "", fmt.Errorf("failed to get AI fix for Dockerfile: %w", err)
+	}
+
+	// Clean up the response - remove any markdown formatting if present
+	fixedDockerfile := strings.TrimSpace(response.Content)
+	if strings.HasPrefix(fixedDockerfile, "```") {
+		// Remove markdown code blocks
+		lines := strings.Split(fixedDockerfile, "\n")
+		var cleanedLines []string
+		inCodeBlock := false
+		for _, line := range lines {
+			if strings.HasPrefix(line, "```") {
+				inCodeBlock = !inCodeBlock
+				continue
+			}
+			if !inCodeBlock || (inCodeBlock && !strings.HasPrefix(line, "```")) {
+				cleanedLines = append(cleanedLines, line)
+			}
+		}
+		fixedDockerfile = strings.Join(cleanedLines, "\n")
+	}
+
+	logger.Info("Received fixed Dockerfile from AI", "lines", len(strings.Split(fixedDockerfile, "\n")))
+	return fixedDockerfile, nil
 }

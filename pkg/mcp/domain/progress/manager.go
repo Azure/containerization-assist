@@ -116,6 +116,13 @@ func NewWithServer(ctx context.Context, req *mcp.CallToolRequest, server Notific
 		m.logger.Debug("MCP progress reporting enabled", "progressToken", m.progressToken)
 	} else {
 		// Fall back to CLI mode
+		if server != nil {
+			m.logger.Info("No progress token in request, progress notifications disabled",
+				"has_server", server != nil,
+				"has_req", req != nil,
+				"has_meta", req != nil && req.Params.Meta != nil,
+				"has_token", req != nil && req.Params.Meta != nil && req.Params.Meta.ProgressToken != nil)
+		}
 		m.setupCLIFallback()
 	}
 
@@ -333,6 +340,13 @@ func (m *Manager) GetCurrent() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.current
+}
+
+// SetCurrent sets the current progress step
+func (m *Manager) SetCurrent(current int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.current = current
 }
 
 // GetTotal returns the total number of steps

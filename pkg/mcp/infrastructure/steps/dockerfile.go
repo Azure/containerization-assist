@@ -3,6 +3,8 @@ package steps
 import (
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -101,36 +103,47 @@ func generateGoDockerfile(port int, logger *slog.Logger) string {
 func generateJavaDockerfile(framework string, port int, logger *slog.Logger) string {
 	var dockerfile strings.Builder
 
-	// Choose base image based on framework
-	if strings.Contains(framework, "spring") {
-		dockerfile.WriteString("FROM openjdk:17-jdk-slim\n")
-	} else {
-		dockerfile.WriteString("FROM openjdk:17-jdk-slim\n")
-	}
-
+	// Multi-stage build for Java applications
+	dockerfile.WriteString("# Build stage\n")
+	dockerfile.WriteString("FROM maven:3.9-eclipse-temurin-17 AS builder\n")
 	dockerfile.WriteString("WORKDIR /app\n")
 	dockerfile.WriteString("COPY . .\n")
 
 	// Handle different build systems
 	dockerfile.WriteString("# Build the application\n")
 	dockerfile.WriteString("RUN if [ -f \"mvnw\" ]; then \\\n")
-	dockerfile.WriteString("      ./mvnw clean package -DskipTests; \\\n")
+	dockerfile.WriteString("      chmod +x mvnw && ./mvnw clean package -DskipTests; \\\n")
 	dockerfile.WriteString("    elif [ -f \"gradlew\" ]; then \\\n")
-	dockerfile.WriteString("      ./gradlew build -x test; \\\n")
+	dockerfile.WriteString("      chmod +x gradlew && ./gradlew build -x test; \\\n")
 	dockerfile.WriteString("    elif [ -f \"pom.xml\" ]; then \\\n")
 	dockerfile.WriteString("      mvn clean package -DskipTests; \\\n")
-	dockerfile.WriteString("    elif [ -f \"build.gradle\" ]; then \\\n")
+	dockerfile.WriteString("    elif [ -f \"build.gradle\" ] || [ -f \"build.gradle.kts\" ]; then \\\n")
 	dockerfile.WriteString("      gradle build -x test; \\\n")
+	dockerfile.WriteString("    else \\\n")
+	dockerfile.WriteString("      echo \"No build file found\" && exit 1; \\\n")
 	dockerfile.WriteString("    fi\n\n")
+
+	// Runtime stage
+	dockerfile.WriteString("# Runtime stage\n")
+	dockerfile.WriteString("FROM eclipse-temurin:17-jre-alpine\n")
+	dockerfile.WriteString("WORKDIR /app\n")
+
+	// Copy built artifacts from builder stage - handle both Maven and Gradle outputs
+	dockerfile.WriteString("# Copy built artifacts from builder stage\n")
+	dockerfile.WriteString("# Use a shell script to find and copy the built artifact\n")
+	dockerfile.WriteString("RUN --mount=from=builder,source=/app,target=/build \\\n")
+	dockerfile.WriteString("    find /build -name '*.jar' -o -name '*.war' | head -1 | xargs -I {} cp {} /app/app.jar\n\n")
 
 	if port > 0 {
 		dockerfile.WriteString(fmt.Sprintf("EXPOSE %d\n", port))
+	} else {
+		dockerfile.WriteString("EXPOSE 8080\n") // Default Java web app port
 	}
 
 	dockerfile.WriteString("# Run the application\n")
-	dockerfile.WriteString("CMD [\"sh\", \"-c\", \"java -jar target/*.jar || java -jar build/libs/*.jar\"]\n")
+	dockerfile.WriteString("ENTRYPOINT [\"java\", \"-jar\", \"app.jar\"]\n")
 
-	logger.Debug("Generated Java Dockerfile with build system detection", "framework", framework)
+	logger.Debug("Generated Java Dockerfile with multi-stage build", "framework", framework)
 	return dockerfile.String()
 }
 
@@ -275,4 +288,18 @@ func getBaseImageForLanguage(language, framework string) string {
 	default:
 		return "alpine:latest"
 	}
+}
+
+// WriteDockerfile writes the Dockerfile content to the specified path
+func WriteDockerfile(repoPath, content string, logger *slog.Logger) error {
+	dockerfilePath := filepath.Join(repoPath, "Dockerfile")
+
+	logger.Info("Writing Dockerfile", "path", dockerfilePath)
+
+	if err := os.WriteFile(dockerfilePath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("failed to write Dockerfile: %w", err)
+	}
+
+	logger.Info("Dockerfile written successfully", "path", dockerfilePath, "size", len(content))
+	return nil
 }
