@@ -2,6 +2,7 @@ package progress
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -53,4 +54,18 @@ func (f *SinkFactory) CreateTrackerForWorkflow(
 	}
 
 	return NewTracker(ctx, totalSteps, sink, opts...)
+}
+
+// NewProgressTracker creates a new progress tracker for workflow operations.
+// This replaces the duplicate function in domain/workflow/factory.go
+func NewProgressTracker(ctx context.Context, req *mcp.CallToolRequest, totalSteps int, logger *slog.Logger) *Tracker {
+	factory := NewSinkFactory(logger)
+	traceID := generateTraceID()
+
+	return factory.CreateTrackerForWorkflow(ctx, req, totalSteps, traceID)
+}
+
+// generateTraceID creates a simple trace ID for correlation
+func generateTraceID() string {
+	return fmt.Sprintf("trace-%d", time.Now().UnixNano())
 }

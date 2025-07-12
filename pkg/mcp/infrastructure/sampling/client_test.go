@@ -75,7 +75,7 @@ func TestClient_NewClientFromEnv_InvalidConfig(t *testing.T) {
 
 	_, err := NewClientFromEnv(logger)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "temperature must be between 0 and 2")
+	assert.Contains(t, err.Error(), "CONFIGURATION_INVALID: invalid configuration")
 }
 
 func TestClient_Sample_NoMCPServer(t *testing.T) {
@@ -121,7 +121,7 @@ func TestClient_AnalyzeError(t *testing.T) {
 
 	// Should fail without MCP server context
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no MCP server in context")
+	assert.Contains(t, err.Error(), "TOOL_EXECUTION_FAILED: failed to analyze error")
 }
 
 func TestClient_CalculateBackoff(t *testing.T) {

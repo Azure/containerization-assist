@@ -116,7 +116,9 @@ func RegisterWorkflowTools(mcpServer interface {
 			args.TestMode = testMode
 		}
 
-		result, err := executeContainerizeAndDeploy(ctx, &req, &args, logger)
+		// Use new orchestrator-based workflow
+		orchestrator := NewOrchestrator(logger)
+		result, err := orchestrator.Execute(ctx, &req, &args)
 		if err != nil {
 			return nil, err
 		}
@@ -156,7 +158,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 
 	// Create unified progress tracker
 	totalSteps := 10
-	progressTracker := NewProgressTracker(ctx, req, totalSteps, logger)
+	progressTracker := progress.NewProgressTracker(ctx, req, totalSteps, logger)
 	defer progressTracker.Finish()
 
 	// Begin progress tracking

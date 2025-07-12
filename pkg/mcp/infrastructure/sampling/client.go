@@ -3,12 +3,12 @@ package sampling
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/prompts"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/tracing"
 	"github.com/mark3labs/mcp-go/server"
@@ -70,7 +70,7 @@ func NewClient(logger *slog.Logger, opts ...Option) *Client {
 func NewClientFromEnv(logger *slog.Logger, opts ...Option) (*Client, error) {
 	cfg := LoadFromEnv()
 	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid configuration: %w", err)
+		return nil, errors.New(errors.CodeConfigurationInvalid, "sampling", "invalid configuration", err)
 	}
 
 	// Apply config first, then any additional options
@@ -112,7 +112,7 @@ func (c *Client) Sample(ctx context.Context, req SamplingRequest) (*SamplingResp
 	)
 
 	if srv := server.ServerFromContext(ctx); srv == nil {
-		return nil, errors.New("no MCP server in context – cannot perform sampling")
+		return nil, errors.New(errors.CodeInternalError, "sampling", "no MCP server in context – cannot perform sampling", nil)
 	}
 
 	// Default values.
@@ -174,7 +174,8 @@ func (c *Client) Sample(ctx context.Context, req SamplingRequest) (*SamplingResp
 	}
 
 	// Record final failure
-	finalErr := fmt.Errorf("all %d sampling attempts failed: %w", c.retryAttempts, lastErr)
+	finalErr := errors.New(errors.CodeOperationFailed, "sampling",
+		fmt.Sprintf("all %d sampling attempts failed", c.retryAttempts), lastErr)
 	span.RecordError(finalErr)
 	span.SetAttributes(attribute.String("error.final", finalErr.Error()))
 	return nil, finalErr
@@ -297,7 +298,7 @@ func (c *Client) AnalyzeError(ctx context.Context, inputErr error, contextInfo s
 	// Get template manager
 	templateManager, err := prompts.NewManager(c.logger, prompts.ManagerConfig{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create template manager: %w", err)
+		return nil, errors.New(errors.CodeInternalError, "sampling", "failed to create template manager", err)
 	}
 
 	// Prepare template data
@@ -309,7 +310,7 @@ func (c *Client) AnalyzeError(ctx context.Context, inputErr error, contextInfo s
 	// Render template
 	rendered, err := templateManager.RenderTemplate("error-analysis", templateData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to render error analysis template: %w", err)
+		return nil, errors.New(errors.CodeInternalError, "sampling", "failed to render error analysis template", err)
 	}
 
 	request := SamplingRequest{
@@ -321,7 +322,7 @@ func (c *Client) AnalyzeError(ctx context.Context, inputErr error, contextInfo s
 
 	response, err := c.Sample(ctx, request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to analyze error: %w", err)
+		return nil, errors.New(errors.CodeToolExecutionFailed, "sampling", "failed to analyze error", err)
 	}
 
 	return parseErrorAnalysis(response.Content), nil

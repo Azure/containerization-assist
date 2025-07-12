@@ -36,8 +36,8 @@ type sessionEntry struct {
 	lastAccess time.Time
 }
 
-// NewMemorySessionManager creates a new production-ready in-memory session manager
-func NewMemorySessionManager(logger *slog.Logger, defaultTTL time.Duration, maxSessions int) SessionManager {
+// NewLegacyMemorySessionManager creates a new production-ready in-memory session manager (legacy implementation)
+func NewLegacyMemorySessionManager(logger *slog.Logger, defaultTTL time.Duration, maxSessions int) SessionManager {
 	manager := &memorySessionManager{
 		logger:          logger.With("component", "session_manager"),
 		sessions:        make(map[string]*sessionEntry),

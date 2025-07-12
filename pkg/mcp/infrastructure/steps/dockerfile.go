@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/Azure/container-kit/pkg/common/errors"
 )
 
 // DockerfileResult contains the generated Dockerfile and metadata
@@ -20,7 +22,7 @@ type DockerfileResult struct {
 // GenerateDockerfile creates an optimized Dockerfile based on analysis results
 func GenerateDockerfile(analyzeResult *AnalyzeResult, logger *slog.Logger) (*DockerfileResult, error) {
 	if analyzeResult == nil {
-		return nil, fmt.Errorf("analyze result is required")
+		return nil, errors.New(errors.CodeInvalidParameter, "dockerfile", "analyze result is required", nil)
 	}
 
 	logger.Info("Generating Dockerfile",
@@ -297,7 +299,7 @@ func WriteDockerfile(repoPath, content string, logger *slog.Logger) error {
 	logger.Info("Writing Dockerfile", "path", dockerfilePath)
 
 	if err := os.WriteFile(dockerfilePath, []byte(content), 0644); err != nil {
-		return fmt.Errorf("failed to write Dockerfile: %w", err)
+		return errors.New(errors.CodeIoError, "dockerfile", "failed to write Dockerfile", err)
 	}
 
 	logger.Info("Dockerfile written successfully", "path", dockerfilePath, "size", len(content))

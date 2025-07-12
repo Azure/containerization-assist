@@ -135,14 +135,20 @@ func (s *serverImpl) registerTools() error {
 	return nil
 }
 
-// NewServer creates a new MCP server with the given options
+// NewMCPServer creates a new MCP server with the given options using the new functional options pattern.
 // This is the primary public API for creating MCP servers
-func NewServer(ctx context.Context, logger *slog.Logger, opts ...Option) (api.MCPServer, error) {
-	// Build configuration from functional options
+func NewMCPServer(ctx context.Context, logger *slog.Logger, opts ...Option) (api.MCPServer, error) {
+	// Use default configuration and provided logger
 	config := workflow.DefaultServerConfig()
-	for _, opt := range opts {
-		opt(&config)
+
+	// Create bootstrap options with logger and config
+	bootstrapOpts := []Option{
+		WithLogger(logger),
+		WithConfig(config),
 	}
+
+	// Add any additional options provided
+	bootstrapOpts = append(bootstrapOpts, opts...)
 
 	// Ensure directories exist
 	if config.StorePath != "" {
@@ -159,15 +165,8 @@ func NewServer(ctx context.Context, logger *slog.Logger, opts ...Option) (api.MC
 		}
 	}
 
-	// Use builder pattern to create server with proper dependency injection
-	server, err := NewServerBuilder().
-		WithConfig(config).
-		WithLogger(logger).
-		Build()
-
-	if err != nil {
-		return nil, errors.New(errors.CodeInternalError, "server", "failed to build server with dependencies", err)
-	}
+	// Use new functional options pattern to create server
+	server := NewServer(bootstrapOpts...)
 
 	server.deps.Logger.Info("MCP Server initialized successfully",
 		"transport", config.TransportType,
@@ -360,4 +359,12 @@ func (s *serverImpl) GetSessionManagerStats() (interface{}, error) {
 	return map[string]interface{}{
 		"error": "session manager not initialized",
 	}, nil
+}
+
+// RegisterChatModes registers custom chat modes for Copilot integration
+func (s *serverImpl) RegisterChatModes() error {
+	s.deps.Logger.Info("Chat mode support enabled via standard MCP protocol",
+		"available_tools", GetChatModeFunctions())
+
+	return nil
 }
