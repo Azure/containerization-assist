@@ -17,15 +17,16 @@ import (
 // MockProgressReporter for testing
 type MockProgressReporter struct {
 	mock.Mock
-	beginCalled    bool
-	updateCalls    []updateCall
-	completeCalled bool
-	doneCalled     bool
-	mu             sync.Mutex
+	beginCalled        bool
+	managerUpdateCalls []managerUpdateCall
+	completeCalled     bool
+	doneCalled         bool
+	mu                 sync.Mutex
 }
 
-type updateCall struct {
-	step    float64
+type managerUpdateCall struct {
+	step    int
+	total   int
 	message string
 }
 
@@ -36,11 +37,11 @@ func (m *MockProgressReporter) Begin(msg string) error {
 	return m.Called(msg).Error(0)
 }
 
-func (m *MockProgressReporter) Update(step float64, msg string) error {
+func (m *MockProgressReporter) Update(step, total int, message string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.updateCalls = append(m.updateCalls, updateCall{step: step, message: msg})
-	return m.Called(step, msg).Error(0)
+	m.managerUpdateCalls = append(m.managerUpdateCalls, managerUpdateCall{step: step, total: total, message: message})
+	return m.Called(step, total, message).Error(0)
 }
 
 func (m *MockProgressReporter) Complete(msg string) error {

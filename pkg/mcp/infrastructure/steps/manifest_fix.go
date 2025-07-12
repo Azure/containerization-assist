@@ -25,7 +25,7 @@ func FixManifestWithAI(ctx context.Context, manifestPath string, deploymentError
 	}
 
 	// Create sampling client
-	samplingClient := sampling.NewClient(ctx, logger)
+	samplingClient := sampling.NewClient(logger)
 
 	// Prepare repository analysis summary
 	repoAnalysis := fmt.Sprintf("Language: %s, Framework: %s, Port: %d",
@@ -81,7 +81,7 @@ func AnalyzePodFailure(ctx context.Context, namespace, podName string, k8sResult
 	errorDetails := fmt.Sprintf("Pod Events:\n%s\n\nPod Status: CrashLoopBackOff or Failed", podEvents)
 
 	// Use AI to analyze the crash
-	samplingClient := sampling.NewClient(ctx, logger)
+	samplingClient := sampling.NewClient(logger)
 	analysis, err := samplingClient.AnalyzePodCrashLoop(
 		ctx,
 		podLogs,

@@ -27,7 +27,7 @@ func WithAIRetry(ctx context.Context, name string, max int, fn func() error, log
 func WithLLMGuidedRetry(ctx context.Context, name string, max int, fn func() error, logger *slog.Logger) error {
 	logger.Info("Starting operation with LLM-guided retry", "operation", name, "max_retries", max)
 
-	samplingClient := sampling.NewClient(ctx, logger)
+	samplingClient := sampling.NewClient(logger)
 
 	for i := 1; i <= max; i++ {
 		logger.Debug("Attempting operation", "operation", name, "attempt", i, "max", max)
@@ -47,7 +47,7 @@ func WithLLMGuidedRetry(ctx context.Context, name string, max int, fn func() err
 		}
 
 		// Use LLM to analyze the error and suggest fixes
-		analysis, analysisErr := samplingClient.AnalyzeError(ctx, name, err, fmt.Sprintf("Attempt %d of %d", i, max))
+		analysis, analysisErr := samplingClient.AnalyzeError(ctx, err, fmt.Sprintf("Operation: %s, Attempt %d of %d", name, i, max))
 		if analysisErr != nil {
 			logger.Warn("Failed to get LLM analysis", "error", analysisErr)
 			// Continue with basic retry

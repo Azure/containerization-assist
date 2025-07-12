@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/security"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/tracing"
 	"github.com/briandowns/spinner"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // NotificationSender is an interface for sending MCP notifications
@@ -178,6 +180,31 @@ func (m *Manager) Begin(msg string) {
 
 // Update advances the progress bar or prints to stdout
 func (m *Manager) Update(step int, msg string, metadata map[string]interface{}) {
+	// Create tracing span for progress update
+	ctx := context.Background()
+	if m.logger != nil {
+		// Try to extract context from logger if available
+		ctx = context.WithValue(ctx, "logger", m.logger)
+	}
+
+	stepName := "unknown"
+	if metadata != nil {
+		if name, ok := metadata["step_name"].(string); ok {
+			stepName = name
+		}
+	}
+
+	err := tracing.TraceProgressUpdate(ctx, m.workflowID, stepName, step, int(m.total), func(tracedCtx context.Context) error {
+		m.updateInternal(step, msg, metadata)
+		return nil
+	})
+
+	if err != nil && m.logger != nil {
+		m.logger.Warn("Progress update tracing failed", "error", err)
+	}
+}
+
+func (m *Manager) updateInternal(step int, msg string, metadata map[string]interface{}) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

@@ -383,7 +383,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 			if criticalVulns, ok := scanResult["critical_vulns"].(int); ok && criticalVulns > 0 {
 				logger.Info("Critical vulnerabilities found, requesting AI analysis")
 
-				samplingClient := sampling.NewClient(ctx, logger)
+				samplingClient := sampling.NewClient(logger)
 				scanResultsJSON, _ := json.Marshal(scanResult)
 
 				analysis, err := samplingClient.AnalyzeSecurityScan(
@@ -940,7 +940,7 @@ func requestDockerfileFix(ctx context.Context, dockerfileContent string, buildEr
 		"framework", analyzeResult.Framework,
 		"error_preview", buildError.Error()[:min(100, len(buildError.Error()))])
 
-	samplingClient := sampling.NewClient(ctx, logger)
+	samplingClient := sampling.NewClient(logger)
 
 	prompt := fmt.Sprintf(`Please fix this Dockerfile that is failing to build.
 

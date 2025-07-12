@@ -3,112 +3,225 @@ package sampling
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/prompts"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/tracing"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // AnalyzeKubernetesManifest uses MCP sampling to analyze and fix Kubernetes manifests
-func (c *Client) AnalyzeKubernetesManifest(ctx context.Context, manifestContent string, deploymentError error, dockerfileContent string, repoAnalysis string) (string, error) {
+func (c *Client) AnalyzeKubernetesManifest(ctx context.Context, manifestContent string, deploymentError error, dockerfileContent string, repoAnalysis string) (result *ManifestFix, err error) {
+	err = tracing.TraceSamplingRequest(ctx, "kubernetes-manifest-fix", func(tracedCtx context.Context) error {
+		var internalErr error
+		result, internalErr = c.analyzeKubernetesManifestInternal(tracedCtx, manifestContent, deploymentError, dockerfileContent, repoAnalysis)
+		return internalErr
+	})
+	return result, err
+}
+
+// analyzeKubernetesManifestInternal contains the actual implementation with metrics
+func (c *Client) analyzeKubernetesManifestInternal(ctx context.Context, manifestContent string, deploymentError error, dockerfileContent string, repoAnalysis string) (result *ManifestFix, err error) {
+	// Add tracing attributes
+	span := tracing.SpanFromContext(ctx)
+	if span.IsRecording() {
+		span.SetAttributes(
+			attribute.String(tracing.AttrSamplingTemplateID, "kubernetes-manifest-fix"),
+			attribute.String(tracing.AttrSamplingContentType, "manifest"),
+			attribute.Int(tracing.AttrSamplingContentSize, len(manifestContent)),
+		)
+	}
+
+	startTime := time.Now()
+	var success bool
+	defer func() {
+		// Record metrics for this request
+		duration := time.Since(startTime)
+		metrics := GetGlobalMetrics()
+
+		validationResult := ValidationResult{
+			IsValid:       success,
+			SyntaxValid:   success,
+			BestPractices: success,
+		}
+
+		responseSize := 0
+		if result != nil {
+			validationResult = result.ValidationStatus
+			responseSize = len(result.FixedManifest)
+		}
+
+		metrics.RecordSamplingRequest(
+			ctx,
+			"kubernetes-manifest-fix",
+			success,
+			duration,
+			estimateTokens(manifestContent+dockerfileContent+repoAnalysis),
+			estimateTokens(manifestContent+dockerfileContent+repoAnalysis),
+			estimateTokens(strconv.Itoa(responseSize)),
+			"manifest",
+			responseSize,
+			validationResult,
+		)
+	}()
+
 	c.logger.Info("Requesting AI assistance to fix Kubernetes manifest",
 		"error_preview", deploymentError.Error()[:min(100, len(deploymentError.Error()))])
 
-	prompt := fmt.Sprintf(`Analyze the following Kubernetes manifest file for errors and suggest fixes:
+	// Get template manager
+	templateManager, err := prompts.NewManager(c.logger, prompts.ManagerConfig{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create template manager: %w", err)
+	}
 
-Current Manifest:
-%s
+	// Prepare template data
+	templateData := prompts.TemplateData{
+		"ManifestContent":   manifestContent,
+		"DeploymentError":   deploymentError.Error(),
+		"DockerfileContent": dockerfileContent,
+		"RepoAnalysis":      repoAnalysis,
+	}
 
-Deployment Error:
-%s
-
-Reference Dockerfile for this application:
-%s
-
-Repository Analysis:
-%s
-
-Please:
-1. Identify the issues causing the deployment error
-2. Provide a fixed version of the manifest
-3. Consider the Dockerfile when fixing the manifest (ports, environment variables, etc.)
-4. Ensure health checks are appropriate for the application type
-5. Use proper resource limits and requests
-6. Verify image references are correct
-
-IMPORTANT:
-- Do NOT create brand new manifests - Only fix the provided manifest
-- Verify that health check paths exist before using httpGet probe; if they don't, use a tcpSocket probe instead
-- Prefer using secrets for sensitive information and configmaps for configuration
-- For Spring Boot applications, use /actuator/health only if actuator is configured
-- Keep the same app name and container image name
-
-Return ONLY the fixed manifest content without any explanation or markdown formatting.`,
-		manifestContent,
-		deploymentError.Error(),
-		dockerfileContent,
-		repoAnalysis)
+	// Render template
+	rendered, err := templateManager.RenderTemplate("kubernetes-manifest-fix", templateData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render kubernetes manifest fix template: %w", err)
+	}
 
 	request := SamplingRequest{
-		Prompt:       prompt,
-		MaxTokens:    2048,
-		Temperature:  0.2, // Lower temperature for more deterministic fixes
-		SystemPrompt: "You are a Kubernetes expert. Fix the manifest to resolve deployment errors while following best practices.",
+		Prompt:       rendered.Content,
+		MaxTokens:    rendered.MaxTokens,
+		Temperature:  rendered.Temperature,
+		SystemPrompt: rendered.SystemPrompt,
 	}
 
 	response, err := c.Sample(ctx, request)
 	if err != nil {
-		return "", fmt.Errorf("failed to get AI fix for manifest: %w", err)
+		return nil, fmt.Errorf("failed to get AI fix for manifest: %w", err)
 	}
 
-	// Clean up the response
-	fixedManifest := strings.TrimSpace(response.Content)
-	return fixedManifest, nil
+	// Parse the response into structured format
+	parser := NewDefaultParser()
+	result, err = parser.ParseManifestFix(response.Content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse manifest fix response: %w", err)
+	}
+
+	// Enrich metadata
+	result.Metadata.TemplateID = rendered.ID
+	result.Metadata.TokensUsed = estimateTokens(response.Content)
+	result.Metadata.Temperature = rendered.Temperature
+	result.Metadata.ProcessingTime = time.Since(time.Now()) // Will be overridden by caller if needed
+
+	// Add original error info
+	result.OriginalIssues = []string{deploymentError.Error()}
+
+	// Validate the result
+	if err := result.Validate(); err != nil {
+		c.logger.Warn("Generated manifest fix failed validation", "error", err)
+		result.ValidationStatus.IsValid = false
+		result.ValidationStatus.Errors = append(result.ValidationStatus.Errors, err.Error())
+	}
+
+	// Perform comprehensive content validation with tracing
+	var contentValidation ValidationResult
+	_, validationErr := tracing.TraceSamplingValidation(ctx, "manifest", func(validationCtx context.Context) (bool, error) {
+		validator := NewDefaultValidator()
+		contentValidation = validator.ValidateManifestContent(result.FixedManifest)
+		return contentValidation.IsValid, nil
+	})
+
+	if validationErr != nil {
+		c.logger.Warn("Content validation tracing failed", "error", validationErr)
+	}
+
+	// Merge validation results
+	result.ValidationStatus.SyntaxValid = contentValidation.SyntaxValid
+	result.ValidationStatus.BestPractices = contentValidation.BestPractices
+	result.ValidationStatus.Errors = append(result.ValidationStatus.Errors, contentValidation.Errors...)
+	result.ValidationStatus.Warnings = append(result.ValidationStatus.Warnings, contentValidation.Warnings...)
+
+	// Update overall validity
+	if !contentValidation.IsValid {
+		result.ValidationStatus.IsValid = false
+	}
+
+	// Add validation results to tracing span
+	if span.IsRecording() {
+		span.SetAttributes(
+			attribute.Bool(tracing.AttrSamplingValidationValid, result.ValidationStatus.IsValid),
+			attribute.Int(tracing.AttrSamplingSecurityIssues, countSecurityIssues(result.ValidationStatus.Errors)),
+		)
+	}
+
+	// Set success flag for metrics
+	success = result.ValidationStatus.IsValid
+	return result, nil
 }
 
 // AnalyzePodCrashLoop uses MCP sampling to diagnose and suggest fixes for pod crash loops
-func (c *Client) AnalyzePodCrashLoop(ctx context.Context, podLogs string, manifestContent string, dockerfileContent string, errorDetails string) (*ErrorAnalysis, error) {
+func (c *Client) AnalyzePodCrashLoop(ctx context.Context, podLogs string, manifestContent string, dockerfileContent string, errorDetails string) (result *ErrorAnalysis, err error) {
+	startTime := time.Now()
+	var success bool
+	defer func() {
+		// Record metrics for this request
+		duration := time.Since(startTime)
+		metrics := GetGlobalMetrics()
+
+		validationResult := ValidationResult{
+			IsValid:       success,
+			SyntaxValid:   success,
+			BestPractices: success,
+		}
+
+		responseSize := 0
+		if result != nil {
+			responseSize = len(result.RootCause + result.Fix)
+		}
+
+		metrics.RecordSamplingRequest(
+			ctx,
+			"pod-crash-analysis",
+			success,
+			duration,
+			estimateTokens(podLogs+manifestContent+dockerfileContent+errorDetails),
+			estimateTokens(podLogs+manifestContent+dockerfileContent+errorDetails),
+			estimateTokens(strconv.Itoa(responseSize)),
+			"error-analysis",
+			responseSize,
+			validationResult,
+		)
+	}()
+
 	c.logger.Info("Requesting AI assistance to diagnose pod crash loop")
 
-	prompt := fmt.Sprintf(`Analyze this Kubernetes pod crash loop and suggest fixes:
+	// Get template manager
+	templateManager, err := prompts.NewManager(c.logger, prompts.ManagerConfig{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create template manager: %w", err)
+	}
 
-Pod Logs:
-%s
+	// Prepare template data
+	templateData := prompts.TemplateData{
+		"PodLogs":           podLogs,
+		"ErrorDetails":      errorDetails,
+		"ManifestContent":   manifestContent,
+		"DockerfileContent": dockerfileContent,
+	}
 
-Error Details:
-%s
-
-Current Manifest:
-%s
-
-Dockerfile:
-%s
-
-Please analyze the crash loop and provide:
-
-ROOT CAUSE:
-[Identify the specific reason for the crash]
-
-FIX STEPS:
-- [Step 1 to fix the issue]
-- [Step 2 to fix the issue]
-- [Additional steps as needed]
-
-ALTERNATIVES:
-- [Alternative approach 1]
-- [Alternative approach 2]
-
-PREVENTION:
-- [How to prevent this in the future]
-
-Focus on actionable fixes that can be applied to the manifest or Dockerfile.`,
-		podLogs,
-		errorDetails,
-		manifestContent,
-		dockerfileContent)
+	// Render template
+	rendered, err := templateManager.RenderTemplate("pod-crash-analysis", templateData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render pod crash analysis template: %w", err)
+	}
 
 	request := SamplingRequest{
-		Prompt:       prompt,
-		MaxTokens:    1500,
-		Temperature:  0.3,
-		SystemPrompt: "You are a Kubernetes debugging expert. Analyze pod crashes and provide actionable solutions.",
+		Prompt:       rendered.Content,
+		MaxTokens:    rendered.MaxTokens,
+		Temperature:  rendered.Temperature,
+		SystemPrompt: rendered.SystemPrompt,
 	}
 
 	response, err := c.Sample(ctx, request)
@@ -116,94 +229,421 @@ Focus on actionable fixes that can be applied to the manifest or Dockerfile.`,
 		return nil, fmt.Errorf("failed to analyze pod crash: %w", err)
 	}
 
-	return parseErrorAnalysis(response.Content), nil
+	result = parseErrorAnalysis(response.Content)
+	success = result != nil && result.RootCause != ""
+	return result, nil
 }
 
 // AnalyzeSecurityScan uses MCP sampling to analyze security scan results and suggest remediations
-func (c *Client) AnalyzeSecurityScan(ctx context.Context, scanResults string, dockerfileContent string, criticalOnly bool) (string, error) {
+func (c *Client) AnalyzeSecurityScan(ctx context.Context, scanResults string, dockerfileContent string, criticalOnly bool) (result *SecurityAnalysis, err error) {
+	startTime := time.Now()
+	var success bool
+	defer func() {
+		// Record metrics for this request
+		duration := time.Since(startTime)
+		metrics := GetGlobalMetrics()
+
+		validationResult := ValidationResult{
+			IsValid:       success,
+			SyntaxValid:   success,
+			BestPractices: success,
+		}
+
+		responseSize := 0
+		if result != nil {
+			responseSize = result.Metadata.TokensUsed
+		}
+
+		metrics.RecordSamplingRequest(
+			ctx,
+			"security-scan-analysis",
+			success,
+			duration,
+			estimateTokens(scanResults+dockerfileContent),
+			estimateTokens(scanResults+dockerfileContent),
+			estimateTokens(strconv.Itoa(responseSize)),
+			"security-analysis",
+			responseSize,
+			validationResult,
+		)
+	}()
+
 	c.logger.Info("Requesting AI assistance to analyze security scan results")
 
-	prompt := fmt.Sprintf(`Analyze these container security scan results and suggest remediations:
+	// Get template manager
+	templateManager, err := prompts.NewManager(c.logger, prompts.ManagerConfig{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create template manager: %w", err)
+	}
 
-Security Scan Results:
-%s
+	// Prepare template data
+	templateData := prompts.TemplateData{
+		"ScanResults":       scanResults,
+		"DockerfileContent": dockerfileContent,
+		"CriticalOnly":      criticalOnly,
+	}
 
-Current Dockerfile:
-%s
-
-Critical Issues Only: %v
-
-Please provide:
-1. Summary of the most critical vulnerabilities
-2. Specific Dockerfile changes to remediate vulnerabilities
-3. Alternative base images if current one has too many vulnerabilities
-4. Best practices to improve container security
-
-Focus on practical remediations that can be implemented in the Dockerfile.
-If base image has critical vulnerabilities, suggest newer/more secure alternatives.
-
-Return your analysis in a clear, actionable format.`,
-		scanResults,
-		dockerfileContent,
-		criticalOnly)
+	// Render template
+	rendered, err := templateManager.RenderTemplate("security-scan-analysis", templateData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render security scan analysis template: %w", err)
+	}
 
 	request := SamplingRequest{
-		Prompt:       prompt,
-		MaxTokens:    2000,
-		Temperature:  0.3,
-		SystemPrompt: "You are a container security expert. Analyze vulnerabilities and provide practical remediation strategies.",
+		Prompt:       rendered.Content,
+		MaxTokens:    rendered.MaxTokens,
+		Temperature:  rendered.Temperature,
+		SystemPrompt: rendered.SystemPrompt,
 	}
 
 	response, err := c.Sample(ctx, request)
 	if err != nil {
-		return "", fmt.Errorf("failed to analyze security scan: %w", err)
+		return nil, fmt.Errorf("failed to analyze security scan: %w", err)
 	}
 
-	return response.Content, nil
+	// Parse the response into structured format
+	parser := NewDefaultParser()
+	result, err = parser.ParseSecurityAnalysis(response.Content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse security analysis response: %w", err)
+	}
+
+	// Enrich metadata
+	result.Metadata.TemplateID = rendered.ID
+	result.Metadata.TokensUsed = estimateTokens(response.Content)
+	result.Metadata.Temperature = rendered.Temperature
+	result.Metadata.ProcessingTime = time.Since(time.Now())
+
+	// Validate the result
+	if err := result.Validate(); err != nil {
+		c.logger.Warn("Generated security analysis failed validation", "error", err)
+		success = false
+	} else {
+		success = true
+	}
+
+	return result, nil
 }
 
 // ImproveRepositoryAnalysis uses MCP sampling to enhance repository analysis
-func (c *Client) ImproveRepositoryAnalysis(ctx context.Context, initialAnalysis string, fileTree string, readmeContent string) (string, error) {
+func (c *Client) ImproveRepositoryAnalysis(ctx context.Context, initialAnalysis string, fileTree string, readmeContent string) (result *RepositoryAnalysis, err error) {
+	startTime := time.Now()
+	var success bool
+	defer func() {
+		// Record metrics for this request
+		duration := time.Since(startTime)
+		metrics := GetGlobalMetrics()
+
+		validationResult := ValidationResult{
+			IsValid:       success,
+			SyntaxValid:   success,
+			BestPractices: success,
+		}
+
+		responseSize := 0
+		if result != nil {
+			responseSize = result.Metadata.TokensUsed
+		}
+
+		metrics.RecordSamplingRequest(
+			ctx,
+			"repository-analysis",
+			success,
+			duration,
+			estimateTokens(initialAnalysis+fileTree+readmeContent),
+			estimateTokens(initialAnalysis+fileTree+readmeContent),
+			estimateTokens(strconv.Itoa(responseSize)),
+			"repository-analysis",
+			responseSize,
+			validationResult,
+		)
+	}()
+
 	c.logger.Info("Requesting AI assistance to improve repository analysis")
 
-	prompt := fmt.Sprintf(`Improve this repository analysis by identifying additional details:
+	// Get template manager
+	templateManager, err := prompts.NewManager(c.logger, prompts.ManagerConfig{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create template manager: %w", err)
+	}
 
-Initial Analysis:
-%s
+	// Prepare template data
+	templateData := prompts.TemplateData{
+		"InitialAnalysis": initialAnalysis,
+		"FileTree":        fileTree,
+		"ReadmeContent":   readmeContent,
+	}
 
-Repository Structure:
-%s
-
-README Content:
-%s
-
-Please enhance the analysis with:
-1. More accurate language/framework detection
-2. Identification of build tools and package managers
-3. Detection of required services (databases, caches, message queues)
-4. Application entry points and main executable
-5. Environment variables and configuration requirements
-6. Suggested port numbers based on framework conventions
-7. Special build requirements or dependencies
-
-Return an enhanced analysis that will help with containerization.`,
-		initialAnalysis,
-		fileTree,
-		readmeContent)
+	// Render template
+	rendered, err := templateManager.RenderTemplate("repository-analysis", templateData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render repository analysis template: %w", err)
+	}
 
 	request := SamplingRequest{
-		Prompt:       prompt,
-		MaxTokens:    1500,
-		Temperature:  0.3,
-		SystemPrompt: "You are a software architecture expert. Analyze repositories to understand their structure and requirements.",
+		Prompt:       rendered.Content,
+		MaxTokens:    rendered.MaxTokens,
+		Temperature:  rendered.Temperature,
+		SystemPrompt: rendered.SystemPrompt,
 	}
 
 	response, err := c.Sample(ctx, request)
 	if err != nil {
-		return "", fmt.Errorf("failed to improve repository analysis: %w", err)
+		return nil, fmt.Errorf("failed to improve repository analysis: %w", err)
 	}
 
-	return response.Content, nil
+	// Parse the response into structured format
+	parser := NewDefaultParser()
+	result, err = parser.ParseRepositoryAnalysis(response.Content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse repository analysis response: %w", err)
+	}
+
+	// Enrich metadata
+	result.Metadata.TemplateID = rendered.ID
+	result.Metadata.TokensUsed = estimateTokens(response.Content)
+	result.Metadata.Temperature = rendered.Temperature
+	result.Metadata.ProcessingTime = time.Since(time.Now())
+
+	// Validate the result
+	if err := result.Validate(); err != nil {
+		c.logger.Warn("Generated repository analysis failed validation", "error", err)
+		success = false
+	} else {
+		success = true
+	}
+
+	return result, nil
+}
+
+// GenerateDockerfile uses MCP sampling to generate production-ready Dockerfiles
+func (c *Client) GenerateDockerfile(ctx context.Context, language string, framework string, port int) (result *DockerfileFix, err error) {
+	startTime := time.Now()
+	var success bool
+	defer func() {
+		// Record metrics for this request
+		duration := time.Since(startTime)
+		metrics := GetGlobalMetrics()
+
+		validationResult := ValidationResult{
+			IsValid:       success,
+			SyntaxValid:   success,
+			BestPractices: success,
+		}
+
+		responseSize := 0
+		if result != nil {
+			validationResult = result.ValidationStatus
+			responseSize = len(result.FixedDockerfile)
+		}
+
+		metrics.RecordSamplingRequest(
+			ctx,
+			"dockerfile-generation",
+			success,
+			duration,
+			estimateTokens(language+framework),
+			estimateTokens(language+framework),
+			estimateTokens(strconv.Itoa(responseSize)),
+			"dockerfile",
+			responseSize,
+			validationResult,
+		)
+	}()
+
+	c.logger.Info("Requesting AI assistance to generate Dockerfile",
+		"language", language,
+		"framework", framework,
+		"port", port)
+
+	// Get template manager
+	templateManager, err := prompts.NewManager(c.logger, prompts.ManagerConfig{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create template manager: %w", err)
+	}
+
+	// Prepare template data
+	templateData := prompts.TemplateData{
+		"Language":  language,
+		"Framework": framework,
+		"Port":      port,
+	}
+
+	// Render template
+	rendered, err := templateManager.RenderTemplate("dockerfile-generation", templateData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render dockerfile generation template: %w", err)
+	}
+
+	request := SamplingRequest{
+		Prompt:       rendered.Content,
+		MaxTokens:    rendered.MaxTokens,
+		Temperature:  rendered.Temperature,
+		SystemPrompt: rendered.SystemPrompt,
+	}
+
+	response, err := c.Sample(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate Dockerfile: %w", err)
+	}
+
+	// Parse the response into structured format
+	parser := NewDefaultParser()
+	result, err = parser.ParseDockerfileFix(response.Content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse dockerfile generation response: %w", err)
+	}
+
+	// This is generation, not fixing, so clear the original error
+	result.OriginalError = ""
+
+	// Enrich metadata
+	result.Metadata.TemplateID = rendered.ID
+	result.Metadata.TokensUsed = estimateTokens(response.Content)
+	result.Metadata.Temperature = rendered.Temperature
+	result.Metadata.ProcessingTime = time.Since(time.Now())
+
+	// Validate the result
+	if err := result.Validate(); err != nil {
+		c.logger.Warn("Generated Dockerfile failed validation", "error", err)
+		result.ValidationStatus.IsValid = false
+		result.ValidationStatus.Errors = append(result.ValidationStatus.Errors, err.Error())
+	}
+
+	// Perform comprehensive content validation
+	validator := NewDefaultValidator()
+	contentValidation := validator.ValidateDockerfileContent(result.FixedDockerfile)
+
+	// Merge validation results
+	result.ValidationStatus.SyntaxValid = contentValidation.SyntaxValid
+	result.ValidationStatus.BestPractices = contentValidation.BestPractices
+	result.ValidationStatus.Errors = append(result.ValidationStatus.Errors, contentValidation.Errors...)
+	result.ValidationStatus.Warnings = append(result.ValidationStatus.Warnings, contentValidation.Warnings...)
+
+	// Update overall validity
+	if !contentValidation.IsValid {
+		result.ValidationStatus.IsValid = false
+	}
+
+	// Set success flag for metrics
+	success = result.ValidationStatus.IsValid
+	return result, nil
+}
+
+// FixDockerfile uses MCP sampling to fix Dockerfile build errors
+func (c *Client) FixDockerfile(ctx context.Context, language string, framework string, port int, dockerfileContent string, buildError string) (result *DockerfileFix, err error) {
+	startTime := time.Now()
+	var success bool
+	defer func() {
+		// Record metrics for this request
+		duration := time.Since(startTime)
+		metrics := GetGlobalMetrics()
+
+		validationResult := ValidationResult{
+			IsValid:       success,
+			SyntaxValid:   success,
+			BestPractices: success,
+		}
+
+		responseSize := 0
+		if result != nil {
+			validationResult = result.ValidationStatus
+			responseSize = len(result.FixedDockerfile)
+		}
+
+		metrics.RecordSamplingRequest(
+			ctx,
+			"dockerfile-fix",
+			success,
+			duration,
+			estimateTokens(dockerfileContent+buildError+language+framework),
+			estimateTokens(dockerfileContent+buildError+language+framework),
+			estimateTokens(strconv.Itoa(responseSize)),
+			"dockerfile",
+			responseSize,
+			validationResult,
+		)
+	}()
+
+	c.logger.Info("Requesting AI assistance to fix Dockerfile",
+		"language", language,
+		"framework", framework,
+		"error_preview", buildError[:min(100, len(buildError))])
+
+	// Get template manager
+	templateManager, err := prompts.NewManager(c.logger, prompts.ManagerConfig{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create template manager: %w", err)
+	}
+
+	// Prepare template data
+	templateData := prompts.TemplateData{
+		"Language":          language,
+		"Framework":         framework,
+		"Port":              port,
+		"DockerfileContent": dockerfileContent,
+		"BuildError":        buildError,
+	}
+
+	// Render template
+	rendered, err := templateManager.RenderTemplate("dockerfile-fix", templateData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render dockerfile fix template: %w", err)
+	}
+
+	request := SamplingRequest{
+		Prompt:       rendered.Content,
+		MaxTokens:    rendered.MaxTokens,
+		Temperature:  rendered.Temperature,
+		SystemPrompt: rendered.SystemPrompt,
+	}
+
+	response, err := c.Sample(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fix Dockerfile: %w", err)
+	}
+
+	// Parse the response into structured format
+	parser := NewDefaultParser()
+	result, err = parser.ParseDockerfileFix(response.Content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse dockerfile fix response: %w", err)
+	}
+
+	// Set the original error
+	result.OriginalError = buildError
+
+	// Enrich metadata
+	result.Metadata.TemplateID = rendered.ID
+	result.Metadata.TokensUsed = estimateTokens(response.Content)
+	result.Metadata.Temperature = rendered.Temperature
+	result.Metadata.ProcessingTime = time.Since(time.Now())
+
+	// Validate the result
+	if err := result.Validate(); err != nil {
+		c.logger.Warn("Generated Dockerfile fix failed validation", "error", err)
+		result.ValidationStatus.IsValid = false
+		result.ValidationStatus.Errors = append(result.ValidationStatus.Errors, err.Error())
+	}
+
+	// Perform comprehensive content validation
+	validator := NewDefaultValidator()
+	contentValidation := validator.ValidateDockerfileContent(result.FixedDockerfile)
+
+	// Merge validation results
+	result.ValidationStatus.SyntaxValid = contentValidation.SyntaxValid
+	result.ValidationStatus.BestPractices = contentValidation.BestPractices
+	result.ValidationStatus.Errors = append(result.ValidationStatus.Errors, contentValidation.Errors...)
+	result.ValidationStatus.Warnings = append(result.ValidationStatus.Warnings, contentValidation.Warnings...)
+
+	// Update overall validity
+	if !contentValidation.IsValid {
+		result.ValidationStatus.IsValid = false
+	}
+
+	// Set success flag for metrics
+	success = result.ValidationStatus.IsValid
+	return result, nil
 }
 
 // min returns the minimum of two integers
@@ -212,4 +652,15 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// countSecurityIssues counts the number of security-related errors
+func countSecurityIssues(errors []string) int {
+	count := 0
+	for _, err := range errors {
+		if strings.Contains(err, "SECURITY:") {
+			count++
+		}
+	}
+	return count
 }
