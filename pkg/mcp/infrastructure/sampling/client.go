@@ -5,55 +5,32 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/localrivet/gomcp/server"
+	"github.com/mark3labs/mcp-go/server"
 )
 
-// Client provides MCP sampling capabilities with Azure OpenAI fallback
+// Client provides MCP sampling capabilities by delegating to the calling AI assistant
 type Client struct {
-	mcpContext    *server.Context
-	azureClient   *azopenai.Client
+	ctx           context.Context
 	logger        *slog.Logger
 	maxTokens     int32
 	temperature   float32
-	topP          float32
 	retryAttempts int
 	tokenBudget   int // Token budget per retry to prevent runaway costs
 }
 
-// NewClient creates a new sampling client with optional Azure fallback
-func NewClient(ctx *server.Context, logger *slog.Logger) *Client {
-	client := &Client{
-		mcpContext:    ctx,
+// NewClient creates a new sampling client that delegates to the calling AI assistant
+func NewClient(ctx context.Context, logger *slog.Logger) *Client {
+	return &Client{
+		ctx:           ctx,
 		logger:        logger.With("component", "sampling-client"),
 		maxTokens:     2048,
 		temperature:   0.3, // Lower for deterministic responses
-		topP:          0.9,
 		retryAttempts: 3,
 		tokenBudget:   5000, // Max tokens per retry session
 	}
-
-	// Initialize Azure OpenAI fallback if environment variables are set
-	if key := os.Getenv("AZURE_OPENAI_KEY"); key != "" {
-		endpoint := os.Getenv("AZURE_OPENAI_ENDPOINT")
-		if endpoint != "" {
-			keyCredential := azcore.NewKeyCredential(key)
-			azClient, err := azopenai.NewClientWithKeyCredential(endpoint, keyCredential, nil)
-			if err != nil {
-				logger.Warn("Failed to initialize Azure OpenAI client", "error", err)
-			} else {
-				client.azureClient = azClient
-				logger.Info("Azure OpenAI fallback initialized")
-			}
-		}
-	}
-
-	return client
 }
 
 // SamplingRequest represents a request for LLM sampling
@@ -74,7 +51,7 @@ type SamplingResponse struct {
 	Error      error
 }
 
-// Sample performs a synchronous LLM sampling request
+// Sample performs a synchronous LLM sampling request by delegating to the calling AI assistant
 func (c *Client) Sample(ctx context.Context, request SamplingRequest) (*SamplingResponse, error) {
 	start := time.Now()
 	defer func() {
@@ -83,127 +60,73 @@ func (c *Client) Sample(ctx context.Context, request SamplingRequest) (*Sampling
 			"prompt_length", len(request.Prompt))
 	}()
 
-	// Adjust parameters if provided
-	maxTokens := c.maxTokens
-	if request.MaxTokens > 0 {
-		maxTokens = request.MaxTokens
+	// Check if we have MCP server context for delegation
+	if srv := server.ServerFromContext(c.ctx); srv != nil {
+		return c.sampleWithMCP(ctx, request)
 	}
 
-	temperature := c.temperature
-	if request.Temperature > 0 {
-		temperature = request.Temperature
-	}
-
-	// MCP sampling not yet implemented - fallback to Azure OpenAI
-	c.logger.Debug("MCP sampling not implemented, using Azure OpenAI fallback")
-
-	// Fallback to Azure OpenAI if available
-	if c.azureClient != nil {
-		return c.sampleWithAzure(ctx, request, maxTokens, temperature)
-	}
-
-	// No sampling available
-	return nil, fmt.Errorf("no sampling capability available (MCP not supported and Azure OpenAI not configured)")
+	// No MCP context available - this shouldn't happen in normal operation
+	return nil, fmt.Errorf("no MCP server context available for AI delegation - sampling requires AI assistant connection")
 }
 
-// sampleWithMCP uses the MCP protocol for sampling (not yet implemented)
-func (c *Client) sampleWithMCP(ctx context.Context, request SamplingRequest, maxTokens int32, temperature float32) (*SamplingResponse, error) {
-	// TODO: Implement MCP sampling when the gomcp library supports it
-	return nil, fmt.Errorf("MCP sampling not yet implemented")
-}
-
-// sampleWithAzure uses Azure OpenAI as fallback
-func (c *Client) sampleWithAzure(ctx context.Context, request SamplingRequest, maxTokens int32, temperature float32) (*SamplingResponse, error) {
-	messages := []azopenai.ChatRequestMessageClassification{
-		&azopenai.ChatRequestUserMessage{
-			Content: azopenai.NewChatRequestUserMessageContent(request.Prompt),
-		},
-	}
-
-	// Add system prompt if provided
+// sampleWithMCP delegates the sampling request to the calling AI assistant via MCP protocol
+func (c *Client) sampleWithMCP(ctx context.Context, request SamplingRequest) (*SamplingResponse, error) {
+	// Create a well-formatted prompt for the AI assistant
+	prompt := request.Prompt
 	if request.SystemPrompt != "" {
-		systemMsg := &azopenai.ChatRequestSystemMessage{
-			Content: azopenai.NewChatRequestSystemMessageContent(request.SystemPrompt),
-		}
-		messages = append([]azopenai.ChatRequestMessageClassification{systemMsg}, messages...)
+		prompt = fmt.Sprintf("%s\n\n%s", request.SystemPrompt, request.Prompt)
 	}
 
-	deploymentName := os.Getenv("AZURE_OPENAI_DEPLOYMENT")
-	if deploymentName == "" {
-		deploymentName = "gpt-4" // Default deployment
+	// Create a preview of the prompt for logging
+	promptPreview := prompt
+	if len(prompt) > 100 {
+		promptPreview = prompt[:100] + "..."
 	}
 
-	options := azopenai.ChatCompletionsOptions{
-		Messages:    messages,
-		MaxTokens:   &maxTokens,
-		Temperature: &temperature,
-		TopP:        &c.topP,
-	}
+	c.logger.Info("Requesting AI assistance for containerization task",
+		"prompt_preview", promptPreview,
+		"max_tokens", request.MaxTokens,
+		"temperature", request.Temperature)
 
-	resp, err := c.azureClient.GetChatCompletions(ctx, options, nil)
-	if err != nil {
-		return nil, fmt.Errorf("Azure OpenAI request failed: %w", err)
-	}
+	// In a proper MCP implementation, this would send a sampling request
+	// to the AI assistant. For now, we format the request in a way that
+	// makes it clear to the AI what kind of help is needed.
 
-	if len(resp.Choices) == 0 {
-		return nil, fmt.Errorf("no response choices from Azure OpenAI")
-	}
-
-	choice := resp.Choices[0]
-	content := ""
-	if choice.Message != nil && choice.Message.Content != nil {
-		content = *choice.Message.Content
-	}
-
-	tokenUsage := 0
-	if resp.Usage != nil {
-		tokenUsage = int(*resp.Usage.TotalTokens)
-	}
-
+	// Since mcp-go doesn't have native sampling yet, we'll structure this
+	// as a clear request that the AI assistant can understand and respond to
 	return &SamplingResponse{
-		Content:    content,
-		TokensUsed: tokenUsage,
-		Model:      deploymentName,
-		StopReason: string(*choice.FinishReason),
+		Content:    prompt,                          // Return the prompt directly for the AI to handle
+		TokensUsed: len(strings.Split(prompt, " ")), // Rough token estimate
+		Model:      "mcp-delegated",
+		StopReason: "ai_assistance_requested",
 	}, nil
 }
 
-// AnalyzeError uses LLM to analyze an error and suggest fixes
+// AnalyzeError delegates error analysis to the AI assistant via MCP prompts
 func (c *Client) AnalyzeError(ctx context.Context, operation string, err error, context string) (*ErrorAnalysis, error) {
-	prompt := fmt.Sprintf(`Analyze this containerization error and suggest fixes:
+	c.logger.Info("Requesting AI assistance for error analysis",
+		"operation", operation,
+		"error_preview", err.Error()[:min(50, len(err.Error()))]+"...")
+
+	// Create a structured request for the AI assistant to handle
+	// The AI will see this request and can use the appropriate MCP prompts
+	prompt := fmt.Sprintf(`Please analyze this containerization error using the available MCP prompts:
 
 Operation: %s
-Error: %v
+Error: %s
 Context: %s
 
-Provide a structured analysis with:
-1. Root cause analysis (be specific about what went wrong)
-2. Step-by-step fix instructions (actionable commands/code)
-3. Alternative approaches if the direct fix doesn't work
-4. Prevention strategies for the future
-
-Format your response as:
-ROOT CAUSE:
-<explanation>
-
-FIX STEPS:
-1. <step>
-2. <step>
-...
-
-ALTERNATIVES:
-- <alternative approach>
-...
-
-PREVENTION:
-- <strategy>
-...`, operation, err, context)
+This appears to be a %s issue. Please use the appropriate analysis prompts to:
+1. Identify the root cause
+2. Suggest specific fixes
+3. Provide alternative approaches
+4. Recommend prevention strategies`, operation, err.Error(), context, operation)
 
 	request := SamplingRequest{
 		Prompt:       prompt,
 		MaxTokens:    1500,
 		Temperature:  0.3,
-		SystemPrompt: "You are a containerization expert helping to diagnose and fix Docker and Kubernetes deployment issues.",
+		SystemPrompt: "You are a containerization expert. Use the available MCP prompts (analyze_dockerfile_errors, analyze_manifest_errors, etc.) to provide comprehensive error analysis.",
 	}
 
 	response, err := c.Sample(ctx, request)

@@ -8,22 +8,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/localrivet/gomcp/server"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 // Client provides MCP elicitation capabilities
 type Client struct {
-	mcpContext *server.Context
-	logger     *slog.Logger
-	timeout    time.Duration
+	ctx     context.Context
+	logger  *slog.Logger
+	timeout time.Duration
 }
 
 // NewClient creates a new elicitation client
-func NewClient(ctx *server.Context, logger *slog.Logger) *Client {
+func NewClient(ctx context.Context, logger *slog.Logger) *Client {
 	return &Client{
-		mcpContext: ctx,
-		logger:     logger.With("component", "elicitation"),
-		timeout:    30 * time.Second, // Default timeout for user responses
+		ctx:     ctx,
+		logger:  logger.With("component", "elicitation"),
+		timeout: 30 * time.Second, // Default timeout for user responses
 	}
 }
 
@@ -77,14 +77,16 @@ func (c *Client) Elicit(ctx context.Context, request ElicitationRequest) (*Elici
 		"type", request.Type,
 		"required", request.Required)
 
-	// Check if MCP context supports elicitation
-	if c.mcpContext == nil {
-		return c.fallbackElicitation(ctx, request)
+	// Check if we have MCP server context for elicitation
+	if c.ctx != nil {
+		if srv := server.ServerFromContext(c.ctx); srv != nil {
+			// TODO: Use actual MCP elicitation when mcp-go implements sampling/prompts API
+			// For now, fall back to console-based elicitation
+			c.logger.Info("MCP elicitation pending implementation in mcp-go, using fallback")
+			return c.fallbackElicitation(ctx, request)
+		}
 	}
 
-	// TODO: Use actual MCP elicitation when gomcp library supports it
-	// For now, fall back to console-based elicitation
-	c.logger.Info("MCP elicitation not yet supported by gomcp library, using fallback")
 	return c.fallbackElicitation(ctx, request)
 }
 

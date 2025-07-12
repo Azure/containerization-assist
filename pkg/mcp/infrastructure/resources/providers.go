@@ -2,6 +2,7 @@
 package resources
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -9,9 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/progress"
-	"github.com/Azure/container-kit/pkg/mcp/security"
-	"github.com/localrivet/gomcp/server"
+	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/security"
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 // Store manages workflow progress and logs
@@ -34,18 +36,123 @@ func NewStore(logger *slog.Logger) *Store {
 }
 
 // RegisterProviders registers all resource providers with the MCP server
-func (s *Store) RegisterProviders(mcpServer server.Server) error {
-	s.logger.Info("MCP resources feature not yet supported by gomcp library - using internal store")
+func (s *Store) RegisterProviders(mcpServer interface {
+	AddResource(resource mcp.Resource, handler server.ResourceHandlerFunc)
+	AddResourceTemplate(template mcp.ResourceTemplate, handler server.ResourceTemplateHandlerFunc)
+}) error {
+	s.logger.Info("Registering MCP resource providers")
 
-	// The gomcp library currently doesn't expose a RegisterResource method
-	// Resources are managed internally in the store and accessible via API methods
-	// This will be implemented when the MCP specification for resources is fully supported
+	// Register static resources for known workflows
+	s.mu.RLock()
+	for workflowID, progressData := range s.progressData {
+		resourceURI := fmt.Sprintf("progress://%s", workflowID)
+		data, _ := json.Marshal(progressData)
 
-	s.logger.Info("Resource providers ready for internal access",
-		"progress_resources", len(s.progressData),
-		"log_resources", len(s.logData))
+		resource := mcp.NewResource(
+			resourceURI,
+			fmt.Sprintf("Progress for workflow %s", workflowID),
+			mcp.WithResourceDescription("Live progress tracking for containerization workflow"),
+			mcp.WithMIMEType("application/json"),
+		)
+
+		mcpServer.AddResource(resource, server.ResourceHandlerFunc(func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+			return []mcp.ResourceContents{
+				mcp.TextResourceContents{
+					URI:      resourceURI,
+					MIMEType: "application/json",
+					Text:     string(data),
+				},
+			}, nil
+		}))
+	}
+	s.mu.RUnlock()
+
+	// Register resource templates for dynamic access
+	// Progress resources
+	progressTemplate := mcp.NewResourceTemplate(
+		"progress://{workflowID}",
+		"Workflow Progress",
+		mcp.WithTemplateDescription("Live progress tracking for containerization workflows"),
+		mcp.WithTemplateMIMEType("application/json"),
+	)
+
+	mcpServer.AddResourceTemplate(progressTemplate, server.ResourceTemplateHandlerFunc(func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		return s.handleProgressResource(ctx, request)
+	}))
+
+	// Log resources
+	logsTemplate := mcp.NewResourceTemplate(
+		"logs://{workflowID}/{stepName}",
+		"Workflow Step Logs",
+		mcp.WithTemplateDescription("Logs for specific workflow steps"),
+		mcp.WithTemplateMIMEType("text/plain"),
+	)
+
+	mcpServer.AddResourceTemplate(logsTemplate, server.ResourceTemplateHandlerFunc(func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		return s.handleLogsResource(ctx, request)
+	}))
+
+	s.logger.Info("Resource providers registered",
+		"static_resources", len(s.progressData),
+		"templates", 2)
 
 	return nil
+}
+
+// handleProgressResource handles dynamic progress resource requests
+func (s *Store) handleProgressResource(ctx context.Context, req mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+	// Extract workflowID from URI
+	parts := strings.Split(req.Params.URI, "://")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid resource URI: %s", req.Params.URI)
+	}
+	workflowID := parts[1]
+
+	resourceData, err := s.GetProgressAsResource(workflowID)
+	if err != nil {
+		return nil, err
+	}
+
+	data, _ := json.Marshal(resourceData)
+
+	return []mcp.ResourceContents{
+		mcp.TextResourceContents{
+			URI:      req.Params.URI,
+			MIMEType: "application/json",
+			Text:     string(data),
+		},
+	}, nil
+}
+
+// handleLogsResource handles dynamic log resource requests
+func (s *Store) handleLogsResource(ctx context.Context, req mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+	// Extract workflowID and stepName from URI
+	// URI format: logs://workflowID/stepName
+	parts := strings.Split(req.Params.URI, "://")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid resource URI: %s", req.Params.URI)
+	}
+
+	pathParts := strings.Split(parts[1], "/")
+	if len(pathParts) != 2 {
+		return nil, fmt.Errorf("invalid log resource path: %s", parts[1])
+	}
+
+	workflowID := pathParts[0]
+	stepName := pathParts[1]
+
+	logData, err := s.GetLogsAsResource(workflowID, stepName)
+	if err != nil {
+		return nil, err
+	}
+
+	return []mcp.ResourceContents{
+		mcp.TextResourceContents{
+			URI:      req.Params.URI,
+			MIMEType: "text/plain",
+			Text:     logData.(string),
+		},
+	}, nil
 }
 
 // GetProgressAsResource returns progress data formatted as a resource

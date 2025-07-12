@@ -14,7 +14,7 @@ import (
 func TestMetadataFields(t *testing.T) {
 	t.Run("new metadata fields populated correctly", func(t *testing.T) {
 		step := NewStepInfo("test_step", "Test Description", 3, 10)
-		
+
 		// Check initial values
 		assert.Equal(t, "progress", step.Metadata.Kind)
 		assert.NotEmpty(t, step.Metadata.StageID)
@@ -54,9 +54,9 @@ func TestMetadataFields(t *testing.T) {
 	t.Run("complete updates all fields", func(t *testing.T) {
 		step := NewStepInfo("complete_test", "Testing completion", 5, 10)
 		time.Sleep(10 * time.Millisecond) // Ensure some duration
-		
+
 		step.Complete()
-		
+
 		assert.Equal(t, StatusCompleted, step.Status)
 		assert.Equal(t, StatusCompleted, step.Metadata.Status)
 		assert.Equal(t, StatusCodeCompleted, step.Metadata.StatusCode)
@@ -69,9 +69,9 @@ func TestMetadataFields(t *testing.T) {
 	t.Run("fail updates all fields", func(t *testing.T) {
 		step := NewStepInfo("fail_test", "Testing failure", 3, 10)
 		err := errors.New("test error")
-		
+
 		step.Fail(err)
-		
+
 		assert.Equal(t, StatusFailed, step.Status)
 		assert.Equal(t, StatusFailed, step.Metadata.Status)
 		assert.Equal(t, StatusCodeFailed, step.Metadata.StatusCode)
@@ -81,24 +81,24 @@ func TestMetadataFields(t *testing.T) {
 
 	t.Run("update progress with ETA calculation", func(t *testing.T) {
 		step := NewStepInfo("eta_test", "Testing ETA", 0, 100)
-		
+
 		// Simulate some work
 		time.Sleep(100 * time.Millisecond)
 		step.UpdateProgress(10, "10% complete")
-		
+
 		assert.Equal(t, 10, step.Metadata.Current)
 		assert.Equal(t, "10% complete", step.Metadata.Message)
 		assert.Equal(t, 10, step.Metadata.Percentage)
 		assert.Equal(t, 0.1, step.Metadata.Progress)
-		
+
 		// ETA should be approximately 900ms (100ms elapsed, 10% done = ~1000ms total - 100ms elapsed)
 		assert.Greater(t, step.Metadata.ETAMS, int64(800))
 		assert.Less(t, step.Metadata.ETAMS, int64(1100))
-		
+
 		// Test edge cases
 		step.UpdateProgress(0, "No progress")
 		assert.Equal(t, int64(0), step.Metadata.ETAMS)
-		
+
 		step.UpdateProgress(100, "Complete")
 		assert.Equal(t, int64(0), step.Metadata.ETAMS)
 	})
@@ -237,12 +237,12 @@ func TestMetadataJSON(t *testing.T) {
 		// Marshal to JSON
 		data, err := json.Marshal(original)
 		require.NoError(t, err)
-		
+
 		// Unmarshal back
 		var unmarshaled Metadata
 		err = json.Unmarshal(data, &unmarshaled)
 		require.NoError(t, err)
-		
+
 		// Compare fields (excluding time fields which may have precision differences)
 		assert.Equal(t, original.Kind, unmarshaled.Kind)
 		assert.Equal(t, original.StageID, unmarshaled.StageID)
@@ -255,10 +255,14 @@ func TestMetadataJSON(t *testing.T) {
 		assert.Equal(t, original.Message, unmarshaled.Message)
 		assert.Equal(t, original.Progress, unmarshaled.Progress)
 		assert.Equal(t, original.ETAMS, unmarshaled.ETAMS)
-		assert.Equal(t, original.Details, unmarshaled.Details)
+		// Details map comparison needs special handling due to JSON number conversion
+		assert.Equal(t, len(original.Details), len(unmarshaled.Details))
+		assert.Equal(t, original.Details["key1"], unmarshaled.Details["key1"])
+		// JSON unmarshaling converts int to float64, so compare as float64
+		assert.Equal(t, float64(original.Details["key2"].(int)), unmarshaled.Details["key2"])
 		assert.Equal(t, original.Error, unmarshaled.Error)
 		assert.Equal(t, original.RetryCount, unmarshaled.RetryCount)
-		
+
 		// Check time fields are close enough
 		assert.WithinDuration(t, original.StartTime, unmarshaled.StartTime, time.Second)
 		assert.Equal(t, original.Duration, unmarshaled.Duration)
@@ -286,7 +290,7 @@ func TestMetadataJSON(t *testing.T) {
 
 		data, err := json.MarshalIndent(metadata, "", "  ")
 		require.NoError(t, err)
-		
+
 		// This serves as a snapshot test - if the JSON structure changes, this test will catch it
 		jsonStr := string(data)
 		assert.Contains(t, jsonStr, `"kind": "progress"`)
@@ -395,25 +399,25 @@ func TestStatusConstants(t *testing.T) {
 func TestWorkflowProgress(t *testing.T) {
 	t.Run("workflow progress tracking", func(t *testing.T) {
 		workflow := NewWorkflowProgress("wf-123", "containerize", 5)
-		
+
 		assert.Equal(t, "wf-123", workflow.WorkflowID)
 		assert.Equal(t, "containerize", workflow.WorkflowName)
 		assert.Equal(t, 5, workflow.TotalSteps)
 		assert.Equal(t, 0, workflow.CurrentStep)
 		assert.Equal(t, StatusRunning, workflow.Status)
-		
+
 		// Add steps
 		step1 := NewStepInfo("analyze", "Analyzing repository", 1, 5)
 		workflow.AddStep(step1)
 		assert.Equal(t, 1, workflow.CurrentStep)
 		assert.Equal(t, 20, workflow.Percentage)
-		
+
 		// Complete workflow
 		workflow.Complete()
 		assert.Equal(t, StatusCompleted, workflow.Status)
 		assert.Equal(t, 100, workflow.Percentage)
 		assert.Greater(t, workflow.Duration, time.Duration(0))
-		
+
 		// Test failure
 		workflow2 := NewWorkflowProgress("wf-456", "deploy", 3)
 		workflow2.Fail("Deployment failed")
@@ -433,7 +437,7 @@ func BenchmarkMetadata(b *testing.B) {
 	b.Run("UpdateProgress", func(b *testing.B) {
 		step := NewStepInfo("bench_step", "Benchmark step", 0, 1000)
 		b.ResetTimer()
-		
+
 		for i := 0; i < b.N; i++ {
 			step.UpdateProgress(i%1000, "Progress update")
 		}
@@ -442,7 +446,7 @@ func BenchmarkMetadata(b *testing.B) {
 	b.Run("JSON Marshal", func(b *testing.B) {
 		metadata := NewStepInfo("bench_step", "Benchmark step", 5, 10).Metadata
 		b.ResetTimer()
-		
+
 		for i := 0; i < b.N; i++ {
 			_, _ = json.Marshal(metadata)
 		}

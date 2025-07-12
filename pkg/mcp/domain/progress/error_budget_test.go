@@ -14,7 +14,7 @@ import (
 // TestErrorBudgetExceeded tests behavior when error budget is exceeded
 func TestErrorBudgetExceeded(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	m := New(nil, 10, logger)
+	m := New(context.Background(), nil, 10, logger)
 
 	// Set a low error budget for testing
 	errorBudget := 3
@@ -40,7 +40,7 @@ func TestProgressManagerFailureRecovery(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	t.Run("recovers from watchdog failure", func(t *testing.T) {
-		m := New(nil, 10, logger)
+		m := New(context.Background(), nil, 10, logger)
 		// Set minUpdateTime to 0 to avoid throttling
 		m.minUpdateTime = 0
 
@@ -60,7 +60,7 @@ func TestProgressManagerFailureRecovery(t *testing.T) {
 		os.Setenv("CI", "true")
 		defer os.Unsetenv("CI")
 
-		m := New(nil, 10, logger)
+		m := New(context.Background(), nil, 10, logger)
 		assert.True(t, m.isCI)
 		assert.Nil(t, m.spinner) // Should not create spinner in CI
 
@@ -79,7 +79,7 @@ func TestProgressManagerTimeout(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
 
-		m := New(nil, 10, logger)
+		m := New(context.Background(), nil, 10, logger)
 
 		// Start a long-running operation
 		go func() {
@@ -108,7 +108,7 @@ func TestProgressManagerResourceLimits(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	t.Run("handles memory pressure", func(t *testing.T) {
-		m := New(nil, 1000, logger) // Large number of steps
+		m := New(context.Background(), nil, 1000, logger) // Large number of steps
 
 		// Create a large metadata object to simulate memory pressure
 		largeMetadata := make(map[string]interface{})
@@ -126,7 +126,7 @@ func TestProgressManagerResourceLimits(t *testing.T) {
 	})
 
 	t.Run("handles high frequency updates", func(t *testing.T) {
-		m := New(nil, 1000, logger)
+		m := New(context.Background(), nil, 1000, logger)
 		m.minUpdateTime = 1 * time.Microsecond // Very short throttle for testing
 
 		start := time.Now()
@@ -149,7 +149,7 @@ func TestProgressManagerErrorStates(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	t.Run("handles invalid progress values", func(t *testing.T) {
-		m := New(nil, 10, logger)
+		m := New(context.Background(), nil, 10, logger)
 
 		// Test negative progress
 		m.minUpdateTime = 0 // Avoid throttling
@@ -162,7 +162,7 @@ func TestProgressManagerErrorStates(t *testing.T) {
 	})
 
 	t.Run("handles nil metadata gracefully", func(t *testing.T) {
-		m := New(nil, 10, logger)
+		m := New(context.Background(), nil, 10, logger)
 
 		// Should not panic with nil metadata
 		assert.NotPanics(t, func() {
@@ -174,7 +174,7 @@ func TestProgressManagerErrorStates(t *testing.T) {
 	})
 
 	t.Run("handles empty messages", func(t *testing.T) {
-		m := New(nil, 10, logger)
+		m := New(context.Background(), nil, 10, logger)
 
 		// Should handle empty messages gracefully
 		assert.NotPanics(t, func() {
@@ -193,7 +193,7 @@ func TestProgressManagerConcurrentFailures(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	t.Run("handles concurrent updates with errors", func(t *testing.T) {
-		m := New(nil, 100, logger)
+		m := New(context.Background(), nil, 100, logger)
 
 		errChan := make(chan error, 10)
 
@@ -246,7 +246,7 @@ func TestProgressManagerRecoveryStrategies(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	t.Run("circuit breaker pattern", func(t *testing.T) {
-		m := New(nil, 10, logger)
+		m := New(context.Background(), nil, 10, logger)
 		m.minUpdateTime = 0 // Avoid throttling
 		// Set a low error budget for testing
 		m.errorBudget = NewErrorBudget(3, 10*time.Minute)
@@ -274,7 +274,7 @@ func TestProgressManagerRecoveryStrategies(t *testing.T) {
 	})
 
 	t.Run("exponential backoff", func(t *testing.T) {
-		m := New(nil, 10, logger)
+		m := New(context.Background(), nil, 10, logger)
 		m.minUpdateTime = 0 // Avoid throttling
 
 		// Test exponential backoff pattern

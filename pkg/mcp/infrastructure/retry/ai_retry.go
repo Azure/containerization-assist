@@ -6,17 +6,17 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/mcp/sampling"
-	"github.com/localrivet/gomcp/server"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 // WithAIRetry wraps a function with AI-powered retry logic
 // This works with external AI assistants (like Claude) using the MCP server
 // The AI assistant observes failures through structured error reporting and can retry the workflow
 func WithAIRetry(ctx context.Context, name string, max int, fn func() error, logger *slog.Logger) error {
-	// Try to get MCP context for enhanced retry with sampling
-	if mcpCtx, ok := ctx.Value("mcp_context").(*server.Context); ok && mcpCtx != nil {
-		return WithLLMGuidedRetry(ctx, mcpCtx, name, max, fn, logger)
+	// Try to get MCP server from context for enhanced retry with sampling
+	if srv := server.ServerFromContext(ctx); srv != nil {
+		return WithLLMGuidedRetry(ctx, name, max, fn, logger)
 	}
 
 	// Fallback to basic retry logic
@@ -24,10 +24,10 @@ func WithAIRetry(ctx context.Context, name string, max int, fn func() error, log
 }
 
 // WithLLMGuidedRetry uses MCP sampling for intelligent retry logic
-func WithLLMGuidedRetry(ctx context.Context, mcpCtx *server.Context, name string, max int, fn func() error, logger *slog.Logger) error {
+func WithLLMGuidedRetry(ctx context.Context, name string, max int, fn func() error, logger *slog.Logger) error {
 	logger.Info("Starting operation with LLM-guided retry", "operation", name, "max_retries", max)
 
-	samplingClient := sampling.NewClient(mcpCtx, logger)
+	samplingClient := sampling.NewClient(ctx, logger)
 
 	for i := 1; i <= max; i++ {
 		logger.Debug("Attempting operation", "operation", name, "attempt", i, "max", max)

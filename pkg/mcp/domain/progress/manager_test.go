@@ -2,14 +2,14 @@ package progress
 
 import (
 	"bytes"
+	"context"
 	"log/slog"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/localrivet/gomcp/mcp"
-	"github.com/localrivet/gomcp/server"
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -67,12 +67,12 @@ func (m *MockContext) HasProgressToken() bool {
 	return m.hasProgressToken
 }
 
-func (m *MockContext) CreateSimpleProgressReporter(total *float64) (*mcp.ProgressReporter, error) {
+func (m *MockContext) SendNotificationToClient(ctx context.Context, method string, params interface{}) error {
 	if !m.hasProgressToken {
-		return nil, nil
+		return nil
 	}
-	// Return the mock reporter cast as the real type (would need adapter in real implementation)
-	return &mcp.ProgressReporter{}, nil
+	// Mock notification sending
+	return nil
 }
 
 // TestNewManager tests manager creation with different contexts
@@ -80,24 +80,34 @@ func TestNewManager(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	tests := []struct {
-		name      string
-		ctx       *server.Context
-		expectMCP bool
-		expectCLI bool
-		envCI     string
+		name          string
+		server        NotificationSender
+		progressToken interface{}
+		expectMCP     bool
+		expectCLI     bool
+		envCI         string
 	}{
 		{
-			name:      "nil context falls back to CLI",
-			ctx:       nil,
-			expectMCP: false,
-			expectCLI: true,
+			name:          "nil server falls back to CLI",
+			server:        nil,
+			progressToken: nil,
+			expectMCP:     false,
+			expectCLI:     true,
 		},
 		{
-			name:      "CI environment uses simple output",
-			ctx:       nil,
-			expectMCP: false,
-			expectCLI: true,
-			envCI:     "true",
+			name:          "CI environment uses simple output",
+			server:        nil,
+			progressToken: nil,
+			expectMCP:     false,
+			expectCLI:     true,
+			envCI:         "true",
+		},
+		{
+			name:          "with server and token enables MCP",
+			server:        &MockContext{hasProgressToken: true},
+			progressToken: "test-token",
+			expectMCP:     true,
+			expectCLI:     false,
 		},
 	}
 
@@ -109,9 +119,17 @@ func TestNewManager(t *testing.T) {
 				defer os.Unsetenv("CI")
 			}
 
-			m := New(tt.ctx, 10, logger)
+			ctx := context.Background()
+			req := &mcp.CallToolRequest{}
+			if tt.progressToken != nil {
+				req.Params.Meta = &mcp.Meta{
+					ProgressToken: tt.progressToken,
+				}
+			}
+
+			m := NewWithServer(ctx, req, tt.server, 10, logger)
 			assert.NotNil(t, m)
-			assert.Equal(t, float64(10), m.total)
+			assert.Equal(t, 10, m.total)
 			assert.Equal(t, 0, m.current)
 			assert.Equal(t, tt.expectCLI, m.isCLI)
 			assert.Equal(t, tt.envCI == "true", m.isCI)
@@ -125,7 +143,7 @@ func TestProgressManagerUpdate(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	t.Run("update advances progress", func(t *testing.T) {
-		m := New(nil, 10, logger)
+		m := New(context.Background(), nil, 10, logger)
 		// Set minUpdateTime to 0 to avoid throttling
 		m.minUpdateTime = 0
 
@@ -143,7 +161,7 @@ func TestProgressManagerUpdate(t *testing.T) {
 	})
 
 	t.Run("update throttling", func(t *testing.T) {
-		m := New(nil, 10, logger)
+		m := New(context.Background(), nil, 10, logger)
 		m.minUpdateTime = 100 * time.Millisecond
 		// Set lastUpdate to past to ensure first update goes through
 		m.lastUpdate = time.Now().Add(-200 * time.Millisecond)
@@ -168,7 +186,7 @@ func TestProgressManagerComplete(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
 
-	m := New(nil, 10, logger)
+	m := New(context.Background(), nil, 10, logger)
 	m.Complete("Test completed")
 
 	// Check that completion was logged
@@ -205,13 +223,13 @@ func TestETA(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	t.Run("no ETA at start", func(t *testing.T) {
-		m := New(nil, 10, logger)
+		m := New(context.Background(), nil, 10, logger)
 		eta := m.calculateETA()
 		assert.Equal(t, time.Duration(0), eta)
 	})
 
 	t.Run("calculates ETA after progress", func(t *testing.T) {
-		m := New(nil, 10, logger)
+		m := New(context.Background(), nil, 10, logger)
 		m.startTime = time.Now().Add(-10 * time.Second) // Started 10 seconds ago
 		m.current = 2                                   // Completed 2 of 10 steps
 
@@ -229,7 +247,7 @@ func TestWatchdog(t *testing.T) {
 	t.Run("watchdog sends heartbeat", func(t *testing.T) {
 		// This test would need a more sophisticated setup with mock MCP context
 		// For now, just verify the watchdog starts and stops
-		m := New(nil, 10, logger)
+		m := New(context.Background(), nil, 10, logger)
 
 		// Give watchdog time to start
 		time.Sleep(50 * time.Millisecond)
@@ -246,8 +264,8 @@ func TestWatchdog(t *testing.T) {
 func TestTraceID(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	m1 := New(nil, 10, logger)
-	m2 := New(nil, 10, logger)
+	m1 := New(context.Background(), nil, 10, logger)
+	m2 := New(context.Background(), nil, 10, logger)
 
 	// Each manager should have a unique trace ID
 	assert.NotEmpty(t, m1.traceID)
@@ -284,7 +302,7 @@ func TestStatusCodeMapping(t *testing.T) {
 // TestConcurrency tests thread safety
 func TestConcurrency(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	m := New(nil, 100, logger)
+	m := New(context.Background(), nil, 100, logger)
 
 	// Run multiple goroutines updating progress
 	var wg sync.WaitGroup
@@ -309,7 +327,7 @@ func TestConcurrency(t *testing.T) {
 // BenchmarkUpdate benchmarks the update operation
 func BenchmarkUpdate(b *testing.B) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	m := New(nil, 1000, logger)
+	m := New(context.Background(), nil, 1000, logger)
 
 	metadata := map[string]interface{}{
 		"step_name": "benchmark_step",
@@ -325,7 +343,7 @@ func BenchmarkUpdate(b *testing.B) {
 // TestGettersAndHelpers tests various getter methods
 func TestGettersAndHelpers(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	m := New(nil, 10, logger)
+	m := New(context.Background(), nil, 10, logger)
 	// Set minUpdateTime to 0 to avoid throttling
 	m.minUpdateTime = 0
 

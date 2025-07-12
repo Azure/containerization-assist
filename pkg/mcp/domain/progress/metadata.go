@@ -8,17 +8,17 @@ import (
 
 // Metadata represents structured progress information
 type Metadata struct {
-	Kind       string                 `json:"kind"`                     // e.g. "progress"
-	StageID    string                 `json:"stage_id"`                 // unique identifier for the stage
-	Step       string                 `json:"step"`                     // human-readable step name
+	Kind       string                 `json:"kind"`     // e.g. "progress"
+	StageID    string                 `json:"stage_id"` // unique identifier for the stage
+	Step       string                 `json:"step"`     // human-readable step name
 	Current    int                    `json:"current"`
 	Total      int                    `json:"total"`
 	Percentage int                    `json:"percentage"`
-	Status     Status                 `json:"status"`                   // e.g. "running", "failed", "skipped"
-	StatusCode int                    `json:"status_code,omitempty"`    // numeric code for UI styling
-	Message    string                 `json:"message,omitempty"`        // current progress message
-	Progress   float64                `json:"progress"`                 // 0.0 to 1.0
-	ETAMS      int64                  `json:"eta_ms,omitempty"`         // estimated time to completion in milliseconds
+	Status     Status                 `json:"status"`                // e.g. "running", "failed", "skipped"
+	StatusCode int                    `json:"status_code,omitempty"` // numeric code for UI styling
+	Message    string                 `json:"message,omitempty"`     // current progress message
+	Progress   float64                `json:"progress"`              // 0.0 to 1.0
+	ETAMS      int64                  `json:"eta_ms,omitempty"`      // estimated time to completion in milliseconds
 	StartTime  time.Time              `json:"start_time,omitempty"`
 	Duration   time.Duration          `json:"duration,omitempty"`
 	Details    map[string]interface{} `json:"details,omitempty"`
@@ -92,7 +92,7 @@ func NewStepInfo(name, description string, current, total int) *StepInfo {
 
 	stageID := generateStageID(name, current)
 	status := StatusRunning
-	
+
 	return &StepInfo{
 		Name:        name,
 		Description: description,
@@ -157,11 +157,11 @@ func (s *StepInfo) AddDetail(key string, value interface{}) {
 func (s *StepInfo) UpdateProgress(current int, message string) {
 	s.Metadata.Current = current
 	s.Metadata.Message = message
-	
+
 	if s.Metadata.Total > 0 {
 		s.Metadata.Percentage = (current * 100) / s.Metadata.Total
 		s.Metadata.Progress = float64(current) / float64(s.Metadata.Total)
-		
+
 		// Calculate ETA based on elapsed time and progress
 		elapsed := time.Since(s.StartTime)
 		if current > 0 && current < s.Metadata.Total {

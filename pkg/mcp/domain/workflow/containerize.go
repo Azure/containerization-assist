@@ -2,16 +2,18 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/retry"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps"
-	"github.com/Azure/container-kit/pkg/mcp/progress"
-	"github.com/localrivet/gomcp/server"
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 	"github.com/rs/zerolog"
 )
 
@@ -45,22 +47,81 @@ type WorkflowStep struct {
 }
 
 // RegisterWorkflowTools registers the single comprehensive workflow tool
-func RegisterWorkflowTools(gomcpServer server.Server, logger *slog.Logger) error {
+func RegisterWorkflowTools(mcpServer interface {
+	AddTool(tool mcp.Tool, handler server.ToolHandlerFunc)
+}, logger *slog.Logger) error {
 	logger.Info("Registering workflow tools")
 
 	// Register the single containerize_and_deploy workflow tool
-	gomcpServer.Tool("containerize_and_deploy",
-		"Complete end-to-end containerization and deployment with AI-powered error fixing",
-		func(ctx *server.Context, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
-			return executeContainerizeAndDeploy(ctx, args, logger)
-		})
+	tool := mcp.Tool{
+		Name:        "containerize_and_deploy",
+		Description: "Complete end-to-end containerization and deployment with AI-powered error fixing",
+		InputSchema: mcp.ToolInputSchema{
+			Type: "object",
+			Properties: map[string]interface{}{
+				"repo_url": map[string]interface{}{
+					"type":        "string",
+					"description": "Repository URL to containerize",
+				},
+				"branch": map[string]interface{}{
+					"type":        "string",
+					"description": "Branch to use (optional)",
+				},
+				"scan": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Run security scan (optional)",
+				},
+			},
+			Required: []string{"repo_url"},
+		},
+	}
+
+	mcpServer.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		arguments := req.GetArguments()
+
+		// Extract arguments
+		args := ContainerizeAndDeployArgs{}
+		if repoURL, ok := arguments["repo_url"].(string); ok {
+			args.RepoURL = repoURL
+		} else {
+			return nil, fmt.Errorf("repo_url is required")
+		}
+
+		if branch, ok := arguments["branch"].(string); ok {
+			args.Branch = branch
+		}
+
+		if scan, ok := arguments["scan"].(bool); ok {
+			args.Scan = scan
+		}
+
+		result, err := executeContainerizeAndDeploy(ctx, &req, &args, logger)
+		if err != nil {
+			return nil, err
+		}
+
+		// Marshal result to JSON
+		resultJSON, err := json.Marshal(result)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal result: %w", err)
+		}
+
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: string(resultJSON),
+				},
+			},
+		}, nil
+	})
 
 	logger.Info("Workflow tools registered successfully")
 	return nil
 }
 
 // executeContainerizeAndDeploy implements the complete 10-step workflow from feedback.md
-func executeContainerizeAndDeploy(mcpCtx *server.Context, args *ContainerizeAndDeployArgs, logger *slog.Logger) (*ContainerizeAndDeployResult, error) {
+func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs, logger *slog.Logger) (*ContainerizeAndDeployResult, error) {
 	logger.Info("Starting containerize_and_deploy workflow",
 		"repo_url", args.RepoURL,
 		"branch", args.Branch,
@@ -71,11 +132,10 @@ func executeContainerizeAndDeploy(mcpCtx *server.Context, args *ContainerizeAndD
 	}
 
 	startTime := time.Now()
-	ctx := context.Background()
 
 	// Create unified progress manager
 	totalSteps := 10
-	progressMgr := progress.New(mcpCtx, totalSteps, logger)
+	progressMgr := progress.New(ctx, req, totalSteps, logger)
 	defer progressMgr.Finish()
 
 	// Begin progress tracking

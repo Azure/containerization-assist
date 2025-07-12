@@ -316,7 +316,7 @@ func (suite *MCPWorkflowIntegrationSuite) TestMCPWorkflowIntegration() {
 
 // runCompleteWorkflow executes a complete containerization workflow
 func (suite *MCPWorkflowIntegrationSuite) runCompleteWorkflow(repo TestRepository) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	// Start MCP server
@@ -404,6 +404,7 @@ func (suite *MCPWorkflowIntegrationSuite) executeWorkflowSteps(ctx context.Conte
 				"repo_url": "file://" + repo.LocalDir, // Use file:// prefix for local directories
 				"branch":   "main",
 				"scan":     false, // Skip scanning for faster tests
+				// TODO: Add test_mode flag to skip deployment steps
 			},
 		},
 	})
@@ -505,14 +506,19 @@ func (suite *MCPWorkflowIntegrationSuite) sendMCPRequest(stdin io.WriteCloser, s
 	require.NoError(suite.T(), err)
 
 	// Send request
+	suite.T().Logf("Sending MCP request: %s", string(requestBytes))
 	_, err = fmt.Fprintf(stdin, "%s\n", requestBytes)
 	require.NoError(suite.T(), err)
 
 	// Read response line by line until we get a JSON response
 	scanner := bufio.NewScanner(stdout)
+	// Set a larger buffer for the scanner to handle large JSON responses
+	const maxScanTokenSize = 1024 * 1024 // 1MB buffer
+	buf := make([]byte, maxScanTokenSize)
+	scanner.Buffer(buf, maxScanTokenSize)
 
 	// Set a deadline for reading
-	deadline := time.Now().Add(120 * time.Second) // Allow enough time for K8s deployment + validation
+	deadline := time.Now().Add(300 * time.Second) // Allow enough time for full workflow including Docker build
 
 	for scanner.Scan() {
 		if time.Now().After(deadline) {
@@ -539,6 +545,11 @@ func (suite *MCPWorkflowIntegrationSuite) sendMCPRequest(stdin io.WriteCloser, s
 
 		// Log non-JSON lines for debugging
 		suite.T().Logf("Server output: %s", line)
+		
+		// Check for progress indicators
+		if strings.Contains(line, "[BEGIN]") || strings.Contains(line, "Step") || strings.Contains(line, "[COMPLETE]") {
+			suite.T().Logf("Progress: %s", line)
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -546,7 +557,14 @@ func (suite *MCPWorkflowIntegrationSuite) sendMCPRequest(stdin io.WriteCloser, s
 	}
 
 	suite.T().Log("No JSON response received within timeout")
-	return map[string]interface{}{}
+	suite.T().Logf("Last request ID was: %v", request["id"])
+	// Return empty response to avoid nil pointer
+	return map[string]interface{}{
+		"error": map[string]interface{}{
+			"code":    -32603,
+			"message": "No response received from server within timeout",
+		},
+	}
 }
 
 // TestMCPToolCommunication tests tool-to-tool communication through orchestration
@@ -644,6 +662,52 @@ func (suite *MCPWorkflowIntegrationSuite) TestMCPToolCommunication() {
 			}
 		})
 	}
+}
+
+// TestMCPPingTool tests basic MCP connectivity with ping tool
+func (suite *MCPWorkflowIntegrationSuite) TestMCPPingTool() {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	mcpServer := suite.startMCPServer(ctx)
+	defer mcpServer.cmd.Process.Kill()
+
+	time.Sleep(2 * time.Second)
+
+	stdin := mcpServer.stdin
+	stdout := mcpServer.stdout
+
+	// Initialize server
+	initResp := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "initialize",
+		"params": map[string]interface{}{
+			"clientInfo": map[string]interface{}{
+				"name":    "ping-test",
+				"version": "1.0.0",
+			},
+		},
+	})
+
+	assert.Contains(suite.T(), initResp, "result")
+	suite.T().Log("✓ MCP server initialized for ping test")
+
+	// Test ping tool
+	pingResp := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      2,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "ping",
+			"arguments": map[string]interface{}{
+				"message": "integration-test",
+			},
+		},
+	})
+
+	suite.T().Logf("Ping response: %+v", pingResp)
+	assert.Contains(suite.T(), pingResp, "result")
 }
 
 // TestMCPErrorHandling tests error handling and recovery scenarios

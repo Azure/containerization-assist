@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,9 +14,10 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/application/session"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/prompts"
-	"github.com/Azure/container-kit/pkg/mcp/resources"
-	"github.com/localrivet/gomcp/server"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/prompts"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/resources"
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 // serverImpl represents the consolidated MCP server implementation
@@ -23,17 +25,11 @@ type serverImpl struct {
 	config         workflow.ServerConfig
 	sessionManager session.SessionManager
 	resourceStore  *resources.Store
-	// workspaceManager *runtime.WorkspaceManager // TODO: Type needs to be implemented
-	// circuitBreakers  *execution.CircuitBreakerRegistry // TODO: Type needs to be implemented
-	// TODO: Fix job manager type after migration
-	// jobManager api.JobExecutionService
-	// transport removed - using gomcp server directly
-	logger    *slog.Logger
-	startTime time.Time
+	logger         *slog.Logger
+	startTime      time.Time
 
-	// Direct gomcp server instead of manager abstraction
-	gomcpServer        server.Server
-	isGomcpInitialized bool
+	mcpServer        *server.MCPServer
+	isMcpInitialized bool
 
 	shutdownMutex  sync.Mutex
 	isShuttingDown bool
@@ -46,62 +42,98 @@ type ConversationComponents struct {
 
 // registerTools registers the single comprehensive workflow tool
 func (s *serverImpl) registerTools() error {
-	if s.gomcpServer == nil {
-		return errors.New(errors.CodeInternalError, "server", "gomcp server not initialized", nil)
+	if s.mcpServer == nil {
+		return errors.New(errors.CodeInternalError, "server", "mcp server not initialized", nil)
 	}
 
 	s.logger.Info("Registering single comprehensive workflow tool for AI-powered containerization")
-
-	// Register ONLY the workflow tool - this ensures AI assistants use complete workflows
-	// instead of individual atomic tools for true workflow-focused operation
-	if err := workflow.RegisterWorkflowTools(s.gomcpServer, s.logger); err != nil {
+	if err := workflow.RegisterWorkflowTools(s.mcpServer, s.logger); err != nil {
 		return errors.New(errors.CodeToolExecutionFailed, "server", "failed to register workflow tools", err)
 	}
 
 	// Keep essential diagnostic tools
-	s.gomcpServer.Tool("ping", "Simple ping tool to test MCP connectivity",
-		func(ctx *server.Context, args struct {
-			Message string `json:"message,omitempty"`
-		}) (interface{}, error) {
-			response := "pong"
-			if args.Message != "" {
-				response = "pong: " + args.Message
-			}
-			return map[string]interface{}{
-				"response":  response,
-				"timestamp": time.Now().Format(time.RFC3339),
-			}, nil
-		})
+	pingTool := mcp.Tool{
+		Name:        "ping",
+		Description: "Simple ping tool to test MCP connectivity",
+		InputSchema: mcp.ToolInputSchema{
+			Type: "object",
+			Properties: map[string]interface{}{
+				"message": map[string]interface{}{
+					"type":        "string",
+					"description": "Optional message to echo back",
+				},
+			},
+		},
+	}
+	s.mcpServer.AddTool(pingTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		arguments := req.GetArguments()
+		message, _ := arguments["message"].(string)
 
-	s.gomcpServer.Tool("server_status", "Get basic server status information",
-		func(ctx *server.Context, args *struct {
-			Details bool `json:"details,omitempty"`
-		}) (*struct {
+		response := "pong"
+		if message != "" {
+			response = "pong: " + message
+		}
+
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: fmt.Sprintf(`{"response":"%s","timestamp":"%s"}`, response, time.Now().Format(time.RFC3339)),
+				},
+			},
+		}, nil
+	})
+
+	statusTool := mcp.Tool{
+		Name:        "server_status",
+		Description: "Get basic server status information",
+		InputSchema: mcp.ToolInputSchema{
+			Type: "object",
+			Properties: map[string]interface{}{
+				"details": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Include detailed information",
+				},
+			},
+		},
+	}
+	s.mcpServer.AddTool(statusTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		arguments := req.GetArguments()
+		details, _ := arguments["details"].(bool)
+
+		status := struct {
 			Status  string `json:"status"`
 			Version string `json:"version"`
 			Uptime  string `json:"uptime"`
-		}, error) {
-			return &struct {
-				Status  string `json:"status"`
-				Version string `json:"version"`
-				Uptime  string `json:"uptime"`
-			}{
-				Status:  "running",
-				Version: "dev",
-				Uptime:  time.Since(s.startTime).String(),
-			}, nil
-		})
+			Details bool   `json:"details,omitempty"`
+		}{
+			Status:  "running",
+			Version: "dev",
+			Uptime:  time.Since(s.startTime).String(),
+			Details: details,
+		}
+
+		statusJSON, _ := json.Marshal(status)
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				mcp.TextContent{
+					Type: "text",
+					Text: string(statusJSON),
+				},
+			},
+		}, nil
+	})
 
 	s.logger.Info("Workflow tools registered successfully - AI will now use complete workflows instead of atomic tools")
 
 	// Register MCP prompts for slash commands
-	promptRegistry := prompts.NewRegistry(s.gomcpServer, s.logger)
+	promptRegistry := prompts.NewRegistry(s.mcpServer, s.logger)
 	if err := promptRegistry.RegisterAll(); err != nil {
 		return errors.New(errors.CodeToolExecutionFailed, "server", "failed to register prompts", err)
 	}
 
 	// Register MCP resource providers
-	if err := s.resourceStore.RegisterProviders(s.gomcpServer); err != nil {
+	if err := s.resourceStore.RegisterProviders(s.mcpServer); err != nil {
 		return errors.New(errors.CodeToolExecutionFailed, "server", "failed to register resource providers", err)
 	}
 
@@ -151,32 +183,6 @@ func NewServer(ctx context.Context, logger *slog.Logger, opts ...Option) (api.MC
 		}
 	}
 
-	// sessionManager is already set above
-
-	// TODO: Implement WorkspaceManager
-	// workspaceManager, err := runtime.NewWorkspaceManager(ctx, runtime.WorkspaceConfig{
-	//	BaseDir: config.WorkspaceDir,
-	//	Logger:  logger.With("component", "workspace_manager"),
-	// })
-	// if err != nil {
-	//	logger.Error("Failed to initialize workspace manager", "error", err)
-	//	return nil, errors.Wrap(err, "server/core", "failed to initialize workspace manager")
-	// }
-
-	// TODO: Implement CircuitBreakerRegistry
-	// circuitBreakers := execution.NewCircuitBreakerRegistry(logger.With("component", "circuit_breakers"))
-
-	// TODO: Create job manager from service container
-	// TODO: Fix after migration
-	// var jobManager api.JobExecutionService
-
-	// Note: Tool registry and orchestrator removed for workflow-focused operation
-
-	// Note: Transport creation removed - using gomcp server directly
-	// The gomcp server handles stdio/http transport internally via .AsStdio() or .AsHTTP()
-
-	// Note: Service container removed - using direct dependency injection
-
 	// Create resource store
 	resourceStore := resources.NewStore(deps.logger)
 
@@ -184,12 +190,8 @@ func NewServer(ctx context.Context, logger *slog.Logger, opts ...Option) (api.MC
 		config:         config,
 		sessionManager: deps.sessionManager,
 		resourceStore:  resourceStore,
-		// workspaceManager: workspaceManager,
-		// circuitBreakers:  circuitBreakers,
-		// jobManager:       jobManager, // TODO: Fix after migration
-		// transport removed - using gomcp server directly
-		logger:    deps.logger,
-		startTime: time.Now(),
+		logger:         deps.logger,
+		startTime:      time.Now(),
 	}
 
 	deps.logger.Info("MCP Server initialized successfully",
@@ -215,20 +217,27 @@ func (s *serverImpl) Start(ctx context.Context) error {
 	// Start resource store cleanup routine
 	s.resourceStore.StartCleanupRoutine(30*time.Minute, 24*time.Hour)
 
-	// Initialize gomcp server directly without manager abstraction
-	if !s.isGomcpInitialized {
-		s.logger.Info("Initializing gomcp server")
-		s.gomcpServer = server.NewServer("Container Kit MCP Server",
-			server.WithLogger(s.logger),
-		).AsStdio()
+	// Initialize mcp-go server directly without manager abstraction
+	if !s.isMcpInitialized {
+		s.logger.Info("Initializing mcp-go server")
 
-		if s.gomcpServer == nil {
-			return errors.New(errors.CodeInternalError, "transport", "failed to create gomcp stdio server", nil)
+		// Create mcp-go server with capabilities
+		s.mcpServer = server.NewMCPServer(
+			"container-kit-mcp",
+			"1.0.0",
+			server.WithResourceCapabilities(true, true),
+			server.WithPromptCapabilities(true),
+			server.WithToolCapabilities(true),
+			server.WithLogging(),
+		)
+
+		if s.mcpServer == nil {
+			return errors.New(errors.CodeInternalError, "transport", "failed to create mcp-go server", nil)
 		}
 
 		// Register tools directly
 		if err := s.registerTools(); err != nil {
-			return errors.New(errors.CodeToolExecutionFailed, "transport", "failed to register tools with gomcp", err)
+			return errors.New(errors.CodeToolExecutionFailed, "transport", "failed to register tools with mcp-go", err)
 		}
 
 		// Register chat modes for Copilot integration
@@ -237,19 +246,15 @@ func (s *serverImpl) Start(ctx context.Context) error {
 			// Don't fail server startup for this
 		}
 
-		s.isGomcpInitialized = true
-		s.logger.Info("Gomcp server initialized successfully")
+		s.isMcpInitialized = true
+		s.logger.Info("MCP-GO server initialized successfully")
 	}
 
-	// Transport setter removed - using gomcp server directly
-
+	// Use mcp-go server Serve method
 	transportDone := make(chan error, 1)
 	go func() {
-		if mcpServer, ok := s.gomcpServer.(interface{ Run() error }); ok {
-			transportDone <- mcpServer.Run()
-		} else {
-			transportDone <- errors.New(errors.CodeNotImplemented, "transport", "server does not implement Run() method", nil)
-		}
+		// mcp-go uses ServeStdio() method for stdio transport
+		transportDone <- server.ServeStdio(s.mcpServer)
 	}()
 
 	select {
@@ -328,54 +333,56 @@ func (s *serverImpl) GetStats() (interface{}, error) {
 		"name":              s.GetName(),
 		"uptime":            time.Since(s.startTime).String(),
 		"status":            "running",
-		"session_count":     0, // TODO: Get actual session count
+		"session_count":     s.getSessionCount(),
 		"transport_type":    s.config.TransportType,
 		"conversation_mode": s.IsConversationModeEnabled(),
 	}, nil
 }
 
+// getSessionCount returns the current number of sessions
+func (s *serverImpl) getSessionCount() int {
+	if s.sessionManager == nil {
+		return 0
+	}
+
+	ctx := context.Background()
+	sessions, err := s.sessionManager.ListSessionsTyped(ctx)
+	if err != nil {
+		s.logger.Warn("Failed to get session count", "error", err)
+		return 0
+	}
+
+	return len(sessions)
+}
+
 // GetSessionManagerStats returns session manager statistics
 func (s *serverImpl) GetSessionManagerStats() (interface{}, error) {
 	if s.sessionManager != nil {
-		// TODO: Add proper session manager stats when interface is available
+		ctx := context.Background()
+		sessions, err := s.sessionManager.ListSessionsTyped(ctx)
+		if err != nil {
+			s.logger.Warn("Failed to get session list for stats", "error", err)
+			return map[string]interface{}{
+				"error":        "failed to retrieve session stats",
+				"max_sessions": s.config.MaxSessions,
+			}, nil
+		}
+
+		// Count active sessions (not expired and not failed)
+		activeSessions := 0
+		for _, session := range sessions {
+			if time.Now().Before(session.ExpiresAt) && session.Status != "failed" {
+				activeSessions++
+			}
+		}
+
 		return map[string]interface{}{
-			"active_sessions": 0,
-			"total_sessions":  0,
+			"active_sessions": activeSessions,
+			"total_sessions":  len(sessions),
 			"max_sessions":    s.config.MaxSessions,
 		}, nil
 	}
 	return map[string]interface{}{
 		"error": "session manager not initialized",
 	}, nil
-}
-
-// ============================================================================
-// api.MCPServer Implementation Methods
-// ============================================================================
-
-// RegisterTool registers a tool with the server (implements api.MCPServer)
-func (s *serverImpl) RegisterTool(tool api.Tool) error {
-	// For workflow-focused server, tools are registered directly in gomcp server
-	// during registerTools() call in Start() method
-	s.logger.Info("Tool registration requested", "tool", tool.Name())
-	return nil
-}
-
-// GetRegistry returns the tool registry (implements api.MCPServer)
-func (s *serverImpl) GetRegistry() api.Registry {
-	// For workflow-focused server, we don't expose a separate registry
-	// Tools are managed directly by the gomcp server
-	return nil
-}
-
-// GetSessionManager returns the session manager (implements api.MCPServer)
-func (s *serverImpl) GetSessionManager() interface{} {
-	return s.sessionManager
-}
-
-// GetOrchestrator returns the tool orchestrator (implements api.MCPServer)
-func (s *serverImpl) GetOrchestrator() api.Orchestrator {
-	// For workflow-focused server, orchestration happens within workflows
-	// No separate orchestrator needed
-	return nil
 }

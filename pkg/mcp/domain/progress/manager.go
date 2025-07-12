@@ -2,23 +2,63 @@
 package progress
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/security"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/security"
 	"github.com/briandowns/spinner"
-	"github.com/localrivet/gomcp/mcp"
-	"github.com/localrivet/gomcp/server"
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 )
+
+// NotificationSender is an interface for sending MCP notifications
+type NotificationSender interface {
+	SendNotificationToClient(ctx context.Context, method string, params interface{}) error
+}
+
+// mcpServerWrapper wraps the mcp-go MCPServer to match our interface
+type mcpServerWrapper struct {
+	server interface {
+		SendNotificationToClient(ctx context.Context, method string, params map[string]any) error
+	}
+}
+
+// SendNotificationToClient implements NotificationSender interface
+func (w *mcpServerWrapper) SendNotificationToClient(ctx context.Context, method string, params interface{}) error {
+	// Convert params to map[string]any
+	paramsMap, ok := params.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("params must be map[string]interface{}, got %T", params)
+	}
+
+	// Convert map[string]interface{} to map[string]any
+	anyMap := make(map[string]any, len(paramsMap))
+	for k, v := range paramsMap {
+		anyMap[k] = v
+	}
+
+	return w.server.SendNotificationToClient(ctx, method, anyMap)
+}
+
+// getServerFromContext attempts to extract the MCP server from the context
+func getServerFromContext(ctx context.Context) NotificationSender {
+	if s := server.ServerFromContext(ctx); s != nil {
+		return &mcpServerWrapper{server: s}
+	}
+	return nil
+}
 
 // Manager provides a unified progress reporting interface that bridges MCP and CLI
 type Manager struct {
-	reporter      *mcp.ProgressReporter
+	ctx           context.Context
+	req           *mcp.CallToolRequest
+	server        NotificationSender
 	spinner       *spinner.Spinner
-	total         float64
+	total         int
 	current       int
 	logger        *slog.Logger
 	mu            sync.Mutex
@@ -32,13 +72,27 @@ type Manager struct {
 	stepDurations map[string]time.Duration
 	traceID       string
 	errorBudget   *ErrorBudget
+	progressToken interface{}
 }
 
 // New creates a new progress manager that automatically falls back to CLI mode
 // when no MCP token exists
-func New(ctx *server.Context, totalSteps int, logger *slog.Logger) *Manager {
+func New(ctx context.Context, req *mcp.CallToolRequest, totalSteps int, logger *slog.Logger) *Manager {
+	// Try to get server from context
+	var server NotificationSender
+	if s := getServerFromContext(ctx); s != nil {
+		server = s
+	}
+	return NewWithServer(ctx, req, server, totalSteps, logger)
+}
+
+// NewWithServer creates a new progress manager with an optional server for sending notifications
+func NewWithServer(ctx context.Context, req *mcp.CallToolRequest, server NotificationSender, totalSteps int, logger *slog.Logger) *Manager {
 	m := &Manager{
-		total:         float64(totalSteps),
+		ctx:           ctx,
+		req:           req,
+		server:        server,
+		total:         totalSteps,
 		current:       0,
 		logger:        logger,
 		startTime:     time.Now(),
@@ -54,18 +108,14 @@ func New(ctx *server.Context, totalSteps int, logger *slog.Logger) *Manager {
 	// Add trace ID to logger context
 	m.logger = logger.With("trace_id", m.traceID)
 
-	// Check if we have MCP context with progress token
-	if ctx != nil && ctx.HasProgressToken() {
-		reporter := ctx.CreateSimpleProgressReporter(&m.total)
-		if reporter != nil {
-			m.reporter = reporter
-			m.isCLI = false
-			m.logger.Debug("MCP progress reporting enabled")
-		} else {
-			m.logger.Warn("Failed to create MCP progress reporter, falling back to CLI")
-			m.setupCLIFallback()
-		}
+	// Check if we have MCP progress token in request
+	// If we have both server and progress token, use MCP mode
+	if server != nil && req != nil && req.Params.Meta != nil && req.Params.Meta.ProgressToken != nil {
+		m.progressToken = req.Params.Meta.ProgressToken
+		m.isCLI = false
+		m.logger.Debug("MCP progress reporting enabled", "progressToken", m.progressToken)
 	} else {
+		// Fall back to CLI mode
 		m.setupCLIFallback()
 	}
 
@@ -97,10 +147,18 @@ func (m *Manager) Begin(msg string) {
 	// Start watchdog timer
 	m.resetWatchdog()
 
-	if m.reporter != nil {
-		// TODO: Use correct MCP progress API when available
-		// The gomcp library may not expose Begin/Update/Done methods yet
-		m.logger.Debug("MCP progress begin", "message", msg)
+	if m.progressToken != nil && m.server != nil {
+		// Send progress notification using mcp-go
+		params := map[string]interface{}{
+			"progressToken": m.progressToken,
+			"progress":      float64(m.current),
+			"total":         float64(m.total),
+			"message":       msg,
+		}
+
+		if err := m.server.SendNotificationToClient(m.ctx, "notifications/progress", params); err != nil {
+			m.logger.Warn("Failed to send progress notification", "error", err)
+		}
 	} else if m.isCLI {
 		if m.isCI {
 			fmt.Printf("[BEGIN] %s\n", msg)
@@ -133,7 +191,7 @@ func (m *Manager) Update(step int, msg string, metadata map[string]interface{}) 
 
 	m.current = step
 	m.lastUpdate = time.Now()
-	percentage := int((float64(step) / m.total) * 100)
+	percentage := int((float64(step) / float64(m.total)) * 100)
 
 	// Enrich metadata
 	if metadata == nil {
@@ -160,12 +218,17 @@ func (m *Manager) Update(step int, msg string, metadata map[string]interface{}) 
 	// Format message with percentage
 	formattedMsg := fmt.Sprintf("[%d%%] %s", percentage, msg)
 
-	if m.reporter != nil {
-		if err := m.reporter.Update(float64(step), formattedMsg); err != nil {
-			m.logger.Warn("Failed to send progress update",
-				"error", err,
-				"step", step,
-				"message", msg)
+	if m.progressToken != nil && m.server != nil {
+		// Send progress notification using mcp-go
+		params := map[string]interface{}{
+			"progressToken": m.progressToken,
+			"progress":      float64(step),
+			"total":         float64(m.total),
+			"message":       formattedMsg,
+		}
+
+		if err := m.server.SendNotificationToClient(m.ctx, "notifications/progress", params); err != nil {
+			m.logger.Warn("Failed to send progress notification", "error", err)
 		}
 	} else if m.isCLI {
 		if m.isCI {
@@ -199,9 +262,17 @@ func (m *Manager) Complete(msg string) {
 	duration := time.Since(m.startTime)
 	finalMsg := fmt.Sprintf("%s (completed in %s)", msg, duration.Round(time.Second))
 
-	if m.reporter != nil {
-		if err := m.reporter.Complete(finalMsg); err != nil {
-			m.logger.Warn("Failed to send complete progress", "error", err)
+	if m.progressToken != nil && m.server != nil {
+		// Send final progress notification
+		params := map[string]interface{}{
+			"progressToken": m.progressToken,
+			"progress":      float64(m.total),
+			"total":         float64(m.total),
+			"message":       finalMsg,
+		}
+
+		if err := m.server.SendNotificationToClient(m.ctx, "notifications/progress", params); err != nil {
+			m.logger.Warn("Failed to send final progress notification", "error", err)
 		}
 	} else if m.isCLI {
 		if m.isCI {
@@ -226,8 +297,8 @@ func (m *Manager) Finish() {
 	// Stop watchdog timer
 	m.stopWatchdog()
 
-	if m.reporter != nil {
-		// TODO: Use correct MCP progress API when available
+	if m.progressToken != nil {
+		// Progress reporting done
 		m.logger.Debug("MCP progress done")
 	} else if m.spinner != nil && !m.isCI {
 		m.spinner.Stop()
@@ -355,22 +426,32 @@ func (m *Manager) startWatchdog() {
 						"kind":       "heartbeat",
 						"step":       m.current,
 						"total":      m.total,
-						"percentage": int((float64(m.current) / m.total) * 100),
+						"percentage": int((float64(m.current) / float64(m.total)) * 100),
 						"trace_id":   m.traceID,
 						"elapsed":    time.Since(m.startTime).String(),
 					}
-					
-					if m.reporter != nil {
-						m.reporter.Update(float64(m.current), msg)
+
+					if m.progressToken != nil && m.server != nil {
+						// Send heartbeat progress notification
+						params := map[string]interface{}{
+							"progressToken": m.progressToken,
+							"progress":      float64(m.current),
+							"total":         float64(m.total),
+							"message":       msg,
+						}
+
+						if err := m.server.SendNotificationToClient(m.ctx, "notifications/progress", params); err != nil {
+							m.logger.Warn("Failed to send heartbeat notification", "error", err)
+						}
 					} else if !m.isCI && m.spinner != nil {
 						m.spinner.Suffix = fmt.Sprintf(" Still working... (step %d/%d)", m.current, int(m.total))
 					}
-					
+
 					// Log heartbeat with metadata
-					m.logger.Debug("Watchdog heartbeat sent", 
+					m.logger.Debug("Watchdog heartbeat sent",
 						"current_step", m.current,
 						"metadata", metadata)
-						
+
 					// Update lastUpdate to prevent immediate re-triggering
 					m.lastUpdate = time.Now()
 				}
@@ -412,17 +493,30 @@ func (m *Manager) resetWatchdog() {
 			"kind":       "heartbeat",
 			"step":       m.current,
 			"total":      m.total,
-			"percentage": int((float64(m.current) / m.total) * 100),
+			"percentage": int((float64(m.current) / float64(m.total)) * 100),
 			"trace_id":   m.traceID,
 		}
-		
-		if m.reporter != nil {
-			// TODO: When gomcp is updated, use proper progress/update with metadata
-			m.reporter.Update(float64(m.current), msg)
-			m.logger.Debug("Watchdog heartbeat", "message", msg, "metadata", metadata)
+
+		if m.progressToken != nil && m.server != nil {
+			// Send heartbeat progress notification
+			params := map[string]interface{}{
+				"progressToken": m.progressToken,
+				"progress":      float64(m.current),
+				"total":         float64(m.total),
+				"message":       msg,
+			}
+
+			if err := m.server.SendNotificationToClient(m.ctx, "notifications/progress", params); err != nil {
+				m.logger.Warn("Failed to send watchdog heartbeat", "error", err)
+			}
 		} else if m.isCLI && m.spinner != nil {
 			m.spinner.Suffix = " " + msg
 		}
+
+		// Log heartbeat with metadata
+		m.logger.Debug("Watchdog heartbeat sent",
+			"current_step", m.current,
+			"metadata", metadata)
 
 		// Reset watchdog again
 		m.resetWatchdog()

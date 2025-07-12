@@ -16,7 +16,7 @@ func TestProgressManagerErrorBudgetIntegration(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	t.Run("error budget tracking", func(t *testing.T) {
-		m := New(nil, 10, logger)
+		m := New(context.Background(), nil, 10, logger)
 
 		// Start with clean slate
 		assert.False(t, m.IsCircuitOpen())
@@ -41,7 +41,7 @@ func TestProgressManagerErrorBudgetIntegration(t *testing.T) {
 	})
 
 	t.Run("circuit breaker activation", func(t *testing.T) {
-		m := New(nil, 10, logger)
+		m := New(context.Background(), nil, 10, logger)
 
 		// Record errors until circuit opens (budget allows 5 errors)
 		for i := 0; i < 6; i++ {
@@ -65,7 +65,7 @@ func TestProgressManagerErrorBudgetIntegration(t *testing.T) {
 
 	t.Run("error budget reset over time", func(t *testing.T) {
 		// Create manager with very short reset period for testing
-		m := New(nil, 10, logger)
+		m := New(context.Background(), nil, 10, logger)
 		m.errorBudget = NewErrorBudget(3, 100*time.Millisecond) // Reset every 100ms
 
 		// Record errors

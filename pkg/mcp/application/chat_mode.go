@@ -1,9 +1,5 @@
 package application
 
-import (
-	"github.com/Azure/container-kit/pkg/ai"
-)
-
 // ChatModeConfig defines the configuration for a custom chat mode
 type ChatModeConfig struct {
 	Mode        string   `json:"mode"`
@@ -13,47 +9,48 @@ type ChatModeConfig struct {
 
 // RegisterChatModes registers custom chat modes for Copilot integration
 func (s *serverImpl) RegisterChatModes() error {
-	// Note: gomcp doesn't have ChatMode support yet, so this is prepared for future use
-	// When available, it would look something like:
-	//
-	// s.gomcpServer.ChatMode("copilot", ChatModeConfig{
-	//     Mode:        "custom",
-	//     Description: "Enhanced Copilot experience with file tools",
-	//     Functions:   GetChatModeFunctions(),
-	// })
-	
-	s.logger.Info("Chat mode registration prepared for future gomcp support",
-		"mode", "copilot",
-		"description", "Enhanced Copilot experience with file tools")
-	
+	s.logger.Info("Chat mode support enabled via standard MCP protocol",
+		"available_tools", GetChatModeFunctions())
+
 	return nil
 }
 
 // GetChatModeFunctions returns the function names available in chat mode
 func GetChatModeFunctions() []string {
 	return []string{
-		"read_file",
-		"list_directory",
-		"file_exists",
 		"containerize_and_deploy",
 	}
 }
 
-// ConvertAIToolsToMCP converts Azure OpenAI tool definitions to MCP format
-// This will be used when gomcp supports function calling in chat modes
-func ConvertAIToolsToMCP() []ToolDefinition {
-	aiTools := ai.GetFileSystemTools()
-	mcpTools := make([]ToolDefinition, 0, len(aiTools))
-	
-	// When gomcp supports this, we'll convert the tools here
-	// For now, just log that we're ready
-	_ = aiTools
-	
-	return mcpTools
+// ConvertWorkflowToolsToChat converts workflow tools to chat-compatible format
+// This provides a mapping of available MCP tools for chat interfaces
+func ConvertWorkflowToolsToChat() []ToolDefinition {
+	// Return the tools that are available for chat mode
+	// These correspond to the actual MCP tools registered by the server
+	return []ToolDefinition{
+		{
+			Name:        "containerize_and_deploy",
+			Description: "Complete containerization and deployment workflow",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"repo_url": map[string]interface{}{
+						"type":        "string",
+						"description": "Repository URL to containerize",
+					},
+					"branch": map[string]interface{}{
+						"type":        "string",
+						"description": "Git branch to use (optional)",
+					},
+				},
+				"required": []string{"repo_url"},
+			},
+		},
+	}
 }
 
 // ToolDefinition represents an MCP tool definition
-// This is a placeholder until gomcp provides the actual type
+// Using our own type for chat mode compatibility with mcp-go
 type ToolDefinition struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`

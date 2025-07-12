@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/common/errors"
-	"github.com/localrivet/gomcp/server"
 )
 
 // ============================================================================
@@ -650,18 +649,6 @@ type MCPServer interface {
 
 	// Stop gracefully shuts down the server
 	Stop(ctx context.Context) error
-
-	// RegisterTool registers a tool with the server
-	RegisterTool(tool Tool) error
-
-	// GetRegistry returns the tool registry
-	GetRegistry() Registry
-
-	// GetSessionManager returns the session manager
-	GetSessionManager() interface{} // Returns session.UnifiedSessionManager to avoid import cycle
-
-	// GetOrchestrator returns the tool orchestrator
-	GetOrchestrator() Orchestrator
 }
 
 // GomcpManager manages the gomcp server lifecycle
@@ -669,14 +656,14 @@ type GomcpManager interface {
 	// Start starts the gomcp server
 	Start(ctx context.Context) error
 
-	// Stop stops the gomcp server
+	// Stop stops the mcp-go server
 	Stop(ctx context.Context) error
 
-	// RegisterTool registers a tool with gomcp
+	// RegisterTool registers a tool with mcp-go
 	RegisterTool(name, description string, handler interface{}) error
 
-	// GetServer returns the underlying gomcp server
-	GetServer() *server.Server
+	// GetServer returns the underlying mcp-go server
+	GetServer() interface{}
 
 	// IsRunning checks if the server is running
 	IsRunning() bool
