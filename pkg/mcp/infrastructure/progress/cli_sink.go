@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
 )
 
 // CLISink implements console progress reporting with ANSI progress bars.
@@ -26,7 +28,7 @@ func NewCLISink(logger *slog.Logger) *CLISink {
 }
 
 // Publish outputs a progress update to the console.
-func (s *CLISink) Publish(ctx context.Context, u Update) error {
+func (s *CLISink) Publish(ctx context.Context, u progress.Update) error {
 	// Create progress bar
 	bar := s.createProgressBar(u.Percentage)
 

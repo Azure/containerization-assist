@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/session"
-	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	infraprogress "github.com/Azure/container-kit/pkg/mcp/infrastructure/progress"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/prompts"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/resources"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
@@ -22,7 +22,7 @@ type Dependencies struct {
 	ResourceStore  *resources.Store
 
 	// Domain services
-	ProgressFactory *progress.SinkFactory
+	ProgressFactory *infraprogress.SinkFactory
 
 	// Infrastructure services
 	SamplingClient *sampling.Client
@@ -61,7 +61,7 @@ func WithSamplingClient(client *sampling.Client) Option {
 }
 
 // WithProgressFactory sets a custom progress factory
-func WithProgressFactory(factory *progress.SinkFactory) Option {
+func WithProgressFactory(factory *infraprogress.SinkFactory) Option {
 	return func(d *Dependencies) {
 		d.ProgressFactory = factory
 	}
@@ -169,6 +169,14 @@ func WithChatModes(enabled bool) Option {
 	}
 }
 
+// WithDependencies sets the entire Dependencies struct at once
+// This is useful for Wire-based initialization
+func WithDependencies(deps *Dependencies) Option {
+	return func(d *Dependencies) {
+		*d = *deps
+	}
+}
+
 // NewDependencies creates and wires up all server dependencies using functional options.
 func NewDependencies(opts ...Option) *Dependencies {
 	// Initialize with sensible defaults
@@ -201,7 +209,7 @@ func NewDependencies(opts ...Option) *Dependencies {
 
 	// Create progress factory if not provided
 	if d.ProgressFactory == nil {
-		d.ProgressFactory = progress.NewSinkFactory(baseLogger.With("service", "progress"))
+		d.ProgressFactory = infraprogress.NewSinkFactory(baseLogger.With("service", "progress"))
 	}
 
 	// Create sampling client if not provided

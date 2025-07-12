@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -23,7 +24,7 @@ func NewSinkFactory(logger *slog.Logger) *SinkFactory {
 }
 
 // CreateSink creates an appropriate sink based on the context.
-func (f *SinkFactory) CreateSink(ctx context.Context, req *mcp.CallToolRequest) Sink {
+func (f *SinkFactory) CreateSink(ctx context.Context, req *mcp.CallToolRequest) progress.Sink {
 	// Try to get MCP server from context
 	if srv := server.ServerFromContext(ctx); srv != nil {
 		// Check if we have a progress token (MCP client wants progress updates)
@@ -44,21 +45,21 @@ func (f *SinkFactory) CreateTrackerForWorkflow(
 	req *mcp.CallToolRequest,
 	totalSteps int,
 	traceID string,
-) *Tracker {
+) *progress.Tracker {
 	sink := f.CreateSink(ctx, req)
 
-	opts := []Option{
-		WithTraceID(traceID),
-		WithHeartbeat(15 * time.Second),
-		WithThrottle(100 * time.Millisecond),
+	opts := []progress.Option{
+		progress.WithTraceID(traceID),
+		progress.WithHeartbeat(15 * time.Second),
+		progress.WithThrottle(100 * time.Millisecond),
 	}
 
-	return NewTracker(ctx, totalSteps, sink, opts...)
+	return progress.NewTracker(ctx, totalSteps, sink, opts...)
 }
 
 // NewProgressTracker creates a new progress tracker for workflow operations.
 // This replaces the duplicate function in domain/workflow/factory.go
-func NewProgressTracker(ctx context.Context, req *mcp.CallToolRequest, totalSteps int, logger *slog.Logger) *Tracker {
+func NewProgressTracker(ctx context.Context, req *mcp.CallToolRequest, totalSteps int, logger *slog.Logger) *progress.Tracker {
 	factory := NewSinkFactory(logger)
 	traceID := generateTraceID()
 

@@ -106,7 +106,7 @@ func generateJavaDockerfile(framework string, port int, logger *slog.Logger) str
 	var dockerfile strings.Builder
 
 	// Check if this is a servlet application (WAR file)
-	isServlet := strings.Contains(strings.ToLower(framework), "servlet") || 
+	isServlet := strings.Contains(strings.ToLower(framework), "servlet") ||
 		strings.Contains(strings.ToLower(framework), "jsp") ||
 		strings.Contains(strings.ToLower(framework), "war")
 

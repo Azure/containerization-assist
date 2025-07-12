@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,8 +12,8 @@ import (
 	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/prompts"
-	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/registrar"
+	"github.com/Azure/container-kit/pkg/mcp/transport"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -35,103 +34,19 @@ type ConversationComponents struct {
 	_ bool // placeholder field
 }
 
-// registerTools registers the single comprehensive workflow tool
-func (s *serverImpl) registerTools() error {
+// registerComponents registers all tools, prompts, and resources
+func (s *serverImpl) registerComponents() error {
 	if s.mcpServer == nil {
 		return errors.New(errors.CodeInternalError, "server", "mcp server not initialized", nil)
 	}
 
-	s.deps.Logger.Info("Registering single comprehensive workflow tool for AI-powered containerization")
-	if err := workflow.RegisterWorkflowTools(s.mcpServer, s.deps.Logger); err != nil {
-		return errors.New(errors.CodeToolExecutionFailed, "server", "failed to register workflow tools", err)
+	// Create and use unified registrar
+	registrar := registrar.NewRegistrar(s.deps.Logger, s.deps.ResourceStore)
+	if err := registrar.RegisterAll(s.mcpServer); err != nil {
+		return errors.New(errors.CodeToolExecutionFailed, "server", "failed to register components", err)
 	}
 
-	// Keep essential diagnostic tools
-	pingTool := mcp.Tool{
-		Name:        "ping",
-		Description: "Simple ping tool to test MCP connectivity",
-		InputSchema: mcp.ToolInputSchema{
-			Type: "object",
-			Properties: map[string]interface{}{
-				"message": map[string]interface{}{
-					"type":        "string",
-					"description": "Optional message to echo back",
-				},
-			},
-		},
-	}
-	s.mcpServer.AddTool(pingTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		arguments := req.GetArguments()
-		message, _ := arguments["message"].(string)
-
-		response := "pong"
-		if message != "" {
-			response = "pong: " + message
-		}
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf(`{"response":"%s","timestamp":"%s"}`, response, time.Now().Format(time.RFC3339)),
-				},
-			},
-		}, nil
-	})
-
-	statusTool := mcp.Tool{
-		Name:        "server_status",
-		Description: "Get basic server status information",
-		InputSchema: mcp.ToolInputSchema{
-			Type: "object",
-			Properties: map[string]interface{}{
-				"details": map[string]interface{}{
-					"type":        "boolean",
-					"description": "Include detailed information",
-				},
-			},
-		},
-	}
-	s.mcpServer.AddTool(statusTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		arguments := req.GetArguments()
-		details, _ := arguments["details"].(bool)
-
-		status := struct {
-			Status  string `json:"status"`
-			Version string `json:"version"`
-			Uptime  string `json:"uptime"`
-			Details bool   `json:"details,omitempty"`
-		}{
-			Status:  "running",
-			Version: "dev",
-			Uptime:  time.Since(s.startTime).String(),
-			Details: details,
-		}
-
-		statusJSON, _ := json.Marshal(status)
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: string(statusJSON),
-				},
-			},
-		}, nil
-	})
-
-	s.deps.Logger.Info("Workflow tools registered successfully - AI will now use complete workflows instead of atomic tools")
-
-	// Register MCP prompts for slash commands
-	promptRegistry := prompts.NewRegistry(s.mcpServer, s.deps.Logger)
-	if err := promptRegistry.RegisterAll(); err != nil {
-		return errors.New(errors.CodeToolExecutionFailed, "server", "failed to register prompts", err)
-	}
-
-	// Register MCP resource providers
-	if err := s.deps.ResourceStore.RegisterProviders(s.mcpServer); err != nil {
-		return errors.New(errors.CodeToolExecutionFailed, "server", "failed to register resource providers", err)
-	}
-
+	s.deps.Logger.Info("All components registered successfully")
 	return nil
 }
 
@@ -141,14 +56,12 @@ func NewMCPServer(ctx context.Context, logger *slog.Logger, opts ...Option) (api
 	// Use default configuration and provided logger
 	config := workflow.DefaultServerConfig()
 
-	// Create bootstrap options with logger and config
-	bootstrapOpts := []Option{
-		WithLogger(logger),
-		WithConfig(config),
+	// Apply any custom options to config
+	tempDeps := &Dependencies{Config: config}
+	for _, opt := range opts {
+		opt(tempDeps)
 	}
-
-	// Add any additional options provided
-	bootstrapOpts = append(bootstrapOpts, opts...)
+	config = tempDeps.Config
 
 	// Ensure directories exist
 	if config.StorePath != "" {
@@ -164,6 +77,15 @@ func NewMCPServer(ctx context.Context, logger *slog.Logger, opts ...Option) (api
 			return nil, errors.New(errors.CodeIoError, "server", fmt.Sprintf("failed to create workspace directory %s", config.WorkspaceDir), err)
 		}
 	}
+
+	// Use Wire for dependency injection if available
+	// In production, we'd generate this with "go generate ./pkg/mcp/wire"
+	// For now, we'll continue using the bootstrap approach
+	bootstrapOpts := []Option{
+		WithLogger(logger),
+		WithConfig(config),
+	}
+	bootstrapOpts = append(bootstrapOpts, opts...)
 
 	// Use new functional options pattern to create server
 	server := NewServer(bootstrapOpts...)
@@ -209,9 +131,9 @@ func (s *serverImpl) Start(ctx context.Context) error {
 			return errors.New(errors.CodeInternalError, "transport", "failed to create mcp-go server", nil)
 		}
 
-		// Register tools directly
-		if err := s.registerTools(); err != nil {
-			return errors.New(errors.CodeToolExecutionFailed, "transport", "failed to register tools with mcp-go", err)
+		// Register all components
+		if err := s.registerComponents(); err != nil {
+			return errors.New(errors.CodeToolExecutionFailed, "transport", "failed to register components with mcp-go", err)
 		}
 
 		// Register chat modes for Copilot integration
@@ -224,21 +146,10 @@ func (s *serverImpl) Start(ctx context.Context) error {
 		s.deps.Logger.Info("MCP-GO server initialized successfully")
 	}
 
-	// Use mcp-go server Serve method
-	transportDone := make(chan error, 1)
-	go func() {
-		// mcp-go uses ServeStdio() method for stdio transport
-		transportDone <- server.ServeStdio(s.mcpServer)
-	}()
-
-	select {
-	case <-ctx.Done():
-		s.deps.Logger.Info("Server stopped by context cancellation")
-		return ctx.Err()
-	case err := <-transportDone:
-		s.deps.Logger.Error("Transport stopped with error", "error", err)
-		return err
-	}
+	// Use transport manager to start appropriate transport
+	transportType := transport.TransportType(s.deps.Config.TransportType)
+	transportManager := transport.NewManager(s.deps.Logger, transportType, 0)
+	return transportManager.Start(ctx, s.mcpServer)
 }
 
 // Shutdown gracefully shuts down the server with proper context handling

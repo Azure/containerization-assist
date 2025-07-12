@@ -43,14 +43,14 @@ func (pec *ProgressiveErrorContext) AddError(step string, err error, attempt int
 		Context:   context,
 		Fixes:     []string{},
 	}
-	
+
 	pec.errors = append(pec.errors, errorContext)
-	
+
 	// Maintain max history
 	if len(pec.errors) > pec.maxHistory {
 		pec.errors = pec.errors[len(pec.errors)-pec.maxHistory:]
 	}
-	
+
 	// Update step summary
 	pec.updateStepSummary(step, err.Error())
 }
@@ -81,12 +81,12 @@ func (pec *ProgressiveErrorContext) GetRecentErrors(count int) []ErrorContext {
 	if count > len(pec.errors) {
 		count = len(pec.errors)
 	}
-	
+
 	start := len(pec.errors) - count
 	if start < 0 {
 		start = 0
 	}
-	
+
 	return pec.errors[start:]
 }
 
@@ -106,16 +106,16 @@ func (pec *ProgressiveErrorContext) GetSummary() string {
 	if len(pec.errors) == 0 {
 		return "No errors recorded"
 	}
-	
+
 	var summary strings.Builder
 	summary.WriteString(fmt.Sprintf("Error History (%d total errors):\n", len(pec.errors)))
-	
+
 	// Group by step
 	stepGroups := make(map[string][]ErrorContext)
 	for _, err := range pec.errors {
 		stepGroups[err.Step] = append(stepGroups[err.Step], err)
 	}
-	
+
 	// Summarize each step
 	for step, errors := range stepGroups {
 		summary.WriteString(fmt.Sprintf("\n%s (%d errors):\n", step, len(errors)))
@@ -137,17 +137,17 @@ func (pec *ProgressiveErrorContext) GetSummary() string {
 			}
 		}
 	}
-	
+
 	return summary.String()
 }
 
 // GetAIContext returns context formatted for AI analysis
 func (pec *ProgressiveErrorContext) GetAIContext() string {
 	var context strings.Builder
-	
+
 	context.WriteString("PREVIOUS ERRORS AND ATTEMPTS:\n")
 	context.WriteString("============================\n\n")
-	
+
 	// Include recent errors with full context
 	recentErrors := pec.GetRecentErrors(5)
 	for i, err := range recentErrors {
@@ -155,14 +155,14 @@ func (pec *ProgressiveErrorContext) GetAIContext() string {
 		context.WriteString(fmt.Sprintf("- Step: %s\n", err.Step))
 		context.WriteString(fmt.Sprintf("- Error: %s\n", err.Error))
 		context.WriteString(fmt.Sprintf("- Attempt: %d\n", err.Attempt))
-		
+
 		if len(err.Context) > 0 {
 			context.WriteString("- Context:\n")
 			for k, v := range err.Context {
 				context.WriteString(fmt.Sprintf("  %s: %v\n", k, v))
 			}
 		}
-		
+
 		if len(err.Fixes) > 0 {
 			context.WriteString("- Previous fixes attempted:\n")
 			for _, fix := range err.Fixes {
@@ -171,7 +171,7 @@ func (pec *ProgressiveErrorContext) GetAIContext() string {
 		}
 		context.WriteString("\n")
 	}
-	
+
 	// Add step summaries
 	if len(pec.stepSummary) > 0 {
 		context.WriteString("STEP ERROR PATTERNS:\n")
@@ -180,7 +180,7 @@ func (pec *ProgressiveErrorContext) GetAIContext() string {
 			context.WriteString(fmt.Sprintf("- %s: %s\n", step, summary))
 		}
 	}
-	
+
 	return context.String()
 }
 
@@ -188,7 +188,7 @@ func (pec *ProgressiveErrorContext) GetAIContext() string {
 func (pec *ProgressiveErrorContext) HasRepeatedErrors(step string, threshold int) bool {
 	count := 0
 	lastError := ""
-	
+
 	for _, err := range pec.errors {
 		if err.Step == step {
 			if err.Error == lastError {
@@ -202,7 +202,7 @@ func (pec *ProgressiveErrorContext) HasRepeatedErrors(step string, threshold int
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -213,19 +213,19 @@ func (pec *ProgressiveErrorContext) ShouldEscalate(step string) bool {
 	if pec.HasRepeatedErrors(step, 3) {
 		return true
 	}
-	
+
 	// 2. More than 5 different errors for the same step
 	stepErrors := pec.GetStepErrors(step)
 	if len(stepErrors) > 5 {
 		return true
 	}
-	
+
 	// 3. Fixes have been attempted but errors persist
 	for _, err := range stepErrors {
 		if len(err.Fixes) >= 2 {
 			return true
 		}
 	}
-	
+
 	return false
 }

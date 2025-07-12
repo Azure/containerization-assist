@@ -55,18 +55,18 @@ func NewPreflightValidator(logger *slog.Logger) *PreflightValidator {
 // ValidateAll runs all preflight checks
 func (v *PreflightValidator) ValidateAll(ctx context.Context) (*PreflightResult, error) {
 	v.logger.Info("Starting preflight validation checks")
-	
+
 	result := &PreflightResult{
 		Success:  true,
 		Checks:   make([]CheckResult, 0, len(v.checks)),
 		Warnings: []string{},
 		Errors:   []string{},
 	}
-	
+
 	for _, check := range v.checks {
 		checkResult := v.runCheck(ctx, check)
 		result.Checks = append(result.Checks, checkResult)
-		
+
 		if !checkResult.Success {
 			if check.Required {
 				result.Success = false
@@ -75,38 +75,38 @@ func (v *PreflightValidator) ValidateAll(ctx context.Context) (*PreflightResult,
 				result.Warnings = append(result.Warnings, fmt.Sprintf("%s: %s", check.Name, checkResult.Message))
 			}
 		}
-		
+
 		v.logger.Info("Preflight check completed",
 			"check", check.Name,
 			"success", checkResult.Success,
 			"duration", checkResult.Duration,
 			"message", checkResult.Message)
 	}
-	
+
 	v.logger.Info("Preflight validation completed",
 		"success", result.Success,
 		"errors", len(result.Errors),
 		"warnings", len(result.Warnings))
-	
+
 	if !result.Success {
 		return result, errors.New(errors.CodeValidationFailed, "preflight",
 			fmt.Sprintf("Preflight validation failed: %d errors", len(result.Errors)), nil)
 	}
-	
+
 	return result, nil
 }
 
 // runCheck executes a single check
 func (v *PreflightValidator) runCheck(ctx context.Context, check PreflightCheck) CheckResult {
 	start := time.Now()
-	
+
 	// Run check with timeout
 	checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	
+
 	err := check.CheckFunc(checkCtx)
 	duration := time.Since(start)
-	
+
 	if err != nil {
 		return CheckResult{
 			Name:     check.Name,
@@ -115,7 +115,7 @@ func (v *PreflightValidator) runCheck(ctx context.Context, check PreflightCheck)
 			Duration: duration,
 		}
 	}
-	
+
 	return CheckResult{
 		Name:     check.Name,
 		Success:  true,
@@ -179,13 +179,13 @@ func checkDocker(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("Docker not found in PATH: %v", err)
 	}
-	
+
 	// Check version
 	version := strings.TrimSpace(string(output))
 	if !strings.Contains(version, "Docker version") {
 		return fmt.Errorf("unexpected Docker version output: %s", version)
 	}
-	
+
 	return nil
 }
 
@@ -202,7 +202,7 @@ func checkDockerDaemon(ctx context.Context) error {
 func checkDiskSpace(ctx context.Context) error {
 	// This is a simplified check - in production you'd want more sophisticated logic
 	const minSpaceGB = 5
-	
+
 	// For now, just check if we can create a temp file
 	tempFile, err := os.CreateTemp("", "preflight-disk-check-*")
 	if err != nil {
@@ -210,7 +210,7 @@ func checkDiskSpace(ctx context.Context) error {
 	}
 	tempFile.Close()
 	os.Remove(tempFile.Name())
-	
+
 	return nil
 }
 
@@ -251,7 +251,7 @@ func checkNetwork(ctx context.Context) error {
 		// Use getent on Linux/Mac which is more reliable
 		cmd = exec.CommandContext(ctx, "getent", "hosts", "github.com")
 	}
-	
+
 	if err := cmd.Run(); err != nil {
 		// Fallback to ping
 		pingCmd := exec.CommandContext(ctx, "ping", "-c", "1", "-W", "2", "8.8.8.8")
@@ -262,7 +262,7 @@ func checkNetwork(ctx context.Context) error {
 			return fmt.Errorf("network connectivity check failed: %v", err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -279,10 +279,10 @@ func (v *PreflightValidator) ValidateRequired(ctx context.Context) (*PreflightRe
 			requiredChecks = append(requiredChecks, check)
 		}
 	}
-	
+
 	originalChecks := v.checks
 	v.checks = requiredChecks
 	defer func() { v.checks = originalChecks }()
-	
+
 	return v.ValidateAll(ctx)
 }

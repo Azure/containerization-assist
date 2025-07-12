@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -25,7 +26,7 @@ func NewMCPSink(server *server.MCPServer, progressToken interface{}, logger *slo
 }
 
 // Publish sends a progress update via MCP notification.
-func (s *MCPSink) Publish(ctx context.Context, u Update) error {
+func (s *MCPSink) Publish(ctx context.Context, u progress.Update) error {
 	if s.server == nil {
 		s.logger.Debug("No MCP server available for progress notification")
 		return nil

@@ -20,8 +20,8 @@ type RetryContext struct {
 
 // WithAIRetryEnhanced performs retries with progressive error context
 func WithAIRetryEnhanced(ctx context.Context, name string, max int, fn func() error, retryCtx *RetryContext, logger *slog.Logger) error {
-	logger.Info("Starting operation with enhanced AI retry", 
-		"operation", name, 
+	logger.Info("Starting operation with enhanced AI retry",
+		"operation", name,
 		"max_retries", max,
 		"has_error_history", retryCtx != nil && retryCtx.ErrorHistory != "")
 
@@ -46,7 +46,7 @@ func WithAIRetryEnhanced(ctx context.Context, name string, max int, fn func() er
 
 		// Build context for AI analysis
 		contextInfo := buildAIContext(name, err, i, max, retryCtx)
-		
+
 		// Use AI to analyze the error with full context
 		analysis, analysisErr := samplingClient.AnalyzeError(ctx, err, contextInfo)
 		if analysisErr != nil {
@@ -95,19 +95,19 @@ func WithAIRetryEnhanced(ctx context.Context, name string, max int, fn func() er
 func buildAIContext(name string, err error, attempt int, max int, retryCtx *RetryContext) string {
 	context := fmt.Sprintf("Operation: %s\nAttempt: %d of %d\n", name, attempt, max)
 	context += fmt.Sprintf("Current Error: %v\n", err)
-	
+
 	if retryCtx != nil {
 		if retryCtx.ErrorHistory != "" {
 			context += "\n" + retryCtx.ErrorHistory + "\n"
 		}
-		
+
 		if len(retryCtx.StepContext) > 0 {
 			context += "\nStep Context:\n"
 			for k, v := range retryCtx.StepContext {
 				context += fmt.Sprintf("- %s: %v\n", k, v)
 			}
 		}
-		
+
 		if len(retryCtx.FixesAttempted) > 0 {
 			context += "\nPreviously Attempted Fixes:\n"
 			for _, fix := range retryCtx.FixesAttempted {
@@ -116,17 +116,17 @@ func buildAIContext(name string, err error, attempt int, max int, retryCtx *Retr
 			context += "\nPlease suggest different fixes that haven't been tried yet.\n"
 		}
 	}
-	
+
 	return context
 }
 
 // enhanceErrorWithContext adds comprehensive context to the final error
 func enhanceErrorWithContext(operation string, err error, attempt int, maxAttempts int, retryCtx *RetryContext, logger *slog.Logger) error {
 	errorMsg := err.Error()
-	
+
 	// Generate fix suggestions similar to the original generateFixSuggestions
 	suggestions := []string{}
-	
+
 	// Common error patterns and suggestions
 	if containsPattern(errorMsg, "docker", "daemon", "not running") {
 		suggestions = append(suggestions, "• Ensure Docker daemon is running: sudo systemctl start docker")
@@ -148,7 +148,7 @@ func enhanceErrorWithContext(operation string, err error, attempt int, maxAttemp
 		suggestions = append(suggestions, "• Review error details and retry with correct parameters")
 		suggestions = append(suggestions, "• Check system prerequisites and dependencies")
 	}
-	
+
 	// Add context from retry context
 	if retryCtx != nil && retryCtx.ErrorHistory != "" {
 		suggestions = append([]string{
@@ -156,24 +156,24 @@ func enhanceErrorWithContext(operation string, err error, attempt int, maxAttemp
 			"• Consider if multiple issues need to be addressed",
 		}, suggestions...)
 	}
-	
+
 	logger.Error("Enhanced error for AI assistant",
 		"operation", operation,
 		"attempt", attempt,
 		"max_attempts", maxAttempts,
 		"fix_suggestions", strings.Join(suggestions, "\n"))
-	
+
 	enhancedMsg := fmt.Sprintf(
 		"[WORKFLOW FAILURE] %s failed after %d attempts.\n\n"+
 			"FINAL ERROR: %v\n\n"+
 			"SUGGESTED FIXES:\n%s\n\n"+
 			"HOW TO RETRY: Run the workflow again after addressing the issues above.",
 		operation, maxAttempts, err, strings.Join(suggestions, "\n"))
-	
+
 	if retryCtx != nil && retryCtx.ErrorHistory != "" {
 		enhancedMsg = retryCtx.ErrorHistory + "\n\n" + enhancedMsg
 	}
-	
+
 	return fmt.Errorf("%s", enhancedMsg)
 }
 
@@ -194,7 +194,7 @@ func logAIGuidance(operation string, err error, attempt int, maxAttempts int, an
 		checklist = append(checklist, "• Review error details and retry with correct parameters")
 		checklist = append(checklist, "• Check system prerequisites and dependencies")
 	}
-	
+
 	logger.Warn("🤖 AI ASSISTANT: Workflow step failed but retrying automatically",
 		"operation", operation,
 		"attempt", attempt,

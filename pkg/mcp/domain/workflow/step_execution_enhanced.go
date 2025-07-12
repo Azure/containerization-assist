@@ -58,7 +58,7 @@ func executeStepWithRetryEnhanced(
 		if err != nil {
 			// Add error to progressive context
 			errorContext.AddError(stepName, err, retryCount, metadata)
-			
+
 			// Add to state manager for persistence
 			stateManager.AddError(fmt.Sprintf("[%s] Attempt %d: %v", stepName, retryCount, err))
 		}
@@ -92,10 +92,10 @@ func executeStepWithRetryEnhanced(
 		step.Status = "failed"
 		step.Error = err.Error()
 		result.Steps = append(result.Steps, step)
-		
+
 		// Include error summary in result
 		errorSummary := errorContext.GetSummary()
-		result.Error = fmt.Sprintf("Step %s failed after %d attempts.\n\n%s", 
+		result.Error = fmt.Sprintf("Step %s failed after %d attempts.\n\n%s",
 			stepName, retryCount, errorSummary)
 
 		// Update progress with failure
@@ -106,14 +106,14 @@ func executeStepWithRetryEnhanced(
 		progressTracker.Update(progressTracker.GetCurrent(), fmt.Sprintf("Failed: %s", message), metadata)
 
 		stepInfo.Fail(err)
-		
+
 		// Save failure state
 		if stateManager != nil {
 			stateManager.SetState("lastFailedStep", stepName)
 			stateManager.SetState("errorSummary", errorSummary)
 			stateManager.SaveState(stepName + "_failed")
 		}
-		
+
 		return err
 	}
 
@@ -127,7 +127,7 @@ func executeStepWithRetryEnhanced(
 	progressTracker.Update(progressTracker.GetCurrent(), fmt.Sprintf("Completed: %s", message), metadata)
 
 	stepInfo.Complete()
-	
+
 	// Mark step as completed in state manager
 	if stateManager != nil {
 		stateManager.SetStepCompleted(stepName)

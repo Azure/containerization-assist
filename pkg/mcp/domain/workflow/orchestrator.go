@@ -9,6 +9,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
+	infraprogress "github.com/Azure/container-kit/pkg/mcp/infrastructure/progress"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -52,7 +53,7 @@ func NewWorkflowState(ctx context.Context, req *mcp.CallToolRequest, args *Conta
 		Steps: make([]WorkflowStep, 0, totalSteps),
 	}
 
-	progressTracker := progress.NewProgressTracker(ctx, req, totalSteps, logger)
+	progressTracker := infraprogress.NewProgressTracker(ctx, req, totalSteps, logger)
 	workflowID := fmt.Sprintf("workflow-%d", time.Now().Unix())
 	workflowProgress := NewWorkflowProgress(workflowID, "containerize_and_deploy", totalSteps)
 

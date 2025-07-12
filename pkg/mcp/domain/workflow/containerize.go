@@ -13,6 +13,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
+	infraprogress "github.com/Azure/container-kit/pkg/mcp/infrastructure/progress"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/utilities"
@@ -164,11 +165,11 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 		workspaceDir = envWorkspace
 	}
 	statePersistence := NewStatePersistence(workspaceDir, logger)
-	
+
 	// Create workflow state manager
 	workflowID := fmt.Sprintf("workflow-%d", time.Now().Unix())
 	stateManager := NewWorkflowStateManager(workflowID, *args, 10, statePersistence, logger)
-	
+
 	// Create progressive error context
 	errorContext := NewProgressiveErrorContext(20) // Keep last 20 errors
 
@@ -181,7 +182,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 				cleanupFuncs[i]()
 			}
 		}
-		
+
 		// Cleanup old checkpoints (older than 24 hours)
 		if err := statePersistence.CleanupOldCheckpoints(24 * time.Hour); err != nil {
 			logger.Debug("Failed to cleanup old checkpoints", "error", err)
@@ -190,7 +191,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 
 	// Create unified progress tracker
 	totalSteps := 10
-	progressTracker := progress.NewProgressTracker(ctx, req, totalSteps, logger)
+	progressTracker := infraprogress.NewProgressTracker(ctx, req, totalSteps, logger)
 	defer progressTracker.Finish()
 
 	// Begin progress tracking
@@ -213,7 +214,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 		}
 		return result, nil
 	}
-	
+
 	// Log any warnings
 	for _, warning := range preflightResult.Warnings {
 		logger.Warn("Preflight warning", "warning", warning)
@@ -272,14 +273,14 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 		result.Success = false
 		return result, nil
 	}
-	
+
 	// Save state after successful analysis
 	stateManager.SetState("analyzeResult", analyzeResult)
 	stateManager.SetStepCompleted("analyze_repository")
 	if err := stateManager.SaveState("analyze_repository"); err != nil {
 		logger.Warn("Failed to save workflow state", "error", err)
 	}
-	
+
 	// Register cleanup for cloned repository if needed
 	if analyzeResult.RepoPath != "" && strings.Contains(analyzeResult.RepoPath, "/tmp/") {
 		repoPath := analyzeResult.RepoPath
@@ -307,7 +308,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 		result.Success = false
 		return result, nil
 	}
-	
+
 	// Save state after successful Dockerfile generation
 	stateManager.SetState("dockerfileResult", dockerfileResult)
 	stateManager.SetStepCompleted("generate_dockerfile")
@@ -336,7 +337,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 		"imageTag", buildResult.ImageTag,
 		"imageID", buildResult.ImageID,
 		"deploy", args.Deploy)
-	
+
 	// Register cleanup for Docker image if deployment is skipped
 	if buildResult != nil && buildResult.ImageID != "" {
 		imageID := buildResult.ImageID

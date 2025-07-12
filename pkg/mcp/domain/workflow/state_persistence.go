@@ -13,15 +13,15 @@ import (
 
 // WorkflowCheckpoint represents a saved state of workflow execution
 type WorkflowCheckpoint struct {
-	WorkflowID   string                 `json:"workflow_id"`
-	Timestamp    time.Time              `json:"timestamp"`
-	CurrentStep  int                    `json:"current_step"`
-	TotalSteps   int                    `json:"total_steps"`
-	Args         ContainerizeAndDeployArgs `json:"args"`
-	State        map[string]interface{} `json:"state"`
-	Errors       []string               `json:"errors"`
-	Warnings     []string               `json:"warnings"`
-	CompletedSteps []string             `json:"completed_steps"`
+	WorkflowID     string                    `json:"workflow_id"`
+	Timestamp      time.Time                 `json:"timestamp"`
+	CurrentStep    int                       `json:"current_step"`
+	TotalSteps     int                       `json:"total_steps"`
+	Args           ContainerizeAndDeployArgs `json:"args"`
+	State          map[string]interface{}    `json:"state"`
+	Errors         []string                  `json:"errors"`
+	Warnings       []string                  `json:"warnings"`
+	CompletedSteps []string                  `json:"completed_steps"`
 }
 
 // StatePersistence handles workflow state persistence
@@ -78,7 +78,7 @@ func (sp *StatePersistence) SaveCheckpoint(checkpoint *WorkflowCheckpoint) error
 // LoadLatestCheckpoint loads the most recent checkpoint for a workflow
 func (sp *StatePersistence) LoadLatestCheckpoint(workflowID string) (*WorkflowCheckpoint, error) {
 	checkpointPath := filepath.Join(sp.workspaceDir, "checkpoints", workflowID, "latest.json")
-	
+
 	data, err := os.ReadFile(checkpointPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -103,7 +103,7 @@ func (sp *StatePersistence) LoadLatestCheckpoint(workflowID string) (*WorkflowCh
 // CleanupOldCheckpoints removes checkpoints older than the specified duration
 func (sp *StatePersistence) CleanupOldCheckpoints(maxAge time.Duration) error {
 	checkpointsDir := filepath.Join(sp.workspaceDir, "checkpoints")
-	
+
 	// Check if checkpoints directory exists
 	if _, err := os.Stat(checkpointsDir); os.IsNotExist(err) {
 		return nil // Nothing to cleanup
@@ -147,16 +147,16 @@ func (sp *StatePersistence) CleanupOldCheckpoints(maxAge time.Duration) error {
 
 // WorkflowStateManager manages workflow state during execution
 type WorkflowStateManager struct {
-	persistence  *StatePersistence
-	workflowID   string
-	args         ContainerizeAndDeployArgs
-	state        map[string]interface{}
-	errors       []string
-	warnings     []string
-	completed    []string
-	currentStep  int
-	totalSteps   int
-	logger       *slog.Logger
+	persistence *StatePersistence
+	workflowID  string
+	args        ContainerizeAndDeployArgs
+	state       map[string]interface{}
+	errors      []string
+	warnings    []string
+	completed   []string
+	currentStep int
+	totalSteps  int
+	logger      *slog.Logger
 }
 
 // NewWorkflowStateManager creates a new workflow state manager

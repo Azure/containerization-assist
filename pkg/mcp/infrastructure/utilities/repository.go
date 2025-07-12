@@ -319,9 +319,9 @@ func (ra *RepositoryAnalyzer) detectJavaFramework(repoPath string, buildTool str
 				return "maven-war"
 			}
 			// Check for servlet dependencies
-			if strings.Contains(string(content), "javax.servlet") || 
-			   strings.Contains(string(content), "jakarta.servlet") ||
-			   strings.Contains(string(content), "spring-boot-starter-web") {
+			if strings.Contains(string(content), "javax.servlet") ||
+				strings.Contains(string(content), "jakarta.servlet") ||
+				strings.Contains(string(content), "spring-boot-starter-web") {
 				ra.logger.Info("Detected Java web application from dependencies")
 				return "maven-servlet"
 			}
@@ -332,8 +332,8 @@ func (ra *RepositoryAnalyzer) detectJavaFramework(repoPath string, buildTool str
 	if buildTool == "gradle" {
 		gradlePath := filepath.Join(repoPath, "build.gradle")
 		if content, err := os.ReadFile(gradlePath); err == nil {
-			if strings.Contains(string(content), "war") || 
-			   strings.Contains(string(content), "org.springframework.boot") {
+			if strings.Contains(string(content), "war") ||
+				strings.Contains(string(content), "org.springframework.boot") {
 				ra.logger.Info("Detected Java web application from build.gradle")
 				return "gradle-servlet"
 			}
@@ -428,29 +428,29 @@ func (ra *RepositoryAnalyzer) analyzeConfigFiles(repoPath string) []ConfigFile {
 	}
 
 	var filesChecked, filesFound int
-	
+
 	for fileName, fileType := range configPatterns {
 		filesChecked++
 		filePath := filepath.Join(repoPath, fileName)
-		
+
 		info, err := os.Stat(filePath)
 		if err != nil {
 			if !os.IsNotExist(err) {
 				// Log actual errors (not just missing files)
-				ra.logger.Debug("Failed to stat config file", 
-					"file", fileName, 
+				ra.logger.Debug("Failed to stat config file",
+					"file", fileName,
 					"error", err,
 					"path", filePath)
 			}
 			continue
 		}
-		
+
 		// Skip directories
 		if info.IsDir() {
 			ra.logger.Debug("Skipping directory with config name", "path", fileName)
 			continue
 		}
-		
+
 		filesFound++
 		configFile := ConfigFile{
 			Path:     fileName,
@@ -474,7 +474,7 @@ func (ra *RepositoryAnalyzer) analyzeConfigFiles(repoPath string) []ConfigFile {
 
 		configFiles = append(configFiles, configFile)
 	}
-	
+
 	ra.logger.Debug("Config file analysis complete",
 		"files_checked", filesChecked,
 		"files_found", filesFound,
@@ -556,7 +556,7 @@ func (ra *RepositoryAnalyzer) findEntryPoints(repoPath, language, framework stri
 			}
 		}
 	}
-	
+
 	// If no entry points found, log a warning
 	if len(entryPoints) == 0 {
 		ra.logger.Debug("No standard entry points found", "language", language, "framework", framework)
@@ -748,13 +748,13 @@ func (ra *RepositoryAnalyzer) parseJSONFile(filePath string) (map[string]interfa
 		if len(preview) > 100 {
 			preview = preview[:100] + "..."
 		}
-		ra.logger.Debug("Failed to parse JSON", 
-			"path", filePath, 
+		ra.logger.Debug("Failed to parse JSON",
+			"path", filePath,
 			"error", err,
 			"preview", preview)
 		return nil, fmt.Errorf("invalid JSON: %w", err)
 	}
-	
+
 	return result, nil
 }
 

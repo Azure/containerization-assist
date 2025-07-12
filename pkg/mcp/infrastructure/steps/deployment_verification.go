@@ -33,25 +33,25 @@ type DeploymentDiagnostics struct {
 
 // PodStatus represents the status of a single pod
 type PodStatus struct {
-	Name            string    `json:"name"`
-	Ready           bool      `json:"ready"`
-	Status          string    `json:"status"`
-	Restarts        int       `json:"restarts"`
-	Age             string    `json:"age"`
-	Node            string    `json:"node"`
-	IP              string    `json:"ip"`
-	ContainerStates []string  `json:"container_states"`
-	LastError       string    `json:"last_error,omitempty"`
+	Name            string   `json:"name"`
+	Ready           bool     `json:"ready"`
+	Status          string   `json:"status"`
+	Restarts        int      `json:"restarts"`
+	Age             string   `json:"age"`
+	Node            string   `json:"node"`
+	IP              string   `json:"ip"`
+	ContainerStates []string `json:"container_states"`
+	LastError       string   `json:"last_error,omitempty"`
 }
 
 // ServiceStatus represents the status of a service
 type ServiceStatus struct {
-	Name        string   `json:"name"`
-	Type        string   `json:"type"`
-	ClusterIP   string   `json:"cluster_ip"`
-	ExternalIP  string   `json:"external_ip,omitempty"`
-	Ports       []string `json:"ports"`
-	Endpoints   int      `json:"endpoints"`
+	Name       string   `json:"name"`
+	Type       string   `json:"type"`
+	ClusterIP  string   `json:"cluster_ip"`
+	ExternalIP string   `json:"external_ip,omitempty"`
+	Ports      []string `json:"ports"`
+	Endpoints  int      `json:"endpoints"`
 }
 
 // VerifyDeploymentWithDiagnostics performs comprehensive deployment verification
@@ -109,8 +109,8 @@ func VerifyDeploymentWithDiagnostics(ctx context.Context, k8sResult *K8sResult, 
 	}
 
 	// Determine overall health
-	diagnostics.DeploymentOK = diagnostics.PodsReady == diagnostics.PodsTotal && 
-		diagnostics.PodsTotal > 0 && 
+	diagnostics.DeploymentOK = diagnostics.PodsReady == diagnostics.PodsTotal &&
+		diagnostics.PodsTotal > 0 &&
 		len(diagnostics.Errors) == 0
 
 	logger.Info("Deployment verification completed",
@@ -128,14 +128,14 @@ func checkDeploymentStatus(ctx context.Context, k8sResult *K8sResult, diag *Depl
 	cmd := exec.CommandContext(ctx, "kubectl", "get", "deployment", k8sResult.AppName,
 		"-n", k8sResult.Namespace,
 		"-o", "jsonpath={.status.readyReplicas}/{.status.replicas}")
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Try to get more info about why it failed
 		statusCmd := exec.CommandContext(ctx, "kubectl", "get", "deployment", k8sResult.AppName,
 			"-n", k8sResult.Namespace, "-o", "wide")
 		statusOutput, _ := statusCmd.CombinedOutput()
-		
+
 		return fmt.Errorf("deployment not found or error: %v, status: %s", err, string(statusOutput))
 	}
 
@@ -155,7 +155,7 @@ func getPodStatuses(ctx context.Context, k8sResult *K8sResult, diag *DeploymentD
 		"-n", k8sResult.Namespace,
 		"-l", fmt.Sprintf("app=%s", k8sResult.AppName),
 		"-o", "json")
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to get pods: %v", err)
@@ -175,12 +175,12 @@ func getPodStatuses(ctx context.Context, k8sResult *K8sResult, diag *DeploymentD
 					Ready        bool   `json:"ready"`
 					RestartCount int    `json:"restartCount"`
 					State        struct {
-						Running    *struct{} `json:"running,omitempty"`
-						Waiting    *struct{
+						Running *struct{} `json:"running,omitempty"`
+						Waiting *struct {
 							Reason  string `json:"reason"`
 							Message string `json:"message"`
 						} `json:"waiting,omitempty"`
-						Terminated *struct{
+						Terminated *struct {
 							Reason  string `json:"reason"`
 							Message string `json:"message"`
 						} `json:"terminated,omitempty"`
@@ -210,7 +210,7 @@ func getPodStatuses(ctx context.Context, k8sResult *K8sResult, diag *DeploymentD
 		allReady := true
 		for _, container := range pod.Status.ContainerStatuses {
 			podStatus.Restarts += container.RestartCount
-			
+
 			if !container.Ready {
 				allReady = false
 			}
@@ -230,8 +230,8 @@ func getPodStatuses(ctx context.Context, k8sResult *K8sResult, diag *DeploymentD
 					podStatus.LastError = container.State.Terminated.Message
 				}
 			}
-			
-			podStatus.ContainerStates = append(podStatus.ContainerStates, 
+
+			podStatus.ContainerStates = append(podStatus.ContainerStates,
 				fmt.Sprintf("%s: %s", container.Name, state))
 		}
 
@@ -247,7 +247,7 @@ func getServiceInfo(ctx context.Context, k8sResult *K8sResult, diag *DeploymentD
 	cmd := exec.CommandContext(ctx, "kubectl", "get", "service", k8sResult.AppName,
 		"-n", k8sResult.Namespace,
 		"-o", "json")
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Service might not exist, which is not critical
@@ -323,7 +323,7 @@ func collectEvents(ctx context.Context, k8sResult *K8sResult, diag *DeploymentDi
 		"--sort-by=.lastTimestamp",
 		"-o", "custom-columns=TIME:.lastTimestamp,TYPE:.type,REASON:.reason,MESSAGE:.message",
 		"--no-headers")
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Also try to get pod events
@@ -368,7 +368,7 @@ func collectPodLogs(ctx context.Context, k8sResult *K8sResult, diag *DeploymentD
 				"-n", k8sResult.Namespace,
 				"--tail=50",
 				"--all-containers=true")
-			
+
 			output, err := cmd.CombinedOutput()
 			if err != nil {
 				// Try previous logs if current fails
@@ -379,11 +379,11 @@ func collectPodLogs(ctx context.Context, k8sResult *K8sResult, diag *DeploymentD
 					"--previous",
 					"--all-containers=true")
 				prevOutput, prevErr := prevCmd.CombinedOutput()
-				
+
 				if prevErr == nil && len(prevOutput) > 0 {
 					diag.Logs[pod.Name+"_previous"] = string(prevOutput)
 				}
-				
+
 				if len(output) > 0 {
 					diag.Logs[pod.Name+"_error"] = fmt.Sprintf("Error getting logs: %v\nPartial output: %s", err, string(output))
 				}
@@ -403,7 +403,7 @@ func checkResourceUsage(ctx context.Context, k8sResult *K8sResult, diag *Deploym
 		"-n", k8sResult.Namespace,
 		"-l", fmt.Sprintf("app=%s", k8sResult.AppName),
 		"--no-headers")
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Metrics server might not be installed
@@ -419,7 +419,7 @@ func checkResourceUsage(ctx context.Context, k8sResult *K8sResult, diag *Deploym
 			podName := fields[0]
 			cpu := fields[1]
 			memory := fields[2]
-			
+
 			diag.ResourceUsage[podName] = map[string]string{
 				"cpu":    cpu,
 				"memory": memory,

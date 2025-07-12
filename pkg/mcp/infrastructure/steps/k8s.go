@@ -347,7 +347,7 @@ func CheckDeploymentHealth(ctx context.Context, k8sResult *K8sResult, logger *sl
 
 	// Generate diagnostic report
 	report := GenerateDiagnosticReport(diagnostics)
-	
+
 	if diagnostics.DeploymentOK {
 		logger.Info("Deployment health check passed",
 			"app_name", k8sResult.AppName,
@@ -365,8 +365,8 @@ func CheckDeploymentHealth(ctx context.Context, k8sResult *K8sResult, logger *sl
 		"pods_ready", diagnostics.PodsReady,
 		"pods_total", diagnostics.PodsTotal,
 		"errors", diagnostics.Errors)
-	
+
 	// Include diagnostics in error for AI analysis
-	return fmt.Errorf("deployment not healthy: %d/%d pods ready\n\nDiagnostics:\n%s", 
+	return fmt.Errorf("deployment not healthy: %d/%d pods ready\n\nDiagnostics:\n%s",
 		diagnostics.PodsReady, diagnostics.PodsTotal, report)
 }
