@@ -216,6 +216,14 @@ func generateFixSuggestions(operation string, errorMsg string, logger *slog.Logg
 		suggestions = append(suggestions, "• Ensure kind cluster can access the image")
 	}
 
+	if containsPattern(errorMsg, "deployment", "validation", "pods ready") {
+		suggestions = append(suggestions, "• Check pod resource requests and limits")
+		suggestions = append(suggestions, "• Verify image pull policy and registry access")
+		suggestions = append(suggestions, "• Review pod scheduling constraints and node capacity")
+		suggestions = append(suggestions, "• Inspect pod logs for startup errors")
+		suggestions = append(suggestions, "• Validate container health checks and readiness probes")
+	}
+
 	if containsPattern(errorMsg, "port", "connection", "refused") {
 		suggestions = append(suggestions, "• Verify application listens on correct port")
 		suggestions = append(suggestions, "• Check port bindings in Dockerfile and K8s manifests")

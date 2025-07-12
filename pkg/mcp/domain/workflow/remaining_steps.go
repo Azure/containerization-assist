@@ -198,8 +198,9 @@ func (s *ManifestStep) Execute(ctx context.Context, state *WorkflowState) error 
 		ServiceName: k8sResult.AppName, // Use AppName as service name
 		Endpoint:    k8sResult.ServiceURL,
 		Metadata: map[string]interface{}{
-			"app_name":    k8sResult.AppName,
-			"ingress_url": k8sResult.IngressURL,
+			"app_name":      k8sResult.AppName,
+			"ingress_url":   k8sResult.IngressURL,
+			"manifest_path": k8sResult.Manifests["path"], // Store manifest path for deployment
 		},
 	}
 
@@ -282,6 +283,23 @@ func (s *DeployStep) Execute(ctx context.Context, state *WorkflowState) error {
 		AppName:    extractRepoName(state.Args.RepoURL),
 		Namespace:  state.K8sResult.Namespace,
 		ServiceURL: state.K8sResult.Endpoint,
+		Manifests: map[string]interface{}{
+			"path": state.K8sResult.Metadata["manifest_path"], // Pass manifest path from ManifestStep
+		},
+		Metadata: map[string]interface{}{
+			"port":      0, // Default port
+			"image_ref": state.K8sResult.Namespace + "/" + extractRepoName(state.Args.RepoURL) + ":latest",
+		},
+	}
+
+	// Add port from dockerfile result if available
+	if state.DockerfileResult != nil {
+		infraK8sResult.Metadata["port"] = state.DockerfileResult.ExposedPort
+	}
+
+	// Add actual image ref from build result if available
+	if state.BuildResult != nil && state.BuildResult.ImageRef != "" {
+		infraK8sResult.Metadata["image_ref"] = state.BuildResult.ImageRef
 	}
 
 	// Deploy to Kubernetes
@@ -319,6 +337,9 @@ func (s *VerifyStep) Execute(ctx context.Context, state *WorkflowState) error {
 		AppName:    extractRepoName(state.Args.RepoURL),
 		Namespace:  state.K8sResult.Namespace,
 		ServiceURL: state.K8sResult.Endpoint,
+		Manifests: map[string]interface{}{
+			"path": state.K8sResult.Metadata["manifest_path"], // Pass manifest path for verification
+		},
 	}
 
 	// Check deployment health

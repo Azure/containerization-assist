@@ -6,10 +6,12 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/common/runner"
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/utilities"
 )
 
 // K8sResult contains the results of Kubernetes deployment operations
@@ -20,6 +22,7 @@ type K8sResult struct {
 	ServiceURL string                 `json:"service_url,omitempty"`
 	IngressURL string                 `json:"ingress_url,omitempty"`
 	DeployedAt time.Time              `json:"deployed_at"`
+	Metadata   map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // GenerateManifests creates Kubernetes manifests for deployment using real K8s operations
@@ -190,50 +193,86 @@ func DeployToKubernetes(ctx context.Context, k8sResult *K8sResult, logger *slog.
 		"resources_deployed", len(deploymentResult.Resources),
 		"duration", deploymentResult.Duration)
 
-	// Validate deployment with retry logic
-	logger.Info("Starting deployment validation with retry logic")
+	// Validate deployment with AI-powered retry logic
+	logger.Info("Starting deployment validation with AI-powered retry logic")
 	var validationResult *kubernetes.ValidationResult
-	maxAttempts := 3
-	for attempt := 0; attempt < maxAttempts; attempt++ {
-		// Wait before validation to allow pods to start
-		waitTime := time.Duration(attempt+1) * 5 * time.Second
-		if attempt > 0 {
-			logger.Info("Waiting before retry", "attempt", attempt+1, "wait_time", waitTime)
-			time.Sleep(waitTime)
-		} else {
-			// Even on first attempt, wait a bit for pods to initialize
-			time.Sleep(2 * time.Second)
+
+	// Use AI-powered retry for deployment validation with enhanced context
+	err = utilities.WithAIRetry(ctx, "validate_kubernetes_deployment", 3, func() error {
+		// Wait a bit for pods to initialize on first attempt
+		time.Sleep(2 * time.Second)
+
+		var validationErr error
+		validationResult, validationErr = deploymentService.ValidateDeployment(ctx, manifestPath, k8sResult.Namespace)
+		if validationErr != nil {
+			return fmt.Errorf("deployment validation error: %w", validationErr)
 		}
 
-		validationResult, err = deploymentService.ValidateDeployment(ctx, manifestPath, k8sResult.Namespace)
-		if err != nil {
-			logger.Warn("Validation error", "attempt", attempt+1, "error", err)
-			continue
+		if !validationResult.Success {
+			errorMsg := fmt.Sprintf("deployment validation failed: %d/%d pods ready",
+				validationResult.PodsReady, validationResult.PodsTotal)
+
+			// Get pod logs and events if available
+			var podLogs string
+			var podEvents string
+			if validationResult.PodsTotal > 0 {
+				// Try to get logs from the first pod
+				cmd := exec.CommandContext(ctx, "kubectl", "get", "pods", "-n", k8sResult.Namespace,
+					"--selector=app="+k8sResult.AppName, "-o", "jsonpath={.items[0].metadata.name}")
+				podName, _ := cmd.Output()
+				if len(podName) > 0 {
+					// Get pod logs
+					logCmd := exec.CommandContext(ctx, "kubectl", "logs", "-n", k8sResult.Namespace,
+						string(podName), "--tail=50")
+					logs, _ := logCmd.Output()
+					if len(logs) > 0 {
+						podLogs = fmt.Sprintf("\n\n--- POD LOGS ---\n%s", string(logs))
+					}
+
+					// Get pod events
+					eventCmd := exec.CommandContext(ctx, "kubectl", "describe", "pod", "-n", k8sResult.Namespace, string(podName))
+					events, _ := eventCmd.Output()
+					if len(events) > 0 {
+						// Extract just the Events section
+						eventStr := string(events)
+						if idx := strings.Index(eventStr, "Events:"); idx >= 0 {
+							podEvents = fmt.Sprintf("\n\n--- POD EVENTS ---\n%s", eventStr[idx:])
+						}
+					}
+				}
+			}
+
+			// Include pod logs and context in error
+			// Extract port from k8sResult metadata if available
+			port := 0
+			if portVal, ok := k8sResult.Metadata["port"].(int); ok {
+				port = portVal
+			}
+
+			// Extract image ref from k8sResult metadata if available
+			imageRef := "unknown"
+			if imageVal, ok := k8sResult.Metadata["image_ref"].(string); ok {
+				imageRef = imageVal
+			}
+
+			contextInfo := fmt.Sprintf("App: %s, Namespace: %s, Image: %s, Port: %d%s%s",
+				k8sResult.AppName, k8sResult.Namespace, imageRef, port, podLogs, podEvents)
+
+			if validationResult.Error != nil {
+				errorMsg = fmt.Sprintf("%s (error: %s)", errorMsg, validationResult.Error.Message)
+			}
+			return fmt.Errorf("%s\nContext: %s", errorMsg, contextInfo)
 		}
 
-		if validationResult.Success {
-			logger.Info("Deployment validation successful",
-				"attempt", attempt+1,
-				"pods_ready", validationResult.PodsReady,
-				"pods_total", validationResult.PodsTotal)
-			break
-		}
-
-		logger.Warn("Deployment validation failed",
-			"attempt", attempt+1,
+		logger.Info("Deployment validation successful",
 			"pods_ready", validationResult.PodsReady,
 			"pods_total", validationResult.PodsTotal)
-	}
+		return nil
+	}, logger)
 
-	// Check final validation result
-	if validationResult != nil && !validationResult.Success {
-		errorMsg := fmt.Sprintf("Deployment validation failed after %d attempts: %d/%d pods ready",
-			maxAttempts, validationResult.PodsReady, validationResult.PodsTotal)
-		if validationResult.Error != nil {
-			errorMsg = fmt.Sprintf("%s (error: %s)", errorMsg, validationResult.Error.Message)
-		}
-		logger.Error("Deployment validation failed", "error", errorMsg)
-		return fmt.Errorf("%s", errorMsg)
+	if err != nil {
+		logger.Error("Deployment validation failed after AI-assisted retries", "error", err)
+		return fmt.Errorf("deployment validation failed: %w", err)
 	}
 
 	return nil

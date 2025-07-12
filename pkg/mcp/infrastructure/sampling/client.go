@@ -11,6 +11,7 @@ import (
 	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/prompts"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/tracing"
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -184,21 +185,125 @@ func (c *Client) Sample(ctx context.Context, req SamplingRequest) (*SamplingResp
 // --- internals --------------------------------------------------------------
 
 func (c *Client) callMCP(ctx context.Context, req SamplingRequest) (*SamplingResponse, error) {
-	// For now, return a fallback response since the actual MCP sampling API
-	// in mcp-go v0.33.0 may not have the exact interface we expect
-	// This allows the client to work without MCP sampling while we develop
-	c.logger.Debug("MCP sampling not yet implemented, using fallback",
+	// Try to get MCP server from context
+	srv := server.ServerFromContext(ctx)
+	if srv == nil {
+		c.logger.Debug("No MCP server in context, using fallback",
+			"prompt_length", len(req.Prompt))
+
+		// Return the prompt as content - this allows AI assistants
+		// to see the request and handle it appropriately
+		return &SamplingResponse{
+			Content:    fmt.Sprintf("AI ASSISTANCE REQUESTED: %s", req.Prompt),
+			TokensUsed: estimateTokens(req.Prompt),
+			Model:      "mcp-fallback",
+			StopReason: "fallback",
+		}, nil
+	}
+
+	c.logger.Info("Using MCP sampling with server",
 		"prompt_length", len(req.Prompt),
 		"max_tokens", req.MaxTokens,
 		"temperature", req.Temperature)
 
-	// Return the prompt as content for now - this allows AI assistants
-	// to see the request and handle it appropriately
+	// Use actual MCP sampling when server is available
+	// This enables AI-powered error analysis during deployment failures
+	return c.callMCPSampling(ctx, srv, req)
+}
+
+// callMCPSampling performs actual MCP sampling using the server's sampling API
+func (c *Client) callMCPSampling(ctx context.Context, srv *server.MCPServer, req SamplingRequest) (*SamplingResponse, error) {
+	c.logger.Info("Making MCP sampling request",
+		"prompt_length", len(req.Prompt),
+		"max_tokens", req.MaxTokens,
+		"temperature", req.Temperature)
+
+	// Create MCP sampling request following the official API
+	samplingRequest := mcp.CreateMessageRequest{
+		CreateMessageParams: mcp.CreateMessageParams{
+			Messages: []mcp.SamplingMessage{
+				{
+					Role: mcp.RoleUser,
+					Content: mcp.TextContent{
+						Type: "text",
+						Text: req.Prompt,
+					},
+				},
+			},
+			MaxTokens:   int(req.MaxTokens),       // Convert int32 to int
+			Temperature: float64(req.Temperature), // Convert float32 to float64
+		},
+	}
+
+	// Add system prompt if provided
+	if req.SystemPrompt != "" {
+		samplingRequest.CreateMessageParams.SystemPrompt = req.SystemPrompt
+	}
+
+	// Make the actual MCP sampling request
+	c.logger.Info("Calling srv.RequestSampling", "messages_count", len(samplingRequest.CreateMessageParams.Messages))
+	result, err := srv.RequestSampling(ctx, samplingRequest)
+	if err != nil {
+		c.logger.Error("MCP sampling request failed", "error", err)
+		return nil, fmt.Errorf("MCP sampling failed: %w", err)
+	}
+
+	c.logger.Info("MCP sampling response received",
+		"result_type", fmt.Sprintf("%T", result),
+		"has_content", result.Content != nil,
+		"content_type", fmt.Sprintf("%T", result.Content))
+
+	// Extract content from the result (CreateMessageResult embeds SamplingMessage)
+	var content string
+	var tokensUsed int
+	var model string
+
+	if result.Content != nil {
+		// Try to extract as TextContent first
+		if textContent, ok := result.Content.(mcp.TextContent); ok {
+			content = textContent.Text
+			c.logger.Debug("Extracted text content", "content_length", len(content))
+		} else if contentMap, ok := result.Content.(map[string]interface{}); ok {
+			// Handle map[string]interface{} format with "text" key
+			if textValue, exists := contentMap["text"]; exists {
+				if textStr, ok := textValue.(string); ok {
+					content = textStr
+					c.logger.Info("Extracted text from map content", "content_length", len(content))
+				}
+			}
+		} else {
+			c.logger.Warn("Content is not TextContent or map",
+				"actual_type", fmt.Sprintf("%T", result.Content),
+				"content_value", fmt.Sprintf("%+v", result.Content))
+		}
+	}
+
+	// Log if we got empty content from MCP
+	if content == "" {
+		c.logger.Warn("MCP sampling returned empty content",
+			"prompt_preview", truncateString(req.Prompt, 100),
+			"result", fmt.Sprintf("%+v", result))
+	}
+
+	// Estimate token usage since MCP doesn't provide usage statistics
+	tokensUsed = estimateTokens(content)
+
+	if result.Model != "" {
+		model = result.Model
+	} else {
+		model = "mcp-ai-assistant"
+	}
+
+	c.logger.Debug("MCP sampling completed",
+		"content_length", len(content),
+		"tokens_used", tokensUsed,
+		"model", model)
+
 	return &SamplingResponse{
-		Content:    fmt.Sprintf("AI ASSISTANCE REQUESTED: %s", req.Prompt),
-		TokensUsed: estimateTokens(req.Prompt),
-		Model:      "mcp-fallback",
-		StopReason: "fallback",
+		Content:    content,
+		TokensUsed: tokensUsed,
+		Model:      model,
+		StopReason: result.StopReason,
 	}, nil
 }
 
@@ -218,6 +323,14 @@ func (c *Client) toResponse(content string, model string) *SamplingResponse {
 func estimateTokens(s string) int {
 	words := len(strings.Fields(s))
 	return int(float64(words) * 1.3)
+}
+
+// truncateString truncates a string to a maximum length
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 func isRetryable(err error) bool {
