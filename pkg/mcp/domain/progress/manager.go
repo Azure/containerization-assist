@@ -14,7 +14,6 @@ import (
 	"github.com/briandowns/spinner"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"go.opentelemetry.io/otel/attribute"
 )
 
 // NotificationSender is an interface for sending MCP notifications
@@ -194,7 +193,7 @@ func (m *Manager) Update(step int, msg string, metadata map[string]interface{}) 
 		}
 	}
 
-	err := tracing.TraceProgressUpdate(ctx, m.workflowID, stepName, step, int(m.total), func(tracedCtx context.Context) error {
+	err := tracing.TraceProgressUpdate(ctx, m.traceID, stepName, step, int(m.total), func(tracedCtx context.Context) error {
 		m.updateInternal(step, msg, metadata)
 		return nil
 	})

@@ -62,8 +62,8 @@ Database Types: %v`,
 		return analyzeResult, nil
 	}
 
-	// Parse enhanced analysis to update fields
-	enhanced := parseEnhancedAnalysis(enhancedAnalysis, analyzeResult, logger)
+	// Use enhanced analysis to update fields
+	enhanced := mergeEnhancedAnalysis(enhancedAnalysis, analyzeResult, logger)
 
 	logger.Info("Repository analysis enhanced",
 		"improved_language", enhanced.Language,
@@ -121,9 +121,9 @@ func getFileTree(repoPath string, logger *slog.Logger) string {
 }
 
 // parseEnhancedAnalysis extracts improvements from AI analysis
-func parseEnhancedAnalysis(enhancedText string, original *AnalyzeResult, logger *slog.Logger) *AnalyzeResult {
+func mergeEnhancedAnalysis(enhancedAnalysis *sampling.RepositoryAnalysis, original *AnalyzeResult, logger *slog.Logger) *AnalyzeResult {
 	// Create a copy of the original
-	enhanced := &AnalyzeResult{
+	result := &AnalyzeResult{
 		Language:  original.Language,
 		Framework: original.Framework,
 		Port:      original.Port,
@@ -134,59 +134,37 @@ func parseEnhancedAnalysis(enhancedText string, original *AnalyzeResult, logger 
 
 	// Copy original analysis
 	for k, v := range original.Analysis {
-		enhanced.Analysis[k] = v
+		result.Analysis[k] = v
 	}
 
-	// Add AI enhancement to analysis
-	enhanced.Analysis["ai_enhanced"] = true
-	enhanced.Analysis["ai_analysis"] = enhancedText
-
-	// Parse enhanced text for improvements
-	lines := strings.Split(enhancedText, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-
-		// Look for framework improvements
-		if strings.Contains(strings.ToLower(line), "framework:") {
-			parts := strings.SplitN(line, ":", 2)
-			if len(parts) == 2 {
-				framework := strings.TrimSpace(parts[1])
-				if framework != "" && framework != enhanced.Framework {
-					logger.Info("AI detected better framework", "original", enhanced.Framework, "improved", framework)
-					enhanced.Framework = framework
-				}
-			}
-		}
-
-		// Look for port suggestions
-		if strings.Contains(strings.ToLower(line), "port:") || strings.Contains(strings.ToLower(line), "suggested port:") {
-			parts := strings.SplitN(line, ":", 2)
-			if len(parts) == 2 {
-				portStr := strings.TrimSpace(parts[1])
-				// Extract just the number
-				for _, part := range strings.Fields(portStr) {
-					if port := parsePort(part); port > 0 {
-						if port != enhanced.Port {
-							logger.Info("AI suggested different port", "original", enhanced.Port, "suggested", port)
-							enhanced.Port = port
-						}
-						break
-					}
-				}
-			}
-		}
-
-		// Look for build tool detection
-		if strings.Contains(strings.ToLower(line), "build tool:") || strings.Contains(strings.ToLower(line), "package manager:") {
-			parts := strings.SplitN(line, ":", 2)
-			if len(parts) == 2 {
-				buildTool := strings.TrimSpace(parts[1])
-				enhanced.Analysis["build_tool"] = buildTool
-			}
-		}
+	// Merge enhanced analysis data
+	if enhancedAnalysis.Language != "" {
+		result.Language = enhancedAnalysis.Language
+	}
+	if enhancedAnalysis.Framework != "" {
+		result.Framework = enhancedAnalysis.Framework
+	}
+	if len(enhancedAnalysis.SuggestedPorts) > 0 {
+		result.Port = enhancedAnalysis.SuggestedPorts[0]
 	}
 
-	return enhanced
+	// Add enhanced data to analysis
+	result.Analysis["ai_enhanced"] = true
+	result.Analysis["build_tools"] = enhancedAnalysis.BuildTools
+	result.Analysis["dependencies"] = enhancedAnalysis.Dependencies
+	result.Analysis["services"] = enhancedAnalysis.Services
+	result.Analysis["entry_points"] = enhancedAnalysis.EntryPoints
+	result.Analysis["environment_vars"] = enhancedAnalysis.EnvironmentVars
+	result.Analysis["suggested_ports"] = enhancedAnalysis.SuggestedPorts
+	result.Analysis["confidence"] = enhancedAnalysis.Confidence
+
+	logger.Info("Successfully merged enhanced analysis",
+		"language", result.Language,
+		"framework", result.Framework,
+		"port", result.Port,
+		"confidence", enhancedAnalysis.Confidence)
+
+	return result
 }
 
 // parsePort extracts a port number from a string

@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/tracing"
 	"github.com/mark3labs/mcp-go/server"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Option configures a Client.

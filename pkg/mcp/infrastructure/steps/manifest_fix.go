@@ -44,7 +44,7 @@ func FixManifestWithAI(ctx context.Context, manifestPath string, deploymentError
 	}
 
 	// Write the fixed manifest back
-	if err := os.WriteFile(manifestPath, []byte(fixedManifest), 0644); err != nil {
+	if err := os.WriteFile(manifestPath, []byte(fixedManifest.FixedManifest), 0644); err != nil {
 		return fmt.Errorf("failed to write fixed manifest: %w", err)
 	}
 
