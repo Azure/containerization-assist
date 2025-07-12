@@ -404,7 +404,7 @@ func (suite *MCPWorkflowIntegrationSuite) executeWorkflowSteps(ctx context.Conte
 				"repo_url": "file://" + repo.LocalDir, // Use file:// prefix for local directories
 				"branch":   "main",
 				"scan":     false, // Skip scanning for faster tests
-				// TODO: Add test_mode flag to skip deployment steps
+				"deploy":   false, // Skip deployment in CI tests
 			},
 		},
 	})
@@ -485,6 +485,22 @@ func (suite *MCPWorkflowIntegrationSuite) executeWorkflowSteps(ctx context.Conte
 		// Log deployment namespace
 		if ns, ok := workflowResult["k8s_namespace"].(string); ok {
 			suite.T().Logf("✓ Deployed to namespace: %s", ns)
+		}
+
+		// Check if deployment was skipped
+		if steps, ok := workflowResult["steps"].([]interface{}); ok {
+			deploymentSkipped := false
+			for _, step := range steps {
+				if stepMap, ok := step.(map[string]interface{}); ok {
+					if status, ok := stepMap["status"].(string); ok && status == "skipped" {
+						deploymentSkipped = true
+						break
+					}
+				}
+			}
+			if deploymentSkipped {
+				suite.T().Log("✓ Deployment steps were skipped as requested")
+			}
 		}
 	}
 

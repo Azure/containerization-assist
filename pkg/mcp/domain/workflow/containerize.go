@@ -22,6 +22,7 @@ type ContainerizeAndDeployArgs struct {
 	RepoURL string `json:"repo_url"`
 	Branch  string `json:"branch,omitempty"`
 	Scan    bool   `json:"scan,omitempty"`
+	Deploy  *bool  `json:"deploy,omitempty"` // Pointer to distinguish unset from false
 }
 
 // ContainerizeAndDeployResult represents the complete workflow output
@@ -71,6 +72,10 @@ func RegisterWorkflowTools(mcpServer interface {
 					"type":        "boolean",
 					"description": "Run security scan (optional)",
 				},
+				"deploy": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Deploy to Kubernetes (optional, defaults to true)",
+				},
 			},
 			Required: []string{"repo_url"},
 		},
@@ -93,6 +98,10 @@ func RegisterWorkflowTools(mcpServer interface {
 
 		if scan, ok := arguments["scan"].(bool); ok {
 			args.Scan = scan
+		}
+
+		if deploy, ok := arguments["deploy"].(bool); ok {
+			args.Deploy = &deploy
 		}
 
 		result, err := executeContainerizeAndDeploy(ctx, &req, &args, logger)
@@ -224,6 +233,23 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 		return nil
 	}, logger, updateProgress, "Building Docker image with AI-powered error fixing", progressMgr, workflowProgress); err != nil {
 		result.Success = false
+		return result, nil
+	}
+
+	// Check if deployment is requested (defaults to true for backward compatibility)
+	shouldDeploy := args.Deploy == nil || *args.Deploy
+
+	if !shouldDeploy {
+		logger.Info("Skipping deployment steps as requested")
+		result.Success = true
+		result.ImageRef = fmt.Sprintf("%s:%s", buildResult.ImageName, buildResult.ImageTag)
+		// Mark the remaining steps as skipped
+		for i := len(result.Steps); i < 10; i++ {
+			result.Steps = append(result.Steps, WorkflowStep{
+				Name:   fmt.Sprintf("Step %d", i+1),
+				Status: "skipped",
+			})
+		}
 		return result, nil
 	}
 
