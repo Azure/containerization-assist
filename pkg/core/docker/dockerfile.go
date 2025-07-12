@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -91,10 +92,10 @@ func listEmbeddedSubdirNames(path string) ([]string, error) {
 }
 
 func WriteDockerfileFromTemplate(templateName, targetDir string) error {
-	basePath := filepath.Join("dockerfiles", templateName)
+	embeddedBasePath := path.Join("dockerfiles", templateName)
 	filesToCopy := []string{"Dockerfile", ".dockerignore"}
 	for _, filename := range filesToCopy {
-		embeddedPath := filepath.Join(basePath, filename)
+		embeddedPath := path.Join(embeddedBasePath, filename)
 		data, err := templates.Templates.ReadFile(embeddedPath)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
