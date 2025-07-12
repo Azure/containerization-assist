@@ -1,0 +1,29 @@
+Generate a secure, production-ready multi-stage Dockerfile that:
+
+## Requirements
+1. **Minimal Base Images**: Use the smallest possible base images (alpine, distroless, or scratch where appropriate)
+2. **Layer Optimization**: Implement proper layer caching strategies
+3. **Security Scanning**: Include vulnerability scanning during build process
+4. **Non-root User**: Set up and run as non-root user for security
+5. **Technology Optimization**: Optimize for the detected or specified technology stack
+
+## Configuration
+- **Language**: go
+- **Framework**: gin  
+- **Port**: 8080
+
+## Best Practices to Include
+- Multi-stage build to minimize final image size
+- Security scanning with Trivy or similar tools
+- Health check configuration
+- Proper signal handling (SIGTERM)
+- Build-time ARGs and runtime ENVs clearly separated
+- Dependency caching optimization
+- Security headers and configurations
+
+## Output Format
+Provide a complete Dockerfile with:
+1. Comments explaining each stage and optimization
+2. Recommended .dockerignore patterns
+3. Build command examples
+4. Security considerations and rationale

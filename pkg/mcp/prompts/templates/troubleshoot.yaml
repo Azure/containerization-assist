@@ -1,0 +1,84 @@
+name: "containerKit.troubleshoot"
+version: "1.0.0"
+description: "Analyze and fix containerization errors with AI-powered diagnostics"
+category: "debugging"
+parameters:
+  error_message:
+    type: "string"
+    description: "Error message or description"
+    required: true
+    max_length: 2000
+  operation:
+    type: "string"
+    description: "Operation that failed"
+    default: "unknown"
+    examples: ["build", "deploy", "scan", "push", "run"]
+  context:
+    type: "string"
+    description: "Additional context or logs"
+    default: ""
+    max_length: 5000
+  severity:
+    type: "string"
+    description: "Error severity level"
+    default: "medium"
+    options: ["low", "medium", "high", "critical"]
+
+template: |
+  I'll analyze this containerization error and provide specific troubleshooting guidance.
+  
+  ## Error Analysis
+  **Operation**: {{.operation}}
+  **Severity**: {{.severity}}
+  **Error**: {{.error_message}}
+  
+  {{if .context}}
+  **Context/Logs**:
+  ```
+  {{.context}}
+  ```
+  {{end}}
+  
+  ## Diagnostic Approach
+  Please provide a comprehensive analysis including:
+  
+  ### 1. 🔍 Root Cause Analysis
+  - Identify the specific cause of the failure
+  - Explain why this error occurred in the containerization context
+  - Determine if this is a configuration, dependency, or environment issue
+  
+  ### 2. 🛠️ Step-by-Step Resolution
+  Provide actionable commands and fixes:
+  ```bash
+  # Example fix commands will be provided here
+  ```
+  
+  ### 3. 🔄 Alternative Approaches
+  If the direct fix doesn't work, suggest:
+  - Alternative configuration approaches
+  - Workaround strategies
+  - Different tool or method options
+  
+  ### 4. 🛡️ Prevention Strategies
+  - Best practices to avoid this issue in the future
+  - Configuration improvements
+  - Monitoring and validation steps
+  
+  ### 5. 📚 Related Documentation
+  - Relevant documentation links
+  - Similar known issues and solutions
+  
+  ## Expected Outcome
+  After applying the suggested fixes, you should be able to:
+  - Successfully complete the {{.operation}} operation
+  - Avoid similar issues in future deployments
+  - Have improved error handling and monitoring
+  
+  Please analyze this error and provide specific, actionable troubleshooting steps.
+
+metadata:
+  tags: ["troubleshooting", "debugging", "error-analysis", "diagnostics", "support"]
+  complexity: "advanced"
+  estimated_tokens: 1200
+  last_updated: "2025-01-12"
+  author: "container-kit"

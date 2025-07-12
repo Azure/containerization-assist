@@ -13,6 +13,8 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/application/session"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	"github.com/Azure/container-kit/pkg/mcp/prompts"
+	"github.com/Azure/container-kit/pkg/mcp/resources"
 	"github.com/localrivet/gomcp/server"
 )
 
@@ -20,6 +22,7 @@ import (
 type serverImpl struct {
 	config         workflow.ServerConfig
 	sessionManager session.SessionManager
+	resourceStore  *resources.Store
 	// workspaceManager *runtime.WorkspaceManager // TODO: Type needs to be implemented
 	// circuitBreakers  *execution.CircuitBreakerRegistry // TODO: Type needs to be implemented
 	// TODO: Fix job manager type after migration
@@ -90,6 +93,18 @@ func (s *serverImpl) registerTools() error {
 		})
 
 	s.logger.Info("Workflow tools registered successfully - AI will now use complete workflows instead of atomic tools")
+
+	// Register MCP prompts for slash commands
+	promptRegistry := prompts.NewRegistry(s.gomcpServer, s.logger)
+	if err := promptRegistry.RegisterAll(); err != nil {
+		return errors.New(errors.CodeToolExecutionFailed, "server", "failed to register prompts", err)
+	}
+
+	// Register MCP resource providers
+	if err := s.resourceStore.RegisterProviders(s.gomcpServer); err != nil {
+		return errors.New(errors.CodeToolExecutionFailed, "server", "failed to register resource providers", err)
+	}
+
 	return nil
 }
 
@@ -162,9 +177,13 @@ func NewServer(ctx context.Context, logger *slog.Logger, opts ...Option) (api.MC
 
 	// Note: Service container removed - using direct dependency injection
 
+	// Create resource store
+	resourceStore := resources.NewStore(deps.logger)
+
 	server := &serverImpl{
 		config:         config,
 		sessionManager: deps.sessionManager,
+		resourceStore:  resourceStore,
 		// workspaceManager: workspaceManager,
 		// circuitBreakers:  circuitBreakers,
 		// jobManager:       jobManager, // TODO: Fix after migration
@@ -193,12 +212,14 @@ func (s *serverImpl) Start(ctx context.Context) error {
 		return err
 	}
 
+	// Start resource store cleanup routine
+	s.resourceStore.StartCleanupRoutine(30*time.Minute, 24*time.Hour)
+
 	// Initialize gomcp server directly without manager abstraction
 	if !s.isGomcpInitialized {
 		s.logger.Info("Initializing gomcp server")
 		s.gomcpServer = server.NewServer("Container Kit MCP Server",
 			server.WithLogger(s.logger),
-			server.WithProtocolVersion("1.0.0"),
 		).AsStdio()
 
 		if s.gomcpServer == nil {
@@ -208,6 +229,12 @@ func (s *serverImpl) Start(ctx context.Context) error {
 		// Register tools directly
 		if err := s.registerTools(); err != nil {
 			return errors.New(errors.CodeToolExecutionFailed, "transport", "failed to register tools with gomcp", err)
+		}
+
+		// Register chat modes for Copilot integration
+		if err := s.RegisterChatModes(); err != nil {
+			s.logger.Warn("Failed to register chat modes", "error", err)
+			// Don't fail server startup for this
 		}
 
 		s.isGomcpInitialized = true

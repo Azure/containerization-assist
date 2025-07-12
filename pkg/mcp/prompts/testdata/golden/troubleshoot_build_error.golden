@@ -1,0 +1,50 @@
+I'll analyze this containerization error and provide specific troubleshooting guidance.
+
+## Error Analysis
+**Operation**: build
+**Severity**: high
+**Error**: Docker build failed: no such file or directory
+
+
+**Context/Logs**:
+```
+Building go application
+```
+
+
+## Diagnostic Approach
+Please provide a comprehensive analysis including:
+
+### 1. 🔍 Root Cause Analysis
+- Identify the specific cause of the failure
+- Explain why this error occurred in the containerization context
+- Determine if this is a configuration, dependency, or environment issue
+
+### 2. 🛠️ Step-by-Step Resolution
+Provide actionable commands and fixes:
+```bash
+# Example fix commands will be provided here
+```
+
+### 3. 🔄 Alternative Approaches
+If the direct fix doesn't work, suggest:
+- Alternative configuration approaches
+- Workaround strategies
+- Different tool or method options
+
+### 4. 🛡️ Prevention Strategies
+- Best practices to avoid this issue in the future
+- Configuration improvements
+- Monitoring and validation steps
+
+### 5. 📚 Related Documentation
+- Relevant documentation links
+- Similar known issues and solutions
+
+## Expected Outcome
+After applying the suggested fixes, you should be able to:
+- Successfully complete the build operation
+- Avoid similar issues in future deployments
+- Have improved error handling and monitoring
+
+Please analyze this error and provide specific, actionable troubleshooting steps.

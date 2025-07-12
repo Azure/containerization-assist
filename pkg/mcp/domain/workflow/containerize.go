@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/retry"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps"
-	"github.com/localrivet/gomcp/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/progress"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -66,16 +66,6 @@ func executeContainerizeAndDeploy(mcpCtx *server.Context, args *ContainerizeAndD
 		"branch", args.Branch,
 		"scan", args.Scan)
 
-	// Initial progress log
-	logger.Info("🚀 PROGRESS",
-		"step", 0,
-		"total", 10,
-		"percentage", 0,
-		"step_name", "workflow_start",
-		"status", "started",
-		"message", "Starting containerization and deployment workflow",
-	)
-
 	result := &ContainerizeAndDeployResult{
 		Steps: make([]WorkflowStep, 0, 10),
 	}
@@ -83,21 +73,19 @@ func executeContainerizeAndDeploy(mcpCtx *server.Context, args *ContainerizeAndD
 	startTime := time.Now()
 	ctx := context.Background()
 
-	// Progress tracker
+	// Create unified progress manager
 	totalSteps := 10
+	progressMgr := progress.New(mcpCtx, totalSteps, logger)
+	defer progressMgr.Finish()
+
+	// Begin progress tracking
+	progressMgr.Begin("Starting containerization and deployment workflow")
+
+	// Create workflow progress tracker
+	workflowID := fmt.Sprintf("workflow-%d", time.Now().Unix())
+	workflowProgress := progress.NewWorkflowProgress(workflowID, "containerize_and_deploy", totalSteps)
+
 	currentStep := 0
-	totalStepsFloat := float64(totalSteps)
-
-	// Create a progress reporter if the client supports it
-	var progressReporter *mcp.ProgressReporter
-	logger.Info("Checking for progress support", "mcpCtx_nil", mcpCtx == nil, "has_progress_token", mcpCtx != nil && mcpCtx.HasProgressToken())
-	if mcpCtx != nil && mcpCtx.HasProgressToken() {
-		progressReporter = mcpCtx.CreateSimpleProgressReporter(&totalStepsFloat)
-		logger.Info("Progress reporting enabled for workflow")
-	} else {
-		logger.Info("No progress token found - progress notifications disabled")
-	}
-
 	updateProgress := func() (int, string) {
 		currentStep++
 		progress := fmt.Sprintf("%d/%d", currentStep, totalSteps)
@@ -126,7 +114,7 @@ func executeContainerizeAndDeploy(mcpCtx *server.Context, args *ContainerizeAndD
 			"framework", analyzeResult.Framework,
 			"port", analyzeResult.Port)
 		return nil
-	}, logger, updateProgress, "Analyzing repository structure and detecting language/framework", mcpCtx, progressReporter); err != nil {
+	}, logger, updateProgress, "Analyzing repository structure and detecting language/framework", progressMgr, workflowProgress); err != nil {
 		// Always return the result object to preserve progress information
 		// gomcp will discard the result if we return a non-nil error
 		result.Success = false
@@ -145,7 +133,7 @@ func executeContainerizeAndDeploy(mcpCtx *server.Context, args *ContainerizeAndD
 
 		logger.Info("Dockerfile generated successfully", "path", dockerfileResult.Path)
 		return nil
-	}, logger, updateProgress, "Generating optimized Dockerfile for detected language/framework", mcpCtx, progressReporter); err != nil {
+	}, logger, updateProgress, "Generating optimized Dockerfile for detected language/framework", progressMgr, workflowProgress); err != nil {
 		result.Success = false
 		return result, nil
 	}
@@ -174,7 +162,7 @@ func executeContainerizeAndDeploy(mcpCtx *server.Context, args *ContainerizeAndD
 			"image_tag", buildResult.ImageTag,
 			"image_id", buildResult.ImageID)
 		return nil
-	}, logger, updateProgress, "Building Docker image with AI-powered error fixing", mcpCtx, progressReporter); err != nil {
+	}, logger, updateProgress, "Building Docker image with AI-powered error fixing", progressMgr, workflowProgress); err != nil {
 		result.Success = false
 		return result, nil
 	}
@@ -192,7 +180,7 @@ func executeContainerizeAndDeploy(mcpCtx *server.Context, args *ContainerizeAndD
 
 		logger.Info("Kind cluster setup completed successfully", "registry_url", registryURL)
 		return nil
-	}, updateProgress, "Setting up local Kubernetes cluster with registry", mcpCtx, progressReporter); err != nil {
+	}, updateProgress, "Setting up local Kubernetes cluster with registry", progressMgr, workflowProgress); err != nil {
 		result.Success = false
 		return result, nil
 	}
@@ -208,7 +196,7 @@ func executeContainerizeAndDeploy(mcpCtx *server.Context, args *ContainerizeAndD
 
 		logger.Info("Image loaded into kind cluster successfully")
 		return nil
-	}, logger, updateProgress, "Loading Docker image into Kubernetes cluster", mcpCtx, progressReporter); err != nil {
+	}, logger, updateProgress, "Loading Docker image into Kubernetes cluster", progressMgr, workflowProgress); err != nil {
 		result.Success = false
 		return result, nil
 	}
@@ -226,7 +214,7 @@ func executeContainerizeAndDeploy(mcpCtx *server.Context, args *ContainerizeAndD
 
 		logger.Info("Kubernetes manifests generated successfully", "app_name", k8sResult.AppName)
 		return nil
-	}, logger, updateProgress, "Generating Kubernetes deployment manifests", mcpCtx, progressReporter); err != nil {
+	}, logger, updateProgress, "Generating Kubernetes deployment manifests", progressMgr, workflowProgress); err != nil {
 		result.Success = false
 		return result, nil
 	}
@@ -242,7 +230,7 @@ func executeContainerizeAndDeploy(mcpCtx *server.Context, args *ContainerizeAndD
 
 		logger.Info("Kubernetes deployment completed successfully")
 		return nil
-	}, logger, updateProgress, "Deploying application to Kubernetes cluster", mcpCtx, progressReporter); err != nil {
+	}, logger, updateProgress, "Deploying application to Kubernetes cluster", progressMgr, workflowProgress); err != nil {
 		result.Success = false
 		return result, nil
 	}
@@ -263,7 +251,7 @@ func executeContainerizeAndDeploy(mcpCtx *server.Context, args *ContainerizeAndD
 		result.Endpoint = endpoint
 		logger.Info("Health probe completed", "endpoint", endpoint)
 		return nil
-	}, updateProgress, "Performing application health checks and endpoint discovery", mcpCtx, progressReporter); err != nil {
+	}, updateProgress, "Performing application health checks and endpoint discovery", progressMgr, workflowProgress); err != nil {
 		// This shouldn't happen since we're returning nil on errors
 		logger.Error("Unexpected error in health probe", "error", err)
 	}
@@ -284,7 +272,7 @@ func executeContainerizeAndDeploy(mcpCtx *server.Context, args *ContainerizeAndD
 				"vulnerabilities", scanResult["vulnerabilities"],
 				"scanner", scanResult["scanner"])
 			return nil
-		}, logger, updateProgress, "Scanning Docker image for security vulnerabilities", mcpCtx, progressReporter); err != nil {
+		}, logger, updateProgress, "Scanning Docker image for security vulnerabilities", progressMgr, workflowProgress); err != nil {
 			result.Success = false
 			return result, nil
 		}
@@ -294,73 +282,68 @@ func executeContainerizeAndDeploy(mcpCtx *server.Context, args *ContainerizeAndD
 	}
 
 	// Step 10: Finalize result and return
-	percentage, progress := updateProgress()
+	percentage, progressStr := updateProgress()
 	finalStep := WorkflowStep{
 		Name:     "finalize_result",
 		Status:   "completed",
-		Progress: progress,
+		Progress: progressStr,
 		Message:  fmt.Sprintf("[%d%%] Workflow completed successfully! Application is running", percentage),
 		Duration: "0s",
 	}
 	result.Steps = append(result.Steps, finalStep)
 
-	// Send final progress notification
-	if mcpCtx != nil && progressReporter != nil {
-		finalMessage := fmt.Sprintf("[100%%] Workflow completed successfully! Application is running at %s", result.Endpoint)
-		if err := progressReporter.Complete(finalMessage); err != nil {
-			logger.Warn("Failed to send final progress notification", "error", err)
-		}
+	// Update with final step
+	metadata := map[string]interface{}{
+		"step_name": "finalize_result",
+		"status":    "completed",
+		"endpoint":  result.Endpoint,
+		"image_ref": fmt.Sprintf("localhost:5001/%s:%s", buildResult.ImageName, buildResult.ImageTag),
+		"namespace": k8sResult.Namespace,
 	}
+	progressMgr.Update(totalSteps, "Finalizing workflow results", metadata)
 
 	result.Success = true
 	result.ImageRef = fmt.Sprintf("localhost:5001/%s:%s", buildResult.ImageName, buildResult.ImageTag)
 	result.Namespace = k8sResult.Namespace
 
+	// Complete workflow progress
+	workflowProgress.Complete()
+
+	// Complete progress tracking
+	finalMessage := fmt.Sprintf("Workflow completed successfully! Application running at %s", result.Endpoint)
+	progressMgr.Complete(finalMessage)
+
 	logger.Info("Containerize and deploy workflow completed successfully",
 		"duration", time.Since(startTime),
 		"endpoint", result.Endpoint,
-		"image_ref", result.ImageRef)
-
-	// Final completion progress log
-	logger.Info("🎉 PROGRESS",
-		"step", 10,
-		"total", 10,
-		"percentage", 100,
-		"step_name", "workflow_complete",
-		"status", "completed",
-		"message", fmt.Sprintf("Workflow completed successfully! Application running at %s", result.Endpoint),
-		"duration", time.Since(startTime).String(),
 		"image_ref", result.ImageRef,
-		"namespace", result.Namespace,
-	)
+		"workflow_id", workflowID)
 
 	return result, nil
 }
 
 // executeStep runs a workflow step and tracks its execution
-func executeStep(result *ContainerizeAndDeployResult, stepName string, stepFunc func() error, progressFunc func() (int, string), message string, mcpCtx *server.Context, progressReporter *mcp.ProgressReporter) error {
+func executeStep(result *ContainerizeAndDeployResult, stepName string, stepFunc func() error, progressFunc func() (int, string), message string, progressMgr *progress.Manager, workflowProgress *progress.WorkflowProgress) error {
 	startTime := time.Now()
-	percentage, progress := progressFunc()
+	percentage, progressStr := progressFunc()
+
+	// Create step info
+	stepInfo := progress.NewStepInfo(stepName, message, progressMgr.GetCurrent()+1, progressMgr.GetTotal())
+	workflowProgress.AddStep(stepInfo)
 
 	step := WorkflowStep{
 		Name:     stepName,
 		Status:   "running",
-		Progress: progress,
+		Progress: progressStr,
 		Message:  fmt.Sprintf("[%d%%] %s", percentage, message),
 	}
 
-	// Send real-time progress notification to MCP client
-	if mcpCtx != nil && progressReporter != nil {
-		currentStepFloat := float64(len(result.Steps) + 1)
-		fmt.Printf("Sending progress notification: step %.0f, message: %s\n", currentStepFloat, step.Message)
-		if err := progressReporter.Update(currentStepFloat, step.Message); err != nil {
-			fmt.Printf("Failed to send progress notification: %v\n", err)
-		} else {
-			fmt.Printf("Progress notification sent successfully\n")
-		}
-	} else {
-		fmt.Printf("No progress reporter available (mcpCtx_nil=%v, progressReporter_nil=%v)\n", mcpCtx == nil, progressReporter == nil)
+	// Update progress through unified manager
+	metadata := map[string]interface{}{
+		"step_name": stepName,
+		"status":    "running",
 	}
+	progressMgr.Update(progressMgr.GetCurrent()+1, message, metadata)
 
 	// Execute the step
 	err := stepFunc()
@@ -371,45 +354,39 @@ func executeStep(result *ContainerizeAndDeployResult, stepName string, stepFunc 
 		step.Error = err.Error()
 		result.Steps = append(result.Steps, step)
 		result.Error = fmt.Sprintf("Step %s failed: %v", stepName, err)
+		stepInfo.Fail(err)
 		return err
 	}
 
 	step.Status = "completed"
 	result.Steps = append(result.Steps, step)
+	stepInfo.Complete()
 	return nil
 }
 
 // executeStepWithRetry runs a workflow step with AI-powered retry logic
-func executeStepWithRetry(ctx context.Context, result *ContainerizeAndDeployResult, stepName string, maxRetries int, stepFunc func() error, logger *slog.Logger, progressFunc func() (int, string), message string, mcpCtx *server.Context, progressReporter *mcp.ProgressReporter) error {
+func executeStepWithRetry(ctx context.Context, result *ContainerizeAndDeployResult, stepName string, maxRetries int, stepFunc func() error, logger *slog.Logger, progressFunc func() (int, string), message string, progressMgr *progress.Manager, workflowProgress *progress.WorkflowProgress) error {
 	startTime := time.Now()
-	percentage, progress := progressFunc()
+	percentage, progressStr := progressFunc()
+
+	// Create step info
+	stepInfo := progress.NewStepInfo(stepName, message, progressMgr.GetCurrent()+1, progressMgr.GetTotal())
+	workflowProgress.AddStep(stepInfo)
 
 	step := WorkflowStep{
 		Name:     stepName,
 		Status:   "running",
-		Progress: progress,
+		Progress: progressStr,
 		Message:  fmt.Sprintf("[%d%%] %s", percentage, message),
 	}
 
-	// Send real-time progress notification to MCP client
-	if mcpCtx != nil && progressReporter != nil {
-		currentStepFloat := float64(len(result.Steps) + 1)
-		if err := progressReporter.Update(currentStepFloat, step.Message); err != nil {
-			logger.Warn("Failed to send progress notification", "error", err, "step", stepName)
-		}
+	// Update progress through unified manager
+	metadata := map[string]interface{}{
+		"step_name":   stepName,
+		"status":      "running",
+		"max_retries": maxRetries,
 	}
-
-	// Structured progress logging (Option C fallback)
-	currentStep := len(result.Steps) + 1
-	totalSteps := 10
-	logger.Info("🔄 PROGRESS",
-		"step", currentStep,
-		"total", totalSteps,
-		"percentage", percentage,
-		"step_name", stepName,
-		"status", "running",
-		"message", step.Message,
-	)
+	progressMgr.Update(progressMgr.GetCurrent()+1, message, metadata)
 
 	// Execute the step with AI retry
 	err := retry.WithAIRetry(ctx, stepName, maxRetries, stepFunc, logger)
@@ -421,32 +398,25 @@ func executeStepWithRetry(ctx context.Context, result *ContainerizeAndDeployResu
 		result.Steps = append(result.Steps, step)
 		result.Error = fmt.Sprintf("Step %s failed: %v", stepName, err)
 
-		// Log failure progress
-		logger.Error("❌ PROGRESS",
-			"step", currentStep,
-			"total", totalSteps,
-			"percentage", percentage,
-			"step_name", stepName,
-			"status", "failed",
-			"error", err.Error(),
-			"duration", step.Duration,
-		)
+		// Update progress with failure
+		metadata["status"] = "failed"
+		metadata["error"] = err.Error()
+		metadata["duration"] = step.Duration
+		progressMgr.Update(progressMgr.GetCurrent(), fmt.Sprintf("Failed: %s", message), metadata)
+
+		stepInfo.Fail(err)
 		return err
 	}
 
 	step.Status = "completed"
 	result.Steps = append(result.Steps, step)
 
-	// Log completion progress
-	logger.Info("✅ PROGRESS",
-		"step", currentStep,
-		"total", totalSteps,
-		"percentage", percentage,
-		"step_name", stepName,
-		"status", "completed",
-		"message", step.Message,
-		"duration", step.Duration,
-	)
+	// Update progress with completion
+	metadata["status"] = "completed"
+	metadata["duration"] = step.Duration
+	progressMgr.Update(progressMgr.GetCurrent(), fmt.Sprintf("Completed: %s", message), metadata)
+
+	stepInfo.Complete()
 	return nil
 }
 

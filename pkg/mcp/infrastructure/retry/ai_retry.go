@@ -5,12 +5,77 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+
+	"github.com/Azure/container-kit/pkg/mcp/sampling"
+	"github.com/localrivet/gomcp/server"
 )
 
 // WithAIRetry wraps a function with AI-powered retry logic
 // This works with external AI assistants (like Claude) using the MCP server
 // The AI assistant observes failures through structured error reporting and can retry the workflow
 func WithAIRetry(ctx context.Context, name string, max int, fn func() error, logger *slog.Logger) error {
+	// Try to get MCP context for enhanced retry with sampling
+	if mcpCtx, ok := ctx.Value("mcp_context").(*server.Context); ok && mcpCtx != nil {
+		return WithLLMGuidedRetry(ctx, mcpCtx, name, max, fn, logger)
+	}
+
+	// Fallback to basic retry logic
+	return withBasicAIRetry(ctx, name, max, fn, logger)
+}
+
+// WithLLMGuidedRetry uses MCP sampling for intelligent retry logic
+func WithLLMGuidedRetry(ctx context.Context, mcpCtx *server.Context, name string, max int, fn func() error, logger *slog.Logger) error {
+	logger.Info("Starting operation with LLM-guided retry", "operation", name, "max_retries", max)
+
+	samplingClient := sampling.NewClient(mcpCtx, logger)
+
+	for i := 1; i <= max; i++ {
+		logger.Debug("Attempting operation", "operation", name, "attempt", i, "max", max)
+
+		err := fn()
+		if err == nil {
+			logger.Info("Operation completed successfully", "operation", name, "attempt", i)
+			return nil
+		}
+
+		logger.Error("Operation failed", "operation", name, "attempt", i, "max", max, "error", err)
+
+		// If this was the last attempt, return enhanced error
+		if i == max {
+			logger.Error("Operation exhausted all retries", "operation", name, "attempts", max)
+			return enhanceErrorForAI(name, err, i, max, logger)
+		}
+
+		// Use LLM to analyze the error and suggest fixes
+		analysis, analysisErr := samplingClient.AnalyzeError(ctx, name, err, fmt.Sprintf("Attempt %d of %d", i, max))
+		if analysisErr != nil {
+			logger.Warn("Failed to get LLM analysis", "error", analysisErr)
+			// Continue with basic retry
+			continue
+		}
+
+		// Log the analysis for visibility
+		logger.Info("LLM Error Analysis",
+			"operation", name,
+			"root_cause", analysis.RootCause,
+			"can_auto_fix", analysis.CanAutoFix,
+			"fix_steps", len(analysis.FixSteps))
+
+		// If we can auto-fix, attempt to apply fixes
+		if analysis.CanAutoFix && len(analysis.FixSteps) > 0 {
+			logger.Info("Attempting automated fixes suggested by LLM")
+			// Note: Actual fix application would be operation-specific
+			// This is a hook for future enhancement
+		}
+
+		// Continue to next retry with LLM insights logged
+	}
+
+	return fmt.Errorf("%s: exhausted %d retries", name, max)
+}
+
+// withBasicAIRetry is the original retry logic without MCP sampling
+func withBasicAIRetry(ctx context.Context, name string, max int, fn func() error, logger *slog.Logger) error {
 	logger.Info("Starting operation with AI retry", "operation", name, "max_retries", max)
 
 	for i := 1; i <= max; i++ {

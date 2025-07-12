@@ -1,0 +1,237 @@
+I'll generate production-ready Kubernetes manifests for your application.
+
+## Deployment Configuration
+- **Application**: my-app
+- **Image**: ghcr.io/org/my-app:v1.0.0
+- **Namespace**: production
+- **Replicas**: 3
+- **Port**: 8080
+- **Service Type**: LoadBalancer
+- **Environment**: production
+
+## Resource Requirements
+```yaml
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+```
+
+## Required Kubernetes Manifests
+Please generate the following manifests with production-ready configurations:
+
+### 1. 📦 Deployment
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: production
+  labels:
+    app: my-app
+    environment: production
+    version: "1.0.0"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+        environment: production
+    spec:
+      containers:
+      - name: my-app
+        image: ghcr.io/org/my-app:v1.0.0
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        # Add appropriate health checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        # Security context
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+```
+
+### 2. 🌐 Service
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app-service
+  namespace: production
+  labels:
+    app: my-app
+    environment: production
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: my-app
+```
+
+### 3. 🔒 ServiceAccount
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: my-app-sa
+  namespace: production
+  labels:
+    app: my-app
+    environment: production
+automountServiceAccountToken: false
+```
+
+### 4. 📝 ConfigMap (if needed)
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-app-config
+  namespace: production
+  labels:
+    app: my-app
+    environment: production
+data:
+  # Add your application configuration here
+  app.env: "production"
+  log.level: "info"
+```
+
+
+### 5. 📊 HorizontalPodAutoscaler
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: my-app-hpa
+  namespace: production
+  labels:
+    app: my-app
+    environment: production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: my-app
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+```
+
+
+### 6. 🛡️ NetworkPolicy (Security)
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: my-app-netpol
+  namespace: production
+  labels:
+    app: my-app
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app: my-app
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: production
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  - {} # Allow all egress (customize as needed)
+```
+
+## Best Practices Included
+✅ **Security**: Non-root user, read-only filesystem, dropped capabilities
+✅ **Reliability**: Rolling updates, health checks, resource limits
+✅ **Observability**: Proper labels and metadata
+✅ **Scalability**: HPA for production environments
+✅ **Network Security**: NetworkPolicy for traffic control
+
+## Deployment Commands
+```bash
+# Apply all manifests
+kubectl apply -f deployment.yaml
+kubectl apply -f service.yaml
+kubectl apply -f serviceaccount.yaml
+kubectl apply -f configmap.yaml
+
+kubectl apply -f hpa.yaml
+
+kubectl apply -f networkpolicy.yaml
+
+# Verify deployment
+kubectl get pods -n production -l app=my-app
+kubectl get svc -n production -l app=my-app
+
+# Check rollout status
+kubectl rollout status deployment/my-app -n production
+```
+
+## Customization Notes
+- Adjust health check paths based on your application endpoints
+- Modify resource requests/limits based on actual usage
+- Update security contexts based on application requirements
+- Add environment-specific configurations to ConfigMap
+- Configure ingress if external access is needed
+
+Please generate complete, production-ready Kubernetes manifests based on this template.

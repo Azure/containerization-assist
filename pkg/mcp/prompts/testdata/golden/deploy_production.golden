@@ -1,0 +1,37 @@
+I'll help you containerize and deploy your application using the complete workflow.
+
+## Deployment Configuration
+- **Repository**: https://github.com/org/app.git
+- **Branch**: main
+- **Registry**: ghcr.io/org/app
+- **Security Scan**: true
+- **Environment**: production
+
+## Workflow Steps
+The containerization and deployment process includes a comprehensive 10-step workflow:
+
+### 🔍 Analysis Phase (Steps 1-2)
+1. **Repository Analysis**: Detect technology stack, dependencies, and project structure
+2. **Dockerfile Generation**: Create optimized multi-stage Dockerfile
+
+### 🏗️ Build Phase (Steps 3-6)
+3. **Docker Build**: Construct container image with optimizations
+4. **Security Scan**: Vulnerability assessment with Trivy/Grype
+5. **Image Tagging**: Version tagging with git commit info
+6. **Registry Push**: Upload to specified container registry
+
+### 🚀 Deploy Phase (Steps 7-10)
+7. **Manifest Generation**: Create Kubernetes deployment manifests
+8. **Cluster Setup**: Validate and prepare target cluster
+9. **Application Deploy**: Deploy with rolling update strategy
+10. **Health Verification**: Confirm deployment success and health
+
+## Next Steps
+
+Ready to start containerization workflow for repository: `https://github.com/org/app.git`
+
+
+Would you like me to:
+- Start the full containerization workflow now?
+- Customize any deployment parameters first?
+- Review the generated configuration?
