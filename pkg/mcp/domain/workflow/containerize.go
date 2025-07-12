@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/utilities"
@@ -153,13 +154,13 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 
 	startTime := time.Now()
 
-	// Create unified progress manager
+	// Create unified progress tracker
 	totalSteps := 10
-	progressMgr := NewManager(ctx, req, totalSteps, logger)
-	defer progressMgr.Finish()
+	progressTracker := NewProgressTracker(ctx, req, totalSteps, logger)
+	defer progressTracker.Finish()
 
 	// Begin progress tracking
-	progressMgr.Begin("Starting containerization and deployment workflow")
+	progressTracker.Begin("Starting containerization and deployment workflow")
 
 	// Create workflow progress tracker
 	workflowID := fmt.Sprintf("workflow-%d", time.Now().Unix())
@@ -171,7 +172,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 		progress := fmt.Sprintf("%d/%d", currentStep, totalSteps)
 		percentage := int((float64(currentStep) / float64(totalSteps)) * 100)
 		// Also update the progress manager's internal counter
-		progressMgr.SetCurrent(currentStep)
+		progressTracker.SetCurrent(currentStep)
 		return percentage, progress
 	}
 
@@ -209,7 +210,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 		}
 
 		return nil
-	}, logger, updateProgress, "Analyzing repository structure and detecting language/framework", progressMgr, workflowProgress); err != nil {
+	}, logger, updateProgress, "Analyzing repository structure and detecting language/framework", progressTracker, workflowProgress); err != nil {
 		// Always return the result object to preserve progress information
 		// gomcp will discard the result if we return a non-nil error
 		result.Success = false
@@ -228,13 +229,13 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 
 		logger.Info("Dockerfile generated successfully", "path", dockerfileResult.Path)
 		return nil
-	}, logger, updateProgress, "Generating optimized Dockerfile for detected language/framework", progressMgr, workflowProgress); err != nil {
+	}, logger, updateProgress, "Generating optimized Dockerfile for detected language/framework", progressTracker, workflowProgress); err != nil {
 		result.Success = false
 		return result, nil
 	}
 
 	// Step 3: Build image with AI retry on Docker errors
-	buildResult, err := executeDockerBuildWithAIFix(ctx, result, dockerfileResult, analyzeResult, args, logger, updateProgress, progressMgr, workflowProgress)
+	buildResult, err := executeDockerBuildWithAIFix(ctx, result, dockerfileResult, analyzeResult, args, logger, updateProgress, progressTracker, workflowProgress)
 	if err != nil {
 		logger.Error("Build step failed", "error", err)
 		result.Success = false
@@ -295,7 +296,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 
 		logger.Info("Kind cluster setup completed successfully", "registry_url", registryURL)
 		return nil
-	}, updateProgress, "Setting up local Kubernetes cluster with registry", progressMgr, workflowProgress); err != nil {
+	}, updateProgress, "Setting up local Kubernetes cluster with registry", progressTracker, workflowProgress); err != nil {
 		logger.Error("Kind cluster setup failed", "error", err)
 		result.Success = false
 		return result, nil
@@ -312,7 +313,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 
 		logger.Info("Image loaded into kind cluster successfully")
 		return nil
-	}, logger, updateProgress, "Loading Docker image into Kubernetes cluster", progressMgr, workflowProgress); err != nil {
+	}, logger, updateProgress, "Loading Docker image into Kubernetes cluster", progressTracker, workflowProgress); err != nil {
 		result.Success = false
 		return result, nil
 	}
@@ -330,13 +331,13 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 
 		logger.Info("Kubernetes manifests generated successfully", "app_name", k8sResult.AppName)
 		return nil
-	}, logger, updateProgress, "Generating Kubernetes deployment manifests", progressMgr, workflowProgress); err != nil {
+	}, logger, updateProgress, "Generating Kubernetes deployment manifests", progressTracker, workflowProgress); err != nil {
 		result.Success = false
 		return result, nil
 	}
 
 	// Step 7: kubectl apply with AI retry on pod crash loops
-	if err := executeDeployWithAIFix(ctx, result, k8sResult, dockerfileResult, analyzeResult, logger, updateProgress, progressMgr, workflowProgress); err != nil {
+	if err := executeDeployWithAIFix(ctx, result, k8sResult, dockerfileResult, analyzeResult, logger, updateProgress, progressTracker, workflowProgress); err != nil {
 		result.Success = false
 		return result, nil
 	}
@@ -357,7 +358,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 		result.Endpoint = endpoint
 		logger.Info("Health probe completed", "endpoint", endpoint)
 		return nil
-	}, updateProgress, "Performing application health checks and endpoint discovery", progressMgr, workflowProgress); err != nil {
+	}, updateProgress, "Performing application health checks and endpoint discovery", progressTracker, workflowProgress); err != nil {
 		// This shouldn't happen since we're returning nil on errors
 		logger.Error("Unexpected error in health probe", "error", err)
 	}
@@ -400,7 +401,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 			}
 
 			return nil
-		}, logger, updateProgress, "Scanning Docker image for security vulnerabilities", progressMgr, workflowProgress); err != nil {
+		}, logger, updateProgress, "Scanning Docker image for security vulnerabilities", progressTracker, workflowProgress); err != nil {
 			result.Success = false
 			return result, nil
 		}
@@ -434,7 +435,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 		"image_ref": fmt.Sprintf("localhost:5001/%s:%s", buildResult.ImageName, buildResult.ImageTag),
 		"namespace": k8sResult.Namespace,
 	}
-	progressMgr.Update(progressMgr.GetCurrent(), "Finalizing workflow results", metadata)
+	progressTracker.Update(progressTracker.GetCurrent(), "Finalizing workflow results", metadata)
 
 	result.Success = true
 	result.ImageRef = fmt.Sprintf("localhost:5001/%s:%s", buildResult.ImageName, buildResult.ImageTag)
@@ -445,7 +446,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 
 	// Complete progress tracking
 	finalMessage := fmt.Sprintf("Workflow completed successfully! Application running at %s", result.Endpoint)
-	progressMgr.Complete(finalMessage)
+	progressTracker.Complete(finalMessage)
 
 	logger.Info("Containerize and deploy workflow completed successfully",
 		"duration", time.Since(startTime),
@@ -457,12 +458,12 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 }
 
 // executeStep runs a workflow step and tracks its execution
-func executeStep(result *ContainerizeAndDeployResult, stepName string, stepFunc func() error, progressFunc func() (int, string), message string, progressMgr Manager, workflowProgress *WorkflowProgress) error {
+func executeStep(result *ContainerizeAndDeployResult, stepName string, stepFunc func() error, progressFunc func() (int, string), message string, progressTracker *progress.Tracker, workflowProgress *WorkflowProgress) error {
 	startTime := time.Now()
 	percentage, progressStr := progressFunc()
 
 	// Create step info
-	stepInfo := NewStepInfo(stepName, message, progressMgr.GetCurrent(), progressMgr.GetTotal())
+	stepInfo := NewStepInfo(stepName, message, progressTracker.GetCurrent(), progressTracker.GetTotal())
 	workflowProgress.AddStep(stepInfo)
 
 	step := WorkflowStep{
@@ -477,7 +478,7 @@ func executeStep(result *ContainerizeAndDeployResult, stepName string, stepFunc 
 		"step_name": stepName,
 		"status":    "running",
 	}
-	progressMgr.Update(progressMgr.GetCurrent(), message, metadata)
+	progressTracker.Update(progressTracker.GetCurrent(), message, metadata)
 
 	// Execute the step
 	err := stepFunc()
@@ -499,12 +500,12 @@ func executeStep(result *ContainerizeAndDeployResult, stepName string, stepFunc 
 }
 
 // executeStepWithRetry runs a workflow step with AI-powered retry logic
-func executeStepWithRetry(ctx context.Context, result *ContainerizeAndDeployResult, stepName string, maxRetries int, stepFunc func() error, logger *slog.Logger, progressFunc func() (int, string), message string, progressMgr Manager, workflowProgress *WorkflowProgress) error {
+func executeStepWithRetry(ctx context.Context, result *ContainerizeAndDeployResult, stepName string, maxRetries int, stepFunc func() error, logger *slog.Logger, progressFunc func() (int, string), message string, progressTracker *progress.Tracker, workflowProgress *WorkflowProgress) error {
 	startTime := time.Now()
 	percentage, progressStr := progressFunc()
 
 	// Create step info
-	stepInfo := NewStepInfo(stepName, message, progressMgr.GetCurrent(), progressMgr.GetTotal())
+	stepInfo := NewStepInfo(stepName, message, progressTracker.GetCurrent(), progressTracker.GetTotal())
 	workflowProgress.AddStep(stepInfo)
 
 	step := WorkflowStep{
@@ -520,7 +521,7 @@ func executeStepWithRetry(ctx context.Context, result *ContainerizeAndDeployResu
 		"status":      "running",
 		"max_retries": maxRetries,
 	}
-	progressMgr.Update(progressMgr.GetCurrent(), message, metadata)
+	progressTracker.Update(progressTracker.GetCurrent(), message, metadata)
 
 	// Execute the step with AI retry
 	err := utilities.WithAIRetry(ctx, stepName, maxRetries, stepFunc, logger)
@@ -536,7 +537,7 @@ func executeStepWithRetry(ctx context.Context, result *ContainerizeAndDeployResu
 		metadata["status"] = "failed"
 		metadata["error"] = err.Error()
 		metadata["duration"] = step.Duration
-		progressMgr.Update(progressMgr.GetCurrent(), fmt.Sprintf("Failed: %s", message), metadata)
+		progressTracker.Update(progressTracker.GetCurrent(), fmt.Sprintf("Failed: %s", message), metadata)
 
 		stepInfo.Fail(err)
 		return err
@@ -548,7 +549,7 @@ func executeStepWithRetry(ctx context.Context, result *ContainerizeAndDeployResu
 	// Update progress with completion
 	metadata["status"] = "completed"
 	metadata["duration"] = step.Duration
-	progressMgr.Update(progressMgr.GetCurrent(), fmt.Sprintf("Completed: %s", message), metadata)
+	progressTracker.Update(progressTracker.GetCurrent(), fmt.Sprintf("Completed: %s", message), metadata)
 
 	stepInfo.Complete()
 	return nil
@@ -706,13 +707,13 @@ func scanImageForVulnerabilities(ctx context.Context, buildResult *steps.BuildRe
 }
 
 // executeDockerBuildWithAIFix executes the Docker build step with AI-powered Dockerfile fixing
-func executeDockerBuildWithAIFix(ctx context.Context, result *ContainerizeAndDeployResult, dockerfileResult *steps.DockerfileResult, analyzeResult *steps.AnalyzeResult, args *ContainerizeAndDeployArgs, logger *slog.Logger, progressFunc func() (int, string), progressMgr Manager, workflowProgress *WorkflowProgress) (*steps.BuildResult, error) {
+func executeDockerBuildWithAIFix(ctx context.Context, result *ContainerizeAndDeployResult, dockerfileResult *steps.DockerfileResult, analyzeResult *steps.AnalyzeResult, args *ContainerizeAndDeployArgs, logger *slog.Logger, progressFunc func() (int, string), progressTracker *progress.Tracker, workflowProgress *WorkflowProgress) (*steps.BuildResult, error) {
 	startTime := time.Now()
 	percentage, progressStr := progressFunc()
 	maxRetries := 2
 
 	// Create step info
-	stepInfo := NewStepInfo("build_image", "Building Docker image with AI-powered error fixing", progressMgr.GetCurrent()+1, progressMgr.GetTotal())
+	stepInfo := NewStepInfo("build_image", "Building Docker image with AI-powered error fixing", progressTracker.GetCurrent()+1, progressTracker.GetTotal())
 	workflowProgress.AddStep(stepInfo)
 
 	step := WorkflowStep{
@@ -728,7 +729,7 @@ func executeDockerBuildWithAIFix(ctx context.Context, result *ContainerizeAndDep
 		"status":      "running",
 		"max_retries": maxRetries,
 	}
-	progressMgr.Update(progressMgr.GetCurrent(), "Building Docker image with AI-powered error fixing", metadata)
+	progressTracker.Update(progressTracker.GetCurrent(), "Building Docker image with AI-powered error fixing", metadata)
 
 	// Extract repo name from URL for image naming
 	imageName := extractRepoName(args.RepoURL)
@@ -817,7 +818,7 @@ func executeDockerBuildWithAIFix(ctx context.Context, result *ContainerizeAndDep
 		metadata["status"] = "failed"
 		metadata["error"] = lastBuildError.Error()
 		metadata["duration"] = step.Duration
-		progressMgr.Update(progressMgr.GetCurrent(), "Failed: Building Docker image", metadata)
+		progressTracker.Update(progressTracker.GetCurrent(), "Failed: Building Docker image", metadata)
 
 		stepInfo.Fail(lastBuildError)
 		return nil, lastBuildError
@@ -830,20 +831,20 @@ func executeDockerBuildWithAIFix(ctx context.Context, result *ContainerizeAndDep
 	// Update progress with completion
 	metadata["status"] = "completed"
 	metadata["duration"] = step.Duration
-	progressMgr.Update(progressMgr.GetCurrent(), "Completed: Building Docker image", metadata)
+	progressTracker.Update(progressTracker.GetCurrent(), "Completed: Building Docker image", metadata)
 
 	stepInfo.Complete()
 	return buildResult, nil
 }
 
 // executeDeployWithAIFix executes Kubernetes deployment with AI-powered manifest fixing
-func executeDeployWithAIFix(ctx context.Context, result *ContainerizeAndDeployResult, k8sResult *steps.K8sResult, dockerfileResult *steps.DockerfileResult, analyzeResult *steps.AnalyzeResult, logger *slog.Logger, progressFunc func() (int, string), progressMgr Manager, workflowProgress *WorkflowProgress) error {
+func executeDeployWithAIFix(ctx context.Context, result *ContainerizeAndDeployResult, k8sResult *steps.K8sResult, dockerfileResult *steps.DockerfileResult, analyzeResult *steps.AnalyzeResult, logger *slog.Logger, progressFunc func() (int, string), progressTracker *progress.Tracker, workflowProgress *WorkflowProgress) error {
 	startTime := time.Now()
 	percentage, progressStr := progressFunc()
 	maxRetries := 2
 
 	// Create step info
-	stepInfo := NewStepInfo("deploy_to_k8s", "Deploying application to Kubernetes cluster", progressMgr.GetCurrent(), progressMgr.GetTotal())
+	stepInfo := NewStepInfo("deploy_to_k8s", "Deploying application to Kubernetes cluster", progressTracker.GetCurrent(), progressTracker.GetTotal())
 	workflowProgress.AddStep(stepInfo)
 
 	step := WorkflowStep{
@@ -859,7 +860,7 @@ func executeDeployWithAIFix(ctx context.Context, result *ContainerizeAndDeployRe
 		"status":      "running",
 		"max_retries": maxRetries,
 	}
-	progressMgr.Update(progressMgr.GetCurrent(), "Deploying application to Kubernetes cluster", metadata)
+	progressTracker.Update(progressTracker.GetCurrent(), "Deploying application to Kubernetes cluster", metadata)
 
 	var lastDeployError error
 	manifestPath := filepath.Join(k8sResult.Manifests["deployment_path"].(string))
@@ -913,7 +914,7 @@ func executeDeployWithAIFix(ctx context.Context, result *ContainerizeAndDeployRe
 		metadata["status"] = "failed"
 		metadata["error"] = lastDeployError.Error()
 		metadata["duration"] = step.Duration
-		progressMgr.Update(progressMgr.GetCurrent(), "Failed: Deploying to Kubernetes", metadata)
+		progressTracker.Update(progressTracker.GetCurrent(), "Failed: Deploying to Kubernetes", metadata)
 
 		stepInfo.Fail(lastDeployError)
 		return lastDeployError
@@ -926,7 +927,7 @@ func executeDeployWithAIFix(ctx context.Context, result *ContainerizeAndDeployRe
 	// Update progress with completion
 	metadata["status"] = "completed"
 	metadata["duration"] = step.Duration
-	progressMgr.Update(progressMgr.GetCurrent(), "Completed: Deploying to Kubernetes", metadata)
+	progressTracker.Update(progressTracker.GetCurrent(), "Completed: Deploying to Kubernetes", metadata)
 
 	stepInfo.Complete()
 	return nil

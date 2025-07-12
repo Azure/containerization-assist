@@ -12,21 +12,16 @@ import (
 
 	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/Azure/container-kit/pkg/mcp/api"
-	"github.com/Azure/container-kit/pkg/mcp/application/session"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/prompts"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/resources"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // serverImpl represents the consolidated MCP server implementation
 type serverImpl struct {
-	config         workflow.ServerConfig
-	sessionManager session.SessionManager
-	resourceStore  *resources.Store
-	logger         *slog.Logger
-	startTime      time.Time
+	deps      *Dependencies
+	startTime time.Time
 
 	mcpServer        *server.MCPServer
 	isMcpInitialized bool
@@ -46,8 +41,8 @@ func (s *serverImpl) registerTools() error {
 		return errors.New(errors.CodeInternalError, "server", "mcp server not initialized", nil)
 	}
 
-	s.logger.Info("Registering single comprehensive workflow tool for AI-powered containerization")
-	if err := workflow.RegisterWorkflowTools(s.mcpServer, s.logger); err != nil {
+	s.deps.Logger.Info("Registering single comprehensive workflow tool for AI-powered containerization")
+	if err := workflow.RegisterWorkflowTools(s.mcpServer, s.deps.Logger); err != nil {
 		return errors.New(errors.CodeToolExecutionFailed, "server", "failed to register workflow tools", err)
 	}
 
@@ -124,26 +119,20 @@ func (s *serverImpl) registerTools() error {
 		}, nil
 	})
 
-	s.logger.Info("Workflow tools registered successfully - AI will now use complete workflows instead of atomic tools")
+	s.deps.Logger.Info("Workflow tools registered successfully - AI will now use complete workflows instead of atomic tools")
 
 	// Register MCP prompts for slash commands
-	promptRegistry := prompts.NewRegistry(s.mcpServer, s.logger)
+	promptRegistry := prompts.NewRegistry(s.mcpServer, s.deps.Logger)
 	if err := promptRegistry.RegisterAll(); err != nil {
 		return errors.New(errors.CodeToolExecutionFailed, "server", "failed to register prompts", err)
 	}
 
 	// Register MCP resource providers
-	if err := s.resourceStore.RegisterProviders(s.mcpServer); err != nil {
+	if err := s.deps.ResourceStore.RegisterProviders(s.mcpServer); err != nil {
 		return errors.New(errors.CodeToolExecutionFailed, "server", "failed to register resource providers", err)
 	}
 
 	return nil
-}
-
-// dependencies holds internal dependencies for the server
-type dependencies struct {
-	sessionManager session.SessionManager
-	logger         *slog.Logger
 }
 
 // NewServer creates a new MCP server with the given options
@@ -154,47 +143,33 @@ func NewServer(ctx context.Context, logger *slog.Logger, opts ...Option) (api.MC
 	for _, opt := range opts {
 		opt(&config)
 	}
-	// Create server logger
-	serverLogger := logger.With("component", "mcp-server")
 
-	// Create internal dependencies
-	sessionManager := session.NewMemorySessionManager(logger, config.SessionTTL, config.MaxSessions)
-	serverLogger.Info("Created enhanced in-memory session manager",
-		"default_ttl", config.SessionTTL,
-		"max_sessions", config.MaxSessions)
-
-	deps := &dependencies{
-		sessionManager: sessionManager,
-		logger:         serverLogger,
-	}
-
+	// Ensure directories exist
 	if config.StorePath != "" {
 		if err := os.MkdirAll(filepath.Dir(config.StorePath), 0o755); err != nil {
-			serverLogger.Error("Failed to create storage directory", "error", err, "path", config.StorePath)
+			logger.Error("Failed to create storage directory", "error", err, "path", config.StorePath)
 			return nil, errors.New(errors.CodeIoError, "server", fmt.Sprintf("failed to create storage directory %s", config.StorePath), err)
 		}
 	}
 
-	// Validate workspace directory exists or can be created
 	if config.WorkspaceDir != "" {
 		if err := os.MkdirAll(config.WorkspaceDir, 0o755); err != nil {
-			serverLogger.Error("Failed to create workspace directory", "error", err, "path", config.WorkspaceDir)
+			logger.Error("Failed to create workspace directory", "error", err, "path", config.WorkspaceDir)
 			return nil, errors.New(errors.CodeIoError, "server", fmt.Sprintf("failed to create workspace directory %s", config.WorkspaceDir), err)
 		}
 	}
 
-	// Create resource store
-	resourceStore := resources.NewStore(deps.logger)
+	// Use builder pattern to create server with proper dependency injection
+	server, err := NewServerBuilder().
+		WithConfig(config).
+		WithLogger(logger).
+		Build()
 
-	server := &serverImpl{
-		config:         config,
-		sessionManager: deps.sessionManager,
-		resourceStore:  resourceStore,
-		logger:         deps.logger,
-		startTime:      time.Now(),
+	if err != nil {
+		return nil, errors.New(errors.CodeInternalError, "server", "failed to build server with dependencies", err)
 	}
 
-	deps.logger.Info("MCP Server initialized successfully",
+	server.deps.Logger.Info("MCP Server initialized successfully",
 		"transport", config.TransportType,
 		"workspace_dir", config.WorkspaceDir,
 		"max_sessions", config.MaxSessions)
@@ -204,22 +179,22 @@ func NewServer(ctx context.Context, logger *slog.Logger, opts ...Option) (api.MC
 
 // Start starts the MCP server
 func (s *serverImpl) Start(ctx context.Context) error {
-	s.logger.Info("Starting Container Kit MCP Server",
-		"transport", s.config.TransportType,
-		"workspace_dir", s.config.WorkspaceDir,
-		"max_sessions", s.config.MaxSessions)
+	s.deps.Logger.Info("Starting Container Kit MCP Server",
+		"transport", s.deps.Config.TransportType,
+		"workspace_dir", s.deps.Config.WorkspaceDir,
+		"max_sessions", s.deps.Config.MaxSessions)
 
-	if err := s.sessionManager.StartCleanupRoutine(ctx); err != nil {
-		s.logger.Error("Failed to start cleanup routine", "error", err)
+	if err := s.deps.SessionManager.StartCleanupRoutine(ctx); err != nil {
+		s.deps.Logger.Error("Failed to start cleanup routine", "error", err)
 		return err
 	}
 
 	// Start resource store cleanup routine
-	s.resourceStore.StartCleanupRoutine(30*time.Minute, 24*time.Hour)
+	s.deps.ResourceStore.StartCleanupRoutine(30*time.Minute, 24*time.Hour)
 
 	// Initialize mcp-go server directly without manager abstraction
 	if !s.isMcpInitialized {
-		s.logger.Info("Initializing mcp-go server")
+		s.deps.Logger.Info("Initializing mcp-go server")
 
 		// Create mcp-go server with capabilities
 		s.mcpServer = server.NewMCPServer(
@@ -242,12 +217,12 @@ func (s *serverImpl) Start(ctx context.Context) error {
 
 		// Register chat modes for Copilot integration
 		if err := s.RegisterChatModes(); err != nil {
-			s.logger.Warn("Failed to register chat modes", "error", err)
+			s.deps.Logger.Warn("Failed to register chat modes", "error", err)
 			// Don't fail server startup for this
 		}
 
 		s.isMcpInitialized = true
-		s.logger.Info("MCP-GO server initialized successfully")
+		s.deps.Logger.Info("MCP-GO server initialized successfully")
 	}
 
 	// Use mcp-go server Serve method
@@ -259,10 +234,10 @@ func (s *serverImpl) Start(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		s.logger.Info("Server stopped by context cancellation")
+		s.deps.Logger.Info("Server stopped by context cancellation")
 		return ctx.Err()
 	case err := <-transportDone:
-		s.logger.Error("Transport stopped with error", "error", err)
+		s.deps.Logger.Error("Transport stopped with error", "error", err)
 		return err
 	}
 }
@@ -277,13 +252,13 @@ func (s *serverImpl) Shutdown(ctx context.Context) error {
 	}
 	s.isShuttingDown = true
 
-	s.logger.Info("Gracefully shutting down MCP Server")
+	s.deps.Logger.Info("Gracefully shutting down MCP Server")
 
 	// Stop session manager with context awareness
 	done := make(chan error, 1)
 	go func() {
-		if err := s.sessionManager.Stop(ctx); err != nil {
-			s.logger.Error("Failed to stop session manager", "error", err)
+		if err := s.deps.SessionManager.Stop(ctx); err != nil {
+			s.deps.Logger.Error("Failed to stop session manager", "error", err)
 			done <- err
 			return
 		}
@@ -293,7 +268,7 @@ func (s *serverImpl) Shutdown(ctx context.Context) error {
 	// Wait for shutdown or context cancellation
 	select {
 	case <-ctx.Done():
-		s.logger.Warn("Shutdown cancelled by context", "error", ctx.Err())
+		s.deps.Logger.Warn("Shutdown cancelled by context", "error", ctx.Err())
 		return ctx.Err()
 	case err := <-done:
 		if err != nil {
@@ -301,7 +276,7 @@ func (s *serverImpl) Shutdown(ctx context.Context) error {
 		}
 	}
 
-	s.logger.Info("MCP Server shutdown complete")
+	s.deps.Logger.Info("MCP Server shutdown complete")
 	return nil
 }
 
@@ -313,7 +288,7 @@ func (s *serverImpl) Stop(ctx context.Context) error {
 
 // EnableConversationMode enables conversation mode (workflow-focused server - no-op)
 func (s *serverImpl) EnableConversationMode(_ interface{}) error {
-	s.logger.Info("Conversation mode not supported in workflow-focused server")
+	s.deps.Logger.Info("Conversation mode not supported in workflow-focused server")
 	return nil
 }
 
@@ -334,21 +309,21 @@ func (s *serverImpl) GetStats() (interface{}, error) {
 		"uptime":            time.Since(s.startTime).String(),
 		"status":            "running",
 		"session_count":     s.getSessionCount(),
-		"transport_type":    s.config.TransportType,
+		"transport_type":    s.deps.Config.TransportType,
 		"conversation_mode": s.IsConversationModeEnabled(),
 	}, nil
 }
 
 // getSessionCount returns the current number of sessions
 func (s *serverImpl) getSessionCount() int {
-	if s.sessionManager == nil {
+	if s.deps.SessionManager == nil {
 		return 0
 	}
 
 	ctx := context.Background()
-	sessions, err := s.sessionManager.ListSessionsTyped(ctx)
+	sessions, err := s.deps.SessionManager.ListSessionsTyped(ctx)
 	if err != nil {
-		s.logger.Warn("Failed to get session count", "error", err)
+		s.deps.Logger.Warn("Failed to get session count", "error", err)
 		return 0
 	}
 
@@ -357,14 +332,14 @@ func (s *serverImpl) getSessionCount() int {
 
 // GetSessionManagerStats returns session manager statistics
 func (s *serverImpl) GetSessionManagerStats() (interface{}, error) {
-	if s.sessionManager != nil {
+	if s.deps.SessionManager != nil {
 		ctx := context.Background()
-		sessions, err := s.sessionManager.ListSessionsTyped(ctx)
+		sessions, err := s.deps.SessionManager.ListSessionsTyped(ctx)
 		if err != nil {
-			s.logger.Warn("Failed to get session list for stats", "error", err)
+			s.deps.Logger.Warn("Failed to get session list for stats", "error", err)
 			return map[string]interface{}{
 				"error":        "failed to retrieve session stats",
-				"max_sessions": s.config.MaxSessions,
+				"max_sessions": s.deps.Config.MaxSessions,
 			}, nil
 		}
 
@@ -379,7 +354,7 @@ func (s *serverImpl) GetSessionManagerStats() (interface{}, error) {
 		return map[string]interface{}{
 			"active_sessions": activeSessions,
 			"total_sessions":  len(sessions),
-			"max_sessions":    s.config.MaxSessions,
+			"max_sessions":    s.deps.Config.MaxSessions,
 		}, nil
 	}
 	return map[string]interface{}{

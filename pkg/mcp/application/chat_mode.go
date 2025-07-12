@@ -9,7 +9,7 @@ type ChatModeConfig struct {
 
 // RegisterChatModes registers custom chat modes for Copilot integration
 func (s *serverImpl) RegisterChatModes() error {
-	s.logger.Info("Chat mode support enabled via standard MCP protocol",
+	s.deps.Logger.Info("Chat mode support enabled via standard MCP protocol",
 		"available_tools", GetChatModeFunctions())
 
 	return nil

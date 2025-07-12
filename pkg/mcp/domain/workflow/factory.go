@@ -1,36 +1,18 @@
-// Package workflow provides progress manager constructor
+// Package workflow provides progress tracking for workflows
 package workflow
 
 import (
 	"context"
 	"log/slog"
 
+	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-// Manager defines the interface all progress managers must implement
-type Manager interface {
-	Begin(msg string)
-	Update(step int, msg string, metadata map[string]interface{})
-	Complete(msg string)
-	Finish()
+// NewProgressTracker creates a new progress tracker for workflow operations.
+func NewProgressTracker(ctx context.Context, req *mcp.CallToolRequest, totalSteps int, logger *slog.Logger) *progress.Tracker {
+	factory := progress.NewSinkFactory(logger)
+	traceID := generateTraceID()
 
-	// State getters
-	GetCurrent() int
-	SetCurrent(current int)
-	GetTotal() int
-	IsComplete() bool
-	GetTraceID() string
-
-	// Error budget methods
-	RecordError(err error) bool
-	RecordSuccess()
-	IsCircuitOpen() bool
-	GetErrorBudgetStatus() ErrorBudgetStatus
-	UpdateWithErrorHandling(step int, msg string, metadata map[string]interface{}, err error) bool
-}
-
-// NewManager creates a new progress manager
-func NewManager(ctx context.Context, req *mcp.CallToolRequest, totalSteps int, logger *slog.Logger) Manager {
-	return NewChannelManager(ctx, req, totalSteps, logger)
+	return factory.CreateTrackerForWorkflow(ctx, req, totalSteps, traceID)
 }
