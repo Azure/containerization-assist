@@ -1,5 +1,5 @@
-// Package elicitation provides MCP elicitation capabilities for gathering user input
-package elicitation
+// Elicitation provides MCP elicitation capabilities for gathering user input within workflows
+package workflow
 
 import (
 	"context"
@@ -11,16 +11,16 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// Client provides MCP elicitation capabilities
-type Client struct {
+// ElicitationClient provides MCP elicitation capabilities
+type ElicitationClient struct {
 	ctx     context.Context
 	logger  *slog.Logger
 	timeout time.Duration
 }
 
-// NewClient creates a new elicitation client
-func NewClient(ctx context.Context, logger *slog.Logger) *Client {
-	return &Client{
+// NewElicitationClient creates a new elicitation client
+func NewElicitationClient(ctx context.Context, logger *slog.Logger) *ElicitationClient {
+	return &ElicitationClient{
 		ctx:     ctx,
 		logger:  logger.With("component", "elicitation"),
 		timeout: 30 * time.Second, // Default timeout for user responses
@@ -71,7 +71,7 @@ type ValidationRules struct {
 }
 
 // Elicit requests input from the user through MCP elicitation
-func (c *Client) Elicit(ctx context.Context, request ElicitationRequest) (*ElicitationResponse, error) {
+func (c *ElicitationClient) Elicit(ctx context.Context, request ElicitationRequest) (*ElicitationResponse, error) {
 	c.logger.Debug("Eliciting user input",
 		"prompt", request.Prompt,
 		"type", request.Type,
@@ -91,7 +91,7 @@ func (c *Client) Elicit(ctx context.Context, request ElicitationRequest) (*Elici
 }
 
 // fallbackElicitation provides console-based elicitation when MCP is not available
-func (c *Client) fallbackElicitation(ctx context.Context, request ElicitationRequest) (*ElicitationResponse, error) {
+func (c *ElicitationClient) fallbackElicitation(ctx context.Context, request ElicitationRequest) (*ElicitationResponse, error) {
 	c.logger.Info("Using console fallback for elicitation",
 		"prompt", request.Prompt,
 		"type", request.Type)
@@ -163,7 +163,7 @@ func (c *Client) fallbackElicitation(ctx context.Context, request ElicitationReq
 }
 
 // getDefaultOrGenerate returns the default value or generates a reasonable value
-func (c *Client) getDefaultOrGenerate(request ElicitationRequest, fallback string) string {
+func (c *ElicitationClient) getDefaultOrGenerate(request ElicitationRequest, fallback string) string {
 	if request.Default != "" {
 		return request.Default
 	}
@@ -182,7 +182,7 @@ func (c *Client) getDefaultOrGenerate(request ElicitationRequest, fallback strin
 }
 
 // ValidateResponse validates a user response against the validation rules
-func (c *Client) ValidateResponse(value string, request ElicitationRequest) error {
+func (c *ElicitationClient) ValidateResponse(value string, request ElicitationRequest) error {
 	if request.Validation == nil {
 		return nil
 	}
@@ -226,7 +226,7 @@ func (c *Client) ValidateResponse(value string, request ElicitationRequest) erro
 }
 
 // ElicitMissingConfiguration elicits missing configuration values needed for containerization
-func (c *Client) ElicitMissingConfiguration(ctx context.Context, config map[string]interface{}) (map[string]interface{}, error) {
+func (c *ElicitationClient) ElicitMissingConfiguration(ctx context.Context, config map[string]interface{}) (map[string]interface{}, error) {
 	c.logger.Info("Eliciting missing configuration values")
 
 	result := make(map[string]interface{})
@@ -316,7 +316,7 @@ func (c *Client) ElicitMissingConfiguration(ctx context.Context, config map[stri
 }
 
 // ElicitDeploymentParameters elicits deployment-specific parameters
-func (c *Client) ElicitDeploymentParameters(ctx context.Context, currentParams map[string]interface{}) (map[string]interface{}, error) {
+func (c *ElicitationClient) ElicitDeploymentParameters(ctx context.Context, currentParams map[string]interface{}) (map[string]interface{}, error) {
 	c.logger.Info("Eliciting deployment parameters")
 
 	result := make(map[string]interface{})

@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
 	"github.com/mark3labs/mcp-go/server"
@@ -63,9 +66,17 @@ func WithLLMGuidedRetry(ctx context.Context, name string, max int, fn func() err
 
 		// If we can auto-fix, attempt to apply fixes
 		if analysis.CanAutoFix && len(analysis.FixSteps) > 0 {
-			logger.Info("Attempting automated fixes suggested by LLM")
-			// Note: Actual fix application would be operation-specific
-			// This is a hook for future enhancement
+			logger.Info("Attempting automated fixes suggested by LLM", "fix_count", len(analysis.FixSteps))
+
+			// Apply the suggested fixes
+			fixApplied, fixErr := applyAIFixSteps(ctx, name, analysis.FixSteps, logger)
+			if fixErr != nil {
+				logger.Warn("Failed to apply AI-suggested fixes", "error", fixErr)
+			} else if fixApplied {
+				logger.Info("AI fixes applied successfully, retrying operation")
+				// Short delay to allow fixes to take effect
+				time.Sleep(100 * time.Millisecond)
+			}
 		}
 
 		// Continue to next retry with LLM insights logged
@@ -317,4 +328,298 @@ func NewRetryableOperation(name string, maxRetries int, logger *slog.Logger) *Re
 		MaxRetries: maxRetries,
 		Logger:     logger,
 	}
+}
+
+// applyAIFixSteps applies AI-suggested fix steps to resolve common issues
+func applyAIFixSteps(ctx context.Context, operation string, fixSteps []string, logger *slog.Logger) (bool, error) {
+	logger.Info("Applying AI-suggested fixes", "operation", operation, "steps", len(fixSteps))
+
+	fixesApplied := false
+
+	for i, step := range fixSteps {
+		logger.Debug("Processing fix step", "step", i+1, "description", step)
+
+		applied, err := applySingleFixStep(ctx, step, logger)
+		if err != nil {
+			logger.Warn("Failed to apply fix step", "step", i+1, "error", err)
+			continue
+		}
+
+		if applied {
+			fixesApplied = true
+			logger.Info("Successfully applied fix step", "step", i+1, "description", step)
+		}
+	}
+
+	return fixesApplied, nil
+}
+
+// applySingleFixStep applies a single AI-suggested fix step
+func applySingleFixStep(ctx context.Context, step string, logger *slog.Logger) (bool, error) {
+	stepLower := strings.ToLower(step)
+
+	// File-based fixes
+	if strings.Contains(stepLower, "dockerfile") && strings.Contains(stepLower, "base image") {
+		return applyDockerfileBaseFix(step, logger)
+	}
+
+	if strings.Contains(stepLower, "dockerfile") && strings.Contains(stepLower, "maven") {
+		return applyMavenDockerfileFix(step, logger)
+	}
+
+	if strings.Contains(stepLower, "dockerfile") && strings.Contains(stepLower, "gradle") {
+		return applyGradleDockerfileFix(step, logger)
+	}
+
+	if strings.Contains(stepLower, "port") && strings.Contains(stepLower, "expose") {
+		return applyPortExposeFix(step, logger)
+	}
+
+	// Environment/configuration fixes
+	if strings.Contains(stepLower, "environment") || strings.Contains(stepLower, "env") {
+		return applyEnvironmentFix(step, logger)
+	}
+
+	// Path and permission fixes
+	if strings.Contains(stepLower, "permission") || strings.Contains(stepLower, "chmod") {
+		return applyPermissionFix(step, logger)
+	}
+
+	// Log that we couldn't automatically apply this fix
+	logger.Debug("Fix step not automatically applicable", "step", step)
+	return false, nil
+}
+
+// applyDockerfileBaseFix applies fixes to Dockerfile base image issues
+func applyDockerfileBaseFix(step string, logger *slog.Logger) (bool, error) {
+	dockerfilePath := "./Dockerfile"
+	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
+		logger.Debug("Dockerfile not found, cannot apply base image fix")
+		return false, nil
+	}
+
+	content, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to read Dockerfile: %w", err)
+	}
+
+	original := string(content)
+	updated := original
+
+	// Common base image fixes
+	if strings.Contains(step, "maven") {
+		// Replace basic java images with Maven-enabled ones
+		updated = regexp.MustCompile(`(?i)FROM\s+openjdk:[0-9]+-jdk`).ReplaceAllString(updated, "FROM maven:3.9-eclipse-temurin-17")
+		updated = regexp.MustCompile(`(?i)FROM\s+eclipse-temurin:[0-9]+-jdk`).ReplaceAllString(updated, "FROM maven:3.9-eclipse-temurin-17")
+	}
+
+	if strings.Contains(step, "gradle") {
+		// Replace basic java images with Gradle-enabled ones
+		updated = regexp.MustCompile(`(?i)FROM\s+openjdk:[0-9]+-jdk`).ReplaceAllString(updated, "FROM gradle:8-jdk17")
+		updated = regexp.MustCompile(`(?i)FROM\s+eclipse-temurin:[0-9]+-jdk`).ReplaceAllString(updated, "FROM gradle:8-jdk17")
+	}
+
+	if updated != original {
+		err = os.WriteFile(dockerfilePath, []byte(updated), 0644)
+		if err != nil {
+			return false, fmt.Errorf("failed to write updated Dockerfile: %w", err)
+		}
+		logger.Info("Applied Dockerfile base image fix", "file", dockerfilePath)
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// applyMavenDockerfileFix adds Maven installation to Dockerfile
+func applyMavenDockerfileFix(step string, logger *slog.Logger) (bool, error) {
+	dockerfilePath := "./Dockerfile"
+	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
+		logger.Debug("Dockerfile not found, cannot apply Maven fix")
+		return false, nil
+	}
+
+	content, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to read Dockerfile: %w", err)
+	}
+
+	original := string(content)
+
+	// Check if Maven is already installed
+	if strings.Contains(original, "maven") || strings.Contains(original, "mvn") {
+		logger.Debug("Maven already present in Dockerfile")
+		return false, nil
+	}
+
+	// Add Maven installation after FROM line
+	lines := strings.Split(original, "\n")
+	var updated []string
+
+	for i, line := range lines {
+		updated = append(updated, line)
+
+		// Add Maven installation after FROM line
+		if strings.HasPrefix(strings.TrimSpace(strings.ToUpper(line)), "FROM") && i < len(lines)-1 {
+			updated = append(updated, "")
+			updated = append(updated, "# Install Maven")
+			updated = append(updated, "RUN apt-get update && apt-get install -y maven && rm -rf /var/lib/apt/lists/*")
+			updated = append(updated, "")
+		}
+	}
+
+	newContent := strings.Join(updated, "\n")
+
+	err = os.WriteFile(dockerfilePath, []byte(newContent), 0644)
+	if err != nil {
+		return false, fmt.Errorf("failed to write updated Dockerfile: %w", err)
+	}
+
+	logger.Info("Applied Maven installation fix to Dockerfile", "file", dockerfilePath)
+	return true, nil
+}
+
+// applyGradleDockerfileFix adds Gradle installation to Dockerfile
+func applyGradleDockerfileFix(step string, logger *slog.Logger) (bool, error) {
+	dockerfilePath := "./Dockerfile"
+	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
+		logger.Debug("Dockerfile not found, cannot apply Gradle fix")
+		return false, nil
+	}
+
+	content, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to read Dockerfile: %w", err)
+	}
+
+	original := string(content)
+
+	// Check if Gradle is already installed
+	if strings.Contains(original, "gradle") {
+		logger.Debug("Gradle already present in Dockerfile")
+		return false, nil
+	}
+
+	// Add Gradle installation after FROM line
+	lines := strings.Split(original, "\n")
+	var updated []string
+
+	for i, line := range lines {
+		updated = append(updated, line)
+
+		// Add Gradle installation after FROM line
+		if strings.HasPrefix(strings.TrimSpace(strings.ToUpper(line)), "FROM") && i < len(lines)-1 {
+			updated = append(updated, "")
+			updated = append(updated, "# Install Gradle")
+			updated = append(updated, "RUN apt-get update && \\")
+			updated = append(updated, "    apt-get install -y wget unzip && \\")
+			updated = append(updated, "    wget -q https://services.gradle.org/distributions/gradle-8.0-bin.zip && \\")
+			updated = append(updated, "    unzip gradle-8.0-bin.zip -d /opt && \\")
+			updated = append(updated, "    ln -s /opt/gradle-8.0/bin/gradle /usr/bin/gradle && \\")
+			updated = append(updated, "    rm gradle-8.0-bin.zip && \\")
+			updated = append(updated, "    rm -rf /var/lib/apt/lists/*")
+			updated = append(updated, "")
+		}
+	}
+
+	newContent := strings.Join(updated, "\n")
+
+	err = os.WriteFile(dockerfilePath, []byte(newContent), 0644)
+	if err != nil {
+		return false, fmt.Errorf("failed to write updated Dockerfile: %w", err)
+	}
+
+	logger.Info("Applied Gradle installation fix to Dockerfile", "file", dockerfilePath)
+	return true, nil
+}
+
+// applyPortExposeFix adds EXPOSE directive to Dockerfile
+func applyPortExposeFix(step string, logger *slog.Logger) (bool, error) {
+	dockerfilePath := "./Dockerfile"
+	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
+		logger.Debug("Dockerfile not found, cannot apply port expose fix")
+		return false, nil
+	}
+
+	// Extract port number from the fix step
+	portRegex := regexp.MustCompile(`\b(\d{4,5})\b`)
+	matches := portRegex.FindStringSubmatch(step)
+	port := "8080" // default
+	if len(matches) > 1 {
+		port = matches[1]
+	}
+
+	content, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to read Dockerfile: %w", err)
+	}
+
+	original := string(content)
+
+	// Check if EXPOSE is already present
+	if strings.Contains(original, "EXPOSE") {
+		logger.Debug("EXPOSE directive already present in Dockerfile")
+		return false, nil
+	}
+
+	// Add EXPOSE directive before CMD/ENTRYPOINT
+	lines := strings.Split(original, "\n")
+	var updated []string
+	exposeAdded := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(strings.ToUpper(line))
+
+		// Add EXPOSE before CMD or ENTRYPOINT
+		if (strings.HasPrefix(trimmed, "CMD") || strings.HasPrefix(trimmed, "ENTRYPOINT")) && !exposeAdded {
+			updated = append(updated, "")
+			updated = append(updated, fmt.Sprintf("EXPOSE %s", port))
+			updated = append(updated, "")
+			exposeAdded = true
+		}
+
+		updated = append(updated, line)
+	}
+
+	// If no CMD/ENTRYPOINT found, add EXPOSE at the end
+	if !exposeAdded {
+		updated = append(updated, "")
+		updated = append(updated, fmt.Sprintf("EXPOSE %s", port))
+	}
+
+	newContent := strings.Join(updated, "\n")
+
+	err = os.WriteFile(dockerfilePath, []byte(newContent), 0644)
+	if err != nil {
+		return false, fmt.Errorf("failed to write updated Dockerfile: %w", err)
+	}
+
+	logger.Info("Applied port expose fix to Dockerfile", "file", dockerfilePath, "port", port)
+	return true, nil
+}
+
+// applyEnvironmentFix applies environment variable fixes
+func applyEnvironmentFix(step string, logger *slog.Logger) (bool, error) {
+	// For now, just log the suggestion - environment fixes are context-specific
+	logger.Info("Environment fix suggested (manual intervention required)", "suggestion", step)
+	return false, nil
+}
+
+// applyPermissionFix applies file permission fixes
+func applyPermissionFix(step string, logger *slog.Logger) (bool, error) {
+	// Common permission fixes for build scripts
+	scriptPaths := []string{"./gradlew", "./mvnw", "./build.sh", "./entrypoint.sh"}
+
+	fixesApplied := false
+	for _, path := range scriptPaths {
+		if _, err := os.Stat(path); err == nil {
+			// Make script executable
+			if err := os.Chmod(path, 0755); err == nil {
+				logger.Info("Applied permission fix", "file", path, "mode", "0755")
+				fixesApplied = true
+			}
+		}
+	}
+
+	return fixesApplied, nil
 }

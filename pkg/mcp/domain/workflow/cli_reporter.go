@@ -1,5 +1,5 @@
-// Package progress provides CLI-based progress reporting
-package progress
+// Package workflow provides CLI-based progress reporting
+package workflow
 
 import (
 	"context"

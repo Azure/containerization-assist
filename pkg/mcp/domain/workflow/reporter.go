@@ -1,5 +1,5 @@
-// Package progress provides unified progress reporting interfaces
-package progress
+// Package workflow provides unified progress reporting interfaces
+package workflow
 
 import (
 	"context"

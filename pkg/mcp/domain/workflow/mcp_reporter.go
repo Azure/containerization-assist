@@ -1,5 +1,5 @@
-// Package progress provides MCP-based progress reporting
-package progress
+// Package workflow provides MCP-based progress reporting
+package workflow
 
 import (
 	"context"

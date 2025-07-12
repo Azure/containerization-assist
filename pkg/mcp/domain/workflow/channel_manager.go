@@ -1,11 +1,12 @@
-// Package progress provides a channel-based progress manager
-package progress
+// Package workflow provides a channel-based progress manager
+package workflow
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/security"
@@ -21,6 +22,7 @@ const (
 	updateTypeProgress
 	updateTypeComplete
 	updateTypeHeartbeat
+	updateTypeQuery
 )
 
 // update represents a progress update to be processed
@@ -49,6 +51,9 @@ type ChannelManager struct {
 	// Configuration
 	minUpdateInterval time.Duration
 	heartbeatInterval time.Duration
+
+	// Atomic current value for thread-safe access
+	currentAtomic int64
 
 	// State (only accessed in renderer goroutine)
 	state *managerState
@@ -93,6 +98,7 @@ func NewChannelManager(ctx context.Context, req *mcp.CallToolRequest, totalSteps
 		done:              make(chan struct{}),
 		minUpdateInterval: 100 * time.Millisecond,
 		heartbeatInterval: 15 * time.Second,
+		currentAtomic:     0, // Initialize atomic value
 		state: &managerState{
 			startTime:     time.Now(),
 			lastUpdate:    time.Now(),
@@ -133,7 +139,9 @@ func (m *ChannelManager) renderer() {
 				m.handleBegin(upd)
 
 			case updateTypeProgress:
-				// Apply throttling
+				// Atomic value is already updated in Update() method
+
+				// Apply throttling for actual progress reporting
 				if m.shouldThrottle(upd) {
 					pendingUpdate = &upd
 					delay := m.minUpdateInterval - time.Since(m.state.lastUpdate)
@@ -153,6 +161,9 @@ func (m *ChannelManager) renderer() {
 
 			case updateTypeHeartbeat:
 				m.handleHeartbeat()
+
+			case updateTypeQuery:
+				m.handleQuery(upd)
 			}
 
 		case <-heartbeatTicker.C:
@@ -183,6 +194,9 @@ func (m *ChannelManager) Begin(msg string) {
 
 // Update advances progress
 func (m *ChannelManager) Update(step int, msg string, metadata map[string]interface{}) {
+	// Update atomic value immediately for thread-safe access
+	atomic.StoreInt64(&m.currentAtomic, int64(step))
+
 	select {
 	case m.updateCh <- update{
 		Type:     updateTypeProgress,
@@ -225,6 +239,9 @@ func (m *ChannelManager) handleProgress(upd update) {
 	m.state.current = upd.Step
 	m.state.lastUpdate = time.Now()
 
+	// Atomic value is already updated in the renderer main loop
+	// No need to update it again here
+
 	// Track step duration
 	if upd.Step > oldCurrent && upd.Metadata != nil {
 		if stepName, ok := upd.Metadata["step_name"].(string); ok {
@@ -261,6 +278,37 @@ func (m *ChannelManager) handleHeartbeat() {
 		m.logger.Warn("Failed to send heartbeat", "error", err)
 	}
 	m.state.lastUpdate = time.Now()
+}
+
+func (m *ChannelManager) handleQuery(upd update) {
+	if upd.Metadata == nil {
+		m.logger.Debug("Query received but no metadata")
+		return
+	}
+
+	query, ok := upd.Metadata["query"].(string)
+	if !ok {
+		m.logger.Debug("Query metadata missing or invalid")
+		return
+	}
+
+	m.logger.Debug("Handling query", "query", query, "current", m.state.current)
+
+	switch query {
+	case "current":
+		if respCh, ok := upd.Metadata["response"].(chan int); ok {
+			select {
+			case respCh <- m.state.current:
+				m.logger.Debug("Sent current value", "value", m.state.current)
+			default:
+				m.logger.Debug("Failed to send current value - receiver gone")
+			}
+		} else {
+			m.logger.Debug("Response channel not found or invalid type")
+		}
+	default:
+		m.logger.Debug("Unknown query type", "query", query)
+	}
 }
 
 // Helper methods
@@ -334,30 +382,7 @@ func (m *ChannelManager) logProgress(step int, message string, metadata map[stri
 
 // GetCurrent returns the current step (thread-safe)
 func (m *ChannelManager) GetCurrent() int {
-	// Send a query through channel to get consistent state
-	type response struct{ current int }
-	respCh := make(chan response, 1)
-
-	// Create a custom query update type
-	query := update{
-		Type: updateType(999), // Special query type
-		Metadata: map[string]interface{}{
-			"query":    "current",
-			"response": respCh,
-		},
-	}
-
-	select {
-	case m.updateCh <- query:
-		select {
-		case resp := <-respCh:
-			return resp.current
-		case <-time.After(100 * time.Millisecond):
-			return 0 // Timeout fallback
-		}
-	default:
-		return 0 // Channel full fallback
-	}
+	return int(atomic.LoadInt64(&m.currentAtomic))
 }
 
 // SetCurrent sets the current step (thread-safe)

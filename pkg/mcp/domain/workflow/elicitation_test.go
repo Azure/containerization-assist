@@ -1,4 +1,4 @@
-package elicitation
+package workflow
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 // TestElicitationClient tests the basic elicitation client functionality
 func TestElicitationClient(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	client := NewClient(nil, logger) // nil context forces fallback mode
+	client := NewElicitationClient(nil, logger) // nil context forces fallback mode
 
 	t.Run("text elicitation with default", func(t *testing.T) {
 		request := ElicitationRequest{
@@ -73,7 +73,7 @@ func TestElicitationValidation(t *testing.T) {
 
 	t.Run("required validation", func(t *testing.T) {
 		// Test the validateResponse method directly since Elicit always provides defaults
-		client := NewClient(nil, logger)
+		client := NewElicitationClient(nil, logger)
 
 		request := ElicitationRequest{
 			Prompt:   "Enter required value:",
@@ -91,7 +91,7 @@ func TestElicitationValidation(t *testing.T) {
 	})
 
 	t.Run("length validation", func(t *testing.T) {
-		client := NewClient(nil, logger)
+		client := NewElicitationClient(nil, logger)
 
 		// Test minimum length
 		err := client.ValidateResponse("ab", ElicitationRequest{
@@ -113,7 +113,7 @@ func TestElicitationValidation(t *testing.T) {
 	})
 
 	t.Run("allowed keys validation", func(t *testing.T) {
-		client := NewClient(nil, logger)
+		client := NewElicitationClient(nil, logger)
 
 		err := client.ValidateResponse("invalid", ElicitationRequest{
 			Validation: &ValidationRules{
@@ -136,7 +136,7 @@ func TestElicitationValidation(t *testing.T) {
 // TestElicitMissingConfiguration tests configuration elicitation
 func TestElicitMissingConfiguration(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	client := NewClient(nil, logger)
+	client := NewElicitationClient(nil, logger)
 
 	t.Run("elicit missing values", func(t *testing.T) {
 		initialConfig := map[string]interface{}{
@@ -182,7 +182,7 @@ func TestElicitMissingConfiguration(t *testing.T) {
 // TestElicitDeploymentParameters tests deployment parameter elicitation
 func TestElicitDeploymentParameters(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	client := NewClient(nil, logger)
+	client := NewElicitationClient(nil, logger)
 
 	t.Run("elicit deployment parameters", func(t *testing.T) {
 		initialParams := map[string]interface{}{
@@ -208,7 +208,7 @@ func TestElicitDeploymentParameters(t *testing.T) {
 // TestElicitationTypes tests different elicitation types
 func TestElicitationTypes(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	client := NewClient(nil, logger)
+	client := NewElicitationClient(nil, logger)
 
 	testCases := []struct {
 		name         string
@@ -243,7 +243,7 @@ func TestElicitationTypes(t *testing.T) {
 // TestElicitationWithContext tests context-aware elicitation
 func TestElicitationWithContext(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	client := NewClient(nil, logger)
+	client := NewElicitationClient(nil, logger)
 
 	t.Run("context provides workspace name", func(t *testing.T) {
 		request := ElicitationRequest{
@@ -277,7 +277,7 @@ func TestElicitationWithContext(t *testing.T) {
 // TestElicitationTimeout tests timeout handling
 func TestElicitationTimeout(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	client := NewClient(nil, logger)
+	client := NewElicitationClient(nil, logger)
 
 	t.Run("custom timeout", func(t *testing.T) {
 		request := ElicitationRequest{
@@ -296,7 +296,7 @@ func TestElicitationTimeout(t *testing.T) {
 // BenchmarkElicitationOperations benchmarks elicitation operations
 func BenchmarkElicitationOperations(b *testing.B) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	client := NewClient(nil, logger)
+	client := NewElicitationClient(nil, logger)
 
 	b.Run("simple text elicitation", func(b *testing.B) {
 		request := ElicitationRequest{

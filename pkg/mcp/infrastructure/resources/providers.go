@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
+	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/security"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -18,7 +18,7 @@ import (
 
 // Store manages workflow progress and logs
 type Store struct {
-	progressData map[string]*progress.WorkflowProgress
+	progressData map[string]*workflow.WorkflowProgress
 	logData      map[string]map[string][]string // workflowID -> stepName -> logs
 	mu           sync.RWMutex
 	logger       *slog.Logger
@@ -28,7 +28,7 @@ type Store struct {
 // NewStore creates a new resource store
 func NewStore(logger *slog.Logger) *Store {
 	return &Store{
-		progressData: make(map[string]*progress.WorkflowProgress),
+		progressData: make(map[string]*workflow.WorkflowProgress),
 		logData:      make(map[string]map[string][]string),
 		logger:       logger.With("component", "resource-store"),
 		maxLogSize:   4096, // 4KB max per log resource
@@ -238,7 +238,7 @@ func (s *Store) GetWorkflowListAsResource() (interface{}, error) {
 }
 
 // StoreProgress stores workflow progress data
-func (s *Store) StoreProgress(workflowID string, progressData *progress.WorkflowProgress) {
+func (s *Store) StoreProgress(workflowID string, progressData *workflow.WorkflowProgress) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -272,7 +272,7 @@ func (s *Store) StoreLogs(workflowID, stepName string, logs []string) {
 }
 
 // GetProgress retrieves workflow progress
-func (s *Store) GetProgress(workflowID string) (*progress.WorkflowProgress, bool) {
+func (s *Store) GetProgress(workflowID string) (*workflow.WorkflowProgress, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

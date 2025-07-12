@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/retry"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps"
@@ -156,7 +155,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 
 	// Create unified progress manager
 	totalSteps := 10
-	progressMgr := progress.New(ctx, req, totalSteps, logger)
+	progressMgr := NewManager(ctx, req, totalSteps, logger)
 	defer progressMgr.Finish()
 
 	// Begin progress tracking
@@ -164,7 +163,7 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 
 	// Create workflow progress tracker
 	workflowID := fmt.Sprintf("workflow-%d", time.Now().Unix())
-	workflowProgress := progress.NewWorkflowProgress(workflowID, "containerize_and_deploy", totalSteps)
+	workflowProgress := NewWorkflowProgress(workflowID, "containerize_and_deploy", totalSteps)
 
 	currentStep := 0
 	updateProgress := func() (int, string) {
@@ -458,12 +457,12 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 }
 
 // executeStep runs a workflow step and tracks its execution
-func executeStep(result *ContainerizeAndDeployResult, stepName string, stepFunc func() error, progressFunc func() (int, string), message string, progressMgr *progress.Manager, workflowProgress *progress.WorkflowProgress) error {
+func executeStep(result *ContainerizeAndDeployResult, stepName string, stepFunc func() error, progressFunc func() (int, string), message string, progressMgr Manager, workflowProgress *WorkflowProgress) error {
 	startTime := time.Now()
 	percentage, progressStr := progressFunc()
 
 	// Create step info
-	stepInfo := progress.NewStepInfo(stepName, message, progressMgr.GetCurrent(), progressMgr.GetTotal())
+	stepInfo := NewStepInfo(stepName, message, progressMgr.GetCurrent(), progressMgr.GetTotal())
 	workflowProgress.AddStep(stepInfo)
 
 	step := WorkflowStep{
@@ -500,12 +499,12 @@ func executeStep(result *ContainerizeAndDeployResult, stepName string, stepFunc 
 }
 
 // executeStepWithRetry runs a workflow step with AI-powered retry logic
-func executeStepWithRetry(ctx context.Context, result *ContainerizeAndDeployResult, stepName string, maxRetries int, stepFunc func() error, logger *slog.Logger, progressFunc func() (int, string), message string, progressMgr *progress.Manager, workflowProgress *progress.WorkflowProgress) error {
+func executeStepWithRetry(ctx context.Context, result *ContainerizeAndDeployResult, stepName string, maxRetries int, stepFunc func() error, logger *slog.Logger, progressFunc func() (int, string), message string, progressMgr Manager, workflowProgress *WorkflowProgress) error {
 	startTime := time.Now()
 	percentage, progressStr := progressFunc()
 
 	// Create step info
-	stepInfo := progress.NewStepInfo(stepName, message, progressMgr.GetCurrent(), progressMgr.GetTotal())
+	stepInfo := NewStepInfo(stepName, message, progressMgr.GetCurrent(), progressMgr.GetTotal())
 	workflowProgress.AddStep(stepInfo)
 
 	step := WorkflowStep{
@@ -707,13 +706,13 @@ func scanImageForVulnerabilities(ctx context.Context, buildResult *steps.BuildRe
 }
 
 // executeDockerBuildWithAIFix executes the Docker build step with AI-powered Dockerfile fixing
-func executeDockerBuildWithAIFix(ctx context.Context, result *ContainerizeAndDeployResult, dockerfileResult *steps.DockerfileResult, analyzeResult *steps.AnalyzeResult, args *ContainerizeAndDeployArgs, logger *slog.Logger, progressFunc func() (int, string), progressMgr *progress.Manager, workflowProgress *progress.WorkflowProgress) (*steps.BuildResult, error) {
+func executeDockerBuildWithAIFix(ctx context.Context, result *ContainerizeAndDeployResult, dockerfileResult *steps.DockerfileResult, analyzeResult *steps.AnalyzeResult, args *ContainerizeAndDeployArgs, logger *slog.Logger, progressFunc func() (int, string), progressMgr Manager, workflowProgress *WorkflowProgress) (*steps.BuildResult, error) {
 	startTime := time.Now()
 	percentage, progressStr := progressFunc()
 	maxRetries := 2
 
 	// Create step info
-	stepInfo := progress.NewStepInfo("build_image", "Building Docker image with AI-powered error fixing", progressMgr.GetCurrent()+1, progressMgr.GetTotal())
+	stepInfo := NewStepInfo("build_image", "Building Docker image with AI-powered error fixing", progressMgr.GetCurrent()+1, progressMgr.GetTotal())
 	workflowProgress.AddStep(stepInfo)
 
 	step := WorkflowStep{
@@ -838,13 +837,13 @@ func executeDockerBuildWithAIFix(ctx context.Context, result *ContainerizeAndDep
 }
 
 // executeDeployWithAIFix executes Kubernetes deployment with AI-powered manifest fixing
-func executeDeployWithAIFix(ctx context.Context, result *ContainerizeAndDeployResult, k8sResult *steps.K8sResult, dockerfileResult *steps.DockerfileResult, analyzeResult *steps.AnalyzeResult, logger *slog.Logger, progressFunc func() (int, string), progressMgr *progress.Manager, workflowProgress *progress.WorkflowProgress) error {
+func executeDeployWithAIFix(ctx context.Context, result *ContainerizeAndDeployResult, k8sResult *steps.K8sResult, dockerfileResult *steps.DockerfileResult, analyzeResult *steps.AnalyzeResult, logger *slog.Logger, progressFunc func() (int, string), progressMgr Manager, workflowProgress *WorkflowProgress) error {
 	startTime := time.Now()
 	percentage, progressStr := progressFunc()
 	maxRetries := 2
 
 	// Create step info
-	stepInfo := progress.NewStepInfo("deploy_to_k8s", "Deploying application to Kubernetes cluster", progressMgr.GetCurrent(), progressMgr.GetTotal())
+	stepInfo := NewStepInfo("deploy_to_k8s", "Deploying application to Kubernetes cluster", progressMgr.GetCurrent(), progressMgr.GetTotal())
 	workflowProgress.AddStep(stepInfo)
 
 	step := WorkflowStep{
