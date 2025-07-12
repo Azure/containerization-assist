@@ -545,7 +545,7 @@ func (suite *MCPWorkflowIntegrationSuite) sendMCPRequest(stdin io.WriteCloser, s
 
 		// Log non-JSON lines for debugging
 		suite.T().Logf("Server output: %s", line)
-		
+
 		// Check for progress indicators
 		if strings.Contains(line, "[BEGIN]") || strings.Contains(line, "Step") || strings.Contains(line, "[COMPLETE]") {
 			suite.T().Logf("Progress: %s", line)
