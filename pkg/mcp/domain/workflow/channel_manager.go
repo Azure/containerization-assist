@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/security"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/utilities"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -369,12 +369,12 @@ func (m *ChannelManager) calculateETA() time.Duration {
 }
 
 func (m *ChannelManager) logProgress(step int, message string, metadata map[string]interface{}) {
-	maskedMetadata := security.MaskMap(metadata)
+	maskedMetadata := utilities.MaskMap(metadata)
 	m.logger.Debug("Progress update",
 		"step", step,
 		"total", m.total,
 		"percentage", metadata["percentage"],
-		"message", security.Mask(message),
+		"message", utilities.Mask(message),
 		"metadata", maskedMetadata)
 }
 
@@ -436,17 +436,21 @@ func (m *ChannelManager) UpdateWithErrorHandling(step int, msg string, metadata 
 	}
 
 	if err != nil {
-		if !m.RecordError(err) {
+		withinBudget := m.RecordError(err)
+		if !withinBudget {
 			metadata["error_budget_exceeded"] = true
 			metadata["circuit_open"] = true
 		}
 		metadata["error"] = err.Error()
 		metadata["status"] = "failed"
+
+		m.Update(step, msg, metadata)
+		return withinBudget // Return true if within error budget, false if budget exceeded
 	} else {
 		m.RecordSuccess()
 		metadata["status"] = "completed"
-	}
 
-	m.Update(step, msg, metadata)
-	return err == nil && !m.IsCircuitOpen()
+		m.Update(step, msg, metadata)
+		return true // Success case always returns true
+	}
 }

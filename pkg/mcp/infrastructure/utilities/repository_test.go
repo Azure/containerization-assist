@@ -1,4 +1,4 @@
-package analysis
+package utilities
 
 import (
 	"encoding/json"

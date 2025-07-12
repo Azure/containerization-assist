@@ -54,7 +54,7 @@ func TestManagerInterface(t *testing.T) {
 		// Test error handling in updates
 		err2 := errors.New("test error 2")
 		success := m.UpdateWithErrorHandling(1, "Step with error", nil, err2)
-		assert.False(t, success) // Should return false due to error
+		assert.True(t, success) // Should return true when within error budget
 
 		// Test successful update
 		success = m.UpdateWithErrorHandling(2, "Successful step", nil, nil)

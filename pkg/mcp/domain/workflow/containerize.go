@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/retry"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/utilities"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rs/zerolog"
@@ -523,7 +523,7 @@ func executeStepWithRetry(ctx context.Context, result *ContainerizeAndDeployResu
 	progressMgr.Update(progressMgr.GetCurrent(), message, metadata)
 
 	// Execute the step with AI retry
-	err := retry.WithAIRetry(ctx, stepName, maxRetries, stepFunc, logger)
+	err := utilities.WithAIRetry(ctx, stepName, maxRetries, stepFunc, logger)
 	step.Duration = time.Since(startTime).String()
 
 	if err != nil {

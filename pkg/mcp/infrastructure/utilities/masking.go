@@ -1,5 +1,4 @@
-// Package security provides security-related utilities for the MCP server
-package security
+package utilities
 
 import (
 	"os"

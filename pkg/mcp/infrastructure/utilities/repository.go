@@ -1,7 +1,6 @@
-// Package analysis provides core repository analysis operations extracted from the Container Kit pipeline.
-// This package contains mechanical analysis operations without AI dependencies,
-// designed to be used by atomic MCP tools.
-package analysis
+// Package utilities provides core utility functions including repository analysis,
+// security masking, and AI-powered retry operations.
+package utilities
 
 import (
 	"encoding/json"

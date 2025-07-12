@@ -500,7 +500,8 @@ func (c *MetricsCollector) GetHealthStatus() map[string]interface{} {
 		issues = append(issues, "high latency")
 	}
 
-	if successRate < 0.8 || avgLatency > 10000.0 {
+	// Only set to unhealthy for severe conditions
+	if successRate < 0.5 || avgLatency > 10000.0 {
 		status = "unhealthy"
 	}
 

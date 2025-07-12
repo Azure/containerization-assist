@@ -110,15 +110,21 @@ public class Main {
 
 		// Parse the result
 		var toolResult struct {
-			Content []struct {
-				Type string `json:"type"`
-				Text string `json:"text"`
-			} `json:"content"`
+			Result struct {
+				Content []struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				} `json:"content"`
+			} `json:"result"`
 		}
 
 		resultBytes, err := json.Marshal(result)
 		require.NoError(t, err)
 		require.NoError(t, json.Unmarshal(resultBytes, &toolResult))
+
+		// Check that we have content
+		require.NotEmpty(t, toolResult.Result.Content, "Expected content in tool result")
+		require.Greater(t, len(toolResult.Result.Content), 0, "Expected at least one content item")
 
 		// Parse the workflow result
 		var workflowResult struct {
@@ -132,7 +138,7 @@ public class Main {
 			} `json:"steps"`
 		}
 
-		require.NoError(t, json.Unmarshal([]byte(toolResult.Content[0].Text), &workflowResult))
+		require.NoError(t, json.Unmarshal([]byte(toolResult.Result.Content[0].Text), &workflowResult))
 
 		// Check that the workflow succeeded
 		assert.True(t, workflowResult.Success, "Workflow should succeed")

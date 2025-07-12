@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/security"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/utilities"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -23,6 +23,8 @@ type Store struct {
 	mu           sync.RWMutex
 	logger       *slog.Logger
 	maxLogSize   int
+	cleanupStop  chan struct{}
+	lastCleanup  time.Time
 }
 
 // NewStore creates a new resource store
@@ -177,7 +179,7 @@ func (s *Store) GetProgressAsResource(workflowID string) (interface{}, error) {
 	}
 
 	// Mask sensitive data before returning
-	maskedResult := security.MaskMap(result)
+	maskedResult := utilities.MaskMap(result)
 
 	return maskedResult, nil
 }
@@ -200,7 +202,7 @@ func (s *Store) GetLogsAsResource(workflowID, stepName string) (interface{}, err
 
 	// Combine logs and mask sensitive data
 	combinedLogs := strings.Join(stepLogs, "\n")
-	maskedLogs := security.Mask(combinedLogs)
+	maskedLogs := utilities.Mask(combinedLogs)
 
 	// Tail last maxLogSize bytes for quick-peek in chat
 	if len(maskedLogs) > s.maxLogSize {
@@ -313,16 +315,60 @@ func (s *Store) CleanupOldData(maxAge time.Duration) {
 
 // StartCleanupRoutine starts a background cleanup routine
 func (s *Store) StartCleanupRoutine(cleanupInterval, maxAge time.Duration) {
+	s.mu.Lock()
+	s.cleanupStop = make(chan struct{})
+	s.lastCleanup = time.Now()
+	s.mu.Unlock()
+
 	go func() {
 		ticker := time.NewTicker(cleanupInterval)
 		defer ticker.Stop()
 
-		for range ticker.C {
-			s.CleanupOldData(maxAge)
+		for {
+			select {
+			case <-ticker.C:
+				s.CleanupOldData(maxAge)
+				s.mu.Lock()
+				s.lastCleanup = time.Now()
+				s.mu.Unlock()
+			case <-s.cleanupStop:
+				return
+			}
 		}
 	}()
 
 	s.logger.Info("Started resource cleanup routine",
 		"interval", cleanupInterval,
 		"max_age", maxAge)
+}
+
+// StopCleanupRoutine stops the background cleanup routine
+func (s *Store) StopCleanupRoutine() {
+	s.mu.Lock()
+	if s.cleanupStop != nil {
+		close(s.cleanupStop)
+		s.cleanupStop = nil
+	}
+	s.mu.Unlock()
+
+	s.logger.Info("Stopped resource cleanup routine")
+}
+
+// GetResourceCount returns the total number of resources
+func (s *Store) GetResourceCount() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	count := len(s.progressData)
+	for _, logs := range s.logData {
+		count += len(logs)
+	}
+	return count
+}
+
+// GetLastCleanupTime returns the last cleanup time
+func (s *Store) GetLastCleanupTime() time.Time {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.lastCleanup
 }

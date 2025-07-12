@@ -18,6 +18,7 @@ type SessionManager interface {
 	UpdateJobStatus(ctx context.Context, sessionID, jobID string, status JobStatus, result interface{}, err error) error
 	StartCleanupRoutine(ctx context.Context) error
 	Stop(ctx context.Context) error
+	GetStats() (*SessionStats, error)
 }
 
 // SessionState represents a session's state
@@ -48,3 +49,10 @@ const (
 	JobStatusCompleted JobStatus = "completed"
 	JobStatusFailed    JobStatus = "failed"
 )
+
+// SessionStats represents session statistics
+type SessionStats struct {
+	ActiveSessions int
+	TotalSessions  int
+	MaxSessions    int
+}

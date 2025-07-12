@@ -328,3 +328,23 @@ func (m *memorySessionManager) evictOldestSession() {
 			"last_access", oldestTime)
 	}
 }
+
+// GetStats returns session statistics
+func (m *memorySessionManager) GetStats() (*SessionStats, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	activeCount := 0
+	now := time.Now()
+	for _, entry := range m.sessions {
+		if entry.expiresAt.After(now) {
+			activeCount++
+		}
+	}
+
+	return &SessionStats{
+		ActiveSessions: activeCount,
+		TotalSessions:  len(m.sessions),
+		MaxSessions:    m.maxSessions,
+	}, nil
+}

@@ -62,7 +62,7 @@ func (v *DefaultValidator) initializeSecurityPatterns() {
 			category:    "docker-security",
 		},
 		{
-			pattern:     `USER\s+root\s*$`,
+			pattern:     `USER\s+root(\s|$)`,
 			severity:    SeverityHigh,
 			description: "Running as root user is a security risk",
 			category:    "docker-security",
@@ -222,6 +222,7 @@ func (v *DefaultValidator) ValidateDockerfileContent(content string) ValidationR
 	if strings.TrimSpace(content) == "" {
 		result.IsValid = false
 		result.SyntaxValid = false
+		result.BestPractices = false
 		result.Errors = append(result.Errors, "dockerfile content is empty")
 		return result
 	}
@@ -252,7 +253,7 @@ func (v *DefaultValidator) ValidateDockerfileContent(content string) ValidationR
 
 	if !v.containsInstruction(content, "USER") {
 		result.BestPractices = false
-		result.Warnings = append(result.Warnings, "no non-root USER specified (security best practice)")
+		result.Warnings = append(result.Warnings, "no non-root USER specified")
 	}
 
 	if !v.containsInstruction(content, "HEALTHCHECK") {
@@ -369,11 +370,10 @@ func (v *DefaultValidator) applySecurityValidation(content string, result *Valid
 			case SeverityCritical, SeverityHigh:
 				result.IsValid = false
 				result.Errors = append(result.Errors,
-					fmt.Sprintf("SECURITY: %s (category: %s)", pattern.Description, pattern.Category))
+					fmt.Sprintf("SECURITY: %s", pattern.Description))
 			case SeverityMedium, SeverityLow:
-				result.BestPractices = false
 				result.Warnings = append(result.Warnings,
-					fmt.Sprintf("SECURITY: %s (category: %s)", pattern.Description, pattern.Category))
+					fmt.Sprintf("SECURITY: %s", pattern.Description))
 			}
 		}
 	}
@@ -462,10 +462,21 @@ func (v *EnhancedValidator) ValidateManifestContent(content string) ValidationRe
 			fmt.Sprintf("content exceeds maximum length of %d characters", v.config.MaxContentLength))
 	}
 
-	// Check for required labels
-	for _, label := range v.config.RequiredLabels {
-		if !strings.Contains(content, fmt.Sprintf("%s:", label)) {
-			result.BestPractices = false
+	// Check for required labels in metadata.labels section
+	if strings.Contains(content, "metadata:") && strings.Contains(content, "labels:") {
+		// Extract labels section
+		labelSection := extractLabelSection(content)
+		for _, label := range v.config.RequiredLabels {
+			if !strings.Contains(labelSection, fmt.Sprintf("%s:", label)) {
+				result.BestPractices = false
+				result.Warnings = append(result.Warnings,
+					fmt.Sprintf("missing recommended label: %s", label))
+			}
+		}
+	} else if len(v.config.RequiredLabels) > 0 {
+		// No labels section at all
+		result.BestPractices = false
+		for _, label := range v.config.RequiredLabels {
 			result.Warnings = append(result.Warnings,
 				fmt.Sprintf("missing recommended label: %s", label))
 		}
@@ -478,6 +489,37 @@ func (v *EnhancedValidator) ValidateManifestContent(content string) ValidationRe
 	}
 
 	return result
+}
+
+// extractLabelSection extracts the labels section from YAML content
+func extractLabelSection(content string) string {
+	lines := strings.Split(content, "\n")
+	inLabels := false
+	labelSection := ""
+	indentLevel := -1
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		currentIndent := len(line) - len(strings.TrimLeft(line, " "))
+
+		if trimmed == "labels:" {
+			inLabels = true
+			indentLevel = currentIndent
+			continue
+		}
+
+		if inLabels {
+			// Check if we've left the labels section
+			if currentIndent <= indentLevel && trimmed != "" {
+				break
+			}
+			if currentIndent > indentLevel {
+				labelSection += line + "\n"
+			}
+		}
+	}
+
+	return labelSection
 }
 
 // containsAllowedImageSource checks if images use allowed registries
@@ -521,25 +563,42 @@ func (v *EnhancedValidator) ValidateDockerfileContent(content string) Validation
 // containsAllowedDockerImageSource checks if FROM instructions use allowed registries
 func (v *EnhancedValidator) containsAllowedDockerImageSource(content string, allowedSources []string) bool {
 	lines := strings.Split(content, "\n")
+	hasFrom := false
+	allFromAllowed := true
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "FROM ") {
+			hasFrom = true
 			imageName := strings.TrimPrefix(line, "FROM ")
 			imageName = strings.Split(imageName, " ")[0] // Remove any additional arguments
 
+			// Skip scratch and stage references
+			if imageName == "scratch" || strings.HasPrefix(imageName, "--") {
+				continue
+			}
+
 			// If no registry specified, assume docker.io
-			if !strings.Contains(imageName, "/") || !strings.Contains(imageName, ".") {
+			if !strings.Contains(imageName, "/") || (!strings.Contains(strings.Split(imageName, "/")[0], ".") && !strings.Contains(strings.Split(imageName, "/")[0], ":")) {
 				imageName = "docker.io/" + imageName
 			}
 
+			isAllowed := false
 			for _, source := range allowedSources {
 				if strings.HasPrefix(imageName, source) {
-					return true
+					isAllowed = true
+					break
 				}
+			}
+
+			if !isAllowed {
+				allFromAllowed = false
+				break
 			}
 		}
 	}
-	return false
+
+	return !hasFrom || allFromAllowed
 }
 
 // ContentSanitizer provides content sanitization capabilities
@@ -598,7 +657,9 @@ func (s *ContentSanitizer) sanitizeContent(content string) string {
 		cleanLines = append(cleanLines, cleanLine)
 	}
 
-	return strings.Join(cleanLines, "\n")
+	// Join lines and trim final newline if present
+	result := strings.Join(cleanLines, "\n")
+	return strings.TrimSuffix(result, "\n")
 }
 
 // ValidationMetrics tracks validation statistics
