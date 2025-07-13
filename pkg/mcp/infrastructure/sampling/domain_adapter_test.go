@@ -17,10 +17,8 @@ func TestDomainAdapter_Basic(t *testing.T) {
 	client := NewClient(logger)
 	adapter := NewDomainAdapter(client)
 
-	// Verify that adapter implements the domain interfaces
-	var _ domain.Sampler = adapter
-	var _ domain.AnalysisSampler = adapter
-	var _ domain.FixSampler = adapter
+	// Verify adapter implements UnifiedSampler
+	var _ domain.UnifiedSampler = adapter
 
 	t.Log("Domain adapter successfully implements all required interfaces")
 }

@@ -30,12 +30,12 @@ type BuildOutput struct {
 
 // OptimizedBuildStep integrates AI-powered resource optimization into the workflow build step
 type OptimizedBuildStep struct {
-	samplingClient domainsampling.Sampler
+	samplingClient domainsampling.UnifiedSampler
 	logger         *slog.Logger
 }
 
 // NewOptimizedBuildStep creates a new optimized build step
-func NewOptimizedBuildStep(samplingClient domainsampling.Sampler, logger *slog.Logger) *OptimizedBuildStep {
+func NewOptimizedBuildStep(samplingClient domainsampling.UnifiedSampler, logger *slog.Logger) *OptimizedBuildStep {
 	return &OptimizedBuildStep{
 		samplingClient: samplingClient,
 		logger:         logger.With("component", "optimized_build_step"),

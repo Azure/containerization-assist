@@ -1,0 +1,880 @@
+//go:build wireinject
+// +build wireinject
+
+//go:generate wire
+
+// Package wire provides dependency injection using Google Wire
+package wire
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"os"
+	"strconv"
+	"time"
+
+	"github.com/Azure/container-kit/pkg/common/runner"
+	"github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/core/kubernetes"
+	"github.com/Azure/container-kit/pkg/core/security"
+	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/application"
+	"github.com/Azure/container-kit/pkg/mcp/application/registrar"
+	"github.com/Azure/container-kit/pkg/mcp/application/session"
+	"github.com/Azure/container-kit/pkg/mcp/application/transport"
+	"github.com/Azure/container-kit/pkg/mcp/domain/events"
+	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
+	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
+	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ml"
+	infraprogress "github.com/Azure/container-kit/pkg/mcp/infrastructure/progress"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/prompts"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/resources"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/utilities"
+	"github.com/google/wire"
+	"github.com/mark3labs/mcp-go/server"
+	"github.com/rs/zerolog"
+)
+
+// ConfigurationSet - Configuration and environment providers
+var ConfigurationSet = wire.NewSet(
+	ProvideDefaultServerConfig,
+)
+
+// ApplicationSet - Core application dependencies
+var ApplicationSet = wire.NewSet(
+	ProvideSessionManager,
+	ProvideResourceStore,
+	ProvideProgressFactory,
+)
+
+// InfrastructureSet - Infrastructure layer dependencies
+var InfrastructureSet = wire.NewSet(
+	ProvideSamplingClient,
+	ProvideSpecializedSamplingClient,
+	ProvidePromptManager,
+	provideDomainSampler,
+	ProvideRepositoryAnalyzer,
+	ProvideEnhancedBuildStep,
+	wire.Bind(new(domainsampling.UnifiedSampler), new(*sampling.DomainAdapter)),
+)
+
+// DomainSet - Domain services and events
+var DomainSet = wire.NewSet(
+	events.NewPublisher,
+	saga.NewSagaCoordinator,
+)
+
+// WorkflowSet - Workflow orchestration (simplified for now)
+var WorkflowSet = wire.NewSet(
+	ProvideOrchestrator,
+	ProvideEventOrchestrator,
+	ProvideSagaOrchestrator,
+)
+
+// MLSet - Machine learning and enhanced capabilities (optional)
+var MLSet = wire.NewSet(
+	ml.ProvideErrorPatternRecognizer,
+	ml.ProvideEnhancedErrorHandler,
+	ml.ProvideStepEnhancer,
+	// ml.ProvideOptimizedBuildStep, // Will add in Phase 2
+)
+
+// CoreServicesSet - Core infrastructure services (Docker, Kubernetes, Security)
+var CoreServicesSet = wire.NewSet(
+	ProvideCommandRunner,
+	ProvideDockerClient,
+	ProvideDockerService,
+	ProvideKubeRunner,
+	ProvideKubernetesService,
+	ProvideSecurityService,
+)
+
+// SecurityScannerSet - Security scanning tools
+var SecurityScannerSet = wire.NewSet(
+	ProvideTrivyScanner,
+	ProvideGrypeScanner,
+	ProvideUnifiedSecurityScanner,
+)
+
+// WorkflowStepsSet - Individual workflow step implementations
+var WorkflowStepsSet = wire.NewSet(
+	ProvideAnalysisStep,
+	ProvideDockerfileStep,
+	ProvideBuildStep,
+	ProvideManifestStep,
+	ProvideDeploymentStep,
+	ProvideVerificationStep,
+)
+
+// WorkflowOrchestrationSet - Workflow orchestration and coordination
+var WorkflowOrchestrationSet = wire.NewSet(
+	ProvideContainerizationOrchestrator,
+	ProvideWorkflowCoordinator,
+	ProvideStepPipeline,
+)
+
+// CLISet - Command line interface providers
+var CLISet = wire.NewSet(
+	ProvideCLIConfig,
+	ProvideCLIApplication,
+	ProvideFlagParser,
+)
+
+// TransportSet - Transport layer providers (MCP server, handlers)
+var TransportSet = wire.NewSet(
+	ProvideMCPServerConfig,
+	ProvideMCPTransport,
+	ProvideHTTPTransport,
+	ProvideServerRegistrar,
+)
+
+// ApplicationServerSet - Complete application server providers
+var ApplicationServerSet = wire.NewSet(
+	ProvideApplicationDependencies,
+	ProvideMCPServer,
+	ProvideApplicationServer,
+)
+
+// DependenciesSet - All dependencies without the final application.Dependencies struct
+var DependenciesSet = wire.NewSet(
+	ConfigurationSet,
+	ApplicationSet,
+	InfrastructureSet,
+	DomainSet,
+	WorkflowSet,
+	MLSet,
+	CoreServicesSet,
+	SecurityScannerSet,
+	WorkflowStepsSet,
+	WorkflowOrchestrationSet,
+	CLISet,
+	TransportSet,
+	ApplicationServerSet,
+)
+
+// Dependencies represents the injected dependencies without the application layer
+type Dependencies struct {
+	Logger         *slog.Logger
+	Config         workflow.ServerConfig
+	SessionManager session.SessionManager
+	ResourceStore  *resources.Store
+
+	ProgressFactory *infraprogress.SinkFactory
+	EventPublisher  *events.Publisher
+	SagaCoordinator *saga.SagaCoordinator
+
+	Orchestrator      *workflow.Orchestrator
+	EventOrchestrator *workflow.EventOrchestrator
+	SagaOrchestrator  *workflow.SagaOrchestrator
+
+	ErrorPatternRecognizer *ml.ErrorPatternRecognizer
+	EnhancedErrorHandler   *ml.EnhancedErrorHandler
+	StepEnhancer           *ml.StepEnhancer
+
+	SamplingClient            domainsampling.UnifiedSampler
+	SpecializedSamplingClient *sampling.SpecializedClient
+	PromptManager             *prompts.Manager
+	// Note: AIRetry is function-based, not a type
+	RepositoryAnalyzer *utilities.RepositoryAnalyzer
+	EnhancedBuildStep  *steps.EnhancedBuildStep
+
+	// Core Services - Phase 2
+	CommandRunner     runner.CommandRunner
+	DockerClient      docker.DockerClient
+	DockerService     docker.Service
+	KubeRunner        kubernetes.KubeRunner
+	KubernetesService kubernetes.Service
+	SecurityService   security.Service
+
+	// Security Scanners - Phase 2
+	TrivyScanner           *docker.TrivyScanner
+	GrypeScanner           *docker.GrypeScanner
+	UnifiedSecurityScanner *docker.UnifiedSecurityScanner
+
+	// Workflow Steps - Phase 3
+	AnalysisStep     *AnalysisStep
+	DockerfileStep   *DockerfileStep
+	BuildStep        *BuildStep
+	ManifestStep     *ManifestStep
+	DeploymentStep   *DeploymentStep
+	VerificationStep *VerificationStep
+
+	// Workflow Orchestration - Phase 3
+	ContainerizationOrchestrator *ContainerizationOrchestrator
+	WorkflowCoordinator          *WorkflowCoordinator
+	StepPipeline                 *StepPipeline
+
+	// CLI Components - Phase 4
+	CLIConfig      *CLIConfig
+	CLIApplication *CLIApplication
+	FlagParser     *FlagParser
+
+	// Transport Components - Phase 4
+	MCPServerConfig *MCPServerConfig
+	MCPTransport    *MCPTransport
+	HTTPTransport   *HTTPTransport
+	ServerRegistrar *ServerRegistrar
+
+	// Application Server Components - Phase 4
+	MCPServer *server.MCPServer
+}
+
+// InitializeDependencies creates all dependencies without the application layer
+func InitializeDependencies(logger *slog.Logger) (*Dependencies, error) {
+	wire.Build(
+		ConfigurationSet,
+		ApplicationSet,
+		InfrastructureSet,
+		DomainSet,
+		WorkflowSet,
+		MLSet,
+		CoreServicesSet,
+		SecurityScannerSet,
+		WorkflowStepsSet,
+		WorkflowOrchestrationSet,
+		CLISet,
+		TransportSet,
+		ProvideMCPServer,
+		wire.Struct(new(Dependencies), "*"),
+	)
+	return nil, nil
+}
+
+// InitializeDependenciesWithConfig creates dependencies with custom config
+func InitializeDependenciesWithConfig(logger *slog.Logger, config workflow.ServerConfig) (*Dependencies, error) {
+	wire.Build(
+		ApplicationSet,
+		InfrastructureSet,
+		DomainSet,
+		WorkflowSet,
+		MLSet,
+		CoreServicesSet,
+		SecurityScannerSet,
+		WorkflowStepsSet,
+		WorkflowOrchestrationSet,
+		CLISet,
+		TransportSet,
+		ProvideMCPServer,
+		wire.Struct(new(Dependencies), "*"),
+	)
+	return nil, nil
+}
+
+// InitializeApplicationServer creates the application server with all required dependencies
+func InitializeApplicationServer(logger *slog.Logger, deps *Dependencies) (*ApplicationServer, error) {
+	// Create the application server directly since we have all components in Dependencies
+	appServer := &ApplicationServer{
+		logger:           logger.With("component", "application_server"),
+		mcpServer:        deps.MCPServer,
+		serverRegistrar:  deps.ServerRegistrar,
+		transportManager: deps.MCPTransport,
+		appDeps: &ApplicationDependencies{
+			logger: logger.With("component", "application_dependencies"),
+			deps:   deps,
+		},
+	}
+	return appServer, nil
+}
+
+// Configuration Providers
+
+// ProvideServerConfig creates a server config from individual components
+func ProvideServerConfig(
+	workspaceDir string,
+	storePath string,
+	maxSessions int,
+	sessionTTL time.Duration,
+	transportType string,
+) workflow.ServerConfig {
+	config := workflow.DefaultServerConfig()
+	config.WorkspaceDir = workspaceDir
+	config.StorePath = storePath
+	config.MaxSessions = maxSessions
+	config.SessionTTL = sessionTTL
+	config.TransportType = transportType
+	return config
+}
+
+// ProvideDefaultServerConfig creates a server config with default values from environment
+func ProvideDefaultServerConfig() workflow.ServerConfig {
+	config := workflow.DefaultServerConfig()
+	config.WorkspaceDir = ProvideWorkspaceDir()
+	config.StorePath = ProvideStorePath()
+	config.MaxSessions = ProvideMaxSessions()
+	config.SessionTTL = ProvideSessionTTL()
+	config.TransportType = ProvideTransportType()
+	return config
+}
+
+func ProvideWorkspaceDir() string {
+	if dir := os.Getenv("CONTAINER_KIT_WORKSPACE"); dir != "" {
+		return dir
+	}
+	return "/tmp/container-kit"
+}
+
+func ProvideStorePath() string {
+	if path := os.Getenv("CONTAINER_KIT_STORE_PATH"); path != "" {
+		return path
+	}
+	return "/tmp/container-kit/sessions.db"
+}
+
+func ProvideMaxSessions() int {
+	if sessions := os.Getenv("CONTAINER_KIT_MAX_SESSIONS"); sessions != "" {
+		if n, err := strconv.Atoi(sessions); err == nil {
+			return n
+		}
+	}
+	return 10
+}
+
+func ProvideSessionTTL() time.Duration {
+	if ttl := os.Getenv("CONTAINER_KIT_SESSION_TTL"); ttl != "" {
+		if d, err := time.ParseDuration(ttl); err == nil {
+			return d
+		}
+	}
+	return 24 * time.Hour
+}
+
+func ProvideTransportType() string {
+	if transport := os.Getenv("CONTAINER_KIT_TRANSPORT"); transport != "" {
+		return transport
+	}
+	return "stdio"
+}
+
+// Application Providers
+
+func ProvideSessionManager(config workflow.ServerConfig, logger *slog.Logger) session.SessionManager {
+	return session.NewMemorySessionManager(logger, config.SessionTTL, config.MaxSessions)
+}
+
+func ProvideResourceStore(logger *slog.Logger) *resources.Store {
+	return resources.NewStore(logger)
+}
+
+func ProvideProgressFactory(logger *slog.Logger) *infraprogress.SinkFactory {
+	return infraprogress.NewSinkFactory(logger)
+}
+
+// Infrastructure Providers
+
+func ProvideSamplingClient(logger *slog.Logger) (*sampling.Client, error) {
+	// Use environment-based configuration if available
+	if os.Getenv("AZURE_OPENAI_ENDPOINT") != "" && os.Getenv("AZURE_OPENAI_KEY") != "" {
+		return sampling.NewClientFromEnv(logger)
+	}
+	return sampling.NewClient(logger), nil
+}
+
+func ProvidePromptManager(logger *slog.Logger) (*prompts.Manager, error) {
+	config := prompts.ManagerConfig{
+		EnableHotReload: false,
+		AllowOverride:   false,
+	}
+	return prompts.NewManager(logger, config)
+}
+
+// provideDomainSampler creates the domain adapter for sampling
+func provideDomainSampler(client *sampling.Client) *sampling.DomainAdapter {
+	return sampling.NewDomainAdapter(client)
+}
+
+// Workflow Providers
+
+func ProvideOrchestrator(logger *slog.Logger) *workflow.Orchestrator {
+	return workflow.NewOrchestrator(logger)
+}
+
+func ProvideEventOrchestrator(logger *slog.Logger, eventPublisher *events.Publisher) *workflow.EventOrchestrator {
+	return workflow.NewEventOrchestrator(logger, eventPublisher)
+}
+
+func ProvideSagaOrchestrator(logger *slog.Logger, eventPublisher *events.Publisher, sagaCoordinator *saga.SagaCoordinator) *workflow.SagaOrchestrator {
+	return workflow.NewSagaOrchestrator(logger, eventPublisher, sagaCoordinator)
+}
+
+// Core Service Providers - Phase 2
+
+func ProvideCommandRunner() runner.CommandRunner {
+	return &runner.DefaultCommandRunner{}
+}
+
+func ProvideDockerClient(cmdRunner runner.CommandRunner) docker.DockerClient {
+	return docker.NewDockerCmdRunner(cmdRunner)
+}
+
+func ProvideDockerService(client docker.DockerClient, logger *slog.Logger) docker.Service {
+	return docker.NewService(client, logger)
+}
+
+func ProvideKubeRunner(cmdRunner runner.CommandRunner) kubernetes.KubeRunner {
+	return kubernetes.NewKubeCmdRunner(cmdRunner)
+}
+
+func ProvideKubernetesService(runner kubernetes.KubeRunner, logger *slog.Logger) kubernetes.Service {
+	return kubernetes.NewService(runner, logger)
+}
+
+func ProvideSecurityService(logger *slog.Logger) security.Service {
+	return security.NewSecurityService(logger, nil)
+}
+
+// Security Scanner Providers - Phase 2
+
+func ProvideTrivyScanner(logger *slog.Logger) *docker.TrivyScanner {
+	// Convert slog.Logger to zerolog.Logger for scanner compatibility
+	zerologLogger := convertSlogToZerolog(logger)
+	return docker.NewTrivyScanner(zerologLogger)
+}
+
+func ProvideGrypeScanner(logger *slog.Logger) *docker.GrypeScanner {
+	// Convert slog.Logger to zerolog.Logger for scanner compatibility
+	zerologLogger := convertSlogToZerolog(logger)
+	return docker.NewGrypeScanner(zerologLogger)
+}
+
+func ProvideUnifiedSecurityScanner(logger *slog.Logger) *docker.UnifiedSecurityScanner {
+	// Convert slog.Logger to zerolog.Logger for scanner compatibility
+	zerologLogger := convertSlogToZerolog(logger)
+	return docker.NewUnifiedSecurityScanner(zerologLogger)
+}
+
+// Helper function to convert slog.Logger to zerolog.Logger
+func convertSlogToZerolog(logger *slog.Logger) zerolog.Logger {
+	// For now, create a new zerolog logger
+	// TODO: In a real implementation, you might want to create a proper adapter
+	return zerolog.New(nil).With().Logger()
+}
+
+// Workflow Step Providers - Phase 3
+
+// AnalysisStep wraps the repository analysis functionality
+type AnalysisStep struct {
+	logger             *slog.Logger
+	repositoryAnalyzer *utilities.RepositoryAnalyzer
+}
+
+func ProvideAnalysisStep(logger *slog.Logger, analyzer *utilities.RepositoryAnalyzer) *AnalysisStep {
+	return &AnalysisStep{
+		logger:             logger.With("component", "analysis_step"),
+		repositoryAnalyzer: analyzer,
+	}
+}
+
+// AnalyzeRepository performs repository analysis using the injected analyzer
+func (a *AnalysisStep) AnalyzeRepository(repoURL, branch string) (*steps.AnalyzeResult, error) {
+	return steps.AnalyzeRepository(repoURL, branch, a.logger)
+}
+
+// DockerfileStep wraps the Dockerfile generation functionality
+type DockerfileStep struct {
+	logger *slog.Logger
+}
+
+func ProvideDockerfileStep(logger *slog.Logger) *DockerfileStep {
+	return &DockerfileStep{
+		logger: logger.With("component", "dockerfile_step"),
+	}
+}
+
+// GenerateDockerfile creates an optimized Dockerfile based on analysis results
+func (d *DockerfileStep) GenerateDockerfile(analyzeResult *steps.AnalyzeResult) (*steps.DockerfileResult, error) {
+	return steps.GenerateDockerfile(analyzeResult, d.logger)
+}
+
+// BuildStep wraps the Docker build functionality
+type BuildStep struct {
+	logger        *slog.Logger
+	dockerService docker.Service
+	enhancedBuild *steps.EnhancedBuildStep
+}
+
+func ProvideBuildStep(logger *slog.Logger, dockerService docker.Service, enhancedBuild *steps.EnhancedBuildStep) *BuildStep {
+	return &BuildStep{
+		logger:        logger.With("component", "build_step"),
+		dockerService: dockerService,
+		enhancedBuild: enhancedBuild,
+	}
+}
+
+// BuildImage builds a Docker image from a Dockerfile using real Docker operations
+func (b *BuildStep) BuildImage(ctx context.Context, dockerfileResult *steps.DockerfileResult, imageName, imageTag, buildContext string) (*steps.BuildResult, error) {
+	return steps.BuildImage(ctx, dockerfileResult, imageName, imageTag, buildContext, b.logger)
+}
+
+// PushImage pushes the built image to a registry
+func (b *BuildStep) PushImage(ctx context.Context, buildResult *steps.BuildResult, registry string) (string, error) {
+	return steps.PushImage(ctx, buildResult, registry, b.logger)
+}
+
+// ManifestStep wraps the Kubernetes manifest generation functionality
+type ManifestStep struct {
+	logger *slog.Logger
+}
+
+func ProvideManifestStep(logger *slog.Logger) *ManifestStep {
+	return &ManifestStep{
+		logger: logger.With("component", "manifest_step"),
+	}
+}
+
+// GenerateManifests creates Kubernetes manifests for the built image
+func (m *ManifestStep) GenerateManifests(buildResult *steps.BuildResult, appName, namespace string, port int) (*steps.K8sResult, error) {
+	return steps.GenerateManifests(buildResult, appName, namespace, port, m.logger)
+}
+
+// DeploymentStep wraps the Kubernetes deployment functionality
+type DeploymentStep struct {
+	logger            *slog.Logger
+	kubernetesService kubernetes.Service
+}
+
+func ProvideDeploymentStep(logger *slog.Logger, k8sService kubernetes.Service) *DeploymentStep {
+	return &DeploymentStep{
+		logger:            logger.With("component", "deployment_step"),
+		kubernetesService: k8sService,
+	}
+}
+
+// DeployToKubernetes deploys the generated manifests to a Kubernetes cluster
+func (d *DeploymentStep) DeployToKubernetes(ctx context.Context, k8sResult *steps.K8sResult) error {
+	return steps.DeployToKubernetes(ctx, k8sResult, d.logger)
+}
+
+// VerificationStep wraps the deployment verification functionality
+type VerificationStep struct {
+	logger            *slog.Logger
+	kubernetesService kubernetes.Service
+}
+
+func ProvideVerificationStep(logger *slog.Logger, k8sService kubernetes.Service) *VerificationStep {
+	return &VerificationStep{
+		logger:            logger.With("component", "verification_step"),
+		kubernetesService: k8sService,
+	}
+}
+
+// VerifyDeployment verifies that the deployment is healthy and running
+func (v *VerificationStep) VerifyDeployment(ctx context.Context, k8sResult *steps.K8sResult) (*steps.DeploymentDiagnostics, error) {
+	return steps.VerifyDeploymentWithDiagnostics(ctx, k8sResult, v.logger)
+}
+
+// Workflow Orchestration Providers - Phase 3
+
+// ContainerizationOrchestrator provides high-level containerization workflow
+type ContainerizationOrchestrator struct {
+	logger           *slog.Logger
+	analysisStep     *AnalysisStep
+	dockerfileStep   *DockerfileStep
+	buildStep        *BuildStep
+	manifestStep     *ManifestStep
+	deploymentStep   *DeploymentStep
+	verificationStep *VerificationStep
+}
+
+func ProvideContainerizationOrchestrator(
+	logger *slog.Logger,
+	analysisStep *AnalysisStep,
+	dockerfileStep *DockerfileStep,
+	buildStep *BuildStep,
+	manifestStep *ManifestStep,
+	deploymentStep *DeploymentStep,
+	verificationStep *VerificationStep,
+) *ContainerizationOrchestrator {
+	return &ContainerizationOrchestrator{
+		logger:           logger.With("component", "containerization_orchestrator"),
+		analysisStep:     analysisStep,
+		dockerfileStep:   dockerfileStep,
+		buildStep:        buildStep,
+		manifestStep:     manifestStep,
+		deploymentStep:   deploymentStep,
+		verificationStep: verificationStep,
+	}
+}
+
+// WorkflowCoordinator coordinates multiple workflow steps
+type WorkflowCoordinator struct {
+	logger          *slog.Logger
+	eventPublisher  *events.Publisher
+	sagaCoordinator *saga.SagaCoordinator
+	progressFactory *infraprogress.SinkFactory
+}
+
+func ProvideWorkflowCoordinator(
+	logger *slog.Logger,
+	eventPublisher *events.Publisher,
+	sagaCoordinator *saga.SagaCoordinator,
+	progressFactory *infraprogress.SinkFactory,
+) *WorkflowCoordinator {
+	return &WorkflowCoordinator{
+		logger:          logger.With("component", "workflow_coordinator"),
+		eventPublisher:  eventPublisher,
+		sagaCoordinator: sagaCoordinator,
+		progressFactory: progressFactory,
+	}
+}
+
+// StepPipeline provides a pipeline for executing workflow steps
+type StepPipeline struct {
+	logger                       *slog.Logger
+	containerizationOrchestrator *ContainerizationOrchestrator
+	workflowCoordinator          *WorkflowCoordinator
+}
+
+func ProvideStepPipeline(
+	logger *slog.Logger,
+	containerizationOrchestrator *ContainerizationOrchestrator,
+	workflowCoordinator *WorkflowCoordinator,
+) *StepPipeline {
+	return &StepPipeline{
+		logger:                       logger.With("component", "step_pipeline"),
+		containerizationOrchestrator: containerizationOrchestrator,
+		workflowCoordinator:          workflowCoordinator,
+	}
+}
+
+// CLI Providers - Phase 4
+
+// CLIConfig wraps command line configuration
+type CLIConfig struct {
+	logger *slog.Logger
+	config workflow.ServerConfig
+}
+
+func ProvideCLIConfig(logger *slog.Logger, config workflow.ServerConfig) *CLIConfig {
+	return &CLIConfig{
+		logger: logger.With("component", "cli_config"),
+		config: config,
+	}
+}
+
+// CLIApplication wraps the CLI application logic
+type CLIApplication struct {
+	logger    *slog.Logger
+	cliConfig *CLIConfig
+}
+
+func ProvideCLIApplication(logger *slog.Logger, cliConfig *CLIConfig) *CLIApplication {
+	return &CLIApplication{
+		logger:    logger.With("component", "cli_application"),
+		cliConfig: cliConfig,
+	}
+}
+
+// FlagParser wraps command line flag parsing
+type FlagParser struct {
+	logger *slog.Logger
+}
+
+func ProvideFlagParser(logger *slog.Logger) *FlagParser {
+	return &FlagParser{
+		logger: logger.With("component", "flag_parser"),
+	}
+}
+
+// Transport Providers - Phase 4
+
+// MCPServerConfig wraps MCP server configuration
+type MCPServerConfig struct {
+	logger *slog.Logger
+	config workflow.ServerConfig
+}
+
+func ProvideMCPServerConfig(logger *slog.Logger, config workflow.ServerConfig) *MCPServerConfig {
+	return &MCPServerConfig{
+		logger: logger.With("component", "mcp_server_config"),
+		config: config,
+	}
+}
+
+// MCPTransport wraps MCP transport management
+type MCPTransport struct {
+	logger           *slog.Logger
+	transportManager *transport.Manager
+}
+
+func ProvideMCPTransport(logger *slog.Logger, config workflow.ServerConfig) *MCPTransport {
+	transportType := transport.TransportType(config.TransportType)
+	manager := transport.NewManager(logger, transportType, config.HTTPPort)
+	return &MCPTransport{
+		logger:           logger.With("component", "mcp_transport"),
+		transportManager: manager,
+	}
+}
+
+// HTTPTransport wraps HTTP transport functionality
+type HTTPTransport struct {
+	logger    *slog.Logger
+	transport *transport.HTTPTransport
+}
+
+func ProvideHTTPTransport(logger *slog.Logger, config workflow.ServerConfig) *HTTPTransport {
+	httpTransport := transport.NewHTTPTransport(logger, config.HTTPPort)
+	return &HTTPTransport{
+		logger:    logger.With("component", "http_transport"),
+		transport: httpTransport,
+	}
+}
+
+// ServerRegistrar wraps component registration
+type ServerRegistrar struct {
+	logger    *slog.Logger
+	registrar *registrar.Registrar
+}
+
+func ProvideServerRegistrar(logger *slog.Logger, resourceStore *resources.Store) *ServerRegistrar {
+	reg := registrar.NewRegistrar(logger, resourceStore)
+	return &ServerRegistrar{
+		logger:    logger.With("component", "server_registrar"),
+		registrar: reg,
+	}
+}
+
+// RegisterAll registers all components with the MCP server
+func (sr *ServerRegistrar) RegisterAll(mcpServer *server.MCPServer) error {
+	return sr.registrar.RegisterAll(mcpServer)
+}
+
+// Application Server Providers - Phase 4
+
+// ApplicationDependencies wraps application-level dependencies for the server
+type ApplicationDependencies struct {
+	logger *slog.Logger
+	deps   *Dependencies
+}
+
+func ProvideApplicationDependencies(logger *slog.Logger, deps *Dependencies) *ApplicationDependencies {
+	return &ApplicationDependencies{
+		logger: logger.With("component", "application_dependencies"),
+		deps:   deps,
+	}
+}
+
+// ProvideMCPServer creates a pre-configured MCP server
+func ProvideMCPServer(logger *slog.Logger) *server.MCPServer {
+	// Create the MCP server with default configuration
+	mcpServer := server.NewMCPServer("Container Kit MCP Server", "1.0.0")
+	return mcpServer
+}
+
+// ApplicationServer wraps the complete application server
+type ApplicationServer struct {
+	logger           *slog.Logger
+	mcpServer        *server.MCPServer
+	serverRegistrar  *ServerRegistrar
+	transportManager *MCPTransport
+	appDeps          *ApplicationDependencies
+}
+
+func ProvideApplicationServer(
+	logger *slog.Logger,
+	mcpServer *server.MCPServer,
+	serverRegistrar *ServerRegistrar,
+	transportManager *MCPTransport,
+	deps *Dependencies,
+) *ApplicationServer {
+	// Create ApplicationDependencies wrapper
+	appDeps := &ApplicationDependencies{
+		logger: logger.With("component", "application_dependencies"),
+		deps:   deps,
+	}
+
+	return &ApplicationServer{
+		logger:           logger.With("component", "application_server"),
+		mcpServer:        mcpServer,
+		serverRegistrar:  serverRegistrar,
+		transportManager: transportManager,
+		appDeps:          appDeps,
+	}
+}
+
+// Initialize sets up the application server with all components
+func (as *ApplicationServer) Initialize() error {
+	as.logger.Info("Initializing application server")
+
+	// Register all components with the MCP server
+	if err := as.serverRegistrar.RegisterAll(as.mcpServer); err != nil {
+		return fmt.Errorf("failed to register components: %w", err)
+	}
+
+	as.logger.Info("Application server initialized successfully")
+	return nil
+}
+
+// Start starts the application server with the configured transport
+func (as *ApplicationServer) Start(ctx context.Context) error {
+	as.logger.Info("Starting application server")
+
+	// Initialize first
+	if err := as.Initialize(); err != nil {
+		return err
+	}
+
+	// Start the transport
+	return as.transportManager.transportManager.Start(ctx, as.mcpServer)
+}
+
+// GetMCPServer returns the underlying MCP server for API compliance
+func (as *ApplicationServer) GetMCPServer() api.MCPServer {
+	// Return a wrapper that implements the api.MCPServer interface
+	return &mcpServerWrapper{
+		server: as.mcpServer,
+		logger: as.logger,
+	}
+}
+
+// mcpServerWrapper wraps the MCP server to implement api.MCPServer interface
+type mcpServerWrapper struct {
+	server *server.MCPServer
+	logger *slog.Logger
+}
+
+// Start implements the api.MCPServer interface
+func (w *mcpServerWrapper) Start(ctx context.Context) error {
+	w.logger.Info("Starting MCP server wrapper")
+	// The actual transport starting is handled by ApplicationServer.Start()
+	return nil
+}
+
+// Shutdown implements the api.MCPServer interface
+func (w *mcpServerWrapper) Shutdown(ctx context.Context) error {
+	w.logger.Info("Shutting down MCP server wrapper")
+	// Add any cleanup logic here
+	return nil
+}
+
+// Stop implements the api.MCPServer interface (alias for Shutdown)
+func (w *mcpServerWrapper) Stop(ctx context.Context) error {
+	return w.Shutdown(ctx)
+}
+
+// Server Provider
+
+// Infrastructure Providers - Phase 2
+
+func ProvideSpecializedSamplingClient(logger *slog.Logger) *sampling.SpecializedClient {
+	return sampling.NewSpecializedClient(logger)
+}
+
+func ProvideRepositoryAnalyzer(logger *slog.Logger) *utilities.RepositoryAnalyzer {
+	return utilities.NewRepositoryAnalyzer(logger)
+}
+
+func ProvideEnhancedBuildStep(logger *slog.Logger) *steps.EnhancedBuildStep {
+	return steps.NewEnhancedBuildStep(logger)
+}
+
+// Server Provider
+
+func ProvideServer(deps *application.Dependencies) api.MCPServer {
+	return application.NewServer(
+		application.WithDependencies(deps),
+	)
+}

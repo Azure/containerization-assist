@@ -156,7 +156,7 @@ How do I add observability with distributed tracing?
 Development best practices specific to Container Kit:
 
 ```
-How do I use the Rich error system from pkg/common/errors?
+How do I use the Rich error system from pkg/mcp/domain/errors?
 ```
 
 ```
@@ -184,11 +184,11 @@ How do I implement event handler testing with mocks?
 **Container Kit Assistant:** *The assistant will provide guidance on:*
 - Where to place the step in the Infrastructure layer (`pkg/mcp/infrastructure/steps/`)
 - How to integrate with the workflow progress tracking and event system
-- Error handling patterns using Rich error system from `pkg/common/errors`
-- CQRS command handling for the new step
-- Domain event publishing for workflow coordination
-- Testing strategies for the new step including property-based tests
-- Integration points with existing AI retry logic and ML optimization
+- Error handling patterns using Rich error system from `pkg/mcp/domain/errors/`
+- Integration with the unified orchestrator and step execution framework
+- AI-powered error recovery and retry logic patterns
+- Testing strategies including workflow integration tests
+- ML integration for build optimization and pattern recognition
 
 #### Debugging a Deployment Issue
 
@@ -236,7 +236,7 @@ When debugging, share the actual error:
 
 ```
 I'm getting this RichError in the scan step: "scanner_unavailable". 
-How do I implement fallback scanning with Grype when Trivy fails?
+How do I implement fallback scanning with the unified security scanner?
 ```
 
 #### 4. Ask for Code Reviews
@@ -299,7 +299,7 @@ The Container Kit chat mode has access to:
 
 2. **Test with Simple Query**
    ```
-   What are the 10 steps in Container Kit's workflow?
+   What are the 10 steps in Container Kit's containerize_and_deploy workflow?
    ```
 
 3. **Check Copilot Status**
@@ -351,7 +351,7 @@ this new feature in the 4-layer architecture?
 Frame questions around the 10-step containerization process:
 
 ```
-How do I add custom validation between the Scan step (4) and Tag step (5)?
+How do I add custom validation between the Scan step (9) and Finalize step (10)?
 ```
 
 ### 5. Security First

@@ -49,7 +49,7 @@ Database Types: %v`,
 		analyzeResult.Analysis["database_types"])
 
 	// Use AI to enhance the analysis
-	samplingClient := sampling.NewClient(logger)
+	samplingClient := sampling.NewSpecializedClient(logger)
 	enhancedAnalysis, err := samplingClient.ImproveRepositoryAnalysis(
 		ctx,
 		initialAnalysis,

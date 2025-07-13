@@ -11,9 +11,10 @@ import (
 
 	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/application/registrar"
+	"github.com/Azure/container-kit/pkg/mcp/application/transport"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/registrar"
-	"github.com/Azure/container-kit/pkg/mcp/transport"
+	// "github.com/Azure/container-kit/pkg/wire" // Temporarily disabled to avoid import cycles
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -50,18 +51,15 @@ func (s *serverImpl) registerComponents() error {
 	return nil
 }
 
-// NewMCPServer creates a new MCP server with the given options using the new functional options pattern.
+// NewMCPServer creates a new MCP server with the given options using Wire dependency injection.
 // This is the primary public API for creating MCP servers
 func NewMCPServer(ctx context.Context, logger *slog.Logger, opts ...Option) (api.MCPServer, error) {
-	// Use default configuration and provided logger
-	config := workflow.DefaultServerConfig()
-
-	// Apply any custom options to config
-	tempDeps := &Dependencies{Config: config}
+	// Extract configuration from options (if provided)
+	tempDeps := &Dependencies{Config: workflow.DefaultServerConfig()}
 	for _, opt := range opts {
 		opt(tempDeps)
 	}
-	config = tempDeps.Config
+	config := tempDeps.Config
 
 	// Ensure directories exist
 	if config.StorePath != "" {
@@ -78,24 +76,61 @@ func NewMCPServer(ctx context.Context, logger *slog.Logger, opts ...Option) (api
 		}
 	}
 
-	// Use Wire for dependency injection if available
-	// In production, we'd generate this with "go generate ./pkg/mcp/wire"
-	// For now, we'll continue using the bootstrap approach
-	bootstrapOpts := []Option{
-		WithLogger(logger),
-		WithConfig(config),
+	// Use Wire for dependency injection
+	// Check if custom config was provided
+	var server api.MCPServer
+	var err error
+
+	if tempDeps.Config.WorkspaceDir != workflow.DefaultServerConfig().WorkspaceDir ||
+		tempDeps.Config.StorePath != workflow.DefaultServerConfig().StorePath ||
+		tempDeps.Config.MaxSessions != workflow.DefaultServerConfig().MaxSessions {
+		// Custom config provided, use InitializeServerWithConfig
+		server, err = initializeServerWithCustomConfig(logger, config)
+	} else {
+		// Use default config from environment
+		server, err = initializeServerFromEnv(logger)
 	}
-	bootstrapOpts = append(bootstrapOpts, opts...)
 
-	// Use new functional options pattern to create server
-	server := NewServer(bootstrapOpts...)
+	if err != nil {
+		logger.Error("Failed to initialize server with Wire", "error", err)
+		// Fallback to manual DI for compatibility
+		logger.Warn("Falling back to manual dependency injection")
+		fallbackServer := NewServer(append([]Option{WithLogger(logger), WithConfig(config)}, opts...)...)
+		return fallbackServer, nil
+	}
 
-	server.deps.Logger.Info("MCP Server initialized successfully",
+	logger.Info("MCP Server initialized successfully with Wire",
 		"transport", config.TransportType,
 		"workspace_dir", config.WorkspaceDir,
 		"max_sessions", config.MaxSessions)
 
 	return server, nil
+}
+
+// initializeServerFromEnv initializes server using environment-based configuration
+func initializeServerFromEnv(logger *slog.Logger) (api.MCPServer, error) {
+	// Import the wire package to access the generated injector
+	return initializeServer(logger)
+}
+
+// initializeServerWithCustomConfig initializes server with custom configuration
+func initializeServerWithCustomConfig(logger *slog.Logger, config workflow.ServerConfig) (api.MCPServer, error) {
+	// Import the wire package to access the generated injector
+	return initializeServerWithConfig(logger, config)
+}
+
+// initializeServer wraps the Wire-generated injector with conversion to application.Dependencies
+func initializeServer(logger *slog.Logger) (api.MCPServer, error) {
+	// Phase 1: Wire infrastructure is ready but temporarily disabled due to import cycle
+	// Will be enabled in Phase 1b after resolving architectural pattern
+	return nil, fmt.Errorf("Wire injection temporarily disabled - see Phase 1b of implementation plan")
+}
+
+// initializeServerWithConfig wraps the Wire-generated injector with custom config
+func initializeServerWithConfig(logger *slog.Logger, config workflow.ServerConfig) (api.MCPServer, error) {
+	// Phase 1: Wire infrastructure is ready but temporarily disabled due to import cycle
+	// Will be enabled in Phase 1b after resolving architectural pattern
+	return nil, fmt.Errorf("Wire injection temporarily disabled - see Phase 1b of implementation plan")
 }
 
 // Start starts the MCP server

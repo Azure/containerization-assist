@@ -45,7 +45,7 @@ func main() {
 
 2. Generate the dependency injection code:
    ```bash
-   go generate ./pkg/mcp/wire
+   go generate ./pkg/mcp/infrastructure/wire
    ```
 
 3. The `wire_gen.go` file will be updated with the generated code.
@@ -70,7 +70,7 @@ To add a new dependency to the Wire provider set:
    ```
 
 3. Update the Dependencies struct if needed
-4. Run `go generate ./pkg/mcp/wire` to regenerate
+4. Run `go generate ./pkg/mcp/infrastructure/wire` to regenerate
 
 ### Testing with Wire
 

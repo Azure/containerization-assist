@@ -11,7 +11,7 @@ Decision: Replace the entire atomic tool ecosystem with a single comprehensive w
 ### Single Workflow Implementation
 - **Tool**: `containerize_and_deploy` (only MCP tool exposed)
 - **Location**: `pkg/mcp/domain/workflow/containerize.go`
-- **Registration**: `pkg/mcp/registrar/tools.go` 
+- **Registration**: `pkg/mcp/application/registrar/tools.go` 
 - **Steps**: 10 sequential stages with built-in progress tracking
 - **Integration**: MCP protocol for AI assistant communication
 

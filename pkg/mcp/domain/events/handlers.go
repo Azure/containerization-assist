@@ -4,7 +4,10 @@ package events
 import (
 	"context"
 	"log/slog"
+	"sync/atomic"
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
 )
 
 // ProgressEventHandler updates progress tracking based on workflow events
@@ -63,15 +66,56 @@ func (h *ProgressEventHandler) Handle(ctx context.Context, event DomainEvent) er
 	return nil
 }
 
+// WorkflowMetrics tracks workflow-level metrics
+type WorkflowMetrics struct {
+	// Step metrics
+	stepsCompleted int64
+	stepsFailed    int64
+
+	// Workflow metrics
+	workflowsCompleted int64
+	workflowsFailed    int64
+
+	// Security scan metrics
+	securityScansCompleted  int64
+	totalVulnerabilities    int64
+	criticalVulnerabilities int64
+}
+
+// GetMetrics returns the current workflow metrics
+func (wm *WorkflowMetrics) GetMetrics() map[string]int64 {
+	return map[string]int64{
+		"steps_completed":          atomic.LoadInt64(&wm.stepsCompleted),
+		"steps_failed":             atomic.LoadInt64(&wm.stepsFailed),
+		"workflows_completed":      atomic.LoadInt64(&wm.workflowsCompleted),
+		"workflows_failed":         atomic.LoadInt64(&wm.workflowsFailed),
+		"security_scans_completed": atomic.LoadInt64(&wm.securityScansCompleted),
+		"total_vulnerabilities":    atomic.LoadInt64(&wm.totalVulnerabilities),
+		"critical_vulnerabilities": atomic.LoadInt64(&wm.criticalVulnerabilities),
+	}
+}
+
+// Global workflow metrics instance
+var globalWorkflowMetrics = &WorkflowMetrics{}
+
+// GetGlobalWorkflowMetrics returns the global workflow metrics
+func GetGlobalWorkflowMetrics() *WorkflowMetrics {
+	return globalWorkflowMetrics
+}
+
 // MetricsEventHandler collects metrics from workflow events
 type MetricsEventHandler struct {
-	logger *slog.Logger
+	logger          *slog.Logger
+	samplingMetrics *sampling.MetricsCollector
+	workflowMetrics *WorkflowMetrics
 }
 
 // NewMetricsEventHandler creates a handler that collects metrics from events
 func NewMetricsEventHandler(logger *slog.Logger) *MetricsEventHandler {
 	return &MetricsEventHandler{
-		logger: logger.With("component", "metrics_event_handler"),
+		logger:          logger.With("component", "metrics_event_handler"),
+		samplingMetrics: sampling.GetGlobalMetrics(),
+		workflowMetrics: GetGlobalWorkflowMetrics(),
 	}
 }
 
@@ -86,13 +130,19 @@ func (h *MetricsEventHandler) Handle(ctx context.Context, event DomainEvent) err
 			"duration_ms", e.Duration.Milliseconds(),
 			"success", e.Success)
 
-		// TODO: Integration with metrics collection system
-		// metrics.Counter("workflow_steps_completed").
-		//   WithTags("step", e.StepName, "success", fmt.Sprintf("%v", e.Success)).
-		//   Increment()
-		// metrics.Histogram("workflow_step_duration").
-		//   WithTags("step", e.StepName).
-		//   Observe(e.Duration.Seconds())
+		// Integration with metrics collection system
+		if e.Success {
+			atomic.AddInt64(&h.workflowMetrics.stepsCompleted, 1)
+		} else {
+			atomic.AddInt64(&h.workflowMetrics.stepsFailed, 1)
+		}
+
+		// Log step metrics for observability systems to pick up
+		h.logger.Info("workflow_step_completed",
+			"step", e.StepName,
+			"success", e.Success,
+			"duration_seconds", e.Duration.Seconds(),
+			"metric_type", "counter")
 
 	case WorkflowCompletedEvent:
 		// Track workflow completion metrics
@@ -101,12 +151,18 @@ func (h *MetricsEventHandler) Handle(ctx context.Context, event DomainEvent) err
 			"duration_ms", e.TotalDuration.Milliseconds(),
 			"success", e.Success)
 
-		// TODO: Integration with metrics collection
-		// metrics.Counter("workflows_completed").
-		//   WithTags("success", fmt.Sprintf("%v", e.Success)).
-		//   Increment()
-		// metrics.Histogram("workflow_duration").
-		//   Observe(e.TotalDuration.Seconds())
+		// Integration with metrics collection
+		if e.Success {
+			atomic.AddInt64(&h.workflowMetrics.workflowsCompleted, 1)
+		} else {
+			atomic.AddInt64(&h.workflowMetrics.workflowsFailed, 1)
+		}
+
+		// Log workflow metrics for observability systems to pick up
+		h.logger.Info("workflow_completed",
+			"success", e.Success,
+			"duration_seconds", e.TotalDuration.Seconds(),
+			"metric_type", "histogram")
 
 	case SecurityScanEvent:
 		// Track security scan metrics
@@ -117,13 +173,28 @@ func (h *MetricsEventHandler) Handle(ctx context.Context, event DomainEvent) err
 			"critical", e.CriticalCount,
 			"duration_ms", e.ScanDuration.Milliseconds())
 
-		// TODO: Integration with metrics collection
-		// metrics.Histogram("security_scan_duration").
-		//   WithTags("scanner", e.Scanner).
-		//   Observe(e.ScanDuration.Seconds())
-		// metrics.Gauge("security_vulnerabilities").
-		//   WithTags("severity", "critical", "scanner", e.Scanner).
-		//   Set(float64(e.CriticalCount))
+		// Integration with metrics collection
+		atomic.AddInt64(&h.workflowMetrics.securityScansCompleted, 1)
+		atomic.AddInt64(&h.workflowMetrics.totalVulnerabilities, int64(e.VulnCount))
+		atomic.AddInt64(&h.workflowMetrics.criticalVulnerabilities, int64(e.CriticalCount))
+
+		// Log security metrics for observability systems to pick up
+		h.logger.Info("security_scan_completed",
+			"scanner", e.Scanner,
+			"duration_seconds", e.ScanDuration.Seconds(),
+			"metric_type", "histogram")
+
+		h.logger.Info("security_vulnerabilities",
+			"severity", "critical",
+			"scanner", e.Scanner,
+			"count", e.CriticalCount,
+			"metric_type", "gauge")
+
+		h.logger.Info("security_vulnerabilities",
+			"severity", "total",
+			"scanner", e.Scanner,
+			"count", e.VulnCount,
+			"metric_type", "gauge")
 	}
 
 	return nil

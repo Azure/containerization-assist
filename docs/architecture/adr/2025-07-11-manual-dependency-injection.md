@@ -244,13 +244,14 @@ func TestBuildStep(t *testing.T) {
 - **Error Handling**: Consistent error patterns using rich error system
 
 ## Implementation Status
-- ✅ Manual dependency injection pattern implemented
+- 🔄 **Hybrid approach**: Manual DI exists alongside Wire implementation
 - ✅ 8 focused service interfaces defined (32 methods total)
-- ✅ Direct service construction in server initialization
+- 🔄 **Mixed construction**: Wire used for complex dependencies, manual for simple ones
 - ✅ Clear dependency graphs established
 - ✅ Testing patterns simplified with focused mocks
 - ✅ Service boundaries well-defined and documented
 - ✅ Integration with workflow architecture complete
+- ✅ **Wire integration**: `pkg/mcp/infrastructure/wire/` provides compile-time DI for complex scenarios
 
 ## Guidelines
 1. **Keep Interfaces Small**: 3-5 methods maximum per interface
@@ -258,6 +259,18 @@ func TestBuildStep(t *testing.T) {
 3. **Explicit Dependencies**: Pass dependencies directly to constructors
 4. **Clear Naming**: Service and method names should be self-explanatory
 5. **Consistent Patterns**: Follow established patterns for new services
+
+## Future Migration to Wire-Only
+
+A comprehensive implementation plan has been created to migrate from the current hybrid approach to Wire-only dependency injection. See [Wire Migration Implementation Plan](../implementation-plan-wire-migration.md) for details.
+
+**Migration Benefits:**
+- **Compile-time safety**: All dependency issues caught at build time
+- **Reduced boilerplate**: 50% reduction in manual wiring code
+- **Better testability**: Clear dependency graphs for mocking
+- **Improved maintainability**: Explicit dependency relationships
+
+**Timeline:** 8-week phased migration maintaining backward compatibility
 
 ## Related ADRs
 - ADR-001: Single Workflow Tool Architecture (workflow orchestration context)

@@ -78,13 +78,13 @@ type WorkflowContext struct {
 
 // ErrorPatternRecognizer provides AI-powered error analysis using existing sampling client
 type ErrorPatternRecognizer struct {
-	samplingClient domainsampling.Sampler
+	samplingClient domainsampling.UnifiedSampler
 	errorHistory   *ErrorHistoryStore
 	logger         *slog.Logger
 }
 
 // NewErrorPatternRecognizer creates a new error pattern recognizer
-func NewErrorPatternRecognizer(samplingClient domainsampling.Sampler, logger *slog.Logger) *ErrorPatternRecognizer {
+func NewErrorPatternRecognizer(samplingClient domainsampling.UnifiedSampler, logger *slog.Logger) *ErrorPatternRecognizer {
 	return &ErrorPatternRecognizer{
 		samplingClient: samplingClient,
 		errorHistory:   NewErrorHistoryStore(),

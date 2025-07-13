@@ -60,36 +60,37 @@ type SessionManager interface {
 
 #### Error Handling Standards
 - Always handle errors explicitly - never ignore with `_`
-- Use the unified Rich error system from `pkg/common/errors/`
+- Use the unified Rich error system from `pkg/mcp/domain/errors/`
 - Use `errors.Is()` and `errors.As()` for error checking
 - Include domain context and proper error codes
 
 ```go
-// Use Rich error system with direct constructor
-import "github.com/Azure/container-kit/pkg/common/errors"
+// Use Rich error system with builder pattern
+import "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 
-return errors.New(
-    errors.CodeValidationFailed,
-    "workflow",
-    "validation failed for field: " + fieldName,
-    err,
-)
+return errors.NewError().
+    Code(errors.CodeValidationFailed).
+    Type(errors.ErrTypeValidation).
+    Severity(errors.SeverityMedium).
+    Message("validation failed for field: " + fieldName).
+    Context("field", fieldName).
+    Suggestion("Check field format and constraints").
+    WithLocation().
+    Build()
 
-// With additional context
-richErr := errors.New(
-    errors.CodeBuildFailed,
-    "build",
-    "Docker build failed during RUN step",
-    buildErr,
-)
-richErr.Fields = map[string]any{
-    "dockerfile_line": 15,
-    "command": "RUN npm install",
-    "exit_code": 1,
-}
-richErr.UserFacing = true
-richErr.Retryable = true
-return richErr
+// For workflow steps with actionable guidance
+return errors.NewError().
+    Code(errors.CodeBuildFailed).
+    Type(errors.ErrTypeBuild).
+    Severity(errors.SeverityHigh).
+    Message("Docker build failed during RUN step").
+    Context("dockerfile_line", 15).
+    Context("command", "RUN npm install").
+    Context("exit_code", 1).
+    Suggestion("Check package.json for missing dependencies").
+    Retryable(true).
+    UserFacing(true).
+    Build()
 ```
 
 ### Code Quality Standards
@@ -240,24 +241,22 @@ func sanitizePath(path string) string {
 
 ### Rich Error Pattern
 ```go
-// Use unified Rich error system from pkg/common/errors/
-import "github.com/Azure/container-kit/pkg/common/errors"
+// Use unified Rich error system from pkg/mcp/domain/errors/
+import "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 
-err := errors.New(
-    errors.CodeBuildFailed,
-    "build",
-    "Docker build failed during RUN step: npm install",
-    buildErr,
-)
-err.Severity = errors.SeverityHigh
-err.Fields = map[string]any{
-    "dockerfile_line": 15,
-    "command": "RUN npm install",
-    "exit_code": 1,
-}
-err.UserFacing = true
-err.Retryable = true
-return err
+return errors.NewError().
+    Code(errors.CodeBuildFailed).
+    Type(errors.ErrTypeBuild).
+    Severity(errors.SeverityHigh).
+    Message("Docker build failed during RUN step: npm install").
+    Context("dockerfile_line", 15).
+    Context("command", "RUN npm install").
+    Context("exit_code", 1).
+    Suggestion("Check package.json dependencies and Node.js version").
+    UserFacing(true).
+    Retryable(true).
+    WithLocation().
+    Build()
 ```
 
 ### Error Context
@@ -304,7 +303,9 @@ pkg/mcp/
 │   ├── commands/          # CQRS command handlers
 │   ├── queries/           # CQRS query handlers
 │   ├── config/            # Application configuration
-│   └── session/           # Session management
+│   ├── registrar/         # Tool and resource registration
+│   ├── session/           # Session management
+│   └── transport/         # Transport layer (stdio, HTTP)
 ├── domain/                # Business logic and workflows
 │   ├── workflow/          # Core containerization workflow
 │   ├── events/            # Domain events and handlers
@@ -320,17 +321,20 @@ pkg/mcp/
     ├── resources/         # MCP resource providers
     ├── tracing/           # Observability integration
     ├── utilities/         # Infrastructure utilities
-    └── validation/        # Validation implementations
+    ├── validation/        # Validation implementations
+    ├── middleware/        # Cross-cutting concerns
+    └── wire/              # Dependency injection with Wire
 ```
 
 **Key Architecture Features:**
 - **Clean Dependencies**: Infrastructure → Application → Domain → API
-- **Single Workflow**: `containerize_and_deploy` handles complete process
-- **CQRS Pattern**: Separate command and query handling
-- **Event-Driven**: Domain events for workflow coordination
-- **Saga Orchestration**: Distributed transaction coordination
+- **Single Workflow**: `containerize_and_deploy` handles complete process with 10 steps
+- **Event-Driven**: Domain events for workflow coordination and observability
+- **AI-Enhanced**: Built-in AI error recovery and ML-powered optimization
 - **Domain-Driven**: Core business logic isolated in domain layer
-- **AI-Enhanced**: Built-in AI error recovery and analysis capabilities
+- **Dependency Injection**: Wire-based DI with manual configuration
+- **Progress Tracking**: Real-time progress indicators with metadata
+- **Rich Error System**: Unified error handling with actionable suggestions
 - **Separation of Concerns**: Each layer has clear responsibilities
 
 ### Import Organization

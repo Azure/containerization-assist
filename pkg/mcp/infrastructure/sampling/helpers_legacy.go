@@ -68,10 +68,13 @@ func (c *Client) analyzeKubernetesManifestInternal(ctx context.Context, manifest
 	}()
 
 	var errorPreview string
+	var deploymentErrorStr string
 	if deploymentError != nil {
-		errorPreview = deploymentError.Error()[:min(100, len(deploymentError.Error()))]
+		deploymentErrorStr = deploymentError.Error()
+		errorPreview = deploymentErrorStr[:min(100, len(deploymentErrorStr))]
 	} else {
-		errorPreview = "No deployment error provided"
+		deploymentErrorStr = "No deployment error provided"
+		errorPreview = deploymentErrorStr
 	}
 	c.logger.Info("Requesting AI assistance to fix Kubernetes manifest",
 		"error_preview", errorPreview)
@@ -85,7 +88,7 @@ func (c *Client) analyzeKubernetesManifestInternal(ctx context.Context, manifest
 	// Prepare template data
 	templateData := prompts.TemplateData{
 		"ManifestContent":   manifestContent,
-		"DeploymentError":   deploymentError.Error(),
+		"DeploymentError":   deploymentErrorStr,
 		"DockerfileContent": dockerfileContent,
 		"RepoAnalysis":      repoAnalysis,
 	}
@@ -122,7 +125,11 @@ func (c *Client) analyzeKubernetesManifestInternal(ctx context.Context, manifest
 	result.Metadata.ProcessingTime = time.Since(startTime)
 
 	// Add original error info
-	result.OriginalIssues = []string{deploymentError.Error()}
+	if deploymentError != nil {
+		result.OriginalIssues = []string{deploymentError.Error()}
+	} else {
+		result.OriginalIssues = []string{deploymentErrorStr}
+	}
 
 	// Validate the result
 	if err := result.Validate(); err != nil {

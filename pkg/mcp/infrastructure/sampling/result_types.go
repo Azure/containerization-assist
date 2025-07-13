@@ -4,8 +4,11 @@ package sampling
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
+
+	domain "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 )
 
 // ManifestFix represents a structured response for Kubernetes manifest fixes
@@ -135,9 +138,10 @@ type ResponseMetadata struct {
 type ChangeType string
 
 const (
-	ChangeTypeAdded    ChangeType = "added"
-	ChangeTypeRemoved  ChangeType = "removed"
-	ChangeTypeModified ChangeType = "modified"
+	ChangeTypeAdded        ChangeType = "added"
+	ChangeTypeRemoved      ChangeType = "removed"
+	ChangeTypeModified     ChangeType = "modified"
+	ChangeTypeOptimization ChangeType = "optimization"
 )
 
 type Severity string
@@ -354,6 +358,144 @@ func (p *DefaultParser) ParseSecurityAnalysis(content string) (*SecurityAnalysis
 		result.RiskLevel = RiskLevelCritical
 	} else if strings.Contains(contentLower, "high") {
 		result.RiskLevel = RiskLevelHigh
+	}
+
+	return result, nil
+}
+
+// ParseErrorAnalysis parses AI response into structured ErrorAnalysis
+func (p *DefaultParser) ParseErrorAnalysis(content string) (*ErrorAnalysis, error) {
+	result := &ErrorAnalysis{}
+
+	// Simple parsing - extract root cause and fix sections
+	lines := strings.Split(content, "\n")
+	inRootCause := false
+	inFix := false
+
+	var rootCauseLines []string
+	var fixLines []string
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		if strings.Contains(strings.ToLower(line), "root cause") {
+			inRootCause = true
+			inFix = false
+			continue
+		}
+		if strings.Contains(strings.ToLower(line), "fix") || strings.Contains(strings.ToLower(line), "solution") {
+			inRootCause = false
+			inFix = true
+			continue
+		}
+
+		if inRootCause && line != "" {
+			rootCauseLines = append(rootCauseLines, line)
+		}
+		if inFix && line != "" {
+			fixLines = append(fixLines, line)
+		}
+	}
+
+	result.RootCause = strings.Join(rootCauseLines, "\n")
+	result.Fix = strings.Join(fixLines, "\n")
+
+	if result.RootCause == "" {
+		result.RootCause = "Unable to determine root cause from analysis"
+	}
+	if result.Fix == "" {
+		result.Fix = "Please check logs and configuration for more details"
+	}
+
+	return result, nil
+}
+
+// ParseDockerfileAnalysis parses AI response into structured DockerfileAnalysis
+func (p *DefaultParser) ParseDockerfileAnalysis(content string) (*domain.DockerfileAnalysis, error) {
+	// This is a simple implementation - in production you'd have more sophisticated parsing
+	result := &domain.DockerfileAnalysis{
+		Language:      "unknown",
+		Framework:     "unknown",
+		Port:          8080,
+		BuildSteps:    []string{},
+		Dependencies:  []string{},
+		Issues:        []string{},
+		Suggestions:   []string{},
+		BaseImage:     "unknown",
+		EstimatedSize: "unknown",
+	}
+
+	// Parse content for known patterns
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "Language:") {
+			result.Language = strings.TrimSpace(strings.Split(line, ":")[1])
+		}
+		if strings.Contains(line, "Framework:") {
+			result.Framework = strings.TrimSpace(strings.Split(line, ":")[1])
+		}
+		if strings.Contains(line, "Port:") {
+			if parts := strings.Split(line, ":"); len(parts) > 1 {
+				if port, err := strconv.Atoi(strings.TrimSpace(parts[1])); err == nil {
+					result.Port = port
+				}
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// ParseManifestAnalysis parses AI response into structured ManifestAnalysis
+func (p *DefaultParser) ParseManifestAnalysis(content string) (*domain.ManifestAnalysis, error) {
+	result := &domain.ManifestAnalysis{
+		ResourceTypes: []string{},
+		Issues:        []string{},
+		Suggestions:   []string{},
+		SecurityRisks: []string{},
+		BestPractices: []string{},
+	}
+
+	// Simple parsing based on sections
+	lines := strings.Split(content, "\n")
+	currentSection := ""
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		if strings.Contains(strings.ToLower(line), "resource") {
+			currentSection = "resources"
+			continue
+		}
+		if strings.Contains(strings.ToLower(line), "issue") {
+			currentSection = "issues"
+			continue
+		}
+		if strings.Contains(strings.ToLower(line), "suggestion") {
+			currentSection = "suggestions"
+			continue
+		}
+		if strings.Contains(strings.ToLower(line), "security") {
+			currentSection = "security"
+			continue
+		}
+
+		if line != "" && strings.HasPrefix(line, "-") {
+			item := strings.TrimPrefix(line, "-")
+			item = strings.TrimSpace(item)
+
+			switch currentSection {
+			case "resources":
+				result.ResourceTypes = append(result.ResourceTypes, item)
+			case "issues":
+				result.Issues = append(result.Issues, item)
+			case "suggestions":
+				result.Suggestions = append(result.Suggestions, item)
+			case "security":
+				result.SecurityRisks = append(result.SecurityRisks, item)
+			}
+		}
 	}
 
 	return result, nil

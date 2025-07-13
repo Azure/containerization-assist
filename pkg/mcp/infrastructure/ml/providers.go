@@ -9,13 +9,13 @@ import (
 )
 
 // ProvideErrorPatternRecognizer creates an error pattern recognizer
-func ProvideErrorPatternRecognizer(samplingClient domainsampling.Sampler, logger *slog.Logger) *ErrorPatternRecognizer {
+func ProvideErrorPatternRecognizer(samplingClient domainsampling.UnifiedSampler, logger *slog.Logger) *ErrorPatternRecognizer {
 	return NewErrorPatternRecognizer(samplingClient, logger)
 }
 
 // ProvideEnhancedErrorHandler creates an enhanced error handler
 func ProvideEnhancedErrorHandler(
-	samplingClient domainsampling.Sampler,
+	samplingClient domainsampling.UnifiedSampler,
 	eventPublisher *events.Publisher,
 	logger *slog.Logger,
 ) *EnhancedErrorHandler {

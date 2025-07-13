@@ -1,7 +1,7 @@
 # ADR-006: Four-Layer MCP Architecture
 
 **Date**: 2025-07-12  
-**Status**: Accepted  
+**Status**: Implemented  
 **Deciders**: Development Team  
 
 ## Context

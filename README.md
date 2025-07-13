@@ -4,7 +4,7 @@
 
 AI-Powered Application Containerization and Kubernetes Deployment
 
-Container Kit automates the complete containerization process from repository analysis to Kubernetes deployment using a unified workflow approach. After aggressive simplification, it now provides a single, powerful workflow tool that handles the entire process with built-in progress tracking.
+Container Kit automates the complete containerization process from repository analysis to Kubernetes deployment using a unified workflow approach. Built on a clean 4-layer architecture with Domain-Driven Design, it provides a single, powerful workflow tool that handles the entire process with AI-powered error recovery and built-in progress tracking.
 
 ## 🚀 Quick Install
 
@@ -124,33 +124,33 @@ pkg/
 └── pipeline/        # Legacy pipeline stages
 ```
 
-**Key Improvements:**
-- **Clean Architecture**: 4-layer Domain-Driven Design with clear dependencies
-- **CQRS Pattern**: Separate command and query handling for better scalability
-- **Event-Driven**: Domain events for workflow coordination and observability
-- **Saga Orchestration**: Distributed transaction coordination for complex workflows
-- **Single Workflow**: One unified tool handles the complete containerization process
-- **Progress Tracking**: Structured logging with real-time progress indicators
-- **ML Integration**: Machine learning for build optimization and pattern recognition
-- **Robust Testing**: Comprehensive test suite with property-based testing
-- **Error Recovery**: AI-powered retry logic with actionable error messages
+**Key Architecture Features:**
+- **Clean 4-Layer Architecture**: API → Domain → Application → Infrastructure with clear dependencies
+- **Single Workflow Tool**: `containerize_and_deploy` handles complete 10-step process
+- **Event-Driven Design**: Domain events for workflow coordination and observability
+- **AI-Enhanced Operations**: Built-in AI error recovery and ML-powered optimization
+- **Progress Tracking**: Real-time progress indicators with metadata and visual feedback
+- **Rich Error System**: Unified error handling with actionable suggestions
+- **Session Management**: BoltDB-based state persistence across operations
+- **Dependency Injection**: Wire-based DI with manual configuration for testability
+- **Comprehensive Testing**: Integration tests with workflow validation
 
 > **📖 Technical Details**: See [Development Guidelines](DEVELOPMENT_GUIDELINES.md) and [Container Kit Design Document](docs/CONTAINER_KIT_DESIGN_DOCUMENT.md).
 
 ## 🛠️ Key Features
 
-- **Unified Workflow**: Complete containerization in a single tool (`containerize_and_deploy`)
-- **Progress Monitoring**: Structured logging with emoji indicators (🚀🔄✅❌🎉)
-- **AI-Guided Process**: Interactive assistance with retry logic throughout workflow
-- **Session Persistence**: BoltDB-based state management across operations
-- **Event-Driven Architecture**: Domain events for workflow coordination and observability
-- **CQRS Implementation**: Separate command and query handling for scalability
-- **Saga Orchestration**: Distributed transaction coordination for complex workflows
-- **ML-Powered Optimization**: Machine learning for build optimization and pattern recognition
-- **Multi-Transport**: stdio and HTTP support with proper error handling
-- **Kubernetes Integration**: Generate manifests and deploy with validation retry
-- **Security Scanning**: Built-in vulnerability detection with Trivy/Grype
-- **Clean Architecture**: 4-layer design with comprehensive test coverage
+- **Single Workflow Tool**: Complete containerization via `containerize_and_deploy` with 10 structured steps
+- **AI-Powered Error Recovery**: Intelligent error analysis and automated retry logic with context
+- **Real-Time Progress Tracking**: Visual progress indicators with step-by-step feedback
+- **Rich Error System**: Structured error handling with actionable suggestions and severity levels
+- **ML-Enhanced Optimization**: Machine learning for build optimization and pattern recognition
+- **Event-Driven Coordination**: Domain events for workflow orchestration and observability
+- **Session Persistence**: BoltDB-based state management with automatic cleanup
+- **Clean Architecture**: 4-layer Domain-Driven Design with proper dependency flow
+- **Security Integration**: Comprehensive vulnerability scanning with Trivy/Grype
+- **Kubernetes Native**: Automated manifest generation and deployment with health checks
+- **Multi-Transport Support**: stdio and HTTP transports with graceful shutdown
+- **Comprehensive Testing**: Unit and integration tests with workflow validation
 
 ## 🧪 Quick Example
 
@@ -160,19 +160,19 @@ pkg/
 
 # Container Kit provides a single powerful workflow tool:
 # - containerize_and_deploy: Complete containerization workflow
-#   ├── 1/10: Repository analysis
-#   ├── 2/10: Dockerfile generation
-#   ├── 3/10: Container building
-#   ├── 4/10: Security scanning
-#   ├── 5/10: Image tagging
-#   ├── 6/10: Registry push
-#   ├── 7/10: Kubernetes manifest generation
-#   ├── 8/10: Cluster setup
-#   ├── 9/10: Deployment
-#   └── 10/10: Health verification
+#   ├── 1/10: Analyze repository structure and detect language/framework
+#   ├── 2/10: Generate optimized Dockerfile with AI assistance
+#   ├── 3/10: Build Docker image with AI-powered error fixing
+#   ├── 4/10: Set up local Kubernetes cluster with registry
+#   ├── 5/10: Load Docker image into Kubernetes cluster
+#   ├── 6/10: Generate Kubernetes deployment manifests
+#   ├── 7/10: Deploy application to Kubernetes cluster
+#   ├── 8/10: Perform health checks and endpoint discovery
+#   ├── 9/10: Run security vulnerability scan (optional)
+#   └── 10/10: Finalize workflow results and cleanup
 
-# Use through Claude Desktop or direct API calls
-# Ask: "Containerize my Python Flask app and deploy to Kubernetes"
+# Use through Claude Desktop or direct MCP protocol
+# Example: "Containerize my Node.js app and deploy to Kubernetes"
 ```
 
 ## 🤝 Contributing

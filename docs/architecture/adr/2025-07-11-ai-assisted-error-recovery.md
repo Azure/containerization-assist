@@ -169,14 +169,14 @@ func (r *AIRetry) RetryDeployment(ctx context.Context, deployFunc func() error) 
 - **Interactive Recovery**: AI can request additional context through MCP
 
 ## Implementation Status
-- ✅ AI retry system core implementation
+- ✅ AI retry system core implementation (`pkg/mcp/infrastructure/utilities/ai_retry.go`)
 - ✅ Integration with rich error system
-- ✅ Workflow step retry integration
+- 🔄 **Partial workflow integration**: Retry logic exists but main workflow uses simplified approach
 - ✅ Context extraction for common failure scenarios
 - ✅ MCP protocol integration for AI communication
 - ✅ Backoff and retry strategy implementation
-- 🚧 AI assistant interaction templates (ongoing)
-- 🚧 Machine learning for retry optimization (future)
+- ✅ AI assistant interaction templates (dockerfile-fix.yaml, kubernetes-manifest-fix.yaml)
+- 🚧 Machine learning for retry optimization (infrastructure exists in `pkg/mcp/infrastructure/ml/`)
 
 ## Usage Guidelines
 1. **Error Classification**: Classify errors as retryable/non-retryable

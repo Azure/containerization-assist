@@ -4,12 +4,27 @@ package workflow
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps"
+	"github.com/rs/zerolog"
 )
 
 // Note: extractRepoName is already defined in containerize.go
+
+// createZerologFromSlog creates a zerolog logger from an slog logger
+// This is a bridge function to use existing security scanners that expect zerolog
+func createZerologFromSlog(slogLogger *slog.Logger) zerolog.Logger {
+	// Create a basic zerolog logger that writes to the same output
+	// For now, we'll use a simple console writer that matches slog output
+	return zerolog.New(zerolog.ConsoleWriter{Out: zerolog.NewConsoleWriter().Out}).
+		With().
+		Timestamp().
+		Str("component", "security_scanner").
+		Logger()
+}
 
 // BuildStep implements Docker image building
 type BuildStep struct{}
@@ -123,20 +138,107 @@ func (s *ScanStep) Execute(ctx context.Context, state *WorkflowState) error {
 
 	state.Logger.Info("Step 4: Running security vulnerability scan")
 
-	// TODO: Implement actual vulnerability scanning
-	// For now, create a placeholder scan report
-	state.ScanReport = map[string]interface{}{
-		"scanner":         "trivy",
-		"scan_time":       time.Now().Format(time.RFC3339),
-		"vulnerabilities": 0,
-		"critical_vulns":  0,
-		"high_vulns":      0,
-		"medium_vulns":    0,
-		"low_vulns":       0,
-		"status":          "clean",
+	// Implement actual vulnerability scanning using UnifiedSecurityScanner
+	imageRef := state.BuildResult.ImageRef
+	if imageRef == "" {
+		return fmt.Errorf("no image reference available for security scan")
 	}
 
-	state.Logger.Info("Security scan completed", "status", "clean")
+	// Create zerolog logger from slog logger for the scanner
+	zerologLogger := createZerologFromSlog(state.Logger)
+
+	// Initialize the unified security scanner
+	scanner := docker.NewUnifiedSecurityScanner(zerologLogger)
+
+	// Run the security scan with medium severity threshold
+	scanResult, err := scanner.ScanImage(ctx, imageRef, "medium")
+	if err != nil {
+		state.Logger.Error("Security scan failed", "error", err, "image", imageRef)
+		// Don't fail the workflow for scan errors, just log and continue
+		state.ScanReport = map[string]interface{}{
+			"scanner":   "unified",
+			"scan_time": time.Now().Format(time.RFC3339),
+			"status":    "error",
+			"error":     err.Error(),
+			"image_ref": imageRef,
+		}
+		state.Logger.Warn("Continuing workflow despite scan failure")
+		return nil
+	}
+
+	// Process scan results
+	vulnerabilityCount := 0
+	criticalCount := 0
+	highCount := 0
+	mediumCount := 0
+	lowCount := 0
+
+	// Extract vulnerability counts from the unified scan result
+	if scanResult.TrivyResult != nil && scanResult.TrivyResult.Vulnerabilities != nil {
+		for _, vuln := range scanResult.TrivyResult.Vulnerabilities {
+			vulnerabilityCount++
+			switch vuln.Severity {
+			case "CRITICAL":
+				criticalCount++
+			case "HIGH":
+				highCount++
+			case "MEDIUM":
+				mediumCount++
+			case "LOW":
+				lowCount++
+			}
+		}
+	}
+
+	// Determine scan status
+	scanStatus := "clean"
+	if criticalCount > 0 {
+		scanStatus = "critical"
+	} else if highCount > 0 {
+		scanStatus = "high"
+	} else if mediumCount > 0 {
+		scanStatus = "medium"
+	} else if vulnerabilityCount > 0 {
+		scanStatus = "low"
+	}
+
+	// Create comprehensive scan report
+	state.ScanReport = map[string]interface{}{
+		"scanner":         "unified",
+		"scan_time":       scanResult.ScanTime.Format(time.RFC3339),
+		"duration":        scanResult.Duration.String(),
+		"image_ref":       imageRef,
+		"vulnerabilities": vulnerabilityCount,
+		"critical_vulns":  criticalCount,
+		"high_vulns":      highCount,
+		"medium_vulns":    mediumCount,
+		"low_vulns":       lowCount,
+		"status":          scanStatus,
+		"trivy_enabled":   scanResult.TrivyResult != nil,
+		"grype_enabled":   scanResult.GrypeResult != nil,
+		"success":         scanResult.Success,
+	}
+
+	// Add remediation information if available
+	if len(scanResult.Remediation) > 0 {
+		remediationSteps := make([]map[string]interface{}, len(scanResult.Remediation))
+		for i, step := range scanResult.Remediation {
+			remediationSteps[i] = map[string]interface{}{
+				"action":      step.Action,
+				"description": step.Description,
+				"priority":    step.Priority,
+			}
+		}
+		state.ScanReport["remediation"] = remediationSteps
+	}
+
+	state.Logger.Info("Security scan completed",
+		"status", scanStatus,
+		"total_vulns", vulnerabilityCount,
+		"critical", criticalCount,
+		"high", highCount,
+		"medium", mediumCount,
+		"low", lowCount)
 	return nil
 }
 
@@ -235,20 +337,56 @@ func (s *ManifestStep) Execute(ctx context.Context, state *WorkflowState) error 
 		return fmt.Errorf("k8s manifest generation failed: %v", err)
 	}
 
-	// Store K8s result in workflow state
+	// Extract actual manifest content from the result
+	manifestContent := []string{}
+	if k8sResult.Manifests != nil {
+		if manifests, ok := k8sResult.Manifests["manifests"]; ok {
+			// Handle different types of manifest content
+			switch v := manifests.(type) {
+			case []string:
+				// If manifests are already a slice of strings
+				manifestContent = v
+			case []interface{}:
+				// If manifests are a slice of interfaces, convert to strings
+				for _, manifest := range v {
+					if manifestStr, ok := manifest.(string); ok {
+						manifestContent = append(manifestContent, manifestStr)
+					}
+				}
+			case map[string]interface{}:
+				// If manifests are a map, extract values as strings
+				for _, manifest := range v {
+					if manifestStr, ok := manifest.(string); ok {
+						manifestContent = append(manifestContent, manifestStr)
+					}
+				}
+			case string:
+				// If it's a single manifest string
+				manifestContent = []string{v}
+			}
+		}
+	}
+
+	// Store K8s result in workflow state with extracted manifest content
 	state.K8sResult = &K8sResult{
-		Manifests:   []string{}, // TODO: Extract actual manifest content
+		Manifests:   manifestContent, // Now contains actual manifest content
 		Namespace:   k8sResult.Namespace,
 		ServiceName: k8sResult.AppName, // Use AppName as service name
 		Endpoint:    k8sResult.ServiceURL,
 		Metadata: map[string]interface{}{
-			"app_name":      k8sResult.AppName,
-			"ingress_url":   k8sResult.IngressURL,
-			"manifest_path": k8sResult.Manifests["path"], // Store manifest path for deployment
+			"app_name":       k8sResult.AppName,
+			"ingress_url":    k8sResult.IngressURL,
+			"manifest_path":  k8sResult.Manifests["path"], // Store manifest path for deployment
+			"manifest_count": len(manifestContent),
+			"template_used":  k8sResult.Manifests["template"],
 		},
 	}
 
-	state.Logger.Info("Kubernetes manifests generated successfully", "app_name", appName, "namespace", k8sResult.Namespace)
+	state.Logger.Info("Kubernetes manifests generated successfully",
+		"app_name", appName,
+		"namespace", k8sResult.Namespace,
+		"manifest_count", len(manifestContent),
+		"manifests_extracted", len(manifestContent) > 0)
 	return nil
 }
 
