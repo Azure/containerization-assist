@@ -62,6 +62,11 @@ type Tracker struct {
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 	mu     sync.Mutex
+
+	// Enhanced ETA tracking
+	stepDurations []time.Duration // Track historical step times
+	avgStepTime   time.Duration   // Exponential moving average
+	stepStart     time.Time       // When current step started
 }
 
 // NewTracker creates a progress tracker.
@@ -205,6 +210,30 @@ func (t *Tracker) publish(step int, msg string, meta map[string]interface{}) {
 	if time.Since(t.last) < t.throttle && step < t.total {
 		return
 	}
+
+	// Track step completion for enhanced ETA
+	if step > t.curStep {
+		now := time.Now()
+		if !t.stepStart.IsZero() {
+			stepDuration := now.Sub(t.stepStart)
+			t.stepDurations = append(t.stepDurations, stepDuration)
+
+			// Keep only last 10 step durations
+			if len(t.stepDurations) > 10 {
+				t.stepDurations = t.stepDurations[1:]
+			}
+
+			// Update exponential moving average
+			if t.avgStepTime == 0 {
+				t.avgStepTime = stepDuration
+			} else {
+				// EMA with alpha = 0.3
+				t.avgStepTime = time.Duration(0.7*float64(t.avgStepTime) + 0.3*float64(stepDuration))
+			}
+		}
+		t.stepStart = now
+	}
+
 	t.curStep = step
 	t.last = time.Now()
 
@@ -218,11 +247,19 @@ func (t *Tracker) publish(step int, msg string, meta map[string]interface{}) {
 		UserMeta:   meta,
 	}
 
-	// Calculate ETA for non-zero progress
+	// Enhanced ETA calculation with historical data
 	if step > 0 && step < t.total {
-		elapsed := time.Since(t.start)
-		eta := time.Duration(float64(elapsed) / float64(step) * float64(t.total-step))
-		u.ETA = eta
+		if len(t.stepDurations) > 0 && t.avgStepTime > 0 {
+			// Use exponential moving average of step durations
+			remainingSteps := t.total - step
+			eta := time.Duration(float64(t.avgStepTime) * float64(remainingSteps))
+			u.ETA = eta
+		} else {
+			// Fallback to simple linear projection
+			elapsed := time.Since(t.start)
+			eta := time.Duration(float64(elapsed) / float64(step) * float64(t.total-step))
+			u.ETA = eta
+		}
 	}
 
 	if status, ok := meta["status"].(string); ok {

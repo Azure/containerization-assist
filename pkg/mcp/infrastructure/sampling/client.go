@@ -526,3 +526,49 @@ func (c *Client) calculateBackoff(attempt int) time.Duration {
 
 	return backoff
 }
+
+// emitTokenProgress emits progress updates during token streaming
+func (c *Client) emitTokenProgress(ctx context.Context, tokensGenerated int, maxTokens int32, startTime time.Time) {
+	if srv := server.ServerFromContext(ctx); srv != nil {
+		percentage := 0
+		if maxTokens > 0 {
+			percentage = int(float64(tokensGenerated) / float64(maxTokens) * 100)
+			if percentage > 100 {
+				percentage = 100
+			}
+		}
+
+		elapsed := time.Since(startTime)
+		var eta time.Duration
+		if tokensGenerated > 0 && maxTokens > 0 {
+			tokensPerSecond := float64(tokensGenerated) / elapsed.Seconds()
+			remainingTokens := float64(maxTokens) - float64(tokensGenerated)
+			if tokensPerSecond > 0 {
+				eta = time.Duration(remainingTokens/tokensPerSecond) * time.Second
+			}
+		}
+
+		payload := map[string]interface{}{
+			"progressToken": "llm-generation",
+			"step":          tokensGenerated,
+			"total":         int(maxTokens),
+			"percentage":    percentage,
+			"status":        "generating",
+			"step_name":     "llm_token_generation",
+			"substep_name":  fmt.Sprintf("token %d/%d", tokensGenerated, maxTokens),
+			"message":       fmt.Sprintf("Generating tokens: %d/%d (%d%%)", tokensGenerated, maxTokens, percentage),
+			"eta_ms":        eta.Milliseconds(),
+			"metadata": map[string]interface{}{
+				"kind":             "token_stream",
+				"tokens_generated": tokensGenerated,
+				"estimated_total":  maxTokens,
+				"tokens_per_sec":   float64(tokensGenerated) / elapsed.Seconds(),
+			},
+		}
+
+		// Send the progress notification
+		if err := srv.SendNotificationToClient(ctx, "notifications/progress", payload); err != nil {
+			c.logger.Debug("Failed to send token progress notification", "error", err)
+		}
+	}
+}

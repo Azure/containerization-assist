@@ -1,4 +1,4 @@
-# ADR-010: AI-Assisted Error Recovery Architecture
+# ADR-005: AI-Assisted Error Recovery Architecture
 
 Date: 2025-07-11
 Status: Accepted
@@ -9,8 +9,9 @@ Decision: Implement an AI-assisted error recovery architecture that provides str
 ## Architecture Details
 
 ### Core Components
-- **AI Retry System**: `pkg/mcp/infrastructure/retry/ai_retry.go` - Intelligent retry logic
-- **Rich Error Integration**: Structured error context for AI consumption
+- **AI Retry System**: `pkg/mcp/infrastructure/utilities/ai_retry.go` - Intelligent retry logic
+- **Rich Error Integration**: Structured error context for AI consumption  
+- **Sampling Client**: LLM integration for guided retry decisions
 - **Recovery Strategies**: Built-in recovery patterns for common failure scenarios
 - **Workflow Integration**: Seamless integration with single workflow architecture
 
@@ -152,12 +153,12 @@ func (r *AIRetry) RetryDeployment(ctx context.Context, deployFunc func() error) 
 
 ## Integration with Other Systems
 
-### Rich Error System (ADR-009)
+### Rich Error System (ADR-004)
 - **Error Enrichment**: AI retry system enhances rich errors with retry context
 - **Structured Output**: Rich errors provide AI-consumable format
 - **Context Preservation**: Error context maintained across retry attempts
 
-### Single Workflow Architecture (ADR-008)
+### Single Workflow Architecture (ADR-001)
 - **Workflow Integration**: Retry logic embedded in workflow steps
 - **Progress Tracking**: Retry attempts tracked in workflow progress
 - **State Management**: Workflow state preserved across retry attempts
@@ -185,6 +186,7 @@ func (r *AIRetry) RetryDeployment(ctx context.Context, deployFunc func() error) 
 5. **Fallback Strategies**: Provide manual recovery options when AI fails
 
 ## Related ADRs
-- ADR-009: Unified Rich Error System (provides structured error foundation)
-- ADR-008: Single Workflow Tool Architecture (workflow context for retry)
-- ADR-007: Model Context Protocol as Primary Interface (AI communication channel)
+- ADR-004: Unified Rich Error System (provides structured error foundation)
+- ADR-001: Single Workflow Tool Architecture (workflow context for retry)
+- ADR-006: Four-Layer MCP Architecture (infrastructure layer integration)
+- ADR-007: CQRS, Saga, and Wire Patterns (advanced error recovery coordination)

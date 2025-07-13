@@ -1,0 +1,8 @@
+{
+    "chat.mcp.serverSampling": {
+        "container-kit/.vscode/mcp.json: containerKit": {
+            "allowedDuringChat": true,
+            "allowedOutsideChat": true
+        }
+    }
+}

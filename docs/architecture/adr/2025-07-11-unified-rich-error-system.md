@@ -1,54 +1,52 @@
-# ADR-009: Unified Rich Error System with Code Generation
+# ADR-004: Unified Rich Error System
 
 Date: 2025-07-11
 Status: Accepted
 Context: Container Kit originally had multiple competing error handling systems scattered across different packages, leading to inconsistent error reporting, poor debugging experience, and lack of structured error context for AI-assisted recovery. The system needed a unified approach to error handling that could provide rich context for both human operators and AI assistants.
 
-Decision: Implement a unified rich error system with code generation that provides structured error context, severity levels, actionable messages, and AI-friendly error information. The system uses YAML-based error code definitions with Go code generation to ensure type safety and consistency.
+Decision: Implement a unified rich error system that provides structured error context, severity levels, actionable messages, and AI-friendly error information. The system provides a centralized error type with rich metadata for enhanced debugging and AI-assisted recovery.
 
 ## Architecture Details
 
 ### Core Components
 - **Rich Error Type**: `pkg/common/errors/errors.go` - Structured error with metadata
-- **Code Generation**: `codes.yaml` → `codes_gen.go` - Type-safe error codes
-- **Builder Pattern**: Fluent API for constructing rich errors
+- **Error Codes**: Predefined error codes with severity and type classification
+- **Constructor Functions**: Simple constructors for creating rich errors
 - **AI Integration**: Structured context for AI-assisted error recovery
 
 ### Rich Error Structure
 ```go
-type RichError struct {
-    Code         ErrorCode             `json:"code"`
-    Type         ErrorType             `json:"type"`
-    Severity     ErrorSeverity         `json:"severity"`
-    Message      string                `json:"message"`
-    Context      map[string]interface{} `json:"context"`
-    Suggestions  []string              `json:"suggestions"`
-    Location     *ErrorLocation        `json:"location,omitempty"`
-    Cause        error                 `json:"cause,omitempty"`
-    Timestamp    time.Time             `json:"timestamp"`
-    Component    string                `json:"component"`
-    Operation    string                `json:"operation"`
+// pkg/common/errors/errors.go
+type Rich struct {
+    Code       Code             `json:"code"`
+    Severity   Severity         `json:"severity"`
+    Message    string           `json:"message"`
+    Retryable  bool             `json:"retryable"`
+    Fields     map[string]any   `json:"fields,omitempty"`
+    Cause      error            `json:"cause,omitempty"`
+    Timestamp  time.Time        `json:"timestamp"`
+    Context    string           `json:"context,omitempty"`
 }
 ```
 
-### Builder Pattern Usage
+### Constructor Usage
 ```go
-return errors.NewError().
-    Code(errors.CodeValidationFailed).
-    Type(errors.ErrTypeValidation).
-    Severity(errors.SeverityMedium).
-    Message("validation failed").
-    Context("field", fieldName).
-    Suggestion("Check field format").
-    WithLocation().
-    Build()
+// Simple constructor for rich errors
+return errors.New(
+    errors.CodeValidationFailed,
+    errors.SeverityMedium,
+    "validation failed",
+    errors.WithField("field", fieldName),
+    errors.WithRetryable(false),
+    errors.WithContext("user input validation"),
+)
 ```
 
-### Code Generation System
-- **Input**: `pkg/common/errors/codes.yaml` - Human-readable error definitions
-- **Output**: `pkg/common/errors/codes_gen.go` - Type-safe Go constants
+### Error Classification System
+- **Error Codes**: Predefined constants in `pkg/common/errors/errors.go`
 - **Categories**: Validation, Infrastructure, Business Logic, Security
 - **Severity Levels**: Critical, High, Medium, Low, Info
+- **Retry Classification**: Automatic determination of retry eligibility
 
 ## Previous Architecture Issues
 
@@ -125,6 +123,7 @@ return errors.NewError().
 5. **Preserve Cause**: Wrap underlying errors to maintain error chains
 
 ## Related ADRs
-- ADR-010: AI-Assisted Error Recovery (consumes rich error context)
-- ADR-008: Single Workflow Tool Architecture (unified error handling across workflow)
-- ADR-011: Manual Dependency Injection (simplified error propagation)
+- ADR-005: AI-Assisted Error Recovery (consumes rich error context)
+- ADR-001: Single Workflow Tool Architecture (unified error handling across workflow)
+- ADR-003: Manual Dependency Injection (simplified error propagation)
+- ADR-006: Four-Layer MCP Architecture (error handling across layers)

@@ -44,83 +44,108 @@ pkg/mcp/
 │   └── interfaces.go       # Essential MCP tool interfaces
 ├── application/            # Application services and orchestration
 │   ├── server.go          # MCP server implementation
-│   ├── chat_mode.go       # Chat mode integration
+│   ├── bootstrap.go       # Dependency injection setup
+│   ├── commands/          # CQRS command handlers
+│   ├── queries/           # CQRS query handlers
+│   ├── config/            # Application configuration
 │   └── session/           # Session management
 ├── domain/                # Business logic and workflows
 │   ├── workflow/          # Core containerization workflow
-│   ├── errors/            # Rich error handling system
+│   ├── events/            # Domain events and handlers
 │   ├── progress/          # Progress tracking (business concept)
-│   └── elicitation/       # User input gathering (business process)
+│   ├── saga/              # Saga pattern coordination
+│   └── sampling/          # Domain sampling contracts
 └── infrastructure/        # Technical implementations
     ├── steps/             # Workflow step implementations
-    ├── analysis/          # Repository analysis
-    ├── retry/             # AI-powered retry logic
-    ├── security/          # Security utilities
+    ├── ml/                # Machine learning integrations
     ├── sampling/          # LLM integration
+    ├── progress/          # Progress tracking implementations
     ├── prompts/           # MCP prompt management
-    └── resources/         # MCP resource providers
+    ├── resources/         # MCP resource providers
+    ├── tracing/           # Observability integration
+    ├── utilities/         # Infrastructure utilities
+    └── validation/        # Validation implementations
 ```
 
 ### Why This Architecture Works
 
 1. **Clean Dependencies**: Infrastructure → Application → Domain → API
 2. **Single Workflow**: `containerize_and_deploy` handles complete process
-3. **Domain-Driven**: Core business logic isolated in domain layer
-4. **Separation of Concerns**: Each layer has clear responsibilities
-5. **AI-Enhanced**: Built-in AI error recovery and analysis capabilities
+3. **CQRS Implementation**: Separate command and query handling for scalability
+4. **Event-Driven Design**: Domain events for workflow coordination and observability
+5. **Saga Orchestration**: Distributed transaction coordination for complex workflows
+6. **ML Integration**: Machine learning for build optimization and pattern recognition
+7. **Domain-Driven**: Core business logic isolated in domain layer
+8. **Separation of Concerns**: Each layer has clear responsibilities
+9. **AI-Enhanced**: Built-in AI error recovery and analysis capabilities
 
 ## How the Workflow Tool Works
 
 ### Unified Workflow Process
 Container Kit provides a single, comprehensive workflow with AI orchestration that handles the complete containerization process:
 
-1. **Analyze** (1/9): Repository structure and technology detection
-2. **Dockerfile** (2/9): Generate optimized Dockerfile with AI assistance
-3. **Build** (3/9): Docker image construction with AI-powered error fixing
-4. **Scan** (4/9): Security vulnerability scanning with AI analysis
-5. **Setup Cluster** (5/9): Local Kubernetes cluster setup with registry
-6. **Load Image** (6/9): Load Docker image into Kubernetes cluster
-7. **Generate Manifests** (7/9): Generate Kubernetes deployment manifests
-8. **Deploy** (8/9): Application deployment with AI-powered error recovery
-9. **Verify** (9/9): Health check and endpoint validation
+1. **Analyze Repository** (1/10): Repository structure and technology detection
+2. **Generate Dockerfile** (2/10): Generate optimized Dockerfile with AI assistance
+3. **Build Image** (3/10): Docker image construction with AI-powered error fixing
+4. **Setup Kind Cluster** (4/10): Local Kubernetes cluster setup with registry
+5. **Load Image** (5/10): Load Docker image into Kubernetes cluster
+6. **Generate K8s Manifests** (6/10): Generate Kubernetes deployment manifests
+7. **Deploy to K8s** (7/10): Application deployment with AI-powered error recovery
+8. **Health Probe** (8/10): Health check and endpoint validation
+9. **Vulnerability Scan** (9/10): Security vulnerability scanning with AI analysis (optional)
+10. **Finalize Result** (10/10): Workflow completion and cleanup
 
 ### Progress Tracking
 Each step provides:
-- **Progress indicator**: "3/9" style progress with percentage
-- **Human-readable message**: "[33%] Analyzing repository structure..."
+- **Progress indicator**: "3/10" style progress with percentage
+- **Human-readable message**: "[30%] Analyzing repository structure..."
 - **AI-powered error recovery**: Detailed error context with AI suggestions
 - **Duration tracking**: Time spent on each step
 - **Metadata tracking**: Structured metadata for progress monitoring
+- **Event publishing**: Domain events for workflow coordination
+- **ML optimization**: Machine learning insights for build improvement
 
 ### Workflow Tool Structure
 ```go
 // RegisterWorkflowTools registers the comprehensive containerization workflow
-func RegisterWorkflowTools(mcpServer *server.MCPServer, logger *slog.Logger) error {
-	tool := mcp.Tool{
-		Name:        "containerize_and_deploy",
-		Description: "Complete containerization workflow from analysis to deployment",
-	}
+func RegisterWorkflowTools(mcpServer interface {
+    AddTool(tool mcp.Tool, handler server.ToolHandlerFunc)
+}, logger *slog.Logger) error {
+    tool := mcp.Tool{
+        Name:        "containerize_and_deploy",
+        Description: "Complete end-to-end containerization and deployment with AI-powered error fixing",
+        InputSchema: mcp.ToolInputSchema{
+            Type: "object",
+            Properties: map[string]interface{}{
+                "repo_url": map[string]interface{}{
+                    "type":        "string",
+                    "description": "Repository URL to containerize",
+                },
+                "deploy": map[string]interface{}{
+                    "type":        "boolean",
+                    "description": "Deploy to Kubernetes (optional, defaults to true)",
+                },
+            },
+            Required: []string{"repo_url"},
+        },
+    }
 
-	mcpServer.RegisterTool(tool, func(ctx context.Context, arguments map[string]interface{}) (*mcp.CallToolResult, error) {
-		// Use new orchestrator-based workflow
-		orchestrator := NewOrchestrator(logger)
-		result, err := orchestrator.Execute(ctx, &req, &args)
-		return result, err
-	})
+    mcpServer.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+        // Use new orchestrator-based workflow
+        orchestrator := NewOrchestrator(logger)
+        result, err := orchestrator.Execute(ctx, &req, &args)
+        return result, err
+    })
 }
 
-// AI-powered orchestrator handles workflow execution
-type Orchestrator struct {
-    logger *slog.Logger
-}
-
-func (o *Orchestrator) Execute(ctx context.Context, req *ContainerizeAndDeployRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
+// AI-powered orchestrator handles workflow execution with ML optimization
+func (o *Orchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
     // Create unified progress tracker
-    totalSteps := 9
-    progressTracker := progress.NewProgressTracker(ctx, req, totalSteps, o.logger)
+    totalSteps := 10
+    progressTracker := infraprogress.NewProgressTracker(ctx, req, totalSteps, o.logger)
     
-    // Execute workflow with AI-powered error recovery
-    return o.executeWorkflowWithProgress(ctx, req, args, progressTracker)
+    // Execute workflow with AI-powered error recovery and event coordination
+    return executeContainerizeAndDeploy(ctx, req, args, o.logger)
 }
 ```
 
@@ -153,31 +178,40 @@ func AnalyzeRepository(ctx context.Context, args AnalyzeArgs) (*AnalyzeResult, e
 ### Adding New Steps
 1. **Create step file**: Add to `pkg/mcp/infrastructure/steps/`
 2. **Implement logic**: Focus on the specific operation with AI integration
-3. **Error handling**: Use unified RichError system from `pkg/mcp/domain/errors/`
+3. **Error handling**: Use Rich error system from `pkg/common/errors/`
 4. **Progress tracking**: Include progress indicators with metadata
-5. **AI Integration**: Consider AI-powered error recovery where applicable
-6. **Testing**: Unit tests for the step with both success and failure scenarios
+5. **Event publishing**: Emit domain events for workflow coordination
+6. **AI Integration**: Consider AI-powered error recovery where applicable
+7. **ML Integration**: Consider ML optimization opportunities
+8. **Testing**: Unit tests for the step with both success and failure scenarios
 
 ### Step Integration
-Steps are integrated into the orchestrator workflow with AI retry logic:
+Steps are integrated into the orchestrator workflow with AI retry logic and event coordination:
 
 ```go
-// Execute step with AI-powered retry logic
-if err := executeStepWithRetry(ctx, result, "analyze", 2, func() error {
+// Execute step with AI-powered retry logic and ML optimization
+if err := executeStepWithRetryEnhanced(ctx, result, "analyze_repository", 2, func() error {
+    logger.Info("Step 1: Analyzing repository", "repo_url", args.RepoURL)
+
     var err error
-    analyzeResult, err = steps.AnalyzeRepository(analyzeArgs, logger)
+    analyzeResult, err = steps.AnalyzeRepository(args.RepoURL, args.Branch, logger)
     if err != nil {
         return fmt.Errorf("repository analysis failed: %v", err)
     }
-    
-    // Optional AI enhancement
-    if enhanced, err := steps.AnalyzeEnhance(analyzeResult, logger); err == nil {
-        analyzeResult = enhanced
-        logger.Info("Repository analysis enhanced by AI")
+
+    // Enhance analysis with AI if available
+    if server.ServerFromContext(ctx) != nil {
+        logger.Info("Enhancing repository analysis with AI")
+        enhancedResult, enhanceErr := steps.EnhanceRepositoryAnalysis(ctx, analyzeResult, logger)
+        if enhanceErr == nil {
+            analyzeResult = enhancedResult
+            logger.Info("Repository analysis enhanced by AI")
+        }
     }
-    
+
     return nil
-}, logger, updateProgress, "Analyzing repository structure", progressTracker, workflowProgress); err != nil {
+}, logger, updateProgress, "Analyzing repository structure and detecting language/framework", progressTracker, workflowProgress, errorContext, stateManager); err != nil {
+    result.Success = false
     return result, nil
 }
 ```
@@ -226,20 +260,27 @@ Start by understanding the 10-step process:
 ### 2. Working with Existing Steps
 ```go
 // pkg/mcp/infrastructure/steps/build.go
+import "github.com/Azure/container-kit/pkg/common/errors"
+
 func BuildImage(ctx context.Context, args BuildArgs) (*BuildResult, error) {
     // Docker build with AI-powered error recovery
     if err := performBuild(args); err != nil {
-        // Use unified RichError system from domain layer
-        return nil, errors.NewError().
-            Code(errors.CodeBuildFailed).
-            Type(errors.ErrTypeBuild).
-            Severity(errors.SeverityHigh).
-            Message("Docker build failed").
-            Context("image", args.ImageName).
-            Context("dockerfile", args.DockerfilePath).
-            Suggestion("Check Dockerfile syntax and dependencies").
-            WithLocation().
-            Build()
+        // Use Rich error system from common/errors package
+        richErr := errors.New(
+            errors.CodeBuildFailed,
+            "build",
+            "Docker build failed",
+            err,
+        )
+        richErr.Severity = errors.SeverityHigh
+        richErr.Fields = map[string]any{
+            "image_name": args.ImageName,
+            "dockerfile_path": args.DockerfilePath,
+            "build_context": args.BuildContext,
+        }
+        richErr.UserFacing = true
+        richErr.Retryable = true
+        return nil, richErr
     }
     
     return &BuildResult{
@@ -318,16 +359,23 @@ Our architecture follows these principles:
 
 ### Error Handling Pattern
 ```go
-// Use the unified RichError system
-return errors.NewError().
-    Code(errors.CodeValidationFailed).
-    Type(errors.ErrTypeValidation).
-    Severity(errors.SeverityMedium).
-    Message("invalid repository path").
-    Context("path", repoPath).
-    Suggestion("Ensure the path exists and is accessible").
-    WithLocation().
-    Build()
+// Use the Rich error system from pkg/common/errors
+import "github.com/Azure/container-kit/pkg/common/errors"
+
+richErr := errors.New(
+    errors.CodeValidationFailed,
+    "workflow",
+    "invalid repository path",
+    err,
+)
+richErr.Severity = errors.SeverityMedium
+richErr.Fields = map[string]any{
+    "path": repoPath,
+    "validation_rule": "path_exists",
+}
+richErr.UserFacing = true
+richErr.Retryable = false
+return richErr
 ```
 
 ### Progress Tracking Pattern
@@ -426,8 +474,8 @@ make version            # Show version
 
 ### For New Contributors
 1. **Understand the Workflow**: Review the 10-step containerization process
-2. **Explore Code**: Look at the 25 core files in the simplified architecture
-3. **Run Tests**: Execute `make test` to see the test suite
+2. **Explore Code**: Look at the 4-layer architecture with CQRS and event-driven patterns
+3. **Run Tests**: Execute `make test` to see the test suite including property-based tests
 4. **Try MCP Client**: Connect with Claude Desktop to see the workflow in action
 
 ### For Workflow Development
@@ -438,10 +486,12 @@ make version            # Show version
 5. **Integration Test**: Test the complete workflow end-to-end
 
 ### For Architecture Understanding
-1. **Study Simplification**: See how complex architecture was simplified
-2. **Trace Workflow Execution**: Follow a workflow call from start to finish
-3. **Understand Sessions**: See how state persists across workflow steps
-4. **Review Error Handling**: Learn the RichError patterns that were retained
+1. **Study 4-Layer Design**: Understand the clean architecture with API/Application/Domain/Infrastructure layers
+2. **Trace Workflow Execution**: Follow a workflow call from start to finish through CQRS command handlers
+3. **Understand Event Flow**: See how domain events coordinate workflow steps
+4. **Review Saga Orchestration**: Learn distributed transaction coordination patterns
+5. **Explore ML Integration**: Understand machine learning optimization features
+6. **Study Error Handling**: Learn the Rich error patterns from pkg/common/errors
 
 ### Resources
 - **Documentation**: `docs/` directory contains updated guides

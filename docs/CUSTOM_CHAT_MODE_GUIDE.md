@@ -6,8 +6,10 @@ This guide explains how to set up and use the Container Kit custom chat mode in 
 
 The Container Kit custom chat mode transforms VS Code's Copilot Chat into a specialized assistant that understands:
 - Container Kit's 4-layer architecture (API/Application/Domain/Infrastructure)
+- CQRS pattern with command and query separation
+- Event-driven architecture with domain events and saga orchestration
 - The unified 10-step containerization workflow
-- AI-powered error recovery patterns
+- AI-powered error recovery patterns with ML optimization
 - Security-first development practices
 - Multi-language container support (16+ languages)
 
@@ -81,7 +83,7 @@ The Container Kit chat mode provides specialized assistance in these areas:
 Ask questions about Container Kit's 4-layer architecture:
 
 ```
-How should I implement a new workflow step?
+How should I implement a new workflow step using CQRS patterns?
 ```
 
 ```
@@ -92,11 +94,19 @@ Where does session management belong in the architecture?
 How do I maintain clean dependencies between layers?
 ```
 
+```
+How do I implement domain events for workflow coordination?
+```
+
+```
+What's the best pattern for saga orchestration in complex workflows?
+```
+
 #### 🔄 Workflow Development
 Get help with the 10-step containerization process:
 
 ```
-How do I add progress tracking to step 5 (Tag)?
+How do I add progress tracking to step 5 (Load Image)?
 ```
 
 ```
@@ -105,6 +115,14 @@ What's the best way to implement AI retry logic for the Build step?
 
 ```
 How do I handle errors in the Kubernetes deployment step?
+```
+
+```
+How do I implement ML-powered build optimization?
+```
+
+```
+What's the pattern for event-driven workflow coordination?
 ```
 
 #### 🛠️ Technology Integration
@@ -122,11 +140,23 @@ What's the best pattern for Azure OpenAI integration?
 How do I implement BoltDB session persistence?
 ```
 
+```
+How do I integrate with the event publishing system?
+```
+
+```
+What's the pattern for implementing CQRS command handlers?
+```
+
+```
+How do I add observability with distributed tracing?
+```
+
 #### 🔧 Code Quality & Testing
 Development best practices specific to Container Kit:
 
 ```
-How do I use the unified RichError system?
+How do I use the Rich error system from pkg/common/errors?
 ```
 
 ```
@@ -137,6 +167,14 @@ What testing patterns should I follow for workflow steps?
 How do I add a new language template?
 ```
 
+```
+What's the pattern for property-based testing in Container Kit?
+```
+
+```
+How do I implement event handler testing with mocks?
+```
+
 ### Example Conversations
 
 #### Adding a New Workflow Step
@@ -145,10 +183,12 @@ How do I add a new language template?
 
 **Container Kit Assistant:** *The assistant will provide guidance on:*
 - Where to place the step in the Infrastructure layer (`pkg/mcp/infrastructure/steps/`)
-- How to integrate with the workflow progress tracking
-- Error handling patterns using RichError system
-- Testing strategies for the new step
-- Integration points with existing AI retry logic
+- How to integrate with the workflow progress tracking and event system
+- Error handling patterns using Rich error system from `pkg/common/errors`
+- CQRS command handling for the new step
+- Domain event publishing for workflow coordination
+- Testing strategies for the new step including property-based tests
+- Integration points with existing AI retry logic and ML optimization
 
 #### Debugging a Deployment Issue
 
@@ -293,14 +333,18 @@ Leverage the domain-specific language:
 - "workflow steps" instead of "functions"
 - "progress tracking" instead of "status updates"  
 - "AI retry logic" instead of "error handling"
-- "unified RichError system" instead of "exceptions"
+- "Rich error system" instead of "exceptions"
+- "domain events" instead of "notifications"
+- "command handlers" instead of "controllers"
+- "saga orchestration" instead of "transaction management"
+- "ML optimization" instead of "performance tuning"
 
 ### 3. Reference Documentation
 The chat mode is aware of Container Kit's extensive documentation:
 
 ```
-According to ADR-006, how should I implement this new feature in the 
-4-layer architecture?
+According to ADR-006 (Four-Layer MCP Architecture), how should I implement 
+this new feature in the 4-layer architecture?
 ```
 
 ### 4. Think in Workflows

@@ -1,4 +1,4 @@
-# ADR-012: Go Embed Template Management
+# ADR-002: Go Embed Template Management
 
 Date: 2025-07-11
 Status: Accepted
@@ -10,12 +10,17 @@ Decision: Use Go's `embed` package to embed all Dockerfile templates, configurat
 
 ### Go Embed Implementation
 ```go
-// pkg/core/docker/templates.go
-//go:embed all:templates/*
-var Templates embed.FS
+// pkg/mcp/infrastructure/prompts/manager.go
+//go:embed templates/*.yaml
+var templates embed.FS
 
-//go:embed configs/*
-var DefaultConfigs embed.FS
+// Template access at runtime
+func NewManager(logger *slog.Logger) *Manager {
+    return &Manager{
+        templates: templates,
+        logger:    logger,
+    }
+}
 
 // Template access at runtime
 func GetDockerfileTemplate(language string, framework string) (string, error) {
@@ -30,28 +35,17 @@ func GetDockerfileTemplate(language string, framework string) (string, error) {
 
 ### Template Structure
 ```
-pkg/core/docker/templates/
-├── go/
-│   ├── standard/Dockerfile
-│   ├── gin/Dockerfile
-│   ├── fiber/Dockerfile
-│   └── chi/Dockerfile
-├── java/
-│   ├── spring-boot/Dockerfile
-│   ├── maven/Dockerfile
-│   └── gradle/Dockerfile
-├── python/
-│   ├── django/Dockerfile
-│   ├── flask/Dockerfile
-│   ├── fastapi/Dockerfile
-│   └── standard/Dockerfile
-├── node/
-│   ├── express/Dockerfile
-│   ├── next/Dockerfile
-│   ├── react/Dockerfile
-│   └── standard/Dockerfile
-└── default/
-    └── Dockerfile
+pkg/mcp/infrastructure/prompts/templates/
+├── analyze.yaml              # Repository analysis prompts
+├── build.yaml               # Docker build prompts
+├── deploy.yaml              # Kubernetes deployment prompts
+├── scan.yaml                # Security scanning prompts
+├── manifest.yaml            # Manifest generation prompts
+├── tag.yaml                 # Image tagging prompts
+├── push.yaml                # Registry push prompts
+├── cluster.yaml             # Cluster setup prompts
+├── verify.yaml              # Verification prompts
+└── workflow.yaml            # General workflow prompts
 ```
 
 ### Template Selection Logic
@@ -279,6 +273,7 @@ func (ts *TemplateSelector) CustomizeTemplate(template string, config *Customiza
 4. **Community Input**: Template improvements based on community feedback
 
 ## Related ADRs
-- ADR-008: Single Workflow Tool Architecture (template integration in workflow)
-- ADR-011: Manual Dependency Injection (template service dependencies)
-- ADR-009: Unified Rich Error System (template error handling)
+- ADR-001: Single Workflow Tool Architecture (template integration in workflow)
+- ADR-003: Manual Dependency Injection (template service dependencies)
+- ADR-004: Unified Rich Error System (template error handling)
+- ADR-006: Four-Layer MCP Architecture (templates in infrastructure layer)

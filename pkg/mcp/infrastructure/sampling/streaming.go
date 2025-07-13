@@ -86,6 +86,8 @@ func (c *Client) SampleStream(
 			if err == nil {
 				// Successfully got stream, process chunks
 				var tokenCount int
+				startTime := time.Now()
+
 				for delta := range stream {
 					tokenCount += estimateTokens(delta)
 					chunk := StreamChunk{
@@ -93,6 +95,12 @@ func (c *Client) SampleStream(
 						TokensSoFar: tokenCount,
 						Model:       "mcp-streaming",
 					}
+
+					// Emit token-level progress every 10 tokens
+					if tokenCount%10 == 0 {
+						c.emitTokenProgress(ctx, tokenCount, req.MaxTokens, startTime)
+					}
+
 					select {
 					case out <- chunk:
 					case <-ctx.Done():
