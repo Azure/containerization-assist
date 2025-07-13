@@ -42,8 +42,8 @@ func (s *AnalyzeStep) Execute(ctx context.Context, state *WorkflowState) error {
 		"framework", analyzeResult.Framework,
 		"port", analyzeResult.Port)
 
-	// Enhance analysis with AI if available
-	if server.ServerFromContext(ctx) != nil {
+	// Enhance analysis with AI if available (skip in test mode)
+	if server.ServerFromContext(ctx) != nil && !state.Args.TestMode {
 		state.Logger.Info("Enhancing repository analysis with AI")
 		enhancedResult, enhanceErr := steps.EnhanceRepositoryAnalysis(ctx, analyzeResult, state.Logger)
 		if enhanceErr == nil {

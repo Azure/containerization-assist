@@ -6,7 +6,10 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/session"
+	"github.com/Azure/container-kit/pkg/mcp/domain/events"
+	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ml"
 	infraprogress "github.com/Azure/container-kit/pkg/mcp/infrastructure/progress"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/prompts"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/resources"
@@ -23,6 +26,18 @@ type Dependencies struct {
 
 	// Domain services
 	ProgressFactory *infraprogress.SinkFactory
+	EventPublisher  *events.Publisher
+	SagaCoordinator *saga.SagaCoordinator
+
+	// Workflow orchestrators
+	Orchestrator      *workflow.Orchestrator
+	EventOrchestrator *workflow.EventOrchestrator
+	SagaOrchestrator  *workflow.SagaOrchestrator
+
+	// AI/ML services
+	ErrorPatternRecognizer *ml.ErrorPatternRecognizer
+	EnhancedErrorHandler   *ml.EnhancedErrorHandler
+	StepEnhancer           *ml.StepEnhancer
 
 	// Infrastructure services
 	SamplingClient *sampling.Client
@@ -237,6 +252,39 @@ func NewDependencies(opts ...Option) *Dependencies {
 		} else {
 			d.PromptManager = promptManager
 		}
+	}
+
+	// Create event publisher if not provided
+	if d.EventPublisher == nil {
+		d.EventPublisher = events.NewPublisher(baseLogger.With("service", "events"))
+	}
+
+	// Create saga coordinator if not provided
+	if d.SagaCoordinator == nil {
+		d.SagaCoordinator = saga.NewSagaCoordinator(
+			baseLogger.With("service", "saga"),
+			d.EventPublisher,
+		)
+	}
+
+	// Create orchestrators if not provided
+	if d.Orchestrator == nil {
+		d.Orchestrator = workflow.NewOrchestrator(baseLogger.With("service", "orchestrator"))
+	}
+
+	if d.EventOrchestrator == nil {
+		d.EventOrchestrator = workflow.NewEventOrchestrator(
+			baseLogger.With("service", "event-orchestrator"),
+			d.EventPublisher,
+		)
+	}
+
+	if d.SagaOrchestrator == nil {
+		d.SagaOrchestrator = workflow.NewSagaOrchestrator(
+			baseLogger.With("service", "saga-orchestrator"),
+			d.EventPublisher,
+			d.SagaCoordinator,
+		)
 	}
 
 	// Update the logger reference to use the tagged version

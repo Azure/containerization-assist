@@ -22,6 +22,9 @@ type Step interface {
 
 // WorkflowState holds all the state that flows between workflow steps
 type WorkflowState struct {
+	// Workflow identification
+	WorkflowID string
+
 	// Input arguments
 	Args *ContainerizeAndDeployArgs
 
@@ -103,19 +106,19 @@ type Orchestrator struct {
 
 // NewOrchestrator creates a new workflow orchestrator with all steps
 func NewOrchestrator(logger *slog.Logger) *Orchestrator {
+	// Create default orchestrator without optimizations
+	return NewOrchestratorWithFactory(nil, logger)
+}
+
+// NewOrchestratorWithFactory creates a new workflow orchestrator with custom step factory
+func NewOrchestratorWithFactory(factory *StepFactory, logger *slog.Logger) *Orchestrator {
+	// If no factory provided, create a default one
+	if factory == nil {
+		factory = NewStepFactory(nil, logger)
+	}
+
 	return &Orchestrator{
-		steps: []Step{
-			NewAnalyzeStep(),
-			NewDockerfileStep(),
-			NewBuildStep(),
-			NewScanStep(),
-			NewTagStep(),
-			NewPushStep(),
-			NewManifestStep(),
-			NewClusterStep(),
-			NewDeployStep(),
-			NewVerifyStep(),
-		},
+		steps:  factory.CreateAllSteps(),
 		logger: logger,
 	}
 }

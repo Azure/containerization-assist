@@ -10,7 +10,10 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/application"
 	"github.com/Azure/container-kit/pkg/mcp/application/session"
+	"github.com/Azure/container-kit/pkg/mcp/domain/events"
+	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ml"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/progress"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/prompts"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/resources"
@@ -24,51 +27,100 @@ import (
 
 // InitializeServer creates a fully wired MCP server
 func InitializeServer(logger *slog.Logger, config workflow.ServerConfig) (api.MCPServer, error) {
-	duration := provideDefaultTTL()
-	int2 := provideMaxSessions(config)
+	duration := _wireDurationValue
+	int2 := config.MaxSessions
 	sessionManager := session.NewMemorySessionManager(logger, duration, int2)
 	store := resources.NewStore(logger)
 	sinkFactory := progress.NewSinkFactory(logger)
+	publisher := events.NewPublisher(logger)
+	sagaCoordinator := saga.NewSagaCoordinator(logger, publisher)
 	client := provideSamplingClient(logger)
+	optimizedBuildStep := ml.ProvideOptimizedBuildStep(client, logger)
+	stepFactory := workflow.ProvideStepFactory(optimizedBuildStep, logger)
+	orchestrator := workflow.ProvideOptimizedOrchestrator(stepFactory, logger)
+	eventOrchestrator := workflow.NewEventOrchestrator(logger, publisher)
+	sagaOrchestrator := workflow.NewSagaOrchestrator(logger, publisher, sagaCoordinator)
+	errorPatternRecognizer := ml.ProvideErrorPatternRecognizer(client, logger)
+	enhancedErrorHandler := ml.ProvideEnhancedErrorHandler(client, publisher, logger)
+	stepEnhancer := ml.ProvideStepEnhancer(enhancedErrorHandler, logger)
 	managerConfig := providePromptManagerConfig(config)
 	manager, err := prompts.NewManager(logger, managerConfig)
 	if err != nil {
 		return nil, err
 	}
-	dependencies := provideDependencies(logger, config, sessionManager, store, sinkFactory, client, manager)
+	dependencies := &application.Dependencies{
+		Logger:                 logger,
+		Config:                 config,
+		SessionManager:         sessionManager,
+		ResourceStore:          store,
+		ProgressFactory:        sinkFactory,
+		EventPublisher:         publisher,
+		SagaCoordinator:        sagaCoordinator,
+		Orchestrator:           orchestrator,
+		EventOrchestrator:      eventOrchestrator,
+		SagaOrchestrator:       sagaOrchestrator,
+		ErrorPatternRecognizer: errorPatternRecognizer,
+		EnhancedErrorHandler:   enhancedErrorHandler,
+		StepEnhancer:           stepEnhancer,
+		SamplingClient:         client,
+		PromptManager:          manager,
+	}
 	mcpServer := provideServer(dependencies)
 	return mcpServer, nil
 }
 
+var (
+	_wireDurationValue = 24 * time.Hour
+)
+
 // wire.go:
+
+// ConfigSet contains configuration-related providers
+var ConfigSet = wire.NewSet(wire.Value(24*time.Hour), providePromptManagerConfig, wire.FieldsOf(new(workflow.ServerConfig), "MaxSessions"))
+
+// CoreSet contains core infrastructure providers
+var CoreSet = wire.NewSet(resources.NewStore, provideSamplingClient, prompts.NewManager, progress.NewSinkFactory)
+
+// SessionSet contains session management providers
+var SessionSet = wire.NewSet(session.NewMemorySessionManager)
+
+// EventSet contains event-driven architecture providers
+var EventSet = wire.NewSet(events.NewPublisher, provideProgressEventHandler,
+	provideMetricsEventHandler,
+)
+
+// SagaSet contains saga pattern providers
+var SagaSet = wire.NewSet(saga.NewSagaCoordinator)
+
+// MLSet contains machine learning and error analysis providers
+var MLSet = wire.NewSet(ml.ProvideErrorPatternRecognizer, ml.ProvideEnhancedErrorHandler, ml.ProvideStepEnhancer, ml.ProvideResourcePredictor, ml.ProvideBuildOptimizer, ml.ProvideOptimizedBuildStep)
+
+// OrchestrationSet contains workflow orchestration providers
+var OrchestrationSet = wire.NewSet(workflow.ProvideStepFactory, workflow.ProvideOptimizedOrchestrator, workflow.NewEventOrchestrator, workflow.NewSagaOrchestrator)
+
+// AppSet contains the main application dependencies using wire.Struct
+var AppSet = wire.NewSet(wire.Struct(
+	new(application.Dependencies),
+	"Logger", "Config", "SessionManager", "ResourceStore",
+	"ProgressFactory", "EventPublisher", "SagaCoordinator",
+	"Orchestrator", "EventOrchestrator", "SagaOrchestrator",
+	"ErrorPatternRecognizer", "EnhancedErrorHandler", "StepEnhancer",
+	"SamplingClient", "PromptManager",
+),
+)
 
 // ProviderSet contains all the providers for the MCP server
 var ProviderSet = wire.NewSet(
-
-	provideServer, session.NewMemorySessionManager, provideDefaultTTL,
-	provideMaxSessions, resources.NewStore, provideSamplingClient, prompts.NewManager, providePromptManagerConfig, progress.NewSinkFactory, provideDependencies,
+	ConfigSet,
+	CoreSet,
+	SessionSet,
+	EventSet,
+	SagaSet,
+	MLSet,
+	OrchestrationSet,
+	AppSet,
+	provideServer,
 )
-
-// provideDependencies creates the Dependencies struct with all wired components
-func provideDependencies(
-	logger *slog.Logger,
-	config workflow.ServerConfig,
-	sessionManager session.SessionManager,
-	resourceStore *resources.Store,
-	progressFactory *progress.SinkFactory,
-	samplingClient *sampling.Client,
-	promptManager *prompts.Manager,
-) *application.Dependencies {
-	return &application.Dependencies{
-		Logger:          logger,
-		Config:          config,
-		SessionManager:  sessionManager,
-		ResourceStore:   resourceStore,
-		ProgressFactory: progressFactory,
-		SamplingClient:  samplingClient,
-		PromptManager:   promptManager,
-	}
-}
 
 // providePromptManagerConfig creates the config for the prompt manager
 func providePromptManagerConfig(config workflow.ServerConfig) prompts.ManagerConfig {
@@ -79,16 +131,6 @@ func providePromptManagerConfig(config workflow.ServerConfig) prompts.ManagerCon
 	}
 }
 
-// provideDefaultTTL provides the default session TTL
-func provideDefaultTTL() time.Duration {
-	return 24 * time.Hour
-}
-
-// provideMaxSessions extracts max sessions from config
-func provideMaxSessions(config workflow.ServerConfig) int {
-	return config.MaxSessions
-}
-
 // provideServer creates the MCP server with dependencies
 func provideServer(deps *application.Dependencies) api.MCPServer {
 	return application.NewServer(application.WithDependencies(deps))
@@ -97,4 +139,14 @@ func provideServer(deps *application.Dependencies) api.MCPServer {
 // provideSamplingClient creates the sampling client without options
 func provideSamplingClient(logger *slog.Logger) *sampling.Client {
 	return sampling.NewClient(logger)
+}
+
+// provideProgressEventHandler creates the progress event handler
+func provideProgressEventHandler(logger *slog.Logger) *events.ProgressEventHandler {
+	return events.NewProgressEventHandler(logger)
+}
+
+// provideMetricsEventHandler creates the metrics event handler
+func provideMetricsEventHandler(logger *slog.Logger) *events.MetricsEventHandler {
+	return events.NewMetricsEventHandler(logger)
 }

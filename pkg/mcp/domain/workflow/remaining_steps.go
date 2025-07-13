@@ -37,6 +37,42 @@ func (s *BuildStep) Execute(ctx context.Context, state *WorkflowState) error {
 	imageTag := "latest"
 	buildContext := state.AnalyzeResult.RepoPath
 
+	// In test mode, skip actual Docker operations
+	if state.Args.TestMode {
+		state.Logger.Info("Test mode: Simulating Docker build",
+			"image_name", imageName,
+			"image_tag", imageTag)
+
+		// Create simulated build result
+		buildResult := &steps.BuildResult{
+			ImageName: imageName,
+			ImageTag:  imageTag,
+			ImageID:   fmt.Sprintf("sha256:test-%s", imageName),
+			BuildTime: time.Now(),
+			Size:      100 * 1024 * 1024, // 100MB simulated size
+		}
+
+		// Store build result in workflow state
+		state.BuildResult = &BuildResult{
+			ImageID:   buildResult.ImageID,
+			ImageRef:  fmt.Sprintf("%s:%s", buildResult.ImageName, buildResult.ImageTag),
+			ImageSize: buildResult.Size,
+			BuildTime: buildResult.BuildTime.Format(time.RFC3339),
+			Metadata: map[string]interface{}{
+				"build_context": buildContext,
+				"image_name":    buildResult.ImageName,
+				"image_tag":     buildResult.ImageTag,
+				"test_mode":     true,
+			},
+		}
+
+		state.Logger.Info("Test mode: Docker build simulation completed",
+			"image_id", buildResult.ImageID,
+			"image_ref", state.BuildResult.ImageRef)
+
+		return nil
+	}
+
 	// Call the infrastructure build function
 	buildResult, err := steps.BuildImage(ctx, infraDockerfileResult, imageName, imageTag, buildContext, state.Logger)
 	if err != nil {
@@ -186,7 +222,15 @@ func (s *ManifestStep) Execute(ctx context.Context, state *WorkflowState) error 
 
 	// Generate manifests
 	appName := extractRepoName(state.Args.RepoURL)
-	k8sResult, err := steps.GenerateManifests(infraBuildResult, appName, "default", state.AnalyzeResult.Port, state.Logger)
+	namespace := "default"
+
+	// In test mode, use test namespace and prefix app name
+	if state.Args.TestMode {
+		namespace = "test-namespace"
+		appName = "test-" + appName
+	}
+
+	k8sResult, err := steps.GenerateManifests(infraBuildResult, appName, namespace, state.AnalyzeResult.Port, state.Logger)
 	if err != nil {
 		return fmt.Errorf("k8s manifest generation failed: %v", err)
 	}
@@ -224,10 +268,18 @@ func (s *ClusterStep) Execute(ctx context.Context, state *WorkflowState) error {
 		return nil
 	}
 
-	// Setup kind cluster with registry
-	registryURL, err := steps.SetupKindCluster(ctx, "container-kit", state.Logger)
-	if err != nil {
-		return fmt.Errorf("kind cluster setup failed: %v", err)
+	// In test mode, simulate cluster setup
+	var registryURL string
+	if state.Args.TestMode {
+		state.Logger.Info("Test mode: Simulating kind cluster setup")
+		registryURL = "test-registry.local:5000"
+	} else {
+		// Setup kind cluster with registry
+		var err error
+		registryURL, err = steps.SetupKindCluster(ctx, "container-kit", state.Logger)
+		if err != nil {
+			return fmt.Errorf("kind cluster setup failed: %v", err)
+		}
 	}
 
 	// Store registry URL for later use
@@ -264,7 +316,7 @@ func (s *DeployStep) Execute(ctx context.Context, state *WorkflowState) error {
 	}
 
 	// First, load image into kind cluster if needed
-	if state.BuildResult != nil {
+	if state.BuildResult != nil && !state.Args.TestMode {
 		infraBuildResult := &steps.BuildResult{
 			ImageName: extractRepoName(state.Args.RepoURL),
 			ImageTag:  "latest",
@@ -276,6 +328,8 @@ func (s *DeployStep) Execute(ctx context.Context, state *WorkflowState) error {
 			return fmt.Errorf("failed to load image to kind: %v", err)
 		}
 		state.Logger.Info("Image loaded into kind cluster successfully")
+	} else if state.Args.TestMode {
+		state.Logger.Info("Test mode: Skipping image load to kind cluster")
 	}
 
 	// Convert workflow K8sResult to infrastructure K8sResult for deployment
@@ -303,9 +357,15 @@ func (s *DeployStep) Execute(ctx context.Context, state *WorkflowState) error {
 	}
 
 	// Deploy to Kubernetes
-	err := steps.DeployToKubernetes(ctx, infraK8sResult, state.Logger)
-	if err != nil {
-		return fmt.Errorf("kubernetes deployment failed: %v", err)
+	if state.Args.TestMode {
+		state.Logger.Info("Test mode: Simulating Kubernetes deployment",
+			"namespace", state.K8sResult.Namespace,
+			"app_name", infraK8sResult.AppName)
+	} else {
+		err := steps.DeployToKubernetes(ctx, infraK8sResult, state.Logger)
+		if err != nil {
+			return fmt.Errorf("kubernetes deployment failed: %v", err)
+		}
 	}
 
 	state.Logger.Info("Application deployed successfully", "namespace", state.K8sResult.Namespace)
@@ -343,23 +403,29 @@ func (s *VerifyStep) Execute(ctx context.Context, state *WorkflowState) error {
 	}
 
 	// Check deployment health
-	err := steps.CheckDeploymentHealth(ctx, infraK8sResult, state.Logger)
-	if err != nil {
-		state.Logger.Warn("Deployment health check failed (non-critical)", "error", err)
-		// Don't fail the workflow for health check issues - just warn
+	if state.Args.TestMode {
+		state.Logger.Info("Test mode: Simulating deployment health check")
+		state.Result.Endpoint = fmt.Sprintf("http://test-%s.%s.svc.cluster.local:8080",
+			extractRepoName(state.Args.RepoURL), state.K8sResult.Namespace)
 	} else {
-		state.Logger.Info("Deployment health check passed")
-	}
+		err := steps.CheckDeploymentHealth(ctx, infraK8sResult, state.Logger)
+		if err != nil {
+			state.Logger.Warn("Deployment health check failed (non-critical)", "error", err)
+			// Don't fail the workflow for health check issues - just warn
+		} else {
+			state.Logger.Info("Deployment health check passed")
+		}
 
-	// Get service endpoint
-	endpoint, err := steps.GetServiceEndpoint(ctx, infraK8sResult, state.Logger)
-	if err != nil {
-		// Log the error but don't fail the workflow
-		state.Logger.Warn("Failed to get service endpoint (non-critical)", "error", err)
-		state.Result.Endpoint = "http://localhost:30000" // Placeholder for tests
-	} else {
-		state.Result.Endpoint = endpoint
-		state.Logger.Info("Service endpoint discovered", "endpoint", endpoint)
+		// Get service endpoint
+		endpoint, err := steps.GetServiceEndpoint(ctx, infraK8sResult, state.Logger)
+		if err != nil {
+			// Log the error but don't fail the workflow
+			state.Logger.Warn("Failed to get service endpoint (non-critical)", "error", err)
+			state.Result.Endpoint = "http://localhost:30000" // Placeholder for tests
+		} else {
+			state.Result.Endpoint = endpoint
+			state.Logger.Info("Service endpoint discovered", "endpoint", endpoint)
+		}
 	}
 
 	state.Logger.Info("Deployment verification completed")

@@ -420,8 +420,16 @@ func executeContainerizeAndDeploy(ctx context.Context, req *mcp.CallToolRequest,
 		logger.Info("Step 6: Generating Kubernetes manifests")
 
 		appName := extractRepoName(args.RepoURL)
+		namespace := "default"
+
+		// In test mode, use test namespace and prefix app name
+		if args.TestMode {
+			namespace = "test-namespace"
+			appName = "test-" + appName
+		}
+
 		var err error
-		k8sResult, err = steps.GenerateManifests(buildResult, appName, "default", analyzeResult.Port, logger)
+		k8sResult, err = steps.GenerateManifests(buildResult, appName, namespace, analyzeResult.Port, logger)
 		if err != nil {
 			return fmt.Errorf("k8s manifest generation failed: %v", err)
 		}
@@ -830,6 +838,11 @@ func executeDockerBuildWithAIFix(ctx context.Context, result *ContainerizeAndDep
 
 	// Extract repo name from URL for image naming
 	imageName := extractRepoName(args.RepoURL)
+
+	// In test mode, prefix the image name
+	if args.TestMode {
+		imageName = "test-" + imageName
+	}
 
 	// Track the buildResult across retries
 	var buildResult *steps.BuildResult
