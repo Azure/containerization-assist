@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"math/rand"
 	"strings"
+	"sync"
 	"testing"
 	"testing/quick"
 	"time"
@@ -48,6 +49,7 @@ type PropertyTester struct {
 	config PropertyTestConfig
 	logger *slog.Logger
 	rand   *rand.Rand
+	mu     sync.Mutex
 }
 
 // NewPropertyTester creates a new property testing framework

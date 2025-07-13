@@ -225,7 +225,7 @@ func BenchmarkPropertyTesting(b *testing.B) {
 // generatePartialExecutionSaga creates a saga with partial execution
 func (pt *PropertyTester) generatePartialExecutionSaga() *saga.SagaExecution {
 	steps := pt.generateSagaSteps()
-	executeCount := pt.rand.Intn(len(steps)/2 + 1) // Execute less than half
+	executeCount := pt.randIntn(len(steps)/2 + 1) // Execute less than half
 
 	executed := make([]saga.SagaStepResult, executeCount)
 	baseTime := time.Now().Add(-time.Hour)
@@ -235,7 +235,7 @@ func (pt *PropertyTester) generatePartialExecutionSaga() *saga.SagaExecution {
 			StepName:  steps[i].Name(),
 			Success:   true,
 			Timestamp: baseTime.Add(time.Duration(i) * time.Minute),
-			Duration:  time.Duration(pt.rand.Intn(60)+10) * time.Second,
+			Duration:  time.Duration(pt.randIntn(60)+10) * time.Second,
 		}
 	}
 
@@ -249,7 +249,7 @@ func (pt *PropertyTester) generatePartialExecutionSaga() *saga.SagaExecution {
 			StepName:  executed[i].StepName,
 			Success:   true,
 			Timestamp: compensationTime.Add(time.Duration(compensatedIndex) * time.Minute),
-			Duration:  time.Duration(pt.rand.Intn(30)+5) * time.Second,
+			Duration:  time.Duration(pt.randIntn(30)+5) * time.Second,
 		}
 	}
 
@@ -291,7 +291,7 @@ func (pt *PropertyTester) generateMultiStepFailureSaga() *saga.SagaExecution {
 			StepName:  steps[i].Name(),
 			Success:   success,
 			Timestamp: baseTime.Add(time.Duration(i) * time.Minute),
-			Duration:  time.Duration(pt.rand.Intn(60)+10) * time.Second,
+			Duration:  time.Duration(pt.randIntn(60)+10) * time.Second,
 		}
 	}
 
@@ -315,7 +315,7 @@ func (pt *PropertyTester) generateMultiStepFailureSaga() *saga.SagaExecution {
 				StepName:  executed[i].StepName,
 				Success:   true,
 				Timestamp: compensationTime.Add(time.Duration(compensatedIndex) * time.Minute),
-				Duration:  time.Duration(pt.rand.Intn(20)+5) * time.Second,
+				Duration:  time.Duration(pt.randIntn(20)+5) * time.Second,
 			}
 			compensatedIndex++
 		}
@@ -340,7 +340,7 @@ func (pt *PropertyTester) generateCompensationChainSaga() *saga.SagaExecution {
 	for i, name := range stepNames {
 		steps[i] = &TestSagaStep{
 			name:          name,
-			canCompensate: pt.rand.Float64() < 0.9, // 90% can be compensated
+			canCompensate: pt.randFloat64() < 0.9, // 90% can be compensated
 		}
 	}
 
@@ -354,7 +354,7 @@ func (pt *PropertyTester) generateCompensationChainSaga() *saga.SagaExecution {
 			StepName:  steps[i].Name(),
 			Success:   true,
 			Timestamp: baseTime.Add(time.Duration(i*10) * time.Minute),
-			Duration:  time.Duration(pt.rand.Intn(300)+60) * time.Second,
+			Duration:  time.Duration(pt.randIntn(300)+60) * time.Second,
 		}
 	}
 
@@ -368,7 +368,7 @@ func (pt *PropertyTester) generateCompensationChainSaga() *saga.SagaExecution {
 			StepName:  executed[i].StepName,
 			Success:   true,
 			Timestamp: compensationTime.Add(time.Duration(compensatedIndex*5) * time.Minute),
-			Duration:  time.Duration(pt.rand.Intn(120)+30) * time.Second,
+			Duration:  time.Duration(pt.randIntn(120)+30) * time.Second,
 		}
 	}
 
@@ -417,7 +417,7 @@ func (pt *PropertyTester) generateFailedWorkflow() *workflow.WorkflowState {
 		// Add some completed steps and one failed step
 		// Use all step names to avoid duplicates
 		stepNames := []string{"analyze", "dockerfile", "build", "scan", "tag", "push", "manifest", "cluster", "deploy", "verify"}
-		stepCount := pt.rand.Intn(8) + 3 // 3-10 steps (can fail at any point)
+		stepCount := pt.randIntn(8) + 3 // 3-10 steps (can fail at any point)
 		if stepCount > 10 {
 			stepCount = 10
 		}
@@ -435,10 +435,10 @@ func (pt *PropertyTester) generateFailedWorkflow() *workflow.WorkflowState {
 			state.Result.Steps[i] = workflow.WorkflowStep{
 				Name:     stepNames[i], // Use direct indexing to ensure proper order
 				Status:   status,
-				Duration: fmt.Sprintf("%ds", pt.rand.Intn(120)+10),
+				Duration: fmt.Sprintf("%ds", pt.randIntn(120)+10),
 				Progress: fmt.Sprintf("%d/10", i+1),
 				Message:  fmt.Sprintf("Step %s %s", stepNames[i], status),
-				Retries:  pt.rand.Intn(3),
+				Retries:  pt.randIntn(3),
 				Error:    errorMsg,
 			}
 		}
@@ -481,10 +481,10 @@ func (pt *PropertyTester) generateSuccessfulWorkflow() *workflow.WorkflowState {
 			state.Result.Steps[i] = workflow.WorkflowStep{
 				Name:     stepNames[i],
 				Status:   "completed",
-				Duration: fmt.Sprintf("%ds", pt.rand.Intn(180)+30),
+				Duration: fmt.Sprintf("%ds", pt.randIntn(180)+30),
 				Progress: fmt.Sprintf("%d/10", i+1),
 				Message:  fmt.Sprintf("Step %s completed successfully", stepNames[i]),
-				Retries:  pt.rand.Intn(2), // Successful workflows can still have retries
+				Retries:  pt.randIntn(2), // Successful workflows can still have retries
 			}
 		}
 

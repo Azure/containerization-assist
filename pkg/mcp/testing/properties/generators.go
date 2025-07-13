@@ -14,6 +14,25 @@ import (
 // Data Generators for Property Testing
 // ============================================================================
 
+// Thread-safe random number generation helpers
+func (pt *PropertyTester) randInt63() int64 {
+	pt.mu.Lock()
+	defer pt.mu.Unlock()
+	return pt.rand.Int63()
+}
+
+func (pt *PropertyTester) randIntn(n int) int {
+	pt.mu.Lock()
+	defer pt.mu.Unlock()
+	return pt.rand.Intn(n)
+}
+
+func (pt *PropertyTester) randFloat64() float64 {
+	pt.mu.Lock()
+	defer pt.mu.Unlock()
+	return pt.rand.Float64()
+}
+
 // generateWorkflowState creates a random workflow state for testing
 func (pt *PropertyTester) generateWorkflowState() *workflow.WorkflowState {
 	workflowID := pt.generateWorkflowID()
@@ -22,7 +41,7 @@ func (pt *PropertyTester) generateWorkflowState() *workflow.WorkflowState {
 	// Generate result based on args (to respect test mode)
 	result := pt.generateWorkflowResultWithArgs(args)
 
-	currentStep := pt.rand.Intn(11) // 0-10 steps
+	currentStep := pt.randIntn(11) // 0-10 steps
 	totalSteps := 10
 
 	// Create basic workflow state
@@ -72,12 +91,12 @@ func (pt *PropertyTester) generateSagaExecution() *saga.SagaExecution {
 
 // generateWorkflowID creates a random workflow ID
 func (pt *PropertyTester) generateWorkflowID() string {
-	return fmt.Sprintf("wf-%d-%d", time.Now().Unix(), pt.rand.Int63())
+	return fmt.Sprintf("wf-%d-%d", time.Now().Unix(), pt.randInt63())
 }
 
 // generateSagaID creates a random saga ID
 func (pt *PropertyTester) generateSagaID() string {
-	return fmt.Sprintf("saga-%d-%d", time.Now().Unix(), pt.rand.Int63())
+	return fmt.Sprintf("saga-%d-%d", time.Now().Unix(), pt.randInt63())
 }
 
 // generateContainerizeArgs creates random containerization arguments
@@ -89,26 +108,26 @@ func (pt *PropertyTester) generateContainerizeArgs() *workflow.ContainerizeAndDe
 	}
 	branches := []string{"main", "develop", "feature/test", ""}
 
-	deployPtr := func(b bool) *bool { return &b }(pt.rand.Float64() < 0.8) // 80% chance of deploy
+	deployPtr := func(b bool) *bool { return &b }(pt.randFloat64() < 0.8) // 80% chance of deploy
 
 	return &workflow.ContainerizeAndDeployArgs{
-		RepoURL:  repoURLs[pt.rand.Intn(len(repoURLs))],
-		Branch:   branches[pt.rand.Intn(len(branches))],
-		Scan:     pt.rand.Float64() < 0.7, // 70% chance of scanning
+		RepoURL:  repoURLs[pt.randIntn(len(repoURLs))],
+		Branch:   branches[pt.randIntn(len(branches))],
+		Scan:     pt.randFloat64() < 0.7, // 70% chance of scanning
 		Deploy:   deployPtr,
-		TestMode: pt.rand.Float64() < 0.3, // 30% chance of test mode
+		TestMode: pt.randFloat64() < 0.3, // 30% chance of test mode
 	}
 }
 
 // generateWorkflowResultWithArgs creates a random workflow result that respects test mode
 func (pt *PropertyTester) generateWorkflowResultWithArgs(args *workflow.ContainerizeAndDeployArgs) *workflow.ContainerizeAndDeployResult {
-	success := pt.rand.Float64() < 0.8 // 80% success rate
+	success := pt.randFloat64() < 0.8 // 80% success rate
 
 	// Successful workflows should have completed all 10 steps
 	// Failed workflows can fail at any step
 	stepCount := 10
 	if !success {
-		stepCount = pt.rand.Intn(10) + 1 // 1-10 steps for failed workflows
+		stepCount = pt.randIntn(10) + 1 // 1-10 steps for failed workflows
 	}
 
 	result := &workflow.ContainerizeAndDeployResult{
@@ -145,14 +164,14 @@ func (pt *PropertyTester) generateWorkflowResultWithArgs(args *workflow.Containe
 		result.Steps[i] = workflow.WorkflowStep{
 			Name:     stepName,
 			Status:   status,
-			Duration: fmt.Sprintf("%ds", pt.rand.Intn(60)+10),
+			Duration: fmt.Sprintf("%ds", pt.randIntn(60)+10),
 			Progress: fmt.Sprintf("%d/10", i+1),
 			Message:  fmt.Sprintf("Completed %s", stepName),
 		}
 
 		if status == "failed" {
 			result.Steps[i].Error = pt.generateErrorMessage()
-			result.Steps[i].Retries = pt.rand.Intn(3)
+			result.Steps[i].Retries = pt.randIntn(3)
 		}
 	}
 
@@ -161,8 +180,8 @@ func (pt *PropertyTester) generateWorkflowResultWithArgs(args *workflow.Containe
 
 // generateWorkflowResult creates a random workflow result
 func (pt *PropertyTester) generateWorkflowResult() *workflow.ContainerizeAndDeployResult {
-	success := pt.rand.Float64() < 0.8 // 80% success rate
-	stepCount := pt.rand.Intn(11)      // 0-10 steps
+	success := pt.randFloat64() < 0.8 // 80% success rate
+	stepCount := pt.randIntn(11)      // 0-10 steps
 
 	result := &workflow.ContainerizeAndDeployResult{
 		Success: success,
@@ -189,10 +208,10 @@ func (pt *PropertyTester) generateWorkflowResult() *workflow.ContainerizeAndDepl
 		result.Steps[i] = workflow.WorkflowStep{
 			Name:     stepName,
 			Status:   status,
-			Duration: fmt.Sprintf("%ds", pt.rand.Intn(300)+10),
+			Duration: fmt.Sprintf("%ds", pt.randIntn(300)+10),
 			Progress: fmt.Sprintf("%d/10", i+1),
 			Message:  fmt.Sprintf("Step %s %s", stepName, status),
-			Retries:  pt.rand.Intn(3),
+			Retries:  pt.randIntn(3),
 		}
 
 		if status == "failed" {
@@ -209,9 +228,9 @@ func (pt *PropertyTester) generateAnalyzeResult() *workflow.AnalyzeResult {
 	frameworks := []string{"gin", "fastapi", "express", "spring", "actix"}
 
 	return &workflow.AnalyzeResult{
-		Language:        languages[pt.rand.Intn(len(languages))],
-		Framework:       frameworks[pt.rand.Intn(len(frameworks))],
-		Port:            []int{8080, 3000, 8000}[pt.rand.Intn(3)],
+		Language:        languages[pt.randIntn(len(languages))],
+		Framework:       frameworks[pt.randIntn(len(frameworks))],
+		Port:            []int{8080, 3000, 8000}[pt.randIntn(3)],
 		BuildCommand:    "go build",
 		StartCommand:    "./app",
 		Dependencies:    pt.generateDependencies(),
@@ -237,8 +256,8 @@ func (pt *PropertyTester) generateBuildResult() *workflow.BuildResult {
 	return &workflow.BuildResult{
 		ImageID:   pt.generateImageID(),
 		ImageRef:  pt.generateImageRef(),
-		ImageSize: int64(pt.rand.Intn(1000000000) + 100000000), // 100MB-1GB
-		BuildTime: fmt.Sprintf("%ds", pt.rand.Intn(300)+30),
+		ImageSize: int64(pt.randIntn(1000000000) + 100000000), // 100MB-1GB
+		BuildTime: fmt.Sprintf("%ds", pt.randIntn(300)+30),
 		Metadata:  make(map[string]interface{}),
 	}
 }
@@ -264,7 +283,7 @@ func (pt *PropertyTester) generateSagaState() saga.SagaState {
 		saga.SagaStateCompensated,
 		saga.SagaStateAborted,
 	}
-	return states[pt.rand.Intn(len(states))]
+	return states[pt.randIntn(len(states))]
 }
 
 // TestSagaStep is a simple implementation of SagaStep for testing
@@ -294,13 +313,13 @@ func (s *TestSagaStep) CanCompensate() bool {
 // generateSagaSteps creates random saga steps
 func (pt *PropertyTester) generateSagaSteps() []saga.SagaStep {
 	stepNames := []string{"analyze", "dockerfile", "build", "scan", "tag", "push", "manifest", "cluster", "deploy", "verify"}
-	stepCount := pt.rand.Intn(len(stepNames)) + 1
+	stepCount := pt.randIntn(len(stepNames)) + 1
 
 	steps := make([]saga.SagaStep, stepCount)
 	for i := 0; i < stepCount; i++ {
 		steps[i] = &TestSagaStep{
 			name:          stepNames[i],
-			canCompensate: pt.rand.Float64() < 0.9, // 90% can be compensated
+			canCompensate: pt.randFloat64() < 0.9, // 90% can be compensated
 		}
 	}
 
@@ -310,7 +329,7 @@ func (pt *PropertyTester) generateSagaSteps() []saga.SagaStep {
 // generateExecutedSteps creates executed steps based on saga steps
 func (pt *PropertyTester) generateExecutedSteps(steps []saga.SagaStep) []saga.SagaStepResult {
 	// Randomly execute some steps
-	executeCount := pt.rand.Intn(len(steps) + 1)
+	executeCount := pt.randIntn(len(steps) + 1)
 	executed := make([]saga.SagaStepResult, executeCount)
 
 	baseTime := time.Now().Add(-time.Hour)
@@ -320,7 +339,7 @@ func (pt *PropertyTester) generateExecutedSteps(steps []saga.SagaStep) []saga.Sa
 			StepName:  step.Name(),
 			Success:   true,
 			Timestamp: baseTime.Add(time.Duration(i) * time.Minute),
-			Duration:  time.Duration(pt.rand.Intn(60)+10) * time.Second,
+			Duration:  time.Duration(pt.randIntn(60)+10) * time.Second,
 			Data:      map[string]interface{}{"success": true},
 		}
 	}
@@ -345,7 +364,7 @@ func (pt *PropertyTester) generateCompensatedSteps(executed []saga.SagaStepResul
 			StepName:  executedStep.StepName,
 			Success:   true,
 			Timestamp: baseTime.Add(time.Duration(compensatedIndex) * time.Minute),
-			Duration:  time.Duration(pt.rand.Intn(30)+5) * time.Second,
+			Duration:  time.Duration(pt.randIntn(30)+5) * time.Second,
 			Data:      map[string]interface{}{"compensated": true},
 		}
 	}
@@ -359,7 +378,7 @@ func (pt *PropertyTester) generateRandomString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
 	b := make([]byte, length)
 	for i := range b {
-		b[i] = charset[pt.rand.Intn(len(charset))]
+		b[i] = charset[pt.randIntn(len(charset))]
 	}
 	return string(b)
 }
@@ -371,7 +390,7 @@ func (pt *PropertyTester) generateRandomRegistry() string {
 		"quay.io",
 		"registry.hub.docker.com",
 	}
-	return registries[pt.rand.Intn(len(registries))]
+	return registries[pt.randIntn(len(registries))]
 }
 
 func (pt *PropertyTester) generateImageRef() string {
@@ -399,15 +418,15 @@ func (pt *PropertyTester) generateErrorMessage() string {
 		"kubernetes deployment failed",
 		"dependency resolution error",
 	}
-	return errors[pt.rand.Intn(len(errors))]
+	return errors[pt.randIntn(len(errors))]
 }
 
 func (pt *PropertyTester) generateDependencies() []string {
 	allDeps := []string{"gin", "logrus", "viper", "cobra", "testify"}
-	count := pt.rand.Intn(3) + 1
+	count := pt.randIntn(3) + 1
 	deps := make([]string, count)
 	for i := 0; i < count; i++ {
-		deps[i] = allDeps[pt.rand.Intn(len(allDeps))]
+		deps[i] = allDeps[pt.randIntn(len(allDeps))]
 	}
 	return deps
 }
