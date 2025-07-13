@@ -67,8 +67,14 @@ func (c *Client) analyzeKubernetesManifestInternal(ctx context.Context, manifest
 		)
 	}()
 
+	var errorPreview string
+	if deploymentError != nil {
+		errorPreview = deploymentError.Error()[:min(100, len(deploymentError.Error()))]
+	} else {
+		errorPreview = "No deployment error provided"
+	}
 	c.logger.Info("Requesting AI assistance to fix Kubernetes manifest",
-		"error_preview", deploymentError.Error()[:min(100, len(deploymentError.Error()))])
+		"error_preview", errorPreview)
 
 	// Get template manager
 	templateManager, err := prompts.NewManager(c.logger, prompts.ManagerConfig{})
@@ -113,7 +119,7 @@ func (c *Client) analyzeKubernetesManifestInternal(ctx context.Context, manifest
 	result.Metadata.TemplateID = rendered.ID
 	result.Metadata.TokensUsed = estimateTokens(response.Content)
 	result.Metadata.Temperature = rendered.Temperature
-	result.Metadata.ProcessingTime = time.Since(time.Now()) // Will be overridden by caller if needed
+	result.Metadata.ProcessingTime = time.Since(startTime)
 
 	// Add original error info
 	result.OriginalIssues = []string{deploymentError.Error()}
@@ -312,7 +318,7 @@ func (c *Client) AnalyzeSecurityScan(ctx context.Context, scanResults string, do
 	result.Metadata.TemplateID = rendered.ID
 	result.Metadata.TokensUsed = estimateTokens(response.Content)
 	result.Metadata.Temperature = rendered.Temperature
-	result.Metadata.ProcessingTime = time.Since(time.Now())
+	result.Metadata.ProcessingTime = time.Since(startTime)
 
 	// Validate the result
 	if err := result.Validate(); err != nil {
@@ -403,7 +409,7 @@ func (c *Client) ImproveRepositoryAnalysis(ctx context.Context, initialAnalysis 
 	result.Metadata.TemplateID = rendered.ID
 	result.Metadata.TokensUsed = estimateTokens(response.Content)
 	result.Metadata.Temperature = rendered.Temperature
-	result.Metadata.ProcessingTime = time.Since(time.Now())
+	result.Metadata.ProcessingTime = time.Since(startTime)
 
 	// Validate the result
 	if err := result.Validate(); err != nil {
@@ -501,7 +507,7 @@ func (c *Client) GenerateDockerfile(ctx context.Context, language string, framew
 	result.Metadata.TemplateID = rendered.ID
 	result.Metadata.TokensUsed = estimateTokens(response.Content)
 	result.Metadata.Temperature = rendered.Temperature
-	result.Metadata.ProcessingTime = time.Since(time.Now())
+	result.Metadata.ProcessingTime = time.Since(startTime)
 
 	// Validate the result
 	if err := result.Validate(); err != nil {
@@ -565,10 +571,16 @@ func (c *Client) FixDockerfile(ctx context.Context, language string, framework s
 		)
 	}()
 
+	var errorPreview string
+	if len(buildError) > 0 {
+		errorPreview = buildError[:min(100, len(buildError))]
+	} else {
+		errorPreview = "No build error provided"
+	}
 	c.logger.Info("Requesting AI assistance to fix Dockerfile",
 		"language", language,
 		"framework", framework,
-		"error_preview", buildError[:min(100, len(buildError))])
+		"error_preview", errorPreview)
 
 	// Get template manager
 	templateManager, err := prompts.NewManager(c.logger, prompts.ManagerConfig{})
@@ -617,7 +629,7 @@ func (c *Client) FixDockerfile(ctx context.Context, language string, framework s
 	result.Metadata.TemplateID = rendered.ID
 	result.Metadata.TokensUsed = estimateTokens(response.Content)
 	result.Metadata.Temperature = rendered.Temperature
-	result.Metadata.ProcessingTime = time.Since(time.Now())
+	result.Metadata.ProcessingTime = time.Since(startTime)
 
 	// Validate the result
 	if err := result.Validate(); err != nil {
@@ -644,14 +656,6 @@ func (c *Client) FixDockerfile(ctx context.Context, language string, framework s
 	// Set success flag for metrics
 	success = result.ValidationStatus.IsValid
 	return result, nil
-}
-
-// min returns the minimum of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // countSecurityIssues counts the number of security-related errors
