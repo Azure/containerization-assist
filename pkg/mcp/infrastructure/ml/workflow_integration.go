@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/events"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
+	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 )
 
 // EnhancedErrorHandler wraps workflow execution with AI-powered error analysis
@@ -20,7 +20,7 @@ type EnhancedErrorHandler struct {
 
 // NewEnhancedErrorHandler creates a new enhanced error handler
 func NewEnhancedErrorHandler(
-	samplingClient *sampling.Client,
+	samplingClient domainsampling.Sampler,
 	eventPublisher *events.Publisher,
 	logger *slog.Logger,
 ) *EnhancedErrorHandler {

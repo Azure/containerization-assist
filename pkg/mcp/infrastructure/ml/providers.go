@@ -5,17 +5,17 @@ import (
 	"log/slog"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/events"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
+	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 )
 
 // ProvideErrorPatternRecognizer creates an error pattern recognizer
-func ProvideErrorPatternRecognizer(samplingClient *sampling.Client, logger *slog.Logger) *ErrorPatternRecognizer {
+func ProvideErrorPatternRecognizer(samplingClient domainsampling.Sampler, logger *slog.Logger) *ErrorPatternRecognizer {
 	return NewErrorPatternRecognizer(samplingClient, logger)
 }
 
 // ProvideEnhancedErrorHandler creates an enhanced error handler
 func ProvideEnhancedErrorHandler(
-	samplingClient *sampling.Client,
+	samplingClient domainsampling.Sampler,
 	eventPublisher *events.Publisher,
 	logger *slog.Logger,
 ) *EnhancedErrorHandler {

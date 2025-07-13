@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ml"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
 )
 
 // OptimizedBuildResult extends BuildResult with optimization metadata
@@ -28,7 +28,7 @@ func BuildImageOptimized(
 	dockerfileResult *DockerfileResult,
 	analyzeResult *AnalyzeResult,
 	imageName, imageTag, buildContext string,
-	samplingClient *sampling.Client,
+	samplingClient sampling.Sampler,
 	logger *slog.Logger,
 ) (*OptimizedBuildResult, error) {
 

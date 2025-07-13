@@ -103,7 +103,7 @@ func (c *Client) analyzeKubernetesManifestInternal(ctx context.Context, manifest
 		SystemPrompt: rendered.SystemPrompt,
 	}
 
-	response, err := c.Sample(ctx, request)
+	response, err := c.SampleInternal(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get AI fix for manifest: %w", err)
 	}
@@ -230,7 +230,7 @@ func (c *Client) AnalyzePodCrashLoop(ctx context.Context, podLogs string, manife
 		SystemPrompt: rendered.SystemPrompt,
 	}
 
-	response, err := c.Sample(ctx, request)
+	response, err := c.SampleInternal(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to analyze pod crash: %w", err)
 	}
@@ -302,7 +302,7 @@ func (c *Client) AnalyzeSecurityScan(ctx context.Context, scanResults string, do
 		SystemPrompt: rendered.SystemPrompt,
 	}
 
-	response, err := c.Sample(ctx, request)
+	response, err := c.SampleInternal(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to analyze security scan: %w", err)
 	}
@@ -393,7 +393,7 @@ func (c *Client) ImproveRepositoryAnalysis(ctx context.Context, initialAnalysis 
 		SystemPrompt: rendered.SystemPrompt,
 	}
 
-	response, err := c.Sample(ctx, request)
+	response, err := c.SampleInternal(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to improve repository analysis: %w", err)
 	}
@@ -488,7 +488,7 @@ func (c *Client) GenerateDockerfile(ctx context.Context, language string, framew
 		SystemPrompt: rendered.SystemPrompt,
 	}
 
-	response, err := c.Sample(ctx, request)
+	response, err := c.SampleInternal(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate Dockerfile: %w", err)
 	}
@@ -610,7 +610,7 @@ func (c *Client) FixDockerfile(ctx context.Context, language string, framework s
 		SystemPrompt: rendered.SystemPrompt,
 	}
 
-	response, err := c.Sample(ctx, request)
+	response, err := c.SampleInternal(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fix Dockerfile: %w", err)
 	}

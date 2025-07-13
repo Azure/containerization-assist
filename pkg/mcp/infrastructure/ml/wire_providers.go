@@ -4,11 +4,11 @@ package ml
 import (
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
+	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 )
 
 // ProvideResourcePredictor provides a ResourcePredictor instance
-func ProvideResourcePredictor(samplingClient *sampling.Client, logger *slog.Logger) *ResourcePredictor {
+func ProvideResourcePredictor(samplingClient domainsampling.Sampler, logger *slog.Logger) *ResourcePredictor {
 	return NewResourcePredictor(samplingClient, logger)
 }
 
@@ -18,6 +18,6 @@ func ProvideBuildOptimizer(predictor *ResourcePredictor, logger *slog.Logger) *B
 }
 
 // ProvideOptimizedBuildStep provides an OptimizedBuildStep instance
-func ProvideOptimizedBuildStep(samplingClient *sampling.Client, logger *slog.Logger) *OptimizedBuildStep {
+func ProvideOptimizedBuildStep(samplingClient domainsampling.Sampler, logger *slog.Logger) *OptimizedBuildStep {
 	return NewOptimizedBuildStep(samplingClient, logger)
 }

@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
+	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 )
 
 // ErrorClassification represents the AI analysis of an error
@@ -78,13 +78,13 @@ type WorkflowContext struct {
 
 // ErrorPatternRecognizer provides AI-powered error analysis using existing sampling client
 type ErrorPatternRecognizer struct {
-	samplingClient *sampling.Client
+	samplingClient domainsampling.Sampler
 	errorHistory   *ErrorHistoryStore
 	logger         *slog.Logger
 }
 
 // NewErrorPatternRecognizer creates a new error pattern recognizer
-func NewErrorPatternRecognizer(samplingClient *sampling.Client, logger *slog.Logger) *ErrorPatternRecognizer {
+func NewErrorPatternRecognizer(samplingClient domainsampling.Sampler, logger *slog.Logger) *ErrorPatternRecognizer {
 	return &ErrorPatternRecognizer{
 		samplingClient: samplingClient,
 		errorHistory:   NewErrorHistoryStore(),
@@ -107,7 +107,7 @@ func (r *ErrorPatternRecognizer) ClassifyError(ctx context.Context, err error, c
 	prompt := r.buildErrorAnalysisPrompt(err, context)
 
 	// Use existing sampling client for AI analysis
-	response, aiErr := r.samplingClient.Sample(ctx, sampling.SamplingRequest{
+	response, aiErr := r.samplingClient.Sample(ctx, domainsampling.Request{
 		Prompt:      prompt,
 		Temperature: 0.1, // Low temperature for consistent analysis
 		MaxTokens:   1000,
