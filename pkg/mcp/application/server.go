@@ -93,10 +93,7 @@ func NewMCPServer(ctx context.Context, logger *slog.Logger, opts ...Option) (api
 
 	if err != nil {
 		logger.Error("Failed to initialize server with Wire", "error", err)
-		// Fallback to manual DI for compatibility
-		logger.Warn("Falling back to manual dependency injection")
-		fallbackServer := NewServer(append([]Option{WithLogger(logger), WithConfig(config)}, opts...)...)
-		return fallbackServer, nil
+		return nil, fmt.Errorf("failed to initialize server: %w", err)
 	}
 
 	logger.Info("MCP Server initialized successfully with Wire",

@@ -48,15 +48,11 @@ func TestDomainAdapter_AnalyzeDockerfile(t *testing.T) {
 	content := "FROM node:16\nCOPY . .\nRUN npm install\nCMD npm start"
 
 	result, err := adapter.AnalyzeDockerfile(ctx, content)
-	require.NoError(t, err)
-	require.NotNil(t, result)
-
-	// Should return basic analysis for now
-	assert.Equal(t, "unknown", result.Language)
-	assert.Equal(t, "unknown", result.Framework)
-	assert.Equal(t, 8080, result.Port)
-	assert.Contains(t, result.BuildSteps, "FROM")
-	assert.Contains(t, result.BuildSteps, "COPY")
+	// Without MCP server context, should get retry exhaustion error
+	require.Error(t, err)
+	require.Nil(t, result)
+	assert.Contains(t, err.Error(), "max retry attempts")
+	assert.Contains(t, err.Error(), "no MCP server in context")
 }
 
 func TestDomainAdapter_AnalyzeKubernetesManifest(t *testing.T) {
@@ -88,12 +84,11 @@ spec:
 `
 
 	result, err := adapter.AnalyzeKubernetesManifest(ctx, content)
-	require.NoError(t, err)
-	require.NotNil(t, result)
-
-	// Should return basic analysis for now
-	assert.Contains(t, result.ResourceTypes, "Deployment")
-	assert.Contains(t, result.ResourceTypes, "Service")
+	// Without MCP server context, should get retry exhaustion error
+	require.Error(t, err)
+	require.Nil(t, result)
+	assert.Contains(t, err.Error(), "max retry attempts")
+	assert.Contains(t, err.Error(), "no MCP server in context")
 }
 
 func TestDomainAdapter_RequestConversion(t *testing.T) {

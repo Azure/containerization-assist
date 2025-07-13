@@ -527,3 +527,9 @@ func GetGlobalMetrics() *MetricsCollector {
 	})
 	return globalMetrics
 }
+
+// ResetGlobalMetrics resets the global metrics instance (for testing)
+func ResetGlobalMetrics() {
+	globalMetrics = NewMetricsCollector()
+	globalMetricsOnce = sync.Once{}
+}

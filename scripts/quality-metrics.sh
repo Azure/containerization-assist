@@ -30,7 +30,11 @@ NUM_GO_FILES=$(find pkg/mcp -name "*.go" -not -path "*/vendor/*" | wc -l)
 echo "  Total Go LOC (pkg/mcp): $TOTAL_GO_LOC"
 echo "  Test Go LOC: $TEST_GO_LOC"
 echo "  Number of Go files: $NUM_GO_FILES"
-echo "  Average LOC per file: $((TOTAL_GO_LOC / NUM_GO_FILES))"
+if [ "$NUM_GO_FILES" -eq 0 ]; then
+    echo "  Average LOC per file: Cannot calculate (no Go files found)"
+else
+    echo "  Average LOC per file: $((TOTAL_GO_LOC / NUM_GO_FILES))"
+fi
 echo ""
 
 # 2. Cyclomatic Complexity
@@ -92,7 +96,7 @@ echo "🔍 Lint Issues:"
 echo "---------------"
 if command_exists golangci-lint; then
     LINT_OUTPUT=$(golangci-lint run pkg/mcp/... --timeout=5m 2>&1 || true)
-    LINT_ISSUES=$(echo "$LINT_OUTPUT" | grep -oP '\d+(?= issues:)' | tail -1 || echo "0")
+    LINT_ISSUES=$(echo "$LINT_OUTPUT" | awk '/issues:/ {match($0, /[0-9]+/); print substr($0, RSTART, RLENGTH)}' | tail -1 || echo "0")
     echo "  Total lint issues: $LINT_ISSUES"
     
     # Count by severity if available
@@ -186,7 +190,7 @@ if [ "$1" == "--json" ]; then
     "total_loc": $TOTAL_GO_LOC,
     "test_loc": $TEST_GO_LOC,
     "num_files": $NUM_GO_FILES,
-    "avg_loc_per_file": $((TOTAL_GO_LOC / NUM_GO_FILES))
+    "avg_loc_per_file": $([ "$NUM_GO_FILES" -eq 0 ] && echo "null" || echo "$((TOTAL_GO_LOC / NUM_GO_FILES))")
   },
   "complexity": {
     "over_30": ${COMPLEX_OVER_30:-0},

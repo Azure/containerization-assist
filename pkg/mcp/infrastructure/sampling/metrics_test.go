@@ -369,6 +369,9 @@ func TestMetricsCollector_GetHealthStatus_HighLatency(t *testing.T) {
 }
 
 func TestGlobalMetrics(t *testing.T) {
+	// Reset global metrics to ensure clean state
+	ResetGlobalMetrics()
+
 	// Get global metrics instance
 	metrics1 := GetGlobalMetrics()
 	metrics2 := GetGlobalMetrics()

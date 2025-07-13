@@ -271,6 +271,6 @@ func (ts *TemplateSelector) CustomizeTemplate(template string, config *Customiza
 
 ## Related ADRs
 - ADR-001: Single Workflow Tool Architecture (template integration in workflow)
-- ADR-003: Manual Dependency Injection (template service dependencies)
+- ADR-003: Wire-Based Dependency Injection (template service dependencies)
 - ADR-004: Unified Rich Error System (template error handling)
 - ADR-006: Four-Layer MCP Architecture (templates in infrastructure layer)

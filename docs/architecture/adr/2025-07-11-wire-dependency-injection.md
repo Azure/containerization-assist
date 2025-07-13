@@ -1,10 +1,10 @@
-# ADR-003: Manual Dependency Injection Pattern
+# ADR-003: Wire-Based Dependency Injection Pattern
 
 Date: 2025-07-11
 Status: Accepted
 Context: Container Kit originally had complex service interfaces with dependency injection frameworks and large manager objects containing 65+ methods across 4 different interfaces. This created unnecessary complexity, harder testing, and difficult-to-understand code paths. The system needed a simpler approach to dependency management that maintained clarity and testability.
 
-Decision: Adopt manual dependency injection with focused service interfaces, direct instantiation patterns, and clear dependency graphs. Replace large manager interfaces with 8 focused services containing 32 methods total, using Google Wire for compile-time dependency injection instead of runtime frameworks.
+Decision: Adopt Google Wire for compile-time dependency injection with focused service interfaces. Replace large manager interfaces with 8 focused services containing 32 methods total, leveraging Wire's compile-time code generation for optimal dependency construction and verification.
 
 ## Architecture Details
 
@@ -149,29 +149,33 @@ type DeploymentManager interface {
 }
 ```
 
-### Direct Dependency Injection
+### Wire-Generated Dependency Injection
 ```go
-// pkg/mcp/application/server.go
-func (s *Server) initializeServices() error {
-    // Direct service construction with clear dependencies
-    s.dockerClient = docker.NewClient(s.config.Docker)
-    s.kubeClient = kubernetes.NewClient(s.config.Kubernetes)
-    
-    // Explicit dependency passing
-    s.imageBuilder = docker.NewImageBuilder(s.dockerClient, s.logger)
-    s.registryClient = docker.NewRegistryClient(s.dockerClient, s.logger)
-    s.scanner = security.NewScanner(s.dockerClient, s.logger)
-    
-    s.manifestGenerator = kubernetes.NewManifestGenerator(s.logger)
-    s.deploymentManager = kubernetes.NewDeploymentManager(s.kubeClient, s.logger)
-    
-    // Workflow step composition
-    s.analyzeStep = steps.NewAnalyzeStep(s.logger)
-    s.buildStep = steps.NewBuildStep(s.imageBuilder, s.registryClient, s.logger)
-    s.deployStep = steps.NewDeployStep(s.manifestGenerator, s.deploymentManager, s.logger)
-    
-    return nil
+// pkg/mcp/infrastructure/wire/wire.go
+//go:build wireinject
+
+package wire
+
+import (
+    "github.com/google/wire"
+    "github.com/your-org/container-kit/pkg/mcp/application"
+    "github.com/your-org/container-kit/pkg/mcp/domain/workflow"
+    "github.com/your-org/container-kit/pkg/mcp/infrastructure/steps"
+)
+
+// InitializeServer creates a fully-wired MCP server
+func InitializeServer(config *workflow.ServerConfig, logger *slog.Logger) (*application.Server, error) {
+    wire.Build(
+        ConfigSet,
+        CoreSet,
+        ApplicationSet,
+        InfrastructureSet,
+    )
+    return nil, nil
 }
+
+// The generated wire_gen.go file contains the actual implementation
+// with all dependencies properly constructed and validated at compile time
 ```
 
 ### Testing Benefits
@@ -205,19 +209,19 @@ func TestBuildStep(t *testing.T) {
 ## Consequences
 
 ### Benefits
-- **Simple Architecture**: No framework complexity or magic behavior
+- **Compile-Time Safety**: All dependency issues caught at build time
 - **Clear Dependencies**: Explicit dependency relationships visible in code
 - **Easy Testing**: Small, focused interfaces are easy to mock
-- **Better Debugging**: Clear service construction and dependency paths
+- **Better Debugging**: Wire generates readable code for service construction
 - **Reduced Coupling**: Services depend only on what they need
-- **Performance**: No framework overhead or reflection
-- **Learning Curve**: Easier for new developers to understand
+- **Performance**: No runtime overhead, optimal generated code
+- **Type Safety**: Full Go type checking on all dependencies
 
 ### Trade-offs
-- **Manual Work**: Need to manually wire dependencies
-- **Duplication**: Some dependency setup code may be repeated
-- **No Auto-wiring**: No automatic dependency resolution
-- **Verbosity**: More explicit code for service construction
+- **Build Step**: Requires `wire` generation during development
+- **Learning Curve**: Developers need to understand Wire provider sets
+- **Generated Code**: Must run `make wire-gen` when dependencies change
+- **Compile-Time Only**: No runtime dependency resolution
 
 ### Maintenance Impact
 - **Refactoring**: Easier to refactor with explicit dependencies
@@ -244,33 +248,36 @@ func TestBuildStep(t *testing.T) {
 - **Error Handling**: Consistent error patterns using rich error system
 
 ## Implementation Status
-- 🔄 **Hybrid approach**: Manual DI exists alongside Wire implementation
+- ✅ **Wire-based DI**: Fully migrated to Google Wire for all dependency injection
 - ✅ 8 focused service interfaces defined (32 methods total)
-- 🔄 **Mixed construction**: Wire used for complex dependencies, manual for simple ones
-- ✅ Clear dependency graphs established
+- ✅ **Wire construction**: All dependencies managed through Wire provider sets
+- ✅ Clear dependency graphs established and compile-time verified
 - ✅ Testing patterns simplified with focused mocks
 - ✅ Service boundaries well-defined and documented
 - ✅ Integration with workflow architecture complete
-- ✅ **Wire integration**: `pkg/mcp/infrastructure/wire/` provides compile-time DI for complex scenarios
+- ✅ **Wire integration**: `pkg/mcp/infrastructure/wire/` provides compile-time DI for all scenarios
 
 ## Guidelines
 1. **Keep Interfaces Small**: 3-5 methods maximum per interface
 2. **Single Responsibility**: One clear purpose per service
-3. **Explicit Dependencies**: Pass dependencies directly to constructors
+3. **Use Wire Providers**: Define providers for all service constructors
 4. **Clear Naming**: Service and method names should be self-explanatory
-5. **Consistent Patterns**: Follow established patterns for new services
+5. **Consistent Patterns**: Follow established Wire patterns for new services
+6. **Run Generation**: Always run `make wire-gen` after dependency changes
 
-## Future Migration to Wire-Only
+## Wire Usage Patterns
 
-A comprehensive implementation plan has been created to migrate from the current hybrid approach to Wire-only dependency injection. See [Wire Migration Implementation Plan](../implementation-plan-wire-migration.md) for details.
+### Creating New Services
+1. Define the interface in the appropriate layer (api, domain, infrastructure)
+2. Implement the service with a constructor function
+3. Add the constructor to the appropriate Wire provider set
+4. Run `make wire-gen` to update generated code
+5. Wire will automatically handle dependency injection
 
-**Migration Benefits:**
-- **Compile-time safety**: All dependency issues caught at build time
-- **Reduced boilerplate**: 50% reduction in manual wiring code
-- **Better testability**: Clear dependency graphs for mocking
-- **Improved maintainability**: Explicit dependency relationships
-
-**Timeline:** 8-week phased migration maintaining backward compatibility
+### Testing with Wire
+- Use Wire's testing support for creating test fixtures
+- Mock interfaces can be provided through test-specific provider sets
+- Wire ensures all test dependencies are properly satisfied
 
 ## Related ADRs
 - ADR-001: Single Workflow Tool Architecture (workflow orchestration context)
