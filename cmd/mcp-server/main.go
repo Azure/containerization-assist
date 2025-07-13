@@ -259,7 +259,8 @@ func createAndConfigureServer(config workflow.ServerConfig, flags *FlagConfig) (
 
 	// Create server using functional options pattern
 	// The server will handle creating its own internal dependencies
-	mcpServer, err := application.NewServer(context.Background(), slogLogger,
+	mcpServer := application.NewServer(
+		application.WithLogger(slogLogger),
 		application.WithWorkspace(config.WorkspaceDir),
 		application.WithMaxSessions(config.MaxSessions),
 		application.WithSessionTTL(config.SessionTTL),
@@ -272,9 +273,6 @@ func createAndConfigureServer(config workflow.ServerConfig, flags *FlagConfig) (
 		application.WithCORSOrigins(config.CORSOrigins),
 		application.WithLogLevel(config.LogLevel),
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create server: %w", err)
-	}
 	if mcpServer == nil {
 		return nil, fmt.Errorf("server is nil despite no error")
 	}

@@ -1,0 +1,59 @@
+id: "dockerfile-fix"
+name: "Dockerfile Build Error Fix"
+description: "Analyzes Dockerfile build errors and provides fixes"
+version: "1.0.0"
+category: "docker"
+template: |
+  Please fix this Dockerfile that is failing to build.
+
+  Language: {{.Language}}
+  Framework: {{.Framework}}
+  Port: {{.Port}}
+
+  Current Dockerfile:
+  {{.DockerfileContent}}
+
+  Build Error:
+  {{.BuildError}}
+
+  Please provide a corrected Dockerfile that:
+  1. Fixes the specific error mentioned
+  2. Uses appropriate base images for the detected language/framework
+  3. Includes proper dependency installation
+  4. Follows Docker best practices
+  5. Uses multi-stage builds when appropriate
+
+  Return ONLY the corrected Dockerfile content without any explanation or markdown formatting.
+
+system_prompt: "You are a Docker and containerization expert. Fix the Dockerfile to resolve build errors while following best practices."
+parameters:
+  - name: "Language"
+    type: "string"
+    description: "Programming language (e.g., java, go, python)"
+    required: true
+    example: "java"
+  - name: "Framework"
+    type: "string"
+    description: "Framework used (e.g., spring-boot, express, django)"
+    required: true
+    example: "spring-boot"
+  - name: "Port"
+    type: "int"
+    description: "Application port number"
+    required: true
+    example: "8080"
+  - name: "DockerfileContent"
+    type: "string"
+    description: "Current Dockerfile content that's failing"
+    required: true
+  - name: "BuildError"
+    type: "string"
+    description: "The build error message"
+    required: true
+defaults:
+  Port: "8080"
+max_tokens: 2048
+temperature: 0.3
+tags: ["docker", "build", "error-fix", "containerization"]
+created_at: 2025-01-12T00:00:00Z
+updated_at: 2025-01-12T00:00:00Z

@@ -203,6 +203,9 @@ TestResult.xml
 nunit-*.xml
 *.VisualState.xml
 
+# Golden test actual output files
+*.golden.actual
+
 # Coverage
 coverage*.json
 !.github/coverage-thresholds.json

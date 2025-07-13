@@ -1,0 +1,65 @@
+id: "pod-crash-analysis"
+name: "Pod Crash Loop Analysis"
+description: "Diagnoses pod crash loops and suggests fixes"
+version: "1.0.0"
+category: "kubernetes"
+template: |
+  Analyze this Kubernetes pod crash loop and suggest fixes:
+
+  Pod Logs:
+  {{.PodLogs}}
+
+  Error Details:
+  {{.ErrorDetails}}
+
+  Current Manifest:
+  {{.ManifestContent}}
+
+  Dockerfile:
+  {{.DockerfileContent}}
+
+  Please analyze the crash loop and provide:
+
+  ROOT CAUSE:
+  [Identify the specific reason for the crash]
+
+  FIX STEPS:
+  - [Step 1 to fix the issue]
+  - [Step 2 to fix the issue]
+  - [Additional steps as needed]
+
+  ALTERNATIVES:
+  - [Alternative approach 1]
+  - [Alternative approach 2]
+
+  PREVENTION:
+  - [How to prevent this in the future]
+
+  Focus on actionable fixes that can be applied to the manifest or Dockerfile.
+
+system_prompt: "You are a Kubernetes debugging expert. Analyze pod crashes and provide actionable solutions."
+parameters:
+  - name: "PodLogs"
+    type: "string"
+    description: "Pod logs showing the crash"
+    required: true
+  - name: "ErrorDetails"
+    type: "string"
+    description: "Additional error details from events"
+    required: true
+  - name: "ManifestContent"
+    type: "string"
+    description: "Kubernetes manifest content"
+    required: true
+  - name: "DockerfileContent"
+    type: "string"
+    description: "Associated Dockerfile content"
+    required: false
+    default: ""
+defaults:
+  DockerfileContent: "Not available"
+max_tokens: 1500
+temperature: 0.3
+tags: ["kubernetes", "debugging", "crash-loop", "pod-failure"]
+created_at: 2025-01-12T00:00:00Z
+updated_at: 2025-01-12T00:00:00Z

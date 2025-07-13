@@ -1,0 +1,49 @@
+id: "security-scan-analysis"
+name: "Security Scan Results Analysis"
+description: "Analyzes container security scan results and suggests remediations"
+version: "1.0.0"
+category: "security"
+template: |
+  Analyze these container security scan results and suggest remediations:
+
+  Security Scan Results:
+  {{.ScanResults}}
+
+  Current Dockerfile:
+  {{.DockerfileContent}}
+
+  Critical Issues Only: {{.CriticalOnly}}
+
+  Please provide:
+  1. Summary of the most critical vulnerabilities
+  2. Specific Dockerfile changes to remediate vulnerabilities
+  3. Alternative base images if current one has too many vulnerabilities
+  4. Best practices to improve container security
+
+  Focus on practical remediations that can be implemented in the Dockerfile.
+  If base image has critical vulnerabilities, suggest newer/more secure alternatives.
+
+  Return your analysis in a clear, actionable format.
+
+system_prompt: "You are a container security expert. Analyze vulnerabilities and provide practical remediation strategies."
+parameters:
+  - name: "ScanResults"
+    type: "string"
+    description: "Security scan results output"
+    required: true
+  - name: "DockerfileContent"
+    type: "string"
+    description: "Current Dockerfile content"
+    required: true
+  - name: "CriticalOnly"
+    type: "bool"
+    description: "Whether to focus only on critical vulnerabilities"
+    required: false
+    default: "false"
+defaults:
+  CriticalOnly: "false"
+max_tokens: 2000
+temperature: 0.3
+tags: ["security", "vulnerability", "scanning", "remediation"]
+created_at: 2025-01-12T00:00:00Z
+updated_at: 2025-01-12T00:00:00Z

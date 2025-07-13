@@ -1,0 +1,65 @@
+id: "kubernetes-manifest-fix"
+name: "Kubernetes Manifest Error Fix"
+description: "Analyzes and fixes Kubernetes manifest deployment errors"
+version: "1.0.0"
+category: "kubernetes"
+template: |
+  Analyze the following Kubernetes manifest file for errors and suggest fixes:
+
+  Current Manifest:
+  {{.ManifestContent}}
+
+  Deployment Error:
+  {{.DeploymentError}}
+
+  Reference Dockerfile for this application:
+  {{.DockerfileContent}}
+
+  Repository Analysis:
+  {{.RepoAnalysis}}
+
+  Please:
+  1. Identify the issues causing the deployment error
+  2. Provide a fixed version of the manifest
+  3. Consider the Dockerfile when fixing the manifest (ports, environment variables, etc.)
+  4. Ensure health checks are appropriate for the application type
+  5. Use proper resource limits and requests
+  6. Verify image references are correct
+
+  IMPORTANT:
+  - Do NOT create brand new manifests - Only fix the provided manifest
+  - Verify that health check paths exist before using httpGet probe; if they don't, use a tcpSocket probe instead
+  - Prefer using secrets for sensitive information and configmaps for configuration
+  - For Spring Boot applications, use /actuator/health only if actuator is configured
+  - Keep the same app name and container image name
+
+  Return ONLY the fixed manifest content without any explanation or markdown formatting.
+
+system_prompt: "You are a Kubernetes expert. Fix the manifest to resolve deployment errors while following best practices."
+parameters:
+  - name: "ManifestContent"
+    type: "string"
+    description: "Current Kubernetes manifest content"
+    required: true
+  - name: "DeploymentError"
+    type: "string"
+    description: "The deployment error message"
+    required: true
+  - name: "DockerfileContent"
+    type: "string"
+    description: "Associated Dockerfile content for context"
+    required: false
+    default: ""
+  - name: "RepoAnalysis"
+    type: "string"
+    description: "Repository analysis summary"
+    required: false
+    default: ""
+defaults:
+  DockerfileContent: "Not available"
+  RepoAnalysis: "Analysis not available"
+max_tokens: 2048
+temperature: 0.2
+tags: ["kubernetes", "manifest", "deployment", "error-fix"]
+created_at: 2025-01-12T00:00:00Z
+updated_at: 2025-01-12T00:00:00Z

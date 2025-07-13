@@ -36,8 +36,8 @@ type sessionEntry struct {
 	lastAccess time.Time
 }
 
-// NewMemorySessionManager creates a new production-ready in-memory session manager
-func NewMemorySessionManager(logger *slog.Logger, defaultTTL time.Duration, maxSessions int) SessionManager {
+// NewLegacyMemorySessionManager creates a new production-ready in-memory session manager (legacy implementation)
+func NewLegacyMemorySessionManager(logger *slog.Logger, defaultTTL time.Duration, maxSessions int) SessionManager {
 	manager := &memorySessionManager{
 		logger:          logger.With("component", "session_manager"),
 		sessions:        make(map[string]*sessionEntry),
@@ -327,4 +327,24 @@ func (m *memorySessionManager) evictOldestSession() {
 			"evicted_session_id", oldestID,
 			"last_access", oldestTime)
 	}
+}
+
+// GetStats returns session statistics
+func (m *memorySessionManager) GetStats() (*SessionStats, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	activeCount := 0
+	now := time.Now()
+	for _, entry := range m.sessions {
+		if entry.expiresAt.After(now) {
+			activeCount++
+		}
+	}
+
+	return &SessionStats{
+		ActiveSessions: activeCount,
+		TotalSessions:  len(m.sessions),
+		MaxSessions:    m.maxSessions,
+	}, nil
 }

@@ -1,0 +1,45 @@
+id: "error-analysis"
+name: "General Error Analysis"
+description: "Analyzes errors and provides actionable fixes"
+version: "1.0.0"
+category: "debugging"
+template: |
+  Analyze this error and provide actionable fixes:
+
+  Error: {{.Error}}
+
+  Context: {{.Context}}
+
+  Please provide:
+
+  ROOT CAUSE:
+  [Identify the specific reason for the error]
+
+  FIX STEPS:
+  - [Step 1 to fix the error]
+  - [Step 2 to fix the error]
+  - [Additional steps as needed]
+
+  ALTERNATIVES:
+  - [Alternative approach 1]
+  - [Alternative approach 2]
+
+  PREVENTION:
+  - [How to prevent this error in the future]
+
+system_prompt: "You are a debugging expert. Analyze errors and provide clear, actionable solutions."
+parameters:
+  - name: "Error"
+    type: "string"
+    description: "The error message or exception"
+    required: true
+  - name: "Context"
+    type: "string"
+    description: "Additional context about when/where the error occurred"
+    required: true
+defaults: {}
+max_tokens: 1000
+temperature: 0.3
+tags: ["debugging", "error-analysis", "troubleshooting"]
+created_at: 2025-01-12T00:00:00Z
+updated_at: 2025-01-12T00:00:00Z

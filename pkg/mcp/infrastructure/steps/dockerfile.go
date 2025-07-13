@@ -3,7 +3,11 @@ package steps
 import (
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/Azure/container-kit/pkg/common/errors"
 )
 
 // DockerfileResult contains the generated Dockerfile and metadata
@@ -18,7 +22,7 @@ type DockerfileResult struct {
 // GenerateDockerfile creates an optimized Dockerfile based on analysis results
 func GenerateDockerfile(analyzeResult *AnalyzeResult, logger *slog.Logger) (*DockerfileResult, error) {
 	if analyzeResult == nil {
-		return nil, fmt.Errorf("analyze result is required")
+		return nil, errors.New(errors.CodeInvalidParameter, "dockerfile", "analyze result is required", nil)
 	}
 
 	logger.Info("Generating Dockerfile",
@@ -101,36 +105,91 @@ func generateGoDockerfile(port int, logger *slog.Logger) string {
 func generateJavaDockerfile(framework string, port int, logger *slog.Logger) string {
 	var dockerfile strings.Builder
 
-	// Choose base image based on framework
-	if strings.Contains(framework, "spring") {
-		dockerfile.WriteString("FROM openjdk:17-jdk-slim\n")
+	// Check if this is a servlet application (WAR file)
+	isServlet := strings.Contains(strings.ToLower(framework), "servlet") ||
+		strings.Contains(strings.ToLower(framework), "jsp") ||
+		strings.Contains(strings.ToLower(framework), "war")
+
+	if isServlet {
+		// Use Tomcat for servlet applications
+		dockerfile.WriteString("# Build stage\n")
+		dockerfile.WriteString("FROM maven:3.9-eclipse-temurin-17 AS builder\n")
+		dockerfile.WriteString("WORKDIR /app\n")
+		dockerfile.WriteString("COPY . .\n")
+
+		// Build the application
+		dockerfile.WriteString("# Build the application\n")
+		dockerfile.WriteString("RUN if [ -f \"mvnw\" ]; then \\\n")
+		dockerfile.WriteString("      chmod +x mvnw && ./mvnw clean package -DskipTests; \\\n")
+		dockerfile.WriteString("    elif [ -f \"gradlew\" ]; then \\\n")
+		dockerfile.WriteString("      chmod +x gradlew && ./gradlew build -x test; \\\n")
+		dockerfile.WriteString("    elif [ -f \"pom.xml\" ]; then \\\n")
+		dockerfile.WriteString("      mvn clean package -DskipTests; \\\n")
+		dockerfile.WriteString("    elif [ -f \"build.gradle\" ] || [ -f \"build.gradle.kts\" ]; then \\\n")
+		dockerfile.WriteString("      gradle build -x test; \\\n")
+		dockerfile.WriteString("    else \\\n")
+		dockerfile.WriteString("      echo \"No build file found\" && exit 1; \\\n")
+		dockerfile.WriteString("    fi\n\n")
+
+		// Runtime stage with Tomcat
+		dockerfile.WriteString("# Runtime stage - Tomcat for servlet applications\n")
+		dockerfile.WriteString("FROM tomcat:10-jre17-temurin-jammy\n")
+		dockerfile.WriteString("# Remove default webapps\n")
+		dockerfile.WriteString("RUN rm -rf /usr/local/tomcat/webapps/*\n")
+		dockerfile.WriteString("# Copy WAR file to Tomcat webapps as ROOT for root context\n")
+		dockerfile.WriteString("COPY --from=builder /app/target/*.war /usr/local/tomcat/webapps/ROOT.war\n")
+
+		if port > 0 {
+			dockerfile.WriteString(fmt.Sprintf("EXPOSE %d\n", port))
+		} else {
+			dockerfile.WriteString("EXPOSE 8080\n") // Default Tomcat port
+		}
+
+		dockerfile.WriteString("# Start Tomcat\n")
+		dockerfile.WriteString("CMD [\"catalina.sh\", \"run\"]\n")
 	} else {
-		dockerfile.WriteString("FROM openjdk:17-jdk-slim\n")
+		// Standard Java application (executable JAR)
+		dockerfile.WriteString("# Build stage\n")
+		dockerfile.WriteString("FROM maven:3.9-eclipse-temurin-17 AS builder\n")
+		dockerfile.WriteString("WORKDIR /app\n")
+		dockerfile.WriteString("COPY . .\n")
+
+		// Handle different build systems
+		dockerfile.WriteString("# Build the application\n")
+		dockerfile.WriteString("RUN if [ -f \"mvnw\" ]; then \\\n")
+		dockerfile.WriteString("      chmod +x mvnw && ./mvnw clean package -DskipTests; \\\n")
+		dockerfile.WriteString("    elif [ -f \"gradlew\" ]; then \\\n")
+		dockerfile.WriteString("      chmod +x gradlew && ./gradlew build -x test; \\\n")
+		dockerfile.WriteString("    elif [ -f \"pom.xml\" ]; then \\\n")
+		dockerfile.WriteString("      mvn clean package -DskipTests; \\\n")
+		dockerfile.WriteString("    elif [ -f \"build.gradle\" ] || [ -f \"build.gradle.kts\" ]; then \\\n")
+		dockerfile.WriteString("      gradle build -x test; \\\n")
+		dockerfile.WriteString("    else \\\n")
+		dockerfile.WriteString("      echo \"No build file found\" && exit 1; \\\n")
+		dockerfile.WriteString("    fi\n\n")
+
+		// Runtime stage
+		dockerfile.WriteString("# Runtime stage\n")
+		dockerfile.WriteString("FROM eclipse-temurin:17-jre-alpine\n")
+		dockerfile.WriteString("WORKDIR /app\n")
+
+		// Copy built artifacts from builder stage - handle both Maven and Gradle outputs
+		dockerfile.WriteString("# Copy built artifacts from builder stage\n")
+		dockerfile.WriteString("# Use a shell script to find and copy the built artifact\n")
+		dockerfile.WriteString("RUN --mount=from=builder,source=/app,target=/build \\\n")
+		dockerfile.WriteString("    find /build -name '*.jar' -not -name '*-sources.jar' -not -name '*-javadoc.jar' | head -1 | xargs -I {} cp {} /app/app.jar\n\n")
+
+		if port > 0 {
+			dockerfile.WriteString(fmt.Sprintf("EXPOSE %d\n", port))
+		} else {
+			dockerfile.WriteString("EXPOSE 8080\n") // Default Java web app port
+		}
+
+		dockerfile.WriteString("# Run the application\n")
+		dockerfile.WriteString("ENTRYPOINT [\"java\", \"-jar\", \"app.jar\"]\n")
 	}
 
-	dockerfile.WriteString("WORKDIR /app\n")
-	dockerfile.WriteString("COPY . .\n")
-
-	// Handle different build systems
-	dockerfile.WriteString("# Build the application\n")
-	dockerfile.WriteString("RUN if [ -f \"mvnw\" ]; then \\\n")
-	dockerfile.WriteString("      ./mvnw clean package -DskipTests; \\\n")
-	dockerfile.WriteString("    elif [ -f \"gradlew\" ]; then \\\n")
-	dockerfile.WriteString("      ./gradlew build -x test; \\\n")
-	dockerfile.WriteString("    elif [ -f \"pom.xml\" ]; then \\\n")
-	dockerfile.WriteString("      mvn clean package -DskipTests; \\\n")
-	dockerfile.WriteString("    elif [ -f \"build.gradle\" ]; then \\\n")
-	dockerfile.WriteString("      gradle build -x test; \\\n")
-	dockerfile.WriteString("    fi\n\n")
-
-	if port > 0 {
-		dockerfile.WriteString(fmt.Sprintf("EXPOSE %d\n", port))
-	}
-
-	dockerfile.WriteString("# Run the application\n")
-	dockerfile.WriteString("CMD [\"sh\", \"-c\", \"java -jar target/*.jar || java -jar build/libs/*.jar\"]\n")
-
-	logger.Debug("Generated Java Dockerfile with build system detection", "framework", framework)
+	logger.Debug("Generated Java Dockerfile", "framework", framework, "isServlet", isServlet)
 	return dockerfile.String()
 }
 
@@ -275,4 +334,18 @@ func getBaseImageForLanguage(language, framework string) string {
 	default:
 		return "alpine:latest"
 	}
+}
+
+// WriteDockerfile writes the Dockerfile content to the specified path
+func WriteDockerfile(repoPath, content string, logger *slog.Logger) error {
+	dockerfilePath := filepath.Join(repoPath, "Dockerfile")
+
+	logger.Info("Writing Dockerfile", "path", dockerfilePath)
+
+	if err := os.WriteFile(dockerfilePath, []byte(content), 0644); err != nil {
+		return errors.New(errors.CodeIoError, "dockerfile", "failed to write Dockerfile", err)
+	}
+
+	logger.Info("Dockerfile written successfully", "path", dockerfilePath, "size", len(content))
+	return nil
 }

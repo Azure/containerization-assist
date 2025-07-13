@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/analysis"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/utilities"
 )
 
 // AnalyzeResult contains the results of repository analysis
@@ -75,7 +75,7 @@ func AnalyzeRepository(repoURL, branch string, logger *slog.Logger) (*AnalyzeRes
 	// The cleanup should be handled by the workflow or session manager.
 
 	// Create analysis engine with enhanced logging
-	analyzer := analysis.NewRepositoryAnalyzer(logger.With("component", "analyze_repository"))
+	analyzer := utilities.NewRepositoryAnalyzer(logger.With("component", "analyze_repository"))
 
 	// Perform real repository analysis with detailed logging
 	logger.Info("Starting repository analysis with analyzer", "path", repoPath)

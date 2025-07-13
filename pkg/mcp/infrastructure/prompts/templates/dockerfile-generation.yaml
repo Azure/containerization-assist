@@ -1,0 +1,46 @@
+id: "dockerfile-generation"
+name: "Dockerfile Generation"
+description: "Generates production-ready Dockerfiles for applications"
+version: "1.0.0"
+category: "docker"
+template: |
+  Generate a production-ready, multi-stage Dockerfile for:
+  - Language: {{.Language}}
+  - Framework: {{.Framework}}  
+  - Port: {{.Port}}
+
+  Requirements:
+  1. Use multi-stage build for minimal final image size
+  2. Implement proper layer caching
+  3. Use non-root user for security
+  4. Include health checks
+  5. Handle signals properly (SIGTERM)
+  6. Separate build-time ARGs from runtime ENVs
+  7. Include security scanning step
+
+  Provide only the Dockerfile content without explanation.
+
+system_prompt: "You are a Docker expert. Generate production-ready, secure, and optimized Dockerfiles."
+parameters:
+  - name: "Language"
+    type: "string"
+    description: "Programming language"
+    required: true
+    example: "java"
+  - name: "Framework"
+    type: "string"
+    description: "Framework used"
+    required: true
+    example: "spring-boot"
+  - name: "Port"
+    type: "int"
+    description: "Application port"
+    required: true
+    example: "8080"
+defaults:
+  Port: "8080"
+max_tokens: 1000
+temperature: 0.2
+tags: ["docker", "generation", "production", "best-practices"]
+created_at: 2025-01-12T00:00:00Z
+updated_at: 2025-01-12T00:00:00Z
