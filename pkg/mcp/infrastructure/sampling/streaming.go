@@ -35,6 +35,26 @@ func (c *Client) SampleStream(
 		attribute.Float64("sampling.temperature", float64(req.Temperature)),
 		attribute.Int("sampling.prompt_length", len(req.Prompt)),
 	)
+
+	// Add advanced parameter attributes for streaming
+	if req.TopP != nil {
+		span.SetAttributes(attribute.Float64("sampling.top_p", float64(*req.TopP)))
+	}
+	if req.FrequencyPenalty != nil {
+		span.SetAttributes(attribute.Float64("sampling.frequency_penalty", float64(*req.FrequencyPenalty)))
+	}
+	if req.PresencePenalty != nil {
+		span.SetAttributes(attribute.Float64("sampling.presence_penalty", float64(*req.PresencePenalty)))
+	}
+	if len(req.StopSequences) > 0 {
+		span.SetAttributes(attribute.Int("sampling.stop_sequences_count", len(req.StopSequences)))
+	}
+	if req.Seed != nil {
+		span.SetAttributes(attribute.Int("sampling.seed", *req.Seed))
+	}
+	if len(req.LogitBias) > 0 {
+		span.SetAttributes(attribute.Int("sampling.logit_bias_count", len(req.LogitBias)))
+	}
 	logger := c.logger.With("op", "SampleStream")
 
 	// Check if we have MCP server context
@@ -66,6 +86,8 @@ func (c *Client) SampleStream(
 			if err == nil {
 				// Successfully got stream, process chunks
 				var tokenCount int
+				startTime := time.Now()
+
 				for delta := range stream {
 					tokenCount += estimateTokens(delta)
 					chunk := StreamChunk{
@@ -73,6 +95,12 @@ func (c *Client) SampleStream(
 						TokensSoFar: tokenCount,
 						Model:       "mcp-streaming",
 					}
+
+					// Emit token-level progress every 10 tokens
+					if tokenCount%10 == 0 {
+						c.emitTokenProgress(ctx, tokenCount, req.MaxTokens, startTime)
+					}
+
 					select {
 					case out <- chunk:
 					case <-ctx.Done():
@@ -150,7 +178,29 @@ func (c *Client) callMCPStream(
 	c.logger.Debug("MCP streaming not yet implemented, using fallback stream",
 		"prompt_length", len(req.Prompt),
 		"max_tokens", req.MaxTokens,
+		"temperature", req.Temperature,
 		"streaming", req.Stream)
+
+	// Log advanced parameters for streaming (when MCP streaming is implemented,
+	// these would be passed to the actual MCP streaming API)
+	if req.TopP != nil {
+		c.logger.Debug("Streaming with TopP parameter", "top_p", *req.TopP)
+	}
+	if req.FrequencyPenalty != nil {
+		c.logger.Debug("Streaming with FrequencyPenalty parameter", "frequency_penalty", *req.FrequencyPenalty)
+	}
+	if req.PresencePenalty != nil {
+		c.logger.Debug("Streaming with PresencePenalty parameter", "presence_penalty", *req.PresencePenalty)
+	}
+	if len(req.StopSequences) > 0 {
+		c.logger.Debug("Streaming with StopSequences parameter", "stop_sequences", req.StopSequences)
+	}
+	if req.Seed != nil {
+		c.logger.Debug("Streaming with Seed parameter", "seed", *req.Seed)
+	}
+	if len(req.LogitBias) > 0 {
+		c.logger.Debug("Streaming with LogitBias parameter", "logit_bias_count", len(req.LogitBias))
+	}
 
 	// For now, simulate streaming by chunking the fallback response
 	// This allows the streaming interface to work while MCP streaming is developed

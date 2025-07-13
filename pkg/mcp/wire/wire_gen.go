@@ -12,12 +12,13 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/session"
 	"github.com/Azure/container-kit/pkg/mcp/domain/events"
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
+	"github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ml"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/progress"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/prompts"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/resources"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
+	sampling2 "github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
 	"github.com/google/wire"
 	"log/slog"
 	"time"
@@ -35,13 +36,14 @@ func InitializeServer(logger *slog.Logger, config workflow.ServerConfig) (api.MC
 	publisher := events.NewPublisher(logger)
 	sagaCoordinator := saga.NewSagaCoordinator(logger, publisher)
 	client := provideSamplingClient(logger)
-	optimizedBuildStep := ml.ProvideOptimizedBuildStep(client, logger)
+	domainAdapter := provideDomainSampler(client)
+	optimizedBuildStep := ml.ProvideOptimizedBuildStep(domainAdapter, logger)
 	stepFactory := workflow.ProvideStepFactory(optimizedBuildStep, logger)
 	orchestrator := workflow.ProvideOptimizedOrchestrator(stepFactory, logger)
 	eventOrchestrator := workflow.NewEventOrchestrator(logger, publisher)
 	sagaOrchestrator := workflow.NewSagaOrchestrator(logger, publisher, sagaCoordinator)
-	errorPatternRecognizer := ml.ProvideErrorPatternRecognizer(client, logger)
-	enhancedErrorHandler := ml.ProvideEnhancedErrorHandler(client, publisher, logger)
+	errorPatternRecognizer := ml.ProvideErrorPatternRecognizer(domainAdapter, logger)
+	enhancedErrorHandler := ml.ProvideEnhancedErrorHandler(domainAdapter, publisher, logger)
 	stepEnhancer := ml.ProvideStepEnhancer(enhancedErrorHandler, logger)
 	managerConfig := providePromptManagerConfig(config)
 	manager, err := prompts.NewManager(logger, managerConfig)
@@ -62,7 +64,7 @@ func InitializeServer(logger *slog.Logger, config workflow.ServerConfig) (api.MC
 		ErrorPatternRecognizer: errorPatternRecognizer,
 		EnhancedErrorHandler:   enhancedErrorHandler,
 		StepEnhancer:           stepEnhancer,
-		SamplingClient:         client,
+		SamplingClient:         domainAdapter,
 		PromptManager:          manager,
 	}
 	mcpServer := provideServer(dependencies)
@@ -79,7 +81,9 @@ var (
 var ConfigSet = wire.NewSet(wire.Value(24*time.Hour), providePromptManagerConfig, wire.FieldsOf(new(workflow.ServerConfig), "MaxSessions"))
 
 // CoreSet contains core infrastructure providers
-var CoreSet = wire.NewSet(resources.NewStore, provideSamplingClient, prompts.NewManager, progress.NewSinkFactory)
+var CoreSet = wire.NewSet(resources.NewStore, provideSamplingClient,
+	provideDomainSampler, wire.Bind(new(sampling.Sampler), new(*sampling2.DomainAdapter)), wire.Bind(new(sampling.AnalysisSampler), new(*sampling2.DomainAdapter)), wire.Bind(new(sampling.FixSampler), new(*sampling2.DomainAdapter)), prompts.NewManager, progress.NewSinkFactory,
+)
 
 // SessionSet contains session management providers
 var SessionSet = wire.NewSet(session.NewMemorySessionManager)
@@ -137,8 +141,8 @@ func provideServer(deps *application.Dependencies) api.MCPServer {
 }
 
 // provideSamplingClient creates the sampling client without options
-func provideSamplingClient(logger *slog.Logger) *sampling.Client {
-	return sampling.NewClient(logger)
+func provideSamplingClient(logger *slog.Logger) *sampling2.Client {
+	return sampling2.NewClient(logger)
 }
 
 // provideProgressEventHandler creates the progress event handler
@@ -149,4 +153,9 @@ func provideProgressEventHandler(logger *slog.Logger) *events.ProgressEventHandl
 // provideMetricsEventHandler creates the metrics event handler
 func provideMetricsEventHandler(logger *slog.Logger) *events.MetricsEventHandler {
 	return events.NewMetricsEventHandler(logger)
+}
+
+// provideDomainSampler creates the domain adapter for sampling
+func provideDomainSampler(client *sampling2.Client) *sampling2.DomainAdapter {
+	return sampling2.NewDomainAdapter(client)
 }

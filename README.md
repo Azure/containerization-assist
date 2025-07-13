@@ -83,14 +83,33 @@ make lint              # Run linter
 
 ## 🏗️ Architecture
 
-Container Kit uses a **modular package architecture** with workflow-focused design after comprehensive refactoring:
+Container Kit uses a **clean 4-layer architecture** with Domain-Driven Design after comprehensive refactoring:
 
 ```
 pkg/
 ├── mcp/             # Model Context Protocol server & workflow
-│   ├── application/     # Server implementation & session management
-│   ├── domain/          # Business logic (workflows, types)
-│   └── infrastructure/  # Workflow steps, analysis, retry
+│   ├── api/             # Interface definitions and contracts
+│   ├── application/     # Application services and orchestration
+│   │   ├── commands/    # CQRS command handlers
+│   │   ├── queries/     # CQRS query handlers
+│   │   ├── config/      # Application configuration
+│   │   └── session/     # Session management
+│   ├── domain/          # Business logic and workflows
+│   │   ├── workflow/    # Core containerization workflow
+│   │   ├── events/      # Domain events and handlers
+│   │   ├── progress/    # Progress tracking (business concept)
+│   │   ├── saga/        # Saga pattern coordination
+│   │   └── sampling/    # Domain sampling contracts
+│   └── infrastructure/ # Technical implementations
+│       ├── steps/       # Workflow step implementations
+│       ├── ml/          # Machine learning integrations
+│       ├── sampling/    # LLM integration
+│       ├── progress/    # Progress tracking implementations
+│       ├── prompts/     # MCP prompt management
+│       ├── resources/   # MCP resource providers
+│       ├── tracing/     # Observability integration
+│       ├── utilities/   # Infrastructure utilities
+│       └── validation/  # Validation implementations
 ├── core/            # Core containerization services
 │   ├── docker/          # Docker operations
 │   ├── kubernetes/      # Kubernetes operations
@@ -106,10 +125,14 @@ pkg/
 ```
 
 **Key Improvements:**
-- **Modular Design**: Clear separation between MCP, core services, and utilities
+- **Clean Architecture**: 4-layer Domain-Driven Design with clear dependencies
+- **CQRS Pattern**: Separate command and query handling for better scalability
+- **Event-Driven**: Domain events for workflow coordination and observability
+- **Saga Orchestration**: Distributed transaction coordination for complex workflows
 - **Single Workflow**: One unified tool handles the complete containerization process
 - **Progress Tracking**: Structured logging with real-time progress indicators
-- **Robust Testing**: Comprehensive test suite with proper timeout handling
+- **ML Integration**: Machine learning for build optimization and pattern recognition
+- **Robust Testing**: Comprehensive test suite with property-based testing
 - **Error Recovery**: AI-powered retry logic with actionable error messages
 
 > **📖 Technical Details**: See [Development Guidelines](DEVELOPMENT_GUIDELINES.md) and [Container Kit Design Document](docs/CONTAINER_KIT_DESIGN_DOCUMENT.md).
@@ -120,10 +143,14 @@ pkg/
 - **Progress Monitoring**: Structured logging with emoji indicators (🚀🔄✅❌🎉)
 - **AI-Guided Process**: Interactive assistance with retry logic throughout workflow
 - **Session Persistence**: BoltDB-based state management across operations
+- **Event-Driven Architecture**: Domain events for workflow coordination and observability
+- **CQRS Implementation**: Separate command and query handling for scalability
+- **Saga Orchestration**: Distributed transaction coordination for complex workflows
+- **ML-Powered Optimization**: Machine learning for build optimization and pattern recognition
 - **Multi-Transport**: stdio and HTTP support with proper error handling
 - **Kubernetes Integration**: Generate manifests and deploy with validation retry
 - **Security Scanning**: Built-in vulnerability detection with Trivy/Grype
-- **Clean Architecture**: Three-layer design with comprehensive test coverage
+- **Clean Architecture**: 4-layer design with comprehensive test coverage
 
 ## 🧪 Quick Example
 

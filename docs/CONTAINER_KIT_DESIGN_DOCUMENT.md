@@ -69,35 +69,45 @@ pkg/mcp/
 │   └── interfaces.go       # Essential MCP tool interfaces
 ├── application/            # Application services and orchestration
 │   ├── server.go          # MCP server implementation
-│   ├── chat_mode.go       # Chat mode integration
+│   ├── bootstrap.go       # Dependency injection setup
+│   ├── commands/          # CQRS command handlers
+│   ├── queries/           # CQRS query handlers
+│   ├── config/            # Application configuration
 │   └── session/           # Session management
 ├── domain/                # Business logic and workflows
 │   ├── workflow/          # Core containerization workflow
-│   ├── errors/            # Rich error handling system
+│   ├── events/            # Domain events and handlers
 │   ├── progress/          # Progress tracking (business concept)
-│   └── elicitation/       # User input gathering (business process)
+│   ├── saga/              # Saga pattern coordination
+│   └── sampling/          # Domain sampling contracts
 └── infrastructure/        # Technical implementations
     ├── steps/             # Workflow step implementations
-    ├── analysis/          # Repository analysis
-    ├── retry/             # AI-powered retry logic
-    ├── security/          # Security utilities
+    ├── ml/                # Machine learning integrations
     ├── sampling/          # LLM integration
+    ├── progress/          # Progress tracking implementations
     ├── prompts/           # MCP prompt management
-    └── resources/         # MCP resource providers
+    ├── resources/         # MCP resource providers
+    ├── tracing/           # Observability integration
+    ├── utilities/         # Infrastructure utilities
+    └── validation/        # Validation implementations
 ```
 
 ### Key Architecture Benefits
 - **Clean Dependencies**: Infrastructure → Application → Domain → API
 - **Single Workflow**: `containerize_and_deploy` handles complete process
+- **CQRS Implementation**: Separate command and query handling for scalability
+- **Event-Driven Design**: Domain events for workflow coordination and observability
+- **Saga Orchestration**: Distributed transaction coordination for complex workflows
+- **ML Integration**: Machine learning for build optimization and pattern recognition
 - **Domain-Driven**: Core business logic isolated in domain layer
 - **Separation of Concerns**: Each layer has clear responsibilities
 - **AI-Enhanced**: Built-in AI error recovery and analysis capabilities
 
 ### Dependency Rules
 - **API Layer**: Essential interfaces only, avoid over-abstraction
-- **Application Layer**: Coordinate domain logic, handle MCP protocol
-- **Domain Layer**: Pure business logic, no infrastructure dependencies
-- **Infrastructure Layer**: Technical implementations, external integrations
+- **Application Layer**: Coordinate domain logic, handle MCP protocol, CQRS orchestration
+- **Domain Layer**: Pure business logic, domain events, saga coordination, no infrastructure dependencies
+- **Infrastructure Layer**: Technical implementations, external integrations, event handlers
 
 ## Core Components
 
@@ -108,17 +118,18 @@ pkg/mcp/
 The unified workflow tool handles the complete containerization process:
 
 ```go
-// Complete 9-step workflow with AI orchestration
+// Complete 10-step workflow with AI orchestration
 steps := []WorkflowStep{
-    {Name: "analyze", Message: "Analyzing repository structure and detecting language/framework"},
-    {Name: "dockerfile", Message: "Generating optimized Dockerfile for detected language/framework"},
-    {Name: "build", Message: "Building Docker image with AI-powered error fixing"},
-    {Name: "scan", Message: "Scanning Docker image for security vulnerabilities"},
-    {Name: "setup_cluster", Message: "Setting up local Kubernetes cluster with registry"},
+    {Name: "analyze_repository", Message: "Analyzing repository structure and detecting language/framework"},
+    {Name: "generate_dockerfile", Message: "Generating optimized Dockerfile for detected language/framework"},
+    {Name: "build_image", Message: "Building Docker image with AI-powered error fixing"},
+    {Name: "setup_kind_cluster", Message: "Setting up local Kubernetes cluster with registry"},
     {Name: "load_image", Message: "Loading Docker image into Kubernetes cluster"},
-    {Name: "generate_manifests", Message: "Generating Kubernetes deployment manifests"},
-    {Name: "deploy", Message: "Deploying application to Kubernetes cluster"},
-    {Name: "verify", Message: "Performing application health checks and endpoint discovery"},
+    {Name: "generate_k8s_manifests", Message: "Generating Kubernetes deployment manifests"},
+    {Name: "deploy_to_k8s", Message: "Deploying application to Kubernetes cluster"},
+    {Name: "health_probe", Message: "Performing application health checks and endpoint discovery"},
+    {Name: "vulnerability_scan", Message: "Scanning Docker image for security vulnerabilities (optional)"},
+    {Name: "finalize_result", Message: "Finalizing workflow results and cleanup"},
 }
 ```
 
@@ -127,35 +138,42 @@ steps := []WorkflowStep{
 - Error recovery with actionable messages
 - AI-powered automation throughout
 - Session management with BoltDB persistence
+- Event-driven workflow coordination
+- CQRS command and query separation
+- Saga orchestration for distributed transactions
+- ML-powered build optimization
+- Comprehensive observability with tracing
 
-### 2. Step Implementations (`pkg/mcp/internal/steps/`)
+### 2. Step Implementations (`pkg/mcp/infrastructure/steps/`)
 
 #### Analyze Step (`pkg/mcp/infrastructure/steps/analyze.go`)
 - **Repository Analysis**: Language detection, dependency analysis, framework identification
-- **AI Enhancement**: Optional AI-powered analysis for better recommendations
+- **AI Enhancement**: Optional AI-powered analysis for better recommendations (`analyze_enhance.go`)
 - **Technology Detection**: Automated technology stack identification
 - **Port Detection**: Automatic application port discovery
 
-#### Build Step (`pkg/mcp/infrastructure/steps/build.go`)
-- **Docker Operations**: Build with comprehensive error handling
+#### Build Steps
+- **Docker Build** (`pkg/mcp/infrastructure/steps/build.go`): Standard Docker operations with error handling
+- **Optimized Build** (`pkg/mcp/infrastructure/steps/optimized_build.go`): ML-enhanced build optimization
 - **AI-Powered Fixing**: Automatic Dockerfile error detection and resolution
 - **Registry Integration**: Multi-registry support with health monitoring
-- **Build Optimization**: Layer caching and multi-stage build optimization
 
-#### Kubernetes Step (`pkg/mcp/infrastructure/steps/k8s.go`)
-- **Manifest Generation**: Automated YAML generation with customization
-- **AI-Powered Fixing**: Automatic manifest error detection and resolution
-- **Health Checks**: Application readiness and liveness probe configuration
-- **Deployment Orchestration**: Rolling updates with AI-powered error recovery
+#### Deployment Steps
+- **Dockerfile Generation** (`pkg/mcp/infrastructure/steps/dockerfile.go`): Automated Dockerfile creation
+- **Kubernetes Manifests** (`pkg/mcp/infrastructure/steps/k8s.go`): YAML generation with customization
+- **Manifest Fixing** (`pkg/mcp/infrastructure/steps/manifest_fix.go`): AI-powered manifest error resolution
+- **Deployment Verification** (`pkg/mcp/infrastructure/steps/deployment_verification.go`): Health checks and validation
 
-### 3. Error Handling (`pkg/mcp/domain/errors/`)
+### 3. Error Handling (`pkg/common/errors/`)
 
 **Rich Error System**:
-- **Structured Error Context**: Comprehensive error information with builder pattern
-- **Actionable Messages**: Clear guidance for resolution
-- **Core Infrastructure**: Used by 54 files across the codebase
-- **Error Classification**: Severity and category-based handling
+- **Structured Error Context**: Comprehensive error information with Rich type
+- **Actionable Messages**: Clear guidance for resolution with user-facing flags
+- **Core Infrastructure**: Used across the entire codebase
+- **Error Classification**: Severity levels (Unknown, Low, Medium, High, Critical)
+- **Retry Support**: Built-in retryable flag for automated error recovery
 - **AI Integration**: Error context for AI-powered retry logic
+- **Code Generation**: Error codes generated from YAML configuration
 
 ### 4. Server Core (`pkg/mcp/application/`)
 
@@ -165,6 +183,27 @@ steps := []WorkflowStep{
 - **Tool Registration**: Single workflow tool with progress tracking
 - **Transport Layer**: stdio transport with proper shutdown handling
 - **AI Integration**: Built-in chat mode support for Copilot integration
+- **CQRS Architecture**: Separate command and query handlers
+- **Configuration Management**: Environment-based configuration with validation
+
+### 5. Machine Learning Integration (`pkg/mcp/infrastructure/ml/`)
+
+**ML-Powered Features**:
+- **Build Optimization** (`build_optimizer.go`): ML-enhanced build performance
+- **Pattern Recognition** (`pattern_recognizer.go`): Build pattern analysis and optimization
+- **Error History** (`error_history.go`): Learning from previous build failures
+- **Build History** (`build_history.go`): Historical build data analysis
+- **Workflow Integration** (`workflow_integration.go`): ML integration with workflow steps
+- **Resource Prediction** (`resource_predictor.go`): Predictive resource allocation
+
+### 6. Event-Driven Architecture (`pkg/mcp/domain/events/`)
+
+**Domain Events**:
+- **Event System** (`events.go`): Core event definitions and types
+- **Event Handlers** (`handlers.go`): Event processing and routing
+- **Event Publisher** (`publisher.go`): Event publication and distribution
+- **Workflow Coordination**: Events for step completion and state changes
+- **Observability**: Event-driven monitoring and tracing
 
 ## Design Patterns
 

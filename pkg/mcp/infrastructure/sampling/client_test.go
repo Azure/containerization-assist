@@ -87,7 +87,7 @@ func TestClient_Sample_NoMCPServer(t *testing.T) {
 		Prompt: "Test prompt",
 	}
 
-	_, err := client.Sample(ctx, req)
+	_, err := client.SampleInternal(ctx, req)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no MCP server in context")
 }
@@ -105,7 +105,7 @@ func TestClient_Sample_WithMCPServer(t *testing.T) {
 		Temperature: 0.1,
 	}
 
-	_, err := client.Sample(ctx, req)
+	_, err := client.SampleInternal(ctx, req)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no MCP server in context")
 }

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
+	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 )
 
 // BuildContext provides context for a build operation
@@ -30,12 +30,12 @@ type BuildOutput struct {
 
 // OptimizedBuildStep integrates AI-powered resource optimization into the workflow build step
 type OptimizedBuildStep struct {
-	samplingClient *sampling.Client
+	samplingClient domainsampling.Sampler
 	logger         *slog.Logger
 }
 
 // NewOptimizedBuildStep creates a new optimized build step
-func NewOptimizedBuildStep(samplingClient *sampling.Client, logger *slog.Logger) *OptimizedBuildStep {
+func NewOptimizedBuildStep(samplingClient domainsampling.Sampler, logger *slog.Logger) *OptimizedBuildStep {
 	return &OptimizedBuildStep{
 		samplingClient: samplingClient,
 		logger:         logger.With("component", "optimized_build_step"),

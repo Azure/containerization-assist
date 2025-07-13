@@ -158,31 +158,58 @@ func (o *Orchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest, ar
 	return state.Result, nil
 }
 
-// executeStepWithRetry executes a single step with retry logic
+// executeStepWithRetry executes a single step with retry logic and rich progress reporting
 func (o *Orchestrator) executeStepWithRetry(ctx context.Context, step Step, state *WorkflowState) error {
 	stepName := step.Name()
 	maxRetries := step.MaxRetries()
 
 	startTime := time.Now()
 
+	// Emit step start event with rich metadata
+	stepIndex := state.CurrentStep + 1
+	state.ProgressTracker.Update(stepIndex, fmt.Sprintf("Starting %s", stepName), map[string]interface{}{
+		"step_name":   stepName,
+		"status":      "started",
+		"can_abort":   true,
+		"max_retries": maxRetries,
+		"step_index":  stepIndex,
+	})
+
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
 			o.logger.Info("Retrying step", "step", stepName, "attempt", attempt, "max_retries", maxRetries)
+
+			// Emit retry event
+			state.ProgressTracker.Update(stepIndex, fmt.Sprintf("Retrying %s (attempt %d/%d)", stepName, attempt+1, maxRetries+1), map[string]interface{}{
+				"step_name":    stepName,
+				"status":       "retrying",
+				"attempt":      attempt + 1,
+				"max_attempts": maxRetries + 1,
+			})
 		}
 
-		// Execute the step
+		// Execute the step with running status
+		state.ProgressTracker.Update(stepIndex, fmt.Sprintf("Executing %s", stepName), map[string]interface{}{
+			"step_name": stepName,
+			"status":    "running",
+			"attempt":   attempt + 1,
+		})
+
 		err := step.Execute(ctx, state)
 		duration := time.Since(startTime).String()
 
 		if err == nil {
-			// Step succeeded
+			// Step succeeded - emit completion event
 			state.UpdateProgress()
 			state.AddStepResult(stepName, "completed", duration, fmt.Sprintf("Step %s completed successfully", stepName), attempt, nil)
 
 			state.ProgressTracker.Update(state.CurrentStep, fmt.Sprintf("Completed %s", stepName), map[string]interface{}{
-				"step":    stepName,
-				"retries": attempt,
+				"step_name":      stepName,
+				"status":         "completed",
+				"retries":        attempt,
+				"duration_ms":    time.Since(startTime).Milliseconds(),
+				"result_summary": fmt.Sprintf("%s completed in %s", stepName, duration),
 			})
 
 			return nil
@@ -191,8 +218,16 @@ func (o *Orchestrator) executeStepWithRetry(ctx context.Context, step Step, stat
 		lastErr = err
 		o.logger.Warn("Step failed", "step", stepName, "attempt", attempt, "error", err)
 
-		// Record error in progress tracker
+		// Record error in progress tracker with rich context
 		state.ProgressTracker.RecordError(err)
+
+		// Emit failure event
+		state.ProgressTracker.Update(stepIndex, fmt.Sprintf("Failed %s (attempt %d)", stepName, attempt+1), map[string]interface{}{
+			"step_name": stepName,
+			"status":    "failed",
+			"attempt":   attempt + 1,
+			"error":     err.Error(),
+		})
 
 		// Check if we should retry
 		if attempt < maxRetries {

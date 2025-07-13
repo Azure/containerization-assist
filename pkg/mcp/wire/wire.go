@@ -15,6 +15,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/session"
 	"github.com/Azure/container-kit/pkg/mcp/domain/events"
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
+	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ml"
 	infraprogress "github.com/Azure/container-kit/pkg/mcp/infrastructure/progress"
@@ -35,6 +36,11 @@ var ConfigSet = wire.NewSet(
 var CoreSet = wire.NewSet(
 	resources.NewStore,
 	provideSamplingClient,
+	provideDomainSampler,
+	// Bind domain interfaces to the adapter implementation
+	wire.Bind(new(domainsampling.Sampler), new(*sampling.DomainAdapter)),
+	wire.Bind(new(domainsampling.AnalysisSampler), new(*sampling.DomainAdapter)),
+	wire.Bind(new(domainsampling.FixSampler), new(*sampling.DomainAdapter)),
 	prompts.NewManager,
 	infraprogress.NewSinkFactory,
 )
@@ -140,4 +146,9 @@ func provideProgressEventHandler(logger *slog.Logger) *events.ProgressEventHandl
 // provideMetricsEventHandler creates the metrics event handler
 func provideMetricsEventHandler(logger *slog.Logger) *events.MetricsEventHandler {
 	return events.NewMetricsEventHandler(logger)
+}
+
+// provideDomainSampler creates the domain adapter for sampling
+func provideDomainSampler(client *sampling.Client) *sampling.DomainAdapter {
+	return sampling.NewDomainAdapter(client)
 }

@@ -1,73 +1,76 @@
 graph TD
-    %% Container Kit MCP - Simplified Workflow Architecture
-    %% Current state: 25 core files with workflow-focused design
-    %% Single unified workflow for complete containerization process
+    %% Container Kit MCP - 4-Layer Clean Architecture with CQRS and Event-Driven Design
+    %% Current state: Clean architecture with Domain-Driven Design
+    %% Single unified workflow with AI-powered automation and ML optimization
 
     Client[MCP Client<br/>Claude Desktop / CLI] --> MCPProtocol[MCP Protocol<br/>Model Context Protocol]
-    MCPProtocol --> Server[MCP Server<br/>application/core/]
+    MCPProtocol --> Server[MCP Server<br/>application/server.go]
 
-    subgraph "Core Architecture (25 Files)"
-        Server --> WorkflowTool[Workflow Tool<br/>server/workflows.go]
+    subgraph "4-Layer Clean Architecture"
         
-        subgraph "Domain Layer"
-            ErrorSystem[Error System<br/>common/errors/<br/>Rich error handling<br/>Used throughout codebase]
+        subgraph "API Layer"
+            Interfaces[Essential Interfaces<br/>api/interfaces.go<br/>Tool definitions & contracts]
         end
 
         subgraph "Application Layer"
-            API[API Interfaces<br/>application/api/<br/>Tool definitions]
-            Core[Server Core<br/>application/core/<br/>MCP implementation]
+            Server --> Bootstrap[Dependency Injection<br/>application/bootstrap.go]
+            Server --> Commands[CQRS Commands<br/>application/commands/]
+            Server --> Queries[CQRS Queries<br/>application/queries/]
+            Server --> Config[Configuration<br/>application/config/]
+            Server --> SessionMgmt[Session Management<br/>application/session/]
         end
 
-        subgraph "Workflow Implementation"
-            WorkflowTool --> Steps[Workflow Steps<br/>internal/steps/]
-            
-            subgraph "10-Step Process"
-                Analyze[1. Analyze<br/>Repository analysis<br/>Technology detection]
-                Dockerfile[2. Dockerfile<br/>Generate optimized<br/>Dockerfile]
-                Build[3. Build<br/>Docker image<br/>construction]
-                Scan[4. Scan<br/>Security vulnerability<br/>scanning]
-                Tag[5. Tag<br/>Image tagging<br/>with version info]
-                Push[6. Push<br/>Push to container<br/>registry]
-                Manifest[7. Manifest<br/>Generate Kubernetes<br/>manifests]
-                Cluster[8. Cluster<br/>Cluster setup<br/>and validation]
-                Deploy[9. Deploy<br/>Application<br/>deployment]
-                Verify[10. Verify<br/>Health check<br/>and validation]
-            end
-            
-            Steps --> Analyze
-            Steps --> Dockerfile
-            Steps --> Build
-            Steps --> Scan
-            Steps --> Tag
-            Steps --> Push
-            Steps --> Manifest
-            Steps --> Cluster
-            Steps --> Deploy
-            Steps --> Verify
+        subgraph "Domain Layer"
+            Workflow[Core Workflow<br/>domain/workflow/<br/>Business logic]
+            Events[Domain Events<br/>domain/events/<br/>Event coordination]
+            Progress[Progress Tracking<br/>domain/progress/<br/>Business concept]
+            Saga[Saga Orchestration<br/>domain/saga/<br/>Transaction coordination]
+            Sampling[Domain Sampling<br/>domain/sampling/<br/>AI contracts]
         end
 
-        subgraph "Step Implementations"
-            AnalyzeImpl[analyze.go<br/>Repository analysis logic]
-            BuildImpl[build.go<br/>Docker operations]
-            K8sImpl[k8s.go<br/>Kubernetes operations]
+        subgraph "Infrastructure Layer"
+            Steps[Workflow Steps<br/>infrastructure/steps/]
+            ML[ML Integration<br/>infrastructure/ml/<br/>Build optimization]
+            SamplingImpl[LLM Integration<br/>infrastructure/sampling/]
+            ProgressImpl[Progress Implementation<br/>infrastructure/progress/]
+            Prompts[MCP Prompts<br/>infrastructure/prompts/]
+            Resources[MCP Resources<br/>infrastructure/resources/]
+            Tracing[Observability<br/>infrastructure/tracing/]
+            Utilities[Infrastructure Utils<br/>infrastructure/utilities/]
+            Validation[Validation<br/>infrastructure/validation/]
         end
-
-        Analyze --> AnalyzeImpl
-        Build --> BuildImpl
-        Dockerfile --> BuildImpl
-        Tag --> BuildImpl
-        Push --> BuildImpl
-        Manifest --> K8sImpl
-        Cluster --> K8sImpl
-        Deploy --> K8sImpl
-        Verify --> K8sImpl
-        Scan --> BuildImpl
     end
 
-    subgraph "Infrastructure Components"
+    subgraph "10-Step Workflow Process"
+        AnalyzeRepo[1. Analyze Repository<br/>Technology detection<br/>AI enhancement]
+        GenDockerfile[2. Generate Dockerfile<br/>Optimized generation<br/>AI assistance]
+        BuildImage[3. Build Image<br/>Docker construction<br/>AI error fixing]
+        SetupCluster[4. Setup Kind Cluster<br/>Local K8s setup<br/>Registry integration]
+        LoadImage[5. Load Image<br/>Image to cluster<br/>Validation]
+        GenManifests[6. Generate K8s Manifests<br/>YAML generation<br/>AI optimization]
+        DeployK8s[7. Deploy to K8s<br/>Application deployment<br/>AI error recovery]
+        HealthProbe[8. Health Probe<br/>Endpoint discovery<br/>Health validation]
+        VulnScan[9. Vulnerability Scan<br/>Security scanning<br/>AI analysis]
+        Finalize[10. Finalize Result<br/>Workflow completion<br/>Cleanup]
+    end
+
+    subgraph "Event-Driven Coordination"
+        EventBus[Event Bus<br/>Domain event publishing]
+        EventHandlers[Event Handlers<br/>Workflow coordination]
+        SagaCoord[Saga Coordinator<br/>Distributed transactions]
+    end
+
+    subgraph "ML-Powered Optimization"
+        BuildOpt[Build Optimizer<br/>ML-enhanced builds]
+        PatternRec[Pattern Recognizer<br/>Build pattern analysis]
+        ErrorHist[Error History<br/>Learning from failures]
+        ResourcePred[Resource Predictor<br/>Predictive allocation]
+    end
+
+    subgraph "Core Infrastructure"
+        ErrorSystem[Rich Error System<br/>pkg/common/errors/<br/>Structured error handling]
         SessionStore[Session Storage<br/>BoltDB persistence]
         WorkspaceManager[Workspace Manager<br/>Isolated workspaces]
-        ProgressTracker[Progress Tracking<br/>Step monitoring]
     end
 
     subgraph "External Integrations"
@@ -75,58 +78,108 @@ graph TD
         Registry[Container Registry<br/>Image storage]
         Kubernetes[Kubernetes API<br/>Orchestration]
         Scanner[Security Scanners<br/>Trivy/Grype]
+        AI[Azure OpenAI<br/>AI assistance]
     end
 
-    %% Core connections
-    WorkflowTool --> SessionStore
-    WorkflowTool --> WorkspaceManager
-    WorkflowTool --> ProgressTracker
-    WorkflowTool --> ErrorSystem
+    %% Layer Dependencies (Clean Architecture)
+    Interfaces --> Commands
+    Interfaces --> Queries
+    Commands --> Workflow
+    Queries --> Workflow
+    Commands --> Events
+    Workflow --> Steps
+    Events --> EventHandlers
+    Saga --> SagaCoord
 
-    %% External connections
-    BuildImpl --> Docker
-    BuildImpl --> Registry
-    BuildImpl --> Scanner
-    K8sImpl --> Kubernetes
+    %% Workflow Step Connections
+    Commands --> AnalyzeRepo
+    AnalyzeRepo --> GenDockerfile
+    GenDockerfile --> BuildImage
+    BuildImage --> SetupCluster
+    SetupCluster --> LoadImage
+    LoadImage --> GenManifests
+    GenManifests --> DeployK8s
+    DeployK8s --> HealthProbe
+    HealthProbe --> VulnScan
+    VulnScan --> Finalize
 
-    %% Error handling flows through everything
-    AnalyzeImpl --> ErrorSystem
-    BuildImpl --> ErrorSystem
-    K8sImpl --> ErrorSystem
+    %% Step Implementation Connections
+    Steps --> AnalyzeRepo
+    Steps --> GenDockerfile
+    Steps --> BuildImage
+    Steps --> SetupCluster
+    Steps --> LoadImage
+    Steps --> GenManifests
+    Steps --> DeployK8s
+    Steps --> HealthProbe
+    Steps --> VulnScan
+    Steps --> Finalize
 
-    %% Progress tracking for all steps
-    Analyze --> ProgressTracker
-    Build --> ProgressTracker
-    Deploy --> ProgressTracker
-    Verify --> ProgressTracker
+    %% Event-Driven Connections
+    Workflow --> Events
+    Events --> EventBus
+    EventBus --> EventHandlers
+    EventHandlers --> SagaCoord
 
-    %% Session management
-    WorkflowTool --> SessionStore
+    %% ML Integration Connections
+    ML --> BuildOpt
+    ML --> PatternRec
+    ML --> ErrorHist
+    ML --> ResourcePred
+    BuildImage --> BuildOpt
+    GenDockerfile --> PatternRec
+    Steps --> ErrorHist
+
+    %% Core Infrastructure Connections
+    Workflow --> SessionStore
+    Workflow --> WorkspaceManager
+    Steps --> ErrorSystem
+    Progress --> ProgressImpl
+
+    %% External System Connections
+    Steps --> Docker
+    Steps --> Registry
+    Steps --> Kubernetes
+    Steps --> Scanner
+    SamplingImpl --> AI
+
+    %% Session and State Management
+    SessionMgmt --> SessionStore
     SessionStore --> BoltDB[BoltDB<br/>Embedded storage]
+
+    %% Progress and Observability
+    ProgressImpl --> Tracing
+    Steps --> ProgressImpl
 
     %% Styling
     classDef clientStyle fill:#e1f5fe,stroke:#0288d1,stroke-width:3px
-    classDef domainStyle fill:#e8f5e9,stroke:#2e7d32,stroke-width:3px
+    classDef apiStyle fill:#e8f5e9,stroke:#2e7d32,stroke-width:3px
     classDef applicationStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:3px
-    classDef workflowStyle fill:#f3e5f5,stroke:#6a1b9a,stroke-width:3px
-    classDef stepStyle fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
-    classDef infraStyle fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef domainStyle fill:#f3e5f5,stroke:#6a1b9a,stroke-width:3px
+    classDef infraStyle fill:#fff3e0,stroke:#ef6c00,stroke-width:3px
+    classDef workflowStyle fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef eventStyle fill:#e0f2f1,stroke:#00695c,stroke-width:2px
+    classDef mlStyle fill:#f1f8e9,stroke:#558b2f,stroke-width:2px
+    classDef coreStyle fill:#fafafa,stroke:#424242,stroke-width:2px
     classDef externalStyle fill:#eceff1,stroke:#455a64,stroke-width:1px,stroke-dasharray: 5 5
 
     class Client,MCPProtocol clientStyle
-    class ErrorSystem domainStyle
-    class API,Core,Server applicationStyle
-    class WorkflowTool,Steps workflowStyle
-    class Analyze,Dockerfile,Build,Scan,Tag,Push,Manifest,Cluster,Deploy,Verify stepStyle
-    class AnalyzeImpl,BuildImpl,K8sImpl stepStyle
-    class SessionStore,WorkspaceManager,ProgressTracker,BoltDB infraStyle
-    class Docker,Registry,Kubernetes,Scanner externalStyle
+    class Interfaces apiStyle
+    class Server,Bootstrap,Commands,Queries,Config,SessionMgmt applicationStyle
+    class Workflow,Events,Progress,Saga,Sampling domainStyle
+    class Steps,ML,SamplingImpl,ProgressImpl,Prompts,Resources,Tracing,Utilities,Validation infraStyle
+    class AnalyzeRepo,GenDockerfile,BuildImage,SetupCluster,LoadImage,GenManifests,DeployK8s,HealthProbe,VulnScan,Finalize workflowStyle
+    class EventBus,EventHandlers,SagaCoord eventStyle
+    class BuildOpt,PatternRec,ErrorHist,ResourcePred mlStyle
+    class ErrorSystem,SessionStore,WorkspaceManager,BoltDB coreStyle
+    class Docker,Registry,Kubernetes,Scanner,AI externalStyle
 
     %% Architecture Notes
-    %% - 25 core files (reduced from 294)
-    %% - Single workflow tool instead of multiple atomic tools
-    %% - 10-step process with progress tracking
-    %% - Direct implementation without over-abstraction
-    %% - Essential error handling system retained
-    %% - Session-based workspace isolation
-    %% - Built-in progress indicators for user feedback
+    %% - 4-layer clean architecture with Domain-Driven Design
+    %% - CQRS pattern with separate command and query handling
+    %% - Event-driven coordination with domain events and saga orchestration
+    %% - ML-powered optimization for build performance and pattern recognition
+    %% - Single workflow tool with 10-step process and progress tracking
+    %% - Rich error handling system with structured context
+    %% - Session-based workspace isolation with BoltDB persistence
+    %% - Comprehensive observability with distributed tracing

@@ -8,6 +8,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/session"
 	"github.com/Azure/container-kit/pkg/mcp/domain/events"
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
+	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ml"
 	infraprogress "github.com/Azure/container-kit/pkg/mcp/infrastructure/progress"
@@ -40,7 +41,7 @@ type Dependencies struct {
 	StepEnhancer           *ml.StepEnhancer
 
 	// Infrastructure services
-	SamplingClient *sampling.Client
+	SamplingClient domainsampling.Sampler
 	PromptManager  *prompts.Manager
 }
 
@@ -69,7 +70,7 @@ func WithSessionManager(sm session.SessionManager) Option {
 }
 
 // WithSamplingClient sets a custom sampling client
-func WithSamplingClient(client *sampling.Client) Option {
+func WithSamplingClient(client domainsampling.Sampler) Option {
 	return func(d *Dependencies) {
 		d.SamplingClient = client
 	}
@@ -229,12 +230,13 @@ func NewDependencies(opts ...Option) *Dependencies {
 
 	// Create sampling client if not provided
 	if d.SamplingClient == nil {
-		d.SamplingClient = sampling.NewClient(
+		infraClient := sampling.NewClient(
 			baseLogger.With("service", "sampling"),
 			sampling.WithMaxTokens(4000),
 			sampling.WithTemperature(0.1), // Conservative for infrastructure tasks
 			sampling.WithRetry(3, 10000),  // 3 attempts, 10k token budget
 		)
+		d.SamplingClient = sampling.NewDomainAdapter(infraClient)
 	}
 
 	// Create prompt manager if not provided

@@ -60,22 +60,36 @@ type SessionManager interface {
 
 #### Error Handling Standards
 - Always handle errors explicitly - never ignore with `_`
-- Use the unified Rich error system from `pkg/mcp/domain/errors/rich.go`
+- Use the unified Rich error system from `pkg/common/errors/`
 - Use `errors.Is()` and `errors.As()` for error checking
-- Include domain context and proper error codes using builder pattern
+- Include domain context and proper error codes
 
 ```go
-// Use Rich error system with builder pattern
-return errors.NewError().
-    Code(errors.CodeValidationFailed).
-    Type(errors.ErrTypeValidation).
-    Severity(errors.SeverityMedium).
-    Message("validation failed for field: " + fieldName).
-    Context("field", fieldName).
-    Context("value", fieldValue).
-    Suggestion("Check field format and constraints").
-    WithLocation().
-    Build()
+// Use Rich error system with direct constructor
+import "github.com/Azure/container-kit/pkg/common/errors"
+
+return errors.New(
+    errors.CodeValidationFailed,
+    "workflow",
+    "validation failed for field: " + fieldName,
+    err,
+)
+
+// With additional context
+richErr := errors.New(
+    errors.CodeBuildFailed,
+    "build",
+    "Docker build failed during RUN step",
+    buildErr,
+)
+richErr.Fields = map[string]any{
+    "dockerfile_line": 15,
+    "command": "RUN npm install",
+    "exit_code": 1,
+}
+richErr.UserFacing = true
+richErr.Retryable = true
+return richErr
 ```
 
 ### Code Quality Standards
@@ -226,18 +240,24 @@ func sanitizePath(path string) string {
 
 ### Rich Error Pattern
 ```go
-// Use unified Rich error system from pkg/mcp/domain/errors/rich.go
-return errors.NewError().
-    Code(errors.CodeBuildFailed).
-    Type(errors.ErrTypeBuild).
-    Severity(errors.SeverityHigh).
-    Message("Docker build failed during RUN step: npm install").
-    Context("dockerfile_line", 15).
-    Context("command", "RUN npm install").
-    Context("exit_code", 1).
-    Suggestion("Check npm dependencies and network connectivity").
-    WithLocation().
-    Build()
+// Use unified Rich error system from pkg/common/errors/
+import "github.com/Azure/container-kit/pkg/common/errors"
+
+err := errors.New(
+    errors.CodeBuildFailed,
+    "build",
+    "Docker build failed during RUN step: npm install",
+    buildErr,
+)
+err.Severity = errors.SeverityHigh
+err.Fields = map[string]any{
+    "dockerfile_line": 15,
+    "command": "RUN npm install",
+    "exit_code": 1,
+}
+err.UserFacing = true
+err.Retryable = true
+return err
 ```
 
 ### Error Context
@@ -280,26 +300,35 @@ pkg/mcp/
 │   └── interfaces.go       # Essential MCP tool interfaces
 ├── application/            # Application services and orchestration
 │   ├── server.go          # MCP server implementation
-│   ├── chat_mode.go       # Chat mode integration
+│   ├── bootstrap.go       # Dependency injection setup
+│   ├── commands/          # CQRS command handlers
+│   ├── queries/           # CQRS query handlers
+│   ├── config/            # Application configuration
 │   └── session/           # Session management
 ├── domain/                # Business logic and workflows
 │   ├── workflow/          # Core containerization workflow
-│   ├── errors/            # Rich error handling system
+│   ├── events/            # Domain events and handlers
 │   ├── progress/          # Progress tracking (business concept)
-│   └── elicitation/       # User input gathering (business process)
+│   ├── saga/              # Saga pattern coordination
+│   └── sampling/          # Domain sampling contracts
 └── infrastructure/        # Technical implementations
     ├── steps/             # Workflow step implementations
-    ├── analysis/          # Repository analysis
-    ├── retry/             # AI-powered retry logic
-    ├── security/          # Security utilities
+    ├── ml/                # Machine learning integrations
     ├── sampling/          # LLM integration
+    ├── progress/          # Progress tracking implementations
     ├── prompts/           # MCP prompt management
-    └── resources/         # MCP resource providers
+    ├── resources/         # MCP resource providers
+    ├── tracing/           # Observability integration
+    ├── utilities/         # Infrastructure utilities
+    └── validation/        # Validation implementations
 ```
 
 **Key Architecture Features:**
 - **Clean Dependencies**: Infrastructure → Application → Domain → API
 - **Single Workflow**: `containerize_and_deploy` handles complete process
+- **CQRS Pattern**: Separate command and query handling
+- **Event-Driven**: Domain events for workflow coordination
+- **Saga Orchestration**: Distributed transaction coordination
 - **Domain-Driven**: Core business logic isolated in domain layer
 - **AI-Enhanced**: Built-in AI error recovery and analysis capabilities
 - **Separation of Concerns**: Each layer has clear responsibilities
@@ -381,27 +410,43 @@ The system uses a single workflow approach with AI orchestration for the complet
 
 ```go
 // RegisterWorkflowTools registers the comprehensive containerization workflow
-func RegisterWorkflowTools(mcpServer *server.MCPServer, logger *slog.Logger) error {
-	tool := mcp.Tool{
-		Name:        "containerize_and_deploy",
-		Description: "Complete containerization workflow from analysis to deployment",
-	}
+func RegisterWorkflowTools(mcpServer interface {
+    AddTool(tool mcp.Tool, handler server.ToolHandlerFunc)
+}, logger *slog.Logger) error {
+    tool := mcp.Tool{
+        Name:        "containerize_and_deploy",
+        Description: "Complete end-to-end containerization and deployment with AI-powered error fixing",
+        InputSchema: mcp.ToolInputSchema{
+            Type: "object",
+            Properties: map[string]interface{}{
+                "repo_url": map[string]interface{}{
+                    "type":        "string",
+                    "description": "Repository URL to containerize",
+                },
+                "deploy": map[string]interface{}{
+                    "type":        "boolean",
+                    "description": "Deploy to Kubernetes (optional, defaults to true)",
+                },
+            },
+            Required: []string{"repo_url"},
+        },
+    }
 
-	mcpServer.RegisterTool(tool, func(ctx context.Context, arguments map[string]interface{}) (*mcp.CallToolResult, error) {
-		// Use new orchestrator-based workflow
-		orchestrator := NewOrchestrator(logger)
-		result, err := orchestrator.Execute(ctx, &req, &args)
-		return result, err
-	})
+    mcpServer.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+        // Use new orchestrator-based workflow
+        orchestrator := NewOrchestrator(logger)
+        result, err := orchestrator.Execute(ctx, &req, &args)
+        return result, err
+    })
 }
 
-// AI-powered orchestrator handles 9-step workflow execution
-func (o *Orchestrator) Execute(ctx context.Context, req *ContainerizeAndDeployRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
-    totalSteps := 9
-    progressTracker := progress.NewProgressTracker(ctx, req, totalSteps, o.logger)
+// AI-powered orchestrator handles 10-step workflow execution
+func (o *Orchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
+    totalSteps := 10
+    progressTracker := infraprogress.NewProgressTracker(ctx, req, totalSteps, o.logger)
     
     // Execute workflow with AI-powered error recovery
-    return o.executeWorkflowWithProgress(ctx, req, args, progressTracker)
+    return o.executeContainerizeAndDeploy(ctx, req, args, o.logger)
 }
 ```
 

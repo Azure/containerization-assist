@@ -50,11 +50,31 @@ func (f *SinkFactory) CreateTrackerForWorkflow(
 
 	opts := []progress.Option{
 		progress.WithTraceID(traceID),
-		progress.WithHeartbeat(15 * time.Second),
+		progress.WithHeartbeat(2 * time.Second), // More responsive for AI clients
 		progress.WithThrottle(100 * time.Millisecond),
 	}
 
 	return progress.NewTracker(ctx, totalSteps, sink, opts...)
+}
+
+// CreateSubTracker creates a sub-tracker for detailed step progress.
+func (f *SinkFactory) CreateSubTracker(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	totalSubSteps int,
+	traceID string,
+	stepName string,
+) *progress.Tracker {
+	sink := f.CreateSink(ctx, req)
+
+	opts := []progress.Option{
+		progress.WithTraceID(traceID),
+		progress.WithHeartbeat(1 * time.Second), // Even more responsive for sub-steps
+		progress.WithThrottle(50 * time.Millisecond),
+	}
+
+	tracker := progress.NewTracker(ctx, totalSubSteps, sink, opts...)
+	return tracker
 }
 
 // NewProgressTracker creates a new progress tracker for workflow operations.

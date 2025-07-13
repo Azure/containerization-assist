@@ -1085,7 +1085,7 @@ Return ONLY the corrected Dockerfile content without any explanation or markdown
 		SystemPrompt: "You are a Docker and containerization expert. Fix the Dockerfile to resolve build errors while following best practices.",
 	}
 
-	response, err := samplingClient.Sample(ctx, request)
+	response, err := samplingClient.SampleInternal(ctx, request)
 	if err != nil {
 		return "", fmt.Errorf("failed to get AI fix for Dockerfile: %w", err)
 	}

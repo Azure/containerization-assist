@@ -88,6 +88,15 @@ type SamplingRequest struct {
 	Temperature  float32
 	SystemPrompt string
 	Stream       bool
+	Metadata     map[string]interface{}
+
+	// Advanced parameters (extracted from metadata for convenience)
+	TopP             *float32
+	FrequencyPenalty *float32
+	PresencePenalty  *float32
+	StopSequences    []string
+	Seed             *int
+	LogitBias        map[string]float32
 }
 
 // SamplingResponse represents a response from the MCP sampling API.
@@ -99,8 +108,8 @@ type SamplingResponse struct {
 	Error      error
 }
 
-// Sample performs sampling with simple retry & budget enforcement.
-func (c *Client) Sample(ctx context.Context, req SamplingRequest) (*SamplingResponse, error) {
+// SampleInternal performs sampling with simple retry & budget enforcement.
+func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*SamplingResponse, error) {
 	ctx, span := tracing.StartSpan(ctx, "sampling.sample")
 	defer span.End()
 
@@ -111,6 +120,26 @@ func (c *Client) Sample(ctx context.Context, req SamplingRequest) (*SamplingResp
 		attribute.Float64("sampling.temperature", float64(req.Temperature)),
 		attribute.Int("sampling.prompt_length", len(req.Prompt)),
 	)
+
+	// Add advanced parameter attributes
+	if req.TopP != nil {
+		span.SetAttributes(attribute.Float64("sampling.top_p", float64(*req.TopP)))
+	}
+	if req.FrequencyPenalty != nil {
+		span.SetAttributes(attribute.Float64("sampling.frequency_penalty", float64(*req.FrequencyPenalty)))
+	}
+	if req.PresencePenalty != nil {
+		span.SetAttributes(attribute.Float64("sampling.presence_penalty", float64(*req.PresencePenalty)))
+	}
+	if len(req.StopSequences) > 0 {
+		span.SetAttributes(attribute.Int("sampling.stop_sequences_count", len(req.StopSequences)))
+	}
+	if req.Seed != nil {
+		span.SetAttributes(attribute.Int("sampling.seed", *req.Seed))
+	}
+	if len(req.LogitBias) > 0 {
+		span.SetAttributes(attribute.Int("sampling.logit_bias_count", len(req.LogitBias)))
+	}
 
 	if srv := server.ServerFromContext(ctx); srv == nil {
 		return nil, errors.New(errors.CodeInternalError, "sampling", "no MCP server in context – cannot perform sampling", nil)
@@ -238,6 +267,36 @@ func (c *Client) callMCPSampling(ctx context.Context, srv *server.MCPServer, req
 	// Add system prompt if provided
 	if req.SystemPrompt != "" {
 		samplingRequest.CreateMessageParams.SystemPrompt = req.SystemPrompt
+	}
+
+	// Add advanced parameters if available
+	// Note: The MCP library may not support all of these parameters directly,
+	// but we can try to set them or pass them via metadata
+	if req.TopP != nil {
+		// Try to set TopP if the field exists in the MCP struct
+		// For now, we'll add it to a metadata field or extension if available
+		c.logger.Debug("TopP parameter requested", "top_p", *req.TopP)
+	}
+
+	if req.FrequencyPenalty != nil {
+		c.logger.Debug("FrequencyPenalty parameter requested", "frequency_penalty", *req.FrequencyPenalty)
+	}
+
+	if req.PresencePenalty != nil {
+		c.logger.Debug("PresencePenalty parameter requested", "presence_penalty", *req.PresencePenalty)
+	}
+
+	if len(req.StopSequences) > 0 {
+		c.logger.Debug("StopSequences parameter requested", "stop_sequences", req.StopSequences)
+		// Many AI models support stop sequences, but we need to check if MCP supports them
+	}
+
+	if req.Seed != nil {
+		c.logger.Debug("Seed parameter requested", "seed", *req.Seed)
+	}
+
+	if len(req.LogitBias) > 0 {
+		c.logger.Debug("LogitBias parameter requested", "logit_bias_count", len(req.LogitBias))
 	}
 
 	// Make the actual MCP sampling request
@@ -433,7 +492,7 @@ func (c *Client) AnalyzeError(ctx context.Context, inputErr error, contextInfo s
 		SystemPrompt: rendered.SystemPrompt,
 	}
 
-	response, err := c.Sample(ctx, request)
+	response, err := c.SampleInternal(ctx, request)
 	if err != nil {
 		return nil, errors.New(errors.CodeToolExecutionFailed, "sampling", "failed to analyze error", err)
 	}
@@ -466,4 +525,50 @@ func (c *Client) calculateBackoff(attempt int) time.Duration {
 	backoff = backoff - jitter + time.Duration(attempt*123456789%int(jitter*2))
 
 	return backoff
+}
+
+// emitTokenProgress emits progress updates during token streaming
+func (c *Client) emitTokenProgress(ctx context.Context, tokensGenerated int, maxTokens int32, startTime time.Time) {
+	if srv := server.ServerFromContext(ctx); srv != nil {
+		percentage := 0
+		if maxTokens > 0 {
+			percentage = int(float64(tokensGenerated) / float64(maxTokens) * 100)
+			if percentage > 100 {
+				percentage = 100
+			}
+		}
+
+		elapsed := time.Since(startTime)
+		var eta time.Duration
+		if tokensGenerated > 0 && maxTokens > 0 {
+			tokensPerSecond := float64(tokensGenerated) / elapsed.Seconds()
+			remainingTokens := float64(maxTokens) - float64(tokensGenerated)
+			if tokensPerSecond > 0 {
+				eta = time.Duration(remainingTokens/tokensPerSecond) * time.Second
+			}
+		}
+
+		payload := map[string]interface{}{
+			"progressToken": "llm-generation",
+			"step":          tokensGenerated,
+			"total":         int(maxTokens),
+			"percentage":    percentage,
+			"status":        "generating",
+			"step_name":     "llm_token_generation",
+			"substep_name":  fmt.Sprintf("token %d/%d", tokensGenerated, maxTokens),
+			"message":       fmt.Sprintf("Generating tokens: %d/%d (%d%%)", tokensGenerated, maxTokens, percentage),
+			"eta_ms":        eta.Milliseconds(),
+			"metadata": map[string]interface{}{
+				"kind":             "token_stream",
+				"tokens_generated": tokensGenerated,
+				"estimated_total":  maxTokens,
+				"tokens_per_sec":   float64(tokensGenerated) / elapsed.Seconds(),
+			},
+		}
+
+		// Send the progress notification
+		if err := srv.SendNotificationToClient(ctx, "notifications/progress", payload); err != nil {
+			c.logger.Debug("Failed to send token progress notification", "error", err)
+		}
+	}
 }

@@ -1,18 +1,19 @@
-# ADR-011: Manual Dependency Injection Pattern
+# ADR-003: Manual Dependency Injection Pattern
 
 Date: 2025-07-11
 Status: Accepted
 Context: Container Kit originally had complex service interfaces with dependency injection frameworks and large manager objects containing 65+ methods across 4 different interfaces. This created unnecessary complexity, harder testing, and difficult-to-understand code paths. The system needed a simpler approach to dependency management that maintained clarity and testability.
 
-Decision: Adopt manual dependency injection with focused service interfaces, direct instantiation patterns, and clear dependency graphs. Replace large manager interfaces with 8 focused services containing 32 methods total, eliminating dependency injection frameworks in favor of explicit dependency construction.
+Decision: Adopt manual dependency injection with focused service interfaces, direct instantiation patterns, and clear dependency graphs. Replace large manager interfaces with 8 focused services containing 32 methods total, using Google Wire for compile-time dependency injection instead of runtime frameworks.
 
 ## Architecture Details
 
-### Manual Dependency Construction
-- **Direct Instantiation**: Services created explicitly in main/setup functions
+### Wire-Based Dependency Construction
+- **Google Wire**: Compile-time dependency injection code generation
+- **Provider Sets**: Structured dependency grouping with wire.NewSet
 - **Clear Dependencies**: Dependencies passed directly to constructors
-- **No IoC Containers**: No dependency injection frameworks or containers
-- **Explicit Composition**: Service composition visible in code
+- **Generated Code**: Wire generates optimal dependency construction code
+- **Explicit Composition**: Service composition visible and verified at compile-time
 
 ### Service Interface Design
 ```go
@@ -45,32 +46,38 @@ type SecurityScanner interface {
 }
 ```
 
-### Dependency Structure
+### Wire Dependency Structure
 ```go
-// Explicit service construction in main
-func NewMCPServer(workspaceDir string, logger *slog.Logger) *Server {
-    // Direct dependency construction
-    dockerClient := docker.NewClient()
-    kubeClient := kubernetes.NewClient()
-    scanner := security.NewScanner(dockerClient)
-    
-    // Explicit dependency injection
-    analyzeStep := steps.NewAnalyzeStep(logger)
-    buildStep := steps.NewBuildStep(dockerClient, logger)
-    deployStep := steps.NewDeployStep(kubeClient, logger)
-    
-    // Clear service composition
-    workflow := workflow.NewContainerizeWorkflow(
-        analyzeStep,
-        buildStep,
-        deployStep,
-        logger,
+// pkg/mcp/wire/wire.go
+//go:generate wire
+
+var ConfigSet = wire.NewSet(
+    wire.Value(workflow.DefaultServerConfig()),
+    wire.FieldsOf(new(workflow.ServerConfig), "WorkspaceDir", "MaxSessions"),
+)
+
+var CoreSet = wire.NewSet(
+    session.NewBoltSessionManager,
+    wire.Bind(new(session.SessionManager), new(*session.BoltSessionManager)),
+    resources.NewStore,
+    wire.Bind(new(resources.ResourceStore), new(*resources.Store)),
+)
+
+var ApplicationSet = wire.NewSet(
+    application.NewServer,
+    commands.NewContainerizeHandler,
+    queries.NewWorkflowStatusHandler,
+)
+
+// Wire generates this initialization function
+func InitializeServer(logger *slog.Logger, opts ...application.Option) (*application.Server, error) {
+    wire.Build(
+        ConfigSet,
+        CoreSet,
+        ApplicationSet,
+        InfrastructureSet,
     )
-    
-    return &Server{
-        workflow: workflow,
-        logger:   logger,
-    }
+    return nil, nil
 }
 ```
 
@@ -253,6 +260,8 @@ func TestBuildStep(t *testing.T) {
 5. **Consistent Patterns**: Follow established patterns for new services
 
 ## Related ADRs
-- ADR-008: Single Workflow Tool Architecture (workflow orchestration context)
-- ADR-009: Unified Rich Error System (error handling across services)
-- ADR-010: AI-Assisted Error Recovery (retry logic integration)
+- ADR-001: Single Workflow Tool Architecture (workflow orchestration context)
+- ADR-004: Unified Rich Error System (error handling across services)
+- ADR-005: AI-Assisted Error Recovery (retry logic integration)
+- ADR-006: Four-Layer MCP Architecture (service layer organization)
+- ADR-007: CQRS, Saga, and Wire Patterns (advanced Wire usage)

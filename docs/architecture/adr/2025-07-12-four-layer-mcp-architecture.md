@@ -110,9 +110,10 @@ pkg/mcp/
 
 ## Related Decisions
 
-- Builds upon ADR-005 (Single Workflow Architecture)
+- Builds upon ADR-001 (Single Workflow Architecture)
 - Consolidates the error handling system from ADR-004
 - Maintains the manual dependency injection approach from ADR-003
+- Enables the advanced patterns from ADR-007 (CQRS, Saga, Wire)
 
 ## References
 

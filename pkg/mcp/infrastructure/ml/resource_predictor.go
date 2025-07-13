@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
+	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 )
 
 // RepositoryAnalysis defines the interface for repository analysis results
@@ -112,13 +112,13 @@ type BuildProfile struct {
 
 // ResourcePredictor provides AI-powered resource prediction for builds
 type ResourcePredictor struct {
-	samplingClient *sampling.Client
+	samplingClient domainsampling.Sampler
 	historyStore   *BuildHistoryStore
 	logger         *slog.Logger
 }
 
 // NewResourcePredictor creates a new resource predictor
-func NewResourcePredictor(samplingClient *sampling.Client, logger *slog.Logger) *ResourcePredictor {
+func NewResourcePredictor(samplingClient domainsampling.Sampler, logger *slog.Logger) *ResourcePredictor {
 	return &ResourcePredictor{
 		samplingClient: samplingClient,
 		historyStore:   NewBuildHistoryStore(),
@@ -185,7 +185,7 @@ func (p *ResourcePredictor) buildProfile(analysis RepositoryAnalysis) BuildProfi
 func (p *ResourcePredictor) getAIPrediction(ctx context.Context, profile BuildProfile) (*ResourcePrediction, error) {
 	prompt := p.buildPredictionPrompt(profile)
 
-	response, err := p.samplingClient.Sample(ctx, sampling.SamplingRequest{
+	response, err := p.samplingClient.Sample(ctx, domainsampling.Request{
 		Prompt:      prompt,
 		Temperature: 0.2, // Lower temperature for more consistent predictions
 		MaxTokens:   1500,
