@@ -1,10 +1,10 @@
 # ADR-007: CQRS, Saga, and Wire Architectural Patterns
 
 **Date**: 2025-07-12  
-**Status**: Accepted  
+**Status**: Partial Implementation  
 **Context**: Enhancing Container Kit's 4-layer architecture with advanced patterns for improved reliability, maintainability, and scalability  
 **Decision**: Implement CQRS pattern for command/query separation, Saga pattern for workflow compensation, and optimized Wire dependency injection  
-**Consequences**: Increased architectural sophistication with improved error recovery, cleaner separation of concerns, and compile-time safety
+**Consequences**: Infrastructure exists for advanced patterns, but main workflow still uses simplified approach for reliability
 
 ## Executive Summary
 
@@ -244,7 +244,15 @@ func InitializeServer(logger *slog.Logger, opts ...application.Option) (*applica
 
 ## Implementation Status
 
-### Phase 1: Wire Optimization ✅ **COMPLETED**
+### Current Working Implementation
+
+The system uses a hybrid approach:
+
+1. **Manual DI for Server Creation**: Functional options pattern with direct construction
+2. **Session-Based Commands**: CQRS-like pattern for session operations (create, cancel, query)
+3. **Direct Workflow Execution**: Main containerization bypasses patterns for simplicity
+
+### Phase 1: Wire Infrastructure 🔄 **BUILT BUT INACTIVE**
 
 **Foundation improvement completed successfully**
 
@@ -270,56 +278,56 @@ var AppSet = wire.NewSet(
 
 **Benefits**: 50% reduction in boilerplate, compile-time safety, zero runtime overhead
 
-### Phase 2: CQRS Implementation ✅ **COMPLETED**
+### Phase 2: CQRS Implementation 🔄 **PARTIAL IMPLEMENTATION**
 
-**Structured command/query separation implemented successfully**
+**Command/query separation exists but not fully integrated**
 
 ```go
-// Current: Mixed responsibilities in single orchestrator
-func (o *Orchestrator) Execute(ctx context.Context, req *ContainerizeAndDeployRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
-    // Both command execution AND status querying mixed together
-}
+// Current Implementation: Commands and queries exist but workflow still uses orchestrator
+// pkg/mcp/application/commands/ - Command handlers exist
+// pkg/mcp/application/queries/ - Query handlers exist
+// BUT: Main workflow still uses ExecuteContainerizeAndDeploy directly
 
-// After: Clear separation
 type ContainerizeCommandHandler struct {
-    saga *workflow.ContainerizationSaga
+    // Exists but not integrated into main workflow
 }
 
 type WorkflowStatusQueryHandler struct {
-    stateRepo *workflow.StateRepository
+    // Exists for status queries
+}
+
+// Main workflow still uses:
+func (o *Orchestrator) Execute(ctx context.Context, req *ContainerizeAndDeployRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
+    // Direct execution, not using CQRS pattern
 }
 ```
 
-**Benefits**: Clear API contracts, improved testability, independent optimization paths
+**Status**: Commands/queries exist as infrastructure but main workflow bypasses them
 
-### Phase 3: Saga Pattern ✅ **COMPLETED**
+### Phase 3: Saga Pattern 🔄 **INFRASTRUCTURE EXISTS**
 
-**Systematic error recovery implemented successfully**
+**Saga infrastructure available but not integrated into main workflow**
 
 ```go
-// Current: Manual cleanup in defer functions
-defer func() {
-    // Manual cleanup logic scattered throughout workflow
-    if buildResult != nil && shouldCleanup {
-        // Custom cleanup code
-    }
-}()
-
-// After: Systematic compensation
+// Infrastructure exists: pkg/mcp/domain/saga/
 type ContainerizationSaga struct {
-    steps []SagaStep // Each step knows how to compensate itself
+    // Saga coordinator and types exist
 }
 
-func (s *ContainerizationSaga) Execute(ctx context.Context) error {
-    for _, step := range s.steps {
-        if err := step.Execute(ctx, s.state); err != nil {
-            return s.compensateAll(ctx) // Systematic rollback
+// BUT: Main workflow still uses traditional error handling
+func executeContainerizeAndDeploy() {
+    defer func() {
+        // Traditional cleanup logic in main workflow
+        for i := len(cleanupFuncs) - 1; i >= 0; i-- {
+            if cleanupFuncs[i] != nil {
+                cleanupFuncs[i]()
+            }
         }
-    }
+    }()
 }
 ```
 
-**Benefits**: Guaranteed cleanup, improved reliability, better error handling
+**Status**: Saga pattern infrastructure exists but main workflow uses traditional cleanup
 
 ## Technical Implementation Details
 

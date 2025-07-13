@@ -28,7 +28,7 @@ func BuildImageOptimized(
 	dockerfileResult *DockerfileResult,
 	analyzeResult *AnalyzeResult,
 	imageName, imageTag, buildContext string,
-	samplingClient sampling.Sampler,
+	samplingClient sampling.UnifiedSampler,
 	logger *slog.Logger,
 ) (*OptimizedBuildResult, error) {
 

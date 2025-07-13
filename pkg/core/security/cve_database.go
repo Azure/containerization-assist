@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	mcperrors "github.com/Azure/container-kit/pkg/common/errors"
@@ -722,9 +723,11 @@ func (db *CVEDatabase) EnrichVulnerability(ctx context.Context, vuln *Vulnerabil
 
 // cveCache provides caching for CVE data
 type cveCache struct {
-	mu    sync.RWMutex
-	cache map[string]*cacheEntryData
-	ttl   time.Duration
+	mu        sync.RWMutex
+	cache     map[string]*cacheEntryData
+	ttl       time.Duration
+	hitCount  int64
+	missCount int64
 }
 
 type cacheEntryData struct {
@@ -750,9 +753,13 @@ func (cc *cveCache) get(cveID string) *CVEInfo {
 
 	entry, ok := cc.cache[cveID]
 	if !ok || time.Now().After(entry.expiresAt) {
+		// Cache miss
+		atomic.AddInt64(&cc.missCount, 1)
 		return nil
 	}
 
+	// Cache hit
+	atomic.AddInt64(&cc.hitCount, 1)
 	return entry.cve
 }
 
@@ -792,8 +799,8 @@ func (db *CVEDatabase) GetCacheStats() map[string]interface{} {
 	return map[string]interface{}{
 		"total_entries": len(db.cache.cache),
 		"ttl_hours":     db.cache.ttl.Hours(),
-		"hit_count":     0, // TODO: Add hit counter to cache
-		"miss_count":    0, // TODO: Add miss counter to cache
+		"hit_count":     atomic.LoadInt64(&db.cache.hitCount),
+		"miss_count":    atomic.LoadInt64(&db.cache.missCount),
 	}
 }
 

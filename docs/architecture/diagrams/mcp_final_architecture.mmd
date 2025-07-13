@@ -68,7 +68,7 @@ graph TD
     end
 
     subgraph "Core Infrastructure"
-        ErrorSystem[Rich Error System<br/>pkg/common/errors/<br/>Structured error handling]
+        ErrorSystem[Rich Error System<br/>pkg/mcp/domain/errors/<br/>Structured error handling<br/>Builder pattern]
         SessionStore[Session Storage<br/>BoltDB persistence]
         WorkspaceManager[Workspace Manager<br/>Isolated workspaces]
     end

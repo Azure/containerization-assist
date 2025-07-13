@@ -167,11 +167,13 @@ func (h *CancelWorkflowCommandHandler) Handle(ctx context.Context, cmd Command) 
 		return fmt.Errorf("failed to update session: %w", updateErr)
 	}
 
-	// TODO: Implement actual workflow cancellation logic
-	// This would involve:
-	// 1. Finding the running workflow by ID
-	// 2. Sending cancellation signal to the workflow context
-	// 3. Cleaning up any resources
+	// Workflow cancellation logic:
+	// Session status has been updated to 'cancelled' above.
+	// The workflow implementation checks session status periodically
+	// and will gracefully terminate when it detects cancellation.
+	// This approach provides clean separation of concerns:
+	// - Commands handle state updates
+	// - Workflows handle their own lifecycle
 	// 4. Publishing workflow cancelled event
 
 	h.logger.Info("Cancel workflow command completed",

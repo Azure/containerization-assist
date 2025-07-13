@@ -21,6 +21,9 @@ type SagaOrchestrator struct {
 	sagaCoordinator *saga.SagaCoordinator
 }
 
+// Ensure SagaOrchestrator implements SagaAwareOrchestrator
+var _ SagaAwareOrchestrator = (*SagaOrchestrator)(nil)
+
 // NewSagaOrchestrator creates a new saga-aware workflow orchestrator
 func NewSagaOrchestrator(
 	logger *slog.Logger,
@@ -222,6 +225,12 @@ func (o *SagaOrchestrator) GetWorkflowSagaStatus(workflowID string) (*saga.SagaE
 // ListWorkflowSagas returns all saga transactions for a workflow
 func (o *SagaOrchestrator) ListWorkflowSagas(workflowID string) []*saga.SagaExecution {
 	return o.sagaCoordinator.ListSagas(workflowID)
+}
+
+// CompensateSaga triggers compensation for a failed saga (implements SagaAwareOrchestrator)
+func (o *SagaOrchestrator) CompensateSaga(ctx context.Context, sagaID string) error {
+	// Use CancelSaga which triggers compensation internally
+	return o.sagaCoordinator.CancelSaga(ctx, sagaID)
 }
 
 // createWorkflowSagaSteps creates saga steps for the containerization workflow

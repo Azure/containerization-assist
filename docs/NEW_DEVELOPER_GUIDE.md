@@ -178,8 +178,8 @@ func AnalyzeRepository(ctx context.Context, args AnalyzeArgs) (*AnalyzeResult, e
 ### Adding New Steps
 1. **Create step file**: Add to `pkg/mcp/infrastructure/steps/`
 2. **Implement logic**: Focus on the specific operation with AI integration
-3. **Error handling**: Use Rich error system from `pkg/common/errors/`
-4. **Progress tracking**: Include progress indicators with metadata
+3. **Error handling**: Use Rich error system from `pkg/mcp/domain/errors/` with builder pattern
+4. **Progress tracking**: Include progress indicators with metadata and events
 5. **Event publishing**: Emit domain events for workflow coordination
 6. **AI Integration**: Consider AI-powered error recovery where applicable
 7. **ML Integration**: Consider ML optimization opportunities
@@ -260,27 +260,25 @@ Start by understanding the 10-step process:
 ### 2. Working with Existing Steps
 ```go
 // pkg/mcp/infrastructure/steps/build.go
-import "github.com/Azure/container-kit/pkg/common/errors"
+import "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 
 func BuildImage(ctx context.Context, args BuildArgs) (*BuildResult, error) {
     // Docker build with AI-powered error recovery
     if err := performBuild(args); err != nil {
-        // Use Rich error system from common/errors package
-        richErr := errors.New(
-            errors.CodeBuildFailed,
-            "build",
-            "Docker build failed",
-            err,
-        )
-        richErr.Severity = errors.SeverityHigh
-        richErr.Fields = map[string]any{
-            "image_name": args.ImageName,
-            "dockerfile_path": args.DockerfilePath,
-            "build_context": args.BuildContext,
-        }
-        richErr.UserFacing = true
-        richErr.Retryable = true
-        return nil, richErr
+        // Use Rich error system with builder pattern
+        return nil, errors.NewError().
+            Code(errors.CodeBuildFailed).
+            Type(errors.ErrTypeBuild).
+            Severity(errors.SeverityHigh).
+            Message("Docker build failed").
+            Context("image_name", args.ImageName).
+            Context("dockerfile_path", args.DockerfilePath).
+            Context("build_context", args.BuildContext).
+            Suggestion("Check Dockerfile syntax and base image availability").
+            UserFacing(true).
+            Retryable(true).
+            WithLocation().
+            Build()
     }
     
     return &BuildResult{
@@ -359,23 +357,21 @@ Our architecture follows these principles:
 
 ### Error Handling Pattern
 ```go
-// Use the Rich error system from pkg/common/errors
-import "github.com/Azure/container-kit/pkg/common/errors"
+// Use the Rich error system from pkg/mcp/domain/errors with builder pattern
+import "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 
-richErr := errors.New(
-    errors.CodeValidationFailed,
-    "workflow",
-    "invalid repository path",
-    err,
-)
-richErr.Severity = errors.SeverityMedium
-richErr.Fields = map[string]any{
-    "path": repoPath,
-    "validation_rule": "path_exists",
-}
-richErr.UserFacing = true
-richErr.Retryable = false
-return richErr
+return errors.NewError().
+    Code(errors.CodeValidationFailed).
+    Type(errors.ErrTypeValidation).
+    Severity(errors.SeverityMedium).
+    Message("invalid repository path").
+    Context("path", repoPath).
+    Context("validation_rule", "path_exists").
+    Suggestion("Ensure the repository path exists and is accessible").
+    UserFacing(true).
+    Retryable(false).
+    WithLocation().
+    Build()
 ```
 
 ### Progress Tracking Pattern
@@ -491,7 +487,7 @@ make version            # Show version
 3. **Understand Event Flow**: See how domain events coordinate workflow steps
 4. **Review Saga Orchestration**: Learn distributed transaction coordination patterns
 5. **Explore ML Integration**: Understand machine learning optimization features
-6. **Study Error Handling**: Learn the Rich error patterns from pkg/common/errors
+6. **Study Error Handling**: Learn the Rich error patterns from pkg/mcp/domain/errors with builder pattern
 
 ### Resources
 - **Documentation**: `docs/` directory contains updated guides

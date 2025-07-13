@@ -6,6 +6,7 @@ import (
 )
 
 // SessionManager interface defines session management operations
+// Deprecated: Use OptimizedSessionManager instead. This interface is maintained only for backward compatibility.
 // This interface maintains backward compatibility while the codebase migrates to OptimizedSessionManager
 type SessionManager interface {
 	// Core methods (kept for compatibility)

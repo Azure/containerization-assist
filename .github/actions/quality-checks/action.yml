@@ -55,6 +55,9 @@ outputs:
   current-issues:
     description: 'Current number of lint issues found'
     value: ${{ steps.quality-analysis.outputs.current-issues }}
+  metrics-json-path:
+    description: 'Path to quality metrics JSON file'
+    value: 'quality-metrics.json'
 
 runs:
   using: "composite"
@@ -197,20 +200,20 @@ runs:
         
         # Add to GitHub Actions summary if ratcheting opportunity exists
         if [[ "$RATCHET_OPPORTUNITY" == "true" ]]; then
-          cat >> $GITHUB_STEP_SUMMARY << EOF
-        ## 🎯 Quality Improvement Opportunity
-        
-        **🎉 Ratcheting Opportunity Detected!**
-        
-        Your code quality improvements have created an opportunity to tighten the error budget:
-        - **Current issues**: $CURRENT_ISSUES
-        - **Current budget**: 200  
-        - **Suggested new budget**: $SUGGESTED_BUDGET
-        
-        **To apply**: Update \`linting.error_budgets.combined.errors\` to \`$SUGGESTED_BUDGET\` in \`.github/quality-config.json\`
-        
-        This locks in your quality improvements and prevents regression! 🔒✨
-        EOF
+          {
+            echo "## 🎯 Quality Improvement Opportunity"
+            echo ""
+            echo "**🎉 Ratcheting Opportunity Detected!**"
+            echo ""
+            echo "Your code quality improvements have created an opportunity to tighten the error budget:"
+            echo "- **Current issues**: $CURRENT_ISSUES"
+            echo "- **Current budget**: 200"
+            echo "- **Suggested new budget**: $SUGGESTED_BUDGET"
+            echo ""
+            echo "**To apply**: Update \`linting.error_budgets.combined.errors\` to \`$SUGGESTED_BUDGET\` in \`.github/quality-config.json\`"
+            echo ""
+            echo "This locks in your quality improvements and prevents regression! 🔒✨"
+          } >> $GITHUB_STEP_SUMMARY
         fi
         
         # Clean up temp files
@@ -242,6 +245,22 @@ runs:
         echo "🔍 Checking architecture patterns..."
         ADAPTERS=$(find pkg/mcp pkg/core -name "*adapter*.go" 2>/dev/null | wc -l | tr -d ' ')
         WRAPPERS=$(find pkg/mcp pkg/core -name "*wrapper*.go" 2>/dev/null | grep -v docker_operation | wc -l | tr -d ' ')
+        
+        # Check for exactly 4 top-level directories in pkg/mcp
+        echo "📂 Checking pkg/mcp directory structure..."
+        if [ -d "pkg/mcp" ]; then
+          ACTUAL_DIRS=$(ls -1 pkg/mcp | wc -l | tr -d ' ')
+          EXPECTED_DIRS=4
+          DIR_LIST=$(ls -1 pkg/mcp | tr '\n' ', ' | sed 's/, $//')
+          
+          if [ "$ACTUAL_DIRS" -ne "$EXPECTED_DIRS" ]; then
+            echo "❌ pkg/mcp must contain exactly 4 directories (api, application, domain, infrastructure)"
+            echo "   Found $ACTUAL_DIRS directories: $DIR_LIST"
+            SCORE=$((SCORE - 20))  # Significant penalty for incorrect structure
+          else
+            echo "✅ pkg/mcp has correct 4-layer structure: $DIR_LIST"
+          fi
+        fi
         
         # Large files check (>800 lines, excluding tests)
         echo "📏 Checking for large files..."
@@ -293,6 +312,7 @@ runs:
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "  Architecture Score: $SCORE/100 ($STATUS)"
         echo ""
+        echo "  📂 pkg/mcp structure: $ACTUAL_DIRS directories (required: 4)"
         echo "  📦 Adapters: $ADAPTERS (target: 0)"
         echo "  🔧 Wrappers: $WRAPPERS (target: 0)"  
         echo "  📄 Large files: $LARGE_FILES (budget: $LARGE_FILE_BUDGET)"
@@ -328,3 +348,57 @@ runs:
         
         echo ""
         echo "✅ Architecture analysis completed"
+        
+    - name: Collect Quality Metrics
+      shell: bash
+      run: |
+        echo "📊 Collecting comprehensive quality metrics..."
+        
+        # Make metrics script executable
+        chmod +x ./scripts/quality-metrics.sh
+        
+        # Run metrics collection
+        ./scripts/quality-metrics.sh --json
+        
+        # Add metrics to GitHub summary
+        if [ -f quality-metrics.json ]; then
+          # Extract metrics values
+          TOTAL_LOC=$(jq -r '.code_size.total_loc' quality-metrics.json)
+          TEST_LOC=$(jq -r '.code_size.test_loc' quality-metrics.json)
+          AVG_LOC=$(jq -r '.code_size.avg_loc_per_file' quality-metrics.json)
+          COMPLEX_30=$(jq -r '.complexity.over_30' quality-metrics.json)
+          COMPLEX_20=$(jq -r '.complexity.over_20' quality-metrics.json)
+          COMPLEX_15=$(jq -r '.complexity.over_15' quality-metrics.json)
+          ARCH_SCORE=$(jq -r '.quality.architecture_score' quality-metrics.json)
+          INTERFACES=$(jq -r '.abstractions.total_interfaces' quality-metrics.json)
+          ADAPTERS=$(jq -r '.abstractions.adapters' quality-metrics.json)
+          TOP_DIRS=$(jq -r '.structure.top_level_dirs' quality-metrics.json)
+          
+          {
+            echo ""
+            echo "## 📊 Quality Metrics Summary"
+            echo ""
+            echo "### Code Size"
+            echo "- **Total LOC**: $TOTAL_LOC"
+            echo "- **Test LOC**: $TEST_LOC"
+            echo "- **Average LOC/file**: $AVG_LOC"
+            echo ""
+            echo "### Complexity Distribution"
+            echo "- **Functions > 30**: $COMPLEX_30"
+            echo "- **Functions > 20**: $COMPLEX_20"
+            echo "- **Functions > 15**: $COMPLEX_15"
+            echo ""
+            echo "### Architecture Health"
+            echo "- **Architecture Score**: $ARCH_SCORE/100"
+            echo "- **Interfaces**: $INTERFACES"
+            echo "- **Adapters**: $ADAPTERS"
+            echo "- **Top-level dirs**: $TOP_DIRS (target: 4)"
+            echo ""
+          } >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Upload metrics as artifact
+        echo "Uploading metrics artifact..."
+        mkdir -p metrics-output
+        cp quality-metrics.json metrics-output/
+        echo "Metrics collected at $(date)" > metrics-output/timestamp.txt

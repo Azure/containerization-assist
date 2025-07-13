@@ -379,15 +379,17 @@ Duration Tracking → Completion Notification
 ## Development Guidelines
 
 ### 1. Adding New Workflow Steps
-1. **Step Implementation**: Create in `pkg/mcp/internal/steps/`
-2. **Error Handling**: Use unified Rich error system
-3. **Progress Tracking**: Include progress indicators
-4. **Testing**: Unit and integration tests
+1. **Step Implementation**: Create in `pkg/mcp/infrastructure/steps/`
+2. **Error Handling**: Use unified Rich error system from `pkg/mcp/domain/errors/`
+3. **Progress Tracking**: Include progress indicators with metadata
+4. **AI Integration**: Consider AI-powered error recovery where applicable
+5. **Testing**: Unit and integration tests with workflow validation
 
 ### 2. Error Handling
-- Use unified Rich error system from `pkg/common/errors/`
-- Include structured context and actionable suggestions
-- Implement proper error classification and severity
+- Use unified Rich error system from `pkg/mcp/domain/errors/` with builder pattern
+- Include structured context and actionable suggestions with severity levels
+- Implement proper error classification (Unknown, Low, Medium, High, Critical)
+- Use location tracking and retryable flags for AI-powered recovery
 
 ### 3. Workflow Development
 - Follow the 10-step workflow pattern
@@ -396,9 +398,11 @@ Duration Tracking → Completion Notification
 - Maintain session state consistency
 
 ### 4. Quality Standards
-- Focus on simplicity and maintainability
-- Comprehensive testing for workflow steps
-- Clear documentation and progress messages
+- Focus on workflow simplicity and maintainability
+- Comprehensive testing with integration workflow validation
+- Clear documentation with structured progress messages
+- AI-enhanced error recovery with actionable user guidance
+- Performance targets: <300μs P95 per request
 
 ## Appendices
 

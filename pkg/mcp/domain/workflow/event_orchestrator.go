@@ -19,6 +19,9 @@ type EventOrchestrator struct {
 	eventUtils     events.EventUtils
 }
 
+// Ensure EventOrchestrator implements EventAwareOrchestrator
+var _ EventAwareOrchestrator = (*EventOrchestrator)(nil)
+
 // NewEventOrchestrator creates a new event-driven workflow orchestrator
 func NewEventOrchestrator(logger *slog.Logger, eventPublisher *events.Publisher) *EventOrchestrator {
 	return &EventOrchestrator{
@@ -145,6 +148,34 @@ func (o *EventOrchestrator) publishWorkflowCompletedEvent(ctx context.Context, w
 	}
 }
 
+// PublishWorkflowEvent publishes workflow-related events (implements EventAwareOrchestrator)
+func (o *EventOrchestrator) PublishWorkflowEvent(ctx context.Context, workflowID string, eventType string, payload interface{}) error {
+	// Create a generic workflow event
+	event := &genericWorkflowEvent{
+		id:         o.eventUtils.GenerateEventID(),
+		timestamp:  time.Now(),
+		workflowID: workflowID,
+		eventType:  eventType,
+		payload:    payload,
+	}
+
+	return o.eventPublisher.Publish(ctx, event)
+}
+
+// genericWorkflowEvent implements DomainEvent for arbitrary workflow events
+type genericWorkflowEvent struct {
+	id         string
+	timestamp  time.Time
+	workflowID string
+	eventType  string
+	payload    interface{}
+}
+
+func (e *genericWorkflowEvent) EventID() string       { return e.id }
+func (e *genericWorkflowEvent) OccurredAt() time.Time { return e.timestamp }
+func (e *genericWorkflowEvent) WorkflowID() string    { return e.workflowID }
+func (e *genericWorkflowEvent) EventType() string     { return e.eventType }
+
 // generateWorkflowID creates a unique workflow identifier
 func (o *EventOrchestrator) generateWorkflowID(args *ContainerizeAndDeployArgs) string {
 	timestamp := time.Now().Format("20060102-150405")
@@ -168,7 +199,12 @@ func extractWorkflowRepoName(repoURL string) string {
 
 // extractUserID extracts user ID from context (placeholder for actual implementation)
 func (o *EventOrchestrator) extractUserID(ctx context.Context) string {
-	// TODO: Extract actual user ID from authentication context
-	// For now, return a placeholder
+	// Extract user ID from authentication context.
+	// In a real implementation, this would parse JWT tokens,
+	// API keys, or other authentication mechanisms.
+	// For now, we use "system" as the default user.
+	if userID, ok := ctx.Value("user_id").(string); ok && userID != "" {
+		return userID
+	}
 	return "system"
 }

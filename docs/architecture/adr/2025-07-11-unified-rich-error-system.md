@@ -125,5 +125,5 @@ return errors.New(
 ## Related ADRs
 - ADR-005: AI-Assisted Error Recovery (consumes rich error context)
 - ADR-001: Single Workflow Tool Architecture (unified error handling across workflow)
-- ADR-003: Manual Dependency Injection (simplified error propagation)
+- ADR-003: Wire-Based Dependency Injection (simplified error propagation)
 - ADR-006: Four-Layer MCP Architecture (error handling across layers)

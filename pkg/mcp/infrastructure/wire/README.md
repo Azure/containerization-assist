@@ -45,7 +45,7 @@ func main() {
 
 2. Generate the dependency injection code:
    ```bash
-   go generate ./pkg/mcp/wire
+   go generate ./pkg/mcp/infrastructure/wire
    ```
 
 3. The `wire_gen.go` file will be updated with the generated code.
@@ -70,7 +70,7 @@ To add a new dependency to the Wire provider set:
    ```
 
 3. Update the Dependencies struct if needed
-4. Run `go generate ./pkg/mcp/wire` to regenerate
+4. Run `go generate ./pkg/mcp/infrastructure/wire` to regenerate
 
 ### Testing with Wire
 
@@ -95,15 +95,15 @@ func TestWithMocks(t *testing.T) {
 }
 ```
 
-## Migration Strategy
+## Wire Implementation
 
-The codebase supports both manual dependency injection and Wire:
+The codebase uses Google Wire for compile-time dependency injection:
 
-1. **Current**: Manual DI using functional options in `bootstrap.go`
-2. **Wire**: Compile-time DI using `wire.go` and `wire_gen.go`
-3. **Hybrid**: Both approaches work side-by-side during migration
+1. **Wire-based DI**: All dependencies managed through provider sets
+2. **Generated Code**: `wire.go` defines providers, `wire_gen.go` contains generated code
+3. **Compile-time Safety**: Dependency issues caught during build
 
-Use `NewMCPServer` for manual DI or `NewMCPServerWithWire` for Wire-based DI.
+Use `InitializeServer` or `InitializeServerFromEnv` to create a fully-wired server.
 
 ## Benefits
 

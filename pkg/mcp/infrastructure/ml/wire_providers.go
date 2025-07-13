@@ -8,7 +8,7 @@ import (
 )
 
 // ProvideResourcePredictor provides a ResourcePredictor instance
-func ProvideResourcePredictor(samplingClient domainsampling.Sampler, logger *slog.Logger) *ResourcePredictor {
+func ProvideResourcePredictor(samplingClient domainsampling.UnifiedSampler, logger *slog.Logger) *ResourcePredictor {
 	return NewResourcePredictor(samplingClient, logger)
 }
 
@@ -18,6 +18,6 @@ func ProvideBuildOptimizer(predictor *ResourcePredictor, logger *slog.Logger) *B
 }
 
 // ProvideOptimizedBuildStep provides an OptimizedBuildStep instance
-func ProvideOptimizedBuildStep(samplingClient domainsampling.Sampler, logger *slog.Logger) *OptimizedBuildStep {
+func ProvideOptimizedBuildStep(samplingClient domainsampling.UnifiedSampler, logger *slog.Logger) *OptimizedBuildStep {
 	return NewOptimizedBuildStep(samplingClient, logger)
 }

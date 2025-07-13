@@ -24,8 +24,8 @@ func FixManifestWithAI(ctx context.Context, manifestPath string, deploymentError
 		return fmt.Errorf("failed to read manifest: %w", err)
 	}
 
-	// Create sampling client
-	samplingClient := sampling.NewClient(logger)
+	// Create specialized sampling client
+	samplingClient := sampling.NewSpecializedClient(logger)
 
 	// Prepare repository analysis summary
 	repoAnalysis := fmt.Sprintf("Language: %s, Framework: %s, Port: %d",
@@ -81,7 +81,7 @@ func AnalyzePodFailure(ctx context.Context, namespace, podName string, k8sResult
 	errorDetails := fmt.Sprintf("Pod Events:\n%s\n\nPod Status: CrashLoopBackOff or Failed", podEvents)
 
 	// Use AI to analyze the crash
-	samplingClient := sampling.NewClient(logger)
+	samplingClient := sampling.NewSpecializedClient(logger)
 	analysis, err := samplingClient.AnalyzePodCrashLoop(
 		ctx,
 		podLogs,

@@ -104,6 +104,9 @@ type Orchestrator struct {
 	logger *slog.Logger
 }
 
+// Ensure Orchestrator implements WorkflowOrchestrator
+var _ WorkflowOrchestrator = (*Orchestrator)(nil)
+
 // NewOrchestrator creates a new workflow orchestrator with all steps
 func NewOrchestrator(logger *slog.Logger) *Orchestrator {
 	// Create default orchestrator without optimizations

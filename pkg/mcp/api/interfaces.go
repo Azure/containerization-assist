@@ -101,25 +101,6 @@ type Registry interface {
 }
 
 // ============================================================================
-// Orchestrator Interface
-// ============================================================================
-
-// Orchestrator provides tool orchestration functionality
-type Orchestrator interface {
-	// RegisterTool registers a tool with the orchestrator
-	RegisterTool(name string, tool Tool) error
-
-	// ExecuteTool executes a tool with the given arguments
-	ExecuteTool(ctx context.Context, toolName string, args interface{}) (interface{}, error)
-
-	// GetTool retrieves a registered tool
-	GetTool(name string) (Tool, bool)
-
-	// ListTools returns a list of all registered tools
-	ListTools() []string
-}
-
-// ============================================================================
 // Transport Interface
 // ============================================================================
 

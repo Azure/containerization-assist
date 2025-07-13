@@ -7,7 +7,7 @@ COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_TIME := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS := -X main.Version=$(VERSION) -X main.GitCommit=$(COMMIT) -X main.BuildTime=$(BUILD_TIME)
 
-.PHONY: build cli mcp test test-integration fmt lint static-analysis security-scan check-all clean version help
+.PHONY: build cli mcp test test-integration fmt lint static-analysis security-scan check-all clean version help wire-gen
 
 # Primary build target - builds both CLI and MCP server
 build: cli mcp
@@ -24,6 +24,13 @@ mcp:
 	@echo "Version: $(VERSION)"
 	GOFLAGS=-trimpath go build -tags mcp -ldflags "$(LDFLAGS)" -o container-kit-mcp ./cmd/mcp-server
 	@echo "✅ Built: container-kit-mcp"
+
+# Wire dependency injection code generation
+wire-gen:
+	@echo "Generating Wire dependency injection code..."
+	@which wire > /dev/null || go install github.com/google/wire/cmd/wire@latest
+	@cd pkg/mcp/infrastructure/wire && go generate
+	@echo "✅ Wire code generated"
 
 # Essential development tasks
 test:
@@ -69,6 +76,7 @@ help:
 	@echo ""
 	@echo "Essential targets:"
 	@echo "  build             Build the MCP server binary"
+	@echo "  wire-gen          Generate Wire dependency injection code"
 	@echo "  test              Run unit tests"
 	@echo "  test-integration  Run integration tests"
 	@echo "  fmt               Format code"

@@ -2,8 +2,6 @@
 // This package must NOT import any infrastructure packages.
 package sampling
 
-import "context"
-
 // Request represents a sampling request with all supported parameters.
 type Request struct {
 	// Core parameters
@@ -45,39 +43,4 @@ type StreamChunk struct {
 	Model       string
 	IsFinal     bool
 	Error       error
-}
-
-// Sampler is the core interface for AI/LLM sampling operations.
-type Sampler interface {
-	// Sample performs a non-streaming sampling request.
-	Sample(ctx context.Context, req Request) (Response, error)
-
-	// Stream initiates a streaming sampling request.
-	// The returned channel will be closed when streaming completes or errors.
-	Stream(ctx context.Context, req Request) (<-chan StreamChunk, error)
-}
-
-// AnalysisSampler extends Sampler with analysis-specific methods.
-type AnalysisSampler interface {
-	Sampler
-
-	// AnalyzeDockerfile analyzes a Dockerfile for issues.
-	AnalyzeDockerfile(ctx context.Context, content string) (*DockerfileAnalysis, error)
-
-	// AnalyzeKubernetesManifest analyzes Kubernetes manifests.
-	AnalyzeKubernetesManifest(ctx context.Context, content string) (*ManifestAnalysis, error)
-
-	// AnalyzeSecurityScan analyzes security scan results.
-	AnalyzeSecurityScan(ctx context.Context, scanResults string) (*SecurityAnalysis, error)
-}
-
-// FixSampler extends Sampler with fix-specific methods.
-type FixSampler interface {
-	Sampler
-
-	// FixDockerfile attempts to fix issues in a Dockerfile.
-	FixDockerfile(ctx context.Context, content string, issues []string) (*DockerfileFix, error)
-
-	// FixKubernetesManifest attempts to fix issues in Kubernetes manifests.
-	FixKubernetesManifest(ctx context.Context, content string, issues []string) (*ManifestFix, error)
 }

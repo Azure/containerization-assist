@@ -41,7 +41,7 @@ type Dependencies struct {
 	StepEnhancer           *ml.StepEnhancer
 
 	// Infrastructure services
-	SamplingClient domainsampling.Sampler
+	SamplingClient domainsampling.UnifiedSampler
 	PromptManager  *prompts.Manager
 }
 
@@ -70,7 +70,7 @@ func WithSessionManager(sm session.SessionManager) Option {
 }
 
 // WithSamplingClient sets a custom sampling client
-func WithSamplingClient(client domainsampling.Sampler) Option {
+func WithSamplingClient(client domainsampling.UnifiedSampler) Option {
 	return func(d *Dependencies) {
 		d.SamplingClient = client
 	}

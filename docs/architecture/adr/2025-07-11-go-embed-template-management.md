@@ -36,16 +36,13 @@ func GetDockerfileTemplate(language string, framework string) (string, error) {
 ### Template Structure
 ```
 pkg/mcp/infrastructure/prompts/templates/
-├── analyze.yaml              # Repository analysis prompts
-├── build.yaml               # Docker build prompts
-├── deploy.yaml              # Kubernetes deployment prompts
-├── scan.yaml                # Security scanning prompts
-├── manifest.yaml            # Manifest generation prompts
-├── tag.yaml                 # Image tagging prompts
-├── push.yaml                # Registry push prompts
-├── cluster.yaml             # Cluster setup prompts
-├── verify.yaml              # Verification prompts
-└── workflow.yaml            # General workflow prompts
+├── dockerfile-fix.yaml           # Dockerfile fixing prompts
+├── dockerfile-generation.yaml   # Dockerfile generation prompts
+├── error-analysis.yaml          # Error analysis prompts
+├── kubernetes-manifest-fix.yaml # K8s manifest fixing prompts
+├── pod-crash-analysis.yaml      # Pod crash analysis prompts
+├── repository-analysis.yaml     # Repository analysis prompts
+└── security-scan-analysis.yaml  # Security scan analysis prompts
 ```
 
 ### Template Selection Logic
@@ -274,6 +271,6 @@ func (ts *TemplateSelector) CustomizeTemplate(template string, config *Customiza
 
 ## Related ADRs
 - ADR-001: Single Workflow Tool Architecture (template integration in workflow)
-- ADR-003: Manual Dependency Injection (template service dependencies)
+- ADR-003: Wire-Based Dependency Injection (template service dependencies)
 - ADR-004: Unified Rich Error System (template error handling)
 - ADR-006: Four-Layer MCP Architecture (templates in infrastructure layer)

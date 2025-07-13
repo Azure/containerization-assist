@@ -4,13 +4,15 @@ run:
   tests: true
 linters:
   disable:
-    - unused
-    - ineffassign      # Disable ineffectual assignment checks
     - depguard         # Disable import restrictions after simplification
   enable:
     - revive
     - staticcheck      # Enable advanced static analysis
     - errcheck         # Enable error checking
+    - unused           # Enable unused code detection
+    - deadcode         # Enable dead code detection
+    - ineffassign      # Enable ineffectual assignment detection
+    - gocyclo          # Enable cyclomatic complexity checks
 
 linters-settings:
   depguard:

@@ -112,13 +112,13 @@ type BuildProfile struct {
 
 // ResourcePredictor provides AI-powered resource prediction for builds
 type ResourcePredictor struct {
-	samplingClient domainsampling.Sampler
+	samplingClient domainsampling.UnifiedSampler
 	historyStore   *BuildHistoryStore
 	logger         *slog.Logger
 }
 
 // NewResourcePredictor creates a new resource predictor
-func NewResourcePredictor(samplingClient domainsampling.Sampler, logger *slog.Logger) *ResourcePredictor {
+func NewResourcePredictor(samplingClient domainsampling.UnifiedSampler, logger *slog.Logger) *ResourcePredictor {
 	return &ResourcePredictor{
 		samplingClient: samplingClient,
 		historyStore:   NewBuildHistoryStore(),
