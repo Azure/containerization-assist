@@ -200,20 +200,20 @@ runs:
         
         # Add to GitHub Actions summary if ratcheting opportunity exists
         if [[ "$RATCHET_OPPORTUNITY" == "true" ]]; then
-          cat >> $GITHUB_STEP_SUMMARY << EOF
-        ## 🎯 Quality Improvement Opportunity
-        
-        **🎉 Ratcheting Opportunity Detected!**
-        
-        Your code quality improvements have created an opportunity to tighten the error budget:
-        - **Current issues**: $CURRENT_ISSUES
-        - **Current budget**: 200  
-        - **Suggested new budget**: $SUGGESTED_BUDGET
-        
-        **To apply**: Update \`linting.error_budgets.combined.errors\` to \`$SUGGESTED_BUDGET\` in \`.github/quality-config.json\`
-        
-        This locks in your quality improvements and prevents regression! 🔒✨
-        EOF
+          {
+            echo "## 🎯 Quality Improvement Opportunity"
+            echo ""
+            echo "**🎉 Ratcheting Opportunity Detected!**"
+            echo ""
+            echo "Your code quality improvements have created an opportunity to tighten the error budget:"
+            echo "- **Current issues**: $CURRENT_ISSUES"
+            echo "- **Current budget**: 200"
+            echo "- **Suggested new budget**: $SUGGESTED_BUDGET"
+            echo ""
+            echo "**To apply**: Update \`linting.error_budgets.combined.errors\` to \`$SUGGESTED_BUDGET\` in \`.github/quality-config.json\`"
+            echo ""
+            echo "This locks in your quality improvements and prevents regression! 🔒✨"
+          } >> $GITHUB_STEP_SUMMARY
         fi
         
         # Clean up temp files
@@ -374,27 +374,27 @@ runs:
           ADAPTERS=$(jq -r '.abstractions.adapters' quality-metrics.json)
           TOP_DIRS=$(jq -r '.structure.top_level_dirs' quality-metrics.json)
           
-          cat >> $GITHUB_STEP_SUMMARY << EOF
-
-## 📊 Quality Metrics Summary
-
-### Code Size
-- **Total LOC**: $TOTAL_LOC
-- **Test LOC**: $TEST_LOC  
-- **Average LOC/file**: $AVG_LOC
-
-### Complexity Distribution
-- **Functions > 30**: $COMPLEX_30
-- **Functions > 20**: $COMPLEX_20
-- **Functions > 15**: $COMPLEX_15
-
-### Architecture Health
-- **Architecture Score**: $ARCH_SCORE/100
-- **Interfaces**: $INTERFACES
-- **Adapters**: $ADAPTERS
-- **Top-level dirs**: $TOP_DIRS (target: 4)
-
-EOF
+          {
+            echo ""
+            echo "## 📊 Quality Metrics Summary"
+            echo ""
+            echo "### Code Size"
+            echo "- **Total LOC**: $TOTAL_LOC"
+            echo "- **Test LOC**: $TEST_LOC"
+            echo "- **Average LOC/file**: $AVG_LOC"
+            echo ""
+            echo "### Complexity Distribution"
+            echo "- **Functions > 30**: $COMPLEX_30"
+            echo "- **Functions > 20**: $COMPLEX_20"
+            echo "- **Functions > 15**: $COMPLEX_15"
+            echo ""
+            echo "### Architecture Health"
+            echo "- **Architecture Score**: $ARCH_SCORE/100"
+            echo "- **Interfaces**: $INTERFACES"
+            echo "- **Adapters**: $ADAPTERS"
+            echo "- **Top-level dirs**: $TOP_DIRS (target: 4)"
+            echo ""
+          } >> $GITHUB_STEP_SUMMARY
         fi
         
         # Upload metrics as artifact
