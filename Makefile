@@ -29,7 +29,7 @@ mcp:
 wire-gen:
 	@echo "Generating Wire dependency injection code..."
 	@which wire > /dev/null || go install github.com/google/wire/cmd/wire@latest
-	@cd pkg/wire && go generate
+	@cd pkg/mcp/infrastructure/wire && go generate
 	@echo "✅ Wire code generated"
 
 # Essential development tasks
