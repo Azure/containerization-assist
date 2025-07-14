@@ -1,18 +1,22 @@
-// Package workflow contains individual workflow step implementations.
-package workflow
+// Package steps contains individual workflow step implementations.
+package steps
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps"
+	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 )
+
+func init() {
+	Register(NewDockerfileStep())
+}
 
 // DockerfileStep implements Dockerfile generation
 type DockerfileStep struct{}
 
 // NewDockerfileStep creates a new dockerfile step
-func NewDockerfileStep() Step {
+func NewDockerfileStep() workflow.Step {
 	return &DockerfileStep{}
 }
 
@@ -27,7 +31,7 @@ func (s *DockerfileStep) MaxRetries() int {
 }
 
 // Execute generates a Dockerfile
-func (s *DockerfileStep) Execute(ctx context.Context, state *WorkflowState) error {
+func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
 	if state.AnalyzeResult == nil {
 		return fmt.Errorf("analyze result is required for Dockerfile generation")
 	}
@@ -35,7 +39,7 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *WorkflowState) erro
 	state.Logger.Info("Step 2: Generating Dockerfile")
 
 	// Convert workflow analyze result to infrastructure type
-	infraAnalyzeResult := &steps.AnalyzeResult{
+	infraAnalyzeResult := &AnalyzeResult{
 		Language:  state.AnalyzeResult.Language,
 		Framework: state.AnalyzeResult.Framework,
 		Port:      state.AnalyzeResult.Port,
@@ -43,7 +47,7 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *WorkflowState) erro
 		RepoPath:  state.AnalyzeResult.RepoPath,
 	}
 
-	dockerfileResult, err := steps.GenerateDockerfile(infraAnalyzeResult, state.Logger)
+	dockerfileResult, err := GenerateDockerfile(infraAnalyzeResult, state.Logger)
 	if err != nil {
 		return fmt.Errorf("dockerfile generation failed: %v", err)
 	}
@@ -51,7 +55,7 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *WorkflowState) erro
 	state.Logger.Info("Dockerfile generation completed", "path", dockerfileResult.Path)
 
 	// Convert to workflow type
-	state.DockerfileResult = &DockerfileResult{
+	state.DockerfileResult = &workflow.DockerfileResult{
 		Content:     dockerfileResult.Content,
 		Path:        dockerfileResult.Path,
 		BaseImage:   dockerfileResult.BaseImage,

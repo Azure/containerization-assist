@@ -1,19 +1,23 @@
-// Package workflow contains individual workflow step implementations.
-package workflow
+// Package steps contains individual workflow step implementations.
+package steps
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps"
+	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/mark3labs/mcp-go/server"
 )
+
+func init() {
+	Register(NewAnalyzeStep())
+}
 
 // AnalyzeStep implements repository analysis
 type AnalyzeStep struct{}
 
 // NewAnalyzeStep creates a new analyze step
-func NewAnalyzeStep() Step {
+func NewAnalyzeStep() workflow.Step {
 	return &AnalyzeStep{}
 }
 
@@ -28,11 +32,11 @@ func (s *AnalyzeStep) MaxRetries() int {
 }
 
 // Execute performs repository analysis
-func (s *AnalyzeStep) Execute(ctx context.Context, state *WorkflowState) error {
+func (s *AnalyzeStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
 	state.Logger.Info("Step 1: Analyzing repository", "repo_url", state.Args.RepoURL)
 
 	// Perform basic repository analysis
-	analyzeResult, err := steps.AnalyzeRepository(state.Args.RepoURL, state.Args.Branch, state.Logger)
+	analyzeResult, err := AnalyzeRepository(state.Args.RepoURL, state.Args.Branch, state.Logger)
 	if err != nil {
 		return fmt.Errorf("repository analysis failed: %v", err)
 	}
@@ -45,7 +49,7 @@ func (s *AnalyzeStep) Execute(ctx context.Context, state *WorkflowState) error {
 	// Enhance analysis with AI if available (skip in test mode)
 	if server.ServerFromContext(ctx) != nil && !state.Args.TestMode {
 		state.Logger.Info("Enhancing repository analysis with AI")
-		enhancedResult, enhanceErr := steps.EnhanceRepositoryAnalysis(ctx, analyzeResult, state.Logger)
+		enhancedResult, enhanceErr := EnhanceRepositoryAnalysis(ctx, analyzeResult, state.Logger)
 		if enhanceErr == nil {
 			analyzeResult = enhancedResult
 			state.Logger.Info("Repository analysis enhanced by AI",
@@ -56,7 +60,7 @@ func (s *AnalyzeStep) Execute(ctx context.Context, state *WorkflowState) error {
 	}
 
 	// Convert to workflow type
-	state.AnalyzeResult = &AnalyzeResult{
+	state.AnalyzeResult = &workflow.AnalyzeResult{
 		Language:  analyzeResult.Language,
 		Framework: analyzeResult.Framework,
 		Port:      analyzeResult.Port,

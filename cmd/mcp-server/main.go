@@ -17,6 +17,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/application"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	_ "github.com/Azure/container-kit/pkg/mcp/infrastructure/wire" // Wire initialization
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -257,24 +258,13 @@ func createAndConfigureServer(config workflow.ServerConfig, flags *FlagConfig) (
 	// Create slog logger for dependency injection
 	slogLogger := createSlogLogger(config.LogLevel)
 
-	// Create server using functional options pattern
-	// The server will handle creating its own internal dependencies
-	mcpServer := application.NewServer(
-		application.WithLogger(slogLogger),
-		application.WithWorkspace(config.WorkspaceDir),
-		application.WithMaxSessions(config.MaxSessions),
-		application.WithSessionTTL(config.SessionTTL),
-		application.WithMaxDiskPerSession(config.MaxDiskPerSession),
-		application.WithTotalDiskLimit(config.TotalDiskLimit),
-		application.WithStorePath(config.StorePath),
-		application.WithTransport(config.TransportType),
-		application.WithHTTPAddress(config.HTTPAddr),
-		application.WithHTTPPort(config.HTTPPort),
-		application.WithCORSOrigins(config.CORSOrigins),
-		application.WithLogLevel(config.LogLevel),
+	// Create server using Wire dependency injection
+	ctx := context.Background()
+	mcpServer, err := application.NewMCPServer(ctx, slogLogger,
+		application.WithConfig(config),
 	)
-	if mcpServer == nil {
-		return nil, fmt.Errorf("server is nil despite no error")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create MCP server: %w", err)
 	}
 
 	// Note: Conversation mode removed - focusing on workflow-only operation

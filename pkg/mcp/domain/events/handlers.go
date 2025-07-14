@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/util"
 )
 
 // ProgressEventHandler updates progress tracking based on workflow events
@@ -106,7 +106,6 @@ func GetGlobalWorkflowMetrics() *WorkflowMetrics {
 // MetricsEventHandler collects metrics from workflow events
 type MetricsEventHandler struct {
 	logger          *slog.Logger
-	samplingMetrics *sampling.MetricsCollector
 	workflowMetrics *WorkflowMetrics
 }
 
@@ -114,7 +113,6 @@ type MetricsEventHandler struct {
 func NewMetricsEventHandler(logger *slog.Logger) *MetricsEventHandler {
 	return &MetricsEventHandler{
 		logger:          logger.With("component", "metrics_event_handler"),
-		samplingMetrics: sampling.GetGlobalMetrics(),
 		workflowMetrics: GetGlobalWorkflowMetrics(),
 	}
 }
@@ -205,15 +203,5 @@ type EventUtils struct{}
 
 // GenerateEventID creates a unique event ID
 func (EventUtils) GenerateEventID() string {
-	return time.Now().Format("20060102150405") + "-" + generateRandomString(6)
-}
-
-// generateRandomString creates a random string for event IDs
-func generateRandomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[time.Now().UnixNano()%int64(len(charset))]
-	}
-	return string(b)
+	return time.Now().Format("20060102150405") + "-" + util.ShortID()
 }

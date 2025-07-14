@@ -19,6 +19,9 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/prompts"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/resources"
 	sampling2 "github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps/optimized"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/tracing"
 	"github.com/google/wire"
 	"log/slog"
 	"os"
@@ -31,19 +34,26 @@ import (
 // InitializeServer creates a fully wired MCP server
 func InitializeServer(logger *slog.Logger) (api.MCPServer, error) {
 	serverConfig := ProvideDefaultServerConfig()
-	sessionManager := ProvideSessionManager(serverConfig, logger)
+	optimizedSessionManager := ProvideSessionManager(serverConfig, logger)
 	store := ProvideResourceStore(logger)
 	sinkFactory := ProvideProgressFactory(logger)
 	publisher := events.NewPublisher(logger)
 	sagaCoordinator := saga.NewSagaCoordinator(logger, publisher)
-	orchestrator := ProvideOrchestrator(logger)
-	eventOrchestrator := ProvideEventOrchestrator(logger, publisher)
-	sagaOrchestrator := ProvideSagaOrchestrator(logger, publisher, sagaCoordinator)
+	stepProvider := steps.ProvideStepProvider()
 	client, err := ProvideSamplingClient(logger)
 	if err != nil {
 		return nil, err
 	}
 	domainAdapter := provideDomainSampler(client)
+	optimizedBuildStep := ml.ProvideOptimizedBuildStep(domainAdapter, logger)
+	buildOptimizer := optimized.ProvideBuildOptimizer(optimizedBuildStep)
+	step := optimized.ProvideOptimizedBuildStep(optimizedBuildStep)
+	stepFactory := workflow.ProvideStepFactory(stepProvider, buildOptimizer, step, logger)
+	tracer := tracing.NewTracerAdapter()
+	orchestrator := workflow.ProvideOrchestrator(stepFactory, sinkFactory, tracer, logger)
+	workflowOrchestrator := workflow.ProvideWorkflowOrchestrator(orchestrator)
+	eventAwareOrchestrator := workflow.ProvideEventOrchestrator(orchestrator, publisher)
+	sagaAwareOrchestrator := workflow.ProvideSagaOrchestrator(eventAwareOrchestrator, sagaCoordinator, logger)
 	errorPatternRecognizer := ml.ProvideErrorPatternRecognizer(domainAdapter, logger)
 	enhancedErrorHandler := ml.ProvideEnhancedErrorHandler(domainAdapter, publisher, logger)
 	stepEnhancer := ml.ProvideStepEnhancer(enhancedErrorHandler, logger)
@@ -54,14 +64,14 @@ func InitializeServer(logger *slog.Logger) (api.MCPServer, error) {
 	dependencies := &application.Dependencies{
 		Logger:                 logger,
 		Config:                 serverConfig,
-		SessionManager:         sessionManager,
+		SessionManager:         optimizedSessionManager,
 		ResourceStore:          store,
 		ProgressFactory:        sinkFactory,
 		EventPublisher:         publisher,
 		SagaCoordinator:        sagaCoordinator,
-		Orchestrator:           orchestrator,
-		EventOrchestrator:      eventOrchestrator,
-		SagaOrchestrator:       sagaOrchestrator,
+		WorkflowOrchestrator:   workflowOrchestrator,
+		EventAwareOrchestrator: eventAwareOrchestrator,
+		SagaAwareOrchestrator:  sagaAwareOrchestrator,
 		ErrorPatternRecognizer: errorPatternRecognizer,
 		EnhancedErrorHandler:   enhancedErrorHandler,
 		StepEnhancer:           stepEnhancer,
@@ -74,19 +84,26 @@ func InitializeServer(logger *slog.Logger) (api.MCPServer, error) {
 
 // InitializeServerWithConfig creates a fully wired MCP server with custom config
 func InitializeServerWithConfig(logger *slog.Logger, config workflow.ServerConfig) (api.MCPServer, error) {
-	sessionManager := ProvideSessionManager(config, logger)
+	optimizedSessionManager := ProvideSessionManager(config, logger)
 	store := ProvideResourceStore(logger)
 	sinkFactory := ProvideProgressFactory(logger)
 	publisher := events.NewPublisher(logger)
 	sagaCoordinator := saga.NewSagaCoordinator(logger, publisher)
-	orchestrator := ProvideOrchestrator(logger)
-	eventOrchestrator := ProvideEventOrchestrator(logger, publisher)
-	sagaOrchestrator := ProvideSagaOrchestrator(logger, publisher, sagaCoordinator)
+	stepProvider := steps.ProvideStepProvider()
 	client, err := ProvideSamplingClient(logger)
 	if err != nil {
 		return nil, err
 	}
 	domainAdapter := provideDomainSampler(client)
+	optimizedBuildStep := ml.ProvideOptimizedBuildStep(domainAdapter, logger)
+	buildOptimizer := optimized.ProvideBuildOptimizer(optimizedBuildStep)
+	step := optimized.ProvideOptimizedBuildStep(optimizedBuildStep)
+	stepFactory := workflow.ProvideStepFactory(stepProvider, buildOptimizer, step, logger)
+	tracer := tracing.NewTracerAdapter()
+	orchestrator := workflow.ProvideOrchestrator(stepFactory, sinkFactory, tracer, logger)
+	workflowOrchestrator := workflow.ProvideWorkflowOrchestrator(orchestrator)
+	eventAwareOrchestrator := workflow.ProvideEventOrchestrator(orchestrator, publisher)
+	sagaAwareOrchestrator := workflow.ProvideSagaOrchestrator(eventAwareOrchestrator, sagaCoordinator, logger)
 	errorPatternRecognizer := ml.ProvideErrorPatternRecognizer(domainAdapter, logger)
 	enhancedErrorHandler := ml.ProvideEnhancedErrorHandler(domainAdapter, publisher, logger)
 	stepEnhancer := ml.ProvideStepEnhancer(enhancedErrorHandler, logger)
@@ -97,14 +114,14 @@ func InitializeServerWithConfig(logger *slog.Logger, config workflow.ServerConfi
 	dependencies := &application.Dependencies{
 		Logger:                 logger,
 		Config:                 config,
-		SessionManager:         sessionManager,
+		SessionManager:         optimizedSessionManager,
 		ResourceStore:          store,
 		ProgressFactory:        sinkFactory,
 		EventPublisher:         publisher,
 		SagaCoordinator:        sagaCoordinator,
-		Orchestrator:           orchestrator,
-		EventOrchestrator:      eventOrchestrator,
-		SagaOrchestrator:       sagaOrchestrator,
+		WorkflowOrchestrator:   workflowOrchestrator,
+		EventAwareOrchestrator: eventAwareOrchestrator,
+		SagaAwareOrchestrator:  sagaAwareOrchestrator,
 		ErrorPatternRecognizer: errorPatternRecognizer,
 		EnhancedErrorHandler:   enhancedErrorHandler,
 		StepEnhancer:           stepEnhancer,
@@ -126,35 +143,30 @@ var ConfigurationSet = wire.NewSet(
 var ApplicationSet = wire.NewSet(
 	ProvideSessionManager,
 	ProvideResourceStore,
-	ProvideProgressFactory,
 )
 
 // InfrastructureSet - Infrastructure layer dependencies
 var InfrastructureSet = wire.NewSet(
 	ProvideSamplingClient,
 	ProvidePromptManager,
-	provideDomainSampler, wire.Bind(new(sampling.UnifiedSampler), new(*sampling2.DomainAdapter)),
+	provideDomainSampler, wire.Bind(new(sampling.UnifiedSampler), new(*sampling2.DomainAdapter)), steps.ProvideStepProvider, tracing.NewTracerAdapter,
 )
 
 // DomainSet - Domain services and events
 var DomainSet = wire.NewSet(events.NewPublisher, saga.NewSagaCoordinator)
 
 // WorkflowSet - Workflow orchestration (simplified for now)
-var WorkflowSet = wire.NewSet(
-	ProvideOrchestrator,
-	ProvideEventOrchestrator,
-	ProvideSagaOrchestrator,
-)
+var WorkflowSet = wire.NewSet(optimized.ProvideOptimizedBuildStep, optimized.ProvideBuildOptimizer, workflow.ProvideStepFactory, workflow.ProvideOrchestrator, workflow.ProvideEventOrchestrator, workflow.ProvideSagaOrchestrator, workflow.ProvideWorkflowOrchestrator, ProvideProgressFactory, wire.Bind(new(workflow.ProgressTrackerFactory), new(*progress.SinkFactory)))
 
 // MLSet - Machine learning and enhanced capabilities (optional)
-var MLSet = wire.NewSet(ml.ProvideErrorPatternRecognizer, ml.ProvideEnhancedErrorHandler, ml.ProvideStepEnhancer)
+var MLSet = wire.NewSet(ml.ProvideErrorPatternRecognizer, ml.ProvideEnhancedErrorHandler, ml.ProvideStepEnhancer, ml.ProvideOptimizedBuildStep)
 
 // AppSet - Main application dependencies using wire.Struct
 var AppSet = wire.NewSet(wire.Struct(
 	new(application.Dependencies),
 	"Logger", "Config", "SessionManager", "ResourceStore",
 	"ProgressFactory", "EventPublisher", "SagaCoordinator",
-	"Orchestrator", "EventOrchestrator", "SagaOrchestrator",
+	"WorkflowOrchestrator", "EventAwareOrchestrator", "SagaAwareOrchestrator",
 	"ErrorPatternRecognizer", "EnhancedErrorHandler", "StepEnhancer",
 	"SamplingClient", "PromptManager",
 ),
@@ -239,8 +251,8 @@ func ProvideTransportType() string {
 	return "stdio"
 }
 
-func ProvideSessionManager(config workflow.ServerConfig, logger *slog.Logger) session.SessionManager {
-	return session.NewMemorySessionManager(logger, config.SessionTTL, config.MaxSessions)
+func ProvideSessionManager(config workflow.ServerConfig, logger *slog.Logger) session.OptimizedSessionManager {
+	return session.NewOptimizedSessionManager(logger, config.SessionTTL, config.MaxSessions)
 }
 
 func ProvideResourceStore(logger *slog.Logger) *resources.Store {
@@ -253,7 +265,7 @@ func ProvideProgressFactory(logger *slog.Logger) *progress.SinkFactory {
 
 func ProvideSamplingClient(logger *slog.Logger) (*sampling2.Client, error) {
 
-	if os.Getenv("AZURE_OPENAI_ENDPOINT") != "" && os.Getenv("AZURE_OPENAI_KEY") != "" {
+	if os.Getenv("SAMPLING_MAX_TOKENS") != "" || os.Getenv("SAMPLING_TEMPERATURE") != "" {
 		return sampling2.NewClientFromEnv(logger)
 	}
 	return sampling2.NewClient(logger), nil
@@ -272,18 +284,6 @@ func provideDomainSampler(client *sampling2.Client) *sampling2.DomainAdapter {
 	return sampling2.NewDomainAdapter(client)
 }
 
-func ProvideOrchestrator(logger *slog.Logger) *workflow.Orchestrator {
-	return workflow.NewOrchestrator(logger)
-}
-
-func ProvideEventOrchestrator(logger *slog.Logger, eventPublisher *events.Publisher) *workflow.EventOrchestrator {
-	return workflow.NewEventOrchestrator(logger, eventPublisher)
-}
-
-func ProvideSagaOrchestrator(logger *slog.Logger, eventPublisher *events.Publisher, sagaCoordinator *saga.SagaCoordinator) *workflow.SagaOrchestrator {
-	return workflow.NewSagaOrchestrator(logger, eventPublisher, sagaCoordinator)
-}
-
 func ProvideServer(deps *application.Dependencies) api.MCPServer {
-	return application.NewServer(application.WithDependencies(deps))
+	return application.NewMCPServerFromDeps(deps)
 }

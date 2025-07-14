@@ -9,8 +9,15 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/events"
+	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
 	"github.com/mark3labs/mcp-go/mcp"
 )
+
+// noOpSink is a no-operation sink for fallback cases
+type noOpEventSink struct{}
+
+func (n *noOpEventSink) Publish(ctx context.Context, u progress.Update) error { return nil }
+func (n *noOpEventSink) Close() error                                         { return nil }
 
 // EventOrchestrator extends the basic orchestrator with event publishing capabilities
 type EventOrchestrator struct {
@@ -57,8 +64,17 @@ func (o *EventOrchestrator) Execute(ctx context.Context, req *mcp.CallToolReques
 		// Continue execution despite event publishing failure
 	}
 
+	// Create progress tracker
+	var progressTracker *progress.Tracker
+	if o.Orchestrator.progressFactory != nil {
+		progressTracker = o.Orchestrator.progressFactory.CreateTracker(ctx, req, 10) // 10 steps
+	} else {
+		// Fallback: create a minimal tracker if no factory provided
+		progressTracker = progress.NewTracker(ctx, 10, &noOpEventSink{})
+	}
+
 	// Initialize workflow state with workflow ID
-	state := NewWorkflowState(ctx, req, args, o.logger)
+	state := NewWorkflowState(ctx, req, args, progressTracker, o.logger)
 	state.WorkflowID = workflowID // Add workflow ID to state
 	defer state.ProgressTracker.Finish()
 
@@ -76,7 +92,7 @@ func (o *EventOrchestrator) Execute(ctx context.Context, req *mcp.CallToolReques
 			"step_name", step.Name(),
 			"total_steps", len(o.steps))
 
-		if err := o.executeStepWithRetry(ctx, step, state); err != nil {
+		if err := o.stepExecutor(ctx, step, state); err != nil {
 			// Publish step failed event
 			progress := float64(state.ProgressTracker.GetCurrent()) / float64(state.ProgressTracker.GetTotal()) * 100
 			o.publishStepCompletedEvent(ctx, workflowID, step, stepNumber, len(o.steps),

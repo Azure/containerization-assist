@@ -5,16 +5,91 @@ run:
 linters:
   disable:
     - depguard         # Disable import restrictions after simplification
+    - exhaustruct      # Disable exhaustive struct checking (too noisy)
+    - nlreturn         # Disable new line return rule (too strict)
+    - wsl              # Disable whitespace linting (too opinionated)
   enable:
-    - revive
-    - staticcheck      # Enable advanced static analysis
-    - errcheck         # Enable error checking
-    - unused           # Enable unused code detection
-    - deadcode         # Enable dead code detection
-    - ineffassign      # Enable ineffectual assignment detection
-    - gocyclo          # Enable cyclomatic complexity checks
+    # Core static analysis
+    - revive           # Enhanced go lint
+    - staticcheck      # Advanced static analysis
+    - errcheck         # Error checking
+    - unused           # Unused code detection
+    - deadcode         # Dead code detection
+    - ineffassign      # Ineffectual assignment detection
+    - gocyclo          # Cyclomatic complexity checks
+    
+    # Security and bug prevention
+    - gosec            # Security analysis
+    - bodyclose        # Check HTTP body close
+    - rowserrcheck     # Check SQL row errors
+    - sqlclosecheck    # Check SQL close
+    - nilerr           # Check nil errors
+    
+    # Code quality and style
+    - gofmt            # Proper formatting
+    - goimports        # Import organization
+    - misspell         # Spelling mistakes
+    - unconvert        # Remove unnecessary conversions
+    - unparam          # Detect unused parameters
+    - prealloc         # Preallocate slices
+    
+    # Performance
+    - gocritic         # Performance and style checks
+    - maligned         # Struct alignment
+    
+    # Maintainability  
+    - dupl             # Duplicate code detection
+    - goconst          # Repeated strings detection
+    - gomodguard       # Module dependencies guard
+    - exportloopref    # Loop variable capture
+    
+    # Testing
+    - testpackage      # Test package naming
 
 linters-settings:
+  # Complexity settings
+  gocyclo:
+    min-complexity: 15
+  
+  # Function length limits
+  funlen:
+    lines: 100
+    statements: 50
+    
+  # Cognitive complexity
+  gocognit:
+    min-complexity: 20
+    
+  # Security settings
+  gosec:
+    excludes:
+      - G304 # File path from variable - many legitimate uses
+      - G404 # Weak random number generator - not all uses need crypto/rand
+      
+  # Code duplication
+  dupl:
+    threshold: 150
+    
+  # Performance settings
+  gocritic:
+    disabled-checks:
+      - commentFormat  # Too opinionated
+      - whyNoLint     # Not needed with our approach
+    enabled-tags:
+      - performance
+      - style
+      - experimental
+      
+  # Constants detection
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+    
+  # Misspelling
+  misspell:
+    locale: US
+    
+  # Import restrictions (if re-enabled later)
   depguard:
     rules:
       main:
@@ -24,6 +99,7 @@ linters-settings:
           - "$gostd"
           - "github.com/Azure/container-kit"
           - "github.com/localrivet/gomcp"
+          - "github.com/mark3labs/mcp-go"
           - "github.com/rs/zerolog"
           - "github.com/stretchr/testify"
           - "github.com/joho/godotenv"

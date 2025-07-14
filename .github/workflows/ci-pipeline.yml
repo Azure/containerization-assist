@@ -176,6 +176,16 @@ jobs:
       with:
         go-version: '1.24.4'
         target-paths: './pkg/mcp/... ./pkg/core/...'
+        
+    - name: Upload Quality Metrics
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: quality-metrics-${{ github.run_id }}
+        path: |
+          quality-metrics.json
+          metrics-output/
+        retention-days: 30
 
   # Unit tests - depends on build completion
   test:
@@ -199,11 +209,63 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-
         
-    - name: Unit Tests
-      run: go test -race -coverprofile=coverage.out ./pkg/mcp/... ./pkg/core/...
+    - name: Unit Tests with Race Detection
+      run: |
+        echo "🏃 Running unit tests with race detection..."
+        go test -race -coverprofile=coverage.out ./pkg/mcp/... ./pkg/core/...
+        
+        # Check for race conditions in test output
+        if grep -q "WARNING: DATA RACE" coverage.out 2>/dev/null; then
+          echo "❌ Data races detected in tests!"
+          exit 1
+        else
+          echo "✅ No data races detected"
+        fi
       
-    - name: Test Coverage
-      run: go tool cover -func=coverage.out
+    - name: Test Coverage Analysis
+      run: |
+        echo "📊 Analyzing test coverage..."
+        
+        # Generate coverage report
+        go tool cover -func=coverage.out > coverage-report.txt
+        go tool cover -html=coverage.out -o coverage.html
+        
+        # Extract overall coverage percentage
+        OVERALL_COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+        echo "Overall coverage: ${OVERALL_COVERAGE}%"
+        
+        # Load coverage thresholds from config
+        OVERALL_TARGET=70
+        OVERALL_MINIMUM=50
+        if [ -f ".github/quality-config.json" ]; then
+          OVERALL_TARGET=$(jq -r '.test_coverage.overall_target // 70' .github/quality-config.json)
+          OVERALL_MINIMUM=$(jq -r '.test_coverage.overall_minimum // 50' .github/quality-config.json)
+        fi
+        
+        echo "Coverage targets: minimum=${OVERALL_MINIMUM}%, target=${OVERALL_TARGET}%"
+        
+        # Check against minimum threshold
+        if (( $(echo "$OVERALL_COVERAGE < $OVERALL_MINIMUM" | bc -l 2>/dev/null || echo 0) )); then
+          echo "❌ Coverage ${OVERALL_COVERAGE}% below minimum threshold ${OVERALL_MINIMUM}%"
+          exit 1
+        elif (( $(echo "$OVERALL_COVERAGE < $OVERALL_TARGET" | bc -l 2>/dev/null || echo 0) )); then
+          echo "⚠️ Coverage ${OVERALL_COVERAGE}% below target ${OVERALL_TARGET}% but above minimum"
+        else
+          echo "✅ Coverage ${OVERALL_COVERAGE}% meets target ${OVERALL_TARGET}%"
+        fi
+        
+        # Store coverage for status reporting
+        echo "COVERAGE_PERCENTAGE=${OVERALL_COVERAGE}" >> $GITHUB_ENV
+        
+    - name: Upload Coverage Report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report-${{ github.run_id }}
+        path: |
+          coverage.out
+          coverage.html
+        retention-days: 30
 
   # MCP Integration tests - lightweight and fast
   mcp-integration:

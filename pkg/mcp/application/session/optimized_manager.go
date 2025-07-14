@@ -58,6 +58,14 @@ type sessionSweeper struct {
 	doneCh   chan struct{}
 }
 
+// sessionEntry represents a session with its metadata
+type sessionEntry struct {
+	*SessionState
+	expiresAt  time.Time
+	labels     map[string]string
+	lastAccess time.Time
+}
+
 // NewOptimizedSessionManager creates a new streamlined session manager
 func NewOptimizedSessionManager(logger *slog.Logger, defaultTTL time.Duration, maxSessions int) OptimizedSessionManager {
 	manager := &optimizedSessionManager{

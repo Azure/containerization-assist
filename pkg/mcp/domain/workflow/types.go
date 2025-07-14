@@ -1,3 +1,19 @@
+// Package workflow provides domain types and interfaces for containerization workflow operations.
+// This package contains the core business logic for orchestrating containerization workflows,
+// including step execution, progress tracking, and error handling.
+//
+// The workflow domain follows a clean architecture pattern where:
+//   - Orchestrator manages the overall workflow execution
+//   - Steps implement individual workflow operations
+//   - State maintains workflow context across steps
+//   - Progress tracks workflow execution status
+//
+// Key workflow capabilities:
+//   - Multi-step containerization process (analyze, build, deploy, etc.)
+//   - Progress tracking with real-time updates
+//   - Error recovery with intelligent retry logic
+//   - OpenTelemetry tracing integration
+//   - Session persistence for long-running workflows
 package workflow
 
 import (
@@ -5,28 +21,43 @@ import (
 	"time"
 )
 
-// TypedArgs represents strongly typed tool arguments
+// TypedArgs represents strongly typed tool arguments for MCP tool invocations.
+// This provides a type-safe wrapper around raw JSON data while maintaining
+// flexibility for different argument structures.
 type TypedArgs struct {
+	// Data contains the raw JSON payload for the tool arguments
 	Data json.RawMessage `json:"data"`
 }
 
-// TypedResult represents strongly typed tool results
+// TypedResult represents strongly typed tool results returned from MCP tool executions.
+// This standardizes the response format across all workflow tools while allowing
+// flexible data payloads.
 type TypedResult struct {
-	Success bool            `json:"success"`
-	Data    json.RawMessage `json:"data,omitempty"`
-	Error   string          `json:"error,omitempty"`
+	// Success indicates whether the tool execution completed successfully
+	Success bool `json:"success"`
+	// Data contains the tool's result payload as raw JSON
+	Data json.RawMessage `json:"data,omitempty"`
+	// Error contains the error message if execution failed
+	Error string `json:"error,omitempty"`
 }
 
-// ChatArgs represents typed arguments for chat operations
+// ChatArgs represents typed arguments for chat-based workflow interactions.
+// This enables conversational interfaces for workflow operations and debugging.
 type ChatArgs struct {
-	Message   string            `json:"message"`
-	SessionID string            `json:"session_id,omitempty"`
-	Context   map[string]string `json:"context,omitempty"`
+	// Message is the user's input message or query
+	Message string `json:"message"`
+	// SessionID identifies the chat session for context continuity
+	SessionID string `json:"session_id,omitempty"`
+	// Context provides additional metadata for the conversation
+	Context map[string]string `json:"context,omitempty"`
 }
 
-// WorkflowArgs represents typed arguments for workflow operations
+// WorkflowArgs represents typed arguments for workflow operations.
+// This provides a generic structure for workflow-level configuration and execution.
 type WorkflowArgs struct {
-	WorkflowName string            `json:"workflow_name,omitempty"`
+	// WorkflowName identifies the type of workflow to execute
+	WorkflowName string `json:"workflow_name,omitempty"`
+	// WorkflowSpec contains the workflow configuration as raw JSON
 	WorkflowSpec json.RawMessage   `json:"workflow_spec,omitempty"`
 	Variables    map[string]string `json:"variables,omitempty"`
 	Options      WorkflowOptions   `json:"options,omitempty"`

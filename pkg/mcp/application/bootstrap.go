@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/application/session"
 	"github.com/Azure/container-kit/pkg/mcp/domain/events"
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
@@ -22,7 +23,7 @@ type Dependencies struct {
 	// Core services
 	Logger         *slog.Logger
 	Config         workflow.ServerConfig
-	SessionManager session.SessionManager
+	SessionManager session.OptimizedSessionManager
 	ResourceStore  *resources.Store
 
 	// Domain services
@@ -31,9 +32,9 @@ type Dependencies struct {
 	SagaCoordinator *saga.SagaCoordinator
 
 	// Workflow orchestrators
-	Orchestrator      *workflow.Orchestrator
-	EventOrchestrator *workflow.EventOrchestrator
-	SagaOrchestrator  *workflow.SagaOrchestrator
+	WorkflowOrchestrator   workflow.WorkflowOrchestrator
+	EventAwareOrchestrator workflow.EventAwareOrchestrator
+	SagaAwareOrchestrator  workflow.SagaAwareOrchestrator
 
 	// AI/ML services
 	ErrorPatternRecognizer *ml.ErrorPatternRecognizer
@@ -63,7 +64,7 @@ func WithConfig(config workflow.ServerConfig) Option {
 }
 
 // WithSessionManager sets a custom session manager
-func WithSessionManager(sm session.SessionManager) Option {
+func WithSessionManager(sm session.OptimizedSessionManager) Option {
 	return func(d *Dependencies) {
 		d.SessionManager = sm
 	}
@@ -211,7 +212,7 @@ func NewDependencies(opts ...Option) *Dependencies {
 
 	// Create session manager if not provided
 	if d.SessionManager == nil {
-		d.SessionManager = session.NewMemorySessionManager(
+		d.SessionManager = session.NewOptimizedSessionManager(
 			baseLogger.With("service", "session"),
 			d.Config.SessionTTL,
 			d.Config.MaxSessions,
@@ -270,19 +271,19 @@ func NewDependencies(opts ...Option) *Dependencies {
 	}
 
 	// Create orchestrators if not provided
-	if d.Orchestrator == nil {
-		d.Orchestrator = workflow.NewOrchestrator(baseLogger.With("service", "orchestrator"))
+	if d.WorkflowOrchestrator == nil {
+		d.WorkflowOrchestrator = workflow.NewOrchestrator(baseLogger.With("service", "orchestrator"))
 	}
 
-	if d.EventOrchestrator == nil {
-		d.EventOrchestrator = workflow.NewEventOrchestrator(
+	if d.EventAwareOrchestrator == nil {
+		d.EventAwareOrchestrator = workflow.NewEventOrchestrator(
 			baseLogger.With("service", "event-orchestrator"),
 			d.EventPublisher,
 		)
 	}
 
-	if d.SagaOrchestrator == nil {
-		d.SagaOrchestrator = workflow.NewSagaOrchestrator(
+	if d.SagaAwareOrchestrator == nil {
+		d.SagaAwareOrchestrator = workflow.NewSagaOrchestrator(
 			baseLogger.With("service", "saga-orchestrator"),
 			d.EventPublisher,
 			d.SagaCoordinator,
@@ -345,6 +346,15 @@ type ToolDefinition struct {
 func NewServer(opts ...Option) *serverImpl {
 	deps := NewDependencies(opts...)
 
+	return &serverImpl{
+		deps:      deps,
+		startTime: time.Now(),
+	}
+}
+
+// NewMCPServerFromDeps creates a new MCP server that implements api.MCPServer.
+// This is used by Wire for dependency injection.
+func NewMCPServerFromDeps(deps *Dependencies) api.MCPServer {
 	return &serverImpl{
 		deps:      deps,
 		startTime: time.Now(),

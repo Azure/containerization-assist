@@ -11,9 +11,16 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/events"
+	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	"github.com/mark3labs/mcp-go/mcp"
 )
+
+// noOpSink is a no-operation sink for fallback cases
+type noOpSagaSink struct{}
+
+func (n *noOpSagaSink) Publish(ctx context.Context, u progress.Update) error { return nil }
+func (n *noOpSagaSink) Close() error                                         { return nil }
 
 // SagaOrchestrator extends EventOrchestrator with saga transaction support
 type SagaOrchestrator struct {
@@ -63,8 +70,17 @@ func (o *SagaOrchestrator) ExecuteWithSaga(ctx context.Context, req *mcp.CallToo
 		o.logger.Error("Failed to publish workflow started event", "error", err)
 	}
 
+	// Create progress tracker
+	var progressTracker *progress.Tracker
+	if o.Orchestrator.progressFactory != nil {
+		progressTracker = o.Orchestrator.progressFactory.CreateTracker(ctx, req, 10) // 10 steps
+	} else {
+		// Fallback: create a minimal tracker if no factory provided
+		progressTracker = progress.NewTracker(ctx, 10, &noOpSagaSink{})
+	}
+
 	// Initialize workflow state
-	state := NewWorkflowState(ctx, req, args, o.logger)
+	state := NewWorkflowState(ctx, req, args, progressTracker, o.logger)
 	state.WorkflowID = workflowID
 	defer state.ProgressTracker.Finish()
 

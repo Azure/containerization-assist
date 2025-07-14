@@ -18,14 +18,14 @@ type QueryHandler interface {
 
 // WorkflowStatusQueryHandler handles workflow status queries
 type WorkflowStatusQueryHandler struct {
-	sessionManager session.SessionManager
+	sessionManager session.OptimizedSessionManager
 	resourceStore  *resources.Store
 	logger         *slog.Logger
 }
 
 // NewWorkflowStatusQueryHandler creates a new workflow status query handler
 func NewWorkflowStatusQueryHandler(
-	sessionManager session.SessionManager,
+	sessionManager session.OptimizedSessionManager,
 	resourceStore *resources.Store,
 	logger *slog.Logger,
 ) *WorkflowStatusQueryHandler {
@@ -53,7 +53,7 @@ func (h *WorkflowStatusQueryHandler) Handle(ctx context.Context, query Query) (i
 		"workflow_id", statusQuery.WorkflowID)
 
 	// Get session information
-	sessionState, err := h.sessionManager.GetSession(ctx, statusQuery.SessionID)
+	sessionState, err := h.sessionManager.Get(ctx, statusQuery.SessionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
@@ -174,13 +174,13 @@ func (h *WorkflowStatusQueryHandler) countCompletedSteps(steps []workflow.Workfl
 
 // SessionListQueryHandler handles session list queries
 type SessionListQueryHandler struct {
-	sessionManager session.SessionManager
+	sessionManager session.OptimizedSessionManager
 	logger         *slog.Logger
 }
 
 // NewSessionListQueryHandler creates a new session list query handler
 func NewSessionListQueryHandler(
-	sessionManager session.SessionManager,
+	sessionManager session.OptimizedSessionManager,
 	logger *slog.Logger,
 ) *SessionListQueryHandler {
 	return &SessionListQueryHandler{
@@ -206,10 +206,19 @@ func (h *SessionListQueryHandler) Handle(ctx context.Context, query Query) (inte
 		"limit", listQuery.Limit,
 		"offset", listQuery.Offset)
 
-	// Get session summaries using existing session manager
-	sessionSummaries, err := h.sessionManager.ListSessionSummaries(ctx)
+	// Get all sessions
+	sessions, err := h.sessionManager.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sessions: %w", err)
+	}
+
+	// Convert to session summaries
+	sessionSummaries := make([]*session.SessionSummary, 0, len(sessions))
+	for _, s := range sessions {
+		sessionSummaries = append(sessionSummaries, &session.SessionSummary{
+			ID:     s.SessionID,
+			Labels: s.Labels,
+		})
 	}
 
 	// Apply pagination
@@ -232,9 +241,9 @@ func (h *SessionListQueryHandler) Handle(ctx context.Context, query Query) (inte
 	paginatedSummaries := sessionSummaries[start:end]
 
 	// Convert to view objects
-	sessions := make([]SessionSummaryView, len(paginatedSummaries))
+	sessionViews := make([]SessionSummaryView, len(paginatedSummaries))
 	for i, summary := range paginatedSummaries {
-		sessions[i] = SessionSummaryView{
+		sessionViews[i] = SessionSummaryView{
 			SessionID: summary.ID,
 			Labels:    summary.Labels,
 			// Note: SessionSummary from the interface doesn't have all fields
@@ -243,7 +252,7 @@ func (h *SessionListQueryHandler) Handle(ctx context.Context, query Query) (inte
 	}
 
 	view := &SessionListView{
-		Sessions: sessions,
+		Sessions: sessionViews,
 		Total:    total,
 		Limit:    limit,
 		Offset:   listQuery.Offset,

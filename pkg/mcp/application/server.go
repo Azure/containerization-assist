@@ -1,3 +1,23 @@
+// Package application provides the application service layer for the Container Kit MCP server.
+// This layer orchestrates domain services and infrastructure components to implement
+// the complete MCP (Model Context Protocol) server functionality.
+//
+// The application layer is responsible for:
+//   - MCP server lifecycle management (start, stop, graceful shutdown)
+//   - Transport layer coordination (HTTP, stdio)
+//   - Tool and resource registration with the MCP protocol
+//   - Dependency injection and service coordination
+//   - Error handling and recovery across service boundaries
+//
+// Architecture:
+//   - Server: Main MCP server implementation and lifecycle
+//   - Transport: Network transport abstractions (HTTP, stdio)
+//   - Registrar: MCP tool and resource registration
+//   - Config: Application configuration management
+//   - Session: User session and state management
+//
+// The application layer follows the clean architecture pattern and depends only on
+// domain interfaces, never on infrastructure implementations directly.
 package application
 
 import (
@@ -14,19 +34,33 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/registrar"
 	"github.com/Azure/container-kit/pkg/mcp/application/transport"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	// "github.com/Azure/container-kit/pkg/wire" // Temporarily disabled to avoid import cycles
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// serverImpl represents the consolidated MCP server implementation
+// serverImpl represents the consolidated MCP server implementation.
+// This is the main application service that coordinates all MCP server functionality,
+// including transport management, tool registration, and workflow orchestration.
+//
+// The server implementation follows these principles:
+//   - Thread-safe operations with proper synchronization
+//   - Graceful shutdown with resource cleanup
+//   - Comprehensive error handling and recovery
+//   - Dependency injection for testability
+//   - Observability through structured logging
 type serverImpl struct {
-	deps      *Dependencies
+	// deps contains all injected dependencies for the server
+	deps *Dependencies
+	// startTime tracks when the server was started for uptime metrics
 	startTime time.Time
 
-	mcpServer        *server.MCPServer
+	// mcpServer is the underlying MCP protocol server instance
+	mcpServer *server.MCPServer
+	// isMcpInitialized tracks whether the MCP server has been properly initialized
 	isMcpInitialized bool
 
-	shutdownMutex  sync.Mutex
+	// shutdownMutex protects shutdown-related state changes
+	shutdownMutex sync.Mutex
+	// isShuttingDown prevents multiple shutdown attempts
 	isShuttingDown bool
 }
 
@@ -116,18 +150,39 @@ func initializeServerWithCustomConfig(logger *slog.Logger, config workflow.Serve
 	return initializeServerWithConfig(logger, config)
 }
 
+// ServerFactory is a function type for creating servers
+type ServerFactory func(logger *slog.Logger) (api.MCPServer, error)
+
+// ServerFactoryWithConfig is a function type for creating servers with config
+type ServerFactoryWithConfig func(logger *slog.Logger, config workflow.ServerConfig) (api.MCPServer, error)
+
+// defaultServerFactory is set by the wire package at init time
+var (
+	defaultServerFactory           ServerFactory
+	defaultServerFactoryWithConfig ServerFactoryWithConfig
+)
+
+// SetServerFactories sets the server factory functions
+// This is called by the wire package to avoid import cycles
+func SetServerFactories(factory ServerFactory, factoryWithConfig ServerFactoryWithConfig) {
+	defaultServerFactory = factory
+	defaultServerFactoryWithConfig = factoryWithConfig
+}
+
 // initializeServer wraps the Wire-generated injector with conversion to application.Dependencies
 func initializeServer(logger *slog.Logger) (api.MCPServer, error) {
-	// Phase 1: Wire infrastructure is ready but temporarily disabled due to import cycle
-	// Will be enabled in Phase 1b after resolving architectural pattern
-	return nil, fmt.Errorf("Wire injection temporarily disabled - see Phase 1b of implementation plan")
+	if defaultServerFactory == nil {
+		return nil, fmt.Errorf("server factory not initialized - Wire injection not configured")
+	}
+	return defaultServerFactory(logger)
 }
 
 // initializeServerWithConfig wraps the Wire-generated injector with custom config
 func initializeServerWithConfig(logger *slog.Logger, config workflow.ServerConfig) (api.MCPServer, error) {
-	// Phase 1: Wire infrastructure is ready but temporarily disabled due to import cycle
-	// Will be enabled in Phase 1b after resolving architectural pattern
-	return nil, fmt.Errorf("Wire injection temporarily disabled - see Phase 1b of implementation plan")
+	if defaultServerFactoryWithConfig == nil {
+		return nil, fmt.Errorf("server factory not initialized - Wire injection not configured")
+	}
+	return defaultServerFactoryWithConfig(logger, config)
 }
 
 // Start starts the MCP server
@@ -137,10 +192,8 @@ func (s *serverImpl) Start(ctx context.Context) error {
 		"workspace_dir", s.deps.Config.WorkspaceDir,
 		"max_sessions", s.deps.Config.MaxSessions)
 
-	if err := s.deps.SessionManager.StartCleanupRoutine(ctx); err != nil {
-		s.deps.Logger.Error("Failed to start cleanup routine", "error", err)
-		return err
-	}
+	// OptimizedSessionManager handles cleanup automatically
+	s.deps.Logger.Info("Session cleanup handled automatically by OptimizedSessionManager")
 
 	// Start resource store cleanup routine
 	s.deps.ResourceStore.StartCleanupRoutine(30*time.Minute, 24*time.Hour)
@@ -178,10 +231,9 @@ func (s *serverImpl) Start(ctx context.Context) error {
 		s.deps.Logger.Info("MCP-GO server initialized successfully")
 	}
 
-	// Use transport manager to start appropriate transport
+	// Use transport registry to start appropriate transport
 	transportType := transport.TransportType(s.deps.Config.TransportType)
-	transportManager := transport.NewManager(s.deps.Logger, transportType, 0)
-	return transportManager.Start(ctx, s.mcpServer)
+	return transport.StartDefaultWithPort(ctx, s.deps.Logger, transportType, s.mcpServer, 0)
 }
 
 // Shutdown gracefully shuts down the server with proper context handling
@@ -263,7 +315,7 @@ func (s *serverImpl) getSessionCount() int {
 	}
 
 	ctx := context.Background()
-	sessions, err := s.deps.SessionManager.ListSessionsTyped(ctx)
+	sessions, err := s.deps.SessionManager.List(ctx)
 	if err != nil {
 		s.deps.Logger.Warn("Failed to get session count", "error", err)
 		return 0
@@ -276,7 +328,7 @@ func (s *serverImpl) getSessionCount() int {
 func (s *serverImpl) GetSessionManagerStats() (interface{}, error) {
 	if s.deps.SessionManager != nil {
 		ctx := context.Background()
-		sessions, err := s.deps.SessionManager.ListSessionsTyped(ctx)
+		sessions, err := s.deps.SessionManager.List(ctx)
 		if err != nil {
 			s.deps.Logger.Warn("Failed to get session list for stats", "error", err)
 			return map[string]interface{}{

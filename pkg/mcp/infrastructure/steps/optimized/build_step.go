@@ -1,14 +1,33 @@
-// Package workflow contains the optimized build step implementation.
-package workflow
+// Package optimized contains the optimized build step implementation.
+package optimized
 
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ml"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps"
 )
+
+// extractRepoName extracts repository name from URL
+func extractRepoName(repoURL string) string {
+	// Extract repo name from URL like https://github.com/user/repo.git
+	parts := strings.Split(repoURL, "/")
+	if len(parts) == 0 {
+		return "app"
+	}
+
+	name := parts[len(parts)-1]
+	// Remove .git suffix if present
+	name = strings.TrimSuffix(name, ".git")
+	if name == "" {
+		return "app"
+	}
+	return name
+}
 
 // OptimizedBuildStep implements Docker image building with AI-powered resource optimization
 type OptimizedBuildStep struct {
@@ -16,7 +35,7 @@ type OptimizedBuildStep struct {
 }
 
 // NewOptimizedBuildStep creates a new optimized build step
-func NewOptimizedBuildStep(optimizedBuild *ml.OptimizedBuildStep) Step {
+func NewOptimizedBuildStep(optimizedBuild *ml.OptimizedBuildStep) workflow.Step {
 	return &OptimizedBuildStep{
 		optimizedBuild: optimizedBuild,
 	}
@@ -33,7 +52,7 @@ func (s *OptimizedBuildStep) MaxRetries() int {
 }
 
 // Execute performs optimized Docker image building
-func (s *OptimizedBuildStep) Execute(ctx context.Context, state *WorkflowState) error {
+func (s *OptimizedBuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
 	if state.DockerfileResult == nil || state.AnalyzeResult == nil {
 		return fmt.Errorf("dockerfile and analyze results are required for build")
 	}
@@ -52,7 +71,7 @@ func (s *OptimizedBuildStep) Execute(ctx context.Context, state *WorkflowState) 
 			"image_tag", imageTag)
 
 		// Create simulated build result
-		state.BuildResult = &BuildResult{
+		state.BuildResult = &workflow.BuildResult{
 			ImageID:   fmt.Sprintf("sha256:test-%s", imageName),
 			ImageRef:  fmt.Sprintf("%s:%s", imageName, imageTag),
 			ImageSize: 100 * 1024 * 1024, // 100MB simulated size
@@ -125,7 +144,7 @@ func (s *OptimizedBuildStep) Execute(ctx context.Context, state *WorkflowState) 
 	actualBuildTime := time.Since(startTime)
 
 	// Store build result in workflow state
-	state.BuildResult = &BuildResult{
+	state.BuildResult = &workflow.BuildResult{
 		ImageID:   buildResult.ImageID,
 		ImageRef:  fmt.Sprintf("%s:%s", buildResult.ImageName, buildResult.ImageTag),
 		ImageSize: buildResult.Size,
@@ -156,7 +175,7 @@ func (s *OptimizedBuildStep) Execute(ctx context.Context, state *WorkflowState) 
 }
 
 // standardBuild performs a standard build without optimization
-func (s *OptimizedBuildStep) standardBuild(ctx context.Context, state *WorkflowState, imageName, imageTag, buildContext string) error {
+func (s *OptimizedBuildStep) standardBuild(ctx context.Context, state *workflow.WorkflowState, imageName, imageTag, buildContext string) error {
 	// Convert workflow types to infrastructure types for compatibility
 	infraDockerfileResult := &steps.DockerfileResult{
 		Content:     state.DockerfileResult.Content,
@@ -176,7 +195,7 @@ func (s *OptimizedBuildStep) standardBuild(ctx context.Context, state *WorkflowS
 	}
 
 	// Store build result in workflow state
-	state.BuildResult = &BuildResult{
+	state.BuildResult = &workflow.BuildResult{
 		ImageID:   buildResult.ImageID,
 		ImageRef:  fmt.Sprintf("%s:%s", buildResult.ImageName, buildResult.ImageTag),
 		ImageSize: buildResult.Size,
@@ -199,7 +218,7 @@ func (s *OptimizedBuildStep) standardBuild(ctx context.Context, state *WorkflowS
 
 // analyzeResultAdapter adapts workflow.AnalyzeResult to ml.RepositoryAnalysis interface
 type analyzeResultAdapter struct {
-	*AnalyzeResult
+	*workflow.AnalyzeResult
 }
 
 func (a *analyzeResultAdapter) GetLanguage() string       { return a.Language }

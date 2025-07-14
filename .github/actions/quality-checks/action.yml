@@ -73,7 +73,9 @@ runs:
           go install honnef.co/go/tools/cmd/staticcheck@${{ inputs.staticcheck-version }} &
           go install golang.org/x/vuln/cmd/govulncheck@${{ inputs.govulncheck-version }} &
           go install github.com/fzipp/gocyclo/cmd/gocyclo@latest &
-          sudo apt-get update -qq && sudo apt-get install -y jq &
+          go install github.com/google/wire/cmd/wire@latest &
+          sudo apt-get update -qq && sudo apt-get install -y jq nodejs npm &
+          npm install -g jscpd@3.5.10 &
           wait
         }
         
@@ -93,6 +95,41 @@ runs:
         else
           echo "✅ Code formatting is correct"
           echo "status=pass" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Wire Dependency Injection Check
+      id: wire-check
+      shell: bash
+      run: |
+        echo "🔌 Checking Wire dependency injection..."
+        
+        # Check if wire files exist
+        if [ -f "pkg/mcp/infrastructure/wire/wire.go" ]; then
+          echo "Found Wire configuration, verifying..."
+          
+          # Run wire vet to check for issues
+          cd pkg/mcp/infrastructure/wire
+          if wire vet; then
+            echo "✅ Wire configuration is valid"
+            
+            # Verify generated code is up to date
+            cp wire_gen.go wire_gen.go.bak
+            wire
+            if ! diff -q wire_gen.go wire_gen.go.bak > /dev/null 2>&1; then
+              echo "❌ Wire generated code is out of date"
+              echo "Please run: go generate ./pkg/mcp/infrastructure/wire/..."
+              mv wire_gen.go.bak wire_gen.go
+              exit 1
+            fi
+            rm wire_gen.go.bak
+            echo "✅ Wire generated code is up to date"
+          else
+            echo "❌ Wire configuration has errors"
+            exit 1
+          fi
+          cd - > /dev/null
+        else
+          echo "ℹ️ No Wire configuration found (skipping)"
         fi
         
     - name: Quality Analysis (Parallel)
@@ -178,6 +215,18 @@ runs:
           exit 0
         } &
         
+        {
+          echo "Running go vet..."
+          if go vet ${{ inputs.target-paths }}; then
+            echo "VET_STATUS=pass" > vet_result.txt
+            echo "✅ go vet passed"
+          else
+            echo "VET_STATUS=fail" > vet_result.txt
+            echo "❌ go vet found issues"
+          fi
+          exit 0
+        } &
+        
         # Wait for all parallel jobs to complete
         wait
         
@@ -185,6 +234,7 @@ runs:
         source lint_result.txt 2>/dev/null || LINT_STATUS=unknown
         source static_result.txt 2>/dev/null || STATIC_STATUS=unknown  
         source security_result.txt 2>/dev/null || SECURITY_STATUS=unknown
+        source vet_result.txt 2>/dev/null || VET_STATUS=unknown
         
         # Extract ratcheting information from lint results
         RATCHET_OPPORTUNITY=${RATCHET_OPPORTUNITY:-false}
@@ -217,8 +267,78 @@ runs:
         fi
         
         # Clean up temp files
-        rm -f lint_result.txt static_result.txt security_result.txt
+        rm -f lint_result.txt static_result.txt security_result.txt vet_result.txt
     
+    - name: Import Graph Validation
+      id: import-validation
+      shell: bash
+      run: |
+        echo "🔍 Validating import graph for clean architecture..."
+        
+        # Make script executable
+        chmod +x ./scripts/validate-imports.sh
+        
+        # Run import validation
+        if ./scripts/validate-imports.sh --json; then
+          echo "✅ Import validation passed"
+          echo "import-status=pass" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Import validation failed"
+          echo "import-status=fail" >> $GITHUB_OUTPUT
+          # Don't fail the build yet - just report
+        fi
+        
+    - name: Duplicate Code Detection
+      id: duplicate-check
+      shell: bash
+      run: |
+        echo "🔍 Checking for duplicate code..."
+        
+        # Create jscpd config
+        cat > .jscpd.json <<EOF
+        {
+          "threshold": 0,
+          "reporters": ["json", "console"],
+          "ignore": ["**/*_test.go", "**/vendor/**", "**/wire_gen.go", "**/*.pb.go"],
+          "absolute": true,
+          "gitignore": true,
+          "minLines": 5,
+          "minTokens": 50,
+          "output": "./",
+          "exitCode": 0
+        }
+        EOF
+        
+        # Run duplicate detection
+        jscpd ./pkg/mcp ./pkg/core || true
+        
+        # Analyze results
+        if [ -f "jscpd-report.json" ]; then
+          DUPLICATES=$(jq '.statistics.total.duplicatedLines' jscpd-report.json)
+          PERCENTAGE=$(jq '.statistics.total.percentage' jscpd-report.json)
+          
+          echo "Found $DUPLICATES duplicated lines ($PERCENTAGE%)"
+          
+          # Set threshold (2% for now)
+          THRESHOLD=2
+          if (( $(echo "$PERCENTAGE > $THRESHOLD" | bc -l) )); then
+            echo "❌ Duplicate code exceeds threshold ($PERCENTAGE% > $THRESHOLD%)"
+            echo "duplicate-status=fail" >> $GITHUB_OUTPUT
+            
+            # Show top duplications
+            echo "Top duplications:"
+            jq -r '.duplicates[:3] | .[] | "  - \(.firstFile.name):\(.firstFile.start)-\(.firstFile.end) ↔ \(.secondFile.name):\(.secondFile.start)-\(.secondFile.end)"' jscpd-report.json || true
+          else
+            echo "✅ Duplicate code within threshold ($PERCENTAGE% <= $THRESHOLD%)"
+            echo "duplicate-status=pass" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "duplicate-percentage=$PERCENTAGE" >> $GITHUB_OUTPUT
+        else
+          echo "⚠️ Could not generate duplication report"
+          echo "duplicate-status=unknown" >> $GITHUB_OUTPUT
+        fi
+        
     - name: Architecture Quality Check
       id: architecture-check
       shell: bash

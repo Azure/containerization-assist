@@ -11,6 +11,11 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+// Ensure SinkFactory implements the domain ProgressTrackerFactory interface
+var _ interface {
+	CreateTracker(ctx context.Context, req *mcp.CallToolRequest, totalSteps int) *progress.Tracker
+} = (*SinkFactory)(nil)
+
 // SinkFactory creates appropriate progress sinks based on context.
 type SinkFactory struct {
 	logger *slog.Logger
@@ -84,6 +89,12 @@ func NewProgressTracker(ctx context.Context, req *mcp.CallToolRequest, totalStep
 	traceID := generateTraceID()
 
 	return factory.CreateTrackerForWorkflow(ctx, req, totalSteps, traceID)
+}
+
+// CreateTracker implements the domain ProgressTrackerFactory interface
+func (f *SinkFactory) CreateTracker(ctx context.Context, req *mcp.CallToolRequest, totalSteps int) *progress.Tracker {
+	traceID := generateTraceID()
+	return f.CreateTrackerForWorkflow(ctx, req, totalSteps, traceID)
 }
 
 // generateTraceID creates a simple trace ID for correlation

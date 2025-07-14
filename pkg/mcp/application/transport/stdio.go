@@ -20,6 +20,11 @@ func NewStdioTransport(logger *slog.Logger) *StdioTransport {
 	}
 }
 
+// Serve implements the Transport interface
+func (t *StdioTransport) Serve(ctx context.Context, mcpServer *server.MCPServer) error {
+	return t.ServeStdio(ctx, mcpServer)
+}
+
 // ServeStdio starts the stdio transport server
 func (t *StdioTransport) ServeStdio(ctx context.Context, mcpServer *server.MCPServer) error {
 	t.logger.Info("Starting stdio transport")

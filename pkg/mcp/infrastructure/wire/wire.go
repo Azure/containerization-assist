@@ -24,6 +24,9 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/prompts"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/resources"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps/optimized"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/tracing"
 	"github.com/google/wire"
 )
 
@@ -36,7 +39,6 @@ var ConfigurationSet = wire.NewSet(
 var ApplicationSet = wire.NewSet(
 	ProvideSessionManager,
 	ProvideResourceStore,
-	ProvideProgressFactory,
 )
 
 // InfrastructureSet - Infrastructure layer dependencies
@@ -45,6 +47,8 @@ var InfrastructureSet = wire.NewSet(
 	ProvidePromptManager,
 	provideDomainSampler,
 	wire.Bind(new(domainsampling.UnifiedSampler), new(*sampling.DomainAdapter)),
+	steps.ProvideStepProvider,
+	tracing.NewTracerAdapter,
 )
 
 // DomainSet - Domain services and events
@@ -55,9 +59,15 @@ var DomainSet = wire.NewSet(
 
 // WorkflowSet - Workflow orchestration (simplified for now)
 var WorkflowSet = wire.NewSet(
-	ProvideOrchestrator,
-	ProvideEventOrchestrator,
-	ProvideSagaOrchestrator,
+	optimized.ProvideOptimizedBuildStep,
+	optimized.ProvideBuildOptimizer,
+	workflow.ProvideStepFactory,
+	workflow.ProvideOrchestrator,
+	workflow.ProvideEventOrchestrator,
+	workflow.ProvideSagaOrchestrator,
+	workflow.ProvideWorkflowOrchestrator,
+	ProvideProgressFactory,
+	wire.Bind(new(workflow.ProgressTrackerFactory), new(*infraprogress.SinkFactory)),
 )
 
 // MLSet - Machine learning and enhanced capabilities (optional)
@@ -65,7 +75,7 @@ var MLSet = wire.NewSet(
 	ml.ProvideErrorPatternRecognizer,
 	ml.ProvideEnhancedErrorHandler,
 	ml.ProvideStepEnhancer,
-	// ml.ProvideOptimizedBuildStep, // Will add in Phase 2
+	ml.ProvideOptimizedBuildStep,
 )
 
 // AppSet - Main application dependencies using wire.Struct
@@ -74,7 +84,7 @@ var AppSet = wire.NewSet(
 		new(application.Dependencies),
 		"Logger", "Config", "SessionManager", "ResourceStore",
 		"ProgressFactory", "EventPublisher", "SagaCoordinator",
-		"Orchestrator", "EventOrchestrator", "SagaOrchestrator",
+		"WorkflowOrchestrator", "EventAwareOrchestrator", "SagaAwareOrchestrator",
 		"ErrorPatternRecognizer", "EnhancedErrorHandler", "StepEnhancer",
 		"SamplingClient", "PromptManager",
 	),
@@ -183,8 +193,8 @@ func ProvideTransportType() string {
 
 // Application Providers
 
-func ProvideSessionManager(config workflow.ServerConfig, logger *slog.Logger) session.SessionManager {
-	return session.NewMemorySessionManager(logger, config.SessionTTL, config.MaxSessions)
+func ProvideSessionManager(config workflow.ServerConfig, logger *slog.Logger) session.OptimizedSessionManager {
+	return session.NewOptimizedSessionManager(logger, config.SessionTTL, config.MaxSessions)
 }
 
 func ProvideResourceStore(logger *slog.Logger) *resources.Store {
@@ -199,7 +209,9 @@ func ProvideProgressFactory(logger *slog.Logger) *infraprogress.SinkFactory {
 
 func ProvideSamplingClient(logger *slog.Logger) (*sampling.Client, error) {
 	// Use environment-based configuration if available
-	if os.Getenv("AZURE_OPENAI_ENDPOINT") != "" && os.Getenv("AZURE_OPENAI_KEY") != "" {
+	// The sampling client uses MCP protocol to delegate to the calling AI assistant
+	// Check for SAMPLING_* environment variables (e.g., SAMPLING_MAX_TOKENS, SAMPLING_TEMPERATURE)
+	if os.Getenv("SAMPLING_MAX_TOKENS") != "" || os.Getenv("SAMPLING_TEMPERATURE") != "" {
 		return sampling.NewClientFromEnv(logger)
 	}
 	return sampling.NewClient(logger), nil
@@ -218,24 +230,10 @@ func provideDomainSampler(client *sampling.Client) *sampling.DomainAdapter {
 	return sampling.NewDomainAdapter(client)
 }
 
-// Workflow Providers
-
-func ProvideOrchestrator(logger *slog.Logger) *workflow.Orchestrator {
-	return workflow.NewOrchestrator(logger)
-}
-
-func ProvideEventOrchestrator(logger *slog.Logger, eventPublisher *events.Publisher) *workflow.EventOrchestrator {
-	return workflow.NewEventOrchestrator(logger, eventPublisher)
-}
-
-func ProvideSagaOrchestrator(logger *slog.Logger, eventPublisher *events.Publisher, sagaCoordinator *saga.SagaCoordinator) *workflow.SagaOrchestrator {
-	return workflow.NewSagaOrchestrator(logger, eventPublisher, sagaCoordinator)
-}
+// Workflow Providers are now in the domain layer
 
 // Server Provider
 
 func ProvideServer(deps *application.Dependencies) api.MCPServer {
-	return application.NewServer(
-		application.WithDependencies(deps),
-	)
+	return application.NewMCPServerFromDeps(deps)
 }

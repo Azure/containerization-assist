@@ -6,37 +6,31 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/events"
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ml"
 )
 
 // ProvideStepFactory creates a StepFactory with optional ML optimization
-func ProvideStepFactory(optimizedBuild *ml.OptimizedBuildStep, logger *slog.Logger) *StepFactory {
-	return NewStepFactory(optimizedBuild, logger)
+func ProvideStepFactory(stepProvider StepProvider, optimizer BuildOptimizer, optimizedBuildStep Step, logger *slog.Logger) *StepFactory {
+	return NewStepFactory(stepProvider, optimizer, optimizedBuildStep, logger)
 }
 
-// ProvideOptimizedOrchestrator creates an orchestrator with optimized steps
-func ProvideOptimizedOrchestrator(factory *StepFactory, logger *slog.Logger) *Orchestrator {
-	return NewOrchestratorWithFactory(factory, logger)
+// ProvideOrchestrator creates a concrete Orchestrator
+func ProvideOrchestrator(factory *StepFactory, progressFactory ProgressTrackerFactory, tracer Tracer, logger *slog.Logger) *Orchestrator {
+	return NewOrchestratorWithFactory(factory, progressFactory, tracer, logger)
+}
+
+// ProvideEventOrchestrator creates an EventOrchestrator using decorators
+func ProvideEventOrchestrator(orchestrator *Orchestrator, publisher *events.Publisher) EventAwareOrchestrator {
+	// Use the decorator pattern
+	return WithEvents(orchestrator, publisher)
+}
+
+// ProvideSagaOrchestrator creates a SagaOrchestrator using decorators
+func ProvideSagaOrchestrator(eventOrchestrator EventAwareOrchestrator, sagaCoordinator *saga.SagaCoordinator, logger *slog.Logger) SagaAwareOrchestrator {
+	// Use the decorator pattern
+	return WithSaga(eventOrchestrator, sagaCoordinator, logger)
 }
 
 // ProvideWorkflowOrchestrator provides the base workflow orchestrator as an interface
-func ProvideWorkflowOrchestrator(factory *StepFactory, logger *slog.Logger) WorkflowOrchestrator {
-	return NewOrchestratorWithFactory(factory, logger)
-}
-
-// ProvideEventAwareOrchestrator provides the event-aware orchestrator as an interface
-func ProvideEventAwareOrchestrator(orchestrator *Orchestrator, publisher *events.Publisher, logger *slog.Logger) EventAwareOrchestrator {
-	return &EventOrchestrator{
-		Orchestrator:   orchestrator,
-		eventPublisher: publisher,
-		eventUtils:     events.EventUtils{},
-	}
-}
-
-// ProvideSagaAwareOrchestrator provides the saga-aware orchestrator as an interface
-func ProvideSagaAwareOrchestrator(eventOrchestrator *EventOrchestrator, sagaCoordinator *saga.SagaCoordinator) SagaAwareOrchestrator {
-	return &SagaOrchestrator{
-		EventOrchestrator: eventOrchestrator,
-		sagaCoordinator:   sagaCoordinator,
-	}
+func ProvideWorkflowOrchestrator(orchestrator *Orchestrator) WorkflowOrchestrator {
+	return orchestrator
 }

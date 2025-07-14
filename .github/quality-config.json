@@ -43,17 +43,36 @@
     "check_new_code_only": true,
     "ratcheting_enabled": true,
     "current_baseline": {
-      "over_30": 9,
-      "over_25": 15,
-      "over_20": 34,
-      "over_15": 1000,
-      "over_10": 263
+      "over_30": 0,
+      "over_25": 4,
+      "over_20": 4,
+      "over_15": 13,
+      "over_10": 53
+    },
+    "component_budgets": {
+      "pkg/mcp/domain": {
+        "over_15": 5,
+        "over_20": 2,
+        "over_25": 1
+      },
+      "pkg/mcp/application": {
+        "over_15": 3,
+        "over_20": 1,
+        "over_25": 0
+      },
+      "pkg/mcp/infrastructure": {
+        "over_15": 8,
+        "over_20": 3,
+        "over_25": 2
+      }
     },
     "known_complex_functions": [
-      "(*AtomicCheckHealthTool).performHealthCheck",
-      "(*AtomicGenerateManifestsTool).performManifestGeneration",
-      "convertToAtomicGenerateManifestsArgs",
-      "collectTestCoverageMetrics"
+      "loadFromEnv",
+      "TestBoltStore_ConcurrentOperations",
+      "(*Client).SampleStream",
+      "DeployToKubernetes",
+      "(*ScanStep).Execute",
+      "cloneRepository"
     ]
   },
   "formatting": {
@@ -67,9 +86,24 @@
     "track_total": true
   },
   "test_coverage": {
-    "target": 50,
-    "minimum": 10,
-    "regression_tolerance": 2
+    "overall_target": 70,
+    "overall_minimum": 50,
+    "domain_target": 90,
+    "domain_minimum": 70,
+    "infrastructure_target": 60,
+    "infrastructure_minimum": 40,
+    "application_target": 80,
+    "application_minimum": 60,
+    "regression_tolerance": 5,
+    "fail_below_minimum": true,
+    "component_budgets": {
+      "pkg/mcp/domain/workflow": 90,
+      "pkg/mcp/domain/progress": 85,
+      "pkg/mcp/application/transport": 85,
+      "pkg/mcp/infrastructure/sampling": 60,
+      "pkg/mcp/infrastructure/session": 80,
+      "pkg/mcp/infrastructure/steps": 70
+    }
   },
   "error_handling": {
     "adoption_target": 60,
