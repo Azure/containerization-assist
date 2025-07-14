@@ -182,13 +182,17 @@ func (s *ScanStep) Execute(ctx context.Context, state *workflow.WorkflowState) e
 	scanResult, err := scanner.ScanImage(ctx, imageRef, "medium")
 	if err != nil {
 		state.Logger.Error("Security scan failed", "error", err, "image", imageRef)
-		// Don't fail the workflow for scan errors, just log and continue
+		// Store scan error information
 		state.ScanReport = map[string]interface{}{
 			"scanner":   "unified",
 			"scan_time": time.Now().Format(time.RFC3339),
 			"status":    "error",
 			"error":     err.Error(),
 			"image_ref": imageRef,
+		}
+		// In strict mode, fail the workflow for scan errors
+		if state.Args.StrictMode {
+			return fmt.Errorf("security scan failed in strict mode: %v", err)
 		}
 		state.Logger.Warn("Continuing workflow despite scan failure")
 		return nil
@@ -577,7 +581,11 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 		err := CheckDeploymentHealth(ctx, infraK8sResult, state.Logger)
 		if err != nil {
 			state.Logger.Warn("Deployment health check failed (non-critical)", "error", err)
-			// Don't fail the workflow for health check issues - just warn
+			// In strict mode, fail the workflow for health check errors
+			if state.Args.StrictMode {
+				return fmt.Errorf("deployment health check failed in strict mode: %v", err)
+			}
+			// Otherwise, don't fail the workflow for health check issues - just warn
 		} else {
 			state.Logger.Info("Deployment health check passed")
 		}
@@ -585,7 +593,11 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 		// Get service endpoint
 		endpoint, err := GetServiceEndpoint(ctx, infraK8sResult, state.Logger)
 		if err != nil {
-			// Log the error but don't fail the workflow
+			// In strict mode, fail the workflow for endpoint retrieval errors
+			if state.Args.StrictMode {
+				return fmt.Errorf("failed to get service endpoint in strict mode: %v", err)
+			}
+			// Otherwise, log the error but don't fail the workflow
 			state.Logger.Warn("Failed to get service endpoint (non-critical)", "error", err)
 			state.Result.Endpoint = "http://localhost:30000" // Placeholder for tests
 		} else {

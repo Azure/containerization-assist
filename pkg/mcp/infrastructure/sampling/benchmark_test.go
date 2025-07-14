@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"sort"
 	"testing"
 	"time"
 
@@ -289,15 +290,10 @@ func findSubstring(s, substr string) bool {
 }
 
 func sortTimes(times []time.Duration) {
-	// Simple bubble sort for benchmarking (we don't want to import sort package)
-	n := len(times)
-	for i := 0; i < n-1; i++ {
-		for j := 0; j < n-i-1; j++ {
-			if times[j] > times[j+1] {
-				times[j], times[j+1] = times[j+1], times[j]
-			}
-		}
-	}
+	// Use standard library sort for efficiency
+	sort.Slice(times, func(i, j int) bool {
+		return times[i] < times[j]
+	})
 }
 
 // TestBenchmarkBaseline ensures our benchmark tests are working correctly

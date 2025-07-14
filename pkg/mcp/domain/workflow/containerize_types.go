@@ -35,6 +35,11 @@ type ContainerizeAndDeployArgs struct {
 	// TestMode skips actual Docker and Kubernetes operations for testing
 	// When true, the workflow simulates operations without external dependencies
 	TestMode bool `json:"test_mode,omitempty"`
+
+	// StrictMode controls error handling behavior for non-critical operations
+	// When true, warnings (e.g., scan failures, health check failures) will fail the workflow
+	// When false (default), warnings are logged but the workflow continues
+	StrictMode bool `json:"strict_mode,omitempty"`
 }
 
 // ContainerizeAndDeployResult represents the complete workflow output and execution summary.
