@@ -1,33 +1,11 @@
 // Package sampling provides domain types for AI-powered analysis and code generation.
 // This package defines the core data structures used for LLM sampling operations
-// in the containerization workflow, including Dockerfile analysis, Kubernetes manifest
-// analysis, and security vulnerability assessment.
-//
-// The sampling domain handles:
-//   - Dockerfile generation and optimization
-//   - Kubernetes manifest creation and validation
-//   - Security vulnerability analysis and remediation
-//   - AI-powered code fixes and improvements
-//   - Template-based content generation
-//
-// All sampling operations are designed to be:
-//   - Deterministic and reproducible
-//   - Observable with comprehensive metadata
-//   - Testable with consistent interfaces
-//   - Extensible for new analysis types
+// in the containerization workflow.
 package sampling
 
 import "time"
 
 // DockerfileAnalysis represents the comprehensive result of analyzing a Dockerfile.
-// This structure contains both technical metadata about the containerized application
-// and actionable recommendations for optimization and security improvements.
-//
-// The analysis includes:
-//   - Technology detection (language, framework, dependencies)
-//   - Container optimization recommendations
-//   - Security issue identification and fixes
-//   - Build process analysis and improvements
 type DockerfileAnalysis struct {
 	// Language is the primary programming language detected (e.g., "go", "nodejs", "python")
 	Language string

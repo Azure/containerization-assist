@@ -4,6 +4,7 @@ package wiring
 
 import (
 	"log/slog"
+	"time"
 
 	"github.com/Azure/container-kit/pkg/common/runner"
 	"github.com/Azure/container-kit/pkg/mcp/api"
@@ -11,6 +12,9 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/config"
 	"github.com/Azure/container-kit/pkg/mcp/application/session"
 	domainevents "github.com/Azure/container-kit/pkg/mcp/domain/events"
+	domainml "github.com/Azure/container-kit/pkg/mcp/domain/ml"
+	domainprompts "github.com/Azure/container-kit/pkg/mcp/domain/prompts"
+	domainresources "github.com/Azure/container-kit/pkg/mcp/domain/resources"
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
@@ -45,6 +49,14 @@ var CommonProviders = wire.NewSet(
 	ProvideCommandRunner,
 )
 
+// ConfigProviders - Configuration providers for different subsystems
+var ConfigProviders = wire.NewSet(
+	// Configuration conversions
+	ProvideTracingConfig,
+	ProvideSecurityConfig,
+	ProvideRegistryConfig,
+)
+
 // DomainProviders - Core domain services and business logic
 var DomainProviders = wire.NewSet(
 	// Events and coordination
@@ -73,6 +85,9 @@ var InfraProviders = wire.NewSet(
 	// AI/ML services
 	ProvideSamplingClient,
 	ProvidePromptManager,
+	
+	// Interface bindings for domain abstractions
+	wire.Bind(new(domainprompts.Manager), new(*prompts.Manager)),
 
 	// Container and deployment
 	ProvideContainerManager,
@@ -91,6 +106,11 @@ var MLProviders = wire.NewSet(
 	ProvideEnhancedErrorHandler,
 	ProvideStepEnhancer,
 	ProvideMLOptimizedBuildStep,
+	
+	// Interface bindings for domain abstractions
+	wire.Bind(new(domainml.ErrorPatternRecognizer), new(*ml.ErrorPatternRecognizer)),
+	wire.Bind(new(domainml.EnhancedErrorHandler), new(*ml.EnhancedErrorHandler)),
+	wire.Bind(new(domainml.StepEnhancer), new(*ml.StepEnhancer)),
 )
 
 // ApplicationProviders - Application layer services and coordination
@@ -116,10 +136,38 @@ var ApplicationProviders = wire.NewSet(
 // ProviderSet - Complete dependency graph for the MCP server
 var ProviderSet = wire.NewSet(
 	CommonProviders,
+	ConfigProviders,
 	DomainProviders,
 	InfraProviders,
 	MLProviders,
 	ApplicationProviders,
+)
+
+// BasicProviderSet - Minimal provider set for basic functionality (without ML)
+var BasicProviderSet = wire.NewSet(
+	CommonProviders,
+	ConfigProviders,
+	DomainProviders,
+	InfraProviders,
+	ApplicationProviders,
+)
+
+// TestProviderSet - Provider set optimized for testing scenarios
+var TestProviderSet = wire.NewSet(
+	CommonProviders,
+	ConfigProviders,
+	DomainProviders,
+	
+	// Simplified infra providers for testing
+	ProvideProgressFactory,
+	wire.Bind(new(workflow.ProgressTrackerFactory), new(*infraprogress.SinkFactory)),
+	ProvideSamplingClient,
+	ProvidePromptManager,
+	ProvideStepProvider,
+	
+	// Application layer
+	ProvideSessionManager,
+	ProvideResourceStore,
 )
 
 // Configuration Providers
@@ -138,13 +186,55 @@ func ProvideServerConfigFromUnified(cfg *config.Config) workflow.ServerConfig {
 	return cfg.ToServerConfig()
 }
 
+// ProvideConfigFromServerConfig converts ServerConfig to Config for custom config usage
+func ProvideConfigFromServerConfig(serverConfig workflow.ServerConfig) *config.Config {
+	return &config.Config{
+		// Map ServerConfig fields to Config
+		WorkspaceDir:   serverConfig.WorkspaceDir,
+		StorePath:      serverConfig.StorePath,
+		MaxSessions:    serverConfig.MaxSessions,
+		SessionTTL:     serverConfig.SessionTTL,
+		LogLevel:       serverConfig.LogLevel,
+		TransportType:  serverConfig.TransportType,
+		HTTPAddr:       serverConfig.HTTPAddr,
+		HTTPPort:       serverConfig.HTTPPort,
+		
+		// Add defaults for sampling config
+		SamplingMaxTokens:     4096,
+		SamplingTemperature:   0.7,
+		SamplingRetryAttempts: 3,
+		SamplingTokenBudget:   100000,
+		SamplingStreaming:     false,
+		
+		// Add defaults for other fields
+		MaxDiskPerSession: 1024 * 1024 * 1024, // 1GB
+		TotalDiskLimit:    5 * 1024 * 1024 * 1024, // 5GB
+		CleanupInterval:   30 * time.Minute,
+		
+		// Tracing defaults
+		TracingEnabled:     false,
+		TracingServiceName: "container-kit-mcp",
+		TracingSampleRate:  1.0,
+		
+		// Security defaults
+		SecurityScanEnabled:    true,
+		SecurityFailOnHigh:     false,
+		SecurityFailOnCritical: true,
+		
+		// Prompt defaults
+		PromptTemplateDir:   "templates",
+		PromptHotReload:     false,
+		PromptAllowOverride: false,
+	}
+}
+
 // Application Providers
 
 func ProvideSessionManager(config workflow.ServerConfig, logger *slog.Logger) session.OptimizedSessionManager {
 	return session.NewOptimizedSessionManager(logger, config.SessionTTL, config.MaxSessions)
 }
 
-func ProvideResourceStore(logger *slog.Logger) *resources.Store {
+func ProvideResourceStore(logger *slog.Logger) domainresources.Store {
 	return resources.NewStore(logger)
 }
 
@@ -155,19 +245,22 @@ func ProvideProgressFactory(logger *slog.Logger) *infraprogress.SinkFactory {
 // Infrastructure Providers
 
 func ProvideSamplingClient(cfg *config.Config, logger *slog.Logger) (*sampling.Client, error) {
-	// Convert unified config to sampling config
-	samplingConfig := sampling.Config{
-		MaxTokens:        cfg.SamplingMaxTokens,
-		Temperature:      cfg.SamplingTemperature,
-		RetryAttempts:    cfg.SamplingRetryAttempts,
-		TokenBudget:      cfg.SamplingTokenBudget,
-		BaseBackoff:      cfg.SamplingBaseBackoff,
-		MaxBackoff:       cfg.SamplingMaxBackoff,
-		StreamingEnabled: cfg.SamplingStreaming,
-		RequestTimeout:   cfg.SamplingTimeout,
+	// Use the centralized config conversion method
+	samplingConfig := cfg.ToSamplingConfig()
+	
+	// Convert to infrastructure sampling config
+	infraConfig := sampling.Config{
+		MaxTokens:        samplingConfig.MaxTokens,
+		Temperature:      samplingConfig.Temperature,
+		RetryAttempts:    samplingConfig.RetryAttempts,
+		TokenBudget:      samplingConfig.TokenBudget,
+		BaseBackoff:      samplingConfig.BaseBackoff,
+		MaxBackoff:       samplingConfig.MaxBackoff,
+		StreamingEnabled: samplingConfig.StreamingEnabled,
+		RequestTimeout:   samplingConfig.RequestTimeout,
 	}
 
-	return sampling.NewClient(logger, sampling.WithConfig(samplingConfig)), nil
+	return sampling.NewClient(logger, sampling.WithConfig(infraConfig)), nil
 }
 
 func ProvidePromptManager(cfg *config.Config, logger *slog.Logger) (*prompts.Manager, error) {
@@ -297,4 +390,33 @@ func ProvideMLOptimizedBuildStep(sampler domainsampling.UnifiedSampler, logger *
 // ProvideCommandRunner creates a command runner
 func ProvideCommandRunner() runner.CommandRunner {
 	return &runner.DefaultCommandRunner{}
+}
+
+// ProvideTracingConfig creates tracing configuration from unified config
+func ProvideTracingConfig(cfg *config.Config) *tracing.Config {
+	tracingConfig := cfg.ToTracingConfig()
+	
+	// Convert to infrastructure tracing config
+	return &tracing.Config{
+		Enabled:        tracingConfig.Enabled,
+		Endpoint:       tracingConfig.Endpoint,
+		Headers:        make(map[string]string), // Can be populated from env vars
+		ServiceName:    tracingConfig.ServiceName,
+		ServiceVersion: "dev", // Could be made configurable
+		Environment:    "development", // Could be made configurable
+		SampleRate:     tracingConfig.SampleRate,
+		ExportTimeout:  30 * time.Second,
+	}
+}
+
+// ProvideSecurityConfig creates security configuration from unified config
+func ProvideSecurityConfig(cfg *config.Config) *config.SecurityConfig {
+	securityConfig := cfg.ToSecurityConfig()
+	return &securityConfig
+}
+
+// ProvideRegistryConfig creates registry configuration from unified config
+func ProvideRegistryConfig(cfg *config.Config) *config.RegistryConfig {
+	registryConfig := cfg.ToRegistryConfig()
+	return &registryConfig
 }

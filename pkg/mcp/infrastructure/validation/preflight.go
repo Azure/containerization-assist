@@ -180,7 +180,6 @@ func checkDocker(ctx context.Context) error {
 		return fmt.Errorf("Docker not found in PATH: %v", err)
 	}
 
-	// Check version
 	version := strings.TrimSpace(string(output))
 	if !strings.Contains(version, "Docker version") {
 		return fmt.Errorf("unexpected Docker version output: %s", version)
@@ -200,10 +199,8 @@ func checkDockerDaemon(ctx context.Context) error {
 
 // checkDiskSpace verifies sufficient disk space
 func checkDiskSpace(ctx context.Context) error {
-	// This is a simplified check - in production you'd want more sophisticated logic
 	const minSpaceGB = 5
 
-	// For now, just check if we can create a temp file
 	tempFile, err := os.CreateTemp("", "preflight-disk-check-*")
 	if err != nil {
 		return fmt.Errorf("insufficient disk space or permissions: %v", err)

@@ -1,23 +1,6 @@
 // Package application provides the application service layer for the Container Kit MCP server.
 // This layer orchestrates domain services and infrastructure components to implement
 // the complete MCP (Model Context Protocol) server functionality.
-//
-// The application layer is responsible for:
-//   - MCP server lifecycle management (start, stop, graceful shutdown)
-//   - Transport layer coordination (HTTP, stdio)
-//   - Tool and resource registration with the MCP protocol
-//   - Dependency injection and service coordination
-//   - Error handling and recovery across service boundaries
-//
-// Architecture:
-//   - Server: Main MCP server implementation and lifecycle
-//   - Transport: Network transport abstractions (HTTP, stdio)
-//   - Registrar: MCP tool and resource registration
-//   - Config: Application configuration management
-//   - Session: User session and state management
-//
-// The application layer follows the clean architecture pattern and depends only on
-// domain interfaces, never on infrastructure implementations directly.
 package application
 
 import (
@@ -40,28 +23,13 @@ import (
 // serverImpl represents the consolidated MCP server implementation.
 // This is the main application service that coordinates all MCP server functionality,
 // including transport management, tool registration, and workflow orchestration.
-//
-// The server implementation follows these principles:
-//   - Thread-safe operations with proper synchronization
-//   - Graceful shutdown with resource cleanup
-//   - Comprehensive error handling and recovery
-//   - Dependency injection for testability
-//   - Observability through structured logging
 type serverImpl struct {
-	// deps contains all injected dependencies for the server
-	deps *Dependencies
-	// startTime tracks when the server was started for uptime metrics
-	startTime time.Time
-
-	// mcpServer is the underlying MCP protocol server instance
-	mcpServer *server.MCPServer
-	// isMcpInitialized tracks whether the MCP server has been properly initialized
+	deps             *Dependencies
+	startTime        time.Time
+	mcpServer        *server.MCPServer
 	isMcpInitialized bool
-
-	// shutdownMutex protects shutdown-related state changes
-	shutdownMutex sync.Mutex
-	// isShuttingDown prevents multiple shutdown attempts
-	isShuttingDown bool
+	shutdownMutex    sync.Mutex
+	isShuttingDown   bool
 }
 
 // ConversationComponents represents conversation mode components
@@ -75,7 +43,6 @@ func (s *serverImpl) registerComponents() error {
 		return errors.New(errors.CodeInternalError, "server", "mcp server not initialized", nil)
 	}
 
-	// Create and use unified registrar
 	registrar := registrar.NewRegistrar(s.deps.Logger, s.deps.ResourceStore, s.deps.WorkflowOrchestrator)
 	if err := registrar.RegisterAll(s.mcpServer); err != nil {
 		return errors.New(errors.CodeToolExecutionFailed, "server", "failed to register components", err)
@@ -86,16 +53,13 @@ func (s *serverImpl) registerComponents() error {
 }
 
 // NewMCPServer creates a new MCP server with the given options using Wire dependency injection.
-// This is the primary public API for creating MCP servers
 func NewMCPServer(ctx context.Context, logger *slog.Logger, opts ...Option) (api.MCPServer, error) {
-	// Extract configuration from options (if provided)
 	tempDeps := &Dependencies{Config: workflow.DefaultServerConfig()}
 	for _, opt := range opts {
 		opt(tempDeps)
 	}
 	config := tempDeps.Config
 
-	// Ensure directories exist
 	if config.StorePath != "" {
 		if err := os.MkdirAll(filepath.Dir(config.StorePath), 0o755); err != nil {
 			logger.Error("Failed to create storage directory", "error", err, "path", config.StorePath)
@@ -110,18 +74,14 @@ func NewMCPServer(ctx context.Context, logger *slog.Logger, opts ...Option) (api
 		}
 	}
 
-	// Use Wire for dependency injection
-	// Check if custom config was provided
 	var server api.MCPServer
 	var err error
 
 	if tempDeps.Config.WorkspaceDir != workflow.DefaultServerConfig().WorkspaceDir ||
 		tempDeps.Config.StorePath != workflow.DefaultServerConfig().StorePath ||
 		tempDeps.Config.MaxSessions != workflow.DefaultServerConfig().MaxSessions {
-		// Custom config provided, use InitializeServerWithConfig
 		server, err = initializeServerWithCustomConfig(logger, config)
 	} else {
-		// Use default config from environment
 		server, err = initializeServerFromEnv(logger)
 	}
 
@@ -140,13 +100,11 @@ func NewMCPServer(ctx context.Context, logger *slog.Logger, opts ...Option) (api
 
 // initializeServerFromEnv initializes server using environment-based configuration
 func initializeServerFromEnv(logger *slog.Logger) (api.MCPServer, error) {
-	// Import the wire package to access the generated injector
 	return initializeServer(logger)
 }
 
 // initializeServerWithCustomConfig initializes server with custom configuration
 func initializeServerWithCustomConfig(logger *slog.Logger, config workflow.ServerConfig) (api.MCPServer, error) {
-	// Import the wire package to access the generated injector
 	return initializeServerWithConfig(logger, config)
 }
 
@@ -163,7 +121,6 @@ var (
 )
 
 // SetServerFactories sets the server factory functions
-// This is called by the wire package to avoid import cycles
 func SetServerFactories(factory ServerFactory, factoryWithConfig ServerFactoryWithConfig) {
 	defaultServerFactory = factory
 	defaultServerFactoryWithConfig = factoryWithConfig

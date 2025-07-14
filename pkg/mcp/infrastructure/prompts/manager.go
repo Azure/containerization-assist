@@ -2,6 +2,7 @@
 package prompts
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"io/fs"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"sync"
 
+	domainprompts "github.com/Azure/container-kit/pkg/mcp/domain/prompts"
 	"gopkg.in/yaml.v3"
 )
 
@@ -309,4 +311,134 @@ func (m *Manager) GetStats() map[string]interface{} {
 		"categories":      categories,
 		"tags":            tags,
 	}
+}
+
+// Domain interface implementation methods
+
+// GetPrompt implements domainprompts.Manager interface
+func (m *Manager) GetPrompt(ctx context.Context, promptID string) (domainprompts.Template, error) {
+	template, err := m.GetTemplate(promptID)
+	if err != nil {
+		return domainprompts.Template{}, err
+	}
+	
+	// Convert to domain Template
+	var variables []domainprompts.Variable
+	for _, param := range template.Parameters {
+		variables = append(variables, domainprompts.Variable{
+			Name:        param.Name,
+			Type:        param.Type,
+			Required:    param.Required,
+			Default:     param.Default,
+			Description: param.Description,
+		})
+	}
+	
+	return domainprompts.Template{
+		ID:          template.ID,
+		Name:        template.Name,
+		Description: template.Description,
+		Content:     template.Template,
+		Variables:   variables,
+		Metadata: map[string]interface{}{
+			"category":    template.Category,
+			"tags":        template.Tags,
+			"version":     template.Version,
+			"max_tokens":  template.MaxTokens,
+			"temperature": template.Temperature,
+		},
+	}, nil
+}
+
+// ListPrompts implements domainprompts.Manager interface
+func (m *Manager) ListPrompts(ctx context.Context) ([]domainprompts.PromptSummary, error) {
+	templates := m.ListTemplates()
+	
+	summaries := make([]domainprompts.PromptSummary, 0, len(templates))
+	for _, template := range templates {
+		summaries = append(summaries, domainprompts.PromptSummary{
+			ID:          template.ID,
+			Name:        template.Name,
+			Description: template.Description,
+		})
+	}
+	
+	return summaries, nil
+}
+
+// RenderPrompt implements domainprompts.Manager interface
+func (m *Manager) RenderPrompt(ctx context.Context, promptID string, variables map[string]interface{}) (string, error) {
+	// Use existing RenderTemplate method
+	rendered, err := m.RenderTemplate(promptID, variables)
+	if err != nil {
+		return "", err
+	}
+	return rendered.Content, nil
+}
+
+// RegisterPrompt implements domainprompts.Manager interface
+func (m *Manager) RegisterPrompt(ctx context.Context, template domainprompts.Template) error {
+	// Convert domain Template to internal Template
+	var parameters []Parameter
+	for _, variable := range template.Variables {
+		parameters = append(parameters, Parameter{
+			Name:        variable.Name,
+			Type:        variable.Type,
+			Required:    variable.Required,
+			Default:     variable.Default,
+			Description: variable.Description,
+		})
+	}
+	
+	// Extract metadata
+	category := "general"
+	if cat, ok := template.Metadata["category"].(string); ok {
+		category = cat
+	}
+	
+	var tags []string
+	if tagSlice, ok := template.Metadata["tags"].([]string); ok {
+		tags = tagSlice
+	}
+	
+	version := "1.0.0"
+	if ver, ok := template.Metadata["version"].(string); ok {
+		version = ver
+	}
+	
+	maxTokens := int32(2048)
+	if mt, ok := template.Metadata["max_tokens"].(int32); ok {
+		maxTokens = mt
+	}
+	
+	temperature := float32(0.3)
+	if temp, ok := template.Metadata["temperature"].(float32); ok {
+		temperature = temp
+	}
+	
+	internalTemplate := &Template{
+		ID:          template.ID,
+		Name:        template.Name,
+		Description: template.Description,
+		Category:    category,
+		Tags:        tags,
+		Version:     version,
+		Template:    template.Content,
+		Parameters:  parameters,
+		MaxTokens:   maxTokens,
+		Temperature: temperature,
+	}
+	
+	// Store in templates map
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
+	m.templates[template.ID] = internalTemplate
+	
+	m.logger.Info("Template registered",
+		"id", template.ID,
+		"name", template.Name,
+		"category", category)
+	
+	return nil
 }

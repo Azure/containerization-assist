@@ -86,7 +86,7 @@ security-scan:
 arch-validate:
 	@echo "Running architectural boundary validation..."
 	@echo "Note: wiring/DI directories are excluded as they need to import from all layers"
-	@cd tools/arch-validate && go run main.go ../../pkg/mcp
+	@cd scripts && go run arch-validate.go
 
 check-all: fmt lint static-analysis security-scan arch-validate test
 
@@ -110,7 +110,8 @@ help:
 	@echo "  lint              Run linter"
 	@echo "  static-analysis   Run static analysis (staticcheck)"
 	@echo "  security-scan     Run security scanning (govulncheck)"
-	@echo "  check-all         Run all checks and tests"
+	@echo "  arch-validate     Run architecture boundary validation"
+	@echo "  check-all         Run all checks and tests (includes arch-validate)"
 	@echo "  clean             Remove binaries"
 	@echo "  version           Show binary version"
 	@echo "  help              Show this help"

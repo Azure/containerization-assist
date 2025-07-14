@@ -280,32 +280,13 @@ func generateFixSuggestions(operation string, errorMsg string, logger *slog.Logg
 func containsPattern(prompt string, patterns ...string) bool {
 	promptLower := strings.ToLower(prompt) // Convert to lowercase for case-insensitive matching
 	for _, pattern := range patterns {
-		if contains(promptLower, pattern) {
+		if strings.Contains(promptLower, pattern) {
 			return true
 		}
 	}
 	return false
 }
 
-// contains checks if a string contains a substring (case-insensitive)
-func contains(s, substr string) bool {
-	// Simple substring check - in a real implementation you might use regex
-	// or more sophisticated pattern matching
-	return len(s) >= len(substr) && findSubstring(s, substr)
-}
-
-// findSubstring performs a simple substring search
-func findSubstring(s, substr string) bool {
-	if len(substr) > len(s) {
-		return false
-	}
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
 
 // Apply applies the suggested fix (kept for backward compatibility)
 func (f *Fix) Apply() error {

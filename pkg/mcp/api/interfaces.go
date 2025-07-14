@@ -1,8 +1,5 @@
 // Package api provides the pure interface definitions for the MCP system.
 // This package contains only interfaces and data contracts with NO implementation code.
-//
-// Dependency flow: Infrastructure → Application → Domain → API
-// The API layer must remain stable and contain no business logic.
 package api
 
 import (
@@ -16,10 +13,7 @@ import (
 
 // MCPServer represents the main MCP server interface
 type MCPServer interface {
-	// Start starts the server
 	Start(ctx context.Context) error
-
-	// Stop gracefully shuts down the server
 	Stop(ctx context.Context) error
 }
 
@@ -29,16 +23,9 @@ type MCPServer interface {
 
 // Tool is the canonical interface for all MCP tools
 type Tool interface {
-	// Name returns the unique identifier for this tool
 	Name() string
-
-	// Description returns a human-readable description of the tool
 	Description() string
-
-	// Execute runs the tool with the given input
 	Execute(ctx context.Context, input ToolInput) (ToolOutput, error)
-
-	// Schema returns the JSON schema for the tool's parameters and results
 	Schema() ToolSchema
 }
 

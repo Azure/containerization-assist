@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sync"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/registry"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -23,35 +23,32 @@ const (
 	TransportTypeHTTP  TransportType = "http"
 )
 
+// TransportRegistry is a type alias for the generic registry
+type TransportRegistry = registry.Registry[Transport]
+
 // Registry holds registered transport implementations
 type Registry struct {
-	transports map[TransportType]Transport
+	transports *TransportRegistry
 	logger     *slog.Logger
-	mu         sync.RWMutex // Protects transports map
 }
 
 // NewRegistry creates a new transport registry
 func NewRegistry(logger *slog.Logger) *Registry {
 	return &Registry{
-		transports: make(map[TransportType]Transport),
+		transports: registry.New[Transport](),
 		logger:     logger.With("component", "transport_registry"),
 	}
 }
 
 // Register adds a transport implementation to the registry
 func (r *Registry) Register(transportType TransportType, transport Transport) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.transports[transportType] = transport
+	r.transports.Add(string(transportType), transport)
 	r.logger.Debug("Transport registered", "type", transportType)
 }
 
 // Start starts the specified transport
 func (r *Registry) Start(ctx context.Context, transportType TransportType, mcpServer *server.MCPServer) error {
-	r.mu.RLock()
-	transport, exists := r.transports[transportType]
-	r.mu.RUnlock()
-
+	transport, exists := r.transports.Get(string(transportType))
 	if !exists {
 		return fmt.Errorf("unsupported transport type: %s", transportType)
 	}

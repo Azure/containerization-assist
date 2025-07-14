@@ -9,7 +9,6 @@ package wiring
 
 import (
 	"log/slog"
-	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/application"
@@ -18,8 +17,8 @@ import (
 	"github.com/google/wire"
 )
 
-// InitializeServer creates a fully wired MCP server with default configuration
-func InitializeServer(logger *slog.Logger) (api.MCPServer, error) {
+// InitializeDefaultServer creates a fully wired MCP server with default configuration
+func InitializeDefaultServer(logger *slog.Logger) (api.MCPServer, error) {
 	wire.Build(ProviderSet)
 	return nil, nil
 }
@@ -27,8 +26,8 @@ func InitializeServer(logger *slog.Logger) (api.MCPServer, error) {
 // InitializeServerWithConfig creates a fully wired MCP server with custom configuration
 func InitializeServerWithConfig(logger *slog.Logger, config workflow.ServerConfig) (api.MCPServer, error) {
 	wire.Build(
-		// Use custom config instead of default
-		wire.Value(config),
+		// Convert ServerConfig to Config for providers that need it
+		ProvideConfigFromServerConfig,
 
 		// Keep all other providers except configuration
 		DomainProviders,
@@ -36,9 +35,9 @@ func InitializeServerWithConfig(logger *slog.Logger, config workflow.ServerConfi
 		MLProviders,
 		ApplicationProviders,
 
-		// Still need these from CommonProviders
-		ProvideStateStore,
+		// Still need these from CommonProviders (but not ProvideConfig)
 		tracing.NewTracerAdapter,
+		ProvideCommandRunner,
 	)
 	return nil, nil
 }
@@ -49,8 +48,8 @@ func InitializeBasicServer(logger *slog.Logger) (api.MCPServer, error) {
 		CommonProviders,
 		DomainProviders,
 		InfraProviders,
+		MLProviders,
 		ApplicationProviders,
-		// Skip MLProviders for basic configuration
 	)
 	return nil, nil
 }
@@ -63,6 +62,7 @@ func InitializeWorkflowOrchestrator(logger *slog.Logger) (workflow.WorkflowOrche
 		CommonProviders,
 		DomainProviders,
 		InfraProviders,
+		MLProviders,
 	)
 	return nil, nil
 }
@@ -70,8 +70,8 @@ func InitializeWorkflowOrchestrator(logger *slog.Logger) (workflow.WorkflowOrche
 // InitializeTestDependencies creates application dependencies for testing
 func InitializeTestDependencies(logger *slog.Logger, config workflow.ServerConfig) (*application.Dependencies, error) {
 	wire.Build(
-		// Use provided config
-		wire.Value(config),
+		// Convert ServerConfig to Config for providers that need it
+		ProvideConfigFromServerConfig,
 
 		// Core providers needed for Dependencies struct
 		DomainProviders,
@@ -81,11 +81,8 @@ func InitializeTestDependencies(logger *slog.Logger, config workflow.ServerConfi
 		// Application layer without server
 		ProvideSessionManager,
 		ProvideResourceStore,
-		ProvideProgressFactory,
-		ProvideSamplingClient,
-		ProvidePromptManager,
-		ProvideStateStore,
 		tracing.NewTracerAdapter,
+		ProvideCommandRunner,
 
 		// Application dependencies structure
 		wire.Struct(

@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/events"
+	domainml "github.com/Azure/container-kit/pkg/mcp/domain/ml"
 	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
+	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 )
 
 // EnhancedErrorHandler wraps workflow execution with AI-powered error analysis
@@ -485,4 +487,114 @@ type AutoFixResult struct {
 	Description string            `json:"description"`
 	Changes     map[string]string `json:"changes"`
 	Reason      string            `json:"reason,omitempty"`
+}
+
+// Domain interface implementation methods
+
+// AnalyzeAndFix implements domainml.EnhancedErrorHandler interface
+func (h *EnhancedErrorHandler) AnalyzeAndFix(ctx context.Context, err error, state *workflow.WorkflowState) (*domainml.ErrorFix, error) {
+	// Convert domain WorkflowState to internal format for analysis
+	// Try to determine step name from current step number
+	stepNames := []string{"analyze", "dockerfile", "build", "scan", "tag", "push", "manifest", "cluster", "deploy", "verify"}
+	stepName := "unknown"
+	if state.CurrentStep > 0 && state.CurrentStep <= len(stepNames) {
+		stepName = stepNames[state.CurrentStep-1]
+	}
+	stepNumber := state.CurrentStep
+	
+	// Analyze the error first
+	classification, analyzeErr := h.AnalyzeWorkflowError(ctx, err, state, stepName, stepNumber)
+	if analyzeErr != nil {
+		return nil, analyzeErr
+	}
+	
+	// Try to apply auto-fix
+	autoFixResult, fixErr := h.ApplyAutoFix(ctx, classification, state)
+	if fixErr != nil {
+		return nil, fixErr
+	}
+	
+	// Convert to domain ErrorFix
+	changes := make([]string, 0, len(autoFixResult.Changes))
+	for key, value := range autoFixResult.Changes {
+		changes = append(changes, fmt.Sprintf("%s: %s", key, value))
+	}
+	
+	return &domainml.ErrorFix{
+		Applied:     autoFixResult.Applied,
+		Description: autoFixResult.Description,
+		Changes:     changes,
+		Confidence:  classification.Confidence,
+		Metadata: map[string]interface{}{
+			"category":       string(classification.Category),
+			"auto_fixable":   classification.AutoFixable,
+			"retry_strategy": string(classification.RetryRecommendation),
+		},
+	}, nil
+}
+
+// SuggestFixes implements domainml.EnhancedErrorHandler interface
+func (h *EnhancedErrorHandler) SuggestFixes(ctx context.Context, err error, state *workflow.WorkflowState) ([]domainml.FixSuggestion, error) {
+	// Convert domain WorkflowState to internal format for analysis
+	// Try to determine step name from current step number
+	stepNames := []string{"analyze", "dockerfile", "build", "scan", "tag", "push", "manifest", "cluster", "deploy", "verify"}
+	stepName := "unknown"
+	if state.CurrentStep > 0 && state.CurrentStep <= len(stepNames) {
+		stepName = stepNames[state.CurrentStep-1]
+	}
+	stepNumber := state.CurrentStep
+	
+	// Analyze the error
+	classification, analyzeErr := h.AnalyzeWorkflowError(ctx, err, state, stepName, stepNumber)
+	if analyzeErr != nil {
+		return nil, analyzeErr
+	}
+	
+	// Create fix suggestions based on classification
+	var suggestions []domainml.FixSuggestion
+	
+	// Main suggestion from AI analysis
+	if classification.SuggestedFix != "" {
+		risk := "medium"
+		if classification.AutoFixable {
+			risk = "low"
+		}
+		if classification.Severity == SeverityCritical {
+			risk = "high"
+		}
+		
+		suggestions = append(suggestions, domainml.FixSuggestion{
+			Description: classification.SuggestedFix,
+			Command:     "", // Could be populated based on category
+			Confidence:  classification.Confidence,
+			Risk:        risk,
+		})
+	}
+	
+	// Add category-specific suggestions
+	switch classification.Category {
+	case CategoryNetwork:
+		suggestions = append(suggestions, domainml.FixSuggestion{
+			Description: "Check network connectivity and retry",
+			Command:     "ping registry.example.com",
+			Confidence:  0.8,
+			Risk:        "low",
+		})
+	case CategoryPermissions:
+		suggestions = append(suggestions, domainml.FixSuggestion{
+			Description: "Verify authentication credentials and permissions",
+			Command:     "kubectl auth can-i create pods",
+			Confidence:  0.9,
+			Risk:        "low",
+		})
+	case CategoryDockerfile:
+		suggestions = append(suggestions, domainml.FixSuggestion{
+			Description: "Review Dockerfile syntax and base image availability",
+			Command:     "docker build --dry-run .",
+			Confidence:  0.7,
+			Risk:        "low",
+		})
+	}
+	
+	return suggestions, nil
 }

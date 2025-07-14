@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -688,7 +689,7 @@ func (ra *RepositoryAnalyzer) analyzeDatabase(repoPath string, dependencies []De
 	// Check dependencies for database libraries
 	for _, dep := range dependencies {
 		if dbType, exists := dbLibraries[dep.Name]; exists {
-			if !ra.contains(dbInfo.Types, dbType) {
+			if !slices.Contains(dbInfo.Types, dbType) {
 				dbInfo.Types = append(dbInfo.Types, dbType)
 			}
 			dbInfo.Libraries = append(dbInfo.Libraries, dep.Name)
@@ -1011,14 +1012,6 @@ func (ra *RepositoryAnalyzer) containsDatabaseConfig(filePath string) bool {
 	return false
 }
 
-func (ra *RepositoryAnalyzer) contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
-}
 
 func (ra *RepositoryAnalyzer) generateSuggestions(result *AnalysisResult) []string {
 	suggestions := make([]string, 0)

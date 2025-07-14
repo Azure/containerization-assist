@@ -5,16 +5,21 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/registry"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
+
+// PromptHandlerRegistry is a type alias for the generic registry
+type PromptHandlerRegistry = registry.Registry[server.PromptHandlerFunc]
 
 // Registry manages MCP prompts with native mcp-go support
 type Registry struct {
 	server interface {
 		AddPrompt(prompt mcp.Prompt, handler server.PromptHandlerFunc)
 	}
-	logger *slog.Logger
+	logger   *slog.Logger
+	handlers *PromptHandlerRegistry
 }
 
 // NewRegistry creates a new prompt registry with native MCP prompt support
@@ -22,8 +27,9 @@ func NewRegistry(s interface {
 	AddPrompt(prompt mcp.Prompt, handler server.PromptHandlerFunc)
 }, logger *slog.Logger) *Registry {
 	return &Registry{
-		server: s,
-		logger: logger.With("component", "prompt-registry"),
+		server:   s,
+		logger:   logger.With("component", "prompt-registry"),
+		handlers: registry.New[server.PromptHandlerFunc](),
 	}
 }
 
@@ -42,8 +48,10 @@ func (r *Registry) RegisterAll() error {
 	for name, description := range prompts {
 		prompt := mcp.NewPrompt(name, mcp.WithPromptDescription(description))
 
-		// Use a simple handler that returns basic containerization guidance
-		r.server.AddPrompt(prompt, r.createBasicHandler(name, description))
+		// Create and store the handler
+		handler := r.createBasicHandler(name, description)
+		r.handlers.Add(name, handler)
+		r.server.AddPrompt(prompt, handler)
 		r.logger.Info("Registered prompt", "name", name, "description", description)
 	}
 

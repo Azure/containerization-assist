@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -262,32 +263,12 @@ func isExpectedBenchmarkError(err error) bool {
 	}
 	errStr := err.Error()
 	// These are expected errors during benchmarking when there's no real MCP server
-	return contains(errStr, "no MCP server") ||
-		contains(errStr, "not available") ||
-		contains(errStr, "context") ||
-		contains(errStr, "timeout")
+	return strings.Contains(errStr, "no MCP server") ||
+		strings.Contains(errStr, "not available") ||
+		strings.Contains(errStr, "context") ||
+		strings.Contains(errStr, "timeout")
 }
 
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) &&
-		s[:len(s)-len(substr)+1] != "" &&
-		findSubstring(s, substr)
-}
-
-func findSubstring(s, substr string) bool {
-	if len(substr) == 0 {
-		return true
-	}
-	if len(s) < len(substr) {
-		return false
-	}
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
 
 func sortTimes(times []time.Duration) {
 	// Use standard library sort for efficiency

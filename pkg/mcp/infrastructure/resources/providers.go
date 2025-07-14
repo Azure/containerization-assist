@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/domain/resources"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/utilities"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -38,10 +39,15 @@ func NewStore(logger *slog.Logger) *Store {
 }
 
 // RegisterProviders registers all resource providers with the MCP server
-func (s *Store) RegisterProviders(mcpServer interface {
-	AddResource(resource mcp.Resource, handler server.ResourceHandlerFunc)
-	AddResourceTemplate(template mcp.ResourceTemplate, handler server.ResourceTemplateHandlerFunc)
-}) error {
+func (s *Store) RegisterProviders(mcpServer interface{}) error {
+	// Type assert to the specific interface we need
+	mcpSrv, ok := mcpServer.(interface {
+		AddResource(resource mcp.Resource, handler server.ResourceHandlerFunc)
+		AddResourceTemplate(template mcp.ResourceTemplate, handler server.ResourceTemplateHandlerFunc)
+	})
+	if !ok {
+		return fmt.Errorf("mcpServer does not implement required interface")
+	}
 	s.logger.Info("Registering MCP resource providers")
 
 	// Register static resources for known workflows
@@ -57,7 +63,7 @@ func (s *Store) RegisterProviders(mcpServer interface {
 			mcp.WithMIMEType("application/json"),
 		)
 
-		mcpServer.AddResource(resource, server.ResourceHandlerFunc(func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		mcpSrv.AddResource(resource, server.ResourceHandlerFunc(func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 			return []mcp.ResourceContents{
 				mcp.TextResourceContents{
 					URI:      resourceURI,
@@ -78,7 +84,7 @@ func (s *Store) RegisterProviders(mcpServer interface {
 		mcp.WithTemplateMIMEType("application/json"),
 	)
 
-	mcpServer.AddResourceTemplate(progressTemplate, server.ResourceTemplateHandlerFunc(func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+	mcpSrv.AddResourceTemplate(progressTemplate, server.ResourceTemplateHandlerFunc(func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 		return s.handleProgressResource(ctx, request)
 	}))
 
@@ -90,7 +96,7 @@ func (s *Store) RegisterProviders(mcpServer interface {
 		mcp.WithTemplateMIMEType("text/plain"),
 	)
 
-	mcpServer.AddResourceTemplate(logsTemplate, server.ResourceTemplateHandlerFunc(func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+	mcpSrv.AddResourceTemplate(logsTemplate, server.ResourceTemplateHandlerFunc(func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 		return s.handleLogsResource(ctx, request)
 	}))
 
@@ -371,4 +377,91 @@ func (s *Store) GetLastCleanupTime() time.Time {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.lastCleanup
+}
+
+// GetResource retrieves a resource by URI (domain interface implementation)
+func (s *Store) GetResource(ctx context.Context, uri string) (resources.Resource, error) {
+	if strings.HasPrefix(uri, "progress://") {
+		workflowID := strings.TrimPrefix(uri, "progress://")
+		content, err := s.GetProgressAsResource(workflowID)
+		if err != nil {
+			return resources.Resource{}, err
+		}
+		return resources.Resource{
+			URI:         uri,
+			Name:        fmt.Sprintf("Progress for %s", workflowID),
+			Description: "Workflow progress data",
+			MimeType:    "application/json",
+			Content:     content,
+		}, nil
+	}
+	if strings.HasPrefix(uri, "logs://") {
+		parts := strings.Split(strings.TrimPrefix(uri, "logs://"), "/")
+		if len(parts) == 2 {
+			content, err := s.GetLogsAsResource(parts[0], parts[1])
+			if err != nil {
+				return resources.Resource{}, err
+			}
+			return resources.Resource{
+				URI:         uri,
+				Name:        fmt.Sprintf("Logs for %s/%s", parts[0], parts[1]),
+				Description: "Step execution logs",
+				MimeType:    "text/plain",
+				Content:     content,
+			}, nil
+		}
+	}
+	return resources.Resource{}, fmt.Errorf("unknown resource URI: %s", uri)
+}
+
+// ListResources lists all available resources (domain interface implementation)
+func (s *Store) ListResources(ctx context.Context) ([]resources.Resource, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	
+	resourceList := make([]resources.Resource, 0)
+	
+	// Add progress resources
+	for workflowID := range s.progressData {
+		resourceList = append(resourceList, resources.Resource{
+			URI:         fmt.Sprintf("progress://%s", workflowID),
+			Name:        fmt.Sprintf("Progress for %s", workflowID),
+			Description: "Workflow progress data",
+			MimeType:    "application/json",
+		})
+	}
+	
+	// Add log resources
+	for workflowID, stepLogs := range s.logData {
+		for stepName := range stepLogs {
+			resourceList = append(resourceList, resources.Resource{
+				URI:         fmt.Sprintf("logs://%s/%s", workflowID, stepName),
+				Name:        fmt.Sprintf("Logs for %s/%s", workflowID, stepName),
+				Description: "Step execution logs",
+				MimeType:    "text/plain",
+			})
+		}
+	}
+	
+	return resourceList, nil
+}
+
+// AddResource adds a new resource to the store (domain interface implementation)
+func (s *Store) AddResource(ctx context.Context, resource resources.Resource) error {
+	// For now, this implementation assumes resources are added via StoreProgress/StoreLogs
+	// In a full implementation, we'd parse the resource and store it appropriately
+	return fmt.Errorf("AddResource not implemented for this store type")
+}
+
+// RemoveResource removes a resource from the store (domain interface implementation)
+func (s *Store) RemoveResource(ctx context.Context, uri string) error {
+	if strings.HasPrefix(uri, "progress://") {
+		workflowID := strings.TrimPrefix(uri, "progress://")
+		s.mu.Lock()
+		delete(s.progressData, workflowID)
+		delete(s.logData, workflowID)
+		s.mu.Unlock()
+		return nil
+	}
+	return fmt.Errorf("cannot remove resource with URI: %s", uri)
 }

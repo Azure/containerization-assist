@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -408,20 +409,17 @@ pytest
 }
 
 func TestContains(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	analyzer := NewRepositoryAnalyzer(logger)
-
 	slice := []string{"apple", "banana", "cherry"}
 
-	if !analyzer.contains(slice, "banana") {
+	if !slices.Contains(slice, "banana") {
 		t.Errorf("Expected to find 'banana' in slice")
 	}
 
-	if analyzer.contains(slice, "grape") {
+	if slices.Contains(slice, "grape") {
 		t.Errorf("Expected not to find 'grape' in slice")
 	}
 
-	if analyzer.contains([]string{}, "anything") {
+	if slices.Contains([]string{}, "anything") {
 		t.Errorf("Expected not to find anything in empty slice")
 	}
 }

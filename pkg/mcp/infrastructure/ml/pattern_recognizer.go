@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"strings"
 
+	domainml "github.com/Azure/container-kit/pkg/mcp/domain/ml"
 	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
+	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 )
 
 // ErrorClassification represents the AI analysis of an error
@@ -307,7 +310,7 @@ func (r *ErrorPatternRecognizer) enhanceWithHistory(classification *ErrorClassif
 
 	if len(similarErrors) > 0 {
 		// Increase confidence if we've seen this pattern before
-		classification.Confidence = minFloat(classification.Confidence+0.2, 1.0)
+		classification.Confidence = math.Min(classification.Confidence+0.2, 1.0)
 
 		// Add historical patterns
 		for _, similar := range similarErrors {
@@ -326,12 +329,6 @@ func (r *ErrorPatternRecognizer) enhanceWithHistory(classification *ErrorClassif
 }
 
 // Helper functions
-func minFloat(a, b float64) float64 {
-	if a < b {
-		return a
-	}
-	return b
-}
 
 func removeDuplicates(slice []string) []string {
 	keys := make(map[string]bool)
@@ -345,4 +342,79 @@ func removeDuplicates(slice []string) []string {
 	}
 
 	return result
+}
+
+// Domain interface implementation methods
+
+// RecognizePattern implements domainml.ErrorPatternRecognizer interface
+func (r *ErrorPatternRecognizer) RecognizePattern(ctx context.Context, err error, stepContext *workflow.WorkflowState) (*domainml.ErrorClassification, error) {
+	// Convert WorkflowState to our internal WorkflowContext
+	stepName := "unknown"
+	repoURL := ""
+	branch := ""
+	
+	if stepContext.Args != nil {
+		repoURL = stepContext.Args.RepoURL
+		branch = stepContext.Args.Branch
+	}
+	
+	// Try to determine step name from current step number
+	stepNames := []string{"analyze", "dockerfile", "build", "scan", "tag", "push", "manifest", "cluster", "deploy", "verify"}
+	if stepContext.CurrentStep > 0 && stepContext.CurrentStep <= len(stepNames) {
+		stepName = stepNames[stepContext.CurrentStep-1]
+	}
+	
+	context := WorkflowContext{
+		WorkflowID: stepContext.WorkflowID,
+		StepName:   stepName,
+		StepNumber: stepContext.CurrentStep,
+		TotalSteps: stepContext.TotalSteps,
+		RepoURL:    repoURL,
+		Branch:     branch,
+	}
+	
+	// Use existing ClassifyError method
+	classification, classifyErr := r.ClassifyError(ctx, err, context)
+	if classifyErr != nil {
+		return nil, classifyErr
+	}
+	
+	// Convert to domain ErrorClassification
+	return &domainml.ErrorClassification{
+		Category:    classification.ErrorType,
+		Confidence:  classification.Confidence,
+		Patterns:    classification.Patterns,
+		Suggestions: []string{classification.SuggestedFix},
+		Metadata: map[string]interface{}{
+			"severity":         string(classification.Severity),
+			"auto_fixable":     classification.AutoFixable,
+			"retry_strategy":   string(classification.RetryRecommendation),
+			"category":         string(classification.Category),
+		},
+	}, nil
+}
+
+// GetSimilarErrors implements domainml.ErrorPatternRecognizer interface
+func (r *ErrorPatternRecognizer) GetSimilarErrors(ctx context.Context, err error) ([]domainml.HistoricalError, error) {
+	// Get similar errors from our error history
+	similarErrors := r.errorHistory.FindSimilarErrors(err, WorkflowContext{})
+	
+	// Convert to domain HistoricalError format
+	var result []domainml.HistoricalError
+	for _, similar := range similarErrors {
+		solutions := []string{}
+		if similar.Classification != nil && similar.Classification.SuggestedFix != "" {
+			solutions = append(solutions, similar.Classification.SuggestedFix)
+		}
+		
+		result = append(result, domainml.HistoricalError{
+			Error:      similar.Error,
+			Context:    similar.StepName,
+			Solutions:  solutions,
+			Similarity: 0.8, // Default similarity score
+			Timestamp:  similar.Timestamp.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+	
+	return result, nil
 }

@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+
+	domainml "github.com/Azure/container-kit/pkg/mcp/domain/ml"
+	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 )
 
 // Step represents a workflow step interface
@@ -231,8 +234,8 @@ func NewStepEnhancer(errorHandler *EnhancedErrorHandler, logger *slog.Logger) *S
 	}
 }
 
-// EnhanceStep wraps a regular step with AI capabilities
-func (se *StepEnhancer) EnhanceStep(step Step) Step {
+// EnhanceStepInternal wraps a regular step with AI capabilities (internal method)
+func (se *StepEnhancer) EnhanceStepInternal(step Step) Step {
 	return NewEnhancedStep(step, se.errorHandler, se.logger)
 }
 
@@ -240,7 +243,7 @@ func (se *StepEnhancer) EnhanceStep(step Step) Step {
 func (se *StepEnhancer) EnhanceAllSteps(steps []Step) []Step {
 	enhanced := make([]Step, len(steps))
 	for i, step := range steps {
-		enhanced[i] = se.EnhanceStep(step)
+		enhanced[i] = se.EnhanceStepInternal(step)
 	}
 	return enhanced
 }
@@ -254,4 +257,130 @@ func CreateEnhancedWorkflow(
 
 	enhancer := NewStepEnhancer(errorHandler, logger)
 	return enhancer.EnhanceAllSteps(originalSteps)
+}
+
+// Domain interface implementation methods
+
+// EnhanceStep implements domainml.StepEnhancer interface
+func (se *StepEnhancer) EnhanceStep(ctx context.Context, step workflow.Step, state *workflow.WorkflowState) (workflow.Step, error) {
+	// This is a simple adapter - we could enhance this to actually modify steps based on state
+	// For now, we just enhance with error handling capabilities
+	
+	// Create an adapter that bridges our internal Step interface with the domain Step interface
+	adapter := &StepAdapter{
+		domainStep: step,
+		logger:     se.logger,
+	}
+	
+	// Enhance the adapted step using the internal method (not the domain interface method)
+	enhanced := se.EnhanceStepInternal(adapter)
+	
+	// Return the enhanced adapter wrapped as a domain step
+	return &EnhancedStepAdapter{
+		enhancedStep: enhanced,
+		logger:       se.logger,
+	}, nil
+}
+
+// OptimizeWorkflow implements domainml.StepEnhancer interface
+func (se *StepEnhancer) OptimizeWorkflow(ctx context.Context, steps []workflow.Step) (*domainml.WorkflowOptimization, error) {
+	// Analyze the workflow and provide optimization suggestions
+	suggestions := []domainml.OptimizationSuggestion{}
+	
+	for i, step := range steps {
+		stepName := step.Name()
+		
+		// Basic optimization suggestions based on step patterns
+		switch stepName {
+		case "build":
+			suggestions = append(suggestions, domainml.OptimizationSuggestion{
+				StepName:    stepName,
+				Type:        "caching",
+				Description: "Enable Docker layer caching to reduce build times",
+				Impact:      0.3, // 30% improvement estimate
+			})
+		case "scan":
+			suggestions = append(suggestions, domainml.OptimizationSuggestion{
+				StepName:    stepName,
+				Type:        "parallel",
+				Description: "Run security scanning in parallel with other steps",
+				Impact:      0.15, // 15% improvement estimate
+			})
+		case "deploy":
+			if i > 0 && steps[i-1].Name() == "verify" {
+				suggestions = append(suggestions, domainml.OptimizationSuggestion{
+					StepName:    stepName,
+					Type:        "reorder",
+					Description: "Move verification step after deployment for faster feedback",
+					Impact:      0.1, // 10% improvement estimate
+				})
+			}
+		}
+	}
+	
+	// Calculate estimated improvement (average of all suggestions)
+	totalImpact := 0.0
+	for _, suggestion := range suggestions {
+		totalImpact += suggestion.Impact
+	}
+	estimatedImprovement := totalImpact / float64(len(suggestions))
+	if len(suggestions) == 0 {
+		estimatedImprovement = 0.0
+	}
+	
+	return &domainml.WorkflowOptimization{
+		Suggestions:          suggestions,
+		EstimatedImprovement: estimatedImprovement,
+		Metadata: map[string]interface{}{
+			"analysis_type": "rule_based",
+			"step_count":    len(steps),
+			"suggestions":   len(suggestions),
+		},
+	}, nil
+}
+
+// StepAdapter adapts domain Step interface to internal Step interface
+type StepAdapter struct {
+	domainStep workflow.Step
+	logger     *slog.Logger
+}
+
+func (sa *StepAdapter) Name() string {
+	return sa.domainStep.Name()
+}
+
+func (sa *StepAdapter) MaxRetries() int {
+	return 3 // Default retry count
+}
+
+func (sa *StepAdapter) Execute(ctx context.Context, state interface{}) error {
+	// Convert state to WorkflowState if possible
+	if workflowState, ok := state.(*workflow.WorkflowState); ok {
+		return sa.domainStep.Execute(ctx, workflowState)
+	}
+	
+	// Fallback - create a basic workflow state
+	basicState := &workflow.WorkflowState{
+		WorkflowID:  "unknown",
+		CurrentStep: 1, // Default to step 1
+	}
+	return sa.domainStep.Execute(ctx, basicState)
+}
+
+// EnhancedStepAdapter adapts enhanced internal step back to domain interface
+type EnhancedStepAdapter struct {
+	enhancedStep Step
+	logger       *slog.Logger
+}
+
+func (esa *EnhancedStepAdapter) Name() string {
+	return esa.enhancedStep.Name()
+}
+
+func (esa *EnhancedStepAdapter) MaxRetries() int {
+	return esa.enhancedStep.MaxRetries()
+}
+
+func (esa *EnhancedStepAdapter) Execute(ctx context.Context, state *workflow.WorkflowState) error {
+	return esa.enhancedStep.Execute(ctx, state)
 }
