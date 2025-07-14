@@ -13,7 +13,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/application"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/tracing"
+	// "github.com/Azure/container-kit/pkg/mcp/infrastructure/observability/tracing"
 	"github.com/google/wire"
 )
 
@@ -36,7 +36,6 @@ func InitializeServerWithConfig(logger *slog.Logger, config workflow.ServerConfi
 		ApplicationProviders,
 
 		// Still need these from CommonProviders (but not ProvideConfig)
-		tracing.NewTracerAdapter,
 		ProvideCommandRunner,
 	)
 	return nil, nil
@@ -81,14 +80,13 @@ func InitializeTestDependencies(logger *slog.Logger, config workflow.ServerConfi
 		// Application layer without server
 		ProvideSessionManager,
 		ProvideResourceStore,
-		tracing.NewTracerAdapter,
 		ProvideCommandRunner,
 
 		// Application dependencies structure
 		wire.Struct(
 			new(application.Dependencies),
 			"Logger", "Config", "SessionManager", "ResourceStore",
-			"ProgressFactory", "EventPublisher", "SagaCoordinator",
+			"ProgressEmitterFactory", "EventPublisher", "SagaCoordinator",
 			"WorkflowOrchestrator", "EventAwareOrchestrator", "SagaAwareOrchestrator",
 			"ErrorPatternRecognizer", "EnhancedErrorHandler", "StepEnhancer",
 			"SamplingClient", "PromptManager",

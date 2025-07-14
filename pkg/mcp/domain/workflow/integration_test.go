@@ -10,7 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
+	"github.com/Azure/container-kit/pkg/mcp/domain/workflow/common"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,14 +32,14 @@ func (t *TestProgressSink) Close() error {
 	return nil
 }
 
-// TestProgressFactory creates a test progress tracker
-type TestProgressFactory struct {
+// TestProgressEmitterFactory creates a test progress emitter
+type TestProgressEmitterFactory struct {
 	sink progress.Sink
 }
 
-func (f *TestProgressFactory) CreateTracker(ctx context.Context, req *mcp.CallToolRequest, totalSteps int) *progress.Tracker {
-	tracker := progress.NewTracker(ctx, totalSteps, f.sink)
-	return tracker
+func (f *TestProgressEmitterFactory) CreateEmitter(ctx context.Context, req *mcp.CallToolRequest, totalSteps int) api.ProgressEmitter {
+	// For tests, return a NoOpEmitter or TrackerEmitter
+	return &common.NoOpEmitter{}
 }
 
 // Add helper function for pointer

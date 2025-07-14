@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/testutil"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

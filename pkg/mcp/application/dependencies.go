@@ -11,8 +11,8 @@ import (
 	domainml "github.com/Azure/container-kit/pkg/mcp/domain/ml"
 	domainprompts "github.com/Azure/container-kit/pkg/mcp/domain/prompts"
 	domainresources "github.com/Azure/container-kit/pkg/mcp/domain/resources"
-	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
+	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 )
 
@@ -42,9 +42,9 @@ type Dependencies struct {
 	ResourceStore  domainresources.Store
 
 	// Domain services
-	ProgressFactory workflow.ProgressTrackerFactory
-	EventPublisher  domainevents.Publisher
-	SagaCoordinator *saga.SagaCoordinator
+	ProgressEmitterFactory workflow.ProgressEmitterFactory
+	EventPublisher         domainevents.Publisher
+	SagaCoordinator        *saga.SagaCoordinator
 
 	// Workflow orchestrators
 	WorkflowOrchestrator   workflow.WorkflowOrchestrator

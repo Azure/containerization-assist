@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/api"
 )
 
 // ProgressMiddleware adds comprehensive progress tracking to step execution
@@ -18,21 +20,36 @@ func ProgressMiddleware() StepMiddleware {
 			startTime := time.Now()
 
 			// Emit step start event with metadata
-			state.ProgressTracker.Update(stepIndex, fmt.Sprintf("Starting %s", stepName), map[string]interface{}{
-				"step_name":   stepName,
-				"status":      "started",
-				"can_abort":   true,
-				"max_retries": step.MaxRetries(),
-				"step_index":  stepIndex,
-				"workflow_id": state.WorkflowID,
-				"total_steps": state.TotalSteps,
+			percentage := int(float64(stepIndex) / float64(state.TotalSteps) * 100)
+			_ = state.ProgressEmitter.EmitDetailed(ctx, api.ProgressUpdate{
+				Step:       stepIndex,
+				Total:      state.TotalSteps,
+				Stage:      stepName,
+				Message:    fmt.Sprintf("Starting %s", stepName),
+				Percentage: percentage,
+				Status:     "started",
+				Metadata: map[string]interface{}{
+					"step_name":   stepName,
+					"can_abort":   true,
+					"max_retries": step.MaxRetries(),
+					"step_index":  stepIndex,
+					"workflow_id": state.WorkflowID,
+					"total_steps": state.TotalSteps,
+				},
 			})
 
 			// Update to running status
-			state.ProgressTracker.Update(stepIndex, fmt.Sprintf("Executing %s", stepName), map[string]interface{}{
-				"step_name":   stepName,
-				"status":      "running",
-				"workflow_id": state.WorkflowID,
+			_ = state.ProgressEmitter.EmitDetailed(ctx, api.ProgressUpdate{
+				Step:       stepIndex,
+				Total:      state.TotalSteps,
+				Stage:      stepName,
+				Message:    fmt.Sprintf("Executing %s", stepName),
+				Percentage: percentage,
+				Status:     "running",
+				Metadata: map[string]interface{}{
+					"step_name":   stepName,
+					"workflow_id": state.WorkflowID,
+				},
 			})
 
 			// Execute the step
@@ -40,16 +57,20 @@ func ProgressMiddleware() StepMiddleware {
 			duration := time.Since(startTime)
 
 			if err != nil {
-				// Record error with structured context
-				state.ProgressTracker.RecordError(err)
-
 				// Emit failure event with detailed information
-				state.ProgressTracker.Update(stepIndex, fmt.Sprintf("Failed %s", stepName), map[string]interface{}{
-					"step_name":   stepName,
-					"status":      "failed",
-					"error":       err.Error(),
-					"duration_ms": duration.Milliseconds(),
-					"workflow_id": state.WorkflowID,
+				_ = state.ProgressEmitter.EmitDetailed(ctx, api.ProgressUpdate{
+					Step:       stepIndex,
+					Total:      state.TotalSteps,
+					Stage:      stepName,
+					Message:    fmt.Sprintf("Failed %s", stepName),
+					Percentage: percentage,
+					Status:     "failed",
+					Metadata: map[string]interface{}{
+						"step_name":   stepName,
+						"error":       err.Error(),
+						"duration_ms": duration.Milliseconds(),
+						"workflow_id": state.WorkflowID,
+					},
 				})
 
 				// Add structured step result
@@ -60,12 +81,20 @@ func ProgressMiddleware() StepMiddleware {
 				state.UpdateProgress()
 
 				// Emit successful completion event
-				state.ProgressTracker.Update(state.CurrentStep, fmt.Sprintf("Completed %s", stepName), map[string]interface{}{
-					"step_name":      stepName,
-					"status":         "completed",
-					"duration_ms":    duration.Milliseconds(),
-					"result_summary": fmt.Sprintf("%s completed in %s", stepName, duration),
-					"workflow_id":    state.WorkflowID,
+				completionPercent := int(float64(state.CurrentStep) / float64(state.TotalSteps) * 100)
+				_ = state.ProgressEmitter.EmitDetailed(ctx, api.ProgressUpdate{
+					Step:       state.CurrentStep,
+					Total:      state.TotalSteps,
+					Stage:      stepName,
+					Message:    fmt.Sprintf("Completed %s", stepName),
+					Percentage: completionPercent,
+					Status:     "completed",
+					Metadata: map[string]interface{}{
+						"step_name":      stepName,
+						"duration_ms":    duration.Milliseconds(),
+						"result_summary": fmt.Sprintf("%s completed in %s", stepName, duration),
+						"workflow_id":    state.WorkflowID,
+					},
 				})
 
 				// Add successful step result

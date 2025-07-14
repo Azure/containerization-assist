@@ -229,3 +229,37 @@ type BuildResult struct {
 	Error     string        `json:"error,omitempty"`
 	Duration  time.Duration `json:"duration"`
 }
+
+// ============================================================================
+// Progress Reporting Interfaces
+// ============================================================================
+
+// ProgressEmitter provides clean interface for progress reporting across transports
+type ProgressEmitter interface {
+	// Emit reports progress with step, percent, and message
+	Emit(ctx context.Context, stage string, percent int, message string) error
+
+	// EmitDetailed reports progress with full structured update
+	EmitDetailed(ctx context.Context, update ProgressUpdate) error
+
+	// Close finalizes the progress reporting
+	Close() error
+}
+
+// ============================================================================
+// Progress Data Structures
+// ============================================================================
+
+// ProgressUpdate represents a structured progress report
+type ProgressUpdate struct {
+	Step       int                    `json:"step"`
+	Total      int                    `json:"total"`
+	Stage      string                 `json:"stage"`
+	Message    string                 `json:"message"`
+	Percentage int                    `json:"percentage"` // 0-100
+	StartedAt  time.Time              `json:"started_at"`
+	ETA        time.Duration          `json:"eta,omitempty"`
+	Status     string                 `json:"status,omitempty"`
+	TraceID    string                 `json:"trace_id,omitempty"`
+	Metadata   map[string]interface{} `json:"metadata,omitempty"`
+}

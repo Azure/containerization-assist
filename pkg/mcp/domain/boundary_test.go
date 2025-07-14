@@ -17,7 +17,10 @@ func TestNoDomainInfrastructureDependencies(t *testing.T) {
 		"github.com/Azure/container-kit/pkg/mcp/domain/progress",
 		"github.com/Azure/container-kit/pkg/mcp/domain/sampling",
 		"github.com/Azure/container-kit/pkg/mcp/domain/session",
-		"github.com/Azure/container-kit/pkg/mcp/domain/errors",
+		"github.com/Azure/container-kit/pkg/mcp/domain/health",
+		"github.com/Azure/container-kit/pkg/mcp/domain/ml",
+		"github.com/Azure/container-kit/pkg/mcp/domain/prompts",
+		"github.com/Azure/container-kit/pkg/mcp/domain/resources",
 	}
 
 	// Forbidden imports in domain layer
@@ -90,12 +93,12 @@ func TestNoApplicationInfrastructureDependencies(t *testing.T) {
 func TestLayerDependencyDirection(t *testing.T) {
 	// Infrastructure should not import from application or api
 	infrastructurePackages := []string{
-		"github.com/Azure/container-kit/pkg/mcp/infrastructure/container",
-		"github.com/Azure/container-kit/pkg/mcp/infrastructure/kubernetes",
+		"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/container",
+		"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/kubernetes",
 		"github.com/Azure/container-kit/pkg/mcp/infrastructure/persistence",
-		"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps",
-		"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling",
-		"github.com/Azure/container-kit/pkg/mcp/infrastructure/ml",
+		"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/steps",
+		"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/sampling",
+		"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/ml",
 	}
 
 	forbiddenForInfra := []string{

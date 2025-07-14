@@ -11,8 +11,13 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application"
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/events"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/tracing"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/ml"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging/events"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging/progress"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/observability/tracing"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/container"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/kubernetes"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/steps"
 	"log/slog"
 )
 
@@ -25,12 +30,16 @@ func InitializeDefaultServer(logger *slog.Logger) (api.MCPServer, error) {
 		return nil, err
 	}
 	serverConfig := ProvideServerConfigFromUnified(config)
-	optimizedSessionManager := ProvideSessionManager(serverConfig, logger)
+	optimizedSessionManager, err := ProvideSessionManager(serverConfig, logger)
+	if err != nil {
+		return nil, err
+	}
 	store := ProvideResourceStore(logger)
-	sinkFactory := ProvideProgressFactory(logger)
+	sinkFactory := progress.NewSinkFactory(logger)
+	progressEmitterFactory := ProvideProgressEmitterFactory(sinkFactory)
 	publisher := events.NewPublisher(logger)
 	sagaCoordinator := saga.NewSagaCoordinator(logger, publisher)
-	stepProvider := ProvideStepProvider(logger)
+	stepProvider := steps.NewRegistryStepProvider()
 	client, err := ProvideSamplingClient(config, logger)
 	if err != nil {
 		return nil, err
@@ -40,16 +49,16 @@ func InitializeDefaultServer(logger *slog.Logger) (api.MCPServer, error) {
 	step := ProvideOptimizedBuildStep(optimizedBuildStep)
 	stepFactory := ProvideStepFactory(stepProvider, step, logger)
 	tracer := tracing.NewTracerAdapter()
-	baseOrchestrator := ProvideBaseOrchestrator(stepFactory, sinkFactory, logger, tracer)
+	baseOrchestrator := ProvideBaseOrchestrator(stepFactory, progressEmitterFactory, logger, tracer)
 	workflowOrchestrator := ProvideWorkflowOrchestrator(baseOrchestrator)
 	eventAwareOrchestrator := ProvideEventOrchestrator(baseOrchestrator, publisher)
 	commandRunner := ProvideCommandRunner()
-	containerManager := ProvideContainerManager(commandRunner, logger)
-	deploymentManager := ProvideDeploymentManager(commandRunner, logger)
+	containerManager := container.NewDockerContainerManager(commandRunner, logger)
+	deploymentManager := kubernetes.NewKubernetesDeploymentManager(commandRunner, logger)
 	sagaAwareOrchestrator := ProvideSagaOrchestrator(eventAwareOrchestrator, sagaCoordinator, containerManager, deploymentManager, logger)
-	errorPatternRecognizer := ProvideErrorPatternRecognizer(domainAdapter, logger)
-	enhancedErrorHandler := ProvideEnhancedErrorHandler(domainAdapter, publisher, logger)
-	stepEnhancer := ProvideStepEnhancer(enhancedErrorHandler, logger)
+	errorPatternRecognizer := ml.NewErrorPatternRecognizer(domainAdapter, logger)
+	enhancedErrorHandler := ml.NewEnhancedErrorHandler(domainAdapter, publisher, logger)
+	stepEnhancer := ml.NewStepEnhancer(enhancedErrorHandler, logger)
 	manager, err := ProvidePromptManager(config, logger)
 	if err != nil {
 		return nil, err
@@ -59,7 +68,7 @@ func InitializeDefaultServer(logger *slog.Logger) (api.MCPServer, error) {
 		Config:                 serverConfig,
 		SessionManager:         optimizedSessionManager,
 		ResourceStore:          store,
-		ProgressFactory:        sinkFactory,
+		ProgressEmitterFactory: progressEmitterFactory,
 		EventPublisher:         publisher,
 		SagaCoordinator:        sagaCoordinator,
 		WorkflowOrchestrator:   workflowOrchestrator,
@@ -77,12 +86,16 @@ func InitializeDefaultServer(logger *slog.Logger) (api.MCPServer, error) {
 
 // InitializeServerWithConfig creates a fully wired MCP server with custom configuration
 func InitializeServerWithConfig(logger *slog.Logger, config workflow.ServerConfig) (api.MCPServer, error) {
-	optimizedSessionManager := ProvideSessionManager(config, logger)
+	optimizedSessionManager, err := ProvideSessionManager(config, logger)
+	if err != nil {
+		return nil, err
+	}
 	store := ProvideResourceStore(logger)
-	sinkFactory := ProvideProgressFactory(logger)
+	sinkFactory := progress.NewSinkFactory(logger)
+	progressEmitterFactory := ProvideProgressEmitterFactory(sinkFactory)
 	publisher := events.NewPublisher(logger)
 	sagaCoordinator := saga.NewSagaCoordinator(logger, publisher)
-	stepProvider := ProvideStepProvider(logger)
+	stepProvider := steps.NewRegistryStepProvider()
 	configConfig := ProvideConfigFromServerConfig(config)
 	client, err := ProvideSamplingClient(configConfig, logger)
 	if err != nil {
@@ -93,16 +106,16 @@ func InitializeServerWithConfig(logger *slog.Logger, config workflow.ServerConfi
 	step := ProvideOptimizedBuildStep(optimizedBuildStep)
 	stepFactory := ProvideStepFactory(stepProvider, step, logger)
 	tracer := tracing.NewTracerAdapter()
-	baseOrchestrator := ProvideBaseOrchestrator(stepFactory, sinkFactory, logger, tracer)
+	baseOrchestrator := ProvideBaseOrchestrator(stepFactory, progressEmitterFactory, logger, tracer)
 	workflowOrchestrator := ProvideWorkflowOrchestrator(baseOrchestrator)
 	eventAwareOrchestrator := ProvideEventOrchestrator(baseOrchestrator, publisher)
 	commandRunner := ProvideCommandRunner()
-	containerManager := ProvideContainerManager(commandRunner, logger)
-	deploymentManager := ProvideDeploymentManager(commandRunner, logger)
+	containerManager := container.NewDockerContainerManager(commandRunner, logger)
+	deploymentManager := kubernetes.NewKubernetesDeploymentManager(commandRunner, logger)
 	sagaAwareOrchestrator := ProvideSagaOrchestrator(eventAwareOrchestrator, sagaCoordinator, containerManager, deploymentManager, logger)
-	errorPatternRecognizer := ProvideErrorPatternRecognizer(domainAdapter, logger)
-	enhancedErrorHandler := ProvideEnhancedErrorHandler(domainAdapter, publisher, logger)
-	stepEnhancer := ProvideStepEnhancer(enhancedErrorHandler, logger)
+	errorPatternRecognizer := ml.NewErrorPatternRecognizer(domainAdapter, logger)
+	enhancedErrorHandler := ml.NewEnhancedErrorHandler(domainAdapter, publisher, logger)
+	stepEnhancer := ml.NewStepEnhancer(enhancedErrorHandler, logger)
 	manager, err := ProvidePromptManager(configConfig, logger)
 	if err != nil {
 		return nil, err
@@ -112,7 +125,7 @@ func InitializeServerWithConfig(logger *slog.Logger, config workflow.ServerConfi
 		Config:                 config,
 		SessionManager:         optimizedSessionManager,
 		ResourceStore:          store,
-		ProgressFactory:        sinkFactory,
+		ProgressEmitterFactory: progressEmitterFactory,
 		EventPublisher:         publisher,
 		SagaCoordinator:        sagaCoordinator,
 		WorkflowOrchestrator:   workflowOrchestrator,
@@ -135,12 +148,16 @@ func InitializeBasicServer(logger *slog.Logger) (api.MCPServer, error) {
 		return nil, err
 	}
 	serverConfig := ProvideServerConfigFromUnified(config)
-	optimizedSessionManager := ProvideSessionManager(serverConfig, logger)
+	optimizedSessionManager, err := ProvideSessionManager(serverConfig, logger)
+	if err != nil {
+		return nil, err
+	}
 	store := ProvideResourceStore(logger)
-	sinkFactory := ProvideProgressFactory(logger)
+	sinkFactory := progress.NewSinkFactory(logger)
+	progressEmitterFactory := ProvideProgressEmitterFactory(sinkFactory)
 	publisher := events.NewPublisher(logger)
 	sagaCoordinator := saga.NewSagaCoordinator(logger, publisher)
-	stepProvider := ProvideStepProvider(logger)
+	stepProvider := steps.NewRegistryStepProvider()
 	client, err := ProvideSamplingClient(config, logger)
 	if err != nil {
 		return nil, err
@@ -150,16 +167,16 @@ func InitializeBasicServer(logger *slog.Logger) (api.MCPServer, error) {
 	step := ProvideOptimizedBuildStep(optimizedBuildStep)
 	stepFactory := ProvideStepFactory(stepProvider, step, logger)
 	tracer := tracing.NewTracerAdapter()
-	baseOrchestrator := ProvideBaseOrchestrator(stepFactory, sinkFactory, logger, tracer)
+	baseOrchestrator := ProvideBaseOrchestrator(stepFactory, progressEmitterFactory, logger, tracer)
 	workflowOrchestrator := ProvideWorkflowOrchestrator(baseOrchestrator)
 	eventAwareOrchestrator := ProvideEventOrchestrator(baseOrchestrator, publisher)
 	commandRunner := ProvideCommandRunner()
-	containerManager := ProvideContainerManager(commandRunner, logger)
-	deploymentManager := ProvideDeploymentManager(commandRunner, logger)
+	containerManager := container.NewDockerContainerManager(commandRunner, logger)
+	deploymentManager := kubernetes.NewKubernetesDeploymentManager(commandRunner, logger)
 	sagaAwareOrchestrator := ProvideSagaOrchestrator(eventAwareOrchestrator, sagaCoordinator, containerManager, deploymentManager, logger)
-	errorPatternRecognizer := ProvideErrorPatternRecognizer(domainAdapter, logger)
-	enhancedErrorHandler := ProvideEnhancedErrorHandler(domainAdapter, publisher, logger)
-	stepEnhancer := ProvideStepEnhancer(enhancedErrorHandler, logger)
+	errorPatternRecognizer := ml.NewErrorPatternRecognizer(domainAdapter, logger)
+	enhancedErrorHandler := ml.NewEnhancedErrorHandler(domainAdapter, publisher, logger)
+	stepEnhancer := ml.NewStepEnhancer(enhancedErrorHandler, logger)
 	manager, err := ProvidePromptManager(config, logger)
 	if err != nil {
 		return nil, err
@@ -169,7 +186,7 @@ func InitializeBasicServer(logger *slog.Logger) (api.MCPServer, error) {
 		Config:                 serverConfig,
 		SessionManager:         optimizedSessionManager,
 		ResourceStore:          store,
-		ProgressFactory:        sinkFactory,
+		ProgressEmitterFactory: progressEmitterFactory,
 		EventPublisher:         publisher,
 		SagaCoordinator:        sagaCoordinator,
 		WorkflowOrchestrator:   workflowOrchestrator,
@@ -187,7 +204,7 @@ func InitializeBasicServer(logger *slog.Logger) (api.MCPServer, error) {
 
 // InitializeWorkflowOrchestrator creates just the workflow orchestrator for testing
 func InitializeWorkflowOrchestrator(logger *slog.Logger) (workflow.WorkflowOrchestrator, error) {
-	stepProvider := ProvideStepProvider(logger)
+	stepProvider := steps.NewRegistryStepProvider()
 	config, err := ProvideConfig()
 	if err != nil {
 		return nil, err
@@ -200,21 +217,26 @@ func InitializeWorkflowOrchestrator(logger *slog.Logger) (workflow.WorkflowOrche
 	optimizedBuildStep := ProvideMLOptimizedBuildStep(domainAdapter, logger)
 	step := ProvideOptimizedBuildStep(optimizedBuildStep)
 	stepFactory := ProvideStepFactory(stepProvider, step, logger)
-	sinkFactory := ProvideProgressFactory(logger)
+	sinkFactory := progress.NewSinkFactory(logger)
+	progressEmitterFactory := ProvideProgressEmitterFactory(sinkFactory)
 	tracer := tracing.NewTracerAdapter()
-	baseOrchestrator := ProvideBaseOrchestrator(stepFactory, sinkFactory, logger, tracer)
+	baseOrchestrator := ProvideBaseOrchestrator(stepFactory, progressEmitterFactory, logger, tracer)
 	workflowOrchestrator := ProvideWorkflowOrchestrator(baseOrchestrator)
 	return workflowOrchestrator, nil
 }
 
 // InitializeTestDependencies creates application dependencies for testing
 func InitializeTestDependencies(logger *slog.Logger, config workflow.ServerConfig) (*application.Dependencies, error) {
-	optimizedSessionManager := ProvideSessionManager(config, logger)
+	optimizedSessionManager, err := ProvideSessionManager(config, logger)
+	if err != nil {
+		return nil, err
+	}
 	store := ProvideResourceStore(logger)
-	sinkFactory := ProvideProgressFactory(logger)
+	sinkFactory := progress.NewSinkFactory(logger)
+	progressEmitterFactory := ProvideProgressEmitterFactory(sinkFactory)
 	publisher := events.NewPublisher(logger)
 	sagaCoordinator := saga.NewSagaCoordinator(logger, publisher)
-	stepProvider := ProvideStepProvider(logger)
+	stepProvider := steps.NewRegistryStepProvider()
 	configConfig := ProvideConfigFromServerConfig(config)
 	client, err := ProvideSamplingClient(configConfig, logger)
 	if err != nil {
@@ -225,16 +247,16 @@ func InitializeTestDependencies(logger *slog.Logger, config workflow.ServerConfi
 	step := ProvideOptimizedBuildStep(optimizedBuildStep)
 	stepFactory := ProvideStepFactory(stepProvider, step, logger)
 	tracer := tracing.NewTracerAdapter()
-	baseOrchestrator := ProvideBaseOrchestrator(stepFactory, sinkFactory, logger, tracer)
+	baseOrchestrator := ProvideBaseOrchestrator(stepFactory, progressEmitterFactory, logger, tracer)
 	workflowOrchestrator := ProvideWorkflowOrchestrator(baseOrchestrator)
 	eventAwareOrchestrator := ProvideEventOrchestrator(baseOrchestrator, publisher)
 	commandRunner := ProvideCommandRunner()
-	containerManager := ProvideContainerManager(commandRunner, logger)
-	deploymentManager := ProvideDeploymentManager(commandRunner, logger)
+	containerManager := container.NewDockerContainerManager(commandRunner, logger)
+	deploymentManager := kubernetes.NewKubernetesDeploymentManager(commandRunner, logger)
 	sagaAwareOrchestrator := ProvideSagaOrchestrator(eventAwareOrchestrator, sagaCoordinator, containerManager, deploymentManager, logger)
-	errorPatternRecognizer := ProvideErrorPatternRecognizer(domainAdapter, logger)
-	enhancedErrorHandler := ProvideEnhancedErrorHandler(domainAdapter, publisher, logger)
-	stepEnhancer := ProvideStepEnhancer(enhancedErrorHandler, logger)
+	errorPatternRecognizer := ml.NewErrorPatternRecognizer(domainAdapter, logger)
+	enhancedErrorHandler := ml.NewEnhancedErrorHandler(domainAdapter, publisher, logger)
+	stepEnhancer := ml.NewStepEnhancer(enhancedErrorHandler, logger)
 	manager, err := ProvidePromptManager(configConfig, logger)
 	if err != nil {
 		return nil, err
@@ -244,7 +266,7 @@ func InitializeTestDependencies(logger *slog.Logger, config workflow.ServerConfi
 		Config:                 config,
 		SessionManager:         optimizedSessionManager,
 		ResourceStore:          store,
-		ProgressFactory:        sinkFactory,
+		ProgressEmitterFactory: progressEmitterFactory,
 		EventPublisher:         publisher,
 		SagaCoordinator:        sagaCoordinator,
 		WorkflowOrchestrator:   workflowOrchestrator,

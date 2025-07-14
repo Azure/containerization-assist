@@ -7,17 +7,17 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
+	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow/common"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
 // BaseOrchestrator provides the core workflow orchestration functionality
 type BaseOrchestrator struct {
-	steps           []Step
-	middlewares     []StepMiddleware
-	progressFactory ProgressTrackerFactory
-	logger          *slog.Logger
+	steps          []Step
+	middlewares    []StepMiddleware
+	emitterFactory ProgressEmitterFactory
+	logger         *slog.Logger
 }
 
 // OrchestratorOption configures a BaseOrchestrator during construction
@@ -33,7 +33,7 @@ func WithMiddleware(middlewares ...StepMiddleware) OrchestratorOption {
 // NewBaseOrchestrator creates a new base orchestrator with the supplied options
 func NewBaseOrchestrator(
 	factory *StepFactory,
-	progressFactory ProgressTrackerFactory,
+	emitterFactory ProgressEmitterFactory,
 	logger *slog.Logger,
 	opts ...OrchestratorOption,
 ) *BaseOrchestrator {
@@ -46,10 +46,10 @@ func NewBaseOrchestrator(
 	}
 
 	orchestrator := &BaseOrchestrator{
-		steps:           steps,
-		middlewares:     []StepMiddleware{}, // Initialize empty slice
-		progressFactory: progressFactory,
-		logger:          logger.With("component", "base_orchestrator"),
+		steps:          steps,
+		middlewares:    []StepMiddleware{}, // Initialize empty slice
+		emitterFactory: emitterFactory,
+		logger:         logger.With("component", "base_orchestrator"),
 	}
 
 	// Apply all options
@@ -64,11 +64,11 @@ func NewBaseOrchestrator(
 func (o *BaseOrchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
 	// Stage 1: Context initialization
 	workflowID, ctx := o.initContext(ctx, args)
-	tracker := o.newTracker(ctx, req)
-	defer tracker.Finish()
+	emitter := o.newEmitter(ctx, req)
+	defer emitter.Close()
 
 	// Stage 2: State and executor setup
-	state := o.newState(workflowID, args, tracker)
+	state := o.newState(workflowID, args, emitter)
 	executor := o.buildStepExecutor()
 
 	// Stage 3: Step execution
@@ -90,25 +90,23 @@ func (o *BaseOrchestrator) initContext(ctx context.Context, args *ContainerizeAn
 	return workflowID, ctx
 }
 
-// newTracker creates a progress tracker for the workflow
-func (o *BaseOrchestrator) newTracker(ctx context.Context, req *mcp.CallToolRequest) *progress.Tracker {
-	if o.progressFactory != nil {
-		return o.progressFactory.CreateTracker(ctx, req, len(o.steps))
+// newEmitter creates a progress emitter for the workflow
+func (o *BaseOrchestrator) newEmitter(ctx context.Context, req *mcp.CallToolRequest) api.ProgressEmitter {
+	if o.emitterFactory != nil {
+		return o.emitterFactory.CreateEmitter(ctx, req, len(o.steps))
 	}
-	sink := &common.NoOpSink{}
-	tracker := progress.NewTracker(ctx, len(o.steps), sink)
-	tracker.Begin("Starting workflow")
-	return tracker
+	// Fallback to no-op emitter
+	return &common.NoOpEmitter{}
 }
 
 // newState creates the workflow state with all necessary components
-func (o *BaseOrchestrator) newState(workflowID string, args *ContainerizeAndDeployArgs, tracker *progress.Tracker) *WorkflowState {
+func (o *BaseOrchestrator) newState(workflowID string, args *ContainerizeAndDeployArgs, emitter api.ProgressEmitter) *WorkflowState {
 	return &WorkflowState{
 		WorkflowID:       workflowID,
 		Args:             args,
 		Result:           &ContainerizeAndDeployResult{},
 		Logger:           o.logger,
-		ProgressTracker:  tracker,
+		ProgressEmitter:  emitter,
 		TotalSteps:       len(o.steps),
 		CurrentStep:      0,
 		WorkflowProgress: NewWorkflowProgress(workflowID, "containerize_and_deploy", len(o.steps)),
@@ -137,21 +135,33 @@ func (o *BaseOrchestrator) runSteps(ctx context.Context, executor StepHandler, s
 
 	for i, step := range o.steps {
 		state.CurrentStep = i + 1
+		percentage := int(float64(state.CurrentStep) / float64(state.TotalSteps) * 100)
 		o.logger.Info("Executing workflow step", "step", step.Name(), "step_number", state.CurrentStep, "total_steps", state.TotalSteps)
-		state.ProgressTracker.Update(state.CurrentStep, fmt.Sprintf("Executing %s", step.Name()), nil)
+
+		// Emit progress update
+		_ = state.ProgressEmitter.Emit(ctx, step.Name(), percentage, fmt.Sprintf("Executing %s", step.Name()))
 
 		if err := executor(ctx, step, state); err != nil {
 			o.logger.Error("Workflow step failed", "step", step.Name(), "step_number", state.CurrentStep, "error", err)
 			state.Result.Success = false
 			state.Result.Error = err.Error()
-			state.ProgressTracker.Update(state.CurrentStep, fmt.Sprintf("%s failed: %v", step.Name(), err),
-				map[string]interface{}{"error": err.Error()})
+
+			// Emit error progress
+			_ = state.ProgressEmitter.EmitDetailed(ctx, api.ProgressUpdate{
+				Step:       state.CurrentStep,
+				Total:      state.TotalSteps,
+				Stage:      step.Name(),
+				Message:    fmt.Sprintf("%s failed: %v", step.Name(), err),
+				Percentage: percentage,
+				Status:     "failed",
+				Metadata:   map[string]interface{}{"error": err.Error()},
+			})
 			return err
 		}
 		o.logger.Info("Workflow step completed", "step", step.Name(), "step_number", state.CurrentStep)
 	}
 
 	state.Result.Success = true
-	state.ProgressTracker.Complete("Workflow completed successfully")
+	// Final completion via Close() which is called in defer
 	return nil
 }

@@ -32,7 +32,7 @@ func TestRegistry_BasicOperations(t *testing.T) {
 
 func TestRegistry_All(t *testing.T) {
 	registry := New[int]()
-	
+
 	// Add some values
 	registry.Add("one", 1)
 	registry.Add("two", 2)
@@ -52,7 +52,7 @@ func TestRegistry_All(t *testing.T) {
 
 func TestRegistry_Keys(t *testing.T) {
 	registry := New[string]()
-	
+
 	registry.Add("a", "value_a")
 	registry.Add("b", "value_b")
 
@@ -66,7 +66,7 @@ func TestRegistry_Keys(t *testing.T) {
 	for _, key := range keys {
 		keyMap[key] = true
 	}
-	
+
 	if !keyMap["a"] || !keyMap["b"] {
 		t.Error("Missing expected keys")
 	}
@@ -74,7 +74,7 @@ func TestRegistry_Keys(t *testing.T) {
 
 func TestRegistry_Remove(t *testing.T) {
 	registry := New[string]()
-	
+
 	registry.Add("key1", "value1")
 	registry.Add("key2", "value2")
 
@@ -96,20 +96,20 @@ func TestRegistry_Remove(t *testing.T) {
 
 func TestRegistry_SizeAndClear(t *testing.T) {
 	registry := New[string]()
-	
+
 	if registry.Size() != 0 {
 		t.Error("Expected empty registry")
 	}
 
 	registry.Add("key1", "value1")
 	registry.Add("key2", "value2")
-	
+
 	if registry.Size() != 2 {
 		t.Errorf("Expected size 2, got %d", registry.Size())
 	}
 
 	registry.Clear()
-	
+
 	if registry.Size() != 0 {
 		t.Error("Expected empty registry after clear")
 	}
@@ -117,7 +117,7 @@ func TestRegistry_SizeAndClear(t *testing.T) {
 
 func TestRegistry_GetOrError(t *testing.T) {
 	registry := New[string]()
-	
+
 	// Test with non-existent key
 	_, err := registry.GetOrError("nonexistent")
 	if err == nil {
@@ -134,7 +134,7 @@ func TestRegistry_GetOrError(t *testing.T) {
 
 func TestRegistry_ThreadSafety(t *testing.T) {
 	registry := New[int]()
-	
+
 	// Run concurrent operations
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
@@ -149,9 +149,9 @@ func TestRegistry_ThreadSafety(t *testing.T) {
 			registry.Keys()
 		}(i)
 	}
-	
+
 	wg.Wait()
-	
+
 	// Verify some operations worked
 	if registry.Size() == 0 {
 		t.Error("Expected some items to be added")
@@ -162,17 +162,17 @@ func TestRegistry_TypeSafety(t *testing.T) {
 	// Test with different types
 	stringRegistry := New[string]()
 	intRegistry := New[int]()
-	
+
 	stringRegistry.Add("key", "string_value")
 	intRegistry.Add("key", 42)
-	
+
 	strVal, _ := stringRegistry.Get("key")
 	intVal, _ := intRegistry.Get("key")
-	
+
 	if strVal != "string_value" {
 		t.Errorf("Expected string_value, got %s", strVal)
 	}
-	
+
 	if intVal != 42 {
 		t.Errorf("Expected 42, got %d", intVal)
 	}

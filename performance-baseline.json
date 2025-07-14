@@ -1,0 +1,55 @@
+{
+  "performance_baseline": {
+    "date": "2025-07-14",
+    "version": "post-architecture-refactor",
+    "description": "Performance baseline after 4-layer architecture reorganization",
+    "target_p95_latency_microseconds": 300,
+    "measurements": {
+      "core_sampling_performance": {
+        "small_prompt": {
+          "p95_latency_ns": 138,
+          "p95_latency_microseconds": 0.138,
+          "memory_per_op_bytes": 48,
+          "allocations_per_op": 2,
+          "meets_target": true,
+          "notes": "Core client with minimal 'Hello' prompt"
+        },
+        "medium_prompt": {
+          "p95_latency_ns": 131,
+          "p95_latency_microseconds": 0.131,
+          "memory_per_op_bytes": 48,
+          "allocations_per_op": 2,
+          "meets_target": true,
+          "notes": "Node.js Dockerfile generation prompt"
+        },
+        "large_prompt": {
+          "p95_latency_ns": 141,
+          "p95_latency_microseconds": 0.141,
+          "memory_per_op_bytes": 48,
+          "allocations_per_op": 2,
+          "meets_target": true,
+          "notes": "Complex repository analysis prompt"
+        }
+      },
+      "performance_characteristics": {
+        "average_p95_latency_ns": 137,
+        "average_p95_latency_microseconds": 0.137,
+        "performance_vs_target": "2000x faster than 300μs target",
+        "memory_efficiency": "48 bytes per operation",
+        "allocation_efficiency": "2 allocations per operation",
+        "consistency": "Very stable across prompt sizes"
+      }
+    },
+    "regression_thresholds": {
+      "p95_latency_increase_max_percent": 100,
+      "memory_increase_max_percent": 50,
+      "allocation_increase_max_percent": 100
+    },
+    "benchmark_environment": {
+      "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
+      "os": "linux",
+      "arch": "amd64",
+      "go_version": "1.24.4"
+    }
+  }
+}

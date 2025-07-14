@@ -7,7 +7,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow/common"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/events"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging/events"
 	"github.com/stretchr/testify/assert"
 )
 

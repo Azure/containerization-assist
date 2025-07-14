@@ -3,7 +3,11 @@
 package wiring
 
 import (
+	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/common/runner"
@@ -18,18 +22,23 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/container"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/events"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/kubernetes"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ml"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/ml"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/prompts"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/sampling"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/resources"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging/events"
+	infraprogress "github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging/progress"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/observability"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/observability/tracing"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/container"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/kubernetes"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/steps"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/steps/optimized"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/persistence"
-	infraprogress "github.com/Azure/container-kit/pkg/mcp/infrastructure/progress"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/prompts"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/resources"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps/optimized"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/tracing"
 	"github.com/google/wire"
 )
 
@@ -38,12 +47,6 @@ var CommonProviders = wire.NewSet(
 	// Configuration
 	ProvideConfig,
 	ProvideServerConfigFromUnified,
-
-	// State storage
-	ProvideStateStore,
-
-	// Tracing
-	tracing.NewTracerAdapter,
 
 	// Command runner
 	ProvideCommandRunner,
@@ -76,25 +79,35 @@ var DomainProviders = wire.NewSet(
 	wire.Bind(new(domainsampling.UnifiedSampler), new(*sampling.DomainAdapter)),
 )
 
-// InfraProviders - Infrastructure implementations and external integrations
+// InfraProviders - Infrastructure implementations organized by domain
 var InfraProviders = wire.NewSet(
-	// Progress tracking
-	ProvideProgressFactory,
-	wire.Bind(new(workflow.ProgressTrackerFactory), new(*infraprogress.SinkFactory)),
+	// Persistence domain
+	persistence.PersistenceProviders,
 
-	// AI/ML services
+	// Orchestration domain
+	orchestration.OrchestrationProviders,
+
+	// Messaging domain
+	messaging.MessagingProviders,
+
+	// AI/ML domain
+	ai_ml.AIMLProviders,
+
+	// Observability domain
+	observability.ObservabilityProviders,
+
+	// Core infrastructure
+	core.CoreProviders,
+
+	// Individual providers needed for current functionality
+	ProvideProgressEmitterFactory,
+	wire.Bind(new(workflow.ProgressEmitterFactory), new(*infraprogress.ProgressEmitterFactory)),
 	ProvideSamplingClient,
 	ProvidePromptManager,
-	
-	// Interface bindings for domain abstractions
 	wire.Bind(new(domainprompts.Manager), new(*prompts.Manager)),
-
-	// Container and deployment
-	ProvideContainerManager,
-	ProvideDeploymentManager,
-
-	// Step implementations
-	ProvideStepProvider,
+	wire.Bind(new(domainml.ErrorPatternRecognizer), new(*ml.ErrorPatternRecognizer)),
+	wire.Bind(new(domainml.EnhancedErrorHandler), new(*ml.EnhancedErrorHandler)),
+	wire.Bind(new(domainml.StepEnhancer), new(*ml.StepEnhancer)),
 	ProvideOptimizedBuildStep,
 )
 
@@ -102,15 +115,7 @@ var InfraProviders = wire.NewSet(
 var MLProviders = wire.NewSet(
 	ProvideResourcePredictor,
 	ProvideBuildOptimizer,
-	ProvideErrorPatternRecognizer,
-	ProvideEnhancedErrorHandler,
-	ProvideStepEnhancer,
 	ProvideMLOptimizedBuildStep,
-	
-	// Interface bindings for domain abstractions
-	wire.Bind(new(domainml.ErrorPatternRecognizer), new(*ml.ErrorPatternRecognizer)),
-	wire.Bind(new(domainml.EnhancedErrorHandler), new(*ml.EnhancedErrorHandler)),
-	wire.Bind(new(domainml.StepEnhancer), new(*ml.StepEnhancer)),
 )
 
 // ApplicationProviders - Application layer services and coordination
@@ -123,7 +128,7 @@ var ApplicationProviders = wire.NewSet(
 	wire.Struct(
 		new(application.Dependencies),
 		"Logger", "Config", "SessionManager", "ResourceStore",
-		"ProgressFactory", "EventPublisher", "SagaCoordinator",
+		"ProgressEmitterFactory", "EventPublisher", "SagaCoordinator",
 		"WorkflowOrchestrator", "EventAwareOrchestrator", "SagaAwareOrchestrator",
 		"ErrorPatternRecognizer", "EnhancedErrorHandler", "StepEnhancer",
 		"SamplingClient", "PromptManager",
@@ -157,14 +162,15 @@ var TestProviderSet = wire.NewSet(
 	CommonProviders,
 	ConfigProviders,
 	DomainProviders,
-	
-	// Simplified infra providers for testing
+
+	// Simplified infra providers for testing (legacy - using individual functions)
 	ProvideProgressFactory,
-	wire.Bind(new(workflow.ProgressTrackerFactory), new(*infraprogress.SinkFactory)),
+	ProvideProgressEmitterFactory,
+	wire.Bind(new(workflow.ProgressEmitterFactory), new(*infraprogress.ProgressEmitterFactory)),
 	ProvideSamplingClient,
 	ProvidePromptManager,
 	ProvideStepProvider,
-	
+
 	// Application layer
 	ProvideSessionManager,
 	ProvideResourceStore,
@@ -190,37 +196,37 @@ func ProvideServerConfigFromUnified(cfg *config.Config) workflow.ServerConfig {
 func ProvideConfigFromServerConfig(serverConfig workflow.ServerConfig) *config.Config {
 	return &config.Config{
 		// Map ServerConfig fields to Config
-		WorkspaceDir:   serverConfig.WorkspaceDir,
-		StorePath:      serverConfig.StorePath,
-		MaxSessions:    serverConfig.MaxSessions,
-		SessionTTL:     serverConfig.SessionTTL,
-		LogLevel:       serverConfig.LogLevel,
-		TransportType:  serverConfig.TransportType,
-		HTTPAddr:       serverConfig.HTTPAddr,
-		HTTPPort:       serverConfig.HTTPPort,
-		
+		WorkspaceDir:  serverConfig.WorkspaceDir,
+		StorePath:     serverConfig.StorePath,
+		MaxSessions:   serverConfig.MaxSessions,
+		SessionTTL:    serverConfig.SessionTTL,
+		LogLevel:      serverConfig.LogLevel,
+		TransportType: serverConfig.TransportType,
+		HTTPAddr:      serverConfig.HTTPAddr,
+		HTTPPort:      serverConfig.HTTPPort,
+
 		// Add defaults for sampling config
 		SamplingMaxTokens:     4096,
 		SamplingTemperature:   0.7,
 		SamplingRetryAttempts: 3,
 		SamplingTokenBudget:   100000,
 		SamplingStreaming:     false,
-		
+
 		// Add defaults for other fields
-		MaxDiskPerSession: 1024 * 1024 * 1024, // 1GB
+		MaxDiskPerSession: 1024 * 1024 * 1024,     // 1GB
 		TotalDiskLimit:    5 * 1024 * 1024 * 1024, // 5GB
 		CleanupInterval:   30 * time.Minute,
-		
+
 		// Tracing defaults
 		TracingEnabled:     false,
 		TracingServiceName: "container-kit-mcp",
 		TracingSampleRate:  1.0,
-		
+
 		// Security defaults
 		SecurityScanEnabled:    true,
 		SecurityFailOnHigh:     false,
 		SecurityFailOnCritical: true,
-		
+
 		// Prompt defaults
 		PromptTemplateDir:   "templates",
 		PromptHotReload:     false,
@@ -230,8 +236,22 @@ func ProvideConfigFromServerConfig(serverConfig workflow.ServerConfig) *config.C
 
 // Application Providers
 
-func ProvideSessionManager(config workflow.ServerConfig, logger *slog.Logger) session.OptimizedSessionManager {
-	return session.NewOptimizedSessionManager(logger, config.SessionTTL, config.MaxSessions)
+func ProvideSessionManager(config workflow.ServerConfig, logger *slog.Logger) (session.OptimizedSessionManager, error) {
+	// Use BoltDB for persistent session storage
+	// Check if StorePath already ends with sessions.db (legacy behavior)
+	dbPath := config.StorePath
+	if !strings.HasSuffix(dbPath, "sessions.db") {
+		// If StorePath is a directory, append sessions.db
+		dbPath = filepath.Join(config.StorePath, "sessions.db")
+	}
+
+	// Ensure the parent directory exists
+	dbDir := filepath.Dir(dbPath)
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create store directory %s: %w", dbDir, err)
+	}
+
+	return session.NewBoltStoreAdapter(dbPath, logger, config.SessionTTL, config.MaxSessions)
 }
 
 func ProvideResourceStore(logger *slog.Logger) domainresources.Store {
@@ -242,12 +262,17 @@ func ProvideProgressFactory(logger *slog.Logger) *infraprogress.SinkFactory {
 	return infraprogress.NewSinkFactory(logger)
 }
 
+func ProvideProgressEmitterFactory(sinkFactory *infraprogress.SinkFactory) *infraprogress.ProgressEmitterFactory {
+	config := infraprogress.DefaultEmitterConfig()
+	return infraprogress.NewProgressEmitterFactory(config, sinkFactory)
+}
+
 // Infrastructure Providers
 
 func ProvideSamplingClient(cfg *config.Config, logger *slog.Logger) (*sampling.Client, error) {
 	// Use the centralized config conversion method
 	samplingConfig := cfg.ToSamplingConfig()
-	
+
 	// Convert to infrastructure sampling config
 	infraConfig := sampling.Config{
 		MaxTokens:        samplingConfig.MaxTokens,
@@ -296,7 +321,7 @@ func ProvideStepFactory(stepProvider workflow.StepProvider, optimizedBuildStep w
 }
 
 // ProvideBaseOrchestrator creates a concrete BaseOrchestrator
-func ProvideBaseOrchestrator(factory *workflow.StepFactory, progressFactory workflow.ProgressTrackerFactory, logger *slog.Logger, tracer workflow.Tracer) *workflow.BaseOrchestrator {
+func ProvideBaseOrchestrator(factory *workflow.StepFactory, emitterFactory workflow.ProgressEmitterFactory, logger *slog.Logger, tracer workflow.Tracer) *workflow.BaseOrchestrator {
 	// Create base orchestrator with common middleware using functional options
 	var opts []workflow.OrchestratorOption
 
@@ -313,7 +338,7 @@ func ProvideBaseOrchestrator(factory *workflow.StepFactory, progressFactory work
 
 	opts = append(opts, workflow.WithMiddleware(middlewares...))
 
-	return workflow.NewBaseOrchestrator(factory, progressFactory, logger, opts...)
+	return workflow.NewBaseOrchestrator(factory, emitterFactory, logger, opts...)
 }
 
 // ProvideEventOrchestrator creates an EventOrchestrator using decorators
@@ -395,14 +420,14 @@ func ProvideCommandRunner() runner.CommandRunner {
 // ProvideTracingConfig creates tracing configuration from unified config
 func ProvideTracingConfig(cfg *config.Config) *tracing.Config {
 	tracingConfig := cfg.ToTracingConfig()
-	
+
 	// Convert to infrastructure tracing config
 	return &tracing.Config{
 		Enabled:        tracingConfig.Enabled,
 		Endpoint:       tracingConfig.Endpoint,
 		Headers:        make(map[string]string), // Can be populated from env vars
 		ServiceName:    tracingConfig.ServiceName,
-		ServiceVersion: "dev", // Could be made configurable
+		ServiceVersion: "dev",         // Could be made configurable
 		Environment:    "development", // Could be made configurable
 		SampleRate:     tracingConfig.SampleRate,
 		ExportTimeout:  30 * time.Second,

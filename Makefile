@@ -88,7 +88,15 @@ arch-validate:
 	@echo "Note: wiring/DI directories are excluded as they need to import from all layers"
 	@cd scripts && go run arch-validate.go
 
-check-all: fmt lint static-analysis security-scan arch-validate test
+perf-check:
+	@echo "Running performance regression detection..."
+	@go run scripts/perf/performance-monitor.go
+
+contract-test:
+	@echo "Running API contract tests..."
+	@go test ./test/contract/ -v
+
+check-all: fmt lint static-analysis security-scan arch-validate perf-check contract-test test
 
 # Utility tasks  
 clean:
@@ -111,7 +119,9 @@ help:
 	@echo "  static-analysis   Run static analysis (staticcheck)"
 	@echo "  security-scan     Run security scanning (govulncheck)"
 	@echo "  arch-validate     Run architecture boundary validation"
-	@echo "  check-all         Run all checks and tests (includes arch-validate)"
+	@echo "  perf-check        Run performance regression detection"
+	@echo "  contract-test     Run API contract stability tests"
+	@echo "  check-all         Run all checks and tests (includes arch-validate, perf-check, contract-test)"
 	@echo "  clean             Remove binaries"
 	@echo "  version           Show binary version"
 	@echo "  help              Show this help"

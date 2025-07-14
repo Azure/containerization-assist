@@ -23,7 +23,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
+	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow/common"
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -286,7 +286,7 @@ type WorkflowState struct {
 	ScanReport       map[string]interface{}
 
 	// Progress tracking
-	ProgressTracker  *progress.Tracker
+	ProgressEmitter  api.ProgressEmitter
 	WorkflowProgress *WorkflowProgress
 	CurrentStep      int
 	TotalSteps       int
@@ -295,13 +295,13 @@ type WorkflowState struct {
 	Logger *slog.Logger
 }
 
-// ProgressTrackerFactory creates progress trackers
-type ProgressTrackerFactory interface {
-	CreateTracker(ctx context.Context, req *mcp.CallToolRequest, totalSteps int) *progress.Tracker
+// ProgressEmitterFactory creates progress emitters for different transport modes
+type ProgressEmitterFactory interface {
+	CreateEmitter(ctx context.Context, req *mcp.CallToolRequest, totalSteps int) api.ProgressEmitter
 }
 
 // NewWorkflowState creates a new workflow state
-func NewWorkflowState(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs, progressTracker *progress.Tracker, logger *slog.Logger) *WorkflowState {
+func NewWorkflowState(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs, progressEmitter api.ProgressEmitter, logger *slog.Logger) *WorkflowState {
 	totalSteps := 10
 
 	result := &ContainerizeAndDeployResult{
@@ -315,7 +315,7 @@ func NewWorkflowState(ctx context.Context, req *mcp.CallToolRequest, args *Conta
 		WorkflowID:       workflowID,
 		Args:             args,
 		Result:           result,
-		ProgressTracker:  progressTracker,
+		ProgressEmitter:  progressEmitter,
 		WorkflowProgress: workflowProgress,
 		CurrentStep:      0,
 		TotalSteps:       totalSteps,
@@ -323,12 +323,15 @@ func NewWorkflowState(ctx context.Context, req *mcp.CallToolRequest, args *Conta
 	}
 }
 
-// UpdateProgress advances the progress tracker and returns progress info
+// UpdateProgress advances the progress emitter and returns progress info
 func (ws *WorkflowState) UpdateProgress() (int, string) {
 	ws.CurrentStep++
 	progress := fmt.Sprintf("%d/%d", ws.CurrentStep, ws.TotalSteps)
 	percentage := int((float64(ws.CurrentStep) / float64(ws.TotalSteps)) * 100)
-	ws.ProgressTracker.SetCurrent(ws.CurrentStep)
+
+	// Emit progress update
+	_ = ws.ProgressEmitter.Emit(context.Background(), "step", percentage, progress)
+
 	return percentage, progress
 }
 

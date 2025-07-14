@@ -22,14 +22,14 @@ type ArchRule struct {
 
 // ValidationResult represents the result of architecture validation
 type ValidationResult struct {
-	Passed      bool
-	Layer       string
-	Package     string
-	File        string
-	Line        int
-	Rule        string
-	Violation   string
-	Suggestion  string
+	Passed     bool
+	Layer      string
+	Package    string
+	File       string
+	Line       int
+	Rule       string
+	Violation  string
+	Suggestion string
 }
 
 func main() {
@@ -67,31 +67,31 @@ func main() {
 func getArchitectureRules() []ArchRule {
 	return []ArchRule{
 		{
-			Name:        "Domain Layer Isolation",
-			Description: "Domain layer must not import infrastructure or application packages",
-			Layer:       "pkg/mcp/domain",
-			ForbiddenRE: regexp.MustCompile(`"[^"]*/(infrastructure|application)/`),
+			Name:         "Domain Layer Isolation",
+			Description:  "Domain layer must not import infrastructure or application packages",
+			Layer:        "pkg/mcp/domain",
+			ForbiddenRE:  regexp.MustCompile(`"[^"]*/(infrastructure|application)/`),
 			CheckImports: true,
 		},
 		{
-			Name:        "Application Layer Boundary", 
-			Description: "Application layer must not directly import infrastructure packages",
-			Layer:       "pkg/mcp/application",
-			ForbiddenRE: regexp.MustCompile(`"[^"]*/infrastructure/`),
+			Name:         "Application Layer Boundary",
+			Description:  "Application layer must not directly import infrastructure packages",
+			Layer:        "pkg/mcp/application",
+			ForbiddenRE:  regexp.MustCompile(`"[^"]*/infrastructure/`),
 			CheckImports: true,
 		},
 		{
-			Name:        "API Layer Isolation",
-			Description: "API layer should only import domain interfaces",
-			Layer:       "pkg/mcp/api",
-			ForbiddenRE: regexp.MustCompile(`"[^"]*/(infrastructure|application)/`),
+			Name:         "API Layer Isolation",
+			Description:  "API layer should only import domain interfaces",
+			Layer:        "pkg/mcp/api",
+			ForbiddenRE:  regexp.MustCompile(`"[^"]*/(infrastructure|application)/`),
 			CheckImports: true,
 		},
 		{
-			Name:        "Infrastructure Layer Direction",
-			Description: "Infrastructure layer must not import from application or api layers",
-			Layer:       "pkg/mcp/infrastructure",
-			ForbiddenRE: regexp.MustCompile(`"[^"]*/(application|api)/`),
+			Name:         "Infrastructure Layer Direction",
+			Description:  "Infrastructure layer must not import from application or api layers",
+			Layer:        "pkg/mcp/infrastructure",
+			ForbiddenRE:  regexp.MustCompile(`"[^"]*/(application|api)/`),
 			CheckImports: true,
 		},
 		{
@@ -102,10 +102,10 @@ func getArchitectureRules() []ArchRule {
 			CheckCode:   true,
 		},
 		{
-			Name:        "Wire Isolation",
-			Description: "Wire dependency injection should only be in wiring package",
-			Layer:       "pkg/mcp",
-			ForbiddenRE: regexp.MustCompile(`"github\.com/google/wire"`),
+			Name:         "Wire Isolation",
+			Description:  "Wire dependency injection should only be in wiring package",
+			Layer:        "pkg/mcp",
+			ForbiddenRE:  regexp.MustCompile(`"github\.com/google/wire"`),
 			CheckImports: true,
 		},
 	}
@@ -117,7 +117,7 @@ func validateLayer(rule ArchRule) []ValidationResult {
 
 	// Find the layer directory
 	layerDir := filepath.Join(baseDir, rule.Layer)
-	
+
 	err := filepath.Walk(layerDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // Skip inaccessible files
@@ -221,14 +221,14 @@ func getPackageFromPath(filePath string) string {
 
 func getSuggestionForRule(ruleName string) string {
 	suggestions := map[string]string{
-		"Domain Layer Isolation":      "Move infrastructure dependencies to domain interfaces",
-		"Application Layer Boundary":  "Use dependency injection to access infrastructure services",
-		"API Layer Isolation":         "Only import domain interfaces in API layer",
+		"Domain Layer Isolation":         "Move infrastructure dependencies to domain interfaces",
+		"Application Layer Boundary":     "Use dependency injection to access infrastructure services",
+		"API Layer Isolation":            "Only import domain interfaces in API layer",
 		"Infrastructure Layer Direction": "Infrastructure should implement domain interfaces, not import from higher layers",
-		"Domain Purity":               "Use domain interfaces for external operations, implement in infrastructure",
-		"Wire Isolation":              "Move dependency injection to pkg/mcp/api/wiring",
+		"Domain Purity":                  "Use domain interfaces for external operations, implement in infrastructure",
+		"Wire Isolation":                 "Move dependency injection to pkg/mcp/api/wiring",
 	}
-	
+
 	if suggestion, exists := suggestions[ruleName]; exists {
 		return suggestion
 	}
