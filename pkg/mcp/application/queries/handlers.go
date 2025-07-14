@@ -7,8 +7,8 @@ import (
 	"log/slog"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/session"
+	"github.com/Azure/container-kit/pkg/mcp/domain/resources"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/resources"
 )
 
 // QueryHandler handles query execution
@@ -19,14 +19,14 @@ type QueryHandler interface {
 // WorkflowStatusQueryHandler handles workflow status queries
 type WorkflowStatusQueryHandler struct {
 	sessionManager session.OptimizedSessionManager
-	resourceStore  *resources.Store
+	resourceStore  resources.Store
 	logger         *slog.Logger
 }
 
 // NewWorkflowStatusQueryHandler creates a new workflow status query handler
 func NewWorkflowStatusQueryHandler(
 	sessionManager session.OptimizedSessionManager,
-	resourceStore *resources.Store,
+	resourceStore resources.Store,
 	logger *slog.Logger,
 ) *WorkflowStatusQueryHandler {
 	return &WorkflowStatusQueryHandler{

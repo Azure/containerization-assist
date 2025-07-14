@@ -17,8 +17,15 @@
 package workflow
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
+	"github.com/Azure/container-kit/pkg/mcp/domain/workflow/common"
+	"github.com/mark3labs/mcp-go/mcp"
 )
 
 // TypedArgs represents strongly typed tool arguments for MCP tool invocations.
@@ -247,4 +254,98 @@ func DefaultServerConfig() ServerConfig {
 		Environment:       "development",
 		TraceSampleRate:   1.0,
 	}
+}
+
+// ============================================================================
+// Core Workflow Types (moved from legacy_orchestrator.go)
+// ============================================================================
+
+// Step defines the interface for individual workflow steps
+type Step interface {
+	Name() string
+	Execute(ctx context.Context, state *WorkflowState) error
+	MaxRetries() int
+}
+
+// WorkflowState holds all the state that flows between workflow steps
+type WorkflowState struct {
+	// Workflow identification
+	WorkflowID string
+
+	// Input arguments
+	Args *ContainerizeAndDeployArgs
+
+	// Result object that accumulates information
+	Result *ContainerizeAndDeployResult
+
+	// Step outputs
+	AnalyzeResult    *AnalyzeResult
+	DockerfileResult *DockerfileResult
+	BuildResult      *BuildResult
+	K8sResult        *K8sResult
+	ScanReport       map[string]interface{}
+
+	// Progress tracking
+	ProgressTracker  *progress.Tracker
+	WorkflowProgress *WorkflowProgress
+	CurrentStep      int
+	TotalSteps       int
+
+	// Utilities
+	Logger *slog.Logger
+}
+
+// ProgressTrackerFactory creates progress trackers
+type ProgressTrackerFactory interface {
+	CreateTracker(ctx context.Context, req *mcp.CallToolRequest, totalSteps int) *progress.Tracker
+}
+
+// NewWorkflowState creates a new workflow state
+func NewWorkflowState(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs, progressTracker *progress.Tracker, logger *slog.Logger) *WorkflowState {
+	totalSteps := 10
+
+	result := &ContainerizeAndDeployResult{
+		Steps: make([]WorkflowStep, 0, totalSteps),
+	}
+
+	workflowID := common.GenerateWorkflowID(args.RepoURL)
+	workflowProgress := NewWorkflowProgress(workflowID, "containerize_and_deploy", totalSteps)
+
+	return &WorkflowState{
+		WorkflowID:       workflowID,
+		Args:             args,
+		Result:           result,
+		ProgressTracker:  progressTracker,
+		WorkflowProgress: workflowProgress,
+		CurrentStep:      0,
+		TotalSteps:       totalSteps,
+		Logger:           logger,
+	}
+}
+
+// UpdateProgress advances the progress tracker and returns progress info
+func (ws *WorkflowState) UpdateProgress() (int, string) {
+	ws.CurrentStep++
+	progress := fmt.Sprintf("%d/%d", ws.CurrentStep, ws.TotalSteps)
+	percentage := int((float64(ws.CurrentStep) / float64(ws.TotalSteps)) * 100)
+	ws.ProgressTracker.SetCurrent(ws.CurrentStep)
+	return percentage, progress
+}
+
+// AddStepResult adds a step result to the workflow result
+func (ws *WorkflowState) AddStepResult(name, status, duration, message string, retries int, err error) {
+	step := WorkflowStep{
+		Name:     name,
+		Status:   status,
+		Duration: duration,
+		Progress: fmt.Sprintf("%d/%d", ws.CurrentStep, ws.TotalSteps),
+		Message:  message,
+		Retries:  retries,
+	}
+
+	if err != nil {
+		step.Error = err.Error()
+	}
+
+	ws.Result.Steps = append(ws.Result.Steps, step)
 }

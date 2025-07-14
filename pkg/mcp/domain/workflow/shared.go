@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -26,7 +27,13 @@ func (w *mcpServerWrapper) SendNotificationToClient(ctx context.Context, method 
 	// Convert params to map[string]any
 	paramsMap, ok := params.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("params must be map[string]interface{}, got %T", params)
+		return errors.NewWorkflowError(
+			errors.CodeTypeConversionFailed,
+			"workflow",
+			"notification",
+			fmt.Sprintf("params must be map[string]interface{}, got %T", params),
+			nil,
+		)
 	}
 
 	// Convert map[string]interface{} to map[string]any

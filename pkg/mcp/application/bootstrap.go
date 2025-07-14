@@ -7,15 +7,14 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/application/session"
-	"github.com/Azure/container-kit/pkg/mcp/domain/events"
+	domainevents "github.com/Azure/container-kit/pkg/mcp/domain/events"
+	domainml "github.com/Azure/container-kit/pkg/mcp/domain/ml"
+	domainprompts "github.com/Azure/container-kit/pkg/mcp/domain/prompts"
+	domainresources "github.com/Azure/container-kit/pkg/mcp/domain/resources"
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ml"
 	infraprogress "github.com/Azure/container-kit/pkg/mcp/infrastructure/progress"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/prompts"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/resources"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
 )
 
 // Dependencies holds all the server dependencies in a structured way.
@@ -24,11 +23,11 @@ type Dependencies struct {
 	Logger         *slog.Logger
 	Config         workflow.ServerConfig
 	SessionManager session.OptimizedSessionManager
-	ResourceStore  *resources.Store
+	ResourceStore  domainresources.Store
 
 	// Domain services
-	ProgressFactory *infraprogress.SinkFactory
-	EventPublisher  *events.Publisher
+	ProgressFactory workflow.ProgressTrackerFactory
+	EventPublisher  domainevents.Publisher
 	SagaCoordinator *saga.SagaCoordinator
 
 	// Workflow orchestrators
@@ -37,13 +36,13 @@ type Dependencies struct {
 	SagaAwareOrchestrator  workflow.SagaAwareOrchestrator
 
 	// AI/ML services
-	ErrorPatternRecognizer *ml.ErrorPatternRecognizer
-	EnhancedErrorHandler   *ml.EnhancedErrorHandler
-	StepEnhancer           *ml.StepEnhancer
+	ErrorPatternRecognizer domainml.ErrorPatternRecognizer
+	EnhancedErrorHandler   domainml.EnhancedErrorHandler
+	StepEnhancer           domainml.StepEnhancer
 
 	// Infrastructure services
 	SamplingClient domainsampling.UnifiedSampler
-	PromptManager  *prompts.Manager
+	PromptManager  domainprompts.Manager
 }
 
 // Option represents a functional option for configuring dependencies
@@ -85,14 +84,14 @@ func WithProgressFactory(factory *infraprogress.SinkFactory) Option {
 }
 
 // WithResourceStore sets a custom resource store
-func WithResourceStore(store *resources.Store) Option {
+func WithResourceStore(store domainresources.Store) Option {
 	return func(d *Dependencies) {
 		d.ResourceStore = store
 	}
 }
 
 // WithPromptManager sets a custom prompt manager
-func WithPromptManager(manager *prompts.Manager) Option {
+func WithPromptManager(manager domainprompts.Manager) Option {
 	return func(d *Dependencies) {
 		d.PromptManager = manager
 	}
@@ -219,48 +218,9 @@ func NewDependencies(opts ...Option) *Dependencies {
 		)
 	}
 
-	// Create resource store if not provided
-	if d.ResourceStore == nil {
-		d.ResourceStore = resources.NewStore(baseLogger.With("service", "resources"))
-	}
-
-	// Create progress factory if not provided
-	if d.ProgressFactory == nil {
-		d.ProgressFactory = infraprogress.NewSinkFactory(baseLogger.With("service", "progress"))
-	}
-
-	// Create sampling client if not provided
-	if d.SamplingClient == nil {
-		infraClient := sampling.NewClient(
-			baseLogger.With("service", "sampling"),
-			sampling.WithMaxTokens(4000),
-			sampling.WithTemperature(0.1), // Conservative for infrastructure tasks
-			sampling.WithRetry(3, 10000),  // 3 attempts, 10k token budget
-		)
-		d.SamplingClient = sampling.NewDomainAdapter(infraClient)
-	}
-
-	// Create prompt manager if not provided
-	if d.PromptManager == nil {
-		promptManager, err := prompts.NewManager(
-			baseLogger.With("service", "prompts"),
-			prompts.ManagerConfig{
-				EnableHotReload: false, // Disable in production
-				AllowOverride:   false, // Use embedded templates only
-			},
-		)
-		if err != nil {
-			baseLogger.Error("Failed to create prompt manager", "error", err)
-			// Continue without error - prompt manager is not critical for basic operation
-		} else {
-			d.PromptManager = promptManager
-		}
-	}
-
-	// Create event publisher if not provided
-	if d.EventPublisher == nil {
-		d.EventPublisher = events.NewPublisher(baseLogger.With("service", "events"))
-	}
+	// NOTE: Infrastructure dependencies should be wired via dependency injection (Wire)
+	// The fallback initialization code has been removed to maintain clean architecture.
+	// Use the wiring package (api/wiring) for proper dependency injection.
 
 	// Create saga coordinator if not provided
 	if d.SagaCoordinator == nil {

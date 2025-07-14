@@ -5,9 +5,9 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/events"
 	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/events"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -85,9 +85,9 @@ func TestBaseOrchestratorWithMiddleware(t *testing.T) {
 
 	// Create a custom step provider that only returns one step
 	singleStepProvider := &singleStepMockProvider{step: testStep}
-	
+
 	stepFactory := NewStepFactory(singleStepProvider, nil, nil, logger)
-	baseOrch := NewBaseOrchestrator(stepFactory, nil, logger, testMiddleware1, testMiddleware2)
+	baseOrch := NewBaseOrchestrator(stepFactory, nil, logger, WithMiddleware(testMiddleware1, testMiddleware2))
 
 	// Execute
 	args := &ContainerizeAndDeployArgs{
@@ -238,7 +238,7 @@ func (m *MockStepProvider) GetVerifyStep() Step     { return &MockStep{name: "ve
 
 // singleStepMockProvider returns only one step for the first call
 type singleStepMockProvider struct {
-	step Step
+	step   Step
 	called bool
 }
 

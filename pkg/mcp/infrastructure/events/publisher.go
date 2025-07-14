@@ -1,14 +1,16 @@
-// Package events provides event publishing capabilities for Container Kit MCP.
+// Package events provides event publishing infrastructure for Container Kit MCP.
 package events
 
 import (
 	"context"
 	"log/slog"
 	"sync"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/events"
 )
 
 // EventHandler represents a function that handles domain events
-type EventHandler func(ctx context.Context, event DomainEvent) error
+type EventHandler func(ctx context.Context, event events.DomainEvent) error
 
 // Publisher manages domain event publishing and subscription
 type Publisher struct {
@@ -35,7 +37,7 @@ func (p *Publisher) Subscribe(eventType string, handler EventHandler) {
 }
 
 // Publish publishes a domain event to all registered handlers
-func (p *Publisher) Publish(ctx context.Context, event DomainEvent) error {
+func (p *Publisher) Publish(ctx context.Context, event events.DomainEvent) error {
 	p.mu.RLock()
 	handlers := p.handlers[event.EventType()]
 	p.mu.RUnlock()
@@ -83,7 +85,7 @@ func (p *Publisher) Publish(ctx context.Context, event DomainEvent) error {
 }
 
 // PublishAsync publishes an event asynchronously without waiting for handlers
-func (p *Publisher) PublishAsync(ctx context.Context, event DomainEvent) {
+func (p *Publisher) PublishAsync(ctx context.Context, event events.DomainEvent) {
 	go func() {
 		if err := p.Publish(ctx, event); err != nil {
 			p.logger.Error("Async event publishing failed",

@@ -86,13 +86,67 @@ linters-settings:
     
   # Performance settings
   gocritic:
-    disabled-checks:
-      - commentFormat  # Too opinionated
-      - whyNoLint     # Not needed with our approach
     enabled-tags:
       - performance
       - style
       - experimental
+    settings:
+      unnamedResult:
+        checkExported: true
+  
+  # Custom rules for error handling
+  revive:
+    rules:
+      - name: bare-return
+        disabled: false
+      - name: blank-imports
+        disabled: false
+      - name: context-as-argument
+        disabled: false
+      - name: context-keys-type
+        disabled: false
+      - name: dot-imports
+        disabled: false
+      - name: error-return
+        disabled: false
+      - name: error-strings
+        disabled: false
+      - name: error-naming
+        disabled: false
+      - name: exported
+        disabled: false
+      - name: if-return
+        disabled: false
+      - name: increment-decrement
+        disabled: false
+      - name: var-naming
+        disabled: false
+      - name: var-declaration
+        disabled: false
+      - name: package-comments
+        disabled: false
+      - name: range
+        disabled: false
+      - name: receiver-naming
+        disabled: false
+      - name: time-naming
+        disabled: false
+      - name: unexported-return
+        disabled: false
+      - name: indent-error-flow
+        disabled: false
+      - name: errorf
+        disabled: false
+      - name: empty-block
+        disabled: false
+      - name: superfluous-else
+        disabled: false
+      - name: unused-parameter
+        disabled: false
+      - name: unreachable-code
+        disabled: false
+      - name: redefines-builtin-id
+        disabled: false
       
   # Constants detection
   goconst:
@@ -139,6 +193,16 @@ linters-settings:
         - dupl
         - maintidx
       path: "_test\\.go"
+    # Allow fmt.Errorf in test files only
+    - linters:
+        - revive
+      path: "_test\\.go"
+      text: "errorf"
+    # Allow fmt.Errorf in generated files
+    - linters:
+        - revive
+      path: "_gen\\.go"
+      text: "errorf"
   exclude:
     - ".*\\.pb\\.go$"
     - ".*_gen\\.go$"

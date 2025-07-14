@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/health"
+	"github.com/Azure/container-kit/pkg/mcp/domain/health"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -18,28 +18,16 @@ import (
 type Handler struct {
 	logger        *slog.Logger
 	mcpServer     *server.MCPServer
-	healthMonitor *health.Monitor
+	healthMonitor health.Monitor
 	port          int
 	mu            sync.RWMutex // Protects mcpServer field
 }
 
 // NewHandler creates a new HTTP handler
-func NewHandler(logger *slog.Logger, port int) *Handler {
+func NewHandler(logger *slog.Logger, port int, healthMonitor health.Monitor) *Handler {
 	if port == 0 {
 		port = 8080 // Default port
 	}
-
-	// Create health monitor and register basic checks
-	healthMonitor := health.NewMonitor(logger)
-	healthMonitor.SetVersion("0.0.6")
-
-	// Register basic MCP server check
-	healthMonitor.RegisterChecker(health.NewBasicChecker("mcp_server", func(ctx context.Context) (health.Status, string, map[string]string) {
-		// Basic liveness check - if we can respond, server is alive
-		return health.StatusHealthy, "MCP server is running", map[string]string{
-			"transport": "http",
-		}
-	}))
 
 	return &Handler{
 		logger:        logger.With("component", "http_handler"),
@@ -271,8 +259,7 @@ func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	h.healthMonitor.CheckAll(ctx)
-	report := h.healthMonitor.GetReport()
+	report := h.healthMonitor.GetHealth(ctx)
 
 	// Set HTTP status based on health status
 	var statusCode int
@@ -303,8 +290,25 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 
 	// Get current health report for metrics
-	report := h.healthMonitor.GetReport()
-	uptimeSeconds := int(report.Uptime.Seconds())
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	report := h.healthMonitor.GetHealth(ctx)
+	// For now, just use 0 for uptime since it's not in the interface
+	uptimeSeconds := 0
+
+	// Count components by status
+	healthy, degraded, unhealthy := 0, 0, 0
+	for _, comp := range report.Components {
+		switch comp.Status {
+		case health.StatusHealthy:
+			healthy++
+		case health.StatusDegraded:
+			degraded++
+		case health.StatusUnhealthy:
+			unhealthy++
+		}
+	}
+	total := len(report.Components)
 
 	// Generate Prometheus metrics
 	metrics := fmt.Sprintf(`# HELP container_kit_mcp_uptime_seconds MCP server uptime in seconds
@@ -313,7 +317,7 @@ container_kit_mcp_uptime_seconds %d
 
 # HELP container_kit_mcp_info MCP server information
 # TYPE container_kit_mcp_info gauge
-container_kit_mcp_info{version="%s",transport="http"} 1
+container_kit_mcp_info{version="0.0.6",transport="http"} 1
 
 # HELP container_kit_mcp_health_status MCP server health status (1=healthy, 0.5=degraded, 0=unhealthy)
 # TYPE container_kit_mcp_health_status gauge
@@ -336,12 +340,11 @@ container_kit_mcp_health_checks_degraded %d
 container_kit_mcp_health_checks_unhealthy %d
 `,
 		uptimeSeconds,
-		report.Version,
 		h.healthStatusToFloat(report.Status),
-		report.Summary["total"],
-		report.Summary["healthy"],
-		report.Summary["degraded"],
-		report.Summary["unhealthy"],
+		total,
+		healthy,
+		degraded,
+		unhealthy,
 	)
 
 	if _, err := w.Write([]byte(metrics)); err != nil {

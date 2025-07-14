@@ -7,7 +7,7 @@ COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_TIME := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS := -X main.Version=$(VERSION) -X main.GitCommit=$(COMMIT) -X main.BuildTime=$(BUILD_TIME)
 
-.PHONY: build cli mcp test test-integration fmt lint static-analysis security-scan check-all clean version help wire-gen docs
+.PHONY: build cli mcp test test-integration fmt lint static-analysis security-scan arch-validate check-all clean version help wire-gen docs
 
 # Primary build target - builds both CLI and MCP server
 build: cli mcp
@@ -29,7 +29,7 @@ mcp:
 wire-gen:
 	@echo "Generating Wire dependency injection code..."
 	@which wire > /dev/null || go install github.com/google/wire/cmd/wire@latest
-	@cd pkg/mcp/infrastructure/wire && go generate
+	@cd pkg/mcp/api/wiring && go generate
 	@echo "✅ Wire code generated"
 
 # Documentation generation
@@ -83,7 +83,12 @@ security-scan:
 	@which $$(go env GOPATH)/bin/govulncheck > /dev/null || go install golang.org/x/vuln/cmd/govulncheck@latest
 	$$(go env GOPATH)/bin/govulncheck ./...
 
-check-all: fmt lint static-analysis security-scan test
+arch-validate:
+	@echo "Running architectural boundary validation..."
+	@echo "Note: wiring/DI directories are excluded as they need to import from all layers"
+	@cd tools/arch-validate && go run main.go ../../pkg/mcp
+
+check-all: fmt lint static-analysis security-scan arch-validate test
 
 # Utility tasks  
 clean:

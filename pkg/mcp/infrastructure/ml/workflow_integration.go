@@ -14,14 +14,14 @@ import (
 // EnhancedErrorHandler wraps workflow execution with AI-powered error analysis
 type EnhancedErrorHandler struct {
 	recognizer     *ErrorPatternRecognizer
-	eventPublisher *events.Publisher
+	eventPublisher events.Publisher
 	logger         *slog.Logger
 }
 
 // NewEnhancedErrorHandler creates a new enhanced error handler
 func NewEnhancedErrorHandler(
 	samplingClient domainsampling.UnifiedSampler,
-	eventPublisher *events.Publisher,
+	eventPublisher events.Publisher,
 	logger *slog.Logger,
 ) *EnhancedErrorHandler {
 	return &EnhancedErrorHandler{

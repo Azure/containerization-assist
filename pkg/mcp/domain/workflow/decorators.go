@@ -7,16 +7,14 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/events"
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
 // WithEvents wraps a base orchestrator with event publishing capabilities
-func WithEvents(base *BaseOrchestrator, publisher *events.Publisher) EventAwareOrchestrator {
-	// Add event middleware to the base orchestrator
-	base.AddMiddleware(EventMiddleware(publisher, base.logger))
-
+func WithEvents(base *BaseOrchestrator, publisher events.Publisher) EventAwareOrchestrator {
 	return &eventDecorator{
 		base:           base,
 		eventPublisher: publisher,
@@ -28,7 +26,7 @@ func WithEvents(base *BaseOrchestrator, publisher *events.Publisher) EventAwareO
 // eventDecorator adds event publishing to any orchestrator
 type eventDecorator struct {
 	base           WorkflowOrchestrator
-	eventPublisher *events.Publisher
+	eventPublisher events.Publisher
 	eventUtils     events.EventUtils
 	logger         *slog.Logger
 }
@@ -55,13 +53,6 @@ func (d *eventDecorator) PublishWorkflowEvent(ctx context.Context, workflowID st
 
 // WithSaga wraps an orchestrator with saga transaction support
 func WithSaga(base EventAwareOrchestrator, coordinator *saga.SagaCoordinator, logger *slog.Logger) SagaAwareOrchestrator {
-	// If base is an eventDecorator that wraps BaseOrchestrator, add saga middleware
-	if decorator, ok := base.(*eventDecorator); ok {
-		if baseOrch, ok := decorator.base.(*BaseOrchestrator); ok {
-			baseOrch.AddMiddleware(SagaMiddleware(coordinator, logger))
-		}
-	}
-
 	return &sagaDecorator{
 		base:        base,
 		coordinator: coordinator,
@@ -71,13 +62,6 @@ func WithSaga(base EventAwareOrchestrator, coordinator *saga.SagaCoordinator, lo
 
 // WithSagaAndDependencies wraps an orchestrator with saga transaction support and infrastructure dependencies
 func WithSagaAndDependencies(base EventAwareOrchestrator, coordinator *saga.SagaCoordinator, containerManager ContainerManager, deploymentManager DeploymentManager, logger *slog.Logger) SagaAwareOrchestrator {
-	// If base is an eventDecorator that wraps BaseOrchestrator, add saga middleware
-	if decorator, ok := base.(*eventDecorator); ok {
-		if baseOrch, ok := decorator.base.(*BaseOrchestrator); ok {
-			baseOrch.AddMiddleware(SagaMiddleware(coordinator, logger))
-		}
-	}
-
 	return &sagaDecorator{
 		base:              base,
 		coordinator:       coordinator,
@@ -119,9 +103,15 @@ func (d *sagaDecorator) CancelWorkflow(ctx context.Context, workflowID string) e
 	d.logger.Info("Cancelling workflow", "workflow_id", workflowID)
 
 	// Extract saga ID from context or lookup
-	sagaID, ok := ctx.Value("saga_id").(string)
+	sagaID, ok := GetSagaID(ctx)
 	if !ok {
-		return fmt.Errorf("no saga associated with workflow %s", workflowID)
+		return errors.NewWorkflowError(
+			errors.CodeNotFound,
+			"workflow",
+			"saga_lookup",
+			fmt.Sprintf("no saga associated with workflow %s", workflowID),
+			nil,
+		).WithWorkflowID(workflowID)
 	}
 
 	// Cancel saga to trigger compensation

@@ -16,7 +16,7 @@ func ProvideErrorPatternRecognizer(samplingClient domainsampling.UnifiedSampler,
 // ProvideEnhancedErrorHandler creates an enhanced error handler
 func ProvideEnhancedErrorHandler(
 	samplingClient domainsampling.UnifiedSampler,
-	eventPublisher *events.Publisher,
+	eventPublisher events.Publisher,
 	logger *slog.Logger,
 ) *EnhancedErrorHandler {
 	return NewEnhancedErrorHandler(samplingClient, eventPublisher, logger)

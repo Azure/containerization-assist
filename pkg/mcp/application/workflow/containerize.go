@@ -7,7 +7,6 @@ import (
 	"log/slog"
 
 	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	infraprogress "github.com/Azure/container-kit/pkg/mcp/infrastructure/progress"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -15,7 +14,7 @@ import (
 // RegisterWorkflowTools registers the single comprehensive workflow tool
 func RegisterWorkflowTools(mcpServer interface {
 	AddTool(tool mcp.Tool, handler server.ToolHandlerFunc)
-}, logger *slog.Logger) error {
+}, orchestrator domainworkflow.WorkflowOrchestrator, logger *slog.Logger) error {
 	logger.Info("Registering workflow tools")
 
 	// Register the single containerize_and_deploy workflow tool
@@ -77,10 +76,7 @@ func RegisterWorkflowTools(mcpServer interface {
 			args.TestMode = testMode
 		}
 
-		// Use new orchestrator-based workflow with progress factory
-		progressFactory := infraprogress.NewSinkFactory(logger)
-		// TODO: Inject tracer via wire
-		orchestrator := domainworkflow.NewOrchestratorWithFactory(nil, progressFactory, nil, logger)
+		// Use injected orchestrator
 		result, err := orchestrator.Execute(ctx, &req, &args)
 		if err != nil {
 			return nil, err

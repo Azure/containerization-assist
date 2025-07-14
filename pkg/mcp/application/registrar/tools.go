@@ -10,21 +10,24 @@ import (
 
 	"github.com/Azure/container-kit/pkg/common/errors"
 	appworkflow "github.com/Azure/container-kit/pkg/mcp/application/workflow"
+	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // ToolRegistrar handles tool registration
 type ToolRegistrar struct {
-	logger    *slog.Logger
-	startTime time.Time
+	logger       *slog.Logger
+	orchestrator domainworkflow.WorkflowOrchestrator
+	startTime    time.Time
 }
 
 // NewToolRegistrar creates a new tool registrar
-func NewToolRegistrar(logger *slog.Logger) *ToolRegistrar {
+func NewToolRegistrar(logger *slog.Logger, orchestrator domainworkflow.WorkflowOrchestrator) *ToolRegistrar {
 	return &ToolRegistrar{
-		logger:    logger.With("component", "tool_registrar"),
-		startTime: time.Now(),
+		logger:       logger.With("component", "tool_registrar"),
+		orchestrator: orchestrator,
+		startTime:    time.Now(),
 	}
 }
 
@@ -34,7 +37,7 @@ func (tr *ToolRegistrar) RegisterAll(mcpServer *server.MCPServer) error {
 
 	// Register workflow tools
 	tr.logger.Info("Registering single comprehensive workflow tool for AI-powered containerization")
-	if err := appworkflow.RegisterWorkflowTools(mcpServer, tr.logger); err != nil {
+	if err := appworkflow.RegisterWorkflowTools(mcpServer, tr.orchestrator, tr.logger); err != nil {
 		return errors.New(errors.CodeToolExecutionFailed, "registrar", "failed to register workflow tools", err)
 	}
 

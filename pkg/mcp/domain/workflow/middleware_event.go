@@ -12,7 +12,7 @@ import (
 )
 
 // EventMiddleware creates a middleware that publishes events for step execution
-func EventMiddleware(publisher *events.Publisher, logger *slog.Logger) StepMiddleware {
+func EventMiddleware(publisher events.Publisher, logger *slog.Logger) StepMiddleware {
 	return func(next StepHandler) StepHandler {
 		return func(ctx context.Context, step Step, state *WorkflowState) error {
 			stepStartTime := time.Now()
@@ -55,14 +55,14 @@ func EventMiddleware(publisher *events.Publisher, logger *slog.Logger) StepMiddl
 
 // WorkflowEventMiddleware creates a middleware that publishes workflow-level events
 // This is used at the orchestrator level, not step level
-func WorkflowEventMiddleware(publisher *events.Publisher, logger *slog.Logger) func(WorkflowHandler) WorkflowHandler {
+func WorkflowEventMiddleware(publisher events.Publisher, logger *slog.Logger) func(WorkflowHandler) WorkflowHandler {
 	return func(next WorkflowHandler) WorkflowHandler {
 		return func(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
 			workflowStartTime := time.Now()
 			workflowID := common.GenerateWorkflowID(args.RepoURL)
 
 			// Store workflow ID in context for other middlewares
-			ctx = context.WithValue(ctx, "workflow_id", workflowID)
+			ctx = WithWorkflowID(ctx, workflowID)
 
 			// Publish workflow started event
 			startEvent := common.CreateWorkflowStartedEvent(workflowID, args.RepoURL, args.Branch, common.ExtractUserID(ctx))

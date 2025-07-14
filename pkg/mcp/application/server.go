@@ -76,7 +76,7 @@ func (s *serverImpl) registerComponents() error {
 	}
 
 	// Create and use unified registrar
-	registrar := registrar.NewRegistrar(s.deps.Logger, s.deps.ResourceStore)
+	registrar := registrar.NewRegistrar(s.deps.Logger, s.deps.ResourceStore, s.deps.WorkflowOrchestrator)
 	if err := registrar.RegisterAll(s.mcpServer); err != nil {
 		return errors.New(errors.CodeToolExecutionFailed, "server", "failed to register components", err)
 	}
@@ -194,9 +194,6 @@ func (s *serverImpl) Start(ctx context.Context) error {
 
 	// OptimizedSessionManager handles cleanup automatically
 	s.deps.Logger.Info("Session cleanup handled automatically by OptimizedSessionManager")
-
-	// Start resource store cleanup routine
-	s.deps.ResourceStore.StartCleanupRoutine(30*time.Minute, 24*time.Hour)
 
 	// Initialize mcp-go server directly without manager abstraction
 	if !s.isMcpInitialized {

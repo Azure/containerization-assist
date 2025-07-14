@@ -4,22 +4,21 @@ package registrar
 import (
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/resources"
+	"github.com/Azure/container-kit/pkg/mcp/domain/resources"
+	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// Registrar manages all registrations (tools, prompts, resources)
+// Registrar manages all registrations (tools, resources)
 type Registrar struct {
 	toolRegistrar     *ToolRegistrar
-	promptRegistrar   *PromptRegistrar
 	resourceRegistrar *ResourceRegistrar
 }
 
 // NewRegistrar creates a new unified registrar
-func NewRegistrar(logger *slog.Logger, resourceStore *resources.Store) *Registrar {
+func NewRegistrar(logger *slog.Logger, resourceStore resources.Store, orchestrator workflow.WorkflowOrchestrator) *Registrar {
 	return &Registrar{
-		toolRegistrar:     NewToolRegistrar(logger),
-		promptRegistrar:   NewPromptRegistrar(logger),
+		toolRegistrar:     NewToolRegistrar(logger, orchestrator),
 		resourceRegistrar: NewResourceRegistrar(logger, resourceStore),
 	}
 }
@@ -28,11 +27,6 @@ func NewRegistrar(logger *slog.Logger, resourceStore *resources.Store) *Registra
 func (r *Registrar) RegisterAll(mcpServer *server.MCPServer) error {
 	// Register tools
 	if err := r.toolRegistrar.RegisterAll(mcpServer); err != nil {
-		return err
-	}
-
-	// Register prompts
-	if err := r.promptRegistrar.RegisterAll(mcpServer); err != nil {
 		return err
 	}
 

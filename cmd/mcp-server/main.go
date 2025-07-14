@@ -15,9 +15,9 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
+	_ "github.com/Azure/container-kit/pkg/mcp/api/wiring" // Wire initialization
 	"github.com/Azure/container-kit/pkg/mcp/application"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	_ "github.com/Azure/container-kit/pkg/mcp/infrastructure/wire" // Wire initialization
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"

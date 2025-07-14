@@ -21,12 +21,22 @@ type BaseOrchestrator struct {
 	logger          *slog.Logger
 }
 
-// NewBaseOrchestrator creates a new base orchestrator with middleware support
+// OrchestratorOption configures a BaseOrchestrator during construction
+type OrchestratorOption func(*BaseOrchestrator)
+
+// WithMiddleware registers one or more step middlewares
+func WithMiddleware(middlewares ...StepMiddleware) OrchestratorOption {
+	return func(o *BaseOrchestrator) {
+		o.middlewares = append(o.middlewares, middlewares...)
+	}
+}
+
+// NewBaseOrchestrator creates a new base orchestrator with the supplied options
 func NewBaseOrchestrator(
 	factory *StepFactory,
 	progressFactory ProgressTrackerFactory,
 	logger *slog.Logger,
-	middlewares ...StepMiddleware,
+	opts ...OrchestratorOption,
 ) *BaseOrchestrator {
 	// Get all steps and filter out nil values
 	allSteps := factory.CreateAllSteps()
@@ -36,18 +46,20 @@ func NewBaseOrchestrator(
 			steps = append(steps, step)
 		}
 	}
-	
-	return &BaseOrchestrator{
+
+	orchestrator := &BaseOrchestrator{
 		steps:           steps,
-		middlewares:     middlewares,
+		middlewares:     []StepMiddleware{}, // Initialize empty slice
 		progressFactory: progressFactory,
 		logger:          logger.With("component", "base_orchestrator"),
 	}
-}
 
-// AddMiddleware adds additional middleware to the orchestrator
-func (o *BaseOrchestrator) AddMiddleware(middleware StepMiddleware) {
-	o.middlewares = append(o.middlewares, middleware)
+	// Apply all options
+	for _, opt := range opts {
+		opt(orchestrator)
+	}
+
+	return orchestrator
 }
 
 // Execute runs the containerization workflow
@@ -55,10 +67,10 @@ func (o *BaseOrchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest
 	startTime := time.Now()
 
 	// Generate workflow ID if not in context
-	workflowID, ok := ctx.Value("workflow_id").(string)
+	workflowID, ok := GetWorkflowID(ctx)
 	if !ok {
 		workflowID = common.GenerateWorkflowID(args.RepoURL)
-		ctx = context.WithValue(ctx, "workflow_id", workflowID)
+		ctx = WithWorkflowID(ctx, workflowID)
 	}
 
 	o.logger.Info("Starting containerize_and_deploy workflow",

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/transport/http"
+	"github.com/Azure/container-kit/pkg/mcp/domain/health"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -16,9 +17,28 @@ type HTTPTransport struct {
 
 // NewHTTPTransport creates a new HTTP transport
 func NewHTTPTransport(logger *slog.Logger, port int) *HTTPTransport {
+	// Create a basic health monitor for HTTP transport
+	// In a production setup, this would be provided by dependency injection
+	healthMonitor := &basicHealthMonitor{}
 	return &HTTPTransport{
-		handler: http.NewHandler(logger, port),
+		handler: http.NewHandler(logger, port, healthMonitor),
 	}
+}
+
+// basicHealthMonitor is a minimal implementation of health.Monitor for HTTP transport
+type basicHealthMonitor struct{}
+
+func (m *basicHealthMonitor) RegisterChecker(checker health.Checker) {}
+
+func (m *basicHealthMonitor) GetHealth(ctx context.Context) health.HealthReport {
+	return health.HealthReport{
+		Status:     health.StatusHealthy,
+		Components: make(map[string]health.ComponentHealth),
+	}
+}
+
+func (m *basicHealthMonitor) GetComponentHealth(ctx context.Context, component string) (health.Status, error) {
+	return health.StatusHealthy, nil
 }
 
 // Serve implements the Transport interface

@@ -4,6 +4,10 @@
 
 The workflow orchestrator architecture has been refactored to use a single base implementation with decorators, replacing the previous 3-level inheritance hierarchy.
 
+## ⚠️ Migration Complete
+
+The legacy orchestrator has been removed as of [current date]. All code should now use the new BaseOrchestrator with decorators.
+
 ## Changes
 
 ### Before

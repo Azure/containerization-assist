@@ -17,11 +17,11 @@ type SagaCoordinator struct {
 	executions map[string]*SagaExecution
 	mutex      sync.RWMutex
 	logger     *slog.Logger
-	publisher  *events.Publisher
+	publisher  events.Publisher
 }
 
 // NewSagaCoordinator creates a new saga coordinator
-func NewSagaCoordinator(logger *slog.Logger, publisher *events.Publisher) *SagaCoordinator {
+func NewSagaCoordinator(logger *slog.Logger, publisher events.Publisher) *SagaCoordinator {
 	return &SagaCoordinator{
 		executions: make(map[string]*SagaExecution),
 		logger:     logger.With("component", "saga_coordinator"),

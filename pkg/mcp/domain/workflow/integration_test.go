@@ -387,7 +387,7 @@ func TestWorkflowOrchestrator_ConcurrentExecution(t *testing.T) {
 			progressFactory := &TestProgressFactory{sink: testSink}
 			mockProvider := &MockStepProvider{}
 			stepFactory := NewStepFactory(mockProvider, nil, nil, logger)
-			orchestrator := NewOrchestratorWithFactory(stepFactory, progressFactory, logger)
+			orchestrator := NewBaseOrchestrator(stepFactory, progressFactory, logger)
 
 			args := &ContainerizeAndDeployArgs{
 				RepoURL:  "https://github.com/non-existent/repo.git", // Will fail fast

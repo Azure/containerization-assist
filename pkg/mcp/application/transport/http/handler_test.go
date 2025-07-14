@@ -2,6 +2,7 @@ package http
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -9,27 +10,50 @@ import (
 	"os"
 	"testing"
 
+	"github.com/Azure/container-kit/pkg/mcp/domain/health"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// mockHealthMonitor is a test double for health.Monitor
+type mockHealthMonitor struct{}
+
+func (m *mockHealthMonitor) RegisterChecker(checker health.Checker) {}
+
+func (m *mockHealthMonitor) GetHealth(ctx context.Context) health.HealthReport {
+	return health.HealthReport{
+		Status:     health.StatusHealthy,
+		Components: make(map[string]health.ComponentHealth),
+		Metadata: map[string]interface{}{
+			"version": "0.0.6",
+		},
+	}
+}
+
+func (m *mockHealthMonitor) GetComponentHealth(ctx context.Context, component string) (health.Status, error) {
+	return health.StatusHealthy, nil
+}
+
 func TestHandler_NewHandler(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	monitor := &mockHealthMonitor{}
 
-	handler := NewHandler(logger, 8080)
+	handler := NewHandler(logger, 8080, monitor)
 	assert.NotNil(t, handler, "Handler should be created successfully")
 }
 
 func TestHandler_NewHandler_DefaultPort(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	monitor := &mockHealthMonitor{}
 
-	handler := NewHandler(logger, 0) // Should default to 8080
+	handler := NewHandler(logger, 0, monitor) // Should default to 8080
 	assert.NotNil(t, handler, "Handler should be created successfully")
 }
 
 func TestHandler_RPCEndpoint_Initialize(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
-	handler := NewHandler(logger, 8080)
+	monitor := &mockHealthMonitor{}
+	handler := NewHandler(logger, 8080, monitor)
 
 	// Test initialize request
 	request := map[string]interface{}{
@@ -60,7 +84,8 @@ func TestHandler_RPCEndpoint_Initialize(t *testing.T) {
 
 func TestHandler_RPCEndpoint_ListTools(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
-	handler := NewHandler(logger, 8080)
+	monitor := &mockHealthMonitor{}
+	handler := NewHandler(logger, 8080, monitor)
 
 	// Test tools/list request
 	request := map[string]interface{}{
@@ -95,7 +120,8 @@ func TestHandler_RPCEndpoint_ListTools(t *testing.T) {
 
 func TestHandler_RPCEndpoint_MethodNotFound(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
-	handler := NewHandler(logger, 8080)
+	monitor := &mockHealthMonitor{}
+	handler := NewHandler(logger, 8080, monitor)
 
 	// Test unknown method
 	request := map[string]interface{}{
@@ -127,7 +153,8 @@ func TestHandler_RPCEndpoint_MethodNotFound(t *testing.T) {
 
 func TestHandler_RPCEndpoint_InvalidMethod(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
-	handler := NewHandler(logger, 8080)
+	monitor := &mockHealthMonitor{}
+	handler := NewHandler(logger, 8080, monitor)
 
 	// Test GET request (should be POST only)
 	req := httptest.NewRequest("GET", "/rpc", nil)
@@ -139,7 +166,8 @@ func TestHandler_RPCEndpoint_InvalidMethod(t *testing.T) {
 
 func TestHandler_HealthEndpoint(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
-	handler := NewHandler(logger, 8080)
+	monitor := &mockHealthMonitor{}
+	handler := NewHandler(logger, 8080, monitor)
 
 	req := httptest.NewRequest("GET", "/healthz", nil)
 	rr := httptest.NewRecorder()
@@ -153,12 +181,20 @@ func TestHandler_HealthEndpoint(t *testing.T) {
 	require.NoError(t, err, "Response should be valid JSON")
 
 	assert.Contains(t, response, "status", "Should have status field")
-	assert.Contains(t, response, "version", "Should have version field")
+	assert.Contains(t, response, "metadata", "Should have metadata field")
+
+	// Check version in metadata
+	if metadata, ok := response["metadata"].(map[string]interface{}); ok {
+		assert.Contains(t, metadata, "version", "Should have version in metadata")
+	} else {
+		t.Error("Metadata should be a map")
+	}
 }
 
 func TestHandler_MetricsEndpoint(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
-	handler := NewHandler(logger, 8080)
+	monitor := &mockHealthMonitor{}
+	handler := NewHandler(logger, 8080, monitor)
 
 	req := httptest.NewRequest("GET", "/metrics", nil)
 	rr := httptest.NewRecorder()
@@ -174,7 +210,8 @@ func TestHandler_MetricsEndpoint(t *testing.T) {
 
 func TestHandler_RootEndpoint(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
-	handler := NewHandler(logger, 8080)
+	monitor := &mockHealthMonitor{}
+	handler := NewHandler(logger, 8080, monitor)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -194,7 +231,8 @@ func TestHandler_RootEndpoint(t *testing.T) {
 
 func TestHandler_CORS_Middleware(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
-	handler := NewHandler(logger, 8080)
+	monitor := &mockHealthMonitor{}
+	handler := NewHandler(logger, 8080, monitor)
 
 	// Test OPTIONS request for CORS preflight
 	req := httptest.NewRequest("OPTIONS", "/rpc", nil)

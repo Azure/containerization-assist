@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow/common"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -26,7 +27,7 @@ func SagaMiddleware(coordinator *saga.SagaCoordinator, logger *slog.Logger) Step
 	return func(next StepHandler) StepHandler {
 		return func(ctx context.Context, step Step, state *WorkflowState) error {
 			// Check if we're in a saga context
-			sagaID, hasSaga := ctx.Value("saga_id").(string)
+			sagaID, hasSaga := GetSagaID(ctx)
 			if !hasSaga {
 				// No saga context, just execute normally
 				return next(ctx, step, state)
@@ -61,20 +62,29 @@ func SagaMiddleware(coordinator *saga.SagaCoordinator, logger *slog.Logger) Step
 					if savedState, ok := data["workflow_state"].(*WorkflowState); ok {
 						return compensatable.Compensate(ctx, savedState)
 					}
-					return fmt.Errorf("missing workflow state for compensation")
+					return errors.NewWorkflowError(
+						errors.CodeInvalidState,
+						"workflow",
+						"saga_compensation",
+						"missing workflow state for compensation",
+						nil,
+					).WithStepContext("saga_id", sagaID).
+						WithStepContext("step_name", data["step_name"])
 				},
 			}
 
 			// Store step data for potential compensation
-			if sagaExec, ok := ctx.Value("saga_execution").(*saga.SagaExecution); ok {
-				// Store step information in saga data for later compensation
-				sagaExec.Data[fmt.Sprintf("step_%s", step.Name())] = map[string]interface{}{
-					"compensatable": true,
-					"state":         state,
+			if sagaExecRaw, ok := GetSagaExecution(ctx); ok {
+				if sagaExec, ok := sagaExecRaw.(*saga.SagaExecution); ok {
+					// Store step information in saga data for later compensation
+					sagaExec.Data[fmt.Sprintf("step_%s", step.Name())] = map[string]interface{}{
+						"compensatable": true,
+						"state":         state,
+					}
+					logger.Info("Marked step as compensatable in saga",
+						"step", step.Name(),
+						"saga_id", sagaID)
 				}
-				logger.Info("Marked step as compensatable in saga",
-					"step", step.Name(),
-					"saga_id", sagaID)
 			}
 
 			// Execute through saga step (which calls our executeFunc)
@@ -88,7 +98,7 @@ func WorkflowSagaMiddleware(coordinator *saga.SagaCoordinator, logger *slog.Logg
 	return func(next WorkflowHandler) WorkflowHandler {
 		return func(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
 			// Generate saga ID
-			workflowID, _ := ctx.Value("workflow_id").(string)
+			workflowID, _ := GetWorkflowID(ctx)
 			if workflowID == "" {
 				workflowID = common.GenerateWorkflowID(args.RepoURL)
 			}
@@ -109,8 +119,8 @@ func WorkflowSagaMiddleware(coordinator *saga.SagaCoordinator, logger *slog.Logg
 			}
 
 			// Add saga context
-			ctx = context.WithValue(ctx, "saga_id", sagaID)
-			ctx = context.WithValue(ctx, "saga_execution", sagaExec)
+			ctx = WithSagaID(ctx, sagaID)
+			ctx = WithSagaExecution(ctx, sagaExec)
 
 			logger.Info("Started saga-enabled workflow",
 				"saga_id", sagaID,
