@@ -13,24 +13,35 @@ func ProvideStepFactory(stepProvider StepProvider, optimizer BuildOptimizer, opt
 	return NewStepFactory(stepProvider, optimizer, optimizedBuildStep, logger)
 }
 
-// ProvideOrchestrator creates a concrete Orchestrator
-func ProvideOrchestrator(factory *StepFactory, progressFactory ProgressTrackerFactory, tracer Tracer, logger *slog.Logger) *Orchestrator {
-	return NewOrchestratorWithFactory(factory, progressFactory, tracer, logger)
+// ProvideBaseOrchestrator creates a concrete BaseOrchestrator
+func ProvideBaseOrchestrator(factory *StepFactory, progressFactory ProgressTrackerFactory, logger *slog.Logger, tracer Tracer) *BaseOrchestrator {
+	// Create base orchestrator with common middleware
+	middlewares := []StepMiddleware{
+		RetryMiddleware(),
+		ProgressMiddleware(),
+	}
+
+	// Add tracing middleware if tracer is available
+	if tracer != nil {
+		middlewares = append([]StepMiddleware{TracingMiddleware(tracer)}, middlewares...)
+	}
+
+	return NewBaseOrchestrator(factory, progressFactory, logger, middlewares...)
 }
 
 // ProvideEventOrchestrator creates an EventOrchestrator using decorators
-func ProvideEventOrchestrator(orchestrator *Orchestrator, publisher *events.Publisher) EventAwareOrchestrator {
-	// Use the decorator pattern
+func ProvideEventOrchestrator(orchestrator *BaseOrchestrator, publisher *events.Publisher) EventAwareOrchestrator {
+	// Use the decorator pattern to add event awareness
 	return WithEvents(orchestrator, publisher)
 }
 
 // ProvideSagaOrchestrator creates a SagaOrchestrator using decorators
-func ProvideSagaOrchestrator(eventOrchestrator EventAwareOrchestrator, sagaCoordinator *saga.SagaCoordinator, logger *slog.Logger) SagaAwareOrchestrator {
-	// Use the decorator pattern
-	return WithSaga(eventOrchestrator, sagaCoordinator, logger)
+func ProvideSagaOrchestrator(eventOrchestrator EventAwareOrchestrator, sagaCoordinator *saga.SagaCoordinator, containerManager ContainerManager, deploymentManager DeploymentManager, logger *slog.Logger) SagaAwareOrchestrator {
+	// Use the decorator pattern to add saga support
+	return WithSagaAndDependencies(eventOrchestrator, sagaCoordinator, containerManager, deploymentManager, logger)
 }
 
 // ProvideWorkflowOrchestrator provides the base workflow orchestrator as an interface
-func ProvideWorkflowOrchestrator(orchestrator *Orchestrator) WorkflowOrchestrator {
+func ProvideWorkflowOrchestrator(orchestrator *BaseOrchestrator) WorkflowOrchestrator {
 	return orchestrator
 }

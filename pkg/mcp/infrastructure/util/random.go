@@ -4,6 +4,9 @@ package util
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
+	"strings"
+	"time"
 )
 
 // ID generates a cryptographically secure random ID of the specified length.
@@ -33,4 +36,23 @@ func ShortID() string {
 // Returns a hex string of 32 characters (16 bytes).
 func LongID() string {
 	return ID(16)
+}
+
+// WorkflowID generates a unique workflow identifier based on repository URL
+func WorkflowID(repoURL string) string {
+	// Extract repo name from URL
+	parts := strings.Split(repoURL, "/")
+	repoName := "unknown"
+	if len(parts) > 0 {
+		repoName = strings.TrimSuffix(parts[len(parts)-1], ".git")
+	}
+
+	// Generate unique workflow ID
+	timestamp := time.Now().Unix()
+	return fmt.Sprintf("workflow-%s-%d", repoName, timestamp)
+}
+
+// EventID generates a unique event identifier
+func EventID() string {
+	return time.Now().Format("20060102150405") + "-" + ShortID()
 }

@@ -138,8 +138,9 @@ A Node.js Express application for integration testing.
 	mockProvider := &MockStepProvider{}
 	stepFactory := NewStepFactory(mockProvider, nil, nil, logger)
 
-	// Create orchestrator with test progress factory
-	orchestrator := NewOrchestratorWithFactory(stepFactory, progressFactory, logger)
+	// Create base orchestrator with test progress factory
+	// Using nil for tracer as it's not needed in integration tests
+	baseOrchestrator := NewBaseOrchestrator(stepFactory, progressFactory, logger, nil)
 
 	// Create workflow arguments
 	args := &ContainerizeAndDeployArgs{
@@ -154,7 +155,7 @@ A Node.js Express application for integration testing.
 	req := &mcp.CallToolRequest{}
 
 	// Execute workflow
-	result, err := orchestrator.Execute(ctx, req, args)
+	result, err := baseOrchestrator.Execute(ctx, req, args)
 
 	// The workflow might fail due to missing Git repo or other dependencies
 	// but we should still capture progress and verify the orchestrator behavior
@@ -224,7 +225,7 @@ func TestWorkflowOrchestrator_InvalidRepository(t *testing.T) {
 	progressFactory := &TestProgressFactory{sink: testSink}
 	mockProvider := &MockStepProvider{}
 	stepFactory := NewStepFactory(mockProvider, nil, nil, logger)
-	orchestrator := NewOrchestratorWithFactory(stepFactory, progressFactory, logger)
+	baseOrchestrator := NewBaseOrchestrator(stepFactory, progressFactory, logger, nil)
 
 	// Test with invalid repository URL
 	args := &ContainerizeAndDeployArgs{
@@ -236,7 +237,7 @@ func TestWorkflowOrchestrator_InvalidRepository(t *testing.T) {
 	}
 
 	req := &mcp.CallToolRequest{}
-	result, err := orchestrator.Execute(ctx, req, args)
+	result, err := baseOrchestrator.Execute(ctx, req, args)
 
 	// Should handle error gracefully
 	assert.Error(t, err, "Should error with invalid repository")
@@ -277,7 +278,7 @@ func TestWorkflowOrchestrator_ContextCancellation(t *testing.T) {
 	progressFactory := &TestProgressFactory{sink: testSink}
 	mockProvider := &MockStepProvider{}
 	stepFactory := NewStepFactory(mockProvider, nil, nil, logger)
-	orchestrator := NewOrchestratorWithFactory(stepFactory, progressFactory, logger)
+	baseOrchestrator := NewBaseOrchestrator(stepFactory, progressFactory, logger, nil)
 
 	args := &ContainerizeAndDeployArgs{
 		RepoURL:  "https://github.com/example/repo.git",
@@ -323,7 +324,7 @@ func TestWorkflowOrchestrator_ProgressTracking(t *testing.T) {
 	progressFactory := &TestProgressFactory{sink: testSink}
 	mockProvider := &MockStepProvider{}
 	stepFactory := NewStepFactory(mockProvider, nil, nil, logger)
-	orchestrator := NewOrchestratorWithFactory(stepFactory, progressFactory, logger)
+	baseOrchestrator := NewBaseOrchestrator(stepFactory, progressFactory, logger, nil)
 
 	args := &ContainerizeAndDeployArgs{
 		RepoURL:  "file://" + tempDir,

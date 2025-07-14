@@ -3,11 +3,11 @@ package events
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"log/slog"
 	"sync/atomic"
 	"time"
-
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/util"
 )
 
 // ProgressEventHandler updates progress tracking based on workflow events
@@ -203,5 +203,15 @@ type EventUtils struct{}
 
 // GenerateEventID creates a unique event ID
 func (EventUtils) GenerateEventID() string {
-	return time.Now().Format("20060102150405") + "-" + util.ShortID()
+	return time.Now().Format("20060102150405") + "-" + generateShortID()
+}
+
+// generateShortID creates a short random ID for internal use
+func generateShortID() string {
+	b := make([]byte, 4)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback to timestamp-based ID if crypto/rand fails
+		return hex.EncodeToString([]byte{byte(time.Now().UnixNano() & 0xFF)})
+	}
+	return hex.EncodeToString(b)
 }

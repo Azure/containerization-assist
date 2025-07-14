@@ -19,7 +19,10 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/container"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/kubernetes"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ml"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/persistence"
 	infraprogress "github.com/Azure/container-kit/pkg/mcp/infrastructure/progress"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/prompts"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/resources"
@@ -49,6 +52,9 @@ var InfrastructureSet = wire.NewSet(
 	wire.Bind(new(domainsampling.UnifiedSampler), new(*sampling.DomainAdapter)),
 	steps.ProvideStepProvider,
 	tracing.NewTracerAdapter,
+	container.ProvideContainerManager,
+	kubernetes.ProvideDeploymentManager,
+	ProvideStateStore,
 )
 
 // DomainSet - Domain services and events
@@ -62,7 +68,7 @@ var WorkflowSet = wire.NewSet(
 	optimized.ProvideOptimizedBuildStep,
 	optimized.ProvideBuildOptimizer,
 	workflow.ProvideStepFactory,
-	workflow.ProvideOrchestrator,
+	workflow.ProvideBaseOrchestrator,
 	workflow.ProvideEventOrchestrator,
 	workflow.ProvideSagaOrchestrator,
 	workflow.ProvideWorkflowOrchestrator,
@@ -231,6 +237,12 @@ func provideDomainSampler(client *sampling.Client) *sampling.DomainAdapter {
 }
 
 // Workflow Providers are now in the domain layer
+
+// Infrastructure Providers
+
+func ProvideStateStore(config workflow.ServerConfig, logger *slog.Logger) workflow.StateStore {
+	return persistence.NewFileStateStore(config.WorkspaceDir, logger)
+}
 
 // Server Provider
 

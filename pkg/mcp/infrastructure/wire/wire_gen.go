@@ -14,6 +14,8 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	"github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/container"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/kubernetes"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ml"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/progress"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/prompts"
@@ -50,10 +52,12 @@ func InitializeServer(logger *slog.Logger) (api.MCPServer, error) {
 	step := optimized.ProvideOptimizedBuildStep(optimizedBuildStep)
 	stepFactory := workflow.ProvideStepFactory(stepProvider, buildOptimizer, step, logger)
 	tracer := tracing.NewTracerAdapter()
-	orchestrator := workflow.ProvideOrchestrator(stepFactory, sinkFactory, tracer, logger)
-	workflowOrchestrator := workflow.ProvideWorkflowOrchestrator(orchestrator)
-	eventAwareOrchestrator := workflow.ProvideEventOrchestrator(orchestrator, publisher)
-	sagaAwareOrchestrator := workflow.ProvideSagaOrchestrator(eventAwareOrchestrator, sagaCoordinator, logger)
+	baseOrchestrator := workflow.ProvideBaseOrchestrator(stepFactory, sinkFactory, logger, tracer)
+	workflowOrchestrator := workflow.ProvideWorkflowOrchestrator(baseOrchestrator)
+	eventAwareOrchestrator := workflow.ProvideEventOrchestrator(baseOrchestrator, publisher)
+	containerManager := container.ProvideContainerManager(logger)
+	deploymentManager := kubernetes.ProvideDeploymentManager(logger)
+	sagaAwareOrchestrator := workflow.ProvideSagaOrchestrator(eventAwareOrchestrator, sagaCoordinator, containerManager, deploymentManager, logger)
 	errorPatternRecognizer := ml.ProvideErrorPatternRecognizer(domainAdapter, logger)
 	enhancedErrorHandler := ml.ProvideEnhancedErrorHandler(domainAdapter, publisher, logger)
 	stepEnhancer := ml.ProvideStepEnhancer(enhancedErrorHandler, logger)
@@ -100,10 +104,12 @@ func InitializeServerWithConfig(logger *slog.Logger, config workflow.ServerConfi
 	step := optimized.ProvideOptimizedBuildStep(optimizedBuildStep)
 	stepFactory := workflow.ProvideStepFactory(stepProvider, buildOptimizer, step, logger)
 	tracer := tracing.NewTracerAdapter()
-	orchestrator := workflow.ProvideOrchestrator(stepFactory, sinkFactory, tracer, logger)
-	workflowOrchestrator := workflow.ProvideWorkflowOrchestrator(orchestrator)
-	eventAwareOrchestrator := workflow.ProvideEventOrchestrator(orchestrator, publisher)
-	sagaAwareOrchestrator := workflow.ProvideSagaOrchestrator(eventAwareOrchestrator, sagaCoordinator, logger)
+	baseOrchestrator := workflow.ProvideBaseOrchestrator(stepFactory, sinkFactory, logger, tracer)
+	workflowOrchestrator := workflow.ProvideWorkflowOrchestrator(baseOrchestrator)
+	eventAwareOrchestrator := workflow.ProvideEventOrchestrator(baseOrchestrator, publisher)
+	containerManager := container.ProvideContainerManager(logger)
+	deploymentManager := kubernetes.ProvideDeploymentManager(logger)
+	sagaAwareOrchestrator := workflow.ProvideSagaOrchestrator(eventAwareOrchestrator, sagaCoordinator, containerManager, deploymentManager, logger)
 	errorPatternRecognizer := ml.ProvideErrorPatternRecognizer(domainAdapter, logger)
 	enhancedErrorHandler := ml.ProvideEnhancedErrorHandler(domainAdapter, publisher, logger)
 	stepEnhancer := ml.ProvideStepEnhancer(enhancedErrorHandler, logger)
@@ -156,7 +162,7 @@ var InfrastructureSet = wire.NewSet(
 var DomainSet = wire.NewSet(events.NewPublisher, saga.NewSagaCoordinator)
 
 // WorkflowSet - Workflow orchestration (simplified for now)
-var WorkflowSet = wire.NewSet(optimized.ProvideOptimizedBuildStep, optimized.ProvideBuildOptimizer, workflow.ProvideStepFactory, workflow.ProvideOrchestrator, workflow.ProvideEventOrchestrator, workflow.ProvideSagaOrchestrator, workflow.ProvideWorkflowOrchestrator, ProvideProgressFactory, wire.Bind(new(workflow.ProgressTrackerFactory), new(*progress.SinkFactory)))
+var WorkflowSet = wire.NewSet(optimized.ProvideOptimizedBuildStep, optimized.ProvideBuildOptimizer, workflow.ProvideStepFactory, workflow.ProvideBaseOrchestrator, workflow.ProvideEventOrchestrator, workflow.ProvideSagaOrchestrator, workflow.ProvideWorkflowOrchestrator, ProvideProgressFactory, wire.Bind(new(workflow.ProgressTrackerFactory), new(*progress.SinkFactory)))
 
 // MLSet - Machine learning and enhanced capabilities (optional)
 var MLSet = wire.NewSet(ml.ProvideErrorPatternRecognizer, ml.ProvideEnhancedErrorHandler, ml.ProvideStepEnhancer, ml.ProvideOptimizedBuildStep)

@@ -271,23 +271,26 @@ func NewDependencies(opts ...Option) *Dependencies {
 	}
 
 	// Create orchestrators if not provided
+	// Note: These need to be wired up properly with dependencies.
+	// This is a fallback for testing - production should use Wire.
 	if d.WorkflowOrchestrator == nil {
-		d.WorkflowOrchestrator = workflow.NewOrchestrator(baseLogger.With("service", "orchestrator"))
+		// Create a basic orchestrator without ML optimization
+		factory := workflow.NewStepFactory(nil, nil, nil, baseLogger)
+		baseOrch := workflow.NewBaseOrchestrator(factory, nil, baseLogger)
+		d.WorkflowOrchestrator = baseOrch
 	}
 
-	if d.EventAwareOrchestrator == nil {
-		d.EventAwareOrchestrator = workflow.NewEventOrchestrator(
-			baseLogger.With("service", "event-orchestrator"),
-			d.EventPublisher,
-		)
+	if d.EventAwareOrchestrator == nil && d.EventPublisher != nil {
+		// Try to wrap existing orchestrator
+		if baseOrch, ok := d.WorkflowOrchestrator.(*workflow.BaseOrchestrator); ok {
+			d.EventAwareOrchestrator = workflow.WithEvents(baseOrch, d.EventPublisher)
+		}
 	}
 
-	if d.SagaAwareOrchestrator == nil {
-		d.SagaAwareOrchestrator = workflow.NewSagaOrchestrator(
-			baseLogger.With("service", "saga-orchestrator"),
-			d.EventPublisher,
-			d.SagaCoordinator,
-		)
+	if d.SagaAwareOrchestrator == nil && d.EventAwareOrchestrator != nil && d.SagaCoordinator != nil {
+		// Try to wrap existing event orchestrator
+		// Note: Container and deployment managers would need to be injected for full saga support
+		d.SagaAwareOrchestrator = workflow.WithSaga(d.EventAwareOrchestrator, d.SagaCoordinator, baseLogger)
 	}
 
 	// Update the logger reference to use the tagged version

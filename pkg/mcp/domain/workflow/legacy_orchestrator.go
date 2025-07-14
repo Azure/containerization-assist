@@ -1,4 +1,8 @@
 // Package workflow provides orchestration for the containerization workflow.
+//
+// DEPRECATED: This file contains the legacy Orchestrator implementation.
+// New code should use BaseOrchestrator with decorators instead.
+// See MIGRATION.md for migration instructions.
 package workflow
 
 import (

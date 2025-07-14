@@ -4,30 +4,15 @@ package optimized
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ml"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/steps"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/util"
 )
 
-// extractRepoName extracts repository name from URL
-func extractRepoName(repoURL string) string {
-	// Extract repo name from URL like https://github.com/user/repo.git
-	parts := strings.Split(repoURL, "/")
-	if len(parts) == 0 {
-		return "app"
-	}
-
-	name := parts[len(parts)-1]
-	// Remove .git suffix if present
-	name = strings.TrimSuffix(name, ".git")
-	if name == "" {
-		return "app"
-	}
-	return name
-}
+// Use util.ExtractRepoName instead of local function
 
 // OptimizedBuildStep implements Docker image building with AI-powered resource optimization
 type OptimizedBuildStep struct {
@@ -60,7 +45,7 @@ func (s *OptimizedBuildStep) Execute(ctx context.Context, state *workflow.Workfl
 	state.Logger.Info("Step 3: Building Docker image with AI-powered optimization")
 
 	// Generate image name and tag from repo URL
-	imageName := extractRepoName(state.Args.RepoURL)
+	imageName := util.ExtractRepoName(state.Args.RepoURL)
 	imageTag := "latest"
 	buildContext := state.AnalyzeResult.RepoPath
 

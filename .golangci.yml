@@ -1,4 +1,4 @@
-version: "2"
+# Configuration for golangci-lint v1
 run:
   go: "1.24.4"
   tests: true
@@ -13,8 +13,7 @@ linters:
     - revive           # Enhanced go lint
     - staticcheck      # Advanced static analysis
     - errcheck         # Error checking
-    - unused           # Unused code detection
-    - deadcode         # Dead code detection
+    - unused           # Unused code detection (replaces deadcode)
     - ineffassign      # Ineffectual assignment detection
     - gocyclo          # Cyclomatic complexity checks
     
@@ -35,13 +34,16 @@ linters:
     
     # Performance
     - gocritic         # Performance and style checks
-    - maligned         # Struct alignment
     
     # Maintainability  
     - dupl             # Duplicate code detection
     - goconst          # Repeated strings detection
     - gomodguard       # Module dependencies guard
-    - exportloopref    # Loop variable capture
+    # Note: copyloopvar and exportloopref may not be available in all versions
+    - lll              # Line length check
+    - nestif           # Nested if statement check
+    - maintidx         # Maintainability index
+    - funlen           # Function length check
     
     # Testing
     - testpackage      # Test package naming
@@ -58,7 +60,19 @@ linters-settings:
     
   # Cognitive complexity
   gocognit:
-    min-complexity: 20
+    min-complexity: 15
+    
+  # Line length
+  lll:
+    line-length: 120
+    
+  # Nested if statements
+  nestif:
+    min-complexity: 4
+    
+  # Maintainability index
+  maintidx:
+    under: 20
     
   # Security settings
   gosec:
@@ -105,48 +119,30 @@ linters-settings:
           - "github.com/joho/godotenv"
           - "github.com/spf13/cobra"
           - "go.etcd.io/bbolt"
-  exclusions:
-    generated: lax
-    presets:
-      - comments
-      - common-false-positives
-      - legacy
-      - std-error-handling
-    rules:
-      - linters:
-          - govet
-        path: _test\.go
-      - linters:
-          - govet
-        path: cmd/
-      - linters:
-          - govet
-        path: tools/
-      - linters:
-          - revive
-        path: pkg/mcp/security/types\.go
-        text: "stutters"
-    paths:
-      - .*\.pb\.go$
-      - .*_gen\.go$
-      - cmd/*
-      - vendor
-      - .git
-      - bin
-      - dist
-      - tools
-      - tools/linters
-      - third_party$
-      - builtin$
-      - examples$
+  exclude-rules:
+    - linters:
+        - govet
+      path: "_test\\.go"
+    - linters:
+        - govet
+      path: "cmd/"
+    - linters:
+        - govet
+      path: "tools/"
+    - linters:
+        - revive
+      path: "pkg/mcp/security/types\\.go"
+      text: "stutters"
+    - linters:
+        - funlen
+        - gocyclo
+        - dupl
+        - maintidx
+      path: "_test\\.go"
+  exclude:
+    - ".*\\.pb\\.go$"
+    - ".*_gen\\.go$"
 issues:
   max-issues-per-linter: 1000  # High limit - actual budget enforced by quality-checks action
   max-same-issues: 200         # High limit - actual budget enforced by quality-checks action  
   new: false
-formatters:
-  exclusions:
-    generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
