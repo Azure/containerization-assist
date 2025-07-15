@@ -26,8 +26,8 @@ func (suite *SessionPersistenceIntegrationSuite) SetupSuite() {
 	suite.tmpDir, err = os.MkdirTemp("", "session-persistence-test-")
 	require.NoError(suite.T(), err)
 
-	suite.sessionDir = filepath.Join(suite.tmpDir, "sessions")
-	require.NoError(suite.T(), os.MkdirAll(suite.sessionDir, 0755))
+	suite.sessionDir = filepath.Join(suite.tmpDir, "sessions.db")
+	// No need to create the file - BoltDB will create it
 }
 
 func (suite *SessionPersistenceIntegrationSuite) TearDownSuite() {
@@ -141,7 +141,7 @@ func (suite *SessionPersistenceIntegrationSuite) startMCPServerWithSessionDir(ct
 	// Start server with session directory
 	cmd := exec.CommandContext(ctx, serverBinaryPath,
 		"--transport", "stdio",
-		"--session-dir", suite.sessionDir)
+		"--store-path", suite.sessionDir)
 
 	stdin, err := cmd.StdinPipe()
 	require.NoError(suite.T(), err)

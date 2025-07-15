@@ -123,5 +123,6 @@ func IsRetryable(err error) bool {
 		strings.Contains(errStr, "connection refused") ||
 		strings.Contains(errStr, "broken pipe") ||
 		strings.Contains(errStr, "network") ||
-		strings.Contains(errStr, "dns")
+		strings.Contains(errStr, "dns") ||
+		strings.Contains(errStr, "no mcp server in context") // Allow retrying MCP server context issues
 }

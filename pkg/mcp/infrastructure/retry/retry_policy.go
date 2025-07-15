@@ -381,7 +381,7 @@ func (arp *AdaptiveRetryPolicy) adjustPolicy() {
 	successRate := float64(arp.successCount) / float64(total)
 
 	// Adjust backoff based on success rate
-	if successRate > 0.95 {
+	if successRate > 0.8 {
 		// High success rate - reduce backoff
 		arp.currentBackoff = math.Max(1.2, arp.currentBackoff*0.8)
 	} else if successRate < 0.7 {

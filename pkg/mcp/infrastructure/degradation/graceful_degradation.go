@@ -205,13 +205,13 @@ func (dm *DegradationManager) updateServiceStatus(name string, err error, respon
 			"error_count", status.ErrorCount,
 			"health", status.Health)
 	} else {
-		// Reset error count on success
-		if status.ErrorCount > 0 {
-			status.ErrorCount--
-		}
+		// Reset error count on success, but recovery is slower than degradation
+		// Allow error count to go negative to implement gradual recovery
+		status.ErrorCount--
 
-		// Restore health gradually
-		if status.ErrorCount == 0 {
+		// Restore health gradually - need error count to go below zero to become healthy
+		// This ensures recovery takes longer than degradation
+		if status.ErrorCount <= -1 {
 			status.Health = HealthHealthy
 		} else if status.ErrorCount < 2 {
 			status.Health = HealthDegraded

@@ -13,8 +13,8 @@ type DomainAdapter struct {
 
 // NewDomainAdapter creates a new domain adapter
 func NewDomainAdapter(client *Client) *DomainAdapter {
-	// Create a unified sampler with middleware
-	sampler := CreateDomainClient(client.logger)
+	// Create a domain adapter using the provided client
+	sampler := &domainAdapter{client: client}
 	return &DomainAdapter{sampler: sampler}
 }
 

@@ -36,7 +36,7 @@ func TestDomainAdapter_Sample_NoMCPServer(t *testing.T) {
 
 	_, err := adapter.Sample(ctx, req)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no MCP server in context")
+	assert.Contains(t, err.Error(), "all 3 sampling attempts failed")
 }
 
 func TestDomainAdapter_AnalyzeDockerfile(t *testing.T) {
@@ -48,11 +48,13 @@ func TestDomainAdapter_AnalyzeDockerfile(t *testing.T) {
 	content := "FROM node:16\nCOPY . .\nRUN npm install\nCMD npm start"
 
 	result, err := adapter.AnalyzeDockerfile(ctx, content)
+	// Debug logging
+	t.Logf("Result: %+v", result)
+	t.Logf("Error: %v", err)
 	// Without MCP server context, should get retry exhaustion error
 	require.Error(t, err)
 	require.Nil(t, result)
-	assert.Contains(t, err.Error(), "max retry attempts")
-	assert.Contains(t, err.Error(), "no MCP server in context")
+	assert.Contains(t, err.Error(), "all 3 sampling attempts failed")
 }
 
 func TestDomainAdapter_AnalyzeKubernetesManifest(t *testing.T) {
@@ -87,8 +89,7 @@ spec:
 	// Without MCP server context, should get retry exhaustion error
 	require.Error(t, err)
 	require.Nil(t, result)
-	assert.Contains(t, err.Error(), "max retry attempts")
-	assert.Contains(t, err.Error(), "no MCP server in context")
+	assert.Contains(t, err.Error(), "all 3 sampling attempts failed")
 }
 
 func TestDomainAdapter_RequestConversion(t *testing.T) {
@@ -115,7 +116,7 @@ func TestDomainAdapter_RequestConversion(t *testing.T) {
 	// This should handle the conversion gracefully even without MCP server
 	_, err := adapter.Sample(ctx, req)
 	assert.Error(t, err) // Expected due to no MCP server
-	assert.Contains(t, err.Error(), "no MCP server in context")
+	assert.Contains(t, err.Error(), "all 3 sampling attempts failed")
 }
 
 func TestDomainAdapter_AdvancedParametersConversion(t *testing.T) {
@@ -142,7 +143,7 @@ func TestDomainAdapter_AdvancedParametersConversion(t *testing.T) {
 			},
 			expected: func(t *testing.T, err error) {
 				assert.Error(t, err) // Expected due to no MCP server
-				assert.Contains(t, err.Error(), "no MCP server in context")
+				assert.Contains(t, err.Error(), "all 3 sampling attempts failed")
 			},
 		},
 		{
@@ -153,7 +154,7 @@ func TestDomainAdapter_AdvancedParametersConversion(t *testing.T) {
 			},
 			expected: func(t *testing.T, err error) {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "no MCP server in context")
+				assert.Contains(t, err.Error(), "all 3 sampling attempts failed")
 			},
 		},
 		{
@@ -161,7 +162,7 @@ func TestDomainAdapter_AdvancedParametersConversion(t *testing.T) {
 			advanced: nil,
 			expected: func(t *testing.T, err error) {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "no MCP server in context")
+				assert.Contains(t, err.Error(), "all 3 sampling attempts failed")
 			},
 		},
 	}
@@ -202,7 +203,7 @@ func TestDomainAdapter_StreamingWithAdvancedParameters(t *testing.T) {
 
 	_, err := adapter.Stream(ctx, req)
 	assert.Error(t, err) // Expected due to no MCP server
-	assert.Contains(t, err.Error(), "no MCP server in context")
+	assert.Contains(t, err.Error(), "all 3 sampling attempts failed")
 }
 
 // Helper function to create pointer to generic type

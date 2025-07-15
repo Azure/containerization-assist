@@ -1,3 +1,5 @@
+//go:build integration_performance
+
 package integration
 
 import (

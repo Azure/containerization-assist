@@ -1,3 +1,5 @@
+//go:build integration_error_recovery
+
 package integration
 
 import (

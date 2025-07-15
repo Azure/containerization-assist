@@ -89,7 +89,7 @@ func TestClient_Sample_NoMCPServer(t *testing.T) {
 
 	_, err := client.SampleInternal(ctx, req)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no MCP server in context")
+	assert.Contains(t, err.Error(), "all 3 sampling attempts failed")
 }
 
 func TestClient_Sample_WithMCPServer(t *testing.T) {
@@ -107,7 +107,7 @@ func TestClient_Sample_WithMCPServer(t *testing.T) {
 
 	_, err := client.SampleInternal(ctx, req)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no MCP server in context")
+	assert.Contains(t, err.Error(), "all 3 sampling attempts failed")
 }
 
 func TestClient_AnalyzeError(t *testing.T) {

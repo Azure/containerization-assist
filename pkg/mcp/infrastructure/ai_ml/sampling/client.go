@@ -149,10 +149,6 @@ func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*Samp
 		span.SetAttributes(attribute.Int("sampling.logit_bias_count", len(req.LogitBias)))
 	}
 
-	if srv := server.ServerFromContext(ctx); srv == nil {
-		return nil, errors.New(errors.CodeInternalError, "sampling", "no MCP server in context – cannot perform sampling", nil)
-	}
-
 	// Default values.
 	if req.MaxTokens == 0 {
 		req.MaxTokens = c.maxTokens
@@ -172,7 +168,15 @@ func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*Samp
 		// Add retry attempt to span
 		span.SetAttributes(attribute.Int(tracing.AttrSamplingRetryAttempt, attempt+1))
 
-		resp, err := c.callMCP(ctx, req)
+		// Check for MCP server context on each attempt
+		var resp *SamplingResponse
+		var err error
+		if srv := server.ServerFromContext(ctx); srv == nil {
+			err = errors.New(errors.CodeInternalError, "sampling", "no MCP server in context – cannot perform sampling", nil)
+		} else {
+			resp, err = c.callMCP(ctx, req)
+		}
+
 		if err == nil {
 			// Log successful response with enhanced details
 			enhancedLogger.LogLLMResponse(ctx, reqLogger, req, resp, time.Since(start))
