@@ -16,7 +16,6 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging/events"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging/progress"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/steps"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/persistence"
@@ -32,8 +31,7 @@ func InitializeServer(logger *slog.Logger, config workflow.ServerConfig) (api.MC
 		return nil, err
 	}
 	store := persistence.ProvideResourceStore(logger)
-	sinkFactory := progress.NewSinkFactory(logger)
-	progressEmitterFactory := messaging.ProvideProgressEmitterFactory(sinkFactory)
+	directProgressFactory := messaging.ProvideDirectProgressFactory(logger)
 	publisher := events.NewPublisher(logger)
 	sagaCoordinator := saga.NewSagaCoordinator(logger, publisher)
 	stepProvider := steps.NewRegistryStepProvider()
@@ -45,7 +43,7 @@ func InitializeServer(logger *slog.Logger, config workflow.ServerConfig) (api.MC
 	resourcePredictor := ai_ml.ProvideResourcePredictor(domainAdapter, logger)
 	buildOptimizer := ai_ml.ProvideBuildOptimizer(resourcePredictor, logger)
 	stepFactory := orchestration.ProvideStepFactory(stepProvider, buildOptimizer, logger)
-	baseOrchestrator := orchestration.ProvideBaseOrchestrator(stepFactory, progressEmitterFactory, logger)
+	baseOrchestrator := orchestration.ProvideBaseOrchestrator(stepFactory, directProgressFactory, logger)
 	errorPatternRecognizer := ml.NewErrorPatternRecognizer(domainAdapter, logger)
 	enhancedErrorHandler := ml.NewEnhancedErrorHandler(domainAdapter, publisher, logger)
 	stepEnhancer := ml.NewStepEnhancer(enhancedErrorHandler, logger)
@@ -53,7 +51,7 @@ func InitializeServer(logger *slog.Logger, config workflow.ServerConfig) (api.MC
 	if err != nil {
 		return nil, err
 	}
-	dependencies := application.ProvideDependencies(logger, config, optimizedSessionManager, store, progressEmitterFactory, publisher, sagaCoordinator, baseOrchestrator, errorPatternRecognizer, enhancedErrorHandler, stepEnhancer, domainAdapter, manager)
+	dependencies := application.ProvideDependencies(logger, config, optimizedSessionManager, store, directProgressFactory, publisher, sagaCoordinator, baseOrchestrator, errorPatternRecognizer, enhancedErrorHandler, stepEnhancer, domainAdapter, manager)
 	mcpServer := application.ProvideServer(dependencies)
 	return mcpServer, nil
 }

@@ -4,20 +4,20 @@
 Accepted
 
 ## Context
-The Container Kit codebase had scattered dependency injection logic across multiple layers, making it difficult to:
+The Container Kit codebase implements a clean separation of dependency injection from business logic to ensure:
 
-1. **Understand Dependencies**: Dependency creation was spread across API layer files
-2. **Test Components**: Complex wiring made unit testing difficult
-3. **Manage Lifecycle**: No clear separation between composition and business logic
-4. **Follow Clean Architecture**: Dependency injection logic violated layer boundaries
+1. **Clear Dependencies**: All dependency creation is centralized in the composition root
+2. **Testable Components**: Each layer can be tested independently with mock providers
+3. **Lifecycle Management**: Clear separation between composition and business logic
+4. **Clean Architecture Compliance**: Dependency injection remains outside business layers
 
-The previous approach mixed dependency creation with business logic in files like:
-- `pkg/mcp/api/wiring/` - Contained both interfaces and dependency injection
-- Various `*_manager.go` files with complex initialization code
-- Scattered provider functions across domain and infrastructure layers
+The architecture maintains clear boundaries by:
+- `pkg/mcp/composition/` - Contains all dependency injection and wiring
+- Layer-specific `providers.go` files with focused provider functions
+- Centralized composition logic outside the 4-layer clean architecture
 
 ## Decision
-We will implement a **Composition Root** pattern that separates dependency injection from business logic:
+The system implements a **Composition Root** pattern that separates dependency injection from business logic:
 
 ### Architecture Overview
 ```
@@ -76,23 +76,15 @@ func ProvideServer(...) (*Server, error)
 - **Wire Learning Curve**: Developers need to understand Wire syntax
 - **Build-time Generation**: Wire code generation adds a build step
 
-### Migration Impact
-1. **Moved from API layer**: Dependency injection logic moved from `api/wiring/` to `composition/`
-2. **Added Provider Files**: Each infrastructure package now has a `providers.go` file
-3. **Simplified Business Logic**: Application and domain layers are cleaner
-4. **Enhanced Testing**: Test setup is significantly simplified
+### Implementation Impact
+1. **Centralized Location**: All dependency injection logic resides in `composition/`
+2. **Provider Organization**: Each infrastructure package contains a `providers.go` file
+3. **Clean Business Logic**: Application and domain layers focus solely on business logic
+4. **Simplified Testing**: Test setup uses focused mock providers
 
 ## Implementation Details
 
-### Before (Scattered Dependencies)
-```go
-// In API layer (violation of clean architecture)
-func NewWorkflowOrchestrator(...) workflow.WorkflowOrchestrator {
-    // Complex dependency setup mixed with interfaces
-}
-```
-
-### After (Composition Root)
+### Current Implementation (Composition Root)
 ```go
 // In composition root
 //go:generate wire
@@ -115,7 +107,7 @@ This ADR aligns with:
 - **Open/Closed**: Easy to extend with new providers without modifying existing code
 
 ## Alternative Considered
-**Service Locator Pattern**: Could have used a service locator, but composition root provides better compile-time safety and clearer dependency graphs.
+**Service Locator Pattern**: The composition root approach provides better compile-time safety and clearer dependency graphs compared to a service locator pattern.
 
 ## References
 - Martin Fowler's "Inversion of Control Containers and the Dependency Injection pattern"

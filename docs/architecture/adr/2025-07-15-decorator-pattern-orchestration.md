@@ -4,19 +4,19 @@
 Accepted
 
 ## Context
-The Container Kit workflow system needed to support multiple cross-cutting concerns without creating complex inheritance hierarchies or tightly coupled code:
+The Container Kit workflow system supports multiple cross-cutting concerns through a composable architecture:
 
-1. **Event Publishing**: Workflows need to publish domain events for observability
-2. **Saga Coordination**: Long-running workflows require distributed transaction support
-3. **Metrics Collection**: Performance monitoring across all workflow operations
-4. **Progress Tracking**: Real-time progress updates for long-running operations
-5. **Retry Logic**: Intelligent retry mechanisms with exponential backoff
-6. **Tracing**: Distributed tracing for debugging and performance analysis
+1. **Event Publishing**: Workflows publish domain events for observability
+2. **Saga Coordination**: Long-running workflows use distributed transaction support
+3. **Metrics Collection**: Performance monitoring tracks all workflow operations
+4. **Progress Tracking**: Real-time progress updates support long-running operations
+5. **Retry Logic**: Intelligent retry mechanisms implement exponential backoff
+6. **Tracing**: Distributed tracing enables debugging and performance analysis
 
-The initial approach was creating large monolithic orchestrator classes that violated single responsibility and were difficult to test and maintain.
+The architecture avoids large monolithic orchestrator classes by using decorator composition to maintain single responsibility and testability.
 
 ## Decision
-We will implement a **Decorator Pattern** for workflow orchestration that allows composing cross-cutting concerns:
+The system implements a **Decorator Pattern** for workflow orchestration that composes cross-cutting concerns:
 
 ### Core Design
 
@@ -196,9 +196,9 @@ func TestFullDecoratorStack(t *testing.T) {
 ## Alternative Patterns Considered
 
 1. **Aspect-Oriented Programming**: Too complex for Go ecosystem
-2. **Middleware Pattern**: Similar to decorators but less type-safe
+2. **Middleware Pattern**: Provides similar functionality but with less type safety than decorators
 3. **Monolithic Orchestrator**: Violates single responsibility principle
-4. **Inheritance**: Go doesn't support inheritance, and composition is preferred
+4. **Inheritance**: Go favors composition over inheritance
 
 ## Compliance
 This ADR implements:

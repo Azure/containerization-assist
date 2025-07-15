@@ -22,33 +22,29 @@ func NewStdioTransport(logger *slog.Logger) *StdioTransport {
 
 // Serve implements the Transport interface
 func (t *StdioTransport) Serve(ctx context.Context, mcpServer *server.MCPServer) error {
-	return t.ServeStdio(ctx, mcpServer)
-}
-
-// ServeStdio starts the stdio transport server
-func (t *StdioTransport) ServeStdio(ctx context.Context, mcpServer *server.MCPServer) error {
 	t.logger.Info("Starting stdio transport")
 
-	// Create error channel for transport
-	transportDone := make(chan error, 1)
-
-	// Run transport in goroutine
+	// Since ServeStdio blocks and doesn't respect context cancellation,
+	// we can log when context is done but can't forcefully stop ServeStdio
 	go func() {
-		// mcp-go uses ServeStdio() method for stdio transport
-		transportDone <- server.ServeStdio(mcpServer)
+		<-ctx.Done()
+		t.logger.Info("Context cancelled, but ServeStdio must be stopped externally")
 	}()
 
-	// Wait for context cancellation or transport error
-	select {
-	case <-ctx.Done():
-		t.logger.Info("Stdio transport stopped by context cancellation")
-		return ctx.Err()
-	case err := <-transportDone:
-		if err != nil {
-			t.logger.Error("Stdio transport stopped with error", "error", err)
-		} else {
-			t.logger.Info("Stdio transport stopped gracefully")
-		}
-		return err
+	// ServeStdio blocks until EOF or error
+	err := server.ServeStdio(mcpServer)
+
+	if err != nil {
+		t.logger.Error("Stdio transport stopped with error", "error", err)
+	} else {
+		t.logger.Info("Stdio transport stopped gracefully")
 	}
+
+	return err
+}
+
+// ServeStdio is a deprecated method kept for backward compatibility
+// Use Serve instead
+func (t *StdioTransport) ServeStdio(ctx context.Context, mcpServer *server.MCPServer) error {
+	return t.Serve(ctx, mcpServer)
 }

@@ -5,7 +5,6 @@ import (
 	"log/slog"
 
 	domainevents "github.com/Azure/container-kit/pkg/mcp/domain/events"
-	domainprogress "github.com/Azure/container-kit/pkg/mcp/domain/progress"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging/events"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging/progress"
@@ -18,26 +17,15 @@ var Providers = wire.NewSet(
 	events.NewPublisher,
 	wire.Bind(new(domainevents.Publisher), new(*events.Publisher)),
 
-	// Progress tracking - unified factory approach
-	progress.NewSinkFactory,
-	ProvideUnifiedProgressFactory,
-	wire.Bind(new(workflow.ProgressEmitterFactory), new(*progress.UnifiedFactory)),
-	wire.Bind(new(domainprogress.EmitterFactory), new(*progress.UnifiedFactory)),
-
-	// Legacy factory for backward compatibility
-	ProvideProgressEmitterFactory,
-
-	// Interface bindings would go here if needed
+	// Progress tracking - direct approach only
+	ProvideDirectProgressFactory,
+	wire.Bind(new(workflow.ProgressEmitterFactory), new(*progress.DirectProgressFactory)),
 )
 
-// ProvideUnifiedProgressFactory creates a unified progress emitter factory
-func ProvideUnifiedProgressFactory(logger *slog.Logger) *progress.UnifiedFactory {
-	return progress.NewUnifiedFactory(logger)
-}
+// DirectProviders is now the same as Providers (kept for compatibility)
+var DirectProviders = Providers
 
-// ProvideProgressEmitterFactory creates a progress emitter factory (legacy)
-func ProvideProgressEmitterFactory(sinkFactory *progress.SinkFactory) *progress.ProgressEmitterFactory {
-	// Use default configuration for progress emitter
-	config := progress.DefaultEmitterConfig()
-	return progress.NewProgressEmitterFactory(config, sinkFactory)
+// ProvideDirectProgressFactory creates the new direct progress factory
+func ProvideDirectProgressFactory(logger *slog.Logger) *progress.DirectProgressFactory {
+	return progress.NewDirectProgressFactory(logger)
 }

@@ -4,27 +4,18 @@
 Accepted
 
 ## Context
-The Container Kit initially had a complex multi-tool architecture with separate tools for each containerization step:
+The Container Kit implements a streamlined architecture with a single, comprehensive containerization workflow:
 
-1. **Tool Proliferation**: 15+ individual MCP tools for different steps
-2. **Complex Orchestration**: Manual tool chaining required by clients
-3. **State Management**: Difficult to maintain state across tool calls
-4. **User Experience**: Poor UX requiring knowledge of internal tool sequence
-5. **Error Recovery**: Complex error handling across disconnected tool calls
+1. **Unified Tool**: One primary MCP tool handles the complete containerization process
+2. **Automated Orchestration**: Built-in workflow orchestration eliminates manual tool chaining
+3. **Integrated State Management**: Session persistence maintains state throughout the workflow
+4. **Superior User Experience**: Simple interface requires no knowledge of internal steps
+5. **Robust Error Recovery**: Unified error handling with progressive context
 
-The previous approach included tools like:
-- `analyze_repository`
-- `generate_dockerfile` 
-- `build_image`
-- `scan_security`
-- `create_manifests`
-- `deploy_to_kubernetes`
-- ... and many more
-
-This created a fragmented experience where users needed to understand and manually orchestrate the entire containerization pipeline.
+The architecture consolidates the entire containerization pipeline into a single coherent workflow, providing users with a straightforward, reliable experience.
 
 ## Decision
-We will implement a **Single Workflow Architecture** with one primary tool that handles the complete containerization process:
+The system implements a **Single Workflow Architecture** with one primary tool that handles the complete containerization process:
 
 ### Core Design
 
@@ -87,11 +78,11 @@ type ContainerizeAndDeployResult struct {
 - **Resource Usage**: Higher resource usage during extended execution
 - **Debugging Complexity**: Harder to debug individual step failures
 
-### Migration Impact
-1. **Tool Consolidation**: 15+ tools reduced to 1 primary tool + utilities (ping, server_status)
-2. **Client Simplification**: Clients need only single tool call instead of complex orchestration
-3. **Documentation Updates**: Simplified documentation with single workflow example
-4. **Testing Updates**: Focus on end-to-end workflow testing
+### Architecture Impact
+1. **Tool Consolidation**: Single primary tool + minimal utilities (ping, server_status)
+2. **Client Simplification**: Clients use one tool call for complete containerization
+3. **Documentation**: Streamlined documentation focuses on single workflow
+4. **Testing**: Comprehensive end-to-end workflow testing
 
 ## Implementation Details
 
@@ -143,7 +134,7 @@ func (w *WorkflowOrchestrator) ExecuteWorkflow(
 - Multi-session support for concurrent workflows
 
 ## Utility Tools
-While the main workflow is consolidated, we maintain essential utility tools:
+The system maintains essential utility tools alongside the main workflow:
 
 1. **ping**: Connectivity testing
 2. **server_status**: Server health and statistics  
@@ -163,7 +154,7 @@ This ADR implements:
 - **Maintainability**: Single workflow path easier to maintain and test
 
 ## Alternative Considered
-**Micro-Tools Architecture**: Could have kept individual tools, but user feedback strongly indicated preference for simplified workflow over granular control.
+**Micro-Tools Architecture**: User feedback strongly indicates preference for the simplified single-workflow approach over granular control through individual tools.
 
 ## References
 - User experience research on containerization workflows

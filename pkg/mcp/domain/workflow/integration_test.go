@@ -10,63 +10,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
-	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	// Test helpers are in the same package
 )
 
-// TestProgressSink for capturing progress updates in tests
-type TestProgressSink struct {
-	updates []progress.Update
-}
-
-func (t *TestProgressSink) Publish(ctx context.Context, update progress.Update) error {
-	t.updates = append(t.updates, update)
-	return nil
-}
-
-func (t *TestProgressSink) Close() error {
-	return nil
-}
-
-// TestProgressEmitterFactory creates a test progress emitter
-type TestProgressEmitterFactory struct {
-	sink progress.Sink
-}
-
-func (f *TestProgressEmitterFactory) CreateEmitter(ctx context.Context, req *mcp.CallToolRequest, totalSteps int) api.ProgressEmitter {
-	// For tests, return a NoOpEmitter or TrackerEmitter
-	return &NoOpEmitter{}
-}
+// Import test helpers from infrastructure layer
+// The test types are now provided by test_progress_helpers.go
+// MockStep and MockStepProvider are defined in base_orchestrator_test.go
 
 // Add helper function for pointer
 func ptrBool(b bool) *bool { return &b }
-
-// MockStep for testing
-type MockStep struct {
-	name    string
-	retries int
-}
-
-func (m *MockStep) Name() string                                            { return m.name }
-func (m *MockStep) MaxRetries() int                                         { return m.retries }
-func (m *MockStep) Execute(ctx context.Context, state *WorkflowState) error { return nil }
-
-// MockStepProvider for testing
-type MockStepProvider struct{}
-
-func (m *MockStepProvider) GetAnalyzeStep() Step    { return &MockStep{name: "analyze", retries: 2} }
-func (m *MockStepProvider) GetDockerfileStep() Step { return &MockStep{name: "dockerfile", retries: 1} }
-func (m *MockStepProvider) GetBuildStep() Step      { return &MockStep{name: "build", retries: 2} }
-func (m *MockStepProvider) GetScanStep() Step       { return &MockStep{name: "scan", retries: 1} }
-func (m *MockStepProvider) GetTagStep() Step        { return &MockStep{name: "tag", retries: 1} }
-func (m *MockStepProvider) GetPushStep() Step       { return &MockStep{name: "push", retries: 2} }
-func (m *MockStepProvider) GetManifestStep() Step   { return &MockStep{name: "manifest", retries: 1} }
-func (m *MockStepProvider) GetClusterStep() Step    { return &MockStep{name: "cluster", retries: 2} }
-func (m *MockStepProvider) GetDeployStep() Step     { return &MockStep{name: "deploy", retries: 2} }
-func (m *MockStepProvider) GetVerifyStep() Step     { return &MockStep{name: "verify", retries: 1} }
 
 func TestWorkflowOrchestrator_Integration(t *testing.T) {
 	if testing.Short() {
@@ -129,11 +84,11 @@ A Node.js Express application for integration testing.
 `), 0644)
 	require.NoError(t, err)
 
-	// Test sink to capture progress
-	testSink := &TestProgressSink{}
+	// Create test progress emitter to capture progress
+	testEmitter := NewTestProgressEmitter()
 
-	// Create progress factory
-	progressFactory := &TestProgressFactory{sink: testSink}
+	// Create progress factory with test emitter
+	progressFactory := &TestDirectProgressFactory{emitter: testEmitter}
 
 	// Create step factory with mock provider
 	mockProvider := &MockStepProvider{}
@@ -141,7 +96,7 @@ A Node.js Express application for integration testing.
 
 	// Create base orchestrator with test progress factory
 	// Using nil for tracer as it's not needed in integration tests
-	baseOrchestrator := NewBaseOrchestrator(stepFactory, progressFactory, logger, nil)
+	baseOrchestrator := NewBaseOrchestrator(stepFactory, progressFactory, logger)
 
 	// Create workflow arguments
 	args := &ContainerizeAndDeployArgs{
@@ -163,11 +118,12 @@ A Node.js Express application for integration testing.
 	if err != nil {
 		t.Logf("Workflow failed as expected: %v", err)
 		// Check that we still got some progress updates
-		assert.NotEmpty(t, testSink.updates, "Should have progress updates even on failure")
+		updates := testEmitter.GetUpdates()
+		assert.NotEmpty(t, updates, "Should have progress updates even on failure")
 
 		// Verify error handling produces progress updates
 		var hasFailure bool
-		for _, update := range testSink.updates {
+		for _, update := range updates {
 			if update.Status == "failed" || update.Status == "retrying" {
 				hasFailure = true
 				break
@@ -181,11 +137,12 @@ A Node.js Express application for integration testing.
 	require.NotNil(t, result, "Result should not be nil")
 
 	// Verify progress updates were captured
-	assert.NotEmpty(t, testSink.updates, "Should have received progress updates")
+	updates := testEmitter.GetUpdates()
+	assert.NotEmpty(t, updates, "Should have received progress updates")
 
 	// Check for workflow progression
 	var hasStarted, hasProgress, hasCompleted bool
-	for _, update := range testSink.updates {
+	for _, update := range updates {
 		if update.Status == "started" || update.Status == "running" {
 			hasStarted = true
 		}
@@ -201,10 +158,10 @@ A Node.js Express application for integration testing.
 	assert.True(t, hasProgress, "Should have step progress")
 	assert.True(t, hasCompleted, "Should have completed status")
 
-	t.Logf("Integration test completed with %d progress updates", len(testSink.updates))
+	t.Logf("Integration test completed with %d progress updates", len(updates))
 
 	// Log all progress updates for debugging
-	for i, update := range testSink.updates {
+	for i, update := range updates {
 		t.Logf("Progress %d: Step %d/%d (%d%%) - %s: %s",
 			i, update.Step, update.Total, update.Percentage, update.Status, update.Message)
 	}
@@ -222,11 +179,11 @@ func TestWorkflowOrchestrator_InvalidRepository(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	testSink := &TestProgressSink{}
-	progressFactory := &TestProgressFactory{sink: testSink}
+	testEmitter := NewTestProgressEmitter()
+	progressFactory := &TestDirectProgressFactory{emitter: testEmitter}
 	mockProvider := &MockStepProvider{}
 	stepFactory := NewStepFactory(mockProvider, nil, nil, logger)
-	baseOrchestrator := NewBaseOrchestrator(stepFactory, progressFactory, logger, nil)
+	baseOrchestrator := NewBaseOrchestrator(stepFactory, progressFactory, logger)
 
 	// Test with invalid repository URL
 	args := &ContainerizeAndDeployArgs{
@@ -244,11 +201,12 @@ func TestWorkflowOrchestrator_InvalidRepository(t *testing.T) {
 	assert.Error(t, err, "Should error with invalid repository")
 
 	// Should still have progress updates for error case
-	assert.NotEmpty(t, testSink.updates, "Should have progress updates even for errors")
+	updates := testEmitter.GetUpdates()
+	assert.NotEmpty(t, updates, "Should have progress updates even for errors")
 
 	// Should indicate failure in progress
 	var hasError bool
-	for _, update := range testSink.updates {
+	for _, update := range updates {
 		if update.Status == "failed" {
 			hasError = true
 			break
@@ -275,11 +233,11 @@ func TestWorkflowOrchestrator_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	testSink := &TestProgressSink{}
-	progressFactory := &TestProgressFactory{sink: testSink}
+	testEmitter := NewTestProgressEmitter()
+	progressFactory := &TestDirectProgressFactory{emitter: testEmitter}
 	mockProvider := &MockStepProvider{}
 	stepFactory := NewStepFactory(mockProvider, nil, nil, logger)
-	baseOrchestrator := NewBaseOrchestrator(stepFactory, progressFactory, logger, nil)
+	baseOrchestrator := NewBaseOrchestrator(stepFactory, progressFactory, logger)
 
 	args := &ContainerizeAndDeployArgs{
 		RepoURL:  "https://github.com/example/repo.git",
@@ -290,7 +248,7 @@ func TestWorkflowOrchestrator_ContextCancellation(t *testing.T) {
 	}
 
 	req := &mcp.CallToolRequest{}
-	_, err := orchestrator.Execute(ctx, req, args)
+	_, err := baseOrchestrator.Execute(ctx, req, args)
 
 	// Should handle context cancellation
 	assert.Error(t, err, "Should error when context is cancelled")
@@ -321,11 +279,11 @@ func TestWorkflowOrchestrator_ProgressTracking(t *testing.T) {
 	err := os.WriteFile(filepath.Join(tempDir, "app.py"), []byte(`print("Hello World")`), 0644)
 	require.NoError(t, err)
 
-	testSink := &TestProgressSink{}
-	progressFactory := &TestProgressFactory{sink: testSink}
+	testEmitter := NewTestProgressEmitter()
+	progressFactory := &TestDirectProgressFactory{emitter: testEmitter}
 	mockProvider := &MockStepProvider{}
 	stepFactory := NewStepFactory(mockProvider, nil, nil, logger)
-	baseOrchestrator := NewBaseOrchestrator(stepFactory, progressFactory, logger, nil)
+	baseOrchestrator := NewBaseOrchestrator(stepFactory, progressFactory, logger)
 
 	args := &ContainerizeAndDeployArgs{
 		RepoURL:  "file://" + tempDir,
@@ -337,13 +295,14 @@ func TestWorkflowOrchestrator_ProgressTracking(t *testing.T) {
 
 	// Execute workflow - expect it to fail but capture progress
 	req := &mcp.CallToolRequest{}
-	_, err = orchestrator.Execute(ctx, req, args)
+	_, err = baseOrchestrator.Execute(ctx, req, args)
 
 	// Focus on progress tracking regardless of workflow success
-	assert.NotEmpty(t, testSink.updates, "Should capture progress updates")
+	updates := testEmitter.GetUpdates()
+	assert.NotEmpty(t, updates, "Should capture progress updates")
 
 	// Verify progress updates have required fields
-	for i, update := range testSink.updates {
+	for i, update := range updates {
 		assert.GreaterOrEqual(t, update.Step, 0, "Update %d should have valid step", i)
 		assert.Greater(t, update.Total, 0, "Update %d should have valid total", i)
 		assert.GreaterOrEqual(t, update.Percentage, 0, "Update %d should have valid percentage", i)
@@ -353,15 +312,15 @@ func TestWorkflowOrchestrator_ProgressTracking(t *testing.T) {
 	}
 
 	// Verify progress sequence makes sense
-	if len(testSink.updates) > 1 {
+	if len(updates) > 1 {
 		// Steps should generally increase or stay the same
-		for i := 1; i < len(testSink.updates); i++ {
-			assert.GreaterOrEqual(t, testSink.updates[i].Step, testSink.updates[i-1].Step,
+		for i := 1; i < len(updates); i++ {
+			assert.GreaterOrEqual(t, updates[i].Step, updates[i-1].Step,
 				"Step should not decrease between updates %d and %d", i-1, i)
 		}
 	}
 
-	t.Logf("Captured %d progress updates with proper tracking", len(testSink.updates))
+	t.Logf("Captured %d progress updates with proper tracking", len(updates))
 }
 
 func TestWorkflowOrchestrator_ConcurrentExecution(t *testing.T) {
@@ -384,8 +343,8 @@ func TestWorkflowOrchestrator_ConcurrentExecution(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
-			testSink := &TestProgressSink{}
-			progressFactory := &TestProgressFactory{sink: testSink}
+			testEmitter := NewTestProgressEmitter()
+			progressFactory := &TestDirectProgressFactory{emitter: testEmitter}
 			mockProvider := &MockStepProvider{}
 			stepFactory := NewStepFactory(mockProvider, nil, nil, logger)
 			orchestrator := NewBaseOrchestrator(stepFactory, progressFactory, logger)
@@ -403,7 +362,8 @@ func TestWorkflowOrchestrator_ConcurrentExecution(t *testing.T) {
 
 			// Expected to fail, but should handle concurrency gracefully
 			assert.Error(t, err, "Workflow %d should fail with invalid repo", workflowID)
-			assert.NotEmpty(t, testSink.updates, "Workflow %d should have progress updates", workflowID)
+			updates := testEmitter.GetUpdates()
+			assert.NotEmpty(t, updates, "Workflow %d should have progress updates", workflowID)
 		}(i)
 	}
 
