@@ -84,12 +84,12 @@ func (m *MockResourceStore) RegisterProviders(mcpServer interface{}) error {
 	return nil
 }
 
-func TestNewRegistrar(t *testing.T) {
+func TestNewMCPRegistrar(t *testing.T) {
 	logger := slog.Default()
 	mockResourceStore := &MockResourceStore{}
 	mockOrchestrator := &MockWorkflowOrchestrator{}
 
-	registrar := NewRegistrar(logger, mockResourceStore, mockOrchestrator)
+	registrar := NewMCPRegistrar(logger, mockResourceStore, mockOrchestrator)
 
 	assert.NotNil(t, registrar)
 	assert.NotNil(t, registrar.toolRegistrar)
@@ -103,7 +103,7 @@ func TestRegistrar_ComponentInitialization(t *testing.T) {
 	mockResourceStore := &MockResourceStore{}
 	mockOrchestrator := &MockWorkflowOrchestrator{}
 
-	registrar := NewRegistrar(logger, mockResourceStore, mockOrchestrator)
+	registrar := NewMCPRegistrar(logger, mockResourceStore, mockOrchestrator)
 
 	// Verify internal components are properly initialized
 	assert.NotNil(t, registrar.toolRegistrar, "ToolRegistrar should be initialized")
@@ -118,7 +118,7 @@ func TestRegistrar_NilDependencies(t *testing.T) {
 
 	// Should not panic with nil dependencies (defensive programming)
 	assert.NotPanics(t, func() {
-		registrar := NewRegistrar(logger, nil, nil)
+		registrar := NewMCPRegistrar(logger, nil, nil)
 		assert.NotNil(t, registrar)
 	})
 }

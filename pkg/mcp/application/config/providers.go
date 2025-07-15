@@ -9,7 +9,6 @@ import (
 // Providers exports all configuration providers
 var Providers = wire.NewSet(
 	ProvideConfig,
-	ProvideConfigFromServerConfig,
 	ProvideTracingConfig,
 	ProvideSecurityConfig,
 	ProvideRegistryConfig,

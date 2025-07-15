@@ -43,15 +43,20 @@ func InitializeServer(logger *slog.Logger, config workflow.ServerConfig) (api.MC
 	resourcePredictor := ai_ml.ProvideResourcePredictor(domainAdapter, logger)
 	buildOptimizer := ai_ml.ProvideBuildOptimizer(resourcePredictor, logger)
 	stepFactory := orchestration.ProvideStepFactory(stepProvider, buildOptimizer, logger)
-	baseOrchestrator := orchestration.ProvideBaseOrchestrator(stepFactory, directProgressFactory, logger)
-	errorPatternRecognizer := ml.NewErrorPatternRecognizer(domainAdapter, logger)
 	enhancedErrorHandler := ml.NewEnhancedErrorHandler(domainAdapter, publisher, logger)
 	stepEnhancer := ml.NewStepEnhancer(enhancedErrorHandler, logger)
+	workflowStepEnhancer := orchestration.ProvideStepEnhancerAdapter(stepEnhancer, logger)
+	baseOrchestrator := orchestration.ProvideEnhancedOrchestrator(stepFactory, directProgressFactory, workflowStepEnhancer, sagaCoordinator, logger)
+	advancedPatternRecognizer := ml.NewAdvancedPatternRecognizer(domainAdapter, logger)
+	adaptiveOrchestratorAdapter := orchestration.ProvideAdaptiveOrchestrator(baseOrchestrator, advancedPatternRecognizer, stepEnhancer, logger)
 	manager, err := ai_ml.ProvidePromptManager(logger)
 	if err != nil {
 		return nil, err
 	}
-	dependencies := application.ProvideDependencies(logger, config, optimizedSessionManager, store, directProgressFactory, publisher, sagaCoordinator, baseOrchestrator, errorPatternRecognizer, enhancedErrorHandler, stepEnhancer, domainAdapter, manager)
-	mcpServer := application.ProvideServer(dependencies)
+	dependencies := application.ProvideDependencies(logger, config, optimizedSessionManager, store, directProgressFactory, publisher, sagaCoordinator, adaptiveOrchestratorAdapter, advancedPatternRecognizer, enhancedErrorHandler, stepEnhancer, domainAdapter, manager)
+	mcpServer, err := application.ProvideServer(dependencies)
+	if err != nil {
+		return nil, err
+	}
 	return mcpServer, nil
 }

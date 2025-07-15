@@ -1,0 +1,16 @@
+[
+  {
+    "name": "unsupported_transport",
+    "transport": "completely_unknown",
+    "error_type": "generic",
+    "message": "INVALID_PARAMETER: unsupported transport type: completely_unknown",
+    "recoverable": true
+  },
+  {
+    "name": "empty_transport_type",
+    "transport": "",
+    "error_type": "generic",
+    "message": "INVALID_PARAMETER: unsupported transport type: ",
+    "recoverable": true
+  }
+]

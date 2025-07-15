@@ -68,7 +68,9 @@ func TestTransportRegistry_StartWithTransportError(t *testing.T) {
 
 	err := registry.Start(ctx, TransportTypeStdio, mockServer)
 	assert.Error(t, err, "Should propagate transport error")
-	assert.Equal(t, expectedError, err, "Should return the exact transport error")
+	assert.Contains(t, err.Error(), "failed to start stdio transport", "Should wrap transport error")
+	// Check that the original error is wrapped inside
+	assert.ErrorIs(t, err, expectedError, "Should wrap the original error")
 
 	mockTransport.AssertExpectations(t)
 }
@@ -224,8 +226,16 @@ func TestTransportErrorPropagation(t *testing.T) {
 			mockTransport.On("Serve", ctx, mockServer).Return(tt.error)
 
 			err := registry.Start(ctx, "test-transport", mockServer)
-			assert.Error(t, err, "Should propagate error")
-			assert.Equal(t, tt.error, err, "Should return the exact error")
+
+			if tt.error == context.Canceled || tt.error == context.DeadlineExceeded {
+				// Context errors should be returned as-is
+				assert.Equal(t, tt.error, err, "Should return context errors as-is")
+			} else {
+				// Other errors should be wrapped
+				assert.Error(t, err, "Should propagate error")
+				assert.Contains(t, err.Error(), "failed to start test-transport transport", "Should wrap transport error")
+				assert.ErrorIs(t, err, tt.error, "Should wrap the original error")
+			}
 
 			mockTransport.AssertExpectations(t)
 		})

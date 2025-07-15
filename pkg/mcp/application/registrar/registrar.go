@@ -1,4 +1,8 @@
-// Package registrar handles tool and prompt registration
+// Package registrar handles MCP tool and resource registration
+//
+// The registrar package is responsible for registering tools and resources
+// with the MCP server. It should not be confused with the registry package,
+// which provides a generic thread-safe map implementation.
 package registrar
 
 import (
@@ -10,23 +14,17 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// ToolRegistrarType is a type alias for the generic registry
-type ToolRegistrarType = registry.Registry[func() error]
-
-// ResourceRegistrarType is a type alias for the generic registry
-type ResourceRegistrarType = registry.Registry[func() error]
-
-// Registrar manages all registrations (tools, resources)
-type Registrar struct {
+// MCPRegistrar manages all MCP registrations (tools, resources)
+type MCPRegistrar struct {
 	toolRegistrar     *ToolRegistrar
 	resourceRegistrar *ResourceRegistrar
-	tools             *ToolRegistrarType
-	resources         *ResourceRegistrarType
+	tools             *registry.Registry[func() error]
+	resources         *registry.Registry[func() error]
 }
 
-// NewRegistrar creates a new unified registrar
-func NewRegistrar(logger *slog.Logger, resourceStore resources.Store, orchestrator workflow.WorkflowOrchestrator) *Registrar {
-	return &Registrar{
+// NewMCPRegistrar creates a new unified MCP registrar
+func NewMCPRegistrar(logger *slog.Logger, resourceStore resources.Store, orchestrator workflow.WorkflowOrchestrator) *MCPRegistrar {
+	return &MCPRegistrar{
 		toolRegistrar:     NewToolRegistrar(logger, orchestrator),
 		resourceRegistrar: NewResourceRegistrar(logger, resourceStore),
 		tools:             registry.New[func() error](),
@@ -35,7 +33,7 @@ func NewRegistrar(logger *slog.Logger, resourceStore resources.Store, orchestrat
 }
 
 // RegisterAll registers all components with the MCP server
-func (r *Registrar) RegisterAll(mcpServer *server.MCPServer) error {
+func (r *MCPRegistrar) RegisterAll(mcpServer *server.MCPServer) error {
 	// Register tools
 	if err := r.toolRegistrar.RegisterAll(mcpServer); err != nil {
 		return err

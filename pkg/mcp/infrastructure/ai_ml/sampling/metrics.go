@@ -27,13 +27,11 @@ type SamplingMetrics struct {
 	totalPromptTokens   int64
 	totalResponseTokens int64
 
-	// Template usage metrics
-	templateUsage map[string]int64
-	templateMu    sync.RWMutex
+	// Template usage metrics (using sync.Map for better write performance)
+	templateUsage sync.Map // map[string]int64
 
-	// Error metrics
-	errorsByType map[string]int64
-	errorsMu     sync.RWMutex
+	// Error metrics (using sync.Map for better write performance)
+	errorsByType sync.Map // map[string]int64
 
 	// Validation metrics
 	validationFailures int64
@@ -42,9 +40,8 @@ type SamplingMetrics struct {
 	// Rate limiting metrics
 	rateLimitHits int64
 
-	// Content type metrics
-	contentTypeMetrics map[string]*ContentTypeMetrics
-	contentMu          sync.RWMutex
+	// Content type metrics (using sync.Map for better write performance)
+	contentTypeMetrics sync.Map // map[string]*ContentTypeMetrics
 
 	// Time-based metrics
 	startTime       time.Time
@@ -65,11 +62,9 @@ type ContentTypeMetrics struct {
 // NewSamplingMetrics creates a new metrics collector
 func NewSamplingMetrics() *SamplingMetrics {
 	return &SamplingMetrics{
-		templateUsage:      make(map[string]int64),
-		errorsByType:       make(map[string]int64),
-		contentTypeMetrics: make(map[string]*ContentTypeMetrics),
-		startTime:          time.Now(),
-		minLatency:         int64(^uint64(0) >> 1), // Max int64
+		// sync.Map fields are zero-initialized and ready to use
+		startTime:  time.Now(),
+		minLatency: int64(^uint64(0) >> 1), // Max int64
 	}
 }
 
@@ -107,11 +102,16 @@ func (m *SamplingMetrics) RecordRequest(ctx context.Context, templateID string, 
 	atomic.AddInt64(&m.totalPromptTokens, int64(promptTokens))
 	atomic.AddInt64(&m.totalResponseTokens, int64(responseTokens))
 
-	// Record template usage
+	// Record template usage using sync.Map
 	if templateID != "" {
-		m.templateMu.Lock()
-		m.templateUsage[templateID]++
-		m.templateMu.Unlock()
+		// Load existing count, increment, and store back atomically
+		for {
+			current, _ := m.templateUsage.LoadOrStore(templateID, int64(0))
+			currentCount := current.(int64)
+			if m.templateUsage.CompareAndSwap(templateID, currentCount, currentCount+1) {
+				break
+			}
+		}
 	}
 
 	// Update last request time
@@ -127,9 +127,14 @@ func (m *SamplingMetrics) RecordRetry() {
 
 // RecordError records an error by type
 func (m *SamplingMetrics) RecordError(errorType string) {
-	m.errorsMu.Lock()
-	m.errorsByType[errorType]++
-	m.errorsMu.Unlock()
+	// Use sync.Map for lock-free error counting
+	for {
+		current, _ := m.errorsByType.LoadOrStore(errorType, int64(0))
+		currentCount := current.(int64)
+		if m.errorsByType.CompareAndSwap(errorType, currentCount, currentCount+1) {
+			break
+		}
+	}
 }
 
 // RecordValidationFailure records a validation failure
@@ -149,14 +154,10 @@ func (m *SamplingMetrics) RecordRateLimitHit() {
 
 // RecordContentType records metrics for a specific content type
 func (m *SamplingMetrics) RecordContentType(contentType string, size int, parsed bool, validationErrors int) {
-	m.contentMu.Lock()
-	defer m.contentMu.Unlock()
+	// Get or create metrics for this content type using sync.Map
+	metricsInterface, _ := m.contentTypeMetrics.LoadOrStore(contentType, &ContentTypeMetrics{})
+	metrics := metricsInterface.(*ContentTypeMetrics)
 
-	if m.contentTypeMetrics[contentType] == nil {
-		m.contentTypeMetrics[contentType] = &ContentTypeMetrics{}
-	}
-
-	metrics := m.contentTypeMetrics[contentType]
 	atomic.AddInt64(&metrics.Requests, 1)
 	atomic.AddInt64(&metrics.TotalSize, int64(size))
 
@@ -203,26 +204,26 @@ func (m *SamplingMetrics) GetMetrics() map[string]interface{} {
 		minLatency = 0
 	}
 
-	// Get template usage
-	m.templateMu.RLock()
+	// Get template usage from sync.Map
 	templateUsage := make(map[string]int64)
-	for k, v := range m.templateUsage {
-		templateUsage[k] = v
-	}
-	m.templateMu.RUnlock()
+	m.templateUsage.Range(func(key, value interface{}) bool {
+		templateUsage[key.(string)] = value.(int64)
+		return true
+	})
 
-	// Get error breakdown
-	m.errorsMu.RLock()
+	// Get error breakdown from sync.Map
 	errorsByType := make(map[string]int64)
-	for k, v := range m.errorsByType {
-		errorsByType[k] = v
-	}
-	m.errorsMu.RUnlock()
+	m.errorsByType.Range(func(key, value interface{}) bool {
+		errorsByType[key.(string)] = value.(int64)
+		return true
+	})
 
-	// Get content type metrics
-	m.contentMu.RLock()
+	// Get content type metrics from sync.Map
 	contentMetrics := make(map[string]map[string]interface{})
-	for contentType, metrics := range m.contentTypeMetrics {
+	m.contentTypeMetrics.Range(func(key, value interface{}) bool {
+		contentType := key.(string)
+		metrics := value.(*ContentTypeMetrics)
+
 		requests := atomic.LoadInt64(&metrics.Requests)
 		successfulParsing := atomic.LoadInt64(&metrics.SuccessfulParsing)
 		validationErrors := atomic.LoadInt64(&metrics.ValidationErrors)
@@ -240,8 +241,8 @@ func (m *SamplingMetrics) GetMetrics() map[string]interface{} {
 			"validation_errors":  validationErrors,
 			"average_size":       avgSize,
 		}
-	}
-	m.contentMu.RUnlock()
+		return true
+	})
 
 	m.mu.RLock()
 	uptime := time.Since(m.startTime)
@@ -328,17 +329,21 @@ func (m *SamplingMetrics) Reset() {
 	atomic.StoreInt64(&m.securityIssues, 0)
 	atomic.StoreInt64(&m.rateLimitHits, 0)
 
-	m.templateMu.Lock()
-	m.templateUsage = make(map[string]int64)
-	m.templateMu.Unlock()
+	// Clear sync.Map contents
+	m.templateUsage.Range(func(key, value interface{}) bool {
+		m.templateUsage.Delete(key)
+		return true
+	})
 
-	m.errorsMu.Lock()
-	m.errorsByType = make(map[string]int64)
-	m.errorsMu.Unlock()
+	m.errorsByType.Range(func(key, value interface{}) bool {
+		m.errorsByType.Delete(key)
+		return true
+	})
 
-	m.contentMu.Lock()
-	m.contentTypeMetrics = make(map[string]*ContentTypeMetrics)
-	m.contentMu.Unlock()
+	m.contentTypeMetrics.Range(func(key, value interface{}) bool {
+		m.contentTypeMetrics.Delete(key)
+		return true
+	})
 
 	m.mu.Lock()
 	m.startTime = time.Now()
@@ -519,17 +524,32 @@ func (c *MetricsCollector) GetHealthStatus() map[string]interface{} {
 // Global metrics instance
 var globalMetrics *MetricsCollector
 var globalMetricsOnce sync.Once
+var globalMetricsMu sync.RWMutex
 
 // GetGlobalMetrics returns the global metrics collector instance
 func GetGlobalMetrics() *MetricsCollector {
-	globalMetricsOnce.Do(func() {
+	globalMetricsMu.RLock()
+	if globalMetrics != nil {
+		metrics := globalMetrics
+		globalMetricsMu.RUnlock()
+		return metrics
+	}
+	globalMetricsMu.RUnlock()
+
+	// Need to initialize, acquire write lock
+	globalMetricsMu.Lock()
+	defer globalMetricsMu.Unlock()
+
+	// Double-check pattern
+	if globalMetrics == nil {
 		globalMetrics = NewMetricsCollector()
-	})
+	}
 	return globalMetrics
 }
 
 // ResetGlobalMetrics resets the global metrics instance (for testing)
 func ResetGlobalMetrics() {
+	globalMetricsMu.Lock()
+	defer globalMetricsMu.Unlock()
 	globalMetrics = NewMetricsCollector()
-	globalMetricsOnce = sync.Once{}
 }

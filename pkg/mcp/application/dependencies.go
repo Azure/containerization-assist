@@ -2,6 +2,7 @@
 package application
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
@@ -62,27 +63,106 @@ type Dependencies struct {
 	PromptManager  domainprompts.Manager
 }
 
+// Validate checks that all required dependencies are present
+func (d *Dependencies) Validate() error {
+	var errs []error
+
+	// Core services validation
+	if d.Logger == nil {
+		errs = append(errs, fmt.Errorf("logger is required"))
+	}
+	if d.SessionManager == nil {
+		errs = append(errs, fmt.Errorf("session manager is required"))
+	}
+	if d.ResourceStore == nil {
+		errs = append(errs, fmt.Errorf("resource store is required"))
+	}
+
+	// Domain services validation
+	if d.ProgressEmitterFactory == nil {
+		errs = append(errs, fmt.Errorf("progress emitter factory is required"))
+	}
+	if d.EventPublisher == nil {
+		errs = append(errs, fmt.Errorf("event publisher is required"))
+	}
+	if d.SagaCoordinator == nil {
+		errs = append(errs, fmt.Errorf("saga coordinator is required"))
+	}
+
+	// Workflow orchestrators validation
+	if d.WorkflowOrchestrator == nil {
+		errs = append(errs, fmt.Errorf("workflow orchestrator is required"))
+	}
+
+	// Infrastructure services validation
+	if d.SamplingClient == nil {
+		errs = append(errs, fmt.Errorf("sampling client is required"))
+	}
+	if d.PromptManager == nil {
+		errs = append(errs, fmt.Errorf("prompt manager is required"))
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("dependency validation failed: %v", errs)
+	}
+	return nil
+}
+
 // NewMCPServerFromDeps creates a new MCP server that implements api.MCPServer.
 // This is used by Wire for dependency injection.
-func NewMCPServerFromDeps(deps *Dependencies) api.MCPServer {
+func NewMCPServerFromDeps(deps *Dependencies) (api.MCPServer, error) {
+	// Validate dependencies first
+	if err := deps.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid dependencies: %w", err)
+	}
+
+	// Convert legacy Dependencies to interface capsules
+	services := NewServiceProvider(FromLegacyDependencies(deps))
+
 	// Create the bootstrapper component
 	bootstrapper := bootstrap.NewBootstrapper(
-		deps.Logger,
-		deps.Config,
-		deps.ResourceStore,
-		deps.WorkflowOrchestrator,
+		services.Logger(),
+		services.Config(),
+		services.ResourceStore(),
+		services.Orchestrator(),
 	)
 
 	// Create the lifecycle manager component
 	lifecycleManager := lifecycle.NewLifecycleManager(
-		deps.Logger,
-		deps.Config,
-		deps.SessionManager,
+		services.Logger(),
+		services.Config(),
+		services.SessionManager(),
 		bootstrapper,
 	)
 
 	return &serverImpl{
-		deps:             deps,
+		services:         services,
+		lifecycleManager: lifecycleManager,
+		bootstrapper:     bootstrapper,
+	}, nil
+}
+
+// NewMCPServerFromServices creates a new MCP server using interface capsules.
+// This is the preferred constructor for new code.
+func NewMCPServerFromServices(services AllServices) api.MCPServer {
+	// Create the bootstrapper component
+	bootstrapper := bootstrap.NewBootstrapper(
+		services.Logger(),
+		services.Config(),
+		services.ResourceStore(),
+		services.Orchestrator(),
+	)
+
+	// Create the lifecycle manager component
+	lifecycleManager := lifecycle.NewLifecycleManager(
+		services.Logger(),
+		services.Config(),
+		services.SessionManager(),
+		bootstrapper,
+	)
+
+	return &serverImpl{
+		services:         services,
 		lifecycleManager: lifecycleManager,
 		bootstrapper:     bootstrapper,
 	}

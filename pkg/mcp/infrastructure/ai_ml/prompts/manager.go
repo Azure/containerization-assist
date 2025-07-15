@@ -26,6 +26,7 @@ type Manager struct {
 	mu        sync.RWMutex
 	logger    *slog.Logger
 	config    ManagerConfig
+	watcher   *HotReloadWatcher // Hot-reload watcher
 }
 
 // ManagerConfig holds configuration for the template manager
@@ -63,6 +64,14 @@ func NewManager(logger *slog.Logger, config ManagerConfig) (*Manager, error) {
 		"embedded_count", len(m.templates),
 		"template_dir", config.TemplateDir,
 		"hot_reload", config.EnableHotReload)
+
+	// Start hot-reload watcher if enabled
+	if config.EnableHotReload {
+		ctx := context.Background()
+		if err := m.StartHotReload(ctx); err != nil {
+			m.logger.Warn("Failed to start hot-reload watcher", "error", err)
+		}
+	}
 
 	return m, nil
 }

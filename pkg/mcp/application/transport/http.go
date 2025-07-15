@@ -45,8 +45,3 @@ func (m *basicHealthMonitor) GetComponentHealth(ctx context.Context, component s
 func (t *HTTPTransport) Serve(ctx context.Context, mcpServer *server.MCPServer) error {
 	return t.handler.Serve(ctx, mcpServer)
 }
-
-// ServeHTTP starts the HTTP transport server (deprecated - use Serve)
-func (t *HTTPTransport) ServeHTTP(ctx context.Context, mcpServer *server.MCPServer) error {
-	return t.Serve(ctx, mcpServer)
-}

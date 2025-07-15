@@ -4,10 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"testing"
-	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
-	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/stretchr/testify/assert"
 )
@@ -116,36 +114,6 @@ func TestCLIDirectEmitter_ProgressBar(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
-}
-
-func TestEmitterToSinkAdapter(t *testing.T) {
-	// Create a CLI emitter
-	cliEmitter := NewCLIDirectEmitter(slog.Default())
-
-	// Wrap it in adapter
-	sink := NewEmitterToSinkAdapter(cliEmitter)
-
-	// Create a progress update
-	ctx := context.Background()
-	update := progress.Update{
-		Step:       5,
-		Total:      10,
-		Message:    "Processing",
-		Percentage: 50,
-		Status:     "running",
-		StartedAt:  time.Now(),
-		UserMeta: map[string]interface{}{
-			"stage": "process",
-		},
-	}
-
-	// Test publish
-	err := sink.Publish(ctx, update)
-	assert.NoError(t, err)
-
-	// Test close
-	err = sink.Close()
-	assert.NoError(t, err)
 }
 
 // TestDirectProgressFactory_WithProgressToken is commented out until we can verify

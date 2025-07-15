@@ -105,6 +105,9 @@ type Transport interface {
 	// Receive receives a message
 	Receive() (interface{}, error)
 
+	// ReceiveStream returns a channel for streaming messages
+	ReceiveStream() (<-chan interface{}, error)
+
 	// IsConnected checks if the transport is connected
 	IsConnected() bool
 }

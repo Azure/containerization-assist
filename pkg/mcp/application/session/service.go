@@ -12,18 +12,34 @@ import (
 
 // Service implements session management using the domain store interface
 type Service struct {
-	store      domainsession.Store
-	logger     *slog.Logger
-	defaultTTL time.Duration
+	store           domainsession.Store
+	logger          *slog.Logger
+	defaultTTL      time.Duration
+	cleanupInterval time.Duration
+	stopCleanup     chan struct{}
 }
 
 // NewService creates a new session service
 func NewService(store domainsession.Store, logger *slog.Logger, defaultTTL time.Duration) *Service {
-	return &Service{
-		store:      store,
-		logger:     logger.With("component", "session_service"),
-		defaultTTL: defaultTTL,
+	// Default cleanup interval to 5 minutes
+	cleanupInterval := 5 * time.Minute
+	if defaultTTL < cleanupInterval && defaultTTL > 0 {
+		// If TTL is shorter than 5 minutes, run cleanup more frequently
+		cleanupInterval = defaultTTL / 2
 	}
+
+	s := &Service{
+		store:           store,
+		logger:          logger.With("component", "session_service"),
+		defaultTTL:      defaultTTL,
+		cleanupInterval: cleanupInterval,
+		stopCleanup:     make(chan struct{}),
+	}
+
+	// Start background cleanup process
+	go s.startBackgroundCleanup()
+
+	return s
 }
 
 // Get retrieves a session by ID
@@ -45,6 +61,15 @@ func (s *Service) GetOrCreate(ctx context.Context, sessionID string) (*SessionSt
 		return s.domainToApplicationSession(sess), nil
 	}
 
+	// Check if error is specifically "not found" vs other errors
+	if err != domainsession.ErrSessionNotFound {
+		// This is a real error (e.g., I/O error), not just a missing session
+		s.logger.Error("Failed to retrieve session",
+			slog.String("session_id", sessionID),
+			slog.String("error", err.Error()))
+		return nil, fmt.Errorf("failed to retrieve session: %w", err)
+	}
+
 	// Create new session if not found
 	newSession := domainsession.NewSession(sessionID, "", s.defaultTTL)
 
@@ -53,7 +78,9 @@ func (s *Service) GetOrCreate(ctx context.Context, sessionID string) (*SessionSt
 		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
-	s.logger.Info("Created new session", "session_id", sessionID)
+	s.logger.Info("Created new session",
+		slog.String("session_id", sessionID),
+		slog.Duration("ttl", s.defaultTTL))
 	return s.domainToApplicationSession(newSession), nil
 }
 
@@ -117,6 +144,9 @@ func (s *Service) Stats() *SessionStats {
 
 // Stop shuts down the session service
 func (s *Service) Stop(ctx context.Context) error {
+	// Stop background cleanup
+	close(s.stopCleanup)
+
 	// Cleanup expired sessions before shutdown
 	removed, err := s.store.Cleanup(ctx)
 	if err != nil {
@@ -127,6 +157,30 @@ func (s *Service) Stop(ctx context.Context) error {
 
 	s.logger.Info("Session service stopped")
 	return nil
+}
+
+// startBackgroundCleanup runs periodic cleanup of expired sessions
+func (s *Service) startBackgroundCleanup() {
+	ticker := time.NewTicker(s.cleanupInterval)
+	defer ticker.Stop()
+
+	s.logger.Info("Started background session cleanup",
+		slog.Duration("interval", s.cleanupInterval))
+
+	for {
+		select {
+		case <-ticker.C:
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			if err := s.Cleanup(ctx); err != nil {
+				s.logger.Error("Background session cleanup failed",
+					slog.String("error", err.Error()))
+			}
+			cancel()
+		case <-s.stopCleanup:
+			s.logger.Info("Stopping background session cleanup")
+			return
+		}
+	}
 }
 
 // Cleanup removes expired sessions (can be called periodically)

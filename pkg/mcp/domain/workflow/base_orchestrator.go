@@ -100,7 +100,7 @@ func (o *BaseOrchestrator) newEmitter(ctx context.Context, req *mcp.CallToolRequ
 
 // newState creates the workflow state with all necessary components
 func (o *BaseOrchestrator) newState(workflowID string, args *ContainerizeAndDeployArgs, emitter api.ProgressEmitter) *WorkflowState {
-	return &WorkflowState{
+	state := &WorkflowState{
 		WorkflowID:       workflowID,
 		Args:             args,
 		Result:           &ContainerizeAndDeployResult{},
@@ -110,6 +110,11 @@ func (o *BaseOrchestrator) newState(workflowID string, args *ContainerizeAndDepl
 		CurrentStep:      0,
 		WorkflowProgress: NewWorkflowProgress(workflowID, "containerize_and_deploy", len(o.steps)),
 	}
+
+	// Set all steps for AI enhancement middleware
+	state.SetAllSteps(o.steps)
+
+	return state
 }
 
 // buildStepExecutor builds the middleware chain for step execution

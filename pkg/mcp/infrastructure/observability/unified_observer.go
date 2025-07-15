@@ -1,0 +1,836 @@
+// Package observability provides the unified observer implementation
+package observability
+
+import (
+	"context"
+	cryptorand "crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"log/slog"
+	"math/rand"
+	"sort"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/errors"
+)
+
+// UnifiedObserver implements the Observer interface with comprehensive observability
+type UnifiedObserver struct {
+	logger *slog.Logger
+	config *ObserverConfig
+
+	// Event tracking
+	events     sync.Map // map[string]*Event
+	eventCount int64
+
+	// Error aggregation
+	errorAggregator *errors.ErrorAggregator
+
+	// Metrics storage
+	counters   sync.Map // map[string]*CounterMetric
+	gauges     sync.Map // map[string]*GaugeMetric
+	histograms sync.Map // map[string]*HistogramMetric
+
+	// Health monitoring
+	healthChecks sync.Map // map[string]*ComponentHealth
+
+	// Resource monitoring
+	resourceUsage sync.Map // map[string]*ResourceUsage
+
+	// Performance tracking
+	operations sync.Map // map[string]*OperationStats
+
+	// Configuration
+	samplingRate atomic.Value // float64
+	logLevel     atomic.Value // slog.Level
+
+	// Lifecycle
+	startTime     time.Time
+	mu            sync.RWMutex
+	cleanupTicker *time.Ticker
+	cleanupStop   chan struct{}
+}
+
+// ObserverConfig provides configuration for the unified observer
+type ObserverConfig struct {
+	SamplingRate       float64
+	MaxEvents          int
+	MaxErrors          int
+	RetentionPeriod    time.Duration
+	MetricsEnabled     bool
+	TracingEnabled     bool
+	HealthCheckEnabled bool
+	LogLevel           slog.Level
+	FlushInterval      time.Duration
+}
+
+// CounterMetric represents a counter metric
+type CounterMetric struct {
+	Name  string
+	Value int64
+	Tags  map[string]string
+	mu    sync.RWMutex
+}
+
+// GaugeMetric represents a gauge metric
+type GaugeMetric struct {
+	Name  string
+	Value float64
+	Tags  map[string]string
+	mu    sync.RWMutex
+}
+
+// HistogramMetric represents a histogram metric with percentiles
+type HistogramMetric struct {
+	Name   string
+	Values []float64
+	Tags   map[string]string
+	mu     sync.RWMutex
+}
+
+// OperationStats tracks statistics for operations
+type OperationStats struct {
+	Name          string
+	Count         int64
+	SuccessCount  int64
+	TotalDuration time.Duration
+	MinDuration   time.Duration
+	MaxDuration   time.Duration
+	LastExecuted  time.Time
+	mu            sync.RWMutex
+}
+
+// DefaultObserverConfig returns a default observer configuration
+func DefaultObserverConfig() *ObserverConfig {
+	return &ObserverConfig{
+		SamplingRate:       1.0,
+		MaxEvents:          10000,
+		MaxErrors:          1000,
+		RetentionPeriod:    time.Hour * 24,
+		MetricsEnabled:     true,
+		TracingEnabled:     true,
+		HealthCheckEnabled: true,
+		LogLevel:           slog.LevelInfo,
+		FlushInterval:      time.Minute * 5,
+	}
+}
+
+// NewUnifiedObserver creates a new unified observer
+func NewUnifiedObserver(logger *slog.Logger, config *ObserverConfig) *UnifiedObserver {
+	if config == nil {
+		config = DefaultObserverConfig()
+	}
+
+	observer := &UnifiedObserver{
+		logger:          logger.With("component", "observer"),
+		config:          config,
+		errorAggregator: errors.NewErrorAggregator(config.RetentionPeriod),
+		startTime:       time.Now(),
+		cleanupStop:     make(chan struct{}),
+	}
+
+	observer.samplingRate.Store(config.SamplingRate)
+	observer.logLevel.Store(config.LogLevel)
+
+	// Start cleanup ticker
+	observer.cleanupTicker = time.NewTicker(config.FlushInterval)
+	go observer.cleanupWorker()
+
+	return observer
+}
+
+// TrackEvent tracks an event in the observability system
+func (o *UnifiedObserver) TrackEvent(ctx context.Context, event *Event) {
+	if !o.shouldSample() {
+		return
+	}
+
+	// Set timestamp if not provided
+	if event.Timestamp.IsZero() {
+		event.Timestamp = time.Now()
+	}
+
+	// Generate unique event ID
+	eventID := o.generateEventID()
+
+	// Store event
+	o.events.Store(eventID, event)
+	atomic.AddInt64(&o.eventCount, 1)
+
+	// Update operation stats if this is an operation event
+	if event.Type == EventTypeOperation {
+		o.updateOperationStats(event)
+	}
+
+	// Log the event
+	o.logEvent(event)
+}
+
+// TrackError tracks a standard error
+func (o *UnifiedObserver) TrackError(ctx context.Context, err error) {
+	if err == nil {
+		return
+	}
+
+	// Convert to structured error if needed
+	var structErr *errors.StructuredError
+	if se, ok := err.(*errors.StructuredError); ok {
+		structErr = se
+	} else {
+		structErr = errors.Wrap(err, "unknown", "system", err.Error())
+	}
+
+	o.TrackStructuredError(ctx, structErr)
+}
+
+// TrackStructuredError tracks a structured error
+func (o *UnifiedObserver) TrackStructuredError(ctx context.Context, err *errors.StructuredError) {
+	if err == nil {
+		return
+	}
+
+	// Add to error aggregator
+	o.errorAggregator.Add(err)
+
+	// Create error event
+	event := &Event{
+		Name:      "error",
+		Type:      EventTypeError,
+		Timestamp: err.Timestamp,
+		Component: err.Component,
+		Operation: err.Operation,
+		Success:   false,
+		Properties: map[string]interface{}{
+			"error_id":    err.ID,
+			"category":    string(err.Category),
+			"severity":    string(err.Severity),
+			"recoverable": err.Recoverable,
+			"message":     err.Message,
+		},
+		Tags: map[string]string{
+			"error_category": string(err.Category),
+			"error_severity": string(err.Severity),
+		},
+	}
+
+	if err.WorkflowID != "" {
+		event.WorkflowID = err.WorkflowID
+	}
+	if err.SessionID != "" {
+		event.SessionID = err.SessionID
+	}
+
+	// Add context as properties
+	for k, v := range err.Context {
+		event.Properties[k] = v
+	}
+
+	o.TrackEvent(ctx, event)
+
+	// Log structured error
+	err.LogStructured(o.logger)
+}
+
+// StartOperation starts tracking an operation
+func (o *UnifiedObserver) StartOperation(ctx context.Context, operation string) *OperationContext {
+	return &OperationContext{
+		Name:      operation,
+		StartTime: time.Now(),
+		Context:   ctx,
+		observer:  o,
+	}
+}
+
+// StartSpan starts a distributed tracing span
+func (o *UnifiedObserver) StartSpan(ctx context.Context, name string) *SpanContext {
+	return &SpanContext{
+		TraceID:   o.generateTraceID(),
+		SpanID:    o.generateSpanID(),
+		Name:      name,
+		StartTime: time.Now(),
+		Context:   ctx,
+		observer:  o,
+	}
+}
+
+// RecordHealthCheck records a health check result
+func (o *UnifiedObserver) RecordHealthCheck(component string, status HealthStatus, latency time.Duration) {
+	health := &ComponentHealth{
+		Status:       status,
+		LastCheck:    time.Now(),
+		ResponseTime: latency,
+	}
+
+	// Load existing health to preserve uptime and error count
+	if existing, ok := o.healthChecks.Load(component); ok {
+		if existingHealth, ok := existing.(*ComponentHealth); ok {
+			health.Uptime = existingHealth.Uptime
+			health.ErrorCount = existingHealth.ErrorCount
+
+			if status != HealthStatusHealthy {
+				health.ErrorCount++
+			}
+		}
+	}
+
+	o.healthChecks.Store(component, health)
+
+	// Track as event
+	event := &Event{
+		Name:      "health_check",
+		Type:      EventTypeHealth,
+		Timestamp: time.Now(),
+		Component: component,
+		Operation: "health_check",
+		Success:   status == HealthStatusHealthy,
+		Properties: map[string]interface{}{
+			"status":  string(status),
+			"latency": latency,
+		},
+		Metrics: map[string]float64{
+			"latency_ms": float64(latency.Milliseconds()),
+		},
+		Tags: map[string]string{
+			"component": component,
+			"status":    string(status),
+		},
+	}
+
+	o.TrackEvent(context.Background(), event)
+}
+
+// RecordMetric records a generic metric
+func (o *UnifiedObserver) RecordMetric(name string, value float64, tags map[string]string) {
+	// Track as histogram for general metrics
+	o.RecordHistogram(name, value, tags)
+}
+
+// IncrementCounter increments a counter metric
+func (o *UnifiedObserver) IncrementCounter(name string, tags map[string]string) {
+	key := o.buildMetricKey(name, tags)
+
+	if existing, loaded := o.counters.LoadOrStore(key, &CounterMetric{
+		Name:  name,
+		Value: 1,
+		Tags:  tags,
+	}); loaded {
+		if counter, ok := existing.(*CounterMetric); ok {
+			counter.mu.Lock()
+			counter.Value++
+			counter.mu.Unlock()
+		}
+	}
+}
+
+// SetGauge sets a gauge metric value
+func (o *UnifiedObserver) SetGauge(name string, value float64, tags map[string]string) {
+	key := o.buildMetricKey(name, tags)
+
+	gauge := &GaugeMetric{
+		Name:  name,
+		Value: value,
+		Tags:  tags,
+	}
+
+	o.gauges.Store(key, gauge)
+}
+
+// RecordHistogram records a value in a histogram
+func (o *UnifiedObserver) RecordHistogram(name string, value float64, tags map[string]string) {
+	key := o.buildMetricKey(name, tags)
+
+	if existing, loaded := o.histograms.LoadOrStore(key, &HistogramMetric{
+		Name:   name,
+		Values: []float64{value},
+		Tags:   tags,
+	}); loaded {
+		if histogram, ok := existing.(*HistogramMetric); ok {
+			histogram.mu.Lock()
+			histogram.Values = append(histogram.Values, value)
+			// Keep only last 1000 values to prevent memory issues
+			if len(histogram.Values) > 1000 {
+				histogram.Values = histogram.Values[len(histogram.Values)-1000:]
+			}
+			histogram.mu.Unlock()
+		}
+	}
+}
+
+// RecordResourceUsage records resource usage metrics
+func (o *UnifiedObserver) RecordResourceUsage(ctx context.Context, resource *ResourceUsage) {
+	if resource.Timestamp.IsZero() {
+		resource.Timestamp = time.Now()
+	}
+
+	o.resourceUsage.Store(resource.Component, resource)
+
+	// Track as event
+	event := &Event{
+		Name:      "resource_usage",
+		Type:      EventTypeResource,
+		Timestamp: resource.Timestamp,
+		Component: resource.Component,
+		Operation: "resource_monitoring",
+		Success:   true,
+		Properties: map[string]interface{}{
+			"resource": resource,
+		},
+		Tags: map[string]string{
+			"component": resource.Component,
+		},
+	}
+
+	// Add resource metrics
+	if resource.CPU != nil {
+		event.Metrics = make(map[string]float64)
+		event.Metrics["cpu_percent"] = resource.CPU.Percent
+		event.Metrics["cpu_used"] = resource.CPU.Used
+	}
+	if resource.Memory != nil {
+		if event.Metrics == nil {
+			event.Metrics = make(map[string]float64)
+		}
+		event.Metrics["memory_percent"] = resource.Memory.Percent
+		event.Metrics["memory_used"] = resource.Memory.Used
+	}
+
+	o.TrackEvent(ctx, event)
+}
+
+// Logger returns the configured logger
+func (o *UnifiedObserver) Logger() *slog.Logger {
+	return o.logger
+}
+
+// GetObservabilityReport generates a comprehensive observability report
+func (o *UnifiedObserver) GetObservabilityReport() *ObservabilityReport {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+
+	now := time.Now()
+	period := TimePeriod{
+		Start:    o.startTime,
+		End:      now,
+		Duration: now.Sub(o.startTime),
+	}
+
+	report := &ObservabilityReport{
+		GeneratedAt:     now,
+		Period:          period,
+		EventSummary:    o.generateEventSummary(),
+		ErrorAnalysis:   o.generateErrorAnalysis(),
+		Performance:     o.generatePerformanceMetrics(),
+		HealthStatus:    o.generateHealthStatus(),
+		ResourceUsage:   o.generateResourceSummary(),
+		Trends:          o.generateTrendAnalysis(),
+		Recommendations: o.generateRecommendations(),
+	}
+
+	return report
+}
+
+// SetSamplingRate sets the sampling rate for events
+func (o *UnifiedObserver) SetSamplingRate(rate float64) {
+	o.samplingRate.Store(rate)
+}
+
+// SetLogLevel sets the logging level
+func (o *UnifiedObserver) SetLogLevel(level slog.Level) {
+	o.logLevel.Store(level)
+}
+
+// Private helper methods
+
+func (o *UnifiedObserver) shouldSample() bool {
+	rate := o.samplingRate.Load().(float64)
+	if rate >= 1.0 {
+		return true
+	}
+
+	// Simple sampling - in production might use more sophisticated sampling
+	return rand.Float64() < rate
+}
+
+func (o *UnifiedObserver) generateEventID() string {
+	bytes := make([]byte, 4)
+	if _, err := cryptorand.Read(bytes); err != nil {
+		// Fallback to timestamp-based ID if crypto random fails
+		return fmt.Sprintf("evt_%d", time.Now().UnixNano())
+	}
+	return "evt_" + hex.EncodeToString(bytes)
+}
+
+func (o *UnifiedObserver) generateTraceID() string {
+	bytes := make([]byte, 8)
+	if _, err := cryptorand.Read(bytes); err != nil {
+		// Fallback to timestamp-based ID if crypto random fails
+		return fmt.Sprintf("%016x", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(bytes)
+}
+
+func (o *UnifiedObserver) generateSpanID() string {
+	bytes := make([]byte, 4)
+	if _, err := cryptorand.Read(bytes); err != nil {
+		// Fallback to timestamp-based ID if crypto random fails
+		return fmt.Sprintf("%08x", time.Now().UnixNano()&0xFFFFFFFF)
+	}
+	return hex.EncodeToString(bytes)
+}
+
+func (o *UnifiedObserver) buildMetricKey(name string, tags map[string]string) string {
+	key := name
+
+	// Sort tag keys for deterministic ordering
+	if len(tags) > 0 {
+		keys := make([]string, 0, len(tags))
+		for k := range tags {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, k := range keys {
+			key += "|" + k + "=" + tags[k]
+		}
+	}
+
+	return key
+}
+
+func (o *UnifiedObserver) updateOperationStats(event *Event) {
+	if event.Duration == 0 {
+		return
+	}
+
+	key := event.Operation
+	if event.Component != "" {
+		key = event.Component + "." + event.Operation
+	}
+
+	if existing, loaded := o.operations.LoadOrStore(key, &OperationStats{
+		Name:          key,
+		Count:         1,
+		SuccessCount:  0,
+		TotalDuration: event.Duration,
+		MinDuration:   event.Duration,
+		MaxDuration:   event.Duration,
+		LastExecuted:  event.Timestamp,
+	}); loaded {
+		if stats, ok := existing.(*OperationStats); ok {
+			stats.mu.Lock()
+			stats.Count++
+			if event.Success {
+				stats.SuccessCount++
+			}
+			stats.TotalDuration += event.Duration
+			if event.Duration < stats.MinDuration {
+				stats.MinDuration = event.Duration
+			}
+			if event.Duration > stats.MaxDuration {
+				stats.MaxDuration = event.Duration
+			}
+			stats.LastExecuted = event.Timestamp
+			stats.mu.Unlock()
+		}
+	} else {
+		// First time - set success count
+		if stats, ok := existing.(*OperationStats); ok && event.Success {
+			stats.SuccessCount = 1
+		}
+	}
+}
+
+func (o *UnifiedObserver) logEvent(event *Event) {
+	level := o.logLevel.Load().(slog.Level)
+
+	// Determine log level based on event type and success
+	var logLevel slog.Level
+	switch event.Type {
+	case EventTypeError:
+		logLevel = slog.LevelError
+	case EventTypeHealth:
+		if event.Success {
+			logLevel = slog.LevelDebug
+		} else {
+			logLevel = slog.LevelWarn
+		}
+	default:
+		if event.Success {
+			logLevel = slog.LevelInfo
+		} else {
+			logLevel = slog.LevelWarn
+		}
+	}
+
+	// Only log if above configured level
+	if logLevel < level {
+		return
+	}
+
+	args := []interface{}{
+		"event_name", event.Name,
+		"event_type", string(event.Type),
+		"component", event.Component,
+		"operation", event.Operation,
+		"success", event.Success,
+		"timestamp", event.Timestamp,
+	}
+
+	if event.Duration > 0 {
+		args = append(args, "duration", event.Duration)
+	}
+	if event.WorkflowID != "" {
+		args = append(args, "workflow_id", event.WorkflowID)
+	}
+	if event.SessionID != "" {
+		args = append(args, "session_id", event.SessionID)
+	}
+
+	// Add properties
+	for k, v := range event.Properties {
+		args = append(args, k, v)
+	}
+
+	// Add metrics
+	for k, v := range event.Metrics {
+		args = append(args, k, v)
+	}
+
+	// Add tags
+	for k, v := range event.Tags {
+		args = append(args, "tag_"+k, v)
+	}
+
+	message := "Event tracked"
+	if !event.Success {
+		message = "Event failed"
+	}
+
+	o.logger.Log(context.Background(), logLevel, message, args...)
+}
+
+func (o *UnifiedObserver) cleanupOldEvents() {
+	cutoff := time.Now().Add(-o.config.RetentionPeriod)
+
+	o.events.Range(func(key, value interface{}) bool {
+		if event, ok := value.(*Event); ok {
+			if event.Timestamp.Before(cutoff) {
+				o.events.Delete(key)
+			}
+		}
+		return true
+	})
+}
+
+// Report generation methods (simplified implementations)
+
+func (o *UnifiedObserver) generateEventSummary() EventSummary {
+	totalEvents := atomic.LoadInt64(&o.eventCount)
+	eventsByType := make(map[EventType]int64)
+	eventsByComponent := make(map[string]int64)
+	var successCount int64
+	var totalDuration time.Duration
+	var durationCount int64
+
+	o.events.Range(func(key, value interface{}) bool {
+		if event, ok := value.(*Event); ok {
+			eventsByType[event.Type]++
+			eventsByComponent[event.Component]++
+			if event.Success {
+				successCount++
+			}
+			if event.Duration > 0 {
+				totalDuration += event.Duration
+				durationCount++
+			}
+		}
+		return true
+	})
+
+	var successRate float64
+	if totalEvents > 0 {
+		successRate = float64(successCount) / float64(totalEvents)
+	}
+
+	var avgDuration time.Duration
+	if durationCount > 0 {
+		avgDuration = totalDuration / time.Duration(durationCount)
+	}
+
+	return EventSummary{
+		TotalEvents:       totalEvents,
+		EventsByType:      eventsByType,
+		EventsByComponent: eventsByComponent,
+		SuccessRate:       successRate,
+		AvgDuration:       avgDuration,
+	}
+}
+
+func (o *UnifiedObserver) generateErrorAnalysis() ErrorAnalysis {
+	errorReport := o.errorAggregator.GetReport()
+
+	return ErrorAnalysis{
+		TotalErrors:       errorReport.TotalErrors,
+		ErrorsByCategory:  make(map[errors.ErrorCategory]int64),
+		ErrorsBySeverity:  make(map[errors.ErrorSeverity]int64),
+		RecoverableErrors: 0, // Would calculate from error report
+		CriticalErrors:    0, // Would calculate from error report
+		ErrorRate:         0, // Would calculate based on total events
+		TopErrors:         errorReport.TopErrors,
+		ErrorPatterns:     errorReport.Patterns,
+	}
+}
+
+func (o *UnifiedObserver) generatePerformanceMetrics() PerformanceMetrics {
+	operationMetrics := make(map[string]OperationMetrics)
+
+	o.operations.Range(func(key, value interface{}) bool {
+		if name, ok := key.(string); ok {
+			if stats, ok := value.(*OperationStats); ok {
+				stats.mu.RLock()
+
+				var successRate float64
+				if stats.Count > 0 {
+					successRate = float64(stats.SuccessCount) / float64(stats.Count)
+				}
+
+				var avgDuration time.Duration
+				if stats.Count > 0 {
+					avgDuration = stats.TotalDuration / time.Duration(stats.Count)
+				}
+
+				var errorRate float64
+				if stats.Count > 0 {
+					errorRate = float64(stats.Count-stats.SuccessCount) / float64(stats.Count)
+				}
+
+				operationMetrics[name] = OperationMetrics{
+					Count:        stats.Count,
+					SuccessRate:  successRate,
+					AvgDuration:  avgDuration,
+					MinDuration:  stats.MinDuration,
+					MaxDuration:  stats.MaxDuration,
+					ErrorRate:    errorRate,
+					LastExecuted: stats.LastExecuted,
+				}
+
+				stats.mu.RUnlock()
+			}
+		}
+		return true
+	})
+
+	return PerformanceMetrics{
+		OperationMetrics: operationMetrics,
+		// Other metrics would be calculated from operation stats
+	}
+}
+
+func (o *UnifiedObserver) generateHealthStatus() map[string]ComponentHealth {
+	healthStatus := make(map[string]ComponentHealth)
+
+	o.healthChecks.Range(func(key, value interface{}) bool {
+		if component, ok := key.(string); ok {
+			if health, ok := value.(*ComponentHealth); ok {
+				healthStatus[component] = *health
+			}
+		}
+		return true
+	})
+
+	return healthStatus
+}
+
+func (o *UnifiedObserver) generateResourceSummary() ResourceSummary {
+	componentUsage := make(map[string]ResourceUsage)
+
+	o.resourceUsage.Range(func(key, value interface{}) bool {
+		if component, ok := key.(string); ok {
+			if usage, ok := value.(*ResourceUsage); ok {
+				componentUsage[component] = *usage
+			}
+		}
+		return true
+	})
+
+	return ResourceSummary{
+		ComponentUsage: componentUsage,
+		// Other fields would be calculated from usage data
+	}
+}
+
+func (o *UnifiedObserver) generateTrendAnalysis() TrendAnalysis {
+	return TrendAnalysis{
+		ErrorTrends:       make(map[string]string),
+		PerformanceTrends: make(map[string]string),
+		UsageTrends:       make(map[string]string),
+		Predictions:       make(map[string]TrendPrediction),
+	}
+}
+
+func (o *UnifiedObserver) generateRecommendations() []Recommendation {
+	var recommendations []Recommendation
+
+	// Analyze performance and generate recommendations
+	errorReport := o.errorAggregator.GetReport()
+
+	// High error rate recommendation
+	if errorReport.TotalErrors > 100 {
+		recommendations = append(recommendations, Recommendation{
+			Type:        RecommendationTypeReliability,
+			Priority:    PriorityHigh,
+			Title:       "High Error Rate Detected",
+			Description: "The system is experiencing a high error rate that may impact reliability",
+			Actions: []Action{
+				{
+					Description: "Review error patterns and implement fixes",
+					Type:        "analysis",
+					Automated:   false,
+				},
+				{
+					Description: "Enable additional monitoring",
+					Type:        "monitoring",
+					Automated:   true,
+				},
+			},
+			Impact: "Improved system reliability and user experience",
+			Effort: "Medium",
+		})
+	}
+
+	return recommendations
+}
+
+// cleanupWorker runs periodic cleanup tasks
+func (o *UnifiedObserver) cleanupWorker() {
+	for {
+		select {
+		case <-o.cleanupTicker.C:
+			o.cleanupOldEvents()
+		case <-o.cleanupStop:
+			return
+		}
+	}
+}
+
+// Close shuts down the observer gracefully
+func (o *UnifiedObserver) Close() error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	// Stop the cleanup ticker
+	if o.cleanupTicker != nil {
+		o.cleanupTicker.Stop()
+	}
+
+	// Signal cleanup worker to stop
+	close(o.cleanupStop)
+
+	// Final cleanup
+	o.cleanupOldEvents()
+
+	o.logger.Info("Observer shut down gracefully")
+	return nil
+}

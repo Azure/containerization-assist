@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/sampling"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -101,7 +102,7 @@ func WithLLMGuidedRetry(ctx context.Context, name string, max int, fn func() err
 		// Continue to next retry with LLM insights logged
 	}
 
-	return fmt.Errorf("%s: exhausted %d retries", name, max)
+	return errors.New(errors.CodeOperationFailed, "ai_retry", fmt.Sprintf("%s: exhausted %d retries", name, max), nil)
 }
 
 // withBasicAIRetry is the original retry logic without MCP sampling
@@ -137,7 +138,7 @@ func withBasicAIRetry(ctx context.Context, name string, max int, fn func() error
 	}
 
 	// This should never be reached due to the logic above
-	return fmt.Errorf("%s: exhausted %d retries", name, max)
+	return errors.New(errors.CodeOperationFailed, "ai_retry", fmt.Sprintf("%s: exhausted %d retries", name, max), nil)
 }
 
 // Fix represents an AI-suggested fix for an error
@@ -397,7 +398,7 @@ func applyDockerfileBaseFix(step string, logger *slog.Logger) (bool, error) {
 
 	content, err := os.ReadFile(dockerfilePath)
 	if err != nil {
-		return false, fmt.Errorf("failed to read Dockerfile: %w", err)
+		return false, errors.New(errors.CodeIoError, "dockerfile", "failed to read Dockerfile", err)
 	}
 
 	original := string(content)
@@ -419,7 +420,7 @@ func applyDockerfileBaseFix(step string, logger *slog.Logger) (bool, error) {
 	if updated != original {
 		err = os.WriteFile(dockerfilePath, []byte(updated), 0644)
 		if err != nil {
-			return false, fmt.Errorf("failed to write updated Dockerfile: %w", err)
+			return false, errors.New(errors.CodeIoError, "dockerfile", "failed to write updated Dockerfile", err)
 		}
 		logger.Info("Applied Dockerfile base image fix", "file", dockerfilePath)
 		return true, nil
@@ -438,7 +439,7 @@ func applyMavenDockerfileFix(step string, logger *slog.Logger) (bool, error) {
 
 	content, err := os.ReadFile(dockerfilePath)
 	if err != nil {
-		return false, fmt.Errorf("failed to read Dockerfile: %w", err)
+		return false, errors.New(errors.CodeIoError, "dockerfile", "failed to read Dockerfile", err)
 	}
 
 	original := string(content)
@@ -469,7 +470,7 @@ func applyMavenDockerfileFix(step string, logger *slog.Logger) (bool, error) {
 
 	err = os.WriteFile(dockerfilePath, []byte(newContent), 0644)
 	if err != nil {
-		return false, fmt.Errorf("failed to write updated Dockerfile: %w", err)
+		return false, errors.New(errors.CodeIoError, "dockerfile", "failed to write updated Dockerfile", err)
 	}
 
 	logger.Info("Applied Maven installation fix to Dockerfile", "file", dockerfilePath)
@@ -486,7 +487,7 @@ func applyGradleDockerfileFix(step string, logger *slog.Logger) (bool, error) {
 
 	content, err := os.ReadFile(dockerfilePath)
 	if err != nil {
-		return false, fmt.Errorf("failed to read Dockerfile: %w", err)
+		return false, errors.New(errors.CodeIoError, "dockerfile", "failed to read Dockerfile", err)
 	}
 
 	original := string(content)
@@ -523,7 +524,7 @@ func applyGradleDockerfileFix(step string, logger *slog.Logger) (bool, error) {
 
 	err = os.WriteFile(dockerfilePath, []byte(newContent), 0644)
 	if err != nil {
-		return false, fmt.Errorf("failed to write updated Dockerfile: %w", err)
+		return false, errors.New(errors.CodeIoError, "dockerfile", "failed to write updated Dockerfile", err)
 	}
 
 	logger.Info("Applied Gradle installation fix to Dockerfile", "file", dockerfilePath)
@@ -548,7 +549,7 @@ func applyPortExposeFix(step string, logger *slog.Logger) (bool, error) {
 
 	content, err := os.ReadFile(dockerfilePath)
 	if err != nil {
-		return false, fmt.Errorf("failed to read Dockerfile: %w", err)
+		return false, errors.New(errors.CodeIoError, "dockerfile", "failed to read Dockerfile", err)
 	}
 
 	original := string(content)
@@ -588,7 +589,7 @@ func applyPortExposeFix(step string, logger *slog.Logger) (bool, error) {
 
 	err = os.WriteFile(dockerfilePath, []byte(newContent), 0644)
 	if err != nil {
-		return false, fmt.Errorf("failed to write updated Dockerfile: %w", err)
+		return false, errors.New(errors.CodeIoError, "dockerfile", "failed to write updated Dockerfile", err)
 	}
 
 	logger.Info("Applied port expose fix to Dockerfile", "file", dockerfilePath, "port", port)
