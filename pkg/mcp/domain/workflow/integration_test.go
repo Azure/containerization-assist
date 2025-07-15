@@ -12,7 +12,6 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow/common"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,7 +38,7 @@ type TestProgressEmitterFactory struct {
 
 func (f *TestProgressEmitterFactory) CreateEmitter(ctx context.Context, req *mcp.CallToolRequest, totalSteps int) api.ProgressEmitter {
 	// For tests, return a NoOpEmitter or TrackerEmitter
-	return &common.NoOpEmitter{}
+	return &NoOpEmitter{}
 }
 
 // Add helper function for pointer

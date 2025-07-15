@@ -287,16 +287,6 @@ func containsPattern(prompt string, patterns ...string) bool {
 	return false
 }
 
-// Apply applies the suggested fix (kept for backward compatibility)
-func (f *Fix) Apply() error {
-	// This method is now deprecated as we rely on external AI assistant
-	// to observe errors and make fixing decisions through the MCP workflow
-	slog.Info("Fix application delegated to external AI assistant",
-		"description", f.Description,
-		"action", f.Action)
-	return nil
-}
-
 // RetryableOperation represents an operation that can be retried with AI assistance
 type RetryableOperation struct {
 	Name       string

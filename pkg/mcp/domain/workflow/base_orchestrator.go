@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow/common"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -82,7 +81,7 @@ func (o *BaseOrchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest
 func (o *BaseOrchestrator) initContext(ctx context.Context, args *ContainerizeAndDeployArgs) (string, context.Context) {
 	workflowID, ok := GetWorkflowID(ctx)
 	if !ok {
-		workflowID = common.GenerateWorkflowID(args.RepoURL)
+		workflowID = GenerateWorkflowID(args.RepoURL)
 		ctx = WithWorkflowID(ctx, workflowID)
 	}
 	o.logger.Info("Starting containerize_and_deploy workflow",
@@ -96,7 +95,7 @@ func (o *BaseOrchestrator) newEmitter(ctx context.Context, req *mcp.CallToolRequ
 		return o.emitterFactory.CreateEmitter(ctx, req, len(o.steps))
 	}
 	// Fallback to no-op emitter
-	return &common.NoOpEmitter{}
+	return &NoOpEmitter{}
 }
 
 // newState creates the workflow state with all necessary components

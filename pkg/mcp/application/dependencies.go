@@ -3,9 +3,10 @@ package application
 
 import (
 	"log/slog"
-	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/application/bootstrap"
+	"github.com/Azure/container-kit/pkg/mcp/application/lifecycle"
 	"github.com/Azure/container-kit/pkg/mcp/application/session"
 	domainevents "github.com/Azure/container-kit/pkg/mcp/domain/events"
 	domainml "github.com/Azure/container-kit/pkg/mcp/domain/ml"
@@ -64,10 +65,33 @@ type Dependencies struct {
 // NewMCPServerFromDeps creates a new MCP server that implements api.MCPServer.
 // This is used by Wire for dependency injection.
 func NewMCPServerFromDeps(deps *Dependencies) api.MCPServer {
+	// Create the bootstrapper component
+	bootstrapper := bootstrap.NewBootstrapper(
+		deps.Logger,
+		deps.Config,
+		deps.ResourceStore,
+		deps.WorkflowOrchestrator,
+	)
+
+	// Create the lifecycle manager component
+	lifecycleManager := lifecycle.NewLifecycleManager(
+		deps.Logger,
+		deps.Config,
+		deps.SessionManager,
+		bootstrapper,
+	)
+
 	return &serverImpl{
-		deps:      deps,
-		startTime: time.Now(),
+		deps:             deps,
+		lifecycleManager: lifecycleManager,
+		bootstrapper:     bootstrapper,
 	}
+}
+
+// GetGroupedDependencies returns a grouped view of the dependencies
+// This provides a migration path to the new structured approach
+func (d *Dependencies) GetGroupedDependencies() *GroupedDependencies {
+	return FromLegacyDependencies(d)
 }
 
 // GetChatModeFunctions returns the function names available in chat mode

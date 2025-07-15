@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 )
 
 // BuildOptimizer integrates resource prediction with Docker build operations
@@ -21,6 +23,37 @@ func NewBuildOptimizer(predictor *ResourcePredictor, logger *slog.Logger) *Build
 		predictor: predictor,
 		logger:    logger.With("component", "build_optimizer"),
 	}
+}
+
+// AnalyzeBuildRequirements analyzes the build requirements for optimization
+func (b *BuildOptimizer) AnalyzeBuildRequirements(ctx context.Context, dockerfilePath, repoPath string) (*workflow.BuildOptimization, error) {
+	// Create a simple analysis to use with the predictor
+	analysis := &SimpleAnalysis{
+		Language:     "unknown",
+		Framework:    "",
+		Dependencies: []string{},
+		BuildCommand: "docker build",
+		StartCommand: "",
+	}
+
+	// Get resource predictions
+	prediction, err := b.predictor.PredictResources(ctx, analysis)
+	if err != nil {
+		return nil, err
+	}
+
+	return &workflow.BuildOptimization{
+		RecommendedCPU:    fmt.Sprintf("%d", prediction.CPU.Cores),
+		RecommendedMemory: fmt.Sprintf("%dM", prediction.Memory.RecommendedMB),
+		EstimatedDuration: prediction.BuildTime,
+		CacheStrategy:     "inline",
+	}, nil
+}
+
+// PredictResourceUsage predicts resource usage for the build
+func (b *BuildOptimizer) PredictResourceUsage(ctx context.Context, optimization *workflow.BuildOptimization) error {
+	// Already included in AnalyzeBuildRequirements
+	return nil
 }
 
 // OptimizeBuildCommand generates an optimized docker build command based on predictions

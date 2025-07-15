@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow/common"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging/events"
 	"github.com/stretchr/testify/assert"
 )
@@ -49,7 +48,7 @@ func TestArchitectureValidation(t *testing.T) {
 			name: "No duplicate noOpSink implementations",
 			check: func(t *testing.T) {
 				// Check that we only have one noOpSink in common package
-				commonType := reflect.TypeOf(common.NoOpSink{})
+				commonType := reflect.TypeOf(NoOpSink{})
 				if commonType.Name() != "NoOpSink" {
 					t.Error("NoOpSink not found in common package")
 				}
@@ -121,7 +120,7 @@ func TestNoCircularDependencies(t *testing.T) {
 	// Circular dependencies would prevent compilation
 
 	// Import and use types from different packages
-	_ = common.NoOpSink{}
+	_ = NoOpSink{}
 	_ = &BaseOrchestrator{}
 	_ = &eventDecorator{}
 	_ = &sagaDecorator{}

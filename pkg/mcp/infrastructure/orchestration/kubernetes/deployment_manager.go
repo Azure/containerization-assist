@@ -7,6 +7,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/common/runner"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	infraerrors "github.com/Azure/container-kit/pkg/mcp/infrastructure/core"
 )
 
 // KubernetesDeploymentManager implements the workflow.DeploymentManager interface using kubectl
@@ -30,13 +31,30 @@ func (m *KubernetesDeploymentManager) DeleteDeployment(ctx context.Context, name
 	// Use --ignore-not-found=true to handle non-existent deployments gracefully
 	out, err := m.runner.RunWithOutput(ctx, "kubectl", "delete", "deployment", name, "-n", namespace, "--ignore-not-found=true")
 	if err != nil {
-		// Log the error but don't fail - deployment might not exist
-		m.logger.Warn("Failed to delete deployment",
-			"namespace", namespace,
-			"name", name,
-			"error", err,
-			"output", out)
-		return nil // Ignore errors as per original behavior
+		// Create structured error for better handling
+		infraErr := infraerrors.NewInfrastructureError(
+			"delete_deployment",
+			"kubernetes",
+			"Failed to delete Kubernetes deployment",
+			err,
+			infraerrors.IsResourceNotFound(err), // Recoverable if resource not found
+		).WithContext("namespace", namespace).
+			WithContext("name", name).
+			WithContext("output", string(out))
+
+		// Check if this is a recoverable error (resource doesn't exist)
+		if infraerrors.IsResourceNotFound(err) {
+			m.logger.Debug("Kubernetes deployment not found, treating as success",
+				"namespace", namespace,
+				"name", name,
+				"error", err,
+				"output", out)
+			return nil // Resource not existing is acceptable for deletion
+		}
+
+		// Log structured error and return it for non-recoverable cases
+		infraErr.LogWithContext(m.logger)
+		return infraErr
 	}
 
 	m.logger.Info("Deployment deleted successfully", "namespace", namespace, "name", name)
@@ -50,13 +68,30 @@ func (m *KubernetesDeploymentManager) DeleteService(ctx context.Context, namespa
 	// Use --ignore-not-found=true to handle non-existent services gracefully
 	out, err := m.runner.RunWithOutput(ctx, "kubectl", "delete", "service", name, "-n", namespace, "--ignore-not-found=true")
 	if err != nil {
-		// Log the error but don't fail - service might not exist
-		m.logger.Warn("Failed to delete service",
-			"namespace", namespace,
-			"name", name,
-			"error", err,
-			"output", out)
-		return nil // Ignore errors as per original behavior
+		// Create structured error for better handling
+		infraErr := infraerrors.NewInfrastructureError(
+			"delete_service",
+			"kubernetes",
+			"Failed to delete Kubernetes service",
+			err,
+			infraerrors.IsResourceNotFound(err), // Recoverable if resource not found
+		).WithContext("namespace", namespace).
+			WithContext("name", name).
+			WithContext("output", string(out))
+
+		// Check if this is a recoverable error (resource doesn't exist)
+		if infraerrors.IsResourceNotFound(err) {
+			m.logger.Debug("Kubernetes service not found, treating as success",
+				"namespace", namespace,
+				"name", name,
+				"error", err,
+				"output", out)
+			return nil // Resource not existing is acceptable for deletion
+		}
+
+		// Log structured error and return it for non-recoverable cases
+		infraErr.LogWithContext(m.logger)
+		return infraErr
 	}
 
 	m.logger.Info("Service deleted successfully", "namespace", namespace, "name", name)

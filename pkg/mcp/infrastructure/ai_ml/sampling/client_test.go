@@ -183,7 +183,7 @@ func TestIsRetryable(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := isRetryable(tt.err)
+		result := IsRetryable(tt.err)
 		assert.Equal(t, tt.retryable, result, "Failed for error: %v", tt.err)
 	}
 }

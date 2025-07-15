@@ -2,7 +2,10 @@
 package observability
 
 import (
+	"log/slog"
+
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/observability/health"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/observability/metrics"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/observability/tracing"
 	"github.com/google/wire"
 )
@@ -14,4 +17,13 @@ var ObservabilityProviders = wire.NewSet(
 
 	// Health monitoring
 	health.NewMonitor,
+
+	// Metrics
+	ProvideMetricsProvider,
 )
+
+// ProvideMetricsProvider creates a new metrics provider with default configuration
+func ProvideMetricsProvider(logger *slog.Logger) (*metrics.MetricsProvider, error) {
+	config := metrics.DefaultConfig()
+	return metrics.NewMetricsProvider(config, logger)
+}

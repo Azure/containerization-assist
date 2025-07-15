@@ -83,59 +83,103 @@ make lint              # Run linter
 
 ## 🏗️ Architecture
 
-Container Kit uses a **clean 4-layer architecture** with Domain-Driven Design after comprehensive refactoring:
+Container Kit uses a **clean 4-layer architecture** with Domain-Driven Design and a composition root pattern:
+
+```mermaid
+graph TB
+    %% External layer
+    subgraph "External Clients"
+        Claude[Claude Desktop]
+        CLI[MCP CLI]
+    end
+
+    %% Composition Root
+    subgraph "Composition Root"
+        Wire[Wire DI + Providers]
+    end
+
+    %% 4-Layer Architecture
+    subgraph "API Layer"
+        Interfaces[Pure Interfaces]
+    end
+
+    subgraph "Application Layer"
+        Server[MCP Server]
+        Handlers[Tool Handlers]
+        Session[Session Service]
+    end
+
+    subgraph "Domain Layer"
+        Workflow[Workflow Orchestrator]
+        Events[Domain Events]
+        ErrorCtx[Error Context]
+    end
+
+    subgraph "Infrastructure Layer"
+        Steps[10 Workflow Steps]
+        AI[AI/ML Integration]
+        Docker[Docker/K8s]
+        Storage[BoltDB Storage]
+    end
+
+    %% Connections
+    Claude --> Server
+    CLI --> Server
+    Wire --> Server
+    Wire --> Workflow
+    Server --> Handlers
+    Handlers --> Workflow
+    Workflow --> Events
+    Workflow --> ErrorCtx
+    Workflow --> Steps
+    Steps --> AI
+    Steps --> Docker
+    Session --> Storage
+```
+
+### Architecture Layers
 
 ```
-pkg/
-├── mcp/             # Model Context Protocol server & workflow
-│   ├── api/             # Interface definitions and contracts
-│   ├── application/     # Application services and orchestration
-│   │   ├── commands/    # CQRS command handlers
-│   │   ├── queries/     # CQRS query handlers
-│   │   ├── config/      # Application configuration
-│   │   └── session/     # Session management
-│   ├── domain/          # Business logic and workflows
-│   │   ├── workflow/    # Core containerization workflow
-│   │   ├── events/      # Domain events and handlers
-│   │   ├── progress/    # Progress tracking (business concept)
-│   │   ├── saga/        # Saga pattern coordination
-│   │   └── sampling/    # Domain sampling contracts
-│   └── infrastructure/ # Technical implementations
-│       ├── steps/       # Workflow step implementations
-│       ├── ml/          # Machine learning integrations
-│       ├── sampling/    # LLM integration
-│       ├── progress/    # Progress tracking implementations
-│       ├── prompts/     # MCP prompt management
-│       ├── resources/   # MCP resource providers
-│       ├── tracing/     # Observability integration
-│       ├── utilities/   # Infrastructure utilities
-│       └── validation/  # Validation implementations
-├── core/            # Core containerization services
-│   ├── docker/          # Docker operations
-│   ├── kubernetes/      # Kubernetes operations
-│   ├── kind/            # Kind cluster management
-│   └── security/        # Security scanning
-├── common/          # Shared utilities
-│   ├── errors/          # Rich error handling
-│   ├── filesystem/      # File operations
-│   ├── logger/          # Logging utilities
-│   └── runner/          # Command execution
-├── ai/              # AI integration and analysis
-└── pipeline/        # Legacy pipeline stages
+pkg/mcp/
+├── composition/         # Composition root (outside 4 layers)
+│   ├── providers.go     # Dependency injection providers
+│   ├── server.go        # Server composition
+│   └── wire_gen.go      # Wire-generated DI code
+├── api/                 # Interface definitions only
+│   └── interfaces.go    # Pure interfaces, no implementations
+├── application/         # Application services & orchestration
+│   ├── server.go        # MCP server implementation
+│   ├── session/         # Session management service
+│   ├── registrar/       # Tool/resource registration
+│   └── providers.go     # Application-specific providers
+├── domain/              # Business logic & workflows
+│   ├── workflow/        # Core workflow orchestration
+│   │   ├── base_orchestrator.go  # Base implementation
+│   │   ├── decorators.go         # Event/Saga decorators
+│   │   └── error_context.go      # Progressive error tracking
+│   ├── events/          # Domain event system
+│   └── progress/        # Progress tracking domain
+└── infrastructure/      # Technical implementations
+    ├── ai_ml/           # AI/ML integration
+    │   ├── ml/          # Machine learning services
+    │   ├── prompts/     # Prompt management
+    │   └── sampling/    # LLM integration
+    ├── orchestration/   # Container & K8s operations
+    │   └── steps/       # 10 workflow step implementations
+    └── persistence/     # Data persistence (BoltDB)
 ```
 
 **Key Architecture Features:**
-- **Clean 4-Layer Architecture**: API → Domain → Application → Infrastructure with clear dependencies
+- **Composition Root Pattern**: Dependency injection separated from business logic
+- **Clean 4-Layer Architecture**: Strict layer boundaries with dependency rule
 - **Single Workflow Tool**: `containerize_and_deploy` handles complete 10-step process
+- **Decorator Pattern**: Composable orchestrator with events, saga, metrics, retry
+- **Progressive Error Context**: AI-assisted error recovery with pattern learning
 - **Event-Driven Design**: Domain events for workflow coordination and observability
-- **AI-Enhanced Operations**: Built-in AI error recovery and ML-powered optimization
-- **Progress Tracking**: Real-time progress indicators with metadata and visual feedback
-- **Rich Error System**: Unified error handling with actionable suggestions
-- **Session Management**: BoltDB-based state persistence across operations
-- **Dependency Injection**: Wire-based DI with manual configuration for testability
-- **Comprehensive Testing**: Integration tests with workflow validation
+- **Session Persistence**: BoltDB-based state management across server restarts
+- **Wire Dependency Injection**: Compile-time safe DI with provider functions
 
-> **📖 Technical Details**: See [Development Guidelines](DEVELOPMENT_GUIDELINES.md) and [Container Kit Design Document](docs/CONTAINER_KIT_DESIGN_DOCUMENT.md).
+> **📖 Technical Details**: See [Architecture Diagrams](docs/architecture/diagrams/README-architecture.md), [ADRs](docs/architecture/adr/), and [Development Guidelines](DEVELOPMENT_GUIDELINES.md).
 
 ## 🛠️ Key Features
 

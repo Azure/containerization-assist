@@ -2,22 +2,45 @@
 package orchestration
 
 import (
+	"log/slog"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
+	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/container"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/kubernetes"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/steps"
 	"github.com/google/wire"
 )
 
-// OrchestrationProviders provides all orchestration domain dependencies
-var OrchestrationProviders = wire.NewSet(
-	// Container management - using existing constructor
+// Providers provides all orchestration domain dependencies
+var Providers = wire.NewSet(
+	// Container management
 	container.NewDockerContainerManager,
 
-	// Kubernetes deployment - using existing constructor
+	// Kubernetes deployment
 	kubernetes.NewKubernetesDeploymentManager,
 
-	// Workflow steps - using existing constructor
+	// Workflow steps
 	steps.NewRegistryStepProvider,
+	ProvideStepFactory,
+
+	// Orchestrators
+	ProvideBaseOrchestrator,
+	wire.Bind(new(workflow.WorkflowOrchestrator), new(*workflow.BaseOrchestrator)),
+
+	// Saga coordination
+	saga.NewSagaCoordinator,
 
 	// Interface bindings would go here if needed
 )
+
+// ProvideStepFactory creates a workflow step factory
+func ProvideStepFactory(stepProvider workflow.StepProvider, optimizer workflow.BuildOptimizer, logger *slog.Logger) *workflow.StepFactory {
+	// For now, pass nil for optimized build step since it doesn't implement the interface
+	return workflow.NewStepFactory(stepProvider, optimizer, nil, logger)
+}
+
+// ProvideBaseOrchestrator creates the base orchestrator
+func ProvideBaseOrchestrator(factory *workflow.StepFactory, emitterFactory workflow.ProgressEmitterFactory, logger *slog.Logger) *workflow.BaseOrchestrator {
+	return workflow.NewBaseOrchestrator(factory, emitterFactory, logger)
+}

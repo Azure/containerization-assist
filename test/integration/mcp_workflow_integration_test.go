@@ -645,7 +645,6 @@ func (suite *MCPWorkflowIntegrationSuite) TestMCPToolCommunication() {
 			assert.Contains(suite.T(), response, "result")
 			if resultRaw, ok := response["result"]; ok && resultRaw != nil {
 				if result, ok := resultRaw.(map[string]interface{}); ok {
-					// Handle gomcp response format with content wrapper
 					if content, ok := result["content"]; ok {
 						if contentArray, ok := content.([]interface{}); ok && len(contentArray) > 0 {
 							if contentItem, ok := contentArray[0].(map[string]interface{}); ok {

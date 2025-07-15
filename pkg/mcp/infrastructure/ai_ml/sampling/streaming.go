@@ -124,7 +124,7 @@ func (c *Client) SampleStream(
 			}
 
 			// Handle error
-			if !isRetryable(err) {
+			if !IsRetryable(err) {
 				span.RecordError(err)
 				lastErr = err
 				break

@@ -2,13 +2,20 @@
 package core
 
 import (
+	"log/slog"
+	"os"
+
+	"github.com/Azure/container-kit/pkg/common/runner"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/filesystem"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/validation"
 	"github.com/google/wire"
 )
 
-// CoreProviders provides all core infrastructure dependencies
-var CoreProviders = wire.NewSet(
+// Providers provides all core infrastructure dependencies
+var Providers = wire.NewSet(
+	// Command runner
+	ProvideCommandRunner,
+
 	// Filesystem operations - using existing constructor
 	filesystem.NewFileSystemManager,
 
@@ -28,3 +35,16 @@ var CoreProviders = wire.NewSet(
 
 	// Interface bindings would go here if needed
 )
+
+// ProvideLogger creates a structured logger instance
+func ProvideLogger() *slog.Logger {
+	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})
+	return slog.New(handler)
+}
+
+// ProvideCommandRunner creates a command runner instance
+func ProvideCommandRunner() runner.CommandRunner {
+	return &runner.DefaultCommandRunner{}
+}

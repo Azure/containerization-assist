@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	infraerrors "github.com/Azure/container-kit/pkg/mcp/infrastructure/core"
 )
 
 // FileStateStore implements the workflow.StateStore interface using the file system
@@ -102,7 +103,11 @@ func (s *FileStateStore) CleanupOldCheckpoints(maxAge time.Duration) error {
 
 	err := filepath.Walk(checkpointsDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil // Skip errors
+			// Log error with context but continue walking
+			s.logger.Debug("Error accessing file during cleanup",
+				"path", path,
+				"error", err)
+			return nil // Continue walking despite individual file errors
 		}
 
 		// Skip directories and latest.json files
@@ -113,9 +118,20 @@ func (s *FileStateStore) CleanupOldCheckpoints(maxAge time.Duration) error {
 		// Check if file is older than cutoff
 		if info.ModTime().Before(cutoffTime) {
 			if err := os.Remove(path); err != nil {
-				s.logger.Warn("Failed to remove old checkpoint", "path", path, "error", err)
+				// Create structured error for file removal
+				infraErr := infraerrors.NewInfrastructureError(
+					"remove_checkpoint",
+					"file_system",
+					"Failed to remove old checkpoint file",
+					err,
+					infraerrors.IsPermissionDenied(err), // Recoverable if permission issue
+				).WithContext("path", path).
+					WithContext("file_age", time.Since(info.ModTime()).String())
+
+				infraErr.LogWithContext(s.logger)
 			} else {
 				cleaned++
+				s.logger.Debug("Removed old checkpoint", "path", path, "age", time.Since(info.ModTime()))
 			}
 		}
 

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/events"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow/common"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -31,7 +30,7 @@ func EventMiddleware(publisher events.Publisher, logger *slog.Logger) StepMiddle
 			duration := time.Since(stepStartTime)
 
 			// Publish step completed event (handles both success and failure)
-			completedEvent := common.CreateStepCompletedEvent(step.Name(), state.WorkflowID, state.CurrentStep, state.TotalSteps, duration, err)
+			completedEvent := CreateStepCompletedEvent(step.Name(), state.WorkflowID, state.CurrentStep, state.TotalSteps, duration, err)
 			publisher.PublishAsync(ctx, completedEvent)
 
 			// Log completion
@@ -59,13 +58,13 @@ func WorkflowEventMiddleware(publisher events.Publisher, logger *slog.Logger) fu
 	return func(next WorkflowHandler) WorkflowHandler {
 		return func(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
 			workflowStartTime := time.Now()
-			workflowID := common.GenerateWorkflowID(args.RepoURL)
+			workflowID := GenerateWorkflowID(args.RepoURL)
 
 			// Store workflow ID in context for other middlewares
 			ctx = WithWorkflowID(ctx, workflowID)
 
 			// Publish workflow started event
-			startEvent := common.CreateWorkflowStartedEvent(workflowID, args.RepoURL, args.Branch, common.ExtractUserID(ctx))
+			startEvent := CreateWorkflowStartedEvent(workflowID, args.RepoURL, args.Branch, ExtractUserID(ctx))
 			publisher.PublishAsync(ctx, startEvent)
 
 			// Execute the workflow
@@ -94,7 +93,7 @@ func WorkflowEventMiddleware(publisher events.Publisher, logger *slog.Logger) fu
 			}
 
 			// Publish workflow completed event
-			completedEvent := common.CreateWorkflowCompletedEvent(workflowID, duration, success, imageRef, namespace, endpoint, errorMsg)
+			completedEvent := CreateWorkflowCompletedEvent(workflowID, duration, success, imageRef, namespace, endpoint, errorMsg)
 			publisher.PublishAsync(ctx, completedEvent)
 
 			return result, err

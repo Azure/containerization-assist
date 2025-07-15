@@ -9,7 +9,6 @@ import (
 
 	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow/common"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -100,7 +99,7 @@ func WorkflowSagaMiddleware(coordinator *saga.SagaCoordinator, logger *slog.Logg
 			// Generate saga ID
 			workflowID, _ := GetWorkflowID(ctx)
 			if workflowID == "" {
-				workflowID = common.GenerateWorkflowID(args.RepoURL)
+				workflowID = GenerateWorkflowID(args.RepoURL)
 			}
 			sagaID := fmt.Sprintf("saga-%s-%d", workflowID, time.Now().Unix())
 

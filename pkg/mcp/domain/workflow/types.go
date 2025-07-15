@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow/common"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -308,7 +307,7 @@ func NewWorkflowState(ctx context.Context, req *mcp.CallToolRequest, args *Conta
 		Steps: make([]WorkflowStep, 0, totalSteps),
 	}
 
-	workflowID := common.GenerateWorkflowID(args.RepoURL)
+	workflowID := GenerateWorkflowID(args.RepoURL)
 	workflowProgress := NewWorkflowProgress(workflowID, "containerize_and_deploy", totalSteps)
 
 	return &WorkflowState{

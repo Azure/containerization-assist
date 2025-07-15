@@ -1,5 +1,5 @@
-// Package common provides shared utilities for workflow orchestration
-package common
+// Package workflow provides shared utilities for workflow orchestration
+package workflow
 
 import (
 	"context"

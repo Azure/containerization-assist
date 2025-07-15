@@ -3,6 +3,7 @@ package session
 
 import (
 	"context"
+	"errors"
 	"time"
 )
 
@@ -26,6 +27,11 @@ const (
 	StatusActive    Status = "active"
 	StatusExpired   Status = "expired"
 	StatusSuspended Status = "suspended"
+)
+
+// Common errors
+var (
+	ErrSessionNotFound = errors.New("session not found")
 )
 
 // Summary represents a lightweight session summary

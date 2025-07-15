@@ -110,8 +110,16 @@ type SamplingResponse struct {
 
 // SampleInternal performs sampling with simple retry & budget enforcement.
 func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*SamplingResponse, error) {
+	start := time.Now()
 	ctx, span := tracing.StartSpan(ctx, "sampling.sample")
 	defer span.End()
+
+	// Create enhanced logger for structured LLM logging
+	enhancedLogger := NewEnhancedLogger(c.logger)
+	reqLogger := enhancedLogger.WithRequestContext(c.logger, req)
+
+	// Log detailed request information
+	enhancedLogger.LogLLMRequest(ctx, reqLogger, req)
 
 	// Add tracing attributes
 	span.SetAttributes(
@@ -166,6 +174,9 @@ func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*Samp
 
 		resp, err := c.callMCP(ctx, req)
 		if err == nil {
+			// Log successful response with enhanced details
+			enhancedLogger.LogLLMResponse(ctx, reqLogger, req, resp, time.Since(start))
+
 			// Add success attributes
 			span.SetAttributes(
 				attribute.Int(tracing.AttrSamplingTokensUsed, resp.TokensUsed),
@@ -175,8 +186,11 @@ func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*Samp
 			return resp, nil
 		}
 
+		// Log error with enhanced context
+		enhancedLogger.LogLLMError(ctx, reqLogger, req, err, time.Since(start), attempt+1)
+
 		// Abort early on non-retryable errors.
-		if !isRetryable(err) {
+		if !IsRetryable(err) {
 			span.RecordError(err)
 			span.SetAttributes(attribute.String("error.non_retryable", err.Error()))
 			return nil, err
@@ -390,17 +404,6 @@ func truncateString(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
-}
-
-func isRetryable(err error) bool {
-	// Check for common retryable error patterns
-	errStr := err.Error()
-	return strings.Contains(errStr, "timeout") ||
-		strings.Contains(errStr, "rate limit") ||
-		strings.Contains(errStr, "temporarily") ||
-		strings.Contains(errStr, "unavailable") ||
-		strings.Contains(errStr, "connection refused") ||
-		strings.Contains(errStr, "broken pipe")
 }
 
 // ErrorAnalysis represents the structured analysis of an error.

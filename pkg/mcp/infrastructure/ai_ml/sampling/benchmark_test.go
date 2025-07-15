@@ -84,12 +84,7 @@ func BenchmarkSamplingPerformance(b *testing.B) {
 		{
 			name: "ClientWithMiddleware_ComplexRequest",
 			createClient: func() sampling.UnifiedSampler {
-				opts := ClientOptions{
-					EnableTracing: false, // Disable for benchmarking
-					EnableMetrics: false, // Disable for benchmarking
-					EnableRetry:   false, // Disable for benchmarking
-				}
-				return NewClientWithMiddleware(logger, opts)
+				return CreateDomainClient(logger)
 			},
 			request: sampling.Request{
 				Prompt:      "Analyze repository structure and recommend deployment strategy",
@@ -210,12 +205,7 @@ func BenchmarkSamplingWithRetries(b *testing.B) {
 
 	ctx := context.Background()
 
-	opts := ClientOptions{
-		EnableTracing: false,
-		EnableMetrics: false,
-		EnableRetry:   true, // Test with retries
-	}
-	client := NewClientWithMiddleware(logger, opts)
+	client := CreateDomainClient(logger)
 
 	request := sampling.Request{
 		Prompt:      "Retry test prompt",
@@ -295,11 +285,6 @@ func TestBenchmarkBaseline(t *testing.T) {
 	require.NotNil(t, adapter, "Domain adapter should be created successfully")
 
 	// Test that middleware client works
-	opts := ClientOptions{
-		EnableTracing: false,
-		EnableMetrics: false,
-		EnableRetry:   false,
-	}
-	middlewareClient := NewClientWithMiddleware(logger, opts)
+	middlewareClient := CreateDomainClient(logger)
 	require.NotNil(t, middlewareClient, "Middleware client should be created successfully")
 }

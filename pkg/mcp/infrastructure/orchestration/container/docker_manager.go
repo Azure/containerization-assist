@@ -7,6 +7,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/common/runner"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	infraerrors "github.com/Azure/container-kit/pkg/mcp/infrastructure/core"
 )
 
 // DockerContainerManager implements the workflow.ContainerManager interface using Docker
@@ -30,12 +31,28 @@ func (m *DockerContainerManager) RemoveImage(ctx context.Context, imageRef strin
 	// Use -f flag to force removal
 	out, err := m.runner.RunWithOutput(ctx, "docker", "rmi", "-f", imageRef)
 	if err != nil {
-		// Log the error but don't fail - image might not exist
-		m.logger.Warn("Failed to remove Docker image",
-			"image_ref", imageRef,
-			"error", err,
-			"output", out)
-		return nil // Ignore errors as per original behavior
+		// Create structured error for better handling
+		infraErr := infraerrors.NewInfrastructureError(
+			"remove_image",
+			"docker",
+			"Failed to remove Docker image",
+			err,
+			infraerrors.IsImageNotFound(err), // Recoverable if image not found
+		).WithContext("image_ref", imageRef).
+			WithContext("output", string(out))
+
+		// Check if this is a recoverable error (image doesn't exist)
+		if infraerrors.IsImageNotFound(err) {
+			m.logger.Debug("Docker image not found, treating as success",
+				"image_ref", imageRef,
+				"error", err,
+				"output", out)
+			return nil // Image not existing is acceptable for removal
+		}
+
+		// Log structured error and return it for non-recoverable cases
+		infraErr.LogWithContext(m.logger)
+		return infraErr
 	}
 
 	m.logger.Info("Docker image removed successfully", "image_ref", imageRef)
