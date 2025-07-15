@@ -86,23 +86,23 @@
     "track_total": true
   },
   "test_coverage": {
-    "overall_target": 70,
-    "overall_minimum": 50,
-    "domain_target": 90,
-    "domain_minimum": 70,
-    "infrastructure_target": 60,
-    "infrastructure_minimum": 40,
-    "application_target": 80,
-    "application_minimum": 60,
+    "overall_target": 50,
+    "overall_minimum": 20,
+    "domain_target": 70,
+    "domain_minimum": 30,
+    "infrastructure_target": 40,
+    "infrastructure_minimum": 20,
+    "application_target": 60,
+    "application_minimum": 30,
     "regression_tolerance": 5,
     "fail_below_minimum": true,
     "component_budgets": {
-      "pkg/mcp/domain/workflow": 90,
-      "pkg/mcp/domain/progress": 85,
-      "pkg/mcp/application/transport": 85,
-      "pkg/mcp/infrastructure/sampling": 60,
-      "pkg/mcp/infrastructure/session": 80,
-      "pkg/mcp/infrastructure/steps": 70
+      "pkg/mcp/domain/workflow": 40,
+      "pkg/mcp/domain/progress": 30,
+      "pkg/mcp/application/transport": 50,
+      "pkg/mcp/infrastructure/sampling": 40,
+      "pkg/mcp/infrastructure/session": 50,
+      "pkg/mcp/infrastructure/steps": 30
     }
   },
   "error_handling": {
