@@ -31,52 +31,20 @@ jobs:
       run: |
         if [ "${{ github.event_name }}" = "pull_request" ]; then
           echo "🔍 Detecting changes for PR #${{ github.event.number }}"
-          echo "Base SHA: ${{ github.event.pull_request.base.sha }}"
-          echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
           
           changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD)
-          echo "📝 Changed files ($(echo "$changed_files" | wc -l) total):"
-          echo "$changed_files"
+          echo "📝 Changed files: $(echo "$changed_files" | wc -l) total"
           
-          # Check for MCP changes
-          # MCP server depends on: cmd/mcp-server/, pkg/common/, pkg/core/, pkg/mcp/
-          mcp_changes=$(echo "$changed_files" | grep -E "^(cmd/mcp-server/|pkg/common/|pkg/core/|pkg/mcp/)" || true)
+          # Check for MCP changes (cmd/mcp-server/, pkg/common/, pkg/core/, pkg/mcp/)
+          mcp_count=$(echo "$changed_files" | grep -E "^(cmd/mcp-server/|pkg/(common|core|mcp)/)" | wc -l)
+          echo "test_mcp=$([ $mcp_count -gt 0 ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
           
-          # Check for CLI changes  
-          # CLI depends on: specific cmd files (cmd.go, clients.go, generate.go, setup.go), 
-          # pkg/ai/, pkg/core/, pkg/common/, pkg/pipeline/
-          cli_changes=$(echo "$changed_files" | grep -E "^(cmd/(cmd|clients|generate|setup)\.go|pkg/ai/|pkg/core/|pkg/common/|pkg/pipeline/)" || true)
+          # Check for CLI changes (cmd/*.go, pkg/ai/, pkg/core/, pkg/common/, pkg/pipeline/)
+          cli_count=$(echo "$changed_files" | grep -E "^(cmd/(cmd|clients|generate|setup)\.go|pkg/(ai|core|common|pipeline)/)" | wc -l)
+          echo "test_cli=$([ $cli_count -gt 0 ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
           
-          # Debug: show what was detected
-          echo "🔍 MCP changes detected:"
-          echo "$mcp_changes" | head -5
-          echo "🔍 CLI changes detected:"
-          echo "$cli_changes" | head -5
-          
-          # Set outputs with explicit true/false values
-          if [ -n "$mcp_changes" ]; then
-            echo "test_mcp=true" >> $GITHUB_OUTPUT
-          else
-            echo "test_mcp=false" >> $GITHUB_OUTPUT
-          fi
-          
-          if [ -n "$cli_changes" ]; then
-            echo "test_cli=true" >> $GITHUB_OUTPUT
-          else
-            echo "test_cli=false" >> $GITHUB_OUTPUT
-          fi
-          echo "MCP changes: $([ -n "$mcp_changes" ] && echo "yes ($(echo "$mcp_changes" | wc -l) files)" || echo "no")"
-          echo "CLI changes: $([ -n "$cli_changes" ] && echo "yes ($(echo "$cli_changes" | wc -l) files)" || echo "no")"
-          
-          # Debug: show the actual output values
-          echo "📌 GitHub Actions outputs:"
-          echo "  test_mcp output: $(cat $GITHUB_OUTPUT | grep test_mcp | cut -d= -f2)"
-          echo "  test_cli output: $(cat $GITHUB_OUTPUT | grep test_cli | cut -d= -f2)"
-          
-          # Show summary of what will be tested
-          echo "📊 Integration Test Plan:"
-          [ -n "$mcp_changes" ] && echo "  ✅ MCP integration tests WILL run (changes in cmd/mcp-server/, pkg/common/, pkg/core/, or pkg/mcp/)" || echo "  ⏭️ MCP integration tests will be SKIPPED"
-          [ -n "$cli_changes" ] && echo "  ✅ CLI integration tests WILL run (changes in cmd/*.go, pkg/ai/, pkg/core/, pkg/common/, or pkg/pipeline/)" || echo "  ⏭️ CLI integration tests will be SKIPPED"
+          echo "MCP changes: $([ $mcp_count -gt 0 ] && echo "yes ($mcp_count files)" || echo "no")"
+          echo "CLI changes: $([ $cli_count -gt 0 ] && echo "yes ($cli_count files)" || echo "no")"
         else
           echo "test_mcp=true" >> $GITHUB_OUTPUT
           echo "test_cli=true" >> $GITHUB_OUTPUT
@@ -98,21 +66,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
       
-    - name: Setup Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24.4'
-        
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ needs.setup.outputs.go-cache-key }}
-        restore-keys: |
-          ${{ runner.os }}-go-
-        
-    - name: Download dependencies
-      run: go mod download
+    - name: Setup Go Environment
+      uses: ./.github/actions/setup-go
       
     - name: Build MCP Server
       run: |
@@ -149,18 +104,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
       
-    - name: Setup Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24.4'
-        
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ needs.setup.outputs.go-cache-key }}
-        restore-keys: |
-          ${{ runner.os }}-go-
+    - name: Setup Go Environment
+      uses: ./.github/actions/setup-go
           
     - name: Cache Quality Tools
       uses: actions/cache@v4
@@ -196,18 +141,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
       
-    - name: Setup Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24.4'
-        
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ needs.setup.outputs.go-cache-key }}
-        restore-keys: |
-          ${{ runner.os }}-go-
+    - name: Setup Go Environment
+      uses: ./.github/actions/setup-go
         
     - name: Unit Tests with Race Detection
       run: |
