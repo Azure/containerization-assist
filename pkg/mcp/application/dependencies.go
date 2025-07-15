@@ -65,24 +65,53 @@ type Dependencies struct {
 // NewMCPServerFromDeps creates a new MCP server that implements api.MCPServer.
 // This is used by Wire for dependency injection.
 func NewMCPServerFromDeps(deps *Dependencies) api.MCPServer {
+	// Convert legacy Dependencies to interface capsules
+	services := NewServiceProvider(FromLegacyDependencies(deps))
+
 	// Create the bootstrapper component
 	bootstrapper := bootstrap.NewBootstrapper(
-		deps.Logger,
-		deps.Config,
-		deps.ResourceStore,
-		deps.WorkflowOrchestrator,
+		services.Logger(),
+		services.Config(),
+		services.ResourceStore(),
+		services.Orchestrator(),
 	)
 
 	// Create the lifecycle manager component
 	lifecycleManager := lifecycle.NewLifecycleManager(
-		deps.Logger,
-		deps.Config,
-		deps.SessionManager,
+		services.Logger(),
+		services.Config(),
+		services.SessionManager(),
 		bootstrapper,
 	)
 
 	return &serverImpl{
-		deps:             deps,
+		services:         services,
+		lifecycleManager: lifecycleManager,
+		bootstrapper:     bootstrapper,
+	}
+}
+
+// NewMCPServerFromServices creates a new MCP server using interface capsules.
+// This is the preferred constructor for new code.
+func NewMCPServerFromServices(services AllServices) api.MCPServer {
+	// Create the bootstrapper component
+	bootstrapper := bootstrap.NewBootstrapper(
+		services.Logger(),
+		services.Config(),
+		services.ResourceStore(),
+		services.Orchestrator(),
+	)
+
+	// Create the lifecycle manager component
+	lifecycleManager := lifecycle.NewLifecycleManager(
+		services.Logger(),
+		services.Config(),
+		services.SessionManager(),
+		bootstrapper,
+	)
+
+	return &serverImpl{
+		services:         services,
 		lifecycleManager: lifecycleManager,
 		bootstrapper:     bootstrapper,
 	}

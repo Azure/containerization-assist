@@ -1,0 +1,5 @@
+{
+  "read_buffer_size": 4096,
+  "write_buffer_size": 4096,
+  "max_message_size": 1048576
+}

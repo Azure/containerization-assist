@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 
+	"sync"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -664,11 +666,12 @@ func (s *ContentSanitizer) sanitizeContent(content string) string {
 
 // ValidationMetrics tracks validation statistics
 type ValidationMetrics struct {
-	TotalValidations      int64
-	SuccessfulValidations int64
-	FailedValidations     int64
-	SecurityIssuesFound   int64
-	BestPracticeWarnings  int64
+	mu                    sync.RWMutex
+	totalValidations      int64
+	successfulValidations int64
+	failedValidations     int64
+	securityIssuesFound   int64
+	bestPracticeWarnings  int64
 }
 
 // NewValidationMetrics creates new validation metrics
@@ -678,45 +681,60 @@ func NewValidationMetrics() *ValidationMetrics {
 
 // RecordValidation records a validation attempt
 func (m *ValidationMetrics) RecordValidation(result ValidationResult) {
-	m.TotalValidations++
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.totalValidations++
 
 	if result.IsValid {
-		m.SuccessfulValidations++
+		m.successfulValidations++
 	} else {
-		m.FailedValidations++
+		m.failedValidations++
 	}
 
 	// Count security issues
 	for _, err := range result.Errors {
 		if strings.Contains(err, "SECURITY:") {
-			m.SecurityIssuesFound++
+			m.securityIssuesFound++
 		}
 	}
 
 	// Count best practice warnings
 	for _, warning := range result.Warnings {
 		if strings.Contains(warning, "best practice") || strings.Contains(warning, "SECURITY:") {
-			m.BestPracticeWarnings++
+			m.bestPracticeWarnings++
 		}
 	}
 }
 
 // GetSuccessRate returns the validation success rate
 func (m *ValidationMetrics) GetSuccessRate() float64 {
-	if m.TotalValidations == 0 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if m.totalValidations == 0 {
 		return 0.0
 	}
-	return float64(m.SuccessfulValidations) / float64(m.TotalValidations)
+	return float64(m.successfulValidations) / float64(m.totalValidations)
 }
 
 // GetMetrics returns current metrics as a map
 func (m *ValidationMetrics) GetMetrics() map[string]interface{} {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Calculate success rate inline to avoid nested lock acquisition
+	var successRate float64
+	if m.totalValidations > 0 {
+		successRate = float64(m.successfulValidations) / float64(m.totalValidations)
+	}
+
 	return map[string]interface{}{
-		"total_validations":      m.TotalValidations,
-		"successful_validations": m.SuccessfulValidations,
-		"failed_validations":     m.FailedValidations,
-		"security_issues_found":  m.SecurityIssuesFound,
-		"best_practice_warnings": m.BestPracticeWarnings,
-		"success_rate":           m.GetSuccessRate(),
+		"total_validations":      m.totalValidations,
+		"successful_validations": m.successfulValidations,
+		"failed_validations":     m.failedValidations,
+		"security_issues_found":  m.securityIssuesFound,
+		"best_practice_warnings": m.bestPracticeWarnings,
+		"success_rate":           successRate,
 	}
 }

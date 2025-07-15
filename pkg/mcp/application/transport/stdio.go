@@ -42,9 +42,3 @@ func (t *StdioTransport) Serve(ctx context.Context, mcpServer *server.MCPServer)
 
 	return err
 }
-
-// ServeStdio is a deprecated method kept for backward compatibility
-// Use Serve instead
-func (t *StdioTransport) ServeStdio(ctx context.Context, mcpServer *server.MCPServer) error {
-	return t.Serve(ctx, mcpServer)
-}

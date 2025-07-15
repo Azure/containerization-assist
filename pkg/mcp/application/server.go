@@ -18,7 +18,7 @@ import (
 // serverImpl represents the MCP server implementation using focused components.
 // This delegates responsibilities to specialized components for better separation of concerns.
 type serverImpl struct {
-	deps             *Dependencies
+	services         AllServices
 	lifecycleManager *lifecycle.LifecycleManager
 	bootstrapper     *bootstrap.Bootstrapper
 }
@@ -123,7 +123,7 @@ func (s *serverImpl) Stop(ctx context.Context) error {
 
 // EnableConversationMode enables conversation mode (workflow-focused server - no-op)
 func (s *serverImpl) EnableConversationMode(_ interface{}) error {
-	s.deps.Logger.Info("Conversation mode not supported in workflow-focused server")
+	s.services.Logger().Info("Conversation mode not supported in workflow-focused server")
 	return nil
 }
 
@@ -144,21 +144,21 @@ func (s *serverImpl) GetStats() (interface{}, error) {
 		"uptime":            s.lifecycleManager.GetUptime().String(),
 		"status":            "running",
 		"session_count":     s.getSessionCount(),
-		"transport_type":    s.deps.Config.TransportType,
+		"transport_type":    s.services.Config().TransportType,
 		"conversation_mode": s.IsConversationModeEnabled(),
 	}, nil
 }
 
 // getSessionCount returns the current number of sessions
 func (s *serverImpl) getSessionCount() int {
-	if s.deps.SessionManager == nil {
+	if s.services.SessionManager() == nil {
 		return 0
 	}
 
 	ctx := context.Background()
-	sessions, err := s.deps.SessionManager.List(ctx)
+	sessions, err := s.services.SessionManager().List(ctx)
 	if err != nil {
-		s.deps.Logger.Warn("Failed to get session count", "error", err)
+		s.services.Logger().Warn("Failed to get session count", "error", err)
 		return 0
 	}
 
@@ -167,14 +167,14 @@ func (s *serverImpl) getSessionCount() int {
 
 // GetSessionManagerStats returns session manager statistics
 func (s *serverImpl) GetSessionManagerStats() (interface{}, error) {
-	if s.deps.SessionManager != nil {
+	if s.services.SessionManager() != nil {
 		ctx := context.Background()
-		sessions, err := s.deps.SessionManager.List(ctx)
+		sessions, err := s.services.SessionManager().List(ctx)
 		if err != nil {
-			s.deps.Logger.Warn("Failed to get session list for stats", "error", err)
+			s.services.Logger().Warn("Failed to get session list for stats", "error", err)
 			return map[string]interface{}{
 				"error":        "failed to retrieve session stats",
-				"max_sessions": s.deps.Config.MaxSessions,
+				"max_sessions": s.services.Config().MaxSessions,
 			}, nil
 		}
 
@@ -189,7 +189,7 @@ func (s *serverImpl) GetSessionManagerStats() (interface{}, error) {
 		return map[string]interface{}{
 			"active_sessions": activeSessions,
 			"total_sessions":  len(sessions),
-			"max_sessions":    s.deps.Config.MaxSessions,
+			"max_sessions":    s.services.Config().MaxSessions,
 		}, nil
 	}
 	return map[string]interface{}{

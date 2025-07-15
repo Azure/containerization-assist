@@ -1,0 +1,8 @@
+{
+  "registered_transports": [
+    "custom",
+    "http",
+    "stdio"
+  ],
+  "transport_count": 3
+}

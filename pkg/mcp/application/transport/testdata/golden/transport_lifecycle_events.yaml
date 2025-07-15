@@ -1,0 +1,10 @@
+- type: registered
+  transport: stdio
+  success: true
+- type: start_attempted
+  transport: stdio
+  success: true
+- type: start_attempted
+  transport: unregistered
+  success: false
+  error: 'unsupported transport type: unregistered'

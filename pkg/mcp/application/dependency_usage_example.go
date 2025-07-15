@@ -11,8 +11,36 @@ import (
 // ExampleUsageOfGroupedDependencies demonstrates how to use the new grouped dependencies
 // This shows the migration path from the flat Dependencies struct to the grouped approach
 func ExampleUsageOfGroupedDependencies(s *serverImpl) {
-	// Convert existing dependencies to grouped structure
-	grouped := s.deps.GetGroupedDependencies()
+	// Access services through interface capsules
+	// For demonstration, we'll extract the grouped dependencies
+	// In real code, you'd use s.services directly
+	services := s.services
+	grouped := &GroupedDependencies{
+		Core: CoreDeps{
+			Logger: services.Logger(),
+			Config: services.Config(),
+			Runner: services.Runner(),
+		},
+		Workflow: WorkflowDeps{
+			Orchestrator:           services.Orchestrator(),
+			EventAwareOrchestrator: services.EventAwareOrchestrator(),
+			SagaAwareOrchestrator:  services.SagaAwareOrchestrator(),
+			EventPublisher:         services.EventPublisher(),
+			ProgressEmitterFactory: services.ProgressFactory(),
+			SagaCoordinator:        services.SagaCoordinator(),
+		},
+		Persistence: PersistenceDeps{
+			SessionManager: services.SessionManager(),
+			ResourceStore:  services.ResourceStore(),
+		},
+		AI: AIDeps{
+			SamplingClient:         services.SamplingClient(),
+			PromptManager:          services.PromptManager(),
+			ErrorPatternRecognizer: services.ErrorRecognizer(),
+			EnhancedErrorHandler:   services.ErrorHandler(),
+			StepEnhancer:           services.StepEnhancer(),
+		},
+	}
 
 	// Access dependencies by logical groups
 	logger := grouped.Core.Logger

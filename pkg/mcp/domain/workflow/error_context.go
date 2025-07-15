@@ -89,6 +89,11 @@ func (pec *ProgressiveErrorContext) GetRecentErrors(count int) []ErrorContext {
 	pec.mu.RLock()
 	defer pec.mu.RUnlock()
 
+	// Handle negative count
+	if count <= 0 {
+		return []ErrorContext{}
+	}
+
 	if count > len(pec.errors) {
 		count = len(pec.errors)
 	}
@@ -163,7 +168,6 @@ func (pec *ProgressiveErrorContext) GetSummary() string {
 
 // GetAIContext returns context formatted for AI analysis
 func (pec *ProgressiveErrorContext) GetAIContext() string {
-	// Note: GetRecentErrors handles its own locking
 	var context strings.Builder
 
 	context.WriteString("PREVIOUS ERRORS AND ATTEMPTS:\n")
@@ -193,11 +197,19 @@ func (pec *ProgressiveErrorContext) GetAIContext() string {
 		context.WriteString("\n")
 	}
 
-	// Add step summaries
-	if len(pec.stepSummary) > 0 {
+	// Add step summaries (with lock protection)
+	pec.mu.RLock()
+	stepSummaryLen := len(pec.stepSummary)
+	stepSummaryCopy := make(map[string]string, stepSummaryLen)
+	for k, v := range pec.stepSummary {
+		stepSummaryCopy[k] = v
+	}
+	pec.mu.RUnlock()
+
+	if stepSummaryLen > 0 {
 		context.WriteString("STEP ERROR PATTERNS:\n")
 		context.WriteString("===================\n")
-		for step, summary := range pec.stepSummary {
+		for step, summary := range stepSummaryCopy {
 			context.WriteString(fmt.Sprintf("- %s: %s\n", step, summary))
 		}
 	}

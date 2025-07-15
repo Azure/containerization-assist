@@ -664,18 +664,17 @@ func TestValidationMetrics(t *testing.T) {
 		Warnings: []string{"SECURITY: security warning"},
 	})
 
-	assert.Equal(t, int64(3), metrics.TotalValidations)
-	assert.Equal(t, int64(1), metrics.SuccessfulValidations)
-	assert.Equal(t, int64(2), metrics.FailedValidations)
-	assert.Equal(t, int64(1), metrics.SecurityIssuesFound)
-	assert.Equal(t, int64(2), metrics.BestPracticeWarnings)
-	assert.InDelta(t, 0.333, metrics.GetSuccessRate(), 0.01)
-
+	// Use the public GetMetrics method instead of private fields
 	metricsMap := metrics.GetMetrics()
 	assert.Equal(t, int64(3), metricsMap["total_validations"])
 	assert.Equal(t, int64(1), metricsMap["successful_validations"])
 	assert.Equal(t, int64(2), metricsMap["failed_validations"])
+	assert.Equal(t, int64(1), metricsMap["security_issues_found"])
+	assert.Equal(t, int64(2), metricsMap["best_practice_warnings"])
 	assert.InDelta(t, 0.333, metricsMap["success_rate"], 0.01)
+
+	// Also test the public GetSuccessRate method
+	assert.InDelta(t, 0.333, metrics.GetSuccessRate(), 0.01)
 }
 
 func TestSecurityPatterns(t *testing.T) {
