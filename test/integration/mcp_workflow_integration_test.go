@@ -337,7 +337,18 @@ func (suite *MCPWorkflowIntegrationSuite) runCompleteWorkflow(repo TestRepositor
 
 // startMCPServer starts the MCP server for testing
 func (suite *MCPWorkflowIntegrationSuite) startMCPServer(ctx context.Context) *MCPServerInstance {
-	cmd := exec.CommandContext(ctx, suite.serverBinaryPath, "--transport", "stdio")
+	// Create unique workspace and store paths for this test instance
+	uniqueSuffix := fmt.Sprintf("-%d-%d", os.Getpid(), time.Now().Unix())
+	workspaceDir := suite.tempDir + "/workspace" + uniqueSuffix
+	storePath := suite.tempDir + "/sessions" + uniqueSuffix + ".db"
+
+	// Create workspace directory
+	require.NoError(suite.T(), os.MkdirAll(workspaceDir, 0755))
+
+	cmd := exec.CommandContext(ctx, suite.serverBinaryPath,
+		"--transport", "stdio",
+		"--workspace-dir", workspaceDir,
+		"--store-path", storePath)
 
 	// Get all pipes before starting
 	stdin, err := cmd.StdinPipe()

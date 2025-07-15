@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -13,14 +14,26 @@ import (
 
 // MCPServerProcess holds the server process and its pipes
 type MCPServerProcess struct {
-	cmd    *exec.Cmd
-	stdin  *os.File
-	stdout *os.File
-	stderr *os.File
+	cmd          *exec.Cmd
+	stdin        *os.File
+	stdout       *os.File
+	stderr       *os.File
+	workspaceDir string
+}
+
+// Cleanup terminates the server process and cleans up workspace
+func (p *MCPServerProcess) Cleanup() {
+	if p.cmd != nil && p.cmd.Process != nil {
+		p.cmd.Process.Kill()
+		p.cmd.Wait()
+	}
+	if p.workspaceDir != "" {
+		os.RemoveAll(p.workspaceDir)
+	}
 }
 
 // startMCPServerProcess starts an MCP server process for testing
-func startMCPServerProcess(ctx context.Context, _ string) *MCPServerProcess {
+func startMCPServerProcess(ctx context.Context, testWorkspaceDir string) *MCPServerProcess {
 	// Build the server binary path
 	serverBinaryPath := "/tmp/mcp-server"
 
@@ -36,7 +49,25 @@ func startMCPServerProcess(ctx context.Context, _ string) *MCPServerProcess {
 		}
 	}
 
-	cmd := exec.CommandContext(ctx, serverBinaryPath, "--transport", "stdio")
+	// Create unique workspace and store paths for this test instance
+	if testWorkspaceDir == "" {
+		testWorkspaceDir = "/tmp/container-kit-test-workspace"
+	}
+
+	// Ensure unique paths by appending process PID and timestamp
+	uniqueSuffix := fmt.Sprintf("-%d-%d", os.Getpid(), time.Now().Unix())
+	workspaceDir := testWorkspaceDir + uniqueSuffix
+	storePath := testWorkspaceDir + uniqueSuffix + "/sessions.db"
+
+	// Create workspace directory
+	if err := os.MkdirAll(workspaceDir, 0755); err != nil {
+		panic("Failed to create test workspace: " + err.Error())
+	}
+
+	cmd := exec.CommandContext(ctx, serverBinaryPath,
+		"--transport", "stdio",
+		"--workspace-dir", workspaceDir,
+		"--store-path", storePath)
 
 	// Get all pipes before starting
 	stdin, err := cmd.StdinPipe()
@@ -63,10 +94,11 @@ func startMCPServerProcess(ctx context.Context, _ string) *MCPServerProcess {
 	stderrFile := stderr.(*os.File)
 
 	return &MCPServerProcess{
-		cmd:    cmd,
-		stdin:  stdinFile,
-		stdout: stdoutFile,
-		stderr: stderrFile,
+		cmd:          cmd,
+		stdin:        stdinFile,
+		stdout:       stdoutFile,
+		stderr:       stderrFile,
+		workspaceDir: workspaceDir,
 	}
 }
 

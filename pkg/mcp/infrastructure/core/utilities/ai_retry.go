@@ -52,8 +52,13 @@ func WithLLMGuidedRetry(ctx context.Context, name string, max int, fn func() err
 		// Use LLM to analyze the error and suggest fixes
 		analysis, analysisErr := samplingClient.AnalyzeError(ctx, err, fmt.Sprintf("Operation: %s, Attempt %d of %d", name, i, max))
 		if analysisErr != nil {
-			logger.Warn("Failed to get LLM analysis", "error", analysisErr)
-			// Continue with basic retry
+			logger.Warn("Failed to get LLM analysis, falling back to pattern-based fixes", "error", analysisErr)
+			// Apply pattern-based auto-fixes even without LLM analysis
+			fixApplied := applyPatternBasedFixes(ctx, name, err.Error(), logger)
+			if fixApplied {
+				logger.Info("Pattern-based fixes applied, retrying operation")
+				time.Sleep(200 * time.Millisecond)
+			}
 			continue
 		}
 
@@ -64,19 +69,33 @@ func WithLLMGuidedRetry(ctx context.Context, name string, max int, fn func() err
 			"can_auto_fix", analysis.CanAutoFix,
 			"fix_steps", len(analysis.FixSteps))
 
-		// If we can auto-fix, attempt to apply fixes
+		// Apply LLM-suggested fixes first
+		fixApplied := false
 		if analysis.CanAutoFix && len(analysis.FixSteps) > 0 {
-			logger.Info("Attempting automated fixes suggested by LLM", "fix_count", len(analysis.FixSteps))
+			logger.Info("Attempting LLM-suggested automated fixes", "fix_count", len(analysis.FixSteps))
 
-			// Apply the suggested fixes
-			fixApplied, fixErr := applyAIFixSteps(ctx, name, analysis.FixSteps, logger)
+			applied, fixErr := applyAIFixSteps(ctx, name, analysis.FixSteps, logger)
 			if fixErr != nil {
-				logger.Warn("Failed to apply AI-suggested fixes", "error", fixErr)
-			} else if fixApplied {
-				logger.Info("AI fixes applied successfully, retrying operation")
-				// Short delay to allow fixes to take effect
-				time.Sleep(100 * time.Millisecond)
+				logger.Warn("Failed to apply LLM-suggested fixes", "error", fixErr)
+			} else if applied {
+				logger.Info("LLM fixes applied successfully")
+				fixApplied = true
 			}
+		}
+
+		// If LLM fixes didn't work or weren't applicable, try pattern-based fixes
+		if !fixApplied {
+			logger.Info("Attempting pattern-based fixes as fallback")
+			applied := applyPatternBasedFixes(ctx, name, err.Error(), logger)
+			if applied {
+				logger.Info("Pattern-based fixes applied successfully")
+				fixApplied = true
+			}
+		}
+
+		// Give fixes time to take effect before retry
+		if fixApplied {
+			time.Sleep(200 * time.Millisecond)
 		}
 
 		// Continue to next retry with LLM insights logged
@@ -600,4 +619,139 @@ func applyPermissionFix(step string, logger *slog.Logger) (bool, error) {
 	}
 
 	return fixesApplied, nil
+}
+
+// applyPatternBasedFixes applies automated fixes based on error pattern recognition
+// This serves as a fallback when LLM analysis is unavailable
+func applyPatternBasedFixes(ctx context.Context, operation string, errorMsg string, logger *slog.Logger) bool {
+	// Truncate error message for logging (inline implementation)
+	errorPreview := errorMsg
+	if len(errorMsg) > 100 {
+		errorPreview = errorMsg[:100] + "..."
+	}
+	logger.Debug("Applying pattern-based auto-fixes", "operation", operation, "error_preview", errorPreview)
+
+	fixesApplied := false
+	errorLower := strings.ToLower(errorMsg)
+
+	// Maven build tool fixes
+	if strings.Contains(errorLower, "mvn") && (strings.Contains(errorLower, "command not found") || strings.Contains(errorLower, "exit code: 127")) {
+		logger.Info("Detected Maven missing error, applying Maven Dockerfile fix")
+		if applied, _ := applyMavenDockerfileFix("Install Maven for build", logger); applied {
+			fixesApplied = true
+		}
+	}
+
+	// Gradle build tool fixes
+	if strings.Contains(errorLower, "gradle") && strings.Contains(errorLower, "command not found") {
+		logger.Info("Detected Gradle missing error, applying Gradle Dockerfile fix")
+		if applied, _ := applyGradleDockerfileFix("Install Gradle for build", logger); applied {
+			fixesApplied = true
+		}
+	}
+
+	// Base image fixes for Java projects
+	if strings.Contains(errorLower, "dockerfile") && strings.Contains(errorLower, "java") {
+		logger.Info("Detected Java Dockerfile issue, applying base image fix")
+		if applied, _ := applyDockerfileBaseFix("Update base image for Java Maven", logger); applied {
+			fixesApplied = true
+		}
+	}
+
+	// Port exposure fixes
+	if strings.Contains(errorLower, "port") && (strings.Contains(errorLower, "connection") || strings.Contains(errorLower, "refused")) {
+		logger.Info("Detected port connection issue, applying port expose fix")
+		if applied, _ := applyPortExposeFix("Expose port 8080", logger); applied {
+			fixesApplied = true
+		}
+	}
+
+	// Permission fixes for executable scripts
+	if strings.Contains(errorLower, "permission denied") || strings.Contains(errorLower, "not executable") {
+		logger.Info("Detected permission issue, applying permission fixes")
+		if applied, _ := applyPermissionFix("Fix script permissions", logger); applied {
+			fixesApplied = true
+		}
+	}
+
+	// Kubernetes deployment specific fixes
+	if strings.Contains(errorLower, "image pull") && strings.Contains(errorLower, "localhost:5001") {
+		logger.Info("Detected image pull issue, applying image registry fix")
+		if applied := applyImageRegistryFix(ctx, operation, errorMsg, logger); applied {
+			fixesApplied = true
+		}
+	}
+
+	// Node readiness and scheduling fixes
+	if strings.Contains(errorLower, "nodes are available") && strings.Contains(errorLower, "taint") {
+		logger.Info("Detected node scheduling issue, applying node readiness fix")
+		if applied := applyNodeReadinessFix(ctx, logger); applied {
+			fixesApplied = true
+		}
+	}
+
+	// Pod validation and resource fixes
+	if strings.Contains(errorLower, "pods ready") && strings.Contains(operation, "validate") {
+		logger.Info("Detected pod readiness issue, applying pod validation fix")
+		if applied := applyPodValidationFix(ctx, errorMsg, logger); applied {
+			fixesApplied = true
+		}
+	}
+
+	if fixesApplied {
+		logger.Info("Pattern-based auto-fixes completed", "operation", operation)
+	} else {
+		logger.Debug("No applicable pattern-based fixes found", "operation", operation)
+	}
+
+	return fixesApplied
+}
+
+// applyImageRegistryFix handles image registry and pull issues
+func applyImageRegistryFix(ctx context.Context, operation string, errorMsg string, logger *slog.Logger) bool {
+	// For kind clusters, ensure image is loaded into kind cluster
+	if strings.Contains(errorMsg, "localhost:5001") {
+		logger.Info("Attempting to load image into kind cluster")
+		// This would require integration with docker/kind commands
+		// For now, log the recommendation
+		logger.Warn("Manual intervention needed: Load image into kind cluster with 'kind load docker-image'")
+		return false
+	}
+	return false
+}
+
+// applyNodeReadinessFix handles Kubernetes node readiness issues
+func applyNodeReadinessFix(ctx context.Context, logger *slog.Logger) bool {
+	logger.Info("Detected node readiness/taint issue")
+	// Check if we can wait for node to become ready or remove taints
+	logger.Warn("Manual intervention needed: Check node status and remove taints if necessary")
+
+	// For kind clusters, nodes usually become ready after a short wait
+	logger.Info("Applying wait strategy for node readiness")
+	time.Sleep(5 * time.Second)
+	return true // Return true to indicate we applied a wait strategy
+}
+
+// applyPodValidationFix handles pod validation and readiness issues
+func applyPodValidationFix(ctx context.Context, errorMsg string, logger *slog.Logger) bool {
+	fixesApplied := false
+
+	// If port is 0, this is a common issue
+	if strings.Contains(errorMsg, "Port: 0") {
+		logger.Info("Detected port 0 issue, applying port configuration fix")
+		if applied, _ := applyPortExposeFix("Set default port 8080", logger); applied {
+			fixesApplied = true
+		}
+	}
+
+	// If image pull is mentioned, try image-related fixes
+	if strings.Contains(errorMsg, "Pulling image") {
+		logger.Info("Image pull detected, applying image availability fix")
+		// Apply a wait strategy for image pull to complete
+		logger.Info("Applying wait strategy for image pull completion")
+		time.Sleep(3 * time.Second)
+		fixesApplied = true
+	}
+
+	return fixesApplied
 }

@@ -117,11 +117,17 @@ func TestClient_AnalyzeError(t *testing.T) {
 	ctx := context.Background()
 
 	testErr := errors.New("mvn: command not found")
-	_, err := client.AnalyzeError(ctx, testErr, "Docker build context")
+	analysis, err := client.AnalyzeError(ctx, testErr, "Docker build context")
 
-	// Should fail without MCP server context
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "TOOL_EXECUTION_FAILED: failed to analyze error")
+	// Should succeed with pattern-based analysis when MCP server context is unavailable
+	assert.NoError(t, err)
+	assert.NotNil(t, analysis)
+
+	// Verify pattern-based analysis for Maven error
+	assert.Contains(t, analysis.RootCause, "Maven is not installed")
+	assert.Contains(t, analysis.Fix, "Install Maven")
+	assert.True(t, analysis.CanAutoFix)
+	assert.Greater(t, len(analysis.FixSteps), 0)
 }
 
 func TestClient_CalculateBackoff(t *testing.T) {

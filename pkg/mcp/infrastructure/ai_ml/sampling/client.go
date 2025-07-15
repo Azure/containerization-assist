@@ -108,7 +108,7 @@ type SamplingResponse struct {
 	Error      error
 }
 
-// SampleInternal performs sampling with simple retry & budget enforcement.
+// SampleInternal performs sampling with AI-assisted retry and error correction.
 func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*SamplingResponse, error) {
 	start := time.Now()
 	ctx, span := tracing.StartSpan(ctx, "sampling.sample")
@@ -157,7 +157,16 @@ func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*Samp
 		req.Temperature = c.temperature
 	}
 
+	// Use AI-assisted retry for better error recovery
+	return c.sampleWithAIAssist(ctx, req, span, enhancedLogger, reqLogger, start)
+}
+
+// sampleWithAIAssist performs AI-assisted sampling with intelligent error correction
+func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingRequest, span trace.Span, enhancedLogger *EnhancedLogger, reqLogger *slog.Logger, start time.Time) (*SamplingResponse, error) {
 	var lastErr error
+	var errorHistory []string
+	currentReq := originalReq // Start with original request
+
 	for attempt := 0; attempt < c.retryAttempts; attempt++ {
 		select {
 		case <-ctx.Done():
@@ -174,12 +183,12 @@ func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*Samp
 		if srv := server.ServerFromContext(ctx); srv == nil {
 			err = errors.New(errors.CodeInternalError, "sampling", "no MCP server in context – cannot perform sampling", nil)
 		} else {
-			resp, err = c.callMCP(ctx, req)
+			resp, err = c.callMCP(ctx, currentReq)
 		}
 
 		if err == nil {
 			// Log successful response with enhanced details
-			enhancedLogger.LogLLMResponse(ctx, reqLogger, req, resp, time.Since(start))
+			enhancedLogger.LogLLMResponse(ctx, reqLogger, currentReq, resp, time.Since(start))
 
 			// Add success attributes
 			span.SetAttributes(
@@ -191,7 +200,7 @@ func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*Samp
 		}
 
 		// Log error with enhanced context
-		enhancedLogger.LogLLMError(ctx, reqLogger, req, err, time.Since(start), attempt+1)
+		enhancedLogger.LogLLMError(ctx, reqLogger, currentReq, err, time.Since(start), attempt+1)
 
 		// Abort early on non-retryable errors.
 		if !IsRetryable(err) {
@@ -199,7 +208,29 @@ func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*Samp
 			span.SetAttributes(attribute.String("error.non_retryable", err.Error()))
 			return nil, err
 		}
+
 		lastErr = err
+		errorHistory = append(errorHistory, err.Error())
+
+		// If this isn't the last attempt, try to use AI to improve the request
+		if attempt < c.retryAttempts-1 {
+			c.logger.Info("Attempting AI-assisted error correction", "attempt", attempt+1, "error", err.Error())
+
+			improvedReq, correctionErr := c.applyAICorrection(ctx, currentReq, errorHistory, attempt+1)
+			if correctionErr != nil {
+				c.logger.Warn("AI correction failed, using original request", "error", correctionErr)
+				// Continue with current request
+			} else {
+				c.logger.Info("Applied AI corrections to request", "attempt", attempt+1)
+				currentReq = improvedReq
+				span.AddEvent("ai.correction_applied", trace.WithAttributes(
+					attribute.Int("attempt", attempt+1),
+					attribute.String("original_prompt_length", fmt.Sprintf("%d", len(originalReq.Prompt))),
+					attribute.String("corrected_prompt_length", fmt.Sprintf("%d", len(currentReq.Prompt))),
+				))
+			}
+		}
+
 		backoff := c.calculateBackoff(attempt)
 		c.logger.Warn("sampling attempt failed – backing off", "attempt", attempt+1, "err", err, "backoff", backoff)
 
@@ -474,10 +505,18 @@ func parseErrorAnalysis(content string) *ErrorAnalysis {
 
 // AnalyzeError uses MCP sampling to analyze an error and suggest fixes.
 func (c *Client) AnalyzeError(ctx context.Context, inputErr error, contextInfo string) (*ErrorAnalysis, error) {
+	// Check if MCP server is available for AI analysis
+	srv := server.ServerFromContext(ctx)
+	if srv == nil {
+		c.logger.Warn("No MCP server available for AI error analysis, using pattern-based analysis")
+		return c.createPatternBasedErrorAnalysis(inputErr.Error(), contextInfo), nil
+	}
+
 	// Get template manager
 	templateManager, err := prompts.NewManager(c.logger, prompts.ManagerConfig{})
 	if err != nil {
-		return nil, errors.New(errors.CodeInternalError, "sampling", "failed to create template manager", err)
+		c.logger.Warn("Failed to create template manager, falling back to pattern-based analysis", "error", err)
+		return c.createPatternBasedErrorAnalysis(inputErr.Error(), contextInfo), nil
 	}
 
 	// Prepare template data
@@ -489,7 +528,8 @@ func (c *Client) AnalyzeError(ctx context.Context, inputErr error, contextInfo s
 	// Render template
 	rendered, err := templateManager.RenderTemplate("error-analysis", templateData)
 	if err != nil {
-		return nil, errors.New(errors.CodeInternalError, "sampling", "failed to render error analysis template", err)
+		c.logger.Warn("Failed to render error analysis template, falling back to pattern-based analysis", "error", err)
+		return c.createPatternBasedErrorAnalysis(inputErr.Error(), contextInfo), nil
 	}
 
 	request := SamplingRequest{
@@ -499,12 +539,148 @@ func (c *Client) AnalyzeError(ctx context.Context, inputErr error, contextInfo s
 		SystemPrompt: rendered.SystemPrompt,
 	}
 
-	response, err := c.SampleInternal(ctx, request)
+	response, err := c.callMCP(ctx, request)
 	if err != nil {
-		return nil, errors.New(errors.CodeToolExecutionFailed, "sampling", "failed to analyze error", err)
+		c.logger.Warn("MCP sampling failed for error analysis, falling back to pattern-based analysis", "error", err)
+		return c.createPatternBasedErrorAnalysis(inputErr.Error(), contextInfo), nil
 	}
 
-	return parseErrorAnalysis(response.Content), nil
+	// Parse AI response, but fallback to pattern-based if parsing fails
+	analysis := parseErrorAnalysis(response.Content)
+	if analysis.RootCause == "" && len(analysis.FixSteps) == 0 {
+		c.logger.Warn("AI analysis returned empty results, falling back to pattern-based analysis")
+		return c.createPatternBasedErrorAnalysis(inputErr.Error(), contextInfo), nil
+	}
+
+	return analysis, nil
+}
+
+// createPatternBasedErrorAnalysis creates error analysis using pattern recognition
+// This serves as a fallback when MCP sampling is unavailable
+func (c *Client) createPatternBasedErrorAnalysis(errorMsg, contextInfo string) *ErrorAnalysis {
+	analysis := &ErrorAnalysis{
+		Alternatives: []string{},
+		Prevention:   []string{},
+		FixSteps:     []string{},
+		CanAutoFix:   true,
+	}
+
+	errorLower := strings.ToLower(errorMsg)
+
+	// Maven-related error patterns
+	if strings.Contains(errorLower, "mvn") && strings.Contains(errorLower, "command not found") {
+		analysis.RootCause = "Maven is not installed in the Docker container"
+		analysis.FixSteps = []string{
+			"Use maven:3.9-eclipse-temurin-17 as base image",
+			"Or install Maven in Dockerfile: RUN apt-get update && apt-get install -y maven",
+		}
+		analysis.Fix = "Install Maven in Docker container"
+		analysis.Alternatives = []string{"Use Gradle instead of Maven", "Use multi-stage build with Maven"}
+		analysis.Prevention = []string{"Always use Maven-enabled base images for Java projects"}
+		return analysis
+	}
+
+	// Gradle-related error patterns
+	if strings.Contains(errorLower, "gradle") && strings.Contains(errorLower, "command not found") {
+		analysis.RootCause = "Gradle is not installed in the Docker container"
+		analysis.FixSteps = []string{
+			"Use gradle:8-jdk17 as base image",
+			"Or install Gradle in Dockerfile with proper installation commands",
+		}
+		analysis.Fix = "Install Gradle in Docker container"
+		analysis.Alternatives = []string{"Use Maven instead of Gradle", "Use Gradle wrapper"}
+		analysis.Prevention = []string{"Always use Gradle-enabled base images for Gradle projects"}
+		return analysis
+	}
+
+	// Kubernetes deployment patterns
+	if strings.Contains(errorLower, "pods ready") && strings.Contains(errorLower, "deployment validation") {
+		analysis.RootCause = "Pod is not becoming ready, likely due to image pull or application startup issues"
+		analysis.FixSteps = []string{
+			"Check if image exists and is accessible",
+			"Verify port configuration in application and Kubernetes manifests",
+			"Add proper health checks and readiness probes",
+			"Wait longer for image pull and application startup",
+		}
+		analysis.Fix = "Fix pod readiness and deployment configuration"
+		analysis.Alternatives = []string{"Use different image tag", "Simplify deployment configuration"}
+		analysis.Prevention = []string{"Test deployments in staging environment", "Add comprehensive health checks"}
+		return analysis
+	}
+
+	// Node scheduling and taint patterns
+	if strings.Contains(errorLower, "nodes are available") && strings.Contains(errorLower, "taint") {
+		analysis.RootCause = "Kubernetes node has taints that prevent pod scheduling"
+		analysis.FixSteps = []string{
+			"Wait for node to become ready",
+			"Remove node taints if safe to do so",
+			"Add toleration to pod specification if needed",
+		}
+		analysis.Fix = "Resolve node scheduling constraints"
+		analysis.Alternatives = []string{"Use different node selector", "Add node affinity rules"}
+		analysis.Prevention = []string{"Monitor node health", "Configure proper cluster resources"}
+		return analysis
+	}
+
+	// Image pull patterns
+	if strings.Contains(errorLower, "image pull") || strings.Contains(errorLower, "pulling image") {
+		analysis.RootCause = "Image pull operation in progress or failed"
+		analysis.FixSteps = []string{
+			"Wait for image pull to complete",
+			"Verify image exists in registry",
+			"Check network connectivity to registry",
+			"Ensure proper image pull policy",
+		}
+		analysis.Fix = "Resolve image pull issues"
+		analysis.Alternatives = []string{"Use local image", "Change image pull policy"}
+		analysis.Prevention = []string{"Pre-pull images", "Use local registry", "Verify image availability"}
+		return analysis
+	}
+
+	// Port configuration patterns
+	if strings.Contains(errorLower, "port: 0") || (strings.Contains(errorLower, "port") && strings.Contains(errorLower, "connection")) {
+		analysis.RootCause = "Application port is not properly configured or accessible"
+		analysis.FixSteps = []string{
+			"Set proper port in application configuration",
+			"Add EXPOSE directive to Dockerfile",
+			"Update Kubernetes service port configuration",
+			"Verify application is listening on the correct port",
+		}
+		analysis.Fix = "Configure application port properly"
+		analysis.Alternatives = []string{"Use different port number", "Configure port binding"}
+		analysis.Prevention = []string{"Always specify ports explicitly", "Test port connectivity"}
+		return analysis
+	}
+
+	// Docker build patterns
+	if strings.Contains(errorLower, "dockerfile") && (strings.Contains(errorLower, "syntax") || strings.Contains(errorLower, "instruction")) {
+		analysis.RootCause = "Dockerfile contains syntax errors or invalid instructions"
+		analysis.FixSteps = []string{
+			"Review Dockerfile syntax",
+			"Check instruction names and format",
+			"Verify base image name and tag",
+			"Ensure proper FROM instruction",
+		}
+		analysis.Fix = "Fix Dockerfile syntax errors"
+		analysis.Alternatives = []string{"Use different base image", "Simplify Dockerfile"}
+		analysis.Prevention = []string{"Use Dockerfile linting", "Test Dockerfiles incrementally"}
+		return analysis
+	}
+
+	// Generic fallback analysis
+	analysis.RootCause = "Operation failed with unspecified error"
+	analysis.FixSteps = []string{
+		"Review error details carefully",
+		"Check system prerequisites and dependencies",
+		"Verify configuration and permissions",
+		"Retry operation with corrected parameters",
+	}
+	analysis.Fix = "Investigate and resolve the underlying issue"
+	analysis.Alternatives = []string{"Try alternative approaches", "Simplify the operation"}
+	analysis.Prevention = []string{"Add better error handling", "Improve system monitoring"}
+	analysis.CanAutoFix = false // Generic errors usually need manual intervention
+
+	return analysis
 }
 
 // SetTokenBudget sets the maximum tokens allowed per retry session
@@ -578,4 +754,68 @@ func (c *Client) emitTokenProgress(ctx context.Context, tokensGenerated int, max
 			c.logger.Debug("Failed to send token progress notification", "error", err)
 		}
 	}
+}
+
+// applyAICorrection uses AI analysis to improve a failed sampling request
+func (c *Client) applyAICorrection(ctx context.Context, originalReq SamplingRequest, errorHistory []string, attempt int) (SamplingRequest, error) {
+	// Create a correction prompt that analyzes the errors and suggests improvements
+	correctionPrompt := fmt.Sprintf(`You are an AI assistant helping to fix a failed LLM sampling request. 
+
+ORIGINAL REQUEST:
+- Prompt: %s
+- Max Tokens: %d
+- Temperature: %f
+- System Prompt: %s
+
+ERROR HISTORY (Attempts 1-%d):
+%s
+
+Your task: Analyze the errors and provide an improved version of the original prompt that addresses the issues. Focus on:
+1. Clarity and specificity improvements
+2. Better constraint specification
+3. Format corrections
+4. Context improvements
+
+Respond with only the improved prompt text - no explanations or commentary.`,
+		originalReq.Prompt,
+		originalReq.MaxTokens,
+		originalReq.Temperature,
+		originalReq.SystemPrompt,
+		attempt,
+		strings.Join(errorHistory, "\n- "))
+
+	correctionReq := SamplingRequest{
+		Prompt:       correctionPrompt,
+		MaxTokens:    1000, // Smaller token limit for corrections
+		Temperature:  0.2,  // Lower temperature for more focused corrections
+		SystemPrompt: "You are a helpful AI assistant that improves prompts for better LLM responses.",
+	}
+
+	c.logger.Debug("Requesting AI correction",
+		"attempt", attempt,
+		"error_count", len(errorHistory),
+		"original_prompt_length", len(originalReq.Prompt))
+
+	// Use direct MCP call to avoid recursion
+	correctionResp, err := c.callMCP(ctx, correctionReq)
+	if err != nil {
+		return originalReq, fmt.Errorf("AI correction failed: %w", err)
+	}
+
+	// Create improved request with the corrected prompt
+	improvedReq := originalReq
+	improvedReq.Prompt = strings.TrimSpace(correctionResp.Content)
+
+	// If the correction seems valid (not empty and different), use it
+	if len(improvedReq.Prompt) > 0 && improvedReq.Prompt != originalReq.Prompt {
+		c.logger.Info("AI correction applied successfully",
+			"attempt", attempt,
+			"original_length", len(originalReq.Prompt),
+			"corrected_length", len(improvedReq.Prompt))
+		return improvedReq, nil
+	}
+
+	// If correction failed or was identical, return original
+	c.logger.Warn("AI correction was empty or identical, keeping original", "attempt", attempt)
+	return originalReq, fmt.Errorf("AI correction produced no improvement")
 }
