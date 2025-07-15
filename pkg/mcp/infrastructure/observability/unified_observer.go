@@ -5,8 +5,10 @@ import (
 	"context"
 	cryptorand "crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"log/slog"
 	"math/rand"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -45,8 +47,10 @@ type UnifiedObserver struct {
 	logLevel     atomic.Value // slog.Level
 
 	// Lifecycle
-	startTime time.Time
-	mu        sync.RWMutex
+	startTime     time.Time
+	mu            sync.RWMutex
+	cleanupTicker *time.Ticker
+	cleanupStop   chan struct{}
 }
 
 // ObserverConfig provides configuration for the unified observer
@@ -124,10 +128,15 @@ func NewUnifiedObserver(logger *slog.Logger, config *ObserverConfig) *UnifiedObs
 		config:          config,
 		errorAggregator: errors.NewErrorAggregator(config.RetentionPeriod),
 		startTime:       time.Now(),
+		cleanupStop:     make(chan struct{}),
 	}
 
 	observer.samplingRate.Store(config.SamplingRate)
 	observer.logLevel.Store(config.LogLevel)
+
+	// Start cleanup ticker
+	observer.cleanupTicker = time.NewTicker(config.FlushInterval)
+	go observer.cleanupWorker()
 
 	return observer
 }
@@ -157,11 +166,6 @@ func (o *UnifiedObserver) TrackEvent(ctx context.Context, event *Event) {
 
 	// Log the event
 	o.logEvent(event)
-
-	// Clean up old events periodically
-	if atomic.LoadInt64(&o.eventCount)%1000 == 0 {
-		go o.cleanupOldEvents()
-	}
 }
 
 // TrackError tracks a standard error
@@ -451,27 +455,47 @@ func (o *UnifiedObserver) shouldSample() bool {
 
 func (o *UnifiedObserver) generateEventID() string {
 	bytes := make([]byte, 4)
-	cryptorand.Read(bytes)
+	if _, err := cryptorand.Read(bytes); err != nil {
+		// Fallback to timestamp-based ID if crypto random fails
+		return fmt.Sprintf("evt_%d", time.Now().UnixNano())
+	}
 	return "evt_" + hex.EncodeToString(bytes)
 }
 
 func (o *UnifiedObserver) generateTraceID() string {
 	bytes := make([]byte, 8)
-	cryptorand.Read(bytes)
+	if _, err := cryptorand.Read(bytes); err != nil {
+		// Fallback to timestamp-based ID if crypto random fails
+		return fmt.Sprintf("%016x", time.Now().UnixNano())
+	}
 	return hex.EncodeToString(bytes)
 }
 
 func (o *UnifiedObserver) generateSpanID() string {
 	bytes := make([]byte, 4)
-	cryptorand.Read(bytes)
+	if _, err := cryptorand.Read(bytes); err != nil {
+		// Fallback to timestamp-based ID if crypto random fails
+		return fmt.Sprintf("%08x", time.Now().UnixNano()&0xFFFFFFFF)
+	}
 	return hex.EncodeToString(bytes)
 }
 
 func (o *UnifiedObserver) buildMetricKey(name string, tags map[string]string) string {
 	key := name
-	for k, v := range tags {
-		key += "|" + k + "=" + v
+
+	// Sort tag keys for deterministic ordering
+	if len(tags) > 0 {
+		keys := make([]string, 0, len(tags))
+		for k := range tags {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, k := range keys {
+			key += "|" + k + "=" + tags[k]
+		}
 	}
+
 	return key
 }
 
@@ -777,4 +801,36 @@ func (o *UnifiedObserver) generateRecommendations() []Recommendation {
 	}
 
 	return recommendations
+}
+
+// cleanupWorker runs periodic cleanup tasks
+func (o *UnifiedObserver) cleanupWorker() {
+	for {
+		select {
+		case <-o.cleanupTicker.C:
+			o.cleanupOldEvents()
+		case <-o.cleanupStop:
+			return
+		}
+	}
+}
+
+// Close shuts down the observer gracefully
+func (o *UnifiedObserver) Close() error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	// Stop the cleanup ticker
+	if o.cleanupTicker != nil {
+		o.cleanupTicker.Stop()
+	}
+
+	// Signal cleanup worker to stop
+	close(o.cleanupStop)
+
+	// Final cleanup
+	o.cleanupOldEvents()
+
+	o.logger.Info("Observer shut down gracefully")
+	return nil
 }
