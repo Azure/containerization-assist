@@ -95,6 +95,18 @@ func TestTransportConcurrentLifecycle(t *testing.T) {
 
 	// Test concurrent access to registry
 	t.Run("ConcurrentRegistryAccess", func(t *testing.T) {
+		// Use mock transports for concurrent test to avoid port conflicts
+		mockRegistry := NewRegistry(logger)
+
+		// Register mock transports that immediately return context.Canceled
+		mockStdio := &MockTransport{}
+		mockStdio.On("Serve", mock.Anything, mock.Anything).Return(context.Canceled)
+		mockRegistry.Register(TransportTypeStdio, mockStdio)
+
+		mockHTTP := &MockTransport{}
+		mockHTTP.On("Serve", mock.Anything, mock.Anything).Return(context.Canceled)
+		mockRegistry.Register(TransportTypeHTTP, mockHTTP)
+
 		numGoroutines := 10
 		var wg sync.WaitGroup
 		wg.Add(numGoroutines)
@@ -115,18 +127,17 @@ func TestTransportConcurrentLifecycle(t *testing.T) {
 
 				// Create unique mock server for each goroutine to avoid races
 				localMockServer := &server.MCPServer{}
-				err := registry.Start(ctx, transportType, localMockServer)
-				// Context cancellation or "no MCP server" errors are expected
-				if err != nil &&
-					err != context.Canceled &&
-					err != context.DeadlineExceeded &&
-					!isExpectedTestError(err) {
+				err := mockRegistry.Start(ctx, transportType, localMockServer)
+				// Context cancellation is expected from our mocks
+				if err != nil && err != context.Canceled {
 					t.Errorf("Unexpected error from goroutine %d: %v", id, err)
 				}
 			}(i)
 		}
 
 		wg.Wait()
+		mockStdio.AssertExpectations(t)
+		mockHTTP.AssertExpectations(t)
 	})
 }
 
@@ -252,7 +263,8 @@ func TestTransportErrorHandling(t *testing.T) {
 		err := registry.Start(ctx, "error-transport", mockServer)
 
 		assert.Error(t, err, "Should propagate transport error")
-		assert.Equal(t, expectedError, err, "Should return the exact error")
+		assert.Contains(t, err.Error(), "failed to start error-transport transport", "Should wrap transport error")
+		assert.ErrorIs(t, err, expectedError, "Should wrap the original error")
 		errorTransport.AssertExpectations(t)
 	})
 

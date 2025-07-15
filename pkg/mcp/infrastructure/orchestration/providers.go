@@ -4,6 +4,7 @@ package orchestration
 import (
 	"log/slog"
 
+	"github.com/Azure/container-kit/pkg/mcp/domain/ml"
 	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/container"
@@ -24,9 +25,14 @@ var Providers = wire.NewSet(
 	steps.NewRegistryStepProvider,
 	ProvideStepFactory,
 
+	// Step enhancer adapter
+	ProvideStepEnhancerAdapter,
+
 	// Orchestrators
-	ProvideBaseOrchestrator,
-	wire.Bind(new(workflow.WorkflowOrchestrator), new(*workflow.BaseOrchestrator)),
+	ProvideEnhancedOrchestrator,
+	ProvideAdaptiveOrchestrator,
+	wire.Bind(new(workflow.WorkflowOrchestrator), new(*AdaptiveOrchestratorAdapter)),
+	wire.Bind(new(workflow.AdaptiveOrchestrator), new(*AdaptiveOrchestratorAdapter)),
 
 	// Saga coordination
 	saga.NewSagaCoordinator,
@@ -43,4 +49,41 @@ func ProvideStepFactory(stepProvider workflow.StepProvider, optimizer workflow.B
 // ProvideBaseOrchestrator creates the base orchestrator
 func ProvideBaseOrchestrator(factory *workflow.StepFactory, emitterFactory workflow.ProgressEmitterFactory, logger *slog.Logger) *workflow.BaseOrchestrator {
 	return workflow.NewBaseOrchestrator(factory, emitterFactory, logger)
+}
+
+// ProvideEnhancedOrchestrator creates the orchestrator with AI enhancement middleware
+func ProvideEnhancedOrchestrator(
+	factory *workflow.StepFactory,
+	emitterFactory workflow.ProgressEmitterFactory,
+	stepEnhancerAdapter workflow.StepEnhancer,
+	sagaCoordinator *saga.SagaCoordinator,
+	logger *slog.Logger,
+) *workflow.BaseOrchestrator {
+	// Create orchestrator with AI enhancement middleware
+	return workflow.NewBaseOrchestrator(
+		factory,
+		emitterFactory,
+		logger,
+		workflow.WithMiddleware(
+			workflow.CombinedEnhancementMiddleware(stepEnhancerAdapter, logger),
+			workflow.RetryMiddleware(),
+			workflow.ProgressMiddleware(),
+			workflow.SagaMiddleware(sagaCoordinator, logger),
+		),
+	)
+}
+
+// ProvideAdaptiveOrchestrator creates the adaptive orchestrator with advanced AI capabilities
+func ProvideAdaptiveOrchestrator(
+	baseOrchestrator *workflow.BaseOrchestrator,
+	patternRecognizer ml.ErrorPatternRecognizer,
+	stepEnhancer ml.StepEnhancer,
+	logger *slog.Logger,
+) *AdaptiveOrchestratorAdapter {
+	return NewAdaptiveOrchestratorAdapter(
+		baseOrchestrator,
+		patternRecognizer,
+		stepEnhancer,
+		logger,
+	)
 }

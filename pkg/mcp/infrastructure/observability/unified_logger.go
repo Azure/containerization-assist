@@ -356,6 +356,9 @@ func (ul *UnifiedLogger) LogWithStructuredError(ctx context.Context, err *errors
 	// Process the log record
 	ul.processLogRecord(ctx, record)
 
+	// Update log metrics
+	ul.updateLogMetrics(record.Level, time.Since(err.Timestamp))
+
 	// Also track the error with the observer
 	ul.observer.TrackStructuredError(ctx, err)
 }
@@ -396,6 +399,9 @@ func (ul *UnifiedLogger) LogOperation(ctx context.Context, operation string, dur
 
 	// Process the log record
 	ul.processLogRecord(ctx, record)
+
+	// Update log metrics
+	ul.updateLogMetrics(record.Level, time.Since(record.Time))
 
 	// Record operation metrics
 	ul.observer.RecordHistogram("operation_duration", float64(duration.Milliseconds()), map[string]string{

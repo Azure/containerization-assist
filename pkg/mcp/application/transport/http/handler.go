@@ -48,6 +48,7 @@ func (h *Handler) Serve(ctx context.Context, mcpServer *server.MCPServer) error 
 	// Mount MCP endpoints
 	mux.HandleFunc("/rpc", h.handleRPC)
 	mux.HandleFunc("/healthz", h.handleHealth)
+	mux.HandleFunc("/readyz", h.handleReady)
 	mux.HandleFunc("/metrics", h.handleMetrics)
 	mux.HandleFunc("/", h.handleRoot)
 
@@ -280,6 +281,57 @@ func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleReady handles readiness probe requests
+func (h *Handler) handleReady(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Check if MCP server is initialized
+	h.mu.RLock()
+	serverReady := h.mcpServer != nil
+	h.mu.RUnlock()
+
+	if !serverReady {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		response := map[string]interface{}{
+			"ready":  false,
+			"reason": "MCP server not initialized",
+		}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Run minimal health checks for readiness
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	report := h.healthMonitor.GetHealth(ctx)
+
+	// For readiness, we only care if critical components are healthy
+	ready := report.Status != health.StatusUnhealthy
+
+	statusCode := http.StatusOK
+	if !ready {
+		statusCode = http.StatusServiceUnavailable
+	}
+
+	w.WriteHeader(statusCode)
+
+	response := map[string]interface{}{
+		"ready":     ready,
+		"status":    string(report.Status),
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		h.logger.Error("Failed to encode ready response", "error", err)
+	}
+}
+
 // handleMetrics handles Prometheus metrics requests
 func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -380,7 +432,8 @@ func (h *Handler) handleRoot(w http.ResponseWriter, r *http.Request) {
 		"version": "0.0.6",
 		"endpoints": map[string]interface{}{
 			"/rpc":     "JSON-RPC bridge to MCP",
-			"/healthz": "Health check endpoint",
+			"/healthz": "Health check endpoint (liveness probe)",
+			"/readyz":  "Readiness probe endpoint",
 			"/metrics": "Prometheus metrics endpoint",
 		},
 		"documentation": "https://github.com/Azure/container-kit",

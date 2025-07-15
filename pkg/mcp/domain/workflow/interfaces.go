@@ -33,6 +33,20 @@ type SagaAwareOrchestrator interface {
 	CompensateSaga(ctx context.Context, sagaID string) error
 }
 
+// AdaptiveOrchestrator extends workflow orchestration with adaptive capabilities
+type AdaptiveOrchestrator interface {
+	WorkflowOrchestrator
+
+	// GetAdaptationStatistics returns statistics about workflow adaptations
+	GetAdaptationStatistics() *AdaptationStatistics
+
+	// UpdateAdaptationStrategy allows manual updates to adaptation strategies
+	UpdateAdaptationStrategy(patternID string, strategy *AdaptationStrategy) error
+
+	// ClearAdaptationHistory clears the adaptation history
+	ClearAdaptationHistory() error
+}
+
 // StepOrchestrator defines the interface for individual step execution
 type StepOrchestrator interface {
 	// ExecuteStep runs a single workflow step

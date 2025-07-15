@@ -15,7 +15,8 @@ func StartDefault(ctx context.Context, logger *slog.Logger, t TransportType, s *
 
 	// Register default transports
 	registry.Register(TransportTypeStdio, NewStdioTransport(logger))
-	registry.Register(TransportTypeHTTP, NewHTTPTransport(logger, 8080)) // Default port
+	registry.Register(TransportTypeHTTP, NewHTTPTransport(logger, 8080))          // Default port
+	registry.Register(TransportTypeStreaming, NewStreamingTransport(logger, 100)) // Default buffer size
 
 	return registry.Start(ctx, t, s)
 }
@@ -28,6 +29,7 @@ func StartDefaultWithPort(ctx context.Context, logger *slog.Logger, t TransportT
 	// Register default transports
 	registry.Register(TransportTypeStdio, NewStdioTransport(logger))
 	registry.Register(TransportTypeHTTP, NewHTTPTransport(logger, httpPort))
+	registry.Register(TransportTypeStreaming, NewStreamingTransport(logger, 100)) // Default buffer size
 
 	return registry.Start(ctx, t, s)
 }

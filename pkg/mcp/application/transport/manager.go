@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/Azure/container-kit/pkg/mcp/application/registry"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -19,16 +20,17 @@ type Transport interface {
 type TransportType string
 
 const (
-	TransportTypeStdio TransportType = "stdio"
-	TransportTypeHTTP  TransportType = "http"
+	TransportTypeStdio     TransportType = "stdio"
+	TransportTypeHTTP      TransportType = "http"
+	TransportTypeStreaming TransportType = "streaming"
 )
 
-// TransportRegistry is a type alias for the generic registry
-type TransportRegistry = registry.Registry[Transport]
+// ErrUnsupportedTransport is returned when an unsupported transport type is requested
+var ErrUnsupportedTransport = fmt.Errorf("unsupported transport type")
 
 // Registry holds registered transport implementations
 type Registry struct {
-	transports *TransportRegistry
+	transports *registry.Registry[Transport]
 	logger     *slog.Logger
 }
 
@@ -43,16 +45,44 @@ func NewRegistry(logger *slog.Logger) *Registry {
 // Register adds a transport implementation to the registry
 func (r *Registry) Register(transportType TransportType, transport Transport) {
 	r.transports.Add(string(transportType), transport)
-	r.logger.Debug("Transport registered", "type", transportType)
+	r.logger.Debug("Transport registered",
+		slog.String("type", string(transportType)))
 }
 
 // Start starts the specified transport
 func (r *Registry) Start(ctx context.Context, transportType TransportType, mcpServer *server.MCPServer) error {
 	transport, exists := r.transports.Get(string(transportType))
 	if !exists {
-		return fmt.Errorf("unsupported transport type: %s", transportType)
+		r.logger.Error("Unsupported transport type requested",
+			slog.String("transport_type", string(transportType)))
+		return errors.New(
+			errors.CodeInvalidParameter,
+			"transport",
+			fmt.Sprintf("unsupported transport type: %s", transportType),
+			ErrUnsupportedTransport,
+		)
 	}
 
-	r.logger.Info("Starting transport", "type", transportType)
-	return transport.Serve(ctx, mcpServer)
+	r.logger.Info("Starting transport", slog.String("type", string(transportType)))
+
+	if err := transport.Serve(ctx, mcpServer); err != nil {
+		// Don't wrap context cancellation - it's expected behavior
+		if err == context.Canceled || err == context.DeadlineExceeded {
+			r.logger.Debug("Transport stopped due to context cancellation",
+				slog.String("transport_type", string(transportType)))
+			return err
+		}
+
+		r.logger.Error("Transport failed to start",
+			slog.String("transport_type", string(transportType)),
+			slog.String("error", err.Error()))
+		return errors.New(
+			errors.CodeOperationFailed,
+			"transport",
+			fmt.Sprintf("failed to start %s transport", transportType),
+			err,
+		)
+	}
+
+	return nil
 }

@@ -1,4 +1,8 @@
 // Package registry provides a generic registry implementation for managing collections of typed items
+//
+// This package provides a thread-safe generic map implementation used throughout the application
+// for storing and retrieving typed data. It should not be confused with the registrar package,
+// which handles MCP-specific tool and resource registration.
 package registry
 
 import (

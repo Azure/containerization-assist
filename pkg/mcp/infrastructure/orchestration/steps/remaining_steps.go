@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/util"
@@ -47,7 +48,7 @@ func (s *BuildStep) Name() string    { return "build_image" }
 func (s *BuildStep) MaxRetries() int { return 3 }
 func (s *BuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
 	if state.DockerfileResult == nil || state.AnalyzeResult == nil {
-		return fmt.Errorf("dockerfile and analyze results are required for build")
+		return errors.New(errors.CodeInvalidState, "build_step", "dockerfile and analyze results are required for build", nil)
 	}
 
 	state.Logger.Info("Step 3: Building Docker image")
@@ -104,11 +105,11 @@ func (s *BuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) 
 	// Call the infrastructure build function
 	buildResult, err := BuildImage(ctx, infraDockerfileResult, imageName, imageTag, buildContext, state.Logger)
 	if err != nil {
-		return fmt.Errorf("docker build failed: %v", err)
+		return errors.New(errors.CodeImageBuildFailed, "build_step", "docker build failed", err)
 	}
 
 	if buildResult == nil {
-		return fmt.Errorf("build result is nil after successful build")
+		return errors.New(errors.CodeInternalError, "build_step", "build result is nil after successful build", nil)
 	}
 
 	// Store build result in workflow state
@@ -146,7 +147,7 @@ func (s *ScanStep) Execute(ctx context.Context, state *workflow.WorkflowState) e
 	}
 
 	if state.BuildResult == nil {
-		return fmt.Errorf("build result is required for security scan")
+		return errors.New(errors.CodeInvalidState, "scan_step", "build result is required for security scan", nil)
 	}
 
 	state.Logger.Info("Step 4: Running security vulnerability scan")
@@ -154,7 +155,7 @@ func (s *ScanStep) Execute(ctx context.Context, state *workflow.WorkflowState) e
 	// Implement actual vulnerability scanning using UnifiedSecurityScanner
 	imageRef := state.BuildResult.ImageRef
 	if imageRef == "" {
-		return fmt.Errorf("no image reference available for security scan")
+		return errors.New(errors.CodeInvalidState, "scan_step", "no image reference available for security scan", nil)
 	}
 
 	// Create zerolog logger from slog logger for the scanner
@@ -177,7 +178,7 @@ func (s *ScanStep) Execute(ctx context.Context, state *workflow.WorkflowState) e
 		}
 		// In strict mode, fail the workflow for scan errors
 		if state.Args.StrictMode {
-			return fmt.Errorf("security scan failed in strict mode: %v", err)
+			return errors.New(errors.CodeVulnerabilityFound, "scan_step", "security scan failed in strict mode", err)
 		}
 		state.Logger.Warn("Continuing workflow despite scan failure")
 		return nil
@@ -267,7 +268,7 @@ func (s *TagStep) Name() string    { return "tag_image" }
 func (s *TagStep) MaxRetries() int { return 2 }
 func (s *TagStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
 	if state.BuildResult == nil {
-		return fmt.Errorf("build result is required for image tagging")
+		return errors.New(errors.CodeInvalidState, "tag_step", "build result is required for image tagging", nil)
 	}
 
 	state.Logger.Info("Step 5: Tagging image for registry")
@@ -300,7 +301,7 @@ func (s *PushStep) Execute(ctx context.Context, state *workflow.WorkflowState) e
 	// For local kind deployment, we skip external registry push
 	// The image will be loaded directly into kind in the deploy step
 	if state.BuildResult == nil {
-		return fmt.Errorf("build result is required for image preparation")
+		return errors.New(errors.CodeInvalidState, "push_step", "build result is required for image preparation", nil)
 	}
 
 	state.Logger.Info("Image prepared for local kind deployment",
@@ -329,7 +330,7 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 	}
 
 	if state.BuildResult == nil || state.AnalyzeResult == nil {
-		return fmt.Errorf("build result and analyze result are required for manifest generation")
+		return errors.New(errors.CodeInvalidState, "manifest_step", "build result and analyze result are required for manifest generation", nil)
 	}
 
 	// Convert workflow BuildResult to infrastructure BuildResult
@@ -351,7 +352,7 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 
 	k8sResult, err := GenerateManifests(infraBuildResult, appName, namespace, state.AnalyzeResult.Port, state.Logger)
 	if err != nil {
-		return fmt.Errorf("k8s manifest generation failed: %v", err)
+		return errors.New(errors.CodeManifestInvalid, "manifest_step", "k8s manifest generation failed", err)
 	}
 
 	// Extract actual manifest content from the result
@@ -433,7 +434,7 @@ func (s *ClusterStep) Execute(ctx context.Context, state *workflow.WorkflowState
 		var err error
 		registryURL, err = SetupKindCluster(ctx, "container-kit", state.Logger)
 		if err != nil {
-			return fmt.Errorf("kind cluster setup failed: %v", err)
+			return errors.New(errors.CodeKubernetesApiError, "cluster_step", "kind cluster setup failed", err)
 		}
 	}
 
@@ -467,7 +468,7 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 	}
 
 	if state.K8sResult == nil {
-		return fmt.Errorf("K8s manifests are required for deployment")
+		return errors.New(errors.CodeInvalidState, "deploy_step", "K8s manifests are required for deployment", nil)
 	}
 
 	// First, load image into kind cluster if needed
@@ -480,7 +481,7 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 
 		err := LoadImageToKind(ctx, infraBuildResult, "container-kit", state.Logger)
 		if err != nil {
-			return fmt.Errorf("failed to load image to kind: %v", err)
+			return errors.New(errors.CodeImagePullFailed, "deploy_step", "failed to load image to kind", err)
 		}
 		state.Logger.Info("Image loaded into kind cluster successfully")
 	} else if state.Args.TestMode {
@@ -519,7 +520,7 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 	} else {
 		err := DeployToKubernetes(ctx, infraK8sResult, state.Logger)
 		if err != nil {
-			return fmt.Errorf("kubernetes deployment failed: %v", err)
+			return errors.New(errors.CodeDeploymentFailed, "deploy_step", "kubernetes deployment failed", err)
 		}
 	}
 
@@ -544,7 +545,7 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 	}
 
 	if state.K8sResult == nil {
-		return fmt.Errorf("K8s result is required for deployment verification")
+		return errors.New(errors.CodeInvalidState, "verify_step", "K8s result is required for deployment verification", nil)
 	}
 
 	// Convert workflow K8sResult to infrastructure K8sResult
@@ -568,7 +569,7 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 			state.Logger.Warn("Deployment health check failed (non-critical)", "error", err)
 			// In strict mode, fail the workflow for health check errors
 			if state.Args.StrictMode {
-				return fmt.Errorf("deployment health check failed in strict mode: %v", err)
+				return errors.New(errors.CodeDeploymentFailed, "verify_step", "deployment health check failed in strict mode", err)
 			}
 			// Otherwise, don't fail the workflow for health check issues - just warn
 		} else {
@@ -580,7 +581,7 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 		if err != nil {
 			// In strict mode, fail the workflow for endpoint retrieval errors
 			if state.Args.StrictMode {
-				return fmt.Errorf("failed to get service endpoint in strict mode: %v", err)
+				return errors.New(errors.CodeKubernetesApiError, "verify_step", "failed to get service endpoint in strict mode", err)
 			}
 			// Otherwise, log the error but don't fail the workflow
 			state.Logger.Warn("Failed to get service endpoint (non-critical)", "error", err)

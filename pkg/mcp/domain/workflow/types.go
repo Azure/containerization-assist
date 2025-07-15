@@ -292,6 +292,30 @@ type WorkflowState struct {
 
 	// Utilities
 	Logger *slog.Logger
+
+	// AI Enhancement fields
+	allSteps     []Step                // Cache of all workflow steps
+	optimization *WorkflowOptimization // Cached optimization results
+}
+
+// GetAllSteps returns all workflow steps (used for optimization analysis)
+func (ws *WorkflowState) GetAllSteps() []Step {
+	return ws.allSteps
+}
+
+// SetAllSteps sets all workflow steps (called during initialization)
+func (ws *WorkflowState) SetAllSteps(steps []Step) {
+	ws.allSteps = steps
+}
+
+// GetOptimization returns cached workflow optimization results
+func (ws *WorkflowState) GetOptimization() *WorkflowOptimization {
+	return ws.optimization
+}
+
+// SetOptimization caches workflow optimization results
+func (ws *WorkflowState) SetOptimization(optimization *WorkflowOptimization) {
+	ws.optimization = optimization
 }
 
 // ProgressEmitterFactory creates progress emitters for different transport modes

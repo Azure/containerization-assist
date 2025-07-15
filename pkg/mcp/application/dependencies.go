@@ -2,6 +2,7 @@
 package application
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
@@ -62,9 +63,59 @@ type Dependencies struct {
 	PromptManager  domainprompts.Manager
 }
 
+// Validate checks that all required dependencies are present
+func (d *Dependencies) Validate() error {
+	var errs []error
+
+	// Core services validation
+	if d.Logger == nil {
+		errs = append(errs, fmt.Errorf("logger is required"))
+	}
+	if d.SessionManager == nil {
+		errs = append(errs, fmt.Errorf("session manager is required"))
+	}
+	if d.ResourceStore == nil {
+		errs = append(errs, fmt.Errorf("resource store is required"))
+	}
+
+	// Domain services validation
+	if d.ProgressEmitterFactory == nil {
+		errs = append(errs, fmt.Errorf("progress emitter factory is required"))
+	}
+	if d.EventPublisher == nil {
+		errs = append(errs, fmt.Errorf("event publisher is required"))
+	}
+	if d.SagaCoordinator == nil {
+		errs = append(errs, fmt.Errorf("saga coordinator is required"))
+	}
+
+	// Workflow orchestrators validation
+	if d.WorkflowOrchestrator == nil {
+		errs = append(errs, fmt.Errorf("workflow orchestrator is required"))
+	}
+
+	// Infrastructure services validation
+	if d.SamplingClient == nil {
+		errs = append(errs, fmt.Errorf("sampling client is required"))
+	}
+	if d.PromptManager == nil {
+		errs = append(errs, fmt.Errorf("prompt manager is required"))
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("dependency validation failed: %v", errs)
+	}
+	return nil
+}
+
 // NewMCPServerFromDeps creates a new MCP server that implements api.MCPServer.
 // This is used by Wire for dependency injection.
-func NewMCPServerFromDeps(deps *Dependencies) api.MCPServer {
+func NewMCPServerFromDeps(deps *Dependencies) (api.MCPServer, error) {
+	// Validate dependencies first
+	if err := deps.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid dependencies: %w", err)
+	}
+
 	// Convert legacy Dependencies to interface capsules
 	services := NewServiceProvider(FromLegacyDependencies(deps))
 
@@ -88,7 +139,7 @@ func NewMCPServerFromDeps(deps *Dependencies) api.MCPServer {
 		services:         services,
 		lifecycleManager: lifecycleManager,
 		bootstrapper:     bootstrapper,
-	}
+	}, nil
 }
 
 // NewMCPServerFromServices creates a new MCP server using interface capsules.

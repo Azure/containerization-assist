@@ -25,6 +25,8 @@ var ObservabilityProviders = wire.NewSet(
 
 	// Metrics
 	ProvideMetricsProvider,
+	ProvideWorkflowMetricsCollector,
+	metrics.MetricsBindings,
 
 	// Configuration
 	ProvideObservabilityConfig,
@@ -88,6 +90,11 @@ func ProvideObservabilityConfig() *ObservabilityConfig {
 func ProvideMetricsProvider(logger *slog.Logger) (*metrics.MetricsProvider, error) {
 	config := metrics.DefaultConfig()
 	return metrics.NewMetricsProvider(config, logger)
+}
+
+// ProvideWorkflowMetricsCollector creates a new workflow metrics collector
+func ProvideWorkflowMetricsCollector(logger *slog.Logger) *metrics.WorkflowMetricsCollector {
+	return metrics.NewWorkflowMetricsCollector("container_kit")
 }
 
 // ObservabilityConfig provides configuration for the entire observability system

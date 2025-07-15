@@ -4,6 +4,7 @@ package ai_ml
 import (
 	"log/slog"
 
+	"github.com/Azure/container-kit/pkg/mcp/application"
 	domainml "github.com/Azure/container-kit/pkg/mcp/domain/ml"
 	domainprompts "github.com/Azure/container-kit/pkg/mcp/domain/prompts"
 	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
@@ -25,8 +26,8 @@ var Providers = wire.NewSet(
 	ProvidePromptManager,
 
 	// Machine learning services
-	ml.NewErrorPatternRecognizer,
-	wire.Bind(new(domainml.ErrorPatternRecognizer), new(*ml.ErrorPatternRecognizer)),
+	ml.NewAdvancedPatternRecognizer,
+	wire.Bind(new(domainml.ErrorPatternRecognizer), new(*ml.AdvancedPatternRecognizer)),
 	ml.NewEnhancedErrorHandler,
 	wire.Bind(new(domainml.EnhancedErrorHandler), new(*ml.EnhancedErrorHandler)),
 	ml.NewStepEnhancer,
@@ -60,6 +61,22 @@ func ProvidePromptManager(logger *slog.Logger) (*prompts.Manager, error) {
 		TemplateDir:     "", // Use embedded templates
 		EnableHotReload: false,
 		AllowOverride:   false,
+	}
+
+	return prompts.NewManager(logger, config)
+}
+
+// ProvidePromptManagerWithConfig creates a prompt manager with custom configuration
+func ProvidePromptManagerWithConfig(logger *slog.Logger, llmConfig *application.LLMConfig) (*prompts.Manager, error) {
+	var config prompts.ManagerConfig
+	if llmConfig != nil {
+		config = llmConfig.ToPromptConfig()
+	} else {
+		config = prompts.ManagerConfig{
+			TemplateDir:     "", // Use embedded templates
+			EnableHotReload: false,
+			AllowOverride:   false,
+		}
 	}
 
 	return prompts.NewManager(logger, config)

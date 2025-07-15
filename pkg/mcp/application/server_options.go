@@ -24,6 +24,7 @@ type serverConfig struct {
 	persistence PersistenceServices
 	workflow    WorkflowServices
 	ai          AIServices
+	llmConfig   *LLMConfig
 }
 
 // WithCoreServices sets the core services (Logger, Config, Runner)

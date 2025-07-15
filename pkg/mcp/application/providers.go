@@ -29,6 +29,9 @@ var Providers = wire.NewSet(
 	ProvideAIDeps,
 	ProvideGroupedDependencies,
 
+	// LLM configuration provider
+	ProvideLLMConfig,
+
 	// Legacy dependencies aggregator (for backward compatibility)
 	ProvideDependencies,
 
@@ -162,7 +165,7 @@ func ProvideGroupedDependencies(
 }
 
 // ProvideServer creates the MCP server implementation
-func ProvideServer(deps *Dependencies) api.MCPServer {
+func ProvideServer(deps *Dependencies) (api.MCPServer, error) {
 	return NewMCPServerFromDeps(deps)
 }
 
@@ -204,4 +207,12 @@ func (e *adapterWorkflowEvent) OccurredAt() time.Time { return time.Now() }
 func (e *adapterWorkflowEvent) WorkflowID() string    { return e.workflowID }
 func (e *adapterWorkflowEvent) Serialize() ([]byte, error) {
 	return []byte("{}"), nil
+}
+
+// ProvideLLMConfig provides LLM configuration for the application
+func ProvideLLMConfig() *LLMConfig {
+	// Return default LLM configuration
+	// This can be overridden by server options
+	defaultConfig := DefaultLLMConfig()
+	return &defaultConfig
 }
