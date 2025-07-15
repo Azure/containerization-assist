@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +14,8 @@ import (
 type CommandRunner interface {
 	RunCommand(...string) (string, error)
 	RunCommandStderr(...string) (string, error)
+	// RunWithOutput runs a command with context support and returns combined output
+	RunWithOutput(ctx context.Context, command string, args ...string) (string, error)
 }
 
 type DefaultCommandRunner struct{}
@@ -56,6 +59,15 @@ func (d *DefaultCommandRunner) RunCommandStderr(args ...string) (string, error) 
 	return stderrOutput, cmdErr
 }
 
+// RunWithOutput runs a command with context support and returns combined output
+func (d *DefaultCommandRunner) RunWithOutput(ctx context.Context, command string, args ...string) (string, error) {
+	logger.Debugf("Running command with context: %s %v", command, args)
+	cmd := exec.CommandContext(ctx, command, args...)
+	out, err := cmd.CombinedOutput()
+	logger.Debugf("Command output: %s", string(out))
+	return string(out), err
+}
+
 type FakeCommandRunner struct {
 	Output string
 	ErrStr string
@@ -75,4 +87,12 @@ func (f *FakeCommandRunner) RunCommandStderr(args ...string) (string, error) {
 		return f.ErrStr, errors.New(f.ErrStr)
 	}
 	return "", nil
+}
+
+// RunWithOutput implements the context-aware method for FakeCommandRunner
+func (f *FakeCommandRunner) RunWithOutput(ctx context.Context, command string, args ...string) (string, error) {
+	if f.ErrStr != "" {
+		return f.Output, errors.New(f.ErrStr)
+	}
+	return f.Output, nil
 }

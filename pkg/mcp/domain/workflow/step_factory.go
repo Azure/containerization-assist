@@ -3,46 +3,52 @@ package workflow
 
 import (
 	"log/slog"
-
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ml"
 )
 
 // StepFactory creates workflow steps with optional optimizations
 type StepFactory struct {
-	optimizedBuild *ml.OptimizedBuildStep
-	logger         *slog.Logger
+	stepProvider       StepProvider
+	optimizer          BuildOptimizer
+	optimizedBuildStep Step // Pre-created optimized build step from infrastructure
+	logger             *slog.Logger
 }
 
 // NewStepFactory creates a new step factory
-func NewStepFactory(optimizedBuild *ml.OptimizedBuildStep, logger *slog.Logger) *StepFactory {
+func NewStepFactory(stepProvider StepProvider, optimizer BuildOptimizer, optimizedBuildStep Step, logger *slog.Logger) *StepFactory {
 	return &StepFactory{
-		optimizedBuild: optimizedBuild,
-		logger:         logger,
+		stepProvider:       stepProvider,
+		optimizer:          optimizer,
+		optimizedBuildStep: optimizedBuildStep,
+		logger:             logger,
 	}
 }
 
 // CreateBuildStep creates either an optimized or standard build step
 func (f *StepFactory) CreateBuildStep() Step {
-	if f.optimizedBuild != nil {
+	if f.optimizedBuildStep != nil {
 		f.logger.Info("Creating optimized build step with AI-powered resource prediction")
-		return NewOptimizedBuildStep(f.optimizedBuild)
+		return f.optimizedBuildStep
 	}
 	f.logger.Info("Creating standard build step")
-	return NewBuildStep()
+	return f.stepProvider.GetBuildStep()
 }
 
 // CreateAllSteps creates all workflow steps with appropriate optimizations
 func (f *StepFactory) CreateAllSteps() []Step {
+	if f.stepProvider == nil {
+		f.logger.Warn("Step provider is nil, creating empty step list")
+		return []Step{}
+	}
 	return []Step{
-		NewAnalyzeStep(),
-		NewDockerfileStep(),
+		f.stepProvider.GetAnalyzeStep(),
+		f.stepProvider.GetDockerfileStep(),
 		f.CreateBuildStep(), // Use factory to create appropriate build step
-		NewScanStep(),
-		NewTagStep(),
-		NewPushStep(),
-		NewManifestStep(),
-		NewClusterStep(),
-		NewDeployStep(),
-		NewVerifyStep(),
+		f.stepProvider.GetScanStep(),
+		f.stepProvider.GetTagStep(),
+		f.stepProvider.GetPushStep(),
+		f.stepProvider.GetManifestStep(),
+		f.stepProvider.GetClusterStep(),
+		f.stepProvider.GetDeployStep(),
+		f.stepProvider.GetVerifyStep(),
 	}
 }

@@ -3,11 +3,11 @@ package events
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"log/slog"
 	"sync/atomic"
 	"time"
-
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/sampling"
 )
 
 // ProgressEventHandler updates progress tracking based on workflow events
@@ -106,7 +106,6 @@ func GetGlobalWorkflowMetrics() *WorkflowMetrics {
 // MetricsEventHandler collects metrics from workflow events
 type MetricsEventHandler struct {
 	logger          *slog.Logger
-	samplingMetrics *sampling.MetricsCollector
 	workflowMetrics *WorkflowMetrics
 }
 
@@ -114,7 +113,6 @@ type MetricsEventHandler struct {
 func NewMetricsEventHandler(logger *slog.Logger) *MetricsEventHandler {
 	return &MetricsEventHandler{
 		logger:          logger.With("component", "metrics_event_handler"),
-		samplingMetrics: sampling.GetGlobalMetrics(),
 		workflowMetrics: GetGlobalWorkflowMetrics(),
 	}
 }
@@ -205,15 +203,15 @@ type EventUtils struct{}
 
 // GenerateEventID creates a unique event ID
 func (EventUtils) GenerateEventID() string {
-	return time.Now().Format("20060102150405") + "-" + generateRandomString(6)
+	return time.Now().Format("20060102150405") + "-" + generateShortID()
 }
 
-// generateRandomString creates a random string for event IDs
-func generateRandomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[time.Now().UnixNano()%int64(len(charset))]
+// generateShortID creates a short random ID for internal use
+func generateShortID() string {
+	b := make([]byte, 4)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback to timestamp-based ID if crypto/rand fails
+		return hex.EncodeToString([]byte{byte(time.Now().UnixNano() & 0xFF)})
 	}
-	return string(b)
+	return hex.EncodeToString(b)
 }

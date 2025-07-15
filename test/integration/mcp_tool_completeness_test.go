@@ -272,7 +272,6 @@ func main() {
 
 func (suite *MCPToolCompletenessTestSuite) extractToolResult(resultRaw interface{}) map[string]interface{} {
 	if result, ok := resultRaw.(map[string]interface{}); ok {
-		// Handle gomcp response format with content wrapper
 		if content, ok := result["content"]; ok {
 			if contentArray, ok := content.([]interface{}); ok && len(contentArray) > 0 {
 				if contentItem, ok := contentArray[0].(map[string]interface{}); ok {

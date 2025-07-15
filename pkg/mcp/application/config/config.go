@@ -22,6 +22,7 @@ type Config struct {
 	MaxSessions       int           `env:"MCP_MAX_SESSIONS" yaml:"max_sessions"`
 	MaxDiskPerSession int64         `env:"MCP_MAX_DISK_PER_SESSION" yaml:"max_disk_per_session"`
 	TotalDiskLimit    int64         `env:"MCP_TOTAL_DISK_LIMIT" yaml:"total_disk_limit"`
+	CleanupInterval   time.Duration `env:"MCP_CLEANUP_INTERVAL" yaml:"cleanup_interval"`
 
 	// Transport settings
 	TransportType string   `env:"MCP_TRANSPORT" yaml:"transport_type"`
@@ -30,7 +31,9 @@ type Config struct {
 	CORSOrigins   []string `env:"MCP_CORS_ORIGINS" yaml:"cors_origins"`
 
 	// Logging settings
-	LogLevel string `env:"MCP_LOG_LEVEL" yaml:"log_level"`
+	LogLevel       string `env:"MCP_LOG_LEVEL" yaml:"log_level"`
+	LogHTTPBodies  bool   `env:"MCP_LOG_HTTP_BODIES" yaml:"log_http_bodies"`
+	MaxBodyLogSize int64  `env:"MCP_MAX_BODY_LOG_SIZE" yaml:"max_body_log_size"`
 
 	// Prompt settings
 	PromptTemplateDir   string `env:"MCP_PROMPT_TEMPLATE_DIR" yaml:"prompt_template_dir"`
@@ -38,10 +41,79 @@ type Config struct {
 	PromptAllowOverride bool   `env:"MCP_PROMPT_ALLOW_OVERRIDE" yaml:"prompt_allow_override"`
 
 	// Sampling settings
-	SamplingEndpoint    string  `env:"MCP_SAMPLING_ENDPOINT" yaml:"sampling_endpoint"`
-	SamplingAPIKey      string  `env:"MCP_SAMPLING_API_KEY" yaml:"sampling_api_key"`
-	SamplingMaxTokens   int32   `env:"MCP_SAMPLING_MAX_TOKENS" yaml:"sampling_max_tokens"`
-	SamplingTemperature float32 `env:"MCP_SAMPLING_TEMPERATURE" yaml:"sampling_temperature"`
+	SamplingEndpoint      string        `env:"MCP_SAMPLING_ENDPOINT" yaml:"sampling_endpoint"`
+	SamplingAPIKey        string        `env:"MCP_SAMPLING_API_KEY" yaml:"sampling_api_key"`
+	SamplingMaxTokens     int32         `env:"MCP_SAMPLING_MAX_TOKENS" yaml:"sampling_max_tokens"`
+	SamplingTemperature   float32       `env:"MCP_SAMPLING_TEMPERATURE" yaml:"sampling_temperature"`
+	SamplingRetryAttempts int           `env:"MCP_SAMPLING_RETRY_ATTEMPTS" yaml:"sampling_retry_attempts"`
+	SamplingTokenBudget   int           `env:"MCP_SAMPLING_TOKEN_BUDGET" yaml:"sampling_token_budget"`
+	SamplingBaseBackoff   time.Duration `env:"MCP_SAMPLING_BASE_BACKOFF" yaml:"sampling_base_backoff"`
+	SamplingMaxBackoff    time.Duration `env:"MCP_SAMPLING_MAX_BACKOFF" yaml:"sampling_max_backoff"`
+	SamplingStreaming     bool          `env:"MCP_SAMPLING_STREAMING" yaml:"sampling_streaming"`
+	SamplingTimeout       time.Duration `env:"MCP_SAMPLING_TIMEOUT" yaml:"sampling_timeout"`
+
+	// Tracing settings
+	TracingEnabled     bool    `env:"MCP_TRACING_ENABLED" yaml:"tracing_enabled"`
+	TracingEndpoint    string  `env:"MCP_TRACING_ENDPOINT" yaml:"tracing_endpoint"`
+	TracingServiceName string  `env:"MCP_TRACING_SERVICE_NAME" yaml:"tracing_service_name"`
+	TracingSampleRate  float64 `env:"MCP_TRACING_SAMPLE_RATE" yaml:"tracing_sample_rate"`
+
+	// Security settings
+	SecurityScanEnabled    bool     `env:"MCP_SECURITY_SCAN_ENABLED" yaml:"security_scan_enabled"`
+	SecurityScanners       []string `env:"MCP_SECURITY_SCANNERS" yaml:"security_scanners"`
+	SecurityFailOnHigh     bool     `env:"MCP_SECURITY_FAIL_ON_HIGH" yaml:"security_fail_on_high"`
+	SecurityFailOnCritical bool     `env:"MCP_SECURITY_FAIL_ON_CRITICAL" yaml:"security_fail_on_critical"`
+
+	// Registry settings
+	RegistryURL      string `env:"MCP_REGISTRY_URL" yaml:"registry_url"`
+	RegistryUsername string `env:"MCP_REGISTRY_USERNAME" yaml:"registry_username"`
+	RegistryPassword string `env:"MCP_REGISTRY_PASSWORD" yaml:"registry_password"`
+	RegistryInsecure bool   `env:"MCP_REGISTRY_INSECURE" yaml:"registry_insecure"`
+}
+
+// SamplingConfig holds configuration for the sampling client
+type SamplingConfig struct {
+	MaxTokens        int32         `json:"max_tokens"`
+	Temperature      float32       `json:"temperature"`
+	RetryAttempts    int           `json:"retry_attempts"`
+	TokenBudget      int           `json:"token_budget"`
+	BaseBackoff      time.Duration `json:"base_backoff"`
+	MaxBackoff       time.Duration `json:"max_backoff"`
+	StreamingEnabled bool          `json:"streaming_enabled"`
+	RequestTimeout   time.Duration `json:"request_timeout"`
+	Endpoint         string        `json:"endpoint"`
+	APIKey           string        `json:"api_key"`
+}
+
+// PromptConfig holds configuration for the prompt manager
+type PromptConfig struct {
+	TemplateDir     string `json:"template_dir"`
+	EnableHotReload bool   `json:"enable_hot_reload"`
+	AllowOverride   bool   `json:"allow_override"`
+}
+
+// TracingConfig holds configuration for distributed tracing
+type TracingConfig struct {
+	Enabled     bool    `json:"enabled"`
+	Endpoint    string  `json:"endpoint"`
+	ServiceName string  `json:"service_name"`
+	SampleRate  float64 `json:"sample_rate"`
+}
+
+// SecurityConfig holds configuration for security scanning
+type SecurityConfig struct {
+	ScanEnabled    bool     `json:"scan_enabled"`
+	Scanners       []string `json:"scanners"`
+	FailOnHigh     bool     `json:"fail_on_high"`
+	FailOnCritical bool     `json:"fail_on_critical"`
+}
+
+// RegistryConfig holds configuration for container registry access
+type RegistryConfig struct {
+	URL      string `json:"url"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Insecure bool   `json:"insecure"`
 }
 
 // LoadOption is a functional option for loading configuration
@@ -117,24 +189,60 @@ func Load(opts ...LoadOption) (*Config, error) {
 // DefaultConfig returns the default configuration
 func DefaultConfig() *Config {
 	return &Config{
-		WorkspaceDir:        "/tmp/mcp-workspace",
-		StorePath:           "/tmp/mcp-store/sessions.db",
-		SessionTTL:          24 * time.Hour,
-		MaxSessions:         100,
-		MaxDiskPerSession:   100 * 1024 * 1024,  // 100MB
-		TotalDiskLimit:      1024 * 1024 * 1024, // 1GB
-		TransportType:       "stdio",
-		HTTPAddr:            "0.0.0.0",
-		HTTPPort:            8080,
-		CORSOrigins:         []string{"*"},
-		LogLevel:            "info",
+		// Server settings
+		WorkspaceDir:      "/tmp/mcp-workspace",
+		StorePath:         "/tmp/mcp-store/sessions.db",
+		SessionTTL:        24 * time.Hour,
+		MaxSessions:       100,
+		MaxDiskPerSession: 100 * 1024 * 1024,  // 100MB
+		TotalDiskLimit:    1024 * 1024 * 1024, // 1GB
+		CleanupInterval:   1 * time.Hour,
+
+		// Transport settings
+		TransportType: "stdio",
+		HTTPAddr:      "0.0.0.0",
+		HTTPPort:      8080,
+		CORSOrigins:   []string{"*"},
+
+		// Logging settings
+		LogLevel:       "info",
+		LogHTTPBodies:  false,
+		MaxBodyLogSize: 1024 * 1024, // 1MB
+
+		// Prompt settings
 		PromptTemplateDir:   "",
 		PromptHotReload:     false,
 		PromptAllowOverride: false,
-		SamplingEndpoint:    "",
-		SamplingAPIKey:      "",
-		SamplingMaxTokens:   4096,
-		SamplingTemperature: 0.7,
+
+		// Sampling settings
+		SamplingEndpoint:      "",
+		SamplingAPIKey:        "",
+		SamplingMaxTokens:     4096,
+		SamplingTemperature:   0.7,
+		SamplingRetryAttempts: 3,
+		SamplingTokenBudget:   5000,
+		SamplingBaseBackoff:   200 * time.Millisecond,
+		SamplingMaxBackoff:    10 * time.Second,
+		SamplingStreaming:     false,
+		SamplingTimeout:       30 * time.Second,
+
+		// Tracing settings
+		TracingEnabled:     false,
+		TracingEndpoint:    "",
+		TracingServiceName: "container-kit-mcp",
+		TracingSampleRate:  0.1,
+
+		// Security settings
+		SecurityScanEnabled:    true,
+		SecurityScanners:       []string{"trivy"},
+		SecurityFailOnHigh:     false,
+		SecurityFailOnCritical: true,
+
+		// Registry settings
+		RegistryURL:      "",
+		RegistryUsername: "",
+		RegistryPassword: "",
+		RegistryInsecure: false,
 	}
 }
 
@@ -154,6 +262,7 @@ func loadFromFile(cfg *Config, path string) error {
 
 // loadFromEnv loads configuration from environment variables
 func loadFromEnv(cfg *Config) {
+	// Server settings
 	if v := os.Getenv("MCP_WORKSPACE_DIR"); v != "" {
 		cfg.WorkspaceDir = v
 	}
@@ -180,6 +289,13 @@ func loadFromEnv(cfg *Config) {
 			cfg.TotalDiskLimit = n
 		}
 	}
+	if v := os.Getenv("MCP_CLEANUP_INTERVAL"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.CleanupInterval = d
+		}
+	}
+
+	// Transport settings
 	if v := os.Getenv("MCP_TRANSPORT"); v != "" {
 		cfg.TransportType = v
 	}
@@ -194,9 +310,21 @@ func loadFromEnv(cfg *Config) {
 	if v := os.Getenv("MCP_CORS_ORIGINS"); v != "" {
 		cfg.CORSOrigins = strings.Split(v, ",")
 	}
+
+	// Logging settings
 	if v := os.Getenv("MCP_LOG_LEVEL"); v != "" {
 		cfg.LogLevel = v
 	}
+	if v := os.Getenv("MCP_LOG_HTTP_BODIES"); v != "" {
+		cfg.LogHTTPBodies = v == "true" || v == "1"
+	}
+	if v := os.Getenv("MCP_MAX_BODY_LOG_SIZE"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+			cfg.MaxBodyLogSize = n
+		}
+	}
+
+	// Prompt settings
 	if v := os.Getenv("MCP_PROMPT_TEMPLATE_DIR"); v != "" {
 		cfg.PromptTemplateDir = v
 	}
@@ -206,6 +334,8 @@ func loadFromEnv(cfg *Config) {
 	if v := os.Getenv("MCP_PROMPT_ALLOW_OVERRIDE"); v != "" {
 		cfg.PromptAllowOverride = v == "true" || v == "1"
 	}
+
+	// Sampling settings
 	if v := os.Getenv("MCP_SAMPLING_ENDPOINT"); v != "" {
 		cfg.SamplingEndpoint = v
 	}
@@ -222,10 +352,83 @@ func loadFromEnv(cfg *Config) {
 			cfg.SamplingTemperature = float32(f)
 		}
 	}
+	if v := os.Getenv("MCP_SAMPLING_RETRY_ATTEMPTS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.SamplingRetryAttempts = n
+		}
+	}
+	if v := os.Getenv("MCP_SAMPLING_TOKEN_BUDGET"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.SamplingTokenBudget = n
+		}
+	}
+	if v := os.Getenv("MCP_SAMPLING_BASE_BACKOFF"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.SamplingBaseBackoff = d
+		}
+	}
+	if v := os.Getenv("MCP_SAMPLING_MAX_BACKOFF"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.SamplingMaxBackoff = d
+		}
+	}
+	if v := os.Getenv("MCP_SAMPLING_STREAMING"); v != "" {
+		cfg.SamplingStreaming = v == "true" || v == "1"
+	}
+	if v := os.Getenv("MCP_SAMPLING_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.SamplingTimeout = d
+		}
+	}
+
+	// Tracing settings
+	if v := os.Getenv("MCP_TRACING_ENABLED"); v != "" {
+		cfg.TracingEnabled = v == "true" || v == "1"
+	}
+	if v := os.Getenv("MCP_TRACING_ENDPOINT"); v != "" {
+		cfg.TracingEndpoint = v
+	}
+	if v := os.Getenv("MCP_TRACING_SERVICE_NAME"); v != "" {
+		cfg.TracingServiceName = v
+	}
+	if v := os.Getenv("MCP_TRACING_SAMPLE_RATE"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			cfg.TracingSampleRate = f
+		}
+	}
+
+	// Security settings
+	if v := os.Getenv("MCP_SECURITY_SCAN_ENABLED"); v != "" {
+		cfg.SecurityScanEnabled = v == "true" || v == "1"
+	}
+	if v := os.Getenv("MCP_SECURITY_SCANNERS"); v != "" {
+		cfg.SecurityScanners = strings.Split(v, ",")
+	}
+	if v := os.Getenv("MCP_SECURITY_FAIL_ON_HIGH"); v != "" {
+		cfg.SecurityFailOnHigh = v == "true" || v == "1"
+	}
+	if v := os.Getenv("MCP_SECURITY_FAIL_ON_CRITICAL"); v != "" {
+		cfg.SecurityFailOnCritical = v == "true" || v == "1"
+	}
+
+	// Registry settings
+	if v := os.Getenv("MCP_REGISTRY_URL"); v != "" {
+		cfg.RegistryURL = v
+	}
+	if v := os.Getenv("MCP_REGISTRY_USERNAME"); v != "" {
+		cfg.RegistryUsername = v
+	}
+	if v := os.Getenv("MCP_REGISTRY_PASSWORD"); v != "" {
+		cfg.RegistryPassword = v
+	}
+	if v := os.Getenv("MCP_REGISTRY_INSECURE"); v != "" {
+		cfg.RegistryInsecure = v == "true" || v == "1"
+	}
 }
 
 // Validate checks if the configuration is valid
 func (c *Config) Validate() error {
+	// Server settings validation
 	if c.WorkspaceDir == "" {
 		return fmt.Errorf("workspace_dir is required")
 	}
@@ -235,18 +438,67 @@ func (c *Config) Validate() error {
 	if c.SessionTTL <= 0 {
 		return fmt.Errorf("session_ttl must be positive")
 	}
+	if c.CleanupInterval <= 0 {
+		return fmt.Errorf("cleanup_interval must be positive")
+	}
+
+	// Transport settings validation
 	if c.TransportType != "stdio" && c.TransportType != "http" {
 		return fmt.Errorf("transport_type must be 'stdio' or 'http'")
 	}
 	if c.TransportType == "http" && c.HTTPPort <= 0 {
 		return fmt.Errorf("http_port must be positive when using http transport")
 	}
+
+	// Logging settings validation
+	validLogLevels := []string{"debug", "info", "warn", "error"}
+	valid := false
+	for _, level := range validLogLevels {
+		if c.LogLevel == level {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		return fmt.Errorf("log_level must be one of: %s", strings.Join(validLogLevels, ", "))
+	}
+	if c.MaxBodyLogSize < 0 {
+		return fmt.Errorf("max_body_log_size must be non-negative")
+	}
+
+	// Sampling settings validation
 	if c.SamplingTemperature < 0 || c.SamplingTemperature > 2 {
 		return fmt.Errorf("sampling_temperature must be between 0 and 2")
 	}
 	if c.SamplingMaxTokens <= 0 {
 		return fmt.Errorf("sampling_max_tokens must be positive")
 	}
+	if c.SamplingRetryAttempts < 0 {
+		return fmt.Errorf("sampling_retry_attempts must be non-negative")
+	}
+	if c.SamplingTokenBudget <= 0 {
+		return fmt.Errorf("sampling_token_budget must be positive")
+	}
+	if c.SamplingBaseBackoff <= 0 {
+		return fmt.Errorf("sampling_base_backoff must be positive")
+	}
+	if c.SamplingMaxBackoff <= c.SamplingBaseBackoff {
+		return fmt.Errorf("sampling_max_backoff must be greater than sampling_base_backoff")
+	}
+	if c.SamplingTimeout <= 0 {
+		return fmt.Errorf("sampling_timeout must be positive")
+	}
+
+	// Tracing settings validation
+	if c.TracingSampleRate < 0 || c.TracingSampleRate > 1 {
+		return fmt.Errorf("tracing_sample_rate must be between 0 and 1")
+	}
+
+	// Security settings validation
+	if len(c.SecurityScanners) == 0 && c.SecurityScanEnabled {
+		return fmt.Errorf("security_scanners cannot be empty when security scanning is enabled")
+	}
+
 	return nil
 }
 
@@ -259,10 +511,68 @@ func (c *Config) ToServerConfig() workflow.ServerConfig {
 		MaxSessions:       c.MaxSessions,
 		MaxDiskPerSession: c.MaxDiskPerSession,
 		TotalDiskLimit:    c.TotalDiskLimit,
+		CleanupInterval:   c.CleanupInterval,
 		TransportType:     c.TransportType,
 		HTTPAddr:          c.HTTPAddr,
 		HTTPPort:          c.HTTPPort,
 		CORSOrigins:       c.CORSOrigins,
 		LogLevel:          c.LogLevel,
+		LogHTTPBodies:     c.LogHTTPBodies,
+		MaxBodyLogSize:    c.MaxBodyLogSize,
+	}
+}
+
+// ToSamplingConfig creates a sampling configuration from the unified config
+func (c *Config) ToSamplingConfig() SamplingConfig {
+	return SamplingConfig{
+		MaxTokens:        c.SamplingMaxTokens,
+		Temperature:      c.SamplingTemperature,
+		RetryAttempts:    c.SamplingRetryAttempts,
+		TokenBudget:      c.SamplingTokenBudget,
+		BaseBackoff:      c.SamplingBaseBackoff,
+		MaxBackoff:       c.SamplingMaxBackoff,
+		StreamingEnabled: c.SamplingStreaming,
+		RequestTimeout:   c.SamplingTimeout,
+		Endpoint:         c.SamplingEndpoint,
+		APIKey:           c.SamplingAPIKey,
+	}
+}
+
+// ToPromptConfig creates a prompt configuration from the unified config
+func (c *Config) ToPromptConfig() PromptConfig {
+	return PromptConfig{
+		TemplateDir:     c.PromptTemplateDir,
+		EnableHotReload: c.PromptHotReload,
+		AllowOverride:   c.PromptAllowOverride,
+	}
+}
+
+// ToTracingConfig creates a tracing configuration from the unified config
+func (c *Config) ToTracingConfig() TracingConfig {
+	return TracingConfig{
+		Enabled:     c.TracingEnabled,
+		Endpoint:    c.TracingEndpoint,
+		ServiceName: c.TracingServiceName,
+		SampleRate:  c.TracingSampleRate,
+	}
+}
+
+// ToSecurityConfig creates a security configuration from the unified config
+func (c *Config) ToSecurityConfig() SecurityConfig {
+	return SecurityConfig{
+		ScanEnabled:    c.SecurityScanEnabled,
+		Scanners:       c.SecurityScanners,
+		FailOnHigh:     c.SecurityFailOnHigh,
+		FailOnCritical: c.SecurityFailOnCritical,
+	}
+}
+
+// ToRegistryConfig creates a registry configuration from the unified config
+func (c *Config) ToRegistryConfig() RegistryConfig {
+	return RegistryConfig{
+		URL:      c.RegistryURL,
+		Username: c.RegistryUsername,
+		Password: c.RegistryPassword,
+		Insecure: c.RegistryInsecure,
 	}
 }

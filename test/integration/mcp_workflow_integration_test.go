@@ -337,7 +337,18 @@ func (suite *MCPWorkflowIntegrationSuite) runCompleteWorkflow(repo TestRepositor
 
 // startMCPServer starts the MCP server for testing
 func (suite *MCPWorkflowIntegrationSuite) startMCPServer(ctx context.Context) *MCPServerInstance {
-	cmd := exec.CommandContext(ctx, suite.serverBinaryPath, "--transport", "stdio")
+	// Create unique workspace and store paths for this test instance
+	uniqueSuffix := fmt.Sprintf("-%d-%d", os.Getpid(), time.Now().Unix())
+	workspaceDir := suite.tempDir + "/workspace" + uniqueSuffix
+	storePath := suite.tempDir + "/sessions" + uniqueSuffix + ".db"
+
+	// Create workspace directory
+	require.NoError(suite.T(), os.MkdirAll(workspaceDir, 0755))
+
+	cmd := exec.CommandContext(ctx, suite.serverBinaryPath,
+		"--transport", "stdio",
+		"--workspace-dir", workspaceDir,
+		"--store-path", storePath)
 
 	// Get all pipes before starting
 	stdin, err := cmd.StdinPipe()
@@ -645,7 +656,6 @@ func (suite *MCPWorkflowIntegrationSuite) TestMCPToolCommunication() {
 			assert.Contains(suite.T(), response, "result")
 			if resultRaw, ok := response["result"]; ok && resultRaw != nil {
 				if result, ok := resultRaw.(map[string]interface{}); ok {
-					// Handle gomcp response format with content wrapper
 					if content, ok := result["content"]; ok {
 						if contentArray, ok := content.([]interface{}); ok && len(contentArray) > 0 {
 							if contentItem, ok := contentArray[0].(map[string]interface{}); ok {

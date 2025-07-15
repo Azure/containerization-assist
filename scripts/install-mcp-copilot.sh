@@ -55,13 +55,11 @@ fi
 
 # Make it executable
 chmod +x container-kit-mcp
-chmod +x scripts/container-kit-mcp-wrapper.sh
 
 echo -e "${GREEN}Build successful!${NC}"
 
-# Get the absolute paths
+# Get the absolute path
 MCP_BINARY="$PROJECT_ROOT/container-kit-mcp"
-WRAPPER_SCRIPT="$PROJECT_ROOT/scripts/container-kit-mcp-wrapper.sh"
 
 echo ""
 echo -e "${BLUE}Setting up GitHub Copilot integration...${NC}"
@@ -84,7 +82,7 @@ if [ -d ".vscode" ]; then
   "servers": {
     "containerKit": {
       "type": "stdio",
-      "command": "$WRAPPER_SCRIPT",
+      "command": "$MCP_BINARY",
       "args": [],
       "description": "Container Kit - AI-powered containerization and Kubernetes deployment"
     }
@@ -114,7 +112,7 @@ else
     echo "  \"servers\": {"
     echo "    \"containerKit\": {"
     echo "      \"type\": \"stdio\","
-    echo "      \"command\": \"$WRAPPER_SCRIPT\","
+    echo "      \"command\": \"$MCP_BINARY\","
     echo "      \"args\": []"
     echo "    }"
     echo "  }"
@@ -133,7 +131,6 @@ echo "5. In Copilot Chat, ask: 'Help me containerize my application'"
 echo ""
 echo "Installed components:"
 echo "- MCP Server: $MCP_BINARY"
-echo "- Wrapper Script: $WRAPPER_SCRIPT"
 if [ -f "$MCP_CONFIG_FILE" ]; then
     echo "- VS Code Config: $MCP_CONFIG_FILE"
 fi
@@ -162,7 +159,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
 
     # Test the server can start properly by redirecting logs
     echo "Starting server test (logs redirected to /tmp/container-kit-test.log)..."
-    if timeout 3s "$WRAPPER_SCRIPT" > /tmp/container-kit-test.log 2>&1; then
+    if timeout 3s "$MCP_BINARY" > /tmp/container-kit-test.log 2>&1; then
         echo -e "${GREEN}✅ Server started successfully${NC}"
     else
         # Check if it timed out (which is expected) or failed

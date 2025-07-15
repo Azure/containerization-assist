@@ -4,6 +4,7 @@ package workflow
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -19,6 +20,7 @@ type ErrorContext struct {
 
 // ProgressiveErrorContext accumulates error context across workflow execution
 type ProgressiveErrorContext struct {
+	mu          sync.RWMutex
 	errors      []ErrorContext
 	maxHistory  int
 	stepSummary map[string]string // Summary of errors per step
@@ -35,6 +37,9 @@ func NewProgressiveErrorContext(maxHistory int) *ProgressiveErrorContext {
 
 // AddError adds a new error to the context
 func (pec *ProgressiveErrorContext) AddError(step string, err error, attempt int, context map[string]interface{}) {
+	pec.mu.Lock()
+	defer pec.mu.Unlock()
+
 	errorContext := ErrorContext{
 		Step:      step,
 		Error:     err.Error(),
@@ -57,6 +62,9 @@ func (pec *ProgressiveErrorContext) AddError(step string, err error, attempt int
 
 // AddFixAttempt records a fix that was attempted
 func (pec *ProgressiveErrorContext) AddFixAttempt(step string, fix string) {
+	pec.mu.Lock()
+	defer pec.mu.Unlock()
+
 	// Find the most recent error for this step
 	for i := len(pec.errors) - 1; i >= 0; i-- {
 		if pec.errors[i].Step == step {
@@ -78,6 +86,9 @@ func (pec *ProgressiveErrorContext) updateStepSummary(step string, errorMsg stri
 
 // GetRecentErrors returns the most recent errors
 func (pec *ProgressiveErrorContext) GetRecentErrors(count int) []ErrorContext {
+	pec.mu.RLock()
+	defer pec.mu.RUnlock()
+
 	if count > len(pec.errors) {
 		count = len(pec.errors)
 	}
@@ -87,11 +98,17 @@ func (pec *ProgressiveErrorContext) GetRecentErrors(count int) []ErrorContext {
 		start = 0
 	}
 
-	return pec.errors[start:]
+	// Return a copy to avoid data races
+	result := make([]ErrorContext, count)
+	copy(result, pec.errors[start:])
+	return result
 }
 
 // GetStepErrors returns all errors for a specific step
 func (pec *ProgressiveErrorContext) GetStepErrors(step string) []ErrorContext {
+	pec.mu.RLock()
+	defer pec.mu.RUnlock()
+
 	stepErrors := []ErrorContext{}
 	for _, err := range pec.errors {
 		if err.Step == step {
@@ -103,6 +120,9 @@ func (pec *ProgressiveErrorContext) GetStepErrors(step string) []ErrorContext {
 
 // GetSummary returns a human-readable summary of all errors
 func (pec *ProgressiveErrorContext) GetSummary() string {
+	pec.mu.RLock()
+	defer pec.mu.RUnlock()
+
 	if len(pec.errors) == 0 {
 		return "No errors recorded"
 	}
@@ -143,6 +163,7 @@ func (pec *ProgressiveErrorContext) GetSummary() string {
 
 // GetAIContext returns context formatted for AI analysis
 func (pec *ProgressiveErrorContext) GetAIContext() string {
+	// Note: GetRecentErrors handles its own locking
 	var context strings.Builder
 
 	context.WriteString("PREVIOUS ERRORS AND ATTEMPTS:\n")
@@ -186,6 +207,9 @@ func (pec *ProgressiveErrorContext) GetAIContext() string {
 
 // HasRepeatedErrors checks if the same error has occurred multiple times
 func (pec *ProgressiveErrorContext) HasRepeatedErrors(step string, threshold int) bool {
+	pec.mu.RLock()
+	defer pec.mu.RUnlock()
+
 	count := 0
 	lastError := ""
 
@@ -208,6 +232,7 @@ func (pec *ProgressiveErrorContext) HasRepeatedErrors(step string, threshold int
 
 // ShouldEscalate determines if errors should be escalated based on patterns
 func (pec *ProgressiveErrorContext) ShouldEscalate(step string) bool {
+	// Note: HasRepeatedErrors and GetStepErrors handle their own locking
 	// Escalate if:
 	// 1. Same error repeated 3+ times
 	if pec.HasRepeatedErrors(step, 3) {

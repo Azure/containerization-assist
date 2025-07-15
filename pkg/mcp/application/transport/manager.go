@@ -6,8 +6,14 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/registry"
 	"github.com/mark3labs/mcp-go/server"
 )
+
+// Transport defines the interface for MCP transport implementations
+type Transport interface {
+	Serve(ctx context.Context, mcpServer *server.MCPServer) error
+}
 
 // TransportType represents the type of transport
 type TransportType string
@@ -17,36 +23,36 @@ const (
 	TransportTypeHTTP  TransportType = "http"
 )
 
-// Manager handles transport lifecycle management
-type Manager struct {
-	logger        *slog.Logger
-	transportType TransportType
-	httpPort      int
+// TransportRegistry is a type alias for the generic registry
+type TransportRegistry = registry.Registry[Transport]
+
+// Registry holds registered transport implementations
+type Registry struct {
+	transports *TransportRegistry
+	logger     *slog.Logger
 }
 
-// NewManager creates a new transport manager
-func NewManager(logger *slog.Logger, transportType TransportType, httpPort int) *Manager {
-	return &Manager{
-		logger:        logger.With("component", "transport_manager"),
-		transportType: transportType,
-		httpPort:      httpPort,
+// NewRegistry creates a new transport registry
+func NewRegistry(logger *slog.Logger) *Registry {
+	return &Registry{
+		transports: registry.New[Transport](),
+		logger:     logger.With("component", "transport_registry"),
 	}
 }
 
-// Start starts the appropriate transport based on configuration
-func (m *Manager) Start(ctx context.Context, mcpServer *server.MCPServer) error {
-	m.logger.Info("Starting transport", "type", m.transportType)
+// Register adds a transport implementation to the registry
+func (r *Registry) Register(transportType TransportType, transport Transport) {
+	r.transports.Add(string(transportType), transport)
+	r.logger.Debug("Transport registered", "type", transportType)
+}
 
-	switch m.transportType {
-	case TransportTypeStdio:
-		transport := NewStdioTransport(m.logger)
-		return transport.ServeStdio(ctx, mcpServer)
-
-	case TransportTypeHTTP:
-		transport := NewHTTPTransport(m.logger, m.httpPort)
-		return transport.ServeHTTP(ctx, mcpServer)
-
-	default:
-		return fmt.Errorf("unsupported transport type: %s", m.transportType)
+// Start starts the specified transport
+func (r *Registry) Start(ctx context.Context, transportType TransportType, mcpServer *server.MCPServer) error {
+	transport, exists := r.transports.Get(string(transportType))
+	if !exists {
+		return fmt.Errorf("unsupported transport type: %s", transportType)
 	}
+
+	r.logger.Info("Starting transport", "type", transportType)
+	return transport.Serve(ctx, mcpServer)
 }

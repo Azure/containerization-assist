@@ -1,8 +1,5 @@
 // Package api provides the pure interface definitions for the MCP system.
 // This package contains only interfaces and data contracts with NO implementation code.
-//
-// Dependency flow: Infrastructure → Application → Domain → API
-// The API layer must remain stable and contain no business logic.
 package api
 
 import (
@@ -16,10 +13,7 @@ import (
 
 // MCPServer represents the main MCP server interface
 type MCPServer interface {
-	// Start starts the server
 	Start(ctx context.Context) error
-
-	// Stop gracefully shuts down the server
 	Stop(ctx context.Context) error
 }
 
@@ -29,16 +23,9 @@ type MCPServer interface {
 
 // Tool is the canonical interface for all MCP tools
 type Tool interface {
-	// Name returns the unique identifier for this tool
 	Name() string
-
-	// Description returns a human-readable description of the tool
 	Description() string
-
-	// Execute runs the tool with the given input
 	Execute(ctx context.Context, input ToolInput) (ToolOutput, error)
-
-	// Schema returns the JSON schema for the tool's parameters and results
 	Schema() ToolSchema
 }
 
@@ -241,4 +228,38 @@ type BuildResult struct {
 	Success   bool          `json:"success"`
 	Error     string        `json:"error,omitempty"`
 	Duration  time.Duration `json:"duration"`
+}
+
+// ============================================================================
+// Progress Reporting Interfaces
+// ============================================================================
+
+// ProgressEmitter provides clean interface for progress reporting across transports
+type ProgressEmitter interface {
+	// Emit reports progress with step, percent, and message
+	Emit(ctx context.Context, stage string, percent int, message string) error
+
+	// EmitDetailed reports progress with full structured update
+	EmitDetailed(ctx context.Context, update ProgressUpdate) error
+
+	// Close finalizes the progress reporting
+	Close() error
+}
+
+// ============================================================================
+// Progress Data Structures
+// ============================================================================
+
+// ProgressUpdate represents a structured progress report
+type ProgressUpdate struct {
+	Step       int                    `json:"step"`
+	Total      int                    `json:"total"`
+	Stage      string                 `json:"stage"`
+	Message    string                 `json:"message"`
+	Percentage int                    `json:"percentage"` // 0-100
+	StartedAt  time.Time              `json:"started_at"`
+	ETA        time.Duration          `json:"eta,omitempty"`
+	Status     string                 `json:"status,omitempty"`
+	TraceID    string                 `json:"trace_id,omitempty"`
+	Metadata   map[string]interface{} `json:"metadata,omitempty"`
 }

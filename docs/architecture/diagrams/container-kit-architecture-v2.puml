@@ -1,0 +1,244 @@
+@startuml Container Kit - Clean Architecture with Composition Root
+!theme plain
+title Container Kit MCP Server - Four-Layer Architecture + Composition Root\nSimplified Workflow Architecture with Decorator Pattern
+
+' Define layer colors
+!define COMPOSITION_COLOR #FFEBEE
+!define API_COLOR #E8F5E9
+!define APP_COLOR #E3F2FD  
+!define DOMAIN_COLOR #F3E5F5
+!define INFRA_COLOR #FFF3E0
+
+package "External Clients" {
+  [Claude Desktop] as Client
+  [MCP CLI] as CLI
+  [HTTP Clients] as HTTP
+}
+
+package "Transport Layer" {
+  [MCP Protocol] as Protocol
+  [HTTP Transport] as HTTPTransport
+  [Stdio Transport] as StdioTransport
+}
+
+rectangle "**Composition Root**" COMPOSITION_COLOR {
+  package "Dependency Injection" {
+    [Server Composer] as ServerComposer
+    [Provider Functions] as Providers
+    [Wire Generated] as WireGen
+  }
+  note right of ServerComposer : Outside 4-layer architecture\nPure dependency wiring\nNo business logic
+}
+
+rectangle "**API Layer**" API_COLOR {
+  package "Interfaces Only" {
+    [MCP Tool Interface] as ToolAPI
+    [Orchestrator Interface] as OrchAPI
+    [Session Interface] as SessionAPI
+    [Event Interface] as EventAPI
+  }
+  note right of ToolAPI : Pure interfaces\nNo implementations\nStable contracts
+}
+
+rectangle "**Application Layer**" APP_COLOR {
+  package "MCP Server" {
+    [Server Core] as Server
+    [Transport Manager] as TransportMgr
+    [Tool Registrar] as ToolReg
+    [Session Service] as SessionSvc
+  }
+  
+  package "Workflow Application" {
+    [Containerize Handler] as ContainerizeHandler
+    [Command Handlers] as CmdHandlers
+    [Query Handlers] as QueryHandlers
+  }
+  
+  package "Configuration" {
+    [Config Service] as Config
+    [Environment Loader] as EnvLoader
+  }
+  
+  note right of Server : MCP protocol handling\nTool registration\nSession coordination
+}
+
+rectangle "**Domain Layer**" DOMAIN_COLOR {
+  package "Workflow Core" {
+    [Base Orchestrator] as BaseOrch
+    [Event Aware Orchestrator] as EventOrch
+    [Saga Aware Orchestrator] as SagaOrch
+    [Workflow Types] as WorkflowTypes
+  }
+  
+  package "Error Handling" {
+    [Progressive Error Context] as ErrorContext
+    [Error Escalation] as Escalation
+    [AI Recovery Context] as AIContext
+  }
+  
+  package "Domain Events" {
+    [Event Publisher] as EventPub
+    [Workflow Events] as WorkflowEvents
+    [Saga Coordinator] as SagaCoord
+  }
+  
+  package "Progress Domain" {
+    [Progress Tracker] as ProgressTracker
+    [Progress Emitter] as ProgressEmitter
+  }
+  
+  note right of BaseOrch : Pure business logic\nDecorator pattern\n10-step workflow
+}
+
+rectangle "**Infrastructure Layer**" INFRA_COLOR {
+  package "Workflow Steps" {
+    [1. Analyze Step] as Step1
+    [2. Dockerfile Step] as Step2
+    [3. Build Step] as Step3
+    [4. Scan Step] as Step4
+    [5. Tag Step] as Step5
+    [6. Push Step] as Step6
+    [7. Manifest Step] as Step7
+    [8. Cluster Step] as Step8
+    [9. Deploy Step] as Step9
+    [10. Verify Step] as Step10
+  }
+  
+  package "AI/ML Integration" {
+    [Azure OpenAI Client] as AIClient
+    [Prompt Manager] as PromptMgr
+    [ML Build Optimizer] as MLOptimizer
+    [Domain Sampler Adapter] as SamplerAdapter
+  }
+  
+  package "Container & K8s" {
+    [Docker Manager] as DockerMgr
+    [K8s Deployment Manager] as K8sMgr
+    [Registry Client] as RegClient
+    [Security Scanner] as Scanner
+  }
+  
+  package "Persistence" {
+    [BoltDB Session Store] as BoltStore
+    [File State Store] as FileStore
+  }
+  
+  package "Messaging & Events" {
+    [Event Publisher Impl] as EventPubImpl
+    [Progress Sink Factory] as ProgressFactory
+    [MCP Progress Sink] as MCPSink
+  }
+  
+  package "Observability" {
+    [OpenTelemetry Tracer] as Tracer
+    [Metrics Collector] as Metrics
+    [Health Monitor] as Health
+  }
+  
+  note bottom of Step1 : Each step is independent\nCan be decorated\nAI-assisted recovery
+}
+
+' External Systems
+cloud "External Services" {
+  [Azure OpenAI] as AzureAI
+  [Docker Engine] as Docker
+  [Kubernetes API] as K8s
+  [Container Registry] as Registry
+  [Trivy/Grype] as SecurityTools
+}
+
+' Layer Dependencies (Clean Architecture)
+COMPOSITION_COLOR -[hidden]down-> API_COLOR
+API_COLOR -[hidden]down-> APP_COLOR
+APP_COLOR -[hidden]down-> DOMAIN_COLOR  
+DOMAIN_COLOR -[hidden]down-> INFRA_COLOR
+
+' Composition Root wiring
+ServerComposer --> WireGen
+WireGen --> Providers
+Providers --> Server : provides
+Providers --> BaseOrch : provides
+Providers --> EventOrch : decorates
+Providers --> SagaOrch : decorates
+
+' Client connections
+Client --> Protocol
+CLI --> Protocol
+HTTP --> HTTPTransport
+Protocol --> Server
+
+' Application layer flow
+Server --> TransportMgr
+Server --> ToolReg
+Server --> SessionSvc
+ToolReg --> ContainerizeHandler
+ContainerizeHandler --> SagaOrch
+
+' Domain layer decorators
+BaseOrch <|-- EventOrch : decorates
+EventOrch <|-- SagaOrch : decorates
+EventOrch --> EventPub
+SagaOrch --> SagaCoord
+BaseOrch --> ErrorContext
+ErrorContext --> Escalation
+ErrorContext --> AIContext
+
+' Progress tracking
+BaseOrch --> ProgressTracker
+ProgressTracker --> ProgressEmitter
+ProgressEmitter --> MCPSink
+
+' Infrastructure implementations
+SagaOrch --> Step1
+Step1 --> Step2
+Step2 --> Step3
+Step3 --> Step4
+Step4 --> Step5
+Step5 --> Step6
+Step6 --> Step7
+Step7 --> Step8
+Step8 --> Step9
+Step9 --> Step10
+
+' AI/ML connections
+Step2 --> AIClient : Dockerfile generation
+Step3 --> MLOptimizer : Build optimization
+ErrorContext --> AIClient : Error recovery
+AIClient --> PromptMgr
+SamplerAdapter --> AIClient
+
+' Container operations
+Step3 --> DockerMgr
+Step4 --> Scanner
+Step5 --> RegClient
+Step6 --> RegClient
+Step8 --> K8sMgr
+Step9 --> K8sMgr
+Step10 --> K8sMgr
+
+' External connections
+AIClient --> AzureAI
+DockerMgr --> Docker
+K8sMgr --> K8s
+RegClient --> Registry
+Scanner --> SecurityTools
+
+' Persistence
+SessionSvc --> BoltStore
+BaseOrch --> FileStore
+
+' Observability
+SagaOrch --> Tracer
+Server --> Health
+Server --> Metrics
+
+' Key architectural notes
+note top of ServerComposer : **Composition Root Pattern**\n• Separates wiring from logic\n• All DI configuration here\n• Clean layer boundaries
+
+note top of SagaOrch : **Decorator Pattern**\n• Base → Event → Saga\n• Each adds functionality\n• Composable concerns
+
+note top of ErrorContext : **Progressive Error Context**\n• Accumulates error history\n• AI-assisted recovery\n• Escalation logic
+
+note bottom of Step10 : **Single Workflow**\n• containerize_and_deploy tool\n• 10 structured steps\n• Built-in progress tracking
+
+@enduml

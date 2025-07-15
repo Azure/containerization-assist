@@ -3,62 +3,50 @@ package transport
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
-	"net/http"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/transport/http"
+	"github.com/Azure/container-kit/pkg/mcp/domain/health"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // HTTPTransport handles HTTP-based MCP communication
 type HTTPTransport struct {
-	logger *slog.Logger
-	port   int
+	handler *http.Handler
 }
 
 // NewHTTPTransport creates a new HTTP transport
 func NewHTTPTransport(logger *slog.Logger, port int) *HTTPTransport {
-	if port == 0 {
-		port = 8080 // Default port
-	}
+	// Create a basic health monitor for HTTP transport
+	// In a production setup, this would be provided by dependency injection
+	healthMonitor := &basicHealthMonitor{}
 	return &HTTPTransport{
-		logger: logger.With("component", "http_transport"),
-		port:   port,
+		handler: http.NewHandler(logger, port, healthMonitor),
 	}
 }
 
-// ServeHTTP starts the HTTP transport server
+// basicHealthMonitor is a minimal implementation of health.Monitor for HTTP transport
+type basicHealthMonitor struct{}
+
+func (m *basicHealthMonitor) RegisterChecker(checker health.Checker) {}
+
+func (m *basicHealthMonitor) GetHealth(ctx context.Context) health.HealthReport {
+	return health.HealthReport{
+		Status:     health.StatusHealthy,
+		Components: make(map[string]health.ComponentHealth),
+	}
+}
+
+func (m *basicHealthMonitor) GetComponentHealth(ctx context.Context, component string) (health.Status, error) {
+	return health.StatusHealthy, nil
+}
+
+// Serve implements the Transport interface
+func (t *HTTPTransport) Serve(ctx context.Context, mcpServer *server.MCPServer) error {
+	return t.handler.Serve(ctx, mcpServer)
+}
+
+// ServeHTTP starts the HTTP transport server (deprecated - use Serve)
 func (t *HTTPTransport) ServeHTTP(ctx context.Context, mcpServer *server.MCPServer) error {
-	t.logger.Info("Starting HTTP transport", "port", t.port)
-
-	// Create HTTP server
-	httpServer := &http.Server{
-		Addr: fmt.Sprintf(":%d", t.port),
-		// Handler would be set up here based on mcp-go HTTP support
-		// This is a placeholder as mcp-go primarily supports stdio
-	}
-
-	// Create error channel for transport
-	transportDone := make(chan error, 1)
-
-	// Run transport in goroutine
-	go func() {
-		transportDone <- httpServer.ListenAndServe()
-	}()
-
-	// Wait for context cancellation or transport error
-	select {
-	case <-ctx.Done():
-		t.logger.Info("Shutting down HTTP transport")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30)
-		defer cancel()
-		return httpServer.Shutdown(shutdownCtx)
-	case err := <-transportDone:
-		if err != nil && err != http.ErrServerClosed {
-			t.logger.Error("HTTP transport stopped with error", "error", err)
-		} else {
-			t.logger.Info("HTTP transport stopped gracefully")
-		}
-		return err
-	}
+	return t.Serve(ctx, mcpServer)
 }

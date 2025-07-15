@@ -2,10 +2,6 @@
 package workflow
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
 	"time"
 
 	"log/slog"
@@ -24,125 +20,33 @@ type WorkflowCheckpoint struct {
 	CompletedSteps []string                  `json:"completed_steps"`
 }
 
-// StatePersistence handles workflow state persistence
+// StatePersistence is now just a wrapper around the StateStore interface
 type StatePersistence struct {
-	workspaceDir string
-	logger       *slog.Logger
+	store  StateStore
+	logger *slog.Logger
 }
 
-// NewStatePersistence creates a new state persistence handler
-func NewStatePersistence(workspaceDir string, logger *slog.Logger) *StatePersistence {
+// NewStatePersistence creates a new state persistence handler using the provided StateStore
+func NewStatePersistence(store StateStore, logger *slog.Logger) *StatePersistence {
 	return &StatePersistence{
-		workspaceDir: workspaceDir,
-		logger:       logger.With("component", "state-persistence"),
+		store:  store,
+		logger: logger.With("component", "state-persistence"),
 	}
 }
 
-// SaveCheckpoint saves the current workflow state
+// SaveCheckpoint saves the current workflow state using the underlying StateStore
 func (sp *StatePersistence) SaveCheckpoint(checkpoint *WorkflowCheckpoint) error {
-	// Ensure checkpoint directory exists
-	checkpointDir := filepath.Join(sp.workspaceDir, "checkpoints", checkpoint.WorkflowID)
-	if err := os.MkdirAll(checkpointDir, 0755); err != nil {
-		return fmt.Errorf("failed to create checkpoint directory: %v", err)
-	}
-
-	// Generate checkpoint filename with timestamp
-	filename := fmt.Sprintf("checkpoint_%d.json", checkpoint.Timestamp.Unix())
-	checkpointPath := filepath.Join(checkpointDir, filename)
-
-	// Marshal checkpoint to JSON
-	data, err := json.MarshalIndent(checkpoint, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal checkpoint: %v", err)
-	}
-
-	// Write checkpoint file
-	if err := os.WriteFile(checkpointPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write checkpoint file: %v", err)
-	}
-
-	// Also save as latest checkpoint for easy access
-	latestPath := filepath.Join(checkpointDir, "latest.json")
-	if err := os.WriteFile(latestPath, data, 0644); err != nil {
-		sp.logger.Warn("Failed to update latest checkpoint", "error", err)
-	}
-
-	sp.logger.Info("Checkpoint saved",
-		"workflow_id", checkpoint.WorkflowID,
-		"step", checkpoint.CurrentStep,
-		"path", checkpointPath)
-
-	return nil
+	return sp.store.SaveCheckpoint(checkpoint)
 }
 
-// LoadLatestCheckpoint loads the most recent checkpoint for a workflow
+// LoadLatestCheckpoint loads the most recent checkpoint for a workflow using the underlying StateStore
 func (sp *StatePersistence) LoadLatestCheckpoint(workflowID string) (*WorkflowCheckpoint, error) {
-	checkpointPath := filepath.Join(sp.workspaceDir, "checkpoints", workflowID, "latest.json")
-
-	data, err := os.ReadFile(checkpointPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil // No checkpoint exists
-		}
-		return nil, fmt.Errorf("failed to read checkpoint: %v", err)
-	}
-
-	var checkpoint WorkflowCheckpoint
-	if err := json.Unmarshal(data, &checkpoint); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal checkpoint: %v", err)
-	}
-
-	sp.logger.Info("Checkpoint loaded",
-		"workflow_id", checkpoint.WorkflowID,
-		"step", checkpoint.CurrentStep,
-		"timestamp", checkpoint.Timestamp)
-
-	return &checkpoint, nil
+	return sp.store.LoadLatestCheckpoint(workflowID)
 }
 
-// CleanupOldCheckpoints removes checkpoints older than the specified duration
+// CleanupOldCheckpoints removes checkpoints older than the specified duration using the underlying StateStore
 func (sp *StatePersistence) CleanupOldCheckpoints(maxAge time.Duration) error {
-	checkpointsDir := filepath.Join(sp.workspaceDir, "checkpoints")
-
-	// Check if checkpoints directory exists
-	if _, err := os.Stat(checkpointsDir); os.IsNotExist(err) {
-		return nil // Nothing to cleanup
-	}
-
-	cutoffTime := time.Now().Add(-maxAge)
-	var cleaned int
-
-	err := filepath.Walk(checkpointsDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil // Skip errors
-		}
-
-		// Skip directories and latest.json files
-		if info.IsDir() || info.Name() == "latest.json" {
-			return nil
-		}
-
-		// Check if file is older than cutoff
-		if info.ModTime().Before(cutoffTime) {
-			if err := os.Remove(path); err != nil {
-				sp.logger.Warn("Failed to remove old checkpoint", "path", path, "error", err)
-			} else {
-				cleaned++
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		sp.logger.Warn("Error during checkpoint cleanup", "error", err)
-	}
-
-	if cleaned > 0 {
-		sp.logger.Info("Cleaned up old checkpoints", "count", cleaned)
-	}
-
-	return nil
+	return sp.store.CleanupOldCheckpoints(maxAge)
 }
 
 // WorkflowStateManager manages workflow state during execution

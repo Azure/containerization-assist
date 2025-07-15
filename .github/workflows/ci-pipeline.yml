@@ -31,52 +31,20 @@ jobs:
       run: |
         if [ "${{ github.event_name }}" = "pull_request" ]; then
           echo "🔍 Detecting changes for PR #${{ github.event.number }}"
-          echo "Base SHA: ${{ github.event.pull_request.base.sha }}"
-          echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
           
           changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD)
-          echo "📝 Changed files ($(echo "$changed_files" | wc -l) total):"
-          echo "$changed_files"
+          echo "📝 Changed files: $(echo "$changed_files" | wc -l) total"
           
-          # Check for MCP changes
-          # MCP server depends on: cmd/mcp-server/, pkg/common/, pkg/core/, pkg/mcp/
-          mcp_changes=$(echo "$changed_files" | grep -E "^(cmd/mcp-server/|pkg/common/|pkg/core/|pkg/mcp/)" || true)
+          # Check for MCP changes (cmd/mcp-server/, pkg/common/, pkg/core/, pkg/mcp/)
+          mcp_count=$(echo "$changed_files" | grep -E "^(cmd/mcp-server/|pkg/(common|core|mcp)/)" | wc -l)
+          echo "test_mcp=$([ $mcp_count -gt 0 ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
           
-          # Check for CLI changes  
-          # CLI depends on: specific cmd files (cmd.go, clients.go, generate.go, setup.go), 
-          # pkg/ai/, pkg/core/, pkg/common/, pkg/pipeline/
-          cli_changes=$(echo "$changed_files" | grep -E "^(cmd/(cmd|clients|generate|setup)\.go|pkg/ai/|pkg/core/|pkg/common/|pkg/pipeline/)" || true)
+          # Check for CLI changes (cmd/*.go, pkg/ai/, pkg/core/, pkg/common/, pkg/pipeline/)
+          cli_count=$(echo "$changed_files" | grep -E "^(cmd/(cmd|clients|generate|setup)\.go|pkg/(ai|core|common|pipeline)/)" | wc -l)
+          echo "test_cli=$([ $cli_count -gt 0 ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
           
-          # Debug: show what was detected
-          echo "🔍 MCP changes detected:"
-          echo "$mcp_changes" | head -5
-          echo "🔍 CLI changes detected:"
-          echo "$cli_changes" | head -5
-          
-          # Set outputs with explicit true/false values
-          if [ -n "$mcp_changes" ]; then
-            echo "test_mcp=true" >> $GITHUB_OUTPUT
-          else
-            echo "test_mcp=false" >> $GITHUB_OUTPUT
-          fi
-          
-          if [ -n "$cli_changes" ]; then
-            echo "test_cli=true" >> $GITHUB_OUTPUT
-          else
-            echo "test_cli=false" >> $GITHUB_OUTPUT
-          fi
-          echo "MCP changes: $([ -n "$mcp_changes" ] && echo "yes ($(echo "$mcp_changes" | wc -l) files)" || echo "no")"
-          echo "CLI changes: $([ -n "$cli_changes" ] && echo "yes ($(echo "$cli_changes" | wc -l) files)" || echo "no")"
-          
-          # Debug: show the actual output values
-          echo "📌 GitHub Actions outputs:"
-          echo "  test_mcp output: $(cat $GITHUB_OUTPUT | grep test_mcp | cut -d= -f2)"
-          echo "  test_cli output: $(cat $GITHUB_OUTPUT | grep test_cli | cut -d= -f2)"
-          
-          # Show summary of what will be tested
-          echo "📊 Integration Test Plan:"
-          [ -n "$mcp_changes" ] && echo "  ✅ MCP integration tests WILL run (changes in cmd/mcp-server/, pkg/common/, pkg/core/, or pkg/mcp/)" || echo "  ⏭️ MCP integration tests will be SKIPPED"
-          [ -n "$cli_changes" ] && echo "  ✅ CLI integration tests WILL run (changes in cmd/*.go, pkg/ai/, pkg/core/, pkg/common/, or pkg/pipeline/)" || echo "  ⏭️ CLI integration tests will be SKIPPED"
+          echo "MCP changes: $([ $mcp_count -gt 0 ] && echo "yes ($mcp_count files)" || echo "no")"
+          echo "CLI changes: $([ $cli_count -gt 0 ] && echo "yes ($cli_count files)" || echo "no")"
         else
           echo "test_mcp=true" >> $GITHUB_OUTPUT
           echo "test_cli=true" >> $GITHUB_OUTPUT
@@ -98,21 +66,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
       
-    - name: Setup Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24.4'
-        
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ needs.setup.outputs.go-cache-key }}
-        restore-keys: |
-          ${{ runner.os }}-go-
-        
-    - name: Download dependencies
-      run: go mod download
+    - name: Setup Go Environment
+      uses: ./.github/actions/setup-go
       
     - name: Build MCP Server
       run: |
@@ -149,18 +104,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
       
-    - name: Setup Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24.4'
-        
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ needs.setup.outputs.go-cache-key }}
-        restore-keys: |
-          ${{ runner.os }}-go-
+    - name: Setup Go Environment
+      uses: ./.github/actions/setup-go
           
     - name: Cache Quality Tools
       uses: actions/cache@v4
@@ -176,6 +121,16 @@ jobs:
       with:
         go-version: '1.24.4'
         target-paths: './pkg/mcp/... ./pkg/core/...'
+        
+    - name: Upload Quality Metrics
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: quality-metrics-${{ github.run_id }}
+        path: |
+          quality-metrics.json
+          metrics-output/
+        retention-days: 30
 
   # Unit tests - depends on build completion
   test:
@@ -186,24 +141,66 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
       
-    - name: Setup Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24.4'
+    - name: Setup Go Environment
+      uses: ./.github/actions/setup-go
         
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ needs.setup.outputs.go-cache-key }}
-        restore-keys: |
-          ${{ runner.os }}-go-
+    - name: Unit Tests with Race Detection
+      run: |
+        echo "🏃 Running unit tests with race detection..."
+        go test -race -coverprofile=coverage.out ./pkg/mcp/... ./pkg/core/...
         
-    - name: Unit Tests
-      run: go test -race -coverprofile=coverage.out ./pkg/mcp/... ./pkg/core/...
+        # Check for race conditions in test output
+        if grep -q "WARNING: DATA RACE" coverage.out 2>/dev/null; then
+          echo "❌ Data races detected in tests!"
+          exit 1
+        else
+          echo "✅ No data races detected"
+        fi
       
-    - name: Test Coverage
-      run: go tool cover -func=coverage.out
+    - name: Test Coverage Analysis
+      run: |
+        echo "📊 Analyzing test coverage..."
+        
+        # Generate coverage report
+        go tool cover -func=coverage.out > coverage-report.txt
+        go tool cover -html=coverage.out -o coverage.html
+        
+        # Extract overall coverage percentage
+        OVERALL_COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+        echo "Overall coverage: ${OVERALL_COVERAGE}%"
+        
+        # Load coverage thresholds from config
+        OVERALL_TARGET=70
+        OVERALL_MINIMUM=50
+        if [ -f ".github/quality-config.json" ]; then
+          OVERALL_TARGET=$(jq -r '.test_coverage.overall_target // 70' .github/quality-config.json)
+          OVERALL_MINIMUM=$(jq -r '.test_coverage.overall_minimum // 50' .github/quality-config.json)
+        fi
+        
+        echo "Coverage targets: minimum=${OVERALL_MINIMUM}%, target=${OVERALL_TARGET}%"
+        
+        # Check against minimum threshold
+        if (( $(echo "$OVERALL_COVERAGE < $OVERALL_MINIMUM" | bc -l 2>/dev/null || echo 0) )); then
+          echo "❌ Coverage ${OVERALL_COVERAGE}% below minimum threshold ${OVERALL_MINIMUM}%"
+          exit 1
+        elif (( $(echo "$OVERALL_COVERAGE < $OVERALL_TARGET" | bc -l 2>/dev/null || echo 0) )); then
+          echo "⚠️ Coverage ${OVERALL_COVERAGE}% below target ${OVERALL_TARGET}% but above minimum"
+        else
+          echo "✅ Coverage ${OVERALL_COVERAGE}% meets target ${OVERALL_TARGET}%"
+        fi
+        
+        # Store coverage for status reporting
+        echo "COVERAGE_PERCENTAGE=${OVERALL_COVERAGE}" >> $GITHUB_ENV
+        
+    - name: Upload Coverage Report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report-${{ github.run_id }}
+        path: |
+          coverage.out
+          coverage.html
+        retention-days: 30
 
   # MCP Integration tests - lightweight and fast
   mcp-integration:

@@ -1,0 +1,36 @@
+name: 'Setup Go Environment'
+description: 'Common Go setup with caching and environment configuration'
+
+inputs:
+  go-version:
+    description: 'Go version to use'
+    required: false
+    default: '1.24.4'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.go-version }}
+        
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+          
+    - name: Configure Go environment
+      shell: bash
+      run: |
+        export GOSUMDB=sum.golang.org
+        export GOPROXY=
+        echo "GOSUMDB=sum.golang.org" >> $GITHUB_ENV
+        echo "GOPROXY=" >> $GITHUB_ENV
+        
+    - name: Download dependencies
+      shell: bash
+      run: go mod download

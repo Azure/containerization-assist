@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -148,7 +149,14 @@ func (c *ElicitationClient) fallbackElicitation(ctx context.Context, request Eli
 	// Validate the response
 	if err := c.ValidateResponse(response.Value, request); err != nil {
 		if request.Required {
-			return nil, fmt.Errorf("validation failed: %w", err)
+			return nil, errors.NewWorkflowError(
+				errors.CodeValidationFailed,
+				"workflow",
+				"elicitation",
+				"validation failed",
+				err,
+			).WithStepContext("prompt", request.Prompt).
+				WithStepContext("type", string(request.Type))
 		}
 		// Use default if validation fails and not required
 		response.Value = request.Default
@@ -191,16 +199,39 @@ func (c *ElicitationClient) ValidateResponse(value string, request ElicitationRe
 
 	// Check required
 	if rules.Required && strings.TrimSpace(value) == "" {
-		return fmt.Errorf("value is required")
+		return errors.NewWorkflowError(
+			errors.CodeValidationFailed,
+			"workflow",
+			"elicitation",
+			"value is required",
+			nil,
+		).WithStepContext("field", request.Prompt).
+			WithStepContext("validation_type", "required")
 	}
 
 	// Check length constraints
 	if rules.MinLength > 0 && len(value) < rules.MinLength {
-		return fmt.Errorf("value must be at least %d characters", rules.MinLength)
+		return errors.NewWorkflowError(
+			errors.CodeValidationFailed,
+			"workflow",
+			"elicitation",
+			fmt.Sprintf("value must be at least %d characters", rules.MinLength),
+			nil,
+		).WithStepContext("field", request.Prompt).
+			WithStepContext("validation_type", "min_length").
+			WithStepContext("min_length", rules.MinLength)
 	}
 
 	if rules.MaxLength > 0 && len(value) > rules.MaxLength {
-		return fmt.Errorf("value must be at most %d characters", rules.MaxLength)
+		return errors.NewWorkflowError(
+			errors.CodeValidationFailed,
+			"workflow",
+			"elicitation",
+			fmt.Sprintf("value must be at most %d characters", rules.MaxLength),
+			nil,
+		).WithStepContext("field", request.Prompt).
+			WithStepContext("validation_type", "max_length").
+			WithStepContext("max_length", rules.MaxLength)
 	}
 
 	// Check pattern (would need regex package in real implementation)
@@ -218,7 +249,15 @@ func (c *ElicitationClient) ValidateResponse(value string, request ElicitationRe
 			}
 		}
 		if !found {
-			return fmt.Errorf("value must be one of: %s", strings.Join(rules.AllowedKeys, ", "))
+			return errors.NewWorkflowError(
+				errors.CodeValidationFailed,
+				"workflow",
+				"elicitation",
+				fmt.Sprintf("value must be one of: %s", strings.Join(rules.AllowedKeys, ", ")),
+				nil,
+			).WithStepContext("field", request.Prompt).
+				WithStepContext("validation_type", "allowed_keys").
+				WithStepContext("allowed_keys", rules.AllowedKeys)
 		}
 	}
 
@@ -296,7 +335,14 @@ func (c *ElicitationClient) ElicitMissingConfiguration(ctx context.Context, conf
 			response, err := c.Elicit(ctx, request)
 			if err != nil {
 				if conf.required {
-					return nil, fmt.Errorf("failed to elicit required value for %s: %w", conf.key, err)
+					return nil, errors.NewWorkflowError(
+						errors.CodeOperationFailed,
+						"workflow",
+						"elicitation",
+						fmt.Sprintf("failed to elicit required value for %s", conf.key),
+						err,
+					).WithStepContext("config_key", conf.key).
+						WithStepContext("prompt", conf.prompt)
 				}
 				c.logger.Warn("Failed to elicit optional value, using default",
 					"key", conf.key,
@@ -306,7 +352,14 @@ func (c *ElicitationClient) ElicitMissingConfiguration(ctx context.Context, conf
 			} else if !response.Cancelled {
 				result[conf.key] = response.Value
 			} else if conf.required {
-				return nil, fmt.Errorf("required configuration %s was cancelled", conf.key)
+				return nil, errors.NewWorkflowError(
+					errors.CodeOperationFailed,
+					"workflow",
+					"elicitation",
+					fmt.Sprintf("required configuration %s was cancelled", conf.key),
+					nil,
+				).WithStepContext("config_key", conf.key).
+					WithStepContext("cancelled", true)
 			}
 		}
 	}
@@ -384,7 +437,14 @@ func (c *ElicitationClient) ElicitDeploymentParameters(ctx context.Context, curr
 			response, err := c.Elicit(ctx, request)
 			if err != nil {
 				if param.required {
-					return nil, fmt.Errorf("failed to elicit required parameter %s: %w", param.key, err)
+					return nil, errors.NewWorkflowError(
+						errors.CodeOperationFailed,
+						"workflow",
+						"elicitation",
+						fmt.Sprintf("failed to elicit required parameter %s", param.key),
+						err,
+					).WithStepContext("param_key", param.key).
+						WithStepContext("prompt", param.prompt)
 				}
 				result[param.key] = param.defaultVal
 			} else if !response.Cancelled {

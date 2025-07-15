@@ -14,16 +14,16 @@ import (
 
 // ContainerizeCommandHandler handles containerization commands
 type ContainerizeCommandHandler struct {
-	orchestrator   *workflow.EventOrchestrator
-	sessionManager session.SessionManager
+	orchestrator   workflow.EventAwareOrchestrator
+	sessionManager session.OptimizedSessionManager
 	eventPublisher *events.Publisher
 	logger         *slog.Logger
 }
 
 // NewContainerizeCommandHandler creates a new containerization command handler
 func NewContainerizeCommandHandler(
-	orchestrator *workflow.EventOrchestrator,
-	sessionManager session.SessionManager,
+	orchestrator workflow.EventAwareOrchestrator,
+	sessionManager session.OptimizedSessionManager,
 	eventPublisher *events.Publisher,
 	logger *slog.Logger,
 ) *ContainerizeCommandHandler {
@@ -77,7 +77,7 @@ func (h *ContainerizeCommandHandler) Handle(ctx context.Context, cmd Command) er
 	}
 
 	// Update session with result
-	updateErr := h.sessionManager.UpdateSession(ctx, containerizeCmd.SessionID, func(state *session.SessionState) error {
+	updateErr := h.sessionManager.Update(ctx, containerizeCmd.SessionID, func(state *session.SessionState) error {
 		// Update session metadata with workflow result
 		if state.Metadata == nil {
 			state.Metadata = make(map[string]interface{})
@@ -112,14 +112,14 @@ func (h *ContainerizeCommandHandler) Handle(ctx context.Context, cmd Command) er
 
 // CancelWorkflowCommandHandler handles workflow cancellation commands
 type CancelWorkflowCommandHandler struct {
-	sessionManager session.SessionManager
+	sessionManager session.OptimizedSessionManager
 	eventPublisher *events.Publisher
 	logger         *slog.Logger
 }
 
 // NewCancelWorkflowCommandHandler creates a new cancellation command handler
 func NewCancelWorkflowCommandHandler(
-	sessionManager session.SessionManager,
+	sessionManager session.OptimizedSessionManager,
 	eventPublisher *events.Publisher,
 	logger *slog.Logger,
 ) *CancelWorkflowCommandHandler {
@@ -148,7 +148,7 @@ func (h *CancelWorkflowCommandHandler) Handle(ctx context.Context, cmd Command) 
 		"reason", cancelCmd.Reason)
 
 	// Update session to mark workflow as cancelled
-	updateErr := h.sessionManager.UpdateSession(ctx, cancelCmd.SessionID, func(state *session.SessionState) error {
+	updateErr := h.sessionManager.Update(ctx, cancelCmd.SessionID, func(state *session.SessionState) error {
 		if state.Metadata == nil {
 			state.Metadata = make(map[string]interface{})
 		}

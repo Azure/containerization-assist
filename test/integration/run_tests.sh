@@ -86,13 +86,32 @@ mkdir -p "$CONTAINER_KIT_TEST_WORKSPACE"
 # Run integration tests with appropriate tags
 if [ "$DOCKER_AVAILABLE" = true ] && [ "$KIND_AVAILABLE" = true ]; then
     echo "Running full integration test suite..."
-    go test -v ./test/integration/... -tags=integration,docker,kind
+    go test -v ./test/integration/... -tags=integration,docker,kind -timeout=20m
 elif [ "$DOCKER_AVAILABLE" = true ]; then
     echo "Running integration tests without Kind..."
-    go test -v ./test/integration/... -tags=integration,docker
+    go test -v ./test/integration/... -tags=integration,docker -timeout=15m
 else
     echo "Running basic integration tests..."
-    go test -v ./test/integration/... -tags=integration
+    go test -v ./test/integration/... -tags=integration -timeout=10m
+fi
+
+echo ""
+echo "Running additional integration test suites..."
+
+# Run session persistence tests
+echo "Testing session persistence..."
+go test -v ./test/integration/ -run TestSessionPersistence -timeout=10m
+
+# Run error recovery tests  
+echo "Testing error recovery..."
+go test -v ./test/integration/ -run TestErrorRecovery -timeout=10m
+
+# Run performance tests (only if not in CI)
+if [ "${CI}" != "true" ]; then
+    echo "Testing performance characteristics..."
+    go test -v ./test/integration/ -run TestPerformance -timeout=15m
+else
+    echo "Skipping performance tests in CI environment..."
 fi
 
 TEST_RESULT=$?

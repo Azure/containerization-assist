@@ -1,20 +1,163 @@
-version: "2"
+# Configuration for golangci-lint v1
 run:
   go: "1.24.4"
   tests: true
 linters:
   disable:
     - depguard         # Disable import restrictions after simplification
+    - exhaustruct      # Disable exhaustive struct checking (too noisy)
+    - nlreturn         # Disable new line return rule (too strict)
+    - wsl              # Disable whitespace linting (too opinionated)
   enable:
-    - revive
-    - staticcheck      # Enable advanced static analysis
-    - errcheck         # Enable error checking
-    - unused           # Enable unused code detection
-    - deadcode         # Enable dead code detection
-    - ineffassign      # Enable ineffectual assignment detection
-    - gocyclo          # Enable cyclomatic complexity checks
+    # Core static analysis
+    - revive           # Enhanced go lint
+    - staticcheck      # Advanced static analysis
+    - errcheck         # Error checking
+    - unused           # Unused code detection (replaces deadcode)
+    - ineffassign      # Ineffectual assignment detection
+    - gocyclo          # Cyclomatic complexity checks
+    
+    # Security and bug prevention
+    - gosec            # Security analysis
+    - bodyclose        # Check HTTP body close
+    - rowserrcheck     # Check SQL row errors
+    - sqlclosecheck    # Check SQL close
+    - nilerr           # Check nil errors
+    
+    # Code quality and style
+    - gofmt            # Proper formatting
+    - goimports        # Import organization
+    - misspell         # Spelling mistakes
+    - unconvert        # Remove unnecessary conversions
+    - unparam          # Detect unused parameters
+    - prealloc         # Preallocate slices
+    
+    # Performance
+    - gocritic         # Performance and style checks
+    
+    # Maintainability  
+    - dupl             # Duplicate code detection
+    - goconst          # Repeated strings detection
+    - gomodguard       # Module dependencies guard
+    # Note: copyloopvar and exportloopref may not be available in all versions
+    - lll              # Line length check
+    - nestif           # Nested if statement check
+    - maintidx         # Maintainability index
+    - funlen           # Function length check
+    
+    # Testing
+    - testpackage      # Test package naming
 
 linters-settings:
+  # Complexity settings
+  gocyclo:
+    min-complexity: 15
+  
+  # Function length limits
+  funlen:
+    lines: 100
+    statements: 50
+    
+  # Cognitive complexity
+  gocognit:
+    min-complexity: 15
+    
+  # Line length
+  lll:
+    line-length: 120
+    
+  # Nested if statements
+  nestif:
+    min-complexity: 4
+    
+  # Maintainability index
+  maintidx:
+    under: 20
+    
+  # Security settings
+  gosec:
+    excludes:
+      - G304 # File path from variable - many legitimate uses
+      - G404 # Weak random number generator - not all uses need crypto/rand
+      
+  # Code duplication
+  dupl:
+    threshold: 150
+    
+  # Performance settings
+  gocritic:
+    enabled-tags:
+      - performance
+      - style
+      - experimental
+    settings:
+      unnamedResult:
+        checkExported: true
+  
+  # Custom rules for error handling
+  revive:
+    rules:
+      - name: bare-return
+        disabled: false
+      - name: blank-imports
+        disabled: false
+      - name: context-as-argument
+        disabled: false
+      - name: context-keys-type
+        disabled: false
+      - name: dot-imports
+        disabled: false
+      - name: error-return
+        disabled: false
+      - name: error-strings
+        disabled: false
+      - name: error-naming
+        disabled: false
+      - name: exported
+        disabled: false
+      - name: if-return
+        disabled: false
+      - name: increment-decrement
+        disabled: false
+      - name: var-naming
+        disabled: false
+      - name: var-declaration
+        disabled: false
+      - name: package-comments
+        disabled: false
+      - name: range
+        disabled: false
+      - name: receiver-naming
+        disabled: false
+      - name: time-naming
+        disabled: false
+      - name: unexported-return
+        disabled: false
+      - name: indent-error-flow
+        disabled: false
+      - name: errorf
+        disabled: false
+      - name: empty-block
+        disabled: false
+      - name: superfluous-else
+        disabled: false
+      - name: unused-parameter
+        disabled: false
+      - name: unreachable-code
+        disabled: false
+      - name: redefines-builtin-id
+        disabled: false
+      
+  # Constants detection
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+    
+  # Misspelling
+  misspell:
+    locale: US
+    
+  # Import restrictions (if re-enabled later)
   depguard:
     rules:
       main:
@@ -24,53 +167,46 @@ linters-settings:
           - "$gostd"
           - "github.com/Azure/container-kit"
           - "github.com/localrivet/gomcp"
+          - "github.com/mark3labs/mcp-go"
           - "github.com/rs/zerolog"
           - "github.com/stretchr/testify"
           - "github.com/joho/godotenv"
           - "github.com/spf13/cobra"
           - "go.etcd.io/bbolt"
-  exclusions:
-    generated: lax
-    presets:
-      - comments
-      - common-false-positives
-      - legacy
-      - std-error-handling
-    rules:
-      - linters:
-          - govet
-        path: _test\.go
-      - linters:
-          - govet
-        path: cmd/
-      - linters:
-          - govet
-        path: tools/
-      - linters:
-          - revive
-        path: pkg/mcp/security/types\.go
-        text: "stutters"
-    paths:
-      - .*\.pb\.go$
-      - .*_gen\.go$
-      - cmd/*
-      - vendor
-      - .git
-      - bin
-      - dist
-      - tools
-      - tools/linters
-      - third_party$
-      - builtin$
-      - examples$
+  exclude-rules:
+    - linters:
+        - govet
+      path: "_test\\.go"
+    - linters:
+        - govet
+      path: "cmd/"
+    - linters:
+        - govet
+      path: "tools/"
+    - linters:
+        - revive
+      path: "pkg/mcp/security/types\\.go"
+      text: "stutters"
+    - linters:
+        - funlen
+        - gocyclo
+        - dupl
+        - maintidx
+      path: "_test\\.go"
+    # Allow fmt.Errorf in test files only
+    - linters:
+        - revive
+      path: "_test\\.go"
+      text: "errorf"
+    # Allow fmt.Errorf in generated files
+    - linters:
+        - revive
+      path: "_gen\\.go"
+      text: "errorf"
+  exclude:
+    - ".*\\.pb\\.go$"
+    - ".*_gen\\.go$"
 issues:
   max-issues-per-linter: 1000  # High limit - actual budget enforced by quality-checks action
   max-same-issues: 200         # High limit - actual budget enforced by quality-checks action  
   new: false
-formatters:
-  exclusions:
-    generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$

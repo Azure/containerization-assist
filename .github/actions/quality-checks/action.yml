@@ -73,6 +73,7 @@ runs:
           go install honnef.co/go/tools/cmd/staticcheck@${{ inputs.staticcheck-version }} &
           go install golang.org/x/vuln/cmd/govulncheck@${{ inputs.govulncheck-version }} &
           go install github.com/fzipp/gocyclo/cmd/gocyclo@latest &
+          go install github.com/google/wire/cmd/wire@latest &
           sudo apt-get update -qq && sudo apt-get install -y jq &
           wait
         }
@@ -178,6 +179,7 @@ runs:
           exit 0
         } &
         
+        
         # Wait for all parallel jobs to complete
         wait
         
@@ -219,6 +221,25 @@ runs:
         # Clean up temp files
         rm -f lint_result.txt static_result.txt security_result.txt
     
+    - name: Import Graph Validation
+      id: import-validation
+      shell: bash
+      run: |
+        echo "🔍 Validating import graph for clean architecture..."
+        
+        # Make script executable
+        chmod +x ./scripts/validate-imports.sh
+        
+        # Run import validation
+        if ./scripts/validate-imports.sh --json; then
+          echo "✅ Import validation passed"
+          echo "import-status=pass" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Import validation failed"
+          echo "import-status=fail" >> $GITHUB_OUTPUT
+          # Don't fail the build yet - just report
+        fi
+        
     - name: Architecture Quality Check
       id: architecture-check
       shell: bash

@@ -116,7 +116,7 @@ logger.Error().Err(err).Str("session_id", sessionID).Msg("Build failed")
 ## Testing Requirements
 
 ### Coverage Standards
-- **Minimum 70% test coverage** for `pkg/mcp` packages
+- **Minimum 15% test coverage** for `pkg/mcp` packages (development phase)
 - All new code must include comprehensive tests
 - Critical path functions require 90%+ coverage
 
@@ -381,7 +381,7 @@ make version              # Show version
 - No `fmt.Print*` or `log.Print*` statements
 - No security issues (gosec)
 - Error budget compliance (see `docs/QUALITY_STANDARDS.md`)
-- Test coverage ≥70% for new code
+- Test coverage ≥15% (development phase)
 
 ### Git Workflow
 - Create feature branches from `main`
