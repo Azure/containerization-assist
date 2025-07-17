@@ -47,15 +47,6 @@ type AdaptiveOrchestrator interface {
 	ClearAdaptationHistory() error
 }
 
-// StepOrchestrator defines the interface for individual step execution
-type StepOrchestrator interface {
-	// ExecuteStep runs a single workflow step
-	ExecuteStep(ctx context.Context, step Step, state *WorkflowState) error
-
-	// CanExecuteStep checks if a step can be executed given the current state
-	CanExecuteStep(step Step, state *WorkflowState) bool
-}
-
 // BuildOptimizer defines the interface for AI-powered build optimization
 type BuildOptimizer interface {
 	AnalyzeBuildRequirements(ctx context.Context, dockerfilePath, repoPath string) (*BuildOptimization, error)
