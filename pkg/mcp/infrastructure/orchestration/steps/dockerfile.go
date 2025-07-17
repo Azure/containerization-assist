@@ -74,22 +74,23 @@ func generateDockerfileForLanguage(language, framework string, port int, logger 
 func generateGoDockerfile(port int, logger *slog.Logger) string {
 	var dockerfile strings.Builder
 
-	dockerfile.WriteString("# Build stage\n")
-	dockerfile.WriteString("FROM golang:1.21-alpine AS builder\n")
-	dockerfile.WriteString("WORKDIR /app\n")
-	dockerfile.WriteString("# Copy go.mod first, go.sum if it exists\n")
-	dockerfile.WriteString("COPY go.mod ./\n")
-	dockerfile.WriteString("# Copy go.sum only if it exists (using wildcard that doesn't fail if missing)\n")
-	dockerfile.WriteString("COPY go.su[m] ./\n")
-	dockerfile.WriteString("RUN go mod download\n")
-	dockerfile.WriteString("COPY . .\n")
-	dockerfile.WriteString("RUN CGO_ENABLED=0 GOOS=linux go build -o main .\n\n")
+	dockerfile.WriteString(`# Build stage
+FROM golang:1.24-alpine AS builder
+WORKDIR /app
+# Copy go.mod first, go.sum if it exists
+COPY go.mod ./
+# Copy go.sum only if it exists (using wildcard that doesn't fail if missing)
+COPY go.su[m] ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -o main .
 
-	dockerfile.WriteString("# Runtime stage\n")
-	dockerfile.WriteString("FROM alpine:latest\n")
-	dockerfile.WriteString("RUN apk --no-cache add ca-certificates\n")
-	dockerfile.WriteString("WORKDIR /root/\n")
-	dockerfile.WriteString("COPY --from=builder /app/main .\n")
+# Runtime stage
+FROM alpine:latest
+RUN apk --no-cache add ca-certificates
+WORKDIR /root/
+COPY --from=builder /app/main .
+`)
 
 	if port > 0 {
 		dockerfile.WriteString(fmt.Sprintf("EXPOSE %d\n", port))
@@ -112,32 +113,31 @@ func generateJavaDockerfile(framework string, port int, logger *slog.Logger) str
 
 	if isServlet {
 		// Use Tomcat for servlet applications
-		dockerfile.WriteString("# Build stage\n")
-		dockerfile.WriteString("FROM maven:3.9-eclipse-temurin-17 AS builder\n")
-		dockerfile.WriteString("WORKDIR /app\n")
-		dockerfile.WriteString("COPY . .\n")
+		dockerfile.WriteString(`# Build stage
+FROM maven:3.9-eclipse-temurin-17 AS builder
+WORKDIR /app
+COPY . .
 
-		// Build the application
-		dockerfile.WriteString("# Build the application\n")
-		dockerfile.WriteString("RUN if [ -f \"mvnw\" ]; then \\\n")
-		dockerfile.WriteString("      chmod +x mvnw && ./mvnw clean package -DskipTests; \\\n")
-		dockerfile.WriteString("    elif [ -f \"gradlew\" ]; then \\\n")
-		dockerfile.WriteString("      chmod +x gradlew && ./gradlew build -x test; \\\n")
-		dockerfile.WriteString("    elif [ -f \"pom.xml\" ]; then \\\n")
-		dockerfile.WriteString("      mvn clean package -DskipTests; \\\n")
-		dockerfile.WriteString("    elif [ -f \"build.gradle\" ] || [ -f \"build.gradle.kts\" ]; then \\\n")
-		dockerfile.WriteString("      gradle build -x test; \\\n")
-		dockerfile.WriteString("    else \\\n")
-		dockerfile.WriteString("      echo \"No build file found\" && exit 1; \\\n")
-		dockerfile.WriteString("    fi\n\n")
+# Build the application
+RUN if [ -f "mvnw" ]; then \
+      chmod +x mvnw && ./mvnw clean package -DskipTests; \
+    elif [ -f "gradlew" ]; then \
+      chmod +x gradlew && ./gradlew build -x test; \
+    elif [ -f "pom.xml" ]; then \
+      mvn clean package -DskipTests; \
+    elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then \
+      gradle build -x test; \
+    else \
+      echo "No build file found" && exit 1; \
+    fi
 
-		// Runtime stage with Tomcat
-		dockerfile.WriteString("# Runtime stage - Tomcat for servlet applications\n")
-		dockerfile.WriteString("FROM tomcat:10-jre17-temurin-jammy\n")
-		dockerfile.WriteString("# Remove default webapps\n")
-		dockerfile.WriteString("RUN rm -rf /usr/local/tomcat/webapps/*\n")
-		dockerfile.WriteString("# Copy WAR file to Tomcat webapps as ROOT for root context\n")
-		dockerfile.WriteString("COPY --from=builder /app/target/*.war /usr/local/tomcat/webapps/ROOT.war\n")
+# Runtime stage - Tomcat for servlet applications
+FROM tomcat:10-jre17-temurin-jammy
+# Remove default webapps
+RUN rm -rf /usr/local/tomcat/webapps/*
+# Copy WAR file to Tomcat webapps as ROOT for root context
+COPY --from=builder /app/target/*.war /usr/local/tomcat/webapps/ROOT.war
+`)
 
 		if port > 0 {
 			dockerfile.WriteString(fmt.Sprintf("EXPOSE %d\n", port))
@@ -145,39 +145,39 @@ func generateJavaDockerfile(framework string, port int, logger *slog.Logger) str
 			dockerfile.WriteString("EXPOSE 8080\n") // Default Tomcat port
 		}
 
-		dockerfile.WriteString("# Start Tomcat\n")
-		dockerfile.WriteString("CMD [\"catalina.sh\", \"run\"]\n")
+		dockerfile.WriteString(`# Start Tomcat
+CMD ["catalina.sh", "run"]
+`)
 	} else {
 		// Standard Java application (executable JAR)
-		dockerfile.WriteString("# Build stage\n")
-		dockerfile.WriteString("FROM maven:3.9-eclipse-temurin-17 AS builder\n")
-		dockerfile.WriteString("WORKDIR /app\n")
-		dockerfile.WriteString("COPY . .\n")
+		dockerfile.WriteString(`# Build stage
+FROM maven:3.9-eclipse-temurin-17 AS builder
+WORKDIR /app
+COPY . .
 
-		// Handle different build systems
-		dockerfile.WriteString("# Build the application\n")
-		dockerfile.WriteString("RUN if [ -f \"mvnw\" ]; then \\\n")
-		dockerfile.WriteString("      chmod +x mvnw && ./mvnw clean package -DskipTests; \\\n")
-		dockerfile.WriteString("    elif [ -f \"gradlew\" ]; then \\\n")
-		dockerfile.WriteString("      chmod +x gradlew && ./gradlew build -x test; \\\n")
-		dockerfile.WriteString("    elif [ -f \"pom.xml\" ]; then \\\n")
-		dockerfile.WriteString("      mvn clean package -DskipTests; \\\n")
-		dockerfile.WriteString("    elif [ -f \"build.gradle\" ] || [ -f \"build.gradle.kts\" ]; then \\\n")
-		dockerfile.WriteString("      gradle build -x test; \\\n")
-		dockerfile.WriteString("    else \\\n")
-		dockerfile.WriteString("      echo \"No build file found\" && exit 1; \\\n")
-		dockerfile.WriteString("    fi\n\n")
+# Build the application
+RUN if [ -f "mvnw" ]; then \
+      chmod +x mvnw && ./mvnw clean package -DskipTests; \
+    elif [ -f "gradlew" ]; then \
+      chmod +x gradlew && ./gradlew build -x test; \
+    elif [ -f "pom.xml" ]; then \
+      mvn clean package -DskipTests; \
+    elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then \
+      gradle build -x test; \
+    else \
+      echo "No build file found" && exit 1; \
+    fi
 
-		// Runtime stage
-		dockerfile.WriteString("# Runtime stage\n")
-		dockerfile.WriteString("FROM eclipse-temurin:17-jre-alpine\n")
-		dockerfile.WriteString("WORKDIR /app\n")
+# Runtime stage
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
 
-		// Copy built artifacts from builder stage - handle both Maven and Gradle outputs
-		dockerfile.WriteString("# Copy built artifacts from builder stage\n")
-		dockerfile.WriteString("# Use a shell script to find and copy the built artifact\n")
-		dockerfile.WriteString("RUN --mount=from=builder,source=/app,target=/build \\\n")
-		dockerfile.WriteString("    find /build -name '*.jar' -not -name '*-sources.jar' -not -name '*-javadoc.jar' | head -1 | xargs -I {} cp {} /app/app.jar\n\n")
+# Copy built artifacts from builder stage
+# Use a shell script to find and copy the built artifact
+RUN --mount=from=builder,source=/app,target=/build \
+    find /build -name '*.jar' -not -name '*-sources.jar' -not -name '*-javadoc.jar' | head -1 | xargs -I {} cp {} /app/app.jar
+
+`)
 
 		if port > 0 {
 			dockerfile.WriteString(fmt.Sprintf("EXPOSE %d\n", port))
@@ -185,8 +185,9 @@ func generateJavaDockerfile(framework string, port int, logger *slog.Logger) str
 			dockerfile.WriteString("EXPOSE 8080\n") // Default Java web app port
 		}
 
-		dockerfile.WriteString("# Run the application\n")
-		dockerfile.WriteString("ENTRYPOINT [\"java\", \"-jar\", \"app.jar\"]\n")
+		dockerfile.WriteString(`# Run the application
+ENTRYPOINT ["java", "-jar", "app.jar"]
+`)
 	}
 
 	logger.Debug("Generated Java Dockerfile", "framework", framework, "isServlet", isServlet)
@@ -197,11 +198,12 @@ func generateJavaDockerfile(framework string, port int, logger *slog.Logger) str
 func generateNodeDockerfile(framework string, port int, logger *slog.Logger) string {
 	var dockerfile strings.Builder
 
-	dockerfile.WriteString("FROM node:18-alpine\n")
-	dockerfile.WriteString("WORKDIR /app\n")
-	dockerfile.WriteString("COPY package*.json ./\n")
-	dockerfile.WriteString("RUN npm ci --only=production\n")
-	dockerfile.WriteString("COPY . .\n")
+	dockerfile.WriteString(`FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+`)
 
 	// Framework-specific optimizations
 	if strings.Contains(framework, "next") {
@@ -214,7 +216,8 @@ func generateNodeDockerfile(framework string, port int, logger *slog.Logger) str
 		dockerfile.WriteString("EXPOSE 3000\n") // Default Node.js port
 	}
 
-	dockerfile.WriteString("CMD [\"npm\", \"start\"]\n")
+	dockerfile.WriteString(`CMD ["npm", "start"]
+`)
 
 	logger.Debug("Generated Node.js Dockerfile", "framework", framework)
 	return dockerfile.String()
@@ -224,11 +227,12 @@ func generateNodeDockerfile(framework string, port int, logger *slog.Logger) str
 func generatePythonDockerfile(framework string, port int, logger *slog.Logger) string {
 	var dockerfile strings.Builder
 
-	dockerfile.WriteString("FROM python:3.11-slim\n")
-	dockerfile.WriteString("WORKDIR /app\n")
-	dockerfile.WriteString("COPY requirements.txt .\n")
-	dockerfile.WriteString("RUN pip install --no-cache-dir -r requirements.txt\n")
-	dockerfile.WriteString("COPY . .\n")
+	dockerfile.WriteString(`FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+`)
 
 	if port > 0 {
 		dockerfile.WriteString(fmt.Sprintf("EXPOSE %d\n", port))
@@ -238,11 +242,14 @@ func generatePythonDockerfile(framework string, port int, logger *slog.Logger) s
 
 	// Framework-specific commands
 	if strings.Contains(framework, "django") {
-		dockerfile.WriteString("CMD [\"python\", \"manage.py\", \"runserver\", \"0.0.0.0:8000\"]\n")
+		dockerfile.WriteString(`CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+`)
 	} else if strings.Contains(framework, "fastapi") {
-		dockerfile.WriteString("CMD [\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"]\n")
+		dockerfile.WriteString(`CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+`)
 	} else {
-		dockerfile.WriteString("CMD [\"python\", \"app.py\"]\n")
+		dockerfile.WriteString(`CMD ["python", "app.py"]
+`)
 	}
 
 	logger.Debug("Generated Python Dockerfile", "framework", framework)
@@ -253,25 +260,27 @@ func generatePythonDockerfile(framework string, port int, logger *slog.Logger) s
 func generateRustDockerfile(port int, logger *slog.Logger) string {
 	var dockerfile strings.Builder
 
-	dockerfile.WriteString("# Build stage\n")
-	dockerfile.WriteString("FROM rust:1.70 AS builder\n")
-	dockerfile.WriteString("WORKDIR /app\n")
-	dockerfile.WriteString("COPY Cargo.toml Cargo.lock ./\n")
-	dockerfile.WriteString("RUN mkdir src && echo 'fn main() {}' > src/main.rs\n")
-	dockerfile.WriteString("RUN cargo build --release\n")
-	dockerfile.WriteString("COPY . .\n")
-	dockerfile.WriteString("RUN cargo build --release\n\n")
+	dockerfile.WriteString(`# Build stage
+FROM rust:1.70 AS builder
+WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && echo 'fn main() {}' > src/main.rs
+RUN cargo build --release
+COPY . .
+RUN cargo build --release
 
-	dockerfile.WriteString("# Runtime stage\n")
-	dockerfile.WriteString("FROM debian:bookworm-slim\n")
-	dockerfile.WriteString("WORKDIR /app\n")
-	dockerfile.WriteString("COPY --from=builder /app/target/release/* ./\n")
+# Runtime stage
+FROM debian:bookworm-slim
+WORKDIR /app
+COPY --from=builder /app/target/release/* ./
+`)
 
 	if port > 0 {
 		dockerfile.WriteString(fmt.Sprintf("EXPOSE %d\n", port))
 	}
 
-	dockerfile.WriteString("CMD [\"./main\"]\n")
+	dockerfile.WriteString(`CMD ["./main"]
+`)
 
 	logger.Debug("Generated Rust Dockerfile with multi-stage build")
 	return dockerfile.String()
@@ -281,10 +290,11 @@ func generateRustDockerfile(port int, logger *slog.Logger) string {
 func generatePHPDockerfile(framework string, port int, logger *slog.Logger) string {
 	var dockerfile strings.Builder
 
-	dockerfile.WriteString("FROM php:8.2-apache\n")
-	dockerfile.WriteString("WORKDIR /var/www/html\n")
-	dockerfile.WriteString("COPY . .\n")
-	dockerfile.WriteString("RUN chown -R www-data:www-data /var/www/html\n")
+	dockerfile.WriteString(`FROM php:8.2-apache
+WORKDIR /var/www/html
+COPY . .
+RUN chown -R www-data:www-data /var/www/html
+`)
 
 	if port > 0 {
 		dockerfile.WriteString(fmt.Sprintf("EXPOSE %d\n", port))
@@ -292,7 +302,8 @@ func generatePHPDockerfile(framework string, port int, logger *slog.Logger) stri
 		dockerfile.WriteString("EXPOSE 80\n")
 	}
 
-	dockerfile.WriteString("CMD [\"apache2-foreground\"]\n")
+	dockerfile.WriteString(`CMD ["apache2-foreground"]
+`)
 
 	logger.Debug("Generated PHP Dockerfile", "framework", framework)
 	return dockerfile.String()
@@ -302,15 +313,17 @@ func generatePHPDockerfile(framework string, port int, logger *slog.Logger) stri
 func generateGenericDockerfile(port int, logger *slog.Logger) string {
 	var dockerfile strings.Builder
 
-	dockerfile.WriteString("FROM alpine:latest\n")
-	dockerfile.WriteString("WORKDIR /app\n")
-	dockerfile.WriteString("COPY . .\n")
+	dockerfile.WriteString(`FROM alpine:latest
+WORKDIR /app
+COPY . .
+`)
 
 	if port > 0 {
 		dockerfile.WriteString(fmt.Sprintf("EXPOSE %d\n", port))
 	}
 
-	dockerfile.WriteString("CMD [\"./start.sh\"]\n")
+	dockerfile.WriteString(`CMD ["./start.sh"]
+`)
 
 	logger.Debug("Generated generic Dockerfile")
 	return dockerfile.String()

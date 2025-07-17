@@ -1,5 +1,6 @@
 // Package sampling contains domain-level abstractions for AI/LLM sampling.
 // This package must NOT import any infrastructure packages.
+// Sampling is the MCP term for calling AI/LLM APIs for text generation/completion
 package sampling
 
 // Request represents a sampling request with all supported parameters.
