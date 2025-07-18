@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/version"
 )
 
 func TestVersionDetection(t *testing.T) {
@@ -168,7 +170,7 @@ func TestDetectNodeVersion(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	versionDetector := NewVersionDetector(logger)
+	versionDetector := version.NewDetector(logger)
 
 	tests := []struct {
 		name        string
@@ -214,7 +216,7 @@ func TestDetectNodeVersion(t *testing.T) {
 				}
 			}
 
-			version := versionDetector.detectNodeVersion(testDir)
+			version := versionDetector.DetectLanguageVersion(testDir, "javascript")
 			if version != tt.expectedVer {
 				t.Errorf("Expected version %s, got %s", tt.expectedVer, version)
 			}
@@ -230,7 +232,7 @@ func TestDetectPythonVersion(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	versionDetector := NewVersionDetector(logger)
+	versionDetector := version.NewDetector(logger)
 
 	tests := []struct {
 		name        string
@@ -277,7 +279,7 @@ python = "^3.11"`,
 				}
 			}
 
-			version := versionDetector.detectPythonVersion(testDir)
+			version := versionDetector.DetectLanguageVersion(testDir, "python")
 			if version != tt.expectedVer {
 				t.Errorf("Expected version %s, got %s", tt.expectedVer, version)
 			}
