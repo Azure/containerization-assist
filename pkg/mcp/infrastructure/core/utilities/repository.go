@@ -15,11 +15,13 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/common/filesystem"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/version"
 )
 
 // RepositoryAnalyzer provides mechanical repository analysis without AI
 type RepositoryAnalyzer struct {
-	logger *slog.Logger
+	logger          *slog.Logger
+	versionDetector *version.Detector
 }
 
 // Engine is an alias for RepositoryAnalyzer for compatibility
@@ -28,7 +30,8 @@ type Engine = RepositoryAnalyzer
 // NewRepositoryAnalyzer creates a new repository analyzer
 func NewRepositoryAnalyzer(logger *slog.Logger) *RepositoryAnalyzer {
 	return &RepositoryAnalyzer{
-		logger: logger.With("component", "repository_analyzer"),
+		logger:          logger.With("component", "repository_analyzer"),
+		versionDetector: version.NewDetector(logger),
 	}
 }
 
@@ -39,19 +42,21 @@ func NewEngine(logger *slog.Logger) *Engine {
 
 // AnalysisResult contains the result of repository analysis
 type AnalysisResult struct {
-	Success      bool                   `json:"success"`
-	Language     string                 `json:"language"`
-	Framework    string                 `json:"framework,omitempty"`
-	Dependencies []Dependency           `json:"dependencies"`
-	ConfigFiles  []ConfigFile           `json:"config_files"`
-	Structure    map[string]interface{} `json:"structure"`
-	EntryPoints  []string               `json:"entry_points"`
-	BuildFiles   []string               `json:"build_files"`
-	Port         int                    `json:"port,omitempty"`
-	DatabaseInfo *DatabaseInfo          `json:"database_info,omitempty"`
-	Suggestions  []string               `json:"suggestions"`
-	Context      map[string]interface{} `json:"context"`
-	Error        *AnalysisError         `json:"error,omitempty"`
+	Success          bool                   `json:"success"`
+	Language         string                 `json:"language"`
+	LanguageVersion  string                 `json:"language_version,omitempty"`
+	Framework        string                 `json:"framework,omitempty"`
+	FrameworkVersion string                 `json:"framework_version,omitempty"`
+	Dependencies     []Dependency           `json:"dependencies"`
+	ConfigFiles      []ConfigFile           `json:"config_files"`
+	Structure        map[string]interface{} `json:"structure"`
+	EntryPoints      []string               `json:"entry_points"`
+	BuildFiles       []string               `json:"build_files"`
+	Port             int                    `json:"port,omitempty"`
+	DatabaseInfo     *DatabaseInfo          `json:"database_info,omitempty"`
+	Suggestions      []string               `json:"suggestions"`
+	Context          map[string]interface{} `json:"context"`
+	Error            *AnalysisError         `json:"error,omitempty"`
 }
 
 // Dependency represents a project dependency
@@ -133,6 +138,10 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(repoPath string) (*AnalysisResul
 	// Detect language and framework
 	result.Language, result.Framework = ra.detectLanguageAndFramework(repoPath)
 
+	// Detect language and framework versions
+	result.LanguageVersion = ra.versionDetector.DetectLanguageVersion(repoPath, result.Language)
+	result.FrameworkVersion = ra.versionDetector.DetectFrameworkVersion(repoPath, result.Framework)
+
 	// Analyze configuration files
 	result.ConfigFiles = ra.analyzeConfigFiles(repoPath)
 
@@ -161,13 +170,17 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(repoPath string) (*AnalysisResul
 		"dependencies":      len(result.Dependencies),
 		"entry_points":      len(result.EntryPoints),
 		"database_detected": result.DatabaseInfo.Detected,
+		"language_version":  result.LanguageVersion,
+		"framework_version": result.FrameworkVersion,
 	}
 
 	result.Success = true
 
 	ra.logger.Info("Repository analysis completed",
 		"language", result.Language,
+		"language_version", result.LanguageVersion,
 		"framework", result.Framework,
+		"framework_version", result.FrameworkVersion,
 		"dependencies", len(result.Dependencies),
 		"database", result.DatabaseInfo.Detected)
 
@@ -221,6 +234,14 @@ func (ra *RepositoryAnalyzer) detectLanguageAndFramework(repoPath string) (strin
 					javaFramework := ra.detectJavaFramework(repoPath, framework)
 					if javaFramework != "" {
 						framework = javaFramework
+					}
+				}
+
+				// For Go, detect specific frameworks
+				if check.language == "go" {
+					goFramework := ra.versionDetector.DetectGoFrameworkFromMod(repoPath)
+					if goFramework != "" {
+						framework = goFramework
 					}
 				}
 
@@ -397,7 +418,7 @@ func (ra *RepositoryAnalyzer) detectLanguageByExtensions(repoPath string) string
 	return detectedLang
 }
 
-// analyzeConfigFiles finds and analyzes configuration files with graceful error handling
+// analyzeConfigFiles finds and analyzes configuration files with graceful error handling with graceful error handling
 func (ra *RepositoryAnalyzer) analyzeConfigFiles(repoPath string) []ConfigFile {
 	configFiles := make([]ConfigFile, 0)
 
@@ -1016,11 +1037,19 @@ func (ra *RepositoryAnalyzer) generateSuggestions(result *AnalysisResult) []stri
 	suggestions := make([]string, 0)
 
 	if result.Language != "" {
-		suggestions = append(suggestions, fmt.Sprintf("Detected %s project", result.Language))
+		suggestion := fmt.Sprintf("Detected %s project", result.Language)
+		if result.LanguageVersion != "" {
+			suggestion += fmt.Sprintf(" (version %s)", result.LanguageVersion)
+		}
+		suggestions = append(suggestions, suggestion)
 	}
 
 	if result.Framework != "" {
-		suggestions = append(suggestions, fmt.Sprintf("Using %s framework", result.Framework))
+		suggestion := fmt.Sprintf("Using %s framework", result.Framework)
+		if result.FrameworkVersion != "" {
+			suggestion += fmt.Sprintf(" (version %s)", result.FrameworkVersion)
+		}
+		suggestions = append(suggestions, suggestion)
 	}
 
 	if len(result.Dependencies) > 0 {
