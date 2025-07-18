@@ -52,14 +52,28 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowSt
 		return fmt.Errorf("dockerfile generation failed: %v", err)
 	}
 
-	state.Logger.Info("Dockerfile generation completed", "path", dockerfileResult.Path)
+	state.Logger.Info("Dockerfile generation completed",
+		"path", dockerfileResult.Path,
+		"base_image", dockerfileResult.BaseImage,
+		"language_version", dockerfileResult.LanguageVersion,
+		"framework_version", dockerfileResult.FrameworkVersion)
 
-	// Convert to workflow type
+	// Convert to workflow type with enhanced metadata
+	metadata := map[string]interface{}{
+		"build_args": dockerfileResult.BuildArgs,
+	}
+	if dockerfileResult.LanguageVersion != "" {
+		metadata["language_version"] = dockerfileResult.LanguageVersion
+	}
+	if dockerfileResult.FrameworkVersion != "" {
+		metadata["framework_version"] = dockerfileResult.FrameworkVersion
+	}
+
 	state.DockerfileResult = &workflow.DockerfileResult{
 		Content:     dockerfileResult.Content,
 		Path:        dockerfileResult.Path,
 		BaseImage:   dockerfileResult.BaseImage,
-		Metadata:    map[string]interface{}{"build_args": dockerfileResult.BuildArgs},
+		Metadata:    metadata,
 		ExposedPort: dockerfileResult.ExposedPort,
 	}
 

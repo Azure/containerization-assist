@@ -97,7 +97,9 @@ func AnalyzeRepository(repoURL, branch string, logger *slog.Logger) (*AnalyzeRes
 	analysisMap := map[string]interface{}{
 		"files_analyzed":    len(result.ConfigFiles),
 		"language":          result.Language,
+		"language_version":  result.LanguageVersion,
 		"framework":         result.Framework,
+		"framework_version": result.FrameworkVersion,
 		"dependencies":      len(result.Dependencies),
 		"entry_points":      result.EntryPoints,
 		"build_files":       result.BuildFiles,
@@ -111,7 +113,9 @@ func AnalyzeRepository(repoURL, branch string, logger *slog.Logger) (*AnalyzeRes
 
 	logger.Info("Repository analysis completed successfully",
 		"language", result.Language,
+		"language_version", result.LanguageVersion,
 		"framework", result.Framework,
+		"framework_version", result.FrameworkVersion,
 		"port", result.Port)
 
 	logger.Info("Returning analysis result", "repo_path", repoPath, "language", result.Language)
