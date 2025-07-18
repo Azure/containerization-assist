@@ -36,11 +36,11 @@ func TestGetTemplate(t *testing.T) {
 func TestGetAllTemplates(t *testing.T) {
 	templates := GetAllTemplates()
 	expectedLanguages := []string{"go", "java", "node", "python", "rust", "php", "generic"}
-	
+
 	if len(templates) != len(expectedLanguages) {
 		t.Errorf("GetAllTemplates() returned %d templates, expected %d", len(templates), len(expectedLanguages))
 	}
-	
+
 	for _, lang := range expectedLanguages {
 		if template, exists := templates[lang]; !exists {
 			t.Errorf("GetAllTemplates() missing template for %s", lang)
@@ -71,7 +71,7 @@ func TestTemplateContents(t *testing.T) {
 				t.Errorf("Template for %s not found", test.language)
 				return
 			}
-			
+
 			for _, expected := range test.contains {
 				if !containsString(template, expected) {
 					t.Errorf("Template for %s does not contain expected string: %s", test.language, expected)
