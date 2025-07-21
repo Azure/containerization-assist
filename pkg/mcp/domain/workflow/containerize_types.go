@@ -16,11 +16,16 @@ package workflow
 //  9. Application deployment
 //  10. Health verification and validation
 type ContainerizeAndDeployArgs struct {
-	// RepoURL is the Git repository URL to containerize (required)
+	// RepoURL is the Git repository URL to containerize (required if repo_path not provided)
 	// Supports HTTPS and SSH Git URLs
-	RepoURL string `json:"repo_url"`
+	RepoURL string `json:"repo_url,omitempty"`
+
+	// RepoPath is the local repository path to containerize (required if repo_url not provided)
+	// Points to a local directory containing the source code
+	RepoPath string `json:"repo_path,omitempty"`
 
 	// Branch specifies the Git branch to use (default: main/master)
+	// Only applicable when using repo_url
 	Branch string `json:"branch,omitempty"`
 
 	// Scan enables security vulnerability scanning with Trivy/Grype
@@ -66,6 +71,11 @@ type ContainerizeAndDeployResult struct {
 
 	// Namespace is the Kubernetes namespace where the application was deployed
 	Namespace string `json:"k8s_namespace,omitempty"`
+
+	// RepoPath is the local path where the repository was cloned or analyzed
+	// For git URLs, this shows the temporary directory where the repo was cloned
+	// For local paths, this shows the original path provided
+	RepoPath string `json:"repo_path,omitempty"`
 
 	// ScanReport contains security vulnerability scan results
 	// Only populated if Scan was enabled and scanning completed
