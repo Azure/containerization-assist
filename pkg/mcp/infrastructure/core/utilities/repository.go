@@ -418,7 +418,7 @@ func (ra *RepositoryAnalyzer) detectLanguageByExtensions(repoPath string) string
 	return detectedLang
 }
 
-// analyzeConfigFiles finds and analyzes configuration files with graceful error handling with graceful error handling
+// analyzeConfigFiles finds and analyzes configuration files with graceful error handling
 func (ra *RepositoryAnalyzer) analyzeConfigFiles(repoPath string) []ConfigFile {
 	configFiles := make([]ConfigFile, 0)
 
