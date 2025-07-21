@@ -51,7 +51,6 @@ func RegisterWorkflowTools(mcpServer interface {
 					"description": "Test mode - skip actual Docker operations (optional)",
 				},
 			},
-			Required: []string{}, // Either repo_url or repo_path is required, validated in handler
 		},
 	}
 
