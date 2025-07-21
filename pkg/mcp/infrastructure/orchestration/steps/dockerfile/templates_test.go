@@ -1,6 +1,7 @@
 package dockerfile
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -73,12 +74,10 @@ func TestTemplateContents(t *testing.T) {
 			}
 
 			for _, expected := range test.contains {
-				if !containsString(template, expected) {
+				if !strings.Contains(template, expected) {
 					t.Errorf("Template for %s does not contain expected string: %s", test.language, expected)
 				}
 			}
 		})
 	}
 }
-
-// Removed the custom containsString and findSubstring functions as they are replaced by strings.Contains.
