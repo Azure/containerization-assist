@@ -7,6 +7,7 @@ WORKDIR /app
 # Copy go.mod first, go.sum if it exists
 COPY go.mod ./
 # Copy go.sum only if it exists (using wildcard that doesn't fail if missing)
+# The pattern 'go.su[m]' matches 'go.sum' and ensures the command succeeds even if the file is absent.
 COPY go.su[m] ./
 RUN go mod download
 COPY . .
