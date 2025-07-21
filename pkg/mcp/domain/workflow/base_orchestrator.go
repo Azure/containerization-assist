@@ -110,7 +110,7 @@ func (o *BaseOrchestrator) newEmitter(ctx context.Context, req *mcp.CallToolRequ
 // newState creates the workflow state with all necessary components
 func (o *BaseOrchestrator) newState(workflowID string, args *ContainerizeAndDeployArgs, emitter api.ProgressEmitter) *WorkflowState {
 	repoIdentifier := GetRepositoryIdentifier(args)
-	
+
 	state := &WorkflowState{
 		WorkflowID:       workflowID,
 		Args:             args,
