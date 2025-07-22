@@ -175,6 +175,7 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(repoPath string) (*AnalysisResul
 }
 
 // detectLanguageAndFramework detects the primary language and framework
+// This is intentionally simple - complex logic belongs in the AI enhancement layer
 func (ra *RepositoryAnalyzer) detectLanguageAndFramework(repoPath string) (string, string) {
 	// Check for specific files that indicate language/framework
 	checks := []struct {
@@ -190,6 +191,12 @@ func (ra *RepositoryAnalyzer) detectLanguageAndFramework(repoPath string) (strin
 		{"pom.xml", "java", "maven"},
 		{"build.gradle", "java", "gradle"},
 		{"build.gradle.kts", "java", "gradle"},
+		{"build.xml", "java", "ant"},
+		{"ivy.xml", "java", "ant"},
+		{"server.xml", "java", "tomcat"},
+		{"context.xml", "java", "tomcat"},
+		{"jboss-web.xml", "java", "jboss"},
+		{"wildfly.xml", "java", "wildfly"},
 		{"Cargo.toml", "rust", ""},
 		{"composer.json", "php", ""},
 		{"Gemfile", "ruby", ""},
@@ -201,9 +208,7 @@ func (ra *RepositoryAnalyzer) detectLanguageAndFramework(repoPath string) (strin
 
 	for _, check := range checks {
 		if strings.Contains(check.file, "*") {
-			// Handle wildcard patterns
-			pattern := strings.Replace(check.file, "*", ".*", -1)
-			if ra.findFilesByPattern(repoPath, pattern) {
+			if ra.findFilesByPattern(repoPath, check.file) {
 				return check.language, check.framework
 			}
 		} else {
@@ -211,17 +216,8 @@ func (ra *RepositoryAnalyzer) detectLanguageAndFramework(repoPath string) (strin
 			if _, err := os.Stat(filePath); err == nil {
 				framework := check.framework
 
-				// For JavaScript, detect specific frameworks
 				if check.language == "javascript" {
 					framework = ra.detectJavaScriptFramework(filePath)
-				}
-
-				// For Java, detect specific frameworks
-				if check.language == "java" {
-					javaFramework := ra.detectJavaFramework(repoPath, framework)
-					if javaFramework != "" {
-						framework = javaFramework
-					}
 				}
 
 				return check.language, framework
@@ -229,7 +225,7 @@ func (ra *RepositoryAnalyzer) detectLanguageAndFramework(repoPath string) (strin
 		}
 	}
 
-	// Fallback: analyze file extensions
+	// If no config files found, try file extension counting
 	return ra.detectLanguageByExtensions(repoPath), ""
 }
 
@@ -724,8 +720,37 @@ func (ra *RepositoryAnalyzer) validateInput(repoPath string) error {
 }
 
 func (ra *RepositoryAnalyzer) findFilesByPattern(repoPath, pattern string) bool {
-	// Simple pattern matching - could be enhanced with proper glob support
-	return false // Placeholder implementation
+	// Convert simple glob pattern to regex for basic support
+	regexPattern := strings.ReplaceAll(pattern, ".", "\\.")
+	regexPattern = strings.ReplaceAll(regexPattern, "*", ".*")
+
+	regex, err := regexp.Compile(regexPattern)
+	if err != nil {
+		ra.logger.Debug("Invalid pattern", "pattern", pattern, "error", err)
+		return false
+	}
+
+	var found bool
+	filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+
+		// Get relative path for pattern matching
+		relPath, err := filepath.Rel(repoPath, path)
+		if err != nil {
+			return nil
+		}
+
+		if regex.MatchString(relPath) || regex.MatchString(info.Name()) {
+			found = true
+			return filepath.SkipDir // Stop walking once we find a match
+		}
+
+		return nil
+	})
+
+	return found
 }
 
 func (ra *RepositoryAnalyzer) parseJSONFile(filePath string) (map[string]interface{}, error) {

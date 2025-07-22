@@ -1,0 +1,70 @@
+id: "improve-repository-analysis"
+name: "Repository Analysis Enhancement"
+description: "Improves repository analysis with AI insights"
+version: "1.0.0"
+category: "analysis"
+template: |
+  You are analyzing a repository to improve the initial analysis based on the provided information.
+
+  Initial Analysis:
+  {{.InitialAnalysis}}
+
+  Repository Structure:
+  {{.FileTree}}
+
+  README Content:
+  {{.ReadmeContent}}
+
+  INSTRUCTIONS:
+  1. Carefully examine the initial analysis, file tree, and README content
+  2. Analyze the repository structure to identify:
+     - Programming language and framework from file extensions and directory structure
+     - Build tools based on configuration files visible in the file tree (package.json, go.mod, requirements.txt, pom.xml, etc.)
+     - Likely entry points from main files and directory structure
+     - Potential services and their default ports based on common patterns
+     - Environment variables that might be needed based on the project type
+     - Typical ports used by the identified framework/language (not actual configured ports)
+  3. Return ONLY a valid JSON object with this exact structure:
+
+  {
+    "language": "string (primary programming language)",
+    "framework": "string (main framework, empty string if none)",
+    "build_tools": ["array of build tools found"],
+    "services": [{"name": "service_name", "type": "database|cache|queue|api", "default_port": 5432, "required": true}],
+    "entry_points": ["array of main executables/entry points"],
+    "environment_vars": [{"name": "VAR_NAME", "description": "description", "required": true, "type": "string"}],
+    "suggested_ports": [8080, 3000],
+    "confidence": 0.85
+  }
+
+  RULES:
+  - Analyze the provided information carefully to extract accurate details
+  - Return ONLY the final JSON object, no explanations or additional text
+  - Confidence should reflect how much information you were able to extract from the provided data
+  - Use empty strings for missing values, empty arrays for missing arrays
+  - All JSON must be properly formatted and escaped
+  - Make reasonable inferences based on common patterns and file extensions
+  - suggested_ports should reflect common defaults for the detected framework/language, not actual configured ports
+
+system_prompt: "You are a software architecture expert. Analyze repositories based on file structure, README content, and initial analysis. Return ONLY valid JSON. Never include explanations, markdown, or any text outside the JSON structure."
+parameters:
+  - name: "InitialAnalysis"
+    type: "string"
+    description: "Initial automated analysis results"
+    required: true
+  - name: "FileTree"
+    type: "string"
+    description: "Repository file structure"
+    required: true
+  - name: "ReadmeContent"
+    type: "string"
+    description: "README file content"
+    required: false
+    default: ""
+defaults:
+  ReadmeContent: "No README available"
+max_tokens: 1500
+temperature: 0.3
+tags: ["analysis", "repository", "architecture", "detection"]
+created_at: 2025-01-12
+updated_at: 2025-01-21
