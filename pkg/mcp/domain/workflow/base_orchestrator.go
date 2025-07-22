@@ -81,19 +81,23 @@ func (o *BaseOrchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest
 func (o *BaseOrchestrator) initContext(ctx context.Context, args *ContainerizeAndDeployArgs) (string, context.Context) {
 	workflowID, ok := GetWorkflowID(ctx)
 	if !ok {
-		// Generate workflow ID based on available input (cached for efficiency)
 		repoIdentifier := GetRepositoryIdentifier(args)
 		workflowID = GenerateWorkflowID(repoIdentifier)
 		ctx = WithWorkflowID(ctx, workflowID)
 	}
 
-	if args.RepoURL != "" {
-		o.logger.Info("Starting containerize_and_deploy workflow",
-			"workflow_id", workflowID, "repo_url", args.RepoURL, "branch", args.Branch, "steps_count", len(o.steps))
-	} else {
-		o.logger.Info("Starting containerize_and_deploy workflow",
-			"workflow_id", workflowID, "repo_path", args.RepoPath, "steps_count", len(o.steps))
+	logFields := []any{
+		"workflow_id", workflowID,
+		"steps_count", len(o.steps),
 	}
+
+	if args.RepoURL != "" {
+		logFields = append(logFields, "repo_url", args.RepoURL, "branch", args.Branch)
+	} else {
+		logFields = append(logFields, "repo_path", args.RepoPath)
+	}
+
+	o.logger.Info("Starting containerize_and_deploy workflow", logFields...)
 
 	return workflowID, ctx
 }

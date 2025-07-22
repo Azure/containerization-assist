@@ -64,17 +64,14 @@ func RegisterWorkflowTools(mcpServer interface {
 		repoURL, hasRepoURL := arguments["repo_url"].(string)
 		repoPath, hasRepoPath := arguments["repo_path"].(string)
 
-		if !hasRepoURL && !hasRepoPath {
+		switch {
+		case !hasRepoURL && !hasRepoPath:
 			return nil, fmt.Errorf("either repo_url or repo_path is required")
-		}
-
-		if hasRepoURL && hasRepoPath {
+		case hasRepoURL && hasRepoPath:
 			return nil, fmt.Errorf("cannot specify both repo_url and repo_path, choose one")
-		}
-
-		if hasRepoURL {
+		case hasRepoURL:
 			args.RepoURL = repoURL
-		} else {
+		case hasRepoPath:
 			args.RepoPath = repoPath
 		}
 
@@ -99,13 +96,8 @@ func RegisterWorkflowTools(mcpServer interface {
 
 		// Check if Docker is available (skip in test mode)
 		if !args.TestMode {
-			if err := docker.CheckDockerInstalled(); err != nil {
-				return nil, fmt.Errorf("docker is not installed: %v", err)
-			}
-
-			dockerClient := docker.NewDockerCmdRunner(&runner.DefaultCommandRunner{})
-			if _, err := dockerClient.Info(ctx); err != nil {
-				return nil, fmt.Errorf("docker daemon is not running or not accessible: %v", err)
+			if err := ensureDockerAvailable(ctx); err != nil {
+				return nil, err
 			}
 		}
 
@@ -132,5 +124,16 @@ func RegisterWorkflowTools(mcpServer interface {
 	})
 
 	logger.Info("Workflow tools registered successfully")
+	return nil
+}
+
+func ensureDockerAvailable(ctx context.Context) error {
+	if err := docker.CheckDockerInstalled(); err != nil {
+		return fmt.Errorf("docker is not installed: %v", err)
+	}
+	dockerClient := docker.NewDockerCmdRunner(&runner.DefaultCommandRunner{})
+	if _, err := dockerClient.Info(ctx); err != nil {
+		return fmt.Errorf("docker daemon is not running or not accessible: %v", err)
+	}
 	return nil
 }
