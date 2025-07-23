@@ -13,10 +13,9 @@ import (
 
 // WorkflowCache provides caching for workflow operations
 type WorkflowCache struct {
-	analysisCache    Cache
-	dockerfileCache  Cache
-	manifestCache    Cache
-	metricsCollector func(operation string, hit bool)
+	analysisCache   Cache
+	dockerfileCache Cache
+	manifestCache   Cache
 }
 
 // NewWorkflowCache creates a new workflow-specific cache
@@ -38,15 +37,7 @@ func NewWorkflowCache() *WorkflowCache {
 		analysisCache:   NewLayeredCache(analysisL1, analysisL2),
 		dockerfileCache: NewLayeredCache(dockerfileL1, dockerfileL2),
 		manifestCache:   NewLayeredCache(manifestL1, manifestL2),
-		metricsCollector: func(operation string, hit bool) {
-			// Default no-op metrics collector
-		},
 	}
-}
-
-// SetMetricsCollector sets the metrics collection function
-func (wc *WorkflowCache) SetMetricsCollector(collector func(operation string, hit bool)) {
-	wc.metricsCollector = collector
 }
 
 // AnalysisResult represents cached repository analysis
@@ -67,11 +58,8 @@ func (wc *WorkflowCache) GetAnalysis(ctx context.Context, repoPath string, commi
 
 	value, found := wc.analysisCache.Get(ctx, key)
 	if !found {
-		wc.metricsCollector("analysis_get", false)
 		return nil, false
 	}
-
-	wc.metricsCollector("analysis_get", true)
 
 	if result, ok := value.(*AnalysisResult); ok {
 		return result, true
@@ -95,7 +83,6 @@ func (wc *WorkflowCache) SetAnalysis(ctx context.Context, repoPath string, commi
 
 	// Cache for 1 hour - analysis results are stable for a given commit
 	wc.analysisCache.Set(ctx, key, result, 1*time.Hour)
-	wc.metricsCollector("analysis_set", true)
 }
 
 // DockerfileContent represents cached Dockerfile content
@@ -114,11 +101,8 @@ func (wc *WorkflowCache) GetDockerfile(ctx context.Context, language, framework 
 
 	value, found := wc.dockerfileCache.Get(ctx, key)
 	if !found {
-		wc.metricsCollector("dockerfile_get", false)
 		return nil, false
 	}
-
-	wc.metricsCollector("dockerfile_get", true)
 
 	if result, ok := value.(*DockerfileContent); ok {
 		return result, true
@@ -142,7 +126,6 @@ func (wc *WorkflowCache) SetDockerfile(ctx context.Context, language, framework 
 
 	// Cache for 24 hours - Dockerfiles for same tech stack are relatively stable
 	wc.dockerfileCache.Set(ctx, key, content, 24*time.Hour)
-	wc.metricsCollector("dockerfile_set", true)
 }
 
 // ManifestContent represents cached Kubernetes manifests
@@ -161,11 +144,8 @@ func (wc *WorkflowCache) GetManifest(ctx context.Context, appName, imageRef stri
 
 	value, found := wc.manifestCache.Get(ctx, key)
 	if !found {
-		wc.metricsCollector("manifest_get", false)
 		return nil, false
 	}
-
-	wc.metricsCollector("manifest_get", true)
 
 	if result, ok := value.(*ManifestContent); ok {
 		return result, true
@@ -189,7 +169,6 @@ func (wc *WorkflowCache) SetManifest(ctx context.Context, appName, imageRef stri
 
 	// Cache for 12 hours - manifests are semi-stable
 	wc.manifestCache.Set(ctx, key, content, 12*time.Hour)
-	wc.metricsCollector("manifest_set", true)
 }
 
 // InvalidateAnalysis removes cached analysis for a repository

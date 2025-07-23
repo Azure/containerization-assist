@@ -191,23 +191,6 @@ func TestHandler_HealthEndpoint(t *testing.T) {
 	}
 }
 
-func TestHandler_MetricsEndpoint(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
-	monitor := &mockHealthMonitor{}
-	handler := NewHandler(logger, 8080, monitor)
-
-	req := httptest.NewRequest("GET", "/metrics", nil)
-	rr := httptest.NewRecorder()
-	handler.handleMetrics(rr, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code, "Should return 200 OK")
-	assert.Equal(t, "text/plain; version=0.0.4; charset=utf-8", rr.Header().Get("Content-Type"), "Should set Prometheus content type")
-
-	body := rr.Body.String()
-	assert.Contains(t, body, "container_kit_mcp_uptime_seconds", "Should contain uptime metric")
-	assert.Contains(t, body, "container_kit_mcp_health_status", "Should contain health status metric")
-}
-
 func TestHandler_RootEndpoint(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	monitor := &mockHealthMonitor{}

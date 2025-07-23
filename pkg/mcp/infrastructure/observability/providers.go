@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/observability/health"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/observability/metrics"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/observability/tracing"
 	"github.com/google/wire"
 )
@@ -22,11 +21,6 @@ var ObservabilityProviders = wire.NewSet(
 
 	// Health monitoring
 	health.NewMonitor,
-
-	// Metrics
-	ProvideMetricsProvider,
-	ProvideWorkflowMetricsCollector,
-	metrics.MetricsBindings,
 
 	// Configuration
 	ProvideObservabilityConfig,
@@ -84,17 +78,6 @@ func ProvideObservabilityConfig() *ObservabilityConfig {
 		BufferSize:                  5000,
 		FlushInterval:               time.Minute * 5,
 	}
-}
-
-// ProvideMetricsProvider creates a new metrics provider with default configuration
-func ProvideMetricsProvider(logger *slog.Logger) (*metrics.MetricsProvider, error) {
-	config := metrics.DefaultConfig()
-	return metrics.NewMetricsProvider(config, logger)
-}
-
-// ProvideWorkflowMetricsCollector creates a new workflow metrics collector
-func ProvideWorkflowMetricsCollector(logger *slog.Logger) *metrics.WorkflowMetricsCollector {
-	return metrics.NewWorkflowMetricsCollector("container_kit")
 }
 
 // ObservabilityConfig provides configuration for the entire observability system
