@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/Azure/container-kit/pkg/common/runner"
+	"github.com/Azure/container-kit/pkg/core/docker"
 	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -28,9 +30,13 @@ func RegisterWorkflowTools(mcpServer interface {
 					"type":        "string",
 					"description": "Repository URL to containerize",
 				},
+				"repo_path": map[string]interface{}{
+					"type":        "string",
+					"description": "Local repository path to containerize (alternative to repo_url)",
+				},
 				"branch": map[string]interface{}{
 					"type":        "string",
-					"description": "Branch to use (optional)",
+					"description": "Branch to use (optional, only applicable when using repo_url)",
 				},
 				"scan": map[string]interface{}{
 					"type":        "boolean",
@@ -45,7 +51,6 @@ func RegisterWorkflowTools(mcpServer interface {
 					"description": "Test mode - skip actual Docker operations (optional)",
 				},
 			},
-			Required: []string{"repo_url"},
 		},
 	}
 
@@ -54,13 +59,26 @@ func RegisterWorkflowTools(mcpServer interface {
 
 		// Extract arguments
 		args := domainworkflow.ContainerizeAndDeployArgs{}
-		if repoURL, ok := arguments["repo_url"].(string); ok {
+
+		// Validate that either repo_url or repo_path is provided
+		repoURL, hasRepoURL := arguments["repo_url"].(string)
+		repoPath, hasRepoPath := arguments["repo_path"].(string)
+
+		switch {
+		case !hasRepoURL && !hasRepoPath:
+			return nil, fmt.Errorf("either repo_url or repo_path is required")
+		case hasRepoURL && hasRepoPath:
+			return nil, fmt.Errorf("cannot specify both repo_url and repo_path, choose one")
+		case hasRepoURL:
 			args.RepoURL = repoURL
-		} else {
-			return nil, fmt.Errorf("repo_url is required")
+		case hasRepoPath:
+			args.RepoPath = repoPath
 		}
 
 		if branch, ok := arguments["branch"].(string); ok {
+			if hasRepoPath {
+				return nil, fmt.Errorf("branch parameter is only applicable when using repo_url")
+			}
 			args.Branch = branch
 		}
 
@@ -74,6 +92,13 @@ func RegisterWorkflowTools(mcpServer interface {
 
 		if testMode, ok := arguments["test_mode"].(bool); ok {
 			args.TestMode = testMode
+		}
+
+		// Check if Docker is available (skip in test mode)
+		if !args.TestMode {
+			if err := ensureDockerAvailable(ctx); err != nil {
+				return nil, err
+			}
 		}
 
 		// Use injected orchestrator
@@ -99,5 +124,16 @@ func RegisterWorkflowTools(mcpServer interface {
 	})
 
 	logger.Info("Workflow tools registered successfully")
+	return nil
+}
+
+func ensureDockerAvailable(ctx context.Context) error {
+	if err := docker.CheckDockerInstalled(); err != nil {
+		return fmt.Errorf("docker is not installed: %v", err)
+	}
+	dockerClient := docker.NewDockerCmdRunner(&runner.DefaultCommandRunner{})
+	if _, err := dockerClient.Info(ctx); err != nil {
+		return fmt.Errorf("docker daemon is not running or not accessible: %v", err)
+	}
 	return nil
 }

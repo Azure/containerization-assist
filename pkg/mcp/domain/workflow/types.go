@@ -274,6 +274,9 @@ type WorkflowState struct {
 	// Input arguments
 	Args *ContainerizeAndDeployArgs
 
+	// Cached repository identifier (computed once from Args)
+	RepoIdentifier string
+
 	// Result object that accumulates information
 	Result *ContainerizeAndDeployResult
 
@@ -331,12 +334,14 @@ func NewWorkflowState(ctx context.Context, req *mcp.CallToolRequest, args *Conta
 		Steps: make([]WorkflowStep, 0, totalSteps),
 	}
 
-	workflowID := GenerateWorkflowID(args.RepoURL)
+	repoIdentifier := GetRepositoryIdentifier(args)
+	workflowID := GenerateWorkflowID(repoIdentifier)
 	workflowProgress := NewWorkflowProgress(workflowID, "containerize_and_deploy", totalSteps)
 
 	return &WorkflowState{
 		WorkflowID:       workflowID,
 		Args:             args,
+		RepoIdentifier:   repoIdentifier,
 		Result:           result,
 		ProgressEmitter:  progressEmitter,
 		WorkflowProgress: workflowProgress,
