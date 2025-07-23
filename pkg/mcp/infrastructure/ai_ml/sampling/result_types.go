@@ -503,6 +503,62 @@ func (p *DefaultParser) ParseManifestAnalysis(content string) (*domain.ManifestA
 
 // ParseRepositoryAnalysis parses AI response into structured RepositoryAnalysis
 func (p *DefaultParser) ParseRepositoryAnalysis(content string) (*RepositoryAnalysis, error) {
+	// Clean the content to extract JSON only
+	jsonContent := p.extractJSON(content)
+
+	var result RepositoryAnalysis
+	if err := json.Unmarshal([]byte(jsonContent), &result); err != nil {
+		// Fallback to legacy parsing if JSON parsing fails
+		return p.parseRepositoryAnalysisLegacy(content)
+	}
+
+	// Set metadata
+	result.Metadata = ResponseMetadata{
+		GeneratedAt: time.Now(),
+	}
+
+	return &result, nil
+}
+
+// extractJSON extracts JSON content from AI response, handling cases where
+// the AI might include extra text or markdown formatting
+func (p *DefaultParser) extractJSON(content string) string {
+	content = strings.TrimSpace(content)
+
+	// Remove markdown code block formatting
+	if strings.HasPrefix(content, "```") {
+		lines := strings.Split(content, "\n")
+		if len(lines) > 2 {
+			// Remove first line (```json or ```) and last line (```)
+			content = strings.Join(lines[1:len(lines)-1], "\n")
+		}
+	}
+
+	// Find JSON object boundaries
+	start := strings.Index(content, "{")
+	if start == -1 {
+		return content
+	}
+
+	// Find matching closing brace
+	braceCount := 0
+	for i := start; i < len(content); i++ {
+		switch content[i] {
+		case '{':
+			braceCount++
+		case '}':
+			braceCount--
+			if braceCount == 0 {
+				return content[start : i+1]
+			}
+		}
+	}
+
+	return content[start:]
+}
+
+// parseRepositoryAnalysisLegacy provides fallback parsing using the old string-matching approach
+func (p *DefaultParser) parseRepositoryAnalysisLegacy(content string) (*RepositoryAnalysis, error) {
 	result := &RepositoryAnalysis{
 		BuildTools:      []string{},
 		Dependencies:    []Dependency{},
