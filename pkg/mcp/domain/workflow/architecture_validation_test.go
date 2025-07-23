@@ -14,9 +14,9 @@ func TestArchitectureValidation(t *testing.T) {
 		check func(t *testing.T)
 	}{
 		{
-			name: "DAGOrchestrator should implement WorkflowOrchestrator",
+			name: "Orchestrator should implement WorkflowOrchestrator",
 			check: func(t *testing.T) {
-				var _ WorkflowOrchestrator = (*DAGOrchestrator)(nil)
+				var _ WorkflowOrchestrator = (*Orchestrator)(nil)
 			},
 		},
 		{
@@ -47,10 +47,10 @@ func TestArchitectureValidation(t *testing.T) {
 	}
 }
 
-// TestDAGOrchestratorCreation validates that DAGOrchestrator can be created
-func TestDAGOrchestratorCreation(t *testing.T) {
+// TestOrchestratorCreation validates that Orchestrator can be created
+func TestOrchestratorCreation(t *testing.T) {
 	// Skip this test for now since it requires complex setup
-	t.Skip("Skipping DAGOrchestrator creation test - requires step provider setup")
+	t.Skip("Skipping Orchestrator creation test - requires step provider setup")
 }
 
 // TestMiddlewareChain validates middleware execution order
@@ -74,7 +74,7 @@ func TestNoCircularDependencies(t *testing.T) {
 
 	// Import and use types from different packages
 	_ = NoOpSink{}
-	_ = &DAGOrchestrator{}
+	_ = &Orchestrator{}
 }
 
 // TestArchitecturalBoundaryEnforcement validates that the 4-layer architecture is properly maintained

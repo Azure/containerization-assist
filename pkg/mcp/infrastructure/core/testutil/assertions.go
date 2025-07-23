@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -61,9 +62,29 @@ func AssertRichError(t *testing.T, err error, expectedCode errors.Code) {
 
 // getFieldValue uses reflection to get a field value from an interface
 func getFieldValue(v interface{}, fieldName string) (interface{}, bool) {
-	// Simple implementation without reflection for now
-	// This could be enhanced with reflection if needed
-	return nil, false
+	rv := reflect.ValueOf(v)
+
+	// Handle pointer types
+	if rv.Kind() == reflect.Ptr {
+		if rv.IsNil() {
+			return nil, false
+		}
+		rv = rv.Elem()
+	}
+
+	// Check if it's a struct
+	if rv.Kind() != reflect.Struct {
+		return nil, false
+	}
+
+	// Look for the field
+	field := rv.FieldByName(fieldName)
+	if !field.IsValid() {
+		return nil, false
+	}
+
+	// Return the field value
+	return field.Interface(), true
 }
 
 // AssertDuration verifies that a duration is within expected bounds

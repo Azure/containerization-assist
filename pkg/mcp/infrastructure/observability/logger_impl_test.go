@@ -13,12 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewUnifiedLogger(t *testing.T) {
+func TestNewLoggerImpl(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
 	config := DefaultLoggerConfig()
 
-	unifiedLogger := NewUnifiedLogger(observer, logger, config)
+	unifiedLogger := NewLoggerImpl(observer, logger, config)
 
 	assert.NotNil(t, unifiedLogger)
 	assert.Equal(t, config, unifiedLogger.config)
@@ -38,8 +38,8 @@ func TestDefaultLoggerConfig(t *testing.T) {
 
 func TestMetricExtraction(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
-	unifiedLogger := NewUnifiedLogger(observer, logger, DefaultLoggerConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
+	unifiedLogger := NewLoggerImpl(observer, logger, DefaultLoggerConfig())
 
 	ctx := context.Background()
 
@@ -65,8 +65,8 @@ func TestMetricExtraction(t *testing.T) {
 
 func TestLogCorrelation(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
-	unifiedLogger := NewUnifiedLogger(observer, logger, DefaultLoggerConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
+	unifiedLogger := NewLoggerImpl(observer, logger, DefaultLoggerConfig())
 
 	ctx := context.WithValue(context.Background(), "session_id", "test_session_123")
 
@@ -86,8 +86,8 @@ func TestLogCorrelation(t *testing.T) {
 
 func TestStructuredErrorLogging(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
-	unifiedLogger := NewUnifiedLogger(observer, logger, DefaultLoggerConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
+	unifiedLogger := NewLoggerImpl(observer, logger, DefaultLoggerConfig())
 
 	ctx := context.Background()
 
@@ -109,8 +109,8 @@ func TestStructuredErrorLogging(t *testing.T) {
 
 func TestOperationLogging(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
-	unifiedLogger := NewUnifiedLogger(observer, logger, DefaultLoggerConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
+	unifiedLogger := NewLoggerImpl(observer, logger, DefaultLoggerConfig())
 
 	ctx := context.Background()
 
@@ -133,8 +133,8 @@ func TestOperationLogging(t *testing.T) {
 
 func TestLogEnrichers(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
-	unifiedLogger := NewUnifiedLogger(observer, logger, DefaultLoggerConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
+	unifiedLogger := NewLoggerImpl(observer, logger, DefaultLoggerConfig())
 
 	// Add enrichers
 	systemEnricher := NewSystemEnricher(true, true, true)
@@ -180,8 +180,8 @@ func TestLogEnrichers(t *testing.T) {
 
 func TestMetricPatternRegistration(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
-	unifiedLogger := NewUnifiedLogger(observer, logger, DefaultLoggerConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
+	unifiedLogger := NewLoggerImpl(observer, logger, DefaultLoggerConfig())
 
 	// Register custom metric pattern
 	customPattern := &MetricPattern{
@@ -209,8 +209,8 @@ func TestMetricPatternRegistration(t *testing.T) {
 
 func TestLogLevels(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
-	unifiedLogger := NewUnifiedLogger(observer, logger, DefaultLoggerConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
+	unifiedLogger := NewLoggerImpl(observer, logger, DefaultLoggerConfig())
 
 	ctx := context.Background()
 
@@ -233,8 +233,8 @@ func TestLogLevels(t *testing.T) {
 
 func TestSensitiveDataRedaction(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
-	unifiedLogger := NewUnifiedLogger(observer, logger, DefaultLoggerConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
+	unifiedLogger := NewLoggerImpl(observer, logger, DefaultLoggerConfig())
 
 	// Add security enricher
 	securityEnricher := NewSecurityEnricher(true, true, true, []string{"password", "secret"})
@@ -256,12 +256,12 @@ func TestSensitiveDataRedaction(t *testing.T) {
 
 func TestCorrelationCleanup(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
 
 	config := DefaultLoggerConfig()
 	config.CorrelationTTL = time.Millisecond * 100 // Short TTL for testing
 
-	unifiedLogger := NewUnifiedLogger(observer, logger, config)
+	unifiedLogger := NewLoggerImpl(observer, logger, config)
 
 	ctx := context.WithValue(context.Background(), "session_id", "test_cleanup_session")
 
@@ -279,12 +279,12 @@ func TestCorrelationCleanup(t *testing.T) {
 
 func TestMaxEnrichersLimit(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
 
 	config := DefaultLoggerConfig()
 	config.MaxLogEnrichers = 2 // Set low limit for testing
 
-	unifiedLogger := NewUnifiedLogger(observer, logger, config)
+	unifiedLogger := NewLoggerImpl(observer, logger, config)
 
 	// Add enrichers up to the limit
 	err1 := unifiedLogger.AddEnricher(NewSystemEnricher(true, false, false))
@@ -308,10 +308,10 @@ func CompileRegex(t *testing.T, pattern string) *regexp.Regexp {
 }
 
 // Benchmark tests
-func BenchmarkUnifiedLogger(b *testing.B) {
+func BenchmarkLoggerImpl(b *testing.B) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
-	unifiedLogger := NewUnifiedLogger(observer, logger, DefaultLoggerConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
+	unifiedLogger := NewLoggerImpl(observer, logger, DefaultLoggerConfig())
 
 	ctx := context.Background()
 
@@ -327,8 +327,8 @@ func BenchmarkUnifiedLogger(b *testing.B) {
 
 func BenchmarkMetricExtraction(b *testing.B) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
-	unifiedLogger := NewUnifiedLogger(observer, logger, DefaultLoggerConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
+	unifiedLogger := NewLoggerImpl(observer, logger, DefaultLoggerConfig())
 
 	ctx := context.Background()
 	message := "Request completed in 150ms with 0 errors using 256MB memory"
@@ -341,8 +341,8 @@ func BenchmarkMetricExtraction(b *testing.B) {
 
 func BenchmarkWithEnrichers(b *testing.B) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
-	unifiedLogger := NewUnifiedLogger(observer, logger, DefaultLoggerConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
+	unifiedLogger := NewLoggerImpl(observer, logger, DefaultLoggerConfig())
 
 	// Add enrichers
 	unifiedLogger.AddEnricher(NewSystemEnricher(true, true, true))

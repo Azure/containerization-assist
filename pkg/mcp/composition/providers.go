@@ -41,10 +41,10 @@ var Providers = wire.NewSet(
 	validation.NewPreflightValidator,
 
 	// Workflow orchestration
-	provideDAGOrchestrator,
+	provideOrchestrator,
 	steps.NewRegistryStepProvider,
 	provideStepFactory,
-	wire.Bind(new(workflow.WorkflowOrchestrator), new(*workflow.DAGOrchestrator)),
+	wire.Bind(new(workflow.WorkflowOrchestrator), new(*workflow.Orchestrator)),
 
 	// Container & Kubernetes
 	container.NewDockerContainerManager,
@@ -95,12 +95,12 @@ func provideCommandRunner() runner.CommandRunner {
 }
 
 // Workflow providers
-func provideDAGOrchestrator(
+func provideOrchestrator(
 	stepProvider workflow.StepProvider,
 	emitterFactory workflow.ProgressEmitterFactory,
 	logger *slog.Logger,
-) (*workflow.DAGOrchestrator, error) {
-	return workflow.NewDAGOrchestrator(stepProvider, emitterFactory, logger)
+) (*workflow.Orchestrator, error) {
+	return workflow.NewOrchestrator(stepProvider, emitterFactory, logger)
 }
 
 func provideStepFactory(stepProvider workflow.StepProvider, optimizer workflow.BuildOptimizer, logger *slog.Logger) *workflow.StepFactory {

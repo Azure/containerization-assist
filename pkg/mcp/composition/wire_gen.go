@@ -30,7 +30,7 @@ func InitializeServer(logger *slog.Logger, config workflow.ServerConfig) (api.MC
 	directProgressFactory := progress.NewDirectProgressFactory(logger)
 	publisher := events.NewPublisher(logger)
 	stepProvider := steps.NewRegistryStepProvider()
-	dagOrchestrator, err := provideDAGOrchestrator(stepProvider, directProgressFactory, logger)
+	orchestrator, err := provideOrchestrator(stepProvider, directProgressFactory, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func InitializeServer(logger *slog.Logger, config workflow.ServerConfig) (api.MC
 	if err != nil {
 		return nil, err
 	}
-	dependencies := provideDependencies(logger, config, optimizedSessionManager, store, directProgressFactory, publisher, dagOrchestrator, advancedPatternRecognizer, enhancedErrorHandler, stepEnhancer, domainAdapter, manager)
+	dependencies := provideDependencies(logger, config, optimizedSessionManager, store, directProgressFactory, publisher, orchestrator, advancedPatternRecognizer, enhancedErrorHandler, stepEnhancer, domainAdapter, manager)
 	mcpServer, err := application.ProvideServer(dependencies)
 	if err != nil {
 		return nil, err

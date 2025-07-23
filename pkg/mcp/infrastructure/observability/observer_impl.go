@@ -14,8 +14,17 @@ import (
 	"time"
 )
 
-// UnifiedObserver implements the Observer interface with comprehensive observability
-type UnifiedObserver struct {
+// Metric name constants
+const (
+	MetricErrorsTotal       = "errors_total"
+	MetricEventsTotal       = "events_total"
+	MetricHealthCheck       = "health_check"
+	MetricOperationDuration = "operation_duration"
+	MetricResourceUsage     = "resource_usage"
+)
+
+// ObserverImpl implements the Observer interface with comprehensive observability
+type ObserverImpl struct {
 	logger *slog.Logger
 	config *ObserverConfig
 
@@ -112,13 +121,13 @@ func DefaultObserverConfig() *ObserverConfig {
 	}
 }
 
-// NewUnifiedObserver creates a new unified observer
-func NewUnifiedObserver(logger *slog.Logger, config *ObserverConfig) *UnifiedObserver {
+// NewObserverImpl creates a new unified observer
+func NewObserverImpl(logger *slog.Logger, config *ObserverConfig) *ObserverImpl {
 	if config == nil {
 		config = DefaultObserverConfig()
 	}
 
-	observer := &UnifiedObserver{
+	observer := &ObserverImpl{
 		logger:      logger.With("component", "observer"),
 		config:      config,
 		startTime:   time.Now(),
@@ -136,7 +145,7 @@ func NewUnifiedObserver(logger *slog.Logger, config *ObserverConfig) *UnifiedObs
 }
 
 // TrackEvent tracks an event in the observability system
-func (o *UnifiedObserver) TrackEvent(ctx context.Context, event *Event) {
+func (o *ObserverImpl) TrackEvent(ctx context.Context, event *Event) {
 	if !o.shouldSample() {
 		return
 	}
@@ -163,7 +172,7 @@ func (o *UnifiedObserver) TrackEvent(ctx context.Context, event *Event) {
 }
 
 // TrackError tracks a standard error
-func (o *UnifiedObserver) TrackError(ctx context.Context, err error) {
+func (o *ObserverImpl) TrackError(ctx context.Context, err error) {
 	if err == nil {
 		return
 	}
@@ -187,7 +196,7 @@ func (o *UnifiedObserver) TrackError(ctx context.Context, err error) {
 	o.TrackEvent(ctx, event)
 
 	// Update error metrics
-	o.IncrementCounter("errors_total", map[string]string{
+	o.IncrementCounter(MetricErrorsTotal, map[string]string{
 		"type": "generic",
 	})
 
@@ -195,7 +204,7 @@ func (o *UnifiedObserver) TrackError(ctx context.Context, err error) {
 }
 
 // StartOperation starts tracking an operation
-func (o *UnifiedObserver) StartOperation(ctx context.Context, operation string) *OperationContext {
+func (o *ObserverImpl) StartOperation(ctx context.Context, operation string) *OperationContext {
 	return &OperationContext{
 		Name:      operation,
 		StartTime: time.Now(),
@@ -205,7 +214,7 @@ func (o *UnifiedObserver) StartOperation(ctx context.Context, operation string) 
 }
 
 // StartSpan starts a distributed tracing span
-func (o *UnifiedObserver) StartSpan(ctx context.Context, name string) *SpanContext {
+func (o *ObserverImpl) StartSpan(ctx context.Context, name string) *SpanContext {
 	return &SpanContext{
 		TraceID:   o.generateTraceID(),
 		SpanID:    o.generateSpanID(),
@@ -217,7 +226,7 @@ func (o *UnifiedObserver) StartSpan(ctx context.Context, name string) *SpanConte
 }
 
 // RecordHealthCheck records a health check result
-func (o *UnifiedObserver) RecordHealthCheck(component string, status HealthStatus, latency time.Duration) {
+func (o *ObserverImpl) RecordHealthCheck(component string, status HealthStatus, latency time.Duration) {
 	health := &ComponentHealth{
 		Status:       status,
 		LastCheck:    time.Now(),
@@ -263,13 +272,13 @@ func (o *UnifiedObserver) RecordHealthCheck(component string, status HealthStatu
 }
 
 // RecordMetric records a generic metric
-func (o *UnifiedObserver) RecordMetric(name string, value float64, tags map[string]string) {
+func (o *ObserverImpl) RecordMetric(name string, value float64, tags map[string]string) {
 	// Track as histogram for general metrics
 	o.RecordHistogram(name, value, tags)
 }
 
 // IncrementCounter increments a counter metric
-func (o *UnifiedObserver) IncrementCounter(name string, tags map[string]string) {
+func (o *ObserverImpl) IncrementCounter(name string, tags map[string]string) {
 	key := o.buildMetricKey(name, tags)
 
 	if existing, loaded := o.counters.LoadOrStore(key, &CounterMetric{
@@ -286,7 +295,7 @@ func (o *UnifiedObserver) IncrementCounter(name string, tags map[string]string) 
 }
 
 // SetGauge sets a gauge metric value
-func (o *UnifiedObserver) SetGauge(name string, value float64, tags map[string]string) {
+func (o *ObserverImpl) SetGauge(name string, value float64, tags map[string]string) {
 	key := o.buildMetricKey(name, tags)
 
 	gauge := &GaugeMetric{
@@ -299,7 +308,7 @@ func (o *UnifiedObserver) SetGauge(name string, value float64, tags map[string]s
 }
 
 // RecordHistogram records a value in a histogram
-func (o *UnifiedObserver) RecordHistogram(name string, value float64, tags map[string]string) {
+func (o *ObserverImpl) RecordHistogram(name string, value float64, tags map[string]string) {
 	key := o.buildMetricKey(name, tags)
 
 	if existing, loaded := o.histograms.LoadOrStore(key, &HistogramMetric{
@@ -320,7 +329,7 @@ func (o *UnifiedObserver) RecordHistogram(name string, value float64, tags map[s
 }
 
 // RecordResourceUsage records resource usage metrics
-func (o *UnifiedObserver) RecordResourceUsage(ctx context.Context, resource *ResourceUsage) {
+func (o *ObserverImpl) RecordResourceUsage(ctx context.Context, resource *ResourceUsage) {
 	if resource.Timestamp.IsZero() {
 		resource.Timestamp = time.Now()
 	}
@@ -361,12 +370,12 @@ func (o *UnifiedObserver) RecordResourceUsage(ctx context.Context, resource *Res
 }
 
 // Logger returns the configured logger
-func (o *UnifiedObserver) Logger() *slog.Logger {
+func (o *ObserverImpl) Logger() *slog.Logger {
 	return o.logger
 }
 
 // GetObservabilityReport generates a comprehensive observability report
-func (o *UnifiedObserver) GetObservabilityReport() *ObservabilityReport {
+func (o *ObserverImpl) GetObservabilityReport() *ObservabilityReport {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
 
@@ -393,18 +402,18 @@ func (o *UnifiedObserver) GetObservabilityReport() *ObservabilityReport {
 }
 
 // SetSamplingRate sets the sampling rate for events
-func (o *UnifiedObserver) SetSamplingRate(rate float64) {
+func (o *ObserverImpl) SetSamplingRate(rate float64) {
 	o.samplingRate.Store(rate)
 }
 
 // SetLogLevel sets the logging level
-func (o *UnifiedObserver) SetLogLevel(level slog.Level) {
+func (o *ObserverImpl) SetLogLevel(level slog.Level) {
 	o.logLevel.Store(level)
 }
 
 // Private helper methods
 
-func (o *UnifiedObserver) shouldSample() bool {
+func (o *ObserverImpl) shouldSample() bool {
 	rate := o.samplingRate.Load().(float64)
 	if rate >= 1.0 {
 		return true
@@ -414,7 +423,7 @@ func (o *UnifiedObserver) shouldSample() bool {
 	return rand.Float64() < rate
 }
 
-func (o *UnifiedObserver) generateEventID() string {
+func (o *ObserverImpl) generateEventID() string {
 	bytes := make([]byte, 4)
 	if _, err := cryptorand.Read(bytes); err != nil {
 		// Fallback to timestamp-based ID if crypto random fails
@@ -423,7 +432,7 @@ func (o *UnifiedObserver) generateEventID() string {
 	return "evt_" + hex.EncodeToString(bytes)
 }
 
-func (o *UnifiedObserver) generateTraceID() string {
+func (o *ObserverImpl) generateTraceID() string {
 	bytes := make([]byte, 8)
 	if _, err := cryptorand.Read(bytes); err != nil {
 		// Fallback to timestamp-based ID if crypto random fails
@@ -432,7 +441,7 @@ func (o *UnifiedObserver) generateTraceID() string {
 	return hex.EncodeToString(bytes)
 }
 
-func (o *UnifiedObserver) generateSpanID() string {
+func (o *ObserverImpl) generateSpanID() string {
 	bytes := make([]byte, 4)
 	if _, err := cryptorand.Read(bytes); err != nil {
 		// Fallback to timestamp-based ID if crypto random fails
@@ -441,7 +450,7 @@ func (o *UnifiedObserver) generateSpanID() string {
 	return hex.EncodeToString(bytes)
 }
 
-func (o *UnifiedObserver) buildMetricKey(name string, tags map[string]string) string {
+func (o *ObserverImpl) buildMetricKey(name string, tags map[string]string) string {
 	key := name
 
 	// Sort tag keys for deterministic ordering
@@ -460,7 +469,7 @@ func (o *UnifiedObserver) buildMetricKey(name string, tags map[string]string) st
 	return key
 }
 
-func (o *UnifiedObserver) updateOperationStats(event *Event) {
+func (o *ObserverImpl) updateOperationStats(event *Event) {
 	if event.Duration == 0 {
 		return
 	}
@@ -503,7 +512,7 @@ func (o *UnifiedObserver) updateOperationStats(event *Event) {
 	}
 }
 
-func (o *UnifiedObserver) logEvent(event *Event) {
+func (o *ObserverImpl) logEvent(event *Event) {
 	level := o.logLevel.Load().(slog.Level)
 
 	// Determine log level based on event type and success
@@ -572,7 +581,7 @@ func (o *UnifiedObserver) logEvent(event *Event) {
 	o.logger.Log(context.Background(), logLevel, message, args...)
 }
 
-func (o *UnifiedObserver) cleanupOldEvents() {
+func (o *ObserverImpl) cleanupOldEvents() {
 	cutoff := time.Now().Add(-o.config.RetentionPeriod)
 
 	o.events.Range(func(key, value interface{}) bool {
@@ -587,7 +596,7 @@ func (o *UnifiedObserver) cleanupOldEvents() {
 
 // Report generation methods (simplified implementations)
 
-func (o *UnifiedObserver) generateEventSummary() EventSummary {
+func (o *ObserverImpl) generateEventSummary() EventSummary {
 	totalEvents := atomic.LoadInt64(&o.eventCount)
 	eventsByType := make(map[EventType]int64)
 	eventsByComponent := make(map[string]int64)
@@ -629,15 +638,36 @@ func (o *UnifiedObserver) generateEventSummary() EventSummary {
 	}
 }
 
-func (o *UnifiedObserver) generateErrorAnalysis() ErrorAnalysis {
+func (o *ObserverImpl) generateErrorAnalysis() ErrorAnalysis {
 	totalEvents := atomic.LoadInt64(&o.eventCount)
 	errorCount := int64(0)
+	recoverableCount := int64(0)
+	criticalCount := int64(0)
+	errorMessages := make(map[string]int)
 
-	// Count error events
+	// Count and classify error events
 	o.events.Range(func(key, value interface{}) bool {
 		if event, ok := value.(*Event); ok {
 			if event.Type == EventTypeError {
 				errorCount++
+
+				// Classify error based on properties
+				if severity, ok := event.Properties["severity"].(string); ok {
+					switch severity {
+					case "critical", "fatal":
+						criticalCount++
+					default:
+						recoverableCount++
+					}
+				} else {
+					// Default to recoverable if no severity specified
+					recoverableCount++
+				}
+
+				// Track error messages for top errors
+				if msg, ok := event.Properties["error"].(string); ok {
+					errorMessages[msg]++
+				}
 			}
 		}
 		return true
@@ -648,16 +678,45 @@ func (o *UnifiedObserver) generateErrorAnalysis() ErrorAnalysis {
 		errorRate = float64(errorCount) / float64(totalEvents)
 	}
 
+	// Get top 5 errors
+	topErrors := o.getTopErrors(errorMessages, 5)
+
 	return ErrorAnalysis{
 		TotalErrors:       errorCount,
-		RecoverableErrors: errorCount, // Assume all errors are recoverable for simplicity
-		CriticalErrors:    0,
+		RecoverableErrors: recoverableCount,
+		CriticalErrors:    criticalCount,
 		ErrorRate:         errorRate,
-		TopErrors:         []string{}, // Could be populated by analyzing error messages
+		TopErrors:         topErrors,
 	}
 }
 
-func (o *UnifiedObserver) generatePerformanceMetrics() PerformanceMetrics {
+// getTopErrors returns the top N most frequent error messages
+func (o *ObserverImpl) getTopErrors(errorMessages map[string]int, n int) []string {
+	// Convert map to slice for sorting
+	type errorCount struct {
+		message string
+		count   int
+	}
+	errors := make([]errorCount, 0, len(errorMessages))
+	for msg, count := range errorMessages {
+		errors = append(errors, errorCount{msg, count})
+	}
+
+	// Sort by count descending
+	sort.Slice(errors, func(i, j int) bool {
+		return errors[i].count > errors[j].count
+	})
+
+	// Get top N
+	topErrors := make([]string, 0, n)
+	for i := 0; i < n && i < len(errors); i++ {
+		topErrors = append(topErrors, fmt.Sprintf("%s (count: %d)", errors[i].message, errors[i].count))
+	}
+
+	return topErrors
+}
+
+func (o *ObserverImpl) generatePerformanceMetrics() PerformanceMetrics {
 	operationMetrics := make(map[string]OperationMetrics)
 
 	o.operations.Range(func(key, value interface{}) bool {
@@ -702,7 +761,7 @@ func (o *UnifiedObserver) generatePerformanceMetrics() PerformanceMetrics {
 	}
 }
 
-func (o *UnifiedObserver) generateHealthStatus() map[string]ComponentHealth {
+func (o *ObserverImpl) generateHealthStatus() map[string]ComponentHealth {
 	healthStatus := make(map[string]ComponentHealth)
 
 	o.healthChecks.Range(func(key, value interface{}) bool {
@@ -717,7 +776,7 @@ func (o *UnifiedObserver) generateHealthStatus() map[string]ComponentHealth {
 	return healthStatus
 }
 
-func (o *UnifiedObserver) generateResourceSummary() ResourceSummary {
+func (o *ObserverImpl) generateResourceSummary() ResourceSummary {
 	componentUsage := make(map[string]ResourceUsage)
 
 	o.resourceUsage.Range(func(key, value interface{}) bool {
@@ -735,7 +794,7 @@ func (o *UnifiedObserver) generateResourceSummary() ResourceSummary {
 	}
 }
 
-func (o *UnifiedObserver) generateTrendAnalysis() TrendAnalysis {
+func (o *ObserverImpl) generateTrendAnalysis() TrendAnalysis {
 	return TrendAnalysis{
 		ErrorTrends:       make(map[string]string),
 		PerformanceTrends: make(map[string]string),
@@ -744,7 +803,7 @@ func (o *UnifiedObserver) generateTrendAnalysis() TrendAnalysis {
 	}
 }
 
-func (o *UnifiedObserver) generateRecommendations() []Recommendation {
+func (o *ObserverImpl) generateRecommendations() []Recommendation {
 	var recommendations []Recommendation
 
 	// Generate simple recommendations based on system state
@@ -768,7 +827,7 @@ func (o *UnifiedObserver) generateRecommendations() []Recommendation {
 }
 
 // cleanupWorker runs periodic cleanup tasks
-func (o *UnifiedObserver) cleanupWorker() {
+func (o *ObserverImpl) cleanupWorker() {
 	for {
 		select {
 		case <-o.cleanupTicker.C:
@@ -780,7 +839,7 @@ func (o *UnifiedObserver) cleanupWorker() {
 }
 
 // Close shuts down the observer gracefully
-func (o *UnifiedObserver) Close() error {
+func (o *ObserverImpl) Close() error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 

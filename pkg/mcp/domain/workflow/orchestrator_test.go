@@ -58,12 +58,12 @@ func (p *DAGMockStepProvider) GetClusterStep() Step    { return p.clusterStep }
 func (p *DAGMockStepProvider) GetDeployStep() Step     { return p.deployStep }
 func (p *DAGMockStepProvider) GetVerifyStep() Step     { return p.verifyStep }
 
-func TestNewDAGOrchestrator(t *testing.T) {
+func TestNewOrchestrator(t *testing.T) {
 	t.Run("creates orchestrator successfully", func(t *testing.T) {
 		stepProvider := createMockStepProvider()
 		logger := slog.Default()
 
-		orchestrator, err := NewDAGOrchestrator(stepProvider, nil, logger)
+		orchestrator, err := NewOrchestrator(stepProvider, nil, logger)
 		require.NoError(t, err)
 		assert.NotNil(t, orchestrator)
 		assert.NotNil(t, orchestrator.dag)
@@ -71,7 +71,7 @@ func TestNewDAGOrchestrator(t *testing.T) {
 	})
 }
 
-func TestDAGOrchestratorExecute(t *testing.T) {
+func TestOrchestratorExecute(t *testing.T) {
 	t.Run("executes workflow successfully", func(t *testing.T) {
 		stepProvider := createMockStepProvider()
 		logger := slog.Default()
@@ -82,7 +82,7 @@ func TestDAGOrchestratorExecute(t *testing.T) {
 			mockStep.On("Execute", mock.Anything, mock.Anything).Return(nil)
 		}
 
-		orchestrator, err := NewDAGOrchestrator(stepProvider, nil, logger)
+		orchestrator, err := NewOrchestrator(stepProvider, nil, logger)
 		require.NoError(t, err)
 
 		ctx := context.Background()
@@ -119,7 +119,7 @@ func TestDAGOrchestratorExecute(t *testing.T) {
 		buildStep := stepProvider.GetBuildStep().(*DAGMockStep)
 		buildStep.On("Execute", mock.Anything, mock.Anything).Return(errors.New("build failed"))
 
-		orchestrator, err := NewDAGOrchestrator(stepProvider, nil, logger)
+		orchestrator, err := NewOrchestrator(stepProvider, nil, logger)
 		require.NoError(t, err)
 
 		ctx := context.Background()
@@ -155,7 +155,7 @@ func TestDAGOrchestratorExecute(t *testing.T) {
 			mockStep.On("Execute", mock.Anything, mock.Anything).Return(nil)
 		}
 
-		orchestrator, err := NewDAGOrchestrator(stepProvider, nil, logger)
+		orchestrator, err := NewOrchestrator(stepProvider, nil, logger)
 		require.NoError(t, err)
 
 		existingWorkflowID := "existing-workflow-123"
@@ -185,7 +185,7 @@ func TestDAGOrchestratorExecute(t *testing.T) {
 		mockEmitter := &NoOpEmitter{}
 		emitterFactory := &mockEmitterFactory{emitter: mockEmitter}
 
-		orchestrator, err := NewDAGOrchestrator(stepProvider, emitterFactory, logger)
+		orchestrator, err := NewOrchestrator(stepProvider, emitterFactory, logger)
 		require.NoError(t, err)
 
 		ctx := context.Background()

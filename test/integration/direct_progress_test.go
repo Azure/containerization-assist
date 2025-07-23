@@ -32,8 +32,8 @@ func TestDirectProgressIntegration(t *testing.T) {
 		},
 	}
 
-	// Create DAG orchestrator with mock provider and progress factory
-	orchestrator, err := workflow.NewDAGOrchestrator(
+	// Create orchestrator with mock provider and progress factory
+	orchestrator, err := workflow.NewOrchestrator(
 		mockProvider,
 		testFactory,
 		logger,

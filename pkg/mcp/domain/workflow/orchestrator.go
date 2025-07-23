@@ -11,27 +11,27 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-// DAGOrchestrator implements workflow orchestration using a DAG execution model
-type DAGOrchestrator struct {
+// Orchestrator implements workflow orchestration using a DAG execution model
+type Orchestrator struct {
 	dag            *DAGWorkflow
 	emitterFactory ProgressEmitterFactory
 	logger         *slog.Logger
 	stepProvider   StepProvider
 }
 
-// NewDAGOrchestrator creates a new DAG-based orchestrator
-func NewDAGOrchestrator(
+// NewOrchestrator creates a new workflow orchestrator
+func NewOrchestrator(
 	stepProvider StepProvider,
 	emitterFactory ProgressEmitterFactory,
 	logger *slog.Logger,
-) (*DAGOrchestrator, error) {
+) (*Orchestrator, error) {
 	// Build the DAG with the standard containerization workflow
 	dag, err := buildContainerizationDAG(stepProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build workflow DAG: %w", err)
 	}
 
-	return &DAGOrchestrator{
+	return &Orchestrator{
 		dag:            dag,
 		emitterFactory: emitterFactory,
 		logger:         logger,
@@ -40,7 +40,7 @@ func NewDAGOrchestrator(
 }
 
 // Execute runs the containerization workflow using DAG execution
-func (o *DAGOrchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
+func (o *Orchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
 	// Initialize context with workflow ID
 	workflowID, ctx := o.initContext(ctx, args)
 
@@ -86,7 +86,7 @@ func (o *DAGOrchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest,
 }
 
 // initContext generates workflow ID and adds it to context
-func (o *DAGOrchestrator) initContext(ctx context.Context, args *ContainerizeAndDeployArgs) (string, context.Context) {
+func (o *Orchestrator) initContext(ctx context.Context, args *ContainerizeAndDeployArgs) (string, context.Context) {
 	workflowID, ok := GetWorkflowID(ctx)
 	if !ok {
 		repoIdentifier := GetRepositoryIdentifier(args)
@@ -97,7 +97,7 @@ func (o *DAGOrchestrator) initContext(ctx context.Context, args *ContainerizeAnd
 }
 
 // newEmitter creates a progress emitter for the workflow
-func (o *DAGOrchestrator) newEmitter(ctx context.Context, req *mcp.CallToolRequest) api.ProgressEmitter {
+func (o *Orchestrator) newEmitter(ctx context.Context, req *mcp.CallToolRequest) api.ProgressEmitter {
 	if o.emitterFactory != nil {
 		return o.emitterFactory.CreateEmitter(ctx, req, len(o.dag.steps))
 	}
@@ -106,7 +106,7 @@ func (o *DAGOrchestrator) newEmitter(ctx context.Context, req *mcp.CallToolReque
 }
 
 // newState creates the workflow state with all necessary components
-func (o *DAGOrchestrator) newState(workflowID string, args *ContainerizeAndDeployArgs, emitter api.ProgressEmitter) *WorkflowState {
+func (o *Orchestrator) newState(workflowID string, args *ContainerizeAndDeployArgs, emitter api.ProgressEmitter) *WorkflowState {
 	repoIdentifier := GetRepositoryIdentifier(args)
 
 	state := &WorkflowState{
