@@ -37,13 +37,19 @@ func (n *NoOpEmitter) EmitDetailed(ctx context.Context, update api.ProgressUpdat
 // Close does nothing
 func (n *NoOpEmitter) Close() error { return nil }
 
-// GenerateWorkflowID creates a unique workflow identifier based on repository URL
-func GenerateWorkflowID(repoURL string) string {
-	// Extract repo name from URL
-	parts := strings.Split(repoURL, "/")
+// GenerateWorkflowID creates a unique workflow identifier based on repository URL or path
+func GenerateWorkflowID(repoInput string) string {
+	// Extract repo name from URL or path
+	parts := strings.Split(repoInput, "/")
 	repoName := "unknown"
 	if len(parts) > 0 {
 		repoName = strings.TrimSuffix(parts[len(parts)-1], ".git")
+		// Handle empty names or special cases
+		if repoName == "" || repoName == "." {
+			if len(parts) > 1 {
+				repoName = parts[len(parts)-2]
+			}
+		}
 	}
 
 	// Generate unique workflow ID
@@ -115,4 +121,12 @@ func GenerateEventID() string {
 func ExtractUserID(ctx context.Context) string {
 	// For now, return empty string - can be enhanced later
 	return ""
+}
+
+// GetRepositoryIdentifier returns the repository identifier from workflow args
+func GetRepositoryIdentifier(args *ContainerizeAndDeployArgs) string {
+	if args.RepoPath != "" {
+		return args.RepoPath
+	}
+	return args.RepoURL
 }
