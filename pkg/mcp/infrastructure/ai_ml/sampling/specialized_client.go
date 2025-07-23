@@ -232,7 +232,7 @@ func (c *SpecializedClient) ImproveRepositoryAnalysis(ctx context.Context, initi
 	}
 
 	// Render template
-	rendered, err := templateManager.RenderTemplate("improve-analysis", templateData)
+	rendered, err := templateManager.RenderTemplate("improve-repository-analysis", templateData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render improve analysis template: %w", err)
 	}
@@ -244,7 +244,7 @@ func (c *SpecializedClient) ImproveRepositoryAnalysis(ctx context.Context, initi
 		Temperature:  rendered.Temperature,
 		SystemPrompt: rendered.SystemPrompt,
 		Metadata: map[string]interface{}{
-			"template_id": "improve-analysis",
+			"template_id": "improve-repository-analysis",
 		},
 	}
 

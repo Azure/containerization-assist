@@ -266,17 +266,12 @@ func (c *Client) callMCP(ctx context.Context, req SamplingRequest) (*SamplingRes
 	// Try to get MCP server from context
 	srv := server.ServerFromContext(ctx)
 	if srv == nil {
-		c.logger.Debug("No MCP server in context, using fallback",
+		c.logger.Debug("No MCP server in context, sampling unavailable",
 			"prompt_length", len(req.Prompt))
 
-		// Return the prompt as content - this allows AI assistants
-		// to see the request and handle it appropriately
-		return &SamplingResponse{
-			Content:    fmt.Sprintf("AI ASSISTANCE REQUESTED: %s", req.Prompt),
-			TokensUsed: estimateTokens(req.Prompt),
-			Model:      "mcp-fallback",
-			StopReason: "fallback",
-		}, nil
+		// Return proper structured error
+		return nil, errors.New(errors.CodeDisabled, "sampling",
+			"MCP server not available for AI sampling - ensure proper context initialization", nil)
 	}
 
 	c.logger.Info("Using MCP sampling with server",
@@ -353,7 +348,8 @@ func (c *Client) callMCPSampling(ctx context.Context, srv *server.MCPServer, req
 	result, err := srv.RequestSampling(ctx, samplingRequest)
 	if err != nil {
 		c.logger.Error("MCP sampling request failed", "error", err)
-		return nil, fmt.Errorf("MCP sampling failed: %w", err)
+		return nil, errors.New(errors.CodeOperationFailed, "sampling",
+			"MCP sampling request failed", err)
 	}
 
 	c.logger.Info("MCP sampling response received",
@@ -799,7 +795,8 @@ Respond with only the improved prompt text - no explanations or commentary.`,
 	// Use direct MCP call to avoid recursion
 	correctionResp, err := c.callMCP(ctx, correctionReq)
 	if err != nil {
-		return originalReq, fmt.Errorf("AI correction failed: %w", err)
+		return originalReq, errors.New(errors.CodeOperationFailed, "sampling",
+			"AI correction request failed", err)
 	}
 
 	// Create improved request with the corrected prompt

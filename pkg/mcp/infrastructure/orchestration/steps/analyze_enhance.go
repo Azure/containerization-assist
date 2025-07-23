@@ -122,7 +122,7 @@ func getFileTree(repoPath string, logger *slog.Logger) string {
 
 // parseEnhancedAnalysis extracts improvements from AI analysis
 func mergeEnhancedAnalysis(enhancedAnalysis *sampling.RepositoryAnalysis, original *AnalyzeResult, logger *slog.Logger) *AnalyzeResult {
-	// Create a copy of the original
+	// Start with original analysis as the foundation
 	result := &AnalyzeResult{
 		Language:  original.Language,
 		Framework: original.Framework,
@@ -132,37 +132,51 @@ func mergeEnhancedAnalysis(enhancedAnalysis *sampling.RepositoryAnalysis, origin
 		SessionID: original.SessionID,
 	}
 
-	// Copy original analysis
+	// Copy all original analysis data
 	for k, v := range original.Analysis {
 		result.Analysis[k] = v
 	}
 
-	// Merge enhanced analysis data
-	if enhancedAnalysis.Language != "" {
-		result.Language = enhancedAnalysis.Language
-	}
-	if enhancedAnalysis.Framework != "" {
-		result.Framework = enhancedAnalysis.Framework
-	}
+	// Use domain-specific merge strategies optimized for each field type
+	result.Language = mergeLanguage(original.Language, enhancedAnalysis.Language, logger)
+	result.Framework = mergeFramework(original.Framework, enhancedAnalysis.Framework, logger)
+	result.Port = mergePort(original.Port, enhancedAnalysis.SuggestedPorts, logger)
+
+	// Add AI insights as supplementary data
+	result.Analysis["ai_enhanced"] = true
+	result.Analysis["ai_build_tools"] = enhancedAnalysis.BuildTools
+	result.Analysis["ai_services"] = enhancedAnalysis.Services
+	result.Analysis["ai_environment_vars"] = enhancedAnalysis.EnvironmentVars
+	result.Analysis["ai_suggested_ports"] = enhancedAnalysis.SuggestedPorts
+	result.Analysis["ai_confidence"] = enhancedAnalysis.Confidence
+
+	// Preserve both static and AI results for comparison/debugging
+	result.Analysis["static_language"] = original.Language
+	result.Analysis["static_framework"] = original.Framework
+	result.Analysis["static_port"] = original.Port
+	result.Analysis["ai_language"] = enhancedAnalysis.Language
+	result.Analysis["ai_framework"] = enhancedAnalysis.Framework
 	if len(enhancedAnalysis.SuggestedPorts) > 0 {
-		result.Port = enhancedAnalysis.SuggestedPorts[0]
+		result.Analysis["ai_port"] = enhancedAnalysis.SuggestedPorts[0]
 	}
 
-	// Add enhanced data to analysis
-	result.Analysis["ai_enhanced"] = true
-	result.Analysis["build_tools"] = enhancedAnalysis.BuildTools
-	result.Analysis["dependencies"] = enhancedAnalysis.Dependencies
-	result.Analysis["services"] = enhancedAnalysis.Services
-	result.Analysis["entry_points"] = enhancedAnalysis.EntryPoints
-	result.Analysis["environment_vars"] = enhancedAnalysis.EnvironmentVars
-	result.Analysis["suggested_ports"] = enhancedAnalysis.SuggestedPorts
-	result.Analysis["confidence"] = enhancedAnalysis.Confidence
+	// Record merge strategy for transparency
+	result.Analysis["merge_strategy"] = "hybrid_domain_specific"
+
+	// Keep original static analysis data intact
+	if deps, ok := original.Analysis["dependencies"]; ok {
+		result.Analysis["static_dependencies_count"] = deps
+	}
+	if entryPoints, ok := original.Analysis["entry_points"]; ok {
+		result.Analysis["static_entry_points"] = entryPoints
+	}
 
 	logger.Info("Successfully merged enhanced analysis",
-		"language", result.Language,
-		"framework", result.Framework,
-		"port", result.Port,
-		"confidence", enhancedAnalysis.Confidence)
+		"final_language", result.Language,
+		"final_framework", result.Framework,
+		"final_port", result.Port,
+		"ai_confidence", enhancedAnalysis.Confidence,
+		"has_static_analysis", original.Analysis != nil)
 
 	return result
 }
@@ -182,4 +196,78 @@ func parsePort(s string) int {
 		return port
 	}
 	return 0
+}
+
+// mergeLanguage uses static-first strategy since file extensions are highly reliable
+func mergeLanguage(staticLang, aiLang string, logger *slog.Logger) string {
+	// Fill gaps: AI provides missing language
+	if staticLang == "" && aiLang != "" {
+		logger.Info("AI provided missing language", "ai_language", aiLang)
+		return aiLang
+	}
+
+	// Static wins: File extensions are authoritative
+	if staticLang != "" {
+		if aiLang != "" && aiLang != staticLang {
+			logger.Debug("Static language detection preferred over AI",
+				"static_language", staticLang,
+				"ai_language", aiLang,
+				"reason", "file extensions are authoritative")
+		}
+		return staticLang
+	}
+
+	return staticLang // Empty if both are empty
+}
+
+// mergeFramework uses AI-first strategy since AI can read README and infer better
+func mergeFramework(staticFramework, aiFramework string, logger *slog.Logger) string {
+	// Fill gaps: AI provides missing framework
+	if staticFramework == "" && aiFramework != "" {
+		logger.Info("AI provided missing framework", "ai_framework", aiFramework)
+		return aiFramework
+	}
+
+	// AI wins: AI is better at framework inference from README/context
+	if aiFramework != "" && aiFramework != staticFramework {
+		logger.Info("AI framework detection preferred over static",
+			"static_framework", staticFramework,
+			"ai_framework", aiFramework,
+			"reason", "AI better at README/context analysis")
+		return aiFramework
+	}
+
+	// Use static if AI provided nothing different
+	if staticFramework != "" {
+		return staticFramework
+	}
+
+	return aiFramework // Use AI even if empty, if it's all we have
+}
+
+// mergePort uses static-first with AI fallback strategy
+func mergePort(staticPort int, aiPorts []int, logger *slog.Logger) int {
+	aiPort := 0
+	if len(aiPorts) > 0 {
+		aiPort = aiPorts[0]
+	}
+
+	// Fill gaps: AI provides missing port
+	if staticPort == 0 && aiPort > 0 {
+		logger.Info("AI provided missing port", "ai_port", aiPort)
+		return aiPort
+	}
+
+	// Static wins: Actual config files beat framework defaults
+	if staticPort > 0 {
+		if aiPort > 0 && aiPort != staticPort {
+			logger.Debug("Static port detection preferred over AI",
+				"static_port", staticPort,
+				"ai_port", aiPort,
+				"reason", "actual config beats framework defaults")
+		}
+		return staticPort
+	}
+
+	return aiPort // Use AI suggestion if static found nothing
 }
