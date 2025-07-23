@@ -279,7 +279,8 @@ func (dag *DAGWorkflow) executeLevel(ctx context.Context, stepNames []string, st
 			"parallel_execution",
 			fmt.Sprintf("Level %d execution failed with %d errors", levelIdx, len(errs)),
 			errs[0], // Use first error as cause
-		).WithStepContext("level", levelIdx).
+		).
+			WithStepContext("level", levelIdx).
 			WithStepContext("errors", errs)
 	}
 

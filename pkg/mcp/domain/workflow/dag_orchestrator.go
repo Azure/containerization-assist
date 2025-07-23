@@ -81,7 +81,6 @@ func (o *DAGOrchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest,
 
 	// Mark as successful
 	state.Result.Success = true
-	// Success with no error message
 
 	return state.Result, nil
 }
@@ -233,7 +232,7 @@ func wrapStep(step Step) func(context.Context, *WorkflowState) error {
 				status = "failed"
 			}
 
-			// Use the Emit method instead of EmitProgress
+			// Emit progress update to notify listeners of step completion status
 			message := fmt.Sprintf("Step %s %s", step.Name(), status)
 			if err != nil {
 				message = fmt.Sprintf("Step %s failed: %v", step.Name(), err)
