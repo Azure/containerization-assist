@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging/events"
 	"github.com/stretchr/testify/assert"
 )
@@ -30,17 +29,6 @@ func TestArchitectureValidation(t *testing.T) {
 				_, ok := orchestrator.(EventAwareOrchestrator)
 				if !ok {
 					t.Error("eventDecorator does not implement EventAwareOrchestrator")
-				}
-			},
-		},
-		{
-			name: "SagaDecorator should implement SagaAwareOrchestrator",
-			check: func(t *testing.T) {
-				// This is validated at compile time
-				var orchestrator interface{} = &sagaDecorator{}
-				_, ok := orchestrator.(SagaAwareOrchestrator)
-				if !ok {
-					t.Error("sagaDecorator does not implement SagaAwareOrchestrator")
 				}
 			},
 		},
@@ -77,7 +65,6 @@ func TestDecoratorComposition(t *testing.T) {
 	// Create actual instances instead of nil pointers
 	logger := slog.Default()
 	publisher := events.NewPublisher(logger)
-	coordinator := saga.NewSagaCoordinator(logger, publisher)
 
 	// Create a minimal base orchestrator
 	mockProvider := &MockStepProvider{}
@@ -86,16 +73,13 @@ func TestDecoratorComposition(t *testing.T) {
 
 	// Test that decorators can be composed
 	eventAware := WithEvents(base, publisher)
-	sagaAware := WithSaga(eventAware, coordinator, logger)
 
 	// Test that interfaces are satisfied
 	var _ WorkflowOrchestrator = base
 	var _ EventAwareOrchestrator = eventAware
-	var _ SagaAwareOrchestrator = sagaAware
 
 	// Verify the decorators were applied (no panic)
 	assert.NotNil(t, eventAware)
-	assert.NotNil(t, sagaAware)
 }
 
 // TestMiddlewareChain validates middleware execution order
@@ -123,7 +107,6 @@ func TestNoCircularDependencies(t *testing.T) {
 	_ = NoOpSink{}
 	_ = &BaseOrchestrator{}
 	_ = &eventDecorator{}
-	_ = &sagaDecorator{}
 }
 
 // TestArchitecturalBoundaryEnforcement validates that the 4-layer architecture is properly maintained

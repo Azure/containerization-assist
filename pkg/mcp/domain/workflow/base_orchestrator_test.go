@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
-	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging/events"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -144,39 +143,6 @@ func TestEventDecorator(t *testing.T) {
 
 	// The event decorator wraps the base orchestrator
 	// In a full integration test, we would verify events were published
-}
-
-// TestSagaDecorator tests the saga transaction decorator
-func TestSagaDecorator(t *testing.T) {
-	logger := slog.Default()
-
-	// Create dependencies
-	publisher := events.NewPublisher(logger)
-	coordinator := saga.NewSagaCoordinator(logger, publisher)
-
-	// Create base orchestrator
-	testStep := &MockStep{
-		name: "test-step",
-		executeFunc: func(ctx context.Context, state *WorkflowState) error {
-			return nil
-		},
-	}
-	mockProvider := &MockStepProvider{steps: []Step{testStep}}
-	stepFactory := NewStepFactory(mockProvider, nil, nil, logger)
-	baseOrch := NewBaseOrchestrator(stepFactory, nil, logger)
-
-	// Apply decorators in order
-	eventOrch := WithEvents(baseOrch, publisher)
-	sagaOrch := WithSaga(eventOrch, coordinator, logger)
-
-	// Test ExecuteWithSaga method
-	args := &ContainerizeAndDeployArgs{
-		RepoURL: "https://github.com/test/repo",
-	}
-
-	result, err := sagaOrch.ExecuteWithSaga(context.Background(), nil, args)
-	require.NoError(t, err)
-	assert.NotNil(t, result)
 }
 
 // MockStep implements the Step interface for testing

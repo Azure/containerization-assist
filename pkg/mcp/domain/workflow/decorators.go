@@ -7,9 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/events"
-	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -49,79 +47,6 @@ func (d *eventDecorator) PublishWorkflowEvent(ctx context.Context, workflowID st
 	}
 
 	return d.eventPublisher.Publish(ctx, event)
-}
-
-// WithSaga wraps an orchestrator with saga transaction support
-func WithSaga(base EventAwareOrchestrator, coordinator *saga.SagaCoordinator, logger *slog.Logger) SagaAwareOrchestrator {
-	return &sagaDecorator{
-		base:        base,
-		coordinator: coordinator,
-		logger:      logger.With("component", "saga_decorator"),
-	}
-}
-
-// WithSagaAndDependencies wraps an orchestrator with saga transaction support and infrastructure dependencies
-func WithSagaAndDependencies(base EventAwareOrchestrator, coordinator *saga.SagaCoordinator, containerManager ContainerManager, deploymentManager DeploymentManager, logger *slog.Logger) SagaAwareOrchestrator {
-	return &sagaDecorator{
-		base:              base,
-		coordinator:       coordinator,
-		containerManager:  containerManager,
-		deploymentManager: deploymentManager,
-		logger:            logger.With("component", "saga_decorator"),
-	}
-}
-
-// sagaDecorator adds saga transaction support to any orchestrator
-type sagaDecorator struct {
-	base              EventAwareOrchestrator
-	coordinator       *saga.SagaCoordinator
-	containerManager  ContainerManager
-	deploymentManager DeploymentManager
-	logger            *slog.Logger
-}
-
-// Execute runs the workflow (delegates to base)
-func (d *sagaDecorator) Execute(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
-	// For backward compatibility, Execute without saga just delegates to base
-	return d.base.Execute(ctx, req, args)
-}
-
-// PublishWorkflowEvent delegates to base
-func (d *sagaDecorator) PublishWorkflowEvent(ctx context.Context, workflowID string, eventType string, payload interface{}) error {
-	return d.base.PublishWorkflowEvent(ctx, workflowID, eventType, payload)
-}
-
-// ExecuteWithSaga runs the workflow with saga transaction support
-func (d *sagaDecorator) ExecuteWithSaga(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
-	// Use workflow saga middleware to wrap the entire execution
-	handler := WorkflowSagaMiddleware(d.coordinator, d.logger)(d.base.Execute)
-	return handler(ctx, req, args)
-}
-
-// CancelWorkflow cancels a running workflow and triggers compensation
-func (d *sagaDecorator) CancelWorkflow(ctx context.Context, workflowID string) error {
-	d.logger.Info("Cancelling workflow", "workflow_id", workflowID)
-
-	// Extract saga ID from context or lookup
-	sagaID, ok := GetSagaID(ctx)
-	if !ok {
-		return errors.NewWorkflowError(
-			errors.CodeNotFound,
-			"workflow",
-			"saga_lookup",
-			fmt.Sprintf("no saga associated with workflow %s", workflowID),
-			nil,
-		).WithWorkflowID(workflowID)
-	}
-
-	// Cancel saga to trigger compensation
-	return d.coordinator.CancelSaga(ctx, sagaID)
-}
-
-// CompensateSaga manually triggers saga compensation
-func (d *sagaDecorator) CompensateSaga(ctx context.Context, sagaID string) error {
-	d.logger.Info("Manually compensating saga", "saga_id", sagaID)
-	return d.coordinator.CancelSaga(ctx, sagaID)
 }
 
 // decoratorWorkflowEvent is a generic event for custom workflow events

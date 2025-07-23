@@ -13,7 +13,6 @@ import (
 	domainml "github.com/Azure/container-kit/pkg/mcp/domain/ml"
 	domainprompts "github.com/Azure/container-kit/pkg/mcp/domain/prompts"
 	domainresources "github.com/Azure/container-kit/pkg/mcp/domain/resources"
-	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/google/wire"
@@ -47,7 +46,6 @@ func ProvideDependencies(
 	resourceStore domainresources.Store,
 	progressEmitterFactory workflow.ProgressEmitterFactory,
 	eventPublisher domainevents.Publisher,
-	sagaCoordinator *saga.SagaCoordinator,
 	workflowOrchestrator workflow.WorkflowOrchestrator,
 	errorPatternRecognizer domainml.ErrorPatternRecognizer,
 	enhancedErrorHandler domainml.EnhancedErrorHandler,
@@ -56,7 +54,7 @@ func ProvideDependencies(
 	promptManager domainprompts.Manager,
 ) *Dependencies {
 	// Create workflow dependencies to get the decorated orchestrators
-	workflowDeps := ProvideWorkflowDeps(workflowOrchestrator, eventPublisher, progressEmitterFactory, sagaCoordinator, logger)
+	workflowDeps := ProvideWorkflowDeps(workflowOrchestrator, eventPublisher, progressEmitterFactory, logger)
 
 	return &Dependencies{
 		Logger:                 logger,
@@ -65,10 +63,8 @@ func ProvideDependencies(
 		ResourceStore:          resourceStore,
 		ProgressEmitterFactory: progressEmitterFactory,
 		EventPublisher:         eventPublisher,
-		SagaCoordinator:        sagaCoordinator,
 		WorkflowOrchestrator:   workflowOrchestrator,
 		EventAwareOrchestrator: workflowDeps.EventAwareOrchestrator,
-		SagaAwareOrchestrator:  workflowDeps.SagaAwareOrchestrator,
 		ErrorPatternRecognizer: errorPatternRecognizer,
 		EnhancedErrorHandler:   enhancedErrorHandler,
 		StepEnhancer:           stepEnhancer,
@@ -91,7 +87,6 @@ func ProvideWorkflowDeps(
 	orchestrator workflow.WorkflowOrchestrator,
 	eventPublisher domainevents.Publisher,
 	progressEmitterFactory workflow.ProgressEmitterFactory,
-	sagaCoordinator *saga.SagaCoordinator,
 	logger *slog.Logger,
 ) WorkflowDeps {
 	// Create EventAwareOrchestrator by wrapping the base orchestrator with event capabilities
@@ -108,16 +103,11 @@ func ProvideWorkflowDeps(
 		}
 	}
 
-	// Create SagaAwareOrchestrator by wrapping the EventAwareOrchestrator with saga capabilities
-	sagaAwareOrchestrator := workflow.WithSaga(eventAwareOrchestrator, sagaCoordinator, logger)
-
 	return WorkflowDeps{
 		Orchestrator:           orchestrator,
 		EventAwareOrchestrator: eventAwareOrchestrator,
-		SagaAwareOrchestrator:  sagaAwareOrchestrator,
 		EventPublisher:         eventPublisher,
 		ProgressEmitterFactory: progressEmitterFactory,
-		SagaCoordinator:        sagaCoordinator,
 	}
 }
 

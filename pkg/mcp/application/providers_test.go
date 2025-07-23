@@ -1,6 +1,6 @@
 // Package application_test provides unit tests for the application layer dependency providers.
 // These tests verify that the ProvideWorkflowDeps function correctly creates EventAwareOrchestrator
-// and SagaAwareOrchestrator instances when given valid dependencies.
+// instances when given valid dependencies.
 package application
 
 import (
@@ -10,7 +10,6 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
 	domainevents "github.com/Azure/container-kit/pkg/mcp/domain/events"
-	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
@@ -86,14 +85,12 @@ func TestProvideWorkflowDeps_ValidDependencies(t *testing.T) {
 	mockOrchestrator := &MockWorkflowOrchestrator{}
 	mockEventPublisher := &MockEventPublisher{}
 	mockProgressEmitterFactory := &MockProgressEmitterFactory{}
-	sagaCoordinator := &saga.SagaCoordinator{}
 
 	// Act
 	workflowDeps := ProvideWorkflowDeps(
 		mockOrchestrator,
 		mockEventPublisher,
 		mockProgressEmitterFactory,
-		sagaCoordinator,
 		logger,
 	)
 
@@ -103,23 +100,17 @@ func TestProvideWorkflowDeps_ValidDependencies(t *testing.T) {
 	// Verify all fields are set
 	assert.NotNil(t, workflowDeps.Orchestrator, "Orchestrator should not be nil")
 	assert.NotNil(t, workflowDeps.EventAwareOrchestrator, "EventAwareOrchestrator should not be nil")
-	assert.NotNil(t, workflowDeps.SagaAwareOrchestrator, "SagaAwareOrchestrator should not be nil")
 	assert.NotNil(t, workflowDeps.EventPublisher, "EventPublisher should not be nil")
 	assert.NotNil(t, workflowDeps.ProgressEmitterFactory, "ProgressEmitterFactory should not be nil")
-	assert.NotNil(t, workflowDeps.SagaCoordinator, "SagaCoordinator should not be nil")
 
 	// Verify that orchestrators implement expected interfaces
 	var _ workflow.WorkflowOrchestrator = workflowDeps.EventAwareOrchestrator
 	var _ workflow.EventAwareOrchestrator = workflowDeps.EventAwareOrchestrator
-	var _ workflow.WorkflowOrchestrator = workflowDeps.SagaAwareOrchestrator
-	var _ workflow.EventAwareOrchestrator = workflowDeps.SagaAwareOrchestrator
-	var _ workflow.SagaAwareOrchestrator = workflowDeps.SagaAwareOrchestrator
 
 	// Verify the dependencies are the same instances we passed in
 	assert.Same(t, mockOrchestrator, workflowDeps.Orchestrator, "Should preserve original orchestrator")
 	assert.Same(t, mockEventPublisher, workflowDeps.EventPublisher, "Should preserve original event publisher")
 	assert.Same(t, mockProgressEmitterFactory, workflowDeps.ProgressEmitterFactory, "Should preserve original progress emitter factory")
-	assert.Same(t, sagaCoordinator, workflowDeps.SagaCoordinator, "Should preserve original saga coordinator")
 }
 
 func TestProvideWorkflowDeps_NonBaseOrchestrator(t *testing.T) {
@@ -130,14 +121,12 @@ func TestProvideWorkflowDeps_NonBaseOrchestrator(t *testing.T) {
 	mockOrchestrator := &MockWorkflowOrchestrator{}
 	mockEventPublisher := &MockEventPublisher{}
 	mockProgressEmitterFactory := &MockProgressEmitterFactory{}
-	sagaCoordinator := &saga.SagaCoordinator{}
 
 	// Act
 	workflowDeps := ProvideWorkflowDeps(
 		mockOrchestrator,
 		mockEventPublisher,
 		mockProgressEmitterFactory,
-		sagaCoordinator,
 		logger,
 	)
 
@@ -147,12 +136,10 @@ func TestProvideWorkflowDeps_NonBaseOrchestrator(t *testing.T) {
 	// Verify all fields are set
 	assert.NotNil(t, workflowDeps.Orchestrator, "Orchestrator should not be nil")
 	assert.NotNil(t, workflowDeps.EventAwareOrchestrator, "EventAwareOrchestrator should not be nil")
-	assert.NotNil(t, workflowDeps.SagaAwareOrchestrator, "SagaAwareOrchestrator should not be nil")
 
 	// Verify that orchestrators implement expected interfaces even with adapter
 	var _ workflow.WorkflowOrchestrator = workflowDeps.EventAwareOrchestrator
 	var _ workflow.EventAwareOrchestrator = workflowDeps.EventAwareOrchestrator
-	var _ workflow.SagaAwareOrchestrator = workflowDeps.SagaAwareOrchestrator
 
 	// Verify the base orchestrator is preserved
 	assert.Same(t, mockOrchestrator, workflowDeps.Orchestrator, "Should preserve original orchestrator")
@@ -167,7 +154,6 @@ func TestProvideWorkflowDeps_EventAwareOrchestratorFunctionality(t *testing.T) {
 	mockOrchestrator := &MockWorkflowOrchestrator{}
 	mockEventPublisher := &MockEventPublisher{}
 	mockProgressEmitterFactory := &MockProgressEmitterFactory{}
-	sagaCoordinator := &saga.SagaCoordinator{}
 
 	// Set up mock expectations
 	mockEventPublisher.On("Publish", mock.Anything, mock.Anything).Return(nil)
@@ -177,7 +163,6 @@ func TestProvideWorkflowDeps_EventAwareOrchestratorFunctionality(t *testing.T) {
 		mockOrchestrator,
 		mockEventPublisher,
 		mockProgressEmitterFactory,
-		sagaCoordinator,
 		logger,
 	)
 
@@ -190,40 +175,6 @@ func TestProvideWorkflowDeps_EventAwareOrchestratorFunctionality(t *testing.T) {
 	mockEventPublisher.AssertCalled(t, "Publish", ctx, mock.Anything)
 }
 
-func TestProvideWorkflowDeps_SagaAwareOrchestratorFunctionality(t *testing.T) {
-	// Arrange
-	logger := slog.Default()
-	mockOrchestrator := &MockWorkflowOrchestrator{}
-	mockEventPublisher := &MockEventPublisher{}
-	mockProgressEmitterFactory := &MockProgressEmitterFactory{}
-	sagaCoordinator := &saga.SagaCoordinator{}
-
-	// Act
-	workflowDeps := ProvideWorkflowDeps(
-		mockOrchestrator,
-		mockEventPublisher,
-		mockProgressEmitterFactory,
-		sagaCoordinator,
-		logger,
-	)
-
-	// Assert that SagaAwareOrchestrator has the expected methods
-	sagaOrch := workflowDeps.SagaAwareOrchestrator
-
-	// Verify it implements all required interfaces
-	var _ workflow.WorkflowOrchestrator = sagaOrch
-	var _ workflow.EventAwareOrchestrator = sagaOrch
-	var _ workflow.SagaAwareOrchestrator = sagaOrch
-
-	// Test that CompensateSaga method exists and can be called
-	ctx := context.Background()
-	err := sagaOrch.CompensateSaga(ctx, "test-saga-id")
-
-	// We expect this to error if saga doesn't exist, but the method should be callable
-	assert.Error(t, err, "CompensateSaga should error for non-existent saga")
-	assert.Contains(t, err.Error(), "saga not found", "Should indicate saga not found")
-}
-
 func TestProvideWorkflowDeps_AdapterEventPublishing(t *testing.T) {
 	// Arrange
 	logger := slog.Default()
@@ -232,7 +183,6 @@ func TestProvideWorkflowDeps_AdapterEventPublishing(t *testing.T) {
 	mockOrchestrator := &MockWorkflowOrchestrator{}
 	mockEventPublisher := &MockEventPublisher{}
 	mockProgressEmitterFactory := &MockProgressEmitterFactory{}
-	sagaCoordinator := &saga.SagaCoordinator{}
 
 	// Set up mock expectations
 	mockEventPublisher.On("Publish", mock.Anything, mock.Anything).Return(nil)
@@ -242,7 +192,6 @@ func TestProvideWorkflowDeps_AdapterEventPublishing(t *testing.T) {
 		mockOrchestrator,
 		mockEventPublisher,
 		mockProgressEmitterFactory,
-		sagaCoordinator,
 		logger,
 	)
 

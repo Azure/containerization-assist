@@ -92,53 +92,6 @@ func (e SecurityScanEvent) OccurredAt() time.Time { return e.Timestamp }
 func (e SecurityScanEvent) WorkflowID() string    { return e.Workflow }
 func (e SecurityScanEvent) EventType() string     { return "security.scan.completed" }
 
-// SagaStartedEvent is published when a saga transaction begins
-type SagaStartedEvent struct {
-	ID         string    `json:"id"`
-	Timestamp  time.Time `json:"timestamp"`
-	Workflow   string    `json:"workflow_id"`
-	SagaID     string    `json:"saga_id"`
-	StepsCount int       `json:"steps_count"`
-}
-
-func (e SagaStartedEvent) EventID() string       { return e.ID }
-func (e SagaStartedEvent) OccurredAt() time.Time { return e.Timestamp }
-func (e SagaStartedEvent) WorkflowID() string    { return e.Workflow }
-func (e SagaStartedEvent) EventType() string     { return "saga.started" }
-
-// SagaCompletedEvent is published when a saga transaction completes (success or failure)
-type SagaCompletedEvent struct {
-	ID               string        `json:"id"`
-	Timestamp        time.Time     `json:"timestamp"`
-	Workflow         string        `json:"workflow_id"`
-	SagaID           string        `json:"saga_id"`
-	Success          bool          `json:"success"`
-	Duration         time.Duration `json:"duration"`
-	StepsExecuted    int           `json:"steps_executed"`
-	StepsCompensated int           `json:"steps_compensated,omitempty"`
-	ErrorMsg         string        `json:"error_message,omitempty"`
-}
-
-func (e SagaCompletedEvent) EventID() string       { return e.ID }
-func (e SagaCompletedEvent) OccurredAt() time.Time { return e.Timestamp }
-func (e SagaCompletedEvent) WorkflowID() string    { return e.Workflow }
-func (e SagaCompletedEvent) EventType() string     { return "saga.completed" }
-
-// SagaCancelledEvent is published when a saga transaction is cancelled
-type SagaCancelledEvent struct {
-	ID               string        `json:"id"`
-	Timestamp        time.Time     `json:"timestamp"`
-	Workflow         string        `json:"workflow_id"`
-	SagaID           string        `json:"saga_id"`
-	StepsCompensated int           `json:"steps_compensated"`
-	Duration         time.Duration `json:"duration"`
-}
-
-func (e SagaCancelledEvent) EventID() string       { return e.ID }
-func (e SagaCancelledEvent) OccurredAt() time.Time { return e.Timestamp }
-func (e SagaCancelledEvent) WorkflowID() string    { return e.Workflow }
-func (e SagaCancelledEvent) EventType() string     { return "saga.cancelled" }
-
 // ErrorAnalysisEvent is published when AI analyzes a workflow error
 type ErrorAnalysisEvent struct {
 	ID             string      `json:"id"`
