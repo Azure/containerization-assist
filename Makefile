@@ -56,7 +56,7 @@ docs:
 # Essential development tasks
 test:
 	@echo "Running tests..."
-	go test -race $$(go list ./pkg/mcp/... ./pkg/core/...)
+	go test -race ./pkg/mcp/... ./pkg/core/...
 
 test-integration:
 	@echo "Running integration tests..."
@@ -71,12 +71,12 @@ fmt:
 lint:
 	@echo "Running linter..."
 	@which $$(go env GOPATH)/bin/golangci-lint > /dev/null || (echo "Install golangci-lint: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin latest"; exit 1)
-	$$(go env GOPATH)/bin/golangci-lint run $$(go list ./pkg/mcp/... ./pkg/core/...)
+	$$(go env GOPATH)/bin/golangci-lint run ./pkg/mcp/... ./pkg/core/...
 
 static-analysis:
 	@echo "Running static analysis..."
 	@which $$(go env GOPATH)/bin/staticcheck > /dev/null || go install honnef.co/go/tools/cmd/staticcheck@latest
-	$$(go env GOPATH)/bin/staticcheck $$(go list ./pkg/mcp/... ./pkg/core/...)
+	$$(go env GOPATH)/bin/staticcheck ./pkg/mcp/... ./pkg/core/...
 
 security-scan:
 	@echo "Running security scan..."
