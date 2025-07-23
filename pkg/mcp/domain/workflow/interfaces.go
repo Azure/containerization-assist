@@ -76,13 +76,6 @@ type StepProvider interface {
 	GetVerifyStep() Step
 }
 
-// MetricsCollector collects metrics for workflow steps
-type MetricsCollector interface {
-	RecordStepDuration(stepName string, duration time.Duration)
-	RecordStepSuccess(stepName string)
-	RecordStepFailure(stepName string)
-}
-
 // Tracer provides distributed tracing capabilities for workflows
 type Tracer interface {
 	// StartSpan creates a new span and returns the updated context and span

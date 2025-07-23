@@ -49,7 +49,6 @@ func (h *Handler) Serve(ctx context.Context, mcpServer *server.MCPServer) error 
 	mux.HandleFunc("/rpc", h.handleRPC)
 	mux.HandleFunc("/healthz", h.handleHealth)
 	mux.HandleFunc("/readyz", h.handleReady)
-	mux.HandleFunc("/metrics", h.handleMetrics)
 	mux.HandleFunc("/", h.handleRoot)
 
 	// Create HTTP server with timeouts
@@ -332,92 +331,6 @@ func (h *Handler) handleReady(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleMetrics handles Prometheus metrics requests
-func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-
-	// Get current health report for metrics
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-	defer cancel()
-	report := h.healthMonitor.GetHealth(ctx)
-	// For now, just use 0 for uptime since it's not in the interface
-	uptimeSeconds := 0
-
-	// Count components by status
-	healthy, degraded, unhealthy := 0, 0, 0
-	for _, comp := range report.Components {
-		switch comp.Status {
-		case health.StatusHealthy:
-			healthy++
-		case health.StatusDegraded:
-			degraded++
-		case health.StatusUnhealthy:
-			unhealthy++
-		}
-	}
-	total := len(report.Components)
-
-	// Generate Prometheus metrics
-	metrics := fmt.Sprintf(`# HELP container_kit_mcp_uptime_seconds MCP server uptime in seconds
-# TYPE container_kit_mcp_uptime_seconds gauge
-container_kit_mcp_uptime_seconds %d
-
-# HELP container_kit_mcp_info MCP server information
-# TYPE container_kit_mcp_info gauge
-container_kit_mcp_info{version="0.0.6",transport="http"} 1
-
-# HELP container_kit_mcp_health_status MCP server health status (1=healthy, 0.5=degraded, 0=unhealthy)
-# TYPE container_kit_mcp_health_status gauge
-container_kit_mcp_health_status %g
-
-# HELP container_kit_mcp_health_checks_total Total number of health checks
-# TYPE container_kit_mcp_health_checks_total gauge
-container_kit_mcp_health_checks_total %d
-
-# HELP container_kit_mcp_health_checks_healthy Number of healthy checks
-# TYPE container_kit_mcp_health_checks_healthy gauge
-container_kit_mcp_health_checks_healthy %d
-
-# HELP container_kit_mcp_health_checks_degraded Number of degraded checks
-# TYPE container_kit_mcp_health_checks_degraded gauge
-container_kit_mcp_health_checks_degraded %d
-
-# HELP container_kit_mcp_health_checks_unhealthy Number of unhealthy checks
-# TYPE container_kit_mcp_health_checks_unhealthy gauge
-container_kit_mcp_health_checks_unhealthy %d
-`,
-		uptimeSeconds,
-		h.healthStatusToFloat(report.Status),
-		total,
-		healthy,
-		degraded,
-		unhealthy,
-	)
-
-	if _, err := w.Write([]byte(metrics)); err != nil {
-		h.logger.Error("Failed to write metrics response", "error", err)
-	}
-}
-
-// healthStatusToFloat converts health status to a float for Prometheus
-func (h *Handler) healthStatusToFloat(status health.Status) float64 {
-	switch status {
-	case health.StatusHealthy:
-		return 1.0
-	case health.StatusDegraded:
-		return 0.5
-	case health.StatusUnhealthy:
-		return 0.0
-	default:
-		return 0.0
-	}
-}
-
 // handleRoot handles root path requests with API documentation
 func (h *Handler) handleRoot(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -434,7 +347,6 @@ func (h *Handler) handleRoot(w http.ResponseWriter, r *http.Request) {
 			"/rpc":     "JSON-RPC bridge to MCP",
 			"/healthz": "Health check endpoint (liveness probe)",
 			"/readyz":  "Readiness probe endpoint",
-			"/metrics": "Prometheus metrics endpoint",
 		},
 		"documentation": "https://github.com/Azure/container-kit",
 	}
