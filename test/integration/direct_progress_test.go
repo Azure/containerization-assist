@@ -41,7 +41,7 @@ func TestDirectProgressIntegration(t *testing.T) {
 		stepFactory,
 		testFactory,
 		logger,
-		workflow.WithMiddleware(workflow.SimpleProgressMiddleware()),
+		workflow.WithMiddleware(workflow.ProgressMiddleware(workflow.SimpleProgress)),
 	)
 
 	// Execute workflow
