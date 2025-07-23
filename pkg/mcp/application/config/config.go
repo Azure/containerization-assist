@@ -69,6 +69,9 @@ type Config struct {
 	RegistryUsername string `env:"MCP_REGISTRY_USERNAME" yaml:"registry_username"`
 	RegistryPassword string `env:"MCP_REGISTRY_PASSWORD" yaml:"registry_password"`
 	RegistryInsecure bool   `env:"MCP_REGISTRY_INSECURE" yaml:"registry_insecure"`
+
+	// Orchestrator settings
+	Orchestrator OrchestratorSettings `env:",prefix=MCP_ORCHESTRATOR_" yaml:"orchestrator"`
 }
 
 // SamplingConfig holds configuration for the sampling client
@@ -114,6 +117,75 @@ type RegistryConfig struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	Insecure bool   `json:"insecure"`
+}
+
+// OrchestratorSettings holds configuration for the unified orchestrator
+type OrchestratorSettings struct {
+	Mode                     string        `env:"MODE" yaml:"mode" default:"sequential"`
+	ParallelExecutionEnabled bool          `env:"PARALLEL_ENABLED" yaml:"parallel_enabled" default:"false"`
+	MaxParallelSteps         int           `env:"MAX_PARALLEL" yaml:"max_parallel_steps" default:"3"`
+	AdaptiveLearningEnabled  bool          `env:"ADAPTIVE_ENABLED" yaml:"adaptive_enabled" default:"false"`
+	EventsEnabled            bool          `env:"EVENTS_ENABLED" yaml:"events_enabled" default:"false"`
+	DefaultTimeout           time.Duration `env:"DEFAULT_TIMEOUT" yaml:"default_timeout" default:"5m"`
+
+	// Middleware settings
+	LoggingLevel       string `env:"LOGGING_LEVEL" yaml:"logging_level" default:"standard"`
+	ProgressMode       string `env:"PROGRESS_MODE" yaml:"progress_mode" default:"simple"`
+	TracingEnabled     bool   `env:"TRACING_ENABLED" yaml:"tracing_enabled" default:"false"`
+	EnhancementEnabled bool   `env:"ENHANCEMENT_ENABLED" yaml:"enhancement_enabled" default:"false"`
+
+	// Retry policy settings
+	RetryBaseBackoff       time.Duration `env:"RETRY_BASE_BACKOFF" yaml:"retry_base_backoff" default:"1s"`
+	RetryMaxBackoff        time.Duration `env:"RETRY_MAX_BACKOFF" yaml:"retry_max_backoff" default:"30s"`
+	RetryBackoffMultiplier float64       `env:"RETRY_BACKOFF_MULTIPLIER" yaml:"retry_backoff_multiplier" default:"2.0"`
+	RetryJitter            bool          `env:"RETRY_JITTER" yaml:"retry_jitter" default:"true"`
+	RetryMaxJitter         float64       `env:"RETRY_MAX_JITTER" yaml:"retry_max_jitter" default:"0.1"`
+
+	// Timeout settings
+	TimeoutAdaptive bool          `env:"TIMEOUT_ADAPTIVE" yaml:"timeout_adaptive" default:"false"`
+	TimeoutMax      time.Duration `env:"TIMEOUT_MAX" yaml:"timeout_max" default:"15m"`
+	TimeoutMin      time.Duration `env:"TIMEOUT_MIN" yaml:"timeout_min" default:"1s"`
+}
+
+// ToOrchestratorConfig converts OrchestratorSettings to workflow.OrchestratorConfig
+func (o *OrchestratorSettings) ToOrchestratorConfig() workflow.OrchestratorConfig {
+	return workflow.OrchestratorConfig{
+		ExecutionMode: workflow.ExecutionMode(o.Mode),
+		ParallelConfig: workflow.ParallelConfig{
+			Enabled:          o.ParallelExecutionEnabled,
+			MaxParallelSteps: o.MaxParallelSteps,
+			DependencyAware:  true, // Enable by default
+		},
+		AdaptiveConfig: workflow.AdaptiveConfig{
+			Enabled:            o.AdaptiveLearningEnabled,
+			PatternRecognition: o.AdaptiveLearningEnabled,
+			StrategyLearning:   o.AdaptiveLearningEnabled,
+			MinConfidence:      0.7, // Default confidence threshold
+		},
+		EventsEnabled:  o.EventsEnabled,
+		MaxConcurrency: o.MaxParallelSteps,
+		DefaultTimeout: o.DefaultTimeout,
+		MiddlewareConfig: workflow.MiddlewareConfig{
+			LoggingLevel:       o.LoggingLevel,
+			ProgressMode:       o.ProgressMode,
+			TracingEnabled:     o.TracingEnabled,
+			EnhancementEnabled: o.EnhancementEnabled,
+			RetryPolicy: workflow.RetryPolicy{
+				BaseBackoff:             o.RetryBaseBackoff,
+				MaxBackoff:              o.RetryMaxBackoff,
+				BackoffMultiplier:       o.RetryBackoffMultiplier,
+				Jitter:                  o.RetryJitter,
+				MaxJitter:               o.RetryMaxJitter,
+				ErrorPatternRecognition: o.AdaptiveLearningEnabled,
+			},
+			TimeoutConfig: workflow.TimeoutConfig{
+				DefaultTimeout:   o.DefaultTimeout,
+				AdaptiveTimeouts: o.TimeoutAdaptive,
+				MaxTimeout:       o.TimeoutMax,
+				MinTimeout:       o.TimeoutMin,
+			},
+		},
+	}
 }
 
 // LoadOption is a functional option for loading configuration

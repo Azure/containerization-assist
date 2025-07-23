@@ -46,8 +46,8 @@ func TestArchitectureValidation(t *testing.T) {
 			name: "Middleware pattern is used correctly",
 			check: func(t *testing.T) {
 				// Verify middleware signatures
-				var _ StepMiddleware = RetryMiddleware()
-				var _ StepMiddleware = ProgressMiddleware()
+				var _ StepMiddleware = DefaultRetryMiddleware()
+				var _ StepMiddleware = ProgressMiddleware(SimpleProgress)
 				var _ StepMiddleware = TracingMiddleware(nil)
 			},
 		},
@@ -88,8 +88,8 @@ func TestMiddlewareChain(t *testing.T) {
 	var middlewares []StepMiddleware
 
 	// Add middleware in order
-	middlewares = append(middlewares, RetryMiddleware())
-	middlewares = append(middlewares, ProgressMiddleware())
+	middlewares = append(middlewares, DefaultRetryMiddleware())
+	middlewares = append(middlewares, ProgressMiddleware(SimpleProgress))
 
 	// Verify we can create an orchestrator with middleware using functional options
 	logger := slog.Default()

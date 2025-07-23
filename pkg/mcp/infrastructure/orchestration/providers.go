@@ -68,8 +68,8 @@ func ProvideEnhancedOrchestrator(
 		logger,
 		workflow.WithMiddleware(
 			workflow.CombinedEnhancementMiddleware(stepEnhancerAdapter, logger),
-			workflow.RetryMiddleware(),
-			workflow.ProgressMiddleware(),
+			workflow.DefaultRetryMiddleware(),
+			workflow.ProgressMiddleware(workflow.SimpleProgress),
 		),
 	)
 }

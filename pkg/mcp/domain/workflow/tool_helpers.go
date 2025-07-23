@@ -91,15 +91,6 @@ type RegistryConfig struct {
 	RateLimitPerMinute int
 }
 
-// RetryPolicy defines how tools should handle retries
-type RetryPolicy struct {
-	MaxAttempts       int           `json:"max_attempts"`
-	InitialDelay      time.Duration `json:"initial_delay"`
-	MaxDelay          time.Duration `json:"max_delay"`
-	BackoffMultiplier float64       `json:"backoff_multiplier"`
-	RetryableErrors   []string      `json:"retryable_errors,omitempty"`
-}
-
 // WithNamespace sets the namespace for the tool
 func WithNamespace(namespace string) RegistryOption {
 	return func(c *RegistryConfig) {
@@ -171,17 +162,6 @@ func WithCache(duration time.Duration) RegistryOption {
 func WithRateLimit(perMinute int) RegistryOption {
 	return func(c *RegistryConfig) {
 		c.RateLimitPerMinute = perMinute
-	}
-}
-
-// DefaultRetryPolicy returns a sensible default retry policy
-func DefaultRetryPolicy() RetryPolicy {
-	return RetryPolicy{
-		MaxAttempts:       3,
-		InitialDelay:      1 * time.Second,
-		MaxDelay:          30 * time.Second,
-		BackoffMultiplier: 2.0,
-		RetryableErrors:   []string{"timeout", "network", "temporary"},
 	}
 }
 
