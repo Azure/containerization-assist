@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-// StepRetryPolicy defines the retry behavior for step execution
-type StepRetryPolicy struct {
+// RetryPolicy defines the retry behavior for step execution
+type RetryPolicy struct {
 	// BaseBackoff is the initial backoff duration
 	BaseBackoff time.Duration
 
@@ -48,9 +48,9 @@ type ErrorPatternProvider interface {
 	RecordAttempt(stepName string, err error, attempt int)
 }
 
-// DefaultStepRetryPolicy returns a sensible default retry policy
-func DefaultStepRetryPolicy() StepRetryPolicy {
-	return StepRetryPolicy{
+// DefaultRetryPolicy returns a sensible default retry policy
+func DefaultRetryPolicy() RetryPolicy {
+	return RetryPolicy{
 		BaseBackoff:       time.Second,
 		MaxBackoff:        30 * time.Second,
 		BackoffMultiplier: 2.0,
@@ -59,9 +59,9 @@ func DefaultStepRetryPolicy() StepRetryPolicy {
 	}
 }
 
-// AggressiveStepRetryPolicy returns a retry policy for critical operations
-func AggressiveStepRetryPolicy() StepRetryPolicy {
-	return StepRetryPolicy{
+// AggressiveRetryPolicy returns a retry policy for critical operations
+func AggressiveRetryPolicy() RetryPolicy {
+	return RetryPolicy{
 		BaseBackoff:             500 * time.Millisecond,
 		MaxBackoff:              60 * time.Second,
 		BackoffMultiplier:       1.5,
@@ -81,7 +81,7 @@ func AggressiveStepRetryPolicy() StepRetryPolicy {
 // - Integration with error pattern recognition
 // - Context deadline awareness
 // - Structured error reporting with attempt counts
-func RetryMiddleware(policy StepRetryPolicy, errorContext ErrorPatternProvider) StepMiddleware {
+func RetryMiddleware(policy RetryPolicy, errorContext ErrorPatternProvider) StepMiddleware {
 	// Apply defaults if needed
 	if policy.BaseBackoff <= 0 {
 		policy.BaseBackoff = time.Second
@@ -109,7 +109,7 @@ func RetryMiddleware(policy StepRetryPolicy, errorContext ErrorPatternProvider) 
 			var lastErr error
 			for attempt := 1; attempt <= maxRetries+1; attempt++ {
 				// Add retry attempt to context for downstream middleware
-				retryCtx := context.WithValue(ctx, "retry_attempt", attempt)
+				retryCtx := WithRetryAttempt(ctx, attempt)
 
 				// Handle backoff for retry attempts (skip for first attempt)
 				if attempt > 1 {
@@ -190,7 +190,7 @@ func RetryMiddleware(policy StepRetryPolicy, errorContext ErrorPatternProvider) 
 }
 
 // calculateBackoff calculates the backoff duration for a retry attempt
-func calculateBackoff(attempt int, policy StepRetryPolicy) time.Duration {
+func calculateBackoff(attempt int, policy RetryPolicy) time.Duration {
 	// Calculate exponential backoff
 	backoff := float64(policy.BaseBackoff) * math.Pow(policy.BackoffMultiplier, float64(attempt-1))
 
@@ -215,7 +215,7 @@ func calculateBackoff(attempt int, policy StepRetryPolicy) time.Duration {
 }
 
 // isRetryableError determines if an error should trigger a retry
-func isRetryableError(err error, step Step, policy StepRetryPolicy, errorContext ErrorPatternProvider, stepName string, attempt, maxRetries int) bool {
+func isRetryableError(err error, step Step, policy RetryPolicy, errorContext ErrorPatternProvider, stepName string, attempt, maxRetries int) bool {
 	// Check step-specific retry logic first
 	if checker, ok := step.(RetryableChecker); ok {
 		if !checker.IsRetryable(err) {
@@ -296,14 +296,14 @@ func (e *NonRetryableError) Unwrap() error {
 
 // Convenience constructors
 
-// SimpleRetryMiddleware creates a retry middleware with default settings
-func SimpleRetryMiddleware() StepMiddleware {
-	return RetryMiddleware(DefaultStepRetryPolicy(), nil)
+// DefaultRetryMiddleware creates a retry middleware with default settings
+func DefaultRetryMiddleware() StepMiddleware {
+	return RetryMiddleware(DefaultRetryPolicy(), nil)
 }
 
 // PatternAwareRetryMiddleware creates a retry middleware with error pattern recognition
 func PatternAwareRetryMiddleware(errorContext ErrorPatternProvider) StepMiddleware {
-	policy := DefaultStepRetryPolicy()
+	policy := DefaultRetryPolicy()
 	policy.ErrorPatternRecognition = true
 	return RetryMiddleware(policy, errorContext)
 }

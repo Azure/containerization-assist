@@ -82,7 +82,7 @@ type MiddlewareConfig struct {
 	ProgressMode string `yaml:"progress_mode"`
 
 	// RetryPolicy controls retry behavior
-	RetryPolicy StepRetryPolicy `yaml:"retry_policy"`
+	RetryPolicy RetryPolicy `yaml:"retry_policy"`
 
 	// TimeoutConfig controls timeout behavior
 	TimeoutConfig TimeoutConfig `yaml:"timeout_config"`
@@ -94,9 +94,9 @@ type MiddlewareConfig struct {
 	EnhancementEnabled bool `yaml:"enhancement_enabled"`
 }
 
-// UnifiedOrchestrator is the single, configurable orchestrator that replaces
+// Orchestrator is the configurable orchestrator that replaces
 // all previous orchestrator implementations (BaseOrchestrator, DAGOrchestrator, AdaptiveOrchestrator)
-type UnifiedOrchestrator struct {
+type Orchestrator struct {
 	config          OrchestratorConfig
 	stepProvider    StepProvider
 	emitterFactory  ProgressEmitterFactory
@@ -109,6 +109,9 @@ type UnifiedOrchestrator struct {
 	errorContext   ErrorPatternProvider
 	stepEnhancer   StepEnhancer
 	tracer         Tracer
+
+	// Context cancellation for cleanup
+	cancel context.CancelFunc
 }
 
 // ExecutionEngine interface for different execution strategies
@@ -121,14 +124,14 @@ type EventPublisher interface {
 	PublishWorkflowEvent(ctx context.Context, workflowID string, eventType string, payload interface{}) error
 }
 
-// NewUnifiedOrchestrator creates a new unified orchestrator with the specified configuration
-func NewUnifiedOrchestrator(
+// NewOrchestrator creates a new orchestrator with the specified configuration
+func NewOrchestrator(
 	config OrchestratorConfig,
 	stepProvider StepProvider,
 	emitterFactory ProgressEmitterFactory,
 	logger *slog.Logger,
 	dependencies *OrchestratorDependencies,
-) (*UnifiedOrchestrator, error) {
+) (*Orchestrator, error) {
 
 	// Validate configuration
 	if err := validateConfig(config); err != nil {
@@ -144,7 +147,7 @@ func NewUnifiedOrchestrator(
 	// Create middleware stack
 	middlewares := createMiddlewareStack(config, dependencies, logger)
 
-	orchestrator := &UnifiedOrchestrator{
+	orchestrator := &Orchestrator{
 		config:          config,
 		stepProvider:    stepProvider,
 		emitterFactory:  emitterFactory,
@@ -182,7 +185,10 @@ type OrchestratorDependencies struct {
 }
 
 // Execute implements WorkflowOrchestrator interface
-func (o *UnifiedOrchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
+func (o *Orchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
+	// Store workflow start time for duration calculation
+	startTime := time.Now()
+
 	// Initialize workflow context
 	workflowCtx, err := o.initContext(ctx, args)
 	if err != nil {
@@ -234,7 +240,7 @@ func (o *UnifiedOrchestrator) Execute(ctx context.Context, req *mcp.CallToolRequ
 
 	o.logger.Info("Workflow execution completed successfully",
 		slog.String("workflow_id", state.WorkflowID),
-		slog.Duration("duration", time.Since(time.Now())), // TODO: Fix when StartTime is added to WorkflowState
+		slog.Duration("duration", time.Since(startTime)),
 	)
 
 	if o.eventPublisher != nil {
@@ -246,8 +252,16 @@ func (o *UnifiedOrchestrator) Execute(ctx context.Context, req *mcp.CallToolRequ
 	return result, nil
 }
 
+// Cleanup releases resources associated with the orchestrator
+func (o *Orchestrator) Cleanup() {
+	if o.cancel != nil {
+		o.cancel()
+		o.cancel = nil
+	}
+}
+
 // getWorkflowSteps returns the standard workflow steps
-func (o *UnifiedOrchestrator) getWorkflowSteps() []Step {
+func (o *Orchestrator) getWorkflowSteps() []Step {
 	return []Step{
 		o.stepProvider.GetAnalyzeStep(),
 		o.stepProvider.GetDockerfileStep(),
@@ -263,23 +277,20 @@ func (o *UnifiedOrchestrator) getWorkflowSteps() []Step {
 }
 
 // initContext initializes the workflow execution context
-func (o *UnifiedOrchestrator) initContext(ctx context.Context, args *ContainerizeAndDeployArgs) (context.Context, error) {
+func (o *Orchestrator) initContext(ctx context.Context, args *ContainerizeAndDeployArgs) (context.Context, error) {
 	// Apply default timeout if configured
 	if o.config.DefaultTimeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, o.config.DefaultTimeout)
-		// TODO: Store cancel function for cleanup if needed
-		_ = cancel
+		ctx, o.cancel = context.WithTimeout(ctx, o.config.DefaultTimeout)
 	}
 
 	// Add orchestrator configuration to context for middleware access
-	ctx = context.WithValue(ctx, "orchestrator_config", o.config)
+	ctx = WithOrchestratorConfig(ctx, o.config)
 
 	return ctx, nil
 }
 
 // newState creates a new workflow state
-func (o *UnifiedOrchestrator) newState(ctx context.Context, args *ContainerizeAndDeployArgs) (*WorkflowState, error) {
+func (o *Orchestrator) newState(ctx context.Context, args *ContainerizeAndDeployArgs) (*WorkflowState, error) {
 	// Create progress emitter (using dummy request for now)
 	emitter := o.emitterFactory.CreateEmitter(ctx, &mcp.CallToolRequest{}, 10)
 

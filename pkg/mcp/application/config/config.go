@@ -170,7 +170,7 @@ func (o *OrchestratorSettings) ToOrchestratorConfig() workflow.OrchestratorConfi
 			ProgressMode:       o.ProgressMode,
 			TracingEnabled:     o.TracingEnabled,
 			EnhancementEnabled: o.EnhancementEnabled,
-			RetryPolicy: workflow.StepRetryPolicy{
+			RetryPolicy: workflow.RetryPolicy{
 				BaseBackoff:             o.RetryBaseBackoff,
 				MaxBackoff:              o.RetryMaxBackoff,
 				BackoffMultiplier:       o.RetryBackoffMultiplier,

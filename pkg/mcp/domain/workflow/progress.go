@@ -65,12 +65,10 @@ func ProgressMiddleware(mode ProgressMode) StepMiddleware {
 
 // getRetryAttempt extracts retry attempt information from context
 func getRetryAttempt(ctx context.Context) int {
-	if attemptVal := ctx.Value("retry_attempt"); attemptVal != nil {
-		if attempt, ok := attemptVal.(int); ok {
-			return attempt
-		}
+	if attempt, ok := GetRetryAttempt(ctx); ok {
+		return attempt
 	}
-	return 1
+	return 1 // Default to first attempt
 }
 
 // emitStartEvent emits the appropriate start event based on progress mode

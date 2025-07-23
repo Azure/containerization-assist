@@ -221,12 +221,10 @@ func shouldLog(sampleRate float64) bool {
 
 // getRetryAttemptFromContext extracts retry attempt from context
 func getRetryAttemptFromContext(ctx context.Context) int {
-	if attemptVal := ctx.Value("retry_attempt"); attemptVal != nil {
-		if attempt, ok := attemptVal.(int); ok {
-			return attempt
-		}
+	if attempt, ok := GetRetryAttempt(ctx); ok {
+		return attempt
 	}
-	return 1
+	return 1 // Default to first attempt
 }
 
 // getTraceIDFromContext extracts trace ID from context (OpenTelemetry integration)

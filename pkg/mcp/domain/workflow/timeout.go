@@ -161,6 +161,11 @@ func WithStepTimeout(defaultTimeout time.Duration) StepMiddleware {
 
 // WithAdaptiveTimeout creates a TimeoutMiddleware with adaptive timeout capabilities
 func WithAdaptiveTimeout(defaultTimeout time.Duration, logger *slog.Logger) StepMiddleware {
+	logger.Info("Creating adaptive timeout middleware",
+		slog.Duration("defaultTimeout", defaultTimeout),
+		slog.Duration("maxTimeout", defaultTimeout*5),
+		slog.Duration("minTimeout", time.Second*5))
+
 	return TimeoutMiddleware(TimeoutConfig{
 		DefaultTimeout:   defaultTimeout,
 		AdaptiveTimeouts: true,
