@@ -12,8 +12,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/errors"
 )
 
 // UnifiedObserver implements the Observer interface with comprehensive observability
@@ -24,9 +22,6 @@ type UnifiedObserver struct {
 	// Event tracking
 	events     sync.Map // map[string]*Event
 	eventCount int64
-
-	// Error aggregation
-	errorAggregator *errors.ErrorAggregator
 
 	// Metrics storage
 	counters   sync.Map // map[string]*CounterMetric
@@ -124,11 +119,10 @@ func NewUnifiedObserver(logger *slog.Logger, config *ObserverConfig) *UnifiedObs
 	}
 
 	observer := &UnifiedObserver{
-		logger:          logger.With("component", "observer"),
-		config:          config,
-		errorAggregator: errors.NewErrorAggregator(config.RetentionPeriod),
-		startTime:       time.Now(),
-		cleanupStop:     make(chan struct{}),
+		logger:      logger.With("component", "observer"),
+		config:      config,
+		startTime:   time.Now(),
+		cleanupStop: make(chan struct{}),
 	}
 
 	observer.samplingRate.Store(config.SamplingRate)
@@ -174,63 +168,30 @@ func (o *UnifiedObserver) TrackError(ctx context.Context, err error) {
 		return
 	}
 
-	// Convert to structured error if needed
-	var structErr *errors.StructuredError
-	if se, ok := err.(*errors.StructuredError); ok {
-		structErr = se
-	} else {
-		structErr = errors.Wrap(err, "unknown", "system", err.Error())
-	}
-
-	o.TrackStructuredError(ctx, structErr)
-}
-
-// TrackStructuredError tracks a structured error
-func (o *UnifiedObserver) TrackStructuredError(ctx context.Context, err *errors.StructuredError) {
-	if err == nil {
-		return
-	}
-
-	// Add to error aggregator
-	o.errorAggregator.Add(err)
-
-	// Create error event
+	// Create simple error event
 	event := &Event{
 		Name:      "error",
 		Type:      EventTypeError,
-		Timestamp: err.Timestamp,
-		Component: err.Component,
-		Operation: err.Operation,
+		Timestamp: time.Now(),
+		Component: "system",
+		Operation: "error_tracking",
 		Success:   false,
 		Properties: map[string]interface{}{
-			"error_id":    err.ID,
-			"category":    string(err.Category),
-			"severity":    string(err.Severity),
-			"recoverable": err.Recoverable,
-			"message":     err.Message,
+			"message": err.Error(),
 		},
 		Tags: map[string]string{
-			"error_category": string(err.Category),
-			"error_severity": string(err.Severity),
+			"error_type": "generic",
 		},
-	}
-
-	if err.WorkflowID != "" {
-		event.WorkflowID = err.WorkflowID
-	}
-	if err.SessionID != "" {
-		event.SessionID = err.SessionID
-	}
-
-	// Add context as properties
-	for k, v := range err.Context {
-		event.Properties[k] = v
 	}
 
 	o.TrackEvent(ctx, event)
 
-	// Log structured error
-	err.LogStructured(o.logger)
+	// Update error metrics
+	o.IncrementCounter("errors_total", map[string]string{
+		"type": "generic",
+	})
+
+	o.logger.Error("Error tracked", "error", err.Error())
 }
 
 // StartOperation starts tracking an operation
@@ -669,17 +630,30 @@ func (o *UnifiedObserver) generateEventSummary() EventSummary {
 }
 
 func (o *UnifiedObserver) generateErrorAnalysis() ErrorAnalysis {
-	errorReport := o.errorAggregator.GetReport()
+	totalEvents := atomic.LoadInt64(&o.eventCount)
+	errorCount := int64(0)
+
+	// Count error events
+	o.events.Range(func(key, value interface{}) bool {
+		if event, ok := value.(*Event); ok {
+			if event.Type == EventTypeError {
+				errorCount++
+			}
+		}
+		return true
+	})
+
+	errorRate := float64(0)
+	if totalEvents > 0 {
+		errorRate = float64(errorCount) / float64(totalEvents)
+	}
 
 	return ErrorAnalysis{
-		TotalErrors:       errorReport.TotalErrors,
-		ErrorsByCategory:  make(map[errors.ErrorCategory]int64),
-		ErrorsBySeverity:  make(map[errors.ErrorSeverity]int64),
-		RecoverableErrors: 0, // Would calculate from error report
-		CriticalErrors:    0, // Would calculate from error report
-		ErrorRate:         0, // Would calculate based on total events
-		TopErrors:         errorReport.TopErrors,
-		ErrorPatterns:     errorReport.Patterns,
+		TotalErrors:       errorCount,
+		RecoverableErrors: errorCount, // Assume all errors are recoverable for simplicity
+		CriticalErrors:    0,
+		ErrorRate:         errorRate,
+		TopErrors:         []string{}, // Could be populated by analyzing error messages
 	}
 }
 
@@ -773,32 +747,22 @@ func (o *UnifiedObserver) generateTrendAnalysis() TrendAnalysis {
 func (o *UnifiedObserver) generateRecommendations() []Recommendation {
 	var recommendations []Recommendation
 
-	// Analyze performance and generate recommendations
-	errorReport := o.errorAggregator.GetReport()
-
-	// High error rate recommendation
-	if errorReport.TotalErrors > 100 {
-		recommendations = append(recommendations, Recommendation{
-			Type:        RecommendationTypeReliability,
-			Priority:    PriorityHigh,
-			Title:       "High Error Rate Detected",
-			Description: "The system is experiencing a high error rate that may impact reliability",
-			Actions: []Action{
-				{
-					Description: "Review error patterns and implement fixes",
-					Type:        "analysis",
-					Automated:   false,
-				},
-				{
-					Description: "Enable additional monitoring",
-					Type:        "monitoring",
-					Automated:   true,
-				},
+	// Generate simple recommendations based on system state
+	recommendations = append(recommendations, Recommendation{
+		Type:        RecommendationTypePerformance,
+		Priority:    PriorityMedium,
+		Title:       "Monitor System Performance",
+		Description: "Continue monitoring system performance metrics",
+		Actions: []Action{
+			{
+				Description: "Review performance metrics regularly",
+				Type:        "monitoring",
+				Automated:   false,
 			},
-			Impact: "Improved system reliability and user experience",
-			Effort: "Medium",
-		})
-	}
+		},
+		Impact: "Improved system visibility",
+		Effort: "Low",
+	})
 
 	return recommendations
 }

@@ -110,3 +110,30 @@ type FileManager interface {
 	// RemoveFile removes a file if it exists
 	RemoveFile(ctx context.Context, path string) error
 }
+
+// Placeholder types for unused but referenced functionality
+
+// WorkflowCheckpoint represents a saved workflow state (placeholder implementation)
+type WorkflowCheckpoint struct {
+	WorkflowID  string                 `json:"workflow_id"`
+	StepIndex   int                    `json:"step_index"`
+	CurrentStep string                 `json:"current_step"`
+	Timestamp   time.Time              `json:"timestamp"`
+	State       map[string]interface{} `json:"state"`
+}
+
+// AdaptationStrategy represents an adaptation strategy (placeholder implementation)
+type AdaptationStrategy struct {
+	ID   string `json:"id"`
+	Type string `json:"type"`
+}
+
+// AdaptationStatistics represents adaptation statistics (placeholder implementation)
+type AdaptationStatistics struct {
+	TotalAdaptations int `json:"total_adaptations"`
+}
+
+// OrchestratorConfig represents orchestrator configuration (placeholder implementation)
+type OrchestratorConfig struct {
+	MaxRetries int `json:"max_retries"`
+}

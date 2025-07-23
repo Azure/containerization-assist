@@ -16,7 +16,6 @@ type InfrastructureError struct {
 	Message     string                 `json:"message"`
 }
 
-// Error implements the error interface
 func (e *InfrastructureError) Error() string {
 	if e.Cause != nil {
 		return fmt.Sprintf("%s failed in %s: %s (caused by: %v)", e.Operation, e.Component, e.Message, e.Cause)
@@ -24,7 +23,6 @@ func (e *InfrastructureError) Error() string {
 	return fmt.Sprintf("%s failed in %s: %s", e.Operation, e.Component, e.Message)
 }
 
-// Unwrap implements error unwrapping for Go 1.13+
 func (e *InfrastructureError) Unwrap() error {
 	return e.Cause
 }
@@ -34,7 +32,6 @@ func (e *InfrastructureError) IsRecoverable() bool {
 	return e.Recoverable
 }
 
-// NewInfrastructureError creates a new infrastructure error
 func NewInfrastructureError(operation, component, message string, cause error, recoverable bool) *InfrastructureError {
 	return &InfrastructureError{
 		Operation:   operation,

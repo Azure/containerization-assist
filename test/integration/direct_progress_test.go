@@ -3,7 +3,6 @@ package integration
 import (
 	"context"
 	"log/slog"
-	"strings"
 	"testing"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
@@ -33,16 +32,15 @@ func TestDirectProgressIntegration(t *testing.T) {
 		},
 	}
 
-	// Create step factory with mock provider
-	stepFactory := workflow.NewStepFactory(mockProvider, nil, nil, logger)
-
-	// Create orchestrator with direct progress factory
-	orchestrator := workflow.NewBaseOrchestrator(
-		stepFactory,
+	// Create DAG orchestrator with mock provider and progress factory
+	orchestrator, err := workflow.NewDAGOrchestrator(
+		mockProvider,
 		testFactory,
 		logger,
-		workflow.WithMiddleware(workflow.ProgressMiddleware(workflow.SimpleProgress)),
 	)
+	if err != nil {
+		t.Fatalf("Failed to create orchestrator: %v", err)
+	}
 
 	// Execute workflow
 	ctx := context.Background()
@@ -73,24 +71,24 @@ func TestDirectProgressIntegration(t *testing.T) {
 	// Check that Close was called
 	assert.True(t, emitter.IsClosed())
 
-	// Verify update content - check for analyze step since that's what we provided
-	foundStart := false
-	foundComplete := false
+	// Verify update content - DAG orchestrator uses different message format
+	foundAnalyzeComplete := false
 	foundProcessing := false
+	foundCompleted := false
 	for _, update := range updates {
-		if update.Stage == "analyze" && update.Message == "Starting analyze" {
-			foundStart = true
-		}
-		if update.Stage == "analyze" && strings.HasPrefix(update.Message, "Completed analyze") {
-			foundComplete = true
+		if update.Stage == "analyze" && update.Message == "Step analyze completed" {
+			foundAnalyzeComplete = true
 		}
 		if update.Stage == "processing" && update.Message == "Processing repository" {
 			foundProcessing = true
 		}
+		if update.Stage == "completed" && update.Message == "Workflow completed" {
+			foundCompleted = true
+		}
 	}
-	assert.True(t, foundStart, "Should have start update for analyze step")
-	assert.True(t, foundComplete, "Should have complete update for analyze step")
+	assert.True(t, foundAnalyzeComplete, "Should have completion update for analyze step")
 	assert.True(t, foundProcessing, "Should have custom processing update")
+	assert.True(t, foundCompleted, "Should have workflow completed update")
 }
 
 // TestDirectProgressFactoryWithMCPServer tests the factory creates MCP emitter when server is present

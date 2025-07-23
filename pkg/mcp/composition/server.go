@@ -18,6 +18,6 @@ import (
 
 // InitializeServer is the single entry point used by main().
 func InitializeServer(logger *slog.Logger, config workflow.ServerConfig) (api.MCPServer, error) {
-	wire.Build(ProviderSet)
+	wire.Build(Providers)
 	return nil, nil
 }

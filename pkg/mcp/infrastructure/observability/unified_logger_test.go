@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/infrastructure/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -92,12 +91,16 @@ func TestStructuredErrorLogging(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Create a structured error
-	structErr := mcperrors.NewValidationError("email", "invalid format")
-	structErr.WithWorkflowID("wf_123").WithSessionID("session_456")
+	// Create error properties
+	errorProps := map[string]interface{}{
+		"field":       "email",
+		"validation":  "invalid format",
+		"workflow_id": "wf_123",
+		"session_id":  "session_456",
+	}
 
 	// Log the structured error
-	unifiedLogger.LogWithStructuredError(ctx, structErr)
+	unifiedLogger.LogStructuredError(ctx, "Validation error occurred", errorProps)
 
 	// Verify error was processed
 	metrics := unifiedLogger.GetLogMetrics()

@@ -69,7 +69,6 @@ type Tracker struct {
 	stepStart     time.Time       // When current step started
 }
 
-// NewTracker creates a progress tracker.
 func NewTracker(ctx context.Context, total int, sink Sink, opts ...Option) *Tracker {
 	ctx, cancel := context.WithCancel(ctx)
 	t := &Tracker{
@@ -136,7 +135,6 @@ func (t *Tracker) GetCurrent() int {
 	return t.curStep
 }
 
-// SetCurrent sets the current step.
 func (t *Tracker) SetCurrent(step int) {
 	t.Update(step, fmt.Sprintf("Step %d/%d", step, t.total), nil)
 }
@@ -151,7 +149,6 @@ func (t *Tracker) IsComplete() bool {
 	return t.GetCurrent() >= t.total
 }
 
-// GetTraceID returns the trace ID.
 func (t *Tracker) GetTraceID() string {
 	return t.traceID
 }

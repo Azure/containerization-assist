@@ -86,7 +86,6 @@ type StatusFilter struct {
 	Status Status
 }
 
-// Apply implements Filter interface
 func (f StatusFilter) Apply(session Session) bool {
 	return session.Status == f.Status
 }
@@ -96,7 +95,6 @@ type UserFilter struct {
 	UserID string
 }
 
-// Apply implements Filter interface
 func (f UserFilter) Apply(session Session) bool {
 	return session.UserID == f.UserID
 }
@@ -104,12 +102,10 @@ func (f UserFilter) Apply(session Session) bool {
 // ExpiredFilter filters expired sessions
 type ExpiredFilter struct{}
 
-// Apply implements Filter interface
 func (f ExpiredFilter) Apply(session Session) bool {
 	return session.ExpiresAt.Before(time.Now())
 }
 
-// NewSession creates a new session with default values
 func NewSession(id, userID string, ttl time.Duration) Session {
 	now := time.Now()
 	return Session{

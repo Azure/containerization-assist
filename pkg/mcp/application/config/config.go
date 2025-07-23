@@ -150,41 +150,7 @@ type OrchestratorSettings struct {
 // ToOrchestratorConfig converts OrchestratorSettings to workflow.OrchestratorConfig
 func (o *OrchestratorSettings) ToOrchestratorConfig() workflow.OrchestratorConfig {
 	return workflow.OrchestratorConfig{
-		ExecutionMode: workflow.ExecutionMode(o.Mode),
-		ParallelConfig: workflow.ParallelConfig{
-			Enabled:          o.ParallelExecutionEnabled,
-			MaxParallelSteps: o.MaxParallelSteps,
-			DependencyAware:  true, // Enable by default
-		},
-		AdaptiveConfig: workflow.AdaptiveConfig{
-			Enabled:            o.AdaptiveLearningEnabled,
-			PatternRecognition: o.AdaptiveLearningEnabled,
-			StrategyLearning:   o.AdaptiveLearningEnabled,
-			MinConfidence:      0.7, // Default confidence threshold
-		},
-		EventsEnabled:  o.EventsEnabled,
-		MaxConcurrency: o.MaxParallelSteps,
-		DefaultTimeout: o.DefaultTimeout,
-		MiddlewareConfig: workflow.MiddlewareConfig{
-			LoggingLevel:       o.LoggingLevel,
-			ProgressMode:       o.ProgressMode,
-			TracingEnabled:     o.TracingEnabled,
-			EnhancementEnabled: o.EnhancementEnabled,
-			RetryPolicy: workflow.RetryPolicy{
-				BaseBackoff:             o.RetryBaseBackoff,
-				MaxBackoff:              o.RetryMaxBackoff,
-				BackoffMultiplier:       o.RetryBackoffMultiplier,
-				Jitter:                  o.RetryJitter,
-				MaxJitter:               o.RetryMaxJitter,
-				ErrorPatternRecognition: o.AdaptiveLearningEnabled,
-			},
-			TimeoutConfig: workflow.TimeoutConfig{
-				DefaultTimeout:   o.DefaultTimeout,
-				AdaptiveTimeouts: o.TimeoutAdaptive,
-				MaxTimeout:       o.TimeoutMax,
-				MinTimeout:       o.TimeoutMin,
-			},
-		},
+		MaxRetries: 3, // Simple default value
 	}
 }
 

@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/runner"
 	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/application/session"
 	domainevents "github.com/Azure/container-kit/pkg/mcp/domain/events"
@@ -19,22 +18,11 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-// Providers provides all application layer dependencies
+// Providers provides simplified application layer dependencies
+// NOTE: Most dependencies are now provided through composition layer
 var Providers = wire.NewSet(
-	// Grouped dependency providers
-	ProvideCoreDeps,
-	ProvideWorkflowDeps,
-	ProvidePersistenceDeps,
-	ProvideAIDeps,
-	ProvideGroupedDependencies,
-
-	// LLM configuration provider
-	ProvideLLMConfig,
-
-	// Legacy dependencies aggregator (for backward compatibility)
+	// Core application services only
 	ProvideDependencies,
-
-	// Server implementation
 	ProvideServer,
 )
 
@@ -53,8 +41,12 @@ func ProvideDependencies(
 	samplingClient domainsampling.UnifiedSampler,
 	promptManager domainprompts.Manager,
 ) *Dependencies {
-	// Create workflow dependencies to get the decorated orchestrators
-	workflowDeps := ProvideWorkflowDeps(workflowOrchestrator, eventPublisher, progressEmitterFactory, logger)
+	// Create EventAwareOrchestrator using a simple adapter
+	eventAwareOrchestrator := &eventOrchestratorAdapter{
+		base:      workflowOrchestrator,
+		publisher: eventPublisher,
+		logger:    logger,
+	}
 
 	return &Dependencies{
 		Logger:                 logger,
@@ -64,93 +56,12 @@ func ProvideDependencies(
 		ProgressEmitterFactory: progressEmitterFactory,
 		EventPublisher:         eventPublisher,
 		WorkflowOrchestrator:   workflowOrchestrator,
-		EventAwareOrchestrator: workflowDeps.EventAwareOrchestrator,
-		ErrorPatternRecognizer: errorPatternRecognizer,
-		EnhancedErrorHandler:   enhancedErrorHandler,
-		StepEnhancer:           stepEnhancer,
-		SamplingClient:         samplingClient,
-		PromptManager:          promptManager,
-	}
-}
-
-// ProvideCoreDeps provides core system dependencies
-func ProvideCoreDeps(logger *slog.Logger, config workflow.ServerConfig, runner runner.CommandRunner) CoreDeps {
-	return CoreDeps{
-		Logger: logger,
-		Config: config,
-		Runner: runner,
-	}
-}
-
-// ProvideWorkflowDeps provides workflow orchestration dependencies
-func ProvideWorkflowDeps(
-	orchestrator workflow.WorkflowOrchestrator,
-	eventPublisher domainevents.Publisher,
-	progressEmitterFactory workflow.ProgressEmitterFactory,
-	logger *slog.Logger,
-) WorkflowDeps {
-	// Create EventAwareOrchestrator by wrapping the base orchestrator with event capabilities
-	var eventAwareOrchestrator workflow.EventAwareOrchestrator
-	if baseOrch, ok := orchestrator.(*workflow.BaseOrchestrator); ok {
-		eventAwareOrchestrator = workflow.WithEvents(baseOrch, eventPublisher)
-	} else {
-		// If it's not a BaseOrchestrator, we'll need to create a wrapper
-		logger.Warn("Could not create EventAwareOrchestrator: base orchestrator is not *BaseOrchestrator")
-		eventAwareOrchestrator = &eventOrchestratorAdapter{
-			base:      orchestrator,
-			publisher: eventPublisher,
-			logger:    logger,
-		}
-	}
-
-	return WorkflowDeps{
-		Orchestrator:           orchestrator,
 		EventAwareOrchestrator: eventAwareOrchestrator,
-		EventPublisher:         eventPublisher,
-		ProgressEmitterFactory: progressEmitterFactory,
-	}
-}
-
-// ProvidePersistenceDeps provides data persistence dependencies
-func ProvidePersistenceDeps(
-	sessionManager session.OptimizedSessionManager,
-	resourceStore domainresources.Store,
-) PersistenceDeps {
-	return PersistenceDeps{
-		SessionManager: sessionManager,
-		ResourceStore:  resourceStore,
-	}
-}
-
-// ProvideAIDeps provides AI/ML service dependencies
-func ProvideAIDeps(
-	samplingClient domainsampling.UnifiedSampler,
-	promptManager domainprompts.Manager,
-	errorPatternRecognizer domainml.ErrorPatternRecognizer,
-	enhancedErrorHandler domainml.EnhancedErrorHandler,
-	stepEnhancer domainml.StepEnhancer,
-) AIDeps {
-	return AIDeps{
-		SamplingClient:         samplingClient,
-		PromptManager:          promptManager,
 		ErrorPatternRecognizer: errorPatternRecognizer,
 		EnhancedErrorHandler:   enhancedErrorHandler,
 		StepEnhancer:           stepEnhancer,
-	}
-}
-
-// ProvideGroupedDependencies aggregates all dependency groups
-func ProvideGroupedDependencies(
-	core CoreDeps,
-	workflow WorkflowDeps,
-	persistence PersistenceDeps,
-	ai AIDeps,
-) *GroupedDependencies {
-	return &GroupedDependencies{
-		Core:        core,
-		Workflow:    workflow,
-		Persistence: persistence,
-		AI:          ai,
+		SamplingClient:         samplingClient,
+		PromptManager:          promptManager,
 	}
 }
 
@@ -197,12 +108,4 @@ func (e *adapterWorkflowEvent) OccurredAt() time.Time { return time.Now() }
 func (e *adapterWorkflowEvent) WorkflowID() string    { return e.workflowID }
 func (e *adapterWorkflowEvent) Serialize() ([]byte, error) {
 	return []byte("{}"), nil
-}
-
-// ProvideLLMConfig provides LLM configuration for the application
-func ProvideLLMConfig() *LLMConfig {
-	// Return default LLM configuration
-	// This can be overridden by server options
-	defaultConfig := DefaultLLMConfig()
-	return &defaultConfig
 }

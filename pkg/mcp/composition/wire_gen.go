@@ -10,14 +10,11 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/application"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/ml"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/sampling"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging/events"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging/progress"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/steps"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/persistence"
 	"log/slog"
 )
 
@@ -25,19 +22,19 @@ import (
 
 // InitializeServer is the single entry point used by main().
 func InitializeServer(logger *slog.Logger, config workflow.ServerConfig) (api.MCPServer, error) {
-	optimizedSessionManager, err := persistence.ProvideSessionManager(config, logger)
+	optimizedSessionManager, err := provideSessionManager(config, logger)
 	if err != nil {
 		return nil, err
 	}
-	store := persistence.ProvideResourceStore(logger)
-	directProgressFactory := messaging.ProvideDirectProgressFactory(logger)
+	store := provideResourceStore(logger)
+	directProgressFactory := progress.NewDirectProgressFactory(logger)
 	publisher := events.NewPublisher(logger)
 	stepProvider := steps.NewRegistryStepProvider()
-	dagOrchestrator, err := orchestration.ProvideDAGOrchestrator(stepProvider, directProgressFactory, logger)
+	dagOrchestrator, err := provideDAGOrchestrator(stepProvider, directProgressFactory, logger)
 	if err != nil {
 		return nil, err
 	}
-	client, err := ai_ml.ProvideSamplingClient(logger)
+	client, err := provideSamplingClient(logger)
 	if err != nil {
 		return nil, err
 	}
@@ -45,11 +42,11 @@ func InitializeServer(logger *slog.Logger, config workflow.ServerConfig) (api.MC
 	advancedPatternRecognizer := ml.NewAdvancedPatternRecognizer(domainAdapter, logger)
 	enhancedErrorHandler := ml.NewEnhancedErrorHandler(domainAdapter, publisher, logger)
 	stepEnhancer := ml.NewStepEnhancer(enhancedErrorHandler, logger)
-	manager, err := ai_ml.ProvidePromptManager(logger)
+	manager, err := providePromptManager(logger)
 	if err != nil {
 		return nil, err
 	}
-	dependencies := application.ProvideDependencies(logger, config, optimizedSessionManager, store, directProgressFactory, publisher, dagOrchestrator, advancedPatternRecognizer, enhancedErrorHandler, stepEnhancer, domainAdapter, manager)
+	dependencies := provideDependencies(logger, config, optimizedSessionManager, store, directProgressFactory, publisher, dagOrchestrator, advancedPatternRecognizer, enhancedErrorHandler, stepEnhancer, domainAdapter, manager)
 	mcpServer, err := application.ProvideServer(dependencies)
 	if err != nil {
 		return nil, err

@@ -10,8 +10,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/errors"
 )
 
 // UnifiedLogger provides enhanced logging with automatic metric extraction and correlation
@@ -322,45 +320,27 @@ func (ul *UnifiedLogger) Debug(ctx context.Context, msg string, args ...interfac
 	ul.log(ctx, slog.LevelDebug, msg, args...)
 }
 
-// LogWithStructuredError logs a structured error with enhanced context
-func (ul *UnifiedLogger) LogWithStructuredError(ctx context.Context, err *errors.StructuredError) {
+// LogStructuredError logs a structured error with enhanced context
+func (ul *UnifiedLogger) LogStructuredError(ctx context.Context, message string, errorProps map[string]interface{}) {
 	// Create enhanced log record
 	record := &LogRecord{
-		Time:       err.Timestamp,
-		Level:      ul.mapErrorSeverityToLogLevel(err.Severity),
-		Message:    err.Message,
-		SessionID:  err.SessionID,
-		WorkflowID: err.WorkflowID,
+		Time:       time.Now(),
+		Level:      slog.LevelError,
+		Message:    message,
 		Properties: make(map[string]interface{}),
 		Tags:       make(map[string]string),
 	}
 
-	// Add error-specific context
-	record.Properties["error_id"] = err.ID
-	record.Properties["error_category"] = string(err.Category)
-	record.Properties["error_severity"] = string(err.Severity)
-	record.Properties["error_recoverable"] = err.Recoverable
-	record.Properties["error_component"] = err.Component
-	record.Properties["error_operation"] = err.Operation
-
-	// Add error context
-	for k, v := range err.Context {
-		record.Properties[fmt.Sprintf("error_context_%s", k)] = v
+	// Add error properties
+	for k, v := range errorProps {
+		record.Properties[k] = v
 	}
-
-	// Add tags
-	record.Tags["error_category"] = string(err.Category)
-	record.Tags["error_severity"] = string(err.Severity)
-	record.Tags["component"] = err.Component
 
 	// Process the log record
 	ul.processLogRecord(ctx, record)
 
 	// Update log metrics
-	ul.updateLogMetrics(record.Level, time.Since(err.Timestamp))
-
-	// Also track the error with the observer
-	ul.observer.TrackStructuredError(ctx, err)
+	ul.updateLogMetrics(record.Level, time.Since(record.Time))
 }
 
 // LogOperation logs an operation with automatic timing and metric extraction
@@ -715,21 +695,6 @@ func (ul *UnifiedLogger) parseMetricValue(valueStr string, pattern *MetricPatter
 	}
 
 	return value, nil
-}
-
-func (ul *UnifiedLogger) mapErrorSeverityToLogLevel(severity errors.ErrorSeverity) slog.Level {
-	switch severity {
-	case errors.SeverityCritical:
-		return slog.LevelError
-	case errors.SeverityHigh:
-		return slog.LevelError
-	case errors.SeverityMedium:
-		return slog.LevelWarn
-	case errors.SeverityLow:
-		return slog.LevelInfo
-	default:
-		return slog.LevelInfo
-	}
 }
 
 func (ul *UnifiedLogger) updateLogMetrics(level slog.Level, processingTime time.Duration) {
