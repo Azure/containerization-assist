@@ -52,6 +52,10 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowSt
 		return fmt.Errorf("dockerfile generation failed: %v", err)
 	}
 
+	if err = WriteDockerfile(infraAnalyzeResult.RepoPath, dockerfileResult.Content, state.Logger); err != nil {
+		return fmt.Errorf("failed to write Dockerfile to path '%s': %v", infraAnalyzeResult.RepoPath, err)
+	}
+
 	state.Logger.Info("Dockerfile generation completed", "path", dockerfileResult.Path)
 
 	// Convert to workflow type

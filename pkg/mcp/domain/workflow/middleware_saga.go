@@ -99,7 +99,8 @@ func WorkflowSagaMiddleware(coordinator *saga.SagaCoordinator, logger *slog.Logg
 			// Generate saga ID
 			workflowID, _ := GetWorkflowID(ctx)
 			if workflowID == "" {
-				workflowID = GenerateWorkflowID(args.RepoURL)
+				repoIdentifier := GetRepositoryIdentifier(args)
+				workflowID = GenerateWorkflowID(repoIdentifier)
 			}
 			sagaID := fmt.Sprintf("saga-%s-%d", workflowID, time.Now().Unix())
 

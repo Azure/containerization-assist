@@ -33,10 +33,18 @@ func (s *AnalyzeStep) MaxRetries() int {
 
 // Execute performs repository analysis
 func (s *AnalyzeStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
-	state.Logger.Info("Step 1: Analyzing repository", "repo_url", state.Args.RepoURL)
+	var input, inputDesc string
+	if state.Args.RepoURL != "" {
+		input = state.Args.RepoURL
+		inputDesc = fmt.Sprintf("repo_url=%s", state.Args.RepoURL)
+	} else {
+		input = state.Args.RepoPath
+		inputDesc = fmt.Sprintf("repo_path=%s", state.Args.RepoPath)
+	}
 
-	// Perform basic repository analysis
-	analyzeResult, err := AnalyzeRepository(state.Args.RepoURL, state.Args.Branch, state.Logger)
+	state.Logger.Info("Step 1: Analyzing repository", "input", inputDesc)
+
+	analyzeResult, err := AnalyzeRepository(input, state.Args.Branch, state.Logger)
 	if err != nil {
 		return fmt.Errorf("repository analysis failed: %v", err)
 	}
@@ -72,6 +80,8 @@ func (s *AnalyzeStep) Execute(ctx context.Context, state *workflow.WorkflowState
 		Dependencies:    []string{},
 		DevDependencies: []string{},
 	}
+
+	state.Result.RepoPath = analyzeResult.RepoPath
 
 	return nil
 }

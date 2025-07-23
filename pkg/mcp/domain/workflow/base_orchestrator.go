@@ -81,11 +81,24 @@ func (o *BaseOrchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest
 func (o *BaseOrchestrator) initContext(ctx context.Context, args *ContainerizeAndDeployArgs) (string, context.Context) {
 	workflowID, ok := GetWorkflowID(ctx)
 	if !ok {
-		workflowID = GenerateWorkflowID(args.RepoURL)
+		repoIdentifier := GetRepositoryIdentifier(args)
+		workflowID = GenerateWorkflowID(repoIdentifier)
 		ctx = WithWorkflowID(ctx, workflowID)
 	}
-	o.logger.Info("Starting containerize_and_deploy workflow",
-		"workflow_id", workflowID, "repo_url", args.RepoURL, "branch", args.Branch, "steps_count", len(o.steps))
+
+	logFields := []any{
+		"workflow_id", workflowID,
+		"steps_count", len(o.steps),
+	}
+
+	if args.RepoURL != "" {
+		logFields = append(logFields, "repo_url", args.RepoURL, "branch", args.Branch)
+	} else {
+		logFields = append(logFields, "repo_path", args.RepoPath)
+	}
+
+	o.logger.Info("Starting containerize_and_deploy workflow", logFields...)
+
 	return workflowID, ctx
 }
 
@@ -100,9 +113,12 @@ func (o *BaseOrchestrator) newEmitter(ctx context.Context, req *mcp.CallToolRequ
 
 // newState creates the workflow state with all necessary components
 func (o *BaseOrchestrator) newState(workflowID string, args *ContainerizeAndDeployArgs, emitter api.ProgressEmitter) *WorkflowState {
+	repoIdentifier := GetRepositoryIdentifier(args)
+
 	state := &WorkflowState{
 		WorkflowID:       workflowID,
 		Args:             args,
+		RepoIdentifier:   repoIdentifier,
 		Result:           &ContainerizeAndDeployResult{},
 		Logger:           o.logger,
 		ProgressEmitter:  emitter,

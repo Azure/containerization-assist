@@ -21,27 +21,29 @@ type AnalyzeResult struct {
 	SessionID string                 `json:"session_id"`
 }
 
-// AnalyzeRepository performs repository analysis with git cloning support
-func AnalyzeRepository(repoURL, branch string, logger *slog.Logger) (*AnalyzeResult, error) {
-	logger.Info("Starting repository analysis",
-		"repo_url", repoURL,
-		"branch", branch)
+// AnalyzeRepository performs repository analysis supporting both URLs and local paths
+// This function handles git cloning when needed and ensures all artifacts are written to the repository directory
+func AnalyzeRepository(input, branch string, logger *slog.Logger) (*AnalyzeResult, error) {
+	// Determine input type and log accordingly
+	isURL := strings.HasPrefix(input, "https://") || strings.HasPrefix(input, "http://") || strings.HasPrefix(input, "git@")
+
+	if isURL {
+		logger.Info("Starting repository analysis with URL", "repo_url", input, "branch", branch)
+	} else {
+		logger.Info("Starting repository analysis with local path", "repo_path", input)
+	}
 
 	// Basic validation
-	if repoURL == "" {
-		return nil, fmt.Errorf("repo_url is required")
+	if input == "" {
+		return nil, fmt.Errorf("repository input (URL or path) is required")
 	}
 
 	var repoPath string
 	var needsCleanup bool
 
-	// Handle different URL types
-	if strings.HasPrefix(repoURL, "https://github.com/") ||
-		strings.HasPrefix(repoURL, "http://github.com/") ||
-		strings.HasPrefix(repoURL, "git@github.com:") {
-
+	if isURL {
 		// Git URL - needs cloning
-		logger.Info("Detected git URL, will clone repository", "url", repoURL)
+		logger.Info("Detected git URL, will clone repository", "url", input)
 
 		// Create temporary directory for cloning
 		tempDir, err := os.MkdirTemp("", "container-kit-analysis-*")
@@ -54,9 +56,9 @@ func AnalyzeRepository(repoURL, branch string, logger *slog.Logger) (*AnalyzeRes
 		needsCleanup = true
 
 		// Attempt to clone the repository
-		logger.Info("Cloning repository", "url", repoURL, "destination", tempDir, "branch", branch)
+		logger.Info("Cloning repository", "url", input, "destination", tempDir, "branch", branch)
 
-		if err := cloneRepository(repoURL, branch, tempDir, logger); err != nil {
+		if err := cloneRepository(input, branch, tempDir, logger); err != nil {
 			if needsCleanup {
 				os.RemoveAll(tempDir)
 			}
@@ -66,12 +68,27 @@ func AnalyzeRepository(repoURL, branch string, logger *slog.Logger) (*AnalyzeRes
 		logger.Info("Git clone successful", "destination", tempDir)
 	} else {
 		// Local path or file:// URL
-		repoPath = strings.TrimPrefix(repoURL, "file://")
+		repoPath = strings.TrimPrefix(input, "file://")
+
+		// Validate local path exists and is a directory
+		if _, err := os.Stat(repoPath); os.IsNotExist(err) {
+			return nil, fmt.Errorf("repository path does not exist: %s", repoPath)
+		}
+
+		fileInfo, err := os.Stat(repoPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to stat repository path: %v", err)
+		}
+
+		if !fileInfo.IsDir() {
+			return nil, fmt.Errorf("repository path is not a directory: %s", repoPath)
+		}
+
 		logger.Info("Using local repository path", "path", repoPath)
 	}
 
 	// Note: We do NOT clean up the temporary directory here because
-	// subsequent steps (like build) need access to the repository files.
+	// subsequent steps (like Dockerfile generation and build) need access to the repository files.
 	// The cleanup should be handled by the workflow or session manager.
 
 	// Create analysis engine with enhanced logging

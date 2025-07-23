@@ -46,9 +46,14 @@ func NewAdaptiveOrchestratorAdapter(
 
 // Execute runs the workflow with adaptive capabilities
 func (a *AdaptiveOrchestratorAdapter) Execute(ctx context.Context, req *mcp.CallToolRequest, args *workflow.ContainerizeAndDeployArgs) (*workflow.ContainerizeAndDeployResult, error) {
-	a.logger.Info("Executing adaptive workflow",
-		"repo_url", args.RepoURL,
-		"branch", args.Branch)
+	if args.RepoURL != "" {
+		a.logger.Info("Executing adaptive workflow",
+			"repo_url", args.RepoURL,
+			"branch", args.Branch)
+	} else {
+		a.logger.Info("Executing adaptive workflow",
+			"repo_path", args.RepoPath)
+	}
 
 	return a.adaptiveOrchestrator.Execute(ctx, req, args)
 }

@@ -58,13 +58,14 @@ func WorkflowEventMiddleware(publisher events.Publisher, logger *slog.Logger) fu
 	return func(next WorkflowHandler) WorkflowHandler {
 		return func(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
 			workflowStartTime := time.Now()
-			workflowID := GenerateWorkflowID(args.RepoURL)
+			repoIdentifier := GetRepositoryIdentifier(args)
+			workflowID := GenerateWorkflowID(repoIdentifier)
 
 			// Store workflow ID in context for other middlewares
 			ctx = WithWorkflowID(ctx, workflowID)
 
 			// Publish workflow started event
-			startEvent := CreateWorkflowStartedEvent(workflowID, args.RepoURL, args.Branch, ExtractUserID(ctx))
+			startEvent := CreateWorkflowStartedEvent(workflowID, repoIdentifier, args.Branch, ExtractUserID(ctx))
 			publisher.PublishAsync(ctx, startEvent)
 
 			// Execute the workflow

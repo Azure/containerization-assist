@@ -26,11 +26,12 @@ type K8sResult struct {
 }
 
 // GenerateManifests creates Kubernetes manifests for deployment using real K8s operations
-func GenerateManifests(buildResult *BuildResult, appName, namespace string, port int, logger *slog.Logger) (*K8sResult, error) {
+func GenerateManifests(buildResult *BuildResult, appName, namespace string, port int, repoPath string, logger *slog.Logger) (*K8sResult, error) {
 	logger.Info("Generating Kubernetes manifests",
 		"app_name", appName,
 		"namespace", namespace,
-		"port", port)
+		"port", port,
+		"repo_path", repoPath)
 
 	if buildResult == nil {
 		return nil, fmt.Errorf("build result is required")
@@ -54,8 +55,8 @@ func GenerateManifests(buildResult *BuildResult, appName, namespace string, port
 	// Use the real K8s manifest service
 	manifestService := kubernetes.NewManifestService(logger.With("component", "k8s_manifest_service"))
 
-	// Create temporary directory for manifests
-	manifestDir := fmt.Sprintf("/tmp/k8s-manifests-%s", appName)
+	// Create manifests directory in the repository path (persistent)
+	manifestDir := fmt.Sprintf("%s/manifests", repoPath)
 	os.MkdirAll(manifestDir, 0755)
 
 	// Generate manifests using the core K8s functionality
