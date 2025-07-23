@@ -13,7 +13,6 @@ func TestNoDomainInfrastructureDependencies(t *testing.T) {
 	domainPackages := []string{
 		"github.com/Azure/container-kit/pkg/mcp/domain/workflow",
 		"github.com/Azure/container-kit/pkg/mcp/domain/events",
-		"github.com/Azure/container-kit/pkg/mcp/domain/saga",
 		"github.com/Azure/container-kit/pkg/mcp/domain/progress",
 		"github.com/Azure/container-kit/pkg/mcp/domain/sampling",
 		"github.com/Azure/container-kit/pkg/mcp/domain/session",

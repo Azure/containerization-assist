@@ -22,17 +22,6 @@ type EventAwareOrchestrator interface {
 	PublishWorkflowEvent(ctx context.Context, workflowID string, eventType string, payload interface{}) error
 }
 
-// SagaAwareOrchestrator extends workflow orchestration with saga transaction support
-type SagaAwareOrchestrator interface {
-	EventAwareOrchestrator
-
-	// ExecuteWithSaga runs the workflow with saga transaction support
-	ExecuteWithSaga(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error)
-
-	// CompensateSaga triggers compensation for a failed saga
-	CompensateSaga(ctx context.Context, sagaID string) error
-}
-
 // AdaptiveOrchestrator extends workflow orchestration with adaptive capabilities
 type AdaptiveOrchestrator interface {
 	WorkflowOrchestrator

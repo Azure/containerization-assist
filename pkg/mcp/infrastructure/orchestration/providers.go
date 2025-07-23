@@ -5,7 +5,6 @@ import (
 	"log/slog"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/ml"
-	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/container"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/kubernetes"
@@ -29,13 +28,8 @@ var Providers = wire.NewSet(
 	ProvideStepEnhancerAdapter,
 
 	// Orchestrators
-	ProvideEnhancedOrchestrator,
-	ProvideAdaptiveOrchestrator,
-	wire.Bind(new(workflow.WorkflowOrchestrator), new(*AdaptiveOrchestratorAdapter)),
-	wire.Bind(new(workflow.AdaptiveOrchestrator), new(*AdaptiveOrchestratorAdapter)),
-
-	// Saga coordination
-	saga.NewSagaCoordinator,
+	ProvideDAGOrchestrator,
+	wire.Bind(new(workflow.WorkflowOrchestrator), new(*workflow.DAGOrchestrator)),
 
 	// Interface bindings would go here if needed
 )
@@ -44,6 +38,15 @@ var Providers = wire.NewSet(
 func ProvideStepFactory(stepProvider workflow.StepProvider, optimizer workflow.BuildOptimizer, logger *slog.Logger) *workflow.StepFactory {
 	// For now, pass nil for optimized build step since it doesn't implement the interface
 	return workflow.NewStepFactory(stepProvider, optimizer, nil, logger)
+}
+
+// ProvideDAGOrchestrator creates the DAG-based orchestrator
+func ProvideDAGOrchestrator(
+	stepProvider workflow.StepProvider,
+	emitterFactory workflow.ProgressEmitterFactory,
+	logger *slog.Logger,
+) (*workflow.DAGOrchestrator, error) {
+	return workflow.NewDAGOrchestrator(stepProvider, emitterFactory, logger)
 }
 
 // ProvideBaseOrchestrator creates the base orchestrator
@@ -56,7 +59,6 @@ func ProvideEnhancedOrchestrator(
 	factory *workflow.StepFactory,
 	emitterFactory workflow.ProgressEmitterFactory,
 	stepEnhancerAdapter workflow.StepEnhancer,
-	sagaCoordinator *saga.SagaCoordinator,
 	logger *slog.Logger,
 ) *workflow.BaseOrchestrator {
 	// Create orchestrator with AI enhancement middleware
@@ -68,7 +70,6 @@ func ProvideEnhancedOrchestrator(
 			workflow.CombinedEnhancementMiddleware(stepEnhancerAdapter, logger),
 			workflow.RetryMiddleware(),
 			workflow.ProgressMiddleware(),
-			workflow.SagaMiddleware(sagaCoordinator, logger),
 		),
 	)
 }

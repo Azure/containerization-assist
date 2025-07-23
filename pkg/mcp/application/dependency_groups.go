@@ -10,7 +10,6 @@ import (
 	domainml "github.com/Azure/container-kit/pkg/mcp/domain/ml"
 	domainprompts "github.com/Azure/container-kit/pkg/mcp/domain/prompts"
 	domainresources "github.com/Azure/container-kit/pkg/mcp/domain/resources"
-	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 )
@@ -26,10 +25,8 @@ type CoreDeps struct {
 type WorkflowDeps struct {
 	Orchestrator           workflow.WorkflowOrchestrator
 	EventAwareOrchestrator workflow.EventAwareOrchestrator
-	SagaAwareOrchestrator  workflow.SagaAwareOrchestrator
 	EventPublisher         domainevents.Publisher
 	ProgressEmitterFactory workflow.ProgressEmitterFactory
-	SagaCoordinator        *saga.SagaCoordinator
 }
 
 // PersistenceDeps holds data persistence dependencies
@@ -68,12 +65,10 @@ func (gd *GroupedDependencies) ToLegacyDependencies() *Dependencies {
 		// Domain services
 		ProgressEmitterFactory: gd.Workflow.ProgressEmitterFactory,
 		EventPublisher:         gd.Workflow.EventPublisher,
-		SagaCoordinator:        gd.Workflow.SagaCoordinator,
 
 		// Workflow orchestrators
 		WorkflowOrchestrator:   gd.Workflow.Orchestrator,
 		EventAwareOrchestrator: gd.Workflow.EventAwareOrchestrator,
-		SagaAwareOrchestrator:  gd.Workflow.SagaAwareOrchestrator,
 
 		// AI/ML services
 		ErrorPatternRecognizer: gd.AI.ErrorPatternRecognizer,
@@ -99,10 +94,8 @@ func FromLegacyDependencies(deps *Dependencies) *GroupedDependencies {
 		Workflow: WorkflowDeps{
 			Orchestrator:           deps.WorkflowOrchestrator,
 			EventAwareOrchestrator: deps.EventAwareOrchestrator,
-			SagaAwareOrchestrator:  deps.SagaAwareOrchestrator,
 			EventPublisher:         deps.EventPublisher,
 			ProgressEmitterFactory: deps.ProgressEmitterFactory,
-			SagaCoordinator:        deps.SagaCoordinator,
 		},
 		Persistence: PersistenceDeps{
 			SessionManager: deps.SessionManager,

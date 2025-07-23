@@ -9,7 +9,6 @@ package composition
 import (
 	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/application"
-	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/ml"
@@ -33,27 +32,24 @@ func InitializeServer(logger *slog.Logger, config workflow.ServerConfig) (api.MC
 	store := persistence.ProvideResourceStore(logger)
 	directProgressFactory := messaging.ProvideDirectProgressFactory(logger)
 	publisher := events.NewPublisher(logger)
-	sagaCoordinator := saga.NewSagaCoordinator(logger, publisher)
 	stepProvider := steps.NewRegistryStepProvider()
+	dagOrchestrator, err := orchestration.ProvideDAGOrchestrator(stepProvider, directProgressFactory, logger)
+	if err != nil {
+		return nil, err
+	}
 	client, err := ai_ml.ProvideSamplingClient(logger)
 	if err != nil {
 		return nil, err
 	}
 	domainAdapter := sampling.NewDomainAdapter(client)
-	resourcePredictor := ai_ml.ProvideResourcePredictor(domainAdapter, logger)
-	buildOptimizer := ai_ml.ProvideBuildOptimizer(resourcePredictor, logger)
-	stepFactory := orchestration.ProvideStepFactory(stepProvider, buildOptimizer, logger)
+	advancedPatternRecognizer := ml.NewAdvancedPatternRecognizer(domainAdapter, logger)
 	enhancedErrorHandler := ml.NewEnhancedErrorHandler(domainAdapter, publisher, logger)
 	stepEnhancer := ml.NewStepEnhancer(enhancedErrorHandler, logger)
-	workflowStepEnhancer := orchestration.ProvideStepEnhancerAdapter(stepEnhancer, logger)
-	baseOrchestrator := orchestration.ProvideEnhancedOrchestrator(stepFactory, directProgressFactory, workflowStepEnhancer, sagaCoordinator, logger)
-	advancedPatternRecognizer := ml.NewAdvancedPatternRecognizer(domainAdapter, logger)
-	adaptiveOrchestratorAdapter := orchestration.ProvideAdaptiveOrchestrator(baseOrchestrator, advancedPatternRecognizer, stepEnhancer, logger)
 	manager, err := ai_ml.ProvidePromptManager(logger)
 	if err != nil {
 		return nil, err
 	}
-	dependencies := application.ProvideDependencies(logger, config, optimizedSessionManager, store, directProgressFactory, publisher, sagaCoordinator, adaptiveOrchestratorAdapter, advancedPatternRecognizer, enhancedErrorHandler, stepEnhancer, domainAdapter, manager)
+	dependencies := application.ProvideDependencies(logger, config, optimizedSessionManager, store, directProgressFactory, publisher, dagOrchestrator, advancedPatternRecognizer, enhancedErrorHandler, stepEnhancer, domainAdapter, manager)
 	mcpServer, err := application.ProvideServer(dependencies)
 	if err != nil {
 		return nil, err

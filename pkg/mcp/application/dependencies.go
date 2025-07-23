@@ -13,7 +13,6 @@ import (
 	domainml "github.com/Azure/container-kit/pkg/mcp/domain/ml"
 	domainprompts "github.com/Azure/container-kit/pkg/mcp/domain/prompts"
 	domainresources "github.com/Azure/container-kit/pkg/mcp/domain/resources"
-	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 )
@@ -46,12 +45,10 @@ type Dependencies struct {
 	// Domain services
 	ProgressEmitterFactory workflow.ProgressEmitterFactory
 	EventPublisher         domainevents.Publisher
-	SagaCoordinator        *saga.SagaCoordinator
 
 	// Workflow orchestrators
 	WorkflowOrchestrator   workflow.WorkflowOrchestrator
 	EventAwareOrchestrator workflow.EventAwareOrchestrator
-	SagaAwareOrchestrator  workflow.SagaAwareOrchestrator
 
 	// AI/ML services - using domain interfaces for clean architecture
 	ErrorPatternRecognizer domainml.ErrorPatternRecognizer
@@ -84,9 +81,6 @@ func (d *Dependencies) Validate() error {
 	}
 	if d.EventPublisher == nil {
 		errs = append(errs, fmt.Errorf("event publisher is required"))
-	}
-	if d.SagaCoordinator == nil {
-		errs = append(errs, fmt.Errorf("saga coordinator is required"))
 	}
 
 	// Workflow orchestrators validation

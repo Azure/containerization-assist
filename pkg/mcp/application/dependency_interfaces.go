@@ -10,7 +10,6 @@ import (
 	domainml "github.com/Azure/container-kit/pkg/mcp/domain/ml"
 	domainprompts "github.com/Azure/container-kit/pkg/mcp/domain/prompts"
 	domainresources "github.com/Azure/container-kit/pkg/mcp/domain/resources"
-	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 )
@@ -35,10 +34,8 @@ type PersistenceServices interface {
 type WorkflowServices interface {
 	Orchestrator() workflow.WorkflowOrchestrator
 	EventAwareOrchestrator() workflow.EventAwareOrchestrator
-	SagaAwareOrchestrator() workflow.SagaAwareOrchestrator
 	EventPublisher() domainevents.Publisher
 	ProgressFactory() workflow.ProgressEmitterFactory
-	SagaCoordinator() *saga.SagaCoordinator
 }
 
 // AIServices provides AI/ML operations
@@ -101,20 +98,12 @@ func (s *serviceProvider) EventAwareOrchestrator() workflow.EventAwareOrchestrat
 	return s.grouped.Workflow.EventAwareOrchestrator
 }
 
-func (s *serviceProvider) SagaAwareOrchestrator() workflow.SagaAwareOrchestrator {
-	return s.grouped.Workflow.SagaAwareOrchestrator
-}
-
 func (s *serviceProvider) EventPublisher() domainevents.Publisher {
 	return s.grouped.Workflow.EventPublisher
 }
 
 func (s *serviceProvider) ProgressFactory() workflow.ProgressEmitterFactory {
 	return s.grouped.Workflow.ProgressEmitterFactory
-}
-
-func (s *serviceProvider) SagaCoordinator() *saga.SagaCoordinator {
-	return s.grouped.Workflow.SagaCoordinator
 }
 
 // AIServices implementation

@@ -10,7 +10,6 @@ import (
 	domainml "github.com/Azure/container-kit/pkg/mcp/domain/ml"
 	domainprompts "github.com/Azure/container-kit/pkg/mcp/domain/prompts"
 	domainresources "github.com/Azure/container-kit/pkg/mcp/domain/resources"
-	"github.com/Azure/container-kit/pkg/mcp/domain/saga"
 	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 )
@@ -126,10 +125,8 @@ func NewServerWithOptions(opts ...ServerOption) AllServices {
 		grouped.Workflow = WorkflowDeps{
 			Orchestrator:           cfg.workflow.Orchestrator(),
 			EventAwareOrchestrator: cfg.workflow.EventAwareOrchestrator(),
-			SagaAwareOrchestrator:  cfg.workflow.SagaAwareOrchestrator(),
 			EventPublisher:         cfg.workflow.EventPublisher(),
 			ProgressEmitterFactory: cfg.workflow.ProgressFactory(),
-			SagaCoordinator:        cfg.workflow.SagaCoordinator(),
 		}
 	}
 
@@ -173,10 +170,8 @@ func (w *persistenceServicesWrapper) ResourceStore() domainresources.Store {
 type workflowServicesWrapper struct {
 	orchestrator           workflow.WorkflowOrchestrator
 	eventAwareOrchestrator workflow.EventAwareOrchestrator
-	sagaAwareOrchestrator  workflow.SagaAwareOrchestrator
 	eventPublisher         domainevents.Publisher
 	progressFactory        workflow.ProgressEmitterFactory
-	sagaCoordinator        *saga.SagaCoordinator
 }
 
 func (w *workflowServicesWrapper) Orchestrator() workflow.WorkflowOrchestrator {
@@ -185,17 +180,11 @@ func (w *workflowServicesWrapper) Orchestrator() workflow.WorkflowOrchestrator {
 func (w *workflowServicesWrapper) EventAwareOrchestrator() workflow.EventAwareOrchestrator {
 	return w.eventAwareOrchestrator
 }
-func (w *workflowServicesWrapper) SagaAwareOrchestrator() workflow.SagaAwareOrchestrator {
-	return w.sagaAwareOrchestrator
-}
 func (w *workflowServicesWrapper) EventPublisher() domainevents.Publisher {
 	return w.eventPublisher
 }
 func (w *workflowServicesWrapper) ProgressFactory() workflow.ProgressEmitterFactory {
 	return w.progressFactory
-}
-func (w *workflowServicesWrapper) SagaCoordinator() *saga.SagaCoordinator {
-	return w.sagaCoordinator
 }
 
 type aiServicesWrapper struct {
