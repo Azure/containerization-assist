@@ -1,0 +1,138 @@
+name: Test Containerization Capability
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  test-containerization:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@v4
+        
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          
+      - name: Setup Docker and Kubernetes tools
+        run: |
+          # Verify Docker is working
+          docker --version
+          docker info
+          
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+          kubectl version --client
+          
+          # Install kind (Kubernetes in Docker)
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+          kind version
+          
+      - name: Build MCP Server from PR
+        run: |
+          echo "Building Container Kit MCP Server from PR code..."
+          go build -tags mcp -o container-kit-mcp ./cmd/mcp-server
+          chmod +x container-kit-mcp
+          ls -la container-kit-mcp
+          
+      - name: Install mcphost
+        run: |
+          echo "Installing mcphost binary..."
+          curl -L -o mcphost "https://github.com/mark3labs/mcphost/releases/latest/download/mcphost-linux-amd64"
+          chmod +x mcphost
+          sudo mv mcphost /usr/local/bin/
+          mcphost --version
+          
+      - name: Create mcphost configuration
+        run: |
+          echo "Creating mcphost configuration..."
+          mkdir -p ~/.config
+          cat > ~/.mcphost.yml << 'EOF'
+          mcpServers:
+            container-copilot:
+              type: "local"
+              command: ["$PWD/container-kit-mcp"]
+              environment:
+                CONTAINER_KIT_LOG_LEVEL: "debug"
+                CONTAINER_KIT_WORKSPACE_DIR: "/tmp/test-workspace"
+                MCP_LOG_LEVEL: "debug"
+          
+          model: "azure:${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}"
+          provider-api-key: "${{ secrets.AZURE_OPENAI_KEY }}"
+          provider-url: "${{ secrets.AZURE_OPENAI_ENDPOINT }}"
+          EOF
+          echo "Configuration created successfully"
+          
+          # Create workspace directory
+          mkdir -p /tmp/test-workspace
+          
+          # Show the full configuration
+          echo "=== mcphost configuration ==="
+          cat ~/.mcphost.yml
+          
+      - name: Test MCP Server stdio mode
+        run: |
+          echo "Testing MCP Server in stdio mode..."
+          # Test that the server can start and respond
+          echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' | timeout 10s ./container-kit-mcp || true
+          echo "Server stdio test completed"
+          
+      - name: Run containerization test
+        id: test
+        run: |
+          echo "Running containerization test..."
+          # Test with a simple Java servlet application using mcphost
+          # mcphost will handle starting/stopping the MCP server automatically
+          RESULT=$(mcphost -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello" --quiet 2>&1)
+          echo "Test completed"
+          echo "result<<EOF" >> $GITHUB_OUTPUT
+          echo "$RESULT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          # Also capture any server logs for analysis
+          echo "Capturing server logs..."
+          # Note: With local transport, mcphost manages the server process
+          # Server logs will be in mcphost output, not separate files
+          
+      - name: Stop MCP Server
+        if: always()
+        run: |
+          echo "Cleaning up..."
+          # With local transport, mcphost manages server lifecycle
+          # No manual server management needed
+          echo "Cleanup completed - mcphost handles server lifecycle automatically"
+          
+      - name: Analyze results and report
+        run: |
+          echo "=== Test Result and Logs ==="
+          echo "${{ steps.test.outputs.result }}"
+          echo ""
+          
+          # Parse output for success indicators
+          echo "=== Analysis ==="
+          TEST_OUTPUT="${{ steps.test.outputs.result }}"
+          if echo "$TEST_OUTPUT" | grep -q "Workflow completed successfully" || \
+             echo "$TEST_OUTPUT" | grep -q "finalize_result.*completed" || \
+             echo "$TEST_OUTPUT" | grep -q "health_probe.*completed" || \
+             echo "$TEST_OUTPUT" | grep -q "Step 10/10.*completed" || \
+             echo "$TEST_OUTPUT" | grep -q "containerization.*successful"; then
+            echo "✅ Containerization test PASSED"
+            echo "SUCCESS: The containerization workflow completed successfully"
+            exit 0
+          else
+            echo "❌ Containerization test FAILED"
+            echo ""
+            echo "=== Error Analysis ==="
+            echo "$TEST_OUTPUT" | grep -i "error\|failed\|exception" | tail -10 || echo "No specific errors found in output"
+            echo ""
+            echo "FAILURE: The containerization workflow did not complete successfully"
+            exit 1
+          fi
