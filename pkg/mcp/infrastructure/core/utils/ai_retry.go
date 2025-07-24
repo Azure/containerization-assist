@@ -14,6 +14,23 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+// enhancedErrorMessageTemplate is the template for AI assistant error messages.
+// This can be customized if needed for different AI assistant behaviors.
+const enhancedErrorMessageTemplate = `🤖 AI ASSISTANT: The workflow failed and needs your help.
+
+OPERATION FAILED: "%s" (attempt %d/%d)
+ERROR: %s
+
+🔧 REQUIRED ACTION: Please retry the workflow using the individual tools. Start with analyze_repository and follow the tool chain:
+- Use analyze_repository first with repo_url and session_id
+- Follow the chain hints to generate_dockerfile → build_image → etc.
+- Use the SAME session_id across all tool calls to maintain state
+
+📋 TROUBLESHOOTING CHECKLIST:
+%s
+
+⚡ IMMEDIATE NEXT STEP: Call analyze_repository tool with repo_url and a unique session_id to start the containerization workflow.`
+
 // WithAIRetry wraps a function with AI-powered retry logic
 // This works with external AI assistants (like Claude) using the MCP server
 // The AI assistant observes failures through structured error reporting and can retry the workflow
@@ -172,20 +189,7 @@ func enhanceErrorForAI(operation string, originalErr error, attempt, maxAttempts
 	fixSuggestions := generateFixSuggestions(operation, errorMsg, logger)
 
 	// Create enhanced error message with explicit instructions for AI assistant
-	enhancedMsg := fmt.Sprintf(`🤖 AI ASSISTANT: The workflow failed and needs your help.
-
-OPERATION FAILED: "%s" (attempt %d/%d)
-ERROR: %s
-
-🔧 REQUIRED ACTION: Please retry the workflow using the individual tools. Start with analyze_repository and follow the tool chain:
-- Use analyze_repository first with repo_url and session_id
-- Follow the chain hints to generate_dockerfile → build_image → etc.
-- Use the SAME session_id across all tool calls to maintain state
-
-📋 TROUBLESHOOTING CHECKLIST:
-%s
-
-⚡ IMMEDIATE NEXT STEP: Call analyze_repository tool with repo_url and a unique session_id to start the containerization workflow.`,
+	enhancedMsg := fmt.Sprintf(enhancedErrorMessageTemplate,
 		operation, attempt, maxAttempts, errorMsg, fixSuggestions)
 
 	logger.Error("Enhanced error for AI assistant",

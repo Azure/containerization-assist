@@ -91,8 +91,8 @@ func (b *Bootstrapper) RegisterComponents(mcpServer *server.MCPServer) error {
 		return errors.New(errors.CodeInternalError, "bootstrapper", "mcp server not initialized", nil)
 	}
 
-	// Use the existing registrar
-	reg := registrar.NewMCPRegistrar(b.logger, b.resourceStore, b.workflowOrchestrator, b.sessionManager)
+	// Use the existing registrar with config
+	reg := registrar.NewMCPRegistrar(b.logger, b.resourceStore, b.workflowOrchestrator, b.sessionManager, b.config)
 	if err := reg.RegisterAll(mcpServer); err != nil {
 		return errors.New(errors.CodeToolExecutionFailed, "bootstrapper", "failed to register components", err)
 	}

@@ -24,10 +24,11 @@ type MCPRegistrar struct {
 	resourceRegistrar *ResourceRegistrar
 	tools             *registry.Registry[func() error]
 	resources         *registry.Registry[func() error]
+	config            workflow.ServerConfig
 }
 
 // NewMCPRegistrar creates a new unified MCP registrar
-func NewMCPRegistrar(logger *slog.Logger, resourceStore *resources.Store, orchestrator workflow.WorkflowOrchestrator, sessionManager OptimizedSessionManager) *MCPRegistrar {
+func NewMCPRegistrar(logger *slog.Logger, resourceStore *resources.Store, orchestrator workflow.WorkflowOrchestrator, sessionManager OptimizedSessionManager, config workflow.ServerConfig) *MCPRegistrar {
 	// Extract dependencies from orchestrator for individual tools
 	var stepProvider workflow.StepProvider
 	var progressFactory workflow.ProgressEmitterFactory
@@ -39,10 +40,11 @@ func NewMCPRegistrar(logger *slog.Logger, resourceStore *resources.Store, orches
 	}
 
 	return &MCPRegistrar{
-		toolRegistrar:     NewToolRegistrar(logger, orchestrator, stepProvider, progressFactory, sessionManager),
+		toolRegistrar:     NewToolRegistrar(logger, orchestrator, stepProvider, progressFactory, sessionManager, config),
 		resourceRegistrar: NewResourceRegistrar(logger, resourceStore),
 		tools:             registry.New[func() error](),
 		resources:         registry.New[func() error](),
+		config:            config,
 	}
 }
 

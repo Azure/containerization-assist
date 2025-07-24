@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/events"
 )
@@ -11,15 +12,18 @@ import (
 type EventHandler func(ctx context.Context, event events.DomainEvent) error
 
 type Publisher struct {
-	handlers map[string][]EventHandler
-	logger   *slog.Logger
-	mu       sync.RWMutex
+	handlers   map[string][]EventHandler
+	logger     *slog.Logger
+	mu         sync.RWMutex
+	workerPool chan struct{} // Limits concurrent async operations
+	wg         sync.WaitGroup
 }
 
 func NewPublisher(logger *slog.Logger) *Publisher {
 	return &Publisher{
-		handlers: make(map[string][]EventHandler),
-		logger:   logger.With("component", "event_publisher"),
+		handlers:   make(map[string][]EventHandler),
+		logger:     logger.With("component", "event_publisher"),
+		workerPool: make(chan struct{}, 10), // Limit to 10 concurrent async operations
 	}
 }
 
@@ -78,15 +82,37 @@ func (p *Publisher) Publish(ctx context.Context, event events.DomainEvent) error
 	return nil
 }
 
+// PublishAsync publishes an event asynchronously without waiting for handlers.
+// Uses a worker pool to prevent goroutine leaks and manage resource usage.
 func (p *Publisher) PublishAsync(ctx context.Context, event events.DomainEvent) {
-	go func() {
-		if err := p.Publish(ctx, event); err != nil {
-			p.logger.Error("Async event publishing failed",
-				"event_type", event.EventType(),
-				"event_id", event.EventID(),
-				"error", err)
-		}
-	}()
+	// Try to acquire a worker slot with a timeout to prevent blocking
+	select {
+	case p.workerPool <- struct{}{}:
+		// Successfully acquired a worker slot
+		p.wg.Add(1)
+		go func() {
+			defer func() {
+				<-p.workerPool // Release worker slot
+				p.wg.Done()
+			}()
+
+			// Create a timeout context for the async operation
+			asyncCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			if err := p.Publish(asyncCtx, event); err != nil {
+				p.logger.Error("Async event publishing failed",
+					"event_type", event.EventType(),
+					"event_id", event.EventID(),
+					"error", err)
+			}
+		}()
+	case <-time.After(100 * time.Millisecond):
+		// Worker pool is full, log and drop the event
+		p.logger.Warn("Worker pool full, dropping async event",
+			"event_type", event.EventType(),
+			"event_id", event.EventID())
+	}
 }
 
 // GetHandlerCount returns the number of handlers for an event type (for testing)
@@ -94,4 +120,20 @@ func (p *Publisher) GetHandlerCount(eventType string) int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return len(p.handlers[eventType])
+}
+
+// Close gracefully shuts down the publisher, waiting for all async operations to complete
+func (p *Publisher) Close(ctx context.Context) error {
+	done := make(chan struct{})
+	go func() {
+		p.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

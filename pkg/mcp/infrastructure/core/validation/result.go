@@ -33,8 +33,8 @@ type ValidationWarning struct {
 func NewValidationResult() *ValidationResult {
 	return &ValidationResult{
 		Valid:    true,
-		Errors:   make([]ValidationError, 0),
-		Warnings: make([]ValidationWarning, 0),
+		Errors:   nil, // Will be allocated when first error is added
+		Warnings: nil, // Will be allocated when first warning is added
 		Context:  make(map[string]interface{}),
 	}
 }

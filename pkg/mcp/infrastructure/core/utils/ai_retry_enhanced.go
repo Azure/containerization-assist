@@ -1,4 +1,4 @@
-// Package utilities provides enhanced AI-powered retry with progressive error context
+// Package utils provides enhanced AI-powered retry with progressive error context
 package utils
 
 import (
