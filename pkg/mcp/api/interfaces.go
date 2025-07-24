@@ -3,8 +3,6 @@ package api
 import (
 	"context"
 	"time"
-
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/validation"
 )
 
 // MCPServer represents the main MCP server interface
@@ -86,22 +84,47 @@ type Validator[T any] interface {
 	Name() string
 }
 
-// Use unified validation types from the core validation package
+// Validation types defined at API layer for clean architecture
 
-// ValidationResult is an alias to the unified validation result
-type ValidationResult = validation.ValidationResult
+// ValidationResult represents the result of a validation operation
+type ValidationResult struct {
+	Valid    bool                   `json:"valid"`
+	Errors   []ValidationError      `json:"errors,omitempty"`
+	Warnings []ValidationWarning    `json:"warnings,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+}
 
-// ValidationError is an alias to the unified validation error
-type ValidationError = validation.ValidationError
+// ValidationError represents a validation error
+type ValidationError struct {
+	Field   string `json:"field,omitempty"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Value   string `json:"value,omitempty"`
+}
 
-// ValidationWarning is an alias to the unified validation warning
-type ValidationWarning = validation.ValidationWarning
+// ValidationWarning represents a validation warning
+type ValidationWarning struct {
+	Field   string `json:"field,omitempty"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Value   string `json:"value,omitempty"`
+}
 
-// BuildValidationResult is an alias to the unified build validation result
-type BuildValidationResult = validation.BuildValidationResult
+// BuildValidationResult represents the result of build validation
+type BuildValidationResult struct {
+	ValidationResult
+	DockerfilePath string            `json:"dockerfile_path,omitempty"`
+	BuildContext   string            `json:"build_context,omitempty"`
+	Issues         []ValidationError `json:"issues,omitempty"`
+}
 
-// ManifestValidationResult is an alias to the unified manifest validation result
-type ManifestValidationResult = validation.ManifestValidationResult
+// ManifestValidationResult represents the result of manifest validation
+type ManifestValidationResult struct {
+	ValidationResult
+	ManifestPath string            `json:"manifest_path,omitempty"`
+	Resource     string            `json:"resource,omitempty"`
+	Issues       []ValidationError `json:"issues,omitempty"`
+}
 
 // WorkflowResult represents the result of executing a workflow
 type WorkflowResult struct {
