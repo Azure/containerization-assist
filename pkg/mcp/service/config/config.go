@@ -61,6 +61,10 @@ type Config struct {
 	RegistryInsecure bool   `env:"MCP_REGISTRY_INSECURE" yaml:"registry_insecure"`
 
 	Orchestrator OrchestratorSettings `env:",prefix=MCP_ORCHESTRATOR_" yaml:"orchestrator"`
+
+	// WorkflowMode controls whether start_workflow is promoted (automated) or deprecated (interactive)
+	// Values: "automated" (promotes start_workflow as primary), "interactive" (deprecates start_workflow)
+	WorkflowMode string `env:"MCP_WORKFLOW_MODE" yaml:"workflow_mode"`
 }
 
 type SamplingConfig struct {
@@ -241,6 +245,9 @@ func DefaultConfig() *Config {
 		RegistryUsername: "",
 		RegistryPassword: "",
 		RegistryInsecure: false,
+
+		// Default to interactive mode (individual steps)
+		WorkflowMode: "interactive",
 	}
 }
 

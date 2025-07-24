@@ -1,4 +1,11 @@
-// Package utils provides consolidated utility functions for the MCP package
+// Package utils provides consolidated utility functions for the MCP package.
+//
+// This package includes:
+// - ExtractRepoName: Extract repository name from a Git URL
+// - ExtractDeploymentName: Extract Kubernetes-compatible deployment name from an image reference
+// - RepositoryAnalyzer: Perform mechanical repository analysis without AI
+// - MaskSensitiveData: Mask sensitive information in strings
+// - AI-powered retry operations with progressive error context
 package utils
 
 import (

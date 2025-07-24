@@ -22,6 +22,7 @@ type ToolRegistrar struct {
 	stepProvider    domainworkflow.StepProvider
 	progressFactory domainworkflow.ProgressEmitterFactory
 	sessionManager  session.OptimizedSessionManager
+	config          domainworkflow.ServerConfig
 }
 
 // NewToolRegistrar creates a new tool registrar
@@ -31,6 +32,7 @@ func NewToolRegistrar(
 	stepProvider domainworkflow.StepProvider,
 	progressFactory domainworkflow.ProgressEmitterFactory,
 	sessionManager session.OptimizedSessionManager,
+	config domainworkflow.ServerConfig,
 ) *ToolRegistrar {
 	return &ToolRegistrar{
 		logger:          logger.With("component", "tool_registrar"),
@@ -38,6 +40,7 @@ func NewToolRegistrar(
 		stepProvider:    stepProvider,
 		progressFactory: progressFactory,
 		sessionManager:  sessionManager,
+		config:          config,
 	}
 }
 
@@ -67,12 +70,22 @@ func (tr *ToolRegistrar) RegisterAll(mcpServer *server.MCPServer) error {
 
 // registerOrchestrationTools registers orchestration tools using direct registration
 func (tr *ToolRegistrar) registerOrchestrationTools(mcpServer *server.MCPServer) error {
-	tr.logger.Info("Registering orchestration tools")
+	tr.logger.Info("Registering orchestration tools", "workflow_mode", tr.config.WorkflowMode)
 
-	// Register start_workflow tool - DEPRECATED: Use individual workflow steps instead
+	// Set description based on workflow mode
+	var startWorkflowDescription string
+	if tr.config.WorkflowMode == "automated" {
+		// In automated mode, promote start_workflow as primary tool
+		startWorkflowDescription = "🚀 Runs the complete containerization workflow automatically. Analyzes repository, generates Dockerfile, builds/scans/pushes image, generates K8s manifests, and deploys to cluster."
+	} else {
+		// In interactive mode (default), deprecate in favor of individual steps
+		startWorkflowDescription = "⚠️ DEPRECATED: Runs entire workflow at once. PREFER individual steps (analyze_repository, generate_dockerfile, etc.) for better control and visibility."
+	}
+
+	// Register start_workflow tool with appropriate description
 	startWorkflowTool := mcp.Tool{
 		Name:        "start_workflow",
-		Description: "⚠️ DEPRECATED: Runs entire workflow at once. PREFER individual steps (analyze_repository, generate_dockerfile, etc.) for better control and visibility.",
+		Description: startWorkflowDescription,
 		InputSchema: mcp.ToolInputSchema{
 			Type: "object",
 			Properties: map[string]interface{}{
@@ -251,6 +264,18 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Session ID for workflow state management",
 				},
+				"retryNumber": map[string]interface{}{
+					"type":        "integer",
+					"description": "Current retry attempt number",
+					"default":     1,
+					"minimum":     1,
+				},
+				"maxRetries": map[string]interface{}{
+					"type":        "integer",
+					"description": "Maximum retry attempts (0 = no retries)",
+					"default":     3,
+					"minimum":     0,
+				},
 			},
 			required: []string{"repo_path", "session_id"},
 		},
@@ -261,6 +286,18 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 				"session_id": map[string]interface{}{
 					"type":        "string",
 					"description": "Session ID for workflow state management",
+				},
+				"retryNumber": map[string]interface{}{
+					"type":        "integer",
+					"description": "Current retry attempt number",
+					"default":     1,
+					"minimum":     1,
+				},
+				"maxRetries": map[string]interface{}{
+					"type":        "integer",
+					"description": "Maximum retry attempts (0 = no retries)",
+					"default":     3,
+					"minimum":     0,
 				},
 			},
 			required: []string{"session_id"},
@@ -273,6 +310,18 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Session ID for workflow state management",
 				},
+				"retryNumber": map[string]interface{}{
+					"type":        "integer",
+					"description": "Current retry attempt number",
+					"default":     1,
+					"minimum":     1,
+				},
+				"maxRetries": map[string]interface{}{
+					"type":        "integer",
+					"description": "Maximum retry attempts (0 = no retries)",
+					"default":     3,
+					"minimum":     0,
+				},
 			},
 			required: []string{"session_id"},
 		},
@@ -283,6 +332,18 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 				"session_id": map[string]interface{}{
 					"type":        "string",
 					"description": "Session ID for workflow state management",
+				},
+				"retryNumber": map[string]interface{}{
+					"type":        "integer",
+					"description": "Current retry attempt number",
+					"default":     1,
+					"minimum":     1,
+				},
+				"maxRetries": map[string]interface{}{
+					"type":        "integer",
+					"description": "Maximum retry attempts (0 = no retries)",
+					"default":     3,
+					"minimum":     0,
 				},
 			},
 			required: []string{"session_id"},
@@ -299,6 +360,18 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Tag for the Docker image",
 				},
+				"retryNumber": map[string]interface{}{
+					"type":        "integer",
+					"description": "Current retry attempt number",
+					"default":     1,
+					"minimum":     1,
+				},
+				"maxRetries": map[string]interface{}{
+					"type":        "integer",
+					"description": "Maximum retry attempts (0 = no retries)",
+					"default":     3,
+					"minimum":     0,
+				},
 			},
 			required: []string{"session_id", "tag"},
 		},
@@ -314,6 +387,18 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Container registry URL",
 				},
+				"retryNumber": map[string]interface{}{
+					"type":        "integer",
+					"description": "Current retry attempt number",
+					"default":     1,
+					"minimum":     1,
+				},
+				"maxRetries": map[string]interface{}{
+					"type":        "integer",
+					"description": "Maximum retry attempts (0 = no retries)",
+					"default":     5,
+					"minimum":     0,
+				},
 			},
 			required: []string{"session_id", "registry"},
 		},
@@ -324,6 +409,18 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 				"session_id": map[string]interface{}{
 					"type":        "string",
 					"description": "Session ID for workflow state management",
+				},
+				"retryNumber": map[string]interface{}{
+					"type":        "integer",
+					"description": "Current retry attempt number",
+					"default":     1,
+					"minimum":     1,
+				},
+				"maxRetries": map[string]interface{}{
+					"type":        "integer",
+					"description": "Maximum retry attempts (0 = no retries)",
+					"default":     3,
+					"minimum":     0,
 				},
 			},
 			required: []string{"session_id"},
@@ -336,6 +433,18 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Session ID for workflow state management",
 				},
+				"retryNumber": map[string]interface{}{
+					"type":        "integer",
+					"description": "Current retry attempt number",
+					"default":     1,
+					"minimum":     1,
+				},
+				"maxRetries": map[string]interface{}{
+					"type":        "integer",
+					"description": "Maximum retry attempts (0 = no retries)",
+					"default":     3,
+					"minimum":     0,
+				},
 			},
 			required: []string{"session_id"},
 		},
@@ -346,6 +455,18 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 				"session_id": map[string]interface{}{
 					"type":        "string",
 					"description": "Session ID for workflow state management",
+				},
+				"retryNumber": map[string]interface{}{
+					"type":        "integer",
+					"description": "Current retry attempt number",
+					"default":     1,
+					"minimum":     1,
+				},
+				"maxRetries": map[string]interface{}{
+					"type":        "integer",
+					"description": "Maximum retry attempts (0 = no retries)",
+					"default":     3,
+					"minimum":     0,
 				},
 			},
 			required: []string{"session_id"},
@@ -358,12 +479,24 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Session ID for workflow state management",
 				},
+				"retryNumber": map[string]interface{}{
+					"type":        "integer",
+					"description": "Current retry attempt number",
+					"default":     1,
+					"minimum":     1,
+				},
+				"maxRetries": map[string]interface{}{
+					"type":        "integer",
+					"description": "Maximum retry attempts (0 = no retries)",
+					"default":     3,
+					"minimum":     0,
+				},
 			},
 			required: []string{"session_id"},
 		},
 	}
 
-	// Register each workflow tool using direct registration
+	// Register each workflow tool using direct registration with retry wrapper
 	for _, toolDef := range workflowTools {
 		tool := mcp.Tool{
 			Name:        toolDef.name,
@@ -377,9 +510,20 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 
 		// Capture toolDef.name in closure
 		toolName := toolDef.name
-		mcpServer.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+
+		// Create base handler
+		handler := func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			return tr.executeWorkflowStep(ctx, req, toolName)
-		})
+		}
+
+		// Wrap with retry logic
+		wrappedHandler := tr.wrapWithRetry(toolName, handler)
+
+		// Wrap with metrics collection
+		metricsHandler := MetricsMiddleware(toolName, wrappedHandler)
+
+		// Register the wrapped handler
+		mcpServer.AddTool(tool, metricsHandler)
 	}
 
 	tr.logger.Info("Workflow tools registered successfully", slog.Int("count", len(workflowTools)))
@@ -420,6 +564,21 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 	// Get arguments
 	args := req.GetArguments()
 
+	// Extract retry information
+	retryNumber := 1
+	if rn, ok := args["retryNumber"].(float64); ok {
+		retryNumber = int(rn)
+	}
+
+	// Log retry information if this is a retry
+	if retryNumber > 1 {
+		tr.logger.Info("Executing tool retry",
+			"tool", stepName,
+			"retryNumber", retryNumber,
+			"sessionId", args["session_id"],
+		)
+	}
+
 	// Handle different step requirements
 	switch stepName {
 	case "analyze_repository":
@@ -435,19 +594,29 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		// Get the analyze step from step provider
 		step, err := tr.stepProvider.GetStep("analyze_repository")
 		if err != nil {
-			return tr.createErrorResult(fmt.Sprintf("Failed to get analyze step: %s", err.Error()))
+			return tr.createErrorResultWithRetry(fmt.Sprintf("Failed to get analyze step: %s", err.Error()), retryNumber)
 		}
 
 		// Create workflow state for this step
 		workflowState, simpleState, err := tr.createStepState(ctx, sessionID, repoPath)
 		if err != nil {
-			return tr.createErrorResult(fmt.Sprintf("Failed to create workflow state: %s", err.Error()))
+			return tr.createErrorResultWithRetry(fmt.Sprintf("Failed to create workflow state: %s", err.Error()), retryNumber)
 		}
 
 		// Execute the step
 		err = step.Execute(ctx, workflowState)
 		if err != nil {
-			return tr.createErrorResult(fmt.Sprintf("Analyze step failed: %s", err.Error()))
+			// Log step failure
+			tr.logger.Info("Step failed",
+				"step", stepName,
+				"error", err.Error(),
+				"retryNumber", retryNumber,
+			)
+			return tr.createStepResult(false, stepName, fmt.Sprintf("Analyze step failed: %s", err.Error()),
+				map[string]interface{}{
+					"session_id": sessionID,
+					"repo_path":  repoPath,
+				}, retryNumber)
 		}
 
 		// Save step results to session artifacts
@@ -461,10 +630,11 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 			tr.logger.Warn("Failed to save workflow state after step execution", "session_id", sessionID, "step", stepName, "error", err)
 		}
 
-		return tr.createSuccessResult(stepName, "Repository analysis completed successfully", map[string]interface{}{
-			"session_id": sessionID,
-			"repo_path":  repoPath,
-		})
+		return tr.createStepResult(true, stepName, "Repository analysis completed successfully",
+			map[string]interface{}{
+				"session_id": sessionID,
+				"repo_path":  repoPath,
+			}, retryNumber)
 
 	case "generate_dockerfile":
 		sessionID, ok := args["session_id"].(string)
@@ -475,19 +645,28 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		// Get the dockerfile step
 		step, err := tr.stepProvider.GetStep("generate_dockerfile")
 		if err != nil {
-			return tr.createErrorResult(fmt.Sprintf("Failed to get dockerfile step: %s", err.Error()))
+			return tr.createErrorResultWithRetry(fmt.Sprintf("Failed to get dockerfile step: %s", err.Error()), retryNumber)
 		}
 
 		// Create workflow state for this step
 		workflowState, simpleState, err := tr.createStepState(ctx, sessionID, "")
 		if err != nil {
-			return tr.createErrorResult(fmt.Sprintf("Failed to create workflow state: %s", err.Error()))
+			return tr.createErrorResultWithRetry(fmt.Sprintf("Failed to create workflow state: %s", err.Error()), retryNumber)
 		}
 
 		// Execute the step
 		err = step.Execute(ctx, workflowState)
 		if err != nil {
-			return tr.createErrorResult(fmt.Sprintf("Dockerfile generation failed: %s", err.Error()))
+			// Log step failure
+			tr.logger.Info("Step failed",
+				"step", stepName,
+				"error", err.Error(),
+				"retryNumber", retryNumber,
+			)
+			return tr.createStepResult(false, stepName, fmt.Sprintf("Dockerfile generation failed: %s", err.Error()),
+				map[string]interface{}{
+					"session_id": sessionID,
+				}, retryNumber)
 		}
 
 		// Save step results to session artifacts
@@ -501,9 +680,10 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 			tr.logger.Warn("Failed to save workflow state after step execution", "session_id", sessionID, "step", stepName, "error", err)
 		}
 
-		return tr.createSuccessResult(stepName, "Dockerfile generated successfully", map[string]interface{}{
-			"session_id": sessionID,
-		})
+		return tr.createStepResult(true, stepName, "Dockerfile generated successfully",
+			map[string]interface{}{
+				"session_id": sessionID,
+			}, retryNumber)
 
 	default:
 		// For other steps, create a session-aware execution
@@ -521,19 +701,28 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		// Get the step from step provider
 		step, err := tr.stepProvider.GetStep(actualStepName)
 		if err != nil {
-			return tr.createErrorResult(fmt.Sprintf("Failed to get step %s (mapped to %s): %s", stepName, actualStepName, err.Error()))
+			return tr.createErrorResultWithRetry(fmt.Sprintf("Failed to get step %s (mapped to %s): %s", stepName, actualStepName, err.Error()), retryNumber)
 		}
 
 		// Create workflow state for this step
 		workflowState, simpleState, err := tr.createStepState(ctx, sessionID, "")
 		if err != nil {
-			return tr.createErrorResult(fmt.Sprintf("Failed to create workflow state: %s", err.Error()))
+			return tr.createErrorResultWithRetry(fmt.Sprintf("Failed to create workflow state: %s", err.Error()), retryNumber)
 		}
 
 		// Execute the step
 		err = step.Execute(ctx, workflowState)
 		if err != nil {
-			return tr.createErrorResult(fmt.Sprintf("Step %s failed: %s", stepName, err.Error()))
+			// Log step failure
+			tr.logger.Info("Step failed",
+				"step", stepName,
+				"error", err.Error(),
+				"retryNumber", retryNumber,
+			)
+			return tr.createStepResult(false, stepName, fmt.Sprintf("Step %s failed: %s", stepName, err.Error()),
+				map[string]interface{}{
+					"session_id": sessionID,
+				}, retryNumber)
 		}
 
 		// Save step results to session artifacts
@@ -547,9 +736,10 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 			tr.logger.Warn("Failed to save workflow state after step execution", "session_id", sessionID, "step", stepName, "error", err)
 		}
 
-		return tr.createSuccessResult(stepName, fmt.Sprintf("Step %s completed successfully", stepName), map[string]interface{}{
-			"session_id": sessionID,
-		})
+		return tr.createStepResult(true, stepName, fmt.Sprintf("Step %s completed successfully", stepName),
+			map[string]interface{}{
+				"session_id": sessionID,
+			}, retryNumber)
 	}
 }
 
@@ -565,11 +755,100 @@ func (tr *ToolRegistrar) createErrorResult(message string) (*mcp.CallToolResult,
 	}, nil
 }
 
+// createErrorResultWithRetry creates an error result with retry information
+func (tr *ToolRegistrar) createErrorResultWithRetry(message string, retryNumber int) (*mcp.CallToolResult, error) {
+	data := map[string]interface{}{
+		"success":      false,
+		"error":        message,
+		"timestamp":    time.Now().Format(time.RFC3339),
+		"retry_number": retryNumber,
+	}
+
+	jsonData, _ := json.Marshal(data)
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			mcp.TextContent{
+				Type: "text",
+				Text: string(jsonData),
+			},
+		},
+	}, nil
+}
+
 func (tr *ToolRegistrar) createSuccessResult(step, message string, data map[string]interface{}) (*mcp.CallToolResult, error) {
 	data["success"] = true
 	data["step"] = step
 	data["message"] = message
 	data["timestamp"] = time.Now().Format(time.RFC3339)
+
+	jsonData, _ := json.Marshal(data)
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			mcp.TextContent{
+				Type: "text",
+				Text: string(jsonData),
+			},
+		},
+	}, nil
+}
+
+// createStepResult creates a result with workflow-aware chain hints
+func (tr *ToolRegistrar) createStepResult(success bool, stepName, message string, data map[string]interface{}, retryNumber int) (*mcp.CallToolResult, error) {
+	data["success"] = success
+	data["step"] = stepName
+	data["message"] = message
+	data["timestamp"] = time.Now().Format(time.RFC3339)
+	data["retry_number"] = retryNumber
+
+	// Add simple static chain hints
+	if success {
+		// Define the workflow sequence
+		workflowSequence := []string{
+			"analyze_repository",
+			"generate_dockerfile",
+			"build_image",
+			"scan_image",
+			"tag_image",
+			"push_image",
+			"generate_k8s_manifests",
+			"prepare_cluster",
+			"deploy_application",
+			"verify_deployment",
+		}
+
+		// Find current step index
+		currentIndex := -1
+		for i, step := range workflowSequence {
+			if step == stepName {
+				currentIndex = i
+				break
+			}
+		}
+
+		// Determine next step
+		if currentIndex >= 0 && currentIndex < len(workflowSequence)-1 {
+			nextStep := workflowSequence[currentIndex+1]
+			data["chain_hint"] = map[string]interface{}{
+				"next_tool": nextStep,
+				"reason":    fmt.Sprintf("%s completed successfully. Ready for %s", stepName, nextStep),
+				"is_retry":  false,
+			}
+		} else if currentIndex == len(workflowSequence)-1 {
+			// Last step completed
+			data["chain_hint"] = map[string]interface{}{
+				"next_tool":            "",
+				"reason":               "Workflow completed successfully",
+				"is_workflow_complete": true,
+			}
+		}
+	} else {
+		// On failure, suggest retry with same tool
+		data["chain_hint"] = map[string]interface{}{
+			"next_tool": stepName,
+			"reason":    fmt.Sprintf("%s failed. Consider retrying with adjusted parameters", stepName),
+			"is_retry":  true,
+		}
+	}
 
 	jsonData, _ := json.Marshal(data)
 	return &mcp.CallToolResult{

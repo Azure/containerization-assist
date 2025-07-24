@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/events"
 )
@@ -78,9 +79,16 @@ func (p *Publisher) Publish(ctx context.Context, event events.DomainEvent) error
 	return nil
 }
 
+// PublishAsync publishes an event asynchronously without waiting for handlers.
+// The goroutine is given a timeout context to prevent resource leaks.
 func (p *Publisher) PublishAsync(ctx context.Context, event events.DomainEvent) {
+	// Create a timeout context for the async operation to prevent goroutine leaks
+	asyncCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+
 	go func() {
-		if err := p.Publish(ctx, event); err != nil {
+		defer cancel() // Ensure context is cleaned up
+
+		if err := p.Publish(asyncCtx, event); err != nil {
 			p.logger.Error("Async event publishing failed",
 				"event_type", event.EventType(),
 				"event_id", event.EventID(),

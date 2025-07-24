@@ -58,6 +58,7 @@ type FlagConfig struct {
 	traceSampleRate   *float64
 	version           *bool
 	demo              *string
+	workflowMode      *string
 }
 
 // parseFlags parses command line flags and returns configuration
@@ -88,6 +89,7 @@ func parseFlags() *FlagConfig {
 		traceSampleRate:   flag.Float64("trace-sample-rate", 1.0, "Trace sampling rate (0.0-1.0)"),
 		version:           flag.Bool("version", false, "Show version information"),
 		demo:              flag.String("demo", "", "Run demo mode: all, basic, errors, session, performance, metrics"),
+		workflowMode:      flag.String("workflow-mode", "", "Workflow mode: 'automated' (promotes start_workflow) or 'interactive' (deprecates start_workflow)"),
 	}
 	flag.Parse()
 	return flags
@@ -201,6 +203,9 @@ func applyBasicConfigOverrides(config *workflow.ServerConfig, flags *FlagConfig)
 	}
 	if *flags.sandboxEnabled {
 		config.SandboxEnabled = true
+	}
+	if *flags.workflowMode != "" {
+		config.WorkflowMode = *flags.workflowMode
 	}
 }
 
@@ -412,6 +417,10 @@ func buildEnvMappings() []EnvConfigMapping {
 			if parsed, err := strconv.ParseFloat(value, 64); err == nil {
 				config.TraceSampleRate = parsed
 			}
+			return nil
+		}},
+		{"CONTAINER_KIT_WORKFLOW_MODE", "string", func(config *workflow.ServerConfig, value string) error {
+			config.WorkflowMode = value
 			return nil
 		}},
 	}

@@ -90,7 +90,8 @@ func TestNewMCPRegistrar(t *testing.T) {
 	resourceStore := resourcesInfra.NewStore(logger)
 	mockOrchestrator := &MockWorkflowOrchestrator{}
 
-	registrar := NewMCPRegistrar(logger, resourceStore, mockOrchestrator, nil)
+	config := workflow.DefaultServerConfig()
+	registrar := NewMCPRegistrar(logger, resourceStore, mockOrchestrator, nil, config)
 
 	assert.NotNil(t, registrar)
 	assert.NotNil(t, registrar.toolRegistrar)
@@ -104,7 +105,8 @@ func TestRegistrar_ComponentInitialization(t *testing.T) {
 	resourceStore := resourcesInfra.NewStore(logger)
 	mockOrchestrator := &MockWorkflowOrchestrator{}
 
-	registrar := NewMCPRegistrar(logger, resourceStore, mockOrchestrator, nil)
+	config := workflow.DefaultServerConfig()
+	registrar := NewMCPRegistrar(logger, resourceStore, mockOrchestrator, nil, config)
 
 	// Verify internal components are properly initialized
 	assert.NotNil(t, registrar.toolRegistrar, "ToolRegistrar should be initialized")
@@ -119,7 +121,8 @@ func TestRegistrar_NilDependencies(t *testing.T) {
 
 	// Should not panic with nil dependencies (defensive programming)
 	assert.NotPanics(t, func() {
-		registrar := NewMCPRegistrar(logger, nil, nil, nil)
+		config := workflow.DefaultServerConfig()
+		registrar := NewMCPRegistrar(logger, nil, nil, nil, config)
 		assert.NotNil(t, registrar)
 	})
 }
@@ -128,7 +131,8 @@ func TestNewToolRegistrar(t *testing.T) {
 	logger := slog.Default()
 	mockOrchestrator := &MockWorkflowOrchestrator{}
 
-	toolRegistrar := NewToolRegistrar(logger, mockOrchestrator, nil, nil, nil)
+	config := workflow.DefaultServerConfig()
+	toolRegistrar := NewToolRegistrar(logger, mockOrchestrator, nil, nil, nil, config)
 
 	assert.NotNil(t, toolRegistrar)
 	assert.Equal(t, mockOrchestrator, toolRegistrar.orchestrator)

@@ -248,6 +248,8 @@ type ServerConfig struct {
 	ServiceVersion  string  `json:"service_version"`
 	Environment     string  `json:"environment"`
 	TraceSampleRate float64 `json:"trace_sample_rate"`
+	// WorkflowMode controls whether start_workflow is promoted (automated) or deprecated (interactive)
+	WorkflowMode string `json:"workflow_mode"`
 }
 
 // DefaultServerConfig returns a default server configuration
@@ -272,6 +274,7 @@ func DefaultServerConfig() ServerConfig {
 		ServiceVersion:    "dev",
 		Environment:       "development",
 		TraceSampleRate:   1.0,
+		WorkflowMode:      "interactive", // Default to interactive mode
 	}
 }
 

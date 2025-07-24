@@ -1,4 +1,6 @@
-// Package observability provides log enrichers for the unified logging system
+// Package observability provides unified monitoring, tracing, and health infrastructure
+// for the MCP components. It consolidates telemetry, distributed tracing, health checks,
+// and logging enrichment into a single coherent package.
 package observability
 
 import (

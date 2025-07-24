@@ -1,3 +1,6 @@
+// Package observability provides unified monitoring, tracing, and health infrastructure
+// for the MCP components. It consolidates telemetry, distributed tracing, health checks,
+// and logging enrichment into a single coherent package.
 package observability
 
 import (
@@ -100,7 +103,8 @@ func (m *Monitor) CheckAll(ctx context.Context) {
 			defer wg.Done()
 			start := time.Now()
 
-			// Run check with timeout
+			// Run check with per-checker timeout to prevent one slow checker
+			// from affecting others. Each checker gets its own 10-second timeout.
 			checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 			defer cancel()
 
