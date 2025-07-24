@@ -27,6 +27,26 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
+// Workflow type constants
+const (
+	// WorkflowTypeContainerization represents the main containerization workflow
+	WorkflowTypeContainerization = "containerization"
+)
+
+// Step name constants
+const (
+	StepAnalyzeRepository  = "analyze_repository"
+	StepGenerateDockerfile = "generate_dockerfile"
+	StepBuildImage         = "build_image"
+	StepSecurityScan       = "security_scan"
+	StepTagImage           = "tag_image"
+	StepPushImage          = "push_image"
+	StepGenerateManifests  = "generate_manifests"
+	StepSetupCluster       = "setup_cluster"
+	StepDeployApplication  = "deploy_application"
+	StepVerifyDeployment   = "verify_deployment"
+)
+
 // TypedArgs represents strongly typed tool arguments for MCP tool invocations.
 // This provides a type-safe wrapper around raw JSON data while maintaining
 // flexibility for different argument structures.
@@ -336,7 +356,7 @@ func NewWorkflowState(ctx context.Context, req *mcp.CallToolRequest, args *Conta
 
 	repoIdentifier := GetRepositoryIdentifier(args)
 	workflowID := GenerateWorkflowID(repoIdentifier)
-	workflowProgress := NewWorkflowProgress(workflowID, "containerize_and_deploy", totalSteps)
+	workflowProgress := NewWorkflowProgress(workflowID, WorkflowTypeContainerization, totalSteps)
 
 	return &WorkflowState{
 		WorkflowID:       workflowID,

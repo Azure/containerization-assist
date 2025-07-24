@@ -74,7 +74,7 @@ func (c *Client) SampleWithProgress(
 	}, nil
 }
 
-// SampleWithProgressAndRetry combines streaming, progress tracking, and intelligent retry logic.
+// SampleWithProgressAndRetry combines streaming, progress tracking, and simple retry logic.
 func (c *Client) SampleWithProgressAndRetry(
 	ctx context.Context,
 	req SamplingRequest,
@@ -92,25 +92,23 @@ func (c *Client) SampleWithProgressAndRetry(
 		resp, err := c.SampleWithProgress(ctx, req, tracker, step, message)
 		if err == nil {
 			// Success
-			tracker.RecordSuccess()
 			return resp, nil
 		}
 
 		// Check if we should retry
-		if attempt < maxRetries && tracker.RecordError(err) {
-			// Within error budget, continue retrying
+		if attempt < maxRetries {
+			// Continue retrying
 			c.logger.Warn("Sampling attempt failed, retrying",
 				"attempt", attempt,
 				"max_retries", maxRetries,
 				"error", err)
 			continue
 		} else {
-			// Either last attempt or error budget exceeded
-			if !tracker.RecordError(err) {
-				c.logger.Error("Error budget exceeded, stopping retries",
-					"attempt", attempt,
-					"error", err)
-			}
+			// Final attempt failed
+			c.logger.Error("All sampling attempts failed",
+				"attempt", attempt,
+				"max_retries", maxRetries,
+				"error", err)
 			return nil, err
 		}
 	}

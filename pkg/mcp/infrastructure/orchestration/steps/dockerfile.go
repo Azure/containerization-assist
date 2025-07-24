@@ -10,7 +10,6 @@ import (
 	"github.com/Azure/container-kit/pkg/common/errors"
 )
 
-// DockerfileResult contains the generated Dockerfile and metadata
 type DockerfileResult struct {
 	Content     string            `json:"content"`
 	Path        string            `json:"path"`
@@ -49,7 +48,6 @@ func GenerateDockerfile(analyzeResult *AnalyzeResult, logger *slog.Logger) (*Doc
 	}, nil
 }
 
-// generateDockerfileForLanguage creates language-specific Dockerfiles
 func generateDockerfileForLanguage(language, framework string, port int, logger *slog.Logger) string {
 	switch language {
 	case "go":
@@ -309,7 +307,6 @@ RUN chown -R www-data:www-data /var/www/html
 	return dockerfile.String()
 }
 
-// generateGenericDockerfile creates a basic Dockerfile for unknown languages
 func generateGenericDockerfile(port int, logger *slog.Logger) string {
 	var dockerfile strings.Builder
 
@@ -329,7 +326,6 @@ COPY . .
 	return dockerfile.String()
 }
 
-// getBaseImageForLanguage returns the base image used for a language
 func getBaseImageForLanguage(language, framework string) string {
 	switch language {
 	case "go":
@@ -349,7 +345,6 @@ func getBaseImageForLanguage(language, framework string) string {
 	}
 }
 
-// WriteDockerfile writes the Dockerfile content to the specified path
 func WriteDockerfile(repoPath, content string, logger *slog.Logger) error {
 	dockerfilePath := filepath.Join(repoPath, "Dockerfile")
 

@@ -48,15 +48,14 @@ func WithTraceID(traceID string) Option {
 
 // Tracker is the simplified replacement for ChannelManager.
 type Tracker struct {
-	sink        Sink
-	total       int
-	start       time.Time
-	last        time.Time
-	curStep     int
-	heartbeat   time.Duration
-	throttle    time.Duration
-	traceID     string
-	errorBudget *ErrorBudget
+	sink      Sink
+	total     int
+	start     time.Time
+	last      time.Time
+	curStep   int
+	heartbeat time.Duration
+	throttle  time.Duration
+	traceID   string
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -72,15 +71,14 @@ type Tracker struct {
 func NewTracker(ctx context.Context, total int, sink Sink, opts ...Option) *Tracker {
 	ctx, cancel := context.WithCancel(ctx)
 	t := &Tracker{
-		sink:        sink,
-		total:       total,
-		start:       time.Now(),
-		last:        time.Now(),
-		heartbeat:   15 * time.Second,
-		throttle:    100 * time.Millisecond,
-		errorBudget: NewErrorBudget(5, 10*time.Minute),
-		ctx:         ctx,
-		cancel:      cancel,
+		sink:      sink,
+		total:     total,
+		start:     time.Now(),
+		last:      time.Now(),
+		heartbeat: 15 * time.Second,
+		throttle:  100 * time.Millisecond,
+		ctx:       ctx,
+		cancel:    cancel,
 	}
 	for _, o := range opts {
 		o(t)
@@ -151,50 +149,6 @@ func (t *Tracker) IsComplete() bool {
 
 func (t *Tracker) GetTraceID() string {
 	return t.traceID
-}
-
-// RecordError records an error and returns true if within budget.
-func (t *Tracker) RecordError(err error) bool {
-	return t.errorBudget.RecordError(err)
-}
-
-// RecordSuccess records a successful operation.
-func (t *Tracker) RecordSuccess() {
-	t.errorBudget.RecordSuccess()
-}
-
-// IsCircuitOpen returns true if error budget is exceeded.
-func (t *Tracker) IsCircuitOpen() bool {
-	return t.errorBudget.IsCircuitOpen()
-}
-
-// GetErrorBudgetStatus returns current error budget status.
-func (t *Tracker) GetErrorBudgetStatus() ErrorBudgetStatus {
-	return t.errorBudget.GetStatus()
-}
-
-// UpdateWithErrorHandling updates progress with error handling.
-func (t *Tracker) UpdateWithErrorHandling(step int, msg string, meta map[string]interface{}, err error) bool {
-	if meta == nil {
-		meta = make(map[string]interface{})
-	}
-
-	if err != nil {
-		withinBudget := t.RecordError(err)
-		if !withinBudget {
-			meta["error_budget_exceeded"] = true
-			meta["circuit_open"] = true
-		}
-		meta["error"] = err.Error()
-		meta["status"] = "failed"
-		t.publish(step, msg, meta)
-		return withinBudget
-	} else {
-		t.RecordSuccess()
-		meta["status"] = "completed"
-		t.publish(step, msg, meta)
-		return true
-	}
 }
 
 // ---- Internals -------------------------------------------------------------

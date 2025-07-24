@@ -1,0 +1,161 @@
+package service
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+
+	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/prompts"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/sampling"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/resources"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/steps"
+	"github.com/Azure/container-kit/pkg/mcp/service/session"
+)
+
+type ServerFactory struct {
+	logger *slog.Logger
+	config workflow.ServerConfig
+}
+
+func NewServerFactory(logger *slog.Logger, config workflow.ServerConfig) *ServerFactory {
+	return &ServerFactory{
+		logger: logger,
+		config: config,
+	}
+}
+
+func (f *ServerFactory) CreateServer(ctx context.Context) (api.MCPServer, error) {
+	f.logger.Info("Creating MCP server with direct dependency injection")
+
+	// Build dependencies in correct order
+	deps, err := f.buildDependencies(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build dependencies: %w", err)
+	}
+
+	// Create and return server
+	server, err := NewMCPServerFromDeps(deps)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create server: %w", err)
+	}
+
+	f.logger.Info("MCP server created successfully")
+	return server, nil
+}
+
+func (f *ServerFactory) buildDependencies(ctx context.Context) (*Dependencies, error) {
+	// Create session manager
+	sessionManager, err := f.createSessionManager()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create session manager: %w", err)
+	}
+
+	// Create resource store
+	resourceStore, err := f.createResourceStore()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource store: %w", err)
+	}
+
+	// Create progress emitter factory
+	progressFactory := f.createProgressEmitterFactory()
+
+	// Create event publisher
+	eventPublisher, err := f.createEventPublisher()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create event publisher: %w", err)
+	}
+
+	// Create AI/ML services
+	samplingClient, err := f.createSamplingClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create sampling client: %w", err)
+	}
+
+	promptManager, err := f.createPromptManager()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create prompt manager: %w", err)
+	}
+
+	// ML services simplified - removed over-abstracted ErrorPatternRecognizer
+
+	// Create workflow orchestrator
+	workflowOrchestrator, err := f.createWorkflowOrchestrator(
+		sessionManager,
+		progressFactory,
+		samplingClient,
+		promptManager,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create workflow orchestrator: %w", err)
+	}
+
+	// Assemble dependencies
+	deps := &Dependencies{
+		Logger:                 f.logger,
+		Config:                 f.config,
+		SessionManager:         sessionManager,
+		ResourceStore:          resourceStore,
+		ProgressEmitterFactory: progressFactory,
+		EventPublisher:         eventPublisher,
+		WorkflowOrchestrator:   workflowOrchestrator,
+		SamplingClient:         samplingClient,
+		PromptManager:          promptManager,
+	}
+
+	// Validate dependencies
+	if err := deps.Validate(); err != nil {
+		return nil, fmt.Errorf("dependency validation failed: %w", err)
+	}
+
+	return deps, nil
+}
+
+func (f *ServerFactory) createSessionManager() (*session.BoltStoreAdapter, error) {
+	return session.NewBoltStoreAdapter(f.config.StorePath, f.logger, f.config.SessionTTL, f.config.MaxSessions)
+}
+
+func (f *ServerFactory) createResourceStore() (*resources.Store, error) {
+	return resources.NewStore(f.logger), nil
+}
+
+func (f *ServerFactory) createProgressEmitterFactory() workflow.ProgressEmitterFactory {
+	return messaging.NewDirectProgressFactory(f.logger)
+}
+
+func (f *ServerFactory) createEventPublisher() (*messaging.Publisher, error) {
+	return messaging.NewPublisher(f.logger), nil
+}
+
+func (f *ServerFactory) createSamplingClient() (*sampling.Client, error) {
+	return sampling.NewClient(f.logger), nil
+}
+
+func (f *ServerFactory) createPromptManager() (*prompts.Manager, error) {
+	config := prompts.ManagerConfig{
+		TemplateDir:     "", // Use embedded templates only
+		EnableHotReload: false,
+		AllowOverride:   false,
+	}
+	return prompts.NewManager(f.logger, config)
+}
+
+func (f *ServerFactory) createWorkflowOrchestrator(
+	sessionManager *session.BoltStoreAdapter,
+	progressFactory workflow.ProgressEmitterFactory,
+	samplingClient *sampling.Client,
+	promptManager *prompts.Manager,
+) (*workflow.Orchestrator, error) {
+	// Create step provider using the registry-based provider
+	stepProvider := steps.NewRegistryStepProvider()
+
+	// Create orchestrator using domain implementation
+	return workflow.NewOrchestrator(stepProvider, progressFactory, f.logger)
+}
+
+func InitializeServer(logger *slog.Logger, config workflow.ServerConfig) (api.MCPServer, error) {
+	factory := NewServerFactory(logger, config)
+	return factory.CreateServer(context.Background())
+}

@@ -167,10 +167,12 @@ func (s *ManifestServiceImpl) DiscoverManifests(_ context.Context, directory str
 // ValidateManifests validates Kubernetes manifests
 func (s *ManifestServiceImpl) ValidateManifests(_ context.Context, manifests []string) (*api.ManifestValidationResult, error) {
 	result := &api.ManifestValidationResult{
-		Valid:    true,
-		Errors:   make([]api.ValidationError, 0),
-		Warnings: make([]api.ValidationWarning, 0),
-		Metadata: make(map[string]interface{}),
+		ValidationResult: api.ValidationResult{
+			Valid:    true,
+			Errors:   make([]api.ValidationError, 0),
+			Warnings: make([]api.ValidationWarning, 0),
+			Metadata: make(map[string]interface{}),
+		},
 	}
 
 	s.logger.Info("Validating manifests", "count", len(manifests))

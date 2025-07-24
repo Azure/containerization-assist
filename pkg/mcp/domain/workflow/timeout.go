@@ -1,4 +1,3 @@
-// Package workflow provides timeout middleware for step execution
 package workflow
 
 import (
@@ -9,30 +8,18 @@ import (
 	"time"
 )
 
-// TimeoutConfig represents timeout configuration options
 type TimeoutConfig struct {
-	// DefaultTimeout is the default timeout applied to steps that don't specify their own timeout
 	DefaultTimeout time.Duration
 
-	// AdaptiveTimeouts enables dynamic timeout adjustment based on historical step performance
-	AdaptiveTimeouts bool
+	AdaptiveTimeouts bool // enables dynamic timeout adjustment
 
-	// MaxTimeout is the maximum timeout that can be applied to any step
 	MaxTimeout time.Duration
 
-	// MinTimeout is the minimum timeout that can be applied to any step
 	MinTimeout time.Duration
 }
 
-// TimeoutProvider interface allows steps to specify their own timeout
 type TimeoutProvider interface {
 	Timeout() time.Duration
-}
-
-// AdaptiveTimeoutProvider interface allows steps to provide context for adaptive timeout calculation
-type AdaptiveTimeoutProvider interface {
-	// ExpectedDuration returns the expected duration for this step based on current context
-	ExpectedDuration(ctx context.Context, state *WorkflowState) time.Duration
 }
 
 // TimeoutMiddleware provides unified timeout handling with context deadline support.
@@ -85,7 +72,6 @@ func TimeoutMiddleware(config TimeoutConfig) StepMiddleware {
 	}
 }
 
-// TimeoutError represents a step execution timeout
 type TimeoutError struct {
 	StepName string
 	Timeout  time.Duration
@@ -100,13 +86,11 @@ func (e *TimeoutError) Unwrap() error {
 	return e.Err
 }
 
-// IsTimeout returns true if the error is a timeout error
 func IsTimeout(err error) bool {
 	var timeoutErr *TimeoutError
 	return errors.As(err, &timeoutErr)
 }
 
-// determineStepTimeout calculates the appropriate timeout for a step
 func determineStepTimeout(ctx context.Context, step Step, state *WorkflowState, config TimeoutConfig) time.Duration {
 	var timeout time.Duration
 
@@ -115,14 +99,10 @@ func determineStepTimeout(ctx context.Context, step Step, state *WorkflowState, 
 		timeout = tp.Timeout()
 	}
 
-	// If no timeout specified, check for adaptive timeout
+	// If no timeout specified and adaptive timeouts enabled, use a simple multiplier
 	if timeout <= 0 && config.AdaptiveTimeouts {
-		if atp, ok := step.(AdaptiveTimeoutProvider); ok {
-			timeout = atp.ExpectedDuration(ctx, state)
-
-			// Apply adaptive timeout multiplier (e.g., 2x expected duration)
-			timeout = time.Duration(float64(timeout) * 2.0)
-		}
+		// Use default timeout with 2x multiplier for adaptive scenarios
+		timeout = time.Duration(float64(config.DefaultTimeout) * 2.0)
 	}
 
 	// Fall back to default timeout
@@ -150,7 +130,6 @@ func determineStepTimeout(ctx context.Context, step Step, state *WorkflowState, 
 	return timeout
 }
 
-// WithStepTimeout is a helper function that creates a TimeoutMiddleware with a simple default timeout
 func WithStepTimeout(defaultTimeout time.Duration) StepMiddleware {
 	return TimeoutMiddleware(TimeoutConfig{
 		DefaultTimeout: defaultTimeout,
@@ -159,7 +138,6 @@ func WithStepTimeout(defaultTimeout time.Duration) StepMiddleware {
 	})
 }
 
-// WithAdaptiveTimeout creates a TimeoutMiddleware with adaptive timeout capabilities
 func WithAdaptiveTimeout(defaultTimeout time.Duration, logger *slog.Logger) StepMiddleware {
 	logger.Info("Creating adaptive timeout middleware",
 		slog.Duration("defaultTimeout", defaultTimeout),
@@ -174,10 +152,7 @@ func WithAdaptiveTimeout(defaultTimeout time.Duration, logger *slog.Logger) Step
 	})
 }
 
-// Legacy timeout handling for DAG compatibility
-// This function can be used by DAG orchestrator to maintain backward compatibility
-
-// ApplyDAGTimeout applies timeout to a context for DAG steps
+// ApplyDAGTimeout applies timeout to a context for DAG steps (legacy DAG compatibility)
 func ApplyDAGTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
 	if timeout <= 0 {
 		// Return a no-op cancel function if no timeout

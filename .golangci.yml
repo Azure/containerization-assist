@@ -1,4 +1,5 @@
-# Configuration for golangci-lint v1
+# Configuration for golangci-lint v2
+version: "2"
 run:
   go: "1.24.4"
   tests: true
@@ -25,8 +26,6 @@ linters:
     - nilerr           # Check nil errors
     
     # Code quality and style
-    - gofmt            # Proper formatting
-    - goimports        # Import organization
     - misspell         # Spelling mistakes
     - unconvert        # Remove unnecessary conversions
     - unparam          # Detect unused parameters
@@ -47,6 +46,11 @@ linters:
     
     # Testing
     - testpackage      # Test package naming
+
+formatters:
+  enable:
+    - gofmt            # Proper formatting
+    - goimports        # Import organization
 
 linters-settings:
   # Complexity settings

@@ -68,15 +68,15 @@ func getArchitectureRules() []ArchRule {
 	return []ArchRule{
 		{
 			Name:         "Domain Layer Isolation",
-			Description:  "Domain layer must not import infrastructure or application packages",
+			Description:  "Domain layer must not import infrastructure or service packages",
 			Layer:        "pkg/mcp/domain",
-			ForbiddenRE:  regexp.MustCompile(`"[^"]*/(infrastructure|application)/`),
+			ForbiddenRE:  regexp.MustCompile(`"[^"]*/(infrastructure|service)/`),
 			CheckImports: true,
 		},
 		{
-			Name:         "Application Layer Boundary",
-			Description:  "Application layer must not directly import infrastructure packages",
-			Layer:        "pkg/mcp/application",
+			Name:         "Service Layer Boundary",
+			Description:  "Service layer must not directly import infrastructure packages (use DI)",
+			Layer:        "pkg/mcp/service",
 			ForbiddenRE:  regexp.MustCompile(`"[^"]*/infrastructure/`),
 			CheckImports: true,
 		},
@@ -84,14 +84,14 @@ func getArchitectureRules() []ArchRule {
 			Name:         "API Layer Isolation",
 			Description:  "API layer should only import domain interfaces",
 			Layer:        "pkg/mcp/api",
-			ForbiddenRE:  regexp.MustCompile(`"[^"]*/(infrastructure|application)/`),
+			ForbiddenRE:  regexp.MustCompile(`"[^"]*/(infrastructure|service)/`),
 			CheckImports: true,
 		},
 		{
 			Name:         "Infrastructure Layer Direction",
-			Description:  "Infrastructure layer must not import from application or api layers",
+			Description:  "Infrastructure layer must not import from service or api layers",
 			Layer:        "pkg/mcp/infrastructure",
-			ForbiddenRE:  regexp.MustCompile(`"[^"]*/(application|api)/`),
+			ForbiddenRE:  regexp.MustCompile(`"[^"]*/(service|api)/`),
 			CheckImports: true,
 		},
 		{
@@ -102,8 +102,8 @@ func getArchitectureRules() []ArchRule {
 			CheckCode:   true,
 		},
 		{
-			Name:         "Wire Isolation",
-			Description:  "Wire dependency injection should only be in wiring package",
+			Name:         "Direct DI Pattern",
+			Description:  "Direct dependency injection should use Dependencies struct pattern",
 			Layer:        "pkg/mcp",
 			ForbiddenRE:  regexp.MustCompile(`"github\.com/google/wire"`),
 			CheckImports: true,
@@ -128,13 +128,8 @@ func validateLayer(rule ArchRule) []ValidationResult {
 			return nil
 		}
 
-		// Skip wire.go files for wire isolation rule
-		if rule.Name == "Wire Isolation" && strings.HasSuffix(path, "wire.go") {
-			return nil
-		}
-
-		// Skip wiring directory for wire isolation rule
-		if rule.Name == "Wire Isolation" && strings.Contains(path, "/wiring/") {
+		// Skip dependencies.go files for DI pattern rule
+		if rule.Name == "Direct DI Pattern" && strings.HasSuffix(path, "dependencies.go") {
 			return nil
 		}
 
@@ -222,11 +217,11 @@ func getPackageFromPath(filePath string) string {
 func getSuggestionForRule(ruleName string) string {
 	suggestions := map[string]string{
 		"Domain Layer Isolation":         "Move infrastructure dependencies to domain interfaces",
-		"Application Layer Boundary":     "Use dependency injection to access infrastructure services",
+		"Service Layer Boundary":         "Use direct dependency injection via Dependencies struct",
 		"API Layer Isolation":            "Only import domain interfaces in API layer",
 		"Infrastructure Layer Direction": "Infrastructure should implement domain interfaces, not import from higher layers",
 		"Domain Purity":                  "Use domain interfaces for external operations, implement in infrastructure",
-		"Wire Isolation":                 "Move dependency injection to pkg/mcp/api/wiring",
+		"Direct DI Pattern":              "Use Dependencies struct for dependency injection, avoid Wire",
 	}
 
 	if suggestion, exists := suggestions[ruleName]; exists {

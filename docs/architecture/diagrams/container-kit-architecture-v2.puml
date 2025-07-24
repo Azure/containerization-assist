@@ -1,6 +1,6 @@
-@startuml Container Kit - Clean Architecture with Composition Root
+@startuml Container Kit - Simplified Clean Architecture
 !theme plain
-title Container Kit MCP Server - Four-Layer Architecture + Composition Root\nSimplified Workflow Architecture with Decorator Pattern
+title Container Kit MCP Server - Simplified Four-Layer Architecture\nTool-Driven Architecture with Direct Dependency Injection
 
 ' Define layer colors
 !define COMPOSITION_COLOR #FFEBEE
@@ -21,14 +21,13 @@ package "Transport Layer" {
   [Stdio Transport] as StdioTransport
 }
 
-rectangle "**Composition Root**" COMPOSITION_COLOR {
-  package "Dependency Injection" {
-    [Server Composer] as ServerComposer
-    [Provider Functions] as Providers
-    [Wire Generated] as WireGen
+rectangle "**Service Layer**" APP_COLOR {
+  package "Direct Dependency Injection" {
+    [Server Factory] as ServerFactory
+    [Dependencies Struct] as Dependencies
+    [Direct Initialization] as DirectInit
   }
-  note right of ServerComposer : Outside 4-layer architecture\nPure dependency wiring\nNo business logic
-}
+  note right of ServerFactory : Simple dependency management\nDirect initialization order\nNo code generation
 
 rectangle "**API Layer**" API_COLOR {
   package "Interfaces Only" {
@@ -40,18 +39,16 @@ rectangle "**API Layer**" API_COLOR {
   note right of ToolAPI : Pure interfaces\nNo implementations\nStable contracts
 }
 
-rectangle "**Application Layer**" APP_COLOR {
   package "MCP Server" {
     [Server Core] as Server
     [Transport Manager] as TransportMgr
-    [Tool Registrar] as ToolReg
     [Session Service] as SessionSvc
   }
   
-  package "Workflow Application" {
-    [Containerize Handler] as ContainerizeHandler
-    [Command Handlers] as CmdHandlers
-    [Query Handlers] as QueryHandlers
+  package "Tool Registry" {
+    [Tool Registry] as ToolRegistry
+    [15 Individual Tools] as Tools
+    [Chain Hints] as ChainHints
   }
   
   package "Configuration" {
@@ -59,21 +56,18 @@ rectangle "**Application Layer**" APP_COLOR {
     [Environment Loader] as EnvLoader
   }
   
-  note right of Server : MCP protocol handling\nTool registration\nSession coordination
-}
+  note right of ToolRegistry : 15 tools (10 workflow, 2 orchestration, 3 utility)\nTable-driven configuration\nTool chaining with hints
 
 rectangle "**Domain Layer**" DOMAIN_COLOR {
   package "Workflow Core" {
-    [Base Orchestrator] as BaseOrch
-    [Event Aware Orchestrator] as EventOrch
-    [Saga Aware Orchestrator] as SagaOrch
+    [Workflow Orchestrator] as WorkflowOrch
+    [Step Factory] as StepFactory
     [Workflow Types] as WorkflowTypes
   }
   
   package "Error Handling" {
-    [Progressive Error Context] as ErrorContext
-    [Error Escalation] as Escalation
-    [AI Recovery Context] as AIContext
+    [Workflow Error] as WorkflowError
+    [Simple Error Context] as ErrorContext
   }
   
   package "Domain Events" {
@@ -87,21 +81,21 @@ rectangle "**Domain Layer**" DOMAIN_COLOR {
     [Progress Emitter] as ProgressEmitter
   }
   
-  note right of BaseOrch : Pure business logic\nDecorator pattern\n10-step workflow
+  note right of WorkflowOrch : Direct orchestration\nStep-based execution\nSimple error handling
 }
 
 rectangle "**Infrastructure Layer**" INFRA_COLOR {
   package "Workflow Steps" {
-    [1. Analyze Step] as Step1
-    [2. Dockerfile Step] as Step2
-    [3. Build Step] as Step3
-    [4. Scan Step] as Step4
-    [5. Tag Step] as Step5
-    [6. Push Step] as Step6
-    [7. Manifest Step] as Step7
-    [8. Cluster Step] as Step8
-    [9. Deploy Step] as Step9
-    [10. Verify Step] as Step10
+    [analyze_repository] as Step1
+    [generate_dockerfile] as Step2
+    [build_image] as Step3
+    [scan_image] as Step4
+    [tag_image] as Step5
+    [push_image] as Step6
+    [generate_k8s_manifests] as Step7
+    [prepare_cluster] as Step8
+    [deploy_application] as Step9
+    [verify_deployment] as Step10
   }
   
   package "AI/ML Integration" {
@@ -123,19 +117,20 @@ rectangle "**Infrastructure Layer**" INFRA_COLOR {
     [File State Store] as FileStore
   }
   
-  package "Messaging & Events" {
-    [Event Publisher Impl] as EventPubImpl
-    [Progress Sink Factory] as ProgressFactory
-    [MCP Progress Sink] as MCPSink
+  package "Unified Messaging" {
+    [Event Publisher] as EventPubImpl
+    [Progress Emitter] as ProgressEmitter
+    [CLI Direct] as CLIDirect
+    [MCP Direct] as MCPDirect
   }
   
-  package "Observability" {
-    [OpenTelemetry Tracer] as Tracer
-    [Metrics Collector] as Metrics
-    [Health Monitor] as Health
+  package "Unified Observability" {
+    [Monitor] as Monitor
+    [Tracing Config] as TracingConfig
+    [Tracing Integration] as TracingIntegration
   }
   
-  note bottom of Step1 : Each step is independent\nCan be decorated\nAI-assisted recovery
+  note bottom of Step1 : Each step is independent\nTable-driven registration\nSession state persistence
 }
 
 ' External Systems
@@ -148,18 +143,16 @@ cloud "External Services" {
 }
 
 ' Layer Dependencies (Clean Architecture)
-COMPOSITION_COLOR -[hidden]down-> API_COLOR
 API_COLOR -[hidden]down-> APP_COLOR
 APP_COLOR -[hidden]down-> DOMAIN_COLOR  
 DOMAIN_COLOR -[hidden]down-> INFRA_COLOR
 
-' Composition Root wiring
-ServerComposer --> WireGen
-WireGen --> Providers
-Providers --> Server : provides
-Providers --> BaseOrch : provides
-Providers --> EventOrch : decorates
-Providers --> SagaOrch : decorates
+' Direct dependency injection
+ServerFactory --> Dependencies
+Dependencies --> DirectInit
+DirectInit --> Server : creates
+DirectInit --> WorkflowOrch : creates
+DirectInit --> ToolRegistry : creates
 
 ' Client connections
 Client --> Protocol
@@ -171,25 +164,24 @@ Protocol --> Server
 Server --> TransportMgr
 Server --> ToolReg
 Server --> SessionSvc
-ToolReg --> ContainerizeHandler
-ContainerizeHandler --> SagaOrch
+Server --> ToolRegistry
+ToolRegistry --> Tools
+Tools --> WorkflowOrch
 
-' Domain layer decorators
-BaseOrch <|-- EventOrch : decorates
-EventOrch <|-- SagaOrch : decorates
-EventOrch --> EventPub
-SagaOrch --> SagaCoord
-BaseOrch --> ErrorContext
-ErrorContext --> Escalation
-ErrorContext --> AIContext
+' Domain layer flow
+WorkflowOrch --> StepFactory
+WorkflowOrch --> WorkflowError
+WorkflowError --> ErrorContext
+WorkflowOrch --> EventPub
 
 ' Progress tracking
-BaseOrch --> ProgressTracker
+WorkflowOrch --> ProgressTracker
 ProgressTracker --> ProgressEmitter
-ProgressEmitter --> MCPSink
+ProgressEmitter --> MCPDirect
+ProgressEmitter --> CLIDirect
 
 ' Infrastructure implementations
-SagaOrch --> Step1
+WorkflowOrch --> Step1
 Step1 --> Step2
 Step2 --> Step3
 Step3 --> Step4
@@ -228,17 +220,17 @@ SessionSvc --> BoltStore
 BaseOrch --> FileStore
 
 ' Observability
-SagaOrch --> Tracer
-Server --> Health
-Server --> Metrics
+WorkflowOrch --> TracingIntegration
+Server --> Monitor
+Server --> TracingConfig
 
 ' Key architectural notes
-note top of ServerComposer : **Composition Root Pattern**\n• Separates wiring from logic\n• All DI configuration here\n• Clean layer boundaries
+note top of ServerFactory : **Direct Dependency Injection**\n• Simple Dependencies struct\n• No code generation needed\n• Clear initialization order
 
-note top of SagaOrch : **Decorator Pattern**\n• Base → Event → Saga\n• Each adds functionality\n• Composable concerns
+note top of ToolRegistry : **Tool Registry Pattern**\n• Table-driven configuration\n• 15 individual tools\n• Tool chaining with hints
 
-note top of ErrorContext : **Progressive Error Context**\n• Accumulates error history\n• AI-assisted recovery\n• Escalation logic
+note top of WorkflowError : **Simple Workflow Errors**\n• Step name + attempt number\n• Standard error wrapping\n• Lightweight design
 
-note bottom of Step10 : **Single Workflow**\n• containerize_and_deploy tool\n• 10 structured steps\n• Built-in progress tracking
+note bottom of Step10 : **Individual Tools**\n• 15 focused tools\n• Session state persistence\n• AI-assisted error recovery
 
 @enduml

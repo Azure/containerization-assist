@@ -2,11 +2,13 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"testing"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging/progress"
+	progresstest "github.com/Azure/container-kit/pkg/mcp/infrastructure/core/testutil/progress"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,7 +20,7 @@ func TestDirectProgressIntegration(t *testing.T) {
 	logger := slog.Default()
 
 	// Create test progress factory
-	testFactory := workflow.NewTestDirectProgressFactory()
+	testFactory := progresstest.NewTestDirectProgressFactory()
 
 	// Create mock step provider with a simple test step
 	mockProvider := &MockStepProvider{
@@ -94,12 +96,12 @@ func TestDirectProgressIntegration(t *testing.T) {
 // TestDirectProgressFactoryWithMCPServer tests the factory creates MCP emitter when server is present
 func TestDirectProgressFactoryWithMCPServer(t *testing.T) {
 	logger := slog.Default()
-	factory := progress.NewDirectProgressFactory(logger)
+	factory := messaging.NewDirectProgressFactory(logger)
 
 	// Test without server - should get CLI emitter
 	ctx := context.Background()
 	emitter := factory.CreateEmitter(ctx, nil, 10)
-	_, isCLI := emitter.(*progress.CLIDirectEmitter)
+	_, isCLI := emitter.(*messaging.CLIDirectEmitter)
 	assert.True(t, isCLI, "Should get CLI emitter without server")
 
 	// Note: Testing with actual MCP server would require more setup
@@ -204,4 +206,41 @@ func (m *MockStepProvider) GetVerifyStep() workflow.Step {
 		return m.verifyStep
 	}
 	return &MockStep{name: "verify"}
+}
+
+// GetStep implements workflow.StepProvider interface
+func (m *MockStepProvider) GetStep(name string) (workflow.Step, error) {
+	stepMap := map[string]workflow.Step{
+		workflow.StepAnalyzeRepository:  m.GetAnalyzeStep(),
+		workflow.StepGenerateDockerfile: m.GetDockerfileStep(),
+		workflow.StepBuildImage:         m.GetBuildStep(),
+		workflow.StepSecurityScan:       m.GetScanStep(),
+		workflow.StepTagImage:           m.GetTagStep(),
+		workflow.StepPushImage:          m.GetPushStep(),
+		workflow.StepGenerateManifests:  m.GetManifestStep(),
+		workflow.StepSetupCluster:       m.GetClusterStep(),
+		workflow.StepDeployApplication:  m.GetDeployStep(),
+		workflow.StepVerifyDeployment:   m.GetVerifyStep(),
+	}
+
+	if step, exists := stepMap[name]; exists {
+		return step, nil
+	}
+	return nil, fmt.Errorf("unknown step: %s", name)
+}
+
+// ListSteps implements workflow.StepProvider interface
+func (m *MockStepProvider) ListSteps() []string {
+	return []string{
+		workflow.StepAnalyzeRepository,
+		workflow.StepGenerateDockerfile,
+		workflow.StepBuildImage,
+		workflow.StepSecurityScan,
+		workflow.StepTagImage,
+		workflow.StepPushImage,
+		workflow.StepGenerateManifests,
+		workflow.StepSetupCluster,
+		workflow.StepDeployApplication,
+		workflow.StepVerifyDeployment,
+	}
 }

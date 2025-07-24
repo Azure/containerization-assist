@@ -39,10 +39,12 @@ type BuildValidationResult = api.BuildValidationResult
 // NewBuildResult creates a new BuildValidationResult
 func NewBuildResult() *BuildValidationResult {
 	return &api.BuildValidationResult{
-		Valid:    true,
-		Errors:   make([]api.ValidationError, 0),
-		Warnings: make([]api.ValidationWarning, 0),
-		Metadata: make(map[string]interface{}),
+		ValidationResult: api.ValidationResult{
+			Valid:    true,
+			Errors:   make([]api.ValidationError, 0),
+			Warnings: make([]api.ValidationWarning, 0),
+			Metadata: make(map[string]interface{}),
+		},
 	}
 }
 

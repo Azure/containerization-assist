@@ -239,7 +239,7 @@ func sanitizePath(path string) string {
 
 ## Error Handling
 
-### Rich Error Pattern
+### Simple Workflow Error Pattern
 ```go
 // Use unified Rich error system from pkg/mcp/domain/errors/
 import "github.com/Azure/container-kit/pkg/mcp/domain/errors"

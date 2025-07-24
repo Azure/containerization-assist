@@ -11,7 +11,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/common/runner"
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/utilities"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/utils"
 )
 
 // K8sResult contains the results of Kubernetes deployment operations
@@ -199,7 +199,7 @@ func DeployToKubernetes(ctx context.Context, k8sResult *K8sResult, logger *slog.
 	var validationResult *kubernetes.ValidationResult
 
 	// Use AI-powered retry for deployment validation with enhanced context
-	err = utilities.WithAIRetry(ctx, "validate_kubernetes_deployment", 3, func() error {
+	err = utils.WithAIRetry(ctx, "validate_kubernetes_deployment", 3, func() error {
 		// Wait a bit for pods to initialize on first attempt
 		time.Sleep(2 * time.Second)
 

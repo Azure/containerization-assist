@@ -1,5 +1,3 @@
-// Package api provides the pure interface definitions for the MCP system.
-// This package contains only interfaces and data contracts with NO implementation code.
 package api
 
 import (
@@ -7,19 +5,11 @@ import (
 	"time"
 )
 
-// ============================================================================
-// Core MCP Server Interface
-// ============================================================================
-
 // MCPServer represents the main MCP server interface
 type MCPServer interface {
 	Start(ctx context.Context) error
 	Stop(ctx context.Context) error
 }
-
-// ============================================================================
-// Tool Interfaces
-// ============================================================================
 
 // Tool is the canonical interface for all MCP tools
 type Tool interface {
@@ -29,10 +19,6 @@ type Tool interface {
 	Schema() ToolSchema
 }
 
-// ============================================================================
-// Data Structures (Pure DTOs - No Methods)
-// ============================================================================
-
 // ToolInput represents the input structure for tools
 type ToolInput struct {
 	SessionID string                 `json:"session_id"`
@@ -40,7 +26,6 @@ type ToolInput struct {
 	Context   map[string]interface{} `json:"context,omitempty"`
 }
 
-// ToolOutput represents the output structure for tools
 type ToolOutput struct {
 	Success  bool                   `json:"success"`
 	Data     map[string]interface{} `json:"data"`
@@ -48,7 +33,6 @@ type ToolOutput struct {
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// ToolSchema represents the schema definition for a tool
 type ToolSchema struct {
 	Name         string                 `json:"name"`
 	Description  string                 `json:"description"`
@@ -60,7 +44,6 @@ type ToolSchema struct {
 	Version      string                 `json:"version,omitempty"`
 }
 
-// ToolExample demonstrates how to use a tool
 type ToolExample struct {
 	Name        string     `json:"name"`
 	Description string     `json:"description"`
@@ -68,107 +51,80 @@ type ToolExample struct {
 	Output      ToolOutput `json:"output"`
 }
 
-// ============================================================================
-// Registry Interface
-// ============================================================================
-
 // Registry manages tool registration and execution
 type Registry interface {
-	// Register adds a tool to the registry
 	Register(tool Tool) error
 
-	// Get retrieves a tool by name
 	Get(name string) (Tool, error)
 
-	// List returns all registered tool names
 	List() []string
 
-	// Execute runs a tool with the given input
 	Execute(ctx context.Context, name string, input ToolInput) (ToolOutput, error)
 }
 
-// ============================================================================
-// Transport Interface
-// ============================================================================
-
 // Transport defines the interface for MCP transports
 type Transport interface {
-	// Start starts the transport
 	Start(ctx context.Context) error
 
-	// Stop stops the transport
 	Stop(ctx context.Context) error
 
-	// Send sends a message
 	Send(message interface{}) error
 
-	// Receive receives a message
 	Receive() (interface{}, error)
 
-	// ReceiveStream returns a channel for streaming messages
 	ReceiveStream() (<-chan interface{}, error)
 
-	// IsConnected checks if the transport is connected
 	IsConnected() bool
 }
 
-// ============================================================================
-// Validation Interfaces
-// ============================================================================
-
 // Validator defines the core validation interface
 type Validator[T any] interface {
-	// Validate validates a value and returns validation result
 	Validate(ctx context.Context, value T) ValidationResult
 
-	// Name returns the validator name for error reporting
 	Name() string
 }
 
-// ============================================================================
-// Validation Data Structures
-// ============================================================================
+// Validation types defined at API layer for clean architecture
 
-// ValidationResult holds validation outcome
+// ValidationResult represents the result of a validation operation
 type ValidationResult struct {
 	Valid    bool                   `json:"valid"`
-	Errors   []ValidationError      `json:"errors"`
-	Warnings []ValidationWarning    `json:"warnings"`
+	Errors   []ValidationError      `json:"errors,omitempty"`
+	Warnings []ValidationWarning    `json:"warnings,omitempty"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // ValidationError represents a validation error
 type ValidationError struct {
-	Field   string `json:"field"`
+	Field   string `json:"field,omitempty"`
+	Code    string `json:"code"`
 	Message string `json:"message"`
-	Code    string `json:"code,omitempty"`
+	Value   string `json:"value,omitempty"`
 }
 
 // ValidationWarning represents a validation warning
 type ValidationWarning struct {
-	Field   string `json:"field"`
+	Field   string `json:"field,omitempty"`
+	Code    string `json:"code"`
 	Message string `json:"message"`
+	Value   string `json:"value,omitempty"`
 }
 
 // BuildValidationResult represents the result of build validation
 type BuildValidationResult struct {
-	Valid    bool                   `json:"valid"`
-	Errors   []ValidationError      `json:"errors"`
-	Warnings []ValidationWarning    `json:"warnings"`
-	Metadata map[string]interface{} `json:"metadata"`
+	ValidationResult
+	DockerfilePath string            `json:"dockerfile_path,omitempty"`
+	BuildContext   string            `json:"build_context,omitempty"`
+	Issues         []ValidationError `json:"issues,omitempty"`
 }
 
 // ManifestValidationResult represents the result of manifest validation
 type ManifestValidationResult struct {
-	Valid    bool                   `json:"valid"`
-	Errors   []ValidationError      `json:"errors"`
-	Warnings []ValidationWarning    `json:"warnings"`
-	Metadata map[string]interface{} `json:"metadata"`
+	ValidationResult
+	ManifestPath string            `json:"manifest_path,omitempty"`
+	Resource     string            `json:"resource,omitempty"`
+	Issues       []ValidationError `json:"issues,omitempty"`
 }
-
-// ============================================================================
-// Workflow Data Structures
-// ============================================================================
 
 // WorkflowResult represents the result of executing a workflow
 type WorkflowResult struct {
@@ -181,7 +137,6 @@ type WorkflowResult struct {
 	Duration    time.Duration `json:"duration"`
 }
 
-// StepResult represents the result of executing a workflow step
 type StepResult struct {
 	StepID    string                 `json:"step_id"`
 	StepName  string                 `json:"step_name"`
@@ -193,10 +148,6 @@ type StepResult struct {
 	Duration  time.Duration          `json:"duration"`
 }
 
-// ============================================================================
-// Session Data Structures
-// ============================================================================
-
 // Session represents a user session
 type Session struct {
 	ID        string                 `json:"id"`
@@ -205,10 +156,6 @@ type Session struct {
 	Metadata  map[string]interface{} `json:"metadata"`
 	State     map[string]interface{} `json:"state"`
 }
-
-// ============================================================================
-// Build Data Structures
-// ============================================================================
 
 // BuildArgs represents arguments for a build operation
 type BuildArgs struct {
@@ -222,7 +169,6 @@ type BuildArgs struct {
 	Platform   string            `json:"platform,omitempty"`
 }
 
-// BuildResult represents the result of a build operation
 type BuildResult struct {
 	BuildID   string        `json:"build_id"`
 	ImageID   string        `json:"image_id"`
@@ -233,25 +179,14 @@ type BuildResult struct {
 	Duration  time.Duration `json:"duration"`
 }
 
-// ============================================================================
-// Progress Reporting Interfaces
-// ============================================================================
-
 // ProgressEmitter provides clean interface for progress reporting across transports
 type ProgressEmitter interface {
-	// Emit reports progress with step, percent, and message
 	Emit(ctx context.Context, stage string, percent int, message string) error
 
-	// EmitDetailed reports progress with full structured update
 	EmitDetailed(ctx context.Context, update ProgressUpdate) error
 
-	// Close finalizes the progress reporting
 	Close() error
 }
-
-// ============================================================================
-// Progress Data Structures
-// ============================================================================
 
 // ProgressUpdate represents a structured progress report
 type ProgressUpdate struct {

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/observability/tracing"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/observability"
 	"github.com/mark3labs/mcp-go/server"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -27,9 +27,9 @@ func (c *Client) SampleStream(
 	ctx context.Context,
 	req SamplingRequest,
 ) (<-chan StreamChunk, error) {
-	ctx, span := tracing.StartSpan(ctx, "sampling.sampleStream")
+	ctx, span := observability.StartSpan(ctx, "sampling.sampleStream")
 	span.SetAttributes(
-		attribute.String(tracing.AttrComponent, "sampling"),
+		attribute.String(observability.AttrComponent, "sampling"),
 		attribute.Bool("sampling.streaming", true),
 		attribute.Int("sampling.max_tokens", int(req.MaxTokens)),
 		attribute.Float64("sampling.temperature", float64(req.Temperature)),
@@ -79,7 +79,7 @@ func (c *Client) SampleStream(
 
 		var lastErr error
 		for attempt := 0; attempt < c.retryAttempts; attempt++ {
-			span.SetAttributes(attribute.Int(tracing.AttrSamplingRetryAttempt, attempt+1))
+			span.SetAttributes(attribute.Int(observability.AttrSamplingRetryAttempt, attempt+1))
 
 			// Try streaming call
 			stream, err := c.callMCPStream(ctx, req)

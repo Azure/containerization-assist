@@ -3,6 +3,7 @@ package workflow
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"testing"
 
@@ -47,16 +48,42 @@ type DAGMockStepProvider struct {
 	verifyStep     Step
 }
 
-func (p *DAGMockStepProvider) GetAnalyzeStep() Step    { return p.analyzeStep }
-func (p *DAGMockStepProvider) GetDockerfileStep() Step { return p.dockerfileStep }
-func (p *DAGMockStepProvider) GetBuildStep() Step      { return p.buildStep }
-func (p *DAGMockStepProvider) GetScanStep() Step       { return p.scanStep }
-func (p *DAGMockStepProvider) GetTagStep() Step        { return p.tagStep }
-func (p *DAGMockStepProvider) GetPushStep() Step       { return p.pushStep }
-func (p *DAGMockStepProvider) GetManifestStep() Step   { return p.manifestStep }
-func (p *DAGMockStepProvider) GetClusterStep() Step    { return p.clusterStep }
-func (p *DAGMockStepProvider) GetDeployStep() Step     { return p.deployStep }
-func (p *DAGMockStepProvider) GetVerifyStep() Step     { return p.verifyStep }
+// GetStep implements the consolidated StepProvider interface
+func (p *DAGMockStepProvider) GetStep(name string) (Step, error) {
+	stepMap := map[string]Step{
+		StepAnalyzeRepository:  p.analyzeStep,
+		StepGenerateDockerfile: p.dockerfileStep,
+		StepBuildImage:         p.buildStep,
+		StepSecurityScan:       p.scanStep,
+		StepTagImage:           p.tagStep,
+		StepPushImage:          p.pushStep,
+		StepGenerateManifests:  p.manifestStep,
+		StepSetupCluster:       p.clusterStep,
+		StepDeployApplication:  p.deployStep,
+		StepVerifyDeployment:   p.verifyStep,
+	}
+
+	if step, exists := stepMap[name]; exists {
+		return step, nil
+	}
+	return nil, fmt.Errorf("step %s not found", name)
+}
+
+// ListSteps returns all available step names
+func (p *DAGMockStepProvider) ListSteps() []string {
+	return []string{
+		StepAnalyzeRepository,
+		StepGenerateDockerfile,
+		StepBuildImage,
+		StepSecurityScan,
+		StepTagImage,
+		StepPushImage,
+		StepGenerateManifests,
+		StepSetupCluster,
+		StepDeployApplication,
+		StepVerifyDeployment,
+	}
+}
 
 func TestNewOrchestrator(t *testing.T) {
 	t.Run("creates orchestrator successfully", func(t *testing.T) {
@@ -109,15 +136,18 @@ func TestOrchestratorExecute(t *testing.T) {
 		logger := slog.Default()
 
 		// Set up analyze and dockerfile to succeed
-		analyzeStep := stepProvider.GetAnalyzeStep().(*DAGMockStep)
-		analyzeStep.On("Execute", mock.Anything, mock.Anything).Return(nil)
+		analyzeStep, _ := stepProvider.GetStep("analyze_repository")
+		analyzeStepMock := analyzeStep.(*DAGMockStep)
+		analyzeStepMock.On("Execute", mock.Anything, mock.Anything).Return(nil)
 
-		dockerfileStep := stepProvider.GetDockerfileStep().(*DAGMockStep)
-		dockerfileStep.On("Execute", mock.Anything, mock.Anything).Return(nil)
+		dockerfileStep, _ := stepProvider.GetStep("generate_dockerfile")
+		dockerfileStepMock := dockerfileStep.(*DAGMockStep)
+		dockerfileStepMock.On("Execute", mock.Anything, mock.Anything).Return(nil)
 
 		// Set up build step to fail
-		buildStep := stepProvider.GetBuildStep().(*DAGMockStep)
-		buildStep.On("Execute", mock.Anything, mock.Anything).Return(errors.New("build failed"))
+		buildStep, _ := stepProvider.GetStep("build_image")
+		buildStepMock := buildStep.(*DAGMockStep)
+		buildStepMock.On("Execute", mock.Anything, mock.Anything).Return(errors.New("build failed"))
 
 		orchestrator, err := NewOrchestrator(stepProvider, nil, logger)
 		require.NoError(t, err)
@@ -136,13 +166,14 @@ func TestOrchestratorExecute(t *testing.T) {
 		assert.Contains(t, result.Error, "Workflow failed")
 
 		// Verify only expected steps were called
-		analyzeStep.AssertExpectations(t)
-		dockerfileStep.AssertExpectations(t)
-		buildStep.AssertExpectations(t)
+		analyzeStepMock.AssertExpectations(t)
+		dockerfileStepMock.AssertExpectations(t)
+		buildStepMock.AssertExpectations(t)
 
 		// Verify subsequent steps were not called
-		scanStep := stepProvider.GetScanStep().(*DAGMockStep)
-		scanStep.AssertNotCalled(t, "Execute")
+		scanStep, _ := stepProvider.GetStep("security_scan")
+		scanStepMock := scanStep.(*DAGMockStep)
+		scanStepMock.AssertNotCalled(t, "Execute")
 	})
 
 	t.Run("uses existing workflow ID from context", func(t *testing.T) {

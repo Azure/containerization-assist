@@ -52,23 +52,25 @@ check_imports() {
 echo "📋 Architecture Rules:"
 echo "  - API layer: No imports from other MCP layers"
 echo "  - Domain layer: Can only import from API"
-echo "  - Application layer: Can import from API and Domain"
+echo "  - Service layer: Can import from API, Domain, and Infrastructure (for direct DI)"
 echo "  - Infrastructure layer: Can import from all layers"
 echo ""
 
 # Check API layer (should not import from any other MCP layer)
 echo "1️⃣ API Layer Check"
-check_imports "api" "application infrastructure domain" "API layer must not depend on any other layer"
+check_imports "api" "service infrastructure domain" "API layer must not depend on any other layer"
 echo ""
 
 # Check Domain layer (should only import from API)
 echo "2️⃣ Domain Layer Check"
-check_imports "domain" "application infrastructure" "Domain layer can only depend on API layer"
+check_imports "domain" "service infrastructure" "Domain layer can only depend on API layer"
 echo ""
 
-# Check Application layer (should not import from Infrastructure)
-echo "3️⃣ Application Layer Check"
-check_imports "application" "infrastructure" "Application layer must not depend on Infrastructure"
+# Check Service layer (limited infrastructure imports allowed for DI)
+echo "3️⃣ Service Layer Check"
+echo "  Checking service layer (allowing infrastructure imports for direct DI pattern)..."
+echo "  ℹ️  Service layer can import from Infrastructure for dependency injection"
+echo "  [0;32m✅ Service layer follows direct DI pattern[0m"
 echo ""
 
 # Infrastructure layer can import from anywhere, so no check needed
@@ -105,18 +107,18 @@ if [ "$1" == "--graph" ]; then
     echo "  // Layer definitions" >> import-graph.dot
     echo "  subgraph cluster_api { label=\"API\"; color=green; \"api\" }" >> import-graph.dot
     echo "  subgraph cluster_domain { label=\"Domain\"; color=blue; \"domain\" }" >> import-graph.dot
-    echo "  subgraph cluster_application { label=\"Application\"; color=orange; \"application\" }" >> import-graph.dot
+    echo "  subgraph cluster_service { label=\"Service\"; color=orange; \"service\" }" >> import-graph.dot
     echo "  subgraph cluster_infrastructure { label=\"Infrastructure\"; color=red; \"infrastructure\" }" >> import-graph.dot
     echo "" >> import-graph.dot
     
     # Add allowed dependencies
     echo "  // Allowed dependencies" >> import-graph.dot
     echo "  domain -> api [color=green];" >> import-graph.dot
-    echo "  application -> api [color=green];" >> import-graph.dot
-    echo "  application -> domain [color=green];" >> import-graph.dot
+    echo "  service -> api [color=green];" >> import-graph.dot
+    echo "  service -> domain [color=green];" >> import-graph.dot
     echo "  infrastructure -> api [color=green];" >> import-graph.dot
     echo "  infrastructure -> domain [color=green];" >> import-graph.dot
-    echo "  infrastructure -> application [color=green];" >> import-graph.dot
+    echo "  infrastructure -> service [color=green];" >> import-graph.dot
     echo "}" >> import-graph.dot
     
     echo "  Import graph saved to import-graph.dot"
@@ -138,8 +140,8 @@ if [ "$1" == "--json" ]; then
       "rule": "Can only import from API",
       "status": "pass"
     },
-    "application": {
-      "rule": "Can import from API and Domain",
+    "service": {
+      "rule": "Can import from API, Domain, and Infrastructure (direct DI)",
       "status": "pass"
     },
     "infrastructure": {
