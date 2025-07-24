@@ -14,9 +14,9 @@ jobs:
         uses: actions/checkout@v4
         
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.22'
           
       - name: Setup Docker and Kubernetes tools
         run: |
@@ -46,10 +46,16 @@ jobs:
       - name: Install mcphost
         run: |
           echo "Installing mcphost binary..."
-          curl -L -o mcphost "https://github.com/mark3labs/mcphost/releases/latest/download/mcphost-linux-amd64"
+          # Use specific version v0.26.1
+          VERSION="v0.26.1"
+          echo "Installing mcphost version: $VERSION"
+          
+          # Download mcphost binary
+          curl -L -o mcphost "https://github.com/mark3labs/mcphost/releases/download/${VERSION}/mcphost-linux-amd64"
           chmod +x mcphost
           sudo mv mcphost /usr/local/bin/
           mcphost --version
+          echo "✅ mcphost v0.26.1 installed successfully"
           
       - name: Create mcphost configuration
         run: |
