@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/common/errors"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/prompts"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/sampling"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -120,6 +121,169 @@ func WithLLMGuidedRetry(ctx context.Context, name string, max int, fn func() err
 	}
 
 	return errors.New(errors.CodeOperationFailed, "ai_retry", fmt.Sprintf("%s: exhausted %d retries", name, max), nil)
+}
+
+// WithDockerfileAIRetry provides specialized AI retry logic for Docker build operations
+// It can modify Dockerfile content in-memory and use AI to fix build issues
+func WithDockerfileAIRetry(ctx context.Context, name string, initialDockerfileContent string, max int, fn func(dockerfileContent string) error, logger *slog.Logger) error {
+	logger.Info("Starting Docker build with AI-guided Dockerfile retry", "operation", name, "max_retries", max)
+
+	samplingClient := sampling.NewClient(logger)
+	currentDockerfileContent := initialDockerfileContent
+
+	for i := 1; i <= max; i++ {
+		logger.Debug("Attempting Docker build", "operation", name, "attempt", i, "max", max)
+
+		err := fn(currentDockerfileContent)
+		if err == nil {
+			logger.Info("Docker build completed successfully", "operation", name, "attempt", i)
+			return nil
+		}
+
+		logger.Error("Docker build failed", "operation", name, "attempt", i, "max", max, "error", err)
+
+		// If this was the last attempt, return enhanced error
+		if i == max {
+			logger.Error("Docker build exhausted all retries", "operation", name, "attempts", max)
+			return enhanceErrorForAI(name, err, i, max, logger)
+		}
+
+		// Use the dockerfile-fix template to analyze and fix the Dockerfile
+		fixedDockerfile, fixErr := applyDockerfileFix(ctx, samplingClient, currentDockerfileContent, err.Error(), logger)
+		if fixErr != nil {
+			logger.Warn("Failed to apply AI Dockerfile fixes", "error", fixErr)
+			// Continue with original content
+			time.Sleep(200 * time.Millisecond)
+			continue
+		}
+
+		if fixedDockerfile != currentDockerfileContent {
+			logger.Info("AI generated Dockerfile fixes, retrying build")
+			currentDockerfileContent = fixedDockerfile
+		} else {
+			logger.Info("No Dockerfile changes suggested by AI, retrying with original")
+		}
+
+		// Give fixes time to take effect before retry
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	return errors.New(errors.CodeOperationFailed, "ai_retry", fmt.Sprintf("%s: exhausted %d retries", name, max), nil)
+}
+
+// applyDockerfileFix uses the dockerfile-fix template to analyze and fix Dockerfile issues
+func applyDockerfileFix(ctx context.Context, samplingClient *sampling.Client, dockerfileContent, buildError string, logger *slog.Logger) (string, error) {
+	logger.Info("Applying AI Dockerfile fixes using dockerfile-fix template")
+
+	// Get template manager
+	templateManager, err := prompts.NewManager(logger, prompts.ManagerConfig{})
+	if err != nil {
+		logger.Warn("Failed to create template manager for dockerfile-fix", "error", err)
+		return dockerfileContent, fmt.Errorf("failed to create template manager: %w", err)
+	}
+
+	// Prepare template data for the dockerfile-fix template
+	templateData := prompts.TemplateData{
+		"DockerfileContent": dockerfileContent,
+		"BuildError":        buildError,
+		"Language":          "java",  // Default, could be extracted from analysis
+		"Framework":         "maven", // Default, could be extracted from analysis
+		"Port":              8080,    // Default port
+	}
+
+	// Render the dockerfile-fix template
+	rendered, err := templateManager.RenderTemplate("dockerfile-fix", templateData)
+	if err != nil {
+		logger.Warn("Failed to render dockerfile-fix template", "error", err)
+		return dockerfileContent, fmt.Errorf("failed to render dockerfile-fix template: %w", err)
+	}
+
+	// Create sampling request
+	samplingReq := sampling.SamplingRequest{
+		Prompt:       rendered.Content,
+		SystemPrompt: rendered.SystemPrompt,
+		MaxTokens:    rendered.MaxTokens,
+		Temperature:  rendered.Temperature,
+	}
+
+	// Use the sampling client to get AI response
+	response, err := samplingClient.SampleInternal(ctx, samplingReq)
+	if err != nil {
+		return dockerfileContent, fmt.Errorf("failed to sample dockerfile-fix template: %w", err)
+	}
+
+	// Extract the fixed Dockerfile content from the AI response
+	fixedContent, extractErr := extractDockerfileFromResponse(response.Content, logger)
+	if extractErr != nil {
+		logger.Warn("Failed to extract Dockerfile from AI response", "error", extractErr)
+		return dockerfileContent, extractErr
+	}
+
+	logger.Info("AI successfully generated Dockerfile fixes",
+		"original_length", len(dockerfileContent),
+		"fixed_length", len(fixedContent))
+
+	return fixedContent, nil
+}
+
+// extractDockerfileFromResponse extracts Dockerfile content from AI response
+func extractDockerfileFromResponse(response string, logger *slog.Logger) (string, error) {
+	// Look for Dockerfile content in code blocks
+	dockerfileRegex := regexp.MustCompile(`(?is)` + "```dockerfile\\s*(.*?)\\s*```")
+	matches := dockerfileRegex.FindStringSubmatch(response)
+
+	if len(matches) > 1 {
+		dockerfile := strings.TrimSpace(matches[1])
+		if len(dockerfile) > 0 {
+			logger.Debug("Extracted Dockerfile from code block", "length", len(dockerfile))
+			return dockerfile, nil
+		}
+	}
+
+	// Alternative: look for FROM statements as indicators of Dockerfile content
+	lines := strings.Split(response, "\n")
+	var dockerfileLines []string
+	inDockerfile := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		// Start of Dockerfile content
+		if strings.HasPrefix(strings.ToUpper(trimmed), "FROM ") {
+			inDockerfile = true
+			dockerfileLines = append(dockerfileLines, trimmed)
+			continue
+		}
+
+		// Continue collecting Dockerfile instructions
+		if inDockerfile {
+			// Check if this looks like a Dockerfile instruction
+			upper := strings.ToUpper(trimmed)
+			if strings.HasPrefix(upper, "RUN ") ||
+				strings.HasPrefix(upper, "COPY ") ||
+				strings.HasPrefix(upper, "ADD ") ||
+				strings.HasPrefix(upper, "WORKDIR ") ||
+				strings.HasPrefix(upper, "EXPOSE ") ||
+				strings.HasPrefix(upper, "CMD ") ||
+				strings.HasPrefix(upper, "ENTRYPOINT ") ||
+				strings.HasPrefix(upper, "ENV ") ||
+				strings.HasPrefix(upper, "LABEL ") ||
+				trimmed == "" { // Empty lines are OK
+				dockerfileLines = append(dockerfileLines, trimmed)
+			} else if len(trimmed) > 0 && !strings.Contains(trimmed, "```") {
+				// Stop if we hit non-Dockerfile content
+				break
+			}
+		}
+	}
+
+	if len(dockerfileLines) > 0 {
+		dockerfile := strings.Join(dockerfileLines, "\n")
+		logger.Debug("Extracted Dockerfile from response content", "length", len(dockerfile))
+		return dockerfile, nil
+	}
+
+	return "", fmt.Errorf("no valid Dockerfile content found in AI response")
 }
 
 // withBasicAIRetry is the original retry logic without MCP sampling

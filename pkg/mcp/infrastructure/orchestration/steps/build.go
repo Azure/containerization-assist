@@ -11,6 +11,7 @@ import (
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/core/kind"
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/utils"
 )
 
 // BuildResult contains the results of a Docker build operation
@@ -69,9 +70,35 @@ func BuildImage(ctx context.Context, dockerfileResult *DockerfileResult, imageNa
 		"dockerfile_length", len(dockerfileResult.Content),
 		"build_context", buildContext)
 
-	buildResult, err := dockerService.QuickBuild(ctx, dockerfileResult.Content, buildContext, buildOptions)
+	// Use AI-powered retry for Docker build operations with content-based fixes
+	var buildResult *docker.BuildResult
+	currentDockerfileContent := dockerfileResult.Content
+
+	err := utils.WithDockerfileAIRetry(ctx, "build_image", currentDockerfileContent, 3, func(dockerfileContent string) error {
+		// Update the current dockerfile content for retry
+		currentDockerfileContent = dockerfileContent
+		// Try building with current Dockerfile content
+		result, buildErr := dockerService.QuickBuild(ctx, dockerfileContent, buildContext, buildOptions)
+		buildResult = result
+
+		// Check for build failure even if no error returned
+		if buildErr != nil {
+			return buildErr
+		}
+
+		if result != nil && !result.Success {
+			// Create an error from the build result
+			if result.Error != nil {
+				return fmt.Errorf("docker build failed: %v", result.Error)
+			}
+			return fmt.Errorf("docker build unsuccessful")
+		}
+
+		return nil
+	}, logger)
+
 	if err != nil {
-		logger.Error("Docker build failed", "error", err, "image_name", imageName)
+		logger.Error("Docker build failed after AI-assisted retries", "error", err, "image_name", imageName)
 		return nil, fmt.Errorf("docker build failed: %v", err)
 	}
 
