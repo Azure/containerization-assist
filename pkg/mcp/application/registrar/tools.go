@@ -35,10 +35,10 @@ func NewToolRegistrar(logger *slog.Logger, orchestrator domainworkflow.WorkflowO
 func (tr *ToolRegistrar) RegisterAll(mcpServer *server.MCPServer) error {
 	tr.logger.Info("Registering tools")
 
-	// Register workflow tools
-	tr.logger.Info("Registering single comprehensive workflow tool for AI-powered containerization")
-	if err := appworkflow.RegisterWorkflowTools(mcpServer, tr.orchestrator, tr.logger); err != nil {
-		return errors.New(errors.CodeToolExecutionFailed, "registrar", "failed to register workflow tools", err)
+	// Register sequential workflow tools only
+	tr.logger.Info("Registering sequential workflow tools for step-by-step AI-powered containerization")
+	if err := appworkflow.RegisterSequentialTools(mcpServer, tr.logger); err != nil {
+		return errors.New(errors.CodeToolExecutionFailed, "registrar", "failed to register sequential workflow tools", err)
 	}
 
 	// Register diagnostic tools

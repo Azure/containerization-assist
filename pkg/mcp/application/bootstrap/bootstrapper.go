@@ -104,6 +104,15 @@ func (b *Bootstrapper) RegisterChatModes() error {
 // GetChatModeFunctions returns the function names available in chat mode
 func GetChatModeFunctions() []string {
 	return []string{
-		"containerize_and_deploy",
+		"analyze_repository",
+		"generate_dockerfile",
+		"build_image",
+		"security_scan",
+		"tag_image",
+		"push_image",
+		"generate_manifests",
+		"setup_cluster",
+		"deploy_application",
+		"verify_deployment",
 	}
 }
