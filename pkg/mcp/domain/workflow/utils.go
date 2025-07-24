@@ -15,26 +15,21 @@ import (
 // NoOpSink is a no-operation progress sink for fallback cases
 type NoOpSink struct{}
 
-// Publish does nothing
 func (n *NoOpSink) Publish(ctx context.Context, u progress.Update) error { return nil }
 
-// Close does nothing
 func (n *NoOpSink) Close() error { return nil }
 
 // NoOpEmitter is a no-operation progress emitter for fallback cases
 type NoOpEmitter struct{}
 
-// Emit does nothing
 func (n *NoOpEmitter) Emit(ctx context.Context, stage string, percent int, message string) error {
 	return nil
 }
 
-// EmitDetailed does nothing
 func (n *NoOpEmitter) EmitDetailed(ctx context.Context, update api.ProgressUpdate) error {
 	return nil
 }
 
-// Close does nothing
 func (n *NoOpEmitter) Close() error { return nil }
 
 // GenerateWorkflowID creates a unique workflow identifier based on repository URL or path

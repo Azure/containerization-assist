@@ -10,12 +10,10 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/errors"
 )
 
-// UnifiedLogger provides enhanced logging with automatic metric extraction and correlation
-type UnifiedLogger struct {
+// LoggerImpl provides enhanced logging with automatic metric extraction and correlation
+type LoggerImpl struct {
 	observer Observer
 	logger   *slog.Logger
 	config   *LoggerConfig
@@ -181,15 +179,15 @@ func DefaultLoggerConfig() *LoggerConfig {
 	}
 }
 
-// NewUnifiedLogger creates a new unified logger
-func NewUnifiedLogger(observer Observer, logger *slog.Logger, config *LoggerConfig) *UnifiedLogger {
+// NewLoggerImpl creates a new unified logger
+func NewLoggerImpl(observer Observer, logger *slog.Logger, config *LoggerConfig) *LoggerImpl {
 	if config == nil {
 		config = DefaultLoggerConfig()
 	}
 
-	ul := &UnifiedLogger{
+	ul := &LoggerImpl{
 		observer:       observer,
-		logger:         logger.With("component", "unified_logger"),
+		logger:         logger.With("component", "logger"),
 		config:         config,
 		metricPatterns: make(map[string]*MetricPattern),
 		enrichers:      make([]LogEnricher, 0, config.MaxLogEnrichers),
@@ -205,7 +203,7 @@ func NewUnifiedLogger(observer Observer, logger *slog.Logger, config *LoggerConf
 }
 
 // registerDefaultMetricPatterns registers common metric extraction patterns
-func (ul *UnifiedLogger) registerDefaultMetricPatterns() {
+func (ul *LoggerImpl) registerDefaultMetricPatterns() {
 	// Response time pattern: "request completed in 150ms"
 	ul.RegisterMetricPattern(&MetricPattern{
 		Name:        "response_time",
@@ -263,7 +261,7 @@ func (ul *UnifiedLogger) registerDefaultMetricPatterns() {
 }
 
 // RegisterMetricPattern registers a new metric extraction pattern
-func (ul *UnifiedLogger) RegisterMetricPattern(pattern *MetricPattern) error {
+func (ul *LoggerImpl) RegisterMetricPattern(pattern *MetricPattern) error {
 	ul.mu.Lock()
 	defer ul.mu.Unlock()
 
@@ -276,7 +274,7 @@ func (ul *UnifiedLogger) RegisterMetricPattern(pattern *MetricPattern) error {
 }
 
 // AddEnricher adds a log enricher
-func (ul *UnifiedLogger) AddEnricher(enricher LogEnricher) error {
+func (ul *LoggerImpl) AddEnricher(enricher LogEnricher) error {
 	ul.mu.Lock()
 	defer ul.mu.Unlock()
 
@@ -303,68 +301,50 @@ func (ul *UnifiedLogger) AddEnricher(enricher LogEnricher) error {
 }
 
 // Info logs an info message with automatic metric extraction and correlation
-func (ul *UnifiedLogger) Info(ctx context.Context, msg string, args ...interface{}) {
+func (ul *LoggerImpl) Info(ctx context.Context, msg string, args ...interface{}) {
 	ul.log(ctx, slog.LevelInfo, msg, args...)
 }
 
 // Warn logs a warning message with automatic metric extraction and correlation
-func (ul *UnifiedLogger) Warn(ctx context.Context, msg string, args ...interface{}) {
+func (ul *LoggerImpl) Warn(ctx context.Context, msg string, args ...interface{}) {
 	ul.log(ctx, slog.LevelWarn, msg, args...)
 }
 
 // Error logs an error message with automatic metric extraction and correlation
-func (ul *UnifiedLogger) Error(ctx context.Context, msg string, args ...interface{}) {
+func (ul *LoggerImpl) Error(ctx context.Context, msg string, args ...interface{}) {
 	ul.log(ctx, slog.LevelError, msg, args...)
 }
 
 // Debug logs a debug message with automatic metric extraction and correlation
-func (ul *UnifiedLogger) Debug(ctx context.Context, msg string, args ...interface{}) {
+func (ul *LoggerImpl) Debug(ctx context.Context, msg string, args ...interface{}) {
 	ul.log(ctx, slog.LevelDebug, msg, args...)
 }
 
-// LogWithStructuredError logs a structured error with enhanced context
-func (ul *UnifiedLogger) LogWithStructuredError(ctx context.Context, err *errors.StructuredError) {
+// LogStructuredError logs a structured error with enhanced context
+func (ul *LoggerImpl) LogStructuredError(ctx context.Context, message string, errorProps map[string]interface{}) {
 	// Create enhanced log record
 	record := &LogRecord{
-		Time:       err.Timestamp,
-		Level:      ul.mapErrorSeverityToLogLevel(err.Severity),
-		Message:    err.Message,
-		SessionID:  err.SessionID,
-		WorkflowID: err.WorkflowID,
+		Time:       time.Now(),
+		Level:      slog.LevelError,
+		Message:    message,
 		Properties: make(map[string]interface{}),
 		Tags:       make(map[string]string),
 	}
 
-	// Add error-specific context
-	record.Properties["error_id"] = err.ID
-	record.Properties["error_category"] = string(err.Category)
-	record.Properties["error_severity"] = string(err.Severity)
-	record.Properties["error_recoverable"] = err.Recoverable
-	record.Properties["error_component"] = err.Component
-	record.Properties["error_operation"] = err.Operation
-
-	// Add error context
-	for k, v := range err.Context {
-		record.Properties[fmt.Sprintf("error_context_%s", k)] = v
+	// Add error properties
+	for k, v := range errorProps {
+		record.Properties[k] = v
 	}
-
-	// Add tags
-	record.Tags["error_category"] = string(err.Category)
-	record.Tags["error_severity"] = string(err.Severity)
-	record.Tags["component"] = err.Component
 
 	// Process the log record
 	ul.processLogRecord(ctx, record)
 
 	// Update log metrics
-	ul.updateLogMetrics(record.Level, time.Since(err.Timestamp))
-
-	// Also track the error with the observer
-	ul.observer.TrackStructuredError(ctx, err)
+	ul.updateLogMetrics(record.Level, time.Since(record.Time))
 }
 
 // LogOperation logs an operation with automatic timing and metric extraction
-func (ul *UnifiedLogger) LogOperation(ctx context.Context, operation string, duration time.Duration, success bool, properties map[string]interface{}) {
+func (ul *LoggerImpl) LogOperation(ctx context.Context, operation string, duration time.Duration, success bool, properties map[string]interface{}) {
 	level := slog.LevelInfo
 	if !success {
 		level = slog.LevelWarn
@@ -411,7 +391,7 @@ func (ul *UnifiedLogger) LogOperation(ctx context.Context, operation string, dur
 }
 
 // log is the core logging method that handles all log processing
-func (ul *UnifiedLogger) log(ctx context.Context, level slog.Level, msg string, args ...interface{}) {
+func (ul *LoggerImpl) log(ctx context.Context, level slog.Level, msg string, args ...interface{}) {
 	startTime := time.Now()
 
 	// Create log record
@@ -442,7 +422,7 @@ func (ul *UnifiedLogger) log(ctx context.Context, level slog.Level, msg string, 
 }
 
 // processLogRecord processes a log record through all enhancement stages
-func (ul *UnifiedLogger) processLogRecord(ctx context.Context, record *LogRecord) {
+func (ul *LoggerImpl) processLogRecord(ctx context.Context, record *LogRecord) {
 	// Extract context information
 	if ul.config.EnableContextEnrichment {
 		ul.extractContextInfo(ctx, record)
@@ -469,7 +449,7 @@ func (ul *UnifiedLogger) processLogRecord(ctx context.Context, record *LogRecord
 }
 
 // extractContextInfo extracts context information from the log record
-func (ul *UnifiedLogger) extractContextInfo(ctx context.Context, record *LogRecord) {
+func (ul *LoggerImpl) extractContextInfo(ctx context.Context, record *LogRecord) {
 	// Extract session ID from context or properties
 	if sessionID, ok := record.Properties["session_id"].(string); ok {
 		record.SessionID = sessionID
@@ -497,7 +477,7 @@ func (ul *UnifiedLogger) extractContextInfo(ctx context.Context, record *LogReco
 }
 
 // handleCorrelation manages log correlation and context tracking
-func (ul *UnifiedLogger) handleCorrelation(ctx context.Context, record *LogRecord) {
+func (ul *LoggerImpl) handleCorrelation(ctx context.Context, record *LogRecord) {
 	// Generate or extract correlation ID
 	correlationID := ul.generateCorrelationID(record)
 	record.CorrelationID = correlationID
@@ -529,7 +509,7 @@ func (ul *UnifiedLogger) handleCorrelation(ctx context.Context, record *LogRecor
 }
 
 // extractMetrics extracts metrics from the log message using registered patterns
-func (ul *UnifiedLogger) extractMetrics(record *LogRecord) {
+func (ul *LoggerImpl) extractMetrics(record *LogRecord) {
 	ul.mu.RLock()
 	patterns := make(map[string]*MetricPattern, len(ul.metricPatterns))
 	for k, v := range ul.metricPatterns {
@@ -577,7 +557,7 @@ func (ul *UnifiedLogger) extractMetrics(record *LogRecord) {
 }
 
 // applyEnrichers applies all registered enrichers to the log record
-func (ul *UnifiedLogger) applyEnrichers(ctx context.Context, record *LogRecord) {
+func (ul *LoggerImpl) applyEnrichers(ctx context.Context, record *LogRecord) {
 	ul.mu.RLock()
 	enrichers := make([]LogEnricher, len(ul.enrichers))
 	copy(enrichers, ul.enrichers)
@@ -598,7 +578,7 @@ func (ul *UnifiedLogger) applyEnrichers(ctx context.Context, record *LogRecord) 
 }
 
 // recordExtractedMetrics records extracted metrics with the observer
-func (ul *UnifiedLogger) recordExtractedMetrics(record *LogRecord) {
+func (ul *LoggerImpl) recordExtractedMetrics(record *LogRecord) {
 	for _, metric := range record.ExtractedMetrics {
 		switch metric.Type {
 		case MetricTypeCounter:
@@ -612,12 +592,12 @@ func (ul *UnifiedLogger) recordExtractedMetrics(record *LogRecord) {
 }
 
 // trackEnhancedEvent tracks an enhanced event with the observer
-func (ul *UnifiedLogger) trackEnhancedEvent(ctx context.Context, record *LogRecord) {
+func (ul *LoggerImpl) trackEnhancedEvent(ctx context.Context, record *LogRecord) {
 	event := &Event{
 		Name:       "enhanced_log",
 		Type:       EventTypeSystem,
 		Timestamp:  record.Time,
-		Component:  "unified_logger",
+		Component:  "logger",
 		Operation:  "log_processing",
 		Success:    record.Level < slog.LevelError,
 		WorkflowID: record.WorkflowID,
@@ -644,7 +624,7 @@ func (ul *UnifiedLogger) trackEnhancedEvent(ctx context.Context, record *LogReco
 
 // Helper methods
 
-func (ul *UnifiedLogger) generateCorrelationID(record *LogRecord) string {
+func (ul *LoggerImpl) generateCorrelationID(record *LogRecord) string {
 	// Use existing IDs if available
 	if record.SessionID != "" {
 		return record.SessionID
@@ -665,7 +645,7 @@ func (ul *UnifiedLogger) generateCorrelationID(record *LogRecord) string {
 	return "corr_" + hash
 }
 
-func (ul *UnifiedLogger) getOrCreateCorrelation(correlationID string, record *LogRecord) *CorrelationContext {
+func (ul *LoggerImpl) getOrCreateCorrelation(correlationID string, record *LogRecord) *CorrelationContext {
 	if existing, ok := ul.correlations.Load(correlationID); ok {
 		return existing.(*CorrelationContext)
 	}
@@ -695,12 +675,12 @@ func (ul *UnifiedLogger) getOrCreateCorrelation(correlationID string, record *Lo
 	return correlation
 }
 
-func (ul *UnifiedLogger) scheduleCorrelationCleanup(correlationID string) {
+func (ul *LoggerImpl) scheduleCorrelationCleanup(correlationID string) {
 	time.Sleep(ul.config.CorrelationTTL)
 	ul.correlations.Delete(correlationID)
 }
 
-func (ul *UnifiedLogger) parseMetricValue(valueStr string, pattern *MetricPattern) (float64, error) {
+func (ul *LoggerImpl) parseMetricValue(valueStr string, pattern *MetricPattern) (float64, error) {
 	value, err := strconv.ParseFloat(valueStr, 64)
 	if err != nil {
 		return 0, err
@@ -717,22 +697,7 @@ func (ul *UnifiedLogger) parseMetricValue(valueStr string, pattern *MetricPatter
 	return value, nil
 }
 
-func (ul *UnifiedLogger) mapErrorSeverityToLogLevel(severity errors.ErrorSeverity) slog.Level {
-	switch severity {
-	case errors.SeverityCritical:
-		return slog.LevelError
-	case errors.SeverityHigh:
-		return slog.LevelError
-	case errors.SeverityMedium:
-		return slog.LevelWarn
-	case errors.SeverityLow:
-		return slog.LevelInfo
-	default:
-		return slog.LevelInfo
-	}
-}
-
-func (ul *UnifiedLogger) updateLogMetrics(level slog.Level, processingTime time.Duration) {
+func (ul *LoggerImpl) updateLogMetrics(level slog.Level, processingTime time.Duration) {
 	ul.logMetrics.mu.Lock()
 	defer ul.logMetrics.mu.Unlock()
 
@@ -742,7 +707,7 @@ func (ul *UnifiedLogger) updateLogMetrics(level slog.Level, processingTime time.
 }
 
 // GetLogMetrics returns current logging metrics
-func (ul *UnifiedLogger) GetLogMetrics() *LogMetrics {
+func (ul *LoggerImpl) GetLogMetrics() *LogMetrics {
 	ul.logMetrics.mu.RLock()
 	defer ul.logMetrics.mu.RUnlock()
 
@@ -765,7 +730,7 @@ func (ul *UnifiedLogger) GetLogMetrics() *LogMetrics {
 }
 
 // GetCorrelationCount returns the current number of active correlations
-func (ul *UnifiedLogger) GetCorrelationCount() int {
+func (ul *LoggerImpl) GetCorrelationCount() int {
 	count := 0
 	ul.correlations.Range(func(key, value interface{}) bool {
 		count++

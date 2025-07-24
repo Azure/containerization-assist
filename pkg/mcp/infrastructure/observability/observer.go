@@ -5,8 +5,6 @@ import (
 	"context"
 	"log/slog"
 	"time"
-
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/errors"
 )
 
 // Observer provides a unified interface for all observability operations
@@ -14,7 +12,6 @@ type Observer interface {
 	// Event tracking
 	TrackEvent(ctx context.Context, event *Event)
 	TrackError(ctx context.Context, err error)
-	TrackStructuredError(ctx context.Context, err *errors.StructuredError)
 
 	// Performance monitoring
 	StartOperation(ctx context.Context, operation string) *OperationContext
@@ -178,14 +175,11 @@ type EventSummary struct {
 
 // ErrorAnalysis provides detailed error analysis
 type ErrorAnalysis struct {
-	TotalErrors       int64                          `json:"total_errors"`
-	ErrorsByCategory  map[errors.ErrorCategory]int64 `json:"errors_by_category"`
-	ErrorsBySeverity  map[errors.ErrorSeverity]int64 `json:"errors_by_severity"`
-	RecoverableErrors int64                          `json:"recoverable_errors"`
-	CriticalErrors    int64                          `json:"critical_errors"`
-	ErrorRate         float64                        `json:"error_rate"`
-	TopErrors         []*errors.StructuredError      `json:"top_errors"`
-	ErrorPatterns     []errors.PatternAnalysis       `json:"error_patterns"`
+	TotalErrors       int64    `json:"total_errors"`
+	RecoverableErrors int64    `json:"recoverable_errors"`
+	CriticalErrors    int64    `json:"critical_errors"`
+	ErrorRate         float64  `json:"error_rate"`
+	TopErrors         []string `json:"top_errors"`
 }
 
 // PerformanceMetrics provides performance analysis

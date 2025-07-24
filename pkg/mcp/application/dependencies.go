@@ -20,14 +20,12 @@ import (
 // Option represents a functional option for configuring dependencies
 type Option func(*Dependencies)
 
-// WithLogger sets a custom logger
 func WithLogger(logger *slog.Logger) Option {
 	return func(d *Dependencies) {
 		d.Logger = logger
 	}
 }
 
-// WithConfig sets the server configuration
 func WithConfig(config workflow.ServerConfig) Option {
 	return func(d *Dependencies) {
 		d.Config = config
@@ -110,62 +108,27 @@ func NewMCPServerFromDeps(deps *Dependencies) (api.MCPServer, error) {
 		return nil, fmt.Errorf("invalid dependencies: %w", err)
 	}
 
-	// Convert legacy Dependencies to interface capsules
-	services := NewServiceProvider(FromLegacyDependencies(deps))
-
 	// Create the bootstrapper component
 	bootstrapper := bootstrap.NewBootstrapper(
-		services.Logger(),
-		services.Config(),
-		services.ResourceStore(),
-		services.Orchestrator(),
+		deps.Logger,
+		deps.Config,
+		deps.ResourceStore,
+		deps.WorkflowOrchestrator,
 	)
 
 	// Create the lifecycle manager component
 	lifecycleManager := lifecycle.NewLifecycleManager(
-		services.Logger(),
-		services.Config(),
-		services.SessionManager(),
+		deps.Logger,
+		deps.Config,
+		deps.SessionManager,
 		bootstrapper,
 	)
 
 	return &serverImpl{
-		services:         services,
+		dependencies:     deps,
 		lifecycleManager: lifecycleManager,
 		bootstrapper:     bootstrapper,
 	}, nil
-}
-
-// NewMCPServerFromServices creates a new MCP server using interface capsules.
-// This is the preferred constructor for new code.
-func NewMCPServerFromServices(services AllServices) api.MCPServer {
-	// Create the bootstrapper component
-	bootstrapper := bootstrap.NewBootstrapper(
-		services.Logger(),
-		services.Config(),
-		services.ResourceStore(),
-		services.Orchestrator(),
-	)
-
-	// Create the lifecycle manager component
-	lifecycleManager := lifecycle.NewLifecycleManager(
-		services.Logger(),
-		services.Config(),
-		services.SessionManager(),
-		bootstrapper,
-	)
-
-	return &serverImpl{
-		services:         services,
-		lifecycleManager: lifecycleManager,
-		bootstrapper:     bootstrapper,
-	}
-}
-
-// GetGroupedDependencies returns a grouped view of the dependencies
-// This provides a migration path to the new structured approach
-func (d *Dependencies) GetGroupedDependencies() *GroupedDependencies {
-	return FromLegacyDependencies(d)
 }
 
 // GetChatModeFunctions returns the function names available in chat mode

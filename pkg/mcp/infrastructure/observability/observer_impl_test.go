@@ -9,20 +9,18 @@ import (
 	"testing"
 	"time"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/infrastructure/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewUnifiedObserver(t *testing.T) {
+func TestNewObserverImpl(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	config := DefaultObserverConfig()
 
-	observer := NewUnifiedObserver(logger, config)
+	observer := NewObserverImpl(logger, config)
 
 	assert.NotNil(t, observer)
 	assert.Equal(t, config, observer.config)
-	assert.NotNil(t, observer.errorAggregator)
 	assert.False(t, observer.startTime.IsZero())
 }
 
@@ -40,7 +38,7 @@ func TestDefaultObserverConfig(t *testing.T) {
 
 func TestTrackEvent(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
 
 	event := &Event{
 		Name:      "test_event",
@@ -82,32 +80,12 @@ func TestTrackEvent(t *testing.T) {
 
 func TestTrackError(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
 
 	// Test with standard error
 	err := errors.New("test error")
 	ctx := context.Background()
 	observer.TrackError(ctx, err)
-
-	// Verify error was tracked
-	errorReport := observer.errorAggregator.GetReport()
-	assert.Greater(t, errorReport.TotalErrors, int64(0))
-}
-
-func TestTrackStructuredError(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
-
-	// Create structured error
-	structErr := mcperrors.NewWorkflowError("test_step", "test error", nil)
-	structErr.WithWorkflowID("workflow_123").WithSessionID("session_456")
-
-	ctx := context.Background()
-	observer.TrackStructuredError(ctx, structErr)
-
-	// Verify error was tracked
-	errorReport := observer.errorAggregator.GetReport()
-	assert.Greater(t, errorReport.TotalErrors, int64(0))
 
 	// Verify error event was created
 	found := false
@@ -115,21 +93,17 @@ func TestTrackStructuredError(t *testing.T) {
 		if event, ok := value.(*Event); ok {
 			if event.Type == EventTypeError {
 				found = true
-				assert.Equal(t, "workflow_123", event.WorkflowID)
-				assert.Equal(t, "session_456", event.SessionID)
-				assert.False(t, event.Success)
 				return false
 			}
 		}
 		return true
 	})
-
 	assert.True(t, found, "Error event should be created")
 }
 
 func TestStartOperation(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
 
 	ctx := context.Background()
 	opCtx := observer.StartOperation(ctx, "test_operation")
@@ -143,7 +117,7 @@ func TestStartOperation(t *testing.T) {
 
 func TestOperationContext(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
 
 	ctx := context.Background()
 	opCtx := observer.StartOperation(ctx, "test_operation")
@@ -179,7 +153,7 @@ func TestOperationContext(t *testing.T) {
 
 func TestStartSpan(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
 
 	ctx := context.Background()
 	spanCtx := observer.StartSpan(ctx, "test_span")
@@ -194,7 +168,7 @@ func TestStartSpan(t *testing.T) {
 
 func TestSpanContext(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
 
 	ctx := context.Background()
 	spanCtx := observer.StartSpan(ctx, "test_span")
@@ -228,7 +202,7 @@ func TestSpanContext(t *testing.T) {
 
 func TestRecordHealthCheck(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
 
 	observer.RecordHealthCheck("test_component", HealthStatusHealthy, time.Millisecond*100)
 
@@ -264,7 +238,7 @@ func TestRecordHealthCheck(t *testing.T) {
 
 func TestMetrics(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
 
 	tags := map[string]string{"tag1": "value1"}
 
@@ -306,7 +280,7 @@ func TestMetrics(t *testing.T) {
 
 func TestRecordResourceUsage(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
 
 	resource := &ResourceUsage{
 		Component: "test_component",
@@ -357,7 +331,7 @@ func TestRecordResourceUsage(t *testing.T) {
 
 func TestGetObservabilityReport(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
 
 	// Add some test data
 	ctx := context.Background()
@@ -372,7 +346,7 @@ func TestGetObservabilityReport(t *testing.T) {
 	})
 
 	// Add error
-	observer.TrackStructuredError(ctx, mcperrors.NewValidationError("field", "invalid"))
+	observer.TrackError(ctx, errors.New("validation error: field invalid"))
 
 	// Add health check
 	observer.RecordHealthCheck("test_component", HealthStatusHealthy, time.Millisecond*50)
@@ -392,7 +366,7 @@ func TestSamplingRate(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	config := DefaultObserverConfig()
 	config.SamplingRate = 0.0 // No sampling
-	observer := NewUnifiedObserver(logger, config)
+	observer := NewObserverImpl(logger, config)
 
 	// This event should not be tracked due to sampling
 	ctx := context.Background()
@@ -422,7 +396,7 @@ func TestSamplingRate(t *testing.T) {
 
 func TestLogger(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
 
 	retrievedLogger := observer.Logger()
 	assert.NotNil(t, retrievedLogger)
@@ -431,7 +405,7 @@ func TestLogger(t *testing.T) {
 
 func TestSetLogLevel(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	observer := NewUnifiedObserver(logger, DefaultObserverConfig())
+	observer := NewObserverImpl(logger, DefaultObserverConfig())
 
 	observer.SetLogLevel(slog.LevelDebug)
 
