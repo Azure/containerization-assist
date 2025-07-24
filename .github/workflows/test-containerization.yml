@@ -36,26 +36,28 @@ jobs:
           sudo mv ./kind /usr/local/bin/kind
           kind version
           
+      - name: Install mcphost
+        run: |
+          echo "Installing mcphost binary..."
+          # Use specific version v0.26.1 - download the correct Linux x86_64 archive
+          VERSION="v0.26.1"
+          echo "Installing mcphost version: $VERSION"
+          
+          # Download and extract mcphost binary from tar.gz
+          curl -L -o mcphost.tar.gz "https://github.com/mark3labs/mcphost/releases/download/${VERSION}/mcphost_Linux_x86_64.tar.gz"
+          tar -xzf mcphost.tar.gz
+          chmod +x mcphost
+          sudo mv mcphost /usr/local/bin/
+          rm -f mcphost.tar.gz
+          mcphost --version
+          echo "✅ mcphost v0.26.1 installed successfully"
+          
       - name: Build MCP Server from PR
         run: |
           echo "Building Container Kit MCP Server from PR code..."
           go build -tags mcp -o container-kit-mcp ./cmd/mcp-server
           chmod +x container-kit-mcp
           ls -la container-kit-mcp
-          
-      - name: Install mcphost
-        run: |
-          echo "Installing mcphost binary..."
-          # Use specific version v0.26.1
-          VERSION="v0.26.1"
-          echo "Installing mcphost version: $VERSION"
-          
-          # Download mcphost binary
-          curl -L -o mcphost "https://github.com/mark3labs/mcphost/releases/download/${VERSION}/mcphost-linux-amd64"
-          chmod +x mcphost
-          sudo mv mcphost /usr/local/bin/
-          mcphost --version
-          echo "✅ mcphost v0.26.1 installed successfully"
           
       - name: Create mcphost configuration
         run: |
