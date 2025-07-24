@@ -66,20 +66,20 @@ jobs:
       - name: Debug cache status
         run: |
           echo "Cache hit: ${{ steps.cache-mcp-server.outputs.cache-hit }}"
-          echo "Cache key would be: mcp-server-${{ runner.os }}-${{ hashFiles('cmd/mcp-server/*', 'pkg/mcp/**/*.go', 'go.mod', 'go.sum') }}"
+          echo "Actual cache key: mcp-server-${{ runner.os }}-${{ hashFiles('**/*.go', 'go.mod', 'go.sum') }}"
           echo ""
-          echo "=== Files being hashed for cache key ==="
-          echo "Files in cmd/mcp-server/:"
-          ls -la cmd/mcp-server/ || echo "Directory not found"
-          echo ""
-          echo "Go files in pkg/mcp/ (first 10):"
-          find pkg/mcp/ -name "*.go" | head -10 || echo "No Go files found"
+          echo "=== Cache debugging ==="
+          echo "Total Go files in repository:"
+          find . -name "*.go" | wc -l
+          echo "First 10 Go files found:"
+          find . -name "*.go" | head -10
           echo ""
           echo "Dependency files:"
           ls -la go.mod go.sum || echo "Dependency files not found"
           echo ""
           echo "Current working directory:"
           pwd
+          echo "MCP binary status:"
           ls -la container-kit-mcp 2>/dev/null || echo "No cached binary found"
           
       - name: Build MCP Server from PR
@@ -104,11 +104,16 @@ jobs:
         run: |
           echo "Creating mcphost configuration..."
           mkdir -p ~/.config
-          cat > ~/.mcphost.yml << 'EOF'
+          
+          # Get the absolute path to the MCP server binary
+          BINARY_PATH=$(realpath ./container-kit-mcp)
+          echo "Using MCP server binary at: $BINARY_PATH"
+          
+          cat > ~/.mcphost.yml << EOF
           mcpServers:
             container-copilot:
               type: "local"
-              command: ["$PWD/container-kit-mcp"]
+              command: ["$BINARY_PATH"]
               environment:
                 CONTAINER_KIT_LOG_LEVEL: "debug"
                 CONTAINER_KIT_WORKSPACE_DIR: "/tmp/test-workspace"
