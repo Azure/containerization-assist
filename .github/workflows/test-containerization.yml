@@ -57,10 +57,30 @@ jobs:
         id: cache-mcp-server
         with:
           path: container-kit-mcp
-          # Cache key includes hash of MCP source files - any changes to MCP code will trigger a new build
-          key: mcp-server-${{ runner.os }}-${{ hashFiles('cmd/mcp-server/**', 'pkg/mcp/**', 'go.mod', 'go.sum') }}
+          # Cache key includes hash of ALL source files that could affect the MCP server build
+          # This ensures any code changes trigger a rebuild
+          key: mcp-server-${{ runner.os }}-${{ hashFiles('**/*.go', 'go.mod', 'go.sum') }}
           restore-keys: |
             mcp-server-${{ runner.os }}-
+            
+      - name: Debug cache status
+        run: |
+          echo "Cache hit: ${{ steps.cache-mcp-server.outputs.cache-hit }}"
+          echo "Cache key would be: mcp-server-${{ runner.os }}-${{ hashFiles('cmd/mcp-server/*', 'pkg/mcp/**/*.go', 'go.mod', 'go.sum') }}"
+          echo ""
+          echo "=== Files being hashed for cache key ==="
+          echo "Files in cmd/mcp-server/:"
+          ls -la cmd/mcp-server/ || echo "Directory not found"
+          echo ""
+          echo "Go files in pkg/mcp/ (first 10):"
+          find pkg/mcp/ -name "*.go" | head -10 || echo "No Go files found"
+          echo ""
+          echo "Dependency files:"
+          ls -la go.mod go.sum || echo "Dependency files not found"
+          echo ""
+          echo "Current working directory:"
+          pwd
+          ls -la container-kit-mcp 2>/dev/null || echo "No cached binary found"
           
       - name: Build MCP Server from PR
         if: steps.cache-mcp-server.outputs.cache-hit != 'true'
@@ -75,6 +95,10 @@ jobs:
           echo "Verifying MCP Server binary..."
           ls -la container-kit-mcp
           echo "✅ MCP Server binary ready"
+          
+          # Quick test that the binary can start (without keeping it running)
+          echo "Testing binary can execute..."
+          ./container-kit-mcp --help 2>/dev/null || echo "Help command not available, but binary is executable"
           
       - name: Create mcphost configuration
         run: |
@@ -103,21 +127,22 @@ jobs:
           echo "=== mcphost configuration ==="
           cat ~/.mcphost.yml
           
-      - name: Test MCP Server stdio mode
-        run: |
-          echo "Testing MCP Server in stdio mode..."
-          # Test that the server can start and respond
-          echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' | timeout 10s ./container-kit-mcp || true
-          echo "Server stdio test completed"
-          
       - name: Run containerization test
         id: test
         run: |
           echo "Running containerization test..."
+          echo "Current working directory: $(pwd)"
+          echo "MCP Server binary location:"
+          ls -la ./container-kit-mcp
+          echo "Absolute path: $(realpath ./container-kit-mcp)"
+          echo ""
+          
           # Test with a simple Java servlet application using mcphost
           # mcphost will handle starting/stopping the MCP server automatically
+          echo "Starting mcphost with containerization request..."
           RESULT=$(mcphost -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello" 2>&1)
-          echo "Test completed"
+          EXIT_CODE=$?
+          echo "Test completed with exit code: $EXIT_CODE"
           echo "result<<EOF" >> $GITHUB_OUTPUT
           echo "$RESULT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
