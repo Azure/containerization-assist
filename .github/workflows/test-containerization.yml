@@ -116,7 +116,7 @@ jobs:
           echo "Running containerization test..."
           # Test with a simple Java servlet application using mcphost
           # mcphost will handle starting/stopping the MCP server automatically
-          RESULT=$(mcphost -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello" --quiet 2>&1)
+          RESULT=$(mcphost -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello" 2>&1)
           echo "Test completed"
           echo "result<<EOF" >> $GITHUB_OUTPUT
           echo "$RESULT" >> $GITHUB_OUTPUT
