@@ -52,38 +52,7 @@ jobs:
           mcphost --version
           echo "✅ mcphost v0.26.1 installed successfully"
           
-      - name: Cache MCP Server binary
-        uses: actions/cache@v4
-        id: cache-mcp-server
-        with:
-          path: container-kit-mcp
-          # Cache key includes hash of ALL source files that could affect the MCP server build
-          # This ensures any code changes trigger a rebuild
-          key: mcp-server-${{ runner.os }}-${{ hashFiles('**/*.go', 'go.mod', 'go.sum') }}
-          restore-keys: |
-            mcp-server-${{ runner.os }}-
-            
-      - name: Debug cache status
-        run: |
-          echo "Cache hit: ${{ steps.cache-mcp-server.outputs.cache-hit }}"
-          echo "Actual cache key: mcp-server-${{ runner.os }}-${{ hashFiles('**/*.go', 'go.mod', 'go.sum') }}"
-          echo ""
-          echo "=== Cache debugging ==="
-          echo "Total Go files in repository:"
-          find . -name "*.go" | wc -l
-          echo "First 10 Go files found:"
-          find . -name "*.go" | head -10
-          echo ""
-          echo "Dependency files:"
-          ls -la go.mod go.sum || echo "Dependency files not found"
-          echo ""
-          echo "Current working directory:"
-          pwd
-          echo "MCP binary status:"
-          ls -la container-kit-mcp 2>/dev/null || echo "No cached binary found"
-          
       - name: Build MCP Server from PR
-        if: steps.cache-mcp-server.outputs.cache-hit != 'true'
         run: |
           echo "Building Container Kit MCP Server from PR code..."
           go build -tags mcp -o container-kit-mcp ./cmd/mcp-server
