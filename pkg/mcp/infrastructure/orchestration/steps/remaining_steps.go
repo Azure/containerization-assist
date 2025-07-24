@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/util"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/utils"
 	"github.com/rs/zerolog"
 )
 
@@ -26,7 +26,7 @@ func init() {
 	Register(NewVerifyStep())
 }
 
-// Use util.ExtractRepoName instead of local function
+// Use utils.ExtractRepoName instead of local function
 
 // createZerologFromSlog creates a zerolog logger from an slog logger
 // This is a bridge function to use existing security scanners that expect zerolog
@@ -62,7 +62,7 @@ func (s *BuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) 
 	}
 
 	// Generate image name and tag from cached repo identifier
-	imageName := util.ExtractRepoName(state.RepoIdentifier)
+	imageName := utils.ExtractRepoName(state.RepoIdentifier)
 	imageTag := "latest"
 	buildContext := state.AnalyzeResult.RepoPath
 
@@ -275,7 +275,7 @@ func (s *TagStep) Execute(ctx context.Context, state *workflow.WorkflowState) er
 
 	// For local kind clusters, we don't need external registry push
 	// The image will be loaded directly into kind
-	imageName := util.ExtractRepoName(state.RepoIdentifier)
+	imageName := utils.ExtractRepoName(state.RepoIdentifier)
 	imageTag := "latest"
 
 	// Update the build result with the final tag
@@ -335,13 +335,13 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 
 	// Convert workflow BuildResult to infrastructure BuildResult
 	infraBuildResult := &BuildResult{
-		ImageName: util.ExtractRepoName(state.RepoIdentifier),
+		ImageName: utils.ExtractRepoName(state.RepoIdentifier),
 		ImageTag:  "latest",
 		ImageID:   state.BuildResult.ImageID,
 	}
 
 	// Generate manifests
-	appName := util.ExtractRepoName(state.RepoIdentifier)
+	appName := utils.ExtractRepoName(state.RepoIdentifier)
 	namespace := "default"
 
 	// In test mode, use test namespace and prefix app name
@@ -474,7 +474,7 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 	// First, load image into kind cluster if needed
 	if state.BuildResult != nil && !state.Args.TestMode {
 		infraBuildResult := &BuildResult{
-			ImageName: util.ExtractRepoName(state.RepoIdentifier),
+			ImageName: utils.ExtractRepoName(state.RepoIdentifier),
 			ImageTag:  "latest",
 			ImageID:   state.BuildResult.ImageID,
 		}
@@ -490,7 +490,7 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 
 	// Convert workflow K8sResult to infrastructure K8sResult for deployment
 	infraK8sResult := &K8sResult{
-		AppName:    util.ExtractRepoName(state.RepoIdentifier),
+		AppName:    utils.ExtractRepoName(state.RepoIdentifier),
 		Namespace:  state.K8sResult.Namespace,
 		ServiceURL: state.K8sResult.Endpoint,
 		Manifests: map[string]interface{}{
@@ -498,7 +498,7 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 		},
 		Metadata: map[string]interface{}{
 			"port":      0, // Default port
-			"image_ref": state.K8sResult.Namespace + "/" + util.ExtractRepoName(state.RepoIdentifier) + ":latest",
+			"image_ref": state.K8sResult.Namespace + "/" + utils.ExtractRepoName(state.RepoIdentifier) + ":latest",
 		},
 	}
 
@@ -550,7 +550,7 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 
 	// Convert workflow K8sResult to infrastructure K8sResult
 	infraK8sResult := &K8sResult{
-		AppName:    util.ExtractRepoName(state.RepoIdentifier),
+		AppName:    utils.ExtractRepoName(state.RepoIdentifier),
 		Namespace:  state.K8sResult.Namespace,
 		ServiceURL: state.K8sResult.Endpoint,
 		Manifests: map[string]interface{}{
@@ -562,7 +562,7 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 	if state.Args.TestMode {
 		state.Logger.Info("Test mode: Simulating deployment health check")
 		state.Result.Endpoint = fmt.Sprintf("http://test-%s.%s.svc.cluster.local:8080",
-			util.ExtractRepoName(state.RepoIdentifier), state.K8sResult.Namespace)
+			utils.ExtractRepoName(state.RepoIdentifier), state.K8sResult.Namespace)
 	} else {
 		err := CheckDeploymentHealth(ctx, infraK8sResult, state.Logger)
 		if err != nil {

@@ -56,9 +56,9 @@ func TestNoDomainInfrastructureDependencies(t *testing.T) {
 func TestNoApplicationInfrastructureDependencies(t *testing.T) {
 	// List of application packages to check
 	applicationPackages := []string{
-		"github.com/Azure/container-kit/pkg/mcp/application/commands",
-		"github.com/Azure/container-kit/pkg/mcp/application/queries",
-		"github.com/Azure/container-kit/pkg/mcp/application/workflow",
+		"github.com/Azure/container-kit/pkg/mcp/service/commands",
+		"github.com/Azure/container-kit/pkg/mcp/service/queries",
+		"github.com/Azure/container-kit/pkg/mcp/service/workflow",
 	}
 
 	// Application layer can use domain, but not infrastructure directly
@@ -92,12 +92,11 @@ func TestNoApplicationInfrastructureDependencies(t *testing.T) {
 func TestLayerDependencyDirection(t *testing.T) {
 	// Infrastructure should not import from application or api
 	infrastructurePackages := []string{
-		"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/container",
-		"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/kubernetes",
-		"github.com/Azure/container-kit/pkg/mcp/infrastructure/persistence",
 		"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/steps",
 		"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/sampling",
-		"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/ml",
+		"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging",
+		"github.com/Azure/container-kit/pkg/mcp/infrastructure/observability",
+		"github.com/Azure/container-kit/pkg/mcp/infrastructure/persistence/session",
 	}
 
 	forbiddenForInfra := []string{

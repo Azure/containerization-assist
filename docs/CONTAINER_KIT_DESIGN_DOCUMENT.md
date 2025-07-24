@@ -20,36 +20,39 @@
 
 ## Executive Summary
 
-Container Kit is an advanced, AI-powered containerization platform that automates the complete Docker and Kubernetes workflow through a unified Model Context Protocol (MCP) server. The system follows a clean 4-layer architecture with workflow-driven design that balances simplicity with maintainability.
+Container Kit is an advanced, AI-powered containerization platform that automates the complete Docker and Kubernetes workflow through individual, chainable tools exposed via Model Context Protocol (MCP). The system follows a simplified 4-layer architecture with tool-driven design that balances focused functionality with maintainability.
 
 ### Key Capabilities
-- **Unified Workflow**: Single `containerize_and_deploy` tool handles complete process
-- **Progress Tracking**: Built-in progress indicators for all 10 workflow steps
+- **15 Individual Tools**: Focused tools (10 workflow, 2 orchestration, 3 utility) with intelligent chaining
+- **Tool Chaining System**: Each tool provides hints for next steps with pre-populated parameters
+- **Session State Persistence**: WorkflowState shared seamlessly across tool calls via BoltDB
 - **AI-Powered Process**: Intelligent automation with error recovery
 - **Enterprise Security**: Comprehensive vulnerability scanning with Trivy/Grype
-- **Session Management**: Persistent state with BoltDB storage
-- **Simplified Architecture**: Essential functionality without over-engineering
+- **Non-Interactive Mode**: Test mode simulation prevents interactive prompts
+- **Simplified Architecture**: Direct dependency injection with consolidated infrastructure
 
 ### Technology Stack
-- **Core**: Go 1.24.4 with 4-layer clean architecture
-- **Protocol**: Model Context Protocol (MCP) via mcp-go v0.33.0 library
+- **Core**: Go 1.24.4 with simplified 4-layer architecture
+- **Protocol**: Model Context Protocol (MCP) via mcp-go library
 - **AI Integration**: Azure OpenAI SDK for guided workflows and error recovery
 - **Storage**: BoltDB for session persistence
 - **Container Runtime**: Docker with full lifecycle management
 - **Orchestration**: Kubernetes client with manifest generation
 - **Security**: Trivy/Grype vulnerability scanning
+- **Architecture**: Direct dependency injection with unified infrastructure packages
 
 ## System Overview
 
 ### Vision Statement
-Container Kit provides a simple, unified workflow that guides users through the complete containerization process from analysis to deployment with AI-powered assistance and built-in progress tracking.
+Container Kit provides individual, focused tools that can be chained together to guide users through the complete containerization process from analysis to deployment with AI-powered assistance and built-in progress tracking.
 
 ### Core Principles
-1. **Workflow-First Design**: Single unified process instead of atomic tools
-2. **Simplicity**: Eliminate over-engineering while maintaining functionality
-3. **Progress Transparency**: Visual feedback for every step
-4. **AI Integration**: Intelligent automation with error recovery
-5. **Developer Experience**: Intuitive interface with clear documentation
+1. **Tool-First Design**: 15 individual focused tools with intelligent chaining capabilities
+2. **State Persistence**: Workflow state shared seamlessly across tool boundaries via BoltDB
+3. **Simplicity**: Direct dependency injection eliminates complexity while maintaining functionality
+4. **Progress Transparency**: Visual feedback for every step with unified messaging
+5. **AI Integration**: Intelligent automation with error recovery
+6. **Developer Experience**: Table-driven tool configuration for easy extension
 
 ### System Boundaries
 - **Input**: Source code repositories, configuration parameters, user interactions
@@ -61,88 +64,133 @@ Container Kit provides a simple, unified workflow that guides users through the 
 
 ### Four-Layer Clean Architecture
 
-Container Kit follows a clean 4-layer Domain-Driven Design architecture:
+Container Kit follows a simplified 4-layer Domain-Driven Design architecture:
 
 ```
 pkg/mcp/
-├── api/                    # Interface definitions and contracts
-│   └── interfaces.go       # Essential MCP tool interfaces
-├── application/            # Application services and orchestration
-│   ├── server.go          # MCP server implementation
-│   ├── bootstrap.go       # Dependency injection setup
+├── api/                   # Interface definitions and contracts
+│   └── interfaces.go      # Essential MCP tool interfaces
+├── service/               # Unified service layer (simplified from application)
+│   ├── bootstrap/         # Application bootstrapping
 │   ├── commands/          # CQRS command handlers
-│   ├── queries/           # CQRS query handlers
-│   ├── config/            # Application configuration
-│   └── session/           # Session management
+│   ├── config/            # Configuration management
+│   ├── dependencies.go    # Simple direct dependency injection
+│   ├── lifecycle/         # Application lifecycle management
+│   ├── queries/           # CQRS query handlers  
+│   ├── registrar/         # MCP tool/resource registration
+│   ├── registry/          # Service registry
+│   ├── server.go          # MCP server implementation with direct DI
+│   ├── session/           # Session management
+│   ├── tools/             # Individual tool implementations (15 tools)
+│   ├── transport/         # HTTP and stdio transport
+│   └── workflow/          # Workflow orchestration
 ├── domain/                # Business logic and workflows
-│   ├── workflow/          # Core containerization workflow
-│   ├── events/            # Domain events and handlers
+│   ├── events/            # Domain events
+│   ├── health/            # Health check interfaces
 │   ├── progress/          # Progress tracking (business concept)
-│   ├── saga/              # Saga pattern coordination
-│   └── sampling/          # Domain sampling contracts
-└── infrastructure/        # Technical implementations
-    ├── steps/             # Workflow step implementations
-    ├── ml/                # Machine learning integrations
-    ├── sampling/          # LLM integration
-    ├── progress/          # Progress tracking implementations
-    ├── prompts/           # MCP prompt management
-    ├── resources/         # MCP resource providers
-    ├── tracing/           # Observability integration
-    ├── utilities/         # Infrastructure utilities
-    └── validation/        # Validation implementations
+│   ├── prompts/           # Prompt interfaces
+│   ├── resources/         # Resource interfaces
+│   ├── sampling/          # LLM sampling domain logic
+│   ├── session/           # Session domain objects
+│   └── workflow/          # Core containerization workflow
+│       ├── workflow_error.go # Simple workflow error handling
+│       └── utils.go       # Workflow utility functions
+└── infrastructure/        # Technical implementations (consolidated)
+    ├── ai_ml/             # AI/ML implementations
+    │   ├── prompts/       # Prompt management
+    │   │   └── templates/ # Embedded prompt templates
+    │   └── sampling/      # LLM integration
+    ├── core/              # Core infrastructure
+    │   ├── resources/     # Resource providers and stores
+    │   ├── testutil/      # Testing utilities
+    │   ├── util/          # General utilities
+    │   ├── utilities/     # Advanced utilities
+    │   └── validation/    # Validation logic
+    ├── messaging/         # UNIFIED: Event publishing and progress reporting
+    │   ├── cli_direct.go        # CLI progress reporting
+    │   ├── emitter.go           # Progress emitters
+    │   ├── event_publisher.go   # Domain event publishing
+    │   ├── factory_direct.go    # Progress factory
+    │   └── mcp_direct.go        # MCP progress reporting
+    ├── observability/     # UNIFIED: Monitoring, tracing, and health
+    │   ├── monitor.go           # Health monitoring
+    │   ├── tracing_config.go    # OpenTelemetry configuration
+    │   ├── tracing_helpers.go   # Tracing utilities
+    │   └── tracing_integration.go # Tracing middleware
+    ├── orchestration/     # Container and K8s orchestration
+    │   └── steps/         # Focused workflow step implementations
+    └── persistence/       # Data persistence
+        └── session/       # Session storage (BoltDB)
 ```
 
 ### Key Architecture Benefits
-- **Clean Dependencies**: Infrastructure → Application → Domain → API
-- **Single Workflow**: `containerize_and_deploy` handles complete process
-- **CQRS Implementation**: Separate command and query handling for scalability
+- **Clean Dependencies**: Infrastructure → Service → Domain → API
+- **Individual Tools**: 15 focused tools with intelligent chaining capabilities
+- **Direct Dependency Injection**: Simple Dependencies struct eliminates complex Wire patterns
+- **Unified Infrastructure**: Consolidated messaging, observability, and orchestration packages
 - **Event-Driven Design**: Domain events for workflow coordination and observability
-- **Saga Orchestration**: Distributed transaction coordination for complex workflows
-- **ML Integration**: Machine learning for build optimization and pattern recognition
 - **Domain-Driven**: Core business logic isolated in domain layer
 - **Separation of Concerns**: Each layer has clear responsibilities
-- **AI-Enhanced**: Built-in AI error recovery and analysis capabilities
+- **Simple Error Handling**: Workflow errors with step and attempt tracking
 
 ### Dependency Rules
 - **API Layer**: Essential interfaces only, avoid over-abstraction
-- **Application Layer**: Coordinate domain logic, handle MCP protocol, CQRS orchestration
-- **Domain Layer**: Pure business logic, domain events, saga coordination, no infrastructure dependencies
-- **Infrastructure Layer**: Technical implementations, external integrations, event handlers
+- **Service Layer**: Coordinate domain logic, handle MCP protocol, direct dependency injection
+- **Domain Layer**: Pure business logic, no infrastructure dependencies  
+- **Infrastructure Layer**: Technical implementations, external integrations, consolidated packages
 
 ## Core Components
 
-### 1. Workflow Server (`pkg/mcp/server/`)
+### 1. Tool Registry (`pkg/mcp/service/tools/`)
 
-**Single Workflow Tool**: `containerize_and_deploy`
+**15 Individual Tools**: Table-driven tool registration
 
-The unified workflow tool handles the complete containerization process:
+The tool registry provides focused, chainable tools:
 
 ```go
-// Complete 10-step workflow with AI orchestration
-steps := []WorkflowStep{
-    {Name: "analyze_repository", Message: "Analyzing repository structure and detecting language/framework"},
-    {Name: "generate_dockerfile", Message: "Generating optimized Dockerfile for detected language/framework"},
-    {Name: "build_image", Message: "Building Docker image with AI-powered error fixing"},
-    {Name: "setup_kind_cluster", Message: "Setting up local Kubernetes cluster with registry"},
-    {Name: "load_image", Message: "Loading Docker image into Kubernetes cluster"},
-    {Name: "generate_k8s_manifests", Message: "Generating Kubernetes deployment manifests"},
-    {Name: "deploy_to_k8s", Message: "Deploying application to Kubernetes cluster"},
-    {Name: "health_probe", Message: "Performing application health checks and endpoint discovery"},
-    {Name: "vulnerability_scan", Message: "Scanning Docker image for security vulnerabilities (optional)"},
-    {Name: "finalize_result", Message: "Finalizing workflow results and cleanup"},
+// Table-driven tool configuration
+var toolConfigs = []ToolConfig{
+    // 10 Workflow Step Tools
+    {
+        Name:           "analyze_repository",
+        Description:    "Analyze repository to detect language and framework",
+        Category:       CategoryWorkflow,
+        NextTool:       "generate_dockerfile",
+        ChainReason:    "Repository analyzed successfully. Ready to generate Dockerfile",
+    },
+    // ... 9 more workflow tools ...
+    
+    // 2 Orchestration Tools
+    {
+        Name:        "start_workflow",
+        Description: "Start a complete containerization workflow",
+        Category:    CategoryOrchestration,
+    },
+    {
+        Name:        "workflow_status", 
+        Description: "Check the status of a running workflow",
+        Category:    CategoryOrchestration,
+    },
+    
+    // 3 Utility Tools
+    {
+        Name:        "list_tools",
+        Description: "List all available MCP tools",
+        Category:    CategoryUtility,
+    },
+    // ... ping, server_status ...
 }
 ```
 
 **Features**:
-- Progress tracking with visual indicators
-- Error recovery with actionable messages
-- AI-powered automation throughout
-- Session management with BoltDB persistence
-- Event-driven workflow coordination
-- CQRS command and query separation
-- Saga orchestration for distributed transactions
-- ML-powered build optimization
-- Comprehensive observability with tracing
+- **Tool Chaining**: Each tool suggests the next step with chain hints
+- **Session Persistence**: Workflow state shared across tool boundaries via BoltDB
+- **Progress tracking**: Visual indicators with unified messaging
+- **Simple Error Handling**: Workflow errors with step and attempt tracking
+- **AI-powered automation**: Error recovery throughout workflow steps
+- **Table-Driven Design**: Easy addition of new tools with configuration
+- **Direct Dependency Injection**: Simple Dependencies struct for clarity
+- **Unified Infrastructure**: Consolidated messaging and observability packages
 
 ### 2. Step Implementations (`pkg/mcp/infrastructure/steps/`)
 
@@ -164,67 +212,72 @@ steps := []WorkflowStep{
 - **Manifest Fixing** (`pkg/mcp/infrastructure/steps/manifest_fix.go`): AI-powered manifest error resolution
 - **Deployment Verification** (`pkg/mcp/infrastructure/steps/deployment_verification.go`): Health checks and validation
 
-### 3. Error Handling (`pkg/common/errors/`)
+### 3. Error Handling (`pkg/mcp/domain/workflow/`)
 
-**Rich Error System**:
-- **Structured Error Context**: Comprehensive error information with Rich type
-- **Actionable Messages**: Clear guidance for resolution with user-facing flags
-- **Core Infrastructure**: Used across the entire codebase
-- **Error Classification**: Severity levels (Unknown, Low, Medium, High, Critical)
-- **Retry Support**: Built-in retryable flag for automated error recovery
-- **AI Integration**: Error context for AI-powered retry logic
-- **Code Generation**: Error codes generated from YAML configuration
+**Simple Workflow Error System**:
+- **Step Context**: Clear identification of which workflow step failed
+- **Attempt Tracking**: Number of retry attempts for debugging
+- **Error Wrapping**: Standard Go error wrapping with fmt.Errorf
+- **Lightweight Design**: No complex accumulation or escalation logic
+- **Standard Error Interface**: Compatible with Go's error handling patterns
+- **AI Integration**: Error context for AI-powered retry logic in workflow steps
 
-### 4. Server Core (`pkg/mcp/application/`)
+### 4. Server Core (`pkg/mcp/service/`)
 
 **MCP Server Implementation**:
-- **Protocol Handling**: mcp-go v0.33.0 integration
+- **Protocol Handling**: mcp-go library integration
 - **Session Management**: BoltDB-based persistence with TTL
-- **Tool Registration**: Single workflow tool with progress tracking
-- **Transport Layer**: stdio transport with proper shutdown handling
+- **Tool Registration**: 15 individual tools with chaining capabilities
+- **Transport Layer**: stdio and HTTP transports with proper shutdown handling
 - **AI Integration**: Built-in chat mode support for Copilot integration
-- **CQRS Architecture**: Separate command and query handlers
+- **Direct Dependency Injection**: Simple Dependencies struct for clear DI
 - **Configuration Management**: Environment-based configuration with validation
 
-### 5. Machine Learning Integration (`pkg/mcp/infrastructure/ml/`)
+### 5. AI/ML Integration (`pkg/mcp/infrastructure/ai_ml/`)
 
-**ML-Powered Features**:
-- **Build Optimization** (`build_optimizer.go`): ML-enhanced build performance
-- **Pattern Recognition** (`pattern_recognizer.go`): Build pattern analysis and optimization
-- **Error History** (`error_history.go`): Learning from previous build failures
-- **Build History** (`build_history.go`): Historical build data analysis
-- **Workflow Integration** (`workflow_integration.go`): ML integration with workflow steps
-- **Resource Prediction** (`resource_predictor.go`): Predictive resource allocation
+**AI-Powered Features**:
+- **Sampling Client** (`sampling/`): LLM integration for error recovery
+- **Prompt Management** (`prompts/`): Template-based AI prompts
+- **Error Analysis**: AI-powered analysis of build and deployment failures
+- **Dockerfile Generation**: AI assistance for Dockerfile creation
+- **Manifest Fixing**: AI-powered Kubernetes manifest error resolution
+- **Repository Analysis**: AI-enhanced technology detection and recommendations
 
-### 6. Event-Driven Architecture (`pkg/mcp/domain/events/`)
+### 6. Unified Infrastructure (`pkg/mcp/infrastructure/`)
 
-**Domain Events**:
-- **Event System** (`events.go`): Core event definitions and types
-- **Event Handlers** (`handlers.go`): Event processing and routing
-- **Event Publisher** (`publisher.go`): Event publication and distribution
-- **Workflow Coordination**: Events for step completion and state changes
-- **Observability**: Event-driven monitoring and tracing
+**Consolidated Packages**:
+- **Messaging** (`messaging/`): Unified event publishing and progress reporting
+- **Observability** (`observability/`): Consolidated monitoring, tracing, and health
+- **Orchestration** (`orchestration/steps/`): Focused workflow step implementations
+- **Core** (`core/`): Resource providers, utilities, and validation
+- **Persistence** (`persistence/session/`): BoltDB session storage
 
 ## Design Patterns
 
-### 1. Unified Workflow Pattern
+### 1. Tool-Driven Pattern
 
-A single workflow tool with AI orchestrator handles the complete containerization process:
+Individual tools with intelligent chaining handle the containerization process:
 
 ```go
-// RegisterWorkflowTools registers the comprehensive containerization workflow
-func RegisterWorkflowTools(mcpServer *server.MCPServer, logger *slog.Logger) error {
-	tool := mcp.Tool{
-		Name:        "containerize_and_deploy",
-		Description: "Complete containerization workflow from analysis to deployment",
-	}
+// RegisterTools registers all 15 individual tools
+func RegisterTools(server MCPServer, deps ToolDependencies) error {
+    for _, config := range toolConfigs {
+        tool := mcp.Tool{
+            Name:        config.Name,
+            Description: config.Description,
+            InputSchema: BuildToolSchema(config),
+        }
+        
+        handler := BuildHandler(config, deps)
+        server.AddTool(tool, handler)
+    }
+    return nil
+}
 
-	mcpServer.RegisterTool(tool, func(ctx context.Context, arguments map[string]interface{}) (*mcp.CallToolResult, error) {
-		// Use new orchestrator-based workflow
-		orchestrator := NewOrchestrator(logger)
-		result, err := orchestrator.Execute(ctx, &req, &args)
-		return result, err
-	})
+// Each tool provides chain hints for next steps
+type ChainHint struct {
+    NextTool string `json:"next_tool"`
+    Reason   string `json:"reason"`
 }
 ```
 
@@ -247,45 +300,60 @@ progressTracker := progress.NewProgressTracker(ctx, req, totalSteps, logger)
 progressTracker.Update(currentStep, message, metadata)
 ```
 
-### 3. Rich Error System
+### 3. Simple Workflow Error System
 
-Unified error handling with structured context and AI integration:
+Lightweight error handling with step context:
 
 ```go
-// Builder pattern for structured errors
-return errors.NewError().
-    Code(errors.CodeValidationFailed).
-    Type(errors.ErrTypeValidation).
-    Severity(errors.SeverityMedium).
-    Message("validation failed").
-    Context("field", fieldName).
-    Suggestion("Check field format").
-    WithLocation().
-    Build()
+// Simple workflow error with step context
+type WorkflowError struct {
+    Step    string // Which workflow step failed
+    Attempt int    // Which attempt number
+    Err     error  // The underlying error
+}
+
+// Usage in workflow steps
+return workflow.NewWorkflowError(
+    "build",    // Step name
+    attempt,    // Current attempt
+    fmt.Errorf("Docker build failed: %w", err),
+)
 
 // AI-powered error analysis integration
-errorAnalysis, err := samplingClient.AnalyzeError(ctx, buildError, contextInfo)
+errorAnalysis, err := samplingClient.AnalyzeError(ctx, workflowError, contextInfo)
 ```
 
-### 4. Direct Implementation Pattern
+### 4. Direct Dependency Injection Pattern
 
-Straightforward, clear implementations:
+Simple, clear dependency management:
 
 ```go
-// Instead of complex service containers, use direct implementation
-func (s *AnalyzeStep) Execute(ctx context.Context, args AnalyzeArgs) error {
-    // Direct implementation without abstraction layers
-    return s.analyzeRepository(ctx, args.RepoPath)
+// Simple Dependencies struct replaces complex Wire patterns
+type Dependencies struct {
+    Logger         *slog.Logger
+    Config         workflow.ServerConfig
+    SessionManager session.OptimizedSessionManager
+    // ... other dependencies
+}
+
+// Direct initialization in buildDependencies()
+func (f *ServerFactory) buildDependencies(ctx context.Context) (*Dependencies, error) {
+    deps := &Dependencies{
+        Logger: f.logger,
+        Config: f.config,
+        // ... initialize other dependencies in order
+    }
+    return deps, nil
 }
 ```
 
 ## Data Flow
 
-### 1. Unified Workflow Flow
+### 1. Individual Tool Flow
 
 ```
-User Request → MCP Server → Workflow Tool → Step Execution →
-Progress Updates → Error Recovery → Completion Response
+User Request → MCP Server → Tool Registry → Tool Handler →
+Step Execution → Progress Updates → Chain Hint → Next Tool Suggestion
 ```
 
 ### 2. Step Execution Flow
@@ -378,30 +446,30 @@ Duration Tracking → Completion Notification
 
 ## Development Guidelines
 
-### 1. Adding New Workflow Steps
-1. **Step Implementation**: Create in `pkg/mcp/infrastructure/steps/`
-2. **Error Handling**: Use unified Rich error system from `pkg/mcp/domain/errors/`
-3. **Progress Tracking**: Include progress indicators with metadata
-4. **AI Integration**: Consider AI-powered error recovery where applicable
-5. **Testing**: Unit and integration tests with workflow validation
+### 1. Adding New Tools
+1. **Tool Configuration**: Add to `toolConfigs` in `pkg/mcp/service/tools/registry.go`
+2. **Step Implementation**: Create corresponding step method in StepProvider
+3. **Error Handling**: Use simple workflow error system from `pkg/mcp/domain/workflow/`
+4. **Chain Hints**: Define NextTool and ChainReason for user guidance
+5. **Testing**: Unit and integration tests with tool validation
 
 ### 2. Error Handling
-- Use unified Rich error system from `pkg/mcp/domain/errors/` with builder pattern
-- Include structured context and actionable suggestions with severity levels
-- Implement proper error classification (Unknown, Low, Medium, High, Critical)
-- Use location tracking and retryable flags for AI-powered recovery
+- Use simple workflow error system from `pkg/mcp/domain/workflow/workflow_error.go`
+- Include step name and attempt number for clear error tracking
+- Wrap original errors with context using fmt.Errorf
+- Keep error handling lightweight and focused on workflow needs
 
-### 3. Workflow Development
-- Follow the 10-step workflow pattern
-- Include progress tracking for all steps
-- Implement error recovery where possible
-- Maintain session state consistency
+### 3. Tool Development
+- Add tools to the table-driven registry in `pkg/mcp/service/tools/registry.go`
+- Follow the ToolConfig pattern for consistent tool definitions
+- Include chain hints to guide users to the next tool
+- Use session state for cross-tool data sharing via BoltDB
 
 ### 4. Quality Standards
-- Focus on workflow simplicity and maintainability
-- Comprehensive testing with integration workflow validation
-- Clear documentation with structured progress messages
-- AI-enhanced error recovery with actionable user guidance
+- Focus on tool simplicity and composability
+- Table-driven design for easy tool addition and maintenance
+- Clear chain hints to guide users through workflows
+- Simple error handling with step context for debugging
 - Performance targets: <300μs P95 per request
 
 ## Appendices
@@ -409,8 +477,10 @@ Duration Tracking → Completion Notification
 ### A. Key Metrics
 
 **Codebase Scale**:
-- **4-layer clean architecture** with Domain-Driven Design
-- **Single workflow approach** that simplifies the entire process
+- **Simplified 4-layer architecture** with Domain-Driven Design
+- **15 individual tools** that can be used independently or chained
+- **Direct dependency injection** eliminates complex Wire patterns
+- **Unified infrastructure** packages reduce complexity
 - **AI-powered automation** with error recovery throughout
 - **Comprehensive test coverage** with integration tests
 

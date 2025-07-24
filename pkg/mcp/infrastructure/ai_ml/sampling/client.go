@@ -1,29 +1,29 @@
-// Package sampling provides MCP sampling integration for LLM-powered features.
 package sampling
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/prompts"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/observability/tracing"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/observability"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
-// Option configures a Client.
 type Option func(*Client)
 
 // WithMaxTokens sets a default max-tokens value when the caller does not specify one.
 func WithMaxTokens(n int32) Option { return func(c *Client) { c.maxTokens = n } }
 
-// WithTemperature sets a default temperature.
 func WithTemperature(t float32) Option { return func(c *Client) { c.temperature = t } }
 
 // WithRetry sets the retry budget (attempts and token budget per attempt).
@@ -47,7 +47,6 @@ type Client struct {
 	requestTimeout   time.Duration
 }
 
-// NewClient returns a new sampling client.
 func NewClient(logger *slog.Logger, opts ...Option) *Client {
 	cfg := DefaultConfig()
 	c := &Client{
@@ -79,9 +78,6 @@ func NewClientFromEnv(logger *slog.Logger, opts ...Option) (*Client, error) {
 	return NewClient(logger, allOpts...), nil
 }
 
-// --- Public API -------------------------------------------------------------
-
-// SamplingRequest represents a request to the MCP sampling API.
 type SamplingRequest struct {
 	Prompt       string
 	MaxTokens    int32
@@ -99,7 +95,6 @@ type SamplingRequest struct {
 	LogitBias        map[string]float32
 }
 
-// SamplingResponse represents a response from the MCP sampling API.
 type SamplingResponse struct {
 	Content    string
 	TokensUsed int
@@ -111,7 +106,7 @@ type SamplingResponse struct {
 // SampleInternal performs sampling with AI-assisted retry and error correction.
 func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*SamplingResponse, error) {
 	start := time.Now()
-	ctx, span := tracing.StartSpan(ctx, "sampling.sample")
+	ctx, span := observability.StartSpan(ctx, "sampling.sample")
 	defer span.End()
 
 	// Create enhanced logger for structured LLM logging
@@ -123,7 +118,7 @@ func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*Samp
 
 	// Add tracing attributes
 	span.SetAttributes(
-		attribute.String(tracing.AttrComponent, "sampling"),
+		attribute.String(observability.AttrComponent, "sampling"),
 		attribute.Int("sampling.max_tokens", int(req.MaxTokens)),
 		attribute.Float64("sampling.temperature", float64(req.Temperature)),
 		attribute.Int("sampling.prompt_length", len(req.Prompt)),
@@ -175,7 +170,7 @@ func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingReq
 		}
 
 		// Add retry attempt to span
-		span.SetAttributes(attribute.Int(tracing.AttrSamplingRetryAttempt, attempt+1))
+		span.SetAttributes(attribute.Int(observability.AttrSamplingRetryAttempt, attempt+1))
 
 		// Check for MCP server context on each attempt
 		var resp *SamplingResponse
@@ -192,7 +187,7 @@ func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingReq
 
 			// Add success attributes
 			span.SetAttributes(
-				attribute.Int(tracing.AttrSamplingTokensUsed, resp.TokensUsed),
+				attribute.Int(observability.AttrSamplingTokensUsed, resp.TokensUsed),
 				attribute.String("sampling.model", resp.Model),
 				attribute.String("sampling.stop_reason", resp.StopReason),
 			)
@@ -259,8 +254,6 @@ func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingReq
 	span.SetAttributes(attribute.String("error.final", finalErr.Error()))
 	return nil, finalErr
 }
-
-// --- internals --------------------------------------------------------------
 
 func (c *Client) callMCP(ctx context.Context, req SamplingRequest) (*SamplingResponse, error) {
 	// Try to get MCP server from context
@@ -411,8 +404,6 @@ func (c *Client) callMCPSampling(ctx context.Context, srv *server.MCPServer, req
 	}, nil
 }
 
-// toResponse converts a generic response to our SamplingResponse
-// This will be used when we have the actual MCP sampling API working
 func (c *Client) toResponse(content string, model string) *SamplingResponse {
 	return &SamplingResponse{
 		Content:    content,
@@ -437,7 +428,6 @@ func truncateString(s string, maxLen int) string {
 	return s[:maxLen] + "..."
 }
 
-// ErrorAnalysis represents the structured analysis of an error.
 type ErrorAnalysis struct {
 	RootCause    string   `json:"root_cause"`
 	Fix          string   `json:"fix"`
@@ -679,12 +669,10 @@ func (c *Client) createPatternBasedErrorAnalysis(errorMsg, contextInfo string) *
 	return analysis
 }
 
-// SetTokenBudget sets the maximum tokens allowed per retry session
 func (c *Client) SetTokenBudget(budget int) {
 	c.tokenBudget = budget
 }
 
-// GetTokenBudget returns the current token budget
 func (c *Client) GetTokenBudget() int {
 	return c.tokenBudget
 }
@@ -815,4 +803,263 @@ Respond with only the improved prompt text - no explanations or commentary.`,
 	// If correction failed or was identical, return original
 	c.logger.Warn("AI correction was empty or identical, keeping original", "attempt", attempt)
 	return originalReq, fmt.Errorf("AI correction produced no improvement")
+}
+
+// Configuration types and functions (consolidated from config.go)
+
+// Config holds configuration for the sampling client
+type Config struct {
+	MaxTokens        int32         `json:"max_tokens" env:"SAMPLING_MAX_TOKENS"`
+	Temperature      float32       `json:"temperature" env:"SAMPLING_TEMPERATURE"`
+	RetryAttempts    int           `json:"retry_attempts" env:"SAMPLING_RETRY_ATTEMPTS"`
+	TokenBudget      int           `json:"token_budget" env:"SAMPLING_TOKEN_BUDGET"`
+	BaseBackoff      time.Duration `json:"base_backoff" env:"SAMPLING_BASE_BACKOFF"`
+	MaxBackoff       time.Duration `json:"max_backoff" env:"SAMPLING_MAX_BACKOFF"`
+	StreamingEnabled bool          `json:"streaming_enabled" env:"SAMPLING_STREAMING_ENABLED"`
+	RequestTimeout   time.Duration `json:"request_timeout" env:"SAMPLING_REQUEST_TIMEOUT"`
+}
+
+// DefaultConfig returns the default configuration
+func DefaultConfig() Config {
+	return Config{
+		MaxTokens:        2048,
+		Temperature:      0.3,
+		RetryAttempts:    3,
+		TokenBudget:      5000,
+		BaseBackoff:      200 * time.Millisecond,
+		MaxBackoff:       10 * time.Second,
+		StreamingEnabled: false,
+		RequestTimeout:   30 * time.Second,
+	}
+}
+
+// LoadFromEnv loads configuration from environment variables
+func LoadFromEnv() Config {
+	cfg := DefaultConfig()
+
+	if val := os.Getenv("SAMPLING_MAX_TOKENS"); val != "" {
+		if parsed, err := strconv.ParseInt(val, 10, 32); err == nil {
+			cfg.MaxTokens = int32(parsed)
+		}
+	}
+
+	if val := os.Getenv("SAMPLING_TEMPERATURE"); val != "" {
+		if parsed, err := strconv.ParseFloat(val, 32); err == nil {
+			cfg.Temperature = float32(parsed)
+		}
+	}
+
+	if val := os.Getenv("SAMPLING_RETRY_ATTEMPTS"); val != "" {
+		if parsed, err := strconv.Atoi(val); err == nil {
+			cfg.RetryAttempts = parsed
+		}
+	}
+
+	if val := os.Getenv("SAMPLING_TOKEN_BUDGET"); val != "" {
+		if parsed, err := strconv.Atoi(val); err == nil {
+			cfg.TokenBudget = parsed
+		}
+	}
+
+	if val := os.Getenv("SAMPLING_BASE_BACKOFF"); val != "" {
+		if parsed, err := time.ParseDuration(val); err == nil {
+			cfg.BaseBackoff = parsed
+		}
+	}
+
+	if val := os.Getenv("SAMPLING_MAX_BACKOFF"); val != "" {
+		if parsed, err := time.ParseDuration(val); err == nil {
+			cfg.MaxBackoff = parsed
+		}
+	}
+
+	if val := os.Getenv("SAMPLING_STREAMING_ENABLED"); val != "" {
+		if parsed, err := strconv.ParseBool(val); err == nil {
+			cfg.StreamingEnabled = parsed
+		}
+	}
+
+	if val := os.Getenv("SAMPLING_REQUEST_TIMEOUT"); val != "" {
+		if parsed, err := time.ParseDuration(val); err == nil {
+			cfg.RequestTimeout = parsed
+		}
+	}
+
+	return cfg
+}
+
+// Validate checks if the configuration is valid
+func (c Config) Validate() error {
+	if c.MaxTokens <= 0 {
+		return ErrInvalidConfig("max_tokens must be positive")
+	}
+
+	if c.Temperature < 0 || c.Temperature > 2 {
+		return ErrInvalidConfig("temperature must be between 0 and 2")
+	}
+
+	if c.RetryAttempts < 0 {
+		return ErrInvalidConfig("retry_attempts must be non-negative")
+	}
+
+	if c.TokenBudget <= 0 {
+		return ErrInvalidConfig("token_budget must be positive")
+	}
+
+	if c.BaseBackoff <= 0 {
+		return ErrInvalidConfig("base_backoff must be positive")
+	}
+
+	if c.MaxBackoff <= c.BaseBackoff {
+		return ErrInvalidConfig("max_backoff must be greater than base_backoff")
+	}
+
+	if c.RequestTimeout <= 0 {
+		return ErrInvalidConfig("request_timeout must be positive")
+	}
+
+	return nil
+}
+
+// WithConfig returns an Option that applies the given configuration
+func WithConfig(cfg Config) Option {
+	return func(c *Client) {
+		c.maxTokens = cfg.MaxTokens
+		c.temperature = cfg.Temperature
+		c.retryAttempts = cfg.RetryAttempts
+		c.tokenBudget = cfg.TokenBudget
+		c.baseBackoff = cfg.BaseBackoff
+		c.maxBackoff = cfg.MaxBackoff
+		c.streamingEnabled = cfg.StreamingEnabled
+		c.requestTimeout = cfg.RequestTimeout
+	}
+}
+
+// ErrInvalidConfig represents a configuration error
+type ErrInvalidConfig string
+
+func (e ErrInvalidConfig) Error() string {
+	return "invalid sampling config: " + string(e)
+}
+
+// Helper functions (consolidated from helpers.go)
+
+// GetWorkflowIDFromContext extracts workflow ID from context with multiple fallbacks
+func GetWorkflowIDFromContext(ctx context.Context) string {
+	// Try common context keys for workflow ID
+	keys := []interface{}{
+		"workflow_id", "workflowID", "workflow",
+		"session_id", "sessionID", "session",
+		"request_id", "requestID", "request",
+	}
+	for _, key := range keys {
+		if val := ctx.Value(key); val != nil {
+			if id, ok := val.(string); ok && id != "" {
+				return id
+			}
+		}
+	}
+
+	// Generate a fallback ID based on context if available
+	if span := ctx.Value("span"); span != nil {
+		return "ctx-derived"
+	}
+
+	return "unknown"
+}
+
+// GetStepNameFromContext extracts step name from context with multiple fallbacks
+func GetStepNameFromContext(ctx context.Context) string {
+	// Try common context keys for step name
+	keys := []interface{}{
+		"step_name", "stepName", "step", "current_step",
+		"operation", "action", "task",
+	}
+	for _, key := range keys {
+		if val := ctx.Value(key); val != nil {
+			if step, ok := val.(string); ok && step != "" {
+				return step
+			}
+		}
+	}
+	return "unknown"
+}
+
+// EstimateTokenCount provides a conservative token count estimate
+func EstimateTokenCount(text string) int {
+	// More sophisticated estimation considering:
+	// - Word count (1.3 tokens per word on average)
+	// - Character count (4 characters per token on average)
+	// - Unicode considerations
+
+	charCount := utf8.RuneCountInString(text)
+	words := len(splitWords(text))
+
+	// Use the more conservative estimate
+	fromChars := charCount / 4
+	fromWords := int(float64(words) * 1.3)
+
+	if fromWords > fromChars {
+		return fromWords
+	}
+	return fromChars
+}
+
+// splitWords splits text into words for more accurate token estimation
+func splitWords(text string) []string {
+	if text == "" {
+		return nil
+	}
+
+	words := make([]string, 0)
+	word := make([]rune, 0)
+
+	for _, r := range text {
+		if r == ' ' || r == '\t' || r == '\n' || r == '\r' {
+			if len(word) > 0 {
+				words = append(words, string(word))
+				word = word[:0]
+			}
+		} else {
+			word = append(word, r)
+		}
+	}
+
+	if len(word) > 0 {
+		words = append(words, string(word))
+	}
+
+	return words
+}
+
+// truncateText truncates a string to a maximum length with ellipsis
+func truncateText(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "…"
+}
+
+// Contains checks if a string contains a substring (case-insensitive helper)
+func Contains(s, substr string) bool {
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
+}
+
+// IsRetryable determines if an error is retryable based on common patterns
+func IsRetryable(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Check for common retryable error patterns
+	errStr := strings.ToLower(err.Error())
+	return strings.Contains(errStr, "timeout") ||
+		strings.Contains(errStr, "rate limit") ||
+		strings.Contains(errStr, "temporarily") ||
+		strings.Contains(errStr, "unavailable") ||
+		strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "broken pipe") ||
+		strings.Contains(errStr, "network") ||
+		strings.Contains(errStr, "dns") ||
+		strings.Contains(errStr, "no mcp server in context") // Allow retrying MCP server context issues
 }

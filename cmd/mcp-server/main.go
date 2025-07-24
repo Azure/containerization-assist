@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
-	"github.com/Azure/container-kit/pkg/mcp/composition" // Wire initialization
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	"github.com/Azure/container-kit/pkg/mcp/service" // Direct dependency injection
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -240,8 +240,8 @@ func createAndConfigureServer(config workflow.ServerConfig, flags *FlagConfig) (
 
 	slogLogger := createSlogLogger(config.LogLevel)
 
-	// Create server using Wire dependency injection
-	mcpServer, err := composition.InitializeServer(slogLogger, config)
+	// Create server using direct dependency injection
+	mcpServer, err := service.InitializeServer(slogLogger, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MCP server: %w", err)
 	}

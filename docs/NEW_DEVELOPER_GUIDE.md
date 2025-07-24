@@ -53,31 +53,36 @@ The project includes a VS Code Dev Container with all dependencies pre-installed
 
 ## Architecture Overview
 
-Container Kit follows a **4-layer clean architecture** implementing Domain-Driven Design (DDD) principles:
+Container Kit follows a **simplified 4-layer architecture** implementing Domain-Driven Design (DDD) principles:
 
 ```
 pkg/mcp/
 ├── api/                    # Interface Layer - Contracts and DTOs
 │   └── interfaces.go       # Essential MCP tool interfaces
-├── application/            # Application Layer - Use cases and orchestration
+├── service/                # Service Layer - Application services and orchestration
 │   ├── server.go          # MCP server implementation
-│   ├── bootstrap.go       # Dependency injection setup
+│   ├── dependencies.go    # Direct dependency injection
+│   ├── bootstrap/         # Application bootstrapping
 │   ├── commands/          # CQRS command handlers
 │   ├── queries/           # CQRS query handlers
-│   └── session/           # Session management
+│   ├── session/           # Session management
+│   ├── tools/             # Tool registry (15 tools)
+│   ├── registrar/         # MCP registration
+│   └── transport/         # HTTP and stdio transports
 ├── domain/                # Domain Layer - Business logic
 │   ├── workflow/          # Core containerization workflow
 │   ├── events/            # Domain events system
-│   ├── errors/            # Rich error handling
 │   ├── progress/          # Progress tracking
-│   └── saga/              # Saga pattern implementation
+│   └── session/           # Session domain objects
 └── infrastructure/        # Infrastructure Layer - External integrations
-    ├── steps/             # Workflow step implementations
-    ├── ml/                # AI/ML integrations
-    ├── sampling/          # LLM client implementation
-    ├── prompts/           # Prompt templates
-    ├── resources/         # MCP resource providers
-    └── wire/              # Dependency injection setup
+    ├── orchestration/     # Container orchestration
+    │   └── steps/         # Workflow step implementations
+    ├── ai_ml/             # AI/ML integrations
+    │   ├── sampling/      # LLM client implementation
+    │   └── prompts/       # Prompt templates
+    ├── messaging/         # Unified event and progress
+    ├── observability/     # Unified monitoring and tracing
+    └── persistence/       # BoltDB session storage
 ```
 
 ### Layer Responsibilities
@@ -88,11 +93,11 @@ pkg/mcp/
 - **Dependencies**: None (innermost layer)
 - **Example**: `MCPServer` interface, tool/prompt interfaces
 
-#### Application Layer
+#### Service Layer
 - **Purpose**: Orchestrate use cases and application flow
-- **Contents**: Command/query handlers, session management, server setup
+- **Contents**: Tool registry, command/query handlers, session management, direct DI
 - **Dependencies**: Domain layer interfaces
-- **Example**: `ContainerizeCommandHandler`, `WorkflowStatusQueryHandler`
+- **Example**: `ToolRegistry`, `SessionManager`, `Dependencies struct`
 
 #### Domain Layer
 - **Purpose**: Core business logic and rules
@@ -113,31 +118,42 @@ Infrastructure → Application → Domain → API
 
 ## Key Design Patterns
 
-### 1. Dependency Injection (Google Wire)
+### 1. Direct Dependency Injection
 
-Container Kit uses compile-time dependency injection via Google Wire:
+Container Kit uses simple, direct dependency injection with a Dependencies struct:
 
 ```go
-// pkg/mcp/infrastructure/wire/wire.go
-var ProviderSet = wire.NewSet(
-    ConfigurationSet,
-    ApplicationSet,
-    DomainSet,
-    InfrastructureSet,
-)
+// pkg/mcp/service/dependencies.go
+type Dependencies struct {
+    Logger         *slog.Logger
+    Config         workflow.ServerConfig
+    SessionManager session.OptimizedSessionManager
+    ResourceStore  domainresources.Store
+    
+    ProgressEmitterFactory workflow.ProgressEmitterFactory
+    EventPublisher         domainevents.Publisher
+    
+    WorkflowOrchestrator   workflow.WorkflowOrchestrator
+    EventAwareOrchestrator workflow.EventAwareOrchestrator
+    
+    SamplingClient domainsampling.UnifiedSampler
+    PromptManager  domainprompts.Manager
+}
 
-// Generated InitializeServer assembles all dependencies
-func InitializeServer(ctx context.Context, logger *slog.Logger, config *ServerConfig) (*MCPServer, error) {
-    wire.Build(ProviderSet)
-    return nil, nil
+// Simple factory builds dependencies in correct order
+func (f *ServerFactory) buildDependencies(ctx context.Context) (*Dependencies, error) {
+    // Build infrastructure first
+    // Then domain components
+    // Finally service components
+    return deps, nil
 }
 ```
 
 **Adding new dependencies:**
-1. Create provider function in `wire.go`
-2. Add to appropriate provider set
-3. Run `go generate ./pkg/mcp/infrastructure/wire`
-4. Wire ensures compile-time safety
+1. Add field to Dependencies struct
+2. Add validation in Validate() method
+3. Add initialization in buildDependencies()
+4. No code generation needed!
 
 ### 2. CQRS (Command Query Responsibility Segregation)
 
@@ -173,22 +189,33 @@ func (h *WorkflowStatusQueryHandler) Handle(ctx context.Context, q Query) (inter
 }
 ```
 
-### 3. Saga Pattern for Distributed Transactions
+### 3. Individual Tools with Chaining
 
-Manages long-running workflows with compensating actions:
+The system provides 15 individual tools that can be chained together:
 
 ```go
-// Each saga step has forward and compensating operations
-type SagaStep interface {
-    Name() string
-    Execute(ctx context.Context) error
-    Compensate(ctx context.Context) error
-    CanCompensate() bool
+// Tool configuration in pkg/mcp/service/tools/registry.go
+type ToolConfig struct {
+    Name           string
+    Description    string
+    Category       ToolCategory  // workflow, orchestration, utility
+    RequiredParams []string
+    
+    // Chain hint configuration
+    NextTool    string   // Suggested next tool
+    ChainReason string   // Why to use next tool
+    
+    // Dependencies
+    NeedsStepProvider    bool
+    NeedsProgressFactory bool
+    NeedsSessionManager  bool
 }
 
-// Coordinator manages saga lifecycle
-saga := coordinator.StartSaga(sagaID, steps)
-// If step 7 fails, automatically compensates steps 6→1
+// Tools provide chain hints to guide users
+type ChainHint struct {
+    NextTool string `json:"next_tool"`
+    Reason   string `json:"reason"`
+}
 ```
 
 ### 4. Domain Events
@@ -210,29 +237,31 @@ publisher.PublishAsync(WorkflowStepCompletedEvent{...})
 subscriber.On("WorkflowStepCompleted", handleStepCompleted)
 ```
 
-### 5. Rich Error System
+### 5. Simple Workflow Errors
 
-Structured error handling with context:
+Lightweight error handling with step context:
 
 ```go
-return errors.NewError().
-    Code(errors.CodeBuildFailed).
-    Type(errors.ErrTypeBuild).
-    Severity(errors.SeverityHigh).
-    Message("Docker build failed").
-    Context("image", imageName).
-    Suggestion("Check Dockerfile syntax").
-    UserFacing(true).
-    Retryable(true).
-    WithLocation().
-    Build()
+// pkg/mcp/domain/workflow/workflow_error.go
+type WorkflowError struct {
+    Step    string // Which workflow step failed
+    Attempt int    // Which attempt number
+    Err     error  // The underlying error
+}
+
+// Usage
+return workflow.NewWorkflowError(
+    "build",    // Step name
+    attempt,    // Current attempt
+    fmt.Errorf("Docker build failed: %w", err),
+)
 ```
 
 ## MCP Server and Protocol
 
 ### What is MCP?
 
-The Model Context Protocol (MCP) is a standardized protocol for AI assistants to interact with external tools. Container Kit implements an MCP server that exposes containerization capabilities to AI systems.
+The Model Context Protocol (MCP) is a standardized protocol for AI assistants to interact with external tools. Container Kit implements an MCP server that exposes 15 individual containerization tools to AI systems, allowing flexible workflows through tool chaining.
 
 ### Server Architecture
 
@@ -275,7 +304,10 @@ func RegisterWorkflowTools(mcpServer MCPServer, logger *slog.Logger) error {
 
 The MCP server registers three types of components:
 
-1. **Tools**: Actions AI can invoke (e.g., `containerize_and_deploy`)
+1. **Tools**: 15 individual tools across three categories:
+   - **Workflow Tools** (10): `analyze_repository`, `generate_dockerfile`, etc.
+   - **Orchestration Tools** (2): `start_workflow`, `workflow_status`
+   - **Utility Tools** (3): `list_tools`, `ping`, `server_status`
 2. **Resources**: Data endpoints (e.g., `progress://workflow-id`)
 3. **Prompts**: AI guidance templates (e.g., dockerfile generation)
 
@@ -283,7 +315,7 @@ The MCP server registers three types of components:
 
 ### The 10-Step Containerization Process
 
-Container Kit implements a unified workflow with 10 sequential steps:
+Container Kit provides 10 individual workflow tools that can be chained:
 
 1. **Analyze Repository** - Detect language, framework, dependencies
 2. **Generate Dockerfile** - AI-powered Dockerfile creation
@@ -426,44 +458,34 @@ tracker.Complete("Workflow completed successfully")
 
 ### Adding a New MCP Tool
 
-1. **Define tool schema**:
+1. **Add tool configuration to registry**:
    ```go
-   healthCheckTool := mcp.Tool{
-       Name:        "health_check",
-       Description: "Check application health",
-       InputSchema: mcp.ToolInputSchema{
-           Type: "object",
-           Properties: map[string]interface{}{
-               "endpoint": map[string]interface{}{
-                   "type": "string",
-               },
-           },
-       },
+   // In pkg/mcp/service/tools/registry.go
+   {
+       Name:                 "my_new_tool",
+       Description:          "Description of the tool",
+       Category:             CategoryWorkflow,
+       RequiredParams:       []string{"session_id"},
+       NeedsStepProvider:    true,
+       NeedsProgressFactory: true,
+       NeedsSessionManager:  true,
+       StepGetterName:       "GetMyNewStep",
+       NextTool:             "next_tool_name",
+       ChainReason:          "Tool completed successfully",
    }
    ```
 
-2. **Implement handler**:
+2. **Implement the step**:
    ```go
-   func handleHealthCheck(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-       endpoint := req.Arguments["endpoint"].(string)
-       
-       health := checkHealth(endpoint)
-       
-       return &mcp.CallToolResult{
-           Content: []mcp.Content{
-               mcp.TextContent{
-                   Type: "text",
-                   Text: toJSON(health),
-               },
-           },
-       }, nil
+   // In your StepProvider
+   func (p *StepProviderImpl) GetMyNewStep() domainworkflow.Step {
+       return &MyNewStep{
+           // implementation
+       }
    }
    ```
 
-3. **Register with server**:
-   ```go
-   mcpServer.AddTool(healthCheckTool, handleHealthCheck)
-   ```
+3. **That's it!** The tool is automatically registered with proper schema and handler.
 
 ## Testing Strategy
 
@@ -573,16 +595,16 @@ sessionManager.UpdateSession(session.ID, func(s *SessionState) error {
 })
 ```
 
-### Working with Wire
+### Working with Dependencies
 
 ```bash
-# After adding new provider
-go generate ./pkg/mcp/infrastructure/wire
+# No code generation needed!
+# Just add to Dependencies struct and buildDependencies()
 
-# If circular dependency
+# If circular dependency:
 # 1. Check layer dependencies
 # 2. Use interfaces instead of concrete types
-# 3. Move provider to correct layer
+# 3. Ensure proper initialization order in buildDependencies()
 ```
 
 ## Debugging and Troubleshooting
@@ -594,10 +616,10 @@ go generate ./pkg/mcp/infrastructure/wire
 - **Review AI fixes**: See what corrections were attempted
 - **Test mode**: Run with `test_mode: true` to isolate issues
 
-#### Wire Compilation Errors
+#### Dependency Injection Errors
 - **Circular dependencies**: Ensure proper layer separation
-- **Missing providers**: Add provider functions for new types
-- **Run generate**: `go generate ./pkg/mcp/infrastructure/wire`
+- **Missing dependencies**: Add to Dependencies struct and Validate()
+- **Initialization order**: Check buildDependencies() order
 
 #### Session Errors
 - **BoltDB locks**: Ensure single process access
@@ -616,8 +638,8 @@ go test -run TestAnalyzeRepository -v
 # Profile performance
 go test -bench=. -cpuprofile=cpu.prof
 
-# Check wire dependencies
-wire check ./pkg/mcp/infrastructure/wire
+# Check dependency initialization
+go test ./pkg/mcp/service -run TestDependencies
 ```
 
 ## Reference
@@ -667,7 +689,7 @@ make help               # Show all targets
 cmd/mcp-server/         # MCP server entry point
 pkg/mcp/                # Core MCP implementation
 ├── api/                # Interfaces and contracts
-├── application/        # Use cases and orchestration
+├── service/            # Application services
 ├── domain/             # Business logic
 └── infrastructure/     # External integrations
 
@@ -683,12 +705,13 @@ examples/               # Usage examples
 ### Architecture Decision Records (ADRs)
 
 Key architectural decisions:
-- [ADR-001: Single Workflow Architecture](../docs/architecture/adr/2025-07-11-single-workflow-architecture.md)
+- [ADR-001: Tool-Splitting Architecture](../docs/architecture/adr/2025-07-11-tool-splitting-architecture.md)
 - [ADR-002: Go Embed Template Management](../docs/architecture/adr/2025-07-11-go-embed-template-management.md)
-- [ADR-003: Wire-Based Dependency Injection](../docs/architecture/adr/2025-07-11-wire-dependency-injection.md)
-- [ADR-004: Unified Rich Error System](../docs/architecture/adr/2025-07-11-unified-rich-error-system.md)
+- [ADR-003: Direct Dependency Injection](../docs/architecture/adr/2025-07-11-direct-dependency-injection.md)
+- [ADR-004: Simple Workflow Error Handling](../docs/architecture/adr/2025-07-11-simple-workflow-errors.md)
 - [ADR-005: AI-Assisted Error Recovery](../docs/architecture/adr/2025-07-11-ai-assisted-error-recovery.md)
-- [ADR-006: Four-Layer MCP Architecture](../docs/architecture/adr/2025-07-12-four-layer-mcp-architecture.md)
+- [ADR-006: Simplified Four-Layer MCP Architecture](../docs/architecture/adr/2025-07-12-simplified-four-layer-architecture.md)
+- [ADR-007: Infrastructure Layer Consolidation](../docs/architecture/adr/2025-07-12-infrastructure-consolidation.md)
 
 ---
 

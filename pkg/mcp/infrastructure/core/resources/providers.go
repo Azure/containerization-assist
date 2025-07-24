@@ -1,4 +1,3 @@
-// Package resources provides MCP resource providers for logs and progress
 package resources
 
 import (
@@ -12,12 +11,11 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/resources"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/utilities"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/utils"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// Store manages workflow progress and logs
 type Store struct {
 	progressData map[string]*workflow.WorkflowProgress
 	logData      map[string]map[string][]string // workflowID -> stepName -> logs
@@ -28,7 +26,6 @@ type Store struct {
 	lastCleanup  time.Time
 }
 
-// NewStore creates a new resource store
 func NewStore(logger *slog.Logger) *Store {
 	return &Store{
 		progressData: make(map[string]*workflow.WorkflowProgress),
@@ -38,7 +35,6 @@ func NewStore(logger *slog.Logger) *Store {
 	}
 }
 
-// RegisterProviders registers all resource providers with the MCP server
 func (s *Store) RegisterProviders(mcpServer interface{}) error {
 	// Type assert to the specific interface we need
 	mcpSrv, ok := mcpServer.(interface {
@@ -107,7 +103,6 @@ func (s *Store) RegisterProviders(mcpServer interface{}) error {
 	return nil
 }
 
-// handleProgressResource handles dynamic progress resource requests
 func (s *Store) handleProgressResource(ctx context.Context, req mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 	// Extract workflowID from URI
 	parts := strings.Split(req.Params.URI, "://")
@@ -132,7 +127,6 @@ func (s *Store) handleProgressResource(ctx context.Context, req mcp.ReadResource
 	}, nil
 }
 
-// handleLogsResource handles dynamic log resource requests
 func (s *Store) handleLogsResource(ctx context.Context, req mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 	// Extract workflowID and stepName from URI
 	// URI format: logs://workflowID/stepName
@@ -163,7 +157,6 @@ func (s *Store) handleLogsResource(ctx context.Context, req mcp.ReadResourceRequ
 	}, nil
 }
 
-// GetProgressAsResource returns progress data formatted as a resource
 func (s *Store) GetProgressAsResource(workflowID string) (interface{}, error) {
 	s.mu.RLock()
 	progress, exists := s.progressData[workflowID]
@@ -185,12 +178,11 @@ func (s *Store) GetProgressAsResource(workflowID string) (interface{}, error) {
 	}
 
 	// Mask sensitive data before returning
-	maskedResult := utilities.MaskMap(result)
+	maskedResult := utils.MaskMap(result)
 
 	return maskedResult, nil
 }
 
-// GetLogsAsResource returns logs formatted as a resource
 func (s *Store) GetLogsAsResource(workflowID, stepName string) (interface{}, error) {
 	s.mu.RLock()
 	workflowLogs, exists := s.logData[workflowID]
@@ -208,7 +200,7 @@ func (s *Store) GetLogsAsResource(workflowID, stepName string) (interface{}, err
 
 	// Combine logs and mask sensitive data
 	combinedLogs := strings.Join(stepLogs, "\n")
-	maskedLogs := utilities.Mask(combinedLogs)
+	maskedLogs := utils.Mask(combinedLogs)
 
 	// Tail last maxLogSize bytes for quick-peek in chat
 	if len(maskedLogs) > s.maxLogSize {
@@ -219,7 +211,6 @@ func (s *Store) GetLogsAsResource(workflowID, stepName string) (interface{}, err
 	return maskedLogs, nil
 }
 
-// GetWorkflowListAsResource returns workflow list formatted as a resource
 func (s *Store) GetWorkflowListAsResource() (interface{}, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -245,7 +236,6 @@ func (s *Store) GetWorkflowListAsResource() (interface{}, error) {
 	}, nil
 }
 
-// StoreProgress stores workflow progress data
 func (s *Store) StoreProgress(workflowID string, progressData *workflow.WorkflowProgress) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -254,7 +244,6 @@ func (s *Store) StoreProgress(workflowID string, progressData *workflow.Workflow
 	s.logger.Debug("Stored workflow progress", "workflow_id", workflowID)
 }
 
-// StoreLogs stores logs for a workflow step
 func (s *Store) StoreLogs(workflowID, stepName string, logs []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -279,7 +268,6 @@ func (s *Store) StoreLogs(workflowID, stepName string, logs []string) {
 		"lines", len(logs))
 }
 
-// GetProgress retrieves workflow progress
 func (s *Store) GetProgress(workflowID string) (*workflow.WorkflowProgress, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -288,7 +276,6 @@ func (s *Store) GetProgress(workflowID string) (*workflow.WorkflowProgress, bool
 	return progress, exists
 }
 
-// GetLogs retrieves logs for a workflow step
 func (s *Store) GetLogs(workflowID, stepName string) ([]string, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -302,7 +289,6 @@ func (s *Store) GetLogs(workflowID, stepName string) ([]string, bool) {
 	return nil, false
 }
 
-// CleanupOldData removes data older than the specified duration
 func (s *Store) CleanupOldData(maxAge time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -319,7 +305,6 @@ func (s *Store) CleanupOldData(maxAge time.Duration) {
 	}
 }
 
-// StartCleanupRoutine starts a background cleanup routine
 func (s *Store) StartCleanupRoutine(cleanupInterval, maxAge time.Duration) {
 	s.mu.Lock()
 	s.cleanupStop = make(chan struct{})
@@ -348,7 +333,6 @@ func (s *Store) StartCleanupRoutine(cleanupInterval, maxAge time.Duration) {
 		"max_age", maxAge)
 }
 
-// StopCleanupRoutine stops the background cleanup routine
 func (s *Store) StopCleanupRoutine() {
 	s.mu.Lock()
 	if s.cleanupStop != nil {
@@ -360,7 +344,6 @@ func (s *Store) StopCleanupRoutine() {
 	s.logger.Info("Stopped resource cleanup routine")
 }
 
-// GetResourceCount returns the total number of resources
 func (s *Store) GetResourceCount() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -372,7 +355,6 @@ func (s *Store) GetResourceCount() int {
 	return count
 }
 
-// GetLastCleanupTime returns the last cleanup time
 func (s *Store) GetLastCleanupTime() time.Time {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

@@ -5,7 +5,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/mcp/application/registry"
+	"github.com/Azure/container-kit/pkg/mcp/service/registry"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )

@@ -1,4 +1,3 @@
-// Package prompts provides template management functionality
 package prompts
 
 import (
@@ -29,14 +28,12 @@ type Manager struct {
 	watcher   *HotReloadWatcher // Hot-reload watcher
 }
 
-// ManagerConfig holds configuration for the template manager
 type ManagerConfig struct {
 	TemplateDir     string // External template directory
 	EnableHotReload bool   // Watch for file changes
 	AllowOverride   bool   // Allow external templates to override embedded ones
 }
 
-// NewManager creates a new template manager
 func NewManager(logger *slog.Logger, config ManagerConfig) (*Manager, error) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
@@ -76,7 +73,6 @@ func NewManager(logger *slog.Logger, config ManagerConfig) (*Manager, error) {
 	return m, nil
 }
 
-// GetTemplate retrieves a template by ID
 func (m *Manager) GetTemplate(id string) (*Template, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -89,7 +85,6 @@ func (m *Manager) GetTemplate(id string) (*Template, error) {
 	return template, nil
 }
 
-// RenderTemplate renders a template with the given data
 func (m *Manager) RenderTemplate(id string, data TemplateData) (*RenderedPrompt, error) {
 	template, err := m.GetTemplate(id)
 	if err != nil {
@@ -112,7 +107,6 @@ func (m *Manager) RenderTemplate(id string, data TemplateData) (*RenderedPrompt,
 	return rendered, nil
 }
 
-// ListTemplates returns all available templates
 func (m *Manager) ListTemplates() []*Template {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -133,7 +127,6 @@ func (m *Manager) ListTemplates() []*Template {
 	return templates
 }
 
-// GetTemplatesByCategory returns templates in a specific category
 func (m *Manager) GetTemplatesByCategory(category string) []*Template {
 	all := m.ListTemplates()
 	var filtered []*Template
@@ -147,7 +140,6 @@ func (m *Manager) GetTemplatesByCategory(category string) []*Template {
 	return filtered
 }
 
-// GetTemplatesByTag returns templates with a specific tag
 func (m *Manager) GetTemplatesByTag(tag string) []*Template {
 	all := m.ListTemplates()
 	var filtered []*Template
@@ -164,7 +156,6 @@ func (m *Manager) GetTemplatesByTag(tag string) []*Template {
 	return filtered
 }
 
-// ReloadTemplates reloads all templates from disk
 func (m *Manager) ReloadTemplates() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -188,7 +179,6 @@ func (m *Manager) ReloadTemplates() error {
 	return nil
 }
 
-// loadEmbeddedTemplates loads templates from embedded filesystem
 func (m *Manager) loadEmbeddedTemplates() error {
 	return fs.WalkDir(embeddedTemplates, "templates", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -214,7 +204,6 @@ func (m *Manager) loadEmbeddedTemplates() error {
 	})
 }
 
-// loadExternalTemplates loads templates from external directory
 func (m *Manager) loadExternalTemplates() error {
 	if _, err := os.Stat(m.config.TemplateDir); os.IsNotExist(err) {
 		m.logger.Warn("Template directory does not exist", "dir", m.config.TemplateDir)
@@ -264,7 +253,6 @@ func (m *Manager) loadExternalTemplates() error {
 	})
 }
 
-// parseTemplate parses a YAML template
 func (m *Manager) parseTemplate(data []byte, path, source string) (*Template, error) {
 	var template Template
 	if err := yaml.Unmarshal(data, &template); err != nil {
@@ -300,7 +288,6 @@ func (m *Manager) parseTemplate(data []byte, path, source string) (*Template, er
 	return &template, nil
 }
 
-// GetStats returns statistics about loaded templates
 func (m *Manager) GetStats() map[string]interface{} {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -321,8 +308,6 @@ func (m *Manager) GetStats() map[string]interface{} {
 		"tags":            tags,
 	}
 }
-
-// Domain interface implementation methods
 
 // GetPrompt implements domainprompts.Manager interface
 func (m *Manager) GetPrompt(ctx context.Context, promptID string) (domainprompts.Template, error) {

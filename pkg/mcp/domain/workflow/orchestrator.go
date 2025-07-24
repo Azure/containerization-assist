@@ -39,6 +39,16 @@ func NewOrchestrator(
 	}, nil
 }
 
+// GetStepProvider returns the step provider for accessing individual steps
+func (o *Orchestrator) GetStepProvider() StepProvider {
+	return o.stepProvider
+}
+
+// GetProgressEmitterFactory returns the progress emitter factory
+func (o *Orchestrator) GetProgressEmitterFactory() ProgressEmitterFactory {
+	return o.emitterFactory
+}
+
 // Execute runs the containerization workflow using DAG execution
 func (o *Orchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
 	// Initialize context with workflow ID
@@ -52,7 +62,7 @@ func (o *Orchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest, ar
 	state := o.newState(workflowID, args, emitter)
 
 	// Log workflow start
-	o.logger.Info("Starting DAG-based containerize_and_deploy workflow",
+	o.logger.Info("Starting DAG-based containerization workflow",
 		"workflow_id", workflowID,
 		"steps_count", len(o.dag.steps),
 		"repo_url", args.RepoURL,
@@ -118,7 +128,7 @@ func (o *Orchestrator) newState(workflowID string, args *ContainerizeAndDeployAr
 		ProgressEmitter:  emitter,
 		TotalSteps:       len(o.dag.steps),
 		CurrentStep:      0,
-		WorkflowProgress: NewWorkflowProgress(workflowID, "containerize_and_deploy", len(o.dag.steps)),
+		WorkflowProgress: NewWorkflowProgress(workflowID, "containerization", len(o.dag.steps)),
 	}
 
 	return state
@@ -136,69 +146,40 @@ func buildContainerizationDAG(provider StepProvider) (*DAGWorkflow, error) {
 	}
 
 	// Add steps - wrapping existing Step implementations
-	builder.
-		AddStep(&DAGStep{
-			Name:    "analyze",
-			Execute: wrapStep(provider.GetAnalyzeStep()),
-			Retry:   defaultRetry,
-			Timeout: 5 * time.Minute,
-		}).
-		AddStep(&DAGStep{
-			Name:    "dockerfile",
-			Execute: wrapStep(provider.GetDockerfileStep()),
-			Retry:   defaultRetry,
-			Timeout: 2 * time.Minute,
-		}).
-		AddStep(&DAGStep{
-			Name:    "build",
-			Execute: wrapStep(provider.GetBuildStep()),
-			Retry:   defaultRetry,
-			Timeout: 15 * time.Minute,
-		}).
-		AddStep(&DAGStep{
-			Name:    "scan",
-			Execute: wrapStep(provider.GetScanStep()),
-			Retry:   defaultRetry,
-			Timeout: 10 * time.Minute,
-		}).
-		AddStep(&DAGStep{
-			Name:    "tag",
-			Execute: wrapStep(provider.GetTagStep()),
-			Retry:   defaultRetry,
-			Timeout: 1 * time.Minute,
-		}).
-		AddStep(&DAGStep{
-			Name:    "push",
-			Execute: wrapStep(provider.GetPushStep()),
-			Retry:   defaultRetry,
-			Timeout: 10 * time.Minute,
-		}).
-		AddStep(&DAGStep{
-			Name:    "manifest",
-			Execute: wrapStep(provider.GetManifestStep()),
-			Retry:   defaultRetry,
-			Timeout: 2 * time.Minute,
-		}).
-		AddStep(&DAGStep{
-			Name:    "cluster",
-			Execute: wrapStep(provider.GetClusterStep()),
-			Retry:   defaultRetry,
-			Timeout: 5 * time.Minute,
-		}).
-		AddStep(&DAGStep{
-			Name:    "deploy",
-			Execute: wrapStep(provider.GetDeployStep()),
-			Retry:   defaultRetry,
-			Timeout: 10 * time.Minute,
-		}).
-		AddStep(&DAGStep{
-			Name:    "verify",
-			Execute: wrapStep(provider.GetVerifyStep()),
-			Retry:   defaultRetry,
-			Timeout: 5 * time.Minute,
-		})
+	// Step definitions with their configurations
+	stepConfigs := []struct {
+		name    string
+		stepKey string
+		timeout time.Duration
+	}{
+		{"analyze", StepAnalyzeRepository, 5 * time.Minute},
+		{"dockerfile", StepGenerateDockerfile, 2 * time.Minute},
+		{"build", StepBuildImage, 15 * time.Minute},
+		{"scan", StepSecurityScan, 10 * time.Minute},
+		{"tag", StepTagImage, 1 * time.Minute},
+		{"push", StepPushImage, 10 * time.Minute},
+		{"manifest", StepGenerateManifests, 2 * time.Minute},
+		{"cluster", StepSetupCluster, 5 * time.Minute},
+		{"deploy", StepDeployApplication, 10 * time.Minute},
+		{"verify", StepVerifyDeployment, 5 * time.Minute},
+	}
 
-	// Define sequential dependencies (as per current workflow)
+	// Add all steps with error handling
+	for _, config := range stepConfigs {
+		step, err := getStep(provider, config.stepKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get step %s: %w", config.name, err)
+		}
+
+		builder.AddStep(&DAGStep{
+			Name:    config.name,
+			Execute: wrapStep(step),
+			Retry:   defaultRetry,
+			Timeout: config.timeout,
+		})
+	}
+
+	// Define sequential dependencies
 	builder.
 		AddDependency("analyze", "dockerfile").
 		AddDependency("dockerfile", "build").
@@ -248,4 +229,13 @@ func wrapStep(step Step) func(context.Context, *WorkflowState) error {
 
 		return err
 	}
+}
+
+// getStep is a helper that gets a step by name and returns an error if not found
+func getStep(provider StepProvider, name string) (Step, error) {
+	step, err := provider.GetStep(name)
+	if err != nil {
+		return nil, fmt.Errorf("step %s not found: %w", name, err)
+	}
+	return step, nil
 }

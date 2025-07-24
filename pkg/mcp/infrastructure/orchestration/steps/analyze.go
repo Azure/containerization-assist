@@ -8,10 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/utilities"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/utils"
 )
 
-// AnalyzeResult contains the results of repository analysis
 type AnalyzeResult struct {
 	Language  string                 `json:"language"`
 	Framework string                 `json:"framework"`
@@ -92,7 +91,7 @@ func AnalyzeRepository(input, branch string, logger *slog.Logger) (*AnalyzeResul
 	// The cleanup should be handled by the workflow or session manager.
 
 	// Create analysis engine with enhanced logging
-	analyzer := utilities.NewRepositoryAnalyzer(logger.With("component", "analyze_repository"))
+	analyzer := utils.NewRepositoryAnalyzer(logger.With("component", "analyze_repository"))
 
 	// Perform real repository analysis with detailed logging
 	logger.Info("Starting repository analysis with analyzer", "path", repoPath)
@@ -142,7 +141,6 @@ func AnalyzeRepository(input, branch string, logger *slog.Logger) (*AnalyzeResul
 	}, nil
 }
 
-// cloneRepository clones a git repository with enhanced branch fallback logic
 func cloneRepository(repoURL, branch, destDir string, logger *slog.Logger) error {
 	// Enhanced git clone with automatic branch fallback
 	var attemptedBranches []string
