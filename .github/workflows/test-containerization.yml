@@ -140,9 +140,20 @@ jobs:
           # Test with a simple Java servlet application using mcphost
           # mcphost will handle starting/stopping the MCP server automatically
           echo "Starting mcphost with containerization request..."
+          
+          # Capture both stdout and stderr, and don't exit on failure
+          set +e
           RESULT=$(mcphost -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello" 2>&1)
           EXIT_CODE=$?
+          set -e
+          
           echo "Test completed with exit code: $EXIT_CODE"
+          echo ""
+          echo "=== MCPHOST OUTPUT ==="
+          echo "$RESULT"
+          echo "=== END OUTPUT ==="
+          echo ""
+          
           echo "result<<EOF" >> $GITHUB_OUTPUT
           echo "$RESULT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
