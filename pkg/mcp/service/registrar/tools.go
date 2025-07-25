@@ -7,12 +7,13 @@ import (
 	"fmt"
 	"time"
 
+	"log/slog"
+
 	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/service/session"
 	"github.com/Azure/container-kit/pkg/mcp/service/tools"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"log/slog"
 )
 
 // ToolRegistrar handles tool registration using the new consolidated system
@@ -648,8 +649,23 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 			return tr.createErrorResultWithRetry(fmt.Sprintf("Failed to get dockerfile step: %s", err.Error()), retryNumber)
 		}
 
+		// Check for previous error info in parameters
+		options := map[string]interface{}{}
+
+		// Extract previous_error if provided
+		if prevError, ok := args["previous_error"].(string); ok && prevError != "" {
+			options["previous_error"] = prevError
+			tr.logger.Info("Detected previous error", "error", prevError)
+		}
+
+		// Extract failed_tool if provided
+		if failedTool, ok := args["failed_tool"].(string); ok && failedTool != "" {
+			options["previous_tool"] = failedTool
+			tr.logger.Info("Detected failed tool", "tool", failedTool)
+		}
+
 		// Create workflow state for this step
-		workflowState, simpleState, err := tr.createStepState(ctx, sessionID, "")
+		workflowState, simpleState, err := tr.createStepState(ctx, sessionID, "", options)
 		if err != nil {
 			return tr.createErrorResultWithRetry(fmt.Sprintf("Failed to create workflow state: %s", err.Error()), retryNumber)
 		}
@@ -704,8 +720,23 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 			return tr.createErrorResultWithRetry(fmt.Sprintf("Failed to get step %s (mapped to %s): %s", stepName, actualStepName, err.Error()), retryNumber)
 		}
 
+		// Check for previous error info in parameters
+		options := map[string]interface{}{}
+
+		// Extract previous_error if provided
+		if prevError, ok := args["previous_error"].(string); ok && prevError != "" {
+			options["previous_error"] = prevError
+			tr.logger.Info("Detected previous error for default case", "error", prevError)
+		}
+
+		// Extract failed_tool if provided
+		if failedTool, ok := args["failed_tool"].(string); ok && failedTool != "" {
+			options["previous_tool"] = failedTool
+			tr.logger.Info("Detected failed tool for default case", "tool", failedTool)
+		}
+
 		// Create workflow state for this step
-		workflowState, simpleState, err := tr.createStepState(ctx, sessionID, "")
+		workflowState, simpleState, err := tr.createStepState(ctx, sessionID, "", options)
 		if err != nil {
 			return tr.createErrorResultWithRetry(fmt.Sprintf("Failed to create workflow state: %s", err.Error()), retryNumber)
 		}
@@ -861,7 +892,7 @@ func (tr *ToolRegistrar) createStepResult(success bool, stepName, message string
 	}, nil
 }
 
-func (tr *ToolRegistrar) createStepState(ctx context.Context, sessionID, repoPath string) (*domainworkflow.WorkflowState, *tools.SimpleWorkflowState, error) {
+func (tr *ToolRegistrar) createStepState(ctx context.Context, sessionID, repoPath string, options ...map[string]interface{}) (*domainworkflow.WorkflowState, *tools.SimpleWorkflowState, error) {
 	// Load existing session state or create new one
 	simpleState, err := tools.LoadWorkflowState(ctx, tr.sessionManager, sessionID)
 	if err != nil {
@@ -909,6 +940,23 @@ func (tr *ToolRegistrar) createStepState(ctx context.Context, sessionID, repoPat
 		TotalSteps:       10, // Standard workflow has 10 steps
 		CurrentStep:      len(simpleState.CompletedSteps),
 		WorkflowProgress: domainworkflow.NewWorkflowProgress(sessionID, "containerization", 10),
+	}
+
+	// Check if we have options with previous error or tool name
+	if len(options) > 0 {
+		if prevErr, ok := options[0]["previous_error"]; ok {
+			if errStr, isStr := prevErr.(string); isStr && errStr != "" {
+				workflowState.PreviousError = fmt.Errorf("%s", errStr)
+				tr.logger.Info("Added previous error to workflow state", "error", errStr)
+			}
+		}
+
+		if prevTool, ok := options[0]["previous_tool"]; ok {
+			if toolName, isStr := prevTool.(string); isStr && toolName != "" {
+				workflowState.PreviousToolName = toolName
+				tr.logger.Info("Added previous tool to workflow state", "tool", toolName)
+			}
+		}
 	}
 
 	// Restore step results from session artifacts

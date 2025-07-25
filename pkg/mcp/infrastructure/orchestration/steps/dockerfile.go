@@ -1,6 +1,7 @@
 package steps
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -19,15 +20,57 @@ type DockerfileResult struct {
 }
 
 // GenerateDockerfile creates an optimized Dockerfile based on analysis results
-func GenerateDockerfile(analyzeResult *AnalyzeResult, logger *slog.Logger) (*DockerfileResult, error) {
+func GenerateDockerfile(analyzeResult *AnalyzeResult, logger *slog.Logger, previousError ...error) (*DockerfileResult, error) {
 	if analyzeResult == nil {
 		return nil, errors.New(errors.CodeInvalidParameter, "dockerfile", "analyze result is required", nil)
 	}
 
-	logger.Info("Generating Dockerfile",
-		"language", analyzeResult.Language,
-		"framework", analyzeResult.Framework,
-		"port", analyzeResult.Port)
+	// Check if we have a previous error to fix
+	var buildError error
+	var existingDockerfilePath string
+	if len(previousError) > 0 && previousError[0] != nil {
+		buildError = previousError[0]
+		existingDockerfilePath = filepath.Join(analyzeResult.RepoPath, "Dockerfile")
+
+		// Check if we have an existing Dockerfile to fix
+		if _, err := os.Stat(existingDockerfilePath); err == nil {
+			logger.Info("Found existing Dockerfile with build errors, attempting AI-assisted fix",
+				"error", buildError.Error())
+
+			// Try to fix Dockerfile with AI
+			if err := FixDockerfileWithAI(context.Background(), existingDockerfilePath, buildError, analyzeResult, logger); err != nil {
+				logger.Warn("AI-assisted fix failed, falling back to template generation",
+					"error", err.Error())
+			} else {
+				// Read the fixed Dockerfile
+				content, err := os.ReadFile(existingDockerfilePath)
+				if err == nil {
+					logger.Info("Successfully fixed Dockerfile with AI assistance")
+					baseImage := getBaseImageForLanguage(analyzeResult.Language, analyzeResult.Framework)
+
+					return &DockerfileResult{
+						Content:     string(content),
+						Path:        "Dockerfile",
+						BaseImage:   baseImage,
+						ExposedPort: analyzeResult.Port,
+					}, nil
+				}
+			}
+		}
+	}
+
+	// If no previous error or AI fixing failed, generate a new Dockerfile
+	if buildError != nil {
+		logger.Info("Regenerating Dockerfile after build failure",
+			"language", analyzeResult.Language,
+			"framework", analyzeResult.Framework,
+			"port", analyzeResult.Port)
+	} else {
+		logger.Info("Generating Dockerfile",
+			"language", analyzeResult.Language,
+			"framework", analyzeResult.Framework,
+			"port", analyzeResult.Port)
+	}
 
 	// Generate Dockerfile based on detected language and framework
 	dockerfile := generateDockerfileForLanguage(analyzeResult.Language, analyzeResult.Framework, analyzeResult.Port, logger)

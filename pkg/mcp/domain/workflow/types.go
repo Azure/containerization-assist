@@ -316,6 +316,10 @@ type WorkflowState struct {
 	CurrentStep      int
 	TotalSteps       int
 
+	// Previous error information for retries and fixing
+	PreviousError    error
+	PreviousToolName string
+
 	// Utilities
 	Logger *slog.Logger
 

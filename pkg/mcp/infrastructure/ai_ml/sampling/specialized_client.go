@@ -373,3 +373,56 @@ func (c *SpecializedClient) FixDockerfile(ctx context.Context, language string, 
 
 	return result, nil
 }
+
+// AnalyzeDockerfileIssue analyzes and fixes Dockerfile build issues
+func (c *SpecializedClient) AnalyzeDockerfileIssue(ctx context.Context, dockerfileContent string, buildError error, repoAnalysis string) (string, error) {
+	// Prepare error string
+	var errorStr string
+	if buildError != nil {
+		errorStr = buildError.Error()
+	} else {
+		errorStr = "No build error provided"
+	}
+
+	// Get template manager
+	templateManager, err := prompts.NewManager(c.logger, prompts.ManagerConfig{})
+	if err != nil {
+		return "", fmt.Errorf("failed to create template manager: %w", err)
+	}
+
+	// Prepare template data
+	templateData := prompts.TemplateData{
+		"DockerfileContent": dockerfileContent,
+		"BuildError":        errorStr,
+		"RepoAnalysis":      repoAnalysis,
+	}
+
+	// Render template
+	rendered, err := templateManager.RenderTemplate("dockerfile-fix", templateData)
+	if err != nil {
+		return "", fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	req := domain.Request{
+		Prompt:       rendered.Content,
+		MaxTokens:    rendered.MaxTokens,
+		Temperature:  rendered.Temperature,
+		SystemPrompt: rendered.SystemPrompt,
+		Metadata: map[string]interface{}{
+			"template_id":       "generate-dockerfile",
+			"dockerfileContent": dockerfileContent,
+			"buildError":        buildError,
+			"repoAnalysis":      repoAnalysis,
+		},
+	}
+
+	start := time.Now()
+	// Sample
+	response, err := c.sampler.Sample(ctx, req)
+	if err != nil {
+		return "", fmt.Errorf("failed to fix dockerfile: %w", err)
+	}
+
+	c.logger.Info("Dockerfile fix completed", "duration", time.Since(start))
+	return response.Content, nil
+}

@@ -47,7 +47,14 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowSt
 		RepoPath:  state.AnalyzeResult.RepoPath,
 	}
 
-	dockerfileResult, err := GenerateDockerfile(infraAnalyzeResult, state.Logger)
+	// Check if this is being called after a build failure
+	var previousError error
+	if state.PreviousError != nil && state.PreviousToolName == "build_image" {
+		state.Logger.Info("Detected previous build failure, entering AI fix mode")
+		previousError = state.PreviousError
+	}
+
+	dockerfileResult, err := GenerateDockerfile(infraAnalyzeResult, state.Logger, previousError)
 	if err != nil {
 		return fmt.Errorf("dockerfile generation failed: %v", err)
 	}

@@ -16,6 +16,7 @@ import (
 type RetryConfig struct {
 	MaxRetries      int
 	RetryableErrors []string
+	OnFailGoTo      string // Name of the tool to redirect to on failure
 	BackoffBase     time.Duration
 	BackoffMax      time.Duration
 }
@@ -53,6 +54,7 @@ var DefaultRetryConfigs = map[string]RetryConfig{
 			"docker daemon not responding",
 			"no space left on device",
 		},
+		OnFailGoTo:  "generate_dockerfile", // If build fails, go back to dockerfile generation with AI fixing
 		BackoffBase: 2 * time.Second,
 		BackoffMax:  30 * time.Second,
 	},
@@ -123,6 +125,7 @@ var DefaultRetryConfigs = map[string]RetryConfig{
 			"api server error",
 			"connection reset",
 		},
+		OnFailGoTo:  "generate_k8s_manifests", // If deployment fails, go back to manifest generation with AI fixing
 		BackoffBase: 5 * time.Second,
 		BackoffMax:  60 * time.Second,
 	},
@@ -214,12 +217,32 @@ func (tr *ToolRegistrar) wrapWithRetry(
 			}
 		}
 
+		// Check if retry limit has been exceeded
+		if retryNumber > maxRetries {
+			tr.logger.Error("Max retries exceeded",
+				"tool", toolName,
+				"retryNumber", retryNumber,
+				"maxRetries", maxRetries,
+			)
+			return nil, fmt.Errorf("max retries exceeded for tool %s", toolName)
+		}
+
 		// Execute the handler
 		result, err := handler(ctx, req)
 
-		// Check if we should suggest retry
+		// Check if we should suggest retry or redirection
 		if err != nil && retryNumber < maxRetries {
-			if config, exists := DefaultRetryConfigs[toolName]; exists {
+			// Check if there's an OnFailGoTo configured for this tool
+			if config, exists := DefaultRetryConfigs[toolName]; exists && config.OnFailGoTo != "" {
+				tr.logger.Warn("Error detected, redirecting to failover tool",
+					"tool", toolName,
+					"error", err.Error(),
+					"redirectTo", config.OnFailGoTo,
+				)
+				// Return result suggesting redirection to another tool
+				return tr.createRedirectResult(toolName, config.OnFailGoTo, err)
+			} else if config, exists := DefaultRetryConfigs[toolName]; exists {
+				// No failover tool, check if error is retryable
 				if shouldRetry(err, config.RetryableErrors) {
 					tr.logger.Warn("Retryable error detected",
 						"tool", toolName,
@@ -233,16 +256,7 @@ func (tr *ToolRegistrar) wrapWithRetry(
 			}
 		}
 
-		// If max retries reached, log it
-		if err != nil && retryNumber >= maxRetries {
-			tr.logger.Error("Max retries reached for tool",
-				"tool", toolName,
-				"error", err.Error(),
-				"retryNumber", retryNumber,
-				"maxRetries", maxRetries,
-			)
-		}
-
+		// If we reach here, either the operation succeeded or we've decided not to retry
 		return result, err
 	}
 }
@@ -286,6 +300,44 @@ func (tr *ToolRegistrar) createRetryResult(toolName string, nextRetry int, err e
 		"chain_hint": map[string]interface{}{
 			"next_tool": toolName, // Retry same tool
 			"reason":    fmt.Sprintf("Retrying after error (attempt %d): %s", nextRetry, err.Error()),
+		},
+	}
+
+	jsonData, _ := json.Marshal(result)
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			mcp.TextContent{
+				Type: "text",
+				Text: string(jsonData),
+			},
+		},
+	}, nil
+}
+
+// createRedirectResult creates a result suggesting redirection to another tool
+func (tr *ToolRegistrar) createRedirectResult(toolName, redirectTo string, err error) (*mcp.CallToolResult, error) {
+	redirectHint := map[string]interface{}{
+		"should_redirect": true,
+		"from_tool":       toolName,
+		"to_tool":         redirectTo,
+		"reason":          fmt.Sprintf("Max retries reached for %s, redirecting to %s", toolName, redirectTo),
+	}
+
+	// Pass the error information as a parameter to the redirect tool
+	// This allows the redirected tool to know it's being called after a failure
+	// and should use AI fixing instead of regular generation
+	result := map[string]interface{}{
+		"success":       false,
+		"error":         err.Error(),
+		"redirect_hint": redirectHint,
+		"chain_hint": map[string]interface{}{
+			"next_tool": redirectTo, // Use the redirect tool
+			"reason":    fmt.Sprintf("Redirecting to %s after %s failed with: %s", redirectTo, toolName, err.Error()),
+			"parameters": map[string]interface{}{
+				"previous_error": err.Error(),
+				"fixing_mode":    true,
+				"failed_tool":    toolName,
+			},
 		},
 	}
 

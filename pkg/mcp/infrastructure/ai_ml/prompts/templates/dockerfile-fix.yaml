@@ -6,9 +6,8 @@ category: "docker"
 template: |
   Please fix this Dockerfile that is failing to build.
 
-  Language: {{.Language}}
-  Framework: {{.Framework}}
-  Port: {{.Port}}
+  Repository Analysis:
+  {{ .RepoAnalysis }}
 
   Current Dockerfile:
   {{.DockerfileContent}}
@@ -27,21 +26,10 @@ template: |
 
 system_prompt: "You are a Docker and containerization expert. Fix the Dockerfile to resolve build errors while following best practices."
 parameters:
-  - name: "Language"
+  - name: "RepoAnalysis"
     type: "string"
-    description: "Programming language (e.g., java, go, python)"
+    description: "The target repository analysis"
     required: true
-    example: "java"
-  - name: "Framework"
-    type: "string"
-    description: "Framework used (e.g., spring-boot, express, django)"
-    required: true
-    example: "spring-boot"
-  - name: "Port"
-    type: "int"
-    description: "Application port number"
-    required: true
-    example: "8080"
   - name: "DockerfileContent"
     type: "string"
     description: "Current Dockerfile content that's failing"

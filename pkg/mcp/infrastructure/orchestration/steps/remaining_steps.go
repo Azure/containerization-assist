@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/common/errors"
@@ -348,6 +350,39 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 	if state.Args.TestMode {
 		namespace = "test-namespace"
 		appName = "test-" + appName
+	}
+
+	// Check if this is being called after a deployment failure
+	if state.PreviousError != nil && (state.PreviousToolName == "deploy_application" || state.PreviousToolName == "prepare_cluster") {
+		state.Logger.Info("Detected previous deployment failure, entering AI fix mode for K8s manifests",
+			"failed_tool", state.PreviousToolName, "error", state.PreviousError.Error())
+
+		// If we have an existing manifest file, try to fix it with AI
+		// Look for the most common K8s manifest files
+		manifestPaths := []string{
+			filepath.Join(state.AnalyzeResult.RepoPath, "k8s", "deployment.yaml"),
+			filepath.Join(state.AnalyzeResult.RepoPath, "k8s", "service.yaml"),
+			filepath.Join(state.AnalyzeResult.RepoPath, "kubernetes", "deployment.yaml"),
+			filepath.Join(state.AnalyzeResult.RepoPath, "kubernetes", "service.yaml"),
+			filepath.Join(state.AnalyzeResult.RepoPath, "manifests", "deployment.yaml"),
+			filepath.Join(state.AnalyzeResult.RepoPath, "manifests", "service.yaml"),
+			filepath.Join(state.AnalyzeResult.RepoPath, "k8s-manifests", "deployment.yaml"),
+			filepath.Join(state.AnalyzeResult.RepoPath, "k8s-manifests", "service.yaml"),
+			filepath.Join(state.AnalyzeResult.RepoPath, "kubernetes-manifests", "deployment.yaml"),
+			filepath.Join(state.AnalyzeResult.RepoPath, "kubernetes-manifests", "service.yaml"),
+		}
+
+		// Check if any manifests exist that we can fix
+		for _, manifestPath := range manifestPaths {
+			if _, err := os.Stat(manifestPath); err == nil {
+				state.Logger.Info("Found existing K8s manifest, attempting AI-assisted fix", "path", manifestPath)
+
+				// TODO: Implement FixK8sManifestWithAI similar to FixDockerfileWithAI
+				// For now, just log that we would fix it
+				state.Logger.Info("AI-assisted manifest fixing is planned but not yet implemented")
+				break
+			}
+		}
 	}
 
 	k8sResult, err := GenerateManifests(infraBuildResult, appName, namespace, state.AnalyzeResult.Port, state.AnalyzeResult.RepoPath, state.Logger)
