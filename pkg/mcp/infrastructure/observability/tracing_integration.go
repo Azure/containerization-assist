@@ -1,68 +1,32 @@
-// Package observability provides unified monitoring, tracing, and health infrastructure
-// for the MCP components. It consolidates telemetry, distributed tracing, health checks,
-// and logging enrichment into a single coherent package.
+// Package observability provides unified monitoring and health infrastructure
+// for the MCP components.
 package observability
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"strconv"
 	"strings"
-
-	"go.opentelemetry.io/otel/attribute"
 )
 
 type ServerInfo struct {
 	ServiceName     string
 	ServiceVersion  string
 	Environment     string
-	TraceSampleRate float64
+	TraceSampleRate float64 // Kept for API compatibility but unused
 }
 
 func InitFromServerInfo(ctx context.Context, info ServerInfo, logger *slog.Logger) error {
-	tracingConfig := ConfigFromServerInfo(info)
-
+	// No-op implementation, telemetry has been removed
 	if logger != nil {
-		logger.Info("Initializing OpenTelemetry tracing",
-			"enabled", tracingConfig.Enabled,
-			"service_name", tracingConfig.ServiceName,
-			"environment", tracingConfig.Environment,
-			"sample_rate", tracingConfig.SampleRate,
-		)
+		logger.Info("Telemetry has been disabled")
 	}
-
-	return InitializeTracing(ctx, tracingConfig)
+	return nil
 }
 
 func ConfigFromServerInfo(info ServerInfo) Config {
-	tracingConfig := DefaultConfig()
-
-	// Override with server info values
-	tracingConfig.ServiceName = info.ServiceName
-	tracingConfig.ServiceVersion = info.ServiceVersion
-	tracingConfig.Environment = info.Environment
-	tracingConfig.SampleRate = info.TraceSampleRate
-
-	// Check environment variables for OTEL configuration
-	if enabled := getEnvBool("CONTAINER_KIT_OTEL_ENABLED", false); enabled {
-		tracingConfig.Enabled = true
-	}
-
-	if endpoint := getEnvString("CONTAINER_KIT_OTEL_ENDPOINT", ""); endpoint != "" {
-		tracingConfig.Endpoint = endpoint
-	}
-
-	if headers := getEnvString("CONTAINER_KIT_OTEL_HEADERS", ""); headers != "" {
-		tracingConfig.Headers = parseHeaders(headers)
-	}
-
-	if sampleRate := getEnvFloat64("CONTAINER_KIT_TRACE_SAMPLE_RATE", -1); sampleRate >= 0 {
-		tracingConfig.SampleRate = sampleRate
-	}
-
-	return tracingConfig
+	return DefaultConfig()
 }
 
 func getEnvString(key, defaultValue string) string {
@@ -101,37 +65,15 @@ func parseHeaders(headers string) map[string]string {
 
 var getEnv = os.Getenv
 
-// MiddlewareHandler creates tracing middleware for MCP requests
+// MiddlewareHandler creates middleware for MCP requests
 func MiddlewareHandler(next func(context.Context) error) func(context.Context) error {
 	return func(ctx context.Context) error {
-		// Extract operation name from context if available
-		operationName := "mcp.request"
-		if op := ctx.Value("operation"); op != nil {
-			if opStr, ok := op.(string); ok {
-				operationName = fmt.Sprintf("mcp.%s", opStr)
-			}
-		}
-
-		ctx, span := StartSpan(ctx, operationName)
-		defer span.End()
-
-		// Add MCP-specific attributes
-		span.SetAttributes(
-			attribute.String(AttrComponent, "mcp"),
-		)
-
-		// Execute the handler
-		err := next(ctx)
-
-		if err != nil {
-			span.RecordError(err)
-		}
-
-		return err
+		// Execute the handler without tracing
+		return next(ctx)
 	}
 }
 
-// WorkflowTracer provides tracing utilities for workflow operations
+// WorkflowTracer provides stub utilities for workflow operations
 type WorkflowTracer struct {
 	workflowID   string
 	workflowName string
@@ -144,18 +86,11 @@ func NewWorkflowTracer(workflowID, workflowName string) *WorkflowTracer {
 	}
 }
 
-// TraceStep executes a workflow step with tracing
+// TraceStep executes a workflow step without tracing
 func (wt *WorkflowTracer) TraceStep(ctx context.Context, stepName string, fn func(context.Context) error) error {
-	return TraceWorkflowStep(ctx, wt.workflowID, stepName, fn)
+	return fn(ctx)
 }
 
 func (wt *WorkflowTracer) AddWorkflowAttributes(ctx context.Context) {
-	span := SpanFromContext(ctx)
-	if span.IsRecording() {
-		span.SetAttributes(
-			attribute.String(AttrProgressWorkflowID, wt.workflowID),
-			attribute.String("workflow.name", wt.workflowName),
-			attribute.String(AttrComponent, "workflow"),
-		)
-	}
+	// No-op implementation
 }

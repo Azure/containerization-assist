@@ -6,10 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/observability"
 	"github.com/mark3labs/mcp-go/server"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 )
 
 // StreamChunk represents a partial response from streaming sampling.
@@ -27,39 +24,10 @@ func (c *Client) SampleStream(
 	ctx context.Context,
 	req SamplingRequest,
 ) (<-chan StreamChunk, error) {
-	ctx, span := observability.StartSpan(ctx, "sampling.sampleStream")
-	span.SetAttributes(
-		attribute.String(observability.AttrComponent, "sampling"),
-		attribute.Bool("sampling.streaming", true),
-		attribute.Int("sampling.max_tokens", int(req.MaxTokens)),
-		attribute.Float64("sampling.temperature", float64(req.Temperature)),
-		attribute.Int("sampling.prompt_length", len(req.Prompt)),
-	)
-
-	// Add advanced parameter attributes for streaming
-	if req.TopP != nil {
-		span.SetAttributes(attribute.Float64("sampling.top_p", float64(*req.TopP)))
-	}
-	if req.FrequencyPenalty != nil {
-		span.SetAttributes(attribute.Float64("sampling.frequency_penalty", float64(*req.FrequencyPenalty)))
-	}
-	if req.PresencePenalty != nil {
-		span.SetAttributes(attribute.Float64("sampling.presence_penalty", float64(*req.PresencePenalty)))
-	}
-	if len(req.StopSequences) > 0 {
-		span.SetAttributes(attribute.Int("sampling.stop_sequences_count", len(req.StopSequences)))
-	}
-	if req.Seed != nil {
-		span.SetAttributes(attribute.Int("sampling.seed", *req.Seed))
-	}
-	if len(req.LogitBias) > 0 {
-		span.SetAttributes(attribute.Int("sampling.logit_bias_count", len(req.LogitBias)))
-	}
 	logger := c.logger.With("op", "SampleStream")
 
 	// Check if we have MCP server context
 	if server.ServerFromContext(ctx) == nil {
-		span.End()
 		return nil, errors.New("no MCP server in context – cannot perform streaming sampling")
 	}
 
@@ -74,13 +42,10 @@ func (c *Client) SampleStream(
 
 	out := make(chan StreamChunk, 32)
 	go func() {
-		defer span.End()
 		defer close(out)
 
 		var lastErr error
 		for attempt := 0; attempt < c.retryAttempts; attempt++ {
-			span.SetAttributes(attribute.Int(observability.AttrSamplingRetryAttempt, attempt+1))
-
 			// Try streaming call
 			stream, err := c.callMCPStream(ctx, req)
 			if err == nil {
@@ -104,7 +69,6 @@ func (c *Client) SampleStream(
 					select {
 					case out <- chunk:
 					case <-ctx.Done():
-						span.RecordError(ctx.Err())
 						return
 					}
 				}
@@ -118,14 +82,12 @@ func (c *Client) SampleStream(
 				select {
 				case out <- final:
 				case <-ctx.Done():
-					span.RecordError(ctx.Err())
 				}
 				return
 			}
 
 			// Handle error
 			if !IsRetryable(err) {
-				span.RecordError(err)
 				lastErr = err
 				break
 			}
@@ -135,16 +97,9 @@ func (c *Client) SampleStream(
 			logger.Warn("stream attempt failed – backing off",
 				"attempt", attempt+1, "err", err, "backoff", backoff)
 
-			span.AddEvent("retry.backoff", trace.WithAttributes(
-				attribute.String("error", err.Error()),
-				attribute.Int("attempt", attempt+1),
-				attribute.String("backoff", backoff.String()),
-			))
-
 			// Respect context during backoff
 			select {
 			case <-ctx.Done():
-				span.RecordError(ctx.Err())
 				return
 			case <-time.After(backoff):
 				// Continue to next attempt
@@ -153,7 +108,6 @@ func (c *Client) SampleStream(
 
 		// All attempts failed, send error chunk
 		if lastErr != nil {
-			span.RecordError(lastErr)
 			logger.Error("all streaming attempts failed", "err", lastErr)
 			errorChunk := StreamChunk{
 				IsFinal: true,

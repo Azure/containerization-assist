@@ -12,11 +12,8 @@ import (
 
 	"github.com/Azure/container-kit/pkg/common/errors"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/prompts"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/observability"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 )
 
 type Option func(*Client)
@@ -106,43 +103,13 @@ type SamplingResponse struct {
 // SampleInternal performs sampling with AI-assisted retry and error correction.
 func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*SamplingResponse, error) {
 	start := time.Now()
-	ctx, span := observability.StartSpan(ctx, "sampling.sample")
-	defer span.End()
-
+	
 	// Create enhanced logger for structured LLM logging
 	enhancedLogger := NewEnhancedLogger(c.logger)
 	reqLogger := enhancedLogger.WithRequestContext(c.logger, req)
 
 	// Log detailed request information
 	enhancedLogger.LogLLMRequest(ctx, reqLogger, req)
-
-	// Add tracing attributes
-	span.SetAttributes(
-		attribute.String(observability.AttrComponent, "sampling"),
-		attribute.Int("sampling.max_tokens", int(req.MaxTokens)),
-		attribute.Float64("sampling.temperature", float64(req.Temperature)),
-		attribute.Int("sampling.prompt_length", len(req.Prompt)),
-	)
-
-	// Add advanced parameter attributes
-	if req.TopP != nil {
-		span.SetAttributes(attribute.Float64("sampling.top_p", float64(*req.TopP)))
-	}
-	if req.FrequencyPenalty != nil {
-		span.SetAttributes(attribute.Float64("sampling.frequency_penalty", float64(*req.FrequencyPenalty)))
-	}
-	if req.PresencePenalty != nil {
-		span.SetAttributes(attribute.Float64("sampling.presence_penalty", float64(*req.PresencePenalty)))
-	}
-	if len(req.StopSequences) > 0 {
-		span.SetAttributes(attribute.Int("sampling.stop_sequences_count", len(req.StopSequences)))
-	}
-	if req.Seed != nil {
-		span.SetAttributes(attribute.Int("sampling.seed", *req.Seed))
-	}
-	if len(req.LogitBias) > 0 {
-		span.SetAttributes(attribute.Int("sampling.logit_bias_count", len(req.LogitBias)))
-	}
 
 	// Default values.
 	if req.MaxTokens == 0 {
@@ -153,11 +120,11 @@ func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*Samp
 	}
 
 	// Use AI-assisted retry for better error recovery
-	return c.sampleWithAIAssist(ctx, req, span, enhancedLogger, reqLogger, start)
+	return c.sampleWithAIAssist(ctx, req, enhancedLogger, reqLogger, start)
 }
 
 // sampleWithAIAssist performs AI-assisted sampling with intelligent error correction
-func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingRequest, span trace.Span, enhancedLogger *EnhancedLogger, reqLogger *slog.Logger, start time.Time) (*SamplingResponse, error) {
+func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingRequest, enhancedLogger *EnhancedLogger, reqLogger *slog.Logger, start time.Time) (*SamplingResponse, error) {
 	var lastErr error
 	var errorHistory []string
 	currentReq := originalReq // Start with original request
@@ -168,9 +135,6 @@ func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingReq
 			return nil, ctx.Err()
 		default:
 		}
-
-		// Add retry attempt to span
-		span.SetAttributes(attribute.Int(observability.AttrSamplingRetryAttempt, attempt+1))
 
 		// Check for MCP server context on each attempt
 		var resp *SamplingResponse
@@ -184,13 +148,6 @@ func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingReq
 		if err == nil {
 			// Log successful response with enhanced details
 			enhancedLogger.LogLLMResponse(ctx, reqLogger, currentReq, resp, time.Since(start))
-
-			// Add success attributes
-			span.SetAttributes(
-				attribute.Int(observability.AttrSamplingTokensUsed, resp.TokensUsed),
-				attribute.String("sampling.model", resp.Model),
-				attribute.String("sampling.stop_reason", resp.StopReason),
-			)
 			return resp, nil
 		}
 
@@ -199,8 +156,6 @@ func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingReq
 
 		// Abort early on non-retryable errors.
 		if !IsRetryable(err) {
-			span.RecordError(err)
-			span.SetAttributes(attribute.String("error.non_retryable", err.Error()))
 			return nil, err
 		}
 
@@ -218,23 +173,11 @@ func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingReq
 			} else {
 				c.logger.Info("Applied AI corrections to request", "attempt", attempt+1)
 				currentReq = improvedReq
-				span.AddEvent("ai.correction_applied", trace.WithAttributes(
-					attribute.Int("attempt", attempt+1),
-					attribute.String("original_prompt_length", fmt.Sprintf("%d", len(originalReq.Prompt))),
-					attribute.String("corrected_prompt_length", fmt.Sprintf("%d", len(currentReq.Prompt))),
-				))
 			}
 		}
 
 		backoff := c.calculateBackoff(attempt)
 		c.logger.Warn("sampling attempt failed – backing off", "attempt", attempt+1, "err", err, "backoff", backoff)
-
-		// Record retry event
-		span.AddEvent("retry.backoff", trace.WithAttributes(
-			attribute.String("error", err.Error()),
-			attribute.Int("attempt", attempt+1),
-			attribute.String("backoff", backoff.String()),
-		))
 
 		// Use a timer to respect context cancellation during backoff
 		timer := time.NewTimer(backoff)
@@ -250,8 +193,6 @@ func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingReq
 	// Record final failure
 	finalErr := errors.New(errors.CodeOperationFailed, "sampling",
 		fmt.Sprintf("all %d sampling attempts failed", c.retryAttempts), lastErr)
-	span.RecordError(finalErr)
-	span.SetAttributes(attribute.String("error.final", finalErr.Error()))
 	return nil, finalErr
 }
 

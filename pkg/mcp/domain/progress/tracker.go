@@ -24,7 +24,7 @@ type Update struct {
 	Percentage int                    `json:"percentage"` // 0-100
 	ETA        time.Duration          `json:"eta,omitempty"`
 	Status     string                 `json:"status,omitempty"`
-	TraceID    string                 `json:"trace_id,omitempty"`
+	TraceID    string                 `json:"trace_id,omitempty"` // Kept for API compatibility
 	UserMeta   map[string]interface{} `json:"user_meta,omitempty"`
 }
 
@@ -41,7 +41,7 @@ func WithThrottle(d time.Duration) Option {
 	return func(t *Tracker) { t.throttle = d }
 }
 
-// WithTraceID sets a trace ID for correlation.
+// WithTraceID sets a trace ID for correlation (kept for API compatibility)
 func WithTraceID(traceID string) Option {
 	return func(t *Tracker) { t.traceID = traceID }
 }

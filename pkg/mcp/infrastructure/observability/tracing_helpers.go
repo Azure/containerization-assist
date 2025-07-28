@@ -1,66 +1,46 @@
-// Package observability provides unified monitoring, tracing, and health infrastructure
-// for the MCP components. It consolidates telemetry, distributed tracing, health checks,
-// and logging enrichment into a single coherent package.
+// Package observability provides unified monitoring and health infrastructure
+// for the MCP components.
 package observability
 
 import (
 	"context"
-	"fmt"
-	"time"
-
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
 )
 
-// SpanHelper provides convenient methods for working with spans
-type SpanHelper struct {
-	span trace.Span
-}
+// SpanHelper provides a no-op implementation for API compatibility
+type SpanHelper struct{}
 
 // NewSpanHelper creates a new span helper
-func NewSpanHelper(span trace.Span) *SpanHelper {
-	return &SpanHelper{span: span}
+func NewSpanHelper(span interface{}) *SpanHelper {
+	return &SpanHelper{}
 }
 
-// SetAttributes sets multiple attributes on the span
-func (h *SpanHelper) SetAttributes(attrs ...attribute.KeyValue) {
-	h.span.SetAttributes(attrs...)
+// SetAttributes is a no-op method for API compatibility
+func (h *SpanHelper) SetAttributes(attrs ...interface{}) {
+	// No-op
 }
 
-// SetStatus sets the span status
-func (h *SpanHelper) SetStatus(code codes.Code, description string) {
-	h.span.SetStatus(code, description)
+// SetStatus is a no-op method for API compatibility
+func (h *SpanHelper) SetStatus(code interface{}, description string) {
+	// No-op
 }
 
-// RecordError records an error on the span
-func (h *SpanHelper) RecordError(err error, opts ...trace.EventOption) {
-	h.span.RecordError(err, opts...)
+// RecordError is a no-op method for API compatibility
+func (h *SpanHelper) RecordError(err error, opts ...interface{}) {
+	// No-op
 }
 
-// End ends the span
+// End is a no-op method for API compatibility
 func (h *SpanHelper) End() {
-	h.span.End()
+	// No-op
 }
 
-// AddEvent adds an event to the span
-func (h *SpanHelper) AddEvent(name string, attrs ...attribute.KeyValue) {
-	h.span.AddEvent(name, trace.WithAttributes(attrs...))
+// AddEvent is a no-op method for API compatibility
+func (h *SpanHelper) AddEvent(name string, attrs ...interface{}) {
+	// No-op
 }
 
-// Common attribute keys for MCP tracing
+// Common attribute keys for tracing (kept for reference)
 const (
-	// Sampling attributes
-	AttrSamplingTemplateID      = "sampling.template_id"
-	AttrSamplingTokensUsed      = "sampling.tokens_used"
-	AttrSamplingPromptTokens    = "sampling.prompt_tokens"
-	AttrSamplingResponseTokens  = "sampling.response_tokens"
-	AttrSamplingContentType     = "sampling.content_type"
-	AttrSamplingContentSize     = "sampling.content_size"
-	AttrSamplingRetryAttempt    = "sampling.retry_attempt"
-	AttrSamplingValidationValid = "sampling.validation_valid"
-	AttrSamplingSecurityIssues  = "sampling.security_issues"
-
 	// Progress attributes
 	AttrProgressWorkflowID = "progress.workflow_id"
 	AttrProgressStepName   = "progress.step_name"
@@ -79,151 +59,32 @@ const (
 	AttrDuration  = "duration_ms"
 )
 
-// TraceSamplingRequest creates a traced sampling request
+// TraceSamplingRequest is a no-op function for API compatibility
 func TraceSamplingRequest(ctx context.Context, templateID string, fn func(context.Context) error) error {
-	ctx, span := StartSpan(ctx, "sampling.request",
-		trace.WithAttributes(
-			attribute.String(AttrComponent, "sampling"),
-			attribute.String(AttrSamplingTemplateID, templateID),
-		),
-	)
-	defer span.End()
-
-	helper := NewSpanHelper(span)
-	startTime := time.Now()
-
-	err := fn(ctx)
-
-	// Record duration
-	duration := time.Since(startTime)
-	helper.SetAttributes(attribute.Int64(AttrDuration, duration.Milliseconds()))
-
-	if err != nil {
-		helper.SetStatus(codes.Error, "sampling request failed")
-		helper.RecordError(err)
-		return err
-	}
-
-	helper.SetStatus(codes.Ok, "sampling request completed")
-	return nil
+	return fn(ctx)
 }
 
-// TraceSamplingValidation creates a traced validation operation
+// TraceSamplingValidation is a no-op function for API compatibility
 func TraceSamplingValidation(ctx context.Context, contentType string, fn func(context.Context) (bool, error)) (bool, error) {
-	ctx, span := StartSpan(ctx, "sampling.validation",
-		trace.WithAttributes(
-			attribute.String(AttrComponent, "sampling"),
-			attribute.String(AttrSamplingContentType, contentType),
-		),
-	)
-	defer span.End()
-
-	helper := NewSpanHelper(span)
-	startTime := time.Now()
-
-	valid, err := fn(ctx)
-
-	// Record results
-	duration := time.Since(startTime)
-	helper.SetAttributes(
-		attribute.Bool(AttrSamplingValidationValid, valid),
-		attribute.Int64(AttrDuration, duration.Milliseconds()),
-	)
-
-	if err != nil {
-		helper.SetStatus(codes.Error, "validation failed")
-		helper.RecordError(err)
-		return valid, err
-	}
-
-	helper.SetStatus(codes.Ok, "validation completed")
-	return valid, nil
+	return fn(ctx)
 }
 
-// TraceProgressUpdate creates a traced progress update
+// TraceProgressUpdate is a no-op function for API compatibility
 func TraceProgressUpdate(ctx context.Context, workflowID, stepName string, stepNumber, totalSteps int, fn func(context.Context) error) error {
-	ctx, span := StartSpan(ctx, "progress.update",
-		trace.WithAttributes(
-			attribute.String(AttrComponent, "progress"),
-			attribute.String(AttrProgressWorkflowID, workflowID),
-			attribute.String(AttrProgressStepName, stepName),
-			attribute.Int(AttrProgressStepNumber, stepNumber),
-			attribute.Int(AttrProgressTotalSteps, totalSteps),
-		),
-	)
-	defer span.End()
-
-	helper := NewSpanHelper(span)
-	startTime := time.Now()
-
-	// Calculate percentage
-	percentage := float64(stepNumber) / float64(totalSteps) * 100
-	helper.SetAttributes(attribute.Float64(AttrProgressPercentage, percentage))
-
-	err := fn(ctx)
-
-	// Record duration
-	duration := time.Since(startTime)
-	helper.SetAttributes(attribute.Int64(AttrDuration, duration.Milliseconds()))
-
-	if err != nil {
-		helper.SetStatus(codes.Error, "progress update failed")
-		helper.RecordError(err)
-		return err
-	}
-
-	helper.SetStatus(codes.Ok, "progress update completed")
-	return nil
+	return fn(ctx)
 }
 
-// TraceWorkflowStep creates a traced workflow step execution
+// TraceWorkflowStep is a no-op function for API compatibility
 func TraceWorkflowStep(ctx context.Context, workflowID, stepName string, fn func(context.Context) error) error {
-	ctx, span := StartSpan(ctx, fmt.Sprintf("workflow.step.%s", stepName),
-		trace.WithAttributes(
-			attribute.String(AttrComponent, "workflow"),
-			attribute.String(AttrProgressWorkflowID, workflowID),
-			attribute.String(AttrProgressStepName, stepName),
-		),
-	)
-	defer span.End()
-
-	helper := NewSpanHelper(span)
-	startTime := time.Now()
-
-	helper.AddEvent("step.started")
-
-	err := fn(ctx)
-
-	// Record duration
-	duration := time.Since(startTime)
-	helper.SetAttributes(attribute.Int64(AttrDuration, duration.Milliseconds()))
-
-	if err != nil {
-		helper.SetStatus(codes.Error, fmt.Sprintf("workflow step %s failed", stepName))
-		helper.RecordError(err)
-		helper.AddEvent("step.failed", attribute.String("error", err.Error()))
-		return err
-	}
-
-	helper.SetStatus(codes.Ok, fmt.Sprintf("workflow step %s completed", stepName))
-	helper.AddEvent("step.completed")
-	return nil
+	return fn(ctx)
 }
 
-// WithTraceID injects a trace ID into the context for correlation
+// WithTraceID is a no-op function for API compatibility
 func WithTraceID(ctx context.Context, traceID string) context.Context {
-	span := SpanFromContext(ctx)
-	if span.IsRecording() {
-		span.SetAttributes(attribute.String("trace.id", traceID))
-	}
 	return ctx
 }
 
-// ExtractTraceID extracts the current trace ID from context
+// ExtractTraceID is a no-op function for API compatibility
 func ExtractTraceID(ctx context.Context) string {
-	span := SpanFromContext(ctx)
-	if span.SpanContext().IsValid() {
-		return span.SpanContext().TraceID().String()
-	}
 	return ""
 }
