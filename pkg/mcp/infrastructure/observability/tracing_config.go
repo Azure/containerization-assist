@@ -1,5 +1,5 @@
 // Package observability provides unified monitoring and health infrastructure
-// for the MCP components. It consolidates health checks and logging enrichment 
+// for the MCP components. It consolidates health checks and logging enrichment
 // into a single coherent package.
 package observability
 

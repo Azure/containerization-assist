@@ -103,7 +103,7 @@ type SamplingResponse struct {
 // SampleInternal performs sampling with AI-assisted retry and error correction.
 func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*SamplingResponse, error) {
 	start := time.Now()
-	
+
 	// Create enhanced logger for structured LLM logging
 	enhancedLogger := NewEnhancedLogger(c.logger)
 	reqLogger := enhancedLogger.WithRequestContext(c.logger, req)
