@@ -52,12 +52,35 @@ jobs:
           mcphost --version
           echo "✅ mcphost v0.26.1 installed successfully"
           
-      - name: Build MCP Server from PR
+      # - name: Build MCP Server from PR
+      #   run: |
+      #     echo "Building Container Kit MCP Server from PR code..."
+      #     go build -tags mcp -o container-kit-mcp ./cmd/mcp-server
+      #     chmod +x container-kit-mcp
+      #     ls -la container-kit-mcp
+      
+      - name: Download MCP Server Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: container-kit-mcp-binary
+          path: ./
+        continue-on-error: true
+        
+      - name: Build and Upload MCP Server (first time only)
+        if: ${{ !hashFiles('./container-kit-mcp') }}
         run: |
-          echo "Building Container Kit MCP Server from PR code..."
+          echo "MCP binary not found, building and uploading for future runs..."
           go build -tags mcp -o container-kit-mcp ./cmd/mcp-server
           chmod +x container-kit-mcp
           ls -la container-kit-mcp
+          
+      - name: Upload MCP Server Binary for future runs
+        if: ${{ !hashFiles('./container-kit-mcp') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-kit-mcp-binary
+          path: ./container-kit-mcp
+          retention-days: 1
           
       - name: Verify MCP Server binary
         run: |
@@ -126,7 +149,7 @@ jobs:
           # Wait for server to start
           echo "Waiting for server to start..."
           for i in {1..30}; do
-            if curl -s http://localhost:9191/health > /dev/null 2>&1; then
+            if curl -s http://localhost:9191/healthz > /dev/null 2>&1; then
               echo "✅ MCP Server is ready on port 9191"
               break
             fi
@@ -146,7 +169,7 @@ jobs:
           echo "MCP Server should be running on http://localhost:9191"
           
           # Verify server is still responding
-          if ! curl -s http://localhost:9191/health > /dev/null; then
+          if ! curl -s http://localhost:9191/healthz > /dev/null; then
             echo "❌ MCP Server is not responding"
             echo "=== Server Log ==="
             cat mcp-server.log || echo "No server log available"
