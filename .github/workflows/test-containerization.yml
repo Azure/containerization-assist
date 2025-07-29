@@ -70,13 +70,6 @@ jobs:
           echo "Creating mcphost configuration..."
           mkdir -p ~/.config
           
-          # Verify source file exists
-          echo "=== Checking source configuration file ==="
-          ls -la .github/mcphost-config.yml
-          echo "=== Source file content ==="
-          cat .github/mcphost-config.yml
-          echo ""
-          
           # Copy the configuration template (mcphost will handle env var substitution)
           cp .github/mcphost-config.yml ~/.mcphost.yml
           
@@ -85,10 +78,8 @@ jobs:
           # Create workspace directory
           mkdir -p /tmp/test-workspace
           
-          # Verify destination file exists
-          echo "=== Checking destination configuration file ==="
-          ls -la ~/.mcphost.yml
-          echo "=== Final mcphost configuration ==="
+          # Show the full configuration
+          echo "=== mcphost configuration ==="
           cat ~/.mcphost.yml
           
       - name: Test MCP Server and LLM connection
@@ -133,7 +124,7 @@ jobs:
           
           # Capture both stdout and stderr, and don't exit on failure
           set +e
-          RESULT=$(mcphost --stream=false -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello" 2>&1)
+          RESULT=$(mcphost --stream=false --max-steps 25 -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello. If you encounter any errors during deployment, please attempt to fix them automatically or provide specific recommendations. Do not ask for user input - proceed with reasonable defaults and complete the containerization process." 2>&1)
           EXIT_CODE=$?
           set -e
           
@@ -166,15 +157,13 @@ jobs:
           ${{ steps.test.outputs.result }}
           ANALYSIS_EOF
           
-          if grep -q "Workflow completed successfully" /tmp/test_output.txt || \
-             grep -q "finalize_result.*completed" /tmp/test_output.txt || \
-             grep -q "health_probe.*completed" /tmp/test_output.txt || \
-             grep -q "Step 10/10.*completed" /tmp/test_output.txt || \
-             grep -q "containerization.*successful" /tmp/test_output.txt || \
-             grep -q "prepare_cluster.*completed.*successfully" /tmp/test_output.txt || \
-             grep -q "generate_k8s_manifests.*completed.*successfully" /tmp/test_output.txt || \
-             grep -q "successfully completed" /tmp/test_output.txt || \
-             grep -q "successfully running" /tmp/test_output.txt; then
+          if grep -q "verify_deployment.*completed.*successfully" /tmp/test_output.txt || \
+             grep -q "deploy_application.*completed.*successfully" /tmp/test_output.txt || \
+             grep -q "All 10 steps completed successfully" /tmp/test_output.txt || \
+             grep -q "Containerization workflow completed successfully" /tmp/test_output.txt || \
+             grep -q "Step 10/10.*verify_deployment.*completed" /tmp/test_output.txt || \
+             grep -q "Deployment verified successfully" /tmp/test_output.txt || \
+             grep -q "Application is running correctly" /tmp/test_output.txt; then
             echo "✅ Containerization test PASSED"
             echo "SUCCESS: The containerization workflow completed successfully"
             echo ""
@@ -190,3 +179,77 @@ jobs:
             echo "FAILURE: The containerization workflow did not complete successfully"
             exit 1
           fi
+          
+      - name: Show generated artifacts and deployment status
+        if: always()
+        run: |
+          echo "=== POST-TEST ARTIFACTS AND STATUS ==="
+          echo ""
+          
+          echo "=== Kubernetes Pods Status ==="
+          if command -v kubectl &> /dev/null; then
+            # Try to get pods from default namespace and any detected namespaces
+            echo "Checking pods in default namespace:"
+            kubectl get pods -o wide 2>/dev/null || echo "No pods found or kubectl not configured"
+            echo ""
+            
+            # Check for any java-servlet or app-related pods in all namespaces
+            echo "Searching for application pods across all namespaces:"
+            kubectl get pods --all-namespaces | grep -i "java\|servlet\|app" 2>/dev/null || echo "No application pods found"
+            echo ""
+            
+            # Show services as well
+            echo "Services:"
+            kubectl get services -o wide 2>/dev/null || echo "No services found"
+            echo ""
+          else
+            echo "kubectl not available"
+          fi
+          
+          echo "=== Generated Dockerfile ==="
+          # Look for Dockerfile in common locations
+          if [ -f "Dockerfile" ]; then
+            echo "Found Dockerfile in root:"
+            cat Dockerfile
+          elif [ -f "/tmp/test-workspace/Dockerfile" ]; then
+            echo "Found Dockerfile in test workspace:"
+            cat /tmp/test-workspace/Dockerfile
+          elif find /tmp -name "Dockerfile" -type f 2>/dev/null | head -1 | xargs test -f; then
+            DOCKERFILE_PATH=$(find /tmp -name "Dockerfile" -type f 2>/dev/null | head -1)
+            echo "Found Dockerfile at: $DOCKERFILE_PATH"
+            cat "$DOCKERFILE_PATH"
+          else
+            echo "No Dockerfile found"
+          fi
+          echo ""
+          
+          echo "=== Generated Kubernetes Manifests ==="
+          # Look for manifest files in common locations
+          MANIFEST_FOUND=false
+          for pattern in "*.yaml" "*.yml" "*manifest*" "*deployment*" "*service*"; do
+            if find /tmp -name "$pattern" -type f 2>/dev/null | grep -v mcphost-config | head -5; then
+              MANIFEST_FOUND=true
+              echo ""
+              find /tmp -name "$pattern" -type f 2>/dev/null | grep -v mcphost-config | head -5 | while read -r manifest; do
+                echo "=== Manifest: $manifest ==="
+                cat "$manifest"
+                echo ""
+              done
+            fi
+          done
+          
+          if [ "$MANIFEST_FOUND" = false ]; then
+            echo "No Kubernetes manifest files found"
+          fi
+          
+          echo "=== Docker Images ==="
+          echo "Available Docker images:"
+          docker images | head -10 || echo "Unable to list Docker images"
+          echo ""
+          
+          echo "=== Working Directory Contents ==="
+          ls -la
+          echo ""
+          
+          echo "=== Temp Directory Structure ==="
+          find /tmp -type f -name "*.yaml" -o -name "*.yml" -o -name "Dockerfile" 2>/dev/null | head -10 || echo "No relevant files found in temp"
