@@ -86,6 +86,33 @@ jobs:
           echo "=== mcphost configuration ==="
           cat ~/.mcphost.yml
           
+      - name: Test MCP Server and LLM connection
+        run: |
+          echo "Testing MCP Server and LLM connection..."
+          echo "This will verify that mcphost can communicate with the MCP server and load the containerization tools"
+          echo ""
+          
+          # Simple test to verify MCP tools are loaded
+          set +e
+          HELLO_RESULT=$(mcphost -p "What containerization tools do you have access to? Please list them." 2>&1)
+          HELLO_EXIT_CODE=$?
+          set -e
+          
+          echo "=== MCP TOOLS TEST OUTPUT ==="
+          # Filter out ANSI color codes and formatting characters for better readability
+          echo "$HELLO_RESULT" | sed 's/\x1b\[[0-9;]*m//g' | sed 's/\r//g'
+          echo "=== END TOOLS TEST ==="
+          echo ""
+          
+          if [ $HELLO_EXIT_CODE -eq 0 ]; then
+            echo "✅ MCP tools test PASSED - MCP server and LLM are working"
+          else
+            echo "❌ MCP tools test FAILED - MCP server or LLM connection issue"
+            echo "Exit code: $HELLO_EXIT_CODE"
+            exit 1
+          fi
+          echo ""
+          
       - name: Run containerization test
         id: test
         run: |
@@ -110,14 +137,16 @@ jobs:
           echo "Test completed with exit code: $EXIT_CODE"
           echo ""
           echo "=== MCPHOST OUTPUT ==="
-          echo "$RESULT"
+          # Filter out ANSI color codes and formatting characters for better readability
+          echo "$RESULT" | sed 's/\x1b\[[0-9;]*m//g' | sed 's/\r//g'
           echo "=== END OUTPUT ==="
           echo ""
           
           # Use a delimiter that won't conflict with the output content
           {
             echo "result<<MCPHOST_OUTPUT_EOF"
-            echo "$RESULT"
+            # Also filter the output we store for analysis
+            echo "$RESULT" | sed 's/\x1b\[[0-9;]*m//g' | sed 's/\r//g'
             echo "MCPHOST_OUTPUT_EOF"
           } >> $GITHUB_OUTPUT
           
