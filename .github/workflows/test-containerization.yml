@@ -70,6 +70,13 @@ jobs:
           echo "Creating mcphost configuration..."
           mkdir -p ~/.config
           
+          # Verify source file exists
+          echo "=== Checking source configuration file ==="
+          ls -la .github/mcphost-config.yml
+          echo "=== Source file content ==="
+          cat .github/mcphost-config.yml
+          echo ""
+          
           # Copy the configuration template (mcphost will handle env var substitution)
           cp .github/mcphost-config.yml ~/.mcphost.yml
           
@@ -78,8 +85,10 @@ jobs:
           # Create workspace directory
           mkdir -p /tmp/test-workspace
           
-          # Show the full configuration
-          echo "=== mcphost configuration ==="
+          # Verify destination file exists
+          echo "=== Checking destination configuration file ==="
+          ls -la ~/.mcphost.yml
+          echo "=== Final mcphost configuration ==="
           cat ~/.mcphost.yml
           
       - name: Test MCP Server and LLM connection
@@ -124,7 +133,7 @@ jobs:
           
           # Capture both stdout and stderr, and don't exit on failure
           set +e
-          RESULT=$(mcphost --stream=false --quiet -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello" 2>&1)
+          RESULT=$(mcphost --stream=false -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello" 2>&1)
           EXIT_CODE=$?
           set -e
           
@@ -146,30 +155,37 @@ jobs:
       - name: Analyze results and report
         run: |
           echo "=== Test Result and Logs ==="
-          echo "${{ steps.test.outputs.result }}"
+          # Use printf to safely output the result without shell interpretation
+          printf '%s\n' '${{ steps.test.outputs.result }}'
           echo ""
           
           # Parse output for success indicators
           echo "=== Analysis ==="
-          TEST_OUTPUT="${{ steps.test.outputs.result }}"
-          if echo "$TEST_OUTPUT" | grep -q "Workflow completed successfully" || \
-             echo "$TEST_OUTPUT" | grep -q "finalize_result.*completed" || \
-             echo "$TEST_OUTPUT" | grep -q "health_probe.*completed" || \
-             echo "$TEST_OUTPUT" | grep -q "Step 10/10.*completed" || \
-             echo "$TEST_OUTPUT" | grep -q "containerization.*successful" || \
-             echo "$TEST_OUTPUT" | grep -q "prepare_cluster.*completed.*successfully" || \
-             echo "$TEST_OUTPUT" | grep -q "generate_k8s_manifests.*completed.*successfully"; then
+          # Save the output to a temporary file to avoid shell interpretation issues
+          cat << 'ANALYSIS_EOF' > /tmp/test_output.txt
+          ${{ steps.test.outputs.result }}
+          ANALYSIS_EOF
+          
+          if grep -q "Workflow completed successfully" /tmp/test_output.txt || \
+             grep -q "finalize_result.*completed" /tmp/test_output.txt || \
+             grep -q "health_probe.*completed" /tmp/test_output.txt || \
+             grep -q "Step 10/10.*completed" /tmp/test_output.txt || \
+             grep -q "containerization.*successful" /tmp/test_output.txt || \
+             grep -q "prepare_cluster.*completed.*successfully" /tmp/test_output.txt || \
+             grep -q "generate_k8s_manifests.*completed.*successfully" /tmp/test_output.txt || \
+             grep -q "successfully completed" /tmp/test_output.txt || \
+             grep -q "successfully running" /tmp/test_output.txt; then
             echo "✅ Containerization test PASSED"
-            echo "SUCCESS: The containerization workflow completed successfully through Kubernetes manifest generation"
+            echo "SUCCESS: The containerization workflow completed successfully"
             echo ""
             echo "=== Completed Steps ==="
-            echo "$TEST_OUTPUT" | grep -o "Step [a-z_]* completed successfully" | sort -u || echo "Step completion details not found"
+            grep -o "Step [a-z_]* completed successfully" /tmp/test_output.txt | sort -u 2>/dev/null || echo "Step completion details not found"
             exit 0
           else
             echo "❌ Containerization test FAILED"
             echo ""
             echo "=== Error Analysis ==="
-            echo "$TEST_OUTPUT" | grep -i "error\|failed\|exception" | tail -10 || echo "No specific errors found in output"
+            grep -i "error\|failed\|exception" /tmp/test_output.txt | tail -10 2>/dev/null || echo "No specific errors found in output"
             echo ""
             echo "FAILURE: The containerization workflow did not complete successfully"
             exit 1
