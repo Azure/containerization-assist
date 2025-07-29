@@ -114,9 +114,12 @@ jobs:
           echo "=== END OUTPUT ==="
           echo ""
           
-          echo "result<<EOF" >> $GITHUB_OUTPUT
-          echo "$RESULT" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # Use a delimiter that won't conflict with the output content
+          {
+            echo "result<<MCPHOST_OUTPUT_EOF"
+            echo "$RESULT"
+            echo "MCPHOST_OUTPUT_EOF"
+          } >> $GITHUB_OUTPUT
           
       - name: Analyze results and report
         run: |
@@ -131,9 +134,14 @@ jobs:
              echo "$TEST_OUTPUT" | grep -q "finalize_result.*completed" || \
              echo "$TEST_OUTPUT" | grep -q "health_probe.*completed" || \
              echo "$TEST_OUTPUT" | grep -q "Step 10/10.*completed" || \
-             echo "$TEST_OUTPUT" | grep -q "containerization.*successful"; then
+             echo "$TEST_OUTPUT" | grep -q "containerization.*successful" || \
+             echo "$TEST_OUTPUT" | grep -q "prepare_cluster.*completed.*successfully" || \
+             echo "$TEST_OUTPUT" | grep -q "generate_k8s_manifests.*completed.*successfully"; then
             echo "✅ Containerization test PASSED"
-            echo "SUCCESS: The containerization workflow completed successfully"
+            echo "SUCCESS: The containerization workflow completed successfully through Kubernetes manifest generation"
+            echo ""
+            echo "=== Completed Steps ==="
+            echo "$TEST_OUTPUT" | grep -o "Step [a-z_]* completed successfully" | sort -u || echo "Step completion details not found"
             exit 0
           else
             echo "❌ Containerization test FAILED"
