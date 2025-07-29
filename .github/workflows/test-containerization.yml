@@ -9,6 +9,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     
+    env:
+      AZURE_OPENAI_DEPLOYMENT_ID: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
+      AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
+      AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+    
     steps:
       - name: Checkout PR code
         uses: actions/checkout@v4
@@ -65,18 +70,9 @@ jobs:
           echo "Creating mcphost configuration..."
           mkdir -p ~/.config
           
-          # Configure mcphost to connect to MCP server via stdio
-          cat > ~/.mcphost.yml << EOF
-          mcpServers:
-            container-copilot:
-              type: "stdio"
-              command: "./container-kit-mcp"
-              args: ["-transport=stdio"]
+          # Copy the configuration template (mcphost will handle env var substitution)
+          cp .github/mcphost-config.yml ~/.mcphost.yml
           
-          model: "azure:${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}"
-          provider-api-key: "${{ secrets.AZURE_OPENAI_KEY }}"
-          provider-url: "${{ secrets.AZURE_OPENAI_ENDPOINT }}"
-          EOF
           echo "Configuration created successfully"
           
           # Create workspace directory
@@ -94,13 +90,12 @@ jobs:
           
           # Simple test to verify MCP tools are loaded
           set +e
-          HELLO_RESULT=$(mcphost --stream=false -p "What containerization tools do you have access to? Please list them." 2>&1)
+          HELLO_RESULT=$(mcphost --stream=false --quiet -p "What containerization tools do you have access to? Please list them." 2>&1)
           HELLO_EXIT_CODE=$?
           set -e
           
           echo "=== MCP TOOLS TEST OUTPUT ==="
-          # Filter out ANSI color codes and formatting characters for better readability
-          echo "$HELLO_RESULT" | sed 's/\x1b\[[0-9;]*m//g' | sed 's/\r//g'
+          echo "$HELLO_RESULT"
           echo "=== END TOOLS TEST ==="
           echo ""
           
@@ -129,7 +124,7 @@ jobs:
           
           # Capture both stdout and stderr, and don't exit on failure
           set +e
-          RESULT=$(mcphost --stream=false -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello" 2>&1)
+          RESULT=$(mcphost --stream=false --quiet -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello" 2>&1)
           EXIT_CODE=$?
           set -e
           
@@ -137,16 +132,14 @@ jobs:
           echo "Test completed with exit code: $EXIT_CODE"
           echo ""
           echo "=== MCPHOST OUTPUT ==="
-          # Filter out ANSI color codes and formatting characters for better readability
-          echo "$RESULT" | sed 's/\x1b\[[0-9;]*m//g' | sed 's/\r//g'
+          echo "$RESULT"
           echo "=== END OUTPUT ==="
           echo ""
           
           # Use a delimiter that won't conflict with the output content
           {
             echo "result<<MCPHOST_OUTPUT_EOF"
-            # Also filter the output we store for analysis
-            echo "$RESULT" | sed 's/\x1b\[[0-9;]*m//g' | sed 's/\r//g'
+            echo "$RESULT"
             echo "MCPHOST_OUTPUT_EOF"
           } >> $GITHUB_OUTPUT
           
