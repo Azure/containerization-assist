@@ -16,7 +16,6 @@ func TestNoDomainInfrastructureDependencies(t *testing.T) {
 		"github.com/Azure/container-kit/pkg/mcp/domain/progress",
 		"github.com/Azure/container-kit/pkg/mcp/domain/sampling",
 		"github.com/Azure/container-kit/pkg/mcp/domain/session",
-		"github.com/Azure/container-kit/pkg/mcp/domain/health",
 		"github.com/Azure/container-kit/pkg/mcp/domain/ml",
 		"github.com/Azure/container-kit/pkg/mcp/domain/prompts",
 		"github.com/Azure/container-kit/pkg/mcp/domain/resources",
@@ -25,7 +24,7 @@ func TestNoDomainInfrastructureDependencies(t *testing.T) {
 	// Forbidden imports in domain layer
 	forbiddenImports := []string{
 		"/infrastructure/",
-		"/application/",
+		"/service/",
 		"os/exec",
 		"database/sql",
 		"net/http",
@@ -52,23 +51,23 @@ func TestNoDomainInfrastructureDependencies(t *testing.T) {
 	}
 }
 
-// TestNoApplicationInfrastructureDependencies ensures application layer doesn't depend on infrastructure directly
-func TestNoApplicationInfrastructureDependencies(t *testing.T) {
-	// List of application packages to check
-	applicationPackages := []string{
+// TestNoServiceInfrastructureDependencies ensures service layer doesn't depend on infrastructure directly
+func TestNoServiceInfrastructureDependencies(t *testing.T) {
+	// List of service packages to check
+	servicePackages := []string{
 		"github.com/Azure/container-kit/pkg/mcp/service/commands",
 		"github.com/Azure/container-kit/pkg/mcp/service/queries",
 		"github.com/Azure/container-kit/pkg/mcp/service/workflow",
 	}
 
-	// Application layer can use domain, but not infrastructure directly
+	// Service layer can use domain, but not infrastructure directly
 	forbiddenImports := []string{
 		"/infrastructure/",
 		"os/exec",
 		"database/sql",
 	}
 
-	for _, pkgPath := range applicationPackages {
+	for _, pkgPath := range servicePackages {
 		t.Run(pkgPath, func(t *testing.T) {
 			pkg, err := build.Import(pkgPath, "", build.IgnoreVendor)
 			if err != nil {
@@ -80,7 +79,7 @@ func TestNoApplicationInfrastructureDependencies(t *testing.T) {
 			for _, imp := range pkg.Imports {
 				for _, forbidden := range forbiddenImports {
 					if strings.Contains(imp, forbidden) {
-						t.Errorf("Application package %s imports forbidden dependency: %s", pkgPath, imp)
+						t.Errorf("Service package %s imports forbidden dependency: %s", pkgPath, imp)
 					}
 				}
 			}
@@ -95,12 +94,11 @@ func TestLayerDependencyDirection(t *testing.T) {
 		"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/steps",
 		"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/sampling",
 		"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging",
-		"github.com/Azure/container-kit/pkg/mcp/infrastructure/observability",
 		"github.com/Azure/container-kit/pkg/mcp/infrastructure/persistence/session",
 	}
 
 	forbiddenForInfra := []string{
-		"/application/",
+		"/service/",
 		"/api/",
 	}
 

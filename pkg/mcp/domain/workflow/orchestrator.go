@@ -1,4 +1,4 @@
-// Package workflow provides DAG-based workflow orchestration
+// Package workflow provides sequential workflow orchestration
 package workflow
 
 import (
@@ -11,31 +11,31 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-// Orchestrator implements workflow orchestration using a DAG execution model
+// Orchestrator implements sequential workflow orchestration
 type Orchestrator struct {
-	dag            *DAGWorkflow
-	emitterFactory ProgressEmitterFactory
-	logger         *slog.Logger
-	stepProvider   StepProvider
+	steps                  []Step
+	logger                 *slog.Logger
+	stepProvider           StepProvider
+	progressEmitterFactory func(context.Context, *mcp.CallToolRequest) api.ProgressEmitter
 }
 
 // NewOrchestrator creates a new workflow orchestrator
 func NewOrchestrator(
 	stepProvider StepProvider,
-	emitterFactory ProgressEmitterFactory,
 	logger *slog.Logger,
+	progressEmitterFactory func(context.Context, *mcp.CallToolRequest) api.ProgressEmitter,
 ) (*Orchestrator, error) {
-	// Build the DAG with the standard containerization workflow
-	dag, err := buildContainerizationDAG(stepProvider)
+	// Build the sequential containerization workflow
+	steps, err := buildContainerizationSteps(stepProvider)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build workflow DAG: %w", err)
+		return nil, fmt.Errorf("failed to build workflow steps: %w", err)
 	}
 
 	return &Orchestrator{
-		dag:            dag,
-		emitterFactory: emitterFactory,
-		logger:         logger,
-		stepProvider:   stepProvider,
+		steps:                  steps,
+		logger:                 logger,
+		stepProvider:           stepProvider,
+		progressEmitterFactory: progressEmitterFactory,
 	}, nil
 }
 
@@ -44,43 +44,38 @@ func (o *Orchestrator) GetStepProvider() StepProvider {
 	return o.stepProvider
 }
 
-// GetProgressEmitterFactory returns the progress emitter factory
-func (o *Orchestrator) GetProgressEmitterFactory() ProgressEmitterFactory {
-	return o.emitterFactory
-}
-
-// Execute runs the containerization workflow using DAG execution
+// Execute runs the containerization workflow sequentially
 func (o *Orchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
 	// Initialize context with workflow ID
 	workflowID, ctx := o.initContext(ctx, args)
 
 	// Create progress emitter
-	emitter := o.newEmitter(ctx, req)
+	emitter := o.progressEmitterFactory(ctx, req)
 	defer emitter.Close()
 
 	// Create workflow state
 	state := o.newState(workflowID, args, emitter)
 
 	// Log workflow start
-	o.logger.Info("Starting DAG-based containerization workflow",
+	o.logger.Info("Starting sequential containerization workflow",
 		"workflow_id", workflowID,
-		"steps_count", len(o.dag.steps),
+		"steps_count", len(o.steps),
 		"repo_url", args.RepoURL,
 		"repo_path", args.RepoPath,
 		"branch", args.Branch,
 	)
 
-	// Execute the DAG workflow
+	// Execute steps sequentially
 	startTime := time.Now()
-	err := o.dag.Execute(ctx, state)
+	err := o.executeSequentially(ctx, state)
 	duration := time.Since(startTime)
 
 	// Log completion
-	o.logger.Info("DAG workflow completed",
+	o.logger.Info("Sequential workflow completed",
 		"workflow_id", workflowID,
 		"success", err == nil,
 		"duration", duration,
-		"steps_executed", len(o.dag.steps),
+		"steps_executed", state.CurrentStep,
 	)
 
 	if err != nil {
@@ -106,15 +101,6 @@ func (o *Orchestrator) initContext(ctx context.Context, args *ContainerizeAndDep
 	return workflowID, ctx
 }
 
-// newEmitter creates a progress emitter for the workflow
-func (o *Orchestrator) newEmitter(ctx context.Context, req *mcp.CallToolRequest) api.ProgressEmitter {
-	if o.emitterFactory != nil {
-		return o.emitterFactory.CreateEmitter(ctx, req, len(o.dag.steps))
-	}
-	// Fallback to no-op emitter
-	return &NoOpEmitter{}
-}
-
 // newState creates the workflow state with all necessary components
 func (o *Orchestrator) newState(workflowID string, args *ContainerizeAndDeployArgs, emitter api.ProgressEmitter) *WorkflowState {
 	repoIdentifier := GetRepositoryIdentifier(args)
@@ -126,116 +112,151 @@ func (o *Orchestrator) newState(workflowID string, args *ContainerizeAndDeployAr
 		Result:           &ContainerizeAndDeployResult{},
 		Logger:           o.logger,
 		ProgressEmitter:  emitter,
-		TotalSteps:       len(o.dag.steps),
+		TotalSteps:       len(o.steps),
 		CurrentStep:      0,
-		WorkflowProgress: NewWorkflowProgress(workflowID, "containerization", len(o.dag.steps)),
+		WorkflowProgress: NewWorkflowProgress(workflowID, "containerization", len(o.steps)),
 	}
 
 	return state
 }
 
-// buildContainerizationDAG creates the DAG for the containerization workflow
-func buildContainerizationDAG(provider StepProvider) (*DAGWorkflow, error) {
-	builder := NewDAGBuilder()
+// executeSequentially runs all workflow steps in sequence
+func (o *Orchestrator) executeSequentially(ctx context.Context, state *WorkflowState) error {
+	// Cache all steps in state for optimization analysis
+	state.SetAllSteps(o.steps)
 
-	// Add all workflow steps with standard retry policies
-	defaultRetry := DAGRetryPolicy{
-		MaxAttempts: 3,
-		BackoffBase: 2 * time.Second,
-		BackoffMax:  30 * time.Second,
-	}
-
-	// Add steps - wrapping existing Step implementations
-	// Step definitions with their configurations
-	stepConfigs := []struct {
-		name    string
-		stepKey string
-		timeout time.Duration
-	}{
-		{"analyze", StepAnalyzeRepository, 5 * time.Minute},
-		{"dockerfile", StepGenerateDockerfile, 2 * time.Minute},
-		{"build", StepBuildImage, 15 * time.Minute},
-		{"scan", StepSecurityScan, 10 * time.Minute},
-		{"tag", StepTagImage, 1 * time.Minute},
-		{"push", StepPushImage, 10 * time.Minute},
-		{"manifest", StepGenerateManifests, 2 * time.Minute},
-		{"cluster", StepSetupCluster, 5 * time.Minute},
-		{"deploy", StepDeployApplication, 10 * time.Minute},
-		{"verify", StepVerifyDeployment, 5 * time.Minute},
-	}
-
-	// Add all steps with error handling
-	for _, config := range stepConfigs {
-		step, err := getStep(provider, config.stepKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get step %s: %w", config.name, err)
-		}
-
-		builder.AddStep(&DAGStep{
-			Name:    config.name,
-			Execute: wrapStep(step),
-			Retry:   defaultRetry,
-			Timeout: config.timeout,
-		})
-	}
-
-	// Define sequential dependencies
-	builder.
-		AddDependency("analyze", "dockerfile").
-		AddDependency("dockerfile", "build").
-		AddDependency("build", "scan").
-		AddDependency("scan", "tag").
-		AddDependency("tag", "push").
-		AddDependency("push", "manifest").
-		AddDependency("manifest", "cluster").
-		AddDependency("cluster", "deploy").
-		AddDependency("deploy", "verify")
-
-	return builder.Build()
-}
-
-// wrapStep wraps an existing Step interface into a DAG-compatible function
-func wrapStep(step Step) func(context.Context, *WorkflowState) error {
-	return func(ctx context.Context, state *WorkflowState) error {
+	for _, step := range o.steps {
 		// Update current step number for progress tracking
 		state.CurrentStep++
 
-		// Update progress
-		percentage := int(float64(state.CurrentStep) / float64(state.TotalSteps) * 100)
+		// Log step start
+		o.logger.Info("Starting workflow step",
+			"step", step.Name(),
+			"step_number", state.CurrentStep,
+			"total_steps", state.TotalSteps,
+		)
 
-		// Execute the step
-		err := step.Execute(ctx, state)
+		// Execute step with retry logic
+		err := o.executeStepWithRetry(ctx, step, state)
 
 		// Emit progress update
 		if state.ProgressEmitter != nil {
-			status := "completed"
-			if err != nil {
-				status = "failed"
-			}
+			percentage := int(float64(state.CurrentStep) / float64(state.TotalSteps) * 100)
+			message := fmt.Sprintf("Step %s completed", step.Name())
 
-			// Emit progress update to notify listeners of step completion status
-			message := fmt.Sprintf("Step %s %s", step.Name(), status)
 			if err != nil {
 				message = fmt.Sprintf("Step %s failed: %v", step.Name(), err)
 			}
 
 			if emitErr := state.ProgressEmitter.Emit(ctx, step.Name(), percentage, message); emitErr != nil {
-				// Log but don't fail on progress emission errors
-				state.Logger.Warn("Failed to emit progress",
+				o.logger.Warn("Failed to emit progress",
 					"step", step.Name(),
 					"error", emitErr)
 			}
 		}
 
-		return err
+		// Log step completion
+		o.logger.Info("Workflow step completed",
+			"step", step.Name(),
+			"success", err == nil,
+			"step_number", state.CurrentStep,
+		)
+
+		if err != nil {
+			return fmt.Errorf("step %s failed: %w", step.Name(), err)
+		}
 	}
+
+	return nil
 }
 
-// getStep is a helper that gets a step by name and returns an error if not found
-func getStep(provider StepProvider, name string) (Step, error) {
-	step, err := provider.GetStep(name)
-	if err != nil {
-		return nil, fmt.Errorf("step %s not found: %w", name, err)
+// executeStepWithRetry executes a step with retry logic
+func (o *Orchestrator) executeStepWithRetry(ctx context.Context, step Step, state *WorkflowState) error {
+	maxRetries := step.MaxRetries()
+	if maxRetries < 1 {
+		maxRetries = 1
 	}
-	return step, nil
+
+	var lastErr error
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		// Create timeout context for this attempt
+		timeoutCtx, cancel := context.WithTimeout(ctx, o.getStepTimeout(step.Name()))
+		defer cancel()
+
+		// Execute the step
+		err := step.Execute(timeoutCtx, state)
+		if err == nil {
+			return nil
+		}
+
+		lastErr = err
+		o.logger.Warn("Step failed, will retry",
+			"step", step.Name(),
+			"attempt", attempt,
+			"max_attempts", maxRetries,
+			"error", err,
+		)
+
+		// Don't sleep after the last attempt
+		if attempt < maxRetries {
+			// Exponential backoff with jitter
+			backoff := time.Duration(attempt) * 2 * time.Second
+			if backoff > 30*time.Second {
+				backoff = 30 * time.Second
+			}
+			time.Sleep(backoff)
+		}
+	}
+
+	return NewWorkflowError(step.Name(), maxRetries, lastErr)
+}
+
+// getStepTimeout returns the timeout for a specific step
+func (o *Orchestrator) getStepTimeout(stepName string) time.Duration {
+	timeouts := map[string]time.Duration{
+		StepAnalyzeRepository:  5 * time.Minute,
+		StepGenerateDockerfile: 2 * time.Minute,
+		StepBuildImage:         15 * time.Minute,
+		StepSecurityScan:       10 * time.Minute,
+		StepTagImage:           1 * time.Minute,
+		StepPushImage:          10 * time.Minute,
+		StepGenerateManifests:  2 * time.Minute,
+		StepSetupCluster:       5 * time.Minute,
+		StepDeployApplication:  10 * time.Minute,
+		StepVerifyDeployment:   5 * time.Minute,
+	}
+
+	if timeout, ok := timeouts[stepName]; ok {
+		return timeout
+	}
+	return 5 * time.Minute // default timeout
+}
+
+// buildContainerizationSteps creates the sequential list of workflow steps
+func buildContainerizationSteps(provider StepProvider) ([]Step, error) {
+	// Define the sequential order of steps
+	stepKeys := []string{
+		StepAnalyzeRepository,
+		StepGenerateDockerfile,
+		StepBuildImage,
+		StepSecurityScan,
+		StepTagImage,
+		StepPushImage,
+		StepGenerateManifests,
+		StepSetupCluster,
+		StepDeployApplication,
+		StepVerifyDeployment,
+	}
+
+	// Build the step list
+	steps := make([]Step, 0, len(stepKeys))
+	for _, stepKey := range stepKeys {
+		step, err := provider.GetStep(stepKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get step %s: %w", stepKey, err)
+		}
+		steps = append(steps, step)
+	}
+
+	return steps, nil
 }

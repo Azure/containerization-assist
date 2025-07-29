@@ -18,7 +18,7 @@ func BenchmarkCoreSamplingPerformance(b *testing.B) {
 	}))
 
 	ctx := context.Background()
-	client := NewCoreClient(logger)
+	client := NewClient(logger)
 
 	tests := []struct {
 		name           string
@@ -110,7 +110,7 @@ func BenchmarkSamplingThroughputOptimized(b *testing.B) {
 	}))
 
 	ctx := context.Background()
-	client := NewCoreClient(logger)
+	client := NewClient(logger)
 	request := sampling.Request{
 		Prompt:      "Quick throughput test",
 		MaxTokens:   10,
@@ -132,7 +132,7 @@ func BenchmarkSamplingMemoryOptimized(b *testing.B) {
 	}))
 
 	ctx := context.Background()
-	client := NewCoreClient(logger)
+	client := NewClient(logger)
 	request := sampling.Request{
 		Prompt:      "Memory test prompt for allocation patterns",
 		MaxTokens:   25,
@@ -154,7 +154,7 @@ func BenchmarkSamplingConcurrency(b *testing.B) {
 	}))
 
 	ctx := context.Background()
-	client := NewCoreClient(logger)
+	client := NewClient(logger)
 	request := sampling.Request{
 		Prompt:      "Concurrent test",
 		MaxTokens:   15,
@@ -185,7 +185,7 @@ func BenchmarkRequestSizes(b *testing.B) {
 	}))
 
 	ctx := context.Background()
-	client := NewCoreClient(logger)
+	client := NewClient(logger)
 
 	// Different prompt sizes to test scalability
 	prompts := map[string]string{

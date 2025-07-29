@@ -16,9 +16,6 @@ const (
 	// WorkflowIDKey stores the unique identifier for a workflow execution
 	WorkflowIDKey contextKey = "workflow_id"
 
-	// TraceIDKey stores distributed tracing information
-	TraceIDKey contextKey = "trace_id"
-
 	// RetryAttemptKey stores the current retry attempt number
 	RetryAttemptKey contextKey = "retry_attempt"
 
@@ -35,17 +32,6 @@ func WithWorkflowID(ctx context.Context, workflowID string) context.Context {
 func GetWorkflowID(ctx context.Context) (string, bool) {
 	workflowID, ok := ctx.Value(WorkflowIDKey).(string)
 	return workflowID, ok
-}
-
-// WithTraceID adds a trace ID to the context
-func WithTraceID(ctx context.Context, traceID string) context.Context {
-	return context.WithValue(ctx, TraceIDKey, traceID)
-}
-
-// GetTraceID retrieves the trace ID from context
-func GetTraceID(ctx context.Context) (string, bool) {
-	traceID, ok := ctx.Value(TraceIDKey).(string)
-	return traceID, ok
 }
 
 // WithRetryAttempt adds a retry attempt number to the context

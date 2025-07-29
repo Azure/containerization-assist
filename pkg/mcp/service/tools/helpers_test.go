@@ -2,9 +2,11 @@ package tools
 
 import (
 	"context"
+	"log/slog"
 	"testing"
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -202,27 +204,14 @@ func TestExtractStringArrayParam(t *testing.T) {
 }
 
 func TestCreateProgressEmitter(t *testing.T) {
-	t.Run("with factory", func(t *testing.T) {
-		mockFactory := &mockProgressEmitterFactory{}
+	t.Run("creates progress emitter", func(t *testing.T) {
+		ctx := context.Background()
+		req := &mcp.CallToolRequest{}
+		totalSteps := 5
+		logger := slog.Default()
 
-		emitter := CreateProgressEmitter(mockFactory)
+		emitter := CreateProgressEmitter(ctx, req, totalSteps, logger)
 		require.NotNil(t, emitter)
-		// The actual emitter type depends on the factory implementation
-	})
-
-	t.Run("nil factory", func(t *testing.T) {
-		emitter := CreateProgressEmitter(nil)
-		require.NotNil(t, emitter)
-		_, ok := emitter.(*NoOpProgressEmitter)
-		assert.True(t, ok, "Should return NoOpProgressEmitter when factory is nil")
-	})
-
-	t.Run("factory returns nil", func(t *testing.T) {
-		// Test with nil factory - the current implementation always returns NoOpEmitter
-		emitter := CreateProgressEmitter(nil)
-		require.NotNil(t, emitter)
-		_, ok := emitter.(*NoOpProgressEmitter)
-		assert.True(t, ok, "Should return NoOpProgressEmitter when factory is nil")
 	})
 }
 

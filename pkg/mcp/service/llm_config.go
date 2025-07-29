@@ -70,14 +70,11 @@ func DefaultLLMConfig() LLMConfig {
 // ToSamplingConfig converts LLMConfig to infrastructure sampling.Config
 func (c LLMConfig) ToSamplingConfig() sampling.Config {
 	return sampling.Config{
-		MaxTokens:        c.MaxTokens,
-		Temperature:      c.Temperature,
-		RetryAttempts:    c.RetryAttempts,
-		TokenBudget:      c.TokenBudget,
-		BaseBackoff:      c.BaseBackoff,
-		MaxBackoff:       c.MaxBackoff,
-		StreamingEnabled: c.StreamingEnabled,
-		RequestTimeout:   c.RequestTimeout,
+		MaxTokens:     c.MaxTokens,
+		Temperature:   c.Temperature,
+		RetryAttempts: c.RetryAttempts,
+		BaseBackoff:   c.BaseBackoff,
+		MaxBackoff:    c.MaxBackoff,
 	}
 }
 

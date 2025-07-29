@@ -246,7 +246,7 @@ func buildMCPServer(t *testing.T, testDir string) string {
 
 // startMCPServer starts the MCP server process
 func startMCPServer(t *testing.T, mcpBinary string, testDir string) *exec.Cmd {
-	cmd := exec.Command(mcpBinary, "--transport", "stdio")
+	cmd := exec.Command(mcpBinary)
 	cmd.Dir = testDir
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("Failed to start MCP server: %v", err)

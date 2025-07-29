@@ -14,7 +14,7 @@ type ArchitectureLayer int
 
 const (
 	APILayer ArchitectureLayer = iota
-	ApplicationLayer
+	ServiceLayer
 	DomainLayer
 	InfrastructureLayer
 )
@@ -37,7 +37,7 @@ func getArchitectureRules() map[ArchitectureLayer]LayerRules {
 			CanImport:      []ArchitectureLayer{DomainLayer}, // Only domain interfaces
 			CannotImport: []string{
 				"/infrastructure/",
-				"/application/",
+				"/service/",
 				"os/exec",
 				"database/sql",
 				"net/http",
@@ -50,9 +50,9 @@ func getArchitectureRules() map[ArchitectureLayer]LayerRules {
 				"sql.Open",
 			},
 		},
-		ApplicationLayer: {
-			Name:           "Application Layer",
-			PackagePattern: "github.com/Azure/container-kit/pkg/mcp/application",
+		ServiceLayer: {
+			Name:           "Service Layer",
+			PackagePattern: "github.com/Azure/container-kit/pkg/mcp/service",
 			CanImport:      []ArchitectureLayer{APILayer, DomainLayer}, // Can use API and domain
 			CannotImport: []string{
 				"/infrastructure/", // Should not directly import infrastructure
@@ -71,7 +71,7 @@ func getArchitectureRules() map[ArchitectureLayer]LayerRules {
 			CanImport:      []ArchitectureLayer{}, // Only other domain packages
 			CannotImport: []string{
 				"/infrastructure/",
-				"/application/",
+				"/service/",
 				"/api/",
 				"os/exec",
 				"database/sql",
@@ -91,7 +91,7 @@ func getArchitectureRules() map[ArchitectureLayer]LayerRules {
 			PackagePattern: "github.com/Azure/container-kit/pkg/mcp/infrastructure",
 			CanImport:      []ArchitectureLayer{DomainLayer}, // Can import domain, but not api/application
 			CannotImport: []string{
-				"/application/",
+				"/service/",
 				"/api/",
 			},
 			MustNotCall: []string{
@@ -132,43 +132,10 @@ func TestDependencyInversionPrinciple(t *testing.T) {
 	t.Log("  - Manager: domain/prompts → infrastructure/ai_ml/prompts")
 }
 
-// TestWiringLayerCompliance ensures wiring only happens in designated places
-func TestWiringLayerCompliance(t *testing.T) {
-	allowedWiringPackages := []string{
-		"github.com/Azure/container-kit/pkg/mcp/api/wiring",
-	}
-
-	allPackages := []string{}
-	allPackages = append(allPackages, findPackagesInLayer(t, "github.com/Azure/container-kit/pkg/mcp/api")...)
-	allPackages = append(allPackages, findPackagesInLayer(t, "github.com/Azure/container-kit/pkg/mcp/application")...)
-	allPackages = append(allPackages, findPackagesInLayer(t, "github.com/Azure/container-kit/pkg/mcp/domain")...)
-	allPackages = append(allPackages, findPackagesInLayer(t, "github.com/Azure/container-kit/pkg/mcp/infrastructure")...)
-
-	for _, pkg := range allPackages {
-		t.Run(pkg, func(t *testing.T) {
-			// Skip allowed wiring packages
-			isAllowed := false
-			for _, allowed := range allowedWiringPackages {
-				if strings.Contains(pkg, allowed) {
-					isAllowed = true
-					break
-				}
-			}
-			if isAllowed {
-				return
-			}
-
-			// Check for Wire imports in non-wiring packages
-			validateNoWireImports(t, pkg)
-		})
-	}
-}
-
 // TestConfigurationCentralization ensures config is centralized
 func TestConfigurationCentralization(t *testing.T) {
 	allowedConfigPackages := []string{
-		"github.com/Azure/container-kit/pkg/mcp/application/config",
-		"github.com/Azure/container-kit/pkg/mcp/api/wiring", // For conversion
+		"github.com/Azure/container-kit/pkg/mcp/service/config",
 	}
 
 	forbiddenConfigPatterns := []string{
@@ -256,26 +223,6 @@ func hasInterfaceImplementation(t *testing.T, pkgPath string, interfaceName stri
 	return false
 }
 
-func validateNoWireImports(t *testing.T, pkgPath string) {
-	pkg, err := build.Import(pkgPath, "", build.IgnoreVendor)
-	if err != nil {
-		t.Skipf("Skipping %s: %v", pkgPath, err)
-		return
-	}
-
-	forbiddenWireImports := []string{
-		"github.com/google/wire",
-	}
-
-	for _, imp := range pkg.Imports {
-		for _, forbidden := range forbiddenWireImports {
-			if strings.Contains(imp, forbidden) {
-				t.Errorf("Package %s should not import Wire directly: %s", pkgPath, imp)
-			}
-		}
-	}
-}
-
 func validateNoScatteredConfig(t *testing.T, pkgPath string, allowedPackages []string, forbiddenPatterns []string) {
 	// Check if this package is allowed to have config
 	for _, allowed := range allowedPackages {
@@ -305,7 +252,7 @@ func TestPerformanceConstraints(t *testing.T) {
 	// Check for performance anti-patterns in hot paths
 	hotPathPackages := []string{
 		"github.com/Azure/container-kit/pkg/mcp/domain/workflow",
-		"github.com/Azure/container-kit/pkg/mcp/application",
+		"github.com/Azure/container-kit/pkg/mcp/service",
 	}
 
 	performanceAntiPatterns := []string{

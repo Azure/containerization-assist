@@ -14,28 +14,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// DAGMockStep implements the Step interface for testing
-type DAGMockStep struct {
+// MockStep implements the Step interface for testing
+type MockStep struct {
 	mock.Mock
 }
 
-func (m *DAGMockStep) Name() string {
+func (m *MockStep) Name() string {
 	args := m.Called()
 	return args.String(0)
 }
 
-func (m *DAGMockStep) Execute(ctx context.Context, state *WorkflowState) error {
+func (m *MockStep) Execute(ctx context.Context, state *WorkflowState) error {
 	args := m.Called(ctx, state)
 	return args.Error(0)
 }
 
-func (m *DAGMockStep) MaxRetries() int {
+func (m *MockStep) MaxRetries() int {
 	args := m.Called()
 	return args.Int(0)
 }
 
-// DAGMockStepProvider implements StepProvider for testing
-type DAGMockStepProvider struct {
+// MockStepProvider implements StepProvider for testing
+type MockStepProvider struct {
 	analyzeStep    Step
 	dockerfileStep Step
 	buildStep      Step
@@ -49,7 +49,7 @@ type DAGMockStepProvider struct {
 }
 
 // GetStep implements the consolidated StepProvider interface
-func (p *DAGMockStepProvider) GetStep(name string) (Step, error) {
+func (p *MockStepProvider) GetStep(name string) (Step, error) {
 	stepMap := map[string]Step{
 		StepAnalyzeRepository:  p.analyzeStep,
 		StepGenerateDockerfile: p.dockerfileStep,
@@ -70,7 +70,22 @@ func (p *DAGMockStepProvider) GetStep(name string) (Step, error) {
 }
 
 // ListSteps returns all available step names
-func (p *DAGMockStepProvider) ListSteps() []string {
+// mockProgressEmitter implements api.ProgressEmitter for testing
+type mockProgressEmitter struct{}
+
+func (m *mockProgressEmitter) Emit(ctx context.Context, stage string, percent int, message string) error {
+	return nil
+}
+
+func (m *mockProgressEmitter) EmitDetailed(ctx context.Context, update api.ProgressUpdate) error {
+	return nil
+}
+
+func (m *mockProgressEmitter) Close() error {
+	return nil
+}
+
+func (p *MockStepProvider) ListSteps() []string {
 	return []string{
 		StepAnalyzeRepository,
 		StepGenerateDockerfile,
@@ -90,10 +105,13 @@ func TestNewOrchestrator(t *testing.T) {
 		stepProvider := createMockStepProvider()
 		logger := slog.Default()
 
-		orchestrator, err := NewOrchestrator(stepProvider, nil, logger)
+		mockProgressFactory := func(ctx context.Context, req *mcp.CallToolRequest) api.ProgressEmitter {
+			return &mockProgressEmitter{}
+		}
+		orchestrator, err := NewOrchestrator(stepProvider, logger, mockProgressFactory)
 		require.NoError(t, err)
 		assert.NotNil(t, orchestrator)
-		assert.NotNil(t, orchestrator.dag)
+		assert.NotNil(t, orchestrator.steps)
 		assert.Equal(t, logger, orchestrator.logger)
 	})
 }
@@ -105,11 +123,14 @@ func TestOrchestratorExecute(t *testing.T) {
 
 		// Set up expectations for all steps
 		for _, step := range getAllSteps(stepProvider) {
-			mockStep := step.(*DAGMockStep)
+			mockStep := step.(*MockStep)
 			mockStep.On("Execute", mock.Anything, mock.Anything).Return(nil)
 		}
 
-		orchestrator, err := NewOrchestrator(stepProvider, nil, logger)
+		mockProgressFactory := func(ctx context.Context, req *mcp.CallToolRequest) api.ProgressEmitter {
+			return &mockProgressEmitter{}
+		}
+		orchestrator, err := NewOrchestrator(stepProvider, logger, mockProgressFactory)
 		require.NoError(t, err)
 
 		ctx := context.Background()
@@ -126,7 +147,7 @@ func TestOrchestratorExecute(t *testing.T) {
 
 		// Verify all steps were called
 		for _, step := range getAllSteps(stepProvider) {
-			mockStep := step.(*DAGMockStep)
+			mockStep := step.(*MockStep)
 			mockStep.AssertExpectations(t)
 		}
 	})
@@ -137,19 +158,22 @@ func TestOrchestratorExecute(t *testing.T) {
 
 		// Set up analyze and dockerfile to succeed
 		analyzeStep, _ := stepProvider.GetStep("analyze_repository")
-		analyzeStepMock := analyzeStep.(*DAGMockStep)
+		analyzeStepMock := analyzeStep.(*MockStep)
 		analyzeStepMock.On("Execute", mock.Anything, mock.Anything).Return(nil)
 
 		dockerfileStep, _ := stepProvider.GetStep("generate_dockerfile")
-		dockerfileStepMock := dockerfileStep.(*DAGMockStep)
+		dockerfileStepMock := dockerfileStep.(*MockStep)
 		dockerfileStepMock.On("Execute", mock.Anything, mock.Anything).Return(nil)
 
 		// Set up build step to fail
 		buildStep, _ := stepProvider.GetStep("build_image")
-		buildStepMock := buildStep.(*DAGMockStep)
+		buildStepMock := buildStep.(*MockStep)
 		buildStepMock.On("Execute", mock.Anything, mock.Anything).Return(errors.New("build failed"))
 
-		orchestrator, err := NewOrchestrator(stepProvider, nil, logger)
+		mockProgressFactory := func(ctx context.Context, req *mcp.CallToolRequest) api.ProgressEmitter {
+			return &mockProgressEmitter{}
+		}
+		orchestrator, err := NewOrchestrator(stepProvider, logger, mockProgressFactory)
 		require.NoError(t, err)
 
 		ctx := context.Background()
@@ -160,7 +184,7 @@ func TestOrchestratorExecute(t *testing.T) {
 
 		result, err := orchestrator.Execute(ctx, req, args)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "Step 'build' failed")
+		assert.Contains(t, err.Error(), "step build failed")
 		assert.NotNil(t, result)
 		assert.False(t, result.Success)
 		assert.Contains(t, result.Error, "Workflow failed")
@@ -172,7 +196,7 @@ func TestOrchestratorExecute(t *testing.T) {
 
 		// Verify subsequent steps were not called
 		scanStep, _ := stepProvider.GetStep("security_scan")
-		scanStepMock := scanStep.(*DAGMockStep)
+		scanStepMock := scanStep.(*MockStep)
 		scanStepMock.AssertNotCalled(t, "Execute")
 	})
 
@@ -182,11 +206,14 @@ func TestOrchestratorExecute(t *testing.T) {
 
 		// Set up all steps to succeed
 		for _, step := range getAllSteps(stepProvider) {
-			mockStep := step.(*DAGMockStep)
+			mockStep := step.(*MockStep)
 			mockStep.On("Execute", mock.Anything, mock.Anything).Return(nil)
 		}
 
-		orchestrator, err := NewOrchestrator(stepProvider, nil, logger)
+		mockProgressFactory := func(ctx context.Context, req *mcp.CallToolRequest) api.ProgressEmitter {
+			return &mockProgressEmitter{}
+		}
+		orchestrator, err := NewOrchestrator(stepProvider, logger, mockProgressFactory)
 		require.NoError(t, err)
 
 		existingWorkflowID := "existing-workflow-123"
@@ -208,15 +235,14 @@ func TestOrchestratorExecute(t *testing.T) {
 
 		// Set up all steps to succeed
 		for _, step := range getAllSteps(stepProvider) {
-			mockStep := step.(*DAGMockStep)
+			mockStep := step.(*MockStep)
 			mockStep.On("Execute", mock.Anything, mock.Anything).Return(nil)
 		}
 
-		// Create mock emitter factory
-		mockEmitter := &NoOpEmitter{}
-		emitterFactory := &mockEmitterFactory{emitter: mockEmitter}
-
-		orchestrator, err := NewOrchestrator(stepProvider, emitterFactory, logger)
+		mockProgressFactory := func(ctx context.Context, req *mcp.CallToolRequest) api.ProgressEmitter {
+			return &mockProgressEmitter{}
+		}
+		orchestrator, err := NewOrchestrator(stepProvider, logger, mockProgressFactory)
 		require.NoError(t, err)
 
 		ctx := context.Background()
@@ -232,57 +258,39 @@ func TestOrchestratorExecute(t *testing.T) {
 	})
 }
 
-func TestBuildContainerizationDAG(t *testing.T) {
-	t.Run("creates correct workflow DAG structure", func(t *testing.T) {
+func TestBuildContainerizationSteps(t *testing.T) {
+	t.Run("creates correct workflow step sequence", func(t *testing.T) {
 		stepProvider := createMockStepProvider()
 
-		dag, err := buildContainerizationDAG(stepProvider)
+		steps, err := buildContainerizationSteps(stepProvider)
 		require.NoError(t, err)
-		assert.NotNil(t, dag)
+		assert.NotNil(t, steps)
 
-		// Verify all steps are present
-		assert.Len(t, dag.steps, 10)
-		assert.NotNil(t, dag.steps["analyze"])
-		assert.NotNil(t, dag.steps["dockerfile"])
-		assert.NotNil(t, dag.steps["build"])
-		assert.NotNil(t, dag.steps["scan"])
-		assert.NotNil(t, dag.steps["tag"])
-		assert.NotNil(t, dag.steps["push"])
-		assert.NotNil(t, dag.steps["manifest"])
-		assert.NotNil(t, dag.steps["cluster"])
-		assert.NotNil(t, dag.steps["deploy"])
-		assert.NotNil(t, dag.steps["verify"])
-
-		// Verify dependencies
-		sorted, err := dag.TopologicalSort()
-		require.NoError(t, err)
-		assert.Equal(t, []string{
-			"analyze", "dockerfile", "build", "scan", "tag",
-			"push", "manifest", "cluster", "deploy", "verify",
-		}, sorted)
-
+		// Verify all steps are present in correct order
+		assert.Len(t, steps, 10)
+		assert.Equal(t, "analyze", steps[0].Name())
+		assert.Equal(t, "dockerfile", steps[1].Name())
+		assert.Equal(t, "build", steps[2].Name())
+		assert.Equal(t, "scan", steps[3].Name())
+		assert.Equal(t, "tag", steps[4].Name())
+		assert.Equal(t, "push", steps[5].Name())
+		assert.Equal(t, "manifest", steps[6].Name())
+		assert.Equal(t, "cluster", steps[7].Name())
+		assert.Equal(t, "deploy", steps[8].Name())
+		assert.Equal(t, "verify", steps[9].Name())
 	})
-}
-
-// mockEmitterFactory implements ProgressEmitterFactory for testing
-type mockEmitterFactory struct {
-	emitter api.ProgressEmitter
-}
-
-func (f *mockEmitterFactory) CreateEmitter(ctx context.Context, req *mcp.CallToolRequest, totalSteps int) api.ProgressEmitter {
-	return f.emitter
 }
 
 // Helper functions
 
-func createMockStepProvider() *DAGMockStepProvider {
-	provider := &DAGMockStepProvider{}
+func createMockStepProvider() *MockStepProvider {
+	provider := &MockStepProvider{}
 
 	// Create mock steps with names
 	steps := []string{"analyze", "dockerfile", "build", "scan", "tag", "push", "manifest", "cluster", "deploy", "verify"}
 
 	for _, name := range steps {
-		step := new(DAGMockStep)
+		step := new(MockStep)
 		step.On("Name").Return(name).Maybe()
 		step.On("MaxRetries").Return(3).Maybe()
 
@@ -313,7 +321,7 @@ func createMockStepProvider() *DAGMockStepProvider {
 	return provider
 }
 
-func getAllSteps(provider *DAGMockStepProvider) []Step {
+func getAllSteps(provider *MockStepProvider) []Step {
 	return []Step{
 		provider.analyzeStep,
 		provider.dockerfileStep,

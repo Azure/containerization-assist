@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/common/errors"
@@ -25,6 +27,12 @@ type BoltStore struct {
 
 // NewBoltStore creates a new BoltDB-backed session store
 func NewBoltStore(dbPath string, logger *slog.Logger) (*BoltStore, error) {
+	// Ensure the parent directory exists
+	dir := filepath.Dir(dbPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, errors.New(errors.CodeIoError, "persistence", fmt.Sprintf("failed to create directory %s", dir), err)
+	}
+
 	db, err := bbolt.Open(dbPath, 0600, &bbolt.Options{
 		Timeout: 1 * time.Second,
 	})

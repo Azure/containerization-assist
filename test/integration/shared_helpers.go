@@ -65,7 +65,6 @@ func startMCPServerProcess(ctx context.Context, testWorkspaceDir string) *MCPSer
 	}
 
 	cmd := exec.CommandContext(ctx, serverBinaryPath,
-		"--transport", "stdio",
 		"--workspace-dir", workspaceDir,
 		"--store-path", storePath)
 

@@ -17,12 +17,11 @@ import (
 
 // ToolRegistrar handles tool registration using the new consolidated system
 type ToolRegistrar struct {
-	logger          *slog.Logger
-	orchestrator    domainworkflow.WorkflowOrchestrator
-	stepProvider    domainworkflow.StepProvider
-	progressFactory domainworkflow.ProgressEmitterFactory
-	sessionManager  session.OptimizedSessionManager
-	config          domainworkflow.ServerConfig
+	logger         *slog.Logger
+	orchestrator   domainworkflow.WorkflowOrchestrator
+	stepProvider   domainworkflow.StepProvider
+	sessionManager session.OptimizedSessionManager
+	config         domainworkflow.ServerConfig
 }
 
 // NewToolRegistrar creates a new tool registrar
@@ -30,17 +29,15 @@ func NewToolRegistrar(
 	logger *slog.Logger,
 	orchestrator domainworkflow.WorkflowOrchestrator,
 	stepProvider domainworkflow.StepProvider,
-	progressFactory domainworkflow.ProgressEmitterFactory,
 	sessionManager session.OptimizedSessionManager,
 	config domainworkflow.ServerConfig,
 ) *ToolRegistrar {
 	return &ToolRegistrar{
-		logger:          logger.With("component", "tool_registrar"),
-		orchestrator:    orchestrator,
-		stepProvider:    stepProvider,
-		progressFactory: progressFactory,
-		sessionManager:  sessionManager,
-		config:          config,
+		logger:         logger.With("component", "tool_registrar"),
+		orchestrator:   orchestrator,
+		stepProvider:   stepProvider,
+		sessionManager: sessionManager,
+		config:         config,
 	}
 }
 

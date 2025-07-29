@@ -15,7 +15,6 @@ type DomainEvent interface {
 	OccurredAt() time.Time
 
 	// WorkflowID returns the workflow this event is associated with
-	// This aligns with existing tracing infrastructure
 	WorkflowID() string
 
 	// EventType returns the type name of this event

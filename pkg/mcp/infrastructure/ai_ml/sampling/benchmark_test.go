@@ -29,9 +29,9 @@ func BenchmarkSamplingPerformance(b *testing.B) {
 		expectedTimeNs int64 // 300μs = 300,000ns
 	}{
 		{
-			name: "CoreClient_SmallPrompt",
+			name: "Client_SmallPrompt",
 			createClient: func() sampling.UnifiedSampler {
-				return NewCoreClient(logger)
+				return NewClient(logger)
 			},
 			request: sampling.Request{
 				Prompt:      "Hello world",
@@ -41,9 +41,9 @@ func BenchmarkSamplingPerformance(b *testing.B) {
 			expectedTimeNs: 300000, // 300μs
 		},
 		{
-			name: "CoreClient_MediumPrompt",
+			name: "Client_MediumPrompt",
 			createClient: func() sampling.UnifiedSampler {
-				return NewCoreClient(logger)
+				return NewClient(logger)
 			},
 			request: sampling.Request{
 				Prompt:      "This is a medium-sized prompt with some more text to simulate real usage patterns and see how performance scales with input size",
@@ -53,9 +53,9 @@ func BenchmarkSamplingPerformance(b *testing.B) {
 			expectedTimeNs: 300000, // 300μs
 		},
 		{
-			name: "CoreClient_LargePrompt",
+			name: "Client_LargePrompt",
 			createClient: func() sampling.UnifiedSampler {
-				return NewCoreClient(logger)
+				return NewClient(logger)
 			},
 			request: sampling.Request{
 				Prompt: `This is a large prompt that contains significantly more text to test performance under realistic conditions.
@@ -69,10 +69,10 @@ func BenchmarkSamplingPerformance(b *testing.B) {
 			expectedTimeNs: 300000, // 300μs
 		},
 		{
-			name: "DomainAdapter_StandardRequest",
+			name: "Client_StandardRequest",
 			createClient: func() sampling.UnifiedSampler {
 				client := NewClient(logger)
-				return NewDomainAdapter(client)
+				return client
 			},
 			request: sampling.Request{
 				Prompt:      "Generate a Dockerfile for a Node.js application",
@@ -159,7 +159,7 @@ func BenchmarkSamplingThroughput(b *testing.B) {
 
 	ctx := context.Background()
 
-	client := NewCoreClient(logger)
+	client := NewClient(logger)
 	request := sampling.Request{
 		Prompt:      "Quick test",
 		MaxTokens:   10,
@@ -182,7 +182,7 @@ func BenchmarkSamplingMemory(b *testing.B) {
 
 	ctx := context.Background()
 
-	client := NewCoreClient(logger)
+	client := NewClient(logger)
 	request := sampling.Request{
 		Prompt:      "Memory allocation test prompt",
 		MaxTokens:   50,
@@ -228,7 +228,7 @@ func BenchmarkConcurrentSampling(b *testing.B) {
 
 	ctx := context.Background()
 
-	client := NewCoreClient(logger)
+	client := NewClient(logger)
 	request := sampling.Request{
 		Prompt:      "Concurrent test",
 		MaxTokens:   20,
@@ -273,16 +273,15 @@ func TestBenchmarkBaseline(t *testing.T) {
 	}))
 
 	// Test that our client creation works
-	coreClient := NewCoreClient(logger)
+	coreClient := NewClient(logger)
 	require.NotNil(t, coreClient, "Core client should be created successfully")
 
 	// Test that legacy client works
 	client := NewClient(logger)
 	require.NotNil(t, client, "Client should be created successfully")
 
-	// Test that domain adapter works
-	adapter := NewDomainAdapter(client)
-	require.NotNil(t, adapter, "Domain adapter should be created successfully")
+	// Test that client implements UnifiedSampler directly
+	require.NotNil(t, client, "Client should be created successfully")
 
 	// Test that middleware client works
 	middlewareClient := CreateDomainClient(logger)

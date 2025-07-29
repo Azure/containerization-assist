@@ -183,24 +183,10 @@ const (
 	EffortExtensive Effort = "extensive" // > 1 week
 )
 
-// Parser interface for converting AI text responses to structured types
-type ResultParser interface {
-	ParseManifestFix(content string) (*ManifestFix, error)
-	ParseDockerfileFix(content string) (*DockerfileFix, error)
-	ParseSecurityAnalysis(content string) (*SecurityAnalysis, error)
-	ParseRepositoryAnalysis(content string) (*RepositoryAnalysis, error)
-}
-
-// DefaultParser implements ResultParser with regex and heuristic parsing
-type DefaultParser struct{}
-
-// NewDefaultParser creates a new parser
-func NewDefaultParser() *DefaultParser {
-	return &DefaultParser{}
-}
+// Simplified parsing functions - no interface abstraction needed
 
 // ParseManifestFix parses AI response into structured ManifestFix
-func (p *DefaultParser) ParseManifestFix(content string) (*ManifestFix, error) {
+func ParseManifestFix(content string) (*ManifestFix, error) {
 	result := &ManifestFix{
 		OriginalIssues:  []string{},
 		ChangesApplied:  []Change{},
@@ -252,7 +238,7 @@ func (p *DefaultParser) ParseManifestFix(content string) (*ManifestFix, error) {
 }
 
 // ParseDockerfileFix parses AI response into structured DockerfileFix
-func (p *DefaultParser) ParseDockerfileFix(content string) (*DockerfileFix, error) {
+func ParseDockerfileFix(content string) (*DockerfileFix, error) {
 	result := &DockerfileFix{
 		ChangesApplied:   []Change{},
 		OptimizationTips: []string{},
@@ -302,7 +288,7 @@ func (p *DefaultParser) ParseDockerfileFix(content string) (*DockerfileFix, erro
 }
 
 // ParseSecurityAnalysis parses AI response into structured SecurityAnalysis
-func (p *DefaultParser) ParseSecurityAnalysis(content string) (*SecurityAnalysis, error) {
+func ParseSecurityAnalysis(content string) (*SecurityAnalysis, error) {
 	result := &SecurityAnalysis{
 		CriticalIssues:    []SecurityIssue{},
 		Remediations:      []Remediation{},
@@ -364,7 +350,7 @@ func (p *DefaultParser) ParseSecurityAnalysis(content string) (*SecurityAnalysis
 }
 
 // ParseErrorAnalysis parses AI response into structured ErrorAnalysis
-func (p *DefaultParser) ParseErrorAnalysis(content string) (*ErrorAnalysis, error) {
+func ParseErrorAnalysis(content string) (*ErrorAnalysis, error) {
 	result := &ErrorAnalysis{}
 
 	// Simple parsing - extract root cause and fix sections
@@ -411,7 +397,7 @@ func (p *DefaultParser) ParseErrorAnalysis(content string) (*ErrorAnalysis, erro
 }
 
 // ParseDockerfileAnalysis parses AI response into structured DockerfileAnalysis
-func (p *DefaultParser) ParseDockerfileAnalysis(content string) (*domain.DockerfileAnalysis, error) {
+func ParseDockerfileAnalysis(content string) (*domain.DockerfileAnalysis, error) {
 	// This is a simple implementation - in production you'd have more sophisticated parsing
 	result := &domain.DockerfileAnalysis{
 		Language:      "unknown",
@@ -448,7 +434,7 @@ func (p *DefaultParser) ParseDockerfileAnalysis(content string) (*domain.Dockerf
 }
 
 // ParseManifestAnalysis parses AI response into structured ManifestAnalysis
-func (p *DefaultParser) ParseManifestAnalysis(content string) (*domain.ManifestAnalysis, error) {
+func ParseManifestAnalysis(content string) (*domain.ManifestAnalysis, error) {
 	result := &domain.ManifestAnalysis{
 		ResourceTypes: []string{},
 		Issues:        []string{},
@@ -502,14 +488,14 @@ func (p *DefaultParser) ParseManifestAnalysis(content string) (*domain.ManifestA
 }
 
 // ParseRepositoryAnalysis parses AI response into structured RepositoryAnalysis
-func (p *DefaultParser) ParseRepositoryAnalysis(content string) (*RepositoryAnalysis, error) {
+func ParseRepositoryAnalysis(content string) (*RepositoryAnalysis, error) {
 	// Clean the content to extract JSON only
-	jsonContent := p.extractJSON(content)
+	jsonContent := extractJSON(content)
 
 	var result RepositoryAnalysis
 	if err := json.Unmarshal([]byte(jsonContent), &result); err != nil {
 		// Fallback to legacy parsing if JSON parsing fails
-		return p.parseRepositoryAnalysisLegacy(content)
+		return parseRepositoryAnalysisLegacy(content)
 	}
 
 	// Set metadata
@@ -522,7 +508,7 @@ func (p *DefaultParser) ParseRepositoryAnalysis(content string) (*RepositoryAnal
 
 // extractJSON extracts JSON content from AI response, handling cases where
 // the AI might include extra text or markdown formatting
-func (p *DefaultParser) extractJSON(content string) string {
+func extractJSON(content string) string {
 	content = strings.TrimSpace(content)
 
 	// Remove markdown code block formatting
@@ -558,7 +544,7 @@ func (p *DefaultParser) extractJSON(content string) string {
 }
 
 // parseRepositoryAnalysisLegacy provides fallback parsing using the old string-matching approach
-func (p *DefaultParser) parseRepositoryAnalysisLegacy(content string) (*RepositoryAnalysis, error) {
+func parseRepositoryAnalysisLegacy(content string) (*RepositoryAnalysis, error) {
 	result := &RepositoryAnalysis{
 		BuildTools:      []string{},
 		Dependencies:    []Dependency{},

@@ -102,9 +102,6 @@ func validateDependencies(config ToolConfig, deps ToolDependencies) error {
 	if config.NeedsStepProvider && deps.StepProvider == nil {
 		return errors.New("StepProvider is required but not provided")
 	}
-	if config.NeedsProgressFactory && deps.ProgressFactory == nil {
-		return errors.New("ProgressFactory is required but not provided")
-	}
 	if config.NeedsSessionManager && deps.SessionManager == nil {
 		return errors.New("SessionManager is required but not provided")
 	}
@@ -147,7 +144,7 @@ func createWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 		}
 
 		// Setup progress emitter
-		progressEmitter := CreateProgressEmitter(deps.ProgressFactory)
+		progressEmitter := CreateProgressEmitter(ctx, &req, 1, deps.Logger)
 		defer progressEmitter.Close()
 
 		// For now, individual tools will handle their own execution

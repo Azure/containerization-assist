@@ -140,7 +140,6 @@ func (suite *SessionPersistenceIntegrationSuite) startMCPServerWithSessionDir(ct
 
 	// Start server with session directory
 	cmd := exec.CommandContext(ctx, serverBinaryPath,
-		"--transport", "stdio",
 		"--store-path", suite.sessionDir)
 
 	stdin, err := cmd.StdinPipe()

@@ -11,7 +11,6 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/service/bootstrap"
 	"github.com/Azure/container-kit/pkg/mcp/service/session"
-	"github.com/Azure/container-kit/pkg/mcp/service/transport"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -47,7 +46,6 @@ func NewLifecycleManager(
 // Start starts the MCP server with full initialization
 func (m *LifecycleManager) Start(ctx context.Context) error {
 	m.logger.Info("Starting Container Kit MCP Server",
-		"transport", m.config.TransportType,
 		"workspace_dir", m.config.WorkspaceDir,
 		"max_sessions", m.config.MaxSessions)
 
@@ -66,9 +64,9 @@ func (m *LifecycleManager) Start(ctx context.Context) error {
 		}
 	}
 
-	// Start the appropriate transport
-	transportType := transport.TransportType(m.config.TransportType)
-	return transport.StartDefaultWithPort(ctx, m.logger, transportType, m.mcpServer, 0)
+	// Start stdio transport directly
+	m.logger.Info("Starting stdio transport")
+	return server.ServeStdio(m.mcpServer)
 }
 
 // initializeMCPServer handles MCP server initialization and registration

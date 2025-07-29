@@ -50,7 +50,7 @@ func (s *Service) Get(ctx context.Context, sessionID string) (*SessionState, err
 	}
 
 	// Convert domain session to application SessionState
-	return s.domainToApplicationSession(sess), nil
+	return s.domainToServiceSession(sess), nil
 }
 
 // GetOrCreate gets an existing session or creates a new one
@@ -58,7 +58,7 @@ func (s *Service) GetOrCreate(ctx context.Context, sessionID string) (*SessionSt
 	// Try to get existing session first
 	sess, err := s.store.Get(ctx, sessionID)
 	if err == nil {
-		return s.domainToApplicationSession(sess), nil
+		return s.domainToServiceSession(sess), nil
 	}
 
 	// Check if error is specifically "not found" vs other errors
@@ -81,7 +81,7 @@ func (s *Service) GetOrCreate(ctx context.Context, sessionID string) (*SessionSt
 	s.logger.Info("Created new session",
 		slog.String("session_id", sessionID),
 		slog.Duration("ttl", s.defaultTTL))
-	return s.domainToApplicationSession(newSession), nil
+	return s.domainToServiceSession(newSession), nil
 }
 
 // Update modifies a session using an update function
@@ -93,7 +93,7 @@ func (s *Service) Update(ctx context.Context, sessionID string, updateFunc func(
 	}
 
 	// Convert to application format
-	appSession := s.domainToApplicationSession(sess)
+	appSession := s.domainToServiceSession(sess)
 
 	// Apply update function
 	if err := updateFunc(appSession); err != nil {
@@ -101,7 +101,7 @@ func (s *Service) Update(ctx context.Context, sessionID string, updateFunc func(
 	}
 
 	// Convert back to domain format
-	updatedSession := s.applicationToDomainSession(*appSession)
+	updatedSession := s.serviceToDomainSession(*appSession)
 
 	// Store updated session
 	return s.store.Update(ctx, updatedSession)
@@ -118,7 +118,7 @@ func (s *Service) List(ctx context.Context) ([]*SessionState, error) {
 	// Convert to application format
 	result := make([]*SessionState, 0, len(sessions))
 	for _, sess := range sessions {
-		result = append(result, s.domainToApplicationSession(sess))
+		result = append(result, s.domainToServiceSession(sess))
 	}
 
 	return result, nil
@@ -197,8 +197,8 @@ func (s *Service) Cleanup(ctx context.Context) error {
 	return nil
 }
 
-// domainToApplicationSession converts domain session to application SessionState
-func (s *Service) domainToApplicationSession(sess domainsession.Session) *SessionState {
+// domainToServiceSession converts domain session to service SessionState
+func (s *Service) domainToServiceSession(sess domainsession.Session) *SessionState {
 	status := string(sess.Status)
 	if sess.IsExpired() {
 		status = string(domainsession.StatusExpired)
@@ -217,8 +217,8 @@ func (s *Service) domainToApplicationSession(sess domainsession.Session) *Sessio
 	}
 }
 
-// applicationToDomainSession converts application SessionState to domain session
-func (s *Service) applicationToDomainSession(state SessionState) domainsession.Session {
+// serviceToDomainSession converts service SessionState to domain session
+func (s *Service) serviceToDomainSession(state SessionState) domainsession.Session {
 	status := domainsession.StatusActive
 	switch state.Status {
 	case string(domainsession.StatusExpired):

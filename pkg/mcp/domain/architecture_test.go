@@ -16,7 +16,7 @@ func TestDomainLayerImports(t *testing.T) {
 	// Forbidden import patterns for domain layer
 	forbiddenImports := []string{
 		"pkg/mcp/infrastructure/",
-		"pkg/mcp/application/",
+		"pkg/mcp/service/",
 		"os/exec",
 		"database/sql",
 		"net/http",

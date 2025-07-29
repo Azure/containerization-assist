@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	progresstest "github.com/Azure/container-kit/pkg/mcp/infrastructure/core/testutil/progress"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging"
@@ -35,10 +36,13 @@ func TestDirectProgressIntegration(t *testing.T) {
 	}
 
 	// Create orchestrator with mock provider and progress factory
+	progressFactory := func(ctx context.Context, req *mcp.CallToolRequest) api.ProgressEmitter {
+		return testFactory.CreateEmitter(ctx, req, 10)
+	}
 	orchestrator, err := workflow.NewOrchestrator(
 		mockProvider,
-		testFactory,
 		logger,
+		progressFactory,
 	)
 	if err != nil {
 		t.Fatalf("Failed to create orchestrator: %v", err)
@@ -96,11 +100,9 @@ func TestDirectProgressIntegration(t *testing.T) {
 // TestDirectProgressFactoryWithMCPServer tests the factory creates MCP emitter when server is present
 func TestDirectProgressFactoryWithMCPServer(t *testing.T) {
 	logger := slog.Default()
-	factory := messaging.NewDirectProgressFactory(logger)
-
 	// Test without server - should get CLI emitter
 	ctx := context.Background()
-	emitter := factory.CreateEmitter(ctx, nil, 10)
+	emitter := messaging.CreateProgressEmitter(ctx, nil, 10, logger)
 	_, isCLI := emitter.(*messaging.CLIDirectEmitter)
 	assert.True(t, isCLI, "Should get CLI emitter without server")
 

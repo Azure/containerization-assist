@@ -10,7 +10,6 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	resources "github.com/Azure/container-kit/pkg/mcp/infrastructure/core/resources"
-	"github.com/Azure/container-kit/pkg/mcp/service/registry"
 	"github.com/Azure/container-kit/pkg/mcp/service/session"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -22,8 +21,6 @@ type OptimizedSessionManager = session.OptimizedSessionManager
 type MCPRegistrar struct {
 	toolRegistrar     *ToolRegistrar
 	resourceRegistrar *ResourceRegistrar
-	tools             *registry.Registry[func() error]
-	resources         *registry.Registry[func() error]
 	config            workflow.ServerConfig
 }
 
@@ -31,19 +28,15 @@ type MCPRegistrar struct {
 func NewMCPRegistrar(logger *slog.Logger, resourceStore *resources.Store, orchestrator workflow.WorkflowOrchestrator, sessionManager OptimizedSessionManager, config workflow.ServerConfig) *MCPRegistrar {
 	// Extract dependencies from orchestrator for individual tools
 	var stepProvider workflow.StepProvider
-	var progressFactory workflow.ProgressEmitterFactory
 
 	// Type assert to concrete Orchestrator to access dependencies
 	if concreteOrchestrator, ok := orchestrator.(*workflow.Orchestrator); ok {
 		stepProvider = concreteOrchestrator.GetStepProvider()
-		progressFactory = concreteOrchestrator.GetProgressEmitterFactory()
 	}
 
 	return &MCPRegistrar{
-		toolRegistrar:     NewToolRegistrar(logger, orchestrator, stepProvider, progressFactory, sessionManager, config),
+		toolRegistrar:     NewToolRegistrar(logger, orchestrator, stepProvider, sessionManager, config),
 		resourceRegistrar: NewResourceRegistrar(logger, resourceStore),
-		tools:             registry.New[func() error](),
-		resources:         registry.New[func() error](),
 		config:            config,
 	}
 }
