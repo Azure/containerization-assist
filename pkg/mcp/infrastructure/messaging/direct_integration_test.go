@@ -6,17 +6,13 @@ import (
 	"testing"
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDirectProgressFactory_CreateEmitter_CLI(t *testing.T) {
-	// Create factory
-	factory := NewDirectProgressFactory(slog.Default())
-
+func TestCreateProgressEmitter_CLI(t *testing.T) {
 	// Create emitter without MCP server (should get CLI emitter)
 	ctx := context.Background()
-	emitter := factory.CreateEmitter(ctx, nil, 10)
+	emitter := CreateProgressEmitter(ctx, nil, 10, slog.Default())
 
 	// Verify we got a CLI emitter
 	_, ok := emitter.(*CLIDirectEmitter)
@@ -31,11 +27,13 @@ func TestDirectProgressFactory_CreateEmitter_CLI(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestDirectProgressFactory_ImplementsInterface(t *testing.T) {
-	factory := NewDirectProgressFactory(slog.Default())
+func TestCreateProgressEmitter_ImplementsInterface(t *testing.T) {
+	// Create emitter and verify it implements the interface
+	ctx := context.Background()
+	emitter := CreateProgressEmitter(ctx, nil, 10, slog.Default())
 
-	// Verify it implements the workflow interface
-	var _ workflow.ProgressEmitterFactory = factory
+	// Verify it implements the API interface
+	var _ api.ProgressEmitter = emitter
 }
 
 func TestCLIDirectEmitter_EmitDetailed(t *testing.T) {

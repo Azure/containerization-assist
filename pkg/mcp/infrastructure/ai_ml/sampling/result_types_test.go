@@ -119,13 +119,12 @@ RUN npm install`,
 	}
 }
 
-func TestDefaultParser_ParseManifestFix(t *testing.T) {
-	parser := NewDefaultParser()
+func TestParseManifestFix(t *testing.T) {
 
 	t.Run("parse manifest from code block", func(t *testing.T) {
 		content := "Here's the fixed manifest:\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: test-pod\nspec:\n  containers:\n  - name: app\n    image: nginx:latest\n```\n\nThis fixes the issue with the missing image tag."
 
-		result, err := parser.ParseManifestFix(content)
+		result, err := ParseManifestFix(content)
 		require.NoError(t, err)
 
 		assert.Contains(t, result.FixedManifest, "apiVersion: v1")
@@ -145,7 +144,7 @@ spec:
   ports:
   - port: 80`
 
-		result, err := parser.ParseManifestFix(content)
+		result, err := ParseManifestFix(content)
 		require.NoError(t, err)
 
 		assert.Contains(t, result.FixedManifest, "apiVersion: v1")
@@ -156,7 +155,7 @@ spec:
 	t.Run("invalid manifest content", func(t *testing.T) {
 		content := "This is not a valid Kubernetes manifest"
 
-		result, err := parser.ParseManifestFix(content)
+		result, err := ParseManifestFix(content)
 		require.NoError(t, err)
 
 		assert.False(t, result.ValidationStatus.SyntaxValid)
@@ -164,8 +163,7 @@ spec:
 	})
 }
 
-func TestDefaultParser_ParseDockerfileFix(t *testing.T) {
-	parser := NewDefaultParser()
+func TestParseDockerfileFix(t *testing.T) {
 
 	t.Run("parse dockerfile with instructions", func(t *testing.T) {
 		content := `Here's the fixed Dockerfile:
@@ -180,7 +178,7 @@ CMD ["npm", "start"]
 
 This fixes the security issues and optimizes the build.`
 
-		result, err := parser.ParseDockerfileFix(content)
+		result, err := ParseDockerfileFix(content)
 		require.NoError(t, err)
 
 		assert.Contains(t, result.FixedDockerfile, "FROM node:16-alpine")
@@ -192,7 +190,7 @@ This fixes the security issues and optimizes the build.`
 	t.Run("invalid dockerfile content", func(t *testing.T) {
 		content := "This is not a valid Dockerfile"
 
-		result, err := parser.ParseDockerfileFix(content)
+		result, err := ParseDockerfileFix(content)
 		require.NoError(t, err)
 
 		assert.False(t, result.ValidationStatus.SyntaxValid)
@@ -200,8 +198,7 @@ This fixes the security issues and optimizes the build.`
 	})
 }
 
-func TestDefaultParser_ParseSecurityAnalysis(t *testing.T) {
-	parser := NewDefaultParser()
+func TestParseSecurityAnalysis(t *testing.T) {
 
 	t.Run("parse security analysis with sections", func(t *testing.T) {
 		content := `Security Analysis Results:
@@ -222,7 +219,7 @@ Alternative Base Images:
 
 The risk level is CRITICAL due to the SQL injection vulnerability.`
 
-		result, err := parser.ParseSecurityAnalysis(content)
+		result, err := ParseSecurityAnalysis(content)
 		require.NoError(t, err)
 
 		assert.Equal(t, RiskLevelCritical, result.RiskLevel)
@@ -234,15 +231,14 @@ The risk level is CRITICAL due to the SQL injection vulnerability.`
 	t.Run("parse medium risk analysis", func(t *testing.T) {
 		content := `Security scan shows some medium severity issues that should be addressed.`
 
-		result, err := parser.ParseSecurityAnalysis(content)
+		result, err := ParseSecurityAnalysis(content)
 		require.NoError(t, err)
 
 		assert.Equal(t, RiskLevelMedium, result.RiskLevel)
 	})
 }
 
-func TestDefaultParser_ParseRepositoryAnalysis(t *testing.T) {
-	parser := NewDefaultParser()
+func TestParseRepositoryAnalysis(t *testing.T) {
 
 	t.Run("parse java spring boot analysis", func(t *testing.T) {
 		content := `Repository Analysis:
@@ -256,7 +252,7 @@ This appears to be a standard Spring Boot application with REST endpoints.
 It includes dependencies for web, data-jpa, and security modules.
 The application should run on port 8080 by default.`
 
-		result, err := parser.ParseRepositoryAnalysis(content)
+		result, err := ParseRepositoryAnalysis(content)
 		require.NoError(t, err)
 
 		assert.Equal(t, "java", result.Language)
@@ -269,7 +265,7 @@ The application should run on port 8080 by default.`
 		content := `This is a Node.js application using Express framework.
 Default port is typically 3000 for Express apps.`
 
-		result, err := parser.ParseRepositoryAnalysis(content)
+		result, err := ParseRepositoryAnalysis(content)
 		require.NoError(t, err)
 
 		assert.Equal(t, "javascript", result.Language)
@@ -496,12 +492,10 @@ func TestEnums(t *testing.T) {
 }
 
 func TestComplexParsing(t *testing.T) {
-	parser := NewDefaultParser()
-
 	t.Run("complex manifest fix with multiple sections", func(t *testing.T) {
 		content := "Analysis of the Kubernetes manifest revealed several issues:\n\nIssues found:\n- Missing resource limits\n- No health checks configured\n- Incorrect image tag\n\nHere's the corrected manifest:\n\n```yaml\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web-app\nspec:\n  replicas: 3\n  template:\n    spec:\n      containers:\n      - name: web-app\n        image: nginx:1.21-alpine\n        resources:\n          requests:\n            memory: \"64Mi\"\n```\n\nKey improvements:\n- Added resource requests and limits\n- Used specific image tag instead of 'latest'"
 
-		result, err := parser.ParseManifestFix(content)
+		result, err := ParseManifestFix(content)
 		require.NoError(t, err)
 
 		// Verify the parsed manifest contains key elements

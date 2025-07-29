@@ -36,8 +36,7 @@ type Dependencies struct {
 	SessionManager session.OptimizedSessionManager
 	ResourceStore  *resources.Store
 
-	ProgressEmitterFactory workflow.ProgressEmitterFactory
-	EventPublisher         domainevents.Publisher
+	EventPublisher domainevents.Publisher
 
 	WorkflowOrchestrator   workflow.WorkflowOrchestrator
 	EventAwareOrchestrator workflow.EventAwareOrchestrator
@@ -59,9 +58,6 @@ func (d *Dependencies) Validate() error {
 		errs = append(errs, fmt.Errorf("resource store is required"))
 	}
 
-	if d.ProgressEmitterFactory == nil {
-		errs = append(errs, fmt.Errorf("progress emitter factory is required"))
-	}
 	if d.EventPublisher == nil {
 		errs = append(errs, fmt.Errorf("event publisher is required"))
 	}

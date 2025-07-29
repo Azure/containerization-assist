@@ -9,7 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/sampling"
+	"github.com/Azure/container-kit/pkg/mcp/domain/sampling"
+	aisample "github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/sampling"
 )
 
 // FixManifestWithAI uses MCP sampling to fix a Kubernetes manifest that failed to deploy
@@ -24,27 +25,17 @@ func FixManifestWithAI(ctx context.Context, manifestPath string, deploymentError
 		return fmt.Errorf("failed to read manifest: %w", err)
 	}
 
-	// Create specialized sampling client
-	samplingClient := sampling.NewSpecializedClient(logger)
-
-	// Prepare repository analysis summary
-	repoAnalysis := fmt.Sprintf("Language: %s, Framework: %s, Port: %d",
-		analyzeResult.Language, analyzeResult.Framework, analyzeResult.Port)
+	// Create domain sampling client
+	samplingClient := aisample.CreateDomainClient(logger)
 
 	// Get AI fix for the manifest
-	fixedManifest, err := samplingClient.AnalyzeKubernetesManifest(
-		ctx,
-		string(manifestContent),
-		deploymentError,
-		dockerfileContent,
-		repoAnalysis,
-	)
+	fixedManifest, err := samplingClient.FixKubernetesManifest(ctx, string(manifestContent), []string{deploymentError.Error()})
 	if err != nil {
 		return fmt.Errorf("failed to get AI fix for manifest: %w", err)
 	}
 
 	// Write the fixed manifest back
-	if err := os.WriteFile(manifestPath, []byte(fixedManifest.FixedManifest), 0644); err != nil {
+	if err := os.WriteFile(manifestPath, []byte(fixedManifest.FixedContent), 0644); err != nil {
 		return fmt.Errorf("failed to write fixed manifest: %w", err)
 	}
 
@@ -53,7 +44,7 @@ func FixManifestWithAI(ctx context.Context, manifestPath string, deploymentError
 }
 
 // AnalyzePodFailure uses AI to diagnose why a pod is failing and suggest fixes
-func AnalyzePodFailure(ctx context.Context, namespace, podName string, k8sResult *K8sResult, dockerfileContent string, logger *slog.Logger) (*sampling.ErrorAnalysis, error) {
+func AnalyzePodFailure(ctx context.Context, namespace, podName string, k8sResult *K8sResult, dockerfileContent string, logger *slog.Logger) (*aisample.ErrorAnalysis, error) {
 	logger.Info("Analyzing pod failure", "namespace", namespace, "pod", podName)
 
 	// Get pod logs
@@ -81,16 +72,40 @@ func AnalyzePodFailure(ctx context.Context, namespace, podName string, k8sResult
 	errorDetails := fmt.Sprintf("Pod Events:\n%s\n\nPod Status: CrashLoopBackOff or Failed", podEvents)
 
 	// Use AI to analyze the crash
-	samplingClient := sampling.NewSpecializedClient(logger)
-	analysis, err := samplingClient.AnalyzePodCrashLoop(
-		ctx,
-		podLogs,
-		string(manifestContent),
-		dockerfileContent,
-		errorDetails,
-	)
+	samplingClient := aisample.CreateDomainClient(logger)
+
+	// Create comprehensive analysis prompt
+	analysisPrompt := fmt.Sprintf(`Analyze this pod crash:
+
+Pod Logs:
+%s
+
+Manifest:
+%s
+
+Dockerfile:
+%s
+
+Error Details:
+%s
+
+Diagnose the issue and suggest fixes.`, podLogs, string(manifestContent), dockerfileContent, errorDetails)
+
+	req := sampling.Request{
+		Prompt:      analysisPrompt,
+		MaxTokens:   2048,
+		Temperature: 0.7,
+	}
+
+	response, err := samplingClient.Sample(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to analyze pod crash: %w", err)
+		return nil, fmt.Errorf("failed to analyze pod failure: %w", err)
+	}
+
+	// Create analysis result
+	analysis := &aisample.ErrorAnalysis{
+		RootCause: "See analysis",
+		Fix:       response.Content,
 	}
 
 	return analysis, nil

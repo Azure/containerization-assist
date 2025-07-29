@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/service/session"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -165,16 +164,14 @@ func TestValidateDependencies(t *testing.T) {
 		{
 			name: "all dependencies provided",
 			config: ToolConfig{
-				NeedsStepProvider:    true,
-				NeedsProgressFactory: true,
-				NeedsSessionManager:  true,
-				NeedsLogger:          true,
+				NeedsStepProvider:   true,
+				NeedsSessionManager: true,
+				NeedsLogger:         true,
 			},
 			deps: ToolDependencies{
-				StepProvider:    &mockStepProvider{},
-				ProgressFactory: &mockProgressEmitterFactory{},
-				SessionManager:  &mockSessionManager{},
-				Logger:          logger,
+				StepProvider:   &mockStepProvider{},
+				SessionManager: &mockSessionManager{},
+				Logger:         logger,
 			},
 			wantErr: false,
 		},
@@ -232,23 +229,21 @@ func TestToolRegistration(t *testing.T) {
 
 	// Create dependencies
 	deps := ToolDependencies{
-		StepProvider:    &mockStepProvider{},
-		ProgressFactory: &mockProgressEmitterFactory{},
-		SessionManager:  &mockSessionManager{},
-		Logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
+		StepProvider:   &mockStepProvider{},
+		SessionManager: &mockSessionManager{},
+		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 
 	// Test registering a single tool
 	config := ToolConfig{
-		Name:                 "test_tool",
-		Description:          "Test tool",
-		Category:             CategoryWorkflow,
-		RequiredParams:       []string{"session_id"},
-		NeedsStepProvider:    true,
-		NeedsProgressFactory: true,
-		NeedsSessionManager:  true,
-		NeedsLogger:          true,
-		StepGetterName:       "GetAnalyzeStep",
+		Name:                "test_tool",
+		Description:         "Test tool",
+		Category:            CategoryWorkflow,
+		RequiredParams:      []string{"session_id"},
+		NeedsStepProvider:   true,
+		NeedsSessionManager: true,
+		NeedsLogger:         true,
+		StepGetterName:      "GetAnalyzeStep",
 	}
 
 	err := RegisterTool(mcpServer, config, deps)
@@ -321,12 +316,6 @@ func (m *mockSessionManager) Stats() *session.SessionStats {
 
 func (m *mockSessionManager) Stop(ctx context.Context) error {
 	return nil
-}
-
-type mockProgressEmitterFactory struct{}
-
-func (m *mockProgressEmitterFactory) CreateEmitter(ctx context.Context, req *mcp.CallToolRequest, totalSteps int) api.ProgressEmitter {
-	return &mockProgressEmitter{}
 }
 
 type mockMCPServer struct {

@@ -12,7 +12,6 @@
 //   - Multi-step containerization process (analyze, build, deploy, etc.)
 //   - Progress tracking with real-time updates
 //   - Error recovery with intelligent retry logic
-//   - OpenTelemetry tracing integration
 //   - Session persistence for long-running workflows
 package workflow
 
@@ -218,63 +217,46 @@ type ToolDefinition struct {
 	Tags        []string               `json:"tags,omitempty"`
 }
 
-// ServerConfig represents server configuration
+// ServerConfig represents simplified server configuration with only essential fields
 type ServerConfig struct {
-	// Core server settings
-	WorkspaceDir      string        `json:"workspace_dir"`
-	StorePath         string        `json:"store_path"`
-	MaxSessions       int           `json:"max_sessions"`
-	SessionTTL        time.Duration `json:"session_ttl"`
-	MaxDiskPerSession int64         `json:"max_disk_per_session"`
-	TotalDiskLimit    int64         `json:"total_disk_limit"`
-	CleanupInterval   time.Duration `json:"cleanup_interval"`
+	// Core server settings (essential)
+	WorkspaceDir string        `json:"workspace_dir"`
+	StorePath    string        `json:"store_path"`
+	SessionTTL   time.Duration `json:"session_ttl"`
 
-	// Transport settings
-	TransportType string   `json:"transport_type"`
-	HTTPAddr      string   `json:"http_addr"`
-	HTTPPort      int      `json:"http_port"`
-	CORSOrigins   []string `json:"cors_origins"`
+	// Session management (essential for functionality)
+	MaxSessions int `json:"max_sessions"`
 
-	// Logging settings
-	LogLevel       string `json:"log_level"`
-	LogHTTPBodies  bool   `json:"log_http_bodies"`
-	MaxBodyLogSize int64  `json:"max_body_log_size"`
+	// Logging settings (essential)
+	LogLevel string `json:"log_level"`
 
-	// Security settings
-	SandboxEnabled bool `json:"sandbox_enabled"`
+	// Service identification (essential)
+	ServiceName    string `json:"service_name"`
+	ServiceVersion string `json:"service_version"`
 
-	// Service identification
-	ServiceName     string  `json:"service_name"`
-	ServiceVersion  string  `json:"service_version"`
-	Environment     string  `json:"environment"`
-	TraceSampleRate float64 `json:"trace_sample_rate"`
-	// WorkflowMode controls whether start_workflow is promoted (automated) or deprecated (interactive)
+	// Container registry (essential)
+	RegistryURL      string `json:"registry_url"`
+	RegistryUsername string `json:"registry_username"`
+	RegistryPassword string `json:"registry_password"`
+
+	// Workflow mode (essential)
 	WorkflowMode string `json:"workflow_mode"`
 }
 
-// DefaultServerConfig returns a default server configuration
+// DefaultServerConfig returns a simplified default server configuration with only essential fields
 func DefaultServerConfig() ServerConfig {
 	return ServerConfig{
-		WorkspaceDir:      "/tmp/container-kit-workspace",
-		StorePath:         "/tmp/container-kit-sessions.db",
-		MaxSessions:       100,
-		SessionTTL:        24 * time.Hour,
-		MaxDiskPerSession: 1024 * 1024 * 1024,      // 1GB
-		TotalDiskLimit:    10 * 1024 * 1024 * 1024, // 10GB
-		CleanupInterval:   time.Hour,
-		TransportType:     "stdio",
-		HTTPAddr:          "localhost",
-		HTTPPort:          8080,
-		CORSOrigins:       []string{},
-		LogLevel:          "info",
-		LogHTTPBodies:     false,
-		MaxBodyLogSize:    1024 * 1024, // 1MB
-		SandboxEnabled:    false,
-		ServiceName:       "container-kit-mcp",
-		ServiceVersion:    "dev",
-		Environment:       "development",
-		TraceSampleRate:   1.0,
-		WorkflowMode:      "interactive", // Default to interactive mode
+		WorkspaceDir:     "/tmp/container-kit-workspace",
+		StorePath:        "/tmp/container-kit-sessions.db",
+		SessionTTL:       24 * time.Hour,
+		MaxSessions:      100,
+		LogLevel:         "info",
+		ServiceName:      "container-kit-mcp",
+		ServiceVersion:   "dev",
+		RegistryURL:      "",
+		RegistryUsername: "",
+		RegistryPassword: "",
+		WorkflowMode:     "interactive", // Default to interactive mode
 	}
 }
 
@@ -320,8 +302,7 @@ type WorkflowState struct {
 	Logger *slog.Logger
 
 	// AI Enhancement fields
-	allSteps     []Step                // Cache of all workflow steps
-	optimization *WorkflowOptimization // Cached optimization results
+	allSteps []Step // Cache of all workflow steps
 }
 
 // GetAllSteps returns all workflow steps (used for optimization analysis)
@@ -332,21 +313,6 @@ func (ws *WorkflowState) GetAllSteps() []Step {
 // SetAllSteps sets all workflow steps (called during initialization)
 func (ws *WorkflowState) SetAllSteps(steps []Step) {
 	ws.allSteps = steps
-}
-
-// GetOptimization returns cached workflow optimization results
-func (ws *WorkflowState) GetOptimization() *WorkflowOptimization {
-	return ws.optimization
-}
-
-// SetOptimization caches workflow optimization results
-func (ws *WorkflowState) SetOptimization(optimization *WorkflowOptimization) {
-	ws.optimization = optimization
-}
-
-// ProgressEmitterFactory creates progress emitters for different transport modes
-type ProgressEmitterFactory interface {
-	CreateEmitter(ctx context.Context, req *mcp.CallToolRequest, totalSteps int) api.ProgressEmitter
 }
 
 // NewWorkflowState creates a new workflow state

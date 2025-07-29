@@ -170,7 +170,7 @@ See `registry_test.go` and `helpers_test.go` for comprehensive test examples.
 
 If migrating from the old individual tool registration:
 
-1. Remove all imports of `pkg/mcp/application/workflow`
+1. Remove all imports of old workflow packages
 2. Replace individual tool registration calls with `tools.RegisterTools()`
 3. Delete old tool registration files
 4. Update any custom tool logic to use the `CustomHandler` field

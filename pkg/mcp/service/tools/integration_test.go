@@ -19,10 +19,9 @@ func TestAllToolsRegistration(t *testing.T) {
 
 	// Create mock dependencies
 	deps := ToolDependencies{
-		StepProvider:    &mockStepProvider{},
-		ProgressFactory: &mockProgressEmitterFactory{},
-		SessionManager:  &mockSessionManager{},
-		Logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
+		StepProvider:   &mockStepProvider{},
+		SessionManager: &mockSessionManager{},
+		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 
 	// Register all tools
@@ -106,16 +105,14 @@ func TestToolDependencies(t *testing.T) {
 		t.Run(config.Name, func(t *testing.T) {
 			switch config.Category {
 			case CategoryWorkflow:
-				// Workflow tools should need all dependencies
+				// Workflow tools should need all dependencies (progress is now handled directly)
 				assert.True(t, config.NeedsStepProvider, "Workflow tool should need StepProvider")
-				assert.True(t, config.NeedsProgressFactory, "Workflow tool should need ProgressFactory")
 				assert.True(t, config.NeedsSessionManager, "Workflow tool should need SessionManager")
 				assert.True(t, config.NeedsLogger, "Workflow tool should need Logger")
 				assert.NotEmpty(t, config.StepGetterName, "Workflow tool should have StepGetterName")
 			case CategoryOrchestration:
 				// Orchestration tools only need logger
 				assert.False(t, config.NeedsStepProvider, "Orchestration tool should not need StepProvider")
-				assert.False(t, config.NeedsProgressFactory, "Orchestration tool should not need ProgressFactory")
 				assert.False(t, config.NeedsSessionManager, "Orchestration tool should not need SessionManager")
 				assert.True(t, config.NeedsLogger, "Orchestration tool should need Logger")
 			case CategoryUtility:

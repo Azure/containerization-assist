@@ -11,12 +11,10 @@ import (
 	"unicode/utf8"
 
 	"github.com/Azure/container-kit/pkg/common/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/sampling"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/prompts"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/observability"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 )
 
 type Option func(*Client)
@@ -26,39 +24,32 @@ func WithMaxTokens(n int32) Option { return func(c *Client) { c.maxTokens = n } 
 
 func WithTemperature(t float32) Option { return func(c *Client) { c.temperature = t } }
 
-// WithRetry sets the retry budget (attempts and token budget per attempt).
-func WithRetry(attempts int, budget int) Option {
+// WithRetryAttempts sets the maximum number of retry attempts.
+func WithRetryAttempts(attempts int) Option {
 	return func(c *Client) {
 		c.retryAttempts = attempts
-		c.tokenBudget = budget
 	}
 }
 
 // Client delegates LLM work to the calling AI assistant via the MCP sampling API.
 type Client struct {
-	logger           *slog.Logger
-	maxTokens        int32
-	temperature      float32
-	retryAttempts    int
-	tokenBudget      int
-	baseBackoff      time.Duration
-	maxBackoff       time.Duration
-	streamingEnabled bool
-	requestTimeout   time.Duration
+	logger        *slog.Logger
+	maxTokens     int32
+	temperature   float32
+	retryAttempts int
+	baseBackoff   time.Duration
+	maxBackoff    time.Duration
 }
 
 func NewClient(logger *slog.Logger, opts ...Option) *Client {
 	cfg := DefaultConfig()
 	c := &Client{
-		logger:           logger.With("component", "sampling-client"),
-		maxTokens:        cfg.MaxTokens,
-		temperature:      cfg.Temperature,
-		retryAttempts:    cfg.RetryAttempts,
-		tokenBudget:      cfg.TokenBudget,
-		baseBackoff:      cfg.BaseBackoff,
-		maxBackoff:       cfg.MaxBackoff,
-		streamingEnabled: cfg.StreamingEnabled,
-		requestTimeout:   cfg.RequestTimeout,
+		logger:        logger.With("component", "sampling-client"),
+		maxTokens:     cfg.MaxTokens,
+		temperature:   cfg.Temperature,
+		retryAttempts: cfg.RetryAttempts,
+		baseBackoff:   cfg.BaseBackoff,
+		maxBackoff:    cfg.MaxBackoff,
 	}
 	for _, o := range opts {
 		o(c)
@@ -106,9 +97,6 @@ type SamplingResponse struct {
 // SampleInternal performs sampling with AI-assisted retry and error correction.
 func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*SamplingResponse, error) {
 	start := time.Now()
-	ctx, span := observability.StartSpan(ctx, "sampling.sample")
-	defer span.End()
-
 	// Create enhanced logger for structured LLM logging
 	enhancedLogger := NewEnhancedLogger(c.logger)
 	reqLogger := enhancedLogger.WithRequestContext(c.logger, req)
@@ -116,33 +104,11 @@ func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*Samp
 	// Log detailed request information
 	enhancedLogger.LogLLMRequest(ctx, reqLogger, req)
 
-	// Add tracing attributes
-	span.SetAttributes(
-		attribute.String(observability.AttrComponent, "sampling"),
-		attribute.Int("sampling.max_tokens", int(req.MaxTokens)),
-		attribute.Float64("sampling.temperature", float64(req.Temperature)),
-		attribute.Int("sampling.prompt_length", len(req.Prompt)),
-	)
-
-	// Add advanced parameter attributes
-	if req.TopP != nil {
-		span.SetAttributes(attribute.Float64("sampling.top_p", float64(*req.TopP)))
-	}
-	if req.FrequencyPenalty != nil {
-		span.SetAttributes(attribute.Float64("sampling.frequency_penalty", float64(*req.FrequencyPenalty)))
-	}
-	if req.PresencePenalty != nil {
-		span.SetAttributes(attribute.Float64("sampling.presence_penalty", float64(*req.PresencePenalty)))
-	}
-	if len(req.StopSequences) > 0 {
-		span.SetAttributes(attribute.Int("sampling.stop_sequences_count", len(req.StopSequences)))
-	}
-	if req.Seed != nil {
-		span.SetAttributes(attribute.Int("sampling.seed", *req.Seed))
-	}
-	if len(req.LogitBias) > 0 {
-		span.SetAttributes(attribute.Int("sampling.logit_bias_count", len(req.LogitBias)))
-	}
+	// Log sampling parameters
+	reqLogger.Debug("Sampling parameters configured",
+		"max_tokens", req.MaxTokens,
+		"temperature", req.Temperature,
+		"prompt_length", len(req.Prompt))
 
 	// Default values.
 	if req.MaxTokens == 0 {
@@ -153,11 +119,11 @@ func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*Samp
 	}
 
 	// Use AI-assisted retry for better error recovery
-	return c.sampleWithAIAssist(ctx, req, span, enhancedLogger, reqLogger, start)
+	return c.sampleWithAIAssist(ctx, req, enhancedLogger, reqLogger, start)
 }
 
 // sampleWithAIAssist performs AI-assisted sampling with intelligent error correction
-func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingRequest, span trace.Span, enhancedLogger *EnhancedLogger, reqLogger *slog.Logger, start time.Time) (*SamplingResponse, error) {
+func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingRequest, enhancedLogger *EnhancedLogger, reqLogger *slog.Logger, start time.Time) (*SamplingResponse, error) {
 	var lastErr error
 	var errorHistory []string
 	currentReq := originalReq // Start with original request
@@ -170,7 +136,7 @@ func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingReq
 		}
 
 		// Add retry attempt to span
-		span.SetAttributes(attribute.Int(observability.AttrSamplingRetryAttempt, attempt+1))
+		reqLogger.Debug("Sampling retry attempt", "attempt", attempt+1)
 
 		// Check for MCP server context on each attempt
 		var resp *SamplingResponse
@@ -185,12 +151,11 @@ func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingReq
 			// Log successful response with enhanced details
 			enhancedLogger.LogLLMResponse(ctx, reqLogger, currentReq, resp, time.Since(start))
 
-			// Add success attributes
-			span.SetAttributes(
-				attribute.Int(observability.AttrSamplingTokensUsed, resp.TokensUsed),
-				attribute.String("sampling.model", resp.Model),
-				attribute.String("sampling.stop_reason", resp.StopReason),
-			)
+			// Log success attributes
+			reqLogger.Debug("Sampling successful",
+				"tokens_used", resp.TokensUsed,
+				"model", resp.Model,
+				"stop_reason", resp.StopReason)
 			return resp, nil
 		}
 
@@ -199,8 +164,7 @@ func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingReq
 
 		// Abort early on non-retryable errors.
 		if !IsRetryable(err) {
-			span.RecordError(err)
-			span.SetAttributes(attribute.String("error.non_retryable", err.Error()))
+			reqLogger.Error("Non-retryable sampling error", "error", err.Error())
 			return nil, err
 		}
 
@@ -218,23 +182,21 @@ func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingReq
 			} else {
 				c.logger.Info("Applied AI corrections to request", "attempt", attempt+1)
 				currentReq = improvedReq
-				span.AddEvent("ai.correction_applied", trace.WithAttributes(
-					attribute.Int("attempt", attempt+1),
-					attribute.String("original_prompt_length", fmt.Sprintf("%d", len(originalReq.Prompt))),
-					attribute.String("corrected_prompt_length", fmt.Sprintf("%d", len(currentReq.Prompt))),
-				))
+				reqLogger.Debug("AI correction applied",
+					"attempt", attempt+1,
+					"original_prompt_length", len(originalReq.Prompt),
+					"corrected_prompt_length", len(currentReq.Prompt))
 			}
 		}
 
 		backoff := c.calculateBackoff(attempt)
 		c.logger.Warn("sampling attempt failed – backing off", "attempt", attempt+1, "err", err, "backoff", backoff)
 
-		// Record retry event
-		span.AddEvent("retry.backoff", trace.WithAttributes(
-			attribute.String("error", err.Error()),
-			attribute.Int("attempt", attempt+1),
-			attribute.String("backoff", backoff.String()),
-		))
+		// Log retry backoff
+		reqLogger.Debug("Applying backoff before retry",
+			"error", err.Error(),
+			"attempt", attempt+1,
+			"backoff_duration", backoff.String())
 
 		// Use a timer to respect context cancellation during backoff
 		timer := time.NewTimer(backoff)
@@ -250,8 +212,7 @@ func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingReq
 	// Record final failure
 	finalErr := errors.New(errors.CodeOperationFailed, "sampling",
 		fmt.Sprintf("all %d sampling attempts failed", c.retryAttempts), lastErr)
-	span.RecordError(finalErr)
-	span.SetAttributes(attribute.String("error.final", finalErr.Error()))
+	reqLogger.Error("Sampling failed after all retries", "error", finalErr.Error())
 	return nil, finalErr
 }
 
@@ -669,14 +630,6 @@ func (c *Client) createPatternBasedErrorAnalysis(errorMsg, contextInfo string) *
 	return analysis
 }
 
-func (c *Client) SetTokenBudget(budget int) {
-	c.tokenBudget = budget
-}
-
-func (c *Client) GetTokenBudget() int {
-	return c.tokenBudget
-}
-
 // calculateBackoff computes exponential backoff with jitter
 func (c *Client) calculateBackoff(attempt int) time.Duration {
 	// Exponential backoff: baseBackoff * 2^attempt
@@ -809,27 +762,21 @@ Respond with only the improved prompt text - no explanations or commentary.`,
 
 // Config holds configuration for the sampling client
 type Config struct {
-	MaxTokens        int32         `json:"max_tokens" env:"SAMPLING_MAX_TOKENS"`
-	Temperature      float32       `json:"temperature" env:"SAMPLING_TEMPERATURE"`
-	RetryAttempts    int           `json:"retry_attempts" env:"SAMPLING_RETRY_ATTEMPTS"`
-	TokenBudget      int           `json:"token_budget" env:"SAMPLING_TOKEN_BUDGET"`
-	BaseBackoff      time.Duration `json:"base_backoff" env:"SAMPLING_BASE_BACKOFF"`
-	MaxBackoff       time.Duration `json:"max_backoff" env:"SAMPLING_MAX_BACKOFF"`
-	StreamingEnabled bool          `json:"streaming_enabled" env:"SAMPLING_STREAMING_ENABLED"`
-	RequestTimeout   time.Duration `json:"request_timeout" env:"SAMPLING_REQUEST_TIMEOUT"`
+	MaxTokens     int32         `json:"max_tokens" env:"SAMPLING_MAX_TOKENS"`
+	Temperature   float32       `json:"temperature" env:"SAMPLING_TEMPERATURE"`
+	RetryAttempts int           `json:"retry_attempts" env:"SAMPLING_RETRY_ATTEMPTS"`
+	BaseBackoff   time.Duration `json:"base_backoff" env:"SAMPLING_BASE_BACKOFF"`
+	MaxBackoff    time.Duration `json:"max_backoff" env:"SAMPLING_MAX_BACKOFF"`
 }
 
 // DefaultConfig returns the default configuration
 func DefaultConfig() Config {
 	return Config{
-		MaxTokens:        2048,
-		Temperature:      0.3,
-		RetryAttempts:    3,
-		TokenBudget:      5000,
-		BaseBackoff:      200 * time.Millisecond,
-		MaxBackoff:       10 * time.Second,
-		StreamingEnabled: false,
-		RequestTimeout:   30 * time.Second,
+		MaxTokens:     2048,
+		Temperature:   0.3,
+		RetryAttempts: 3,
+		BaseBackoff:   200 * time.Millisecond,
+		MaxBackoff:    10 * time.Second,
 	}
 }
 
@@ -855,12 +802,6 @@ func LoadFromEnv() Config {
 		}
 	}
 
-	if val := os.Getenv("SAMPLING_TOKEN_BUDGET"); val != "" {
-		if parsed, err := strconv.Atoi(val); err == nil {
-			cfg.TokenBudget = parsed
-		}
-	}
-
 	if val := os.Getenv("SAMPLING_BASE_BACKOFF"); val != "" {
 		if parsed, err := time.ParseDuration(val); err == nil {
 			cfg.BaseBackoff = parsed
@@ -870,18 +811,6 @@ func LoadFromEnv() Config {
 	if val := os.Getenv("SAMPLING_MAX_BACKOFF"); val != "" {
 		if parsed, err := time.ParseDuration(val); err == nil {
 			cfg.MaxBackoff = parsed
-		}
-	}
-
-	if val := os.Getenv("SAMPLING_STREAMING_ENABLED"); val != "" {
-		if parsed, err := strconv.ParseBool(val); err == nil {
-			cfg.StreamingEnabled = parsed
-		}
-	}
-
-	if val := os.Getenv("SAMPLING_REQUEST_TIMEOUT"); val != "" {
-		if parsed, err := time.ParseDuration(val); err == nil {
-			cfg.RequestTimeout = parsed
 		}
 	}
 
@@ -902,20 +831,12 @@ func (c Config) Validate() error {
 		return ErrInvalidConfig("retry_attempts must be non-negative")
 	}
 
-	if c.TokenBudget <= 0 {
-		return ErrInvalidConfig("token_budget must be positive")
-	}
-
 	if c.BaseBackoff <= 0 {
 		return ErrInvalidConfig("base_backoff must be positive")
 	}
 
 	if c.MaxBackoff <= c.BaseBackoff {
 		return ErrInvalidConfig("max_backoff must be greater than base_backoff")
-	}
-
-	if c.RequestTimeout <= 0 {
-		return ErrInvalidConfig("request_timeout must be positive")
 	}
 
 	return nil
@@ -927,11 +848,8 @@ func WithConfig(cfg Config) Option {
 		c.maxTokens = cfg.MaxTokens
 		c.temperature = cfg.Temperature
 		c.retryAttempts = cfg.RetryAttempts
-		c.tokenBudget = cfg.TokenBudget
 		c.baseBackoff = cfg.BaseBackoff
 		c.maxBackoff = cfg.MaxBackoff
-		c.streamingEnabled = cfg.StreamingEnabled
-		c.requestTimeout = cfg.RequestTimeout
 	}
 }
 
@@ -1062,4 +980,143 @@ func IsRetryable(err error) bool {
 		strings.Contains(errStr, "network") ||
 		strings.Contains(errStr, "dns") ||
 		strings.Contains(errStr, "no mcp server in context") // Allow retrying MCP server context issues
+}
+
+// ============================================================================
+// Domain Interface Implementation - UnifiedSampler
+// ============================================================================
+
+// Ensure Client implements the domain interface
+var _ sampling.UnifiedSampler = (*Client)(nil)
+
+// Sample implements the domain UnifiedSampler interface
+func (c *Client) Sample(ctx context.Context, req sampling.Request) (sampling.Response, error) {
+	// Convert domain request to internal request
+	internalReq := SamplingRequest{
+		Prompt:       req.Prompt,
+		MaxTokens:    req.MaxTokens,
+		Temperature:  req.Temperature,
+		SystemPrompt: req.SystemPrompt,
+	}
+
+	resp, err := c.SampleInternal(ctx, internalReq)
+	if err != nil {
+		return sampling.Response{}, err
+	}
+
+	return sampling.Response{
+		Content:    resp.Content,
+		TokensUsed: resp.TokensUsed,
+	}, nil
+}
+
+// Stream implements the domain UnifiedSampler interface
+func (c *Client) Stream(ctx context.Context, req sampling.Request) (<-chan sampling.StreamChunk, error) {
+	// For now, return an error as streaming is not implemented in the main client
+	// This can be enhanced later if streaming is needed
+	return nil, fmt.Errorf("streaming not implemented")
+}
+
+// AnalyzeDockerfile implements the domain UnifiedSampler interface
+func (c *Client) AnalyzeDockerfile(ctx context.Context, content string) (*sampling.DockerfileAnalysis, error) {
+	// Use internal sampling to analyze dockerfile
+	req := SamplingRequest{
+		Prompt:    fmt.Sprintf("Analyze this Dockerfile for best practices and issues:\n\n%s", content),
+		MaxTokens: c.maxTokens,
+	}
+
+	resp, err := c.SampleInternal(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	// For now, use simple defaults - could be enhanced to parse from resp.Content
+	return &sampling.DockerfileAnalysis{
+		Language:     "detected",             // Could be parsed from resp.Content
+		Framework:    "unknown",              // Could be parsed from resp.Content
+		Port:         8080,                   // Default port
+		BuildSteps:   []string{resp.Content}, // Use response content
+		Dependencies: []string{},             // Parse from response if needed
+	}, nil
+}
+
+// AnalyzeKubernetesManifest implements the domain UnifiedSampler interface
+func (c *Client) AnalyzeKubernetesManifest(ctx context.Context, content string) (*sampling.ManifestAnalysis, error) {
+	req := SamplingRequest{
+		Prompt:    fmt.Sprintf("Analyze this Kubernetes manifest for best practices and issues:\n\n%s", content),
+		MaxTokens: c.maxTokens,
+	}
+
+	resp, err := c.SampleInternal(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &sampling.ManifestAnalysis{
+		ResourceTypes: []string{"Deployment", "Service"}, // Parse from response if needed
+		Issues:        []string{},                        // Parse from response content if needed
+		Suggestions:   []string{resp.Content},            // Use response content
+		SecurityRisks: []string{},                        // Parse from response if needed
+		BestPractices: []string{},                        // Parse from response if needed
+	}, nil
+}
+
+// AnalyzeSecurityScan implements the domain UnifiedSampler interface
+func (c *Client) AnalyzeSecurityScan(ctx context.Context, scanResults string) (*sampling.SecurityAnalysis, error) {
+	req := SamplingRequest{
+		Prompt:    fmt.Sprintf("Analyze these security scan results and provide recommendations:\n\n%s", scanResults),
+		MaxTokens: c.maxTokens,
+	}
+
+	resp, err := c.SampleInternal(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &sampling.SecurityAnalysis{
+		RiskLevel:       "low",                      // Parse from response if needed
+		Vulnerabilities: []sampling.Vulnerability{}, // Parse from response content if needed
+		Recommendations: []string{resp.Content},     // Use response content
+		Remediations:    []string{},                 // Parse from response if needed
+	}, nil
+}
+
+// FixDockerfile implements the domain UnifiedSampler interface
+func (c *Client) FixDockerfile(ctx context.Context, content string, issues []string) (*sampling.DockerfileFix, error) {
+	issuesText := strings.Join(issues, "\n- ")
+	req := SamplingRequest{
+		Prompt:    fmt.Sprintf("Fix these issues in the Dockerfile:\n\nIssues:\n- %s\n\nDockerfile:\n%s", issuesText, content),
+		MaxTokens: c.maxTokens,
+	}
+
+	resp, err := c.SampleInternal(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &sampling.DockerfileFix{
+		FixedContent: resp.Content, // The LLM should return the fixed dockerfile
+		Changes:      []string{},   // Parse from response if needed
+		Explanation:  resp.Content,
+	}, nil
+}
+
+// FixKubernetesManifest implements the domain UnifiedSampler interface
+func (c *Client) FixKubernetesManifest(ctx context.Context, content string, issues []string) (*sampling.ManifestFix, error) {
+	issuesText := strings.Join(issues, "\n- ")
+	req := SamplingRequest{
+		Prompt:    fmt.Sprintf("Fix these issues in the Kubernetes manifest:\n\nIssues:\n- %s\n\nManifest:\n%s", issuesText, content),
+		MaxTokens: c.maxTokens,
+	}
+
+	resp, err := c.SampleInternal(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &sampling.ManifestFix{
+		FixedContent: resp.Content, // The LLM should return the fixed manifest
+		Changes:      []string{},   // Parse from response if needed
+		Explanation:  resp.Content,
+	}, nil
 }

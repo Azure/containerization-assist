@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/google/uuid"
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/pkg/errors"
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
 	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging"
 	"github.com/Azure/container-kit/pkg/mcp/service/session"
 )
 
@@ -186,14 +189,9 @@ func GenerateSessionID() string {
 // convertWorkflowError converts domain workflow error to a simple map (no longer needed as separate function)
 // This is kept for compatibility but workflow errors are now stored directly in metadata
 
-// CreateProgressEmitter creates a progress emitter if factory is available
-func CreateProgressEmitter(factory domainworkflow.ProgressEmitterFactory) api.ProgressEmitter {
-	if factory != nil {
-		// Note: ProgressEmitterFactory is an interface, we need to use it properly
-		// For now, return a no-op emitter since the factory pattern needs updating
-	}
-	// Return no-op emitter if factory is not available
-	return &NoOpProgressEmitter{}
+// CreateProgressEmitter creates a progress emitter using the messaging package
+func CreateProgressEmitter(ctx context.Context, req *mcp.CallToolRequest, totalSteps int, logger *slog.Logger) api.ProgressEmitter {
+	return messaging.CreateProgressEmitter(ctx, req, totalSteps, logger)
 }
 
 // ExtractStringParam safely extracts a string parameter from arguments

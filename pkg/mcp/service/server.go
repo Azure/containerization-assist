@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/orchestration/steps"
 	"github.com/Azure/container-kit/pkg/mcp/service/session"
+	"github.com/mark3labs/mcp-go/mcp"
 )
 
 type ServerFactory struct {
@@ -59,9 +60,6 @@ func (f *ServerFactory) buildDependencies(ctx context.Context) (*Dependencies, e
 		return nil, fmt.Errorf("failed to create resource store: %w", err)
 	}
 
-	// Create progress emitter factory
-	progressFactory := f.createProgressEmitterFactory()
-
 	// Create event publisher
 	eventPublisher, err := f.createEventPublisher()
 	if err != nil {
@@ -84,7 +82,6 @@ func (f *ServerFactory) buildDependencies(ctx context.Context) (*Dependencies, e
 	// Create workflow orchestrator
 	workflowOrchestrator, err := f.createWorkflowOrchestrator(
 		sessionManager,
-		progressFactory,
 		samplingClient,
 		promptManager,
 	)
@@ -94,15 +91,14 @@ func (f *ServerFactory) buildDependencies(ctx context.Context) (*Dependencies, e
 
 	// Assemble dependencies
 	deps := &Dependencies{
-		Logger:                 f.logger,
-		Config:                 f.config,
-		SessionManager:         sessionManager,
-		ResourceStore:          resourceStore,
-		ProgressEmitterFactory: progressFactory,
-		EventPublisher:         eventPublisher,
-		WorkflowOrchestrator:   workflowOrchestrator,
-		SamplingClient:         samplingClient,
-		PromptManager:          promptManager,
+		Logger:               f.logger,
+		Config:               f.config,
+		SessionManager:       sessionManager,
+		ResourceStore:        resourceStore,
+		EventPublisher:       eventPublisher,
+		WorkflowOrchestrator: workflowOrchestrator,
+		SamplingClient:       samplingClient,
+		PromptManager:        promptManager,
 	}
 
 	// Validate dependencies
@@ -119,10 +115,6 @@ func (f *ServerFactory) createSessionManager() (*session.BoltStoreAdapter, error
 
 func (f *ServerFactory) createResourceStore() (*resources.Store, error) {
 	return resources.NewStore(f.logger), nil
-}
-
-func (f *ServerFactory) createProgressEmitterFactory() workflow.ProgressEmitterFactory {
-	return messaging.NewDirectProgressFactory(f.logger)
 }
 
 func (f *ServerFactory) createEventPublisher() (*messaging.Publisher, error) {
@@ -144,7 +136,6 @@ func (f *ServerFactory) createPromptManager() (*prompts.Manager, error) {
 
 func (f *ServerFactory) createWorkflowOrchestrator(
 	sessionManager *session.BoltStoreAdapter,
-	progressFactory workflow.ProgressEmitterFactory,
 	samplingClient *sampling.Client,
 	promptManager *prompts.Manager,
 ) (*workflow.Orchestrator, error) {
@@ -152,7 +143,10 @@ func (f *ServerFactory) createWorkflowOrchestrator(
 	stepProvider := steps.NewRegistryStepProvider()
 
 	// Create orchestrator using domain implementation
-	return workflow.NewOrchestrator(stepProvider, progressFactory, f.logger)
+	progressFactory := func(ctx context.Context, req *mcp.CallToolRequest) api.ProgressEmitter {
+		return messaging.CreateProgressEmitter(ctx, req, 10, f.logger)
+	}
+	return workflow.NewOrchestrator(stepProvider, f.logger, progressFactory)
 }
 
 func InitializeServer(logger *slog.Logger, config workflow.ServerConfig) (api.MCPServer, error) {

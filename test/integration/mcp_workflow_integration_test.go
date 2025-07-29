@@ -346,7 +346,6 @@ func (suite *MCPWorkflowIntegrationSuite) startMCPServer(ctx context.Context) *M
 	require.NoError(suite.T(), os.MkdirAll(workspaceDir, 0755))
 
 	cmd := exec.CommandContext(ctx, suite.serverBinaryPath,
-		"--transport", "stdio",
 		"--workspace-dir", workspaceDir,
 		"--store-path", storePath)
 

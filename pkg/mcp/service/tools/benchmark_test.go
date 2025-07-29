@@ -14,10 +14,9 @@ import (
 func BenchmarkToolRegistration(b *testing.B) {
 	// Create dependencies once
 	deps := ToolDependencies{
-		StepProvider:    &mockStepProvider{},
-		ProgressFactory: &mockProgressEmitterFactory{},
-		SessionManager:  &mockSessionManager{},
-		Logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
+		StepProvider:   &mockStepProvider{},
+		SessionManager: &mockSessionManager{},
+		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 
 	b.ResetTimer()
@@ -176,17 +175,15 @@ func BenchmarkParameterExtraction(b *testing.B) {
 // BenchmarkDependencyValidation benchmarks dependency validation
 func BenchmarkDependencyValidation(b *testing.B) {
 	config := ToolConfig{
-		NeedsStepProvider:    true,
-		NeedsProgressFactory: true,
-		NeedsSessionManager:  true,
-		NeedsLogger:          true,
+		NeedsStepProvider:   true,
+		NeedsSessionManager: true,
+		NeedsLogger:         true,
 	}
 
 	deps := ToolDependencies{
-		StepProvider:    &mockStepProvider{},
-		ProgressFactory: &mockProgressEmitterFactory{},
-		SessionManager:  &mockSessionManager{},
-		Logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
+		StepProvider:   &mockStepProvider{},
+		SessionManager: &mockSessionManager{},
+		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 
 	b.ResetTimer()
@@ -201,21 +198,19 @@ func BenchmarkDependencyValidation(b *testing.B) {
 // BenchmarkWorkflowHandlerCreation benchmarks creating workflow handlers
 func BenchmarkWorkflowHandlerCreation(b *testing.B) {
 	config := ToolConfig{
-		Name:                 "test_tool",
-		Category:             CategoryWorkflow,
-		RequiredParams:       []string{"session_id"},
-		NeedsStepProvider:    true,
-		NeedsProgressFactory: true,
-		NeedsSessionManager:  true,
-		NeedsLogger:          true,
-		StepGetterName:       "GetAnalyzeStep",
+		Name:                "test_tool",
+		Category:            CategoryWorkflow,
+		RequiredParams:      []string{"session_id"},
+		NeedsStepProvider:   true,
+		NeedsSessionManager: true,
+		NeedsLogger:         true,
+		StepGetterName:      "GetAnalyzeStep",
 	}
 
 	deps := ToolDependencies{
-		StepProvider:    &mockStepProvider{},
-		ProgressFactory: &mockProgressEmitterFactory{},
-		SessionManager:  &mockSessionManager{},
-		Logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
+		StepProvider:   &mockStepProvider{},
+		SessionManager: &mockSessionManager{},
+		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 
 	b.ResetTimer()
@@ -227,10 +222,9 @@ func BenchmarkWorkflowHandlerCreation(b *testing.B) {
 // BenchmarkMemoryUsage benchmarks memory allocation
 func BenchmarkMemoryUsage(b *testing.B) {
 	deps := ToolDependencies{
-		StepProvider:    &mockStepProvider{},
-		ProgressFactory: &mockProgressEmitterFactory{},
-		SessionManager:  &mockSessionManager{},
-		Logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
+		StepProvider:   &mockStepProvider{},
+		SessionManager: &mockSessionManager{},
+		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 
 	b.ReportAllocs()
