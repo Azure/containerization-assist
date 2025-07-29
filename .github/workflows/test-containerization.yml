@@ -94,7 +94,7 @@ jobs:
           
           # Simple test to verify MCP tools are loaded
           set +e
-          HELLO_RESULT=$(mcphost -p "What containerization tools do you have access to? Please list them." 2>&1)
+          HELLO_RESULT=$(mcphost --stream=false -p "What containerization tools do you have access to? Please list them." 2>&1)
           HELLO_EXIT_CODE=$?
           set -e
           
@@ -129,7 +129,7 @@ jobs:
           
           # Capture both stdout and stderr, and don't exit on failure
           set +e
-          RESULT=$(mcphost -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello" 2>&1)
+          RESULT=$(mcphost --stream=false -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello" 2>&1)
           EXIT_CODE=$?
           set -e
           
