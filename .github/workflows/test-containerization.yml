@@ -52,59 +52,26 @@ jobs:
           mcphost --version
           echo "✅ mcphost v0.26.1 installed successfully"
           
-      # - name: Build MCP Server from PR
-      #   run: |
-      #     echo "Building Container Kit MCP Server from PR code..."
-      #     go build -tags mcp -o container-kit-mcp ./cmd/mcp-server
-      #     chmod +x container-kit-mcp
-      #     ls -la container-kit-mcp
-      
-      - name: Download MCP Server Binary
-        uses: actions/download-artifact@v4
-        with:
-          name: container-kit-mcp-binary
-          path: ./
-        continue-on-error: true
-        
-      - name: Build and Upload MCP Server (first time only)
-        id: build-mcp
-        if: ${{ hashFiles('./container-kit-mcp') == '' }}
+      - name: Build MCP Server from PR
         run: |
-          echo "MCP binary not found, building and uploading for future runs..."
+          echo "Building Container Kit MCP Server from PR code..."
           go build -tags mcp -o container-kit-mcp ./cmd/mcp-server
           chmod +x container-kit-mcp
           ls -la container-kit-mcp
-          echo "binary-built=true" >> $GITHUB_OUTPUT
-          
-      - name: Upload MCP Server Binary for future runs
-        if: ${{ steps.build-mcp.outputs.binary-built == 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: container-kit-mcp-binary
-          path: ./container-kit-mcp
-          retention-days: 1
-          
-      - name: Verify MCP Server binary
-        run: |
-          echo "Verifying MCP Server binary..."
-          ls -la container-kit-mcp
           echo "✅ MCP Server binary ready"
-          
-          # Quick test that the binary can start (without keeping it running)
-          echo "Testing binary can execute..."
-          ./container-kit-mcp --help 2>/dev/null || echo "Help command not available, but binary is executable"
           
       - name: Create mcphost configuration
         run: |
           echo "Creating mcphost configuration..."
           mkdir -p ~/.config
           
-          # Configure mcphost to connect to MCP server via HTTP
+          # Configure mcphost to connect to MCP server via stdio
           cat > ~/.mcphost.yml << EOF
           mcpServers:
             container-copilot:
-              type: "http"
-              url: "http://localhost:9191"
+              type: "stdio"
+              command: "./container-kit-mcp"
+              args: ["-transport=stdio"]
           
           model: "azure:${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}"
           provider-api-key: "${{ secrets.AZURE_OPENAI_KEY }}"
@@ -119,71 +86,18 @@ jobs:
           echo "=== mcphost configuration ==="
           cat ~/.mcphost.yml
           
-      - name: Start MCP Server
-        run: |
-          echo "Starting MCP server on port 9191..."
-          # Use cached binary if available, otherwise use make
-          if [ -f ./mcp-server ]; then
-            echo "Using cached MCP server binary"
-            chmod +x ./mcp-server
-            ./mcp-server -transport=http -http-port=9191 &
-          else
-            echo "Building MCP server"
-            make mcp-server
-            ./mcp-server -transport=http -http-port=9191 &
-          fi
-          MCP_PID=$!
-          echo "MCP_PID=$MCP_PID" >> $GITHUB_ENV
-          
-          # Wait for server to start and check health
-          echo "Waiting for MCP server to start..."
-          for i in {1..30}; do
-            if curl -f http://localhost:9191/healthz > /dev/null 2>&1; then
-              echo "MCP server is healthy on port 9191"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "MCP server failed to start within 30 seconds"
-              curl -v http://localhost:9191/healthz || true
-              exit 1
-            fi
-            sleep 1
-          done
-        env:
-          MCP_HTTP_PORT: 9191
-          
       - name: Run containerization test
         id: test
         run: |
           echo "Running containerization test..."
           echo "Current working directory: $(pwd)"
-          echo "MCP Server should be running on http://localhost:9191"
-          
-          # Verify server is still responding
-          if ! curl -s http://localhost:9191/healthz > /dev/null; then
-            echo "❌ MCP Server is not responding"
-            echo "=== Server Log ==="
-            cat mcp-server.log || echo "No server log available"
-            exit 1
-          fi
-          echo "✅ MCP Server is responding"
+          echo "MCP Server will be started by mcphost via stdio"
           echo ""
-          
-          # Start streaming server logs in background during the test
-          echo "=== Starting MCP Server Log Stream ==="
-          tail -f mcp-server.log &
-          TAIL_PID=$!
-          echo $TAIL_PID > tail.pid
-          echo "Log streaming started with PID: $TAIL_PID"
-          echo ""
-          
-          # Give a moment for log streaming to start
-          sleep 1
           
           # Test with a simple Java servlet application using mcphost
-          # mcphost will connect to the running HTTP server
+          # mcphost will start the MCP server via stdio and communicate directly
           echo "Starting mcphost with containerization request..."
-          echo "=== Server logs will appear below while mcphost runs ==="
+          echo "MCP server will be started automatically by mcphost via stdio"
           echo ""
           
           # Capture both stdout and stderr, and don't exit on failure
@@ -192,15 +106,7 @@ jobs:
           EXIT_CODE=$?
           set -e
           
-          # Stop log streaming now that the test is complete
-          if [ -f tail.pid ]; then
-            TAIL_PID=$(cat tail.pid)
-            kill $TAIL_PID 2>/dev/null || echo "Log streaming already stopped"
-            rm -f tail.pid
-          fi
-          
           echo ""
-          echo "=== Log streaming stopped ==="
           echo "Test completed with exit code: $EXIT_CODE"
           echo ""
           echo "=== MCPHOST OUTPUT ==="
@@ -211,43 +117,6 @@ jobs:
           echo "result<<EOF" >> $GITHUB_OUTPUT
           echo "$RESULT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          
-      - name: Stop MCP Server
-        if: always()
-        run: |
-          echo "Stopping MCP Server..."
-          
-          # Stop any remaining log streaming (in case of errors)
-          if [ -f tail.pid ]; then
-            TAIL_PID=$(cat tail.pid)
-            echo "Stopping any remaining log streaming (PID: $TAIL_PID)..."
-            kill $TAIL_PID 2>/dev/null || echo "Log streaming already stopped"
-            rm -f tail.pid
-          fi
-          
-          # Stop MCP Server
-          if [ -f mcp-server.pid ]; then
-            SERVER_PID=$(cat mcp-server.pid)
-            echo "Stopping MCP Server (PID: $SERVER_PID)..."
-            kill $SERVER_PID 2>/dev/null || echo "Server already stopped"
-            
-            # Wait for graceful shutdown
-            sleep 2
-            
-            # Force kill if still running
-            if kill -0 $SERVER_PID 2>/dev/null; then
-              echo "Force killing server..."
-              kill -9 $SERVER_PID 2>/dev/null || true
-            fi
-            
-            rm -f mcp-server.pid
-          fi
-          
-          echo "=== Final Server Log ==="
-          cat mcp-server.log 2>/dev/null || echo "No server log available"
-          echo "=== End Server Log ==="
-          
-          echo "Cleanup completed"
           
       - name: Analyze results and report
         run: |
