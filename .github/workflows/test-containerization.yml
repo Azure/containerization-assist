@@ -116,7 +116,7 @@ jobs:
           echo ""
           
           # Start server and capture PID
-          $BINARY_PATH -transport=http -http-addr=0.0.0.0:9191 > mcp-server.log 2>&1 &
+          $BINARY_PATH -transport=http -http-port=9191 > mcp-server.log 2>&1 &
           SERVER_PID=$!
           echo "MCP Server started with PID: $SERVER_PID"
           echo $SERVER_PID > mcp-server.pid
