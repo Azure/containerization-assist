@@ -67,7 +67,7 @@ jobs:
         continue-on-error: true
         
       - name: Build and Upload MCP Server (first time only)
-        if: ${{ !hashFiles('./container-kit-mcp') }}
+        if: ${{ hashFiles('./container-kit-mcp') == '' }}
         run: |
           echo "MCP binary not found, building and uploading for future runs..."
           go build -tags mcp -o container-kit-mcp ./cmd/mcp-server
@@ -75,7 +75,7 @@ jobs:
           ls -la container-kit-mcp
           
       - name: Upload MCP Server Binary for future runs
-        if: ${{ !hashFiles('./container-kit-mcp') }}
+        if: ${{ hashFiles('./container-kit-mcp') == '' }}
         uses: actions/upload-artifact@v4
         with:
           name: container-kit-mcp-binary
