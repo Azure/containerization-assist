@@ -140,8 +140,8 @@ jobs:
           echo "  CONTAINER_KIT_HTTP_PORT=$CONTAINER_KIT_HTTP_PORT"
           echo ""
           
-          # Start server and capture PID
-          $BINARY_PATH -transport=http > mcp-server.log 2>&1 &
+          # Start server and capture PID - using explicit command line flag
+          $BINARY_PATH -transport=http -http-port=9191 > mcp-server.log 2>&1 &
           SERVER_PID=$!
           echo "MCP Server started with PID: $SERVER_PID"
           echo $SERVER_PID > mcp-server.pid
