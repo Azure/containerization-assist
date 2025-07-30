@@ -9,6 +9,7 @@ import (
 	"log/slog"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/prompts"
 	resources "github.com/Azure/container-kit/pkg/mcp/infrastructure/core/resources"
 	"github.com/Azure/container-kit/pkg/mcp/service/session"
 	"github.com/mark3labs/mcp-go/server"
@@ -21,6 +22,7 @@ type OptimizedSessionManager = session.OptimizedSessionManager
 type MCPRegistrar struct {
 	toolRegistrar     *ToolRegistrar
 	resourceRegistrar *ResourceRegistrar
+	promptRegistrar   *prompts.Registry
 	config            workflow.ServerConfig
 }
 
@@ -37,6 +39,7 @@ func NewMCPRegistrar(logger *slog.Logger, resourceStore *resources.Store, orches
 	return &MCPRegistrar{
 		toolRegistrar:     NewToolRegistrar(logger, orchestrator, stepProvider, sessionManager, config),
 		resourceRegistrar: NewResourceRegistrar(logger, resourceStore),
+		promptRegistrar:   prompts.NewRegistry(logger),
 		config:            config,
 	}
 }
@@ -50,6 +53,11 @@ func (r *MCPRegistrar) RegisterAll(mcpServer *server.MCPServer) error {
 
 	// Register resources
 	if err := r.resourceRegistrar.RegisterAll(mcpServer); err != nil {
+		return err
+	}
+
+	// Register prompts
+	if err := r.promptRegistrar.RegisterAll(mcpServer); err != nil {
 		return err
 	}
 
