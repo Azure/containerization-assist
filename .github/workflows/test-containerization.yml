@@ -57,13 +57,13 @@ jobs:
           mcphost --version
           echo "✅ mcphost v0.26.1 installed successfully"
           
-      - name: Build MCP Server from PR
-        run: |
-          echo "Building Container Kit MCP Server from PR code..."
-          go build -tags mcp -o container-kit-mcp ./cmd/mcp-server
-          chmod +x container-kit-mcp
-          ls -la container-kit-mcp
-          echo "✅ MCP Server binary ready"
+      # - name: Build MCP Server from PR
+      #   run: |
+      #     echo "Building Container Kit MCP Server from PR code..."
+      #     go build -tags mcp -o container-kit-mcp ./cmd/mcp-server
+      #     chmod +x container-kit-mcp
+      #     ls -la container-kit-mcp
+      #     echo "✅ MCP Server binary ready"
           
       - name: Create mcphost configuration
         run: |
