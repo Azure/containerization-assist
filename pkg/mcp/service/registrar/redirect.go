@@ -65,15 +65,15 @@ type AIFixingPrompt struct {
 }
 
 // createRedirectResponse creates a response instructing the client to call a different tool
-func (tr *ToolRegistrar) createRedirectResponse(failedTool, error string, sessionID string) (*mcp.CallToolResult, error) {
-	config, hasRedirect := RedirectConfigs[failedTool]
+func (tr *ToolRegistrar) createRedirectResponse(fromTool, error string, sessionID string) (*mcp.CallToolResult, error) {
+	config, hasRedirect := RedirectConfigs[fromTool]
 	if !hasRedirect {
 		// No redirect configured - return normal error
-		return tr.createErrorResult(fmt.Sprintf("Tool %s failed: %s", failedTool, error))
+		return tr.createErrorResult(fmt.Sprintf("Tool %s failed: %s", fromTool, error))
 	}
 
 	// Generate AI fixing prompt
-	aiPrompt := tr.generateAIFixingPrompt(failedTool, config.RedirectTo, error, sessionID)
+	aiPrompt := tr.generateAIFixingPrompt(fromTool, config.RedirectTo, error, sessionID)
 
 	// Create redirect instruction (only AIPrompt is used for text response)
 	instruction := RedirectInstruction{
@@ -83,7 +83,7 @@ func (tr *ToolRegistrar) createRedirectResponse(failedTool, error string, sessio
 	// Create text-based response with AI prompt
 	var responseText string
 	if instruction.AIPrompt != nil {
-		responseText = fmt.Sprintf(`Tool %s failed: %s
+		responseText = fmt.Sprintf(`Tool %s failed with error: %s
 
 **Fixing Strategy**: %s
 
@@ -104,7 +104,7 @@ func (tr *ToolRegistrar) createRedirectResponse(failedTool, error string, sessio
 - fixing_mode: true
 
 **Next Action:** Call tool "%s" with the above parameters and use the AI guidance to generate the corrected content.`,
-			failedTool,
+			fromTool,
 			error,
 			instruction.AIPrompt.FixingStrategy,
 			config.RedirectTo,
@@ -113,24 +113,24 @@ func (tr *ToolRegistrar) createRedirectResponse(failedTool, error string, sessio
 			instruction.AIPrompt.ExpectedOutput,
 			sessionID,
 			error,
-			failedTool,
+			fromTool,
 			config.RedirectTo)
 	} else {
 		responseText = fmt.Sprintf(`Tool %s failed: %s
 
-**Next Action:** Call tool "%s" to fix the issue.
+**Next Action:** Call tool "%s" with appropriate parameters to fix the issue.
 
 **Parameters:**
 - session_id: %s
 - previous_error: %s  
 - failed_tool: %s
 - fixing_mode: true`,
-			failedTool,
+			fromTool,
 			error,
 			config.RedirectTo,
 			sessionID,
 			error,
-			failedTool)
+			fromTool)
 	}
 
 	return &mcp.CallToolResult{

@@ -13,12 +13,10 @@ func (tr *ToolRegistrar) generateAIFixingPrompt(failedTool, fixingTool, error, s
 	switch failedTool {
 	case "build_image":
 		return tr.generateDockerfileFix(error, sessionID)
-	case "deploy_application":
-		return tr.generateManifestFix(error, sessionID)
-	case "push_image":
-		return tr.generateImageBuildFix(error, sessionID)
 	case "scan_image":
 		return tr.generateSecurityFix(error, sessionID)
+	case "deploy_application":
+		return tr.generateManifestFix(error, sessionID)
 	default:
 		return tr.generateGenericFix(failedTool, fixingTool, error, sessionID)
 	}
@@ -130,39 +128,6 @@ Generate complete, working Kubernetes manifests that fix this deployment issue.`
 	}
 }
 
-// generateImageBuildFix creates AI prompt for fixing image build issues
-func (tr *ToolRegistrar) generateImageBuildFix(error, sessionID string) *AIFixingPrompt {
-	context := tr.getSessionContext(sessionID)
-
-	systemPrompt := `You are a Docker expert specializing in container image optimization and troubleshooting. An image build or push operation has failed and you need to provide guidance for fixing it.
-
-Focus areas:
-- Image size optimization
-- Layer caching strategies  
-- Registry authentication issues
-- Network connectivity problems
-- Build context optimization
-- Multi-platform builds if needed`
-
-	userPrompt := fmt.Sprintf(`Image build/push failed with error:
-%s
-
-Context:
-%s
-
-Provide specific steps to fix this issue and regenerate the image successfully.`,
-		error,
-		tr.formatContextForAI(context, "all"))
-
-	return &AIFixingPrompt{
-		SystemPrompt:   systemPrompt,
-		UserPrompt:     userPrompt,
-		Context:        context,
-		ExpectedOutput: "Specific instructions for fixing the image build issue",
-		FixingStrategy: "image_rebuild",
-	}
-}
-
 // generateSecurityFix creates AI prompt for fixing security scan issues
 func (tr *ToolRegistrar) generateSecurityFix(error, sessionID string) *AIFixingPrompt {
 	context := tr.getSessionContext(sessionID)
@@ -192,7 +157,7 @@ Provide specific recommendations to address these security issues and regenerate
 		UserPrompt:     userPrompt,
 		Context:        context,
 		ExpectedOutput: "Updated Dockerfile with security improvements",
-		FixingStrategy: "security_hardening",
+		FixingStrategy: "dockerfile_regeneration_with_security_hardening",
 	}
 }
 
