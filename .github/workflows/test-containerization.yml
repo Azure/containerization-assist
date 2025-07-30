@@ -104,11 +104,11 @@ jobs:
           mcphost hooks init
           
           # Copy hook script and make it executable
-          cp .github/workflows/mcphost/track-tool-success.sh /tmp/track-tool-success.sh
-          chmod +x /tmp/track-tool-success.sh
+          sudo cp .github/workflows/mcphost/track-tool-success.sh /usr/local/bin/track-tool-success.sh
+          sudo chmod +x /usr/local/bin/track-tool-success.sh
           
           # Verify hook script exists and is executable
-          ls -la /tmp/track-tool-success.sh
+          ls -la /usr/local/bin/track-tool-success.sh
           
           # Initialize empty hook log file
           touch /tmp/workflow-hooks.log
@@ -122,7 +122,7 @@ jobs:
           mcphost hooks list
           
           echo "✅ mcphost hooks configured successfully"
-          echo "Hook script location: /tmp/track-tool-success.sh"
+          echo "Hook script location: /usr/local/bin/track-tool-success.sh"
           
       - name: Test MCP Server and LLM connection
         run: |
@@ -188,29 +188,8 @@ jobs:
           echo "=== END OUTPUT ==="
           echo ""
           
-          # Use a delimiter that won't conflict with the output content
-          {
-            echo "result<<MCPHOST_OUTPUT_EOF"
-            echo "$RESULT"
-            echo "MCPHOST_OUTPUT_EOF"
-          } >> $GITHUB_OUTPUT
-          
       - name: Analyze results and report
         run: |
-          echo "=== Test Result and Logs ==="
-          # Clean the output by removing ANSI escape sequences and control characters
-          CLEAN_RESULT='${{ steps.test.outputs.result }}'
-          
-          # Remove ANSI escape sequences, control chars, and excessive whitespace
-          CLEAN_RESULT=$(echo "$CLEAN_RESULT" | sed 's/\x1b\[[0-9;]*m//g' | tr -d '\000-\010\013\014\016-\037' | sed 's/[[:space:]]*$//' | sed '/^$/d')
-          
-          # Filter out the TTY and spinner errors, but keep meaningful content
-          FILTERED_RESULT=$(echo "$CLEAN_RESULT" | grep -v "Error running spinner" | grep -v "could not open a new TTY" | grep -v "no such device or address" | sed '/^[[:space:]]*$/d')
-          
-          echo "Filtered mcphost output:"
-          echo "$FILTERED_RESULT"
-          echo ""
-          
           echo "=== Hook-Based Analysis ==="
           if [ -f "/tmp/workflow-hooks.log" ]; then
             echo "Hook execution log found. Analyzing tool success status..."
