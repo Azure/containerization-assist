@@ -268,7 +268,6 @@ func DefaultServerConfig() ServerConfig {
 type Step interface {
 	Name() string
 	Execute(ctx context.Context, state *WorkflowState) error
-	MaxRetries() int
 }
 
 // WorkflowState holds all the state that flows between workflow steps
@@ -303,6 +302,13 @@ type WorkflowState struct {
 
 	// AI Enhancement fields
 	allSteps []Step // Cache of all workflow steps
+	
+	// Fixing context for redirect mechanism
+	FixingMode    bool   `json:"fixing_mode,omitempty"`
+	PreviousError string `json:"previous_error,omitempty"`
+	FailedTool    string `json:"failed_tool,omitempty"`
+	// Additional request parameters for AI-generated content
+	RequestParams map[string]interface{} `json:"request_params,omitempty"`
 }
 
 // GetAllSteps returns all workflow steps (used for optimization analysis)

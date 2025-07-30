@@ -136,8 +136,7 @@ func (o *Orchestrator) executeSequentially(ctx context.Context, state *WorkflowS
 			"total_steps", state.TotalSteps,
 		)
 
-		// Execute step with retry logic
-		err := o.executeStepWithRetry(ctx, step, state)
+		err := step.Execute(ctx, state)
 
 		// Emit progress update
 		if state.ProgressEmitter != nil {
@@ -170,67 +169,7 @@ func (o *Orchestrator) executeSequentially(ctx context.Context, state *WorkflowS
 	return nil
 }
 
-// executeStepWithRetry executes a step with retry logic
-func (o *Orchestrator) executeStepWithRetry(ctx context.Context, step Step, state *WorkflowState) error {
-	maxRetries := step.MaxRetries()
-	if maxRetries < 1 {
-		maxRetries = 1
-	}
 
-	var lastErr error
-	for attempt := 1; attempt <= maxRetries; attempt++ {
-		// Create timeout context for this attempt
-		timeoutCtx, cancel := context.WithTimeout(ctx, o.getStepTimeout(step.Name()))
-		defer cancel()
-
-		// Execute the step
-		err := step.Execute(timeoutCtx, state)
-		if err == nil {
-			return nil
-		}
-
-		lastErr = err
-		o.logger.Warn("Step failed, will retry",
-			"step", step.Name(),
-			"attempt", attempt,
-			"max_attempts", maxRetries,
-			"error", err,
-		)
-
-		// Don't sleep after the last attempt
-		if attempt < maxRetries {
-			// Exponential backoff with jitter
-			backoff := time.Duration(attempt) * 2 * time.Second
-			if backoff > 30*time.Second {
-				backoff = 30 * time.Second
-			}
-			time.Sleep(backoff)
-		}
-	}
-
-	return NewWorkflowError(step.Name(), maxRetries, lastErr)
-}
-
-// getStepTimeout returns the timeout for a specific step
-func (o *Orchestrator) getStepTimeout(stepName string) time.Duration {
-	timeouts := map[string]time.Duration{
-		StepAnalyzeRepository:  5 * time.Minute,
-		StepGenerateDockerfile: 2 * time.Minute,
-		StepBuildImage:         15 * time.Minute,
-		StepSecurityScan:       10 * time.Minute,
-		StepTagImage:           1 * time.Minute,
-		StepPushImage:          10 * time.Minute,
-		StepGenerateManifests:  2 * time.Minute,
-		StepSetupCluster:       5 * time.Minute,
-		StepDeployApplication:  10 * time.Minute,
-		StepVerifyDeployment:   5 * time.Minute,
-	}
-
-	if timeout, ok := timeouts[stepName]; ok {
-		return timeout
-	}
-	return 5 * time.Minute // default timeout
-}
 
 // buildContainerizationSteps creates the sequential list of workflow steps
 func buildContainerizationSteps(provider StepProvider) ([]Step, error) {
