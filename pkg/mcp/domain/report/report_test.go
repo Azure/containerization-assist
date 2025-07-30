@@ -1,0 +1,345 @@
+package report
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/Azure/container-kit/pkg/pipeline"
+)
+
+func TestMCPProgressiveReport(t *testing.T) {
+	// Create temporary directory for testing
+	tempDir := t.TempDir()
+
+	workflowID := "test-workflow-123"
+
+	// Test creating new report
+	report, err := LoadOrCreateMCPReport(workflowID, tempDir)
+	if err != nil {
+		t.Fatalf("Failed to create new report: %v", err)
+	}
+
+	if report.WorkflowID != workflowID {
+		t.Errorf("Expected WorkflowID %s, got %s", workflowID, report.WorkflowID)
+	}
+
+	if report.Summary.Outcome != MCPOutcomeInProgress {
+		t.Errorf("Expected initial outcome %s, got %s", MCPOutcomeInProgress, report.Summary.Outcome)
+	}
+
+	// Test adding step results
+	startTime := time.Now()
+	endTime := startTime.Add(5 * time.Second)
+
+	outputs := map[string]interface{}{
+		"dockerfile_path":    "/app/Dockerfile",
+		"analysis_summary":   "Go application detected",
+		"detected_framework": "gin",
+	}
+
+	artifacts := []GeneratedArtifact{
+		{
+			Type:        "dockerfile",
+			Path:        "/app/Dockerfile",
+			Description: "Generated Dockerfile for Go application",
+			CreatedAt:   time.Now(),
+		},
+	}
+
+	err = UpdateStepResult(report, "analyze_repository", true, startTime, &endTime, "", outputs, artifacts)
+	if err != nil {
+		t.Fatalf("Failed to update step result: %v", err)
+	}
+
+	// Verify step was added
+	if len(report.StepResults) != 1 {
+		t.Errorf("Expected 1 step result, got %d", len(report.StepResults))
+	}
+
+	step := report.StepResults[0]
+	if step.StepName != "analyze_repository" {
+		t.Errorf("Expected step name 'analyze_repository', got %s", step.StepName)
+	}
+
+	if !step.Success {
+		t.Errorf("Expected step to be successful")
+	}
+
+	if len(step.Artifacts) != 1 {
+		t.Errorf("Expected 1 artifact, got %d", len(step.Artifacts))
+	}
+
+	// Test database detection
+	databases := []pipeline.DatabaseDetectionResult{
+		{
+			Type:    "postgresql",
+			Version: "13",
+			Source:  "docker-compose.yml",
+		},
+		{
+			Type:    "redis",
+			Version: "6.2",
+			Source:  "requirements.txt",
+		},
+	}
+
+	AddDatabaseDetection(report, databases)
+
+	if len(report.DetectedDatabases) != 2 {
+		t.Errorf("Expected 2 detected databases, got %d", len(report.DetectedDatabases))
+	}
+
+	// Test token usage
+	UpdateTokenUsage(report, 100, 50)
+
+	if report.TokenUsage.PromptTokens != 100 {
+		t.Errorf("Expected 100 prompt tokens, got %d", report.TokenUsage.PromptTokens)
+	}
+
+	if report.TokenUsage.TotalTokens != 150 {
+		t.Errorf("Expected 150 total tokens, got %d", report.TokenUsage.TotalTokens)
+	}
+
+	// Test saving and loading
+	err = SaveMCPReport(report, tempDir)
+	if err != nil {
+		t.Fatalf("Failed to save report: %v", err)
+	}
+
+	// Verify files were created
+	jsonPath := filepath.Join(tempDir, MCPReportDirectory, MCPReportFileName)
+	if _, err := os.Stat(jsonPath); os.IsNotExist(err) {
+		t.Errorf("JSON report file was not created")
+	}
+
+	markdownPath := filepath.Join(tempDir, MCPReportDirectory, MCPMarkdownFileName)
+	if _, err := os.Stat(markdownPath); os.IsNotExist(err) {
+		t.Errorf("Markdown report file was not created")
+	}
+
+	// Test loading existing report
+	loadedReport, err := LoadOrCreateMCPReport(workflowID, tempDir)
+	if err != nil {
+		t.Fatalf("Failed to load existing report: %v", err)
+	}
+
+	if len(loadedReport.StepResults) != 1 {
+		t.Errorf("Expected 1 step result in loaded report, got %d", len(loadedReport.StepResults))
+	}
+
+	if len(loadedReport.DetectedDatabases) != 2 {
+		t.Errorf("Expected 2 detected databases in loaded report, got %d", len(loadedReport.DetectedDatabases))
+	}
+
+	// Test summary updates
+	UpdateSummary(loadedReport)
+
+	if loadedReport.Summary.TotalSteps != 1 {
+		t.Errorf("Expected 1 total step, got %d", loadedReport.Summary.TotalSteps)
+	}
+
+	if loadedReport.Summary.CompletedSteps != 1 {
+		t.Errorf("Expected 1 completed step, got %d", loadedReport.Summary.CompletedSteps)
+	}
+
+	if loadedReport.Summary.SuccessRate != 100.0 {
+		t.Errorf("Expected 100%% success rate, got %.1f%%", loadedReport.Summary.SuccessRate)
+	}
+}
+
+func TestMCPReportFailedStep(t *testing.T) {
+	tempDir := t.TempDir()
+	workflowID := "test-workflow-failed"
+
+	report, err := LoadOrCreateMCPReport(workflowID, tempDir)
+	if err != nil {
+		t.Fatalf("Failed to create new report: %v", err)
+	}
+
+	// Add a failed step
+	startTime := time.Now()
+	endTime := startTime.Add(2 * time.Second)
+
+	err = UpdateStepResult(report, "build_image", false, startTime, &endTime, "Docker build failed", nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to update failed step result: %v", err)
+	}
+
+	UpdateSummary(report)
+
+	if report.Summary.Outcome != MCPOutcomeFailure {
+		t.Errorf("Expected outcome %s, got %s", MCPOutcomeFailure, report.Summary.Outcome)
+	}
+
+	if report.Summary.FailedSteps != 1 {
+		t.Errorf("Expected 1 failed step, got %d", report.Summary.FailedSteps)
+	}
+
+	if report.Summary.SuccessRate != 0.0 {
+		t.Errorf("Expected 0%% success rate, got %.1f%%", report.Summary.SuccessRate)
+	}
+}
+
+func TestMCPReportStageVisits(t *testing.T) {
+	tempDir := t.TempDir()
+	workflowID := "test-workflow-stages"
+
+	report, err := LoadOrCreateMCPReport(workflowID, tempDir)
+	if err != nil {
+		t.Fatalf("Failed to create new report: %v", err)
+	}
+
+	// Add stage visits
+	startTime := time.Now()
+	endTime := startTime.Add(3 * time.Second)
+
+	AddStageVisit(report, "analyze", pipeline.RunOutcomeSuccess, startTime, &endTime, 0)
+	AddStageVisit(report, "build", pipeline.RunOutcomeFailure, startTime, &endTime, 1)
+
+	if len(report.StageHistory) != 2 {
+		t.Errorf("Expected 2 stage visits, got %d", len(report.StageHistory))
+	}
+
+	firstVisit := report.StageHistory[0]
+	if firstVisit.StageID != "analyze" {
+		t.Errorf("Expected first visit stage ID 'analyze', got %s", firstVisit.StageID)
+	}
+
+	if firstVisit.Outcome != pipeline.RunOutcomeSuccess {
+		t.Errorf("Expected first visit outcome success, got %s", firstVisit.Outcome)
+	}
+
+	secondVisit := report.StageHistory[1]
+	if secondVisit.RetryCount != 1 {
+		t.Errorf("Expected second visit retry count 1, got %d", secondVisit.RetryCount)
+	}
+}
+
+func TestMCPReportMarkdownGeneration(t *testing.T) {
+	tempDir := t.TempDir()
+	workflowID := "test-workflow-markdown"
+
+	report, err := LoadOrCreateMCPReport(workflowID, tempDir)
+	if err != nil {
+		t.Fatalf("Failed to create new report: %v", err)
+	}
+
+	// Add some data
+	startTime := time.Now()
+	endTime := startTime.Add(2 * time.Second)
+
+	artifacts := []GeneratedArtifact{
+		{
+			Type:        "dockerfile",
+			Path:        "Dockerfile",
+			Description: "Main application Dockerfile",
+			CreatedAt:   time.Now(),
+		},
+	}
+
+	UpdateStepResult(report, "generate_dockerfile", true, startTime, &endTime, "", nil, artifacts)
+	UpdateTokenUsage(report, 200, 100)
+	UpdateSummary(report)
+
+	// Generate markdown
+	markdown := FormatMCPMarkdownReport(report)
+
+	// Verify markdown contains expected content
+	if !containsString(markdown, "# MCP Workflow Report") {
+		t.Error("Markdown should contain main heading")
+	}
+
+	if !containsString(markdown, workflowID) {
+		t.Error("Markdown should contain workflow ID")
+	}
+
+	if !containsString(markdown, "generate_dockerfile") {
+		t.Error("Markdown should contain step name")
+	}
+
+	if !containsString(markdown, "## Token Usage") {
+		t.Error("Markdown should contain token usage section")
+	}
+
+	if !containsString(markdown, "200") {
+		t.Error("Markdown should contain prompt token count")
+	}
+}
+
+func TestReportStepExecution(t *testing.T) {
+	tempDir := t.TempDir()
+	workflowID := "test-workflow-execution"
+
+	startTime := time.Now()
+	endTime := startTime.Add(1 * time.Second)
+
+	outputs := map[string]interface{}{
+		"image_id": "sha256:abc123",
+		"size":     "500MB",
+	}
+
+	artifacts := []GeneratedArtifact{
+		{
+			Type:        "image",
+			Path:        "myapp:latest",
+			Description: "Built container image",
+			CreatedAt:   time.Now(),
+		},
+	}
+
+	// Test the high-level ReportStepExecution function
+	err := ReportStepExecution(workflowID, "build_image", tempDir, true, startTime, &endTime, "", outputs, artifacts)
+	if err != nil {
+		t.Fatalf("Failed to report step execution: %v", err)
+	}
+
+	// Verify report was created and contains the step
+	report, err := LoadOrCreateMCPReport(workflowID, tempDir)
+	if err != nil {
+		t.Fatalf("Failed to load report after step execution: %v", err)
+	}
+
+	if len(report.StepResults) != 1 {
+		t.Errorf("Expected 1 step result, got %d", len(report.StepResults))
+	}
+
+	step := report.StepResults[0]
+	if step.StepName != "build_image" {
+		t.Errorf("Expected step name 'build_image', got %s", step.StepName)
+	}
+
+	if !step.Success {
+		t.Error("Expected step to be successful")
+	}
+
+	if len(step.Artifacts) != 1 {
+		t.Errorf("Expected 1 artifact, got %d", len(step.Artifacts))
+	}
+
+	// Verify files were written
+	jsonPath := filepath.Join(tempDir, MCPReportDirectory, MCPReportFileName)
+	if _, err := os.Stat(jsonPath); os.IsNotExist(err) {
+		t.Error("JSON report file should exist after step execution")
+	}
+}
+
+// Helper function for string containment check
+func containsString(s, substr string) bool {
+	return len(s) >= len(substr) &&
+		(s == substr ||
+			len(s) > len(substr) &&
+				(s[:len(substr)] == substr ||
+					s[len(s)-len(substr):] == substr ||
+					containsSubstring(s, substr)))
+}
+
+func containsSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
