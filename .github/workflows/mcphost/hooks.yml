@@ -1,5 +1,5 @@
 hooks:
   PostToolUse:
     - type: command
-      command: "~/.mcphost/hooks/log-prompt.sh"
+      command: "log-prompt.sh"
       timeout: 5

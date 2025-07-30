@@ -104,13 +104,15 @@ jobs:
           echo "Initializing mcphost hooks..."
           mcphost hooks init
           
-          # Create hooks directory and copy hook script
-          mkdir -p ~/.mcphost/hooks/
-          cp .github/workflows/mcphost/track-tool-success.sh ~/.mcphost/hooks/log-prompt.sh
-          chmod +x ~/.mcphost/hooks/log-prompt.sh
+          # Replace the example hooks configuration with our custom one
+          cp .github/workflows/mcphost/hooks.yml ~/.mcphost/hooks.yml
+          
+          # Copy hook script to system PATH location to avoid path security issues
+          sudo cp .github/workflows/mcphost/track-tool-success.sh /usr/local/bin/log-prompt.sh
+          sudo chmod +x /usr/local/bin/log-prompt.sh
           
           # Verify hook script exists and is executable
-          ls -la ~/.mcphost/hooks/log-prompt.sh
+          ls -la /usr/local/bin/log-prompt.sh
           
           # Initialize empty hook log file
           touch /tmp/workflow-hooks.log
@@ -124,7 +126,7 @@ jobs:
           mcphost hooks list
           
           echo "✅ mcphost hooks configured successfully"
-          echo "Hook script location: ~/.mcphost/hooks/log-prompt.sh"
+          echo "Hook script location: /usr/local/bin/log-prompt.sh"
           
       - name: Test MCP Server and LLM connection
         run: |
