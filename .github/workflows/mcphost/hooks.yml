@@ -1,6 +1,5 @@
 hooks:
   PostToolUse:
-    - hooks:
-        - type: command
-          command: "/usr/local/bin/track-tool-success.sh"
-          timeout: 5
+    - type: command
+      command: "~/.mcphost/hooks/log-prompt.sh"
+      timeout: 5
