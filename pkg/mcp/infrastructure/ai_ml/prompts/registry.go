@@ -79,14 +79,14 @@ func (r *Registry) createBasicHandler(name, description string) server.PromptHan
 
 		messages := []mcp.PromptMessage{
 			{
-				Role: "system",
+				Role: mcp.RoleAssistant,
 				Content: mcp.TextContent{
 					Type: "text",
 					Text: systemPrompt,
 				},
 			},
 			{
-				Role: "user",
+				Role: mcp.RoleUser,
 				Content: mcp.TextContent{
 					Type: "text",
 					Text: userPrompt,
