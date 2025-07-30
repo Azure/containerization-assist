@@ -68,10 +68,13 @@ jobs:
       - name: Create mcphost configuration
         run: |
           echo "Creating mcphost configuration..."
-          mkdir -p ~/.config
+          mkdir -p ~/.config/mcphost
           
-          # Copy the configuration template (mcphost will handle env var substitution)
+          # Copy the main configuration template
           cp .github/workflows/mcphost/config.yml ~/.mcphost.yml
+          
+          # Copy the hooks configuration to the correct location
+          cp .github/workflows/mcphost/hooks.yml ~/.config/mcphost/hooks.yml
           
           echo "Configuration created successfully"
           
@@ -85,6 +88,9 @@ jobs:
           # Show the full configuration
           echo "=== mcphost configuration ==="
           cat ~/.mcphost.yml
+          echo ""
+          echo "=== mcphost hooks configuration ==="
+          cat ~/.config/mcphost/hooks.yml
           
       - name: Setup mcphost hooks for monitoring
         run: |
@@ -92,6 +98,10 @@ jobs:
           
           # Install jq for JSON parsing in hooks
           sudo apt-get update && sudo apt-get install -y jq
+          
+          # Initialize hooks configuration
+          echo "Initializing mcphost hooks..."
+          mcphost hooks init
           
           # Copy hook script and make it executable
           cp .github/workflows/mcphost/track-tool-success.sh /tmp/track-tool-success.sh
@@ -102,6 +112,14 @@ jobs:
           
           # Initialize empty hook log file
           touch /tmp/workflow-hooks.log
+          
+          # Validate hooks configuration
+          echo "Validating hooks configuration..."
+          mcphost hooks validate
+          
+          # List active hooks
+          echo "Active hooks:"
+          mcphost hooks list
           
           echo "✅ mcphost hooks configured successfully"
           echo "Hook script location: /tmp/track-tool-success.sh"
@@ -158,7 +176,7 @@ jobs:
           
           # Capture both stdout and stderr, and don't exit on failure
           set +e
-          RESULT=$(timeout 300s mcphost --stream=false --quiet -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello. This is an automated test - do NOT ask for user input." 2>&1)
+          RESULT=$(timeout 300s mcphost --stream=false -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello. This is an automated test - do NOT ask for user input." 2>&1)
           EXIT_CODE=$?
           set -e
           

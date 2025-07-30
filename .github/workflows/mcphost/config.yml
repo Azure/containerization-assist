@@ -17,9 +17,3 @@ mcpServers:
 model: "azure:${env://AZURE_OPENAI_DEPLOYMENT_ID}"
 provider-api-key: "${env://AZURE_OPENAI_KEY}"
 provider-url: "${env://AZURE_OPENAI_ENDPOINT}"
-
-hooks:
-  PostToolUse:
-    - type: command
-      command: "/tmp/track-tool-success.sh"
-      timeout: 5
