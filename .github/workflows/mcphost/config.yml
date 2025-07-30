@@ -2,7 +2,7 @@ mcpServers:
   container-kit:
     type: "local"
     command: "./container-kit-mcp"
-    args: ["-transport=stdio"]
+    args: []
   
   filesystem:
     type: "builtin"
