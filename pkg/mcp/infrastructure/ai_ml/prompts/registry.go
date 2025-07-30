@@ -12,27 +12,21 @@ import (
 
 // Registry manages MCP prompts with native mcp-go support
 type Registry struct {
-	server interface {
-		AddPrompt(prompt mcp.Prompt, handler server.PromptHandlerFunc)
-	}
 	logger   *slog.Logger
 	handlers map[string]server.PromptHandlerFunc
 	mu       sync.RWMutex
 }
 
 // NewRegistry creates a new prompt registry with native MCP prompt support
-func NewRegistry(s interface {
-	AddPrompt(prompt mcp.Prompt, handler server.PromptHandlerFunc)
-}, logger *slog.Logger) *Registry {
+func NewRegistry(logger *slog.Logger) *Registry {
 	return &Registry{
-		server:   s,
 		logger:   logger.With("component", "prompt-registry"),
 		handlers: make(map[string]server.PromptHandlerFunc),
 	}
 }
 
 // RegisterAll registers all Container Kit prompts using native mcp-go support
-func (r *Registry) RegisterAll() error {
+func (r *Registry) RegisterAll(mcpServer *server.MCPServer) error {
 	r.logger.Info("Registering Container Kit prompts with native mcp-go support")
 
 	// Register containerization prompts using native mcp-go API
@@ -50,8 +44,8 @@ func (r *Registry) RegisterAll() error {
 		handler := r.createBasicHandler(name, description)
 		r.mu.Lock()
 		r.handlers[name] = handler
+		mcpServer.AddPrompt(prompt, handler)
 		r.mu.Unlock()
-		r.server.AddPrompt(prompt, handler)
 		r.logger.Info("Registered prompt", "name", name, "description", description)
 	}
 
