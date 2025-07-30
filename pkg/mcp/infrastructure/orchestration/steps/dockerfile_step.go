@@ -28,7 +28,6 @@ func (s *DockerfileStep) Name() string {
 	return "generate_dockerfile"
 }
 
-
 // Execute generates a Dockerfile
 func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
 	if state.AnalyzeResult == nil {
@@ -37,15 +36,15 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowSt
 
 	// Check if this is a fixing mode call
 	if state.FixingMode {
-		state.Logger.Info("Regenerating Dockerfile with AI fixing", 
+		state.Logger.Info("Regenerating Dockerfile with AI fixing",
 			"previous_error", state.PreviousError,
 			"failed_tool", state.FailedTool)
-		
+
 		// Check if AI-generated Dockerfile content is provided
 		if aiContent, exists := state.RequestParams["ai_generated_dockerfile"]; exists {
 			if dockerfileContent, ok := aiContent.(string); ok && dockerfileContent != "" {
 				state.Logger.Info("Using AI-generated Dockerfile content for fixing")
-				
+
 				// Use AI-generated content directly
 				dockerfileResult := &DockerfileResult{
 					Content:     dockerfileContent,
@@ -53,13 +52,13 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowSt
 					BaseImage:   extractBaseImageFromDockerfile(dockerfileContent),
 					ExposedPort: extractPortFromDockerfile(dockerfileContent),
 				}
-				
+
 				if err := WriteDockerfile(state.AnalyzeResult.RepoPath, dockerfileContent, state.Logger); err != nil {
 					return fmt.Errorf("failed to write AI-generated Dockerfile to path '%s': %v", state.AnalyzeResult.RepoPath, err)
 				}
-				
+
 				state.Logger.Info("AI-generated Dockerfile written successfully", "path", dockerfileResult.Path)
-				
+
 				// Convert to workflow type
 				state.DockerfileResult = &workflow.DockerfileResult{
 					Content:     dockerfileResult.Content,
@@ -68,11 +67,11 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowSt
 					Metadata:    map[string]interface{}{"ai_generated": true, "fixing_mode": true},
 					ExposedPort: dockerfileResult.ExposedPort,
 				}
-				
+
 				return nil
 			}
 		}
-		
+
 		state.Logger.Info("No AI-generated content provided, falling back to standard generation with error context")
 	} else {
 		state.Logger.Info("Step 2: Generating Dockerfile")
@@ -104,7 +103,7 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowSt
 		metadata["fixing_mode"] = true
 		metadata["fixed_from_error"] = state.PreviousError
 	}
-	
+
 	state.DockerfileResult = &workflow.DockerfileResult{
 		Content:     dockerfileResult.Content,
 		Path:        dockerfileResult.Path,
@@ -140,7 +139,7 @@ func extractBaseImageFromDockerfile(content string) string {
 func extractPortFromDockerfile(content string) int {
 	lines := strings.Split(content, "\n")
 	re := regexp.MustCompile(`EXPOSE\s+(\d+)`)
-	
+
 	for _, line := range lines {
 		line = strings.TrimSpace(strings.ToUpper(line))
 		if matches := re.FindStringSubmatch(line); len(matches) > 1 {

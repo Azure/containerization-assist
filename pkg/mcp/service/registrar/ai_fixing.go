@@ -14,7 +14,7 @@ func (tr *ToolRegistrar) generateAIFixingPrompt(failedTool, fixingTool, error, s
 	case "build_image":
 		return tr.generateDockerfileFix(error, sessionID)
 	case "deploy_application":
-		return tr.generateManifestFix(error, sessionID) 
+		return tr.generateManifestFix(error, sessionID)
 	case "push_image":
 		return tr.generateImageBuildFix(error, sessionID)
 	case "scan_image":
@@ -28,7 +28,7 @@ func (tr *ToolRegistrar) generateAIFixingPrompt(failedTool, fixingTool, error, s
 func (tr *ToolRegistrar) generateDockerfileFix(error, sessionID string) *AIFixingPrompt {
 	// Get existing analysis and dockerfile from session
 	context := tr.getSessionContext(sessionID)
-	
+
 	systemPrompt := `You are an expert Docker containerization specialist. A Dockerfile build has failed and you need to analyze the error and generate a corrected Dockerfile.
 
 Key principles:
@@ -61,8 +61,8 @@ Repository context:
 Current Dockerfile (if available):
 %s
 
-Generate a complete, working Dockerfile that fixes this issue.`, 
-		error, 
+Generate a complete, working Dockerfile that fixes this issue.`,
+		error,
 		tr.formatContextForAI(context, "analysis"),
 		tr.formatContextForAI(context, "dockerfile"))
 
@@ -78,7 +78,7 @@ Generate a complete, working Dockerfile that fixes this issue.`,
 // generateManifestFix creates AI prompt for fixing Kubernetes manifest issues
 func (tr *ToolRegistrar) generateManifestFix(error, sessionID string) *AIFixingPrompt {
 	context := tr.getSessionContext(sessionID)
-	
+
 	systemPrompt := `You are an expert Kubernetes engineer. A Kubernetes deployment has failed and you need to analyze the error and generate corrected manifests.
 
 Key principles:
@@ -133,7 +133,7 @@ Generate complete, working Kubernetes manifests that fix this deployment issue.`
 // generateImageBuildFix creates AI prompt for fixing image build issues
 func (tr *ToolRegistrar) generateImageBuildFix(error, sessionID string) *AIFixingPrompt {
 	context := tr.getSessionContext(sessionID)
-	
+
 	systemPrompt := `You are a Docker expert specializing in container image optimization and troubleshooting. An image build or push operation has failed and you need to provide guidance for fixing it.
 
 Focus areas:
@@ -166,7 +166,7 @@ Provide specific steps to fix this issue and regenerate the image successfully.`
 // generateSecurityFix creates AI prompt for fixing security scan issues
 func (tr *ToolRegistrar) generateSecurityFix(error, sessionID string) *AIFixingPrompt {
 	context := tr.getSessionContext(sessionID)
-	
+
 	systemPrompt := `You are a container security expert. A security scan has found vulnerabilities and you need to provide guidance for creating a more secure container image.
 
 Security best practices:
@@ -199,7 +199,7 @@ Provide specific recommendations to address these security issues and regenerate
 // generateGenericFix creates a generic AI prompt for any tool failure
 func (tr *ToolRegistrar) generateGenericFix(failedTool, fixingTool, error, sessionID string) *AIFixingPrompt {
 	context := tr.getSessionContext(sessionID)
-	
+
 	systemPrompt := fmt.Sprintf(`You are a containerization expert helping to fix issues in a workflow. The %s step failed and needs to be addressed by regenerating/fixing the %s step.
 
 Analyze the error and provide specific guidance for fixing the issue.`, failedTool, fixingTool)
@@ -237,11 +237,11 @@ func (tr *ToolRegistrar) getSessionContext(sessionID string) map[string]interfac
 	}
 
 	context := map[string]interface{}{
-		"session_id":       sessionID,
-		"repo_path":        simpleState.RepoPath,
-		"completed_steps":  simpleState.CompletedSteps,
-		"current_step":     simpleState.CurrentStep,
-		"status":           simpleState.Status,
+		"session_id":      sessionID,
+		"repo_path":       simpleState.RepoPath,
+		"completed_steps": simpleState.CompletedSteps,
+		"current_step":    simpleState.CurrentStep,
+		"status":          simpleState.Status,
 	}
 
 	// Add artifacts as context
@@ -262,7 +262,7 @@ func (tr *ToolRegistrar) formatContextForAI(context map[string]interface{}, cont
 			}
 		}
 		return "Repository analysis not available"
-		
+
 	case "dockerfile":
 		if dockerfileData, exists := context["dockerfile_result"]; exists {
 			if dockerfileMap, ok := dockerfileData.(map[string]interface{}); ok {
@@ -272,7 +272,7 @@ func (tr *ToolRegistrar) formatContextForAI(context map[string]interface{}, cont
 			}
 		}
 		return "Dockerfile content not available"
-		
+
 	case "k8s_manifests":
 		if k8sData, exists := context["k8s_result"]; exists {
 			if data, _ := json.MarshalIndent(k8sData, "", "  "); data != nil {
@@ -280,7 +280,7 @@ func (tr *ToolRegistrar) formatContextForAI(context map[string]interface{}, cont
 			}
 		}
 		return "Kubernetes manifests not available"
-		
+
 	case "build_result":
 		if buildData, exists := context["build_result"]; exists {
 			if data, _ := json.MarshalIndent(buildData, "", "  "); data != nil {
@@ -288,13 +288,13 @@ func (tr *ToolRegistrar) formatContextForAI(context map[string]interface{}, cont
 			}
 		}
 		return "Build information not available"
-		
+
 	case "all":
 		if data, _ := json.MarshalIndent(context, "", "  "); data != nil {
 			return string(data)
 		}
 		return "Context not available"
-		
+
 	default:
 		return "Unknown context type"
 	}

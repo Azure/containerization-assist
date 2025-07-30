@@ -302,7 +302,7 @@ type WorkflowState struct {
 
 	// AI Enhancement fields
 	allSteps []Step // Cache of all workflow steps
-	
+
 	// Fixing context for redirect mechanism
 	FixingMode    bool   `json:"fixing_mode,omitempty"`
 	PreviousError string `json:"previous_error,omitempty"`

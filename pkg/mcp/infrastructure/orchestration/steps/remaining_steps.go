@@ -326,24 +326,24 @@ func (s *ManifestStep) MaxRetries() int { return 2 }
 func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
 	// Check if this is a fixing mode call
 	if state.FixingMode {
-		state.Logger.Info("Step 6: Regenerating Kubernetes manifests with AI fixing", 
+		state.Logger.Info("Step 6: Regenerating Kubernetes manifests with AI fixing",
 			"previous_error", state.PreviousError,
 			"failed_tool", state.FailedTool)
-		
+
 		// Check if AI-generated manifest content is provided
 		if aiContent, exists := state.RequestParams["ai_generated_manifests"]; exists {
 			if manifestsContent, ok := aiContent.(string); ok && manifestsContent != "" {
 				state.Logger.Info("Using AI-generated Kubernetes manifests for fixing")
-				
+
 				// Parse AI-generated manifests (split by --- separator)
 				manifestList := parseK8sManifests(manifestsContent)
-				
+
 				// Write manifests to files (for kubectl apply)
 				manifestPath, err := writeK8sManifestsToFile(state.AnalyzeResult.RepoPath, manifestsContent, state.Logger)
 				if err != nil {
 					return fmt.Errorf("failed to write AI-generated manifests: %v", err)
 				}
-				
+
 				// Set results with AI metadata
 				state.K8sResult = &workflow.K8sResult{
 					Manifests:   manifestList,
@@ -357,15 +357,15 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 						"manifest_count": len(manifestList),
 					},
 				}
-				
-				state.Logger.Info("AI-generated Kubernetes manifests processed successfully", 
+
+				state.Logger.Info("AI-generated Kubernetes manifests processed successfully",
 					"manifest_count", len(manifestList),
 					"path", manifestPath)
-				
+
 				return nil
 			}
 		}
-		
+
 		state.Logger.Info("No AI-generated manifests provided, falling back to standard generation with error context")
 	} else {
 		state.Logger.Info("Step 6: Generating Kubernetes manifests")
@@ -446,7 +446,7 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 		metadata["fixing_mode"] = true
 		metadata["fixed_from_error"] = state.PreviousError
 	}
-	
+
 	state.K8sResult = &workflow.K8sResult{
 		Manifests:   manifestContent, // Now contains actual manifest content
 		Namespace:   k8sResult.Namespace,
@@ -656,27 +656,27 @@ func parseK8sManifests(content string) []string {
 	// Split by YAML document separator
 	manifests := strings.Split(content, "---")
 	var result []string
-	
+
 	for _, manifest := range manifests {
 		manifest = strings.TrimSpace(manifest)
 		if manifest != "" && !strings.HasPrefix(manifest, "#") {
 			result = append(result, manifest)
 		}
 	}
-	
+
 	return result
 }
 
 // writeK8sManifestsToFile writes AI-generated manifests to a file
 func writeK8sManifestsToFile(repoPath, content string, logger *slog.Logger) (string, error) {
 	manifestPath := filepath.Join(repoPath, "k8s-manifests.yaml")
-	
+
 	logger.Info("Writing AI-generated Kubernetes manifests", "path", manifestPath)
-	
+
 	if err := os.WriteFile(manifestPath, []byte(content), 0644); err != nil {
 		return "", fmt.Errorf("failed to write manifests file: %w", err)
 	}
-	
+
 	logger.Info("AI-generated manifests written successfully", "path", manifestPath, "size", len(content))
 	return manifestPath, nil
 }
@@ -684,25 +684,25 @@ func writeK8sManifestsToFile(repoPath, content string, logger *slog.Logger) (str
 // extractNamespaceFromManifests extracts namespace from AI-generated manifests
 func extractNamespaceFromManifests(manifests []string) string {
 	namespaceRe := regexp.MustCompile(`namespace:\s*(\w+)`)
-	
+
 	for _, manifest := range manifests {
 		if matches := namespaceRe.FindStringSubmatch(manifest); len(matches) > 1 {
 			return matches[1]
 		}
 	}
-	
+
 	return "default" // fallback to default namespace
 }
 
 // extractServiceNameFromManifests extracts service name from AI-generated manifests
 func extractServiceNameFromManifests(manifests []string) string {
 	serviceRe := regexp.MustCompile(`kind:\s*Service[\s\S]*?name:\s*(\w+)`)
-	
+
 	for _, manifest := range manifests {
 		if matches := serviceRe.FindStringSubmatch(manifest); len(matches) > 1 {
 			return matches[1]
 		}
 	}
-	
+
 	return "app" // fallback service name
 }

@@ -169,8 +169,6 @@ func (o *Orchestrator) executeSequentially(ctx context.Context, state *WorkflowS
 	return nil
 }
 
-
-
 // buildContainerizationSteps creates the sequential list of workflow steps
 func buildContainerizationSteps(provider StepProvider) ([]Step, error) {
 	// Define the sequential order of steps

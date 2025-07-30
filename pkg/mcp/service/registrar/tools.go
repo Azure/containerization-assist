@@ -7,12 +7,13 @@ import (
 	"fmt"
 	"time"
 
+	"log/slog"
+
 	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/service/session"
 	"github.com/Azure/container-kit/pkg/mcp/service/tools"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"log/slog"
 )
 
 // ToolRegistrar handles tool registration using the new consolidated system
@@ -271,7 +272,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"description": "Error from the previous failed tool (when fixing_mode is true)",
 				},
 				"failed_tool": map[string]interface{}{
-					"type":        "string", 
+					"type":        "string",
 					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 			},
@@ -295,7 +296,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"description": "Error from the previous failed tool (when fixing_mode is true)",
 				},
 				"failed_tool": map[string]interface{}{
-					"type":        "string", 
+					"type":        "string",
 					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 				"ai_generated_dockerfile": map[string]interface{}{
@@ -323,7 +324,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"description": "Error from the previous failed tool (when fixing_mode is true)",
 				},
 				"failed_tool": map[string]interface{}{
-					"type":        "string", 
+					"type":        "string",
 					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 			},
@@ -347,7 +348,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"description": "Error from the previous failed tool (when fixing_mode is true)",
 				},
 				"failed_tool": map[string]interface{}{
-					"type":        "string", 
+					"type":        "string",
 					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 			},
@@ -375,7 +376,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"description": "Error from the previous failed tool (when fixing_mode is true)",
 				},
 				"failed_tool": map[string]interface{}{
-					"type":        "string", 
+					"type":        "string",
 					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 			},
@@ -426,7 +427,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"description": "Error from the previous failed tool (when fixing_mode is true)",
 				},
 				"failed_tool": map[string]interface{}{
-					"type":        "string", 
+					"type":        "string",
 					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 				"ai_generated_manifests": map[string]interface{}{
@@ -454,7 +455,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"description": "Error from the previous failed tool (when fixing_mode is true)",
 				},
 				"failed_tool": map[string]interface{}{
-					"type":        "string", 
+					"type":        "string",
 					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 			},
@@ -478,7 +479,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"description": "Error from the previous failed tool (when fixing_mode is true)",
 				},
 				"failed_tool": map[string]interface{}{
-					"type":        "string", 
+					"type":        "string",
 					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 			},
@@ -502,7 +503,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"description": "Error from the previous failed tool (when fixing_mode is true)",
 				},
 				"failed_tool": map[string]interface{}{
-					"type":        "string", 
+					"type":        "string",
 					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 			},
@@ -580,12 +581,12 @@ func (tr *ToolRegistrar) executeWorkflowStepWithRedirect(ctx context.Context, re
 	if fm, ok := args["fixing_mode"].(bool); ok {
 		fixingMode = fm
 	}
-	
+
 	previousError := ""
 	if pe, ok := args["previous_error"].(string); ok {
 		previousError = pe
 	}
-	
+
 	failedTool := ""
 	if ft, ok := args["failed_tool"].(string); ok {
 		failedTool = ft
@@ -812,7 +813,7 @@ func (tr *ToolRegistrar) createStepStateWithFixing(ctx context.Context, sessionI
 		TotalSteps:       10, // Standard workflow has 10 steps
 		CurrentStep:      len(simpleState.CompletedSteps),
 		WorkflowProgress: domainworkflow.NewWorkflowProgress(sessionID, "containerization", 10),
-		
+
 		// Set fixing context from request
 		FixingMode:    fixingMode,
 		PreviousError: previousError,
