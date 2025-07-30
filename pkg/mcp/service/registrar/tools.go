@@ -9,6 +9,7 @@ import (
 
 	"log/slog"
 
+	"github.com/Azure/container-kit/pkg/mcp/domain/report"
 	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/service/session"
 	"github.com/Azure/container-kit/pkg/mcp/service/tools"
@@ -610,7 +611,7 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 
 		if err != nil {
 			// Report step failure to MCP report
-			if reportErr := domainworkflow.ReportStepExecution(sessionID, stepName, repoPath, false, startTime, &endTime, err.Error(),
+			if reportErr := report.ReportStepExecution(sessionID, stepName, repoPath, false, startTime, &endTime, err.Error(),
 				map[string]interface{}{
 					"session_id": sessionID,
 					"repo_path":  repoPath,
@@ -635,11 +636,11 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		tr.saveStepResults(workflowState, simpleState, stepName)
 
 		// Report successful step execution to MCP report
-		artifacts := []domainworkflow.GeneratedArtifact{}
+		artifacts := []report.GeneratedArtifact{}
 		// Add artifacts based on actual files that get created during analysis
 		// Note: analyze_repository typically doesn't create files, but updates workflow state
 		// The MCP report files themselves will be created by ReportStepExecution
-		if reportErr := domainworkflow.ReportStepExecution(sessionID, stepName, repoPath, true, startTime, &endTime, "",
+		if reportErr := report.ReportStepExecution(sessionID, stepName, repoPath, true, startTime, &endTime, "",
 			map[string]interface{}{
 				"session_id":        sessionID,
 				"repo_path":         repoPath,
@@ -707,7 +708,7 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 
 		if err != nil {
 			// Report step failure to MCP report
-			if reportErr := domainworkflow.ReportStepExecution(sessionID, stepName, repoPath, false, startTime, &endTime, err.Error(),
+			if reportErr := report.ReportStepExecution(sessionID, stepName, repoPath, false, startTime, &endTime, err.Error(),
 				map[string]interface{}{
 					"session_id": sessionID,
 				}, nil); reportErr != nil {
@@ -730,17 +731,17 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		tr.saveStepResults(workflowState, simpleState, stepName)
 
 		// Report successful step execution to MCP report
-		artifacts := []domainworkflow.GeneratedArtifact{}
+		artifacts := []report.GeneratedArtifact{}
 		// Track actual Dockerfile if it was created
 		if workflowState.DockerfileResult != nil && workflowState.DockerfileResult.Path != "" {
-			artifacts = append(artifacts, domainworkflow.GeneratedArtifact{
+			artifacts = append(artifacts, report.GeneratedArtifact{
 				Type:        "dockerfile",
 				Path:        workflowState.DockerfileResult.Path, // Actual path where Dockerfile was saved
 				Description: "Generated Dockerfile for containerization",
 				CreatedAt:   endTime,
 			})
 		}
-		if reportErr := domainworkflow.ReportStepExecution(sessionID, stepName, repoPath, true, startTime, &endTime, "",
+		if reportErr := report.ReportStepExecution(sessionID, stepName, repoPath, true, startTime, &endTime, "",
 			map[string]interface{}{
 				"session_id":           sessionID,
 				"dockerfile_generated": true,
@@ -807,7 +808,7 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 
 		if err != nil {
 			// Report step failure to MCP report
-			if reportErr := domainworkflow.ReportStepExecution(sessionID, actualStepName, repoPath, false, startTime, &endTime, err.Error(),
+			if reportErr := report.ReportStepExecution(sessionID, actualStepName, repoPath, false, startTime, &endTime, err.Error(),
 				map[string]interface{}{
 					"session_id": sessionID,
 					"tool_name":  stepName,
@@ -833,7 +834,7 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 
 		// Report successful step execution to MCP report
 		artifacts := tr.extractArtifactsFromWorkflowState(workflowState, actualStepName, endTime)
-		if reportErr := domainworkflow.ReportStepExecution(sessionID, actualStepName, repoPath, true, startTime, &endTime, "",
+		if reportErr := report.ReportStepExecution(sessionID, actualStepName, repoPath, true, startTime, &endTime, "",
 			map[string]interface{}{
 				"session_id":     sessionID,
 				"tool_name":      stepName,
@@ -1233,8 +1234,8 @@ func (tr *ToolRegistrar) saveStepResults(workflowState *domainworkflow.WorkflowS
 
 // extractArtifactsFromWorkflowState extracts artifacts based on the workflow state for MCP reporting
 // Only tracks actual files that get created, not workflow state data
-func (tr *ToolRegistrar) extractArtifactsFromWorkflowState(workflowState *domainworkflow.WorkflowState, stepName string, createdAt time.Time) []domainworkflow.GeneratedArtifact {
-	var artifacts []domainworkflow.GeneratedArtifact
+func (tr *ToolRegistrar) extractArtifactsFromWorkflowState(workflowState *domainworkflow.WorkflowState, stepName string, createdAt time.Time) []report.GeneratedArtifact {
+	var artifacts []report.GeneratedArtifact
 
 	switch stepName {
 	case "analyze_repository":
@@ -1244,7 +1245,7 @@ func (tr *ToolRegistrar) extractArtifactsFromWorkflowState(workflowState *domain
 	case "generate_dockerfile":
 		// Track actual Dockerfile if created
 		if workflowState.DockerfileResult != nil && workflowState.DockerfileResult.Path != "" {
-			artifacts = append(artifacts, domainworkflow.GeneratedArtifact{
+			artifacts = append(artifacts, report.GeneratedArtifact{
 				Type:        "dockerfile",
 				Path:        workflowState.DockerfileResult.Path,
 				Description: "Generated Dockerfile for containerization",
@@ -1255,7 +1256,7 @@ func (tr *ToolRegistrar) extractArtifactsFromWorkflowState(workflowState *domain
 	case "build_image":
 		// Track actual built image
 		if workflowState.BuildResult != nil && workflowState.BuildResult.ImageID != "" {
-			artifacts = append(artifacts, domainworkflow.GeneratedArtifact{
+			artifacts = append(artifacts, report.GeneratedArtifact{
 				Type:        "image",
 				Path:        workflowState.BuildResult.ImageID,
 				Description: fmt.Sprintf("Built container image: %s", workflowState.BuildResult.ImageID),
@@ -1269,7 +1270,7 @@ func (tr *ToolRegistrar) extractArtifactsFromWorkflowState(workflowState *domain
 			for i, manifestContent := range workflowState.K8sResult.Manifests {
 				// Only add if manifest content exists (actual files would be saved to disk)
 				if manifestContent != "" {
-					artifacts = append(artifacts, domainworkflow.GeneratedArtifact{
+					artifacts = append(artifacts, report.GeneratedArtifact{
 						Type:        "manifest",
 						Path:        fmt.Sprintf("k8s-manifest-%d.yaml", i+1), // Actual filename that would be saved
 						Description: "Kubernetes deployment manifest",
@@ -1282,7 +1283,7 @@ func (tr *ToolRegistrar) extractArtifactsFromWorkflowState(workflowState *domain
 	case "security_scan", "scan_image":
 		// Track security scan report if created
 		if workflowState.ScanReport != nil && len(workflowState.ScanReport) > 0 {
-			artifacts = append(artifacts, domainworkflow.GeneratedArtifact{
+			artifacts = append(artifacts, report.GeneratedArtifact{
 				Type:        "security_report",
 				Path:        "security-scan-report.json",
 				Description: "Container security scan report",
