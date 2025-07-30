@@ -1,0 +1,29 @@
+mcpServers:
+  container-copilot:
+    type: "local"
+    command: "./container-kit-mcp"
+    args: ["-transport=stdio"]
+  
+  filesystem:
+    type: "builtin"
+    name: "fs"
+    options:
+      allowed_directories: ["/tmp", ".", "/home/runner/work"]
+  
+  bash:
+    type: "builtin"
+    name: "bash"
+  
+  todo:
+    type: "builtin"
+    name: "todo"
+
+model: "azure:${env://AZURE_OPENAI_DEPLOYMENT_ID}"
+provider-api-key: "${env://AZURE_OPENAI_KEY}"
+provider-url: "${env://AZURE_OPENAI_ENDPOINT}"
+
+hooks:
+  PostToolUse:
+    - type: command
+      command: "/tmp/track-tool-success.sh"
+      timeout: 5

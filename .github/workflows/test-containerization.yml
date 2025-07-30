@@ -71,7 +71,7 @@ jobs:
           mkdir -p ~/.config
           
           # Copy the configuration template (mcphost will handle env var substitution)
-          cp .github/mcphost-config.yml ~/.mcphost.yml
+          cp .github/workflows/mcphost/config.yml ~/.mcphost.yml
           
           echo "Configuration created successfully"
           
@@ -81,6 +81,26 @@ jobs:
           # Show the full configuration
           echo "=== mcphost configuration ==="
           cat ~/.mcphost.yml
+          
+      - name: Setup mcphost hooks for monitoring
+        run: |
+          echo "Setting up mcphost hooks for containerization monitoring..."
+          
+          # Install jq for JSON parsing in hooks
+          sudo apt-get update && sudo apt-get install -y jq
+          
+          mkdir -p .mcphost
+          
+          # Copy hooks configuration and scripts
+          cp .github/workflows/mcphost/hooks.yml .mcphost/hooks.yml
+          cp .github/workflows/mcphost/track-tool-success.sh /tmp/track-tool-success.sh
+          
+          # Make script executable
+          chmod +x /tmp/track-tool-success.sh
+          
+          echo "✅ mcphost hooks configured successfully"
+          echo "Hook configuration:"
+          cat .mcphost/hooks.yml
           
       - name: Test MCP Server and LLM connection
         run: |
@@ -150,33 +170,57 @@ jobs:
           printf '%s\n' '${{ steps.test.outputs.result }}'
           echo ""
           
-          # Parse output for success indicators
-          echo "=== Analysis ==="
-          # Save the output to a temporary file to avoid shell interpretation issues
-          cat << 'ANALYSIS_EOF' > /tmp/test_output.txt
-          ${{ steps.test.outputs.result }}
-          ANALYSIS_EOF
-          
-          if grep -q "verify_deployment.*completed.*successfully" /tmp/test_output.txt || \
-             grep -q "deploy_application.*completed.*successfully" /tmp/test_output.txt || \
-             grep -q "All 10 steps completed successfully" /tmp/test_output.txt || \
-             grep -q "Containerization workflow completed successfully" /tmp/test_output.txt || \
-             grep -q "Step 10/10.*verify_deployment.*completed" /tmp/test_output.txt || \
-             grep -q "Deployment verified successfully" /tmp/test_output.txt || \
-             grep -q "Application is running correctly" /tmp/test_output.txt; then
-            echo "✅ Containerization test PASSED"
-            echo "SUCCESS: The containerization workflow completed successfully"
+          echo "=== Hook-Based Analysis ==="
+          if [ -f "/tmp/workflow-hooks.log" ]; then
+            echo "Hook execution log found. Analyzing tool success status..."
+            cat /tmp/workflow-hooks.log
             echo ""
-            echo "=== Completed Steps ==="
-            grep -o "Step [a-z_]* completed successfully" /tmp/test_output.txt | sort -u 2>/dev/null || echo "Step completion details not found"
-            exit 0
+            
+            # Count successful tools from hook logs
+            SUCCESSFUL_TOOLS=$(grep -c "✅ Tool completed successfully" /tmp/workflow-hooks.log || echo "0")
+            FAILED_TOOLS=$(grep -c "❌ Tool failed" /tmp/workflow-hooks.log || echo "0")
+            
+            echo "=== Hook Analysis Summary ==="
+            echo "Successful tools: $SUCCESSFUL_TOOLS"
+            echo "Failed tools: $FAILED_TOOLS"
+            echo ""
+            
+            # Determine success based on hook evidence
+            SUCCESS=false
+            
+            # Check for final milestone (highest priority)
+            if grep -q "🎉 SUCCESS: Application fully containerized and deployed!" /tmp/workflow-hooks.log; then
+              SUCCESS=true
+              SUCCESS_REASON="Final success milestone reached"
+
+            
+            if [ "$SUCCESS" = "true" ]; then
+              echo "✅ Containerization test PASSED (Hook Verification)"
+              echo "SUCCESS: $SUCCESS_REASON"
+              echo ""
+              echo "=== Completed Milestones ==="
+              grep "MILESTONE:" /tmp/workflow-hooks.log | sed 's/.*MILESTONE: /- /' || echo "No milestone details found"
+              exit 0
+            else
+              echo "❌ Containerization test FAILED (Hook Verification)"
+              echo "FAILURE: Hook logs show incomplete workflow - $SUCCESSFUL_TOOLS successful, $FAILED_TOOLS failed"
+              if [ "$FAILED_TOOLS" -gt 0 ]; then
+                echo ""
+                echo "=== Failed Tools ==="
+                grep "❌ Tool failed" /tmp/workflow-hooks.log || echo "No failed tool details found"
+              fi
+              exit 1
+            fi
           else
-            echo "❌ Containerization test FAILED"
+            echo "❌ CRITICAL: No hook logs found - hooks are not working!"
+            echo "FAILURE: Hook-based verification is required but hooks did not execute"
             echo ""
-            echo "=== Error Analysis ==="
-            grep -i "error\|failed\|exception" /tmp/test_output.txt | tail -10 2>/dev/null || echo "No specific errors found in output"
+            echo "This indicates a problem with:"
+            echo "- mcphost hooks configuration"
+            echo "- Hook script execution permissions"
+            echo "- PostToolUse hook not being triggered"
             echo ""
-            echo "FAILURE: The containerization workflow did not complete successfully"
+            echo "Please check the hook setup and mcphost configuration."
             exit 1
           fi
           
@@ -184,6 +228,21 @@ jobs:
         if: always()
         run: |
           echo "=== POST-TEST ARTIFACTS AND STATUS ==="
+          echo ""
+          
+          echo "=== Workflow Hook Logs ==="
+          if [ -f "/tmp/workflow-hooks.log" ]; then
+            echo "Hook execution log:"
+            cat /tmp/workflow-hooks.log
+            echo ""
+            echo "Hook Summary:"
+            echo "- Successful tools: $(grep -c "✅ Tool completed successfully" /tmp/workflow-hooks.log || echo "0")"
+            echo "- Failed tools: $(grep -c "❌ Tool failed" /tmp/workflow-hooks.log || echo "0")"
+            echo "- Milestones reached: $(grep -c "MILESTONE:" /tmp/workflow-hooks.log || echo "0")"
+            echo "- Final success: $(grep -c "🎉 SUCCESS:" /tmp/workflow-hooks.log || echo "0")"
+          else
+            echo "No hook logs found"
+          fi
           echo ""
           
           echo "=== Kubernetes Pods Status ==="
