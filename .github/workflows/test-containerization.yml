@@ -114,23 +114,6 @@ jobs:
           ls -la ./container-kit-mcp
           echo ""
           
-          echo "Testing MCP server startup directly..."
-          # Test the MCP server binary directly first
-          set +e
-          timeout 10s ./container-kit-mcp -transport=stdio < /dev/null > /tmp/mcp-test.log 2>&1 &
-          MCP_PID=$!
-          sleep 2
-          kill $MCP_PID 2>/dev/null || true
-          wait $MCP_PID 2>/dev/null || true
-          set -e
-          
-          echo "MCP server test log:"
-          cat /tmp/mcp-test.log || echo "No log output"
-          echo ""
-          
-          echo "This will verify that mcphost can communicate with the MCP server and load the containerization tools"
-          echo ""
-          
           # Simple test to verify MCP tools are loaded
           set +e
           HELLO_RESULT=$(mcphost --stream=false --quiet -p "If you have access to containerization tools (mcp_containerkit tools), respond with 'successful'. If you do not have access to containerization tools, respond with 'unsuccessful' and nothing else." 2>&1)
