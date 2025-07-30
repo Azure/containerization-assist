@@ -1,5 +1,5 @@
 mcpServers:
-  container-copilot:
+  container-kit:
     type: "local"
     command: "./container-kit-mcp"
     args: ["-transport=stdio"]

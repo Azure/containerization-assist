@@ -75,8 +75,12 @@ jobs:
           
           echo "Configuration created successfully"
           
-          # Create workspace directory
+          # Create workspace directory and copy MCP binary there
           mkdir -p /tmp/test-workspace
+          cp ./container-kit-mcp /tmp/test-workspace/
+          
+          # Also ensure the binary is in the current directory for mcphost
+          ls -la ./container-kit-mcp
           
           # Show the full configuration
           echo "=== mcphost configuration ==="
@@ -105,12 +109,31 @@ jobs:
       - name: Test MCP Server and LLM connection
         run: |
           echo "Testing MCP Server and LLM connection..."
+          echo "Current working directory: $(pwd)"
+          echo "MCP Server binary location:"
+          ls -la ./container-kit-mcp
+          echo ""
+          
+          echo "Testing MCP server startup directly..."
+          # Test the MCP server binary directly first
+          set +e
+          timeout 10s ./container-kit-mcp -transport=stdio < /dev/null > /tmp/mcp-test.log 2>&1 &
+          MCP_PID=$!
+          sleep 2
+          kill $MCP_PID 2>/dev/null || true
+          wait $MCP_PID 2>/dev/null || true
+          set -e
+          
+          echo "MCP server test log:"
+          cat /tmp/mcp-test.log || echo "No log output"
+          echo ""
+          
           echo "This will verify that mcphost can communicate with the MCP server and load the containerization tools"
           echo ""
           
           # Simple test to verify MCP tools are loaded
           set +e
-          HELLO_RESULT=$(mcphost --stream=false --quiet -p "What containerization tools do you have access to? Please list them." 2>&1)
+          HELLO_RESULT=$(mcphost --stream=false --quiet -p "If you have access to containerization tools (mcp_containerkit tools), respond with 'successful'. If you do not have access to containerization tools, respond with 'unsuccessful' and nothing else." 2>&1)
           HELLO_EXIT_CODE=$?
           set -e
           
@@ -119,11 +142,17 @@ jobs:
           echo "=== END TOOLS TEST ==="
           echo ""
           
-          if [ $HELLO_EXIT_CODE -eq 0 ]; then
-            echo "✅ MCP tools test PASSED - MCP server and LLM are working"
+          # Check for explicit unsuccessful response
+          if echo "$HELLO_RESULT" | grep -i "unsuccessful" > /dev/null; then
+            echo "❌ CRITICAL: MCP server failed - LLM responded 'unsuccessful'"
+            echo "This means containerization tools are not available."
+            echo "Stopping execution."
+            exit 1
+          elif echo "$HELLO_RESULT" | grep -i "successful" > /dev/null; then
+            echo "✅ MCP tools test PASSED - Container tools are available"
           else
-            echo "❌ MCP tools test FAILED - MCP server or LLM connection issue"
-            echo "Exit code: $HELLO_EXIT_CODE"
+            echo "❌ MCP tools test FAILED - Unexpected response"
+            echo "Expected 'successful' or 'unsuccessful' but got different response"
             exit 1
           fi
           echo ""
