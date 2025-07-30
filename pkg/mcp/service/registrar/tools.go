@@ -526,12 +526,12 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 		// Capture toolDef.name in closure
 		toolName := toolDef.name
 
-		// Create handler with redirect logic (no retry wrapping)
+		// Create handler with redirect logic
 		handler := func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			return tr.executeWorkflowStepWithRedirect(ctx, req, toolName)
+			return tr.executeWorkflowStep(ctx, req, toolName)
 		}
 
-		// Wrap with metrics collection only
+		// Wrap with metrics collection
 		metricsHandler := MetricsMiddleware(toolName, handler)
 
 		// Register the handler
@@ -571,8 +571,8 @@ func (tr *ToolRegistrar) registerUtilityTools(mcpServer *server.MCPServer) error
 	return nil
 }
 
-// executeWorkflowStepWithRedirect executes an individual workflow step with redirect support
-func (tr *ToolRegistrar) executeWorkflowStepWithRedirect(ctx context.Context, req mcp.CallToolRequest, stepName string) (*mcp.CallToolResult, error) {
+// executeWorkflowStep executes an individual workflow step
+func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallToolRequest, stepName string) (*mcp.CallToolResult, error) {
 	// Get arguments
 	args := req.GetArguments()
 
@@ -602,154 +602,88 @@ func (tr *ToolRegistrar) executeWorkflowStepWithRedirect(ctx context.Context, re
 		)
 	}
 
-	// Handle different step requirements
+	// Define required parameters for each tool
+	requiredParams := tr.getRequiredParameters(stepName)
+
+	// Validate required parameters
+	validatedParams := make(map[string]string)
+	for paramName, paramType := range requiredParams {
+		switch paramType {
+		case "string":
+			value, ok := args[paramName].(string)
+			if !ok || value == "" {
+				return tr.createErrorResult(fmt.Sprintf("%s parameter is required for %s", paramName, stepName))
+			}
+			validatedParams[paramName] = value
+		}
+	}
+
+	sessionID := validatedParams["session_id"]
+	repoPath := validatedParams["repo_path"] // Optional, may not be present for all tools
+
+	// Map tool names to actual step names
+	actualStepName := tr.mapToolNameToStepName(stepName)
+	if actualStepName != stepName {
+		tr.logger.Info("Mapping tool name to step name", "tool_name", stepName, "step_name", actualStepName)
+	}
+
+	// Get the step from step provider
+	step, err := tr.stepProvider.GetStep(actualStepName)
+	if err != nil {
+		return tr.createRedirectResponse(stepName, fmt.Sprintf("Failed to get step %s (mapped to %s): %s", stepName, actualStepName, err.Error()), sessionID)
+	}
+
+	// Create workflow state for this step with fixing context
+	workflowState, simpleState, err := tr.createStepState(ctx, sessionID, repoPath, fixingMode, previousError, failedTool, args)
+	if err != nil {
+		return tr.createRedirectResponse(stepName, fmt.Sprintf("Failed to create workflow state: %s", err.Error()), sessionID)
+	}
+
+	// Execute the step
+	err = step.Execute(ctx, workflowState)
+	if err != nil {
+		// Log step failure
+		tr.logger.Info("Step failed",
+			"step", stepName,
+			"error", err.Error(),
+		)
+		return tr.createRedirectResponse(stepName, fmt.Sprintf("Step %s failed: %s", stepName, err.Error()), sessionID)
+	}
+
+	// Save step results to session artifacts
+	tr.saveStepResults(workflowState, simpleState, stepName)
+
+	// Mark step as completed and save state
+	simpleState.MarkStepCompleted(stepName)
+	simpleState.CurrentStep = stepName
+	simpleState.Status = "running"
+	if err := tools.SaveWorkflowState(ctx, tr.sessionManager, simpleState); err != nil {
+		tr.logger.Warn("Failed to save workflow state after step execution", "session_id", sessionID, "step", stepName, "error", err)
+	}
+
+	// TODO: Handle any additional results or artifacts from the step execution
+	responseData := map[string]interface{}{
+		"session_id": sessionID,
+	}
+
+	successMessage := fmt.Sprintf("Step %s completed successfully", stepName)
+
+	return tr.createProgressResponse(stepName, successMessage, responseData, sessionID)
+
+}
+
+// getRequiredParameters returns the required parameters for each tool
+func (tr *ToolRegistrar) getRequiredParameters(stepName string) map[string]string {
 	switch stepName {
 	case "analyze_repository":
-		repoPath, ok := args["repo_path"].(string)
-		if !ok || repoPath == "" {
-			return tr.createErrorResult("repo_path parameter is required for analyze_repository")
+		return map[string]string{
+			"repo_path":  "string",
+			"session_id": "string",
 		}
-		sessionID, ok := args["session_id"].(string)
-		if !ok || sessionID == "" {
-			return tr.createErrorResult("session_id parameter is required for analyze_repository")
-		}
-
-		// Get the analyze step from step provider
-		step, err := tr.stepProvider.GetStep("analyze_repository")
-		if err != nil {
-			return tr.createErrorResult(fmt.Sprintf("Failed to get analyze step: %s", err.Error()))
-		}
-
-		// Create workflow state for this step with fixing context
-		workflowState, simpleState, err := tr.createStepStateWithFixing(ctx, sessionID, repoPath, fixingMode, previousError, failedTool, args)
-		if err != nil {
-			return tr.createErrorResult(fmt.Sprintf("Failed to create workflow state: %s", err.Error()))
-		}
-
-		// Execute the step
-		err = step.Execute(ctx, workflowState)
-		if err != nil {
-			// Log step failure and return redirect response
-			tr.logger.Info("Step failed",
-				"step", stepName,
-				"error", err.Error(),
-			)
-			return tr.createRedirectResponse(stepName, fmt.Sprintf("Analyze step failed: %s", err.Error()), sessionID)
-		}
-
-		// Save step results to session artifacts
-		tr.saveStepResults(workflowState, simpleState, stepName)
-
-		// Mark step as completed and save state
-		simpleState.MarkStepCompleted(stepName)
-		simpleState.CurrentStep = stepName
-		simpleState.Status = "running"
-		if err := tools.SaveWorkflowState(ctx, tr.sessionManager, simpleState); err != nil {
-			tr.logger.Warn("Failed to save workflow state after step execution", "session_id", sessionID, "step", stepName, "error", err)
-		}
-
-		return tr.createProgressResponse(stepName, "Repository analysis completed successfully",
-			map[string]interface{}{
-				"session_id": sessionID,
-				"repo_path":  repoPath,
-			}, sessionID)
-
-	case "generate_dockerfile":
-		sessionID, ok := args["session_id"].(string)
-		if !ok || sessionID == "" {
-			return tr.createErrorResult("session_id parameter is required for generate_dockerfile")
-		}
-
-		// Get the dockerfile step
-		step, err := tr.stepProvider.GetStep("generate_dockerfile")
-		if err != nil {
-			return tr.createRedirectResponse(stepName, fmt.Sprintf("Failed to get dockerfile step: %s", err.Error()), sessionID)
-		}
-
-		// Create workflow state for this step with fixing context
-		workflowState, simpleState, err := tr.createStepStateWithFixing(ctx, sessionID, "", fixingMode, previousError, failedTool, args)
-		if err != nil {
-			return tr.createRedirectResponse(stepName, fmt.Sprintf("Failed to create workflow state: %s", err.Error()), sessionID)
-		}
-
-		// Execute the step
-		err = step.Execute(ctx, workflowState)
-		if err != nil {
-			// Log step failure
-			tr.logger.Info("Step failed",
-				"step", stepName,
-				"error", err.Error(),
-			)
-			return tr.createRedirectResponse(stepName, fmt.Sprintf("Dockerfile generation failed: %s", err.Error()), sessionID)
-		}
-
-		// Save step results to session artifacts
-		tr.saveStepResults(workflowState, simpleState, stepName)
-
-		// Mark step as completed and save state
-		simpleState.MarkStepCompleted(stepName)
-		simpleState.CurrentStep = stepName
-		simpleState.Status = "running"
-		if err := tools.SaveWorkflowState(ctx, tr.sessionManager, simpleState); err != nil {
-			tr.logger.Warn("Failed to save workflow state after step execution", "session_id", sessionID, "step", stepName, "error", err)
-		}
-
-		return tr.createProgressResponse(stepName, "Dockerfile generated successfully",
-			map[string]interface{}{
-				"session_id": sessionID,
-			}, sessionID)
-
 	default:
-		// For other steps, create a session-aware execution
-		sessionID, ok := args["session_id"].(string)
-		if !ok || sessionID == "" {
-			return tr.createErrorResult("session_id parameter is required")
+		return map[string]string{
+			"session_id": "string",
 		}
-
-		// Map tool names to actual step names
-		actualStepName := tr.mapToolNameToStepName(stepName)
-		if actualStepName != stepName {
-			tr.logger.Info("Mapping tool name to step name", "tool_name", stepName, "step_name", actualStepName)
-		}
-
-		// Get the step from step provider
-		step, err := tr.stepProvider.GetStep(actualStepName)
-		if err != nil {
-			return tr.createRedirectResponse(stepName, fmt.Sprintf("Failed to get step %s (mapped to %s): %s", stepName, actualStepName, err.Error()), sessionID)
-		}
-
-		// Create workflow state for this step with fixing context
-		workflowState, simpleState, err := tr.createStepStateWithFixing(ctx, sessionID, "", fixingMode, previousError, failedTool, args)
-		if err != nil {
-			return tr.createRedirectResponse(stepName, fmt.Sprintf("Failed to create workflow state: %s", err.Error()), sessionID)
-		}
-
-		// Execute the step
-		err = step.Execute(ctx, workflowState)
-		if err != nil {
-			// Log step failure
-			tr.logger.Info("Step failed",
-				"step", stepName,
-				"error", err.Error(),
-			)
-			return tr.createRedirectResponse(stepName, fmt.Sprintf("Step %s failed: %s", stepName, err.Error()), sessionID)
-		}
-
-		// Save step results to session artifacts
-		tr.saveStepResults(workflowState, simpleState, stepName)
-
-		// Mark step as completed and save state
-		simpleState.MarkStepCompleted(stepName)
-		simpleState.CurrentStep = stepName
-		simpleState.Status = "running"
-		if err := tools.SaveWorkflowState(ctx, tr.sessionManager, simpleState); err != nil {
-			tr.logger.Warn("Failed to save workflow state after step execution", "session_id", sessionID, "step", stepName, "error", err)
-		}
-
-		return tr.createProgressResponse(stepName, fmt.Sprintf("Step %s completed successfully", stepName),
-			map[string]interface{}{
-				"session_id": sessionID,
-			}, sessionID)
 	}
 }
 
@@ -765,7 +699,7 @@ func (tr *ToolRegistrar) createErrorResult(message string) (*mcp.CallToolResult,
 	}, nil
 }
 
-func (tr *ToolRegistrar) createStepStateWithFixing(ctx context.Context, sessionID, repoPath string, fixingMode bool, previousError, failedTool string, requestParams map[string]interface{}) (*domainworkflow.WorkflowState, *tools.SimpleWorkflowState, error) {
+func (tr *ToolRegistrar) createStepState(ctx context.Context, sessionID, repoPath string, fixingMode bool, previousError, failedTool string, requestParams map[string]interface{}) (*domainworkflow.WorkflowState, *tools.SimpleWorkflowState, error) {
 	// Load existing session state or create new one
 	simpleState, err := tools.LoadWorkflowState(ctx, tr.sessionManager, sessionID)
 	if err != nil {
@@ -813,13 +747,10 @@ func (tr *ToolRegistrar) createStepStateWithFixing(ctx context.Context, sessionI
 		TotalSteps:       10, // Standard workflow has 10 steps
 		CurrentStep:      len(simpleState.CompletedSteps),
 		WorkflowProgress: domainworkflow.NewWorkflowProgress(sessionID, "containerization", 10),
-
-		// Set fixing context from request
-		FixingMode:    fixingMode,
-		PreviousError: previousError,
-		FailedTool:    failedTool,
-		// Set request parameters for AI-generated content
-		RequestParams: requestParams,
+		RequestParams:    requestParams,
+		FixingMode:       fixingMode,
+		PreviousError:    previousError,
+		FailedTool:       failedTool,
 	}
 
 	// Restore step results from session artifacts
