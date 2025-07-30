@@ -4,6 +4,9 @@ TOOL_NAME="$1"
 TOOL_OUTPUT="$2"
 TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S')"
 
+# Initialize log file if it doesn't exist
+touch /tmp/workflow-hooks.log
+
 # Only process containerization tools - ignore all others
 case "$TOOL_NAME" in
   mcp_containerkit_*)
@@ -15,12 +18,22 @@ case "$TOOL_NAME" in
     ;;
 esac
 
+# Clean the tool output by removing ANSI escape sequences and control characters
+CLEAN_OUTPUT=""
+if [ -n "$TOOL_OUTPUT" ]; then
+    # Remove ANSI escape sequences, control chars, and other formatting
+    CLEAN_OUTPUT=$(echo "$TOOL_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g' | tr -d '\000-\010\013\014\016-\037' | tr -s ' ')
+fi
+
 # Parse tool output to check actual success status
 SUCCESS_STATUS="unknown"
-if [ -n "$TOOL_OUTPUT" ]; then
+if [ -n "$CLEAN_OUTPUT" ]; then
     # Try to extract success field from JSON output
-    SUCCESS_STATUS=$(echo "$TOOL_OUTPUT" | jq -r '.success // "unknown"' 2>/dev/null || echo "unknown")
+    SUCCESS_STATUS=$(echo "$CLEAN_OUTPUT" | jq -r '.success // "unknown"' 2>/dev/null || echo "unknown")
 fi
+
+# Log the tool execution with basic info
+echo "[$TIMESTAMP] 🔧 Container tool executed: $TOOL_NAME" >> /tmp/workflow-hooks.log
 
 if [ "$SUCCESS_STATUS" = "true" ]; then
     # Log successful tool executions
@@ -30,8 +43,8 @@ elif [ "$SUCCESS_STATUS" = "false" ]; then
     echo "[$TIMESTAMP] ❌ Tool failed: $TOOL_NAME" >> /tmp/workflow-hooks.log
     exit 0  # Don't track milestones for failed tools
 else
-    # Log when we can't determine success status
-    echo "[$TIMESTAMP] ❓ Tool completed (status unknown): $TOOL_NAME" >> /tmp/workflow-hooks.log
+    # Assume failure when we can't determine status, but allow for reruns
+    echo "[$TIMESTAMP] ❌ Tool status unknown (assuming failure): $TOOL_NAME" >> /tmp/workflow-hooks.log
     exit 0  # Don't track milestones for unknown status
 fi
 

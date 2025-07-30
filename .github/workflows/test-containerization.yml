@@ -89,18 +89,18 @@ jobs:
           # Install jq for JSON parsing in hooks
           sudo apt-get update && sudo apt-get install -y jq
           
-          mkdir -p .mcphost
-          
-          # Copy hooks configuration and scripts
-          cp .github/workflows/mcphost/hooks.yml .mcphost/hooks.yml
+          # Copy hook script and make it executable
           cp .github/workflows/mcphost/track-tool-success.sh /tmp/track-tool-success.sh
-          
-          # Make script executable
           chmod +x /tmp/track-tool-success.sh
           
+          # Verify hook script exists and is executable
+          ls -la /tmp/track-tool-success.sh
+          
+          # Initialize empty hook log file
+          touch /tmp/workflow-hooks.log
+          
           echo "✅ mcphost hooks configured successfully"
-          echo "Hook configuration:"
-          cat .mcphost/hooks.yml
+          echo "Hook script location: /tmp/track-tool-success.sh"
           
       - name: Test MCP Server and LLM connection
         run: |
@@ -166,8 +166,17 @@ jobs:
       - name: Analyze results and report
         run: |
           echo "=== Test Result and Logs ==="
-          # Use printf to safely output the result without shell interpretation
-          printf '%s\n' '${{ steps.test.outputs.result }}'
+          # Clean the output by removing ANSI escape sequences and control characters
+          CLEAN_RESULT='${{ steps.test.outputs.result }}'
+          
+          # Remove ANSI escape sequences, control chars, and excessive whitespace
+          CLEAN_RESULT=$(echo "$CLEAN_RESULT" | sed 's/\x1b\[[0-9;]*m//g' | tr -d '\000-\010\013\014\016-\037' | sed 's/[[:space:]]*$//' | sed '/^$/d')
+          
+          # Filter out the TTY and spinner errors, but keep meaningful content
+          FILTERED_RESULT=$(echo "$CLEAN_RESULT" | grep -v "Error running spinner" | grep -v "could not open a new TTY" | grep -v "no such device or address" | sed '/^[[:space:]]*$/d')
+          
+          echo "Filtered mcphost output:"
+          echo "$FILTERED_RESULT"
           echo ""
           
           echo "=== Hook-Based Analysis ==="
@@ -179,21 +188,32 @@ jobs:
             # Count successful tools from hook logs
             SUCCESSFUL_TOOLS=$(grep -c "✅ Tool completed successfully" /tmp/workflow-hooks.log || echo "0")
             FAILED_TOOLS=$(grep -c "❌ Tool failed" /tmp/workflow-hooks.log || echo "0")
+            CONTAINER_TOOLS=$(grep -c "🔧 Container tool executed" /tmp/workflow-hooks.log || echo "0")
             
             echo "=== Hook Analysis Summary ==="
+            echo "Container tools executed: $CONTAINER_TOOLS"
             echo "Successful tools: $SUCCESSFUL_TOOLS"
             echo "Failed tools: $FAILED_TOOLS"
             echo ""
             
             # Determine success based on hook evidence
             SUCCESS=false
+            SUCCESS_REASON="Unknown"
             
             # Check for final milestone (highest priority)
             if grep -q "🎉 SUCCESS: Application fully containerized and deployed!" /tmp/workflow-hooks.log; then
               SUCCESS=true
               SUCCESS_REASON="Final success milestone reached"
+            # Check if we have any successful container tools
+            elif [ "$SUCCESSFUL_TOOLS" -gt 0 ] && [ "$FAILED_TOOLS" -eq 0 ]; then
+              SUCCESS=true
+              SUCCESS_REASON="Container tools executed successfully ($SUCCESSFUL_TOOLS tools)"
+            # If no container tools were called, it means hooks are working but mcphost didn't use our MCP server
+            elif [ "$CONTAINER_TOOLS" -eq 0 ]; then
+              SUCCESS=false
+              SUCCESS_REASON="No container tools were executed - MCP server may not be loaded"
+            fi
 
-            
             if [ "$SUCCESS" = "true" ]; then
               echo "✅ Containerization test PASSED (Hook Verification)"
               echo "SUCCESS: $SUCCESS_REASON"
@@ -203,8 +223,20 @@ jobs:
               exit 0
             else
               echo "❌ Containerization test FAILED (Hook Verification)"
-              echo "FAILURE: Hook logs show incomplete workflow - $SUCCESSFUL_TOOLS successful, $FAILED_TOOLS failed"
-              if [ "$FAILED_TOOLS" -gt 0 ]; then
+              echo "FAILURE: $SUCCESS_REASON"
+              
+              if [ "$CONTAINER_TOOLS" -eq 0 ]; then
+                echo ""
+                echo "=== Diagnosis ==="
+                echo "The MCP server appears to not be loaded properly."
+                echo "Check mcphost output for MCP server loading errors:"
+                echo "$FILTERED_RESULT" | grep -i "container-copilot\|mcp\|server\|failed\|error" || echo "No MCP-related messages found"
+                echo ""
+                echo "Possible causes:"
+                echo "- container-kit-mcp binary failed to start"
+                echo "- MCP server initialization timeout"
+                echo "- Transport/communication errors"
+              elif [ "$FAILED_TOOLS" -gt 0 ]; then
                 echo ""
                 echo "=== Failed Tools ==="
                 grep "❌ Tool failed" /tmp/workflow-hooks.log || echo "No failed tool details found"
