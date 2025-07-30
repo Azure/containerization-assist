@@ -139,7 +139,7 @@ jobs:
           
           # Capture both stdout and stderr, and don't exit on failure
           set +e
-          RESULT=$(timeout 300s mcphost --stream=false -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello. This is an automated test - do NOT ask for user input." 2>&1)
+          RESULT=$(timeout 300s mcphost --stream=false --compact -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello. This is an automated test - do NOT ask for user input." 2>&1)
           EXIT_CODE=$?
           set -e
           
@@ -160,10 +160,16 @@ jobs:
           SUCCESS_REASON="Unknown"
           
           # Check if containerization workflow completed successfully
-          if echo "$RESULT" | grep -qi "successfully\|completed\|deployed\|containerized"; then
+          if echo "$RESULT" | grep -qi "successfully containerized\|completed successfully\|containerization.*success\|workflow.*completed\|process.*completed successfully"; then
             SUCCESS=true
-            SUCCESS_REASON="Output indicates successful completion"
-          elif echo "$RESULT" | grep -qi "error\|failed\|timeout"; then
+            SUCCESS_REASON="Output indicates successful containerization workflow completion"
+          elif echo "$RESULT" | grep -qi "containerized.*ready\|deployment.*ready\|application.*ready"; then
+            SUCCESS=true
+            SUCCESS_REASON="Output indicates application is ready and containerized"
+          elif echo "$RESULT" | grep -qi "successfully.*generated\|successfully.*built\|successfully.*deployed"; then
+            SUCCESS=true
+            SUCCESS_REASON="Output indicates successful completion of containerization steps"
+          elif echo "$RESULT" | grep -qi "error\|failed\|timeout\|unable to\|could not.*complete"; then
             SUCCESS=false
             SUCCESS_REASON="Output indicates errors or failures"
           elif [ "$EXIT_CODE" -eq 0 ]; then
@@ -173,6 +179,15 @@ jobs:
             SUCCESS=false
             SUCCESS_REASON="Process completed with error exit code: $EXIT_CODE"
           fi
+
+          echo "=== Analysis Details ==="
+          echo "Exit code: $EXIT_CODE"
+          echo "Success indicators found:"
+          echo "$RESULT" | grep -i "success\|completed\|containerized\|ready" | head -5 || echo "None found"
+          echo ""
+          echo "Error indicators found:"
+          echo "$RESULT" | grep -i "error\|failed\|timeout" | head -5 || echo "None found"
+          echo ""
 
           if [ "$SUCCESS" = "true" ]; then
             echo "✅ Containerization test PASSED (Output Analysis)"
