@@ -13,10 +13,6 @@ mcpServers:
   bash:
     type: "builtin"
     name: "bash"
-  
-  todo:
-    type: "builtin"
-    name: "todo"
 
 model: "azure:${env://AZURE_OPENAI_DEPLOYMENT_ID}"
 provider-api-key: "${env://AZURE_OPENAI_KEY}"
