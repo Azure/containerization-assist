@@ -158,7 +158,7 @@ jobs:
           
           # Capture both stdout and stderr, and don't exit on failure
           set +e
-          RESULT=$(mcphost --stream=false --max-steps 60 --compact -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello. If you encounter any errors during deployment, please attempt to fix them automatically or provide specific recommendations. Do not ask for user input - proceed with reasonable defaults and complete the containerization process." 2>&1)
+          RESULT=$(timeout 600s mcphost --stream=false --quiet -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello" 2>&1)
           EXIT_CODE=$?
           set -e
           
