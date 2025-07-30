@@ -116,7 +116,7 @@ jobs:
           
           # Simple test to verify MCP tools are loaded
           set +e
-          HELLO_RESULT=$(timeout 30s mcphost --stream=false -p "If you have access to containerization tools (mcp_containerkit tools), respond with 'successful'. If you do not have access to containerization tools, respond with 'unsuccessful' and nothing else." 2>&1)
+          HELLO_RESULT=$(timeout 30s mcphost --quiet --stream=false -p "If you have access to containerization tools (mcp_containerkit tools), respond with 'successful'. If you do not have access to containerization tools, respond with 'unsuccessful' and nothing else." 2>&1)
           HELLO_EXIT_CODE=$?
           set -e
           
@@ -136,6 +136,8 @@ jobs:
           else
             echo "❌ MCP tools test FAILED - Unexpected response"
             echo "Expected 'successful' or 'unsuccessful' but got different response"
+            echo "Full response for analysis:"
+            echo "\"$HELLO_RESULT\""
             exit 1
           fi
           echo ""
