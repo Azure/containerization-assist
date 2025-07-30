@@ -73,8 +73,9 @@ jobs:
           # Copy the main configuration template
           cp .github/workflows/mcphost/config.yml ~/.mcphost.yml
           
-          # Copy the hooks configuration to the correct location
-          cp .github/workflows/mcphost/hooks.yml ~/.config/mcphost/hooks.yml
+          # Copy the hooks configuration to the mcphost directory (not ~/.config/)
+          mkdir -p ~/.mcphost
+          cp .github/workflows/mcphost/hooks.yml ~/.mcphost/hooks.yml
           
           echo "Configuration created successfully"
           
@@ -90,7 +91,7 @@ jobs:
           cat ~/.mcphost.yml
           echo ""
           echo "=== mcphost hooks configuration ==="
-          cat ~/.config/mcphost/hooks.yml
+          cat ~/.mcphost/hooks.yml
           
       - name: Setup mcphost hooks for monitoring
         run: |
