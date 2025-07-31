@@ -58,7 +58,11 @@ func (r *Registry) createBasicHandler(name, description string) server.PromptHan
 
 		switch name {
 		case "containerize_repository":
-			userPrompt = "You are an expert in Kubernetes and docker. Execute the #analyze_repository tool and execute subsequent tools from the Container Kit mcp based on results to containerize the application. Update file contents as instructed by tool responses. When a tool fails, attempt to update Kubernetes manifests and dockerfiles before retrying the tool a maximum of 5 times."
+			userPrompt = "You are an expert in Kubernetes and Docker.\n" +
+				"Execute the #analyze_repository tool and execute subsequent tools from the Container Kit MCP based on results to containerize the application.\n" +
+				"Update file contents as instructed by tool responses.\n" +
+				"When a tool fails, attempt to update Kubernetes manifests and Dockerfiles before retrying the tool a maximum of 5 times.\n" +
+				"Write manifest files to the ./manifests directory"
 		default:
 			systemPrompt = "You are a containerization expert."
 			userPrompt = "Please help with containerization tasks."
