@@ -174,29 +174,36 @@ func (tr *ToolRegistrar) createProgressResponse(stepName string, responseData ma
 		}
 	}
 
-	result := responseData["analyze_result"]
+	analyzeRepoResult := responseData["analyze_result"]
 
 	// Build text-based response
 	var responseText string
 
-	// Format result safely
-	var resultStr string
-	if result != nil {
-		resultStr = fmt.Sprintf("%v", result)
+	// Format result
+	var analyzeRepoResultStr string
+	if analyzeRepoResult != nil {
+		analyzeRepoResultStr = fmt.Sprintf("%v", analyzeRepoResult)
 	} else {
-		resultStr = "No result available"
+		analyzeRepoResultStr = ""
 	}
 
 	// Add next step instruction
 	if currentIndex >= 0 && currentIndex < len(workflowSequence)-1 {
 		nextStep := workflowSequence[currentIndex+1]
+
+		// Build response with conditional repo analysis result
+		var repoAnalysisSection string
+		if analyzeRepoResultStr != "" {
+			repoAnalysisSection = fmt.Sprintf(`**Repo Analysis Result:**
+%s
+
+`, analyzeRepoResultStr)
+		}
+
 		responseText = fmt.Sprintf(`**%s completed successfully**
 
 **Progress:** Step %d of %d completed
-**Step Results:**
-%s
-
-**Next Step:** %s
+%s**Next Step:** %s
 **Parameters:**
 - session_id: %s
 
@@ -204,7 +211,7 @@ func (tr *ToolRegistrar) createProgressResponse(stepName string, responseData ma
 			stepName,
 			currentIndex+1,
 			len(workflowSequence),
-			resultStr,
+			repoAnalysisSection,
 			nextStep,
 			sessionID,
 			nextStep)
