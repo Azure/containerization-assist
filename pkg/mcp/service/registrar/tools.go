@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 	"log/slog"
+	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/report"
 	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
@@ -646,7 +646,7 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 			"session_id": sessionID,
 			"repo_path":  repoPath,
 		}
-		
+
 		if mcpReport, reportErr := report.ReportStepExecution(sessionID, stepName, repoPath, true, startTime, &endTime, "",
 			map[string]interface{}{
 				"session_id":        sessionID,
@@ -758,12 +758,12 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 				CreatedAt:   endTime,
 			})
 		}
-		
+
 		responseData := map[string]interface{}{
 			"session_id":         sessionID,
 			"dockerfile_content": workflowState.DockerfileResult.Content,
 		}
-		
+
 		if mcpReport, reportErr := report.ReportStepExecution(sessionID, stepName, repoPath, true, startTime, &endTime, "",
 			map[string]interface{}{
 				"session_id":           sessionID,
