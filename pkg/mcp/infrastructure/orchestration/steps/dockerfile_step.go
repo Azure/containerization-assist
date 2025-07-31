@@ -76,7 +76,8 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowSt
 		return fmt.Errorf("analyze result is required for Dockerfile generation")
 	}
 
-	// Convert workflow analyze result to infrastructure type
+	state.Logger.Info("Step 2: Generating Dockerfile")
+
 	infraAnalyzeResult := &AnalyzeResult{
 		Language:  state.AnalyzeResult.Language,
 		Framework: state.AnalyzeResult.Framework,
@@ -90,20 +91,21 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowSt
 		return fmt.Errorf("dockerfile generation failed: %v", err)
 	}
 
-	if err = WriteDockerfile(infraAnalyzeResult.RepoPath, dockerfileResult.Content, state.Logger); err != nil {
-		return fmt.Errorf("failed to write Dockerfile to path '%s': %v", infraAnalyzeResult.RepoPath, err)
+	state.Logger.Info("Dockerfile generated; returning content in MCP response instead of writing to disk")
+
+	// Add instructions for user to create/update Dockerfile
+	instructions := "To use this Dockerfile, create or update a file named 'Dockerfile' in your project root with the following content."
+	if dockerfileResult.Path != "Dockerfile" {
+		instructions += "\nFile name: " + dockerfileResult.Path
 	}
 
-	state.Logger.Info("Dockerfile generation completed", "path", dockerfileResult.Path)
-
-	// Convert to workflow type
 	metadata := map[string]interface{}{"build_args": dockerfileResult.BuildArgs}
 
 	state.DockerfileResult = &workflow.DockerfileResult{
 		Content:     dockerfileResult.Content,
 		Path:        dockerfileResult.Path,
 		BaseImage:   dockerfileResult.BaseImage,
-		Metadata:    metadata,
+		Metadata:    map[string]interface{}{"build_args": dockerfileResult.BuildArgs, "instructions": instructions},
 		ExposedPort: dockerfileResult.ExposedPort,
 	}
 
