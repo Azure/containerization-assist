@@ -115,17 +115,19 @@ func extractBaseImageFromDockerfile(content string) string {
 	lines := strings.Split(content, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(strings.ToUpper(line), "FROM ") {
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				baseImage := parts[1]
-				// Remove AS alias if present
-				if len(parts) >= 4 && strings.ToUpper(parts[2]) == "AS" {
-					return baseImage
-				}
-				return baseImage
-			}
+		if !strings.HasPrefix(strings.ToUpper(line), "FROM ") {
+			continue
 		}
+		parts := strings.Fields(line)
+		if len(parts) < 2 {
+			continue
+		}
+		baseImage := parts[1]
+		// Remove AS alias if present
+		if len(parts) >= 4 && strings.ToUpper(parts[2]) == "AS" {
+			return baseImage
+		}
+		return baseImage
 	}
 	return "unknown"
 }
@@ -137,10 +139,12 @@ func extractPortFromDockerfile(content string) int {
 
 	for _, line := range lines {
 		line = strings.TrimSpace(strings.ToUpper(line))
-		if matches := re.FindStringSubmatch(line); len(matches) > 1 {
-			if port, err := strconv.Atoi(matches[1]); err == nil {
-				return port
-			}
+		matches := re.FindStringSubmatch(line)
+		if len(matches) < 1 {
+			continue
+		}
+		if port, err := strconv.Atoi(matches[1]); err == nil {
+			return port
 		}
 	}
 	return 0
