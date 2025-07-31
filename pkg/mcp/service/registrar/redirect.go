@@ -3,6 +3,7 @@ package registrar
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -83,7 +84,12 @@ func (tr *ToolRegistrar) createRedirectResponse(fromTool, error string, sessionI
 	// Create text-based response with AI prompt
 	var responseText string
 	if instruction.AIPrompt != nil {
-		responseText = fmt.Sprintf(`Tool %s failed with error: %s
+		// Format error for better readability if it contains build output
+		formattedError := tr.formatErrorForDisplay(error)
+
+		responseText = fmt.Sprintf(`Tool %s failed with error:
+
+%s
 
 **Fixing Strategy**: %s
 
@@ -105,7 +111,7 @@ func (tr *ToolRegistrar) createRedirectResponse(fromTool, error string, sessionI
 
 **Next Action:** Call tool "%s" with the above parameters and use the AI guidance to generate the corrected content.`,
 			fromTool,
-			error,
+			formattedError,
 			instruction.AIPrompt.FixingStrategy,
 			config.RedirectTo,
 			instruction.AIPrompt.SystemPrompt,
@@ -144,7 +150,7 @@ func (tr *ToolRegistrar) createRedirectResponse(fromTool, error string, sessionI
 }
 
 // createProgressResponse creates a response for successful tool execution with next step hint
-func (tr *ToolRegistrar) createProgressResponse(stepName, message string, _ map[string]interface{}, sessionID string) (*mcp.CallToolResult, error) {
+func (tr *ToolRegistrar) createProgressResponse(stepName string, responseData map[string]any, sessionID string) (*mcp.CallToolResult, error) {
 	// Workflow sequence for determining next step
 	workflowSequence := []string{
 		"analyze_repository",
@@ -168,17 +174,27 @@ func (tr *ToolRegistrar) createProgressResponse(stepName, message string, _ map[
 		}
 	}
 
+	result := responseData["analyze_result"]
+
 	// Build text-based response
 	var responseText string
+
+	// Format result safely
+	var resultStr string
+	if result != nil {
+		resultStr = fmt.Sprintf("%v", result)
+	} else {
+		resultStr = "No result available"
+	}
 
 	// Add next step instruction
 	if currentIndex >= 0 && currentIndex < len(workflowSequence)-1 {
 		nextStep := workflowSequence[currentIndex+1]
 		responseText = fmt.Sprintf(`**%s completed successfully**
 
-%s
-
 **Progress:** Step %d of %d completed
+**Step Results:**
+%s
 
 **Next Step:** %s
 **Parameters:**
@@ -186,9 +202,9 @@ func (tr *ToolRegistrar) createProgressResponse(stepName, message string, _ map[
 
 **Action:** Call tool "%s" to continue the workflow.`,
 			stepName,
-			message,
 			currentIndex+1,
 			len(workflowSequence),
+			resultStr,
 			nextStep,
 			sessionID,
 			nextStep)
@@ -196,23 +212,17 @@ func (tr *ToolRegistrar) createProgressResponse(stepName, message string, _ map[
 		// Last step completed
 		responseText = fmt.Sprintf(`**%s completed successfully**
 
-%s
-
 **Containerization workflow completed successfully!**
 
 All %d steps have been executed. Your application should now be containerized and deployed.`,
 			stepName,
-			message,
 			len(workflowSequence))
 	} else {
 		// Fallback for unknown step
 		responseText = fmt.Sprintf(`**%s completed successfully**
 
-%s
-
 **Session ID:** %s`,
 			stepName,
-			message,
 			sessionID)
 	}
 
@@ -224,4 +234,13 @@ All %d steps have been executed. Your application should now be containerized an
 			},
 		},
 	}, nil
+}
+
+// formatErrorForDisplay formats error messages for better readability in tool responses
+func (tr *ToolRegistrar) formatErrorForDisplay(error string) string {
+	// If error contains build output or multi-line content, format it properly
+	if len(error) > 200 || strings.Contains(error, "\n") {
+		return fmt.Sprintf("```\n%s\n```", error)
+	}
+	return error
 }

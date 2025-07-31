@@ -197,31 +197,45 @@ func (tr *ToolRegistrar) registerOrchestrationTools(mcpServer *server.MCPServer)
 			"deploy_application", "verify_deployment",
 		}
 
+		// Build step status details
+		stepStatuses := make(map[string]interface{})
+		for _, step := range allSteps {
+			stepStatuses[step] = simpleState.GetStepStatus(step)
+		}
+
+		// Find next step that hasn't been completed or failed
+		nextStep := func() string {
+			for _, step := range allSteps {
+				if !simpleState.IsStepCompleted(step) && !simpleState.IsStepFailed(step) {
+					return step
+				}
+			}
+			return "workflow_complete"
+		}()
+
+		// Determine overall workflow status
+		overallStatus := simpleState.Status
+		if len(simpleState.FailedSteps) > 0 {
+			overallStatus = "error"
+		} else if len(simpleState.CompletedSteps) == len(allSteps) {
+			overallStatus = "completed"
+		} else if len(simpleState.CompletedSteps) > 0 {
+			overallStatus = "running"
+		}
+
 		statusData := map[string]interface{}{
 			"success":             true,
 			"session_id":          sessionID,
 			"repo_path":           simpleState.RepoPath,
-			"current_status":      simpleState.Status,
+			"current_status":      overallStatus,
 			"current_step":        simpleState.CurrentStep,
 			"completed_steps":     simpleState.CompletedSteps,
+			"failed_steps":        simpleState.FailedSteps,
+			"step_statuses":       stepStatuses,
 			"total_steps":         len(allSteps),
 			"progress_percentage": int(float64(len(simpleState.CompletedSteps)) / float64(len(allSteps)) * 100),
-			"next_step": func() string {
-				for _, step := range allSteps {
-					found := false
-					for _, completed := range simpleState.CompletedSteps {
-						if completed == step {
-							found = true
-							break
-						}
-					}
-					if !found {
-						return step
-					}
-				}
-				return "workflow_complete"
-			}(),
-			"timestamp": time.Now().Format(time.RFC3339),
+			"next_step":           nextStep,
+			"timestamp":           time.Now().Format(time.RFC3339),
 		}
 
 		jsonData, _ := json.Marshal(statusData)
@@ -286,6 +300,10 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Session ID for workflow state management",
 				},
+				"dockerfile_content": map[string]interface{}{
+					"type":        "string",
+					"description": "AI-generated Dockerfile content to save",
+				},
 				"fixing_mode": map[string]interface{}{
 					"type":        "boolean",
 					"description": "Whether this tool is being called to fix a previous failure",
@@ -299,12 +317,8 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
-				"ai_generated_dockerfile": map[string]interface{}{
-					"type":        "string",
-					"description": "AI-generated Dockerfile content for fixing build failures",
-				},
 			},
-			required: []string{"session_id"},
+			required: []string{"session_id", "dockerfile_content"},
 		},
 		{
 			name:        "build_image",
@@ -417,6 +431,24 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Session ID for workflow state management",
 				},
+				"manifests": map[string]interface{}{
+					"type":        "object",
+					"description": "AI-generated Kubernetes manifests as key-value pairs (filename: content)",
+					"properties": map[string]interface{}{
+						"deployment.yaml": map[string]interface{}{
+							"type":        "string",
+							"description": "Kubernetes Deployment manifest content",
+						},
+						"service.yaml": map[string]interface{}{
+							"type":        "string",
+							"description": "Kubernetes Service manifest content",
+						},
+						"ingress.yaml": map[string]interface{}{
+							"type":        "string",
+							"description": "Kubernetes Ingress manifest content (optional)",
+						},
+					},
+				},
 				"fixing_mode": map[string]interface{}{
 					"type":        "boolean",
 					"description": "Whether this tool is being called to fix a previous failure",
@@ -430,12 +462,8 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
-				"ai_generated_manifests": map[string]interface{}{
-					"type":        "string",
-					"description": "AI-generated Kubernetes manifests for fixing deployment failures",
-				},
 			},
-			required: []string{"session_id"},
+			required: []string{"session_id", "manifests"},
 		},
 		{
 			name:        "prepare_cluster",
@@ -606,7 +634,8 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 	requiredParams := tr.getRequiredParameters(stepName)
 
 	// Validate required parameters
-	validatedParams := make(map[string]string)
+	validatedParams := make(map[string]any)
+
 	for paramName, paramType := range requiredParams {
 		switch paramType {
 		case "string":
@@ -615,11 +644,32 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 				return tr.createErrorResult(fmt.Sprintf("%s parameter is required for %s", paramName, stepName))
 			}
 			validatedParams[paramName] = value
+		case "object":
+			value, ok := args[paramName]
+			if !ok || value == nil {
+				return tr.createErrorResult(fmt.Sprintf("%s parameter is required for %s", paramName, stepName))
+			}
+			validatedParams[paramName] = value
 		}
 	}
 
-	sessionID := validatedParams["session_id"]
-	repoPath := validatedParams["repo_path"] // Optional, may not be present for all tools
+	if validatedParams["session_id"] == nil {
+		return tr.createErrorResult("session_id parameter is required for all workflow steps")
+	}
+
+	sessionID, ok := validatedParams["session_id"].(string)
+	if !ok || sessionID == "" {
+		return tr.createErrorResult("session_id parameter must be a non-empty string")
+	}
+
+	if stepName == "analyze_repository" && validatedParams["repo_path"] == nil {
+		return tr.createErrorResult("repo_path parameter is required for analyze_repository step")
+	}
+
+	repoPath := ""
+	if validatedParams["repo_path"] != nil {
+		repoPath = validatedParams["repo_path"].(string)
+	}
 
 	// Map tool names to actual step names
 	actualStepName := tr.mapToolNameToStepName(stepName)
@@ -647,7 +697,16 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 			"step", stepName,
 			"error", err.Error(),
 		)
-		return tr.createRedirectResponse(stepName, fmt.Sprintf("Step %s failed: %s", stepName, err.Error()), sessionID)
+
+		// Mark step as failed and save state
+		simpleState.MarkStepFailed(stepName)
+		simpleState.CurrentStep = stepName
+		simpleState.Status = "error"
+		if saveErr := tools.SaveWorkflowState(ctx, tr.sessionManager, simpleState); saveErr != nil {
+			tr.logger.Warn("Failed to save workflow state after step failure", "session_id", sessionID, "step", stepName, "error", saveErr)
+		}
+
+		return tr.createRedirectResponse(stepName, fmt.Sprintf("Step %s failed with the following error: %v", stepName, err), sessionID)
 	}
 
 	// Save step results to session artifacts
@@ -666,24 +725,30 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		"session_id": sessionID,
 	}
 
-	successMessage := fmt.Sprintf("Step %s completed successfully", stepName)
+	if stepName == "analyze_repository" {
+		// If this is the analyze step, include the analyze result in the response
+		if workflowState.AnalyzeResult != nil {
+			responseData["analyze_result"] = workflowState.AnalyzeResult
+		}
+	}
 
-	return tr.createProgressResponse(stepName, successMessage, responseData, sessionID)
+	return tr.createProgressResponse(stepName, responseData, sessionID)
 
 }
 
 // getRequiredParameters returns the required parameters for each tool
 func (tr *ToolRegistrar) getRequiredParameters(stepName string) map[string]string {
-	switch stepName {
-	case "analyze_repository":
-		return map[string]string{
-			"repo_path":  "string",
-			"session_id": "string",
+	if config, err := tools.GetToolConfig(stepName); err == nil {
+		params := make(map[string]string)
+		for _, param := range config.RequiredParams {
+			params[param] = "string" // Default to string type
 		}
-	default:
-		return map[string]string{
-			"session_id": "string",
-		}
+		return params
+
+	}
+
+	return map[string]string{
+		"session_id": "string",
 	}
 }
 
@@ -717,6 +782,7 @@ func (tr *ToolRegistrar) createStepState(ctx context.Context, sessionID, repoPat
 			RepoPath:       repoPath,
 			Status:         "initialized",
 			CompletedSteps: []string{},
+			FailedSteps:    []string{},
 			Artifacts:      make(map[string]interface{}),
 			Metadata:       make(map[string]interface{}),
 		}
@@ -748,7 +814,6 @@ func (tr *ToolRegistrar) createStepState(ctx context.Context, sessionID, repoPat
 		CurrentStep:      len(simpleState.CompletedSteps),
 		WorkflowProgress: domainworkflow.NewWorkflowProgress(sessionID, "containerization", 10),
 		RequestParams:    requestParams,
-		FixingMode:       fixingMode,
 		PreviousError:    previousError,
 		FailedTool:       failedTool,
 	}

@@ -30,51 +30,50 @@ func (s *DockerfileStep) Name() string {
 
 // Execute generates a Dockerfile
 func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
-	if state.AnalyzeResult == nil {
-		return fmt.Errorf("analyze result is required for Dockerfile generation")
+	// Check if generated Dockerfile content is provided
+	var dockerfileContent string
+	var hasContent bool
+
+	if content, exists := state.RequestParams["dockerfile_content"]; exists {
+		if contentStr, ok := content.(string); ok && contentStr != "" {
+			dockerfileContent = contentStr
+			hasContent = true
+			state.Logger.Info("Using provided Dockerfile content")
+		}
 	}
 
-	// Check if this is a fixing mode call
-	if state.FixingMode {
-		state.Logger.Info("Regenerating Dockerfile with AI fixing",
-			"previous_error", state.PreviousError,
-			"failed_tool", state.FailedTool)
-
-		// Check if AI-generated Dockerfile content is provided
-		if aiContent, exists := state.RequestParams["ai_generated_dockerfile"]; exists {
-			if dockerfileContent, ok := aiContent.(string); ok && dockerfileContent != "" {
-				state.Logger.Info("Using AI-generated Dockerfile content for fixing")
-
-				// Use AI-generated content directly
-				dockerfileResult := &DockerfileResult{
-					Content:     dockerfileContent,
-					Path:        "Dockerfile",
-					BaseImage:   extractBaseImageFromDockerfile(dockerfileContent),
-					ExposedPort: extractPortFromDockerfile(dockerfileContent),
-				}
-
-				if err := WriteDockerfile(state.AnalyzeResult.RepoPath, dockerfileContent, state.Logger); err != nil {
-					return fmt.Errorf("failed to write AI-generated Dockerfile to path '%s': %v", state.AnalyzeResult.RepoPath, err)
-				}
-
-				state.Logger.Info("AI-generated Dockerfile written successfully", "path", dockerfileResult.Path)
-
-				// Convert to workflow type
-				state.DockerfileResult = &workflow.DockerfileResult{
-					Content:     dockerfileResult.Content,
-					Path:        dockerfileResult.Path,
-					BaseImage:   dockerfileResult.BaseImage,
-					Metadata:    map[string]interface{}{"ai_generated": true, "fixing_mode": true},
-					ExposedPort: dockerfileResult.ExposedPort,
-				}
-
-				return nil
-			}
+	if hasContent {
+		// Use generated content directly
+		dockerfileResult := &DockerfileResult{
+			Content:     dockerfileContent,
+			Path:        "Dockerfile",
+			BaseImage:   extractBaseImageFromDockerfile(dockerfileContent),
+			ExposedPort: extractPortFromDockerfile(dockerfileContent),
 		}
 
-		state.Logger.Info("No AI-generated content provided, falling back to standard generation with error context")
-	} else {
-		state.Logger.Info("Step 2: Generating Dockerfile")
+		if err := WriteDockerfile(state.AnalyzeResult.RepoPath, dockerfileContent, state.Logger); err != nil {
+			return fmt.Errorf("failed to write AI-generated Dockerfile to path '%s': %v", state.AnalyzeResult.RepoPath, err)
+		}
+
+		state.Logger.Info("Dockerfile written successfully", "path", dockerfileResult.Path)
+
+		// Convert to workflow type
+		state.DockerfileResult = &workflow.DockerfileResult{
+			Content:     dockerfileResult.Content,
+			Path:        dockerfileResult.Path,
+			BaseImage:   dockerfileResult.BaseImage,
+			Metadata:    map[string]interface{}{"ai_generated": true},
+			ExposedPort: dockerfileResult.ExposedPort,
+		}
+
+		return nil
+	}
+
+	// If no content provided, generate Dockerfile normally
+	state.Logger.Info("No content provided, generating Dockerfile from analysis")
+
+	if state.AnalyzeResult == nil {
+		return fmt.Errorf("analyze result is required for Dockerfile generation")
 	}
 
 	// Convert workflow analyze result to infrastructure type
@@ -99,10 +98,6 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowSt
 
 	// Convert to workflow type
 	metadata := map[string]interface{}{"build_args": dockerfileResult.BuildArgs}
-	if state.FixingMode {
-		metadata["fixing_mode"] = true
-		metadata["fixed_from_error"] = state.PreviousError
-	}
 
 	state.DockerfileResult = &workflow.DockerfileResult{
 		Content:     dockerfileResult.Content,

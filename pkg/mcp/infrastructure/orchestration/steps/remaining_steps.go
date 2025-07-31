@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/common/errors"
@@ -109,7 +108,7 @@ func (s *BuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) 
 	// Call the infrastructure build function
 	buildResult, err := BuildImage(ctx, infraDockerfileResult, imageName, imageTag, buildContext, state.Logger)
 	if err != nil {
-		return errors.New(errors.CodeImageBuildFailed, "build_step", "docker build failed", err)
+		return errors.New(errors.CodeImageBuildFailed, "build_step", err.Error(), err)
 	}
 
 	if buildResult == nil {
@@ -324,52 +323,54 @@ func NewManifestStep() workflow.Step    { return &ManifestStep{} }
 func (s *ManifestStep) Name() string    { return "generate_manifests" }
 func (s *ManifestStep) MaxRetries() int { return 2 }
 func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
-	// Check if this is a fixing mode call
-	if state.FixingMode {
-		state.Logger.Info("Step 6: Regenerating Kubernetes manifests with AI fixing",
-			"previous_error", state.PreviousError,
-			"failed_tool", state.FailedTool)
+	// Check if manifest content is provided
+	var manifestList []string
 
-		// Check if AI-generated manifest content is provided
-		if aiContent, exists := state.RequestParams["ai_generated_manifests"]; exists {
-			if manifestsContent, ok := aiContent.(string); ok && manifestsContent != "" {
-				state.Logger.Info("Using AI-generated Kubernetes manifests for fixing")
+	if manifestsData, exists := state.RequestParams["manifests"]; exists {
+		if manifestsMap, ok := manifestsData.(map[string]interface{}); ok {
+			state.Logger.Info("Using provided structured Kubernetes manifests from save_k8s_manifests tool")
 
-				// Parse AI-generated manifests (split by --- separator)
-				manifestList := parseK8sManifests(manifestsContent)
-
-				// Write manifests to files (for kubectl apply)
-				manifestPath, err := writeK8sManifestsToFile(state.AnalyzeResult.RepoPath, manifestsContent, state.Logger)
-				if err != nil {
-					return fmt.Errorf("failed to write AI-generated manifests: %v", err)
-				}
-
-				// Set results with AI metadata
-				state.K8sResult = &workflow.K8sResult{
-					Manifests:   manifestList,
-					Namespace:   extractNamespaceFromManifests(manifestList),
-					ServiceName: extractServiceNameFromManifests(manifestList),
-					Endpoint:    "", // Will be set after deployment
-					Metadata: map[string]interface{}{
-						"ai_generated":   true,
-						"fixing_mode":    true,
-						"manifest_path":  manifestPath,
-						"manifest_count": len(manifestList),
-					},
-				}
-
-				state.Logger.Info("AI-generated Kubernetes manifests processed successfully",
-					"manifest_count", len(manifestList),
-					"path", manifestPath)
-
-				return nil
+			// Create manifests directory
+			manifestsDir := filepath.Join(state.AnalyzeResult.RepoPath, "manifests")
+			if err := createManifestsDirectory(manifestsDir, state.Logger); err != nil {
+				return fmt.Errorf("failed to create manifests directory: %v", err)
 			}
-		}
 
-		state.Logger.Info("No AI-generated manifests provided, falling back to standard generation with error context")
-	} else {
-		state.Logger.Info("Step 6: Generating Kubernetes manifests")
+			// Write individual manifest files
+			for filename, content := range manifestsMap {
+				if contentStr, ok := content.(string); ok && contentStr != "" {
+					filePath := filepath.Join(manifestsDir, filename)
+					if err := writeManifestFile(filePath, contentStr, state.Logger); err != nil {
+						return fmt.Errorf("failed to write manifest file %s: %v", filename, err)
+					}
+					manifestList = append(manifestList, contentStr)
+					state.Logger.Info("Wrote manifest file", "filename", filename, "path", filePath)
+				}
+			}
+
+			// Set results with AI metadata
+			state.K8sResult = &workflow.K8sResult{
+				Manifests:   manifestList,
+				Namespace:   extractNamespaceFromManifests(manifestList),
+				ServiceName: extractServiceNameFromManifests(manifestList),
+				Endpoint:    "", // Will be set after deployment
+				Metadata: map[string]interface{}{
+					"ai_generated":   true,
+					"manifest_path":  manifestsDir,
+					"manifest_count": len(manifestList),
+				},
+			}
+
+			state.Logger.Info("Kubernetes manifests processed successfully",
+				"manifest_count", len(manifestList),
+				"path", manifestsDir)
+
+			return nil
+		}
 	}
+
+	// If no content provided, generate manifests normally
+	state.Logger.Info("Step 6: Generating Kubernetes manifests")
 
 	// Check if deployment is actually requested
 	shouldDeploy := state.Args.Deploy == nil || *state.Args.Deploy
@@ -441,10 +442,6 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 		"manifest_path":  k8sResult.Manifests["path"], // Store manifest path for deployment
 		"manifest_count": len(manifestContent),
 		"template_used":  k8sResult.Manifests["template"],
-	}
-	if state.FixingMode {
-		metadata["fixing_mode"] = true
-		metadata["fixed_from_error"] = state.PreviousError
 	}
 
 	state.K8sResult = &workflow.K8sResult{
@@ -651,36 +648,6 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 	return nil
 }
 
-// parseK8sManifests parses AI-generated Kubernetes manifests separated by ---
-func parseK8sManifests(content string) []string {
-	// Split by YAML document separator
-	manifests := strings.Split(content, "---")
-	var result []string
-
-	for _, manifest := range manifests {
-		manifest = strings.TrimSpace(manifest)
-		if manifest != "" && !strings.HasPrefix(manifest, "#") {
-			result = append(result, manifest)
-		}
-	}
-
-	return result
-}
-
-// writeK8sManifestsToFile writes AI-generated manifests to a file
-func writeK8sManifestsToFile(repoPath, content string, logger *slog.Logger) (string, error) {
-	manifestPath := filepath.Join(repoPath, "k8s-manifests.yaml")
-
-	logger.Info("Writing AI-generated Kubernetes manifests", "path", manifestPath)
-
-	if err := os.WriteFile(manifestPath, []byte(content), 0644); err != nil {
-		return "", fmt.Errorf("failed to write manifests file: %w", err)
-	}
-
-	logger.Info("AI-generated manifests written successfully", "path", manifestPath, "size", len(content))
-	return manifestPath, nil
-}
-
 // extractNamespaceFromManifests extracts namespace from AI-generated manifests
 func extractNamespaceFromManifests(manifests []string) string {
 	namespaceRe := regexp.MustCompile(`namespace:\s*(\w+)`)
@@ -705,4 +672,28 @@ func extractServiceNameFromManifests(manifests []string) string {
 	}
 
 	return "app" // fallback service name
+}
+
+// createManifestsDirectory creates the manifests directory if it doesn't exist
+func createManifestsDirectory(manifestsDir string, logger *slog.Logger) error {
+	logger.Info("Creating manifests directory", "path", manifestsDir)
+
+	if err := os.MkdirAll(manifestsDir, 0755); err != nil {
+		return fmt.Errorf("failed to create manifests directory: %w", err)
+	}
+
+	logger.Info("Manifests directory created successfully", "path", manifestsDir)
+	return nil
+}
+
+// writeManifestFile writes a single manifest file to disk
+func writeManifestFile(filePath, content string, logger *slog.Logger) error {
+	logger.Info("Writing manifest file", "path", filePath)
+
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("failed to write manifest file: %w", err)
+	}
+
+	logger.Info("Manifest file written successfully", "path", filePath, "size", len(content))
+	return nil
 }

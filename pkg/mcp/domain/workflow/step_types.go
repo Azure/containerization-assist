@@ -1,6 +1,8 @@
 // Package workflow defines types for workflow steps.
 package workflow
 
+import "fmt"
+
 // AnalyzeResult represents the output of repository analysis
 type AnalyzeResult struct {
 	Language        string                 `json:"language"`
@@ -12,6 +14,26 @@ type AnalyzeResult struct {
 	DevDependencies []string               `json:"dev_dependencies"`
 	Metadata        map[string]interface{} `json:"metadata"`
 	RepoPath        string                 `json:"repo_path"`
+}
+
+// String returns a formatted string representation of AnalyzeResult
+func (ar AnalyzeResult) String() string {
+	return fmt.Sprintf(`Language: %s
+Framework: %s
+Port: %d
+Build Command: %s
+Start Command: %s
+Dependencies: %v
+Dev Dependencies: %v
+Repository Path: %s`,
+		ar.Language,
+		ar.Framework,
+		ar.Port,
+		ar.BuildCommand,
+		ar.StartCommand,
+		ar.Dependencies,
+		ar.DevDependencies,
+		ar.RepoPath)
 }
 
 // DockerfileResult represents the output of Dockerfile generation

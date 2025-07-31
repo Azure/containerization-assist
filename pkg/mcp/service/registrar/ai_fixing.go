@@ -37,8 +37,8 @@ Key principles:
 - Handle dependencies correctly
 - Set proper working directories and permissions
 
-You will receive:
-1. The original error from docker build
+Inspect the following:
+1. Error from docker build
 2. Repository analysis results (language, framework, dependencies)
 3. The current Dockerfile content (if available)
 
@@ -56,13 +56,9 @@ Please analyze this error and generate a corrected Dockerfile. Focus on:
 Repository context:
 %s
 
-Current Dockerfile (if available):
-%s
-
 Generate a complete, working Dockerfile that fixes this issue.`,
 		error,
-		tr.formatContextForAI(context, "analysis"),
-		tr.formatContextForAI(context, "dockerfile"))
+		tr.formatContextForAI(context, "analysis"))
 
 	return &AIFixingPrompt{
 		SystemPrompt:   systemPrompt,
@@ -87,7 +83,7 @@ Key principles:
 - Handle configuration and secrets properly
 - Follow Kubernetes best practices
 
-You will receive:
+Inspect the following:
 1. The deployment/kubectl error
 2. Application analysis (ports, requirements)
 3. Current manifest content (if available)
@@ -107,16 +103,12 @@ Please analyze this error and generate corrected Kubernetes manifests. Focus on:
 Application context:
 %s
 
-Current manifests (if available):
-%s
-
 Container image info:
 %s
 
 Generate complete, working Kubernetes manifests that fix this deployment issue.`,
 		error,
 		tr.formatContextForAI(context, "analysis"),
-		tr.formatContextForAI(context, "k8s_manifests"),
 		tr.formatContextForAI(context, "build_result"))
 
 	return &AIFixingPrompt{
