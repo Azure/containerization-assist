@@ -611,12 +611,15 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 
 		if err != nil {
 			// Report step failure to MCP report
-			if reportErr := report.ReportStepExecution(sessionID, stepName, repoPath, false, startTime, &endTime, err.Error(),
+			if mcpReport, reportErr := report.ReportStepExecution(sessionID, stepName, repoPath, false, startTime, &endTime, err.Error(),
 				map[string]interface{}{
 					"session_id": sessionID,
 					"repo_path":  repoPath,
 				}, nil); reportErr != nil {
 				tr.logger.Warn("Failed to report step execution to MCP report", "error", reportErr, "step", stepName)
+			} else if mcpReport != nil {
+				// Add report content to response data for MCP client
+				tr.logger.Info("Step failure reported to MCP", "step", stepName)
 			}
 
 			// Log step failure
@@ -639,8 +642,13 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		artifacts := []report.GeneratedArtifact{}
 		// Add artifacts based on actual files that get created during analysis
 		// Note: analyze_repository typically doesn't create files, but updates workflow state
-		// The MCP report files themselves will be created by ReportStepExecution
-		if reportErr := report.ReportStepExecution(sessionID, stepName, repoPath, true, startTime, &endTime, "",
+		// The MCP report content will be included in the response
+		responseData := map[string]interface{}{
+			"session_id": sessionID,
+			"repo_path":  repoPath,
+		}
+		
+		if mcpReport, reportErr := report.ReportStepExecution(sessionID, stepName, repoPath, true, startTime, &endTime, "",
 			map[string]interface{}{
 				"session_id":        sessionID,
 				"repo_path":         repoPath,
@@ -659,6 +667,17 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 				}(),
 			}, artifacts); reportErr != nil {
 			tr.logger.Warn("Failed to report step execution to MCP report", "error", reportErr, "step", stepName)
+		} else if mcpReport != nil {
+			// Include MCP report files in response for client to handle
+			if mcpReport.Metadata != nil {
+				if files, ok := mcpReport.Metadata["files"].(map[string]interface{}); ok {
+					responseData["mcp_report_files"] = files
+				}
+				if instructions, ok := mcpReport.Metadata["instructions"].(string); ok {
+					responseData["mcp_report_instructions"] = instructions
+				}
+			}
+			tr.logger.Info("Repository analysis reported to MCP", "step", stepName)
 		}
 
 		// Mark step as completed and save state
@@ -670,10 +689,7 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		}
 
 		return tr.createStepResult(true, stepName, "Repository analysis completed successfully",
-			map[string]interface{}{
-				"session_id": sessionID,
-				"repo_path":  repoPath,
-			}, retryNumber)
+			responseData, retryNumber)
 
 	case "generate_dockerfile":
 		sessionID, ok := args["session_id"].(string)
@@ -708,11 +724,13 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 
 		if err != nil {
 			// Report step failure to MCP report
-			if reportErr := report.ReportStepExecution(sessionID, stepName, repoPath, false, startTime, &endTime, err.Error(),
+			if mcpReport, reportErr := report.ReportStepExecution(sessionID, stepName, repoPath, false, startTime, &endTime, err.Error(),
 				map[string]interface{}{
 					"session_id": sessionID,
 				}, nil); reportErr != nil {
 				tr.logger.Warn("Failed to report step execution to MCP report", "error", reportErr, "step", stepName)
+			} else if mcpReport != nil {
+				tr.logger.Info("Step failure reported to MCP", "step", stepName)
 			}
 
 			// Log step failure
@@ -741,7 +759,13 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 				CreatedAt:   endTime,
 			})
 		}
-		if reportErr := report.ReportStepExecution(sessionID, stepName, repoPath, true, startTime, &endTime, "",
+		
+		responseData := map[string]interface{}{
+			"session_id":         sessionID,
+			"dockerfile_content": workflowState.DockerfileResult.Content,
+		}
+		
+		if mcpReport, reportErr := report.ReportStepExecution(sessionID, stepName, repoPath, true, startTime, &endTime, "",
 			map[string]interface{}{
 				"session_id":           sessionID,
 				"dockerfile_generated": true,
@@ -753,6 +777,17 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 				}(),
 			}, artifacts); reportErr != nil {
 			tr.logger.Warn("Failed to report step execution to MCP report", "error", reportErr, "step", stepName)
+		} else if mcpReport != nil {
+			// Include MCP report files in response for client to handle
+			if mcpReport.Metadata != nil {
+				if files, ok := mcpReport.Metadata["files"].(map[string]interface{}); ok {
+					responseData["mcp_report_files"] = files
+				}
+				if instructions, ok := mcpReport.Metadata["instructions"].(string); ok {
+					responseData["mcp_report_instructions"] = instructions
+				}
+			}
+			tr.logger.Info("Dockerfile generation reported to MCP", "step", stepName)
 		}
 
 		// Mark step as completed and save state
@@ -764,9 +799,7 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		}
 
 		return tr.createStepResult(true, stepName, "Dockerfile generated successfully",
-			map[string]interface{}{
-				"session_id": sessionID,
-			}, retryNumber)
+			responseData, retryNumber)
 
 	default:
 		// For other steps, create a session-aware execution
@@ -808,13 +841,15 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 
 		if err != nil {
 			// Report step failure to MCP report
-			if reportErr := report.ReportStepExecution(sessionID, actualStepName, repoPath, false, startTime, &endTime, err.Error(),
+			if mcpReport, reportErr := report.ReportStepExecution(sessionID, actualStepName, repoPath, false, startTime, &endTime, err.Error(),
 				map[string]interface{}{
 					"session_id": sessionID,
 					"tool_name":  stepName,
 					"step_name":  actualStepName,
 				}, nil); reportErr != nil {
 				tr.logger.Warn("Failed to report step execution to MCP report", "error", reportErr, "step", actualStepName)
+			} else if mcpReport != nil {
+				tr.logger.Info("Step failure reported to MCP", "step", actualStepName)
 			}
 
 			// Log step failure
@@ -834,7 +869,7 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 
 		// Report successful step execution to MCP report
 		artifacts := tr.extractArtifactsFromWorkflowState(workflowState, actualStepName, endTime)
-		if reportErr := report.ReportStepExecution(sessionID, actualStepName, repoPath, true, startTime, &endTime, "",
+		if mcpReport, reportErr := report.ReportStepExecution(sessionID, actualStepName, repoPath, true, startTime, &endTime, "",
 			map[string]interface{}{
 				"session_id":     sessionID,
 				"tool_name":      stepName,
@@ -842,6 +877,8 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 				"step_completed": true,
 			}, artifacts); reportErr != nil {
 			tr.logger.Warn("Failed to report step execution to MCP report", "error", reportErr, "step", actualStepName)
+		} else if mcpReport != nil {
+			tr.logger.Info("Step execution reported to MCP", "step", actualStepName)
 		}
 
 		// Mark step as completed and save state

@@ -5,27 +5,27 @@ import (
 	"time"
 )
 
-// ReportStepExecution updates the MCP report with step execution results
-func ReportStepExecution(workflowID, stepName, targetDir string, success bool, startTime time.Time, endTime *time.Time, errorMsg string, outputs map[string]interface{}, artifacts []GeneratedArtifact) error {
+// ReportStepExecution updates the MCP report with step execution results and returns report content for MCP response
+func ReportStepExecution(workflowID, stepName, targetDir string, success bool, startTime time.Time, endTime *time.Time, errorMsg string, outputs map[string]interface{}, artifacts []GeneratedArtifact) (*MCPProgressiveReport, error) {
 	report, err := LoadOrCreateMCPReport(workflowID, targetDir)
 	if err != nil {
-		return fmt.Errorf("loading report: %w", err)
+		return nil, fmt.Errorf("loading report: %w", err)
 	}
 
 	// Update step result
 	if err := UpdateStepResult(report, stepName, success, startTime, endTime, errorMsg, outputs, artifacts); err != nil {
-		return fmt.Errorf("updating step result: %w", err)
+		return nil, fmt.Errorf("updating step result: %w", err)
 	}
 
 	// Update summary
 	UpdateSummary(report)
 
-	// Save report
+	// Prepare report content for MCP response instead of writing to disk
 	if err := SaveMCPReport(report, targetDir); err != nil {
-		return fmt.Errorf("saving report: %w", err)
+		return nil, fmt.Errorf("preparing report content: %w", err)
 	}
 
-	return nil
+	return report, nil
 }
 
 // UpdateStepResult updates or adds a step result to the report

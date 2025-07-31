@@ -1,8 +1,6 @@
 package report
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -102,50 +100,57 @@ func TestMCPProgressiveReport(t *testing.T) {
 		t.Errorf("Expected 150 total tokens, got %d", report.TokenUsage.TotalTokens)
 	}
 
-	// Test saving and loading
+	// Test saving (now prepares content in metadata instead of writing files)
 	err = SaveMCPReport(report, tempDir)
 	if err != nil {
-		t.Fatalf("Failed to save report: %v", err)
+		t.Fatalf("Failed to prepare report content: %v", err)
 	}
 
-	// Verify files were created
-	jsonPath := filepath.Join(tempDir, MCPReportDirectory, MCPReportFileName)
-	if _, err := os.Stat(jsonPath); os.IsNotExist(err) {
-		t.Errorf("JSON report file was not created")
+	// Verify structured files were prepared in metadata
+	if report.Metadata == nil {
+		t.Errorf("Report metadata should not be nil after saving")
 	}
 
-	markdownPath := filepath.Join(tempDir, MCPReportDirectory, MCPMarkdownFileName)
-	if _, err := os.Stat(markdownPath); os.IsNotExist(err) {
-		t.Errorf("Markdown report file was not created")
+	if files, exists := report.Metadata["files"]; !exists {
+		t.Errorf("Files should be prepared in metadata")
+	} else {
+		filesMap, ok := files.(map[string]interface{})
+		if !ok {
+			t.Errorf("Files metadata should be a map")
+		} else {
+			if _, exists := filesMap["mcp_report.json"]; !exists {
+				t.Errorf("JSON file should be prepared in metadata")
+			}
+			if _, exists := filesMap["mcp_report.md"]; !exists {
+				t.Errorf("Markdown file should be prepared in metadata")
+			}
+		}
 	}
 
-	// Test loading existing report
-	loadedReport, err := LoadOrCreateMCPReport(workflowID, tempDir)
+	// Test creating another report (since we no longer read from disk, each call creates new)
+	newReport, err := LoadOrCreateMCPReport(workflowID, tempDir)
 	if err != nil {
-		t.Fatalf("Failed to load existing report: %v", err)
+		t.Fatalf("Failed to create new report: %v", err)
 	}
 
-	if len(loadedReport.StepResults) != 1 {
-		t.Errorf("Expected 1 step result in loaded report, got %d", len(loadedReport.StepResults))
+	// Since we don't persist to disk, this should be a fresh report
+	if len(newReport.StepResults) != 0 {
+		t.Errorf("Expected 0 step results in fresh report, got %d", len(newReport.StepResults))
 	}
 
-	if len(loadedReport.DetectedDatabases) != 2 {
-		t.Errorf("Expected 2 detected databases in loaded report, got %d", len(loadedReport.DetectedDatabases))
+	// Test summary updates using the original report (since we don't have persistence)
+	UpdateSummary(report)
+
+	if report.Summary.TotalSteps != 1 {
+		t.Errorf("Expected 1 total step, got %d", report.Summary.TotalSteps)
 	}
 
-	// Test summary updates
-	UpdateSummary(loadedReport)
-
-	if loadedReport.Summary.TotalSteps != 1 {
-		t.Errorf("Expected 1 total step, got %d", loadedReport.Summary.TotalSteps)
+	if report.Summary.CompletedSteps != 1 {
+		t.Errorf("Expected 1 completed step, got %d", report.Summary.CompletedSteps)
 	}
 
-	if loadedReport.Summary.CompletedSteps != 1 {
-		t.Errorf("Expected 1 completed step, got %d", loadedReport.Summary.CompletedSteps)
-	}
-
-	if loadedReport.Summary.SuccessRate != 100.0 {
-		t.Errorf("Expected 100%% success rate, got %.1f%%", loadedReport.Summary.SuccessRate)
+	if report.Summary.SuccessRate != 100.0 {
+		t.Errorf("Expected 100%% success rate, got %.1f%%", report.Summary.SuccessRate)
 	}
 }
 
@@ -289,18 +294,17 @@ func TestReportStepExecution(t *testing.T) {
 		},
 	}
 
-	// Test the high-level ReportStepExecution function
-	err := ReportStepExecution(workflowID, "build_image", tempDir, true, startTime, &endTime, "", outputs, artifacts)
+	// Test the high-level ReportStepExecution function (now returns report and error)
+	report, err := ReportStepExecution(workflowID, "build_image", tempDir, true, startTime, &endTime, "", outputs, artifacts)
 	if err != nil {
 		t.Fatalf("Failed to report step execution: %v", err)
 	}
 
-	// Verify report was created and contains the step
-	report, err := LoadOrCreateMCPReport(workflowID, tempDir)
-	if err != nil {
-		t.Fatalf("Failed to load report after step execution: %v", err)
+	if report == nil {
+		t.Fatalf("ReportStepExecution should return a report")
 	}
 
+	// Verify report contains the step
 	if len(report.StepResults) != 1 {
 		t.Errorf("Expected 1 step result, got %d", len(report.StepResults))
 	}
@@ -318,10 +322,25 @@ func TestReportStepExecution(t *testing.T) {
 		t.Errorf("Expected 1 artifact, got %d", len(step.Artifacts))
 	}
 
-	// Verify files were written
-	jsonPath := filepath.Join(tempDir, MCPReportDirectory, MCPReportFileName)
-	if _, err := os.Stat(jsonPath); os.IsNotExist(err) {
-		t.Error("JSON report file should exist after step execution")
+	// Verify structured files were prepared in metadata instead of files being written
+	if report.Metadata == nil {
+		t.Error("Report metadata should not be nil after step execution")
+	}
+
+	if files, exists := report.Metadata["files"]; !exists {
+		t.Error("Files should be prepared in metadata after step execution")
+	} else {
+		filesMap, ok := files.(map[string]interface{})
+		if !ok {
+			t.Error("Files metadata should be a map")
+		} else {
+			if _, exists := filesMap["mcp_report.json"]; !exists {
+				t.Error("JSON file should be prepared in metadata after step execution")
+			}
+			if _, exists := filesMap["mcp_report.md"]; !exists {
+				t.Error("Markdown file should be prepared in metadata after step execution")
+			}
+		}
 	}
 }
 
