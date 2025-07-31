@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-
 	"log/slog"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/report"
@@ -799,7 +798,10 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		}
 
 		return tr.createStepResult(true, stepName, "Dockerfile generated successfully",
-			responseData, retryNumber)
+			map[string]interface{}{
+				"session_id":         sessionID,
+				"dockerfile_content": workflowState.DockerfileResult.Content,
+			}, retryNumber)
 
 	default:
 		// For other steps, create a session-aware execution

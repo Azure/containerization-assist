@@ -31,10 +31,7 @@ func (r *Registry) RegisterAll(mcpServer *server.MCPServer) error {
 
 	// Register containerization prompts using native mcp-go API
 	prompts := map[string]string{
-		"analyze_dockerfile_errors": "Analyze Dockerfile for issues and suggest fixes",
-		"analyze_manifest_errors":   "Analyze Kubernetes manifests for issues and suggest fixes",
-		"analyze_repository":        "Analyze repository for containerization requirements",
-		"generate_dockerfile":       "Generate optimized Dockerfile for a repository",
+		"containerize_repository": "Containerize a repository using Container Kit",
 	}
 
 	for name, description := range prompts {
@@ -60,38 +57,35 @@ func (r *Registry) createBasicHandler(name, description string) server.PromptHan
 		var systemPrompt, userPrompt string
 
 		switch name {
-		case "analyze_dockerfile_errors":
-			systemPrompt = "You are an expert Dockerfile analyst and containerization specialist."
-			userPrompt = "Please analyze the provided Dockerfile for potential issues and suggest fixes. Look for security vulnerabilities, optimization opportunities, and best practices violations."
-		case "analyze_manifest_errors":
-			systemPrompt = "You are an expert Kubernetes administrator and YAML configuration specialist."
-			userPrompt = "Please analyze the provided Kubernetes manifest for potential issues and suggest fixes. Check for resource limits, networking, security, and deployment best practices."
-		case "analyze_repository":
-			systemPrompt = "You are an expert in application containerization and DevOps practices."
-			userPrompt = "Please analyze this repository to determine the best containerization approach. Identify the language, framework, dependencies, and provide containerization recommendations."
-		case "generate_dockerfile":
-			systemPrompt = "You are an expert in creating production-ready, optimized Dockerfiles."
-			userPrompt = "Please generate a production-ready, multi-stage Dockerfile based on the repository analysis. Include security best practices, proper layer caching, and optimization techniques."
+		case "containerize_repository":
+			userPrompt = "You are an expert in Kubernetes and Docker.\n" +
+				"Execute the #analyze_repository tool and execute subsequent tools from the Container Kit MCP based on results to containerize the application.\n" +
+				"Update file contents as instructed by tool responses.\n" +
+				"When a tool fails, attempt to update Kubernetes manifests and Dockerfiles before retrying the tool a maximum of 5 times.\n" +
+				"Write manifest files to the ./manifests directory"
 		default:
 			systemPrompt = "You are a containerization expert."
 			userPrompt = "Please help with containerization tasks."
 		}
 
-		messages := []mcp.PromptMessage{
-			{
-				Role: mcp.RoleAssistant,
-				Content: mcp.TextContent{
-					Type: "text",
-					Text: systemPrompt,
-				},
-			},
-			{
+		messages := []mcp.PromptMessage{}
+		if userPrompt != "" {
+			messages = append(messages, mcp.PromptMessage{
 				Role: mcp.RoleUser,
 				Content: mcp.TextContent{
 					Type: "text",
 					Text: userPrompt,
 				},
-			},
+			})
+		}
+		if systemPrompt != "" {
+			messages = append(messages, mcp.PromptMessage{
+				Role: mcp.RoleUser,
+				Content: mcp.TextContent{
+					Type: "text",
+					Text: systemPrompt,
+				},
+			})
 		}
 
 		return &mcp.GetPromptResult{

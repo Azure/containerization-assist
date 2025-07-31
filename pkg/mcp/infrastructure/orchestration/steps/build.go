@@ -77,7 +77,7 @@ func BuildImage(ctx context.Context, dockerfileResult *DockerfileResult, imageNa
 
 	if !buildResult.Success {
 		logger.Error("Docker build unsuccessful", "error", buildResult.Error)
-		return nil, fmt.Errorf("docker build unsuccessful: %v", buildResult.Error)
+		return nil, fmt.Errorf("docker build unsuccessful: %v with logs %s", buildResult.Error, buildResult.Logs)
 	}
 
 	buildDuration := time.Since(startTime)

@@ -12,7 +12,7 @@ import (
 func LoadOrCreateMCPReport(workflowID, targetDir string) (*MCPProgressiveReport, error) {
 	// For MCP mode, we don't read from disk - we maintain state in memory only
 	// This avoids file system operations and returns content via MCP responses
-	
+
 	// Create new report (previous state would be maintained by the calling workflow)
 
 	// Create new report
@@ -39,19 +39,19 @@ func LoadOrCreateMCPReport(workflowID, targetDir string) (*MCPProgressiveReport,
 func SaveMCPReport(report *MCPProgressiveReport, targetDir string) error {
 	// In MCP mode, we don't write to disk - content is returned in MCP responses
 	// This avoids file system operations and provides content directly to the client
-	
+
 	// Add instructions for user about report content
 	if report.Metadata == nil {
 		report.Metadata = make(map[string]interface{})
 	}
-	
+
 	jsonData, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshaling report: %w", err)
 	}
-	
+
 	markdownContent := FormatMCPMarkdownReport(report)
-	
+
 	// Store structured file content for MCP client to handle
 	report.Metadata["files"] = map[string]interface{}{
 		"mcp_report.json": map[string]interface{}{
@@ -61,7 +61,7 @@ func SaveMCPReport(report *MCPProgressiveReport, targetDir string) error {
 			"description": "Complete MCP workflow report in JSON format",
 		},
 		"mcp_report.md": map[string]interface{}{
-			"path":        ".container-kit/mcp_report.md", 
+			"path":        ".container-kit/mcp_report.md",
 			"content":     markdownContent,
 			"type":        "text/markdown",
 			"description": "Human-readable MCP workflow report in Markdown format",
