@@ -61,6 +61,7 @@ func (r *Registry) createBasicHandler(name, description string) server.PromptHan
 			userPrompt = "You are an expert in Kubernetes and Docker.\n" +
 				"Execute the #analyze_repository tool and execute subsequent tools from the Container Kit MCP based on results to containerize the application.\n" +
 				"Update file contents as instructed by tool responses.\n" +
+				"Create or update mcp-report.json and mcp-report.md contents as instructed by tool responses.\n" +
 				"When a tool fails, attempt to update Kubernetes manifests and Dockerfiles before retrying the tool a maximum of 5 times.\n" +
 				"Write manifest files to the ./manifests directory"
 		default:
