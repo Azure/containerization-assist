@@ -5,11 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
-
-	"log/slog"
-
-	"log/slog"
 
 	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/service/session"

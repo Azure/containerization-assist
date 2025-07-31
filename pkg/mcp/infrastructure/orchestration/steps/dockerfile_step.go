@@ -99,8 +99,6 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowSt
 		instructions += "\nFile name: " + dockerfileResult.Path
 	}
 
-	metadata := map[string]interface{}{"build_args": dockerfileResult.BuildArgs}
-
 	state.DockerfileResult = &workflow.DockerfileResult{
 		Content:     dockerfileResult.Content,
 		Path:        dockerfileResult.Path,
