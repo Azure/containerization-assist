@@ -31,11 +31,7 @@ func (r *Registry) RegisterAll(mcpServer *server.MCPServer) error {
 
 	// Register containerization prompts using native mcp-go API
 	prompts := map[string]string{
-		"analyze_dockerfile_errors": "Analyze Dockerfile for issues and suggest fixes",
-		"analyze_manifest_errors":   "Analyze Kubernetes manifests for issues and suggest fixes",
-		"analyze_repository":        "Analyze repository for containerization requirements",
-		"generate_dockerfile":       "Generate optimized Dockerfile for a repository",
-		"containerize_repository":   "Containerize a repository using Container Kit",
+		"containerize_repository": "Containerize a repository using Container Kit",
 	}
 
 	for name, description := range prompts {
