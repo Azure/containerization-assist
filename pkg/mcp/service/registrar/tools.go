@@ -7,12 +7,13 @@ import (
 	"fmt"
 	"time"
 
+	"log/slog"
+
 	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/service/session"
 	"github.com/Azure/container-kit/pkg/mcp/service/tools"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"log/slog"
 )
 
 // ToolRegistrar handles tool registration using the new consolidated system
@@ -679,7 +680,8 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 
 		return tr.createStepResult(true, stepName, "Dockerfile generated successfully",
 			map[string]interface{}{
-				"session_id": sessionID,
+				"session_id":         sessionID,
+				"dockerfile_content": workflowState.DockerfileResult.Content,
 			}, retryNumber)
 
 	default:
