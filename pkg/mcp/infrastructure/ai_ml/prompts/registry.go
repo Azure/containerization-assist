@@ -45,6 +45,7 @@ var prompts = []PromptAndHandler{
 		userText: []string{"You are an expert in Kubernetes and Docker.",
 			"Execute the #analyze_repository tool and execute subsequent tools from the Container Kit MCP based on results to containerize the application.",
 			"Update file contents as instructed by tool responses.",
+			"Create or update mcp-report.json and mcp-report.md contents as instructed by tool responses.",
 			"When a tool fails, attempt to update Kubernetes manifests and Dockerfiles before retrying the tool a maximum of 5 times.",
 			"Write manifest files to the ./manifests directory",
 		},
