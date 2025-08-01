@@ -2,8 +2,10 @@
 package registrar
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
+	"text/template"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -23,28 +25,96 @@ var WorkflowSequence = []string{
 }
 
 const (
-	// Response template constants
-	completedTemplate = `**%s completed successfully**
+	// Response templates
+	stepCompletedTemplate = `**{{.StepName}} completed successfully**
 
-**Progress:** Step %d of %d completed
-%s**Next Step:** %s
-**Parameters:**
-- session_id: %s
+**Progress:** Step {{.CurrentStep}} of {{.TotalSteps}} completed
+**Session ID:** {{.SessionID}}
+{{.RepoAnalysisSection}}
+**Next Step:** {{.NextStep}}
 
-**Action:** Call tool "%s" to continue the workflow.`
+**Action:** Call tool "{{.NextStep}}" to continue the workflow.`
 
-	workflowCompletedTemplate = `**%s completed successfully**
+	workflowCompletedTemplate = `**{{.StepName}} completed successfully**
 
 **Containerization workflow completed successfully!**
 
-All %d steps have been executed. Your application should now be containerized and deployed.`
+All {{.TotalSteps}} steps have been executed. Your application should now be containerized and deployed.`
 
-	fallbackTemplate = `**%s completed successfully**
+	fallbackTemplate = `**{{.StepName}} completed successfully**
 
-**Session ID:** %s`
+**Session ID:** {{.SessionID}}`
+
+	// Redirect response templates
+	redirectWithAITemplate = `Tool {{.FromTool}} failed with error:
+
+{{.FormattedError}}
+
+**Fixing Strategy**: {{.FixingStrategy}}
+
+**AI Guidance for {{.RedirectTo}}**:
+
+**System Context:**
+{{.SystemPrompt}}
+
+**User Prompt:**
+{{.UserPrompt}}
+
+**Expected Output:** {{.ExpectedOutput}}
+
+**Parameters for next call:**
+- session_id: {{.SessionID}}
+- previous_error: {{.Error}}
+- failed_tool: {{.FromTool}}
+- fixing_mode: true
+
+**Next Action:** 
+1. Read the current files (Dockerfile, manifests, etc.) to understand existing configuration
+2. Call tool "{{.RedirectTo}}" with the correct parameters and use the AI guidance to generate the corrected content.`
+
+	redirectSimpleTemplate = `Tool {{.FromTool}} failed: {{.Error}}
+
+**Next Action:** 
+1. Read the current files to understand existing configuration
+2. Call tool "{{.RedirectTo}}" with appropriate parameters to fix the issue.
+
+**Parameters:**
+- session_id: {{.SessionID}}
+- previous_error: {{.Error}}
+- failed_tool: {{.FromTool}}
+- fixing_mode: true`
 
 	errorDisplayThreshold = 200
 )
+
+// WorkflowTemplateData handles all workflow-related responses (progress, completion, fallback)
+type WorkflowTemplateData struct {
+	// Common fields
+	StepName  string
+	SessionID string
+
+	// Progress-specific fields (optional)
+	CurrentStep         int
+	TotalSteps          int
+	RepoAnalysisSection string
+	NextStep            string
+}
+
+// RedirectTemplateData handles all redirect responses (with or without AI)
+type RedirectTemplateData struct {
+	// Common redirect fields
+	FromTool   string
+	Error      string
+	RedirectTo string
+	SessionID  string
+
+	// AI-specific fields (optional)
+	FormattedError string
+	FixingStrategy string
+	SystemPrompt   string
+	UserPrompt     string
+	ExpectedOutput string
+}
 
 // RedirectConfig defines where to redirect when a tool fails
 type RedirectConfig struct {
@@ -84,102 +154,34 @@ var RedirectConfigs = map[string]RedirectConfig{
 
 // RedirectInstruction contains the instruction for the client to call the next tool
 type RedirectInstruction struct {
-	ShouldRedirect bool                   `json:"should_redirect"`
-	RedirectTo     string                 `json:"redirect_to"`
-	Reason         string                 `json:"reason"`
-	FailedTool     string                 `json:"failed_tool"`
-	FailureReason  string                 `json:"failure_reason"`
-	Parameters     map[string]interface{} `json:"parameters"`
-	FixingMode     bool                   `json:"fixing_mode"`
-	AIPrompt       *AIFixingPrompt        `json:"ai_prompt,omitempty"`
+	ShouldRedirect bool            `json:"should_redirect"`
+	RedirectTo     string          `json:"redirect_to"`
+	Reason         string          `json:"reason"`
+	FailedTool     string          `json:"failed_tool"`
+	FailureReason  string          `json:"failure_reason"`
+	Parameters     map[string]any  `json:"parameters"`
+	FixingMode     bool            `json:"fixing_mode"`
+	AIPrompt       *AIFixingPrompt `json:"ai_prompt,omitempty"`
 }
 
 // AIFixingPrompt provides structured context for AI-powered fixing
 type AIFixingPrompt struct {
-	SystemPrompt   string                 `json:"system_prompt"`
-	UserPrompt     string                 `json:"user_prompt"`
-	Context        map[string]interface{} `json:"context"`
-	ExpectedOutput string                 `json:"expected_output"`
-	FixingStrategy string                 `json:"fixing_strategy"`
+	SystemPrompt   string         `json:"system_prompt"`
+	UserPrompt     string         `json:"user_prompt"`
+	Context        map[string]any `json:"context"`
+	ExpectedOutput string         `json:"expected_output"`
+	FixingStrategy string         `json:"fixing_strategy"`
 }
 
 // createRedirectResponse creates a response instructing the client to call a different tool
 func (tr *ToolRegistrar) createRedirectResponse(fromTool, error string, sessionID string) (*mcp.CallToolResult, error) {
 	config, hasRedirect := RedirectConfigs[fromTool]
 	if !hasRedirect {
-		// No redirect configured - return normal error
 		return tr.createErrorResult(fmt.Sprintf("Tool %s failed: %s", fromTool, error))
 	}
 
-	// Generate AI fixing prompt
 	aiPrompt := tr.generateAIFixingPrompt(fromTool, config.RedirectTo, error, sessionID)
-
-	// Create redirect instruction (only AIPrompt is used for text response)
-	instruction := RedirectInstruction{
-		AIPrompt: aiPrompt,
-	}
-
-	// Create text-based response with AI prompt
-	var responseText string
-	if instruction.AIPrompt != nil {
-		// Format error for better readability if it contains build output
-		formattedError := tr.formatErrorForDisplay(error)
-
-		responseText = fmt.Sprintf(`Tool %s failed with error:
-
-%s
-
-**Fixing Strategy**: %s
-
-**AI Guidance for %s**:
-
-**System Context:**
-%s
-
-**User Prompt:**
-%s
-
-**Expected Output:** %s
-
-**Parameters for next call:**
-- session_id: %s
-- previous_error: %s
-- failed_tool: %s
-- fixing_mode: true
-
-**Next Action:** 
-1. Read the current files (Dockerfile, manifests, etc.) to understand existing configuration
-2. Call tool "%s" with the above parameters and use the AI guidance to generate the corrected content.`,
-			fromTool,
-			formattedError,
-			instruction.AIPrompt.FixingStrategy,
-			config.RedirectTo,
-			instruction.AIPrompt.SystemPrompt,
-			instruction.AIPrompt.UserPrompt,
-			instruction.AIPrompt.ExpectedOutput,
-			sessionID,
-			error,
-			fromTool,
-			config.RedirectTo)
-	} else {
-		responseText = fmt.Sprintf(`Tool %s failed: %s
-
-**Next Action:** 
-1. Read the current files to understand existing configuration
-2. Call tool "%s" with appropriate parameters to fix the issue.
-
-**Parameters:**
-- session_id: %s
-- previous_error: %s  
-- failed_tool: %s
-- fixing_mode: true`,
-			fromTool,
-			error,
-			config.RedirectTo,
-			sessionID,
-			error,
-			fromTool)
-	}
+	responseText := tr.buildRedirectResponseText(fromTool, error, sessionID, config.RedirectTo, aiPrompt)
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
@@ -193,11 +195,7 @@ func (tr *ToolRegistrar) createRedirectResponse(fromTool, error string, sessionI
 
 // createProgressResponse creates a response for successful tool execution with next step hint
 func (tr *ToolRegistrar) createProgressResponse(stepName string, responseData map[string]any, sessionID string) (*mcp.CallToolResult, error) {
-
-	// Find current step index
 	currentIndex := tr.findStepIndex(stepName)
-
-	// Build text-based response
 	analyzeRepoResultStr := tr.formatAnalyzeResult(responseData["analyze_result"])
 	responseText := tr.buildResponseText(stepName, currentIndex, analyzeRepoResultStr, sessionID)
 
@@ -224,7 +222,7 @@ func (tr *ToolRegistrar) findStepIndex(stepName string) int {
 }
 
 // formatAnalyzeResult formats the analyze_result for display
-func (tr *ToolRegistrar) formatAnalyzeResult(analyzeResult interface{}) string {
+func (tr *ToolRegistrar) formatAnalyzeResult(analyzeResult any) string {
 	if analyzeResult != nil {
 		return fmt.Sprintf("%v", analyzeResult)
 	}
@@ -233,34 +231,116 @@ func (tr *ToolRegistrar) formatAnalyzeResult(analyzeResult interface{}) string {
 
 // buildResponseText constructs the appropriate response text based on workflow progress
 func (tr *ToolRegistrar) buildResponseText(stepName string, currentIndex int, analyzeResultStr, sessionID string) string {
-	switch {
-	case currentIndex >= 0 && currentIndex < len(WorkflowSequence)-1:
-		return tr.buildProgressResponse(stepName, currentIndex, analyzeResultStr, sessionID)
-	case currentIndex == len(WorkflowSequence)-1:
-		return fmt.Sprintf(workflowCompletedTemplate, stepName, len(WorkflowSequence))
-	default:
-		return fmt.Sprintf(fallbackTemplate, stepName, sessionID)
+	// Handle workflow completion
+	if currentIndex == len(WorkflowSequence)-1 {
+		return tr.buildCompletedResponse(stepName)
 	}
+
+	// Handle step in progress
+	if currentIndex >= 0 && currentIndex < len(WorkflowSequence)-1 {
+		return tr.buildProgressResponse(stepName, currentIndex, analyzeResultStr, sessionID)
+	}
+
+	// Handle unknown/invalid step
+	return tr.buildFallbackResponse(stepName, sessionID)
+}
+
+// buildCompletedResponse builds response for completed workflow
+func (tr *ToolRegistrar) buildCompletedResponse(stepName string) string {
+	data := WorkflowTemplateData{
+		StepName:   stepName,
+		TotalSteps: len(WorkflowSequence),
+	}
+	return tr.executeTemplate(workflowCompletedTemplate, data)
+}
+
+// buildFallbackResponse builds response for unknown steps
+func (tr *ToolRegistrar) buildFallbackResponse(stepName, sessionID string) string {
+	data := WorkflowTemplateData{
+		StepName:  stepName,
+		SessionID: sessionID,
+	}
+	return tr.executeTemplate(fallbackTemplate, data)
+}
+
+// executeTemplate safely executes a template with given data
+func (tr *ToolRegistrar) executeTemplate(templateStr string, data any) string {
+	tmpl, err := template.New("response").Parse(templateStr)
+	if err != nil {
+		return fmt.Sprintf("Template error: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return fmt.Sprintf("Template execution error: %v", err)
+	}
+
+	return buf.String()
+}
+
+// buildRedirectResponseText constructs redirect response text using templates
+func (tr *ToolRegistrar) buildRedirectResponseText(fromTool, error, sessionID, redirectTo string, aiPrompt *AIFixingPrompt) string {
+	if aiPrompt != nil {
+		data := RedirectTemplateData{
+			FromTool:       fromTool,
+			Error:          error,
+			RedirectTo:     redirectTo,
+			SessionID:      sessionID,
+			FormattedError: tr.formatErrorForDisplay(error),
+			FixingStrategy: aiPrompt.FixingStrategy,
+			SystemPrompt:   aiPrompt.SystemPrompt,
+			UserPrompt:     aiPrompt.UserPrompt,
+			ExpectedOutput: aiPrompt.ExpectedOutput,
+		}
+		return tr.executeTemplate(redirectWithAITemplate, data)
+	}
+
+	data := RedirectTemplateData{
+		FromTool:   fromTool,
+		Error:      error,
+		RedirectTo: redirectTo,
+		SessionID:  sessionID,
+	}
+	return tr.executeTemplate(redirectSimpleTemplate, data)
 }
 
 // buildProgressResponse builds response for workflow in progress
 func (tr *ToolRegistrar) buildProgressResponse(stepName string, currentIndex int, analyzeResultStr, sessionID string) string {
 	nextStep := WorkflowSequence[currentIndex+1]
-	repoAnalysisSection := ""
-	if analyzeResultStr != "" {
-		repoAnalysisSection = fmt.Sprintf(`**Repo Analysis Result:**
+	repoAnalysisSection := tr.formatRepoAnalysisSection(analyzeResultStr)
+
+	data := WorkflowTemplateData{
+		StepName:            stepName,
+		SessionID:           sessionID,
+		CurrentStep:         currentIndex + 1,
+		TotalSteps:          len(WorkflowSequence),
+		RepoAnalysisSection: repoAnalysisSection,
+		NextStep:            nextStep,
+	}
+
+	return tr.executeTemplate(stepCompletedTemplate, data)
+}
+
+// formatRepoAnalysisSection formats repository analysis section for display
+func (tr *ToolRegistrar) formatRepoAnalysisSection(analyzeResultStr string) string {
+	if analyzeResultStr == "" {
+		return ""
+	}
+	return fmt.Sprintf(`**Repo Analysis Result:**
 %s
 
 `, analyzeResultStr)
-	}
-	return fmt.Sprintf(completedTemplate, stepName, currentIndex+1, len(WorkflowSequence), repoAnalysisSection, nextStep, sessionID, nextStep)
 }
 
 // formatErrorForDisplay formats error messages for better readability in tool responses
 func (tr *ToolRegistrar) formatErrorForDisplay(error string) string {
-	// If error contains build output or multi-line content, format it properly
-	if len(error) > errorDisplayThreshold || strings.Contains(error, "\n") {
+	if tr.shouldFormatAsCodeBlock(error) {
 		return fmt.Sprintf("```\n%s\n```", error)
 	}
 	return error
+}
+
+// shouldFormatAsCodeBlock determines if error should be formatted as code block
+func (tr *ToolRegistrar) shouldFormatAsCodeBlock(error string) bool {
+	return len(error) > errorDisplayThreshold || strings.Contains(error, "\n")
 }
