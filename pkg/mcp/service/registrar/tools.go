@@ -5,9 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
-
 	"log/slog"
+	"time"
 
 	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/service/session"
@@ -143,7 +142,7 @@ func (tr *ToolRegistrar) registerOrchestrationTools(mcpServer *server.MCPServer)
 	// Register workflow_status tool
 	workflowStatusTool := mcp.Tool{
 		Name:        "workflow_status",
-		Description: "📊 Check workflow progress and see which steps are completed. Use this to understand current state before continuing.",
+		Description: "📊 Check workflow progress and see which steps are completed. Only use when you need to understand the current workflow state.",
 		InputSchema: mcp.ToolInputSchema{
 			Type: "object",
 			Properties: map[string]interface{}{
@@ -197,31 +196,60 @@ func (tr *ToolRegistrar) registerOrchestrationTools(mcpServer *server.MCPServer)
 			"deploy_application", "verify_deployment",
 		}
 
+		// Build step status details in order
+		stepStatuses := make([]map[string]interface{}, 0, len(allSteps))
+		for _, step := range allSteps {
+			stepStatuses = append(stepStatuses, map[string]interface{}{
+				"step":   step,
+				"status": simpleState.GetStepStatus(step),
+			})
+		}
+
+		// Calculate next step based on current step's workflow configuration
+		nextStep := func() string {
+			// If no current step, start with first step
+			if simpleState.CurrentStep == "" {
+				return "analyze_repository"
+			}
+
+			// If current step failed, check redirect configuration
+			if simpleState.IsStepFailed(simpleState.CurrentStep) {
+				if redirectConfig, exists := RedirectConfigs[simpleState.CurrentStep]; exists {
+					return redirectConfig.RedirectTo
+				}
+			}
+
+			// Get next tool from workflow configuration
+			if config, err := tools.GetToolConfig(simpleState.CurrentStep); err == nil && config.NextTool != "" {
+				return config.NextTool
+			}
+
+			return "workflow_complete"
+		}()
+
+		// Determine overall workflow status
+		overallStatus := simpleState.Status
+		if len(simpleState.FailedSteps) > 0 {
+			overallStatus = "error"
+		} else if len(simpleState.CompletedSteps) == len(allSteps) {
+			overallStatus = "completed"
+		} else if len(simpleState.CompletedSteps) > 0 {
+			overallStatus = "running"
+		}
+
 		statusData := map[string]interface{}{
 			"success":             true,
 			"session_id":          sessionID,
 			"repo_path":           simpleState.RepoPath,
-			"current_status":      simpleState.Status,
+			"current_status":      overallStatus,
 			"current_step":        simpleState.CurrentStep,
 			"completed_steps":     simpleState.CompletedSteps,
+			"failed_steps":        simpleState.FailedSteps,
+			"step_statuses":       stepStatuses,
 			"total_steps":         len(allSteps),
 			"progress_percentage": int(float64(len(simpleState.CompletedSteps)) / float64(len(allSteps)) * 100),
-			"next_step": func() string {
-				for _, step := range allSteps {
-					found := false
-					for _, completed := range simpleState.CompletedSteps {
-						if completed == step {
-							found = true
-							break
-						}
-					}
-					if !found {
-						return step
-					}
-				}
-				return "workflow_complete"
-			}(),
-			"timestamp": time.Now().Format(time.RFC3339),
+			"next_step":           nextStep,
+			"timestamp":           time.Now().Format(time.RFC3339),
 		}
 
 		jsonData, _ := json.Marshal(statusData)
@@ -262,17 +290,18 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Session ID for workflow state management",
 				},
-				"retryNumber": map[string]interface{}{
-					"type":        "integer",
-					"description": "Current retry attempt number",
-					"default":     1,
-					"minimum":     1,
+				"fixing_mode": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Whether this tool is being called to fix a previous failure",
+					"default":     false,
 				},
-				"maxRetries": map[string]interface{}{
-					"type":        "integer",
-					"description": "Maximum retry attempts (0 = no retries)",
-					"default":     3,
-					"minimum":     0,
+				"previous_error": map[string]interface{}{
+					"type":        "string",
+					"description": "Error from the previous failed tool (when fixing_mode is true)",
+				},
+				"failed_tool": map[string]interface{}{
+					"type":        "string",
+					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 			},
 			required: []string{"repo_path", "session_id"},
@@ -285,20 +314,25 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Session ID for workflow state management",
 				},
-				"retryNumber": map[string]interface{}{
-					"type":        "integer",
-					"description": "Current retry attempt number",
-					"default":     1,
-					"minimum":     1,
+				"dockerfile_content": map[string]interface{}{
+					"type":        "string",
+					"description": "AI-generated Dockerfile content to save",
 				},
-				"maxRetries": map[string]interface{}{
-					"type":        "integer",
-					"description": "Maximum retry attempts (0 = no retries)",
-					"default":     3,
-					"minimum":     0,
+				"fixing_mode": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Whether this tool is being called to fix a previous failure",
+					"default":     false,
+				},
+				"previous_error": map[string]interface{}{
+					"type":        "string",
+					"description": "Error from the previous failed tool (when fixing_mode is true)",
+				},
+				"failed_tool": map[string]interface{}{
+					"type":        "string",
+					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 			},
-			required: []string{"session_id"},
+			required: []string{"session_id", "dockerfile_content"},
 		},
 		{
 			name:        "build_image",
@@ -308,17 +342,18 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Session ID for workflow state management",
 				},
-				"retryNumber": map[string]interface{}{
-					"type":        "integer",
-					"description": "Current retry attempt number",
-					"default":     1,
-					"minimum":     1,
+				"fixing_mode": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Whether this tool is being called to fix a previous failure",
+					"default":     false,
 				},
-				"maxRetries": map[string]interface{}{
-					"type":        "integer",
-					"description": "Maximum retry attempts (0 = no retries)",
-					"default":     3,
-					"minimum":     0,
+				"previous_error": map[string]interface{}{
+					"type":        "string",
+					"description": "Error from the previous failed tool (when fixing_mode is true)",
+				},
+				"failed_tool": map[string]interface{}{
+					"type":        "string",
+					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 			},
 			required: []string{"session_id"},
@@ -331,17 +366,18 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Session ID for workflow state management",
 				},
-				"retryNumber": map[string]interface{}{
-					"type":        "integer",
-					"description": "Current retry attempt number",
-					"default":     1,
-					"minimum":     1,
+				"fixing_mode": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Whether this tool is being called to fix a previous failure",
+					"default":     false,
 				},
-				"maxRetries": map[string]interface{}{
-					"type":        "integer",
-					"description": "Maximum retry attempts (0 = no retries)",
-					"default":     3,
-					"minimum":     0,
+				"previous_error": map[string]interface{}{
+					"type":        "string",
+					"description": "Error from the previous failed tool (when fixing_mode is true)",
+				},
+				"failed_tool": map[string]interface{}{
+					"type":        "string",
+					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 			},
 			required: []string{"session_id"},
@@ -358,17 +394,18 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Tag for the Docker image",
 				},
-				"retryNumber": map[string]interface{}{
-					"type":        "integer",
-					"description": "Current retry attempt number",
-					"default":     1,
-					"minimum":     1,
+				"fixing_mode": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Whether this tool is being called to fix a previous failure",
+					"default":     false,
 				},
-				"maxRetries": map[string]interface{}{
-					"type":        "integer",
-					"description": "Maximum retry attempts (0 = no retries)",
-					"default":     3,
-					"minimum":     0,
+				"previous_error": map[string]interface{}{
+					"type":        "string",
+					"description": "Error from the previous failed tool (when fixing_mode is true)",
+				},
+				"failed_tool": map[string]interface{}{
+					"type":        "string",
+					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 			},
 			required: []string{"session_id", "tag"},
@@ -385,7 +422,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Container registry URL",
 				},
-				"retryNumber": map[string]interface{}{
+				"redirect_attempt": map[string]interface{}{
 					"type":        "integer",
 					"description": "Current retry attempt number",
 					"default":     1,
@@ -408,20 +445,39 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Session ID for workflow state management",
 				},
-				"retryNumber": map[string]interface{}{
-					"type":        "integer",
-					"description": "Current retry attempt number",
-					"default":     1,
-					"minimum":     1,
+				"manifests": map[string]interface{}{
+					"type":        "object",
+					"description": "AI-generated Kubernetes manifests as key-value pairs (filename: content)",
+					"properties": map[string]interface{}{
+						"deployment.yaml": map[string]interface{}{
+							"type":        "string",
+							"description": "Kubernetes Deployment manifest content",
+						},
+						"service.yaml": map[string]interface{}{
+							"type":        "string",
+							"description": "Kubernetes Service manifest content",
+						},
+						"ingress.yaml": map[string]interface{}{
+							"type":        "string",
+							"description": "Kubernetes Ingress manifest content (optional)",
+						},
+					},
 				},
-				"maxRetries": map[string]interface{}{
-					"type":        "integer",
-					"description": "Maximum retry attempts (0 = no retries)",
-					"default":     3,
-					"minimum":     0,
+				"fixing_mode": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Whether this tool is being called to fix a previous failure",
+					"default":     false,
+				},
+				"previous_error": map[string]interface{}{
+					"type":        "string",
+					"description": "Error from the previous failed tool (when fixing_mode is true)",
+				},
+				"failed_tool": map[string]interface{}{
+					"type":        "string",
+					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 			},
-			required: []string{"session_id"},
+			required: []string{"session_id", "manifests"},
 		},
 		{
 			name:        "prepare_cluster",
@@ -431,17 +487,18 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Session ID for workflow state management",
 				},
-				"retryNumber": map[string]interface{}{
-					"type":        "integer",
-					"description": "Current retry attempt number",
-					"default":     1,
-					"minimum":     1,
+				"fixing_mode": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Whether this tool is being called to fix a previous failure",
+					"default":     false,
 				},
-				"maxRetries": map[string]interface{}{
-					"type":        "integer",
-					"description": "Maximum retry attempts (0 = no retries)",
-					"default":     3,
-					"minimum":     0,
+				"previous_error": map[string]interface{}{
+					"type":        "string",
+					"description": "Error from the previous failed tool (when fixing_mode is true)",
+				},
+				"failed_tool": map[string]interface{}{
+					"type":        "string",
+					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 			},
 			required: []string{"session_id"},
@@ -454,17 +511,18 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Session ID for workflow state management",
 				},
-				"retryNumber": map[string]interface{}{
-					"type":        "integer",
-					"description": "Current retry attempt number",
-					"default":     1,
-					"minimum":     1,
+				"fixing_mode": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Whether this tool is being called to fix a previous failure",
+					"default":     false,
 				},
-				"maxRetries": map[string]interface{}{
-					"type":        "integer",
-					"description": "Maximum retry attempts (0 = no retries)",
-					"default":     3,
-					"minimum":     0,
+				"previous_error": map[string]interface{}{
+					"type":        "string",
+					"description": "Error from the previous failed tool (when fixing_mode is true)",
+				},
+				"failed_tool": map[string]interface{}{
+					"type":        "string",
+					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 			},
 			required: []string{"session_id"},
@@ -477,17 +535,18 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Session ID for workflow state management",
 				},
-				"retryNumber": map[string]interface{}{
-					"type":        "integer",
-					"description": "Current retry attempt number",
-					"default":     1,
-					"minimum":     1,
+				"fixing_mode": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Whether this tool is being called to fix a previous failure",
+					"default":     false,
 				},
-				"maxRetries": map[string]interface{}{
-					"type":        "integer",
-					"description": "Maximum retry attempts (0 = no retries)",
-					"default":     3,
-					"minimum":     0,
+				"previous_error": map[string]interface{}{
+					"type":        "string",
+					"description": "Error from the previous failed tool (when fixing_mode is true)",
+				},
+				"failed_tool": map[string]interface{}{
+					"type":        "string",
+					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 			},
 			required: []string{"session_id"},
@@ -509,18 +568,15 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 		// Capture toolDef.name in closure
 		toolName := toolDef.name
 
-		// Create base handler
+		// Create handler with redirect logic
 		handler := func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			return tr.executeWorkflowStep(ctx, req, toolName)
 		}
 
-		// Wrap with retry logic
-		wrappedHandler := tr.wrapWithRetry(toolName, handler)
-
 		// Wrap with metrics collection
-		metricsHandler := MetricsMiddleware(toolName, wrappedHandler)
+		metricsHandler := MetricsMiddleware(toolName, handler)
 
-		// Register the wrapped handler
+		// Register the handler
 		mcpServer.AddTool(tool, metricsHandler)
 	}
 
@@ -562,183 +618,151 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 	// Get arguments
 	args := req.GetArguments()
 
-	// Extract retry information
-	retryNumber := 1
-	if rn, ok := args["retryNumber"].(float64); ok {
-		retryNumber = int(rn)
+	// Extract fixing information
+	fixingMode := false
+	if fm, ok := args["fixing_mode"].(bool); ok {
+		fixingMode = fm
 	}
 
-	// Log retry information if this is a retry
-	if retryNumber > 1 {
-		tr.logger.Info("Executing tool retry",
+	previousError := ""
+	if pe, ok := args["previous_error"].(string); ok {
+		previousError = pe
+	}
+
+	failedTool := ""
+	if ft, ok := args["failed_tool"].(string); ok {
+		failedTool = ft
+	}
+
+	// Log fixing information if this is a fixing call
+	if fixingMode {
+		tr.logger.Info("Executing tool in fixing mode",
 			"tool", stepName,
-			"retryNumber", retryNumber,
+			"failed_tool", failedTool,
+			"previous_error", previousError,
 			"sessionId", args["session_id"],
 		)
 	}
 
-	// Handle different step requirements
-	switch stepName {
-	case "analyze_repository":
-		repoPath, ok := args["repo_path"].(string)
-		if !ok || repoPath == "" {
-			return tr.createErrorResult("repo_path parameter is required for analyze_repository")
-		}
-		sessionID, ok := args["session_id"].(string)
-		if !ok || sessionID == "" {
-			return tr.createErrorResult("session_id parameter is required for analyze_repository")
-		}
+	// Define required parameters for each tool
+	requiredParams := tr.getRequiredParameters(stepName)
 
-		// Get the analyze step from step provider
-		step, err := tr.stepProvider.GetStep("analyze_repository")
-		if err != nil {
-			return tr.createErrorResultWithRetry(fmt.Sprintf("Failed to get analyze step: %s", err.Error()), retryNumber)
+	// Validate required parameters
+	validatedParams := make(map[string]any)
+
+	for paramName, paramType := range requiredParams {
+		switch paramType {
+		case "string":
+			value, ok := args[paramName].(string)
+			if !ok || value == "" {
+				return tr.createErrorResult(fmt.Sprintf("%s parameter is required for %s", paramName, stepName))
+			}
+			validatedParams[paramName] = value
+		case "object":
+			value, ok := args[paramName]
+			if !ok || value == nil {
+				return tr.createErrorResult(fmt.Sprintf("%s parameter is required for %s", paramName, stepName))
+			}
+			validatedParams[paramName] = value
 		}
+	}
 
-		// Create workflow state for this step
-		workflowState, simpleState, err := tr.createStepState(ctx, sessionID, repoPath)
-		if err != nil {
-			return tr.createErrorResultWithRetry(fmt.Sprintf("Failed to create workflow state: %s", err.Error()), retryNumber)
-		}
+	if validatedParams["session_id"] == nil {
+		return tr.createErrorResult("session_id parameter is required for all workflow steps")
+	}
 
-		// Execute the step
-		err = step.Execute(ctx, workflowState)
-		if err != nil {
-			// Log step failure
-			tr.logger.Info("Step failed",
-				"step", stepName,
-				"error", err.Error(),
-				"retryNumber", retryNumber,
-			)
-			return tr.createStepResult(false, stepName, fmt.Sprintf("Analyze step failed: %s", err.Error()),
-				map[string]interface{}{
-					"session_id": sessionID,
-					"repo_path":  repoPath,
-				}, retryNumber)
-		}
+	sessionID, ok := validatedParams["session_id"].(string)
+	if !ok || sessionID == "" {
+		return tr.createErrorResult("session_id parameter must be a non-empty string")
+	}
 
-		// Save step results to session artifacts
-		tr.saveStepResults(workflowState, simpleState, stepName)
+	if stepName == "analyze_repository" && validatedParams["repo_path"] == nil {
+		return tr.createErrorResult("repo_path parameter is required for analyze_repository step")
+	}
 
-		// Mark step as completed and save state
-		simpleState.MarkStepCompleted(stepName)
+	repoPath := ""
+	if validatedParams["repo_path"] != nil {
+		repoPath = validatedParams["repo_path"].(string)
+	}
+
+	// Map tool names to actual step names
+	actualStepName := tr.mapToolNameToStepName(stepName)
+	if actualStepName != stepName {
+		tr.logger.Info("Mapping tool name to step name", "tool_name", stepName, "step_name", actualStepName)
+	}
+
+	// Get the step from step provider
+	step, err := tr.stepProvider.GetStep(actualStepName)
+	if err != nil {
+		return tr.createRedirectResponse(stepName, fmt.Sprintf("Failed to get step %s (mapped to %s): %s", stepName, actualStepName, err.Error()), sessionID)
+	}
+
+	// Create workflow state for this step with fixing context
+	workflowState, simpleState, err := tr.createStepState(ctx, sessionID, repoPath, fixingMode, previousError, failedTool, args)
+	if err != nil {
+		return tr.createRedirectResponse(stepName, fmt.Sprintf("Failed to create workflow state: %s", err.Error()), sessionID)
+	}
+
+	// Execute the step
+	err = step.Execute(ctx, workflowState)
+	if err != nil {
+		// Log step failure
+		tr.logger.Info("Step failed",
+			"step", stepName,
+			"error", err.Error(),
+		)
+
+		// Mark step as failed and save state
+		simpleState.MarkStepFailed(stepName)
 		simpleState.CurrentStep = stepName
-		simpleState.Status = "running"
-		if err := tools.SaveWorkflowState(ctx, tr.sessionManager, simpleState); err != nil {
-			tr.logger.Warn("Failed to save workflow state after step execution", "session_id", sessionID, "step", stepName, "error", err)
+		simpleState.Status = "error"
+		if saveErr := tools.SaveWorkflowState(ctx, tr.sessionManager, simpleState); saveErr != nil {
+			tr.logger.Warn("Failed to save workflow state after step failure", "session_id", sessionID, "step", stepName, "error", saveErr)
 		}
 
-		return tr.createStepResult(true, stepName, "Repository analysis completed successfully",
-			map[string]interface{}{
-				"session_id": sessionID,
-				"repo_path":  repoPath,
-			}, retryNumber)
+		return tr.createRedirectResponse(stepName, fmt.Sprintf("Step %s failed with the following error: %v", stepName, err), sessionID)
+	}
 
-	case "generate_dockerfile":
-		sessionID, ok := args["session_id"].(string)
-		if !ok || sessionID == "" {
-			return tr.createErrorResult("session_id parameter is required for generate_dockerfile")
+	// Save step results to session artifacts
+	tr.saveStepResults(workflowState, simpleState, stepName)
+
+	// Mark step as completed and save state
+	simpleState.MarkStepCompleted(stepName)
+	simpleState.CurrentStep = stepName
+	simpleState.Status = "running"
+	if err := tools.SaveWorkflowState(ctx, tr.sessionManager, simpleState); err != nil {
+		tr.logger.Warn("Failed to save workflow state after step execution", "session_id", sessionID, "step", stepName, "error", err)
+	}
+
+	// TODO: Handle any additional results or artifacts from the step execution
+	responseData := map[string]interface{}{
+		"session_id": sessionID,
+	}
+
+	if stepName == "analyze_repository" {
+		// If this is the analyze step, include the analyze result in the response
+		if workflowState.AnalyzeResult != nil {
+			responseData["analyze_result"] = workflowState.AnalyzeResult
 		}
+	}
 
-		// Get the dockerfile step
-		step, err := tr.stepProvider.GetStep("generate_dockerfile")
-		if err != nil {
-			return tr.createErrorResultWithRetry(fmt.Sprintf("Failed to get dockerfile step: %s", err.Error()), retryNumber)
+	return tr.createProgressResponse(stepName, responseData, sessionID)
+
+}
+
+// getRequiredParameters returns the required parameters for each tool
+func (tr *ToolRegistrar) getRequiredParameters(stepName string) map[string]string {
+	if config, err := tools.GetToolConfig(stepName); err == nil {
+		params := make(map[string]string)
+		for _, param := range config.RequiredParams {
+			params[param] = "string" // Default to string type
 		}
+		return params
 
-		// Create workflow state for this step
-		workflowState, simpleState, err := tr.createStepState(ctx, sessionID, "")
-		if err != nil {
-			return tr.createErrorResultWithRetry(fmt.Sprintf("Failed to create workflow state: %s", err.Error()), retryNumber)
-		}
+	}
 
-		// Execute the step
-		err = step.Execute(ctx, workflowState)
-		if err != nil {
-			// Log step failure
-			tr.logger.Info("Step failed",
-				"step", stepName,
-				"error", err.Error(),
-				"retryNumber", retryNumber,
-			)
-			return tr.createStepResult(false, stepName, fmt.Sprintf("Dockerfile generation failed: %s", err.Error()),
-				map[string]interface{}{
-					"session_id": sessionID,
-				}, retryNumber)
-		}
-
-		// Save step results to session artifacts
-		tr.saveStepResults(workflowState, simpleState, stepName)
-
-		// Mark step as completed and save state
-		simpleState.MarkStepCompleted(stepName)
-		simpleState.CurrentStep = stepName
-		simpleState.Status = "running"
-		if err := tools.SaveWorkflowState(ctx, tr.sessionManager, simpleState); err != nil {
-			tr.logger.Warn("Failed to save workflow state after step execution", "session_id", sessionID, "step", stepName, "error", err)
-		}
-
-		return tr.createStepResult(true, stepName, "Dockerfile generated successfully",
-			map[string]interface{}{
-				"session_id":         sessionID,
-				"dockerfile_content": workflowState.DockerfileResult.Content,
-			}, retryNumber)
-
-	default:
-		// For other steps, create a session-aware execution
-		sessionID, ok := args["session_id"].(string)
-		if !ok || sessionID == "" {
-			return tr.createErrorResult("session_id parameter is required")
-		}
-
-		// Map tool names to actual step names
-		actualStepName := tr.mapToolNameToStepName(stepName)
-		if actualStepName != stepName {
-			tr.logger.Info("Mapping tool name to step name", "tool_name", stepName, "step_name", actualStepName)
-		}
-
-		// Get the step from step provider
-		step, err := tr.stepProvider.GetStep(actualStepName)
-		if err != nil {
-			return tr.createErrorResultWithRetry(fmt.Sprintf("Failed to get step %s (mapped to %s): %s", stepName, actualStepName, err.Error()), retryNumber)
-		}
-
-		// Create workflow state for this step
-		workflowState, simpleState, err := tr.createStepState(ctx, sessionID, "")
-		if err != nil {
-			return tr.createErrorResultWithRetry(fmt.Sprintf("Failed to create workflow state: %s", err.Error()), retryNumber)
-		}
-
-		// Execute the step
-		err = step.Execute(ctx, workflowState)
-		if err != nil {
-			// Log step failure
-			tr.logger.Info("Step failed",
-				"step", stepName,
-				"error", err.Error(),
-				"retryNumber", retryNumber,
-			)
-			return tr.createStepResult(false, stepName, fmt.Sprintf("Step %s failed: %s", stepName, err.Error()),
-				map[string]interface{}{
-					"session_id": sessionID,
-				}, retryNumber)
-		}
-
-		// Save step results to session artifacts
-		tr.saveStepResults(workflowState, simpleState, stepName)
-
-		// Mark step as completed and save state
-		simpleState.MarkStepCompleted(stepName)
-		simpleState.CurrentStep = stepName
-		simpleState.Status = "running"
-		if err := tools.SaveWorkflowState(ctx, tr.sessionManager, simpleState); err != nil {
-			tr.logger.Warn("Failed to save workflow state after step execution", "session_id", sessionID, "step", stepName, "error", err)
-		}
-
-		return tr.createStepResult(true, stepName, fmt.Sprintf("Step %s completed successfully", stepName),
-			map[string]interface{}{
-				"session_id": sessionID,
-			}, retryNumber)
+	return map[string]string{
+		"session_id": "string",
 	}
 }
 
@@ -754,113 +778,7 @@ func (tr *ToolRegistrar) createErrorResult(message string) (*mcp.CallToolResult,
 	}, nil
 }
 
-// createErrorResultWithRetry creates an error result with retry information
-func (tr *ToolRegistrar) createErrorResultWithRetry(message string, retryNumber int) (*mcp.CallToolResult, error) {
-	data := map[string]interface{}{
-		"success":      false,
-		"error":        message,
-		"timestamp":    time.Now().Format(time.RFC3339),
-		"retry_number": retryNumber,
-	}
-
-	jsonData, _ := json.Marshal(data)
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: string(jsonData),
-			},
-		},
-	}, nil
-}
-
-func (tr *ToolRegistrar) createSuccessResult(step, message string, data map[string]interface{}) (*mcp.CallToolResult, error) {
-	data["success"] = true
-	data["step"] = step
-	data["message"] = message
-	data["timestamp"] = time.Now().Format(time.RFC3339)
-
-	jsonData, _ := json.Marshal(data)
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: string(jsonData),
-			},
-		},
-	}, nil
-}
-
-// createStepResult creates a result with workflow-aware chain hints
-func (tr *ToolRegistrar) createStepResult(success bool, stepName, message string, data map[string]interface{}, retryNumber int) (*mcp.CallToolResult, error) {
-	data["success"] = success
-	data["step"] = stepName
-	data["message"] = message
-	data["timestamp"] = time.Now().Format(time.RFC3339)
-	data["retry_number"] = retryNumber
-
-	// Add simple static chain hints
-	if success {
-		// Define the workflow sequence
-		workflowSequence := []string{
-			"analyze_repository",
-			"generate_dockerfile",
-			"build_image",
-			"scan_image",
-			"tag_image",
-			"push_image",
-			"generate_k8s_manifests",
-			"prepare_cluster",
-			"deploy_application",
-			"verify_deployment",
-		}
-
-		// Find current step index
-		currentIndex := -1
-		for i, step := range workflowSequence {
-			if step == stepName {
-				currentIndex = i
-				break
-			}
-		}
-
-		// Determine next step
-		if currentIndex >= 0 && currentIndex < len(workflowSequence)-1 {
-			nextStep := workflowSequence[currentIndex+1]
-			data["chain_hint"] = map[string]interface{}{
-				"next_tool": nextStep,
-				"reason":    fmt.Sprintf("%s completed successfully. Ready for %s", stepName, nextStep),
-				"is_retry":  false,
-			}
-		} else if currentIndex == len(workflowSequence)-1 {
-			// Last step completed
-			data["chain_hint"] = map[string]interface{}{
-				"next_tool":            "",
-				"reason":               "Workflow completed successfully",
-				"is_workflow_complete": true,
-			}
-		}
-	} else {
-		// On failure, suggest retry with same tool
-		data["chain_hint"] = map[string]interface{}{
-			"next_tool": stepName,
-			"reason":    fmt.Sprintf("%s failed. Consider retrying with adjusted parameters", stepName),
-			"is_retry":  true,
-		}
-	}
-
-	jsonData, _ := json.Marshal(data)
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: string(jsonData),
-			},
-		},
-	}, nil
-}
-
-func (tr *ToolRegistrar) createStepState(ctx context.Context, sessionID, repoPath string) (*domainworkflow.WorkflowState, *tools.SimpleWorkflowState, error) {
+func (tr *ToolRegistrar) createStepState(ctx context.Context, sessionID, repoPath string, fixingMode bool, previousError, failedTool string, requestParams map[string]interface{}) (*domainworkflow.WorkflowState, *tools.SimpleWorkflowState, error) {
 	// Load existing session state or create new one
 	simpleState, err := tools.LoadWorkflowState(ctx, tr.sessionManager, sessionID)
 	if err != nil {
@@ -878,6 +796,7 @@ func (tr *ToolRegistrar) createStepState(ctx context.Context, sessionID, repoPat
 			RepoPath:       repoPath,
 			Status:         "initialized",
 			CompletedSteps: []string{},
+			FailedSteps:    []string{},
 			Artifacts:      make(map[string]interface{}),
 			Metadata:       make(map[string]interface{}),
 		}
@@ -908,6 +827,9 @@ func (tr *ToolRegistrar) createStepState(ctx context.Context, sessionID, repoPat
 		TotalSteps:       10, // Standard workflow has 10 steps
 		CurrentStep:      len(simpleState.CompletedSteps),
 		WorkflowProgress: domainworkflow.NewWorkflowProgress(sessionID, "containerization", 10),
+		RequestParams:    requestParams,
+		PreviousError:    previousError,
+		FailedTool:       failedTool,
 	}
 
 	// Restore step results from session artifacts
