@@ -142,7 +142,7 @@ func (tr *ToolRegistrar) registerOrchestrationTools(mcpServer *server.MCPServer)
 	// Register workflow_status tool
 	workflowStatusTool := mcp.Tool{
 		Name:        "workflow_status",
-		Description: "📊 Check workflow progress and see which steps are completed. Use this to understand current state before continuing.",
+		Description: "📊 Check workflow progress and see which steps are completed. Only use when you need to understand the current workflow state.",
 		InputSchema: mcp.ToolInputSchema{
 			Type: "object",
 			Properties: map[string]interface{}{
@@ -196,10 +196,13 @@ func (tr *ToolRegistrar) registerOrchestrationTools(mcpServer *server.MCPServer)
 			"deploy_application", "verify_deployment",
 		}
 
-		// Build step status details
-		stepStatuses := make(map[string]interface{})
+		// Build step status details in order
+		stepStatuses := make([]map[string]interface{}, 0, len(allSteps))
 		for _, step := range allSteps {
-			stepStatuses[step] = simpleState.GetStepStatus(step)
+			stepStatuses = append(stepStatuses, map[string]interface{}{
+				"step":   step,
+				"status": simpleState.GetStepStatus(step),
+			})
 		}
 
 		// Calculate next step based on current step's workflow configuration
@@ -208,19 +211,19 @@ func (tr *ToolRegistrar) registerOrchestrationTools(mcpServer *server.MCPServer)
 			if simpleState.CurrentStep == "" {
 				return "analyze_repository"
 			}
-			
+
 			// If current step failed, check redirect configuration
 			if simpleState.IsStepFailed(simpleState.CurrentStep) {
 				if redirectConfig, exists := RedirectConfigs[simpleState.CurrentStep]; exists {
 					return redirectConfig.RedirectTo
 				}
 			}
-			
+
 			// Get next tool from workflow configuration
 			if config, err := tools.GetToolConfig(simpleState.CurrentStep); err == nil && config.NextTool != "" {
 				return config.NextTool
 			}
-			
+
 			return "workflow_complete"
 		}()
 
