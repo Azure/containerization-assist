@@ -11,7 +11,7 @@ import (
 // Workflow sequence constants
 var WorkflowSequence = []string{
 	"analyze_repository",
-	"generate_dockerfile", 
+	"generate_dockerfile",
 	"build_image",
 	"scan_image",
 	"tag_image",
@@ -200,7 +200,6 @@ func (tr *ToolRegistrar) createProgressResponse(stepName string, responseData ma
 	// Build text-based response
 	analyzeRepoResultStr := tr.formatAnalyzeResult(responseData["analyze_result"])
 	responseText := tr.buildResponseText(stepName, currentIndex, analyzeRepoResultStr, sessionID)
-
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{

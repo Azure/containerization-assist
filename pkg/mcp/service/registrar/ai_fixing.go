@@ -153,7 +153,7 @@ func (tr *ToolRegistrar) getContext(sessionID, artifactKey string) string {
 			return string(jsonData)
 		}
 	}
-	
+
 	return "Data not available"
 }
 
