@@ -110,22 +110,26 @@ func TestMCPProgressiveReport(t *testing.T) {
 	// Verify structured files were prepared in metadata
 	if report.Metadata == nil {
 		t.Errorf("Report metadata should not be nil after saving")
+		return
 	}
 
-	if files, exists := report.Metadata["files"]; !exists {
+	files, exists := report.Metadata["files"]
+	if !exists {
 		t.Errorf("Files should be prepared in metadata")
-	} else {
-		filesMap, ok := files.(map[string]interface{})
-		if !ok {
-			t.Errorf("Files metadata should be a map")
-		} else {
-			if _, exists := filesMap["mcp_report.json"]; !exists {
-				t.Errorf("JSON file should be prepared in metadata")
-			}
-			if _, exists := filesMap["mcp_report.md"]; !exists {
-				t.Errorf("Markdown file should be prepared in metadata")
-			}
-		}
+		return
+	}
+
+	filesMap, ok := files.(map[string]interface{})
+	if !ok {
+		t.Errorf("Files metadata should be a map")
+		return
+	}
+
+	if _, exists := filesMap["mcp_report.json"]; !exists {
+		t.Errorf("JSON file should be prepared in metadata")
+	}
+	if _, exists := filesMap["mcp_report.md"]; !exists {
+		t.Errorf("Markdown file should be prepared in metadata")
 	}
 
 	// Test creating another report (since we no longer read from disk, each call creates new)
@@ -329,21 +333,25 @@ func TestReportStepExecution(t *testing.T) {
 	// Verify structured files were prepared in metadata instead of files being written
 	if report.Metadata == nil {
 		t.Error("Report metadata should not be nil after step execution")
+		return
 	}
 
-	if files, exists := report.Metadata["files"]; !exists {
+	files, exists := report.Metadata["files"]
+	if !exists {
 		t.Error("Files should be prepared in metadata after step execution")
-	} else {
-		filesMap, ok := files.(map[string]interface{})
-		if !ok {
-			t.Error("Files metadata should be a map")
-		} else {
-			if _, exists := filesMap["mcp_report.json"]; !exists {
-				t.Error("JSON file should be prepared in metadata after step execution")
-			}
-			if _, exists := filesMap["mcp_report.md"]; !exists {
-				t.Error("Markdown file should be prepared in metadata after step execution")
-			}
-		}
+		return
+	}
+
+	filesMap, ok := files.(map[string]interface{})
+	if !ok {
+		t.Error("Files metadata should be a map")
+		return
+	}
+
+	if _, exists := filesMap["mcp_report.json"]; !exists {
+		t.Error("JSON file should be prepared in metadata after step execution")
+	}
+	if _, exists := filesMap["mcp_report.md"]; !exists {
+		t.Error("Markdown file should be prepared in metadata after step execution")
 	}
 }
