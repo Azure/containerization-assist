@@ -1,6 +1,7 @@
 package report
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -244,7 +245,10 @@ func TestMCPReportMarkdownGeneration(t *testing.T) {
 		},
 	}
 
-	UpdateStepResult(report, "generate_dockerfile", true, startTime, &endTime, "", nil, artifacts)
+	err = UpdateStepResult(report, "generate_dockerfile", true, startTime, &endTime, "", nil, artifacts)
+	if err != nil {
+		t.Fatalf("Failed to update step result: %v", err)
+	}
 	UpdateTokenUsage(report, 200, 100)
 	UpdateSummary(report)
 
@@ -252,23 +256,23 @@ func TestMCPReportMarkdownGeneration(t *testing.T) {
 	markdown := FormatMCPMarkdownReport(report)
 
 	// Verify markdown contains expected content
-	if !containsString(markdown, "# MCP Workflow Report") {
+	if !strings.Contains(markdown, "# MCP Workflow Report") {
 		t.Error("Markdown should contain main heading")
 	}
 
-	if !containsString(markdown, workflowID) {
+	if !strings.Contains(markdown, workflowID) {
 		t.Error("Markdown should contain workflow ID")
 	}
 
-	if !containsString(markdown, "generate_dockerfile") {
+	if !strings.Contains(markdown, "generate_dockerfile") {
 		t.Error("Markdown should contain step name")
 	}
 
-	if !containsString(markdown, "## Token Usage") {
+	if !strings.Contains(markdown, "## Token Usage") {
 		t.Error("Markdown should contain token usage section")
 	}
 
-	if !containsString(markdown, "200") {
+	if !strings.Contains(markdown, "200") {
 		t.Error("Markdown should contain prompt token count")
 	}
 }
@@ -342,23 +346,4 @@ func TestReportStepExecution(t *testing.T) {
 			}
 		}
 	}
-}
-
-// Helper function for string containment check
-func containsString(s, substr string) bool {
-	return len(s) >= len(substr) &&
-		(s == substr ||
-			len(s) > len(substr) &&
-				(s[:len(substr)] == substr ||
-					s[len(s)-len(substr):] == substr ||
-					containsSubstring(s, substr)))
-}
-
-func containsSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

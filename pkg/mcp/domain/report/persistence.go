@@ -53,20 +53,35 @@ func SaveMCPReport(report *MCPProgressiveReport, targetDir string) error {
 	markdownContent := FormatMCPMarkdownReport(report)
 
 	// Store structured file content for MCP client to handle
-	report.Metadata["files"] = map[string]interface{}{
-		"mcp_report.json": map[string]interface{}{
-			"path":        ".container-kit/mcp_report.json",
-			"content":     string(jsonData),
-			"type":        "application/json",
-			"description": "Complete MCP workflow report in JSON format",
-		},
-		"mcp_report.md": map[string]interface{}{
-			"path":        ".container-kit/mcp_report.md",
-			"content":     markdownContent,
-			"type":        "text/markdown",
-			"description": "Human-readable MCP workflow report in Markdown format",
-		},
+	// Check if files already exist in metadata and preserve them
+	var existingFiles map[string]interface{}
+	if files, exists := report.Metadata["files"]; exists {
+		if filesMap, ok := files.(map[string]interface{}); ok {
+			existingFiles = filesMap
+		}
 	}
+
+	// If no existing files, create new map
+	if existingFiles == nil {
+		existingFiles = make(map[string]interface{})
+	}
+
+	// Add or update the MCP report files (preserving any other files)
+	existingFiles["mcp_report.json"] = map[string]interface{}{
+		"path":        ".container-kit/mcp_report.json",
+		"content":     string(jsonData),
+		"type":        "application/json",
+		"description": "Complete MCP workflow report in JSON format",
+	}
+	existingFiles["mcp_report.md"] = map[string]interface{}{
+		"path":        ".container-kit/mcp_report.md",
+		"content":     markdownContent,
+		"type":        "text/markdown",
+		"description": "Human-readable MCP workflow report in Markdown format",
+	}
+
+	// Store the updated files map back to metadata
+	report.Metadata["files"] = existingFiles
 	report.Metadata["instructions"] = "Report files are provided in this response. The MCP client can offer to create these files in your project."
 
 	return nil
