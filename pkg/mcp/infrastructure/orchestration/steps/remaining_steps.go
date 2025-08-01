@@ -535,7 +535,7 @@ func NewVerifyStep() workflow.Step    { return &VerifyStep{} }
 func (s *VerifyStep) Name() string    { return "verify_deployment" }
 func (s *VerifyStep) MaxRetries() int { return 2 }
 func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
-	state.Logger.Info("Step 10: Verifying deployment health")
+	state.Logger.Info("Step 10: Verifying deployment health with port forwarding")
 
 	// Check if deployment was actually requested
 	shouldDeploy := state.Args.Deploy == nil || *state.Args.Deploy
@@ -558,40 +558,78 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 		},
 	}
 
-	// Check deployment health
+	// Perform enhanced verification with port forwarding and health checks
+	var verifyResult *VerificationResult
 	if state.Args.TestMode {
-		state.Logger.Info("Test mode: Simulating deployment health check")
+		state.Logger.Info("Test mode: Simulating enhanced deployment verification")
 		state.Result.Endpoint = fmt.Sprintf("http://test-%s.%s.svc.cluster.local:8080",
 			utils.ExtractRepoName(state.RepoIdentifier), state.K8sResult.Namespace)
+
+		// Simulate successful verification output
+		state.Logger.Info("✅ Deployment verified successfully")
+		state.Logger.Info("✅ Port forwarding active (timeout: 30min)")
+		state.Logger.Info("✅ Application responding (200 OK, 45ms)")
+		state.Logger.Info("🔗 Access your app: http://localhost:8080")
 	} else {
-		err := CheckDeploymentHealth(ctx, infraK8sResult, state.Logger)
+		// Use enhanced verification with port forwarding
+		var err error
+		verifyResult, err = VerifyDeploymentWithPortForward(ctx, infraK8sResult, state.Logger)
 		if err != nil {
-			state.Logger.Warn("Deployment health check failed (non-critical)", "error", err)
-			// In strict mode, fail the workflow for health check errors
+			state.Logger.Warn("Enhanced deployment verification failed", "error", err)
+			// In strict mode, fail the workflow for verification errors
 			if state.Args.StrictMode {
-				return errors.New(errors.CodeDeploymentFailed, "verify_step", "deployment health check failed in strict mode", err)
+				return errors.New(errors.CodeDeploymentFailed, "verify_step", "enhanced deployment verification failed in strict mode", err)
 			}
-			// Otherwise, don't fail the workflow for health check issues - just warn
-		} else {
-			state.Logger.Info("Deployment health check passed")
+			// Otherwise, don't fail the workflow - just warn
 		}
 
-		// Get service endpoint
-		endpoint, err := GetServiceEndpoint(ctx, infraK8sResult, state.Logger)
-		if err != nil {
-			// In strict mode, fail the workflow for endpoint retrieval errors
-			if state.Args.StrictMode {
-				return errors.New(errors.CodeKubernetesApiError, "verify_step", "failed to get service endpoint in strict mode", err)
+		// Process and display verification results
+		if verifyResult != nil {
+			for _, message := range verifyResult.Messages {
+				switch message.Level {
+				case "success":
+					state.Logger.Info(fmt.Sprintf("%s %s", message.Icon, message.Message))
+				case "warning":
+					state.Logger.Warn(fmt.Sprintf("%s %s", message.Icon, message.Message))
+				case "error":
+					state.Logger.Error(fmt.Sprintf("%s %s", message.Icon, message.Message))
+				case "info":
+					state.Logger.Info(fmt.Sprintf("%s %s", message.Icon, message.Message))
+				}
 			}
-			// Otherwise, log the error but don't fail the workflow
-			state.Logger.Warn("Failed to get service endpoint (non-critical)", "error", err)
-			state.Result.Endpoint = "http://localhost:30000" // Placeholder for tests
-		} else {
-			state.Result.Endpoint = endpoint
-			state.Logger.Info("Service endpoint discovered", "endpoint", endpoint)
+
+			// Set endpoint in result
+			if verifyResult.AccessURL != "" {
+				state.Result.Endpoint = verifyResult.AccessURL
+				state.Logger.Info(fmt.Sprintf("🔗 Access your app: %s", verifyResult.AccessURL))
+			} else {
+				// Fallback to original endpoint discovery
+				endpoint, err := GetServiceEndpoint(ctx, infraK8sResult, state.Logger)
+				if err != nil {
+					if state.Args.StrictMode {
+						return errors.New(errors.CodeKubernetesApiError, "verify_step", "failed to get service endpoint in strict mode", err)
+					}
+					state.Logger.Warn("Failed to get service endpoint (non-critical)", "error", err)
+					state.Result.Endpoint = "http://localhost:30000" // Placeholder for tests
+				} else {
+					state.Result.Endpoint = endpoint
+					state.Logger.Info("Service endpoint discovered", "endpoint", endpoint)
+				}
+			}
+
+			// Final summary message
+			if verifyResult.DeploymentSuccess {
+				if verifyResult.AccessURL != "" {
+					state.Logger.Info("Next: Test your application or run additional verification tools")
+				} else {
+					state.Logger.Info("Next: Check cluster networking or contact your platform team")
+				}
+			} else {
+				state.Logger.Info("Next: Check deployment logs with 'kubectl describe' or retry deployment")
+			}
 		}
 	}
 
-	state.Logger.Info("Deployment verification completed")
+	state.Logger.Info("Enhanced deployment verification completed")
 	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -159,40 +160,96 @@ func DeployToKubernetes(ctx context.Context, k8sResult *K8sResult, logger *slog.
 		"manifest_path", manifestPath,
 		"options", fmt.Sprintf("%+v", deploymentOptions))
 
-	deploymentResult, err := deploymentService.DeployManifest(ctx, manifestPath, deploymentOptions)
+	// Get the directory containing the manifest files
+	// manifestPath might be a specific file, so we need the directory
+	manifestDir := filepath.Dir(manifestPath)
+
+	// Get all YAML files in the manifest directory to ensure we deploy everything
+	yamlFiles, err := getYAMLFilesInDirectory(manifestDir)
 	if err != nil {
-		logger.Error("Failed to deploy to Kubernetes", "error", err)
-		return fmt.Errorf("failed to deploy to Kubernetes: %v", err)
+		logger.Error("Failed to get YAML files from manifest directory", "error", err, "manifest_dir", manifestDir)
+		return fmt.Errorf("failed to get YAML files from manifest directory: %v", err)
 	}
 
-	if !deploymentResult.Success {
-		// Check if we have error details
-		var errorMsg string
-		if deploymentResult.Error != nil {
-			errorMsg = fmt.Sprintf("%s: %s", deploymentResult.Error.Type, deploymentResult.Error.Message)
-		} else if validationData, ok := deploymentResult.Context["validation"]; ok {
-			// Check validation result for details
-			if validation, ok := validationData.(*kubernetes.ValidationResult); ok && validation.Error != nil {
-				errorMsg = fmt.Sprintf("validation failed: %s", validation.Error.Message)
-			} else {
-				errorMsg = "deployment validation failed but no error details available"
-			}
-		} else {
-			errorMsg = fmt.Sprintf("deployment failed (resources deployed: %d)", len(deploymentResult.Resources))
+	logger.Info("Found manifest files to deploy", "files", yamlFiles, "count", len(yamlFiles))
+
+	// Deploy each manifest file individually to ensure all are deployed
+	// Collect all results first, then report failures at the end
+	var allResources []kubernetes.DeployedResource
+	var deploymentErrors []string
+	var successfulDeployments []string
+
+	for _, yamlFile := range yamlFiles {
+		logger.Info("Deploying manifest file", "file", yamlFile)
+
+		deploymentResult, err := deploymentService.DeployManifest(ctx, yamlFile, deploymentOptions)
+		if err != nil {
+			deploymentErrors = append(deploymentErrors, fmt.Sprintf("%s: %v", yamlFile, err))
+			logger.Error("Failed to deploy manifest file", "file", yamlFile, "error", err)
+			continue // Continue with other files
 		}
 
-		logger.Error("Kubernetes deployment unsuccessful",
-			"error", errorMsg,
-			"resources_deployed", len(deploymentResult.Resources),
-			"output", deploymentResult.Output)
-		return fmt.Errorf("kubernetes deployment unsuccessful: %s", errorMsg)
+		if !deploymentResult.Success {
+			// Check if we have error details
+			var errorMsg string
+			if deploymentResult.Error != nil {
+				errorMsg = fmt.Sprintf("%s: %s", deploymentResult.Error.Type, deploymentResult.Error.Message)
+			} else if validationData, ok := deploymentResult.Context["validation"]; ok {
+				// Check validation result for details
+				if validation, ok := validationData.(*kubernetes.ValidationResult); ok && validation.Error != nil {
+					errorMsg = fmt.Sprintf("validation failed: %s", validation.Error.Message)
+				} else {
+					errorMsg = "deployment validation failed but no error details available"
+				}
+			} else {
+				errorMsg = fmt.Sprintf("deployment failed (resources deployed: %d)", len(deploymentResult.Resources))
+			}
+
+			deploymentErrors = append(deploymentErrors, fmt.Sprintf("%s: %s", yamlFile, errorMsg))
+			logger.Error("Kubernetes deployment unsuccessful for file",
+				"file", yamlFile,
+				"error", errorMsg,
+				"resources_deployed", len(deploymentResult.Resources),
+				"output", deploymentResult.Output)
+			continue // Continue with other files
+		}
+
+		// Collect resources from successful deployments
+		allResources = append(allResources, deploymentResult.Resources...)
+		successfulDeployments = append(successfulDeployments, yamlFile)
+		logger.Info("Successfully deployed manifest file",
+			"file", yamlFile,
+			"resources_deployed", len(deploymentResult.Resources))
+	}
+
+	// Report results
+	if len(successfulDeployments) > 0 {
+		logger.Info("Successfully deployed manifest files",
+			"files", successfulDeployments,
+			"count", len(successfulDeployments))
+	}
+
+	// If we have deployment errors, we need to return an error to indicate partial failure
+	if len(deploymentErrors) > 0 {
+		logger.Error("Some manifest files failed to deploy",
+			"errors", deploymentErrors,
+			"failed_count", len(deploymentErrors),
+			"successful_count", len(successfulDeployments))
+
+		// Return error with details about what failed and what succeeded
+		if len(successfulDeployments) == 0 {
+			return fmt.Errorf("all manifest deployments failed: %v", deploymentErrors)
+		} else {
+			return fmt.Errorf("partial deployment failure: %d/%d files failed to deploy. Errors: %v. Successfully deployed: %v",
+				len(deploymentErrors), len(yamlFiles), deploymentErrors, successfulDeployments)
+		}
 	}
 
 	logger.Info("Kubernetes deployment completed successfully",
 		"app_name", k8sResult.AppName,
 		"namespace", k8sResult.Namespace,
-		"resources_deployed", len(deploymentResult.Resources),
-		"duration", deploymentResult.Duration)
+		"total_resources_deployed", len(allResources),
+		"manifest_files_deployed", len(yamlFiles))
 
 	// Validate deployment with AI-powered retry logic
 	logger.Info("Starting deployment validation with AI-powered retry logic")
@@ -319,8 +376,8 @@ func GetServiceEndpoint(ctx context.Context, k8sResult *K8sResult, logger *slog.
 	}
 
 	// For kind clusters, construct localhost URL with NodePort
-	nodePortStr := string(output)
-	if nodePortStr != "" {
+	nodePortStr := strings.TrimSpace(string(output))
+	if nodePortStr != "" && nodePortStr != "<no value>" {
 		endpoint := fmt.Sprintf("http://localhost:%s", nodePortStr)
 		logger.Info("Service endpoint retrieved (NodePort)", "endpoint", endpoint)
 		return endpoint, nil
@@ -370,4 +427,28 @@ func CheckDeploymentHealth(ctx context.Context, k8sResult *K8sResult, logger *sl
 	// Include diagnostics in error for AI analysis
 	return fmt.Errorf("deployment not healthy: %d/%d pods ready\n\nDiagnostics:\n%s",
 		diagnostics.PodsReady, diagnostics.PodsTotal, report)
+}
+
+// getYAMLFilesInDirectory returns all YAML files in the given directory
+func getYAMLFilesInDirectory(dirPath string) ([]string, error) {
+	var yamlFiles []string
+
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read directory %s: %w", dirPath, err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		fileName := entry.Name()
+		if strings.HasSuffix(fileName, ".yaml") || strings.HasSuffix(fileName, ".yml") {
+			fullPath := filepath.Join(dirPath, fileName)
+			yamlFiles = append(yamlFiles, fullPath)
+		}
+	}
+
+	return yamlFiles, nil
 }

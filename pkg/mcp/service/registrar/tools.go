@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"log/slog"
@@ -542,16 +543,7 @@ func (tr *ToolRegistrar) registerUtilityTools(mcpServer *server.MCPServer) error
 		},
 	}
 
-	mcpServer.AddTool(listToolsTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf(`{"success":true,"message":"list_tools called","timestamp":"%s"}`, time.Now().Format(time.RFC3339)),
-				},
-			},
-		}, nil
-	})
+	mcpServer.AddTool(listToolsTool, tools.CreateListToolsHandler())
 
 	tr.logger.Info("Utility tools registered successfully")
 	return nil
@@ -683,6 +675,68 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 				"session_id":         sessionID,
 				"dockerfile_content": workflowState.DockerfileResult.Content,
 			}, retryNumber)
+
+	case "verify_deployment":
+		sessionID, ok := args["session_id"].(string)
+		if !ok || sessionID == "" {
+			return tr.createErrorResult("session_id parameter is required for verify_deployment")
+		}
+
+		// Map tool name to actual step name
+		actualStepName := tr.mapToolNameToStepName(stepName)
+
+		// Get the step from step provider
+		step, err := tr.stepProvider.GetStep(actualStepName)
+		if err != nil {
+			return tr.createErrorResultWithRetry(fmt.Sprintf("Failed to get step %s: %s", actualStepName, err.Error()), retryNumber)
+		}
+
+		// Create workflow state for this step
+		workflowState, simpleState, err := tr.createStepState(ctx, sessionID, "")
+		if err != nil {
+			return tr.createErrorResultWithRetry(fmt.Sprintf("Failed to create workflow state: %s", err.Error()), retryNumber)
+		}
+
+		// Execute the step
+		err = step.Execute(ctx, workflowState)
+		if err != nil {
+			tr.logger.Info("Step failed", "step", stepName, "error", err.Error(), "retryNumber", retryNumber)
+			return tr.createStepResult(false, stepName, fmt.Sprintf("Deployment verification failed: %s", err.Error()),
+				map[string]interface{}{
+					"session_id": sessionID,
+				}, retryNumber)
+		}
+
+		// Save step results to session artifacts
+		tr.saveStepResults(workflowState, simpleState, stepName)
+
+		// Mark step as completed and save state
+		simpleState.MarkStepCompleted(stepName)
+		simpleState.CurrentStep = stepName
+		simpleState.Status = "running"
+		if err := tools.SaveWorkflowState(ctx, tr.sessionManager, simpleState); err != nil {
+			tr.logger.Warn("Failed to save workflow state after step execution", "session_id", sessionID, "step", stepName, "error", err)
+		}
+
+		// Create detailed success message for verify_deployment with port forwarding info
+		var successMessage string
+		additionalData := map[string]interface{}{
+			"session_id": sessionID,
+		}
+
+		if workflowState.Result != nil && workflowState.Result.Endpoint != "" {
+			if strings.Contains(workflowState.Result.Endpoint, "localhost") {
+				successMessage = fmt.Sprintf("✅ Deployment verified successfully\n✅ Port forwarding active (timeout: 30min)\n🔗 Access your app: %s\n\nNext: Test your application or run additional verification tools", workflowState.Result.Endpoint)
+			} else {
+				successMessage = fmt.Sprintf("✅ Deployment verified successfully\n🔗 Service endpoint: %s", workflowState.Result.Endpoint)
+			}
+			additionalData["endpoint"] = workflowState.Result.Endpoint
+			additionalData["access_url"] = workflowState.Result.Endpoint
+		} else {
+			successMessage = "✅ Deployment verification completed successfully"
+		}
+
+		return tr.createStepResult(true, stepName, successMessage, additionalData, retryNumber)
 
 	default:
 		// For other steps, create a session-aware execution

@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"log/slog"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/pkg/errors"
-	"log/slog"
 
 	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/service/session"
@@ -218,7 +219,7 @@ var toolConfigs = []ToolConfig{
 	},
 	{
 		Name:                "verify_deployment",
-		Description:         "Verify the deployment is healthy and running correctly",
+		Description:         "Verify deployment health with automatic port forwarding and application testing",
 		Category:            CategoryWorkflow,
 		RequiredParams:      []string{"session_id"},
 		NeedsStepProvider:   true,
@@ -226,7 +227,7 @@ var toolConfigs = []ToolConfig{
 		NeedsLogger:         true,
 		StepGetterName:      "GetVerifyStep",
 		NextTool:            "", // End of workflow
-		ChainReason:         "Deployment verified successfully. Workflow complete!",
+		ChainReason:         "Deployment verified with port forwarding. Access your app via the provided link!",
 	},
 
 	// Orchestration Tools

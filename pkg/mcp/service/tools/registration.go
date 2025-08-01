@@ -7,9 +7,10 @@ import (
 	"reflect"
 	"time"
 
+	"log/slog"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/pkg/errors"
-	"log/slog"
 
 	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/mark3labs/mcp-go/server"
