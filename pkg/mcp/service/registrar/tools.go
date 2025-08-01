@@ -202,13 +202,25 @@ func (tr *ToolRegistrar) registerOrchestrationTools(mcpServer *server.MCPServer)
 			stepStatuses[step] = simpleState.GetStepStatus(step)
 		}
 
-		// Find next step that hasn't been completed or failed
+		// Calculate next step based on current step's workflow configuration
 		nextStep := func() string {
-			for _, step := range allSteps {
-				if !simpleState.IsStepCompleted(step) && !simpleState.IsStepFailed(step) {
-					return step
+			// If no current step, start with first step
+			if simpleState.CurrentStep == "" {
+				return "analyze_repository"
+			}
+			
+			// If current step failed, check redirect configuration
+			if simpleState.IsStepFailed(simpleState.CurrentStep) {
+				if redirectConfig, exists := RedirectConfigs[simpleState.CurrentStep]; exists {
+					return redirectConfig.RedirectTo
 				}
 			}
+			
+			// Get next tool from workflow configuration
+			if config, err := tools.GetToolConfig(simpleState.CurrentStep); err == nil && config.NextTool != "" {
+				return config.NextTool
+			}
+			
 			return "workflow_complete"
 		}()
 
