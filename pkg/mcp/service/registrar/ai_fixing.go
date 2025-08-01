@@ -8,26 +8,9 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/service/tools"
 )
 
-// generateAIFixingPrompt creates AI prompts for fixing specific tool failures
-func (tr *ToolRegistrar) generateAIFixingPrompt(failedTool, fixingTool, error, sessionID string) *AIFixingPrompt {
-	switch failedTool {
-	case "build_image":
-		return tr.generateDockerfileFix(error, sessionID)
-	case "scan_image":
-		return tr.generateSecurityFix(error, sessionID)
-	case "deploy_application":
-		return tr.generateManifestFix(error, sessionID)
-	default:
-		return tr.generateGenericFix(failedTool, fixingTool, error, sessionID)
-	}
-}
-
-// generateDockerfileFix creates AI prompt for fixing Dockerfile issues
-func (tr *ToolRegistrar) generateDockerfileFix(error, sessionID string) *AIFixingPrompt {
-	// Get existing analysis and dockerfile from session
-	context := tr.getSessionContext(sessionID)
-
-	systemPrompt := `You are an expert Docker containerization specialist. A Dockerfile build has failed and you need to analyze the error and generate a corrected Dockerfile.
+// AI prompt templates as constants for better maintainability
+const (
+	dockerSystemPrompt = `You are an expert Docker containerization specialist. A Dockerfile build has failed and you need to analyze the error and generate a corrected Dockerfile.
 
 Key principles:
 - Use multi-stage builds when appropriate
@@ -44,36 +27,7 @@ Inspect the following:
 
 Generate a corrected Dockerfile that addresses the specific error while maintaining best practices.`
 
-	userPrompt := fmt.Sprintf(`Docker build failed with this error:
-%s
-
-Please analyze this error and generate a corrected Dockerfile. Focus on:
-1. Fixing the specific issue that caused the build failure
-2. Maintaining compatibility with the detected language/framework
-3. Following Docker best practices
-4. Optimizing for the application type
-
-Repository context:
-%s
-
-Generate a complete, working Dockerfile that fixes this issue.`,
-		error,
-		tr.formatContextForAI(context, "analysis"))
-
-	return &AIFixingPrompt{
-		SystemPrompt:   systemPrompt,
-		UserPrompt:     userPrompt,
-		Context:        context,
-		ExpectedOutput: "A complete Dockerfile that addresses the build failure",
-		FixingStrategy: "dockerfile_regeneration",
-	}
-}
-
-// generateManifestFix creates AI prompt for fixing Kubernetes manifest issues
-func (tr *ToolRegistrar) generateManifestFix(error, sessionID string) *AIFixingPrompt {
-	context := tr.getSessionContext(sessionID)
-
-	systemPrompt := `You are an expert Kubernetes engineer. A Kubernetes deployment has failed and you need to analyze the error and generate corrected manifests.
+	k8sSystemPrompt = `You are an expert Kubernetes engineer. A Kubernetes deployment has failed and you need to analyze the error and generate corrected manifests.
 
 Key principles:
 - Use proper resource limits and requests
@@ -91,40 +45,7 @@ Inspect the following:
 
 Generate corrected Kubernetes manifests that address the specific deployment issue.`
 
-	userPrompt := fmt.Sprintf(`Kubernetes deployment failed with this error:
-%s
-
-Please analyze this error and generate corrected Kubernetes manifests. Focus on:
-1. Fixing the specific deployment issue
-2. Ensuring proper resource configuration
-3. Setting up health checks if needed
-4. Following Kubernetes best practices
-
-Application context:
-%s
-
-Container image info:
-%s
-
-Generate complete, working Kubernetes manifests that fix this deployment issue.`,
-		error,
-		tr.formatContextForAI(context, "analysis"),
-		tr.formatContextForAI(context, "build_result"))
-
-	return &AIFixingPrompt{
-		SystemPrompt:   systemPrompt,
-		UserPrompt:     userPrompt,
-		Context:        context,
-		ExpectedOutput: "Complete Kubernetes manifests (Deployment, Service, etc.) that fix the deployment issue",
-		FixingStrategy: "manifest_regeneration",
-	}
-}
-
-// generateSecurityFix creates AI prompt for fixing security scan issues
-func (tr *ToolRegistrar) generateSecurityFix(error, sessionID string) *AIFixingPrompt {
-	context := tr.getSessionContext(sessionID)
-
-	systemPrompt := `You are a container security expert. A security scan has found vulnerabilities and you need to provide guidance for creating a more secure container image.
+	securitySystemPrompt = `You are a container security expert. A security scan has found vulnerabilities and you need to provide guidance for creating a more secure container image.
 
 Security best practices:
 - Use minimal base images
@@ -133,21 +54,56 @@ Security best practices:
 - Use non-root users
 - Set proper file permissions
 - Avoid embedding secrets`
+)
 
-	userPrompt := fmt.Sprintf(`Security scan failed or found issues:
-%s
+// generateAIFixingPrompt creates AI prompts for fixing specific tool failures
+func (tr *ToolRegistrar) generateAIFixingPrompt(failedTool, fixingTool, error, sessionID string) *AIFixingPrompt {
+	switch failedTool {
+	case "build_image":
+		return tr.generateDockerfileFix(error, sessionID)
+	case "scan_image":
+		return tr.generateSecurityFix(error, sessionID)
+	case "deploy_application":
+		return tr.generateManifestFix(error, sessionID)
+	default:
+		return tr.generateGenericFix(failedTool, fixingTool, error, sessionID)
+	}
+}
 
-Current build context:
-%s
-
-Provide specific recommendations to address these security issues and regenerate a more secure image.`,
-		error,
-		tr.formatContextForAI(context, "all"))
+// generateDockerfileFix creates AI prompt for fixing Dockerfile issues
+func (tr *ToolRegistrar) generateDockerfileFix(error, sessionID string) *AIFixingPrompt {
+	userPrompt := tr.buildDockerUserPrompt(error, sessionID)
 
 	return &AIFixingPrompt{
-		SystemPrompt:   systemPrompt,
+		SystemPrompt:   dockerSystemPrompt,
 		UserPrompt:     userPrompt,
-		Context:        context,
+		Context:        map[string]interface{}{"session_id": sessionID}, // Minimal context
+		ExpectedOutput: "A complete Dockerfile that addresses the build failure",
+		FixingStrategy: "dockerfile_regeneration",
+	}
+}
+
+// generateManifestFix creates AI prompt for fixing Kubernetes manifest issues
+func (tr *ToolRegistrar) generateManifestFix(error, sessionID string) *AIFixingPrompt {
+	userPrompt := tr.buildK8sUserPrompt(error, sessionID)
+
+	return &AIFixingPrompt{
+		SystemPrompt:   k8sSystemPrompt,
+		UserPrompt:     userPrompt,
+		Context:        map[string]interface{}{"session_id": sessionID}, // Minimal context
+		ExpectedOutput: "Complete Kubernetes manifests (Deployment, Service, etc.) that fix the deployment issue",
+		FixingStrategy: "manifest_regeneration",
+	}
+}
+
+// generateSecurityFix creates AI prompt for fixing security scan issues
+func (tr *ToolRegistrar) generateSecurityFix(error, sessionID string) *AIFixingPrompt {
+	userPrompt := tr.buildSecurityUserPrompt(error, sessionID)
+
+	return &AIFixingPrompt{
+		SystemPrompt:   securitySystemPrompt,
+		UserPrompt:     userPrompt,
+		Context:        map[string]interface{}{"session_id": sessionID}, // Minimal context
 		ExpectedOutput: "Updated Dockerfile with security improvements",
 		FixingStrategy: "dockerfile_regeneration_with_security_hardening",
 	}
@@ -155,8 +111,6 @@ Provide specific recommendations to address these security issues and regenerate
 
 // generateGenericFix creates a generic AI prompt for any tool failure
 func (tr *ToolRegistrar) generateGenericFix(failedTool, fixingTool, error, sessionID string) *AIFixingPrompt {
-	context := tr.getSessionContext(sessionID)
-
 	systemPrompt := fmt.Sprintf(`You are a containerization expert helping to fix issues in a workflow. The %s step failed and needs to be addressed by regenerating/fixing the %s step.
 
 Analyze the error and provide specific guidance for fixing the issue.`, failedTool, fixingTool)
@@ -164,95 +118,108 @@ Analyze the error and provide specific guidance for fixing the issue.`, failedTo
 	userPrompt := fmt.Sprintf(`The %s step failed with error:
 %s
 
-Context:
-%s
+Session: %s
+Context: %s
 
-Please provide specific steps to fix this issue.`,
+Instructions:
+1. Read current files to understand the configuration
+2. Analyze the error and provide specific steps to fix this issue`,
 		failedTool,
 		error,
-		tr.formatContextForAI(context, "all"))
+		sessionID,
+		"Use MCP tools to read current files and session info")
 
 	return &AIFixingPrompt{
 		SystemPrompt:   systemPrompt,
 		UserPrompt:     userPrompt,
-		Context:        context,
+		Context:        map[string]interface{}{"session_id": sessionID},
 		ExpectedOutput: fmt.Sprintf("Instructions for fixing the %s failure", failedTool),
 		FixingStrategy: "generic_fix",
 	}
 }
 
-// getSessionContext retrieves session context for AI prompts
-func (tr *ToolRegistrar) getSessionContext(sessionID string) map[string]interface{} {
-	// Load session state to get context
+// getContext loads and formats specific context data on demand
+func (tr *ToolRegistrar) getContext(sessionID, artifactKey string) string {
 	ctx := context.Background()
-	simpleState, err := tools.LoadWorkflowState(ctx, tr.sessionManager, sessionID)
+	state, err := tools.LoadWorkflowState(ctx, tr.sessionManager, sessionID)
 	if err != nil {
-		tr.logger.Warn("Failed to load session context for AI prompt", "session_id", sessionID, "error", err)
-		return map[string]interface{}{
-			"error": "Failed to load session context",
+		tr.logger.Warn("Failed to load context", "session_id", sessionID, "artifact", artifactKey, "error", err)
+		return "Context not available"
+	}
+
+	// Direct artifact access
+	if data, exists := state.Artifacts[artifactKey]; exists {
+		if jsonData, err := json.MarshalIndent(data, "", "  "); err == nil {
+			return string(jsonData)
 		}
 	}
-
-	context := map[string]interface{}{
-		"session_id":      sessionID,
-		"repo_path":       simpleState.RepoPath,
-		"completed_steps": simpleState.CompletedSteps,
-		"current_step":    simpleState.CurrentStep,
-		"status":          simpleState.Status,
-	}
-
-	// Add artifacts as context
-	for key, value := range simpleState.Artifacts {
-		context[key] = value
-	}
-
-	return context
+	
+	return "Data not available"
 }
 
-// formatContextForAI formats specific context data for AI prompts
-func (tr *ToolRegistrar) formatContextForAI(context map[string]interface{}, contextType string) string {
-	switch contextType {
-	case "analysis":
-		if analyzeData, exists := context["analyze_result"]; exists {
-			if data, _ := json.MarshalIndent(analyzeData, "", "  "); data != nil {
-				return fmt.Sprintf("Repository Analysis:\n%s", string(data))
-			}
-		}
-		return "Repository analysis not available"
+// Helper functions for building user prompts
 
-	case "dockerfile":
-		if dockerfileData, exists := context["dockerfile_result"]; exists {
-			if dockerfileMap, ok := dockerfileData.(map[string]interface{}); ok {
-				if content, ok := dockerfileMap["content"].(string); ok {
-					return fmt.Sprintf("Current Dockerfile:\n%s", content)
-				}
-			}
-		}
-		return "Dockerfile content not available"
+// buildDockerUserPrompt creates user prompt for Docker build failures
+func (tr *ToolRegistrar) buildDockerUserPrompt(error, sessionID string) string {
+	return fmt.Sprintf(`Docker build failed with this error:
+%s
 
-	case "k8s_manifests":
-		if k8sData, exists := context["k8s_result"]; exists {
-			if data, _ := json.MarshalIndent(k8sData, "", "  "); data != nil {
-				return fmt.Sprintf("Current K8s Manifests:\n%s", string(data))
-			}
-		}
-		return "Kubernetes manifests not available"
+Please analyze this error and generate a corrected Dockerfile. Focus on:
+1. Read the current Dockerfile to understand the existing configuration
+2. Fix the specific issue that caused the build failure
+3. Maintain compatibility with the detected language/framework
+4. Follow Docker best practices
+5. Optimize for the application type
 
-	case "build_result":
-		if buildData, exists := context["build_result"]; exists {
-			if data, _ := json.MarshalIndent(buildData, "", "  "); data != nil {
-				return fmt.Sprintf("Build Information:\n%s", string(data))
-			}
-		}
-		return "Build information not available"
+Repository context:
+%s
 
-	case "all":
-		if data, _ := json.MarshalIndent(context, "", "  "); data != nil {
-			return string(data)
-		}
-		return "Context not available"
+Instructions:
+1. First, read the current Dockerfile from the repository
+2. Analyze the build error against the current Dockerfile
+3. Generate a complete, working Dockerfile that fixes this issue`,
+		error, tr.getContext(sessionID, "analyze_result"))
+}
 
-	default:
-		return "Unknown context type"
-	}
+// buildK8sUserPrompt creates user prompt for Kubernetes deployment failures
+func (tr *ToolRegistrar) buildK8sUserPrompt(error, sessionID string) string {
+	return fmt.Sprintf(`Kubernetes deployment failed with this error:
+%s
+
+Please analyze this error and generate corrected Kubernetes manifests. Focus on:
+1. Read the current Kubernetes manifests to understand existing configuration
+2. Fix the specific deployment issue
+3. Ensure proper resource configuration
+4. Set up health checks if needed
+5. Follow Kubernetes best practices
+
+Application context:
+%s
+
+Container image info:
+%s
+
+Instructions:
+1. First, read the current Kubernetes manifests from the repository
+2. Analyze the deployment error against the current manifests
+3. Generate complete, working Kubernetes manifests that fix this deployment issue`,
+		error,
+		tr.getContext(sessionID, "analyze_result"),
+		tr.getContext(sessionID, "build_result"))
+}
+
+// buildSecurityUserPrompt creates user prompt for security scan failures
+func (tr *ToolRegistrar) buildSecurityUserPrompt(error, sessionID string) string {
+	return fmt.Sprintf(`Security scan failed or found issues:
+%s
+
+Current build context:
+%s
+%s
+
+Instructions:
+1. Read the current Dockerfile to understand security issues
+2. Provide specific recommendations to address these security issues
+3. Regenerate a more secure image with hardened configuration`,
+		error, tr.getContext(sessionID, "analyze_result"), tr.getContext(sessionID, "build_result"))
 }

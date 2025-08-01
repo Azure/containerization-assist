@@ -8,6 +8,44 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
+// Workflow sequence constants
+var WorkflowSequence = []string{
+	"analyze_repository",
+	"generate_dockerfile", 
+	"build_image",
+	"scan_image",
+	"tag_image",
+	"push_image",
+	"generate_k8s_manifests",
+	"prepare_cluster",
+	"deploy_application",
+	"verify_deployment",
+}
+
+const (
+	// Response template constants
+	completedTemplate = `**%s completed successfully**
+
+**Progress:** Step %d of %d completed
+%s**Next Step:** %s
+**Parameters:**
+- session_id: %s
+
+**Action:** Call tool "%s" to continue the workflow.`
+
+	workflowCompletedTemplate = `**%s completed successfully**
+
+**Containerization workflow completed successfully!**
+
+All %d steps have been executed. Your application should now be containerized and deployed.`
+
+	fallbackTemplate = `**%s completed successfully**
+
+**Session ID:** %s`
+
+	errorDisplayThreshold = 200
+)
+
 // RedirectConfig defines where to redirect when a tool fails
 type RedirectConfig struct {
 	RedirectTo   string `json:"redirect_to"`   // Tool to redirect to
@@ -109,7 +147,9 @@ func (tr *ToolRegistrar) createRedirectResponse(fromTool, error string, sessionI
 - failed_tool: %s
 - fixing_mode: true
 
-**Next Action:** Call tool "%s" with the above parameters and use the AI guidance to generate the corrected content.`,
+**Next Action:** 
+1. Read the current files (Dockerfile, manifests, etc.) to understand existing configuration
+2. Call tool "%s" with the above parameters and use the AI guidance to generate the corrected content.`,
 			fromTool,
 			formattedError,
 			instruction.AIPrompt.FixingStrategy,
@@ -124,7 +164,9 @@ func (tr *ToolRegistrar) createRedirectResponse(fromTool, error string, sessionI
 	} else {
 		responseText = fmt.Sprintf(`Tool %s failed: %s
 
-**Next Action:** Call tool "%s" with appropriate parameters to fix the issue.
+**Next Action:** 
+1. Read the current files to understand existing configuration
+2. Call tool "%s" with appropriate parameters to fix the issue.
 
 **Parameters:**
 - session_id: %s
@@ -151,87 +193,14 @@ func (tr *ToolRegistrar) createRedirectResponse(fromTool, error string, sessionI
 
 // createProgressResponse creates a response for successful tool execution with next step hint
 func (tr *ToolRegistrar) createProgressResponse(stepName string, responseData map[string]any, sessionID string) (*mcp.CallToolResult, error) {
-	// Workflow sequence for determining next step
-	workflowSequence := []string{
-		"analyze_repository",
-		"generate_dockerfile",
-		"build_image",
-		"scan_image",
-		"tag_image",
-		"push_image",
-		"generate_k8s_manifests",
-		"prepare_cluster",
-		"deploy_application",
-		"verify_deployment",
-	}
 
 	// Find current step index
-	currentIndex := -1
-	for i, step := range workflowSequence {
-		if step == stepName {
-			currentIndex = i
-			break
-		}
-	}
-
-	analyzeRepoResult := responseData["analyze_result"]
+	currentIndex := tr.findStepIndex(stepName)
 
 	// Build text-based response
-	var responseText string
+	analyzeRepoResultStr := tr.formatAnalyzeResult(responseData["analyze_result"])
+	responseText := tr.buildResponseText(stepName, currentIndex, analyzeRepoResultStr, sessionID)
 
-	// Format result
-	var analyzeRepoResultStr string
-	if analyzeRepoResult != nil {
-		analyzeRepoResultStr = fmt.Sprintf("%v", analyzeRepoResult)
-	} else {
-		analyzeRepoResultStr = ""
-	}
-
-	// Add next step instruction
-	if currentIndex >= 0 && currentIndex < len(workflowSequence)-1 {
-		nextStep := workflowSequence[currentIndex+1]
-
-		// Build response with conditional repo analysis result
-		var repoAnalysisSection string
-		if analyzeRepoResultStr != "" {
-			repoAnalysisSection = fmt.Sprintf(`**Repo Analysis Result:**
-%s
-
-`, analyzeRepoResultStr)
-		}
-
-		responseText = fmt.Sprintf(`**%s completed successfully**
-
-**Progress:** Step %d of %d completed
-%s**Next Step:** %s
-**Parameters:**
-- session_id: %s
-
-**Action:** Call tool "%s" to continue the workflow.`,
-			stepName,
-			currentIndex+1,
-			len(workflowSequence),
-			repoAnalysisSection,
-			nextStep,
-			sessionID,
-			nextStep)
-	} else if currentIndex == len(workflowSequence)-1 {
-		// Last step completed
-		responseText = fmt.Sprintf(`**%s completed successfully**
-
-**Containerization workflow completed successfully!**
-
-All %d steps have been executed. Your application should now be containerized and deployed.`,
-			stepName,
-			len(workflowSequence))
-	} else {
-		// Fallback for unknown step
-		responseText = fmt.Sprintf(`**%s completed successfully**
-
-**Session ID:** %s`,
-			stepName,
-			sessionID)
-	}
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
@@ -243,10 +212,55 @@ All %d steps have been executed. Your application should now be containerized an
 	}, nil
 }
 
+// Helper functions for cleaner code organization
+
+// findStepIndex returns the index of a step in the workflow sequence
+func (tr *ToolRegistrar) findStepIndex(stepName string) int {
+	for i, step := range WorkflowSequence {
+		if step == stepName {
+			return i
+		}
+	}
+	return -1
+}
+
+// formatAnalyzeResult formats the analyze_result for display
+func (tr *ToolRegistrar) formatAnalyzeResult(analyzeResult interface{}) string {
+	if analyzeResult != nil {
+		return fmt.Sprintf("%v", analyzeResult)
+	}
+	return ""
+}
+
+// buildResponseText constructs the appropriate response text based on workflow progress
+func (tr *ToolRegistrar) buildResponseText(stepName string, currentIndex int, analyzeResultStr, sessionID string) string {
+	switch {
+	case currentIndex >= 0 && currentIndex < len(WorkflowSequence)-1:
+		return tr.buildProgressResponse(stepName, currentIndex, analyzeResultStr, sessionID)
+	case currentIndex == len(WorkflowSequence)-1:
+		return fmt.Sprintf(workflowCompletedTemplate, stepName, len(WorkflowSequence))
+	default:
+		return fmt.Sprintf(fallbackTemplate, stepName, sessionID)
+	}
+}
+
+// buildProgressResponse builds response for workflow in progress
+func (tr *ToolRegistrar) buildProgressResponse(stepName string, currentIndex int, analyzeResultStr, sessionID string) string {
+	nextStep := WorkflowSequence[currentIndex+1]
+	repoAnalysisSection := ""
+	if analyzeResultStr != "" {
+		repoAnalysisSection = fmt.Sprintf(`**Repo Analysis Result:**
+%s
+
+`, analyzeResultStr)
+	}
+	return fmt.Sprintf(completedTemplate, stepName, currentIndex+1, len(WorkflowSequence), repoAnalysisSection, nextStep, sessionID, nextStep)
+}
+
 // formatErrorForDisplay formats error messages for better readability in tool responses
 func (tr *ToolRegistrar) formatErrorForDisplay(error string) string {
 	// If error contains build output or multi-line content, format it properly
-	if len(error) > 200 || strings.Contains(error, "\n") {
+	if len(error) > errorDisplayThreshold || strings.Contains(error, "\n") {
 		return fmt.Sprintf("```\n%s\n```", error)
 	}
 	return error
