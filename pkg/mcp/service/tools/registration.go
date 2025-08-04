@@ -202,7 +202,7 @@ func createOrchestrationHandler(config ToolConfig, deps ToolDependencies) func(c
 func createUtilityHandler(config ToolConfig, deps ToolDependencies) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	switch config.Name {
 	case "list_tools":
-		return createListToolsHandler()
+		return CreateListToolsHandler()
 	default:
 		return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			result := createErrorResult(errors.Errorf("utility handler not implemented for %s", config.Name))
@@ -342,7 +342,7 @@ func createWorkflowStatusHandler(config ToolConfig, deps ToolDependencies) func(
 	}
 }
 
-func createListToolsHandler() func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func CreateListToolsHandler() func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		tools := make([]map[string]interface{}, 0, len(toolConfigs))
 

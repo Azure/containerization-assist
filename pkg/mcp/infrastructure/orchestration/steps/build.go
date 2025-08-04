@@ -77,7 +77,33 @@ func BuildImage(ctx context.Context, dockerfileResult *DockerfileResult, imageNa
 
 	if !buildResult.Success {
 		logger.Error("Docker build unsuccessful", "error", buildResult.Error)
-		return nil, fmt.Errorf("docker build unsuccessful: %v with logs %s", buildResult.Error, buildResult.Logs)
+
+		// Debug: Log what we received
+		if buildResult.Error != nil {
+			logger.Error("Build error details",
+				"message", buildResult.Error.Message,
+				"build_logs_length", len(buildResult.Error.BuildLogs),
+				"command", buildResult.Error.Command,
+				"exit_code", buildResult.Error.ExitCode)
+		} else {
+			logger.Error("Build error is nil despite build failure")
+		}
+
+		// Extract detailed error information from BuildError if available
+		if buildResult.Error != nil {
+			errorMsg := fmt.Sprintf("Docker build failed: %s", buildResult.Error.Message)
+			if buildResult.Error.BuildLogs != "" {
+				errorMsg += fmt.Sprintf("\nBuild output:\n%s", buildResult.Error.BuildLogs)
+			}
+			if buildResult.Error.Command != "" {
+				errorMsg += fmt.Sprintf("\nCommand: %s", buildResult.Error.Command)
+			}
+			if buildResult.Error.ExitCode != 0 {
+				errorMsg += fmt.Sprintf("\nExit code: %d", buildResult.Error.ExitCode)
+			}
+			return nil, fmt.Errorf("%s", errorMsg)
+		}
+		return nil, fmt.Errorf("docker build unsuccessful: %v", buildResult.Error)
 	}
 
 	buildDuration := time.Since(startTime)

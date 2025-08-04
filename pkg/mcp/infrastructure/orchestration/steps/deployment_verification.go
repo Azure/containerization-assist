@@ -98,6 +98,8 @@ type VerificationResult struct {
 	HealthCheckResult *HealthCheckResult `json:"health_check,omitempty"`
 	AccessURL         string             `json:"access_url,omitempty"`
 	Messages          []StatusMessage    `json:"messages"`
+	UserMessage       string             `json:"user_message,omitempty"` // Formatted message for end user
+	NextSteps         string             `json:"next_steps,omitempty"`   // Suggested next actions
 }
 
 // StatusMessage represents a status message with icon and level
@@ -577,11 +579,11 @@ func startPortForwardWithTimeout(ctx context.Context, config PortForwardConfig, 
 		}, err
 	}
 
-	// Wait for port forward to establish or fail (check every 500ms for up to 10 seconds)
+	// Wait for port forward to establish or fail (check every 500ms for up to 5 seconds)
 	established := false
 	var lastError error
 
-	for i := 0; i < 20; i++ { // 20 * 500ms = 10 seconds max wait (increased from 5s)
+	for i := 0; i < 10; i++ { // 10 * 500ms = 5 seconds max wait
 		time.Sleep(500 * time.Millisecond)
 
 		// Check if process is still running
@@ -609,11 +611,11 @@ func startPortForwardWithTimeout(ctx context.Context, config PortForwardConfig, 
 			break
 		}
 
-		// Check stderr for common error patterns, but be more specific
+		// Check stderr for common error patterns
 		stderrOutput := stderr.String()
 		if strings.Contains(stderrOutput, "not found") ||
-			strings.Contains(stderrOutput, "unable to forward") ||
-			strings.Contains(stderrOutput, "error forwarding") {
+			strings.Contains(stderrOutput, "error") ||
+			strings.Contains(stderrOutput, "failed") {
 			lastError = fmt.Errorf("kubectl port-forward error: %s", stderrOutput)
 			break
 		}
@@ -626,7 +628,7 @@ func startPortForwardWithTimeout(ctx context.Context, config PortForwardConfig, 
 		}
 
 		if lastError == nil {
-			lastError = fmt.Errorf("port forwarding failed to establish after 10 seconds, stdout: %s, stderr: %s",
+			lastError = fmt.Errorf("port forwarding failed to establish after 5 seconds, stdout: %s, stderr: %s",
 				stdout.String(), stderr.String())
 		}
 
@@ -851,6 +853,21 @@ func VerifyDeploymentWithPortForward(ctx context.Context, k8sResult *K8sResult, 
 			Message: fmt.Sprintf("Application responding (%d OK, %dms)", healthResult.ResponseCode, healthResult.ResponseTime.Milliseconds()),
 			Icon:    "✅",
 		})
+	}
+
+	// 4. Generate user-friendly message and next steps
+	if result.DeploymentSuccess && result.AccessURL != "" {
+		// Access URL available case
+		result.UserMessage = fmt.Sprintf("✅ Deployment verified successfully\n✅ Port forwarding active (timeout: 30min)\n🔗 Access your app: %s", result.AccessURL)
+		result.NextSteps = "Test your application or run additional verification tools"
+	} else if result.DeploymentSuccess {
+		// Deployment successful but no access URL
+		result.UserMessage = "✅ Deployment verified successfully"
+		result.NextSteps = "Check cluster networking for app"
+	} else {
+		// Deployment failed
+		result.UserMessage = "❌ Deployment verification failed"
+		result.NextSteps = "Check deployment logs with 'kubectl describe' or retry deployment"
 	}
 
 	logger.Info("Enhanced deployment verification completed",
