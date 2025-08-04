@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/domain/report"
 	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/service/session"
 	"github.com/Azure/container-kit/pkg/mcp/service/tools"
@@ -703,9 +704,26 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		return tr.createRedirectResponse(stepName, fmt.Sprintf("Failed to create workflow state: %s", err.Error()), sessionID)
 	}
 
+	// Track start time for MCP reporting
+	startTime := time.Now()
+
 	// Execute the step
 	err = step.Execute(ctx, workflowState)
+	endTime := time.Now()
+
 	if err != nil {
+		// Report step failure to MCP report
+		if mcpReport, reportErr := report.ReportStepExecution(sessionID, stepName, repoPath, false, startTime, &endTime, err.Error(),
+			map[string]interface{}{
+				"session_id": sessionID,
+				"repo_path":  repoPath,
+			}, nil); reportErr != nil {
+			tr.logger.Warn("Failed to report step execution to MCP report", "error", reportErr, "step", stepName)
+		} else if mcpReport != nil {
+			// Add report content to response data for MCP client
+			tr.logger.Info("Step failure reported to MCP", "step", stepName)
+		}
+
 		// Log step failure
 		tr.logger.Info("Step failed",
 			"step", stepName,
@@ -726,13 +744,8 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 	// Save step results to session artifacts
 	tr.saveStepResults(workflowState, simpleState, stepName)
 
-	// Mark step as completed and save state
-	simpleState.MarkStepCompleted(stepName)
-	simpleState.CurrentStep = stepName
-	simpleState.Status = "running"
-	if err := tools.SaveWorkflowState(ctx, tr.sessionManager, simpleState); err != nil {
-		tr.logger.Warn("Failed to save workflow state after step execution", "session_id", sessionID, "step", stepName, "error", err)
-	}
+	// Report successful step execution to MCP report
+	artifacts := tr.extractArtifactsFromWorkflowState(workflowState, stepName, endTime)
 
 	// TODO: Handle any additional results or artifacts from the step execution
 	responseData := map[string]interface{}{
@@ -743,7 +756,39 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		// If this is the analyze step, include the analyze result in the response
 		if workflowState.AnalyzeResult != nil {
 			responseData["analyze_result"] = workflowState.AnalyzeResult
+			responseData["repo_path"] = repoPath
+			responseData["analysis_complete"] = true
+			responseData["language"] = workflowState.AnalyzeResult.Language
+			responseData["framework"] = workflowState.AnalyzeResult.Framework
 		}
+	}
+
+	if mcpReport, reportErr := report.ReportStepExecution(sessionID, stepName, repoPath, true, startTime, &endTime, "",
+		map[string]interface{}{
+			"session_id":     sessionID,
+			"repo_path":      repoPath,
+			"step_completed": true,
+		}, artifacts); reportErr != nil {
+		tr.logger.Warn("Failed to report step execution to MCP report", "error", reportErr, "step", stepName)
+	} else if mcpReport != nil {
+		// Include MCP report files in response for client to handle
+		if mcpReport.Metadata != nil {
+			if files, ok := mcpReport.Metadata["files"].(map[string]interface{}); ok {
+				responseData["mcp_report_files"] = files
+			}
+			if instructions, ok := mcpReport.Metadata["instructions"].(string); ok {
+				responseData["mcp_report_instructions"] = instructions
+			}
+		}
+		tr.logger.Info("Step execution reported to MCP", "step", stepName)
+	}
+
+	// Mark step as completed and save state
+	simpleState.MarkStepCompleted(stepName)
+	simpleState.CurrentStep = stepName
+	simpleState.Status = "running"
+	if err := tools.SaveWorkflowState(ctx, tr.sessionManager, simpleState); err != nil {
+		tr.logger.Warn("Failed to save workflow state after step execution", "session_id", sessionID, "step", stepName, "error", err)
 	}
 
 	return tr.createProgressResponse(stepName, responseData, sessionID)
@@ -1035,4 +1080,67 @@ func (tr *ToolRegistrar) saveStepResults(workflowState *domainworkflow.WorkflowS
 			tr.logger.Info("Saved k8s result to session artifacts", "namespace", workflowState.K8sResult.Namespace)
 		}
 	}
+}
+
+// extractArtifactsFromWorkflowState extracts artifacts based on the workflow state for MCP reporting
+// Only tracks actual files that get created, not workflow state data
+func (tr *ToolRegistrar) extractArtifactsFromWorkflowState(workflowState *domainworkflow.WorkflowState, stepName string, createdAt time.Time) []report.GeneratedArtifact {
+	var artifacts []report.GeneratedArtifact
+
+	switch stepName {
+	case "analyze_repository":
+		// analyze_repository typically doesn't create files, just analyzes the repo
+		// No artifacts to track for this step
+
+	case "generate_dockerfile":
+		// Track actual Dockerfile if created
+		if workflowState.DockerfileResult != nil && workflowState.DockerfileResult.Path != "" {
+			artifacts = append(artifacts, report.GeneratedArtifact{
+				Type:        "dockerfile",
+				Path:        workflowState.DockerfileResult.Path,
+				Description: "Generated Dockerfile for containerization",
+				CreatedAt:   createdAt,
+			})
+		}
+
+	case "build_image":
+		// Track actual built image
+		if workflowState.BuildResult != nil && workflowState.BuildResult.ImageID != "" {
+			artifacts = append(artifacts, report.GeneratedArtifact{
+				Type:        "image",
+				Path:        workflowState.BuildResult.ImageID,
+				Description: fmt.Sprintf("Built container image: %s", workflowState.BuildResult.ImageID),
+				CreatedAt:   createdAt,
+			})
+		}
+
+	case "generate_manifests", "generate_k8s_manifests":
+		// Track actual Kubernetes manifest files if created
+		if workflowState.K8sResult != nil && len(workflowState.K8sResult.Manifests) > 0 {
+			for i, manifestContent := range workflowState.K8sResult.Manifests {
+				// Only add if manifest content exists (actual files would be saved to disk)
+				if manifestContent != "" {
+					artifacts = append(artifacts, report.GeneratedArtifact{
+						Type:        "manifest",
+						Path:        fmt.Sprintf("k8s-manifest-%d.yaml", i+1), // Actual filename that would be saved
+						Description: "Kubernetes deployment manifest",
+						CreatedAt:   createdAt,
+					})
+				}
+			}
+		}
+
+	case "security_scan", "scan_image":
+		// Track security scan report if created
+		if workflowState.ScanReport != nil && len(workflowState.ScanReport) > 0 {
+			artifacts = append(artifacts, report.GeneratedArtifact{
+				Type:        "security_report",
+				Path:        "security-scan-report.json",
+				Description: "Container security scan report",
+				CreatedAt:   createdAt,
+			})
+		}
+	}
+
+	return artifacts
 }
