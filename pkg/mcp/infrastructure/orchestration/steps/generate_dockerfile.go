@@ -108,17 +108,14 @@ func generateJavaDockerfile(framework string, port int, logger *slog.Logger) str
 	isServlet := true
 
 	// Walk through all directories to find JAR files
-	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+	err := filepath.WalkDir(".", func(path string, info os.DirEntry, err error) error {
 		if err != nil {
 			return nil // Continue walking even if there's an error
 		}
 
-		if !info.IsDir() && strings.HasSuffix(info.Name(), ".jar") {
-			// Skip sources and javadoc JARs
-			if !strings.Contains(info.Name(), "-sources") && !strings.Contains(info.Name(), "-javadoc") {
-				isServlet = false
-				return filepath.SkipAll // Found a JAR, stop walking
-			}
+		if !info.IsDir() && strings.HasSuffix(info.Name(), ".jar") && !strings.Contains(info.Name(), "-sources") && !strings.Contains(info.Name(), "-javadoc") {
+			isServlet = false
+			return filepath.SkipAll // Found a JAR, stop walking
 		}
 		return nil
 	})

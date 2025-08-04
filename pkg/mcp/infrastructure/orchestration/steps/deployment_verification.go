@@ -652,7 +652,7 @@ func startPortForwardWithTimeout(ctx context.Context, config PortForwardConfig, 
 		// Wait for the timeout duration, then kill the process
 		time.Sleep(config.Timeout)
 		if cmd.Process != nil {
-			fmt.Printf("Killing port forwarding process")
+			slog.Info("Killing port forwarding process")
 			cmd.Process.Kill()
 		}
 	}()

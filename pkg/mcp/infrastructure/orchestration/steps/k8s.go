@@ -431,22 +431,18 @@ func CheckDeploymentHealth(ctx context.Context, k8sResult *K8sResult, logger *sl
 
 // getYAMLFilesInDirectory returns all YAML files in the given directory
 func getYAMLFilesInDirectory(dirPath string) ([]string, error) {
-	var yamlFiles []string
-
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory %s: %w", dirPath, err)
 	}
 
+	var yamlFiles []string
 	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-
-		fileName := entry.Name()
-		if strings.HasSuffix(fileName, ".yaml") || strings.HasSuffix(fileName, ".yml") {
-			fullPath := filepath.Join(dirPath, fileName)
-			yamlFiles = append(yamlFiles, fullPath)
+		if entry.Type().IsRegular() {
+			switch ext := strings.ToLower(filepath.Ext(entry.Name())); ext {
+			case ".yaml", ".yml":
+				yamlFiles = append(yamlFiles, filepath.Join(dirPath, entry.Name()))
+			}
 		}
 	}
 

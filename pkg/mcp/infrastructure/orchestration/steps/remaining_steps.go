@@ -667,22 +667,21 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 			}
 
 			// Set endpoint in result
-			if verifyResult.AccessURL != "" {
-				state.Result.Endpoint = verifyResult.AccessURL
-				state.Logger.Info(fmt.Sprintf("🔗 Access your app: %s", verifyResult.AccessURL))
-			} else {
-				// Fallback to original endpoint discovery
-				endpoint, err := GetServiceEndpoint(ctx, infraK8sResult, state.Logger)
-				if err != nil {
-					if state.Args.StrictMode {
-						return errors.New(errors.CodeKubernetesApiError, "verify_step", "failed to get service endpoint in strict mode", err)
-					}
-					state.Logger.Warn("Failed to get service endpoint (non-critical)", "error", err)
-					state.Result.Endpoint = "http://localhost:30000" // Placeholder for tests
-				} else {
-					state.Result.Endpoint = endpoint
-					state.Logger.Info("Service endpoint discovered", "endpoint", endpoint)
+			if url := verifyResult.AccessURL; url != "" {
+				state.Result.Endpoint = url
+				state.Logger.Info(fmt.Sprintf("🔗 Access your app: %s", url))
+				return nil
+			}
+
+			endpoint, err := GetServiceEndpoint(ctx, infraK8sResult, state.Logger)
+			if err != nil {
+				if state.Args.StrictMode {
+					return errors.New(errors.CodeKubernetesApiError, "verify_step", "failed to get service endpoint in strict mode", err)
 				}
+				state.Logger.Warn("Failed to get service endpoint (non-critical)", "error", err)
+			} else {
+				state.Result.Endpoint = endpoint
+				state.Logger.Info("Service endpoint discovered", "endpoint", endpoint)
 			}
 
 			// Log the formatted summary message and next steps from verification result
