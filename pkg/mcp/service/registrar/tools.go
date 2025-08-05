@@ -817,20 +817,7 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		tr.logger.Warn("Failed to save workflow state after step execution", "session_id", sessionID, "step", stepName, "error", err)
 	}
 
-	jsonData, err := json.Marshal(responseData)
-	if err != nil {
-		tr.logger.Warn("Failed to marshal response data", "error", err)
-		return tr.createProgressResponse(stepName, responseData, sessionID)
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: string(jsonData),
-			},
-		},
-	}, nil
+	return tr.createProgressResponse(stepName, responseData, sessionID)
 
 }
 
