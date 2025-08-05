@@ -35,6 +35,7 @@ type SimpleWorkflowState struct {
 	Status         string                        `json:"status"`
 	CurrentStep    string                        `json:"current_step"`
 	CompletedSteps []string                      `json:"completed_steps"`
+	FailedSteps    []string                      `json:"failed_steps"`
 	SkipSteps      []string                      `json:"skip_steps"`
 	Artifacts      map[string]interface{}        `json:"artifacts"`
 	Metadata       map[string]interface{}        `json:"metadata"`
@@ -48,7 +49,72 @@ func (s *SimpleWorkflowState) MarkStepCompleted(stepName string) {
 			return // Already completed
 		}
 	}
+	// Remove from failed steps if it was previously failed
+	s.removeFromFailedSteps(stepName)
 	s.CompletedSteps = append(s.CompletedSteps, stepName)
+}
+
+// MarkStepFailed marks a step as failed
+func (s *SimpleWorkflowState) MarkStepFailed(stepName string) {
+	for _, failed := range s.FailedSteps {
+		if failed == stepName {
+			return // Already marked as failed
+		}
+	}
+	// Remove from completed steps if it was previously completed
+	s.removeFromCompletedSteps(stepName)
+	s.FailedSteps = append(s.FailedSteps, stepName)
+}
+
+// removeFromCompletedSteps removes a step from the completed steps list
+func (s *SimpleWorkflowState) removeFromCompletedSteps(stepName string) {
+	for i, completed := range s.CompletedSteps {
+		if completed == stepName {
+			s.CompletedSteps = append(s.CompletedSteps[:i], s.CompletedSteps[i+1:]...)
+			return
+		}
+	}
+}
+
+// removeFromFailedSteps removes a step from the failed steps list
+func (s *SimpleWorkflowState) removeFromFailedSteps(stepName string) {
+	for i, failed := range s.FailedSteps {
+		if failed == stepName {
+			s.FailedSteps = append(s.FailedSteps[:i], s.FailedSteps[i+1:]...)
+			return
+		}
+	}
+}
+
+// IsStepCompleted checks if a step is completed
+func (s *SimpleWorkflowState) IsStepCompleted(stepName string) bool {
+	for _, completed := range s.CompletedSteps {
+		if completed == stepName {
+			return true
+		}
+	}
+	return false
+}
+
+// IsStepFailed checks if a step has failed
+func (s *SimpleWorkflowState) IsStepFailed(stepName string) bool {
+	for _, failed := range s.FailedSteps {
+		if failed == stepName {
+			return true
+		}
+	}
+	return false
+}
+
+// GetStepStatus returns the status of a specific step
+func (s *SimpleWorkflowState) GetStepStatus(stepName string) string {
+	if s.IsStepCompleted(stepName) {
+		return "completed"
+	}
+	if s.IsStepFailed(stepName) {
+		return "failed"
+	}
+	return "not_started"
 }
 
 // SetError sets a workflow error
@@ -86,6 +152,7 @@ func LoadWorkflowState(ctx context.Context, sessionManager session.OptimizedSess
 			SessionID:      sessionID,
 			Status:         "initialized",
 			CompletedSteps: []string{},
+			FailedSteps:    []string{},
 			Artifacts:      make(map[string]interface{}),
 			Metadata:       make(map[string]interface{}),
 		}, nil
@@ -120,6 +187,15 @@ func LoadWorkflowState(ctx context.Context, sessionManager session.OptimizedSess
 		}
 		state.CompletedSteps = steps
 	}
+	if failedSteps, ok := workflowMap["failed_steps"].([]interface{}); ok {
+		steps := make([]string, len(failedSteps))
+		for i, step := range failedSteps {
+			if s, ok := step.(string); ok {
+				steps[i] = s
+			}
+		}
+		state.FailedSteps = steps
+	}
 	if skipSteps, ok := workflowMap["skip_steps"].([]interface{}); ok {
 		steps := make([]string, len(skipSteps))
 		for i, step := range skipSteps {
@@ -151,6 +227,7 @@ func SaveWorkflowState(ctx context.Context, sessionManager session.OptimizedSess
 		"status":          state.Status,
 		"current_step":    state.CurrentStep,
 		"completed_steps": state.CompletedSteps,
+		"failed_steps":    state.FailedSteps,
 		"skip_steps":      state.SkipSteps,
 		"artifacts":       state.Artifacts,
 		"metadata":        state.Metadata,

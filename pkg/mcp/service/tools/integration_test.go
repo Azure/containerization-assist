@@ -248,7 +248,7 @@ func TestServerStatusToolHandler(t *testing.T) {
 // TestListToolsHandler tests the list_tools tool
 func TestListToolsHandler(t *testing.T) {
 	ctx := context.Background()
-	handler := createListToolsHandler()
+	handler := CreateListToolsHandler()
 
 	req := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{

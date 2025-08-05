@@ -120,7 +120,7 @@ func BenchmarkServerStatusHandler(b *testing.B) {
 // BenchmarkListToolsHandler benchmarks the list tools handler
 func BenchmarkListToolsHandler(b *testing.B) {
 	ctx := context.Background()
-	handler := createListToolsHandler()
+	handler := CreateListToolsHandler()
 
 	req := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
