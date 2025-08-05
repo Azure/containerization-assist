@@ -430,7 +430,7 @@ When reporting issues, logs help us understand what went wrong. Here's how to ga
 
 #### Method 1: Enable Debug Logging
 
-1. **Update your Claude Desktop configuration:**
+1. **Update your configuration:**
 ```json
 {
   "mcpServers": {

@@ -92,7 +92,7 @@ Container Kit uses a **simplified 4-layer architecture** with Domain-Driven Desi
 graph TB
     %% External layer
     subgraph "External Clients"
-        Claude[Claude Desktop]
+        VsCode[VsCode]
         CLI[MCP CLI]
     end
 
@@ -125,7 +125,7 @@ graph TB
     end
 
     %% Connections
-    Claude --> Server
+    VsCode --> Server
     CLI --> Server
     Server --> Tools
     Tools --> Session
