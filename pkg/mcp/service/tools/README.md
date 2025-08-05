@@ -40,7 +40,7 @@ The tool registry provides a table-driven approach to tool registration that:
 | `generate_k8s_manifests` | Generate Kubernetes manifests | `prepare_cluster` |
 | `prepare_cluster` | Prepare Kubernetes cluster | `deploy_application` |
 | `deploy_application` | Deploy to Kubernetes | `verify_deployment` |
-| `verify_deployment` | Verify deployment health | (end) |
+| `verify_deployment` | Verify deployment health with automatic port forwarding for app testing | (end) |
 
 ### Orchestration Tools
 
