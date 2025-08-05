@@ -720,7 +720,6 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 			}, nil); reportErr != nil {
 			tr.logger.Warn("Failed to report step execution to MCP report", "error", reportErr, "step", stepName)
 		} else if mcpReport != nil {
-			// Add report content to response data for MCP client
 			tr.logger.Info("Step failure reported to MCP", "step", stepName)
 		}
 
@@ -763,11 +762,38 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		}
 	}
 
+	if stepName == "generate_dockerfile" {
+		if workflowState.DockerfileResult != nil {
+			responseData["dockerfile_content"] = workflowState.DockerfileResult.Content
+			responseData["dockerfile_generated"] = true
+		}
+	}
+
 	if mcpReport, reportErr := report.ReportStepExecution(sessionID, stepName, repoPath, true, startTime, &endTime, "",
 		map[string]interface{}{
-			"session_id":     sessionID,
-			"repo_path":      repoPath,
-			"step_completed": true,
+			"session_id":        sessionID,
+			"repo_path":         repoPath,
+			"step_completed":    true,
+			"analysis_complete": stepName == "analyze_repository",
+			"language": func() string {
+				if stepName == "analyze_repository" && workflowState.AnalyzeResult != nil {
+					return workflowState.AnalyzeResult.Language
+				}
+				return ""
+			}(),
+			"framework": func() string {
+				if stepName == "analyze_repository" && workflowState.AnalyzeResult != nil {
+					return workflowState.AnalyzeResult.Framework
+				}
+				return ""
+			}(),
+			"dockerfile_generated": stepName == "generate_dockerfile",
+			"dockerfile_path": func() string {
+				if stepName == "generate_dockerfile" && workflowState.DockerfileResult != nil {
+					return workflowState.DockerfileResult.Path
+				}
+				return ""
+			}(),
 		}, artifacts); reportErr != nil {
 		tr.logger.Warn("Failed to report step execution to MCP report", "error", reportErr, "step", stepName)
 	} else if mcpReport != nil {
@@ -791,7 +817,20 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		tr.logger.Warn("Failed to save workflow state after step execution", "session_id", sessionID, "step", stepName, "error", err)
 	}
 
-	return tr.createProgressResponse(stepName, responseData, sessionID)
+	jsonData, err := json.Marshal(responseData)
+	if err != nil {
+		tr.logger.Warn("Failed to marshal response data", "error", err)
+		return tr.createProgressResponse(stepName, responseData, sessionID)
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			mcp.TextContent{
+				Type: "text",
+				Text: string(jsonData),
+			},
+		},
+	}, nil
 
 }
 
@@ -1082,8 +1121,6 @@ func (tr *ToolRegistrar) saveStepResults(workflowState *domainworkflow.WorkflowS
 	}
 }
 
-// extractArtifactsFromWorkflowState extracts artifacts based on the workflow state for MCP reporting
-// Only tracks actual files that get created, not workflow state data
 func (tr *ToolRegistrar) extractArtifactsFromWorkflowState(workflowState *domainworkflow.WorkflowState, stepName string, createdAt time.Time) []report.GeneratedArtifact {
 	var artifacts []report.GeneratedArtifact
 
