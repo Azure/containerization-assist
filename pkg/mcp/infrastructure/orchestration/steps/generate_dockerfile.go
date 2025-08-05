@@ -103,7 +103,6 @@ COPY --from=builder /app/main .
 // generateJavaDockerfile creates optimized Dockerfile for Java applications
 func generateJavaDockerfile(framework string, port int, logger *slog.Logger) string {
 	var dockerfile strings.Builder
-
 	// Check if this is a servlet application (WAR file)
 	isServlet := strings.Contains(strings.ToLower(framework), "servlet") ||
 		strings.Contains(strings.ToLower(framework), "jsp") ||

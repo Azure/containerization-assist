@@ -2,6 +2,7 @@ package steps
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -30,8 +31,8 @@ func EnhanceRepositoryAnalysis(ctx context.Context, analyzeResult *AnalyzeResult
 		}
 	}
 
-	// Get file tree
-	fileTree := getFileTree(analyzeResult.RepoPath, logger)
+	// Use the file tree that was already generated in repository analysis
+	fileTree := extractFileTree(analyzeResult.Analysis, logger)
 
 	// Create initial analysis summary
 	initialAnalysis := fmt.Sprintf(`Language: %s
@@ -52,8 +53,8 @@ Database Types: %v`,
 	// Use AI to enhance the analysis
 	samplingClient := aisample.CreateDomainClient(logger)
 
-	// Create enhanced prompt with all context
-	enhancedPrompt := fmt.Sprintf(`Improve this repository analysis:
+	// Create enhanced prompt with structured JSON request
+	enhancedPrompt := fmt.Sprintf(`Analyze this repository and provide enhanced analysis in JSON format.
 
 Initial Analysis:
 %s
@@ -64,26 +65,40 @@ File Tree:
 README Content:
 %s
 
-Provide an improved analysis.`, initialAnalysis, fileTree, readmeContent)
+Please respond with ONLY a valid JSON object in this exact format:
+{
+  "language": "detected_language",
+  "framework": "detected_framework", 
+  "suggested_ports": [8080, 3000],
+  "build_tools": ["npm", "webpack"],
+  "services": ["web", "api"],
+  "environment_vars": ["PORT", "NODE_ENV"],
+  "dockerfile_suggestions": ["use multi-stage build", "use alpine base"],
+  "security_considerations": ["avoid running as root", "scan for vulnerabilities"],
+  "confidence": 0.85
+}
+
+Focus on containerization-relevant insights and provide actionable recommendations.`, initialAnalysis, fileTree, readmeContent)
 
 	req := sampling.Request{
 		Prompt:      enhancedPrompt,
 		MaxTokens:   2048,
-		Temperature: 0.7,
+		Temperature: 0.3, // Lower temperature for more consistent JSON output
 	}
 
-	_, err := samplingClient.Sample(ctx, req)
+	response, err := samplingClient.Sample(ctx, req) //NOTE: Sampling is currently limited as the LLM can only work off the data we provide to it. It does not search through and read the repository.
 	if err != nil {
 		logger.Warn("Failed to enhance repository analysis with AI", "error", err)
 		// Return original analysis if AI enhancement fails
 		return analyzeResult, nil
 	}
 
-	// For now, create a simple enhanced analysis result
-	enhancedAnalysis := &aisample.RepositoryAnalysis{
-		Language:   analyzeResult.Language,
-		Framework:  analyzeResult.Framework,
-		Confidence: 0.8,
+	// Parse the JSON response
+	enhancedAnalysis, err := parseAIResponse(response.Content, logger)
+	if err != nil {
+		logger.Warn("Failed to parse AI response", "error", err, "response", response.Content)
+		// Return original analysis if parsing fails
+		return analyzeResult, nil
 	}
 
 	// Use enhanced analysis to update fields
@@ -97,51 +112,100 @@ Provide an improved analysis.`, initialAnalysis, fileTree, readmeContent)
 	return enhanced, nil
 }
 
-// getFileTree generates a simple file tree representation
-func getFileTree(repoPath string, logger *slog.Logger) string {
-	var result strings.Builder
-
-	err := filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil // Skip errors
-		}
-
-		// Skip .git directory
-		if strings.Contains(path, ".git/") {
-			return filepath.SkipDir
-		}
-
-		// Get relative path
-		relPath, err := filepath.Rel(repoPath, path)
-		if err != nil {
-			return nil
-		}
-
-		// Skip if too deep (more than 3 levels)
-		depth := strings.Count(relPath, string(filepath.Separator))
-		if depth > 3 {
-			if info.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		// Add to result with indentation
-		indent := strings.Repeat("  ", depth)
-		if info.IsDir() {
-			result.WriteString(fmt.Sprintf("%s%s/\n", indent, info.Name()))
-		} else {
-			result.WriteString(fmt.Sprintf("%s%s\n", indent, info.Name()))
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		logger.Warn("Error generating file tree", "error", err)
+// extractFileTree extracts and marshals the file tree structure from analysis data
+func extractFileTree(analysis map[string]interface{}, logger *slog.Logger) string {
+	structure, ok := analysis["structure"]
+	if !ok {
+		logger.Warn("No file tree structure found in analysis result")
+		return "{}"
 	}
 
-	return result.String()
+	fileTreeBytes, err := json.MarshalIndent(structure, "", "  ")
+	if err != nil {
+		logger.Warn("Failed to marshal existing file tree structure", "error", err)
+		return "{}"
+	}
+
+	return string(fileTreeBytes)
+}
+
+// parseAIResponse parses the AI response JSON into a RepositoryAnalysis struct
+func parseAIResponse(content string, logger *slog.Logger) (*aisample.RepositoryAnalysis, error) {
+	// Clean up the response content - sometimes LLMs add extra text
+	content = strings.TrimSpace(content)
+
+	// Find JSON object boundaries
+	startIdx := strings.Index(content, "{")
+	endIdx := strings.LastIndex(content, "}")
+
+	if startIdx == -1 || endIdx == -1 || endIdx <= startIdx {
+		return nil, fmt.Errorf("no valid JSON object found in response")
+	}
+
+	jsonContent := content[startIdx : endIdx+1]
+
+	// Parse the JSON into a temporary struct
+	var aiResponse struct {
+		Language               string   `json:"language"`
+		Framework              string   `json:"framework"`
+		SuggestedPorts         []int    `json:"suggested_ports"`
+		BuildTools             []string `json:"build_tools"`
+		Services               []string `json:"services"`
+		EnvironmentVars        []string `json:"environment_vars"`
+		DockerfileSuggestions  []string `json:"dockerfile_suggestions"`
+		SecurityConsiderations []string `json:"security_considerations"`
+		Confidence             float64  `json:"confidence"`
+	}
+
+	if err := json.Unmarshal([]byte(jsonContent), &aiResponse); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+	}
+
+	// Convert to RepositoryAnalysis struct
+	analysis := &aisample.RepositoryAnalysis{
+		Language:        aiResponse.Language,
+		Framework:       aiResponse.Framework,
+		SuggestedPorts:  aiResponse.SuggestedPorts,
+		BuildTools:      aiResponse.BuildTools,
+		Services:        convertToServices(aiResponse.Services),
+		EnvironmentVars: convertToEnvVars(aiResponse.EnvironmentVars),
+		Confidence:      aiResponse.Confidence,
+	}
+
+	logger.Info("Successfully parsed AI response",
+		"language", analysis.Language,
+		"framework", analysis.Framework,
+		"confidence", analysis.Confidence,
+		"ports", analysis.SuggestedPorts)
+
+	return analysis, nil
+}
+
+// convertToServices converts string slice to Service slice
+func convertToServices(serviceNames []string) []aisample.Service {
+	services := make([]aisample.Service, len(serviceNames))
+	for i, name := range serviceNames {
+		services[i] = aisample.Service{
+			Name:     name,
+			Type:     "unknown", // AI would need to specify this in a more structured response
+			Required: true,
+		}
+	}
+	return services
+}
+
+// convertToEnvVars converts string slice to EnvVar slice
+func convertToEnvVars(varNames []string) []aisample.EnvVar {
+	envVars := make([]aisample.EnvVar, len(varNames))
+	for i, name := range varNames {
+		envVars[i] = aisample.EnvVar{
+			Name:        name,
+			Description: fmt.Sprintf("Environment variable: %s", name),
+			Required:    true,
+			Type:        "string",
+		}
+	}
+	return envVars
 }
 
 // parseEnhancedAnalysis extracts improvements from AI analysis
