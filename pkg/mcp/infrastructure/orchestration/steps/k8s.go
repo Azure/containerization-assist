@@ -190,21 +190,7 @@ func DeployToKubernetes(ctx context.Context, k8sResult *K8sResult, logger *slog.
 		}
 
 		if !deploymentResult.Success {
-			// Check if we have error details
-			var errorMsg string
-			if deploymentResult.Error != nil {
-				errorMsg = fmt.Sprintf("%s: %s", deploymentResult.Error.Type, deploymentResult.Error.Message)
-			} else if validationData, ok := deploymentResult.Context["validation"]; ok {
-				// Check validation result for details
-				if validation, ok := validationData.(*kubernetes.ValidationResult); ok && validation.Error != nil {
-					errorMsg = fmt.Sprintf("validation failed: %s", validation.Error.Message)
-				} else {
-					errorMsg = "deployment validation failed but no error details available"
-				}
-			} else {
-				errorMsg = fmt.Sprintf("deployment failed (resources deployed: %d)", len(deploymentResult.Resources))
-			}
-
+			errorMsg := extractDeploymentErrorMessage(deploymentResult)
 			deploymentErrors = append(deploymentErrors, fmt.Sprintf("%s: %s", yamlFile, errorMsg))
 			logger.Error("Kubernetes deployment unsuccessful for file",
 				"file", yamlFile,
@@ -239,10 +225,10 @@ func DeployToKubernetes(ctx context.Context, k8sResult *K8sResult, logger *slog.
 		// Return error with details about what failed and what succeeded
 		if len(successfulDeployments) == 0 {
 			return fmt.Errorf("all manifest deployments failed: %v", deploymentErrors)
-		} else {
-			return fmt.Errorf("partial deployment failure: %d/%d files failed to deploy. Errors: %v. Successfully deployed: %v",
-				len(deploymentErrors), len(yamlFiles), deploymentErrors, successfulDeployments)
 		}
+		return fmt.Errorf("partial deployment failure: %d/%d files failed to deploy. Errors: %v. Successfully deployed: %v",
+			len(deploymentErrors), len(yamlFiles), deploymentErrors, successfulDeployments)
+
 	}
 
 	logger.Info("Kubernetes deployment completed successfully",
@@ -447,4 +433,23 @@ func getYAMLFilesInDirectory(dirPath string) ([]string, error) {
 	}
 
 	return yamlFiles, nil
+}
+
+// extractDeploymentErrorMessage extracts error message from a failed deployment result
+func extractDeploymentErrorMessage(deploymentResult *kubernetes.DeploymentResult) string {
+	// Check if we have error details
+	if deploymentResult.Error != nil {
+		return fmt.Sprintf("%s: %s", deploymentResult.Error.Type, deploymentResult.Error.Message)
+	}
+
+	// Check validation result for details
+	if validationData, ok := deploymentResult.Context["validation"]; ok {
+		if validation, ok := validationData.(*kubernetes.ValidationResult); ok && validation.Error != nil {
+			return fmt.Sprintf("validation failed: %s", validation.Error.Message)
+		}
+		return "deployment validation failed but no error details available"
+	}
+
+	// Fallback to resources deployed count
+	return fmt.Sprintf("deployment failed (resources deployed: %d)", len(deploymentResult.Resources))
 }
