@@ -1,0 +1,192 @@
+name: ✨ Feature Request
+description: Suggest a new feature or enhancement for Container Kit
+title: "✨ [FEATURE]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a new feature! Please provide as much detail as possible to help us understand your request.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission checklist
+      description: Please confirm you have completed these steps
+      options:
+        - label: I have searched existing issues and discussions to ensure this feature hasn't been requested
+          required: true
+        - label: I have read the [Contributing Guidelines](https://github.com/Azure/container-kit/blob/main/CONTRIBUTING.md)
+          required: true
+        - label: I have considered if this fits the project's scope and goals
+          required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Feature Summary
+      description: A clear and concise description of the feature you'd like to see
+      placeholder: Describe the feature in one or two sentences...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Feature Category
+      description: Which area of Container Kit would this feature affect?
+      options:
+        - New MCP Tool
+        - MCP Server Enhancement
+        - Workflow Improvement
+        - Docker Integration
+        - Kubernetes Integration
+        - Security & Scanning
+        - AI/LLM Integration
+        - Session Management
+        - Developer Experience
+        - Documentation
+        - Performance
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? What's the current limitation or pain point?
+      placeholder: |
+        Currently, when I try to..., I encounter...
+        This makes it difficult to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe your proposed solution in detail
+      placeholder: |
+        I would like to see...
+        This could work by...
+        The user experience would be...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions
+      description: Have you considered alternative approaches? What are the tradeoffs?
+      placeholder: |
+        Alternative 1: ...
+        Alternative 2: ...
+        Tradeoffs: ...
+
+  - type: textarea
+    id: use-cases
+    attributes:
+      label: Use Cases
+      description: Describe specific scenarios where this feature would be valuable
+      placeholder: |
+        Use Case 1: When developing microservices...
+        Use Case 2: When working with CI/CD pipelines...
+        Use Case 3: When deploying to production...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority Level
+      description: How important is this feature to you?
+      options:
+        - Low - Nice to have
+        - Medium - Would improve my workflow
+        - High - Significant impact on my work
+        - Critical - Blocking my usage
+    validations:
+      required: true
+
+  - type: dropdown
+    id: effort
+    attributes:
+      label: Implementation Effort (if known)
+      description: If you have development experience, estimate the implementation complexity
+      options:
+        - Small - Few hours of work
+        - Medium - Few days of work
+        - Large - Weeks of work
+        - Very Large - Major architectural changes
+        - Unknown
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: How would you know this feature is working correctly?
+      placeholder: |
+        Given...
+        When...
+        Then...
+        
+        Example:
+        - [ ] New tool appears in `list_tools` output
+        - [ ] Tool executes successfully with valid input
+        - [ ] Tool provides helpful error messages for invalid input
+        - [ ] Tool integrates with workflow orchestration
+
+  - type: textarea
+    id: mockups
+    attributes:
+      label: Mockups or Examples
+      description: |
+        Include mockups, examples, or references to similar implementations.
+        You can attach images by dragging & dropping, selecting, or pasting them.
+      placeholder: |
+        Command examples:
+        ```bash
+        ./container-kit-mcp
+        # Tool: new_feature_tool
+        ```
+        
+        Output examples:
+        ```json
+        {
+          "success": true,
+          "data": "..."
+        }
+        ```
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact Assessment
+      description: |
+        Consider the broader impact of this feature:
+        - Who would benefit from this feature?
+        - Are there any potential downsides or risks?
+        - Would this require breaking changes?
+      placeholder: |
+        Benefits: ...
+        Potential risks: ...
+        Breaking changes: ...
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Are you willing to contribute to implementing this feature?
+      options:
+        - label: I'm willing to implement this feature myself
+        - label: I can help with testing and feedback
+        - label: I can help with documentation
+        - label: I can provide domain expertise
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other information that would be helpful
+      placeholder: Links to related issues, external resources, or additional context...
