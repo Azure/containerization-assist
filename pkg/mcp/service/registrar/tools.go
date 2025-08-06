@@ -421,6 +421,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 				"registry": map[string]interface{}{
 					"type":        "string",
 					"description": "Container registry URL",
+					"default":     "localhost:5001",
 				},
 				"redirect_attempt": map[string]interface{}{
 					"type":        "integer",

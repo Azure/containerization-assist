@@ -27,12 +27,13 @@ type K8sResult struct {
 }
 
 // GenerateManifests creates Kubernetes manifests for deployment using real K8s operations
-func GenerateManifests(buildResult *BuildResult, appName, namespace string, port int, repoPath string, logger *slog.Logger) (*K8sResult, error) {
+func GenerateManifests(buildResult *BuildResult, appName, namespace string, port int, repoPath, registryURL string, logger *slog.Logger) (*K8sResult, error) {
 	logger.Info("Generating Kubernetes manifests",
 		"app_name", appName,
 		"namespace", namespace,
 		"port", port,
-		"repo_path", repoPath)
+		"repo_path", repoPath,
+		"registry_url", registryURL)
 
 	if buildResult == nil {
 		return nil, fmt.Errorf("build result is required")
@@ -50,8 +51,13 @@ func GenerateManifests(buildResult *BuildResult, appName, namespace string, port
 		port = 8080 // Default port
 	}
 
-	// Create image reference for local registry
-	imageRef := fmt.Sprintf("localhost:5001/%s:%s", buildResult.ImageName, buildResult.ImageTag)
+	if registryURL == "" {
+		registryURL = "localhost:5001" // Default fallback
+	}
+
+	// Create image reference using the provided registry URL
+	imageRef := fmt.Sprintf("%s/%s:%s", registryURL, buildResult.ImageName, buildResult.ImageTag)
+	logger.Info("Using registry URL for image reference", "registry", registryURL, "image_ref", imageRef)
 
 	// Use the real K8s manifest service
 	manifestService := kubernetes.NewManifestService(logger.With("component", "k8s_manifest_service"))
@@ -160,9 +166,21 @@ func DeployToKubernetes(ctx context.Context, k8sResult *K8sResult, logger *slog.
 		"manifest_path", manifestPath,
 		"options", fmt.Sprintf("%+v", deploymentOptions))
 
-	// Get the directory containing the manifest files
-	// manifestPath might be a specific file, so we need the directory
-	manifestDir := filepath.Dir(manifestPath)
+	// Determine if manifestPath is a file or directory
+	var manifestDir string
+
+	info, err := os.Stat(manifestPath)
+	if err != nil {
+		// If we can't stat the path, assume it's a file and use the directory
+		manifestDir = filepath.Dir(manifestPath)
+		logger.Warn("Cannot stat manifest path, assuming it's a file", "manifest_path", manifestPath, "manifest_dir", manifestDir)
+	} else if info.IsDir() {
+		manifestDir = manifestPath
+		logger.Info("Manifest path is a directory", "manifest_dir", manifestDir)
+	} else {
+		manifestDir = filepath.Dir(manifestPath)
+		logger.Info("Manifest path is a file, using parent directory", "manifest_file", manifestPath, "manifest_dir", manifestDir)
+	}
 
 	// Get all YAML files in the manifest directory to ensure we deploy everything
 	yamlFiles, err := getYAMLFilesInDirectory(manifestDir)

@@ -69,7 +69,7 @@ func (s *BuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) 
 	// Generate image name and tag from cached repo identifier
 	imageName := utils.ExtractRepoName(state.RepoIdentifier)
 	imageTag := "latest" // Default fallback
-	
+
 	// Check for desired tag in request parameters
 	if tagParam, exists := state.RequestParams["tag"]; exists {
 		if tagStr, ok := tagParam.(string); ok && tagStr != "" {
@@ -82,7 +82,7 @@ func (s *BuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) 
 			}
 		}
 	}
-	
+
 	buildContext := state.AnalyzeResult.RepoPath
 
 	// In test mode, skip actual Docker operations
@@ -524,7 +524,16 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 		appName = "test-" + appName
 	}
 
-	k8sResult, err := GenerateManifests(infraBuildResult, appName, namespace, state.AnalyzeResult.Port, state.AnalyzeResult.RepoPath, state.Logger)
+	// Get registry URL from request parameters (set by push_image step)
+	registryURL := "localhost:5001" // Default fallback
+	if registryParam, exists := state.RequestParams["registry"]; exists {
+		if registryStr, ok := registryParam.(string); ok && registryStr != "" {
+			registryURL = registryStr
+			state.Logger.Info("Using registry URL from request parameters", "registry", registryURL)
+		}
+	}
+
+	k8sResult, err := GenerateManifests(infraBuildResult, appName, namespace, state.AnalyzeResult.Port, state.AnalyzeResult.RepoPath, registryURL, state.Logger)
 	if err != nil {
 		return errors.New(errors.CodeManifestInvalid, "manifest_step", "k8s manifest generation failed", err)
 	}
@@ -662,10 +671,18 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 		},
 	}
 
-	// Add port from dockerfile result if available
-	if state.DockerfileResult != nil {
-		infraK8sResult.Metadata["port"] = state.DockerfileResult.ExposedPort
+	// Add port using priority: Dockerfile → Analysis → Default
+	port := 8080 // Default fallback
+	if state.DockerfileResult != nil && state.DockerfileResult.ExposedPort > 0 {
+		port = state.DockerfileResult.ExposedPort
+		state.Logger.Info("Using port from Dockerfile", "port", port)
+	} else if state.AnalyzeResult != nil && state.AnalyzeResult.Port > 0 {
+		port = state.AnalyzeResult.Port
+		state.Logger.Info("Using port from analysis", "port", port)
+	} else {
+		state.Logger.Info("Using default application port", "port", port, "reason", "no port detected from Dockerfile or analysis")
 	}
+	infraK8sResult.Metadata["port"] = port
 
 	// Add actual image ref from build result if available
 	if state.BuildResult != nil && state.BuildResult.ImageRef != "" {
