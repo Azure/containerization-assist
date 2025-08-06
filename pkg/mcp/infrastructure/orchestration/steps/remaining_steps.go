@@ -869,21 +869,24 @@ func validateDockerTag(tag string) error {
 
 // extractAndValidateTag extracts and validates a Docker tag from workflow state request parameters
 func extractAndValidateTag(state *workflow.WorkflowState, logger *slog.Logger) string {
-	imageTag := "latest" // Default fallback
-
-	if tagParam, exists := state.RequestParams["tag"]; exists {
-		tagStr, ok := tagParam.(string)
-		if !ok || tagStr == "" {
-			logger.Warn("Tag parameter is not a valid string or is empty, using 'latest'")
-		} else if err := validateDockerTag(tagStr); err != nil {
-			logger.Warn("Invalid tag provided, using 'latest'", "invalid_tag", tagStr, "error", err)
-		} else {
-			imageTag = tagStr
-			logger.Info("Using requested tag", "tag", imageTag)
-		}
+	tagParam, exists := state.RequestParams["tag"]
+	if !exists {
+		return "latest"
 	}
 
-	return imageTag
+	tagStr, ok := tagParam.(string)
+	if !ok || tagStr == "" {
+		logger.Warn("Tag parameter is not a valid string or is empty, using 'latest'")
+		return "latest"
+	}
+
+	if err := validateDockerTag(tagStr); err != nil {
+		logger.Warn("Invalid tag provided, using 'latest'", "invalid_tag", tagStr, "error", err)
+		return "latest"
+	}
+
+	logger.Info("Using requested tag", "tag", tagStr)
+	return tagStr
 }
 
 // parseImageReference parses an image reference and extracts the tag, default returns "latest"
