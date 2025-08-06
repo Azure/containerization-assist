@@ -1006,7 +1006,7 @@ func (tr *ToolRegistrar) saveStepResults(workflowState *domainworkflow.WorkflowS
 			tr.logger.Info("Saved dockerfile result to session artifacts", "path", workflowState.DockerfileResult.Path)
 		}
 
-	case "build_image":
+	case "build_image", "tag_image":
 		if workflowState.BuildResult != nil {
 			buildData := map[string]interface{}{
 				"image_id":   workflowState.BuildResult.ImageID,
