@@ -769,31 +769,34 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		}
 	}
 
+	var language string
+	if stepName == "analyze_repository" && workflowState.AnalyzeResult != nil {
+		language = workflowState.AnalyzeResult.Language
+	} else {
+		language = ""
+	}
+	var framework string
+	if stepName == "analyze_repository" && workflowState.AnalyzeResult != nil {
+		framework = workflowState.AnalyzeResult.Framework
+	} else {
+		framework = ""
+	}
+	var dockerfilePath string
+	if stepName == "generate_dockerfile" && workflowState.DockerfileResult != nil {
+		dockerfilePath = workflowState.DockerfileResult.Path
+	} else {
+		dockerfilePath = ""
+	}
 	if mcpReport, reportErr := report.ReportStepExecution(sessionID, stepName, repoPath, true, startTime, &endTime, "",
 		map[string]interface{}{
-			"session_id":        sessionID,
-			"repo_path":         repoPath,
-			"step_completed":    true,
-			"analysis_complete": stepName == "analyze_repository",
-			"language": func() string {
-				if stepName == "analyze_repository" && workflowState.AnalyzeResult != nil {
-					return workflowState.AnalyzeResult.Language
-				}
-				return ""
-			}(),
-			"framework": func() string {
-				if stepName == "analyze_repository" && workflowState.AnalyzeResult != nil {
-					return workflowState.AnalyzeResult.Framework
-				}
-				return ""
-			}(),
+			"session_id":           sessionID,
+			"repo_path":            repoPath,
+			"step_completed":       true,
+			"analysis_complete":    stepName == "analyze_repository",
+			"language":             language,
+			"framework":            framework,
 			"dockerfile_generated": stepName == "generate_dockerfile",
-			"dockerfile_path": func() string {
-				if stepName == "generate_dockerfile" && workflowState.DockerfileResult != nil {
-					return workflowState.DockerfileResult.Path
-				}
-				return ""
-			}(),
+			"dockerfile_path":      dockerfilePath,
 		}, artifacts); reportErr != nil {
 		tr.logger.Warn("Failed to report step execution to MCP report", "error", reportErr, "step", stepName)
 	} else if mcpReport != nil {
