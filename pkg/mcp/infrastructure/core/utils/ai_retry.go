@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"time"
@@ -700,10 +701,38 @@ func applyImageRegistryFix(ctx context.Context, operation string, errorMsg strin
 	// For kind clusters, ensure image is loaded into kind cluster
 	if strings.Contains(errorMsg, "localhost:5001") {
 		logger.Info("Attempting to load image into kind cluster")
-		// This would require integration with docker/kind commands
-		// For now, log the recommendation
+
+		// Extract image name from error message if possible
+		// Look for patterns like "localhost:5001/imagename:tag"
+		re := regexp.MustCompile(`localhost:5001/([^:\s]+):([^\s]+)`)
+		matches := re.FindStringSubmatch(errorMsg)
+
+		if len(matches) >= 3 {
+			imageName := matches[1]
+			imageTag := matches[2]
+			localImageRef := fmt.Sprintf("%s:%s", imageName, imageTag)
+			registryImageRef := fmt.Sprintf("localhost:5001/%s:%s", imageName, imageTag)
+
+			logger.Info("Detected image reference, attempting kind load",
+				"local_image", localImageRef,
+				"registry_image", registryImageRef)
+
+			// Try to load image into kind cluster
+			cmd := exec.CommandContext(ctx, "kind", "load", "docker-image", localImageRef, "--name", "container-kit")
+			if output, err := cmd.CombinedOutput(); err != nil {
+				logger.Warn("Failed to load image into kind cluster automatically",
+					"error", err,
+					"output", string(output))
+				logger.Warn("Manual intervention needed: Load image into kind cluster with 'kind load docker-image'")
+				return false
+			}
+
+			logger.Info("Successfully loaded image into kind cluster", "image", localImageRef)
+			return true
+		}
+
+		logger.Warn("Could not extract image name from error message")
 		logger.Warn("Manual intervention needed: Load image into kind cluster with 'kind load docker-image'")
-		return false
 	}
 	return false
 }
