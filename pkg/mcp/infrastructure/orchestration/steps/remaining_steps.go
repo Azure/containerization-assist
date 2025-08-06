@@ -68,20 +68,7 @@ func (s *BuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) 
 
 	// Generate image name and tag from cached repo identifier
 	imageName := utils.ExtractRepoName(state.RepoIdentifier)
-	imageTag := "latest" // Default fallback
-
-	// Check for desired tag in request parameters
-	if tagParam, exists := state.RequestParams["tag"]; exists {
-		tagStr, ok := tagParam.(string)
-		if !ok || tagStr == "" {
-			state.Logger.Warn("Tag parameter is not a valid string or is empty, using 'latest'")
-		} else if err := validateDockerTag(tagStr); err != nil {
-			state.Logger.Warn("Invalid tag provided, using 'latest'", "invalid_tag", tagStr, "error", err)
-		} else {
-			imageTag = tagStr
-			state.Logger.Info("Using requested tag for build", "tag", imageTag)
-		}
-	}
+	imageTag := extractAndValidateTag(state, state.Logger)
 
 	buildContext := state.AnalyzeResult.RepoPath
 
@@ -293,17 +280,7 @@ func (s *TagStep) Execute(ctx context.Context, state *workflow.WorkflowState) er
 	state.Logger.Info("Step 5: Tagging image for registry")
 
 	// Extract tag from request parameters, default to "latest" if not provided
-	imageTag := "latest"
-	if tagParam, exists := state.RequestParams["tag"]; exists {
-		if tagStr, ok := tagParam.(string); ok && tagStr != "" {
-			// Basic tag validation
-			if err := validateDockerTag(tagStr); err != nil {
-				state.Logger.Warn("Invalid tag provided, using 'latest'", "invalid_tag", tagStr, "error", err)
-			} else {
-				imageTag = tagStr
-			}
-		}
-	}
+	imageTag := extractAndValidateTag(state, state.Logger)
 
 	imageName := utils.ExtractRepoName(state.RepoIdentifier)
 	sourceImageRef := state.BuildResult.ImageRef // Current image reference from BuildStep
@@ -390,15 +367,7 @@ func (s *PushStep) Execute(ctx context.Context, state *workflow.WorkflowState) e
 	if !state.Args.TestMode {
 		// Extract image name and tag from the ImageRef set by TagStep
 		imageName := utils.ExtractRepoName(state.RepoIdentifier)
-		imageTag := "latest" // Default fallback
-
-		// Parse tag from ImageRef if available (format: "imageName:tag")
-		if state.BuildResult.ImageRef != "" {
-			parts := strings.Split(state.BuildResult.ImageRef, ":")
-			if len(parts) == 2 {
-				imageTag = parts[1]
-			}
-		}
+		imageTag := parseImageReference(state.BuildResult.ImageRef)
 
 		// Convert workflow BuildResult to infrastructure BuildResult for kind loading
 		infraBuildResult := &BuildResult{
@@ -498,15 +467,7 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 
 	// Convert workflow BuildResult to infrastructure BuildResult
 	imageName := utils.ExtractRepoName(state.RepoIdentifier)
-	imageTag := "latest" // Default fallback
-
-	// Parse tag from ImageRef if available (format: "imageName:tag")
-	if state.BuildResult.ImageRef != "" {
-		parts := strings.Split(state.BuildResult.ImageRef, ":")
-		if len(parts) == 2 {
-			imageTag = parts[1]
-		}
-	}
+	imageTag := parseImageReference(state.BuildResult.ImageRef)
 
 	infraBuildResult := &BuildResult{
 		ImageName: imageName,
@@ -881,14 +842,15 @@ func writeManifestFile(filePath, content string, logger *slog.Logger) error {
 	return nil
 }
 
-// validateDockerTag validates a Docker tag format
+// validateDockerTag validates a Docker tag format according to Docker Registry specification
 func validateDockerTag(tag string) error {
-	// Docker tag rules:
-	// - Must be valid ASCII and lowercase
-	// - Max 128 characters
-	// - Can contain lowercase letters, digits, underscores, periods, dashes
-	// - Cannot start with period or dash
-	// - Cannot contain consecutive periods
+	// Docker tag rules from registry specification grammar:
+	// tag := /[\w][\w.-]{0,127}/
+	// (see: https://pkg.go.dev/github.com/distribution/reference#pkg-overview)
+	// - Must start with word character (letter, digit, underscore)
+	// - Followed by 0-127 word characters, dots, or dashes
+	// - Maximum 128 characters total
+	// - Case sensitive (uppercase allowed)
 	if len(tag) == 0 {
 		return fmt.Errorf("tag cannot be empty")
 	}
@@ -896,16 +858,44 @@ func validateDockerTag(tag string) error {
 		return fmt.Errorf("tag too long (max 128 characters)")
 	}
 
-	// Check for valid characters and format
-	validTag := regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$`)
+	// Check format according to registry specification: [\w][\w.-]{0,127}
+	validTag := regexp.MustCompile(`^[\w][\w.-]{0,127}$`)
 	if !validTag.MatchString(tag) {
-		return fmt.Errorf("invalid tag format: must contain only alphanumeric, dots, dashes, underscores")
-	}
-
-	// Check for consecutive periods
-	if strings.Contains(tag, "..") {
-		return fmt.Errorf("invalid tag: cannot contain consecutive periods")
+		return fmt.Errorf("invalid tag format: must start with word character, followed by word chars/dots/dashes, max 128 chars")
 	}
 
 	return nil
+}
+
+// extractAndValidateTag extracts and validates a Docker tag from workflow state request parameters
+func extractAndValidateTag(state *workflow.WorkflowState, logger *slog.Logger) string {
+	imageTag := "latest" // Default fallback
+
+	if tagParam, exists := state.RequestParams["tag"]; exists {
+		tagStr, ok := tagParam.(string)
+		if !ok || tagStr == "" {
+			logger.Warn("Tag parameter is not a valid string or is empty, using 'latest'")
+		} else if err := validateDockerTag(tagStr); err != nil {
+			logger.Warn("Invalid tag provided, using 'latest'", "invalid_tag", tagStr, "error", err)
+		} else {
+			imageTag = tagStr
+			logger.Info("Using requested tag", "tag", imageTag)
+		}
+	}
+
+	return imageTag
+}
+
+// parseImageReference parses an image reference and extracts the tag, default returns "latest"
+func parseImageReference(imageRef string) string {
+	if imageRef == "" {
+		return "latest"
+	}
+
+	parts := strings.Split(imageRef, ":")
+	if len(parts) == 2 {
+		return parts[1]
+	}
+
+	return "latest"
 }
