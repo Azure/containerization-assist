@@ -72,14 +72,14 @@ func (s *BuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) 
 
 	// Check for desired tag in request parameters
 	if tagParam, exists := state.RequestParams["tag"]; exists {
-		if tagStr, ok := tagParam.(string); ok && tagStr != "" {
-			// Basic tag validation
-			if err := validateDockerTag(tagStr); err != nil {
-				state.Logger.Warn("Invalid tag provided, using 'latest'", "invalid_tag", tagStr, "error", err)
-			} else {
-				imageTag = tagStr
-				state.Logger.Info("Using requested tag for build", "tag", imageTag)
-			}
+		tagStr, ok := tagParam.(string)
+		if !ok || tagStr == "" {
+			state.Logger.Warn("Tag parameter is not a valid string or is empty, using 'latest'")
+		} else if err := validateDockerTag(tagStr); err != nil {
+			state.Logger.Warn("Invalid tag provided, using 'latest'", "invalid_tag", tagStr, "error", err)
+		} else {
+			imageTag = tagStr
+			state.Logger.Info("Using requested tag for build", "tag", imageTag)
 		}
 	}
 
