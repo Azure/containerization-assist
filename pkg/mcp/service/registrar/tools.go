@@ -694,8 +694,8 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		return tr.createRedirectResponse(stepName, fmt.Sprintf("Failed to create workflow state: %s", err.Error()), sessionID)
 	}
 
-	// Execute the step
-	err = step.Execute(ctx, workflowState)
+	// Execute the step and get result
+	stepResult, err := step.Execute(ctx, workflowState)
 	if err != nil {
 		// Log step failure
 		tr.logger.Info("Step failed",
@@ -725,21 +725,30 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		tr.logger.Warn("Failed to save workflow state after step execution", "session_id", sessionID, "step", stepName, "error", err)
 	}
 
-	// TODO: Handle any additional results or artifacts from the step execution
+	// Prepare response data with step result information
 	responseData := map[string]interface{}{
 		"session_id": sessionID,
 	}
 
-	if stepName == "analyze_repository" {
-		// If this is the analyze step, include the analyze result in the response
-		if workflowState.AnalyzeResult != nil {
-			responseData["analyze_result"] = workflowState.AnalyzeResult
+	// Include step result data if available
+	if stepResult != nil && stepResult.Success {
+		tr.logger.Info("Including step result data", "step", stepName, "has_data", len(stepResult.Data) > 0)
+		
+		// Add the step result for rich formatting
+		responseData["step_result"] = map[string]interface{}{
+			"success": stepResult.Success,
+			"data":    stepResult.Data,
+		}
+		
+		// Include metadata if present
+		if len(stepResult.Metadata) > 0 {
+			responseData["step_metadata"] = stepResult.Metadata
 		}
 	}
 
 	return tr.createProgressResponse(stepName, responseData, sessionID)
-
 }
+
 
 // getRequiredParameters returns the required parameters for each tool
 func (tr *ToolRegistrar) getRequiredParameters(stepName string) map[string]string {
@@ -799,7 +808,7 @@ func (tr *ToolRegistrar) createStepState(ctx context.Context, sessionID, repoPat
 		}
 	}
 
-	// Update repo path if provided and different
+	// Update repo path if provided and different (avoid unnecessary updates)
 	if repoPath != "" && simpleState.RepoPath != repoPath {
 		simpleState.RepoPath = repoPath
 	}

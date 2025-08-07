@@ -32,7 +32,7 @@ func (s *AnalyzeStep) MaxRetries() int {
 }
 
 // Execute performs repository analysis
-func (s *AnalyzeStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
+func (s *AnalyzeStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
 	var input, inputDesc string
 	if state.Args.RepoURL != "" {
 		input = state.Args.RepoURL
@@ -46,7 +46,7 @@ func (s *AnalyzeStep) Execute(ctx context.Context, state *workflow.WorkflowState
 
 	analyzeResult, err := AnalyzeRepository(input, state.Args.Branch, state.Logger)
 	if err != nil {
-		return fmt.Errorf("repository analysis failed: %v", err)
+		return nil, fmt.Errorf("repository analysis failed: %v", err)
 	}
 
 	state.Logger.Info("Repository analysis completed",
@@ -83,5 +83,17 @@ func (s *AnalyzeStep) Execute(ctx context.Context, state *workflow.WorkflowState
 
 	state.Result.RepoPath = analyzeResult.RepoPath
 
-	return nil
+	// Return StepResult with minimal data and metadata
+	return &workflow.StepResult{
+		Success: true,
+		Data: map[string]interface{}{
+			"language":     analyzeResult.Language,
+			"framework":    analyzeResult.Framework,
+			"port":         analyzeResult.Port,
+			"repo_path":    analyzeResult.RepoPath,
+		},
+		Metadata: map[string]interface{}{
+			"analysis": analyzeResult.Analysis,
+		},
+	}, nil
 }
