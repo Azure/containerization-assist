@@ -599,16 +599,7 @@ func (tr *ToolRegistrar) registerUtilityTools(mcpServer *server.MCPServer) error
 		},
 	}
 
-	mcpServer.AddTool(listToolsTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf(`{"success":true,"message":"list_tools called","timestamp":"%s"}`, time.Now().Format(time.RFC3339)),
-				},
-			},
-		}, nil
-	})
+	mcpServer.AddTool(listToolsTool, tools.CreateListToolsHandler())
 
 	tr.logger.Info("Utility tools registered successfully")
 	return nil

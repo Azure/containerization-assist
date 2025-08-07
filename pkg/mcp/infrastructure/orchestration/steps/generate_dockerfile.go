@@ -104,10 +104,26 @@ COPY --from=builder /app/main .
 func generateJavaDockerfile(framework string, port int, logger *slog.Logger) string {
 	var dockerfile strings.Builder
 
-	// Check if this is a servlet application (WAR file)
-	isServlet := strings.Contains(strings.ToLower(framework), "servlet") ||
-		strings.Contains(strings.ToLower(framework), "jsp") ||
-		strings.Contains(strings.ToLower(framework), "war")
+	// Simple detection: if it has JAR files anywhere, it's a standard Java app, otherwise servlet
+	isServlet := true
+
+	// Walk through all directories to find JAR files
+	err := filepath.WalkDir(".", func(path string, info os.DirEntry, err error) error {
+		if err != nil {
+			return nil // Continue walking even if there's an error
+		}
+
+		if !info.IsDir() && strings.HasSuffix(info.Name(), ".jar") && !strings.Contains(info.Name(), "-sources") && !strings.Contains(info.Name(), "-javadoc") {
+			isServlet = false
+			return filepath.SkipAll // Found a JAR, stop walking
+		}
+		return nil
+	})
+
+	// If walk failed, default to servlet
+	if err != nil {
+		isServlet = true
+	}
 
 	if isServlet {
 		// Use Tomcat for servlet applications
@@ -130,7 +146,7 @@ RUN if [ -f "mvnw" ]; then \
     fi
 
 # Runtime stage - Tomcat for servlet applications
-FROM tomcat:10-jre17-temurin-jammy
+FROM tomcat:9.0-jre17-temurin
 # Remove default webapps
 RUN rm -rf /usr/local/tomcat/webapps/*
 # Copy WAR file to Tomcat webapps as ROOT for root context
@@ -167,7 +183,7 @@ RUN if [ -f "mvnw" ]; then \
     fi
 
 # Runtime stage
-FROM eclipse-temurin:17-jre-alpine
+FROM tomcat:9.0-jre17-temurin
 WORKDIR /app
 
 # Copy built artifacts from builder stage

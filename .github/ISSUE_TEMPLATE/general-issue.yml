@@ -1,0 +1,91 @@
+name: 💬 General Issue
+description: Ask a question, report a documentation issue, or discuss something else
+title: "💬 [ISSUE]: "
+labels: ["question", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for questions, documentation issues, or other general discussions that don't fit the bug report or feature request categories.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission checklist
+      description: Please confirm you have completed these steps
+      options:
+        - label: I have searched existing issues and discussions
+          required: true
+        - label: I have checked the documentation and README
+          required: true
+        - label: This doesn't fit the bug report or feature request categories
+          required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Issue Type
+      description: What type of issue is this?
+      options:
+        - Question - Need help or clarification
+        - Documentation - Docs are unclear, missing, or incorrect
+        - Discussion - Want to discuss an idea or approach
+        - Support - Need help with setup or usage
+        - Performance - Performance question or concern
+        - Security - Security question or concern
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe your question, issue, or topic for discussion
+      placeholder: |
+        Please provide a clear description of:
+        - What you're trying to achieve
+        - What's unclear or problematic
+        - What you've already tried (if applicable)
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: |
+        Provide relevant context:
+        - Your use case or project setup
+        - Container Kit version (if applicable)
+        - Environment details (if relevant)
+        - Links to relevant documentation or code
+      placeholder: |
+        Project: ...
+        Version: ...
+        Environment: ...
+        Relevant links: ...
+
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What I've Tried
+      description: What have you already attempted? (if applicable)
+      placeholder: |
+        1. I tried...
+        2. I looked at...
+        3. I searched for...
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Outcome
+      description: What are you hoping to achieve or understand?
+      placeholder: I'm hoping to...
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Information
+      description: Any other relevant information, links, or context
+      placeholder: Any additional details that might be helpful...

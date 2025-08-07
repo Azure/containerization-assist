@@ -12,6 +12,7 @@ before:
     - go mod verify
 
 builds:
+  # CLI binary
   - id: container-kit
     main: ./main.go
     binary: container-kit
@@ -29,19 +30,44 @@ builds:
       - goos: windows
         goarch: arm64
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+      - -s -w -X main.Version={{.Version}} -X main.GitCommit={{.Commit}} -X main.BuildTime={{.Date}}
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
+  # MCP Server binary
+  - id: container-kit-mcp
+    main: ./cmd/mcp-server
+    binary: container-kit-mcp
+    tags:
+      - mcp
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    # Skip unsupported combinations
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X main.Version={{.Version}} -X main.GitCommit={{.Commit}} -X main.BuildTime={{.Date}}
     mod_timestamp: '{{ .CommitTimestamp }}'
 
 archives:
   - id: default
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    builds:
+      - container-kit
+      - container-kit-mcp
     format_overrides:
       - goos: windows
         format: zip
     files:
       - LICENSE*
       - README.md
-      - docs/quickstart.md
 
 checksum:
   name_template: 'checksums.txt'
