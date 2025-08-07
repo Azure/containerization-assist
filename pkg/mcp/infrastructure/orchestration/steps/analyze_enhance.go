@@ -129,20 +129,29 @@ func extractFileTree(analysis map[string]interface{}, logger *slog.Logger) strin
 	return string(fileTreeBytes)
 }
 
-// parseAIResponse parses the AI response JSON into a RepositoryAnalysis struct
-func parseAIResponse(content string, logger *slog.Logger) (*aisample.RepositoryAnalysis, error) {
-	// Clean up the response content - sometimes LLMs add extra text
+// extractJSON extracts JSON content from a potentially messy LLM response
+func extractJSON(content string) string {
 	content = strings.TrimSpace(content)
 
-	// Find JSON object boundaries
 	startIdx := strings.Index(content, "{")
-	endIdx := strings.LastIndex(content, "}")
-
-	if startIdx == -1 || endIdx == -1 || endIdx <= startIdx {
-		return nil, fmt.Errorf("no valid JSON object found in response")
+	if startIdx == -1 {
+		return ""
 	}
 
-	jsonContent := content[startIdx : endIdx+1]
+	endIdx := strings.LastIndex(content, "}")
+	if endIdx == -1 || endIdx <= startIdx {
+		return ""
+	}
+
+	return content[startIdx : endIdx+1]
+}
+
+// parseAIResponse parses the AI response JSON into a RepositoryAnalysis struct
+func parseAIResponse(content string, logger *slog.Logger) (*aisample.RepositoryAnalysis, error) {
+	cleaned := extractJSON(content)
+	if cleaned == "" {
+		return nil, fmt.Errorf("no valid JSON object found in response")
+	}
 
 	// Parse the JSON into a temporary struct
 	var aiResponse struct {
@@ -157,7 +166,7 @@ func parseAIResponse(content string, logger *slog.Logger) (*aisample.RepositoryA
 		Confidence             float64  `json:"confidence"`
 	}
 
-	if err := json.Unmarshal([]byte(jsonContent), &aiResponse); err != nil {
+	if err := json.Unmarshal([]byte(cleaned), &aiResponse); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 

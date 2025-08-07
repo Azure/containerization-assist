@@ -364,31 +364,30 @@ func (s *PushStep) Execute(ctx context.Context, state *workflow.WorkflowState) e
 	}
 
 	// For local kind deployment, load image directly into kind cluster
-	if !state.Args.TestMode {
-		// Extract image name and tag from the ImageRef set by TagStep
-		imageName := utils.ExtractRepoName(state.RepoIdentifier)
-		imageTag := parseImageReference(state.BuildResult.ImageRef)
-
-		// Convert workflow BuildResult to infrastructure BuildResult for kind loading
-		infraBuildResult := &BuildResult{
-			ImageName: imageName,
-			ImageTag:  imageTag,
-			ImageID:   state.BuildResult.ImageID,
-		}
-
-		state.Logger.Info("Loading image into kind cluster",
-			"image_name", infraBuildResult.ImageName,
-			"image_tag", infraBuildResult.ImageTag)
-
-		err := LoadImageToKind(ctx, infraBuildResult, "container-kit", state.Logger)
-		if err != nil {
-			return errors.New(errors.CodeImagePullFailed, "push_step", "failed to load image to kind cluster", err)
-		}
-		state.Logger.Info("Image loaded into kind cluster successfully")
-	} else {
+	if state.Args.TestMode {
 		state.Logger.Info("Test mode: Skipping image load to kind cluster")
+		return nil
+	}
+	// Extract image name and tag from the ImageRef set by TagStep
+	imageName := utils.ExtractRepoName(state.RepoIdentifier)
+	imageTag := parseImageReference(state.BuildResult.ImageRef)
+
+	// Convert workflow BuildResult to infrastructure BuildResult for kind loading
+	infraBuild := &BuildResult{
+		ImageName: imageName,
+		ImageTag:  imageTag,
+		ImageID:   state.BuildResult.ImageID,
 	}
 
+	state.Logger.Info("Loading image into kind cluster",
+		"image_name", imageName,
+		"image_tag", imageTag)
+
+	if err := LoadImageToKind(ctx, infraBuild, "container-kit", state.Logger); err != nil {
+		return errors.New(errors.CodeImagePullFailed, "push_step", "failed to load image to kind cluster", err)
+	}
+
+	state.Logger.Info("Image loaded into kind cluster successfully")
 	state.Logger.Info("Image prepared for local kind deployment",
 		"image_ref", state.BuildResult.ImageRef)
 
@@ -485,16 +484,22 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 		appName = "test-" + appName
 	}
 
-	// Get registry URL from request parameters (set by push_image step)
-	registryURL := "localhost:5001" // Default fallback
-	if registryParam, exists := state.RequestParams["registry"]; exists {
-		if registryStr, ok := registryParam.(string); ok && registryStr != "" {
-			registryURL = registryStr
-			state.Logger.Info("Using registry URL from request parameters", "registry", registryURL)
-		}
+	// Determine registry URL (default to localhost if not provided)
+	registryURL := "localhost:5001"
+	if val, ok := state.RequestParams["registry"].(string); ok && val != "" {
+		registryURL = val
+		state.Logger.Info("Using registry URL from request parameters", "registry", registryURL)
 	}
 
-	k8sResult, err := GenerateManifests(infraBuildResult, appName, namespace, state.AnalyzeResult.Port, state.AnalyzeResult.RepoPath, registryURL, state.Logger)
+	k8sResult, err := GenerateManifests(
+		infraBuildResult,
+		appName,
+		namespace,
+		state.AnalyzeResult.Port,
+		state.AnalyzeResult.RepoPath,
+		registryURL,
+		state.Logger,
+	)
 	if err != nil {
 		return errors.New(errors.CodeManifestInvalid, "manifest_step", "k8s manifest generation failed", err)
 	}
@@ -634,13 +639,16 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 
 	// Add port using priority: Dockerfile → Analysis → Default
 	port := 8080 // Default fallback
-	if state.DockerfileResult != nil && state.DockerfileResult.ExposedPort > 0 {
+	switch {
+	case state.DockerfileResult != nil && state.DockerfileResult.ExposedPort > 0:
 		port = state.DockerfileResult.ExposedPort
 		state.Logger.Info("Using port from Dockerfile", "port", port)
-	} else if state.AnalyzeResult != nil && state.AnalyzeResult.Port > 0 {
+
+	case state.AnalyzeResult != nil && state.AnalyzeResult.Port > 0:
 		port = state.AnalyzeResult.Port
 		state.Logger.Info("Using port from analysis", "port", port)
-	} else {
+
+	default:
 		state.Logger.Info("Using default application port", "port", port, "reason", "no port detected from Dockerfile or analysis")
 	}
 	infraK8sResult.Metadata["port"] = port
@@ -867,22 +875,19 @@ func validateDockerTag(tag string) error {
 	return nil
 }
 
-// extractAndValidateTag extracts and validates a Docker tag from workflow state request parameters
+// extractAndValidateTag extracts and validates a Docker tag from the request parameters.
 func extractAndValidateTag(state *workflow.WorkflowState, logger *slog.Logger) string {
-	tagParam, exists := state.RequestParams["tag"]
-	if !exists {
-		return "latest"
-	}
+	const fallbackTag = "latest"
 
-	tagStr, ok := tagParam.(string)
+	tagStr, ok := state.RequestParams["tag"].(string)
 	if !ok || tagStr == "" {
-		logger.Warn("Tag parameter is not a valid string or is empty, using 'latest'")
-		return "latest"
+		logger.Warn("Missing or invalid tag parameter, defaulting to 'latest'")
+		return fallbackTag
 	}
 
 	if err := validateDockerTag(tagStr); err != nil {
-		logger.Warn("Invalid tag provided, using 'latest'", "invalid_tag", tagStr, "error", err)
-		return "latest"
+		logger.Warn("Invalid tag provided, defaulting to 'latest'", "invalid_tag", tagStr, "error", err)
+		return fallbackTag
 	}
 
 	logger.Info("Using requested tag", "tag", tagStr)
