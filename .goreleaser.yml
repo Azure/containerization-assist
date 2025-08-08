@@ -12,27 +12,6 @@ before:
     - go mod verify
 
 builds:
-  # CLI binary
-  - id: container-kit
-    main: ./main.go
-    binary: container-kit
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - darwin
-      - windows
-    goarch:
-      - amd64
-      - arm64
-    # Skip unsupported combinations
-    ignore:
-      - goos: windows
-        goarch: arm64
-    ldflags:
-      - -s -w -X main.Version={{.Version}} -X main.GitCommit={{.Commit}} -X main.BuildTime={{.Date}}
-    mod_timestamp: '{{ .CommitTimestamp }}'
-
   # MCP Server binary
   - id: container-kit-mcp
     main: ./cmd/mcp-server
@@ -57,10 +36,9 @@ builds:
     mod_timestamp: '{{ .CommitTimestamp }}'
 
 archives:
-  - id: default
-    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+  - id: mcp
+    name_template: "container-kit-mcp_{{ .Os }}_{{ .Arch }}"
     builds:
-      - container-kit
       - container-kit-mcp
     format_overrides:
       - goos: windows
@@ -107,15 +85,11 @@ release:
 
     Welcome to Container Kit {{ .Tag }}! This release includes several improvements and bug fixes.
 
-    ### Installation
+  ### Installation (MCP Server)
+    
+  The MCP server binary (container-kit-mcp) is attached for each OS/architecture. To install and configure it, please follow the User Guide:
 
-    #### Quick Install (Linux/macOS)
-    ```bash
-    curl -sSL https://raw.githubusercontent.com/Azure/container-kit/main/scripts/install.sh | bash
-    ```
-
-    #### Manual Download
-    Download the appropriate binary for your platform from the assets below.
+  - USER_GUIDE.md: https://github.com/Azure/container-kit/blob/{{ .Tag }}/USER_GUIDE.md
 
   footer: |
     ## Thanks!
