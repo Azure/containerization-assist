@@ -111,6 +111,7 @@ func AnalyzeRepository(input, branch string, logger *slog.Logger) (*AnalyzeResul
 
 	// Convert result to analysis map
 	analysisMap := map[string]interface{}{
+		"structure":         result.Structure,
 		"files_analyzed":    len(result.ConfigFiles),
 		"language":          result.Language,
 		"framework":         result.Framework,

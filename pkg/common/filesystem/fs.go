@@ -4,10 +4,9 @@
 package filesystem
 
 import (
-	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	ignore "github.com/sabhiram/go-gitignore"
@@ -189,10 +188,9 @@ func GenerateSimpleFileTree(rootPath string) (string, error) {
 	return GenerateFileTree(rootPath, options)
 }
 
-// GenerateJSONFileTree creates a JSON-like representation of the directory structure
-// with nested braces. This is the consolidated version of the former ReadFileTree function.
-// It respects .gitignore and uses the DefaultIgnorePatterns for filtering.
-func GenerateJSONFileTree(root string, maxDepth int) (string, error) {
+// GenerateFileTreeMap creates a structured map representation of the directory structure
+// This builds on GenerateJSONFileTree but returns the actual map instead of a formatted string
+func GenerateFileTreeMap(root string, maxDepth int) (map[string]interface{}, error) {
 	// Create a map to represent the file tree structure
 	fileTree := make(map[string]interface{})
 
@@ -256,7 +254,7 @@ func GenerateJSONFileTree(root string, maxDepth int) (string, error) {
 
 			if isLast {
 				if !info.IsDir() {
-					// Add file as a string value
+					// Add file as a null value
 					current[part] = nil
 				} else {
 					// Create an empty map for directories
@@ -284,60 +282,26 @@ func GenerateJSONFileTree(root string, maxDepth int) (string, error) {
 	})
 
 	if err != nil {
+		return nil, err
+	}
+
+	return fileTree, nil
+}
+
+// GenerateJSONFileTree creates a JSON representation of the directory structure.
+// It respects .gitignore and uses the DefaultIgnorePatterns for filtering.
+func GenerateJSONFileTree(root string, maxDepth int) (string, error) {
+	// Use GenerateFileTreeMap to get the structured data
+	fileTree, err := GenerateFileTreeMap(root, maxDepth)
+	if err != nil {
 		return "", err
 	}
 
-	// Format the tree as a string
-	var buffer bytes.Buffer
-	formatJSONTree(fileTree, &buffer, 0)
-	return buffer.String(), nil
-}
-
-// formatJSONTree recursively formats the tree map into a string representation
-// of a directory structure in JSON-like format
-func formatJSONTree(tree map[string]interface{}, buffer *bytes.Buffer, indent int) {
-	// Open the current level
-	buffer.WriteString("{\n")
-
-	// Sort keys for consistent output
-	entryNames := getSortedKeys(tree)
-
-	// Process each entry in the tree
-	for i, entryName := range entryNames {
-		// Create proper indentation for this level
-		currentIndent := strings.Repeat("  ", indent+1)
-		buffer.WriteString(currentIndent)
-
-		// Write the entry name
-		buffer.WriteString("\"" + entryName + "\"")
-
-		entryValue := tree[entryName]
-		if entryValue == nil {
-			// This is a file - no additional formatting needed
-		} else if subdirectory, isDirectory := entryValue.(map[string]interface{}); isDirectory {
-			// This is a directory - recursively format its contents
-			buffer.WriteString(": ")
-			formatJSONTree(subdirectory, buffer, indent+1)
-		}
-
-		// Add comma if not the last entry
-		if i < len(entryNames)-1 {
-			buffer.WriteString(",")
-		}
-		buffer.WriteString("\n")
+	// Marshal to actual JSON
+	jsonBytes, err := json.Marshal(fileTree)
+	if err != nil {
+		return "", err
 	}
 
-	// Close the current level with proper indentation
-	closingIndent := strings.Repeat("  ", indent)
-	buffer.WriteString(closingIndent + "}")
-}
-
-// getSortedKeys extracts and sorts keys from a map
-func getSortedKeys(tree map[string]interface{}) []string {
-	var keys []string
-	for k := range tree {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
+	return string(jsonBytes), nil
 }

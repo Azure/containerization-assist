@@ -8,9 +8,11 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/common/errors"
+	"github.com/Azure/container-kit/pkg/common/runner"
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/utils"
@@ -66,7 +68,8 @@ func (s *BuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) 
 
 	// Generate image name and tag from cached repo identifier
 	imageName := utils.ExtractRepoName(state.RepoIdentifier)
-	imageTag := "latest"
+	imageTag := extractAndValidateTag(state, state.Logger)
+
 	buildContext := state.AnalyzeResult.RepoPath
 
 	// In test mode, skip actual Docker operations
@@ -276,13 +279,68 @@ func (s *TagStep) Execute(ctx context.Context, state *workflow.WorkflowState) er
 
 	state.Logger.Info("Step 5: Tagging image for registry")
 
-	// For local kind clusters, we don't need external registry push
-	// The image will be loaded directly into kind
+	// Extract tag from request parameters, default to "latest" if not provided
+	imageTag := extractAndValidateTag(state, state.Logger)
+
 	imageName := utils.ExtractRepoName(state.RepoIdentifier)
-	imageTag := "latest"
+	sourceImageRef := state.BuildResult.ImageRef // Current image reference from BuildStep
+	targetImageRef := fmt.Sprintf("%s:%s", imageName, imageTag)
+
+	// In test mode, skip actual Docker operations
+	if state.Args.TestMode {
+		state.Logger.Info("Test mode: Simulating Docker tag operation",
+			"source", sourceImageRef,
+			"target", targetImageRef)
+
+		// Update the build result with the final tag
+		state.BuildResult.ImageRef = targetImageRef
+
+		state.Logger.Info("Test mode: Image tagged successfully",
+			"image_name", imageName,
+			"image_tag", imageTag,
+			"image_ref", state.BuildResult.ImageRef)
+		return nil
+	}
+
+	// Only perform actual Docker tagging if the tag is different
+	if sourceImageRef != targetImageRef {
+		state.Logger.Info("Performing Docker tag operation",
+			"source", sourceImageRef,
+			"target", targetImageRef)
+
+		// Initialize Docker client for registry operations
+		dockerClient := docker.NewDockerCmdRunner(&runner.DefaultCommandRunner{})
+
+		// Use the RegistryManager for tagging
+		registryManager := docker.NewRegistryManager(dockerClient, state.Logger.With("component", "registry_manager"))
+
+		tagResult, err := registryManager.TagImage(ctx, sourceImageRef, targetImageRef)
+		if err != nil {
+			state.Logger.Error("Docker tag operation failed", "error", err,
+				"source", sourceImageRef, "target", targetImageRef)
+			return errors.New(errors.CodeImageBuildFailed, "tag_step",
+				fmt.Sprintf("failed to tag image from %s to %s: %v", sourceImageRef, targetImageRef, err), err)
+		}
+
+		if !tagResult.Success {
+			errorMsg := "docker tag operation unsuccessful"
+			if tagResult.Error != nil {
+				errorMsg = fmt.Sprintf("docker tag failed: %s", tagResult.Error.Message)
+			}
+			state.Logger.Error("Docker tag unsuccessful", "error", errorMsg)
+			return errors.New(errors.CodeImageBuildFailed, "tag_step", errorMsg, nil)
+		}
+
+		state.Logger.Info("Docker tag operation completed successfully",
+			"source", sourceImageRef,
+			"target", targetImageRef,
+			"duration", tagResult.Duration)
+	} else {
+		state.Logger.Info("Tag unchanged, skipping Docker tag operation", "image_ref", sourceImageRef)
+	}
 
 	// Update the build result with the final tag
-	state.BuildResult.ImageRef = fmt.Sprintf("%s:%s", imageName, imageTag)
+	state.BuildResult.ImageRef = targetImageRef
 
 	state.Logger.Info("Image tagged successfully",
 		"image_name", imageName,
@@ -301,12 +359,35 @@ func (s *PushStep) MaxRetries() int { return 3 }
 func (s *PushStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
 	state.Logger.Info("Step 6: Preparing image for deployment")
 
-	// For local kind deployment, we skip external registry push
-	// The image will be loaded directly into kind in the deploy step
 	if state.BuildResult == nil {
 		return errors.New(errors.CodeInvalidState, "push_step", "build result is required for image preparation", nil)
 	}
 
+	// For local kind deployment, load image directly into kind cluster
+	if state.Args.TestMode {
+		state.Logger.Info("Test mode: Skipping image load to kind cluster")
+		return nil
+	}
+	// Extract image name and tag from the ImageRef set by TagStep
+	imageName := utils.ExtractRepoName(state.RepoIdentifier)
+	imageTag := parseImageReference(state.BuildResult.ImageRef)
+
+	// Convert workflow BuildResult to infrastructure BuildResult for kind loading
+	infraBuild := &BuildResult{
+		ImageName: imageName,
+		ImageTag:  imageTag,
+		ImageID:   state.BuildResult.ImageID,
+	}
+
+	state.Logger.Info("Loading image into kind cluster",
+		"image_name", imageName,
+		"image_tag", imageTag)
+
+	if err := LoadImageToKind(ctx, infraBuild, "container-kit", state.Logger); err != nil {
+		return errors.New(errors.CodeImagePullFailed, "push_step", "failed to load image to kind cluster", err)
+	}
+
+	state.Logger.Info("Image loaded into kind cluster successfully")
 	state.Logger.Info("Image prepared for local kind deployment",
 		"image_ref", state.BuildResult.ImageRef)
 
@@ -384,9 +465,12 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 	}
 
 	// Convert workflow BuildResult to infrastructure BuildResult
+	imageName := utils.ExtractRepoName(state.RepoIdentifier)
+	imageTag := parseImageReference(state.BuildResult.ImageRef)
+
 	infraBuildResult := &BuildResult{
-		ImageName: utils.ExtractRepoName(state.RepoIdentifier),
-		ImageTag:  "latest",
+		ImageName: imageName,
+		ImageTag:  imageTag,
 		ImageID:   state.BuildResult.ImageID,
 	}
 
@@ -400,7 +484,22 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 		appName = "test-" + appName
 	}
 
-	k8sResult, err := GenerateManifests(infraBuildResult, appName, namespace, state.AnalyzeResult.Port, state.AnalyzeResult.RepoPath, state.Logger)
+	// Determine registry URL (default to localhost if not provided)
+	registryURL := "localhost:5001"
+	if val, ok := state.RequestParams["registry"].(string); ok && val != "" {
+		registryURL = val
+		state.Logger.Info("Using registry URL from request parameters", "registry", registryURL)
+	}
+
+	k8sResult, err := GenerateManifests(
+		infraBuildResult,
+		appName,
+		namespace,
+		state.AnalyzeResult.Port,
+		state.AnalyzeResult.RepoPath,
+		registryURL,
+		state.Logger,
+	)
 	if err != nil {
 		return errors.New(errors.CodeManifestInvalid, "manifest_step", "k8s manifest generation failed", err)
 	}
@@ -523,23 +622,7 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 		return errors.New(errors.CodeInvalidState, "deploy_step", "K8s manifests are required for deployment", nil)
 	}
 
-	// First, load image into kind cluster if needed
-	if state.BuildResult != nil && !state.Args.TestMode {
-		infraBuildResult := &BuildResult{
-			ImageName: utils.ExtractRepoName(state.RepoIdentifier),
-			ImageTag:  "latest",
-			ImageID:   state.BuildResult.ImageID,
-		}
-
-		err := LoadImageToKind(ctx, infraBuildResult, "container-kit", state.Logger)
-		if err != nil {
-			return errors.New(errors.CodeImagePullFailed, "deploy_step", "failed to load image to kind", err)
-		}
-		state.Logger.Info("Image loaded into kind cluster successfully")
-	} else if state.Args.TestMode {
-		state.Logger.Info("Test mode: Skipping image load to kind cluster")
-	}
-
+	// Image should already be loaded into kind cluster by PushStep (Step 6)
 	// Convert workflow K8sResult to infrastructure K8sResult for deployment
 	infraK8sResult := &K8sResult{
 		AppName:    utils.ExtractRepoName(state.RepoIdentifier),
@@ -549,20 +632,42 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 			"path": state.K8sResult.Metadata["manifest_path"], // Pass manifest path from ManifestStep
 		},
 		Metadata: map[string]interface{}{
-			"port":      0, // Default port
-			"image_ref": state.K8sResult.Namespace + "/" + utils.ExtractRepoName(state.RepoIdentifier) + ":latest",
+			"port":      0,                          // Default port
+			"image_ref": state.BuildResult.ImageRef, // Use the tagged image reference from TagStep
 		},
 	}
 
-	// Add port from dockerfile result if available
-	if state.DockerfileResult != nil {
-		infraK8sResult.Metadata["port"] = state.DockerfileResult.ExposedPort
+	// Add port using priority: Dockerfile → Analysis → Default
+	port := 8080 // Default fallback
+	switch {
+	case state.DockerfileResult != nil && state.DockerfileResult.ExposedPort > 0:
+		port = state.DockerfileResult.ExposedPort
+		state.Logger.Info("Using port from Dockerfile", "port", port)
+
+	case state.AnalyzeResult != nil && state.AnalyzeResult.Port > 0:
+		port = state.AnalyzeResult.Port
+		state.Logger.Info("Using port from analysis", "port", port)
+
+	default:
+		state.Logger.Info("Using default application port", "port", port, "reason", "no port detected from Dockerfile or analysis")
 	}
+	infraK8sResult.Metadata["port"] = port
 
 	// Add actual image ref from build result if available
 	if state.BuildResult != nil && state.BuildResult.ImageRef != "" {
 		infraK8sResult.Metadata["image_ref"] = state.BuildResult.ImageRef
 	}
+
+	// Log deployment details for debugging
+	manifestPath := ""
+	if path, ok := infraK8sResult.Manifests["path"].(string); ok {
+		manifestPath = path
+	}
+	state.Logger.Info("Preparing for Kubernetes deployment",
+		"manifest_path", manifestPath,
+		"namespace", infraK8sResult.Namespace,
+		"app_name", infraK8sResult.AppName,
+		"image_ref", infraK8sResult.Metadata["image_ref"])
 
 	// Deploy to Kubernetes
 	if state.Args.TestMode {
@@ -743,4 +848,62 @@ func writeManifestFile(filePath, content string, logger *slog.Logger) error {
 
 	logger.Info("Manifest file written successfully", "path", filePath, "size", len(content))
 	return nil
+}
+
+// validateDockerTag validates a Docker tag format according to Docker Registry specification
+func validateDockerTag(tag string) error {
+	// Docker tag rules from registry specification grammar:
+	// tag := /[\w][\w.-]{0,127}/
+	// (see: https://pkg.go.dev/github.com/distribution/reference#pkg-overview)
+	// - Must start with word character (letter, digit, underscore)
+	// - Followed by 0-127 word characters, dots, or dashes
+	// - Maximum 128 characters total
+	// - Case sensitive (uppercase allowed)
+	if len(tag) == 0 {
+		return fmt.Errorf("tag cannot be empty")
+	}
+	if len(tag) > 128 {
+		return fmt.Errorf("tag too long (max 128 characters)")
+	}
+
+	// Check format according to registry specification: [\w][\w.-]{0,127}
+	validTag := regexp.MustCompile(`^[\w][\w.-]{0,127}$`)
+	if !validTag.MatchString(tag) {
+		return fmt.Errorf("invalid tag format: must start with word character, followed by word chars/dots/dashes, max 128 chars")
+	}
+
+	return nil
+}
+
+// extractAndValidateTag extracts and validates a Docker tag from the request parameters.
+func extractAndValidateTag(state *workflow.WorkflowState, logger *slog.Logger) string {
+	const fallbackTag = "latest"
+
+	tagStr, ok := state.RequestParams["tag"].(string)
+	if !ok || tagStr == "" {
+		logger.Warn("Missing or invalid tag parameter, defaulting to 'latest'")
+		return fallbackTag
+	}
+
+	if err := validateDockerTag(tagStr); err != nil {
+		logger.Warn("Invalid tag provided, defaulting to 'latest'", "invalid_tag", tagStr, "error", err)
+		return fallbackTag
+	}
+
+	logger.Info("Using requested tag", "tag", tagStr)
+	return tagStr
+}
+
+// parseImageReference parses an image reference and extracts the tag, default returns "latest"
+func parseImageReference(imageRef string) string {
+	if imageRef == "" {
+		return "latest"
+	}
+
+	parts := strings.Split(imageRef, ":")
+	if len(parts) == 2 {
+		return parts[1]
+	}
+
+	return "latest"
 }
