@@ -129,8 +129,8 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowSt
 			"exposed_port": dockerfileResult.ExposedPort,
 		},
 		Metadata: map[string]interface{}{
-			"build_args":    dockerfileResult.BuildArgs,
-			"instructions":  instructions,
+			"build_args":   dockerfileResult.BuildArgs,
+			"instructions": instructions,
 		},
 	}, nil
 }

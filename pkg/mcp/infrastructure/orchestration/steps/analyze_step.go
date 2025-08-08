@@ -87,10 +87,10 @@ func (s *AnalyzeStep) Execute(ctx context.Context, state *workflow.WorkflowState
 	return &workflow.StepResult{
 		Success: true,
 		Data: map[string]interface{}{
-			"language":     analyzeResult.Language,
-			"framework":    analyzeResult.Framework,
-			"port":         analyzeResult.Port,
-			"repo_path":    analyzeResult.RepoPath,
+			"language":  analyzeResult.Language,
+			"framework": analyzeResult.Framework,
+			"port":      analyzeResult.Port,
+			"repo_path": analyzeResult.RepoPath,
 		},
 		Metadata: map[string]interface{}{
 			"analysis": analyzeResult.Analysis,

@@ -733,13 +733,13 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 	// Include step result data if available
 	if stepResult != nil && stepResult.Success {
 		tr.logger.Info("Including step result data", "step", stepName, "has_data", len(stepResult.Data) > 0)
-		
+
 		// Add the step result for rich formatting
 		responseData["step_result"] = map[string]interface{}{
 			"success": stepResult.Success,
 			"data":    stepResult.Data,
 		}
-		
+
 		// Include metadata if present
 		if len(stepResult.Metadata) > 0 {
 			responseData["step_metadata"] = stepResult.Metadata
@@ -748,7 +748,6 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 
 	return tr.createProgressResponse(stepName, responseData, sessionID)
 }
-
 
 // getRequiredParameters returns the required parameters for each tool
 func (tr *ToolRegistrar) getRequiredParameters(stepName string) map[string]string {
