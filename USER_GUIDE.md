@@ -159,7 +159,7 @@ Location by platform:
 
 If the file doesn't exist, create it with this minimal configuration:
 
-```jsonc
+```json
 {
   "servers": {
     "container-kit": {
