@@ -27,12 +27,13 @@ type K8sResult struct {
 }
 
 // GenerateManifests creates Kubernetes manifests for deployment using real K8s operations
-func GenerateManifests(buildResult *BuildResult, appName, namespace string, port int, repoPath string, logger *slog.Logger) (*K8sResult, error) {
+func GenerateManifests(buildResult *BuildResult, appName, namespace string, port int, repoPath, registryURL string, logger *slog.Logger) (*K8sResult, error) {
 	logger.Info("Generating Kubernetes manifests",
 		"app_name", appName,
 		"namespace", namespace,
 		"port", port,
-		"repo_path", repoPath)
+		"repo_path", repoPath,
+		"registry_url", registryURL)
 
 	if buildResult == nil {
 		return nil, fmt.Errorf("build result is required")
@@ -50,8 +51,13 @@ func GenerateManifests(buildResult *BuildResult, appName, namespace string, port
 		port = 8080 // Default port
 	}
 
-	// Create image reference for local registry
-	imageRef := fmt.Sprintf("localhost:5001/%s:%s", buildResult.ImageName, buildResult.ImageTag)
+	if registryURL == "" {
+		registryURL = "localhost:5001" // Default fallback
+	}
+
+	// Create image reference using the provided registry URL
+	imageRef := fmt.Sprintf("%s/%s:%s", registryURL, buildResult.ImageName, buildResult.ImageTag)
+	logger.Info("Using registry URL for image reference", "registry", registryURL, "image_ref", imageRef)
 
 	// Use the real K8s manifest service
 	manifestService := kubernetes.NewManifestService(logger.With("component", "k8s_manifest_service"))

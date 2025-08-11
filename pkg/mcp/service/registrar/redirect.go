@@ -294,7 +294,7 @@ func (tr *ToolRegistrar) buildRedirectResponseText(fromTool, error, sessionID, r
 
 	// Add step result context if available
 	if len(stepResult) > 0 && stepResult[0] != nil {
-		contextSection := tr.buildStepResultContext(fromTool, stepResult[0])
+		contextSection := tr.buildStepResultContext(stepResult[0])
 		if contextSection != "" {
 			return baseResponse + "\n\n" + contextSection
 		}

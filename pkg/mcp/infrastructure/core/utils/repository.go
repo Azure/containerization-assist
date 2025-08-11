@@ -65,19 +65,11 @@ type RepositoryAnalyzer struct {
 	logger *slog.Logger
 }
 
-// Engine is an alias for RepositoryAnalyzer for compatibility
-type Engine = RepositoryAnalyzer
-
 // NewRepositoryAnalyzer creates a new repository analyzer
-func NewRepositoryAnalyzer(logger *slog.Logger) *RepositoryAnalyzer {
+func NewRepositoryAnalyzer(logger *slog.Logger) *RepositoryAnalyzer { //TODO: Refactor -  we are just wrapping the logger
 	return &RepositoryAnalyzer{
 		logger: logger.With("component", "repository_analyzer"),
 	}
-}
-
-// NewEngine creates a new analysis engine (alias for NewRepositoryAnalyzer)
-func NewEngine(logger *slog.Logger) *Engine {
-	return NewRepositoryAnalyzer(logger)
 }
 
 // AnalysisResult contains the result of repository analysis
@@ -154,10 +146,8 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(repoPath string) (*AnalysisResul
 		return result, nil
 	}
 
-	// Generate file tree
-	options := filesystem.DefaultFileTreeOptions()
-	options.MaxDepth = 3
-	fileTree, err := filesystem.GenerateFileTree(repoPath, options)
+	// Generate structured file tree using existing filesystem function
+	fileTreeMap, err := filesystem.GenerateFileTreeMap(repoPath, 4)
 	if err != nil {
 		result.Error = &AnalysisError{
 			Type:    "filesystem_error",
@@ -167,11 +157,7 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(repoPath string) (*AnalysisResul
 		return result, nil
 	}
 
-	// Parse file tree structure
-	if err := json.Unmarshal([]byte(fileTree), &result.Structure); err != nil {
-		ra.logger.Warn("Failed to parse file tree as JSON, using raw string", "error", err)
-		result.Structure = map[string]interface{}{"raw": fileTree}
-	}
+	result.Structure = fileTreeMap
 
 	// Detect language and framework
 	result.Language, result.Framework = ra.detectLanguageAndFramework(repoPath)

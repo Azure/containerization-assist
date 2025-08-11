@@ -421,6 +421,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 				"registry": map[string]interface{}{
 					"type":        "string",
 					"description": "Container registry URL",
+					"default":     "localhost:5001",
 				},
 				"redirect_attempt": map[string]interface{}{
 					"type":        "integer",
@@ -1011,7 +1012,7 @@ func (tr *ToolRegistrar) saveStepResults(workflowState *domainworkflow.WorkflowS
 			tr.logger.Info("Saved dockerfile result to session artifacts", "path", workflowState.DockerfileResult.Path)
 		}
 
-	case "build_image":
+	case "build_image", "tag_image":
 		if workflowState.BuildResult != nil {
 			buildData := map[string]interface{}{
 				"image_id":   workflowState.BuildResult.ImageID,
