@@ -716,6 +716,12 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		var stepResultData map[string]interface{}
 		if stepResult != nil && len(stepResult.Data) > 0 {
 			stepResultData = stepResult.Data
+			if len(stepResult.Metadata) > 0 {
+				if stepResultData == nil {
+					stepResultData = make(map[string]interface{})
+				}
+				stepResultData["metadata"] = stepResult.Metadata
+			}
 		}
 
 		return tr.createRedirectResponse(stepName, fmt.Sprintf("Step %s failed with the following error: %v", stepName, err), sessionID, stepResultData)

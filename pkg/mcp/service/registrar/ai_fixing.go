@@ -167,19 +167,32 @@ func (tr *ToolRegistrar) getK8sDeploymentDiagnostics(sessionID string) string {
 	}
 
 	// Access K8sResult from artifacts
-	if k8sData, exists := state.Artifacts["k8s_result"]; exists {
-		if k8sMap, ok := k8sData.(map[string]interface{}); ok {
-			if metadata, ok := k8sMap["metadata"].(map[string]interface{}); ok {
-				if diagnostics, exists := metadata["deployment_diagnostics"]; exists {
-					if jsonData, err := json.MarshalIndent(diagnostics, "", "  "); err == nil {
-						return string(jsonData)
-					}
-				}
-			}
-		}
+	k8sData, exists := state.Artifacts["k8s_result"]
+	if !exists {
+		return "No deployment diagnostics available"
 	}
 
-	return "No deployment diagnostics available"
+	k8sMap, ok := k8sData.(map[string]interface{})
+	if !ok {
+		return "No deployment diagnostics available"
+	}
+
+	metadata, ok := k8sMap["metadata"].(map[string]interface{})
+	if !ok {
+		return "No deployment diagnostics available"
+	}
+
+	diagnostics, exists := metadata["deployment_diagnostics"]
+	if !exists {
+		return "No deployment diagnostics available"
+	}
+
+	jsonData, err := json.MarshalIndent(diagnostics, "", "  ")
+	if err != nil {
+		return "No deployment diagnostics available"
+	}
+
+	return string(jsonData)
 }
 
 // Helper functions for building user prompts

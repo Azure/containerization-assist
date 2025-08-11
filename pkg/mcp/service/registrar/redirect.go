@@ -179,7 +179,7 @@ type AIFixingPrompt struct {
 }
 
 // createRedirectResponse creates a response instructing the client to call a different tool
-func (tr *ToolRegistrar) createRedirectResponse(fromTool, error string, sessionID string, stepResult ...map[string]interface{}) (*mcp.CallToolResult, error) {
+func (tr *ToolRegistrar) createRedirectResponse(fromTool, error string, sessionID string, stepResult ...map[string]any) (*mcp.CallToolResult, error) {
 	config, hasRedirect := RedirectConfigs[fromTool]
 	if !hasRedirect {
 		return tr.createErrorResult(fmt.Sprintf("Tool %s failed: %s", fromTool, error))
@@ -289,7 +289,7 @@ func (tr *ToolRegistrar) executeTemplate(templateStr string, data any) string {
 }
 
 // buildRedirectResponseText constructs redirect response text using templates
-func (tr *ToolRegistrar) buildRedirectResponseText(fromTool, error, sessionID, redirectTo string, aiPrompt *AIFixingPrompt, stepResult ...map[string]interface{}) string {
+func (tr *ToolRegistrar) buildRedirectResponseText(fromTool, error, sessionID, redirectTo string, aiPrompt *AIFixingPrompt, stepResult ...map[string]any) string {
 	baseResponse := tr.buildBaseRedirectResponse(fromTool, error, sessionID, redirectTo, aiPrompt)
 
 	// Add step result context if available
@@ -330,7 +330,7 @@ func (tr *ToolRegistrar) buildBaseRedirectResponse(fromTool, error, sessionID, r
 }
 
 // buildStepResultContext creates a formatted context section from step result data
-func (tr *ToolRegistrar) buildStepResultContext(stepResultData map[string]interface{}) string {
+func (tr *ToolRegistrar) buildStepResultContext(stepResultData map[string]any) string {
 	if len(stepResultData) == 0 {
 		return ""
 	}
@@ -459,76 +459,83 @@ func (tr *ToolRegistrar) formatArray(arr []any) string {
 		return "[]"
 	}
 
-	var items []string
-	for _, item := range arr {
-		items = append(items, tr.formatSingleValue(item))
+	var builder strings.Builder
+	builder.WriteByte('[')
+	
+	totalLength := 0
+	for i, item := range arr {
+		if i > 0 {
+			builder.WriteString(", ")
+			totalLength += 2
+		}
+		formatted := tr.formatValueOnly(item)
+		builder.WriteString(formatted)
+		totalLength += len(formatted)
+	}
+	
+	builder.WriteByte(']')
+
+	// If content is too long, reformat with newlines
+	if totalLength > 100 {
+		builder.Reset()
+		builder.WriteString("[\n")
+		for i, item := range arr {
+			if i > 0 {
+				builder.WriteString(",\n")
+			}
+			builder.WriteString("  ")
+			builder.WriteString(tr.formatValueOnly(item))
+		}
+		builder.WriteString("\n]")
 	}
 
-	// For diagnostic arrays with long content, format as newlines for readability
-	if len(items) > 0 && (len(strings.Join(items, ", ")) > 100) {
-		return fmt.Sprintf("[\n  %s\n]", strings.Join(items, ",\n  "))
-	}
-
-	return fmt.Sprintf("[%s]", strings.Join(items, ", "))
+	return builder.String()
 }
 
-// formatSingleValue formats a single value without a key
-func (tr *ToolRegistrar) formatSingleValue(value any) string {
+// formatValue formats a single value based on its type with improved readability
+func (tr *ToolRegistrar) formatValue(key string, value any) string {
+	valueStr := tr.formatValueOnly(value)
+	if valueStr == "" {
+		return ""
+	}
+	if key == "" {
+		return valueStr
+	}
+	return fmt.Sprintf("%s: %s", key, valueStr)
+}
+
+// formatValueOnly formats just the value part without key prefix
+func (tr *ToolRegistrar) formatValueOnly(value any) string {
 	switch v := value.(type) {
 	case string:
-		return fmt.Sprintf(`"%s"`, v)
+		return v
 	case bool:
 		return fmt.Sprintf("%t", v)
 	case float64:
 		return fmt.Sprintf("%.0f", v)
 	case int:
 		return fmt.Sprintf("%d", v)
-	default:
-		return fmt.Sprintf("%v", v)
-	}
-}
-
-// formatValue formats a single value based on its type with improved readability
-func (tr *ToolRegistrar) formatValue(key string, value any) string {
-	switch v := value.(type) {
-	case string:
-		if v == "" {
-			return ""
-		}
-		return fmt.Sprintf("%s: %s", key, v)
-	case bool:
-		return fmt.Sprintf("%s: %t", key, v)
-	case float64:
-		return fmt.Sprintf("%s: %.0f", key, v)
-	case int:
-		return fmt.Sprintf("%s: %d", key, v)
 	case []any:
 		if len(v) <= maxArrayDisplayItems {
-			// For arrays within limit, show actual values
-			return fmt.Sprintf("%s: %s", key, tr.formatArray(v))
+			return tr.formatArray(v)
 		}
-		return fmt.Sprintf("%s: [%d items]", key, len(v))
+		return fmt.Sprintf("[%d items]", len(v))
 	case map[string]any:
 		if len(v) == 0 {
 			return ""
 		}
 		if len(v) <= maxMapDisplayFields {
-			// For small nested maps, show key-value pairs inline
 			var items []string
 			for k, val := range v {
 				if formatted := tr.formatValue(k, val); formatted != "" {
 					items = append(items, formatted)
 				}
 			}
-			if len(items) > 0 {
-				return fmt.Sprintf("%s: %s", key, strings.Join(items, ", "))
-			}
-			return ""
+			return strings.Join(items, ", ")
 		}
-
-		return fmt.Sprintf("%s: {%d fields}", key, len(v))
+		return fmt.Sprintf("{%d fields}", len(v))
 	default:
-		return fmt.Sprintf("%s: %v", key, v)
+		return fmt.Sprintf("%v", v)
 	}
 }
 

@@ -151,9 +151,11 @@ func VerifyDeploymentWithDiagnostics(ctx context.Context, k8sResult *K8sResult, 
 		diagnostics.Warnings = append(diagnostics.Warnings, fmt.Sprintf("Event collection failed: %v", err))
 	}
 
-	// 5. Collect pod logs (only for failing/not ready pods)
-	if err := collectPodLogs(ctx, k8sResult, diagnostics, logger); err != nil {
-		diagnostics.Warnings = append(diagnostics.Warnings, fmt.Sprintf("Log collection failed: %v", err))
+	// 5. Collect pod logs (only if pods are not ready)
+	if diagnostics.PodsReady < diagnostics.PodsTotal {
+		if err := collectPodLogs(ctx, k8sResult, diagnostics, logger); err != nil {
+			diagnostics.Warnings = append(diagnostics.Warnings, fmt.Sprintf("Log collection failed: %v", err))
+		}
 	}
 
 	// 6. Check resource usage
@@ -187,7 +189,7 @@ func checkDeploymentStatus(ctx context.Context, k8sResult *K8sResult, diag *Depl
 		logger.Error("Failed to list deployments", "error", err, "output", string(allDeploymentsOutput))
 		return fmt.Errorf("failed to list deployments: %v", err)
 	}
-	
+
 	logger.Info("All deployments in namespace", "namespace", k8sResult.Namespace, "output", string(allDeploymentsOutput))
 
 	cmd := exec.CommandContext(ctx, "kubectl", "get", "deployment", k8sResult.AppName,
@@ -444,42 +446,38 @@ func collectEvents(ctx context.Context, k8sResult *K8sResult, diag *DeploymentDi
 // collectPodLogs collects logs from failing/not ready pods for troubleshooting
 func collectPodLogs(ctx context.Context, k8sResult *K8sResult, diag *DeploymentDiagnostics, logger *slog.Logger) error {
 	for _, pod := range diag.PodStatuses {
-		// Only collect logs for failing or not ready pods
-		if pod.Ready && pod.Restarts == 0 {
-			continue // Skip healthy pods
-		}
+		if !pod.Ready || pod.Restarts > 0 {
+			logger.Info("Collecting logs for: pod ", pod.Name, "ready ", pod.Ready, "restarts ", pod.Restarts)
 
-		logger.Info("Collecting logs for problematic pod", "pod", pod.Name, "ready", pod.Ready, "restarts", pod.Restarts)
+			tailLimit := "100"
 
-		tailLimit := "100" // More logs for problematic pods
-
-		// Get logs with tail limit
-		cmd := exec.CommandContext(ctx, "kubectl", "logs",
-			pod.Name,
-			"-n", k8sResult.Namespace,
-			"--tail="+tailLimit,
-			"--all-containers=true")
-
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			// Try previous logs if current fails
-			prevCmd := exec.CommandContext(ctx, "kubectl", "logs",
+			cmd := exec.CommandContext(ctx, "kubectl", "logs",
 				pod.Name,
 				"-n", k8sResult.Namespace,
 				"--tail="+tailLimit,
-				"--previous",
 				"--all-containers=true")
-			prevOutput, prevErr := prevCmd.CombinedOutput()
 
-			if prevErr == nil && len(prevOutput) > 0 {
-				diag.Logs[pod.Name+"_previous"] = string(prevOutput)
-			}
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				// Try previous logs if current fails
+				prevCmd := exec.CommandContext(ctx, "kubectl", "logs",
+					pod.Name,
+					"-n", k8sResult.Namespace,
+					"--tail="+tailLimit,
+					"--previous",
+					"--all-containers=true")
+				prevOutput, prevErr := prevCmd.CombinedOutput()
 
-			if len(output) > 0 {
-				diag.Logs[pod.Name+"_error"] = fmt.Sprintf("Error getting logs: %v\nPartial output: %s", err, string(output))
+				if prevErr == nil && len(prevOutput) > 0 {
+					diag.Logs[pod.Name+"_previous"] = string(prevOutput)
+				}
+
+				if len(output) > 0 {
+					diag.Logs[pod.Name+"_error"] = fmt.Sprintf("Error getting logs: %v\nPartial output: %s", err, string(output))
+				}
+			} else if len(output) > 0 {
+				diag.Logs[pod.Name] = string(output)
 			}
-		} else if len(output) > 0 {
-			diag.Logs[pod.Name] = string(output)
 		}
 	}
 
