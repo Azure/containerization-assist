@@ -180,7 +180,7 @@ Notes:
 
 Add an `env` block to increase log verbosity:
 
-```jsonc
+```json
 {
   "servers": {
     "container-kit": {
