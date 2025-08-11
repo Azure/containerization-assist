@@ -711,7 +711,13 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 			tr.logger.Warn("Failed to save workflow state after step failure", "session_id", sessionID, "step", stepName, "error", saveErr)
 		}
 
-		return tr.createRedirectResponse(stepName, fmt.Sprintf("Step %s failed with the following error: %v", stepName, err), sessionID)
+		// Prepare step result data for context, even on failure
+		var stepResultData map[string]interface{}
+		if stepResult != nil && len(stepResult.Data) > 0 {
+			stepResultData = stepResult.Data
+		}
+
+		return tr.createRedirectResponse(stepName, fmt.Sprintf("Step %s failed with the following error: %v", stepName, err), sessionID, stepResultData)
 	}
 
 	// Save step results to session artifacts
@@ -730,9 +736,9 @@ func (tr *ToolRegistrar) executeWorkflowStep(ctx context.Context, req mcp.CallTo
 		"session_id": sessionID,
 	}
 
-	// Include step result data if available
-	if stepResult != nil && stepResult.Success {
-		tr.logger.Info("Including step result data", "step", stepName, "has_data", len(stepResult.Data) > 0)
+	// Include step result data if available (for both success and failure cases)
+	if stepResult != nil {
+		tr.logger.Info("Including step result data", "step", stepName, "success", stepResult.Success, "has_data", len(stepResult.Data) > 0)
 
 		// Add the step result for rich formatting
 		responseData["step_result"] = map[string]interface{}{

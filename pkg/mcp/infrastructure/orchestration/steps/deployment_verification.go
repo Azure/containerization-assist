@@ -151,11 +151,9 @@ func VerifyDeploymentWithDiagnostics(ctx context.Context, k8sResult *K8sResult, 
 		diagnostics.Warnings = append(diagnostics.Warnings, fmt.Sprintf("Event collection failed: %v", err))
 	}
 
-	// 5. Collect pod logs (only if pods are not ready)
-	if diagnostics.PodsReady < diagnostics.PodsTotal {
-		if err := collectPodLogs(ctx, k8sResult, diagnostics, logger); err != nil {
-			diagnostics.Warnings = append(diagnostics.Warnings, fmt.Sprintf("Log collection failed: %v", err))
-		}
+	// 5. Collect pod logs (only for failing/not ready pods)
+	if err := collectPodLogs(ctx, k8sResult, diagnostics, logger); err != nil {
+		diagnostics.Warnings = append(diagnostics.Warnings, fmt.Sprintf("Log collection failed: %v", err))
 	}
 
 	// 6. Check resource usage
@@ -180,6 +178,18 @@ func VerifyDeploymentWithDiagnostics(ctx context.Context, k8sResult *K8sResult, 
 
 // checkDeploymentStatus checks the deployment resource status
 func checkDeploymentStatus(ctx context.Context, k8sResult *K8sResult, diag *DeploymentDiagnostics, logger *slog.Logger) error {
+	logger.Info("Checking deployment status", "app_name", k8sResult.AppName, "namespace", k8sResult.Namespace)
+
+	// First, check if any deployments exist in the namespace
+	allDeploymentsCmd := exec.CommandContext(ctx, "kubectl", "get", "deployments", "-n", k8sResult.Namespace)
+	allDeploymentsOutput, err := allDeploymentsCmd.CombinedOutput()
+	if err != nil {
+		logger.Error("Failed to list deployments", "error", err, "output", string(allDeploymentsOutput))
+		return fmt.Errorf("failed to list deployments: %v", err)
+	}
+	
+	logger.Info("All deployments in namespace", "namespace", k8sResult.Namespace, "output", string(allDeploymentsOutput))
+
 	cmd := exec.CommandContext(ctx, "kubectl", "get", "deployment", k8sResult.AppName,
 		"-n", k8sResult.Namespace,
 		"-o", "jsonpath={.status.readyReplicas}/{.status.replicas}")
@@ -191,6 +201,8 @@ func checkDeploymentStatus(ctx context.Context, k8sResult *K8sResult, diag *Depl
 			"-n", k8sResult.Namespace, "-o", "wide")
 		statusOutput, _ := statusCmd.CombinedOutput()
 
+		logger.Error("Deployment not found", "app_name", k8sResult.AppName, "namespace", k8sResult.Namespace,
+			"error", err, "kubectl_output", string(output), "status_output", string(statusOutput))
 		return fmt.Errorf("deployment not found or error: %v, status: %s", err, string(statusOutput))
 	}
 
@@ -205,16 +217,32 @@ func checkDeploymentStatus(ctx context.Context, k8sResult *K8sResult, diag *Depl
 
 // getPodStatuses gets detailed status for all pods
 func getPodStatuses(ctx context.Context, k8sResult *K8sResult, diag *DeploymentDiagnostics, logger *slog.Logger) error {
+	// First, get all pods in the namespace to see if there are any pods at all
+	allPodsCmd := exec.CommandContext(ctx, "kubectl", "get", "pods", "-n", k8sResult.Namespace)
+	allPodsOutput, _ := allPodsCmd.CombinedOutput()
+	logger.Info("All pods in namespace", "namespace", k8sResult.Namespace, "output", string(allPodsOutput))
+
 	// Get pods in JSON format for detailed parsing
+	selector := fmt.Sprintf("app=%s", k8sResult.AppName)
+	logger.Info("Getting pods with selector", "namespace", k8sResult.Namespace, "selector", selector)
+
 	cmd := exec.CommandContext(ctx, "kubectl", "get", "pods",
 		"-n", k8sResult.Namespace,
-		"-l", fmt.Sprintf("app=%s", k8sResult.AppName),
+		"-l", selector,
 		"-o", "json")
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		logger.Error("Failed to get pods", "error", err, "output", string(output), "selector", selector, "namespace", k8sResult.Namespace)
 		return fmt.Errorf("failed to get pods: %v", err)
 	}
+
+	outputStr := string(output)
+	maxLen := 500
+	if len(outputStr) < maxLen {
+		maxLen = len(outputStr)
+	}
+	logger.Info("Pod query result", "output_length", len(output), "raw_output", outputStr[:maxLen])
 
 	var podList struct {
 		Items []struct {
@@ -413,38 +441,45 @@ func collectEvents(ctx context.Context, k8sResult *K8sResult, diag *DeploymentDi
 	return nil
 }
 
-// collectPodLogs collects logs from pods that are not ready
+// collectPodLogs collects logs from failing/not ready pods for troubleshooting
 func collectPodLogs(ctx context.Context, k8sResult *K8sResult, diag *DeploymentDiagnostics, logger *slog.Logger) error {
 	for _, pod := range diag.PodStatuses {
-		if !pod.Ready || pod.Restarts > 0 {
-			// Get logs with tail limit
-			cmd := exec.CommandContext(ctx, "kubectl", "logs",
+		// Only collect logs for failing or not ready pods
+		if pod.Ready && pod.Restarts == 0 {
+			continue // Skip healthy pods
+		}
+
+		logger.Info("Collecting logs for problematic pod", "pod", pod.Name, "ready", pod.Ready, "restarts", pod.Restarts)
+
+		tailLimit := "100" // More logs for problematic pods
+
+		// Get logs with tail limit
+		cmd := exec.CommandContext(ctx, "kubectl", "logs",
+			pod.Name,
+			"-n", k8sResult.Namespace,
+			"--tail="+tailLimit,
+			"--all-containers=true")
+
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			// Try previous logs if current fails
+			prevCmd := exec.CommandContext(ctx, "kubectl", "logs",
 				pod.Name,
 				"-n", k8sResult.Namespace,
-				"--tail=50",
+				"--tail="+tailLimit,
+				"--previous",
 				"--all-containers=true")
+			prevOutput, prevErr := prevCmd.CombinedOutput()
 
-			output, err := cmd.CombinedOutput()
-			if err != nil {
-				// Try previous logs if current fails
-				prevCmd := exec.CommandContext(ctx, "kubectl", "logs",
-					pod.Name,
-					"-n", k8sResult.Namespace,
-					"--tail=50",
-					"--previous",
-					"--all-containers=true")
-				prevOutput, prevErr := prevCmd.CombinedOutput()
-
-				if prevErr == nil && len(prevOutput) > 0 {
-					diag.Logs[pod.Name+"_previous"] = string(prevOutput)
-				}
-
-				if len(output) > 0 {
-					diag.Logs[pod.Name+"_error"] = fmt.Sprintf("Error getting logs: %v\nPartial output: %s", err, string(output))
-				}
-			} else if len(output) > 0 {
-				diag.Logs[pod.Name] = string(output)
+			if prevErr == nil && len(prevOutput) > 0 {
+				diag.Logs[pod.Name+"_previous"] = string(prevOutput)
 			}
+
+			if len(output) > 0 {
+				diag.Logs[pod.Name+"_error"] = fmt.Sprintf("Error getting logs: %v\nPartial output: %s", err, string(output))
+			}
+		} else if len(output) > 0 {
+			diag.Logs[pod.Name] = string(output)
 		}
 	}
 

@@ -374,15 +374,32 @@ func (s *PushStep) Execute(ctx context.Context, state *workflow.WorkflowState) (
 		return nil, errors.New(errors.CodeInvalidState, "push_step", "build result is required for image preparation", nil)
 	}
 
+	// Update the build result with the correct local registry reference for kind deployment
+	imageName := utils.ExtractRepoName(state.RepoIdentifier)
+	imageTag := "latest"
+	localRegistryImageRef := fmt.Sprintf("localhost:5001/%s:%s", imageName, imageTag)
+
+	// Update both BuildResult and Result with the correct local registry reference
+	state.BuildResult.ImageRef = localRegistryImageRef
+	state.Result.ImageRef = localRegistryImageRef
+
 	state.Logger.Info("Image prepared for local kind deployment",
-		"image_ref", state.BuildResult.ImageRef)
+		"image_ref", localRegistryImageRef)
 
-	// Update the result with the image reference
-	state.Result.ImageRef = state.BuildResult.ImageRef
+	state.Logger.Info("Build result:",
+		"image_id", state.BuildResult.ImageID,
+		"image_ref", state.BuildResult.ImageRef,
+		"image_size", state.BuildResult.ImageSize,
+		"build_time", state.BuildResult.BuildTime,
+	)
 
-	// Return basic success result
-
-	return &workflow.StepResult{Success: true}, nil
+	// Return StepResult with corrected image reference in data
+	return &workflow.StepResult{
+		Success: true,
+		Data: map[string]interface{}{
+			"image_ref": localRegistryImageRef,
+		},
+	}, nil
 }
 
 // ManifestStep implements Kubernetes manifest generation
@@ -509,10 +526,14 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 	}
 
 	// Store K8s result in workflow state with extracted manifest content
+	manifestPath := k8sResult.Manifests["path"]
+	state.Logger.Info("Setting manifest_path in metadata",
+		"raw_path", manifestPath)
+
 	metadata := map[string]interface{}{
 		"app_name":       k8sResult.AppName,
 		"ingress_url":    k8sResult.IngressURL,
-		"manifest_path":  k8sResult.Manifests["path"], // Store manifest path for deployment
+		"manifest_path":  manifestPath, // Store manifest path for deployment
 		"manifest_count": len(manifestContent),
 		"template_used":  k8sResult.Manifests["template"],
 	}
@@ -622,12 +643,26 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 	}
 
 	// Convert workflow K8sResult to infrastructure K8sResult for deployment
+	manifestPath := ""
+	if pathFromMetadata, exists := state.K8sResult.Metadata["manifest_path"]; exists {
+		if pathStr, ok := pathFromMetadata.(string); ok {
+			manifestPath = pathStr
+		}
+	}
+
+	state.Logger.Info("Using manifest path for deployment",
+		"manifest_path", manifestPath)
+
+	if manifestPath == "" {
+		return nil, errors.New(errors.CodeInvalidState, "deploy_step", "manifest path not found in K8s result metadata", nil)
+	}
+
 	infraK8sResult := &K8sResult{
 		AppName:    utils.ExtractRepoName(state.RepoIdentifier),
 		Namespace:  state.K8sResult.Namespace,
 		ServiceURL: state.K8sResult.Endpoint,
 		Manifests: map[string]interface{}{
-			"path": state.K8sResult.Metadata["manifest_path"], // Pass manifest path from ManifestStep
+			"path": manifestPath,
 		},
 		Metadata: map[string]interface{}{
 			"port":      0, // Default port
@@ -655,14 +690,22 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 		if err != nil {
 			// Capture deployment diagnostics for error reporting
 			captureDeploymentDiagnostics(ctx, state, infraK8sResult, state.Logger)
-			return nil, errors.New(errors.CodeDeploymentFailed, "deploy_step", "kubernetes deployment failed", err)
+
+			return &workflow.StepResult{
+				Success: false,
+			}, err
 		}
 	}
 
 	state.Logger.Info("Application deployed successfully", "namespace", state.K8sResult.Namespace)
-	// Return basic success result
 
-	return &workflow.StepResult{Success: true}, nil
+	return &workflow.StepResult{
+		Success: true,
+		Data: map[string]interface{}{
+			"namespace": state.K8sResult.Namespace,
+			"app_name":  infraK8sResult.AppName,
+		},
+	}, nil
 }
 
 // VerifyStep implements deployment verification

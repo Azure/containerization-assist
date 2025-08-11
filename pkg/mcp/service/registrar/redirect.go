@@ -88,8 +88,8 @@ All {{.TotalSteps}} steps have been executed. Your application should now be con
 
 	// Configuration constants
 	errorDisplayThreshold = 200
-	maxArrayDisplayItems  = 3
-	maxMapDisplayFields   = 5
+	maxArrayDisplayItems  = 20
+	maxMapDisplayFields   = 50
 )
 
 // WorkflowTemplateData handles all workflow-related responses (progress, completion, fallback)
@@ -179,14 +179,14 @@ type AIFixingPrompt struct {
 }
 
 // createRedirectResponse creates a response instructing the client to call a different tool
-func (tr *ToolRegistrar) createRedirectResponse(fromTool, error string, sessionID string) (*mcp.CallToolResult, error) {
+func (tr *ToolRegistrar) createRedirectResponse(fromTool, error string, sessionID string, stepResult ...map[string]interface{}) (*mcp.CallToolResult, error) {
 	config, hasRedirect := RedirectConfigs[fromTool]
 	if !hasRedirect {
 		return tr.createErrorResult(fmt.Sprintf("Tool %s failed: %s", fromTool, error))
 	}
 
 	aiPrompt := tr.generateAIFixingPrompt(fromTool, config.RedirectTo, error, sessionID)
-	responseText := tr.buildRedirectResponseText(fromTool, error, sessionID, config.RedirectTo, aiPrompt)
+	responseText := tr.buildRedirectResponseText(fromTool, error, sessionID, config.RedirectTo, aiPrompt, stepResult...)
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
@@ -285,16 +285,26 @@ func (tr *ToolRegistrar) executeTemplate(templateStr string, data any) string {
 		return fmt.Sprintf("Template execution error: %v", err)
 	}
 
-	result := buf.String()
-	if strings.TrimSpace(result) == "" {
-		return "Error: template produced empty result"
-	}
-
-	return result
+	return buf.String()
 }
 
 // buildRedirectResponseText constructs redirect response text using templates
-func (tr *ToolRegistrar) buildRedirectResponseText(fromTool, error, sessionID, redirectTo string, aiPrompt *AIFixingPrompt) string {
+func (tr *ToolRegistrar) buildRedirectResponseText(fromTool, error, sessionID, redirectTo string, aiPrompt *AIFixingPrompt, stepResult ...map[string]interface{}) string {
+	baseResponse := tr.buildBaseRedirectResponse(fromTool, error, sessionID, redirectTo, aiPrompt)
+
+	// Add step result context if available
+	if len(stepResult) > 0 && stepResult[0] != nil {
+		contextSection := tr.buildStepResultContext(fromTool, stepResult[0])
+		if contextSection != "" {
+			return baseResponse + "\n\n" + contextSection
+		}
+	}
+
+	return baseResponse
+}
+
+// buildBaseRedirectResponse builds the base redirect response without step context
+func (tr *ToolRegistrar) buildBaseRedirectResponse(fromTool, error, sessionID, redirectTo string, aiPrompt *AIFixingPrompt) string {
 	if aiPrompt != nil {
 		data := RedirectTemplateData{
 			FromTool:       fromTool,
@@ -317,6 +327,46 @@ func (tr *ToolRegistrar) buildRedirectResponseText(fromTool, error, sessionID, r
 		SessionID:  sessionID,
 	}
 	return tr.executeTemplate(redirectSimpleTemplate, data)
+}
+
+// buildStepResultContext creates a formatted context section from step result data
+func (tr *ToolRegistrar) buildStepResultContext(stepResultData map[string]interface{}) string {
+	if len(stepResultData) == 0 {
+		return ""
+	}
+
+	context := []string{"**Step Context Available:**"}
+
+	// Add deployment diagnostics if available (common for deploy failures)
+	if diagnostics, exists := stepResultData["deployment_diagnostics"]; exists {
+		if diagMap, ok := diagnostics.(map[string]interface{}); ok {
+			if logs, exists := diagMap["pod_logs"]; exists && logs != nil {
+				context = append(context, fmt.Sprintf("- Pod logs: %v", logs))
+			}
+			if errors, exists := diagMap["errors"]; exists && errors != nil {
+				context = append(context, fmt.Sprintf("- Deployment errors: %v", errors))
+			}
+			if events, exists := diagMap["recent_events"]; exists && events != nil {
+				context = append(context, fmt.Sprintf("- Kubernetes events: %v", events))
+			}
+		}
+	}
+
+	// Add other relevant data
+	for key, value := range stepResultData {
+		if key == "deployment_diagnostics" {
+			continue
+		}
+		if value != nil && value != "" {
+			context = append(context, fmt.Sprintf("- %s: %v", key, value))
+		}
+	}
+
+	if len(context) > 1 {
+		return strings.Join(context, "\n")
+	}
+
+	return ""
 }
 
 // buildProgressResponseWithSections builds response for workflow in progress with step-specific sections
@@ -413,6 +463,12 @@ func (tr *ToolRegistrar) formatArray(arr []any) string {
 	for _, item := range arr {
 		items = append(items, tr.formatSingleValue(item))
 	}
+
+	// For diagnostic arrays with long content, format as newlines for readability
+	if len(items) > 0 && (len(strings.Join(items, ", ")) > 100) {
+		return fmt.Sprintf("[\n  %s\n]", strings.Join(items, ",\n  "))
+	}
+
 	return fmt.Sprintf("[%s]", strings.Join(items, ", "))
 }
 
@@ -448,7 +504,7 @@ func (tr *ToolRegistrar) formatValue(key string, value any) string {
 		return fmt.Sprintf("%s: %d", key, v)
 	case []any:
 		if len(v) <= maxArrayDisplayItems {
-			// For small arrays, show actual values
+			// For arrays within limit, show actual values
 			return fmt.Sprintf("%s: %s", key, tr.formatArray(v))
 		}
 		return fmt.Sprintf("%s: [%d items]", key, len(v))
@@ -469,6 +525,7 @@ func (tr *ToolRegistrar) formatValue(key string, value any) string {
 			}
 			return ""
 		}
+
 		return fmt.Sprintf("%s: {%d fields}", key, len(v))
 	default:
 		return fmt.Sprintf("%s: %v", key, v)

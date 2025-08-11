@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/common/logger"
 	"github.com/Azure/container-kit/pkg/common/runner"
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/utils"
 )
 
 // K8sResult contains the results of Kubernetes deployment operations
@@ -161,8 +161,17 @@ func DeployToKubernetes(ctx context.Context, k8sResult *K8sResult, logger *slog.
 		"options", fmt.Sprintf("%+v", deploymentOptions))
 
 	// Get the directory containing the manifest files
-	// manifestPath might be a specific file, so we need the directory
-	manifestDir := filepath.Dir(manifestPath)
+	// manifestPath might be a specific file or already a directory
+	var manifestDir string
+	if fileInfo, err := os.Stat(manifestPath); err == nil && fileInfo.IsDir() {
+		// manifestPath is already a directory
+		manifestDir = manifestPath
+		logger.Info("Manifest path is a directory", "path", manifestPath)
+	} else {
+		// manifestPath is a file, get its directory
+		manifestDir = filepath.Dir(manifestPath)
+		logger.Info("Manifest path is a file, using parent directory", "file", manifestPath, "dir", manifestDir)
+	}
 
 	// Get all YAML files in the manifest directory to ensure we deploy everything
 	yamlFiles, err := getYAMLFilesInDirectory(manifestDir)
@@ -184,19 +193,23 @@ func DeployToKubernetes(ctx context.Context, k8sResult *K8sResult, logger *slog.
 
 		deploymentResult, err := deploymentService.DeployManifest(ctx, yamlFile, deploymentOptions)
 		if err != nil {
-			deploymentErrors = append(deploymentErrors, fmt.Sprintf("%s: %v", yamlFile, err))
+			deploymentErrors = append(deploymentErrors, fmt.Sprintf("File: %s, Error: %v", yamlFile, err))
 			logger.Error("Failed to deploy manifest file", "file", yamlFile, "error", err)
 			continue // Continue with other files
 		}
 
 		if !deploymentResult.Success {
 			errorMsg := extractDeploymentErrorMessage(deploymentResult)
-			deploymentErrors = append(deploymentErrors, fmt.Sprintf("%s: %s", yamlFile, errorMsg))
+			fullError := fmt.Sprintf("File: %s, Error: %s", yamlFile, errorMsg)
+			if deploymentResult.Output != "" {
+				fullError = fmt.Sprintf("File: %s, Error: %s, kubectl output: %s", yamlFile, errorMsg, deploymentResult.Output)
+			}
+			deploymentErrors = append(deploymentErrors, fullError)
 			logger.Error("Kubernetes deployment unsuccessful for file",
 				"file", yamlFile,
 				"error", errorMsg,
 				"resources_deployed", len(deploymentResult.Resources),
-				"output", deploymentResult.Output)
+				"kubectl_output", deploymentResult.Output)
 			continue // Continue with other files
 		}
 
@@ -215,7 +228,7 @@ func DeployToKubernetes(ctx context.Context, k8sResult *K8sResult, logger *slog.
 			"count", len(successfulDeployments))
 	}
 
-	// If we have deployment errors, we need to return an error to indicate partial failure
+	// Report all deployment results - both failures and successes
 	if len(deploymentErrors) > 0 {
 		logger.Error("Some manifest files failed to deploy",
 			"errors", deploymentErrors,
@@ -231,93 +244,47 @@ func DeployToKubernetes(ctx context.Context, k8sResult *K8sResult, logger *slog.
 
 	}
 
-	logger.Info("Kubernetes deployment completed successfully",
+	logger.Info("Kubernetes manifest deployment completed successfully",
 		"app_name", k8sResult.AppName,
 		"namespace", k8sResult.Namespace,
 		"total_resources_deployed", len(allResources),
-		"manifest_files_deployed", len(yamlFiles))
+		"manifest_files_deployed", len(yamlFiles),
+		"successful_files", successfulDeployments)
 
-	// Validate deployment with AI-powered retry logic
-	logger.Info("Starting deployment validation with AI-powered retry logic")
-	var validationResult *kubernetes.ValidationResult
+	// Log the deployed resources for debugging
+	logger.Info("Deployed resources details", "resources", allResources)
 
-	// Use AI-powered retry for deployment validation with enhanced context
-	err = utils.WithAIRetry(ctx, "validate_kubernetes_deployment", 3, func() error {
-		// Wait a bit for pods to initialize on first attempt
-		time.Sleep(2 * time.Second)
+	// Simple deployment validation - check for pod/deployment errors
+	logger.Info("Starting deployment validation")
 
-		var validationErr error
-		validationResult, validationErr = deploymentService.ValidateDeployment(ctx, manifestPath, k8sResult.Namespace)
-		if validationErr != nil {
-			return fmt.Errorf("deployment validation error: %w", validationErr)
-		}
+	// Wait a bit for pods to initialize
+	time.Sleep(5 * time.Second)
 
-		if !validationResult.Success {
-			errorMsg := fmt.Sprintf("deployment validation failed: %d/%d pods ready",
-				validationResult.PodsReady, validationResult.PodsTotal)
+	validationResult, err := deploymentService.ValidateDeployment(ctx, manifestPath, k8sResult.Namespace)
+	if err != nil {
+		logger.Error("Deployment validation error", "error", err)
+		return fmt.Errorf("deployment validation error: %w", err)
+	}
 
-			// Get pod logs and events if available
-			var podLogs string
-			var podEvents string
-			if validationResult.PodsTotal > 0 {
-				// Try to get logs from the first pod
-				cmd := exec.CommandContext(ctx, "kubectl", "get", "pods", "-n", k8sResult.Namespace,
-					"--selector=app="+k8sResult.AppName, "-o", "jsonpath={.items[0].metadata.name}")
-				podName, _ := cmd.Output()
-				if len(podName) > 0 {
-					// Get pod logs
-					logCmd := exec.CommandContext(ctx, "kubectl", "logs", "-n", k8sResult.Namespace,
-						string(podName), "--tail=50")
-					logs, _ := logCmd.Output()
-					if len(logs) > 0 {
-						podLogs = fmt.Sprintf("\n\n--- POD LOGS ---\n%s", string(logs))
-					}
-
-					// Get pod events
-					eventCmd := exec.CommandContext(ctx, "kubectl", "describe", "pod", "-n", k8sResult.Namespace, string(podName))
-					events, _ := eventCmd.Output()
-					if len(events) > 0 {
-						// Extract just the Events section
-						eventStr := string(events)
-						if idx := strings.Index(eventStr, "Events:"); idx >= 0 {
-							podEvents = fmt.Sprintf("\n\n--- POD EVENTS ---\n%s", eventStr[idx:])
-						}
-					}
-				}
-			}
-
-			// Include pod logs and context in error
-			// Extract port from k8sResult metadata if available
-			port := 0
-			if portVal, ok := k8sResult.Metadata["port"].(int); ok {
-				port = portVal
-			}
-
-			// Extract image ref from k8sResult metadata if available
-			imageRef := "unknown"
-			if imageVal, ok := k8sResult.Metadata["image_ref"].(string); ok {
-				imageRef = imageVal
-			}
-
-			contextInfo := fmt.Sprintf("App: %s, Namespace: %s, Image: %s, Port: %d%s%s",
-				k8sResult.AppName, k8sResult.Namespace, imageRef, port, podLogs, podEvents)
-
-			if validationResult.Error != nil {
-				errorMsg = fmt.Sprintf("%s (error: %s)", errorMsg, validationResult.Error.Message)
-			}
-			return fmt.Errorf("%s\nContext: %s", errorMsg, contextInfo)
-		}
-
-		logger.Info("Deployment validation successful",
+	// If validation fails, return error with pod details
+	if !validationResult.Success {
+		logger.Error("Deployment validation failed",
 			"pods_ready", validationResult.PodsReady,
 			"pods_total", validationResult.PodsTotal)
-		return nil
-	}, logger)
 
-	if err != nil {
-		logger.Error("Deployment validation failed after AI-assisted retries", "error", err)
-		return fmt.Errorf("deployment validation failed: %w", err)
+		errorMsg := fmt.Sprintf("deployment validation failed: %d/%d pods ready",
+			validationResult.PodsReady, validationResult.PodsTotal)
+
+		if validationResult.Error != nil {
+			errorMsg = fmt.Sprintf("%s (error: %s)", errorMsg, validationResult.Error.Message)
+		}
+
+		return fmt.Errorf("%s", errorMsg)
 	}
+
+	logger.Info("Deployment validation successful",
+		"pods_ready", validationResult.PodsReady,
+		"pods_total", validationResult.PodsTotal)
 
 	return nil
 }
@@ -417,6 +384,7 @@ func CheckDeploymentHealth(ctx context.Context, k8sResult *K8sResult, logger *sl
 
 // getYAMLFilesInDirectory returns all YAML files in the given directory
 func getYAMLFilesInDirectory(dirPath string) ([]string, error) {
+	logger.Infof("Scanning directory for YAML files in: %s", dirPath)
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory %s: %w", dirPath, err)
