@@ -382,7 +382,7 @@ curl -sSL https://raw.githubusercontent.com/Azure/container-kit/main/scripts/upd
 If you're having trouble, enable debug logging via `mcp.json`:
 
 1. **Edit `mcp.json`** and add the env block:
-```jsonc
+```json
 {
   "servers": {
     "container-kit": {
