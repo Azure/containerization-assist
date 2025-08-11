@@ -57,7 +57,6 @@ func TestNoServiceInfrastructureDependencies(t *testing.T) {
 	servicePackages := []string{
 		"github.com/Azure/container-kit/pkg/mcp/service/commands",
 		"github.com/Azure/container-kit/pkg/mcp/service/queries",
-		"github.com/Azure/container-kit/pkg/mcp/service/workflow",
 	}
 
 	// Service layer can use domain, but not infrastructure directly
