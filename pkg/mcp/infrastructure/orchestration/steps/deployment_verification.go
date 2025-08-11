@@ -447,7 +447,7 @@ func collectEvents(ctx context.Context, k8sResult *K8sResult, diag *DeploymentDi
 func collectPodLogs(ctx context.Context, k8sResult *K8sResult, diag *DeploymentDiagnostics, logger *slog.Logger) error {
 	for _, pod := range diag.PodStatuses {
 		if !pod.Ready || pod.Restarts > 0 {
-			logger.Info("Collecting logs for: pod ", pod.Name, "ready ", pod.Ready, "restarts ", pod.Restarts)
+			logger.Info("Collecting logs for pod", "pod", pod.Name, "ready", pod.Ready, "restarts", pod.Restarts)
 
 			tailLimit := "100"
 
