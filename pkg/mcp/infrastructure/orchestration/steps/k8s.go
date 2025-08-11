@@ -174,9 +174,9 @@ func DeployToKubernetes(ctx context.Context, k8sResult *K8sResult, logger *slog.
 		manifestDir = manifestPath
 		logger.Info("Manifest path is a directory", "path", manifestPath)
 	} else {
-	// manifestPath is a file, get its directory
-	manifestDir = filepath.Dir(manifestPath)
-	logger.Info("Manifest path is a file, using parent directory", "manifest_file", manifestPath, "manifest_dir", manifestDir)
+		// manifestPath is a file, get its directory
+		manifestDir = filepath.Dir(manifestPath)
+		logger.Info("Manifest path is a file, using parent directory", "manifest_file", manifestPath, "manifest_dir", manifestDir)
 	}
 
 	// Get all YAML files in the manifest directory to ensure we deploy everything

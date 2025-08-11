@@ -461,7 +461,7 @@ func (tr *ToolRegistrar) formatArray(arr []any) string {
 
 	var builder strings.Builder
 	builder.WriteByte('[')
-	
+
 	totalLength := 0
 	for i, item := range arr {
 		if i > 0 {
@@ -472,7 +472,7 @@ func (tr *ToolRegistrar) formatArray(arr []any) string {
 		builder.WriteString(formatted)
 		totalLength += len(formatted)
 	}
-	
+
 	builder.WriteByte(']')
 
 	// If content is too long, reformat with newlines
