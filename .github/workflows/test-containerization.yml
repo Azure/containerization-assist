@@ -68,7 +68,7 @@ jobs:
           sudo mv mcphost /usr/local/bin/
           rm -f mcphost.tar.gz
           mcphost --version
-          echo "✅ mcphost v0.26.1 installed successfully"
+          echo "✅ mcphost v0.29.0 installed successfully"
           
       - name: Build MCP Server from PR
         run: |
@@ -91,6 +91,9 @@ jobs:
           if [ -f ".github/workflows/mcphost/hooks.yml" ]; then
             cp .github/workflows/mcphost/hooks.yml .mcphost/hooks.yml
             echo "Installed hooks.yml"
+            # Also install hooks to user config dir to ensure discovery
+            cp .github/workflows/mcphost/hooks.yml ~/.config/mcphost/hooks.yml
+            echo "Installed hooks.yml to ~/.config/mcphost/hooks.yml"
           fi
           if [ -f ".github/workflows/mcphost/track-tools.sh" ]; then
             cp .github/workflows/mcphost/track-tools.sh /tmp/track-tools.sh
@@ -170,7 +173,10 @@ jobs:
 
           # Capture both stdout and stderr, and don't exit on failure
           set +e
-          RESULT=$(timeout 300s mcphost --stream=false -p "Please containerize this repository: ${CONTAINERIZE_REPO}. This is an automated test - do NOT ask for user input." 2>&1)
+          # Reduce interactive/TTY output noise and allow more time for deploy/debug loops
+          export NO_COLOR=1
+          export TERM=dumb
+          RESULT=$(timeout 900s mcphost --quiet --stream=false -p "Please containerize this repository: ${CONTAINERIZE_REPO}. This is an automated test - do NOT ask for user input." 2>&1)
           EXIT_CODE=$?
           set -e
           
@@ -187,6 +193,32 @@ jobs:
           echo "$RESULT" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
           echo "EXIT_CODE=$EXIT_CODE" >> $GITHUB_ENV
+          # Persist full output to a file for artifacts and summary
+          echo "$RESULT" > /tmp/mcphost-output.txt
+
+      - name: Collect Kubernetes diagnostics on failure
+        if: always()
+        run: |
+          if [ -n "${EXIT_CODE:-}" ] && [ "${EXIT_CODE}" -ne 0 ]; then
+            echo "=== Collecting Kubernetes diagnostics (failure path) ==="
+            if command -v kubectl &> /dev/null; then
+              : > /tmp/k8s-diagnostics.txt
+              {
+                echo "\n--- get all (default) ---"
+                kubectl get all -o wide || true
+                echo "\n--- get all (all namespaces) ---"
+                kubectl get all -A -o wide || true
+                echo "\n--- describe deployments (all namespaces) ---"
+                kubectl get deploy -A -o name | xargs -r -L1 kubectl describe || true
+                echo "\n--- recent events ---"
+                kubectl get events -A --sort-by=.lastTimestamp | tail -n 100 || true
+              } | tee -a /tmp/k8s-diagnostics.txt
+            else
+              echo "kubectl not available for diagnostics"
+            fi
+          else
+            echo "Diagnostics skipped: EXIT_CODE indicates success"
+          fi
           
       - name: Analyze results and report
         run: |
@@ -195,6 +227,7 @@ jobs:
           # Immediate failure if mcphost exited non-zero
           if [ -n "$EXIT_CODE" ] && [ "$EXIT_CODE" -ne 0 ]; then
             echo "❌ mcphost returned non-zero exit code: $EXIT_CODE"
+            echo "SUMMARY_EXIT_CODE=$EXIT_CODE" >> $GITHUB_ENV
             exit 1
           fi
 
@@ -218,14 +251,20 @@ jobs:
           if [ -z "$DOCKERFILE_PATH" ]; then
             echo "❌ No Dockerfile found"
             echo "Full output:"; echo "$RESULT"
+            echo "SUMMARY_DOCKERFILE_FOUND=false" >> $GITHUB_ENV
+            echo "SUMMARY_DOCKERFILE_HAS_FROM=false" >> $GITHUB_ENV
             exit 1
           fi
 
           echo "Found Dockerfile at: $DOCKERFILE_PATH"
+          echo "SUMMARY_DOCKERFILE_FOUND=true" >> $GITHUB_ENV
+          echo "SUMMARY_DOCKERFILE_PATH=$DOCKERFILE_PATH" >> $GITHUB_ENV
           if ! grep -Ei '^\s*FROM\s+' "$DOCKERFILE_PATH" >/dev/null; then
             echo "❌ Dockerfile missing FROM instruction"
+            echo "SUMMARY_DOCKERFILE_HAS_FROM=false" >> $GITHUB_ENV
             exit 1
           fi
+          echo "SUMMARY_DOCKERFILE_HAS_FROM=true" >> $GITHUB_ENV
 
           # Locate at least one Kubernetes Deployment manifest with an image
           MANIFEST_OK=false
@@ -240,10 +279,13 @@ jobs:
           if [ "$MANIFEST_OK" != true ]; then
             echo "❌ No Kubernetes Deployment manifest with image found"
             echo "Searched under /tmp for *.yaml/*.yml"
+            echo "SUMMARY_MANIFEST_PRESENT=false" >> $GITHUB_ENV
             exit 1
           fi
 
           echo "✅ Concrete checks passed: Dockerfile valid and Deployment manifest present"
+          echo "SUMMARY_MANIFEST_PRESENT=true" >> $GITHUB_ENV
+          echo "SUMMARY_EXIT_CODE=0" >> $GITHUB_ENV
           exit 0
 
       - name: Verify all container tools executed successfully
@@ -265,6 +307,8 @@ jobs:
 
           if [ ! -f /tmp/tool-success.log ]; then
             echo "❌ Hooks log not found; required tool success list is empty"
+            echo "SUMMARY_TOOLS_OK=false" >> $GITHUB_ENV
+            echo "SUMMARY_TOOLS_MISSING=all" >> $GITHUB_ENV
             exit 1
           fi
 
@@ -278,10 +322,13 @@ jobs:
           if [ ${#MISSING[@]} -gt 0 ]; then
             echo "❌ Missing successful calls for tools: ${MISSING[*]}"
             echo "Logged successes:"; sort -u /tmp/tool-success.log || true
+            echo "SUMMARY_TOOLS_OK=false" >> $GITHUB_ENV
+            echo "SUMMARY_TOOLS_MISSING=${MISSING[*]}" >> $GITHUB_ENV
             exit 1
           fi
 
           echo "✅ All required tools had at least one successful call"
+          echo "SUMMARY_TOOLS_OK=true" >> $GITHUB_ENV
           
       - name: Show generated artifacts and deployment status
         if: always()
@@ -403,6 +450,16 @@ jobs:
 
           echo "Manifests collected: $COUNT" >> "$ART_DIR/index.txt"
           echo "Repository: $CONTAINERIZE_REPO" >> "$ART_DIR/index.txt"
+          # Include full mcphost output if present
+          if [ -f /tmp/mcphost-output.txt ]; then
+            cp /tmp/mcphost-output.txt "$ART_DIR/"
+            echo "mcphost-output: mcphost-output.txt" >> "$ART_DIR/index.txt"
+          fi
+          # Include Kubernetes diagnostics if present
+          if [ -f /tmp/k8s-diagnostics.txt ]; then
+            cp /tmp/k8s-diagnostics.txt "$ART_DIR/"
+            echo "k8s-diagnostics: k8s-diagnostics.txt" >> "$ART_DIR/index.txt"
+          fi
 
       - name: Upload containerization artifacts
         if: always()
@@ -413,14 +470,92 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Add artifact links to job summary
+      - name: Write clean job summary
         if: always()
         run: |
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          echo "## Containerization artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Run page (artifacts at bottom): $RUN_URL" >> $GITHUB_STEP_SUMMARY
-          echo "- Artifact name: containerization-artifacts-${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
-          if [ -f containerization-artifacts/index.txt ]; then
-            echo "\n### Contents" >> $GITHUB_STEP_SUMMARY
-            echo "\n\`\`\`\n$(cat containerization-artifacts/index.txt)\n\`\`\`" >> $GITHUB_STEP_SUMMARY
+          ART_NAME="containerization-artifacts-${{ github.run_id }}"
+          REPO="${CONTAINERIZE_REPO}"
+          EXIT="${SUMMARY_EXIT_CODE:-${EXIT_CODE:-unknown}}"
+          DF_FOUND="${SUMMARY_DOCKERFILE_FOUND:-unknown}"
+          DF_FROM="${SUMMARY_DOCKERFILE_HAS_FROM:-unknown}"
+          MF_PRESENT="${SUMMARY_MANIFEST_PRESENT:-unknown}"
+          TOOLS_OK="${SUMMARY_TOOLS_OK:-unknown}"
+          TOOLS_MISSING="${SUMMARY_TOOLS_MISSING:-none}"
+
+          status_badge() {
+            case "$1" in
+              true|0) echo "✅" ;;
+              false|1) echo "❌" ;;
+              *) echo "⚠️" ;;
+            esac
+          }
+
+          echo "# Containerization Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Repository | ${REPO} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Exit code | ${EXIT} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dockerfile found | $(status_badge "$DF_FOUND") ${DF_FOUND} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dockerfile has FROM | $(status_badge "$DF_FROM") ${DF_FROM} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deployment manifest present | $(status_badge "$MF_PRESENT") ${MF_PRESENT} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Required tools | $(status_badge "$TOOLS_OK") ${TOOLS_OK} |" >> $GITHUB_STEP_SUMMARY
+          if [ "${TOOLS_OK}" != "true" ]; then
+            echo "| Missing tools | ${TOOLS_MISSING} |" >> $GITHUB_STEP_SUMMARY
           fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Run page (download artifacts at bottom): ${RUN_URL}" >> $GITHUB_STEP_SUMMARY
+          echo "- Artifact: ${ART_NAME}" >> $GITHUB_STEP_SUMMARY
+
+          echo "\n<details><summary>mcphost output (full file in artifacts)</summary>" >> $GITHUB_STEP_SUMMARY
+          if [ -f /tmp/mcphost-output.txt ]; then
+            MAX=120000
+            SIZE=$(wc -c < /tmp/mcphost-output.txt)
+            if [ "$SIZE" -gt "$MAX" ]; then
+              echo "\n(Truncated to $MAX bytes)\n" >> $GITHUB_STEP_SUMMARY
+              {
+                echo '```'
+                head -c $MAX /tmp/mcphost-output.txt
+                echo
+                echo '```'
+              } >> $GITHUB_STEP_SUMMARY
+            else
+              {
+                echo '```'
+                cat /tmp/mcphost-output.txt
+                echo
+                echo '```'
+              } >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "(No mcphost output captured)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+
+          echo "\n<details><summary>Kubernetes diagnostics (on failure)</summary>" >> $GITHUB_STEP_SUMMARY
+          if [ -f /tmp/k8s-diagnostics.txt ]; then
+            MAX=80000
+            SIZE=$(wc -c < /tmp/k8s-diagnostics.txt)
+            if [ "$SIZE" -gt "$MAX" ]; then
+              echo "\n(Truncated to $MAX bytes)\n" >> $GITHUB_STEP_SUMMARY
+              {
+                echo '```'
+                head -c $MAX /tmp/k8s-diagnostics.txt
+                echo
+                echo '```'
+              } >> $GITHUB_STEP_SUMMARY
+            else
+              {
+                echo '```'
+                cat /tmp/k8s-diagnostics.txt
+                echo
+                echo '```'
+              } >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "(No diagnostics captured)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
