@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/common/errors"
-	"github.com/Azure/container-kit/pkg/common/runner"
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/utils"
@@ -33,12 +32,41 @@ func init() {
 
 // Use utils.ExtractRepoName instead of local function
 
+// captureDeploymentDiagnostics captures deployment diagnostics and stores them in K8s result metadata
+func captureDeploymentDiagnostics(ctx context.Context, state *workflow.WorkflowState, infraK8sResult *K8sResult, logger *slog.Logger) {
+	if diagnostics, diagErr := VerifyDeploymentWithDiagnostics(ctx, infraK8sResult, logger); diagErr == nil {
+		// Store deployment diagnostics in K8s result metadata for access in response
+		if state.K8sResult.Metadata == nil {
+			state.K8sResult.Metadata = make(map[string]interface{})
+		}
+		state.K8sResult.Metadata["deployment_diagnostics"] = map[string]interface{}{
+			"deployment_ok":  diagnostics.DeploymentOK,
+			"pods_ready":     diagnostics.PodsReady,
+			"pods_total":     diagnostics.PodsTotal,
+			"pod_statuses":   diagnostics.PodStatuses,
+			"services":       diagnostics.Services,
+			"recent_events":  diagnostics.Events,
+			"pod_logs":       diagnostics.Logs,
+			"resource_usage": diagnostics.ResourceUsage,
+			"errors":         diagnostics.Errors,
+			"warnings":       diagnostics.Warnings,
+			"timestamp":      diagnostics.Timestamp,
+		}
+		logger.Info("Captured deployment diagnostics",
+			"pods_ready", diagnostics.PodsReady,
+			"pods_total", diagnostics.PodsTotal,
+			"errors_count", len(diagnostics.Errors),
+			"logs_count", len(diagnostics.Logs))
+	}
+}
+
 // createZerologFromSlog creates a zerolog logger from an slog logger
 // This is a bridge function to use existing security scanners that expect zerolog
 func createZerologFromSlog(slogLogger *slog.Logger) zerolog.Logger {
-	// Create a basic zerolog logger that writes to the same output
-	// For now, we'll use a simple console writer that matches slog output
-	return zerolog.New(zerolog.ConsoleWriter{Out: zerolog.NewConsoleWriter().Out}).
+	// Create a zerolog logger that uses the same underlying writer as the slog logger
+	// Use os.Stderr as the default output to match typical slog behavior
+	writer := zerolog.ConsoleWriter{Out: os.Stderr}
+	return zerolog.New(writer).
 		With().
 		Timestamp().
 		Str("component", "security_scanner").
@@ -51,9 +79,9 @@ type BuildStep struct{}
 func NewBuildStep() workflow.Step    { return &BuildStep{} }
 func (s *BuildStep) Name() string    { return "build_image" }
 func (s *BuildStep) MaxRetries() int { return 3 }
-func (s *BuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
+func (s *BuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
 	if state.DockerfileResult == nil || state.AnalyzeResult == nil {
-		return errors.New(errors.CodeInvalidState, "build_step", "dockerfile and analyze results are required for build", nil)
+		return nil, errors.New(errors.CodeInvalidState, "build_step", "dockerfile and analyze results are required for build", nil)
 	}
 
 	state.Logger.Info("Step 3: Building Docker image")
@@ -105,17 +133,19 @@ func (s *BuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) 
 			"image_id", buildResult.ImageID,
 			"image_ref", state.BuildResult.ImageRef)
 
-		return nil
+		// Return basic success result
+
+		return &workflow.StepResult{Success: true}, nil
 	}
 
 	// Call the infrastructure build function
 	buildResult, err := BuildImage(ctx, infraDockerfileResult, imageName, imageTag, buildContext, state.Logger)
 	if err != nil {
-		return errors.New(errors.CodeImageBuildFailed, "build_step", err.Error(), err)
+		return nil, errors.New(errors.CodeImageBuildFailed, "build_step", err.Error(), err)
 	}
 
 	if buildResult == nil {
-		return errors.New(errors.CodeInternalError, "build_step", "build result is nil after successful build", nil)
+		return nil, errors.New(errors.CodeInternalError, "build_step", "build result is nil after successful build", nil)
 	}
 
 	// Store build result in workflow state
@@ -136,7 +166,20 @@ func (s *BuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) 
 		"image_name", buildResult.ImageName,
 		"image_tag", buildResult.ImageTag)
 
-	return nil
+	// Return StepResult with build data
+	return &workflow.StepResult{
+		Success: true,
+		Data: map[string]interface{}{
+			"image_id":   buildResult.ImageID,
+			"image_ref":  fmt.Sprintf("%s:%s", buildResult.ImageName, buildResult.ImageTag),
+			"image_size": buildResult.Size,
+			"build_time": buildResult.BuildTime.Format(time.RFC3339),
+		},
+		Metadata: map[string]interface{}{
+			"image_name": buildResult.ImageName,
+			"image_tag":  buildResult.ImageTag,
+		},
+	}, nil
 }
 
 // ScanStep implements security scanning
@@ -145,15 +188,17 @@ type ScanStep struct{}
 func NewScanStep() workflow.Step    { return &ScanStep{} }
 func (s *ScanStep) Name() string    { return "security_scan" }
 func (s *ScanStep) MaxRetries() int { return 2 }
-func (s *ScanStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
+func (s *ScanStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
 	// Skip if scanning is not requested
 	if !state.Args.Scan {
 		state.Logger.Info("Step 4: Skipping security scan (not requested)")
-		return nil
+		// Return basic success result
+
+		return &workflow.StepResult{Success: true}, nil
 	}
 
 	if state.BuildResult == nil {
-		return errors.New(errors.CodeInvalidState, "scan_step", "build result is required for security scan", nil)
+		return nil, errors.New(errors.CodeInvalidState, "scan_step", "build result is required for security scan", nil)
 	}
 
 	state.Logger.Info("Step 4: Running security vulnerability scan")
@@ -161,7 +206,7 @@ func (s *ScanStep) Execute(ctx context.Context, state *workflow.WorkflowState) e
 	// Implement actual vulnerability scanning using UnifiedSecurityScanner
 	imageRef := state.BuildResult.ImageRef
 	if imageRef == "" {
-		return errors.New(errors.CodeInvalidState, "scan_step", "no image reference available for security scan", nil)
+		return nil, errors.New(errors.CodeInvalidState, "scan_step", "no image reference available for security scan", nil)
 	}
 
 	// Create zerolog logger from slog logger for the scanner
@@ -184,10 +229,12 @@ func (s *ScanStep) Execute(ctx context.Context, state *workflow.WorkflowState) e
 		}
 		// In strict mode, fail the workflow for scan errors
 		if state.Args.StrictMode {
-			return errors.New(errors.CodeVulnerabilityFound, "scan_step", "security scan failed in strict mode", err)
+			return nil, errors.New(errors.CodeVulnerabilityFound, "scan_step", "security scan failed in strict mode", err)
 		}
 		state.Logger.Warn("Continuing workflow despite scan failure")
-		return nil
+		// Return basic success result
+
+		return &workflow.StepResult{Success: true}, nil
 	}
 
 	// Process scan results
@@ -263,7 +310,24 @@ func (s *ScanStep) Execute(ctx context.Context, state *workflow.WorkflowState) e
 		"high", highCount,
 		"medium", mediumCount,
 		"low", lowCount)
-	return nil
+
+	// Return StepResult with scan data
+	return &workflow.StepResult{
+		Success: true,
+		Data: map[string]interface{}{
+			"scanner":         "unified",
+			"vulnerabilities": vulnerabilityCount,
+			"critical_vulns":  criticalCount,
+			"high_vulns":      highCount,
+			"medium_vulns":    mediumCount,
+			"low_vulns":       lowCount,
+			"status":          scanStatus,
+		},
+		Metadata: map[string]interface{}{
+			"scan_time": time.Now().Format(time.RFC3339),
+			"image_ref": state.BuildResult.ImageRef,
+		},
+	}, nil
 }
 
 // TagStep implements image tagging
@@ -272,9 +336,9 @@ type TagStep struct{}
 func NewTagStep() workflow.Step    { return &TagStep{} }
 func (s *TagStep) Name() string    { return "tag_image" }
 func (s *TagStep) MaxRetries() int { return 2 }
-func (s *TagStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
+func (s *TagStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
 	if state.BuildResult == nil {
-		return errors.New(errors.CodeInvalidState, "tag_step", "build result is required for image tagging", nil)
+		return nil, errors.New(errors.CodeInvalidState, "tag_step", "build result is required for image tagging", nil)
 	}
 
 	state.Logger.Info("Step 5: Tagging image for registry")
@@ -283,71 +347,18 @@ func (s *TagStep) Execute(ctx context.Context, state *workflow.WorkflowState) er
 	imageTag := extractAndValidateTag(state, state.Logger)
 
 	imageName := utils.ExtractRepoName(state.RepoIdentifier)
-	sourceImageRef := state.BuildResult.ImageRef // Current image reference from BuildStep
-	targetImageRef := fmt.Sprintf("%s:%s", imageName, imageTag)
-
-	// In test mode, skip actual Docker operations
-	if state.Args.TestMode {
-		state.Logger.Info("Test mode: Simulating Docker tag operation",
-			"source", sourceImageRef,
-			"target", targetImageRef)
-
-		// Update the build result with the final tag
-		state.BuildResult.ImageRef = targetImageRef
-
-		state.Logger.Info("Test mode: Image tagged successfully",
-			"image_name", imageName,
-			"image_tag", imageTag,
-			"image_ref", state.BuildResult.ImageRef)
-		return nil
-	}
-
-	// Only perform actual Docker tagging if the tag is different
-	if sourceImageRef != targetImageRef {
-		state.Logger.Info("Performing Docker tag operation",
-			"source", sourceImageRef,
-			"target", targetImageRef)
-
-		// Initialize Docker client for registry operations
-		dockerClient := docker.NewDockerCmdRunner(&runner.DefaultCommandRunner{})
-
-		// Use the RegistryManager for tagging
-		registryManager := docker.NewRegistryManager(dockerClient, state.Logger.With("component", "registry_manager"))
-
-		tagResult, err := registryManager.TagImage(ctx, sourceImageRef, targetImageRef)
-		if err != nil {
-			state.Logger.Error("Docker tag operation failed", "error", err,
-				"source", sourceImageRef, "target", targetImageRef)
-			return errors.New(errors.CodeImageBuildFailed, "tag_step",
-				fmt.Sprintf("failed to tag image from %s to %s: %v", sourceImageRef, targetImageRef, err), err)
-		}
-
-		if !tagResult.Success {
-			errorMsg := "docker tag operation unsuccessful"
-			if tagResult.Error != nil {
-				errorMsg = fmt.Sprintf("docker tag failed: %s", tagResult.Error.Message)
-			}
-			state.Logger.Error("Docker tag unsuccessful", "error", errorMsg)
-			return errors.New(errors.CodeImageBuildFailed, "tag_step", errorMsg, nil)
-		}
-
-		state.Logger.Info("Docker tag operation completed successfully",
-			"source", sourceImageRef,
-			"target", targetImageRef,
-			"duration", tagResult.Duration)
-	} else {
-		state.Logger.Info("Tag unchanged, skipping Docker tag operation", "image_ref", sourceImageRef)
-	}
 
 	// Update the build result with the final tag
-	state.BuildResult.ImageRef = targetImageRef
+	state.BuildResult.ImageRef = fmt.Sprintf("%s:%s", imageName, imageTag)
 
 	state.Logger.Info("Image tagged successfully",
 		"image_name", imageName,
 		"image_tag", imageTag,
 		"image_ref", state.BuildResult.ImageRef)
 
-	return nil
+	// Return basic success result
+
+	return &workflow.StepResult{Success: true}, nil
 }
 
 // PushStep implements image pushing
@@ -356,45 +367,39 @@ type PushStep struct{}
 func NewPushStep() workflow.Step    { return &PushStep{} }
 func (s *PushStep) Name() string    { return "push_image" }
 func (s *PushStep) MaxRetries() int { return 3 }
-func (s *PushStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
+func (s *PushStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
 	state.Logger.Info("Step 6: Preparing image for deployment")
 
 	if state.BuildResult == nil {
-		return errors.New(errors.CodeInvalidState, "push_step", "build result is required for image preparation", nil)
+		return nil, errors.New(errors.CodeInvalidState, "push_step", "build result is required for image preparation", nil)
 	}
 
-	// For local kind deployment, load image directly into kind cluster
-	if state.Args.TestMode {
-		state.Logger.Info("Test mode: Skipping image load to kind cluster")
-		return nil
-	}
-	// Extract image name and tag from the ImageRef set by TagStep
+	// Update the build result with the correct local registry reference for kind deployment
 	imageName := utils.ExtractRepoName(state.RepoIdentifier)
-	imageTag := parseImageReference(state.BuildResult.ImageRef)
+	imageTag := "latest"
+	localRegistryImageRef := fmt.Sprintf("localhost:5001/%s:%s", imageName, imageTag)
 
-	// Convert workflow BuildResult to infrastructure BuildResult for kind loading
-	infraBuild := &BuildResult{
-		ImageName: imageName,
-		ImageTag:  imageTag,
-		ImageID:   state.BuildResult.ImageID,
-	}
+	// Update both BuildResult and Result with the correct local registry reference
+	state.BuildResult.ImageRef = localRegistryImageRef
+	state.Result.ImageRef = localRegistryImageRef
 
-	state.Logger.Info("Loading image into kind cluster",
-		"image_name", imageName,
-		"image_tag", imageTag)
-
-	if err := LoadImageToKind(ctx, infraBuild, "container-kit", state.Logger); err != nil {
-		return errors.New(errors.CodeImagePullFailed, "push_step", "failed to load image to kind cluster", err)
-	}
-
-	state.Logger.Info("Image loaded into kind cluster successfully")
 	state.Logger.Info("Image prepared for local kind deployment",
-		"image_ref", state.BuildResult.ImageRef)
+		"image_ref", localRegistryImageRef)
 
-	// Update the result with the image reference
-	state.Result.ImageRef = state.BuildResult.ImageRef
+	state.Logger.Info("Build result:",
+		"image_id", state.BuildResult.ImageID,
+		"image_ref", state.BuildResult.ImageRef,
+		"image_size", state.BuildResult.ImageSize,
+		"build_time", state.BuildResult.BuildTime,
+	)
 
-	return nil
+	// Return StepResult with corrected image reference in data
+	return &workflow.StepResult{
+		Success: true,
+		Data: map[string]interface{}{
+			"image_ref": localRegistryImageRef,
+		},
+	}, nil
 }
 
 // ManifestStep implements Kubernetes manifest generation
@@ -403,7 +408,7 @@ type ManifestStep struct{}
 func NewManifestStep() workflow.Step    { return &ManifestStep{} }
 func (s *ManifestStep) Name() string    { return "generate_manifests" }
 func (s *ManifestStep) MaxRetries() int { return 2 }
-func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
+func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
 	// Check if manifest content is provided
 	var manifestList []string
 
@@ -414,7 +419,7 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 			// Create manifests directory
 			manifestsDir := filepath.Join(state.AnalyzeResult.RepoPath, "manifests")
 			if err := createManifestsDirectory(manifestsDir, state.Logger); err != nil {
-				return fmt.Errorf("failed to create manifests directory: %v", err)
+				return nil, fmt.Errorf("failed to create manifests directory: %v", err)
 			}
 
 			// Write individual manifest files
@@ -422,7 +427,7 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 				if contentStr, ok := content.(string); ok && contentStr != "" {
 					filePath := filepath.Join(manifestsDir, filename)
 					if err := writeManifestFile(filePath, contentStr, state.Logger); err != nil {
-						return fmt.Errorf("failed to write manifest file %s: %v", filename, err)
+						return nil, fmt.Errorf("failed to write manifest file %s: %v", filename, err)
 					}
 					manifestList = append(manifestList, contentStr)
 					state.Logger.Info("Wrote manifest file", "filename", filename, "path", filePath)
@@ -446,7 +451,9 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 				"manifest_count", len(manifestList),
 				"path", manifestsDir)
 
-			return nil
+			// Return basic success result
+
+			return &workflow.StepResult{Success: true}, nil
 		}
 	}
 
@@ -457,11 +464,13 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 	shouldDeploy := state.Args.Deploy == nil || *state.Args.Deploy
 	if !shouldDeploy {
 		state.Logger.Info("Skipping manifest generation (deployment not requested)")
-		return nil
+		// Return basic success result
+
+		return &workflow.StepResult{Success: true}, nil
 	}
 
 	if state.BuildResult == nil || state.AnalyzeResult == nil {
-		return errors.New(errors.CodeInvalidState, "manifest_step", "build result and analyze result are required for manifest generation", nil)
+		return nil, errors.New(errors.CodeInvalidState, "manifest_step", "build result and analyze result are required for manifest generation", nil)
 	}
 
 	// Convert workflow BuildResult to infrastructure BuildResult
@@ -501,7 +510,7 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 		state.Logger,
 	)
 	if err != nil {
-		return errors.New(errors.CodeManifestInvalid, "manifest_step", "k8s manifest generation failed", err)
+		return nil, errors.New(errors.CodeManifestInvalid, "manifest_step", "k8s manifest generation failed", err)
 	}
 
 	// Extract actual manifest content from the result
@@ -535,10 +544,14 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 	}
 
 	// Store K8s result in workflow state with extracted manifest content
+	manifestPath := k8sResult.Manifests["path"]
+	state.Logger.Info("Setting manifest_path in metadata",
+		"raw_path", manifestPath)
+
 	metadata := map[string]interface{}{
 		"app_name":       k8sResult.AppName,
 		"ingress_url":    k8sResult.IngressURL,
-		"manifest_path":  k8sResult.Manifests["path"], // Store manifest path for deployment
+		"manifest_path":  manifestPath, // Store manifest path for deployment
 		"manifest_count": len(manifestContent),
 		"template_used":  k8sResult.Manifests["template"],
 	}
@@ -556,7 +569,9 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 		"namespace", k8sResult.Namespace,
 		"manifest_count", len(manifestContent),
 		"manifests_extracted", len(manifestContent) > 0)
-	return nil
+	// Return basic success result
+
+	return &workflow.StepResult{Success: true}, nil
 }
 
 // ClusterStep implements cluster setup
@@ -565,14 +580,16 @@ type ClusterStep struct{}
 func NewClusterStep() workflow.Step    { return &ClusterStep{} }
 func (s *ClusterStep) Name() string    { return "setup_cluster" }
 func (s *ClusterStep) MaxRetries() int { return 2 }
-func (s *ClusterStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
+func (s *ClusterStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
 	state.Logger.Info("Step 7: Setting up kind cluster")
 
 	// Check if deployment is actually requested
 	shouldDeploy := state.Args.Deploy == nil || *state.Args.Deploy
 	if !shouldDeploy {
 		state.Logger.Info("Skipping cluster setup (deployment not requested)")
-		return nil
+		// Return basic success result
+
+		return &workflow.StepResult{Success: true}, nil
 	}
 
 	// In test mode, simulate cluster setup
@@ -585,7 +602,7 @@ func (s *ClusterStep) Execute(ctx context.Context, state *workflow.WorkflowState
 		var err error
 		registryURL, err = SetupKindCluster(ctx, "container-kit", state.Logger)
 		if err != nil {
-			return errors.New(errors.CodeKubernetesApiError, "cluster_step", "kind cluster setup failed", err)
+			return nil, errors.New(errors.CodeKubernetesApiError, "cluster_step", "kind cluster setup failed", err)
 		}
 	}
 
@@ -599,7 +616,9 @@ func (s *ClusterStep) Execute(ctx context.Context, state *workflow.WorkflowState
 	state.K8sResult.Metadata["registry_url"] = registryURL
 
 	state.Logger.Info("Kind cluster setup completed successfully", "registry_url", registryURL)
-	return nil
+	// Return basic success result
+
+	return &workflow.StepResult{Success: true}, nil
 }
 
 // DeployStep implements application deployment
@@ -608,28 +627,60 @@ type DeployStep struct{}
 func NewDeployStep() workflow.Step    { return &DeployStep{} }
 func (s *DeployStep) Name() string    { return "deploy_application" }
 func (s *DeployStep) MaxRetries() int { return 3 }
-func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
+func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
 	state.Logger.Info("Step 8: Deploying application to Kubernetes")
 
 	// Check if deployment is actually requested
 	shouldDeploy := state.Args.Deploy == nil || *state.Args.Deploy
 	if !shouldDeploy {
 		state.Logger.Info("Skipping deployment (not requested)")
-		return nil
+		// Return basic success result
+
+		return &workflow.StepResult{Success: true}, nil
 	}
 
 	if state.K8sResult == nil {
-		return errors.New(errors.CodeInvalidState, "deploy_step", "K8s manifests are required for deployment", nil)
+		return nil, errors.New(errors.CodeInvalidState, "deploy_step", "K8s manifests are required for deployment", nil)
 	}
 
-	// Image should already be loaded into kind cluster by PushStep (Step 6)
+	// First, load image into kind cluster if needed
+	if state.BuildResult != nil && !state.Args.TestMode {
+		infraBuildResult := &BuildResult{
+			ImageName: utils.ExtractRepoName(state.RepoIdentifier),
+			ImageTag:  "latest",
+			ImageID:   state.BuildResult.ImageID,
+		}
+
+		err := LoadImageToKind(ctx, infraBuildResult, "container-kit", state.Logger)
+		if err != nil {
+			return nil, errors.New(errors.CodeImagePullFailed, "deploy_step", "failed to load image to kind", err)
+		}
+		state.Logger.Info("Image loaded into kind cluster successfully")
+	} else if state.Args.TestMode {
+		state.Logger.Info("Test mode: Skipping image load to kind cluster")
+	}
+
 	// Convert workflow K8sResult to infrastructure K8sResult for deployment
+	manifestPath := ""
+	if pathFromMetadata, exists := state.K8sResult.Metadata["manifest_path"]; exists {
+		if pathStr, ok := pathFromMetadata.(string); ok {
+			manifestPath = pathStr
+		}
+	}
+
+	state.Logger.Info("Using manifest path for deployment",
+		"manifest_path", manifestPath)
+
+	if manifestPath == "" {
+		return nil, errors.New(errors.CodeInvalidState, "deploy_step", "manifest path not found in K8s result metadata", nil)
+	}
+
 	infraK8sResult := &K8sResult{
 		AppName:    utils.ExtractRepoName(state.RepoIdentifier),
 		Namespace:  state.K8sResult.Namespace,
 		ServiceURL: state.K8sResult.Endpoint,
 		Manifests: map[string]interface{}{
-			"path": state.K8sResult.Metadata["manifest_path"], // Pass manifest path from ManifestStep
+			"path": manifestPath,
 		},
 		Metadata: map[string]interface{}{
 			"port":      0,                          // Default port
@@ -659,7 +710,6 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 	}
 
 	// Log deployment details for debugging
-	manifestPath := ""
 	if path, ok := infraK8sResult.Manifests["path"].(string); ok {
 		manifestPath = path
 	}
@@ -677,12 +727,24 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 	} else {
 		err := DeployToKubernetes(ctx, infraK8sResult, state.Logger)
 		if err != nil {
-			return errors.New(errors.CodeDeploymentFailed, "deploy_step", "kubernetes deployment failed", err)
+			// Capture deployment diagnostics for error reporting
+			captureDeploymentDiagnostics(ctx, state, infraK8sResult, state.Logger)
+
+			return &workflow.StepResult{
+				Success: false,
+			}, err
 		}
 	}
 
 	state.Logger.Info("Application deployed successfully", "namespace", state.K8sResult.Namespace)
-	return nil
+
+	return &workflow.StepResult{
+		Success: true,
+		Data: map[string]interface{}{
+			"namespace": state.K8sResult.Namespace,
+			"app_name":  infraK8sResult.AppName,
+		},
+	}, nil
 }
 
 // VerifyStep implements deployment verification
@@ -691,18 +753,20 @@ type VerifyStep struct{}
 func NewVerifyStep() workflow.Step    { return &VerifyStep{} }
 func (s *VerifyStep) Name() string    { return "verify_deployment" }
 func (s *VerifyStep) MaxRetries() int { return 2 }
-func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
+func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
 	state.Logger.Info("Step 10: Verifying deployment health with port forwarding")
 
 	// Check if deployment was actually requested
 	shouldDeploy := state.Args.Deploy == nil || *state.Args.Deploy
 	if !shouldDeploy {
 		state.Logger.Info("Skipping verification (deployment not requested)")
-		return nil
+		// Return basic success result
+
+		return &workflow.StepResult{Success: true}, nil
 	}
 
 	if state.K8sResult == nil {
-		return errors.New(errors.CodeInvalidState, "verify_step", "K8s result is required for deployment verification", nil)
+		return nil, errors.New(errors.CodeInvalidState, "verify_step", "K8s result is required for deployment verification", nil)
 	}
 
 	// Convert workflow K8sResult to infrastructure K8sResult
@@ -735,7 +799,7 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 			state.Logger.Warn("Enhanced deployment verification failed", "error", err)
 			// In strict mode, fail the workflow for verification errors
 			if state.Args.StrictMode {
-				return errors.New(errors.CodeDeploymentFailed, "verify_step", "enhanced deployment verification failed in strict mode", err)
+				return nil, errors.New(errors.CodeDeploymentFailed, "verify_step", "enhanced deployment verification failed in strict mode", err)
 			}
 			// Otherwise, don't fail the workflow - just warn
 		}
@@ -756,6 +820,9 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 					"port_forward":       verifyResult.PortForwardResult,
 					"health_check":       verifyResult.HealthCheckResult,
 				}
+
+				// Also capture current deployment diagnostics for the final response
+				captureDeploymentDiagnostics(ctx, state, infraK8sResult, state.Logger)
 			}
 
 			for _, message := range verifyResult.Messages {
@@ -775,13 +842,15 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 			if url := verifyResult.AccessURL; url != "" {
 				state.Result.Endpoint = url
 				state.Logger.Info(fmt.Sprintf("🔗 Access your app: %s", url))
-				return nil
+				// Return basic success result
+
+				return &workflow.StepResult{Success: true}, nil
 			}
 
 			endpoint, err := GetServiceEndpoint(ctx, infraK8sResult, state.Logger)
 			if err != nil {
 				if state.Args.StrictMode {
-					return errors.New(errors.CodeKubernetesApiError, "verify_step", "failed to get service endpoint in strict mode", err)
+					return nil, errors.New(errors.CodeKubernetesApiError, "verify_step", "failed to get service endpoint in strict mode", err)
 				}
 				state.Logger.Warn("Failed to get service endpoint (non-critical)", "error", err)
 			} else {
@@ -797,7 +866,9 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 	}
 
 	state.Logger.Info("Enhanced deployment verification completed")
-	return nil
+	// Return basic success result
+
+	return &workflow.StepResult{Success: true}, nil
 }
 
 // extractNamespaceFromManifests extracts namespace from AI-generated manifests

@@ -264,10 +264,23 @@ func DefaultServerConfig() ServerConfig {
 // Core Workflow Types (moved from legacy_orchestrator.go)
 // ============================================================================
 
+// StepResult represents the result of a step execution with minimal data and metadata
+type StepResult struct {
+	Success  bool                   `json:"success"`
+	Data     map[string]interface{} `json:"data,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// Validate ensures the StepResult is properly formed
+func (sr *StepResult) Validate() error {
+	// StepResult is always considered valid - validation is optional
+	return nil
+}
+
 // Step defines the interface for individual workflow steps
 type Step interface {
 	Name() string
-	Execute(ctx context.Context, state *WorkflowState) error
+	Execute(ctx context.Context, state *WorkflowState) (*StepResult, error)
 }
 
 // WorkflowState holds all the state that flows between workflow steps

@@ -27,10 +27,10 @@ func TestDirectProgressIntegration(t *testing.T) {
 	mockProvider := &MockStepProvider{
 		analyzeStep: &MockStep{
 			name: "analyze",
-			executeFunc: func(ctx context.Context, state *workflow.WorkflowState) error {
+			executeFunc: func(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
 				// Emit some progress during execution
 				_ = state.ProgressEmitter.Emit(ctx, "processing", 50, "Processing repository")
-				return nil
+				return &workflow.StepResult{Success: true}, nil
 			},
 		},
 	}
@@ -113,16 +113,16 @@ func TestDirectProgressFactoryWithMCPServer(t *testing.T) {
 // MockStep implements workflow.Step for testing
 type MockStep struct {
 	name        string
-	executeFunc func(ctx context.Context, state *workflow.WorkflowState) error
+	executeFunc func(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error)
 	maxRetries  int
 }
 
 func (m *MockStep) Name() string { return m.name }
-func (m *MockStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
+func (m *MockStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
 	if m.executeFunc != nil {
 		return m.executeFunc(ctx, state)
 	}
-	return nil
+	return &workflow.StepResult{Success: true}, nil
 }
 func (m *MockStep) MaxRetries() int { return m.maxRetries }
 
@@ -144,70 +144,90 @@ func (m *MockStepProvider) GetAnalyzeStep() workflow.Step {
 	if m.analyzeStep != nil {
 		return m.analyzeStep
 	}
-	return &MockStep{name: "analyze"}
+	return &MockStep{name: "analyze", executeFunc: func(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
+		return &workflow.StepResult{Success: true}, nil
+	}}
 }
 
 func (m *MockStepProvider) GetDockerfileStep() workflow.Step {
 	if m.dockerfileStep != nil {
 		return m.dockerfileStep
 	}
-	return &MockStep{name: "dockerfile"}
+	return &MockStep{name: "dockerfile", executeFunc: func(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
+		return &workflow.StepResult{Success: true}, nil
+	}}
 }
 
 func (m *MockStepProvider) GetBuildStep() workflow.Step {
 	if m.buildStep != nil {
 		return m.buildStep
 	}
-	return &MockStep{name: "build"}
+	return &MockStep{name: "build", executeFunc: func(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
+		return &workflow.StepResult{Success: true}, nil
+	}}
 }
 
 func (m *MockStepProvider) GetScanStep() workflow.Step {
 	if m.scanStep != nil {
 		return m.scanStep
 	}
-	return &MockStep{name: "scan"}
+	return &MockStep{name: "scan", executeFunc: func(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
+		return &workflow.StepResult{Success: true}, nil
+	}}
 }
 
 func (m *MockStepProvider) GetTagStep() workflow.Step {
 	if m.tagStep != nil {
 		return m.tagStep
 	}
-	return &MockStep{name: "tag"}
+	return &MockStep{name: "tag", executeFunc: func(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
+		return &workflow.StepResult{Success: true}, nil
+	}}
 }
 
 func (m *MockStepProvider) GetPushStep() workflow.Step {
 	if m.pushStep != nil {
 		return m.pushStep
 	}
-	return &MockStep{name: "push"}
+	return &MockStep{name: "push", executeFunc: func(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
+		return &workflow.StepResult{Success: true}, nil
+	}}
 }
 
 func (m *MockStepProvider) GetManifestStep() workflow.Step {
 	if m.manifestStep != nil {
 		return m.manifestStep
 	}
-	return &MockStep{name: "manifest"}
+	return &MockStep{name: "manifest", executeFunc: func(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
+		return &workflow.StepResult{Success: true}, nil
+	}}
 }
 
 func (m *MockStepProvider) GetClusterStep() workflow.Step {
 	if m.clusterStep != nil {
 		return m.clusterStep
 	}
-	return &MockStep{name: "cluster"}
+	return &MockStep{name: "cluster", executeFunc: func(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
+		return &workflow.StepResult{Success: true}, nil
+	}}
 }
 
 func (m *MockStepProvider) GetDeployStep() workflow.Step {
 	if m.deployStep != nil {
 		return m.deployStep
 	}
-	return &MockStep{name: "deploy"}
+	return &MockStep{name: "deploy", executeFunc: func(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
+		return &workflow.StepResult{Success: true}, nil
+	}}
 }
 
 func (m *MockStepProvider) GetVerifyStep() workflow.Step {
 	if m.verifyStep != nil {
 		return m.verifyStep
 	}
-	return &MockStep{name: "verify"}
+	return &MockStep{name: "verify", executeFunc: func(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
+		return &workflow.StepResult{Success: true}, nil
+	}}
 }
 
 // GetStep implements workflow.StepProvider interface

@@ -3,6 +3,7 @@ package workflow
 
 import (
 	"fmt"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -44,6 +45,7 @@ type BuildResult struct {
 	ImageSize int64                  `json:"image_size"`
 	BuildTime string                 `json:"build_time"`
 	Metadata  map[string]interface{} `json:"metadata"`
+	Errors    []string               `json:"errors,omitempty"`
 }
 
 // K8sResult represents the output of Kubernetes manifest generation

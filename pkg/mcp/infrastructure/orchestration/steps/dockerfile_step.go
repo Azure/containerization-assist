@@ -29,7 +29,7 @@ func (s *DockerfileStep) Name() string {
 }
 
 // Execute generates a Dockerfile
-func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
+func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
 	// Check if generated Dockerfile content is provided
 	var dockerfileContent string
 	var hasContent bool
@@ -52,7 +52,7 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowSt
 		}
 
 		if err := WriteDockerfile(state.AnalyzeResult.RepoPath, dockerfileContent, state.Logger); err != nil {
-			return fmt.Errorf("failed to write AI-generated Dockerfile to path '%s': %v", state.AnalyzeResult.RepoPath, err)
+			return nil, fmt.Errorf("failed to write AI-generated Dockerfile to path '%s': %v", state.AnalyzeResult.RepoPath, err)
 		}
 
 		state.Logger.Info("Dockerfile written successfully", "path", dockerfileResult.Path)
@@ -66,14 +66,26 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowSt
 			ExposedPort: dockerfileResult.ExposedPort,
 		}
 
-		return nil
+		// Return StepResult with dockerfile data
+		return &workflow.StepResult{
+			Success: true,
+			Data: map[string]interface{}{
+				"content":      dockerfileResult.Content,
+				"path":         dockerfileResult.Path,
+				"base_image":   dockerfileResult.BaseImage,
+				"exposed_port": dockerfileResult.ExposedPort,
+			},
+			Metadata: map[string]interface{}{
+				"ai_generated": true,
+			},
+		}, nil
 	}
 
 	// If no content provided, generate Dockerfile normally
 	state.Logger.Info("No content provided, generating Dockerfile from analysis")
 
 	if state.AnalyzeResult == nil {
-		return fmt.Errorf("analyze result is required for Dockerfile generation")
+		return nil, fmt.Errorf("analyze result is required for Dockerfile generation")
 	}
 
 	state.Logger.Info("Step 2: Generating Dockerfile")
@@ -88,7 +100,7 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowSt
 
 	dockerfileResult, err := GenerateDockerfile(infraAnalyzeResult, state.Logger)
 	if err != nil {
-		return fmt.Errorf("dockerfile generation failed: %v", err)
+		return nil, fmt.Errorf("dockerfile generation failed: %v", err)
 	}
 
 	state.Logger.Info("Dockerfile generated; returning content in MCP response instead of writing to disk")
@@ -107,7 +119,20 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowSt
 		ExposedPort: dockerfileResult.ExposedPort,
 	}
 
-	return nil
+	// Return StepResult with dockerfile data
+	return &workflow.StepResult{
+		Success: true,
+		Data: map[string]interface{}{
+			"content":      dockerfileResult.Content,
+			"path":         dockerfileResult.Path,
+			"base_image":   dockerfileResult.BaseImage,
+			"exposed_port": dockerfileResult.ExposedPort,
+		},
+		Metadata: map[string]interface{}{
+			"build_args":   dockerfileResult.BuildArgs,
+			"instructions": instructions,
+		},
+	}, nil
 }
 
 // extractBaseImageFromDockerfile extracts the base image from Dockerfile content
