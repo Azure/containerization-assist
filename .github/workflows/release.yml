@@ -11,9 +11,9 @@ on:
 
 permissions:
   contents: write
+  id-token: write
   # packages: write
   # issues: write
-  # id-token: write
 
 jobs:
   # Run tests before creating the release
@@ -92,6 +92,11 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 #v3.9.2
+        with:
+          cosign-release: 'v2.5.3'
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
