@@ -48,6 +48,31 @@ checksum:
   name_template: 'checksums.txt'
   algorithm: sha256
 
+signs:
+  # Sign the checksum file with cosign (keyless via GitHub OIDC)
+  - id: cosign-checksums
+    cmd: cosign
+    artifacts: checksum
+    signature: "${artifact}.sig"
+    args:
+      - sign-blob
+      - --yes
+      - --output-signature
+      - "${signature}"
+      - "${artifact}"
+
+  # Sign the archives (zip/tar.gz) with cosign as detached signatures
+  - id: cosign-archives
+    cmd: cosign
+    artifacts: archive
+    signature: "${artifact}.sig"
+    args:
+      - sign-blob
+      - --yes
+      - --output-signature
+      - "${signature}"
+      - "${artifact}"
+
 changelog:
   sort: asc
   use: github
@@ -104,6 +129,11 @@ release:
     #### Documentation
     - User Guide: https://github.com/Azure/container-kit/blob/{{ .Tag }}/USER_GUIDE.md
     
+    #### Verify Integrity & Signature
+     - We publish SHA-256 checksums (checksums.txt) and cosign detached signatures (*.sig) for archives and the checksum file.
+     - Verify checksum: match your artifact's SHA-256 against the line in checksums.txt.
+     - Verify signature (cosign): cosign verify-blob --signature checksums.txt.sig checksums.txt
+
     For the complete, always up-to-date setup (including configuration, troubleshooting, and updates) please follow all steps in the User Guide above.
 
   footer: |
