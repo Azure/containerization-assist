@@ -78,20 +78,23 @@ This script will:
 
 If the automated script doesn't work, follow these steps:
 
-1. **Download Container Kit**
+1. **Download Container Kit MCP Server**
    - Go to: https://github.com/Azure/container-kit/releases/latest
-   - Download the file for your system:
-     - Windows: `container-kit_windows_amd64.zip`
-     - macOS: `container-kit_darwin_amd64.tar.gz`
-     - Linux: `container-kit_linux_amd64.tar.gz`
+   - Download the archive matching your OS/architecture (examples):
+     - Windows (x64): `container-kit-mcp_windows_amd64.zip`
+     - Windows (ARM64): `container-kit-mcp_windows_arm64.zip`
+     - macOS (Intel): `container-kit-mcp_darwin_amd64.tar.gz`
+     - macOS (Apple Silicon): `container-kit-mcp_darwin_arm64.tar.gz`
+     - Linux (x64): `container-kit-mcp_linux_amd64.tar.gz`
+     - Linux (ARM64): `container-kit-mcp_linux_arm64.tar.gz`
 
 2. **Extract the files**
    - Windows: Right-click the zip file → "Extract All"
    - macOS/Linux: Double-click the tar.gz file
 
 3. **Move to the right location**
-   - Windows: Move `container-kit-mcp.exe` to `C:\Program Files\ContainerKit\`
-   - macOS/Linux: Move `container-kit-mcp` to `/usr/local/bin/`
+  - Windows: Move `container-kit-mcp.exe` to `C:\Program Files\ContainerKit\` (or another directory on PATH)
+  - macOS/Linux: Move `container-kit-mcp` to `/usr/local/bin/` (or `$HOME/bin` on PATH)
 
 ### Verify Installation
 
@@ -145,41 +148,52 @@ Container Kit MCP Server v1.0.0
 
 ## Step 3: Configure MCP Integration
 
-### Configure VS Code Settings
+We use a user-level `mcp.json` file as the single source of truth (no edits to `settings.json`).
 
-1. **Open VS Code**
-2. **Press** `Ctrl+,` (Windows/Linux) or `Cmd+,` (macOS) to open Settings
-3. **Click** "Open Settings (JSON)" in the top-right corner
-4. **Add this configuration:**
+### Create or Edit mcp.json
+
+Location by platform:
+- **macOS:** `~/Library/Application Support/Code/User/mcp.json`
+- **Linux:** `~/.config/Code/User/mcp.json`
+- **Windows:** `%APPDATA%/Code/User/mcp.json`
+
+If the file doesn't exist, create it with this minimal configuration:
 
 ```json
 {
-  "mcp.servers": {
+  "servers": {
     "container-kit": {
+      "type": "stdio",
       "command": "container-kit-mcp",
-      "args": [],
-      "transport": "stdio"
+      "args": []
     }
-  },
-  "github.copilot.chat.experimental.mcp.enabled": true
+  }
 }
 ```
 
-*[Image placeholder: VS Code settings.json showing MCP configuration]*
+Notes:
+- Use just `container-kit-mcp` if it's on your PATH; otherwise supply the absolute path.
+- Keep the server name `container-kit` (lowercase, hyphen) for consistency with prompts.
+- Restart VS Code after saving to load changes.
 
-### Alternative: Use Settings UI
+### Optional: Enable Debug Logging Early
 
-If you prefer the visual interface:
+Add an `env` block to increase log verbosity:
 
-1. **Open Settings** (`Ctrl+,` / `Cmd+,`)
-2. **Search for** "mcp"
-3. **Enable** "GitHub Copilot Chat: Experimental MCP"
-4. **Add** Container Kit server in the MCP Servers section:
-   - **Name:** `container-kit`
-   - **Command:** `container-kit-mcp`
-   - **Transport:** `stdio`
+```json
+{
+  "servers": {
+    "container-kit": {
+      "type": "stdio",
+      "command": "container-kit-mcp",
+      "args": [],
+      "env": { "CONTAINER_KIT_LOG_LEVEL": "debug" }
+    }
+  }
+}
+```
 
-*[Image placeholder: VS Code Settings UI showing MCP configuration options]*
+*[Image placeholder: mcp.json open in VS Code]*
 
 ---
 
@@ -337,11 +351,11 @@ curl -sSL https://raw.githubusercontent.com/Azure/container-kit/main/scripts/upd
 **Problem:** The MCP server isn't configured correctly in VS Code.
 
 **Solutions:**
-1. **Check your VS Code settings.json configuration**
-2. **Make sure the JSON is valid** (VS Code will show syntax errors)
-3. **Verify MCP extension is installed and enabled**
-4. **Restart VS Code** after making changes
-5. **Check that container-kit-mcp is in your PATH**
+1. **Open your `mcp.json`** and verify the `servers.container-kit` block.
+2. **Validate JSON syntax** (VS Code shows red squiggles on errors).
+3. **Confirm MCP extension is installed & enabled**.
+4. **Restart VS Code** after edits.
+5. **Ensure `container-kit-mcp` resolves** (run `which container-kit-mcp` / `where container-kit-mcp`).
 
 *[Image placeholder: VS Code showing MCP configuration and Copilot Chat connection status]*
 
@@ -365,28 +379,24 @@ curl -sSL https://raw.githubusercontent.com/Azure/container-kit/main/scripts/upd
 
 ### Getting Debug Information
 
-If you're having trouble, you can enable debug logging:
+If you're having trouble, enable debug logging via `mcp.json`:
 
-1. **Update your VS Code settings.json:**
+1. **Edit `mcp.json`** and add the env block:
 ```json
 {
-  "mcp.servers": {
+  "servers": {
     "container-kit": {
+      "type": "stdio",
       "command": "container-kit-mcp",
       "args": [],
-      "transport": "stdio",
-      "env": {
-        "CONTAINER_KIT_LOG_LEVEL": "debug"
-      }
+      "env": { "CONTAINER_KIT_LOG_LEVEL": "debug" }
     }
-  },
-  "github.copilot.chat.experimental.mcp.enabled": true
+  }
 }
 ```
-
 2. **Restart VS Code**
-3. **Try your operation again**
-4. **Check the Output panel** (View → Output, select "MCP" or "Container Kit")
+3. **Retry the failing action**
+4. **Open Output panel** (View → Output) and select the MCP-related channel (e.g. "MCP" or extension-specific).
 
 *[Image placeholder: VS Code Output panel showing Container Kit debug logs]*
 
@@ -397,7 +407,7 @@ If you're having trouble, you can enable debug logging:
 ### Documentation and Resources
 
 - **Official Documentation:** [GitHub Repository](https://github.com/Azure/container-kit)
-- **Examples:** Check the `examples/` folder in the repository
+- **Examples:** (Coming soon)
 - **MCP Documentation:** [Model Context Protocol](https://modelcontextprotocol.io/)
 
 ### Community Support
@@ -430,16 +440,15 @@ When reporting issues, logs help us understand what went wrong. Here's how to ga
 
 #### Method 1: Enable Debug Logging
 
-1. **Update your configuration:**
+1. **Update your `mcp.json`:**
 ```json
 {
-  "mcpServers": {
+  "servers": {
     "container-kit": {
+      "type": "stdio",
       "command": "container-kit-mcp",
       "args": [],
-      "env": {
-        "CONTAINER_KIT_LOG_LEVEL": "debug"
-      }
+      "env": { "CONTAINER_KIT_LOG_LEVEL": "debug" }
     }
   }
 }
@@ -497,7 +506,7 @@ When reporting issues, always include:
 5. **Steps to reproduce:** Exact steps you took
 6. **Expected vs actual behavior:** What should happen vs what did happen
 7. **Logs:** Debug logs from VS Code Output panel (sanitized of sensitive data)
-8. **Configuration:** Your VS Code settings.json MCP configuration (remove sensitive values)
+8. **Configuration:** Your `mcp.json` server configuration (remove sensitive values)
 
 #### Quick Info Script
 

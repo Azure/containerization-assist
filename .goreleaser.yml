@@ -12,28 +12,7 @@ before:
     - go mod verify
 
 builds:
-  # CLI binary
-  - id: container-kit
-    main: ./main.go
-    binary: container-kit
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - darwin
-      - windows
-    goarch:
-      - amd64
-      - arm64
-    # Skip unsupported combinations
-    ignore:
-      - goos: windows
-        goarch: arm64
-    ldflags:
-      - -s -w -X main.Version={{.Version}} -X main.GitCommit={{.Commit}} -X main.BuildTime={{.Date}}
-    mod_timestamp: '{{ .CommitTimestamp }}'
-
-  # MCP Server binary
+  # MCP Server binary (only binary released)
   - id: container-kit-mcp
     main: ./cmd/mcp-server
     binary: container-kit-mcp
@@ -48,19 +27,15 @@ builds:
     goarch:
       - amd64
       - arm64
-    # Skip unsupported combinations
-    ignore:
-      - goos: windows
-        goarch: arm64
     ldflags:
       - -s -w -X main.Version={{.Version}} -X main.GitCommit={{.Commit}} -X main.BuildTime={{.Date}}
     mod_timestamp: '{{ .CommitTimestamp }}'
 
 archives:
-  - id: default
-    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+  - id: mcp
+    # Use explicit naming to reflect MCP server artifact
+    name_template: "container-kit-mcp_{{ .Os }}_{{ .Arch }}"
     builds:
-      - container-kit
       - container-kit-mcp
     format_overrides:
       - goos: windows
@@ -72,6 +47,31 @@ archives:
 checksum:
   name_template: 'checksums.txt'
   algorithm: sha256
+
+signs:
+  # Sign the checksum file with cosign (keyless via GitHub OIDC)
+  - id: cosign-checksums
+    cmd: cosign
+    artifacts: checksum
+    signature: "${artifact}.sig"
+    args:
+      - sign-blob
+      - --yes
+      - --output-signature
+      - "${signature}"
+      - "${artifact}"
+
+  # Sign the archives (zip/tar.gz) with cosign as detached signatures
+  - id: cosign-archives
+    cmd: cosign
+    artifacts: archive
+    signature: "${artifact}.sig"
+    args:
+      - sign-blob
+      - --yes
+      - --output-signature
+      - "${signature}"
+      - "${artifact}"
 
 changelog:
   sort: asc
@@ -107,15 +107,34 @@ release:
 
     Welcome to Container Kit {{ .Tag }}! This release includes several improvements and bug fixes.
 
-    ### Installation
+    ### Installation (MCP Server)
 
-    #### Quick Install (Linux/macOS)
-    ```bash
-    curl -sSL https://raw.githubusercontent.com/Azure/container-kit/main/scripts/install.sh | bash
+    The MCP server binary (container-kit-mcp) is provided for Linux, macOS (Intel & ARM), and Windows (amd64 & arm64).
+
+    #### Quick Install (Windows PowerShell)
+    ```powershell
+    Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-WebRequest -Uri https://raw.githubusercontent.com/Azure/container-kit/main/scripts/setup-vscode.ps1 -OutFile setup-vscode.ps1; ./setup-vscode.ps1; Remove-Item setup-vscode.ps1
     ```
 
-    #### Manual Download
-    Download the appropriate binary for your platform from the assets below.
+    #### Quick Install (macOS / Linux)
+    ```bash
+    curl -sSL https://raw.githubusercontent.com/Azure/container-kit/main/scripts/setup-vscode.sh | bash
+    ```
+
+    #### Manual Install
+    1. Download the archive matching your platform.
+    2. Extract the binary and place it on your PATH (e.g. /usr/local/bin or $HOME/bin).
+    3. Verify: `container-kit-mcp --help`
+
+    #### Documentation
+    - User Guide: https://github.com/Azure/container-kit/blob/{{ .Tag }}/USER_GUIDE.md
+    
+    #### Verify Integrity & Signature
+     - We publish SHA-256 checksums (checksums.txt) and cosign detached signatures (*.sig) for archives and the checksum file.
+     - Verify checksum: match your artifact's SHA-256 against the line in checksums.txt.
+     - Verify signature (cosign): cosign verify-blob --signature checksums.txt.sig checksums.txt
+
+    For the complete, always up-to-date setup (including configuration, troubleshooting, and updates) please follow all steps in the User Guide above.
 
   footer: |
     ## Thanks!
