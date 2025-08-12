@@ -241,4 +241,4 @@ func (s *Service) serviceToDomainSession(state SessionState) domainsession.Sessi
 }
 
 // Ensure Service implements OptimizedSessionManager
-var _ OptimizedSessionManager = (*Service)(nil)
+var _ SessionManager = (*Service)(nil)

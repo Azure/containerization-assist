@@ -18,7 +18,7 @@ import (
 type LifecycleManager struct {
 	logger           *slog.Logger
 	config           workflow.ServerConfig
-	sessionManager   session.OptimizedSessionManager
+	sessionManager   session.SessionManager
 	bootstrapper     *bootstrap.Bootstrapper
 	mcpServer        *server.MCPServer
 	isMcpInitialized bool
@@ -31,7 +31,7 @@ type LifecycleManager struct {
 func NewLifecycleManager(
 	logger *slog.Logger,
 	config workflow.ServerConfig,
-	sessionManager session.OptimizedSessionManager,
+	sessionManager session.SessionManager,
 	bootstrapper *bootstrap.Bootstrapper,
 ) *LifecycleManager {
 	return &LifecycleManager{

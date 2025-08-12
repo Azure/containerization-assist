@@ -17,7 +17,7 @@ import (
 // WorkflowHandler provides direct workflow operations
 type WorkflowHandler struct {
 	orchestrator   workflow.EventAwareOrchestrator
-	sessionManager session.OptimizedSessionManager
+	sessionManager session.SessionManager
 	eventPublisher *events.Publisher
 	logger         *slog.Logger
 }
@@ -25,7 +25,7 @@ type WorkflowHandler struct {
 // NewWorkflowHandler creates a new workflow handler
 func NewWorkflowHandler(
 	orchestrator workflow.EventAwareOrchestrator,
-	sessionManager session.OptimizedSessionManager,
+	sessionManager session.SessionManager,
 	eventPublisher *events.Publisher,
 	logger *slog.Logger,
 ) *WorkflowHandler {

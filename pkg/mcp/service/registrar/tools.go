@@ -20,7 +20,7 @@ type ToolRegistrar struct {
 	logger         *slog.Logger
 	orchestrator   domainworkflow.WorkflowOrchestrator
 	stepProvider   domainworkflow.StepProvider
-	sessionManager session.OptimizedSessionManager
+	sessionManager session.SessionManager
 	config         domainworkflow.ServerConfig
 }
 
@@ -29,7 +29,7 @@ func NewToolRegistrar(
 	logger *slog.Logger,
 	orchestrator domainworkflow.WorkflowOrchestrator,
 	stepProvider domainworkflow.StepProvider,
-	sessionManager session.OptimizedSessionManager,
+	sessionManager session.SessionManager,
 	config domainworkflow.ServerConfig,
 ) *ToolRegistrar {
 	return &ToolRegistrar{

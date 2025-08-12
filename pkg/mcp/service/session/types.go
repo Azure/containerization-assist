@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// OptimizedSessionManager provides a streamlined session management interface
-type OptimizedSessionManager interface {
+// SessionManager provides a streamlined session management interface
+type SessionManager interface {
 	// Get retrieves a session by ID
 	Get(ctx context.Context, sessionID string) (*SessionState, error)
 

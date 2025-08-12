@@ -33,7 +33,7 @@ func WithConfig(config workflow.ServerConfig) Option {
 type Dependencies struct {
 	Logger         *slog.Logger
 	Config         workflow.ServerConfig
-	SessionManager session.OptimizedSessionManager
+	SessionManager session.SessionManager
 	ResourceStore  *resources.Store
 
 	EventPublisher domainevents.Publisher

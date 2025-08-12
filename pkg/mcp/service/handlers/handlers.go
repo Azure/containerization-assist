@@ -20,7 +20,7 @@ type Handlers struct {
 // NewHandlers creates a new set of handlers with all dependencies
 func NewHandlers(
 	orchestrator workflow.EventAwareOrchestrator,
-	sessionManager session.OptimizedSessionManager,
+	sessionManager session.SessionManager,
 	resourceStore *resources.Store,
 	eventPublisher *events.Publisher,
 	logger *slog.Logger,
@@ -34,7 +34,7 @@ func NewHandlers(
 // Dependencies represents the required dependencies for handlers
 type Dependencies struct {
 	Orchestrator   workflow.EventAwareOrchestrator
-	SessionManager session.OptimizedSessionManager
+	SessionManager session.SessionManager
 	ResourceStore  *resources.Store
 	EventPublisher *events.Publisher
 	Logger         *slog.Logger

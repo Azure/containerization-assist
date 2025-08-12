@@ -14,14 +14,14 @@ import (
 
 // StatusHandler provides direct status and query operations
 type StatusHandler struct {
-	sessionManager session.OptimizedSessionManager
+	sessionManager session.SessionManager
 	resourceStore  *resources.Store
 	logger         *slog.Logger
 }
 
 // NewStatusHandler creates a new status handler
 func NewStatusHandler(
-	sessionManager session.OptimizedSessionManager,
+	sessionManager session.SessionManager,
 	resourceStore *resources.Store,
 	logger *slog.Logger,
 ) *StatusHandler {

@@ -15,7 +15,7 @@ import (
 // ContainerizeCommandHandler handles containerization commands
 type ContainerizeCommandHandler struct {
 	orchestrator   workflow.EventAwareOrchestrator
-	sessionManager session.OptimizedSessionManager
+	sessionManager session.SessionManager
 	eventPublisher *events.Publisher
 	logger         *slog.Logger
 }
@@ -23,7 +23,7 @@ type ContainerizeCommandHandler struct {
 // NewContainerizeCommandHandler creates a new containerization command handler
 func NewContainerizeCommandHandler(
 	orchestrator workflow.EventAwareOrchestrator,
-	sessionManager session.OptimizedSessionManager,
+	sessionManager session.SessionManager,
 	eventPublisher *events.Publisher,
 	logger *slog.Logger,
 ) *ContainerizeCommandHandler {
@@ -112,14 +112,14 @@ func (h *ContainerizeCommandHandler) Handle(ctx context.Context, cmd Command) er
 
 // CancelWorkflowCommandHandler handles workflow cancellation commands
 type CancelWorkflowCommandHandler struct {
-	sessionManager session.OptimizedSessionManager
+	sessionManager session.SessionManager
 	eventPublisher *events.Publisher
 	logger         *slog.Logger
 }
 
 // NewCancelWorkflowCommandHandler creates a new cancellation command handler
 func NewCancelWorkflowCommandHandler(
-	sessionManager session.OptimizedSessionManager,
+	sessionManager session.SessionManager,
 	eventPublisher *events.Publisher,
 	logger *slog.Logger,
 ) *CancelWorkflowCommandHandler {

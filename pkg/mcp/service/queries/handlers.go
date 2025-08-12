@@ -18,14 +18,14 @@ type QueryHandler interface {
 
 // WorkflowStatusQueryHandler handles workflow status queries
 type WorkflowStatusQueryHandler struct {
-	sessionManager session.OptimizedSessionManager
+	sessionManager session.SessionManager
 	resourceStore  *resources.Store
 	logger         *slog.Logger
 }
 
 // NewWorkflowStatusQueryHandler creates a new workflow status query handler
 func NewWorkflowStatusQueryHandler(
-	sessionManager session.OptimizedSessionManager,
+	sessionManager session.SessionManager,
 	resourceStore *resources.Store,
 	logger *slog.Logger,
 ) *WorkflowStatusQueryHandler {
@@ -174,13 +174,13 @@ func (h *WorkflowStatusQueryHandler) countCompletedSteps(steps []workflow.Workfl
 
 // SessionListQueryHandler handles session list queries
 type SessionListQueryHandler struct {
-	sessionManager session.OptimizedSessionManager
+	sessionManager session.SessionManager
 	logger         *slog.Logger
 }
 
 // NewSessionListQueryHandler creates a new session list query handler
 func NewSessionListQueryHandler(
-	sessionManager session.OptimizedSessionManager,
+	sessionManager session.SessionManager,
 	logger *slog.Logger,
 ) *SessionListQueryHandler {
 	return &SessionListQueryHandler{

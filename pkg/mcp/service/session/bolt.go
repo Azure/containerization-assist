@@ -11,22 +11,22 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/infrastructure/persistence/session"
 )
 
-// BoltStoreAdapter adapts the BoltStore to implement OptimizedSessionManager
-type BoltStoreAdapter struct {
+// BoltStore adapts the BoltStore to implement OptimizedSessionManager
+type BoltStore struct {
 	store       *session.BoltStore
 	logger      *slog.Logger
 	defaultTTL  time.Duration
 	maxSessions int
 }
 
-// NewBoltStoreAdapter creates a new adapter for BoltStore
-func NewBoltStoreAdapter(dbPath string, logger *slog.Logger, defaultTTL time.Duration, maxSessions int) (*BoltStoreAdapter, error) {
+// NewBoltStore creates a new adapter for BoltStore
+func NewBoltStore(dbPath string, logger *slog.Logger, defaultTTL time.Duration, maxSessions int) (*BoltStore, error) {
 	store, err := session.NewBoltStore(dbPath, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create bolt store: %w", err)
 	}
 
-	return &BoltStoreAdapter{
+	return &BoltStore{
 		store:       store,
 		logger:      logger.With("component", "bolt_store_adapter"),
 		defaultTTL:  defaultTTL,
@@ -35,7 +35,7 @@ func NewBoltStoreAdapter(dbPath string, logger *slog.Logger, defaultTTL time.Dur
 }
 
 // Get retrieves a session by ID
-func (a *BoltStoreAdapter) Get(ctx context.Context, sessionID string) (*SessionState, error) {
+func (a *BoltStore) Get(ctx context.Context, sessionID string) (*SessionState, error) {
 	sess, err := a.store.Get(ctx, sessionID)
 	if err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func (a *BoltStoreAdapter) Get(ctx context.Context, sessionID string) (*SessionS
 }
 
 // GetOrCreate gets an existing session or creates a new one
-func (a *BoltStoreAdapter) GetOrCreate(ctx context.Context, sessionID string) (*SessionState, error) {
+func (a *BoltStore) GetOrCreate(ctx context.Context, sessionID string) (*SessionState, error) {
 	// Try to get existing session
 	existing, err := a.Get(ctx, sessionID)
 	if err == nil {
@@ -94,7 +94,7 @@ func (a *BoltStoreAdapter) GetOrCreate(ctx context.Context, sessionID string) (*
 }
 
 // Update modifies a session using an update function
-func (a *BoltStoreAdapter) Update(ctx context.Context, sessionID string, updateFunc func(*SessionState) error) error {
+func (a *BoltStore) Update(ctx context.Context, sessionID string, updateFunc func(*SessionState) error) error {
 	// Get current session
 	state, err := a.Get(ctx, sessionID)
 	if err != nil {
@@ -124,7 +124,7 @@ func (a *BoltStoreAdapter) Update(ctx context.Context, sessionID string, updateF
 }
 
 // List returns all active sessions
-func (a *BoltStoreAdapter) List(ctx context.Context) ([]*SessionState, error) {
+func (a *BoltStore) List(ctx context.Context) ([]*SessionState, error) {
 	sessions, err := a.store.List(ctx)
 	if err != nil {
 		return nil, err
@@ -149,7 +149,7 @@ func (a *BoltStoreAdapter) List(ctx context.Context) ([]*SessionState, error) {
 }
 
 // Stats returns session statistics
-func (a *BoltStoreAdapter) Stats() *SessionStats {
+func (a *BoltStore) Stats() *SessionStats {
 	stats, err := a.store.Stats(context.Background())
 	if err != nil {
 		a.logger.Error("failed to get store stats", "error", err)
@@ -170,9 +170,9 @@ func (a *BoltStoreAdapter) Stats() *SessionStats {
 }
 
 // Stop shuts down the session manager
-func (a *BoltStoreAdapter) Stop(ctx context.Context) error {
+func (a *BoltStore) Stop(ctx context.Context) error {
 	return a.store.Close()
 }
 
 // Ensure BoltStoreAdapter implements OptimizedSessionManager
-var _ OptimizedSessionManager = (*BoltStoreAdapter)(nil)
+var _ SessionManager = (*BoltStore)(nil)

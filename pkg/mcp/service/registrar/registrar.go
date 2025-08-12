@@ -16,7 +16,7 @@ import (
 )
 
 // Alias for session manager interface
-type OptimizedSessionManager = session.OptimizedSessionManager
+type OptimizedSessionManager = session.SessionManager
 
 // MCPRegistrar manages all MCP registrations (tools, resources)
 type MCPRegistrar struct {

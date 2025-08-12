@@ -109,8 +109,8 @@ func (f *ServerFactory) buildDependencies(ctx context.Context) (*Dependencies, e
 	return deps, nil
 }
 
-func (f *ServerFactory) createSessionManager() (*session.BoltStoreAdapter, error) {
-	return session.NewBoltStoreAdapter(f.config.StorePath, f.logger, f.config.SessionTTL, f.config.MaxSessions)
+func (f *ServerFactory) createSessionManager() (*session.BoltStore, error) {
+	return session.NewBoltStore(f.config.StorePath, f.logger, f.config.SessionTTL, f.config.MaxSessions)
 }
 
 func (f *ServerFactory) createResourceStore() (*resources.Store, error) {
@@ -135,7 +135,7 @@ func (f *ServerFactory) createPromptManager() (*prompts.Manager, error) {
 }
 
 func (f *ServerFactory) createWorkflowOrchestrator(
-	sessionManager *session.BoltStoreAdapter,
+	sessionManager *session.BoltStore,
 	samplingClient *sampling.Client,
 	promptManager *prompts.Manager,
 ) (*workflow.Orchestrator, error) {

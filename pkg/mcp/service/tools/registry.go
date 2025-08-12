@@ -52,7 +52,7 @@ type ToolConfig struct {
 // ToolDependencies holds all possible dependencies a tool might need
 type ToolDependencies struct {
 	StepProvider   domainworkflow.StepProvider
-	SessionManager session.OptimizedSessionManager
+	SessionManager session.SessionManager
 	Logger         *slog.Logger
 }
 

@@ -16,7 +16,7 @@ import (
 )
 
 // Alias for session manager interface
-type OptimizedSessionManager = session.OptimizedSessionManager
+type OptimizedSessionManager = session.SessionManager
 
 // Bootstrapper handles server initialization and component registration
 type Bootstrapper struct {

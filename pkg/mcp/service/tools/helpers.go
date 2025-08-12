@@ -18,11 +18,11 @@ import (
 
 // WorkflowStateHelpers provides utility functions for workflow state management
 type WorkflowStateHelpers struct {
-	sessionManager session.OptimizedSessionManager
+	sessionManager session.SessionManager
 }
 
 // NewWorkflowStateHelpers creates a new instance of workflow state helpers
-func NewWorkflowStateHelpers(sessionManager session.OptimizedSessionManager) *WorkflowStateHelpers {
+func NewWorkflowStateHelpers(sessionManager session.SessionManager) *WorkflowStateHelpers {
 	return &WorkflowStateHelpers{
 		sessionManager: sessionManager,
 	}
@@ -134,7 +134,7 @@ func (s *SimpleWorkflowState) UpdateArtifacts(result map[string]interface{}) {
 }
 
 // LoadWorkflowState loads workflow state from session
-func LoadWorkflowState(ctx context.Context, sessionManager session.OptimizedSessionManager, sessionID string) (*SimpleWorkflowState, error) {
+func LoadWorkflowState(ctx context.Context, sessionManager session.SessionManager, sessionID string) (*SimpleWorkflowState, error) {
 	sessionData, err := sessionManager.Get(ctx, sessionID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get session")
@@ -220,7 +220,7 @@ func LoadWorkflowState(ctx context.Context, sessionManager session.OptimizedSess
 }
 
 // SaveWorkflowState saves workflow state to session
-func SaveWorkflowState(ctx context.Context, sessionManager session.OptimizedSessionManager, state *SimpleWorkflowState) error {
+func SaveWorkflowState(ctx context.Context, sessionManager session.SessionManager, state *SimpleWorkflowState) error {
 	// Create workflow state map for serialization
 	workflowData := map[string]interface{}{
 		"repo_path":       state.RepoPath,
