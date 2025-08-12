@@ -176,7 +176,7 @@ jobs:
           # Reduce interactive/TTY output noise and allow more time for deploy/debug loops
           export NO_COLOR=1
           export TERM=dumb
-          RESULT=$(timeout 900s mcphost --quiet --stream=false -p "Please containerize this repository: ${CONTAINERIZE_REPO}. This is an automated test - do NOT ask for user input." 2>&1)
+          RESULT=$(timeout 120s mcphost --quiet --stream=false -p "Please containerize this repository: ${CONTAINERIZE_REPO}. This is an automated test - do NOT ask for user input." 2>&1)
           EXIT_CODE=$?
           set -e
           
