@@ -3,6 +3,13 @@ name: Test Containerization Capability
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: 'Repository URL to containerize (e.g., https://github.com/konveyor-ecosystem/coolstore)'
+        required: false
+        type: string
+        default: 'https://github.com/konveyor-ecosystem/coolstore'
 
 jobs:
   test-containerization:
@@ -13,6 +20,8 @@ jobs:
       AZURE_OPENAI_DEPLOYMENT_ID: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
       AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
       AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+      # If triggered manually, allow overriding the repo; else default to Coolstore
+      CONTAINERIZE_REPO: ${{ github.event_name == 'workflow_dispatch' && inputs.repo || 'https://github.com/konveyor-ecosystem/coolstore' }}
     
     steps:
       - name: Checkout PR code
@@ -41,11 +50,15 @@ jobs:
           sudo mv ./kind /usr/local/bin/kind
           kind version
           
+          # Install jq for JSON parsing used by hooks
+          sudo apt-get update -y
+          sudo apt-get install -y jq
+          
       - name: Install mcphost
         run: |
           echo "Installing mcphost binary..."
-          # Use specific version v0.26.1 - download the correct Linux x86_64 archive
-          VERSION="v0.26.1"
+          # Use specific version v0.29.0 - download the correct Linux x86_64 archive
+          VERSION="v0.29.0"
           echo "Installing mcphost version: $VERSION"
           
           # Download and extract mcphost binary from tar.gz
@@ -72,7 +85,19 @@ jobs:
           
           # Copy the main configuration template
           cp .github/workflows/mcphost/config.yml ~/.mcphost.yml
-          
+
+          # Install hooks config and tracking script
+          mkdir -p .mcphost
+          if [ -f ".github/workflows/mcphost/hooks.yml" ]; then
+            cp .github/workflows/mcphost/hooks.yml .mcphost/hooks.yml
+            echo "Installed hooks.yml"
+          fi
+          if [ -f ".github/workflows/mcphost/track-tools.sh" ]; then
+            cp .github/workflows/mcphost/track-tools.sh /tmp/track-tools.sh
+            chmod +x /tmp/track-tools.sh
+            echo "Installed track-tools.sh"
+          fi
+
           echo "Configuration created successfully"
           
           # Create workspace directory and copy MCP binary there
@@ -130,16 +155,22 @@ jobs:
           echo "Current working directory: $(pwd)"
           echo "MCP Server will be started by mcphost via stdio"
           echo ""
-          
-          # Test with a simple Java servlet application using mcphost
+
+          echo "Target repository to containerize: $CONTAINERIZE_REPO"
+          if [ -z "$CONTAINERIZE_REPO" ]; then
+            echo "No CONTAINERIZE_REPO provided; exiting."
+            exit 1
+          fi
+
+          # Test with the Konveyor Coolstore application using mcphost
           # mcphost will start the MCP server via stdio and communicate directly
           echo "Starting mcphost with containerization request..."
           echo "MCP server will be started automatically by mcphost via stdio"
           echo ""
-          
+
           # Capture both stdout and stderr, and don't exit on failure
           set +e
-          RESULT=$(timeout 300s mcphost --stream=false -p "Please containerize this repository: https://github.com/GRomR1/java-servlet-hello. This is an automated test - do NOT ask for user input." 2>&1)
+          RESULT=$(timeout 300s mcphost --stream=false -p "Please containerize this repository: ${CONTAINERIZE_REPO}. This is an automated test - do NOT ask for user input." 2>&1)
           EXIT_CODE=$?
           set -e
           
@@ -159,24 +190,98 @@ jobs:
           
       - name: Analyze results and report
         run: |
-          echo "=== Output-Based Analysis ==="
-          
-          # Check if output contains "successfully" in the last 30 lines
-          if echo "$RESULT" | tail -30 | grep -q "successfully"; then
-            SUCCESS=true
-          else
-            SUCCESS=false
-          fi
+          echo "=== Artifact-Based Analysis (no phrases) ==="
 
-          if [ "$SUCCESS" = "true" ]; then
-            echo "✅ Containerization test PASSED"
-            exit 0
-          else
-            echo "❌ Containerization test FAILED"
-            echo "Full output:"
-            echo "$RESULT"
+          # Immediate failure if mcphost exited non-zero
+          if [ -n "$EXIT_CODE" ] && [ "$EXIT_CODE" -ne 0 ]; then
+            echo "❌ mcphost returned non-zero exit code: $EXIT_CODE"
             exit 1
           fi
+
+          # Determine repo name for context
+          REPO_NAME=$(basename "$CONTAINERIZE_REPO"); REPO_NAME=${REPO_NAME%.git}
+          echo "Analyzing artifacts for repo: $REPO_NAME"
+
+          # Locate Dockerfile
+          DOCKERFILE_PATH=""
+          if [ -f "Dockerfile" ]; then
+            DOCKERFILE_PATH="$(pwd)/Dockerfile"
+          elif [ -f "/tmp/test-workspace/Dockerfile" ]; then
+            DOCKERFILE_PATH="/tmp/test-workspace/Dockerfile"
+          else
+            DF_CANDIDATE=$(find /tmp -type f -name "Dockerfile" 2>/dev/null | head -1)
+            if [ -n "$DF_CANDIDATE" ]; then
+              DOCKERFILE_PATH="$DF_CANDIDATE"
+            fi
+          fi
+
+          if [ -z "$DOCKERFILE_PATH" ]; then
+            echo "❌ No Dockerfile found"
+            echo "Full output:"; echo "$RESULT"
+            exit 1
+          fi
+
+          echo "Found Dockerfile at: $DOCKERFILE_PATH"
+          if ! grep -Ei '^\s*FROM\s+' "$DOCKERFILE_PATH" >/dev/null; then
+            echo "❌ Dockerfile missing FROM instruction"
+            exit 1
+          fi
+
+          # Locate at least one Kubernetes Deployment manifest with an image
+          MANIFEST_OK=false
+          while IFS= read -r -d '' mf; do
+            if grep -Ei '^\s*kind:\s*Deployment\b' "$mf" >/dev/null && grep -Ei '^\s*image:\s*' "$mf" >/dev/null; then
+              echo "Found Deployment manifest with image: $mf"
+              MANIFEST_OK=true
+              break
+            fi
+          done < <(find /tmp -type f \( -name "*.yaml" -o -name "*.yml" \) 2>/dev/null -print0)
+
+          if [ "$MANIFEST_OK" != true ]; then
+            echo "❌ No Kubernetes Deployment manifest with image found"
+            echo "Searched under /tmp for *.yaml/*.yml"
+            exit 1
+          fi
+
+          echo "✅ Concrete checks passed: Dockerfile valid and Deployment manifest present"
+          exit 0
+
+      - name: Verify all container tools executed successfully
+        if: always()
+        run: |
+          echo "Verifying required tool calls via hooks log..."
+          REQUIRED=(
+            analyze_repository
+            generate_dockerfile
+            build_image
+            scan_image
+            tag_image
+            push_image
+            generate_k8s_manifests
+            prepare_cluster
+            deploy_application
+            verify_deployment
+          )
+
+          if [ ! -f /tmp/tool-success.log ]; then
+            echo "❌ Hooks log not found; required tool success list is empty"
+            exit 1
+          fi
+
+          MISSING=()
+          for t in "${REQUIRED[@]}"; do
+            if ! grep -q "^${t}$" /tmp/tool-success.log; then
+              MISSING+=("$t")
+            fi
+          done
+
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "❌ Missing successful calls for tools: ${MISSING[*]}"
+            echo "Logged successes:"; sort -u /tmp/tool-success.log || true
+            exit 1
+          fi
+
+          echo "✅ All required tools had at least one successful call"
           
       - name: Show generated artifacts and deployment status
         if: always()
@@ -200,9 +305,10 @@ jobs:
             kubectl get pods -o wide 2>/dev/null || echo "No pods found or kubectl not configured"
             echo ""
             
-            # Check for any java-servlet or app-related pods in all namespaces
+            # Check for any pods related to the target repo across all namespaces
             echo "Searching for application pods across all namespaces:"
-            kubectl get pods --all-namespaces | grep -i "java\|servlet\|app" 2>/dev/null || echo "No application pods found"
+            REPO_NAME=$(basename "$CONTAINERIZE_REPO"); REPO_NAME=${REPO_NAME%.git}
+            kubectl get pods --all-namespaces | grep -i "${REPO_NAME}\|coolstore\|java\|servlet" 2>/dev/null || echo "No application pods found"
             echo ""
             
             # Show services as well
@@ -260,3 +366,61 @@ jobs:
           
           echo "=== Temp Directory Structure ==="
           find /tmp -type f -name "*.yaml" -o -name "*.yml" -o -name "Dockerfile" 2>/dev/null | head -10 || echo "No relevant files found in temp"
+
+      - name: Collect containerization artifacts
+        if: always()
+        run: |
+          set -e
+          ART_DIR="containerization-artifacts"
+          rm -rf "$ART_DIR" && mkdir -p "$ART_DIR/manifests"
+
+          # Resolve Dockerfile path (same logic as above)
+          DOCKERFILE_PATH=""
+          if [ -f "Dockerfile" ]; then
+            DOCKERFILE_PATH="$(pwd)/Dockerfile"
+          elif [ -f "/tmp/test-workspace/Dockerfile" ]; then
+            DOCKERFILE_PATH="/tmp/test-workspace/Dockerfile"
+          else
+            CANDIDATE=$(find /tmp -type f -name "Dockerfile" 2>/dev/null | head -1)
+            if [ -n "$CANDIDATE" ]; then
+              DOCKERFILE_PATH="$CANDIDATE"
+            fi
+          fi
+
+          if [ -n "$DOCKERFILE_PATH" ] && [ -f "$DOCKERFILE_PATH" ]; then
+            cp "$DOCKERFILE_PATH" "$ART_DIR/"
+            echo "Dockerfile: $(basename "$DOCKERFILE_PATH")" >> "$ART_DIR/index.txt"
+          fi
+
+          # Collect manifests (limit to 50 to avoid oversized artifacts)
+          COUNT=0
+          while IFS= read -r -d '' mf; do
+            base=$(basename "$mf")
+            cp "$mf" "$ART_DIR/manifests/$base" || true
+            COUNT=$((COUNT+1))
+            [ $COUNT -ge 50 ] && break
+          done < <(find /tmp -type f \( -name "*.yaml" -o -name "*.yml" \) 2>/dev/null | grep -v mcphost-config | head -50 | tr '\n' '\0')
+
+          echo "Manifests collected: $COUNT" >> "$ART_DIR/index.txt"
+          echo "Repository: $CONTAINERIZE_REPO" >> "$ART_DIR/index.txt"
+
+      - name: Upload containerization artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: containerization-artifacts-${{ github.run_id }}
+          path: containerization-artifacts/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Add artifact links to job summary
+        if: always()
+        run: |
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "## Containerization artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Run page (artifacts at bottom): $RUN_URL" >> $GITHUB_STEP_SUMMARY
+          echo "- Artifact name: containerization-artifacts-${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          if [ -f containerization-artifacts/index.txt ]; then
+            echo "\n### Contents" >> $GITHUB_STEP_SUMMARY
+            echo "\n\`\`\`\n$(cat containerization-artifacts/index.txt)\n\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi

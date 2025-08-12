@@ -2,5 +2,5 @@ hooks:
   PostToolUse:
     - hooks:
         - type: command
-          command: "/tmp/track-tool-success.sh"
+          command: "/tmp/track-tools.sh"
           timeout: 5
