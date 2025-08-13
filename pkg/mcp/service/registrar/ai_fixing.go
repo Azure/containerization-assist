@@ -91,7 +91,7 @@ func (tr *ToolRegistrar) generateManifestFix(error, sessionID string) *AIFixingP
 		SystemPrompt:   k8sSystemPrompt,
 		UserPrompt:     userPrompt,
 		Context:        map[string]interface{}{"session_id": sessionID}, // Minimal context
-		ExpectedOutput: "Complete Kubernetes manifests (Deployment, Service, etc.) that fix the deployment issue",
+		ExpectedOutput: "Correct Kubernetes manifests (Deployment, Service, etc.) that fix the deployment issue",
 		FixingStrategy: "manifest_regeneration",
 	}
 }
@@ -157,6 +157,44 @@ func (tr *ToolRegistrar) getContext(sessionID, artifactKey string) string {
 	return "Data not available"
 }
 
+// getK8sDeploymentDiagnostics extracts deployment diagnostics from K8sResult metadata
+func (tr *ToolRegistrar) getK8sDeploymentDiagnostics(sessionID string) string {
+	ctx := context.Background()
+	state, err := tools.LoadWorkflowState(ctx, tr.sessionManager, sessionID)
+	if err != nil {
+		tr.logger.Warn("Failed to load workflow state for diagnostics", "session_id", sessionID, "error", err)
+		return "Deployment diagnostics not available"
+	}
+
+	// Access K8sResult from artifacts
+	k8sData, exists := state.Artifacts["k8s_result"]
+	if !exists {
+		return "No deployment diagnostics available"
+	}
+
+	k8sMap, ok := k8sData.(map[string]interface{})
+	if !ok {
+		return "No deployment diagnostics available"
+	}
+
+	metadata, ok := k8sMap["metadata"].(map[string]interface{})
+	if !ok {
+		return "No deployment diagnostics available"
+	}
+
+	diagnostics, exists := metadata["deployment_diagnostics"]
+	if !exists {
+		return "No deployment diagnostics available"
+	}
+
+	jsonData, err := json.MarshalIndent(diagnostics, "", "  ")
+	if err != nil {
+		return "No deployment diagnostics available"
+	}
+
+	return string(jsonData)
+}
+
 // Helper functions for building user prompts
 
 // buildDockerUserPrompt creates user prompt for Docker build failures
@@ -183,6 +221,9 @@ Instructions:
 
 // buildK8sUserPrompt creates user prompt for Kubernetes deployment failures
 func (tr *ToolRegistrar) buildK8sUserPrompt(error, sessionID string) string {
+	// Get deployment diagnostics from K8sResult metadata
+	deploymentDiagnostics := tr.getK8sDeploymentDiagnostics(sessionID)
+
 	return fmt.Sprintf(`Kubernetes deployment failed with this error:
 %s
 
@@ -199,13 +240,18 @@ Application context:
 Container image info:
 %s
 
+Deployment diagnostics:
+%s
+
 Instructions:
 1. First, read the current Kubernetes manifests from the repository
 2. Analyze the deployment error against the current manifests
 3. Generate complete, working Kubernetes manifests that fix this deployment issue`,
 		error,
 		tr.getContext(sessionID, "analyze_result"),
-		tr.getContext(sessionID, "build_result"))
+		tr.getContext(sessionID, "build_result"),
+		deploymentDiagnostics,
+	)
 }
 
 // buildSecurityUserPrompt creates user prompt for security scan failures

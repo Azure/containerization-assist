@@ -279,8 +279,8 @@ func (m *mockStepProvider) ListSteps() []string {
 
 type mockStep struct{}
 
-func (m *mockStep) Execute(ctx context.Context, state *workflow.WorkflowState) error {
-	return nil
+func (m *mockStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
+	return &workflow.StepResult{Success: true}, nil
 }
 
 func (m *mockStep) Name() string {

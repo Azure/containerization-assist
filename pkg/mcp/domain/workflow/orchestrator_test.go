@@ -24,9 +24,9 @@ func (m *MockStep) Name() string {
 	return args.String(0)
 }
 
-func (m *MockStep) Execute(ctx context.Context, state *WorkflowState) error {
+func (m *MockStep) Execute(ctx context.Context, state *WorkflowState) (*StepResult, error) {
 	args := m.Called(ctx, state)
-	return args.Error(0)
+	return args.Get(0).(*StepResult), args.Error(1)
 }
 
 func (m *MockStep) MaxRetries() int {
@@ -124,7 +124,7 @@ func TestOrchestratorExecute(t *testing.T) {
 		// Set up expectations for all steps
 		for _, step := range getAllSteps(stepProvider) {
 			mockStep := step.(*MockStep)
-			mockStep.On("Execute", mock.Anything, mock.Anything).Return(nil)
+			mockStep.On("Execute", mock.Anything, mock.Anything).Return(&StepResult{Success: true}, nil)
 		}
 
 		mockProgressFactory := func(ctx context.Context, req *mcp.CallToolRequest) api.ProgressEmitter {
@@ -159,16 +159,16 @@ func TestOrchestratorExecute(t *testing.T) {
 		// Set up analyze and dockerfile to succeed
 		analyzeStep, _ := stepProvider.GetStep("analyze_repository")
 		analyzeStepMock := analyzeStep.(*MockStep)
-		analyzeStepMock.On("Execute", mock.Anything, mock.Anything).Return(nil)
+		analyzeStepMock.On("Execute", mock.Anything, mock.Anything).Return(&StepResult{Success: true}, nil)
 
 		dockerfileStep, _ := stepProvider.GetStep("generate_dockerfile")
 		dockerfileStepMock := dockerfileStep.(*MockStep)
-		dockerfileStepMock.On("Execute", mock.Anything, mock.Anything).Return(nil)
+		dockerfileStepMock.On("Execute", mock.Anything, mock.Anything).Return(&StepResult{Success: true}, nil)
 
 		// Set up build step to fail
 		buildStep, _ := stepProvider.GetStep("build_image")
 		buildStepMock := buildStep.(*MockStep)
-		buildStepMock.On("Execute", mock.Anything, mock.Anything).Return(errors.New("build failed"))
+		buildStepMock.On("Execute", mock.Anything, mock.Anything).Return((*StepResult)(nil), errors.New("build failed"))
 
 		mockProgressFactory := func(ctx context.Context, req *mcp.CallToolRequest) api.ProgressEmitter {
 			return &mockProgressEmitter{}
@@ -207,7 +207,7 @@ func TestOrchestratorExecute(t *testing.T) {
 		// Set up all steps to succeed
 		for _, step := range getAllSteps(stepProvider) {
 			mockStep := step.(*MockStep)
-			mockStep.On("Execute", mock.Anything, mock.Anything).Return(nil)
+			mockStep.On("Execute", mock.Anything, mock.Anything).Return(&StepResult{Success: true}, nil)
 		}
 
 		mockProgressFactory := func(ctx context.Context, req *mcp.CallToolRequest) api.ProgressEmitter {
@@ -236,7 +236,7 @@ func TestOrchestratorExecute(t *testing.T) {
 		// Set up all steps to succeed
 		for _, step := range getAllSteps(stepProvider) {
 			mockStep := step.(*MockStep)
-			mockStep.On("Execute", mock.Anything, mock.Anything).Return(nil)
+			mockStep.On("Execute", mock.Anything, mock.Anything).Return(&StepResult{Success: true}, nil)
 		}
 
 		mockProgressFactory := func(ctx context.Context, req *mcp.CallToolRequest) api.ProgressEmitter {

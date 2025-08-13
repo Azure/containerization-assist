@@ -136,7 +136,7 @@ func (o *Orchestrator) executeSequentially(ctx context.Context, state *WorkflowS
 			"total_steps", state.TotalSteps,
 		)
 
-		err := step.Execute(ctx, state)
+		_, err := step.Execute(ctx, state)
 
 		// Emit progress update
 		if state.ProgressEmitter != nil {
