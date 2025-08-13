@@ -263,7 +263,7 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Download CLI binary
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: container-kit-${{ runner.os }}-${{ github.run_id }}
         path: ./
@@ -300,7 +300,7 @@ jobs:
       
     steps:
     - name: Download all results
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         pattern: cc-run-*
         path: results
