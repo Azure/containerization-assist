@@ -7,17 +7,11 @@ COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_TIME := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS := -X main.Version=$(VERSION) -X main.GitCommit=$(COMMIT) -X main.BuildTime=$(BUILD_TIME)
 
-.PHONY: build cli mcp test test-integration fmt lint static-analysis security-scan arch-validate check-all clean version help wire-gen docs
+.PHONY: build mcp test test-integration fmt lint static-analysis security-scan arch-validate check-all clean version help wire-gen docs
 
 # Primary build target - builds both CLI and MCP server
-build: cli mcp
+build: mcp
 	@echo "✅ Build complete!"
-
-cli:
-	@echo "Building Container Kit CLI..."
-	@echo "Version: $(VERSION)"
-	GOFLAGS=-trimpath go build -ldflags "$(LDFLAGS)" -o container-kit ./main.go
-	@echo "✅ Built: container-kit"
 
 mcp:
 	@echo "Building Container Kit MCP Server..."

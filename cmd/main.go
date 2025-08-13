@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"context"
@@ -64,7 +64,7 @@ func handleSpecialFlags(flags *FlagConfig) {
 
 }
 
-func main() {
+func Execute() {
 	// Parse command line flags
 	flags := parseFlags()
 
