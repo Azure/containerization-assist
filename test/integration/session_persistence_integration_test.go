@@ -102,8 +102,6 @@ func (suite *SessionPersistenceIntegrationSuite) TestConcurrentSessionManagement
 	suite.T().Log("✓ Concurrent session management verified")
 }
 
-// TestSessionCleanup tests automatic cleanup of expired sessions
-
 // Helper methods
 
 func (suite *SessionPersistenceIntegrationSuite) startMCPServerWithSessionDir(ctx context.Context) *MCPServerProcess {
