@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 // K8sDeploymentYAML is a minimal Deployment used by integration tests.
 const K8sDeploymentYAML = `apiVersion: apps/v1

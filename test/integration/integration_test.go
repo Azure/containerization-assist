@@ -1,5 +1,5 @@
 // Package integration provides integration tests for the Container Kit MCP server
-package integration
+package integration_test
 
 import (
 	"os"

@@ -1,5 +1,5 @@
-// Package integration provides minimal, focused integration tests for the Container Kit MCP server workflow
-package integration
+// Package integration_test provides minimal, focused integration tests for the Container Kit MCP server workflow
+package integration_test
 
 import (
 	"context"

@@ -1,6 +1,6 @@
 //go:build integration_error_recovery
 
-package integration
+package integration_test
 
 import (
 	"context"
