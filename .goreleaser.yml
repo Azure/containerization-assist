@@ -14,7 +14,7 @@ before:
 builds:
   # MCP Server binary (only binary released)
   - id: container-kit-mcp
-    main: ./cmd/mcp-server
+    main: ./
     binary: container-kit-mcp
     tags:
       - mcp
@@ -29,7 +29,7 @@ builds:
       - arm64
     ldflags:
       - -s -w -X main.Version={{.Version}} -X main.GitCommit={{.Commit}} -X main.BuildTime={{.Date}}
-    mod_timestamp: '{{ .CommitTimestamp }}'
+    mod_timestamp: "{{ .CommitTimestamp }}"
 
 archives:
   - id: mcp
@@ -45,7 +45,7 @@ archives:
       - README.md
 
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "checksums.txt"
   algorithm: sha256
 
 signs:
@@ -78,22 +78,22 @@ changelog:
   use: github
   filters:
     exclude:
-      - '^docs:'
-      - '^test:'
-      - '^chore:'
-      - '^ci:'
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
   groups:
-    - title: '🚀 Features'
-      regexp: '^feat'
-    - title: '🐛 Bug Fixes'
-      regexp: '^fix'
-    - title: '🔨 Refactoring'
-      regexp: '^refactor'
-    - title: '⚡ Performance Improvements'
-      regexp: '^perf'
-    - title: '🔐 Security'
-      regexp: '^security'
-    - title: 'Other Changes'
+    - title: "🚀 Features"
+      regexp: "^feat"
+    - title: "🐛 Bug Fixes"
+      regexp: "^fix"
+    - title: "🔨 Refactoring"
+      regexp: "^refactor"
+    - title: "⚡ Performance Improvements"
+      regexp: "^perf"
+    - title: "🔐 Security"
+      regexp: "^security"
+    - title: "Other Changes"
       order: 999
 
 release:
@@ -128,7 +128,7 @@ release:
 
     #### Documentation
     - User Guide: https://github.com/Azure/container-kit/blob/{{ .Tag }}/USER_GUIDE.md
-    
+
     #### Verify Integrity & Signature
      - We publish SHA-256 checksums (checksums.txt) and cosign detached signatures (*.sig) for archives and the checksum file.
      - Verify checksum: match your artifact's SHA-256 against the line in checksums.txt.
@@ -163,4 +163,4 @@ github_urls:
   download: https://github.com
 
 metadata:
-  mod_timestamp: '{{ .CommitTimestamp }}'
+  mod_timestamp: "{{ .CommitTimestamp }}"

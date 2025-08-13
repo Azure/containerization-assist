@@ -16,7 +16,7 @@ build: mcp
 mcp:
 	@echo "Building Container Kit MCP Server..."
 	@echo "Version: $(VERSION)"
-	GOFLAGS=-trimpath go build -tags mcp -ldflags "$(LDFLAGS)" -o container-kit-mcp ./cmd/mcp-server
+	GOFLAGS=-trimpath go build -tags mcp -ldflags "$(LDFLAGS)" -o container-kit-mcp .
 	@echo "✅ Built: container-kit-mcp"
 
 # Wire dependency injection code generation
