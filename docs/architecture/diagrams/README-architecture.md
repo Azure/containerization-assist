@@ -18,7 +18,7 @@ graph TB
 
     subgraph "Service Layer"
         Server[MCP Server]
-        Tools[Tool Registry - 15 Tools]
+        Tools[Tool Registry]
         Session[Session Service]
         DI[Direct Dependencies]
     end
@@ -267,7 +267,7 @@ pkg/mcp/
 ├── service/               # Unified service layer
 │   ├── server.go          # MCP server with direct DI
 │   ├── dependencies.go    # Simple dependency injection
-│   ├── tools/             # Tool registry (15 tools)
+│   ├── tools/             # Tool registry
 │   │   ├── registry.go    # Table-driven tool configs
 │   │   └── helpers.go     # Tool helper functions
 │   ├── session/           # Session management

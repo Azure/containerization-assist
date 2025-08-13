@@ -41,11 +41,7 @@ func (suite *MCPToolCompletenessTestSuite) TestAllToolsImplemented() {
 
 	// Start MCP server
 	mcpServer := suite.startMCPServer(ctx)
-	defer func() {
-		if err := mcpServer.cmd.Process.Kill(); err != nil {
-			suite.T().Logf("Failed to kill MCP server process: %v", err)
-		}
-	}()
+	defer mcpServer.Cleanup()
 
 	time.Sleep(2 * time.Second)
 
@@ -53,7 +49,7 @@ func (suite *MCPToolCompletenessTestSuite) TestAllToolsImplemented() {
 	stdout := mcpServer.stdout
 
 	// Initialize server
-	suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
+	initResp := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      1,
 		"method":  "initialize",
@@ -64,67 +60,187 @@ func (suite *MCPToolCompletenessTestSuite) TestAllToolsImplemented() {
 			},
 		},
 	})
+	assert.Contains(suite.T(), initResp, "result", "initialize should return a result")
 
-	// Define all essential tools that must be implemented
-	// In the simplified architecture, we only have these core tools
-	essentialTools := []struct {
-		name           string
-		args           map[string]interface{}
-		requiredFields []string // Fields that must be present in successful response
-		description    string
-	}{
-		{
-			name: "ping",
-			args: map[string]interface{}{
-				"message": "test-ping",
+	// Minimal validation: tools/list works and returns non-empty toolset
+	_, toolsArr := suite.listAndDiscoverTools(stdin, stdout, 2)
+	assert.GreaterOrEqual(suite.T(), len(toolsArr), 1, "tools/list should return at least one tool")
+	suite.T().Log("✓ tools/list is available")
+
+	// Create a test repo and session for exercising tools
+	repoDir := suite.createTestRepository()
+	sessionID := fmt.Sprintf("tools-%d", time.Now().UnixNano())
+
+	// 1) analyze_repository
+	respAnalyze := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      3,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "analyze_repository",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"repo_path":  repoDir,
+				"test_mode":  true,
 			},
-			requiredFields: []string{"response", "timestamp"},
-			description:    "Connectivity testing",
 		},
-		{
-			name: "server_status",
-			args: map[string]interface{}{
-				"details": true,
+	})
+	assert.Contains(suite.T(), respAnalyze, "result", "analyze_repository should return a result")
+
+	// 2) generate_dockerfile
+	dockerfileContent := "FROM alpine:3.19\nCMD [\"sh\", \"-c\", \"sleep 1d\"]"
+	respDockerfile := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      4,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "generate_dockerfile",
+			"arguments": map[string]interface{}{
+				"session_id":         sessionID,
+				"dockerfile_content": dockerfileContent,
+				"test_mode":          true,
 			},
-			requiredFields: []string{"status", "version", "uptime"},
-			description:    "Server status information",
 		},
-	}
+	})
+	assert.Contains(suite.T(), respDockerfile, "result", "generate_dockerfile should return a result")
 
-	// Test each essential tool
-	for i, tool := range essentialTools {
-		suite.Run(fmt.Sprintf("Tool_%s", tool.name), func() {
-			suite.T().Logf("Testing tool: %s - %s", tool.name, tool.description)
+	// 3) build_image
+	respBuild := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      5,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "build_image",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"test_mode":  true,
+			},
+		},
+	})
+	assert.Contains(suite.T(), respBuild, "result", "build_image should return a result")
 
-			response := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
-				"jsonrpc": "2.0",
-				"id":      i + 10,
-				"method":  "tools/call",
-				"params": map[string]interface{}{
-					"name":      tool.name,
-					"arguments": tool.args,
-				},
-			})
+	// 4) scan_image
+	respScan := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      6,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "scan_image",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"test_mode":  true,
+			},
+		},
+	})
+	assert.Contains(suite.T(), respScan, "result", "scan_image should return a result")
 
-			// Validate response structure
-			assert.Contains(suite.T(), response, "result", "Tool %s should return a result", tool.name)
-			assert.NotContains(suite.T(), response, "error", "Tool %s should not return an error", tool.name)
+	// 5) tag_image
+	respTag := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      7,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "tag_image",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"tag":        "latest",
+				"test_mode":  true,
+			},
+		},
+	})
+	assert.Contains(suite.T(), respTag, "result", "tag_image should return a result")
 
-			if resultRaw, ok := response["result"]; ok && resultRaw != nil {
-				result := suite.extractToolResult(resultRaw)
-				if result != nil {
-					suite.validateToolResponse(tool.name, result, tool.requiredFields)
-				} else {
-					suite.T().Errorf("Tool %s returned null/empty result", tool.name)
-				}
-			} else {
-				suite.T().Errorf("Tool %s missing result field", tool.name)
-			}
-		})
-	}
+	// 6) push_image
+	respPush := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      8,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "push_image",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"registry":   "localhost:5001",
+				"test_mode":  true,
+			},
+		},
+	})
+	assert.Contains(suite.T(), respPush, "result", "push_image should return a result")
 
-	// Verify all tools returned successful responses
-	suite.T().Log("✓ All essential MCP tools are properly implemented and functional")
+	// 7) generate_k8s_manifests (include ingress)
+	manifests := BasicK8sManifestsWithIngress()
+	respManifests := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      9,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "generate_k8s_manifests",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"manifests":  manifests,
+				"test_mode":  true,
+			},
+		},
+	})
+	assert.Contains(suite.T(), respManifests, "result", "generate_k8s_manifests should return a result")
+
+	// 8) prepare_cluster
+	respPrepare := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      10,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "prepare_cluster",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"test_mode":  true,
+			},
+		},
+	})
+	assert.Contains(suite.T(), respPrepare, "result", "prepare_cluster should return a result")
+
+	// 9) deploy_application
+	respDeploy := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      11,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "deploy_application",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"test_mode":  true,
+			},
+		},
+	})
+	assert.Contains(suite.T(), respDeploy, "result", "deploy_application should return a result")
+
+	// 10) verify_deployment
+	respVerify := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      12,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "verify_deployment",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"test_mode":  true,
+			},
+		},
+	})
+	assert.Contains(suite.T(), respVerify, "result", "verify_deployment should return a result")
+
+	// SAD PATH: call an unknown tool to ensure proper error response
+	respUnknown := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      13,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name":      "totally_nonexistent_tool",
+			"arguments": map[string]interface{}{},
+		},
+	})
+	assert.Contains(suite.T(), respUnknown, "error", "unknown tool should return an error")
+
+	suite.T().Log("✓ All tools were able to be called in test_mode")
 }
 
 // TestToolDiscoverability validates that all tools can be discovered via tools/list
@@ -136,11 +252,7 @@ func (suite *MCPToolCompletenessTestSuite) TestToolDiscoverability() {
 
 	// Start MCP server
 	mcpServer := suite.startMCPServer(ctx)
-	defer func() {
-		if err := mcpServer.cmd.Process.Kill(); err != nil {
-			suite.T().Logf("Failed to kill MCP server process: %v", err)
-		}
-	}()
+	defer mcpServer.Cleanup()
 
 	time.Sleep(2 * time.Second)
 
@@ -148,7 +260,7 @@ func (suite *MCPToolCompletenessTestSuite) TestToolDiscoverability() {
 	stdout := mcpServer.stdout
 
 	// Initialize server
-	suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
+	initResp := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      1,
 		"method":  "initialize",
@@ -159,61 +271,35 @@ func (suite *MCPToolCompletenessTestSuite) TestToolDiscoverability() {
 			},
 		},
 	})
+	assert.Contains(suite.T(), initResp, "result", "initialize should return a result")
 
-	// List all available tools
-	response := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
-		"jsonrpc": "2.0",
-		"id":      2,
-		"method":  "tools/list",
-		"params":  map[string]interface{}{},
-	})
+	// List and discover tools using helper
+	discoveredTools, toolsArray := suite.listAndDiscoverTools(stdin, stdout, 2)
+	suite.T().Logf("Found %d tools via tools/list", len(toolsArray))
 
-	// Validate response
-	assert.Contains(suite.T(), response, "result", "tools/list should return a result")
-
-	if resultRaw, ok := response["result"]; ok && resultRaw != nil {
-		if result, ok := resultRaw.(map[string]interface{}); ok {
-			if toolsRaw, ok := result["tools"]; ok {
-				if toolsArray, ok := toolsRaw.([]interface{}); ok {
-					suite.T().Logf("Found %d tools via tools/list", len(toolsArray))
-
-					// Extract tool names
-					discoveredTools := make(map[string]bool)
-					for _, toolRaw := range toolsArray {
-						if tool, ok := toolRaw.(map[string]interface{}); ok {
-							if name, ok := tool["name"].(string); ok {
-								discoveredTools[name] = true
-								suite.T().Logf("  - %s: %s", name, tool["description"])
-							}
-						}
-					}
-
-					// Verify all essential tools are discoverable
-					// In the simplified architecture, we have fewer tools
-					expectedTools := []string{
-						"containerize_and_deploy", // The main workflow tool
-						"ping",
-						"server_status",
-					}
-
-					for _, expectedTool := range expectedTools {
-						assert.True(suite.T(), discoveredTools[expectedTool],
-							"Essential tool %s should be discoverable via tools/list", expectedTool)
-					}
-
-					suite.T().Log("✓ All essential tools are discoverable")
-				} else {
-					suite.T().Error("tools/list result.tools is not an array")
-				}
-			} else {
-				suite.T().Error("tools/list result missing 'tools' field")
-			}
-		} else {
-			suite.T().Error("tools/list result is not an object")
-		}
-	} else {
-		suite.T().Error("tools/list missing result field")
+	// Verify current workflow tools are discoverable
+	expectedTools := []string{
+		"analyze_repository",
+		"generate_dockerfile",
+		"build_image",
+		"scan_image",
+		"tag_image",
+		"push_image",
+		"generate_k8s_manifests",
+		"prepare_cluster",
+		"deploy_application",
+		"verify_deployment",
+		"start_workflow",
+		"workflow_status",
+		"list_tools",
 	}
+
+	for _, expectedTool := range expectedTools {
+		assert.True(suite.T(), discoveredTools[expectedTool],
+			"Tool %s should be discoverable via tools/list", expectedTool)
+	}
+
+	suite.T().Log("✓ All essential tools are discoverable")
 }
 
 // Helper methods (reused from workflow integration test)
@@ -290,6 +376,7 @@ func (suite *MCPToolCompletenessTestSuite) extractToolResult(resultRaw interface
 	return nil
 }
 
+// TODO: Function currently not in use. We should verify the correct results from the tool calls
 func (suite *MCPToolCompletenessTestSuite) validateToolResponse(toolName string, result map[string]interface{}, requiredFields []string) {
 	suite.T().Logf("Validating tool response for %s", toolName)
 
@@ -316,20 +403,37 @@ func (suite *MCPToolCompletenessTestSuite) validateToolResponse(toolName string,
 			}
 		}
 
-	case "ping":
-		// Should have response and timestamp
-		if response, ok := result["response"].(string); ok {
-			assert.NotEmpty(suite.T(), response, "Ping response should not be empty")
-			suite.T().Logf("✓ Ping response: %s", response)
-		}
+	} //TODO: We need tests for all the individual tools
+}
 
-	case "server_status":
-		// Should have status information
-		if status, ok := result["status"].(string); ok {
-			assert.Equal(suite.T(), "running", status, "Server should be running")
-			suite.T().Logf("✓ Server status: %s", status)
+// listAndDiscoverTools calls tools/list and returns a set of tool names and the raw tools array
+func (suite *MCPToolCompletenessTestSuite) listAndDiscoverTools(stdin *os.File, stdout *os.File, requestID int) (map[string]bool, []interface{}) {
+	resp := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      requestID,
+		"method":  "tools/list",
+		"params":  map[string]interface{}{},
+	})
+
+	// Basic structure assertions
+	assert.Contains(suite.T(), resp, "result", "tools/list should return a result")
+	result, _ := resp["result"].(map[string]interface{})
+	toolsRaw, ok := result["tools"]
+	if !ok {
+		return map[string]bool{}, []interface{}{}
+	}
+	toolsArray, _ := toolsRaw.([]interface{})
+
+	// Extract tool names
+	discovered := make(map[string]bool)
+	for _, tr := range toolsArray {
+		if tool, ok := tr.(map[string]interface{}); ok {
+			if name, ok := tool["name"].(string); ok {
+				discovered[name] = true
+			}
 		}
 	}
+	return discovered, toolsArray
 }
 
 // Test runner

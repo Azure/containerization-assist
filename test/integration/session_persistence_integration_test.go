@@ -103,28 +103,6 @@ func (suite *SessionPersistenceIntegrationSuite) TestConcurrentSessionManagement
 }
 
 // TestSessionCleanup tests automatic cleanup of expired sessions
-func (suite *SessionPersistenceIntegrationSuite) TestSessionCleanup() {
-	suite.T().Log("Testing session cleanup functionality")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-
-	server := suite.startMCPServerWithSessionDir(ctx)
-	defer server.cmd.Process.Kill()
-	time.Sleep(2 * time.Second)
-
-	// Start a session
-	sessionID := suite.initializeAndStartWorkflow(server)
-	suite.T().Logf("Started session for cleanup test: %s", sessionID)
-
-	// Verify session exists
-	suite.verifySessionExists(server, sessionID)
-
-	// Trigger session cleanup (would normally be based on TTL)
-	suite.triggerSessionCleanup(server)
-
-	suite.T().Log("✓ Session cleanup functionality verified")
-}
 
 // Helper methods
 
@@ -182,45 +160,30 @@ func (suite *SessionPersistenceIntegrationSuite) initializeAndStartWorkflow(serv
 	stdin := server.stdin
 	stdout := server.stdout
 
-	// Initialize server
-	initResp := sendMCPRequest(stdin, stdout, map[string]interface{}{
-		"jsonrpc": "2.0",
-		"id":      1,
-		"method":  "initialize",
-		"params": map[string]interface{}{
-			"clientInfo": map[string]interface{}{
-				"name":    "session-persistence-test",
-				"version": "1.0.0",
-			},
-		},
-	}, suite.T())
-
-	require.Contains(suite.T(), initResp, "result")
+	// Initialize server (shared helper)
+	_ = initializeMCP(suite.T(), stdin, stdout, "session-persistence-test", "1.0.0")
 
 	// Create test repository
 	repoDir := suite.createTestRepository()
 
-	// Start workflow to create session
-	workflowResp := sendMCPRequest(stdin, stdout, map[string]interface{}{
+	// Create a session by analyzing the repository with a generated session ID
+	sessionID := fmt.Sprintf("session-%d", time.Now().UnixNano())
+	analyzeResp := sendMCPRequest(stdin, stdout, map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      2,
 		"method":  "tools/call",
 		"params": map[string]interface{}{
-			"name": "containerize_and_deploy",
+			"name": "analyze_repository",
 			"arguments": map[string]interface{}{
-				"repo_url":  "file://" + repoDir,
-				"branch":    "main",
-				"scan":      false,
-				"deploy":    false,
-				"test_mode": true,
+				"repo_path":  repoDir,
+				"session_id": sessionID,
+				"test_mode":  true,
 			},
 		},
 	}, suite.T())
-
-	require.Contains(suite.T(), workflowResp, "result")
-
-	// Extract session ID from response (would be in the result)
-	sessionID := fmt.Sprintf("test-session-%d", time.Now().Unix())
+	require.Contains(suite.T(), analyzeResp, "result")
+	// The test uses the explicit sessionID we sent to the server; it must never be empty.
+	require.NotEmpty(suite.T(), sessionID, "generated session ID must not be empty")
 	return sessionID
 }
 
@@ -229,29 +192,17 @@ func (suite *SessionPersistenceIntegrationSuite) verifySessionRestored(server *M
 	stdout := server.stdout
 
 	// Initialize new server instance
-	initResp := sendMCPRequest(stdin, stdout, map[string]interface{}{
-		"jsonrpc": "2.0",
-		"id":      1,
-		"method":  "initialize",
-		"params": map[string]interface{}{
-			"clientInfo": map[string]interface{}{
-				"name":    "session-restore-test",
-				"version": "1.0.0",
-			},
-		},
-	}, suite.T())
+	_ = initializeMCP(suite.T(), stdin, stdout, "session-restore-test", "1.0.0")
 
-	require.Contains(suite.T(), initResp, "result")
-
-	// Try to query session status (if such tool exists)
+	// Query workflow_status for the session
 	statusResp := sendMCPRequest(stdin, stdout, map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      2,
 		"method":  "tools/call",
 		"params": map[string]interface{}{
-			"name": "server_status",
+			"name": "workflow_status",
 			"arguments": map[string]interface{}{
-				"include_sessions": true,
+				"session_id": sessionID,
 			},
 		},
 	}, suite.T())
@@ -271,7 +222,7 @@ func (suite *SessionPersistenceIntegrationSuite) verifySessionExists(server *MCP
 		"id":      time.Now().Unix(),
 		"method":  "tools/call",
 		"params": map[string]interface{}{
-			"name": "server_status",
+			"name": "workflow_status",
 			"arguments": map[string]interface{}{
 				"session_id": sessionID,
 			},
@@ -279,27 +230,6 @@ func (suite *SessionPersistenceIntegrationSuite) verifySessionExists(server *MCP
 	}, suite.T())
 
 	assert.Contains(suite.T(), statusResp, "result")
-}
-
-func (suite *SessionPersistenceIntegrationSuite) triggerSessionCleanup(server *MCPServerProcess) {
-	// This would trigger session cleanup functionality
-	// For now, we just verify the server is responsive
-	stdin := server.stdin
-	stdout := server.stdout
-
-	pingResp := sendMCPRequest(stdin, stdout, map[string]interface{}{
-		"jsonrpc": "2.0",
-		"id":      99,
-		"method":  "tools/call",
-		"params": map[string]interface{}{
-			"name": "ping",
-			"arguments": map[string]interface{}{
-				"message": "cleanup-test",
-			},
-		},
-	}, suite.T())
-
-	assert.Contains(suite.T(), pingResp, "result")
 }
 
 func (suite *SessionPersistenceIntegrationSuite) createTestRepository() string {

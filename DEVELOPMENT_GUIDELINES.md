@@ -328,7 +328,7 @@ pkg/mcp/
 
 **Key Architecture Features:**
 - **Clean Dependencies**: Infrastructure → Application → Domain → API
-- **Single Workflow**: `containerize_and_deploy` handles complete process with 10 steps
+- **Workflow Steps**: 10 individual tools for analyze, Dockerfile, build, scan, tag, push, manifests, prepare, deploy, verify
 - **Event-Driven**: Domain events for workflow coordination and observability
 - **AI-Enhanced**: Built-in AI error recovery and ML-powered optimization
 - **Domain-Driven**: Core business logic isolated in domain layer
@@ -410,49 +410,7 @@ make version              # Show version
 ## Architecture Patterns
 
 ### Workflow-Focused Architecture
-The system uses a single workflow approach with AI orchestration for the complete containerization process:
-
-```go
-// RegisterWorkflowTools registers the comprehensive containerization workflow
-func RegisterWorkflowTools(mcpServer interface {
-    AddTool(tool mcp.Tool, handler server.ToolHandlerFunc)
-}, logger *slog.Logger) error {
-    tool := mcp.Tool{
-        Name:        "containerize_and_deploy",
-        Description: "Complete end-to-end containerization and deployment with AI-powered error fixing",
-        InputSchema: mcp.ToolInputSchema{
-            Type: "object",
-            Properties: map[string]interface{}{
-                "repo_url": map[string]interface{}{
-                    "type":        "string",
-                    "description": "Repository URL to containerize",
-                },
-                "deploy": map[string]interface{}{
-                    "type":        "boolean",
-                    "description": "Deploy to Kubernetes (optional, defaults to true)",
-                },
-            },
-            Required: []string{"repo_url"},
-        },
-    }
-
-    mcpServer.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-        // Use new orchestrator-based workflow
-        orchestrator := NewOrchestrator(logger)
-        result, err := orchestrator.Execute(ctx, &req, &args)
-        return result, err
-    })
-}
-
-// AI-powered orchestrator handles 10-step workflow execution
-func (o *Orchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
-    totalSteps := 10
-    progressTracker := infraprogress.NewProgressTracker(ctx, req, totalSteps, o.logger)
-    
-    // Execute workflow with AI-powered error recovery
-    return o.executeContainerizeAndDeploy(ctx, req, args, o.logger)
-}
-```
+The system exposes 10 individual workflow step tools and optional orchestration helpers. The legacy single-tool workflow has been removed. Prefer calling step tools directly; the "start_workflow" helper is available but deprecated in interactive mode.
 
 ### Key Architecture Benefits
 1. **Single Point of Entry**: One tool handles the entire workflow with AI orchestration

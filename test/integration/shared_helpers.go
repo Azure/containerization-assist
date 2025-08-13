@@ -37,15 +37,13 @@ func startMCPServerProcess(ctx context.Context, testWorkspaceDir string) *MCPSer
 	// Build the server binary path
 	serverBinaryPath := "/tmp/mcp-server"
 
-	// Build the server if it doesn't exist
-	if _, err := os.Stat(serverBinaryPath); os.IsNotExist(err) {
-		buildCmd := exec.Command("go", "build", "-o", serverBinaryPath, "../../cmd/mcp-server")
+	// Always (re)build the server to ensure latest changes are tested
+	buildCmd := exec.Command("go", "build", "-o", serverBinaryPath, "../../cmd/mcp-server")
+	if err := buildCmd.Run(); err != nil {
+		// Try alternative build path when running from repo root
+		buildCmd = exec.Command("go", "build", "-o", serverBinaryPath, "./cmd/mcp-server")
 		if err := buildCmd.Run(); err != nil {
-			// Try alternative build path
-			buildCmd = exec.Command("go", "build", "-o", serverBinaryPath, "./cmd/mcp-server")
-			if err := buildCmd.Run(); err != nil {
-				panic("Failed to build MCP server: " + err.Error())
-			}
+			panic("Failed to build MCP server: " + err.Error())
 		}
 	}
 
@@ -146,4 +144,30 @@ func sendMCPRequest(stdin *os.File, stdout *os.File, request map[string]interfac
 	}
 
 	return response
+}
+
+// initializeMCP sends the JSON-RPC initialize request and verifies a successful handshake
+func initializeMCP(t *testing.T, stdin *os.File, stdout *os.File, name, version string) map[string]interface{} {
+	req := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "initialize",
+		"params": map[string]interface{}{
+			"clientInfo": map[string]interface{}{
+				"name":    name,
+				"version": version,
+			},
+		},
+	}
+	resp := sendMCPRequest(stdin, stdout, req, t)
+	if resp == nil {
+		t.Fatalf("initialize returned nil response")
+	}
+	if _, hasErr := resp["error"]; hasErr {
+		t.Fatalf("initialize returned top-level error: %v", resp["error"])
+	}
+	if _, ok := resp["result"]; !ok {
+		t.Fatalf("initialize did not return result: %v", resp)
+	}
+	return resp
 }
