@@ -225,7 +225,7 @@ You should see the version information.
 
 ## How to Use Container Kit
 
-Container Kit provides 15 different tools that work together to containerize your applications. Here's how to use them through VS Code Copilot:
+Container Kit provides 13 different tools that work together to containerize your applications. Here's how to use them through VS Code Copilot:
 
 ### Quick Start: Complete Workflow
 
@@ -580,10 +580,8 @@ Here are all the tools available in Container Kit:
 11. **start_workflow** - Run the complete containerization process
 12. **workflow_status** - Check the progress of your workflow
 
-### Utility Tools (3 tools)
+### Utility Tools (1 tool)
 13. **list_tools** - Show all available tools
-14. **ping** - Test that Container Kit is working
-15. **server_status** - Get information about the Container Kit server
 
 *[Image placeholder: Diagram showing how the tools work together]*
 
@@ -602,7 +600,7 @@ Congratulations! 🎉 You've successfully set up Container Kit with VS Code Copi
 
 ### Learn More
 
-- **Explore all 15 tools** by asking Copilot "What can Container Kit do?"
+- **Explore all 13 tools** by asking Copilot "What can Container Kit do?"
 - **Read about Kubernetes** if you want to deploy to the cloud
 - **Learn Docker basics** to understand what Container Kit is doing
 - **Try the integrated workflow** - Copilot can edit files directly in your workspace

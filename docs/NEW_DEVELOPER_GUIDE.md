@@ -66,7 +66,7 @@ pkg/mcp/
 │   ├── commands/          # CQRS command handlers
 │   ├── queries/           # CQRS query handlers
 │   ├── session/           # Session management
-│   ├── tools/             # Tool registry (15 tools)
+│   ├── tools/             # Tool registry (tools and registrar)
 │   ├── registrar/         # MCP registration
 │   └── transport/         # HTTP and stdio transports
 ├── domain/                # Domain Layer - Business logic
@@ -266,24 +266,27 @@ The Model Context Protocol (MCP) is a standardized protocol for AI assistants to
 ### Server Architecture
 
 ```go
-// MCP server registration
-func RegisterWorkflowTools(mcpServer MCPServer, logger *slog.Logger) error {
+// Example: registering an individual tool (analyze_repository)
+func RegisterAnalyzeTool(mcpServer MCPServer, logger *slog.Logger) error {
     tool := mcp.Tool{
-        Name:        "containerize_and_deploy",
-        Description: "Complete containerization workflow",
+        Name:        "analyze_repository",
+        Description: "Analyze a repository to detect language and framework",
         InputSchema: mcp.ToolInputSchema{
             Type: "object",
             Properties: map[string]interface{}{
-                "repo_url": map[string]interface{}{
+                "repo_path": map[string]interface{}{
                     "type":        "string",
-                    "description": "Repository URL",
+                    "description": "Absolute path to the repository to analyze",
+                },
+                "session_id": map[string]interface{}{
+                    "type":        "string",
+                    "description": "Workflow session identifier",
                 },
             },
-            Required: []string{"repo_url"},
+            Required: []string{"repo_path", "session_id"},
         },
     }
-    
-    mcpServer.AddTool(tool, handleContainerizeAndDeploy)
+    mcpServer.AddTool(tool, handleAnalyzeRepository)
     return nil
 }
 ```
@@ -304,10 +307,10 @@ func RegisterWorkflowTools(mcpServer MCPServer, logger *slog.Logger) error {
 
 The MCP server registers three types of components:
 
-1. **Tools**: 15 individual tools across three categories:
-   - **Workflow Tools** (10): `analyze_repository`, `generate_dockerfile`, etc.
-   - **Orchestration Tools** (2): `start_workflow`, `workflow_status`
-   - **Utility Tools** (3): `list_tools`, `ping`, `server_status`
+1. **Tools** across three categories:
+    - **Workflow Tools** (10): `analyze_repository`, `generate_dockerfile`, `build_image`, `scan_image`, `tag_image`, `push_image`, `generate_k8s_manifests`, `prepare_cluster`, `deploy_application`, `verify_deployment`
+    - **Orchestration Tools** (2): `start_workflow`, `workflow_status`
+    - **Utility Tools** (1): `list_tools`
 2. **Resources**: Data endpoints (e.g., `progress://workflow-id`)
 3. **Prompts**: AI guidance templates (e.g., dockerfile generation)
 
@@ -317,16 +320,16 @@ The MCP server registers three types of components:
 
 Container Kit provides 10 individual workflow tools that can be chained:
 
-1. **Analyze Repository** - Detect language, framework, dependencies
-2. **Generate Dockerfile** - AI-powered Dockerfile creation
-3. **Build Image** - Docker build with AI error recovery
-4. **Setup Kind Cluster** - Local Kubernetes environment
-5. **Load Image** - Transfer image to cluster
-6. **Generate Manifests** - Kubernetes YAML generation
-7. **Deploy Application** - Apply manifests with error handling
-8. **Health Probe** - Validate deployment health
-9. **Vulnerability Scan** - Security analysis (optional)
-10. **Finalize Result** - Cleanup and summary
+1. analyze_repository – Detect language, framework, dependencies
+2. generate_dockerfile – AI-assisted Dockerfile creation
+3. build_image – Docker build with error recovery
+4. scan_image – Security vulnerability analysis
+5. tag_image – Image tagging with version metadata
+6. push_image – Push image to a container registry
+7. generate_k8s_manifests – Create Kubernetes manifests
+8. prepare_cluster – Prepare the Kubernetes cluster
+9. deploy_application – Deploy manifests to the cluster
+10. verify_deployment – Verify deployment health
 
 ### Step Implementation Pattern
 

@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
@@ -332,6 +333,20 @@ func (ws *WorkflowState) GetAllSteps() []Step {
 // SetAllSteps sets all workflow steps (called during initialization)
 func (ws *WorkflowState) SetAllSteps(steps []Step) {
 	ws.allSteps = steps
+}
+
+// IsTestMode determines whether the current workflow execution is running in test mode.
+// Precedence: Args.TestMode > RequestParams["test_mode"] > CONTAINER_KIT_TEST_MODE env var.
+func (ws *WorkflowState) IsTestMode() bool {
+	if ws != nil && ws.Args != nil && ws.Args.TestMode {
+		return true
+	}
+	if ws != nil && ws.RequestParams != nil {
+		if v, ok := ws.RequestParams["test_mode"].(bool); ok && v {
+			return true
+		}
+	}
+	return os.Getenv("CONTAINER_KIT_TEST_MODE") == "true"
 }
 
 // NewWorkflowState creates a new workflow state

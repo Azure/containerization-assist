@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/logger"
 	"github.com/Azure/container-kit/pkg/common/runner"
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
 )
@@ -180,7 +179,7 @@ func DeployToKubernetes(ctx context.Context, k8sResult *K8sResult, logger *slog.
 	}
 
 	// Get all YAML files in the manifest directory to ensure we deploy everything
-	yamlFiles, err := getYAMLFilesInDirectory(manifestDir)
+	yamlFiles, err := getYAMLFilesInDirectory(manifestDir, logger)
 	if err != nil {
 		logger.Error("Failed to get YAML files from manifest directory", "error", err, "manifest_dir", manifestDir)
 		return fmt.Errorf("failed to get YAML files from manifest directory: %v", err)
@@ -389,8 +388,8 @@ func CheckDeploymentHealth(ctx context.Context, k8sResult *K8sResult, logger *sl
 }
 
 // getYAMLFilesInDirectory returns all YAML files in the given directory
-func getYAMLFilesInDirectory(dirPath string) ([]string, error) {
-	logger.Infof("Scanning directory for YAML files in: %s", dirPath)
+func getYAMLFilesInDirectory(dirPath string, logger *slog.Logger) ([]string, error) {
+	logger.Info("Scanning directory for YAML files", "path", dirPath)
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory %s: %w", dirPath, err)
