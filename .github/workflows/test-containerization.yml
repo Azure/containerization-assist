@@ -90,24 +90,29 @@ jobs:
           mkdir -p .mcphost
           if [ -f ".github/workflows/mcphost/hooks.yml" ]; then
             cp .github/workflows/mcphost/hooks.yml .mcphost/hooks.yml
-            echo "Installed hooks.yml"
+            echo "Installed hooks.yml to .mcphost/"
             # Also install hooks to user config dir to ensure discovery
+            mkdir -p ~/.config/mcphost
             cp .github/workflows/mcphost/hooks.yml ~/.config/mcphost/hooks.yml
-            echo "Installed hooks.yml to ~/.config/mcphost/hooks.yml"
+            echo "Installed hooks.yml to ~/.config/mcphost/"
+            
+            echo "Hook configuration:"
+            cat .mcphost/hooks.yml
           fi
           if [ -f ".github/workflows/mcphost/track-tools.sh" ]; then
             cp .github/workflows/mcphost/track-tools.sh /tmp/track-tools.sh
             chmod +x /tmp/track-tools.sh
-            echo "Installed track-tools.sh"
+            echo "Installed and made executable: /tmp/track-tools.sh"
             
-            # Test the tracking script
-            echo "Testing tracking script..."
-            echo '{"tool":"test_tool","success":true}' | /tmp/track-tools.sh || echo "Track script test failed"
+            # Quick dry-run of the tracking script with a minimal JSON payload
+            echo '{"tool_name":"analyze_repository"}' | /tmp/track-tools.sh || true
+            echo '{"tool_name":"mcp_containerkit_generate_dockerfile"}' | /tmp/track-tools.sh || true
           fi
           
-          # Initialize the tool success log
+          # Initialize the tool success log and debug log
           touch /tmp/tool-success.log
-          echo "Initialized tool success log"
+          touch /tmp/hook-debug.log
+          echo "Initialized tool success and debug logs"
 
           echo "Configuration created successfully"
           
@@ -157,8 +162,43 @@ jobs:
             echo "\"$HELLO_RESULT\""
             exit 1
           fi
+          
+          # Test individual tool call to see if hooks fire
+          echo ""
+          echo "Testing individual tool call to trigger hooks..."
+          set +e
+          TOOL_TEST_RESULT=$(timeout 30s mcphost --quiet --stream=false -p "Please call the 'list_tools' tool to show me all available container tools. Just call the tool, don't ask for permission." 2>&1)
+          TOOL_EXIT_CODE=$?
+          set -e
+          
+          echo "=== INDIVIDUAL TOOL TEST OUTPUT ==="
+          echo "$TOOL_TEST_RESULT"
+          echo "=== END TOOL TEST ==="
+          
+          # Check if hooks were triggered by this simple tool call
+          echo "Checking if hooks fired during tool test..."
+          if [ -f /tmp/hook-debug.log ]; then
+            echo "Hook debug log after tool test:"
+            cat /tmp/hook-debug.log
+          else
+            echo "No hook debug log found after tool test"
+          fi
+          
+          if [ -f /tmp/tool-success.log ]; then
+            echo "Tools logged after individual test:"
+            cat /tmp/tool-success.log
+          else
+            echo "No tools logged after individual test"
+          fi
           echo ""
           
+      - name: Validate and list hooks
+        run: |
+          echo "Validating mcphost hooks configuration..."
+          mcphost hooks validate || true
+          echo "Listing active hooks..."
+          mcphost hooks list || true
+
       - name: Run containerization test
         id: test
         run: |
@@ -191,20 +231,25 @@ jobs:
           
           # Run mcphost with timeout, using process substitution to capture both output and log
           echo "Starting mcphost with real-time logging to $LOG_FILE..."
+          echo "Current working directory: $(pwd)"
+          echo "Hook configuration files:"
+          find . -name "hooks.yml" -o -name "*.mcphost.yml" 2>/dev/null || echo "No hook config files found in current dir"
+          find ~/.config -name "hooks.yml" 2>/dev/null || echo "No hook config files found in ~/.config"
+          echo ""
           
           # Start mcphost in background with output going to both stdout and log file
-          timeout 200s mcphost --quiet --stream=false -p "Please containerize this repository: ${CONTAINERIZE_REPO}. This is an automated test - do NOT ask for user input." > >(tee "$LOG_FILE") 2>&1
+          # Try to explicitly specify hooks config if mcphost supports it
+          timeout 200s mcphost --quiet --stream=false --config ~/.mcphost.yml -p "Please containerize this repository: ${CONTAINERIZE_REPO}. This is an automated test - do NOT ask for user input." > >(tee "$LOG_FILE") 2>&1
           EXIT_CODE=$?
           
           # Wait a moment for file operations to complete
           sleep 1
           
-          # Read the captured output from the log file
+          # Read the captured output from the log file if present
           if [ -f "$LOG_FILE" ] && [ -s "$LOG_FILE" ]; then
             RESULT=$(cat "$LOG_FILE")
             echo "Captured $(wc -l < "$LOG_FILE") lines of output"
           else
-            # Fallback: if log file is empty/missing, we still have some output
             RESULT="Process completed but no detailed output captured in log file"
             echo "Warning: Log file is empty or missing"
           fi
@@ -369,25 +414,35 @@ jobs:
           echo "Verifying required tool calls via hooks log..."
           
           # Debug: Show what's in the tool success log
-          echo "Tool success log contents:"
+          echo "=== Tool Success Log Analysis ==="
           if [ -f /tmp/tool-success.log ]; then
+            echo "Tool success log exists with $(wc -l < /tmp/tool-success.log) lines:"
             cat /tmp/tool-success.log || echo "Could not read tool success log"
-            echo "Total successful tools logged: $(wc -l < /tmp/tool-success.log || echo 0)"
+            echo ""
           else
             echo "❌ Tool success log file does not exist at /tmp/tool-success.log"
           fi
-          echo ""
           
-          # Debug: Check if mcphost actually used hooks
-          echo "Checking for hook execution evidence..."
+          # Debug: Show hook debug information
+          echo "=== Hook Debug Information ==="
+          if [ -f /tmp/hook-debug.log ]; then
+            echo "Hook debug log exists with $(wc -l < /tmp/hook-debug.log) lines:"
+            echo "Last 20 lines from hook debug log:"
+            tail -n 20 /tmp/hook-debug.log || echo "Could not read hook debug log"
+            echo ""
+          else
+            echo "⚠️  No hook debug log found - hooks may not be executing"
+          fi
+          
+          # Check if mcphost actually used hooks
+          echo "=== Hook Execution Evidence ==="
           find /tmp -name "*hook*" -o -name "*track*" 2>/dev/null | head -10 || echo "No hook-related files found"
-          echo ""
           
           # Check if the tracking script was executed at all
           if [ -f /tmp/track-tools.sh ]; then
             echo "Tracking script exists and is $([ -x /tmp/track-tools.sh ] && echo "executable" || echo "not executable")"
           else
-            echo "Tracking script not found at /tmp/track-tools.sh"
+            echo "❌ Tracking script not found at /tmp/track-tools.sh"
           fi
           echo ""
           
@@ -404,21 +459,22 @@ jobs:
             verify_deployment
           )
 
-          if [ ! -f /tmp/tool-success.log ]; then
-            echo "❌ Hooks log not found; required tool success list is empty"
+          if [ ! -f /tmp/tool-success.log ] || [ ! -s /tmp/tool-success.log ]; then
+            echo "❌ Hooks log not found or empty; required tool success list is empty"
             echo "This suggests the mcphost hooks are not working properly"
             echo "SUMMARY_TOOLS_OK=false" >> $GITHUB_ENV
             echo "SUMMARY_TOOLS_MISSING=all" >> $GITHUB_ENV
             
-            # Don't fail the workflow if the main containerization succeeded
-            # This is likely a hooks configuration issue, not a containerization failure
-            if [ "${EXIT_CODE:-1}" -eq 0 ] && [ -f "Dockerfile" ] || find /tmp -name "Dockerfile" | head -1 | xargs test -f; then
-              echo "⚠️  Containerization appears successful despite hooks not working"
-              echo "This is likely a hooks configuration issue - treating as success"
-              exit 0
+            # Check if hook debug log has any activity
+            if [ -f /tmp/hook-debug.log ] && [ -s /tmp/hook-debug.log ]; then
+              echo "⚠️  Hook debug log exists but no tools logged - hook may be firing but not recognizing tools"
+              echo "This suggests a tool name mismatch issue"
             else
-              exit 1
+              echo "⚠️  No hook debug activity - hooks likely not executing at all"
+              echo "This suggests an mcphost hook configuration issue"
             fi
+            
+            exit 1
           fi
 
           MISSING=()
@@ -430,18 +486,11 @@ jobs:
 
           if [ ${#MISSING[@]} -gt 0 ]; then
             echo "❌ Missing successful calls for tools: ${MISSING[*]}"
-            echo "Logged successes:"; sort -u /tmp/tool-success.log || true
+            echo "Logged successes:"
+            sort -u /tmp/tool-success.log || true
             echo "SUMMARY_TOOLS_OK=false" >> $GITHUB_ENV
             echo "SUMMARY_TOOLS_MISSING=${MISSING[*]}" >> $GITHUB_ENV
-            
-            # Don't fail if containerization actually succeeded
-            if [ "${EXIT_CODE:-1}" -eq 0 ] && [ -f "Dockerfile" ] || find /tmp -name "Dockerfile" | head -1 | xargs test -f; then
-              echo "⚠️  Containerization appears successful despite some tools not being logged"
-              echo "This may be a hooks tracking issue - treating as success"
-              exit 0
-            else
-              exit 1
-            fi
+            exit 1
           fi
 
           echo "✅ All required tools had at least one successful call"
@@ -596,6 +645,16 @@ jobs:
           if [ -f /tmp/k8s-diagnostics.txt ]; then
             cp /tmp/k8s-diagnostics.txt "$ART_DIR/"
             echo "k8s-diagnostics: k8s-diagnostics.txt" >> "$ART_DIR/index.txt"
+          fi
+          # Include hook debug log to help diagnose hook issues
+          if [ -f /tmp/hook-debug.log ]; then
+            cp /tmp/hook-debug.log "$ART_DIR/"
+            echo "hook-debug-log: hook-debug.log" >> "$ART_DIR/index.txt"
+          fi
+          # Include tool success log
+          if [ -f /tmp/tool-success.log ]; then
+            cp /tmp/tool-success.log "$ART_DIR/"
+            echo "tool-success-log: tool-success.log" >> "$ART_DIR/index.txt"
           fi
 
       - name: Upload containerization artifacts

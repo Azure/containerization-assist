@@ -1,35 +1,43 @@
 #!/usr/bin/env bash
 # Records successful tool calls for containerization workflow.
-# Supports two modes:
-# 1) Positional args: $1 = tool name, $2 = raw JSON output (optional)
-# 2) Structured JSON via stdin with fields: {"tool":"<name>", "success": true/false}
+# Called by mcphost PostToolUse hook; reads JSON payload from stdin.
 set -euo pipefail
 
+DEBUG_LOG="/tmp/hook-debug.log"
 LOG_FILE="/tmp/tool-success.log"
-TOOL_NAME="${1:-}"
-OUTPUT_JSON="${2:-}"
 
-# If no positional tool name, try to parse from stdin JSON
-if [[ -z "$TOOL_NAME" ]]; then
-  if IFS= read -r -t 0.1 STDIN_DATA; then
-    # Read full stdin
-    STDIN_DATA+=$(cat)
-    # Attempt to parse tool and success
-    PARSED_TOOL=$(echo "$STDIN_DATA" | jq -r '.tool // empty' 2>/dev/null || echo "")
-    PARSED_SUCCESS=$(echo "$STDIN_DATA" | jq -r '.success // empty' 2>/dev/null || echo "")
-    if [[ -n "$PARSED_TOOL" ]]; then
-      TOOL_NAME="$PARSED_TOOL"
-      if [[ -z "$OUTPUT_JSON" ]]; then
-        OUTPUT_JSON="$STDIN_DATA"
-      fi
-      # If success provided explicitly, forward it later
-      EXPLICIT_SUCCESS="$PARSED_SUCCESS"
-    fi
-  fi
+mkdir -p /tmp
+touch "$DEBUG_LOG" "$LOG_FILE"
+
+echo "$(date): PostToolUse hook invoked" >> "$DEBUG_LOG"
+
+# Read JSON from stdin as per mcphost examples (contains tool_name, tool_input)
+PAYLOAD=$(cat || true)
+if [ -z "${PAYLOAD}" ]; then
+  echo "$(date): No stdin payload provided to hook" >> "$DEBUG_LOG"
+  exit 0
 fi
 
-# Normalize tool names (expected 10 required tools)
-# These must match the containerization tool names exposed by your MCP server
+echo "$(date): Raw payload: ${PAYLOAD}" >> "$DEBUG_LOG"
+
+# Extract tool_name field
+TOOL_NAME=$(echo "$PAYLOAD" | jq -r '.tool_name // empty' 2>/dev/null || echo "")
+if [ -z "$TOOL_NAME" ]; then
+  echo "$(date): tool_name missing in payload" >> "$DEBUG_LOG"
+  exit 0
+fi
+
+echo "$(date): Extracted tool_name: '$TOOL_NAME'" >> "$DEBUG_LOG"
+
+# Accept base names or namespaced ones like mcp_containerkit_*; normalize by stripping common prefixes
+NORM_NAME="$TOOL_NAME"
+if [[ "$NORM_NAME" == mcp_containerkit_* ]]; then
+  NORM_NAME="${NORM_NAME#mcp_containerkit_}"
+elif [[ "$NORM_NAME" == mcp__*__* ]]; then
+  # pattern like mcp__server__tool
+  NORM_NAME="${NORM_NAME##*__}"
+fi
+
 REQUIRED_TOOLS=(
   analyze_repository
   generate_dockerfile
@@ -43,39 +51,17 @@ REQUIRED_TOOLS=(
   verify_deployment
 )
 
-# Ensure log file exists
-mkdir -p /tmp
-: > /tmp/.tool-success.touch 2>/dev/null || true
-[ -f "$LOG_FILE" ] || touch "$LOG_FILE"
-
-# Only consider required tools
-is_required=false
 for t in "${REQUIRED_TOOLS[@]}"; do
-  if [[ "$t" == "$TOOL_NAME" ]]; then
-    is_required=true
-    break
+  if [[ "$NORM_NAME" == "$t" ]]; then
+    if ! grep -q "^${t}$" "$LOG_FILE"; then
+      echo "$t" >> "$LOG_FILE"
+      echo "$(date): Logged required tool: $t (from '$TOOL_NAME')" >> "$DEBUG_LOG"
+    else
+      echo "$(date): Tool already logged: $t" >> "$DEBUG_LOG"
+    fi
+    exit 0
   fi
 done
 
-if [[ "$is_required" != true ]]; then
-  exit 0
-fi
-
-SUCCESS_FLAG="false"
-# Prefer explicit success from stdin JSON if available
-if [[ -n "${EXPLICIT_SUCCESS:-}" ]]; then
-  SUCCESS_FLAG="$EXPLICIT_SUCCESS"
-elif [[ -n "$OUTPUT_JSON" ]]; then
-  # Strip ANSI, control chars, then attempt to read .success
-  CLEAN=$(echo "$OUTPUT_JSON" | sed 's/\x1b\[[0-9;]*m//g' | tr -d '\000-\010\013\014\016-\037' | tr -s ' ')
-  SUCCESS_FLAG=$(echo "$CLEAN" | jq -r '.success // "false"' 2>/dev/null || echo "false")
-fi
-
-if [[ "$SUCCESS_FLAG" == "true" ]]; then
-  # Record success once per tool
-  if ! grep -q "^${TOOL_NAME}$" "$LOG_FILE"; then
-    echo "$TOOL_NAME" >> "$LOG_FILE"
-  fi
-fi
-
+echo "$(date): Non-required tool encountered: '$TOOL_NAME' (normalized: '$NORM_NAME')" >> "$DEBUG_LOG"
 exit 0
