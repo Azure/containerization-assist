@@ -176,12 +176,40 @@ jobs:
           # Reduce interactive/TTY output noise and allow more time for deploy/debug loops
           export NO_COLOR=1
           export TERM=dumb
-          RESULT=$(timeout 120s mcphost --quiet --stream=false -p "Please containerize this repository: ${CONTAINERIZE_REPO}. This is an automated test - do NOT ask for user input." 2>&1)
+          
+          # Create log file for real-time capture
+          LOG_FILE="/tmp/mcphost-realtime.log"
+          touch "$LOG_FILE"
+          
+          # Run mcphost with timeout, capturing output to both variable and file
+          # Use tee to write to both stdout and log file, then capture in variable
+          echo "Starting mcphost with real-time logging to $LOG_FILE..."
+          (timeout 200s mcphost --quiet --stream=false -p "Please containerize this repository: ${CONTAINERIZE_REPO}. This is an automated test - do NOT ask for user input." 2>&1 | tee "$LOG_FILE") 
           EXIT_CODE=$?
+          
+          # Read the captured output from the log file
+          if [ -f "$LOG_FILE" ]; then
+            RESULT=$(cat "$LOG_FILE")
+            echo "Captured $(wc -l < "$LOG_FILE") lines of output"
+          else
+            RESULT="No output captured - log file not created"
+          fi
+          
           set -e
           
           echo ""
           echo "Test completed with exit code: $EXIT_CODE"
+          
+          # Handle timeout scenario specifically
+          if [ "$EXIT_CODE" -eq 124 ]; then
+            echo "⚠️  Process timed out after 200 seconds"
+            echo "Partial logs should still be available in the output below"
+            echo "This may indicate the containerization process is taking longer than expected"
+          elif [ "$EXIT_CODE" -ne 0 ]; then
+            echo "❌ Process failed with exit code: $EXIT_CODE"
+          else
+            echo "✅ Process completed successfully"
+          fi
           echo ""
           echo "=== MCPHOST OUTPUT ==="
           echo "$RESULT"
@@ -193,12 +221,45 @@ jobs:
           echo "$RESULT" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
           echo "EXIT_CODE=$EXIT_CODE" >> $GITHUB_ENV
+          
           # Persist full output to a file for artifacts and summary
-          echo "$RESULT" > /tmp/mcphost-output.txt
+          # Use the real-time log if available, otherwise use captured result
+          if [ -f "$LOG_FILE" ] && [ -s "$LOG_FILE" ]; then
+            cp "$LOG_FILE" /tmp/mcphost-output.txt
+            echo "Using real-time log file ($(wc -l < "$LOG_FILE") lines)"
+          else
+            echo "$RESULT" > /tmp/mcphost-output.txt
+            echo "Using captured result variable"
+          fi
 
       - name: Collect Kubernetes diagnostics on failure
         if: always()
         run: |
+          echo "=== Collecting diagnostics and partial results ==="
+          
+          # Always show what logs we have, even on timeout
+          if [ -f /tmp/mcphost-realtime.log ]; then
+            echo "Real-time log file exists with $(wc -l < /tmp/mcphost-realtime.log) lines"
+            echo "Last 50 lines from real-time log:"
+            tail -n 50 /tmp/mcphost-realtime.log || echo "Could not read log file"
+          fi
+          echo ""
+          
+          # Handle timeout scenario
+          if [ -n "${EXIT_CODE:-}" ] && [ "${EXIT_CODE}" -eq 124 ]; then
+            echo "=== TIMEOUT RECOVERY - Collecting partial progress ==="
+            
+            # Check for any partial artifacts that might have been created
+            echo "Checking for partial containerization artifacts:"
+            find /tmp -name "Dockerfile" -o -name "*.yaml" -o -name "*.yml" | head -10 || echo "No artifacts found"
+            echo ""
+            
+            # Check if any Docker images were created
+            echo "Docker images that may have been created:"
+            docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}" | head -10 || echo "Could not list Docker images"
+            echo ""
+          fi
+          
           if [ -n "${EXIT_CODE:-}" ] && [ "${EXIT_CODE}" -ne 0 ]; then
             echo "=== Collecting Kubernetes diagnostics (failure path) ==="
             if command -v kubectl &> /dev/null; then
@@ -454,6 +515,11 @@ jobs:
           if [ -f /tmp/mcphost-output.txt ]; then
             cp /tmp/mcphost-output.txt "$ART_DIR/"
             echo "mcphost-output: mcphost-output.txt" >> "$ART_DIR/index.txt"
+          fi
+          # Include real-time log if it's different/additional
+          if [ -f /tmp/mcphost-realtime.log ]; then
+            cp /tmp/mcphost-realtime.log "$ART_DIR/"
+            echo "mcphost-realtime-log: mcphost-realtime.log" >> "$ART_DIR/index.txt"
           fi
           # Include Kubernetes diagnostics if present
           if [ -f /tmp/k8s-diagnostics.txt ]; then
