@@ -16,17 +16,6 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/service/session"
 )
 
-// WorkflowStateHelpers provides utility functions for workflow state management
-type WorkflowStateHelpers struct {
-	sessionManager session.OptimizedSessionManager
-}
-
-// NewWorkflowStateHelpers creates a new instance of workflow state helpers
-func NewWorkflowStateHelpers(sessionManager session.OptimizedSessionManager) *WorkflowStateHelpers {
-	return &WorkflowStateHelpers{
-		sessionManager: sessionManager,
-	}
-}
 
 // SimpleWorkflowState represents a simplified workflow state for tool operations
 type SimpleWorkflowState struct {
@@ -54,67 +43,68 @@ func (s *SimpleWorkflowState) MarkStepCompleted(stepName string) {
 	s.CompletedSteps = append(s.CompletedSteps, stepName)
 }
 
+
 // MarkStepFailed marks a step as failed
 func (s *SimpleWorkflowState) MarkStepFailed(stepName string) {
-	for _, failed := range s.FailedSteps {
-		if failed == stepName {
-			return // Already marked as failed
-		}
-	}
-	// Remove from completed steps if it was previously completed
-	s.removeFromCompletedSteps(stepName)
-	s.FailedSteps = append(s.FailedSteps, stepName)
+for _, failed := range s.FailedSteps {
+if failed == stepName {
+return // Already marked as failed
+}
+}
+// Remove from completed steps if it was previously completed
+s.removeFromCompletedSteps(stepName)
+s.FailedSteps = append(s.FailedSteps, stepName)
 }
 
 // removeFromCompletedSteps removes a step from the completed steps list
 func (s *SimpleWorkflowState) removeFromCompletedSteps(stepName string) {
-	for i, completed := range s.CompletedSteps {
-		if completed == stepName {
-			s.CompletedSteps = append(s.CompletedSteps[:i], s.CompletedSteps[i+1:]...)
-			return
-		}
-	}
+for i, completed := range s.CompletedSteps {
+if completed == stepName {
+s.CompletedSteps = append(s.CompletedSteps[:i], s.CompletedSteps[i+1:]...)
+return
+}
+}
 }
 
 // removeFromFailedSteps removes a step from the failed steps list
 func (s *SimpleWorkflowState) removeFromFailedSteps(stepName string) {
-	for i, failed := range s.FailedSteps {
-		if failed == stepName {
-			s.FailedSteps = append(s.FailedSteps[:i], s.FailedSteps[i+1:]...)
-			return
-		}
-	}
+for i, failed := range s.FailedSteps {
+if failed == stepName {
+s.FailedSteps = append(s.FailedSteps[:i], s.FailedSteps[i+1:]...)
+return
+}
+}
 }
 
 // IsStepCompleted checks if a step is completed
 func (s *SimpleWorkflowState) IsStepCompleted(stepName string) bool {
-	for _, completed := range s.CompletedSteps {
-		if completed == stepName {
-			return true
-		}
-	}
-	return false
+for _, completed := range s.CompletedSteps {
+if completed == stepName {
+return true
+}
+}
+return false
 }
 
 // IsStepFailed checks if a step has failed
 func (s *SimpleWorkflowState) IsStepFailed(stepName string) bool {
-	for _, failed := range s.FailedSteps {
-		if failed == stepName {
-			return true
-		}
-	}
-	return false
+for _, failed := range s.FailedSteps {
+if failed == stepName {
+return true
+}
+}
+return false
 }
 
 // GetStepStatus returns the status of a specific step
 func (s *SimpleWorkflowState) GetStepStatus(stepName string) string {
-	if s.IsStepCompleted(stepName) {
-		return "completed"
-	}
-	if s.IsStepFailed(stepName) {
-		return "failed"
-	}
-	return "not_started"
+if s.IsStepCompleted(stepName) {
+return "completed"
+}
+if s.IsStepFailed(stepName) {
+return "failed"
+}
+return "not_started"
 }
 
 // SetError sets a workflow error
@@ -331,20 +321,6 @@ func ExtractStringArrayParam(args map[string]interface{}, key string) ([]string,
 	}
 }
 
-// NoOpProgressEmitter provides a no-op implementation of ProgressEmitter
-type NoOpProgressEmitter struct{}
-
-func (e *NoOpProgressEmitter) Emit(ctx context.Context, stage string, percent int, message string) error {
-	return nil
-}
-
-func (e *NoOpProgressEmitter) EmitDetailed(ctx context.Context, update api.ProgressUpdate) error {
-	return nil
-}
-
-func (e *NoOpProgressEmitter) Close() error {
-	return nil
-}
 
 // MarshalJSON marshals data to JSON string
 func MarshalJSON(data interface{}) string {

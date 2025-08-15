@@ -1,19 +1,18 @@
 package tools
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"reflect"
-	"time"
+"context"
+"encoding/json"
+"fmt"
+"time"
 
-	"log/slog"
+"log/slog"
 
-	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/pkg/errors"
+"github.com/mark3labs/mcp-go/mcp"
+"github.com/pkg/errors"
 
-	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/mark3labs/mcp-go/server"
+domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+"github.com/mark3labs/mcp-go/server"
 )
 
 // RegisterTools registers all tools based on their configurations
@@ -26,23 +25,6 @@ func RegisterTools(mcpServer *server.MCPServer, deps ToolDependencies) error {
 	return nil
 }
 
-// RegisterToolsExcept registers all tools except those in the exclusion list
-func RegisterToolsExcept(mcpServer *server.MCPServer, deps ToolDependencies, excludeTools []string) error {
-	excludeMap := make(map[string]bool)
-	for _, toolName := range excludeTools {
-		excludeMap[toolName] = true
-	}
-
-	for _, config := range toolConfigs {
-		if excludeMap[config.Name] {
-			continue // Skip excluded tools
-		}
-		if err := RegisterTool(mcpServer, config, deps); err != nil {
-			return errors.Wrapf(err, "failed to register tool %s", config.Name)
-		}
-	}
-	return nil
-}
 
 // RegisterTool registers a single tool based on its configuration
 func RegisterTool(mcpServer *server.MCPServer, config ToolConfig, deps ToolDependencies) error {
@@ -211,29 +193,6 @@ func createUtilityHandler(config ToolConfig, deps ToolDependencies) func(context
 	}
 }
 
-// getStepFromProvider uses reflection to call the appropriate getter method
-func getStepFromProvider(provider domainworkflow.StepProvider, methodName string) (domainworkflow.Step, error) {
-	providerValue := reflect.ValueOf(provider)
-	method := providerValue.MethodByName(methodName)
-
-	if !method.IsValid() {
-		return nil, errors.Errorf("method %s not found on StepProvider", methodName)
-	}
-
-	// Call the method
-	results := method.Call(nil)
-	if len(results) != 1 {
-		return nil, errors.Errorf("unexpected number of return values from %s", methodName)
-	}
-
-	// Convert to Step interface
-	step, ok := results[0].Interface().(domainworkflow.Step)
-	if !ok {
-		return nil, errors.Errorf("method %s did not return a Step", methodName)
-	}
-
-	return step, nil
-}
 
 // Handler implementations for specific tools
 
