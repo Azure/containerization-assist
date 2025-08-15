@@ -157,7 +157,7 @@ pkg/mcp/
 │   ├── registry/          # Service registry
 │   ├── server.go          # MCP server implementation with direct DI
 │   ├── session/           # Session management
-│   ├── tools/             # Individual tool implementations (15 tools)
+│   ├── tools/             # Tool registration and individual tool handlers
 │   ├── transport/         # HTTP and stdio transport
 │   └── workflow/          # Workflow orchestration
 ├── domain/                # Business logic and workflows

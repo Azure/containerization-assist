@@ -101,7 +101,7 @@ func (s *BuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) 
 	buildContext := state.AnalyzeResult.RepoPath
 
 	// In test mode, skip actual Docker operations
-	if state.Args.TestMode {
+	if state.IsTestMode() {
 		state.Logger.Info("Test mode: Simulating Docker build",
 			"image_name", imageName,
 			"image_tag", imageTag)
@@ -488,7 +488,7 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 	namespace := "default"
 
 	// In test mode, use test namespace and prefix app name
-	if state.Args.TestMode {
+	if state.IsTestMode() {
 		namespace = "test-namespace"
 		appName = "test-" + appName
 	}
@@ -594,7 +594,7 @@ func (s *ClusterStep) Execute(ctx context.Context, state *workflow.WorkflowState
 
 	// In test mode, simulate cluster setup
 	var registryURL string
-	if state.Args.TestMode {
+	if state.IsTestMode() {
 		state.Logger.Info("Test mode: Simulating kind cluster setup")
 		registryURL = "test-registry.local:5000"
 	} else {
@@ -644,7 +644,7 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 	}
 
 	// First, load image into kind cluster if needed
-	if state.BuildResult != nil && !state.Args.TestMode {
+	if state.BuildResult != nil && !state.IsTestMode() {
 		infraBuildResult := &BuildResult{
 			ImageName: utils.ExtractRepoName(state.RepoIdentifier),
 			ImageTag:  "latest",
@@ -656,7 +656,7 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 			return nil, errors.New(errors.CodeImagePullFailed, "deploy_step", "failed to load image to kind", err)
 		}
 		state.Logger.Info("Image loaded into kind cluster successfully")
-	} else if state.Args.TestMode {
+	} else if state.IsTestMode() {
 		state.Logger.Info("Test mode: Skipping image load to kind cluster")
 	}
 
@@ -720,7 +720,7 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 		"image_ref", infraK8sResult.Metadata["image_ref"])
 
 	// Deploy to Kubernetes
-	if state.Args.TestMode {
+	if state.IsTestMode() {
 		state.Logger.Info("Test mode: Simulating Kubernetes deployment",
 			"namespace", state.K8sResult.Namespace,
 			"app_name", infraK8sResult.AppName)
@@ -781,7 +781,7 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 
 	// Perform enhanced verification with port forwarding and health checks
 	var verifyResult *VerificationResult
-	if state.Args.TestMode {
+	if state.IsTestMode() {
 		state.Logger.Info("Test mode: Simulating enhanced deployment verification")
 		state.Result.Endpoint = fmt.Sprintf("http://test-%s.%s.svc.cluster.local:8080",
 			utils.ExtractRepoName(state.RepoIdentifier), state.K8sResult.Namespace)

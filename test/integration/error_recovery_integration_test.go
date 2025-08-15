@@ -1,6 +1,6 @@
 //go:build integration_error_recovery
 
-package integration
+package integration_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,9 +35,9 @@ func (suite *ErrorRecoveryIntegrationSuite) TearDownSuite() {
 	}
 }
 
-// TestWorkflowErrorRecovery tests that workflows can recover from transient errors
+// TestWorkflowErrorRecovery tests recovery using the 10-step tools with redirect behavior
 func (suite *ErrorRecoveryIntegrationSuite) TestWorkflowErrorRecovery() {
-	suite.T().Log("Testing workflow error recovery mechanisms")
+	suite.T().Log("Testing workflow error recovery with step tools")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -51,71 +52,97 @@ func (suite *ErrorRecoveryIntegrationSuite) TestWorkflowErrorRecovery() {
 	// Initialize server
 	suite.initializeServer(stdin, stdout)
 
-	// Test recovery scenarios
-	errorScenarios := []struct {
-		name        string
-		repoConfig  map[string]string
-		expectError bool
-		shouldRetry bool
-	}{
-		{
-			name: "InvalidDockerfileSyntax",
-			repoConfig: map[string]string{
-				"dockerfile_error": "syntax_error",
+	// Create minimal repo
+	repoDir := suite.createErrorProneRepository(map[string]string{})
+
+	// Use a unique session id
+	sessionID := fmt.Sprintf("recovery-%d", time.Now().UnixNano())
+
+	// 1) analyze_repository (test_mode true to avoid AI sampling)
+	analyzeResp := sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "analyze_repository",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"repo_path":  repoDir,
+				"test_mode":  true,
 			},
-			expectError: true,
-			shouldRetry: true,
 		},
-		{
-			name: "MissingDependencies",
-			repoConfig: map[string]string{
-				"missing_deps": "go_mod_error",
+	}, suite.T())
+	assert.Contains(suite.T(), analyzeResp, "result")
+
+	// SAD PATH: build_image WITHOUT dockerfile_result -> expect redirect to generate_dockerfile
+	suite.T().Log("SAD PATH: build_image without Dockerfile should redirect to generate_dockerfile")
+	buildFail := sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      2,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "build_image",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				// test_mode can be true; failure is due to invalid state before build
+				"test_mode": true,
 			},
-			expectError: true,
-			shouldRetry: true,
 		},
-		{
-			name: "NetworkTimeout",
-			repoConfig: map[string]string{
-				"network_error": "timeout",
+	}, suite.T())
+	// Extract text content and assert redirect hint
+	redirectText := suite.extractFirstContentText(buildFail)
+	require.NotEmpty(suite.T(), redirectText)
+	assert.Contains(suite.T(), redirectText, "Tool build_image failed")
+	assert.Contains(suite.T(), redirectText, "Call tool \"generate_dockerfile\"")
+
+	// Recovery step: generate_dockerfile with provided content (valid minimal Dockerfile)
+	dockerfileContent := strings.TrimSpace(`FROM golang:1.21-alpine
+WORKDIR /app
+COPY . .
+RUN go build -o app
+EXPOSE 8080
+CMD ["./app"]`)
+
+	genResp := sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      3,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "generate_dockerfile",
+			"arguments": map[string]interface{}{
+				"session_id":         sessionID,
+				"dockerfile_content": dockerfileContent,
+				"test_mode":          true,
 			},
-			expectError: true,
-			shouldRetry: true,
 		},
-	}
+	}, suite.T())
+	assert.Contains(suite.T(), genResp, "result")
 
-	for _, scenario := range errorScenarios {
-		suite.Run(scenario.name, func() {
-			repoDir := suite.createErrorProneRepository(scenario.repoConfig)
+	// HAPPY PATH: build_image again (now should succeed in test_mode)
+	suite.T().Log("HAPPY PATH: after generating Dockerfile, build_image succeeds and suggests next step")
+	buildOk := sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      4,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "build_image",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"test_mode":  true,
+			},
+		},
+	}, suite.T())
+	okText := suite.extractFirstContentText(buildOk)
+	require.NotEmpty(suite.T(), okText)
+	assert.Contains(suite.T(), okText, "build_image completed successfully")
+	assert.Contains(suite.T(), okText, "**Next Step:** scan_image")
 
-			response := sendMCPRequest(stdin, stdout, map[string]interface{}{
-				"jsonrpc": "2.0",
-				"id":      time.Now().Unix(),
-				"method":  "tools/call",
-				"params": map[string]interface{}{
-					"name": "containerize_and_deploy",
-					"arguments": map[string]interface{}{
-						"repo_url":       "file://" + repoDir,
-						"branch":         "main",
-						"scan":           false,
-						"deploy":         false,
-						"test_mode":      true,
-						"retry_on_error": scenario.shouldRetry,
-					},
-				},
-			}, suite.T())
-
-			// Validate error handling
-			suite.validateErrorRecovery(response, scenario)
-		})
-	}
-
-	suite.T().Log("✓ Workflow error recovery mechanisms verified")
+	suite.T().Log("✓ Redirect and recovery for build_image verified")
 }
 
-// TestProgressiveErrorContext tests that error context accumulates properly
-func (suite *ErrorRecoveryIntegrationSuite) TestProgressiveErrorContext() {
-	suite.T().Log("Testing progressive error context accumulation")
+// TestDeployRedirectsToManifestsOnMissingPath ensures deploy errors redirect to generate_k8s_manifests and then succeed after providing manifests
+func (suite *ErrorRecoveryIntegrationSuite) TestDeployRedirectsToManifestsOnMissingPath() {
+	suite.T().Log("Testing deploy failure redirect to generate_k8s_manifests")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
@@ -129,35 +156,144 @@ func (suite *ErrorRecoveryIntegrationSuite) TestProgressiveErrorContext() {
 
 	suite.initializeServer(stdin, stdout)
 
-	// Create repository that will cause multiple sequential errors
-	repoDir := suite.createMultiErrorRepository()
+	// Setup repo and session
+	repoDir := suite.createMultiErrorRepository() // content not important here
+	sessionID := fmt.Sprintf("deploy-%d", time.Now().UnixNano())
 
-	response := sendMCPRequest(stdin, stdout, map[string]interface{}{
+	// analyze_repository
+	_ = sendMCPRequest(stdin, stdout, map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      1,
 		"method":  "tools/call",
 		"params": map[string]interface{}{
-			"name": "containerize_and_deploy",
+			"name": "analyze_repository",
 			"arguments": map[string]interface{}{
-				"repo_url":        "file://" + repoDir,
-				"branch":          "main",
-				"scan":            false,
-				"deploy":          false,
-				"test_mode":       true,
-				"max_retry_count": 3,
+				"session_id": sessionID,
+				"repo_path":  repoDir,
+				"test_mode":  true,
 			},
 		},
 	}, suite.T())
 
-	// Validate error context accumulation
-	suite.validateProgressiveErrorContext(response)
+	// generate_dockerfile
+	_ = sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      2,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "generate_dockerfile",
+			"arguments": map[string]interface{}{
+				"session_id":         sessionID,
+				"dockerfile_content": "FROM alpine:3.19\nCMD [\"sh\", \"-c\", \"sleep 1d\"]",
+				"test_mode":          true,
+			},
+		},
+	}, suite.T())
 
-	suite.T().Log("✓ Progressive error context accumulation verified")
+	// build_image (test mode success)
+	_ = sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      3,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "build_image",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"test_mode":  true,
+			},
+		},
+	}, suite.T())
+
+	// tag_image
+	_ = sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      4,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "tag_image",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"tag":        "latest",
+				"test_mode":  true,
+			},
+		},
+	}, suite.T())
+
+	// push_image (prepares local ref)
+	_ = sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      5,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "push_image",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"registry":   "localhost:5001",
+			},
+		},
+	}, suite.T())
+
+	// SAD PATH: deploy_application BEFORE manifests to force error and redirect
+	suite.T().Log("SAD PATH: deploy without manifests should redirect to generate_k8s_manifests")
+	deployFail := sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      6,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "deploy_application",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"test_mode":  true,
+			},
+		},
+	}, suite.T())
+	red := suite.extractFirstContentText(deployFail)
+	require.NotEmpty(suite.T(), red)
+	assert.Contains(suite.T(), red, "Tool deploy_application failed")
+	assert.Contains(suite.T(), red, "Call tool \"generate_k8s_manifests\"")
+
+	// Recovery step: generate_k8s_manifests by providing content so manifest_path is set
+	manifests := BasicK8sManifestsWithIngress()
+
+	_ = sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      7,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "generate_k8s_manifests",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"manifests":  manifests,
+				"test_mode":  true,
+			},
+		},
+	}, suite.T())
+
+	// HAPPY PATH: deploy_application again (should succeed in test_mode)
+	suite.T().Log("HAPPY PATH: after generating manifests, deploy_application succeeds")
+	deployOk := sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      8,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "deploy_application",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"test_mode":  true,
+			},
+		},
+	}, suite.T())
+	ok := suite.extractFirstContentText(deployOk)
+	require.NotEmpty(suite.T(), ok)
+	assert.Contains(suite.T(), ok, "Deployment")
+
+	suite.T().Log("✓ Redirect and recovery for deploy_application verified")
 }
 
-// TestErrorEscalation tests that errors escalate appropriately after multiple failures
-func (suite *ErrorRecoveryIntegrationSuite) TestErrorEscalation() {
-	suite.T().Log("Testing error escalation after multiple failures")
+// TestWorkflowStatusErrorAccumulation verifies that failures are accumulated in workflow status
+func (suite *ErrorRecoveryIntegrationSuite) TestWorkflowStatusErrorAccumulation() {
+	suite.T().Log("Testing workflow_status accumulates failed steps across attempts")
+	suite.T().Log("SAD PATH ONLY: intentionally trigger multiple failures and verify accumulation via workflow_status")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
@@ -171,91 +307,97 @@ func (suite *ErrorRecoveryIntegrationSuite) TestErrorEscalation() {
 
 	suite.initializeServer(stdin, stdout)
 
-	// Create repository that will cause persistent errors
-	repoDir := suite.createPersistentErrorRepository()
+	// Create a simple repo and session
+	repoDir := suite.createErrorProneRepository(map[string]string{})
+	sessionID := fmt.Sprintf("status-%d", time.Now().UnixNano())
 
-	response := sendMCPRequest(stdin, stdout, map[string]interface{}{
+	// analyze_repository
+	_ = sendMCPRequest(stdin, stdout, map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      1,
 		"method":  "tools/call",
 		"params": map[string]interface{}{
-			"name": "containerize_and_deploy",
+			"name": "analyze_repository",
 			"arguments": map[string]interface{}{
-				"repo_url":        "file://" + repoDir,
-				"branch":          "main",
-				"scan":            false,
-				"deploy":          false,
-				"test_mode":       true,
-				"max_retry_count": 2,
+				"session_id": sessionID,
+				"repo_path":  repoDir,
+				"test_mode":  true,
 			},
 		},
 	}, suite.T())
 
-	// Validate error escalation behavior
-	suite.validateErrorEscalation(response)
-
-	suite.T().Log("✓ Error escalation behavior verified")
-}
-
-// TestGracefulDegradation tests that services degrade gracefully under failure conditions
-func (suite *ErrorRecoveryIntegrationSuite) TestGracefulDegradation() {
-	suite.T().Log("Testing graceful degradation under failure conditions")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-
-	server := suite.startMCPServer(ctx)
-	defer server.cmd.Process.Kill()
-	time.Sleep(2 * time.Second)
-
-	stdin := server.stdin
-	stdout := server.stdout
-
-	suite.initializeServer(stdin, stdout)
-
-	// Test degradation scenarios
-	degradationTests := []struct {
-		name           string
-		toolName       string
-		args           map[string]interface{}
-		expectedResult string
-	}{
-		{
-			name:     "PingWithDegradedService",
-			toolName: "ping",
-			args: map[string]interface{}{
-				"message": "degradation-test",
+	// Intentionally cause two failures to accumulate:
+	// 1) build_image before generating a Dockerfile
+	_ = sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      2,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "build_image",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"test_mode":  true,
 			},
-			expectedResult: "should_respond",
 		},
-		{
-			name:     "StatusWithPartialFailure",
-			toolName: "server_status",
-			args: map[string]interface{}{
-				"details": true,
+	}, suite.T())
+
+	// 2) deploy_application before generating manifests
+	_ = sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      3,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "deploy_application",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+				"test_mode":  true,
 			},
-			expectedResult: "partial_info",
 		},
+	}, suite.T())
+
+	// Query workflow_status to verify error accumulation for this session
+	statusResp := sendMCPRequest(stdin, stdout, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      4,
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name": "workflow_status",
+			"arguments": map[string]interface{}{
+				"session_id": sessionID,
+			},
+		},
+	}, suite.T())
+
+	// Prefer structured check if server returns JSON; otherwise fall back to text contains
+	var failedSteps []string
+	if resultRaw, ok := statusResp["result"]; ok {
+		if parsed := suite.extractToolResult(resultRaw); parsed != nil {
+			if fs, ok := parsed["failed_steps"].([]interface{}); ok {
+				for _, s := range fs {
+					if name, ok := s.(string); ok {
+						failedSteps = append(failedSteps, name)
+					}
+				}
+			}
+		}
 	}
 
-	for _, test := range degradationTests {
-		suite.Run(test.name, func() {
-			response := sendMCPRequest(stdin, stdout, map[string]interface{}{
-				"jsonrpc": "2.0",
-				"id":      time.Now().Unix(),
-				"method":  "tools/call",
-				"params": map[string]interface{}{
-					"name":      test.toolName,
-					"arguments": test.args,
-				},
-			}, suite.T())
-
-			suite.validateGracefulDegradation(response, test)
-		})
+	if len(failedSteps) > 0 {
+		assert.GreaterOrEqual(suite.T(), len(failedSteps), 2, "expected at least two failed steps recorded")
+		assert.Contains(suite.T(), failedSteps, "build_image")
+		assert.Contains(suite.T(), failedSteps, "deploy_application")
+	} else {
+		// Fallback to human-readable content assertions
+		text := suite.extractFirstContentText(statusResp)
+		require.NotEmpty(suite.T(), text)
+		assert.Contains(suite.T(), text, "build_image")
+		assert.Contains(suite.T(), text, "deploy_application")
 	}
 
-	suite.T().Log("✓ Graceful degradation under failure conditions verified")
+	suite.T().Log("✓ workflow_status reflects accumulated failures for the session")
 }
+
+//
 
 // Helper methods
 
@@ -544,6 +686,27 @@ func (suite *ErrorRecoveryIntegrationSuite) extractToolResult(resultRaw interfac
 		return result
 	}
 	return nil
+}
+
+// extractFirstContentText fetches the first text field from MCP result
+func (suite *ErrorRecoveryIntegrationSuite) extractFirstContentText(resp map[string]interface{}) string {
+	if resp == nil {
+		return ""
+	}
+	res, ok := resp["result"].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	contentArr, ok := res["content"].([]interface{})
+	if !ok || len(contentArr) == 0 {
+		return ""
+	}
+	first, ok := contentArr[0].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	text, _ := first["text"].(string)
+	return text
 }
 
 // Test runner
