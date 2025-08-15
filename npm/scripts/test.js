@@ -85,7 +85,7 @@ class MCPServerTester {
     
     try {
       const stats = fs.statSync(binaryPath);
-      const isExecutable = (stats.mode & parseInt('0111', 8)) !== 0;
+      const isExecutable = (stats.mode & EXECUTABLE_BITS) !== 0;
       
       if (isExecutable) {
         this.pass('Binary is executable');
