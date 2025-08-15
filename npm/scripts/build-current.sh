@@ -63,7 +63,9 @@ go build -ldflags "$LDFLAGS" -o "$NPM_DIR/bin/$OUTPUT" ./cmd/mcp-server
 
 # Make executable (except Windows)
 if [[ ! "$OUTPUT" == *.exe ]]; then
-    chmod +x "$NPM_DIR/bin/$OUTPUT"
+    if [ -f "$NPM_DIR/bin/$OUTPUT" ]; then
+        chmod +x "$NPM_DIR/bin/$OUTPUT"
+    fi
 fi
 
 # Create symlink for convenience
