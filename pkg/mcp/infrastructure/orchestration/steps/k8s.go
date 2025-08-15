@@ -277,11 +277,36 @@ func DeployToKubernetes(ctx context.Context, k8sResult *K8sResult, logger *slog.
 			"pods_ready", validationResult.PodsReady,
 			"pods_total", validationResult.PodsTotal)
 
+		// Build detailed error message with pod diagnostics
 		errorMsg := fmt.Sprintf("deployment validation failed: %d/%d pods ready",
 			validationResult.PodsReady, validationResult.PodsTotal)
 
+		// Add pod status details
+		if len(validationResult.Pods) > 0 {
+			errorMsg += "\n\nPod Status Details:"
+			for _, pod := range validationResult.Pods {
+				errorMsg += fmt.Sprintf("\n- Pod: %s, Status: %s, Ready: %s, Restarts: %d",
+					pod.Name, pod.Status, pod.Ready, pod.Restarts)
+			}
+		}
+
+		// Add deployment error details if available
 		if validationResult.Error != nil {
-			errorMsg = fmt.Sprintf("%s (error: %s)", errorMsg, validationResult.Error.Message)
+			errorMsg += fmt.Sprintf("\n\nDeployment Error: %s", validationResult.Error.Message)
+
+			// Include kubectl output for debugging
+			if validationResult.Error.Output != "" {
+				errorMsg += fmt.Sprintf("\n\nKubectl Output:\n%s", validationResult.Error.Output)
+			}
+		}
+
+		// Add service status if available
+		if len(validationResult.Services) > 0 {
+			errorMsg += "\n\nService Status:"
+			for _, svc := range validationResult.Services {
+				errorMsg += fmt.Sprintf("\n- Service: %s, Type: %s, ClusterIP: %s",
+					svc.Name, svc.Type, svc.ClusterIP)
+			}
 		}
 
 		return fmt.Errorf("%s", errorMsg)

@@ -316,6 +316,56 @@ func (s *ServiceImpl) ValidateDeployment(ctx context.Context, manifestPath strin
 	// Check if all pods are ready
 	result.Success = result.PodsTotal > 0 && result.PodsReady == result.PodsTotal
 
+	// If validation fails, gather additional diagnostic information
+	if !result.Success {
+		s.logger.Warn("Deployment validation failed, gathering diagnostic information",
+			"pods_ready", result.PodsReady,
+			"pods_total", result.PodsTotal)
+
+		// Collect detailed diagnostics for failed/pending pods
+		diagnosticInfo := make([]string, 0)
+
+		// Get events for the namespace (most critical information)
+		if eventsOutput, err := s.kube.GetEvents(ctx, namespace); err == nil {
+			filteredEvents := s.filterRelevantEvents(eventsOutput)
+			if filteredEvents != "" {
+				diagnosticInfo = append(diagnosticInfo, "Critical Events:")
+				diagnosticInfo = append(diagnosticInfo, filteredEvents)
+			}
+		} else {
+			s.logger.Warn("Failed to get events", "error", err)
+		}
+
+		// Get essential pod information for non-ready pods
+		for _, pod := range result.Pods {
+			if pod.Ready != "1/1" && !strings.Contains(pod.Status, "Running") {
+				if describeOutput, err := s.kube.DescribePod(ctx, pod.Name, namespace); err == nil {
+					essentialInfo := s.extractEssentialPodInfo(describeOutput, pod.Name)
+					if essentialInfo != "" {
+						diagnosticInfo = append(diagnosticInfo, fmt.Sprintf("\nPod Issues for %s:", pod.Name))
+						diagnosticInfo = append(diagnosticInfo, essentialInfo)
+					}
+				} else {
+					s.logger.Warn("Failed to describe pod", "pod", pod.Name, "error", err)
+				}
+			}
+		}
+
+		// Store diagnostic information in error context
+		if len(diagnosticInfo) > 0 {
+			result.Error = &DeploymentError{
+				Type:    "validation_error",
+				Message: fmt.Sprintf("Deployment validation failed: %d/%d pods ready", result.PodsReady, result.PodsTotal),
+				Output:  strings.Join(diagnosticInfo, "\n\n"),
+				Context: map[string]interface{}{
+					"diagnostic_info_collected": true,
+					"events_checked":            true,
+					"pods_described":            len(diagnosticInfo) > 1, // More than just events
+				},
+			}
+		}
+	}
+
 	result.Duration = time.Since(startTime)
 	result.Context = map[string]interface{}{
 		"validation_time": result.Duration.Seconds(),
@@ -602,4 +652,113 @@ func (s *ServiceImpl) executeKubectlDiff(ctx context.Context, manifestPath, name
 	cmd := exec.CommandContext(ctx, "kubectl", args...)
 	output, err := cmd.CombinedOutput()
 	return string(output), err
+}
+
+// filterRelevantEvents filters events to show only critical debugging information
+func (s *ServiceImpl) filterRelevantEvents(eventsOutput string) string {
+	var relevantEvents []string
+	lines := strings.Split(eventsOutput, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Skip empty lines and headers
+		if line == "" || strings.Contains(line, "LAST SEEN") {
+			continue
+		}
+
+		// Include lines that indicate problems
+		if strings.Contains(line, "Failed") ||
+			strings.Contains(line, "Error") ||
+			strings.Contains(line, "Warning") ||
+			strings.Contains(line, "BackOff") ||
+			strings.Contains(line, "Unhealthy") ||
+			strings.Contains(line, "ImagePull") ||
+			strings.Contains(line, "Created container") ||
+			strings.Contains(line, "Started container") ||
+			strings.Contains(line, "Pulled") {
+			relevantEvents = append(relevantEvents, "  "+line)
+		}
+	}
+
+	return strings.Join(relevantEvents, "\n")
+}
+
+// extractEssentialPodInfo extracts only the most critical information from kubectl describe pod output
+func (s *ServiceImpl) extractEssentialPodInfo(describeOutput, podName string) string {
+	var essential []string
+	lines := strings.Split(describeOutput, "\n")
+
+	var inContainerSection, inConditionsSection, inEventsSection bool
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Track sections
+		if strings.HasPrefix(line, "Containers:") {
+			inContainerSection = true
+			inConditionsSection = false
+			inEventsSection = false
+			continue
+		} else if strings.HasPrefix(line, "Conditions:") {
+			inContainerSection = false
+			inConditionsSection = true
+			inEventsSection = false
+			continue
+		} else if strings.HasPrefix(line, "Events:") {
+			inContainerSection = false
+			inConditionsSection = false
+			inEventsSection = true
+			continue
+		} else if strings.HasPrefix(line, "Volumes:") ||
+			strings.HasPrefix(line, "QoS Class:") ||
+			strings.HasPrefix(line, "Node-Selectors:") ||
+			strings.HasPrefix(line, "Tolerations:") {
+			inContainerSection = false
+			inConditionsSection = false
+			inEventsSection = false
+			continue
+		}
+
+		// Extract key information
+		if strings.Contains(line, "Status:") ||
+			strings.Contains(line, "Reason:") ||
+			strings.Contains(line, "Message:") {
+			essential = append(essential, "  "+line)
+		}
+
+		// Container state information
+		if inContainerSection && (strings.Contains(line, "State:") ||
+			strings.Contains(line, "Last State:") ||
+			strings.Contains(line, "Ready:") ||
+			strings.Contains(line, "Restart Count:") ||
+			strings.Contains(line, "Image:") ||
+			strings.Contains(line, "Reason:") ||
+			strings.Contains(line, "Exit Code:") ||
+			strings.Contains(line, "Started:") ||
+			strings.Contains(line, "Finished:")) {
+			essential = append(essential, "  "+line)
+		}
+
+		// Condition information (Ready, Scheduled, etc.)
+		if inConditionsSection && !strings.HasPrefix(line, " ") && line != "" {
+			essential = append(essential, "  "+line)
+		}
+
+		// Recent events (last 5-10 lines of events)
+		if inEventsSection && (strings.Contains(line, "Failed") ||
+			strings.Contains(line, "Error") ||
+			strings.Contains(line, "Warning") ||
+			strings.Contains(line, "BackOff") ||
+			strings.Contains(line, "ImagePull") ||
+			strings.Contains(line, "Started") ||
+			strings.Contains(line, "Created")) {
+			essential = append(essential, "  "+line)
+		}
+	}
+
+	if len(essential) == 0 {
+		return ""
+	}
+
+	return strings.Join(essential, "\n")
 }
