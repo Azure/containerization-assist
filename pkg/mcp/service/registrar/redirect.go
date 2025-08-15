@@ -3,10 +3,14 @@ package registrar
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"text/template"
+	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/service/session"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -74,6 +78,35 @@ All {{.TotalSteps}} steps have been executed. Your application should now be con
 1. Read the current files (Dockerfile, manifests, etc.) to understand existing configuration
 2. Call tool "{{.RedirectTo}}" with the correct parameters and use the AI guidance to generate the corrected content.`
 
+	redirectDockerfileRegenerationTemplate = `Tool {{.FromTool}} failed multiple times with error:
+
+{{.FormattedError}}
+
+**Container Image Issue Detected**: After {{.FailureCount}} deployment failures, the issue may be with the container image itself rather than the Kubernetes manifests.
+
+**Fixing Strategy**: Regenerating Dockerfile and rebuilding container image to address potential image-level issues (missing dependencies, wrong ports, incorrect startup commands, etc.)
+
+**AI Guidance for {{.RedirectTo}}**:
+
+**System Context:**
+{{.SystemPrompt}}
+
+**User Prompt:**
+{{.UserPrompt}}
+
+**Expected Output:** {{.ExpectedOutput}}
+
+**Parameters for next call:**
+- session_id: {{.SessionID}}
+- previous_error: {{.Error}}
+- failed_tool: {{.FromTool}}
+- fixing_mode: true
+
+**Next Action:** 
+1. Analyze the deployment failure to identify potential container image issues
+2. Call tool "{{.RedirectTo}}" to regenerate the Dockerfile with corrections
+3. Continue with build_image → deploy_application chain to test the fix`
+
 	redirectSimpleTemplate = `Tool {{.FromTool}} failed: {{.Error}}
 
 **Next Action:** 
@@ -119,6 +152,9 @@ type RedirectTemplateData struct {
 	SystemPrompt   string
 	UserPrompt     string
 	ExpectedOutput string
+
+	// Failure tracking fields
+	FailureCount int
 }
 
 // RedirectConfig defines where to redirect when a tool fails
@@ -178,11 +214,45 @@ type AIFixingPrompt struct {
 	FixingStrategy string         `json:"fixing_strategy"`
 }
 
+// DeploymentFailureTracking tracks deployment failure attempts and redirect patterns
+type DeploymentFailureTracking struct {
+	ConsecutiveFailures map[string]int            `json:"consecutive_failures"`
+	LastRedirectTo      string                    `json:"last_redirect_to"`
+	TotalAttempts       int                       `json:"total_attempts"`
+	FailureHistory      []DeploymentFailureRecord `json:"failure_history"`
+}
+
+// DeploymentFailureRecord records individual deployment failure details
+type DeploymentFailureRecord struct {
+	Timestamp  string `json:"timestamp"`
+	RedirectTo string `json:"redirect_to"`
+	Error      string `json:"error"`
+}
+
 // createRedirectResponse creates a response instructing the client to call a different tool
 func (tr *ToolRegistrar) createRedirectResponse(fromTool, error string, sessionID string, stepResult ...map[string]any) (*mcp.CallToolResult, error) {
 	config, hasRedirect := RedirectConfigs[fromTool]
 	if !hasRedirect {
 		return tr.createErrorResult(fmt.Sprintf("Tool %s failed: %s", fromTool, error))
+	}
+
+	// Special handling for deploy_application - use proper failure tracking
+	if fromTool == "deploy_application" {
+		redirectTo, err := tr.determineDeploymentRedirectWithTracking(sessionID, config.RedirectTo, error)
+		if err != nil {
+			// Fallback to default behavior if tracking fails
+			tr.logger.Warn("Failed to load deployment failure tracking, using default redirect", "error", err)
+			redirectTo = config.RedirectTo
+		}
+
+		if redirectTo != config.RedirectTo {
+			// Create a modified config for dockerfile regeneration
+			config = RedirectConfig{
+				RedirectTo:   redirectTo,
+				MaxRedirects: config.MaxRedirects,
+				Reason:       "Multiple deployment failures detected - rebuilding container image to fix potential image issues",
+			}
+		}
 	}
 
 	aiPrompt := tr.generateAIFixingPrompt(fromTool, config.RedirectTo, error, sessionID)
@@ -306,6 +376,24 @@ func (tr *ToolRegistrar) buildRedirectResponseText(fromTool, error, sessionID, r
 // buildBaseRedirectResponse builds the base redirect response without step context
 func (tr *ToolRegistrar) buildBaseRedirectResponse(fromTool, error, sessionID, redirectTo string, aiPrompt *AIFixingPrompt) string {
 	if aiPrompt != nil {
+		// Check if this is a deployment failure redirecting to dockerfile regeneration
+		if fromTool == "deploy_application" && redirectTo == "generate_dockerfile" {
+			data := RedirectTemplateData{
+				FromTool:       fromTool,
+				Error:          error,
+				RedirectTo:     redirectTo,
+				SessionID:      sessionID,
+				FormattedError: tr.formatErrorForDisplay(error),
+				FixingStrategy: aiPrompt.FixingStrategy,
+				SystemPrompt:   aiPrompt.SystemPrompt,
+				UserPrompt:     aiPrompt.UserPrompt,
+				ExpectedOutput: aiPrompt.ExpectedOutput,
+				FailureCount:   2, // Indicating multiple failures
+			}
+			return tr.executeTemplate(redirectDockerfileRegenerationTemplate, data)
+		}
+
+		// Standard AI redirect template
 		data := RedirectTemplateData{
 			FromTool:       fromTool,
 			Error:          error,
@@ -416,6 +504,30 @@ func (tr *ToolRegistrar) generateStepSpecificSections(stepName string, responseD
 
 	if len(stepData) == 0 {
 		return nil
+	}
+
+	// For Dockerfile generation, render the file content as a fenced code block
+	// This is to fix the issue in the LLM Host where '*' would cause formatting issues
+	if stepName == "generate_dockerfile" {
+		if content, ok := stepData["content"].(string); ok && strings.TrimSpace(content) != "" {
+			path := "Dockerfile"
+			if p, ok := stepData["path"].(string); ok && p != "" {
+				path = p
+			}
+			// Build a dedicated section with proper code fencing for Dockerfile
+			var b strings.Builder
+			b.WriteString("\n**" + label + ":**\n")
+			b.WriteString("Path: ")
+			b.WriteString(path)
+			b.WriteString("\n\n")
+			b.WriteString("```dockerfile\n")
+			b.WriteString(content)
+			if !strings.HasSuffix(content, "\n") {
+				b.WriteString("\n")
+			}
+			b.WriteString("```\n")
+			return []string{"\n" + b.String() + "\n"}
+		}
 	}
 
 	// Format the data as a display section
@@ -557,4 +669,140 @@ func (tr *ToolRegistrar) shouldFormatAsCodeBlock(error string) bool {
 		return false
 	}
 	return len(error) > errorDisplayThreshold || strings.Contains(error, "\n")
+}
+
+// determineDeploymentRedirectWithTracking decides where to redirect deploy_application using proper failure tracking
+func (tr *ToolRegistrar) determineDeploymentRedirectWithTracking(sessionID, defaultRedirect, error string) (string, error) {
+	// Load current failure tracking
+	tracking, err := tr.loadDeploymentFailureTracking(sessionID)
+	if err != nil {
+		return "", fmt.Errorf("failed to load deployment failure tracking: %w", err)
+	}
+
+	// Determine redirect target
+	redirectTo := defaultRedirect
+
+	// Get current consecutive failures for this redirect path
+	currentConsecutiveFailures := tracking.ConsecutiveFailures[defaultRedirect]
+
+	// If we've had 2+ consecutive failures with current redirect approach, try the other approach
+	if currentConsecutiveFailures >= 2 {
+		if defaultRedirect == "generate_k8s_manifests" {
+			redirectTo = "generate_dockerfile"
+		} else {
+			redirectTo = "generate_k8s_manifests"
+		}
+		// Reset consecutive failures for the current approach since we're switching
+		tracking.ConsecutiveFailures[defaultRedirect] = 0
+	}
+
+	// Update tracking for the chosen redirect target
+	tracking.ConsecutiveFailures[redirectTo]++
+	tracking.LastRedirectTo = redirectTo
+	tracking.TotalAttempts++
+	tracking.FailureHistory = append(tracking.FailureHistory, DeploymentFailureRecord{
+		Timestamp:  time.Now().Format(time.RFC3339),
+		RedirectTo: redirectTo,
+		Error:      error,
+	})
+
+	// Save updated tracking
+	if err := tr.saveDeploymentFailureTracking(sessionID, tracking); err != nil {
+		tr.logger.Warn("Failed to save deployment failure tracking", "session_id", sessionID, "error", err)
+	}
+
+	tr.logger.Info("Deployment failure tracking updated",
+		"session_id", sessionID,
+		"consecutive_failures_for_redirect", tracking.ConsecutiveFailures[redirectTo],
+		"redirect_to", redirectTo,
+		"total_attempts", tracking.TotalAttempts)
+
+	return redirectTo, nil
+}
+
+// loadDeploymentFailureTracking loads failure tracking from session state
+func (tr *ToolRegistrar) loadDeploymentFailureTracking(sessionID string) (*DeploymentFailureTracking, error) {
+	// Get session artifacts
+	session, err := tr.sessionManager.Get(context.Background(), sessionID)
+	if err != nil {
+		// If session doesn't exist, return default tracking
+		return &DeploymentFailureTracking{
+			ConsecutiveFailures: make(map[string]int),
+			LastRedirectTo:      "",
+			TotalAttempts:       0,
+			FailureHistory:      []DeploymentFailureRecord{},
+		}, nil
+	}
+
+	// Try to get tracking from session metadata
+	if session.Metadata != nil {
+		if trackingData, exists := session.Metadata["deployment_failure_tracking"]; exists {
+			if trackingBytes, ok := trackingData.([]byte); ok {
+				var tracking DeploymentFailureTracking
+				if err := json.Unmarshal(trackingBytes, &tracking); err == nil {
+					// Initialize map if nil
+					if tracking.ConsecutiveFailures == nil {
+						tracking.ConsecutiveFailures = make(map[string]int)
+					}
+					return &tracking, nil
+				}
+			}
+			// Try to handle as string (JSON)
+			if trackingStr, ok := trackingData.(string); ok {
+				var tracking DeploymentFailureTracking
+				if err := json.Unmarshal([]byte(trackingStr), &tracking); err == nil {
+					// Initialize map if nil
+					if tracking.ConsecutiveFailures == nil {
+						tracking.ConsecutiveFailures = make(map[string]int)
+					}
+					return &tracking, nil
+				}
+			}
+		}
+	}
+
+	// Return default tracking if not found or parsing failed
+	return &DeploymentFailureTracking{
+		ConsecutiveFailures: make(map[string]int),
+		LastRedirectTo:      "",
+		TotalAttempts:       0,
+		FailureHistory:      []DeploymentFailureRecord{},
+	}, nil
+}
+
+// saveDeploymentFailureTracking saves failure tracking to session state
+func (tr *ToolRegistrar) saveDeploymentFailureTracking(sessionID string, tracking *DeploymentFailureTracking) error {
+	trackingBytes, err := json.Marshal(tracking)
+	if err != nil {
+		return fmt.Errorf("failed to marshal tracking data: %w", err)
+	}
+
+	// Update session with proper update function
+	return tr.sessionManager.Update(context.Background(), sessionID, func(sessionState *session.SessionState) error {
+		if sessionState.Metadata == nil {
+			sessionState.Metadata = make(map[string]interface{})
+		}
+		sessionState.Metadata["deployment_failure_tracking"] = string(trackingBytes)
+		return nil
+	})
+}
+
+// Legacy method - keeping for backwards compatibility but updating to use new tracking
+func (tr *ToolRegistrar) determineDeploymentRedirect(sessionID, defaultRedirect string) string {
+	// Use new tracking method with empty error
+	redirectTo, err := tr.determineDeploymentRedirectWithTracking(sessionID, defaultRedirect, "")
+	if err != nil {
+		tr.logger.Warn("Failed to use tracking-based redirect, falling back to default", "error", err)
+		return defaultRedirect
+	}
+	return redirectTo
+}
+
+// Legacy method - updated to return actual failure count
+func (tr *ToolRegistrar) getDeploymentFailureCount(sessionID string) int {
+	tracking, err := tr.loadDeploymentFailureTracking(sessionID)
+	if err != nil {
+		return 0
+	}
+	return tracking.TotalAttempts
 }
