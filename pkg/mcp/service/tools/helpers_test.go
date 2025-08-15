@@ -1,13 +1,13 @@
 package tools
 
 import (
-"context"
-"log/slog"
-"testing"
+	"context"
+	"log/slog"
+	"testing"
 
-"github.com/mark3labs/mcp-go/mcp"
-"github.com/stretchr/testify/assert"
-"github.com/stretchr/testify/require"
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateSessionID(t *testing.T) {

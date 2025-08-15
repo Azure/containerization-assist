@@ -1,18 +1,18 @@
 package tools
 
 import (
-"context"
-"encoding/json"
-"fmt"
-"time"
+	"context"
+	"encoding/json"
+	"fmt"
+	"time"
 
-"log/slog"
+	"log/slog"
 
-"github.com/mark3labs/mcp-go/mcp"
-"github.com/pkg/errors"
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/pkg/errors"
 
-domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-"github.com/mark3labs/mcp-go/server"
+	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 // RegisterTools registers all tools based on their configurations
@@ -24,7 +24,6 @@ func RegisterTools(mcpServer *server.MCPServer, deps ToolDependencies) error {
 	}
 	return nil
 }
-
 
 // RegisterTool registers a single tool based on its configuration
 func RegisterTool(mcpServer *server.MCPServer, config ToolConfig, deps ToolDependencies) error {
@@ -192,7 +191,6 @@ func createUtilityHandler(config ToolConfig, deps ToolDependencies) func(context
 		}
 	}
 }
-
 
 // Handler implementations for specific tools
 
