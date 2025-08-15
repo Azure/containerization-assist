@@ -88,7 +88,7 @@ if (!fs.existsSync(binaryPath)) {
 // Make binary executable (Unix-like systems)
 if (platform !== 'win32') {
   try {
-    fs.chmodSync(binaryPath, 0o755);
+    fs.chmodSync(binaryPath, EXECUTABLE_PERMISSIONS);
     log(`✓ Made binary executable: ${binaryName}`, 'green');
   } catch (err) {
     log(`⚠ Could not make binary executable: ${err.message}`, 'yellow');
