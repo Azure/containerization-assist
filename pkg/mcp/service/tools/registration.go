@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"time"
 
 	"log/slog"
@@ -19,24 +18,6 @@ import (
 // RegisterTools registers all tools based on their configurations
 func RegisterTools(mcpServer *server.MCPServer, deps ToolDependencies) error {
 	for _, config := range toolConfigs {
-		if err := RegisterTool(mcpServer, config, deps); err != nil {
-			return errors.Wrapf(err, "failed to register tool %s", config.Name)
-		}
-	}
-	return nil
-}
-
-// RegisterToolsExcept registers all tools except those in the exclusion list
-func RegisterToolsExcept(mcpServer *server.MCPServer, deps ToolDependencies, excludeTools []string) error {
-	excludeMap := make(map[string]bool)
-	for _, toolName := range excludeTools {
-		excludeMap[toolName] = true
-	}
-
-	for _, config := range toolConfigs {
-		if excludeMap[config.Name] {
-			continue // Skip excluded tools
-		}
 		if err := RegisterTool(mcpServer, config, deps); err != nil {
 			return errors.Wrapf(err, "failed to register tool %s", config.Name)
 		}
@@ -209,30 +190,6 @@ func createUtilityHandler(config ToolConfig, deps ToolDependencies) func(context
 			return &result, nil
 		}
 	}
-}
-
-// getStepFromProvider uses reflection to call the appropriate getter method
-func getStepFromProvider(provider domainworkflow.StepProvider, methodName string) (domainworkflow.Step, error) {
-	providerValue := reflect.ValueOf(provider)
-	method := providerValue.MethodByName(methodName)
-
-	if !method.IsValid() {
-		return nil, errors.Errorf("method %s not found on StepProvider", methodName)
-	}
-
-	// Call the method
-	results := method.Call(nil)
-	if len(results) != 1 {
-		return nil, errors.Errorf("unexpected number of return values from %s", methodName)
-	}
-
-	// Convert to Step interface
-	step, ok := results[0].Interface().(domainworkflow.Step)
-	if !ok {
-		return nil, errors.Errorf("method %s did not return a Step", methodName)
-	}
-
-	return step, nil
 }
 
 // Handler implementations for specific tools
