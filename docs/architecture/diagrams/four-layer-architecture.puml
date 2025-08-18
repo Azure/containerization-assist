@@ -1,6 +1,6 @@
-@startuml Container Kit MCP - Four-Layer Clean Architecture
+@startuml Containerization Assist MCP - Four-Layer Clean Architecture
 !theme plain
-title Container Kit MCP Server - Four-Layer Clean Architecture\nPhases 1-6 Complete: Wire DI, Quality Gates, Documentation
+title Containerization Assist MCP Server - Four-Layer Clean Architecture\nPhases 1-6 Complete: Wire DI, Quality Gates, Documentation
 
 ' Define layer colors
 !define API_COLOR #E8F5E9

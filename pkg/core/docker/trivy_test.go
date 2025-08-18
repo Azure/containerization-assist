@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	coresecurity "github.com/Azure/container-kit/pkg/core/security"
+	coresecurity "github.com/Azure/containerization-assist/pkg/core/security"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )

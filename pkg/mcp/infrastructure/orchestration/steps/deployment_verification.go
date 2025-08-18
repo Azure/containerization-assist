@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/errors"
+	"github.com/Azure/containerization-assist/pkg/common/errors"
 )
 
 // DeploymentDiagnostics contains comprehensive diagnostics for a deployment

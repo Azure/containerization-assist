@@ -1,5 +1,5 @@
-# Container Kit User Update Script for Windows
-# This script updates Container Kit MCP Server to the latest version
+# Containerization Assist User Update Script for Windows
+# This script updates Containerization Assist MCP Server to the latest version
 
 param(
     [switch]$Force,
@@ -8,8 +8,8 @@ param(
 
 # Configuration
 $RepoOwner = "Azure"
-$RepoName = "container-kit"
-$BinaryName = "container-kit-mcp"
+$RepoName = "containerization-assist"
+$BinaryName = "containerization-assist-mcp"
 
 # Colors for output (Windows PowerShell compatible)
 function Write-ColorText {
@@ -52,7 +52,7 @@ function Write-Step {
 # Show help
 function Show-Help {
     Write-Host @"
-Container Kit Update Script for Windows
+Containerization Assist Update Script for Windows
 
 USAGE:
     .\update-user.ps1 [OPTIONS]
@@ -62,7 +62,7 @@ OPTIONS:
     -Help       Show this help message
 
 DESCRIPTION:
-    This script updates Container Kit to the latest version available on GitHub.
+    This script updates Containerization Assist to the latest version available on GitHub.
     It will:
     1. Check your current version
     2. Check for the latest version on GitHub
@@ -167,13 +167,13 @@ function Compare-Versions {
     }
 }
 
-# Check if Container Kit is running
-function Test-ContainerKitRunning {
+# Check if Containerization Assist is running
+function Test-ContainerizationAssistRunning {
     $processes = Get-Process -Name $BinaryName -ErrorAction SilentlyContinue
     
     if ($processes) {
-        Write-Warning-Custom "Container Kit appears to be running (PIDs: $($processes.Id -join ', '))"
-        Write-Info "Please close Claude Desktop and any running Container Kit processes"
+        Write-Warning-Custom "Containerization Assist appears to be running (PIDs: $($processes.Id -join ', '))"
+        Write-Info "Please close Claude Desktop and any running Containerization Assist processes"
         
         if (-not $Force) {
             $continue = Read-Host "Do you want to continue with the update anyway? (y/N)"
@@ -209,9 +209,9 @@ function Backup-Current {
     }
 }
 
-# Update Container Kit
-function Update-ContainerKit {
-    Write-Step "Updating Container Kit..."
+# Update Containerization Assist
+function Update-ContainerizationAssist {
+    Write-Step "Updating Containerization Assist..."
     
     try {
         # Download and run the setup script
@@ -285,7 +285,7 @@ function Show-Summary {
     )
     
     Write-Host ""
-    Write-Success "🎉 Container Kit Update Complete!"
+    Write-Success "🎉 Containerization Assist Update Complete!"
     Write-Host ""
     Write-Info "Version Update:"
     Write-Info "  • From: $OldVersion"
@@ -293,7 +293,7 @@ function Show-Summary {
     Write-Host ""
     Write-Info "Next Steps:"
     Write-Info "1. 🔄 Restart Claude Desktop (if it was running)"
-    Write-Info "2. 🧪 Test the connection by asking Claude about Container Kit tools"
+    Write-Info "2. 🧪 Test the connection by asking Claude about Containerization Assist tools"
     Write-Info "3. 📖 Check the changelog for new features: https://github.com/$RepoOwner/$RepoName/releases/latest"
     Write-Host ""
     Write-Info "If you encounter any issues:"
@@ -310,8 +310,8 @@ function Main {
     }
     
     Write-Host ""
-    Write-Info "=== Container Kit Update Script for Windows ==="
-    Write-Info "This script will update Container Kit to the latest version"
+    Write-Info "=== Containerization Assist Update Script for Windows ==="
+    Write-Info "This script will update Containerization Assist to the latest version"
     Write-Host ""
     
     # Get current version
@@ -358,14 +358,14 @@ function Main {
     }
     
     # Check if running
-    Test-ContainerKitRunning
+    Test-ContainerizationAssistRunning
     
     # Backup current installation
     $backupPath = Backup-Current
     
     # Perform update
     try {
-        if (Update-ContainerKit) {
+        if (Update-ContainerizationAssist) {
             if (Test-Update) {
                 $newVersion = Get-CurrentVersion
                 Show-Summary -OldVersion $currentVersion -NewVersion $newVersion

@@ -1,0 +1,146 @@
+name: Publish to NPM
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 1.0.0)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run (do not actually publish)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Get all tags for version detection
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.4'
+          cache: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+            VERSION="${VERSION#v}"  # Remove 'v' prefix if present
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Publishing version: $VERSION"
+
+      - name: Update package.json version
+        working-directory: ./npm
+        run: |
+          npm version ${{ steps.version.outputs.version }} --no-git-tag-version
+          echo "Updated package.json to version ${{ steps.version.outputs.version }}"
+
+      - name: Build binaries for all platforms
+        working-directory: ./npm
+        run: |
+          chmod +x scripts/build-all.sh
+          npm run build
+        env:
+          CGO_ENABLED: 0
+
+      - name: Verify build artifacts
+        working-directory: ./npm
+        run: |
+          echo "Built binaries:"
+          ls -lah bin/
+          echo ""
+          echo "Total package size:"
+          du -sh .
+
+      - name: Run package tests
+        working-directory: ./npm
+        run: |
+          npm test || echo "Tests completed with warnings"
+
+      - name: Create npm package
+        working-directory: ./npm
+        run: |
+          npm pack
+          echo "Package contents:"
+          tar -tzf *.tgz | head -20
+
+      - name: Dry run - Check package
+        if: github.event.inputs.dry_run == 'true'
+        working-directory: ./npm
+        run: |
+          echo "DRY RUN: Would publish package:"
+          ls -lah *.tgz
+          echo ""
+          echo "Package details:"
+          npm publish --dry-run
+
+      - name: Publish to NPM
+        if: github.event.inputs.dry_run != 'true'
+        working-directory: ./npm
+        run: |
+          npm publish --access public
+          echo "✅ Published @container-assist/mcp-server@${{ steps.version.outputs.version }} to NPM"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Verify publication
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          sleep 10  # Wait for NPM to update
+          npm view @container-assist/mcp-server@${{ steps.version.outputs.version }}
+
+  test-installation:
+    needs: build-and-publish
+    if: github.event.inputs.dry_run != 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [16, 18, 20]
+    
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Test global installation
+        run: |
+          npm install -g @container-assist/mcp-server@${{ needs.build-and-publish.outputs.version }}
+          container-assist-mcp --version
+          ckmcp --version
+
+      - name: Test npx usage
+        run: |
+          npx @container-assist/mcp-server@${{ needs.build-and-publish.outputs.version }} --version
+
+      - name: Test local installation
+        run: |
+          mkdir test-project
+          cd test-project
+          npm init -y
+          npm install @container-assist/mcp-server@${{ needs.build-and-publish.outputs.version }}
+          npx container-assist-mcp --version

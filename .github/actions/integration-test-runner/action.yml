@@ -11,7 +11,7 @@ inputs:
   binary-name:
     description: "Name of the binary to use"
     required: false
-    default: "container-kit"
+    default: "containerization-assist"
   azure-openai-key:
     description: "Azure OpenAI API key"
     required: false
@@ -95,10 +95,10 @@ runs:
         fi
 
         # Copy snapshot files to run artifacts if they exist
-        if [ -d ".container-kit" ]; then
-          cp -r .container-kit artifacts/snapshot
+        if [ -d ".containerization-assist" ]; then
+          cp -r .containerization-assist artifacts/snapshot
         else
-          echo "No .container-kit directory found - skipping snapshot copy"
+          echo "No .containerization-assist directory found - skipping snapshot copy"
         fi
 
         # Determine test result

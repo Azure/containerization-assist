@@ -33,7 +33,7 @@ func getArchitectureRules() map[ArchitectureLayer]LayerRules {
 	return map[ArchitectureLayer]LayerRules{
 		APILayer: {
 			Name:           "API Layer",
-			PackagePattern: "github.com/Azure/container-kit/pkg/mcp/api",
+			PackagePattern: "github.com/Azure/containerization-assist/pkg/mcp/api",
 			CanImport:      []ArchitectureLayer{DomainLayer}, // Only domain interfaces
 			CannotImport: []string{
 				"/infrastructure/",
@@ -52,7 +52,7 @@ func getArchitectureRules() map[ArchitectureLayer]LayerRules {
 		},
 		ServiceLayer: {
 			Name:           "Service Layer",
-			PackagePattern: "github.com/Azure/container-kit/pkg/mcp/service",
+			PackagePattern: "github.com/Azure/containerization-assist/pkg/mcp/service",
 			CanImport:      []ArchitectureLayer{APILayer, DomainLayer}, // Can use API and domain
 			CannotImport: []string{
 				"/infrastructure/", // Should not directly import infrastructure
@@ -67,7 +67,7 @@ func getArchitectureRules() map[ArchitectureLayer]LayerRules {
 		},
 		DomainLayer: {
 			Name:           "Domain Layer",
-			PackagePattern: "github.com/Azure/container-kit/pkg/mcp/domain",
+			PackagePattern: "github.com/Azure/containerization-assist/pkg/mcp/domain",
 			CanImport:      []ArchitectureLayer{}, // Only other domain packages
 			CannotImport: []string{
 				"/infrastructure/",
@@ -88,7 +88,7 @@ func getArchitectureRules() map[ArchitectureLayer]LayerRules {
 		},
 		InfrastructureLayer: {
 			Name:           "Infrastructure Layer",
-			PackagePattern: "github.com/Azure/container-kit/pkg/mcp/infrastructure",
+			PackagePattern: "github.com/Azure/containerization-assist/pkg/mcp/infrastructure",
 			CanImport:      []ArchitectureLayer{DomainLayer}, // Can import domain, but not api/application
 			CannotImport: []string{
 				"/service/",
@@ -135,7 +135,7 @@ func TestDependencyInversionPrinciple(t *testing.T) {
 // TestConfigurationCentralization ensures config is centralized
 func TestConfigurationCentralization(t *testing.T) {
 	allowedConfigPackages := []string{
-		"github.com/Azure/container-kit/pkg/mcp/service/config",
+		"github.com/Azure/containerization-assist/pkg/mcp/service/config",
 	}
 
 	forbiddenConfigPatterns := []string{
@@ -144,7 +144,7 @@ func TestConfigurationCentralization(t *testing.T) {
 		"settings.go",
 	}
 
-	infrastructurePackages := findPackagesInLayer(t, "github.com/Azure/container-kit/pkg/mcp/infrastructure")
+	infrastructurePackages := findPackagesInLayer(t, "github.com/Azure/containerization-assist/pkg/mcp/infrastructure")
 
 	for _, pkg := range infrastructurePackages {
 		t.Run(pkg, func(t *testing.T) {
@@ -168,7 +168,7 @@ func findPackagesInLayer(t *testing.T, pattern string) []string {
 		if info.IsDir() && strings.Contains(path, "pkg/mcp/") {
 			// Convert file path to import path
 			relPath := strings.TrimPrefix(path, baseDir)
-			importPath := "github.com/Azure/container-kit/" + strings.ReplaceAll(relPath, string(os.PathSeparator), "/")
+			importPath := "github.com/Azure/containerization-assist/" + strings.ReplaceAll(relPath, string(os.PathSeparator), "/")
 
 			if strings.Contains(importPath, pattern) {
 				packages = append(packages, importPath)
@@ -251,8 +251,8 @@ func validateNoScatteredConfig(t *testing.T, pkgPath string, allowedPackages []s
 func TestPerformanceConstraints(t *testing.T) {
 	// Check for performance anti-patterns in hot paths
 	hotPathPackages := []string{
-		"github.com/Azure/container-kit/pkg/mcp/domain/workflow",
-		"github.com/Azure/container-kit/pkg/mcp/service",
+		"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow",
+		"github.com/Azure/containerization-assist/pkg/mcp/service",
 	}
 
 	performanceAntiPatterns := []string{

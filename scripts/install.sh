@@ -1,6 +1,6 @@
 #!/bin/bash
-# Container Kit Installation Script
-# This script downloads and installs the latest version of container-kit
+# Containerization Assist Installation Script
+# This script downloads and installs the latest version of containerization-assist
 
 set -e
 
@@ -12,8 +12,8 @@ NC='\033[0m' # No Color
 
 # Configuration
 REPO_OWNER="Azure"
-REPO_NAME="container-kit"
-BINARY_NAME="container-kit"
+REPO_NAME="containerization-assist"
+BINARY_NAME="containerization-assist"
 INSTALL_DIR="/usr/local/bin"
 FALLBACK_DIR="$HOME/bin"
 
@@ -207,7 +207,7 @@ verify_installation() {
 
 # Main installation flow
 main() {
-    print_info "=== Container Kit Installation Script ==="
+    print_info "=== Containerization Assist Installation Script ==="
     print_info ""
 
     # Check for existing installation

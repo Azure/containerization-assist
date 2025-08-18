@@ -3,7 +3,7 @@ package messaging
 import (
 	"context"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/containerization-assist/pkg/mcp/api"
 )
 
 // NoOpEmitter is a no-operation progress emitter for testing or when progress reporting is disabled

@@ -7,11 +7,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/common/errors"
-	"github.com/Azure/container-kit/pkg/common/logger"
-	"github.com/Azure/container-kit/pkg/common/runner"
-	"github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/core/kind"
+	"github.com/Azure/containerization-assist/pkg/common/errors"
+	"github.com/Azure/containerization-assist/pkg/common/logger"
+	"github.com/Azure/containerization-assist/pkg/common/runner"
+	"github.com/Azure/containerization-assist/pkg/core/docker"
+	"github.com/Azure/containerization-assist/pkg/core/kind"
 )
 
 // ValidateKindInstalled checks if 'kind' is installed, installs it if missing based on OS.
@@ -72,28 +72,28 @@ func GetKindCluster(ctx context.Context, kindRunner kind.KindRunner, docker dock
 	clusters := strings.Split(string(output), "\n")
 	exists := false
 	for _, cluster := range clusters {
-		if strings.TrimSpace(cluster) == "container-kit" {
+		if strings.TrimSpace(cluster) == "containerization-assist" {
 			exists = true
-			logger.Infof("found existing 'container-kit' cluster")
+			logger.Infof("found existing 'containerization-assist' cluster")
 			break
 		}
 	}
 
 	if exists {
-		logger.Warn("Deleting existing kind cluster 'container-kit'")
-		if output, err = kindRunner.DeleteCluster(ctx, "container-kit"); err != nil {
+		logger.Warn("Deleting existing kind cluster 'containerization-assist'")
+		if output, err = kindRunner.DeleteCluster(ctx, "containerization-assist"); err != nil {
 			return "", errors.New(errors.CodeOperationFailed, "kind", fmt.Sprintf("failed to delete existing kind cluster: %s, error: %v", output, err), err)
 		}
 	}
-	logger.Info("Creating kind cluster 'container-kit'")
+	logger.Info("Creating kind cluster 'containerization-assist'")
 	if err := SetupLocalRegistryCluster(ctx, kindRunner, docker); err != nil {
 		return "", errors.New(errors.CodeOperationFailed, "kind", fmt.Sprintf("setting up local registry cluster: %v", err), err)
 	}
 
-	logger.Info("Setting kubectl context to 'kind-container-kit'")
+	logger.Info("Setting kubectl context to 'kind-containerization-assist'")
 	// Create a kube runner to set context
 	kubeRunner := NewKubeCmdRunner(&runner.DefaultCommandRunner{})
-	if output, err = kubeRunner.SetKubeContext(ctx, "kind-container-kit"); err != nil {
+	if output, err = kubeRunner.SetKubeContext(ctx, "kind-containerization-assist"); err != nil {
 		return "", errors.New(errors.CodeOperationFailed, "kind", fmt.Sprintf("failed to set kubectl context: %s, error: %v", output, err), err)
 	}
 

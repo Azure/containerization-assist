@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/errors"
-	"github.com/Azure/container-kit/pkg/common/runner"
+	"github.com/Azure/containerization-assist/pkg/common/errors"
+	"github.com/Azure/containerization-assist/pkg/common/runner"
 )
 
 type DockerClient interface {
@@ -18,6 +18,7 @@ type DockerClient interface {
 	Push(ctx context.Context, imageTag string) (string, error)
 	Pull(ctx context.Context, imageRef string) (string, error)
 	Tag(ctx context.Context, sourceRef, targetRef string) (string, error)
+	Inspect(ctx context.Context, imageRef string) (string, error)
 	Login(ctx context.Context, registry, username, password string) (string, error)
 	LoginWithToken(ctx context.Context, registry, token string) (string, error)
 	Logout(ctx context.Context, registry string) (string, error)
@@ -49,7 +50,8 @@ func (d *DockerCmdRunner) Version(ctx context.Context) (string, error) {
 }
 
 func (d *DockerCmdRunner) Build(ctx context.Context, dockerfilePath, imageTag, contextPath string) (string, error) {
-	return d.runner.RunCommandStderr("docker", "build", "-q", "-f", dockerfilePath, "-t", imageTag, contextPath)
+	// The -q flag makes docker output only the image ID to stdout on success
+	return d.runner.RunCommand("docker", "build", "-q", "-f", dockerfilePath, "-t", imageTag, contextPath)
 }
 
 func (d *DockerCmdRunner) Push(ctx context.Context, image string) (string, error) {
@@ -62,6 +64,10 @@ func (d *DockerCmdRunner) Pull(ctx context.Context, imageRef string) (string, er
 
 func (d *DockerCmdRunner) Tag(ctx context.Context, sourceRef, targetRef string) (string, error) {
 	return d.runner.RunCommand("docker", "tag", sourceRef, targetRef)
+}
+
+func (d *DockerCmdRunner) Inspect(ctx context.Context, imageRef string) (string, error) {
+	return d.runner.RunCommand("docker", "inspect", imageRef)
 }
 
 func (d *DockerCmdRunner) Login(ctx context.Context, registry, username, password string) (string, error) {

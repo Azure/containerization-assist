@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/containerization-assist/pkg/mcp/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

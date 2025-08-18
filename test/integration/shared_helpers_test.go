@@ -49,7 +49,7 @@ func startMCPServerProcess(ctx context.Context, testWorkspaceDir string) *MCPSer
 
 	// Create unique workspace and store paths for this test instance
 	if testWorkspaceDir == "" {
-		testWorkspaceDir = "/tmp/container-kit-test-workspace"
+		testWorkspaceDir = "/tmp/containerization-assist-test-workspace"
 	}
 
 	// Ensure unique paths by appending process PID and timestamp

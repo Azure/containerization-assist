@@ -11,10 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/errors"
-	"github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/utils"
+	"github.com/Azure/containerization-assist/pkg/common/errors"
+	"github.com/Azure/containerization-assist/pkg/common/runner"
+	"github.com/Azure/containerization-assist/pkg/core/docker"
+	"github.com/Azure/containerization-assist/pkg/core/kubernetes"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/core/utils"
 	"github.com/rs/zerolog"
 )
 
@@ -172,7 +174,7 @@ func (s *BuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) 
 		Data: map[string]interface{}{
 			"image_id":   buildResult.ImageID,
 			"image_ref":  fmt.Sprintf("%s:%s", buildResult.ImageName, buildResult.ImageTag),
-			"image_size": buildResult.Size,
+			"image_size": formatBytes(buildResult.Size),
 			"build_time": buildResult.BuildTime.Format(time.RFC3339),
 		},
 		Metadata: map[string]interface{}{
@@ -337,26 +339,75 @@ func NewTagStep() workflow.Step    { return &TagStep{} }
 func (s *TagStep) Name() string    { return "tag_image" }
 func (s *TagStep) MaxRetries() int { return 2 }
 func (s *TagStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
-	if state.BuildResult == nil {
-		return nil, errors.New(errors.CodeInvalidState, "tag_step", "build result is required for image tagging", nil)
+	if state.BuildResult == nil || state.BuildResult.ImageID == "" {
+		state.Logger.Error("Cannot tag image: missing build result",
+			"hint", "Run build_image and ensure it succeeds before tag_image. Fix/regenerate Dockerfile if the build failed.")
+		return &workflow.StepResult{
+				Success: false,
+			}, errors.New(
+				errors.CodeInvalidState,
+				"tag_step",
+				"cannot tag image: build result is missing or incomplete; do not proceed. Run build_image again after fixing Dockerfile.",
+				nil,
+			)
 	}
 
 	state.Logger.Info("Step 5: Tagging image for registry")
 
 	// Extract tag from request parameters, default to "latest" if not provided
 	imageTag := extractAndValidateTag(state, state.Logger)
-
 	imageName := utils.ExtractRepoName(state.RepoIdentifier)
 
+	// In test mode, skip actual Docker operations
+	if state.IsTestMode() {
+		state.Logger.Info("Test mode: Simulating Docker tag",
+			"source_image_id", state.BuildResult.ImageID,
+			"target_image", fmt.Sprintf("%s:%s", imageName, imageTag))
+
+		// Update the build result with the final tag
+		state.BuildResult.ImageRef = fmt.Sprintf("%s:%s", imageName, imageTag)
+
+		state.Logger.Info("Test mode: Image tag simulation completed",
+			"image_name", imageName,
+			"image_tag", imageTag,
+			"image_ref", state.BuildResult.ImageRef)
+
+		return &workflow.StepResult{Success: true}, nil
+	}
+
+	// Actually tag the Docker image using the built image ID
+	sourceImage := state.BuildResult.ImageID
+	targetImage := fmt.Sprintf("%s:%s", imageName, imageTag)
+
+	// Create Docker registry manager for tagging
+	dockerClient := docker.NewDockerCmdRunner(nil)
+	registryManager := docker.NewRegistryManager(dockerClient, state.Logger)
+
+	state.Logger.Info("Tagging Docker image",
+		"source_image_id", sourceImage,
+		"target_image", targetImage)
+
+	tagResult, err := registryManager.TagImage(ctx, sourceImage, targetImage)
+	if err != nil {
+		return nil, errors.New(errors.CodeOperationFailed, "tag_step", fmt.Sprintf("failed to tag image: %v", err), err)
+	}
+
+	if !tagResult.Success {
+		errorMsg := "Docker tag operation failed"
+		if tagResult.Error != nil {
+			errorMsg = tagResult.Error.Message
+		}
+		return nil, errors.New(errors.CodeOperationFailed, "tag_step", errorMsg, nil)
+	}
+
 	// Update the build result with the final tag
-	state.BuildResult.ImageRef = fmt.Sprintf("%s:%s", imageName, imageTag)
+	state.BuildResult.ImageRef = targetImage
 
 	state.Logger.Info("Image tagged successfully",
 		"image_name", imageName,
 		"image_tag", imageTag,
-		"image_ref", state.BuildResult.ImageRef)
-
-	// Return basic success result
+		"image_ref", state.BuildResult.ImageRef,
+		"source_image_id", sourceImage)
 
 	return &workflow.StepResult{Success: true}, nil
 }
@@ -376,7 +427,8 @@ func (s *PushStep) Execute(ctx context.Context, state *workflow.WorkflowState) (
 
 	// Update the build result with the correct local registry reference for kind deployment
 	imageName := utils.ExtractRepoName(state.RepoIdentifier)
-	imageTag := "latest"
+	// Preserve the tag from the previous TagStep instead of hardcoding "latest"
+	imageTag := parseImageReference(state.BuildResult.ImageRef)
 	localRegistryImageRef := fmt.Sprintf("localhost:5001/%s:%s", imageName, imageTag)
 
 	// Update both BuildResult and Result with the correct local registry reference
@@ -389,7 +441,7 @@ func (s *PushStep) Execute(ctx context.Context, state *workflow.WorkflowState) (
 	state.Logger.Info("Build result:",
 		"image_id", state.BuildResult.ImageID,
 		"image_ref", state.BuildResult.ImageRef,
-		"image_size", state.BuildResult.ImageSize,
+		"image_size", formatBytes(state.BuildResult.ImageSize),
 		"build_time", state.BuildResult.BuildTime,
 	)
 
@@ -414,7 +466,7 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 
 	if manifestsData, exists := state.RequestParams["manifests"]; exists {
 		if manifestsMap, ok := manifestsData.(map[string]interface{}); ok {
-			state.Logger.Info("Using provided structured Kubernetes manifests from save_k8s_manifests tool")
+			state.Logger.Info("Using provided Kubernetes manifests from the LLM Host")
 
 			// Create manifests directory
 			manifestsDir := filepath.Join(state.AnalyzeResult.RepoPath, "manifests")
@@ -458,7 +510,7 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 	}
 
 	// If no content provided, generate manifests normally
-	state.Logger.Info("Step 6: Generating Kubernetes manifests")
+	state.Logger.Info("Generating Kubernetes manifests through the MCP")
 
 	// Check if deployment is actually requested
 	shouldDeploy := state.Args.Deploy == nil || *state.Args.Deploy
@@ -600,9 +652,16 @@ func (s *ClusterStep) Execute(ctx context.Context, state *workflow.WorkflowState
 	} else {
 		// Setup kind cluster with registry
 		var err error
-		registryURL, err = SetupKindCluster(ctx, "container-kit", state.Logger)
+		registryURL, err = SetupKindCluster(ctx, "containerization-assist", state.Logger)
 		if err != nil {
 			return nil, errors.New(errors.CodeKubernetesApiError, "cluster_step", "kind cluster setup failed", err)
+		}
+
+		// Wait for nodes to become ready after cluster setup
+		state.Logger.Info("Waiting for cluster nodes to become ready...")
+		if err := waitForNodesReady(ctx, state.Logger); err != nil {
+			state.Logger.Warn("Nodes may not be fully ready, but continuing", "error", err)
+			// Don't fail the step, just warn - nodes often become ready shortly after
 		}
 	}
 
@@ -647,11 +706,11 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 	if state.BuildResult != nil && !state.IsTestMode() {
 		infraBuildResult := &BuildResult{
 			ImageName: utils.ExtractRepoName(state.RepoIdentifier),
-			ImageTag:  "latest",
+			ImageTag:  parseImageReference(state.BuildResult.ImageRef),
 			ImageID:   state.BuildResult.ImageID,
 		}
 
-		err := LoadImageToKind(ctx, infraBuildResult, "container-kit", state.Logger)
+		err := LoadImageToKind(ctx, infraBuildResult, "containerization-assist", state.Logger)
 		if err != nil {
 			return nil, errors.New(errors.CodeImagePullFailed, "deploy_step", "failed to load image to kind", err)
 		}
@@ -977,4 +1036,31 @@ func parseImageReference(imageRef string) string {
 	}
 
 	return "latest"
+}
+
+// waitForNodesReady waits for Kubernetes nodes to become ready
+func waitForNodesReady(ctx context.Context, logger *slog.Logger) error {
+	kubeRunner := kubernetes.NewKubeCmdRunner(&runner.DefaultCommandRunner{})
+	maxAttempts := 12 // 60 seconds total (5 seconds * 12)
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		// Check node status
+		output, err := kubeRunner.GetNodes(ctx)
+		if err != nil {
+			logger.Warn("Failed to get node status", "attempt", attempt, "error", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		// Check if nodes are ready (not tainted with not-ready)
+		if strings.Contains(string(output), "Ready") && !strings.Contains(string(output), "NotReady") {
+			logger.Info("Cluster nodes are ready", "attempt", attempt)
+			return nil
+		}
+
+		logger.Info("Waiting for nodes to become ready...", "attempt", attempt, "max_attempts", maxAttempts)
+		time.Sleep(5 * time.Second)
+	}
+
+	return fmt.Errorf("nodes did not become ready within timeout period")
 }

@@ -7,11 +7,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Azure/container-kit/pkg/common/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/resources"
-	"github.com/Azure/container-kit/pkg/mcp/service/registrar"
-	"github.com/Azure/container-kit/pkg/mcp/service/session"
+	"github.com/Azure/containerization-assist/pkg/common/errors"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/core/resources"
+	"github.com/Azure/containerization-assist/pkg/mcp/service/registrar"
+	"github.com/Azure/containerization-assist/pkg/mcp/service/session"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -68,7 +68,7 @@ func (b *Bootstrapper) CreateMCPServer() *server.MCPServer {
 	b.logger.Info("Creating mcp-go server with capabilities")
 
 	mcpServer := server.NewMCPServer(
-		"container-kit-v2",
+		"containerization-assist-v2",
 		"1.0.0",
 		server.WithResourceCapabilities(true, true),
 		server.WithPromptCapabilities(true),

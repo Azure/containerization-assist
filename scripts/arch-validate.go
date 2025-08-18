@@ -1,4 +1,4 @@
-// Package main provides a command-line architecture validation tool for Container Kit MCP
+// Package main provides a command-line architecture validation tool for Containerization Assist MCP
 package main
 
 import (
@@ -33,7 +33,7 @@ type ValidationResult struct {
 }
 
 func main() {
-	fmt.Println("🏗️  Container Kit MCP Architecture Validator")
+	fmt.Println("🏗️  Containerization Assist MCP Architecture Validator")
 	fmt.Println("============================================")
 
 	rules := getArchitectureRules()

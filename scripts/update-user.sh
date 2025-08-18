@@ -1,6 +1,6 @@
 #!/bin/bash
-# Container Kit User Update Script
-# This script updates Container Kit MCP Server to the latest version
+# Containerization Assist User Update Script
+# This script updates Containerization Assist MCP Server to the latest version
 
 set -e
 
@@ -13,8 +13,8 @@ NC='\033[0m' # No Color
 
 # Configuration
 REPO_OWNER="Azure"
-REPO_NAME="container-kit"
-BINARY_NAME="container-kit-mcp"
+REPO_NAME="containerization-assist"
+BINARY_NAME="containerization-assist-mcp"
 
 # Print colored messages
 print_error() {
@@ -94,14 +94,14 @@ version_compare() {
     fi
 }
 
-# Check if Container Kit is running
+# Check if Containerization Assist is running
 check_if_running() {
     local pids
     pids=$(pgrep -f "$BINARY_NAME" 2>/dev/null || true)
     
     if [ -n "$pids" ]; then
-        print_warning "Container Kit appears to be running (PIDs: $pids)"
-        print_info "Please close Claude Desktop and any running Container Kit processes"
+        print_warning "Containerization Assist appears to be running (PIDs: $pids)"
+        print_info "Please close Claude Desktop and any running Containerization Assist processes"
         
         read -p "Do you want to continue with the update anyway? (y/N) " -n 1 -r
         echo
@@ -134,9 +134,9 @@ backup_current() {
     fi
 }
 
-# Update Container Kit
-update_container_kit() {
-    print_step "Updating Container Kit..."
+# Update Containerization Assist
+update_containerization_assist() {
+    print_step "Updating Containerization Assist..."
     
     # Use the setup script to install the latest version
     if command_exists curl; then
@@ -189,7 +189,7 @@ show_summary() {
     local new_version="$2"
     
     echo
-    print_success "🎉 Container Kit Update Complete!"
+    print_success "🎉 Containerization Assist Update Complete!"
     echo
     print_info "Version Update:"
     print_info "  • From: $old_version"
@@ -197,7 +197,7 @@ show_summary() {
     echo
     print_info "Next Steps:"
     print_info "1. 🔄 Restart Claude Desktop (if it was running)"
-    print_info "2. 🧪 Test the connection by asking Claude about Container Kit tools"
+    print_info "2. 🧪 Test the connection by asking Claude about Containerization Assist tools"
     print_info "3. 📖 Check the changelog for new features: https://github.com/$REPO_OWNER/$REPO_NAME/releases/latest"
     echo
     print_info "If you encounter any issues:"
@@ -209,8 +209,8 @@ show_summary() {
 # Main update flow
 main() {
     echo
-    print_info "=== Container Kit Update Script ==="
-    print_info "This script will update Container Kit to the latest version"
+    print_info "=== Containerization Assist Update Script ==="
+    print_info "This script will update Containerization Assist to the latest version"
     echo
     
     # Get current and latest versions
@@ -257,7 +257,7 @@ main() {
     backup_path=$(backup_current)
     
     # Perform update
-    if update_container_kit; then
+    if update_containerization_assist; then
         if verify_update; then
             local new_version
             new_version=$(get_current_version)

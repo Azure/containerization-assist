@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/Azure/container-kit/pkg/common/runner"
+	"github.com/Azure/containerization-assist/pkg/common/runner"
 )
 
 type KindRunner interface {
@@ -59,7 +59,7 @@ func (k *KindCmdRunner) SetupRegistry(ctx context.Context) (string, error) {
         if (-Not (docker network inspect kind -ErrorAction SilentlyContinue)) { docker network create kind }
         if (-Not (docker ps -q -f name=kind-registry)) { docker run -d --restart=always -p 5001:5000 --name kind-registry registry:2 }
         if (-Not (docker network inspect kind | Select-String kind-registry)) { docker network connect kind kind-registry }
-        kind create cluster --name container-kit
+        kind create cluster --name containerization-assist
 		$configMap = @"
 kubectl apply -f - <<EOF
 apiVersion: v1
@@ -104,7 +104,7 @@ fi
 # https://github.com/kubernetes-sigs/kind/issues/2875
 # https://github.com/containerd/containerd/blob/main/docs/cri/config.md#registry-configuration
 # See: https://github.com/containerd/containerd/blob/main/docs/hosts.md
-cat <<EOF | kind create cluster -n container-kit --config=-
+cat <<EOF | kind create cluster -n containerization-assist --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 containerdConfigPatches:
@@ -122,7 +122,7 @@ EOF
 # We want a consistent name that works from both ends, so we tell containerd to
 # alias localhost:${reg_port} to the registry container when pulling images
 REGISTRY_DIR="/etc/containerd/certs.d/localhost:${reg_port}"
-for node in $(kind get nodes -n container-kit); do
+for node in $(kind get nodes -n containerization-assist); do
   docker exec "${node}" mkdir -p "${REGISTRY_DIR}"
   cat <<EOF | docker exec -i "${node}" cp /dev/stdin "${REGISTRY_DIR}/hosts.toml"
 [host."http://${reg_name}:5000"]

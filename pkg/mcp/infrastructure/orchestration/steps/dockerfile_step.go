@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
 )
 
 func init() {

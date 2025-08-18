@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/errors"
+	"github.com/Azure/containerization-assist/pkg/common/errors"
 )
 
 // Builder provides mechanical Docker build operations without AI

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	mcperrors "github.com/Azure/container-kit/pkg/common/errors"
+	mcperrors "github.com/Azure/containerization-assist/pkg/common/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -446,7 +446,7 @@ func (s *SBOMGenerator) createSPDXDocument(source string, packages []Package) *S
 		DocumentNamespace: fmt.Sprintf("https://sbom.example.com/%s-%d", source, time.Now().Unix()),
 		CreationInfo: SPDXCreationInfo{
 			Created:            now,
-			Creators:           []string{"Tool: container-kit-security-scanner"},
+			Creators:           []string{"Tool: containerization-assist-security-scanner"},
 			LicenseListVersion: "3.19",
 		},
 		Packages:      []SPDXPackage{},

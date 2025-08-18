@@ -1,8 +1,8 @@
-# Container Kit Installation Script for Windows
-# This script downloads and installs the latest version of container-kit
+# Containerization Assist Installation Script for Windows
+# This script downloads and installs the latest version of containerization-assist
 
 param(
-    [string]$InstallDir = "$env:LOCALAPPDATA\Programs\container-kit",
+    [string]$InstallDir = "$env:LOCALAPPDATA\Programs\containerization-assist",
     [string]$Version = "latest"
 )
 
@@ -10,8 +10,8 @@ $ErrorActionPreference = "Stop"
 
 # Configuration
 $RepoOwner = "Azure"
-$RepoName = "container-kit"
-$BinaryName = "container-kit.exe"
+$RepoName = "containerization-assist"
+$BinaryName = "containerization-assist.exe"
 
 # Colors and output helpers
 function Write-ColorOutput($ForegroundColor) {
@@ -64,7 +64,7 @@ function Download-Binary {
     $arch = Get-Architecture
     $platform = "windows_$arch"
     
-    Write-Info "Downloading Container Kit for Windows ($arch)..."
+    Write-Info "Downloading Containerization Assist for Windows ($arch)..."
     
     # Construct download URLs
     if ($Version -eq "latest") {
@@ -76,7 +76,7 @@ function Download-Binary {
         $checksumUrl = "https://github.com/$RepoOwner/$RepoName/releases/download/$Version/checksums.txt"
     }
     
-    $archivePath = Join-Path $env:TEMP "container-kit_${platform}.zip"
+    $archivePath = Join-Path $env:TEMP "containerization-assist_${platform}.zip"
     $checksumPath = Join-Path $env:TEMP "checksums.txt"
     
     try {
@@ -111,7 +111,7 @@ function Download-Binary {
         
         # Extract archive
         Write-Info "Extracting binary..."
-        $extractPath = Join-Path $env:TEMP "container-kit-extract"
+        $extractPath = Join-Path $env:TEMP "containerization-assist-extract"
         if (Test-Path $extractPath) {
             Remove-Item -Path $extractPath -Recurse -Force
         }
@@ -119,7 +119,7 @@ function Download-Binary {
         Expand-Archive -Path $archivePath -DestinationPath $extractPath -Force
         
         # Find the binary
-        $binaryPath = Get-ChildItem -Path $extractPath -Filter "container-kit.exe" -Recurse | Select-Object -First 1
+        $binaryPath = Get-ChildItem -Path $extractPath -Filter "containerization-assist.exe" -Recurse | Select-Object -First 1
         if (!$binaryPath) {
             Write-Error-Message "Binary not found in archive"
             exit 1
@@ -129,7 +129,7 @@ function Download-Binary {
         $destPath = Join-Path $InstallDir $BinaryName
         Copy-Item -Path $binaryPath.FullName -Destination $destPath -Force
         
-        Write-Success "Successfully installed Container Kit to: $destPath"
+        Write-Success "Successfully installed Containerization Assist to: $destPath"
         
         # Cleanup
         Remove-Item -Path $archivePath -Force -ErrorAction SilentlyContinue
@@ -139,7 +139,7 @@ function Download-Binary {
         return $destPath
     }
     catch {
-        Write-Error-Message "Failed to download or extract Container Kit: $_"
+        Write-Error-Message "Failed to download or extract Containerization Assist: $_"
         exit 1
     }
 }
@@ -169,20 +169,20 @@ function Test-Installation {
     if (Test-Path $testPath) {
         try {
             $version = & $testPath --version 2>$null
-            Write-Success "✅ Container Kit is installed and accessible"
+            Write-Success "✅ Containerization Assist is installed and accessible"
             Write-Info "Version: $version"
             Write-Info ""
             Write-Info "To get started, run:"
-            Write-Info "  container-kit --help"
+            Write-Info "  containerization-assist --help"
             
-            if ($BinaryName -eq "container-kit.exe") {
+            if ($BinaryName -eq "containerization-assist.exe") {
                 Write-Info ""
                 Write-Info "For MCP server functionality, run:"
-                Write-Info "  container-kit-mcp"
+                Write-Info "  containerization-assist-mcp"
             }
         }
         catch {
-            Write-Error-Message "Container Kit was installed but cannot be executed"
+            Write-Error-Message "Containerization Assist was installed but cannot be executed"
             Write-Error-Message $_
             exit 1
         }
@@ -194,12 +194,12 @@ function Test-Installation {
 }
 
 # Main installation flow
-function Install-ContainerKit {
-    Write-Info "=== Container Kit Installation Script ==="
+function Install-ContainerizationAssist {
+    Write-Info "=== Containerization Assist Installation Script ==="
     Write-Info ""
     
     # Check for existing installation
-    $existingPath = Get-Command container-kit -ErrorAction SilentlyContinue
+    $existingPath = Get-Command containerization-assist -ErrorAction SilentlyContinue
     if ($existingPath) {
         Write-Info "Found existing installation at: $($existingPath.Path)"
         $response = Read-Host "Do you want to proceed with reinstallation? (y/N)"
@@ -236,7 +236,7 @@ function Install-ContainerKit {
 
 # Run installation
 try {
-    Install-ContainerKit
+    Install-ContainerizationAssist
 }
 catch {
     Write-Error-Message "Installation failed: $_"

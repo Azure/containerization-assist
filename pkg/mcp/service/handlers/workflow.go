@@ -1,4 +1,4 @@
-// Package handlers provides direct request handlers for Container Kit MCP,
+// Package handlers provides direct request handlers for Containerization Assist MCP,
 // replacing the complex CQRS pattern with simple, direct handlers.
 package handlers
 
@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/common/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/events"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/service/session"
+	"github.com/Azure/containerization-assist/pkg/common/errors"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/events"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/service/session"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 

@@ -11,7 +11,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/pkg/errors"
 
-	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	domainworkflow "github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
 	"github.com/mark3labs/mcp-go/server"
 )
 

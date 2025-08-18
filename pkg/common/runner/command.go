@@ -7,7 +7,7 @@ import (
 	"io"
 	"os/exec"
 
-	"github.com/Azure/container-kit/pkg/common/logger"
+	"github.com/Azure/containerization-assist/pkg/common/logger"
 )
 
 // CommandRunner is an interface for executing commands and getting the output/error

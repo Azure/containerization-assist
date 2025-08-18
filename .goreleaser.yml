@@ -1,9 +1,9 @@
 # .goreleaser.yml
-# Build configuration for container-kit
+# Build configuration for containerization-assist
 
 version: 2
 
-project_name: container-kit
+project_name: containerization-assist
 
 before:
   hooks:
@@ -13,9 +13,9 @@ before:
 
 builds:
   # MCP Server binary (only binary released)
-  - id: container-kit-mcp
+  - id: containerization-assist-mcp
     main: ./cmd/mcp-server
-    binary: container-kit-mcp
+    binary: containerization-assist-mcp
     tags:
       - mcp
     env:
@@ -29,14 +29,14 @@ builds:
       - arm64
     ldflags:
       - -s -w -X main.Version={{.Version}} -X main.GitCommit={{.Commit}} -X main.BuildTime={{.Date}}
-    mod_timestamp: '{{ .CommitTimestamp }}'
+    mod_timestamp: "{{ .CommitTimestamp }}"
 
 archives:
   - id: mcp
     # Use explicit naming to reflect MCP server artifact
-    name_template: "container-kit-mcp_{{ .Os }}_{{ .Arch }}"
+    name_template: "containerization-assist-mcp_{{ .Os }}_{{ .Arch }}"
     builds:
-      - container-kit-mcp
+      - containerization-assist-mcp
     format_overrides:
       - goos: windows
         format: zip
@@ -45,7 +45,7 @@ archives:
       - README.md
 
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "checksums.txt"
   algorithm: sha256
 
 signs:
@@ -78,57 +78,57 @@ changelog:
   use: github
   filters:
     exclude:
-      - '^docs:'
-      - '^test:'
-      - '^chore:'
-      - '^ci:'
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
   groups:
-    - title: '🚀 Features'
-      regexp: '^feat'
-    - title: '🐛 Bug Fixes'
-      regexp: '^fix'
-    - title: '🔨 Refactoring'
-      regexp: '^refactor'
-    - title: '⚡ Performance Improvements'
-      regexp: '^perf'
-    - title: '🔐 Security'
-      regexp: '^security'
-    - title: 'Other Changes'
+    - title: "🚀 Features"
+      regexp: "^feat"
+    - title: "🐛 Bug Fixes"
+      regexp: "^fix"
+    - title: "🔨 Refactoring"
+      regexp: "^refactor"
+    - title: "⚡ Performance Improvements"
+      regexp: "^perf"
+    - title: "🔐 Security"
+      regexp: "^security"
+    - title: "Other Changes"
       order: 999
 
 release:
   github:
     owner: Azure
-    name: container-kit
+    name: containerization-assist
 
   # Release notes template
   header: |
-    ## Container Kit {{ .Tag }}
+    ## Containerization Assist {{ .Tag }}
 
-    Welcome to Container Kit {{ .Tag }}! This release includes several improvements and bug fixes.
+    Welcome to Containerization Assist {{ .Tag }}! This release includes several improvements and bug fixes.
 
     ### Installation (MCP Server)
 
-    The MCP server binary (container-kit-mcp) is provided for Linux, macOS (Intel & ARM), and Windows (amd64 & arm64).
+    The MCP server binary (containerization-assist-mcp) is provided for Linux, macOS (Intel & ARM), and Windows (amd64 & arm64).
 
     #### Quick Install (Windows PowerShell)
     ```powershell
-    Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-WebRequest -Uri https://raw.githubusercontent.com/Azure/container-kit/main/scripts/setup-vscode.ps1 -OutFile setup-vscode.ps1; ./setup-vscode.ps1; Remove-Item setup-vscode.ps1
+    Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-WebRequest -Uri https://raw.githubusercontent.com/Azure/containerization-assist/main/scripts/setup-vscode.ps1 -OutFile setup-vscode.ps1; ./setup-vscode.ps1; Remove-Item setup-vscode.ps1
     ```
 
     #### Quick Install (macOS / Linux)
     ```bash
-    curl -sSL https://raw.githubusercontent.com/Azure/container-kit/main/scripts/setup-vscode.sh | bash
+    curl -sSL https://raw.githubusercontent.com/Azure/containerization-assist/main/scripts/setup-vscode.sh | bash
     ```
 
     #### Manual Install
     1. Download the archive matching your platform.
     2. Extract the binary and place it on your PATH (e.g. /usr/local/bin or $HOME/bin).
-    3. Verify: `container-kit-mcp --help`
+    3. Verify: `containerization-assist-mcp --help`
 
     #### Documentation
-    - User Guide: https://github.com/Azure/container-kit/blob/{{ .Tag }}/USER_GUIDE.md
-    
+    - User Guide: https://github.com/Azure/containerization-assist/blob/{{ .Tag }}/USER_GUIDE.md
+
     #### Verify Integrity & Signature
      - We publish SHA-256 checksums (checksums.txt) and cosign detached signatures (*.sig) for archives and the checksum file.
      - Verify checksum: match your artifact's SHA-256 against the line in checksums.txt.
@@ -141,7 +141,7 @@ release:
 
     Thanks to all contributors who made this release possible!
 
-    **Full Changelog**: https://github.com/Azure/container-kit/compare/{{ .PreviousTag }}...{{ .Tag }}
+    **Full Changelog**: https://github.com/Azure/containerization-assist/compare/{{ .PreviousTag }}...{{ .Tag }}
 
   # Set draft to true for manual review before publishing
   draft: false
@@ -163,4 +163,4 @@ github_urls:
   download: https://github.com
 
 metadata:
-  mod_timestamp: '{{ .CommitTimestamp }}'
+  mod_timestamp: "{{ .CommitTimestamp }}"

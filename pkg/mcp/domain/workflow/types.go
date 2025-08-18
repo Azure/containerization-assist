@@ -23,7 +23,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/containerization-assist/pkg/mcp/api"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -247,12 +247,12 @@ type ServerConfig struct {
 // DefaultServerConfig returns a simplified default server configuration with only essential fields
 func DefaultServerConfig() ServerConfig {
 	return ServerConfig{
-		WorkspaceDir:     "/tmp/container-kit-workspace",
-		StorePath:        "/tmp/container-kit-sessions.db",
+		WorkspaceDir:     "/tmp/containerization-assist-workspace",
+		StorePath:        "/tmp/containerization-assist-sessions.db",
 		SessionTTL:       24 * time.Hour,
 		MaxSessions:      100,
 		LogLevel:         "info",
-		ServiceName:      "container-kit-mcp",
+		ServiceName:      "containerization-assist-mcp",
 		ServiceVersion:   "dev",
 		RegistryURL:      "",
 		RegistryUsername: "",
@@ -336,7 +336,7 @@ func (ws *WorkflowState) SetAllSteps(steps []Step) {
 }
 
 // IsTestMode determines whether the current workflow execution is running in test mode.
-// Precedence: Args.TestMode > RequestParams["test_mode"] > CONTAINER_KIT_TEST_MODE env var.
+// Precedence: Args.TestMode > RequestParams["test_mode"] > CONTAINERIZATION_ASSIST_TEST_MODE env var.
 func (ws *WorkflowState) IsTestMode() bool {
 	if ws != nil && ws.Args != nil && ws.Args.TestMode {
 		return true
@@ -346,7 +346,7 @@ func (ws *WorkflowState) IsTestMode() bool {
 			return true
 		}
 	}
-	return os.Getenv("CONTAINER_KIT_TEST_MODE") == "true"
+	return os.Getenv("CONTAINERIZATION_ASSIST_TEST_MODE") == "true"
 }
 
 // NewWorkflowState creates a new workflow state

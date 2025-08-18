@@ -26,15 +26,15 @@ func NewRegistry(logger *slog.Logger) *Registry {
 	}
 }
 
-// RegisterAll registers all Container Kit prompts using native mcp-go support
+// RegisterAll registers all Containerization Assist prompts using native mcp-go support
 func (r *Registry) RegisterAll(mcpServer *server.MCPServer) error {
-	r.logger.Info("Registering Container Kit prompts with native mcp-go support")
+	r.logger.Info("Registering Containerization Assist prompts with native mcp-go support")
 
 	for _, p := range prompts {
 		r.logger.Info("Registering prompt", "name", p.toolname, "description", p.description)
 		mcpServer.AddPrompt(p.GetPrompt(), p.GetHandler())
 	}
-	r.logger.Info("Container Kit prompts registered successfully", "count", len(prompts))
+	r.logger.Info("Containerization Assist prompts registered successfully", "count", len(prompts))
 	return nil
 }
 
@@ -43,7 +43,7 @@ var prompts = []PromptAndHandler{
 		toolname:    "containerize_repository",
 		description: "Containerize a repository",
 		userText: []string{"You are an expert in Kubernetes and Docker.",
-			"Execute the #analyze_repository tool and execute subsequent tools from the Container Kit MCP based on results to containerize the application.",
+			"Execute the #analyze_repository tool and execute subsequent tools from the Containerization Assist MCP based on results to containerize the application.",
 			"Update file contents as instructed by tool responses.",
 			"When a tool fails, attempt to update Kubernetes manifests and Dockerfiles before retrying the tool a maximum of 5 times.",
 			"Write manifest files to the ./manifests directory",

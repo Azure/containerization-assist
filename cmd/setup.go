@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/logger"
+	"github.com/Azure/containerization-assist/pkg/common/logger"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 )
@@ -93,9 +93,9 @@ func NormalizeTargetRepoPath(path string) (string, error) {
 // LoadSetupConfig loads configuration from environment, flags, and defaults
 func LoadSetupConfig(cmd *cobra.Command, args []string, projectRoot string) (*SetupConfig, error) {
 	// Generate default resource names
-	defaultResourceGroup := GenerateDefaultResourceName("container-kit-rg-")
-	defaultResourceName := GenerateDefaultResourceName("container-kit-ai-")
-	defaultDeploymentName := GenerateDefaultResourceName("container-kit-dep-")
+	defaultResourceGroup := GenerateDefaultResourceName("containerization-assist-rg-")
+	defaultResourceName := GenerateDefaultResourceName("containerization-assist-ai-")
+	defaultDeploymentName := GenerateDefaultResourceName("containerization-assist-dep-")
 	defaultLocation := DetermineDefaultLocation()
 
 	// Load the .env file only if force-setup is NOT enabled
@@ -360,7 +360,7 @@ func UpdateEnvFile(projectRoot string, config *SetupConfig, apiKey, endpoint, de
 		AZURE_OPENAI_ENDPOINT:      endpoint,
 		AZURE_OPENAI_DEPLOYMENT_ID: deploymentID,
 
-		// Container Kit variables
+		// Containerization Assist variables
 		"AZURE_OPENAI_RESOURCE_GROUP":  config.ResourceGroup,
 		"AZURE_OPENAI_LOCATION":        config.Location,
 		"AZURE_OPENAI_RESOURCE_NAME":   config.OpenAIResourceName,
@@ -386,15 +386,15 @@ func UpdateEnvFile(projectRoot string, config *SetupConfig, apiKey, endpoint, de
 
 	// Write .env file content
 	var content strings.Builder
-	content.WriteString("# Container-Kit environment variables\n")
-	content.WriteString("# This file was generated/updated by container-kit setup\n\n")
+	content.WriteString("# containerization-assist environment variables\n")
+	content.WriteString("# This file was generated/updated by containerization-assist setup\n\n")
 
 	// Azure OpenAI variables first
 	content.WriteString(fmt.Sprintf("%s=%s\n", AZURE_OPENAI_KEY, envVars[AZURE_OPENAI_KEY]))
 	content.WriteString(fmt.Sprintf("%s=%s\n", AZURE_OPENAI_ENDPOINT, envVars[AZURE_OPENAI_ENDPOINT]))
 	content.WriteString(fmt.Sprintf("%s=%s\n", AZURE_OPENAI_DEPLOYMENT_ID, envVars[AZURE_OPENAI_DEPLOYMENT_ID]))
 
-	content.WriteString("\n# Container-Kit setup variables\n")
+	content.WriteString("\n# containerization-assist setup variables\n")
 
 	// All AZURE_OPENAI_ variables
 	for k, v := range envVars {

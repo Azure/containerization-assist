@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	mcperrors "github.com/Azure/container-kit/pkg/common/errors"
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	mcperrors "github.com/Azure/containerization-assist/pkg/common/errors"
+	"github.com/Azure/containerization-assist/pkg/mcp/api"
 )
 
 // Simple local validation types to replace deleted domain/security package

@@ -1,4 +1,4 @@
-# Error codes configuration for Container Kit MCP Server
+# Error codes configuration for Containerization Assist MCP Server
 # This file defines all error codes used throughout the system
 # Run 'go generate' to regenerate codes_gen.go from this file
 

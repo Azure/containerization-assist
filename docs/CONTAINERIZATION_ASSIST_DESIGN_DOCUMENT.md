@@ -1,4 +1,4 @@
-# Container Kit Design Document
+# Containerization Assist Design Document
 
 **Version**: 3.0
 **Date**: 2025-07-12
@@ -20,7 +20,7 @@
 
 ## Executive Summary
 
-Container Kit is an advanced, AI-powered containerization platform that automates the complete Docker and Kubernetes workflow through individual, chainable tools exposed via Model Context Protocol (MCP). The system follows a simplified 4-layer architecture with tool-driven design that balances focused functionality with maintainability.
+Containerization Assist is an advanced, AI-powered containerization platform that automates the complete Docker and Kubernetes workflow through individual, chainable tools exposed via Model Context Protocol (MCP). The system follows a simplified 4-layer architecture with tool-driven design that balances focused functionality with maintainability.
 
 ### Key Capabilities
 - **15 Individual Tools**: Focused tools (10 workflow, 2 orchestration, 3 utility) with intelligent chaining
@@ -44,7 +44,7 @@ Container Kit is an advanced, AI-powered containerization platform that automate
 ## System Overview
 
 ### Vision Statement
-Container Kit provides individual, focused tools that can be chained together to guide users through the complete containerization process from analysis to deployment with AI-powered assistance and built-in progress tracking.
+Containerization Assist provides individual, focused tools that can be chained together to guide users through the complete containerization process from analysis to deployment with AI-powered assistance and built-in progress tracking.
 
 ### Core Principles
 1. **Tool-First Design**: 15 individual focused tools with intelligent chaining capabilities
@@ -64,7 +64,7 @@ Container Kit provides individual, focused tools that can be chained together to
 
 ### Four-Layer Clean Architecture
 
-Container Kit follows a simplified 4-layer Domain-Driven Design architecture:
+Containerization Assist follows a simplified 4-layer Domain-Driven Design architecture:
 
 ```
 pkg/mcp/
@@ -425,7 +425,7 @@ Duration Tracking → Completion Notification
 ## Deployment & Operations
 
 ### 1. Deployment Model
-- **Single Binary**: container-kit-mcp executable
+- **Single Binary**: containerization-assist-mcp executable
 - **Minimal Dependencies**: Reduced external dependencies
 - **Easy Configuration**: Environment-based configuration
 

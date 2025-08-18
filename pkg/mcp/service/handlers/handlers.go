@@ -1,14 +1,14 @@
-// Package handlers provides a unified set of direct handlers for Container Kit MCP,
+// Package handlers provides a unified set of direct handlers for Containerization Assist MCP,
 // replacing the complex CQRS pattern with simple, direct request handlers.
 package handlers
 
 import (
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/events"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/resources"
-	"github.com/Azure/container-kit/pkg/mcp/service/session"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/events"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/core/resources"
+	"github.com/Azure/containerization-assist/pkg/mcp/service/session"
 )
 
 // Handlers provides a unified interface to all application handlers

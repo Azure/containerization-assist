@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	domainsession "github.com/Azure/container-kit/pkg/mcp/domain/session"
+	domainsession "github.com/Azure/containerization-assist/pkg/mcp/domain/session"
 )
 
 // Service implements session management using the domain store interface

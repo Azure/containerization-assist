@@ -64,8 +64,8 @@ jobs:
       
     - name: Build MCP Server
       run: |
-        GOFLAGS=-trimpath go build -o container-kit-mcp ./cmd/mcp-server
-        ./container-kit-mcp --version
+        GOFLAGS=-trimpath go build -o containerization-assist-mcp ./cmd/mcp-server
+        ./containerization-assist-mcp --version
 
   # Quality checks - parallel with build
   quality:

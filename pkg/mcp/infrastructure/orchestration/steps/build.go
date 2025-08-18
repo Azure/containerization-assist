@@ -2,15 +2,16 @@ package steps
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os/exec"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/runner"
-	"github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/core/kind"
-	"github.com/Azure/container-kit/pkg/core/kubernetes"
+	"github.com/Azure/containerization-assist/pkg/common/runner"
+	"github.com/Azure/containerization-assist/pkg/core/docker"
+	"github.com/Azure/containerization-assist/pkg/core/kind"
+	"github.com/Azure/containerization-assist/pkg/core/kubernetes"
 )
 
 // BuildResult contains the results of a Docker build operation
@@ -112,11 +113,26 @@ func BuildImage(ctx context.Context, dockerfileResult *DockerfileResult, imageNa
 		"duration", buildDuration,
 		"image_ref", buildResult.ImageRef)
 
+	// Get image size using docker inspect
+	imageSize := int64(0)
+	if buildResult.ImageID == "" {
+		logger.Warn("No image ID available for size inspection")
+	} else {
+		dockerClient := docker.NewDockerCmdRunner(&runner.DefaultCommandRunner{})
+		inspectOutput, err := dockerClient.Inspect(ctx, buildResult.ImageID)
+		if err != nil {
+			logger.Warn("Failed to inspect image for size", "error", err, "image_id", buildResult.ImageID)
+		} else {
+			imageSize = extractImageSizeFromInspect(inspectOutput, logger)
+		}
+	}
+
 	return &BuildResult{
 		ImageName: imageName,
 		ImageTag:  imageTag,
 		ImageID:   buildResult.ImageID,
 		BuildTime: startTime,
+		Size:      imageSize,
 	}, nil
 }
 
@@ -180,7 +196,7 @@ func LoadImageToKind(ctx context.Context, buildResult *BuildResult, clusterName 
 
 	// Default cluster name
 	if clusterName == "" {
-		clusterName = "container-kit"
+		clusterName = "containerization-assist"
 	}
 
 	// Construct image references
@@ -240,4 +256,36 @@ func SetupKindCluster(ctx context.Context, clusterName string, logger *slog.Logg
 		"registry_url", registryURL)
 
 	return registryURL, nil
+}
+
+// extractImageSizeFromInspect extracts the image size from docker inspect JSON output
+func extractImageSizeFromInspect(inspectOutput string, logger *slog.Logger) int64 {
+	var inspectData []struct {
+		Size int64 `json:"Size"`
+	}
+
+	if err := json.Unmarshal([]byte(inspectOutput), &inspectData); err != nil {
+		logger.Warn("Failed to parse docker inspect output", "error", err)
+		return 0
+	}
+
+	if len(inspectData) > 0 {
+		return inspectData[0].Size
+	}
+
+	return 0
+}
+
+// formatBytes converts bytes to human-readable format (B, KB, MB, GB)
+func formatBytes(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }

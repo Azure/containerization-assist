@@ -6,10 +6,10 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/resources"
-	"github.com/Azure/container-kit/pkg/mcp/service/session"
+	"github.com/Azure/containerization-assist/pkg/common/errors"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/core/resources"
+	"github.com/Azure/containerization-assist/pkg/mcp/service/session"
 )
 
 // StatusHandler provides direct status and query operations

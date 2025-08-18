@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	progresstest "github.com/Azure/container-kit/pkg/mcp/infrastructure/core/testutil/progress"
+	progresstest "github.com/Azure/containerization-assist/pkg/mcp/infrastructure/core/testutil/progress"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

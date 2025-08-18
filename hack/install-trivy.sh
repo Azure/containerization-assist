@@ -82,7 +82,7 @@ else
 fi
 
 echo ""
-echo "Trivy is now available for container security scanning in Container Kit."
+echo "Trivy is now available for container security scanning in Containerization Assist."
 echo "The build_image tool will automatically scan images for vulnerabilities."
 echo ""
 echo "First run may take longer as Trivy downloads its vulnerability database."

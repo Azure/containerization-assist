@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	mcperrors "github.com/Azure/container-kit/pkg/common/errors"
-	"github.com/Azure/container-kit/templates"
+	mcperrors "github.com/Azure/containerization-assist/pkg/common/errors"
+	"github.com/Azure/containerization-assist/templates"
 )
 
 // TemplateEngine provides mechanical Dockerfile template operations

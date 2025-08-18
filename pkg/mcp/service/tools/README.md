@@ -1,6 +1,6 @@
-# Container Kit Tool Registry
+# Containerization Assist Tool Registry
 
-This package contains the consolidated tool registration system for Container Kit's MCP implementation.
+This package contains the consolidated tool registration system for Containerization Assist's MCP implementation.
 
 ## Overview
 
@@ -62,7 +62,7 @@ The tool registry provides a table-driven approach to tool registration that:
 ### Registering All Tools
 
 ```go
-import "github.com/Azure/container-kit/pkg/mcp/service/tools"
+import "github.com/Azure/containerization-assist/pkg/mcp/service/tools"
 
 // Create dependencies
 deps := tools.ToolDependencies{

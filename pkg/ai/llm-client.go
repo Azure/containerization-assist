@@ -9,7 +9,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
-	"github.com/Azure/container-kit/pkg/common/logger"
+	"github.com/Azure/containerization-assist/pkg/common/logger"
 )
 
 type AzOpenAIClient struct {
