@@ -38,16 +38,9 @@ jobs:
           # Check for MCP changes (cmd/mcp-server/, pkg/common/, pkg/core/, pkg/mcp/)
           mcp_count=$(echo "$changed_files" | grep -E "^(cmd/mcp-server/|pkg/(common|core|mcp)/)" | wc -l)
           echo "test_mcp=$([ $mcp_count -gt 0 ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
-          
-          # Check for CLI changes (cmd/*.go, pkg/ai/, pkg/core/, pkg/common/, pkg/pipeline/)
-          cli_count=$(echo "$changed_files" | grep -E "^(cmd/(cmd|clients|generate|setup)\.go|pkg/(ai|core|common|pipeline)/)" | wc -l)
-          echo "test_cli=$([ $cli_count -gt 0 ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
-          
           echo "MCP changes: $([ $mcp_count -gt 0 ] && echo "yes ($mcp_count files)" || echo "no")"
-          echo "CLI changes: $([ $cli_count -gt 0 ] && echo "yes ($cli_count files)" || echo "no")"
         else
           echo "test_mcp=true" >> $GITHUB_OUTPUT
-          echo "test_cli=true" >> $GITHUB_OUTPUT
           echo "Non-PR event: testing all packages"
         fi
         
@@ -73,20 +66,6 @@ jobs:
       run: |
         GOFLAGS=-trimpath go build -o container-kit-mcp ./cmd/mcp-server
         ./container-kit-mcp --version
-        
-    - name: Build Legacy CLI
-      if: needs.setup.outputs.test-cli == 'true'
-      run: |
-        GOFLAGS=-trimpath go build -o container-kit ./main.go
-        ./container-kit --version
-        
-    - name: Upload CLI Binary
-      if: needs.setup.outputs.test-cli == 'true'
-      uses: actions/upload-artifact@v4
-      with:
-        name: container-kit-${{ runner.os }}-${{ github.run_id }}
-        path: ./container-kit
-        retention-days: 1
 
   # Quality checks - parallel with build
   quality:
@@ -150,7 +129,7 @@ jobs:
         
         # Run tests with race detection and capture output
         set -o pipefail
-        go test -race -coverprofile=coverage.out -v ./pkg/mcp/... ./pkg/core/... 2>&1 | tee test-output.log
+        go test -race -coverprofile=coverage.out -v ./... 2>&1 | tee test-output.log
         
         # Check for race conditions in test output
         if grep -q "WARNING: DATA RACE" test-output.log; then
@@ -223,7 +202,6 @@ jobs:
         echo "🔍 MCP Integration Test Debug:"
         echo "  test-mcp: '${{ needs.setup.outputs.test-mcp }}'"
         echo "  architecture-score: '${{ needs.quality.outputs.architecture-score }}'"
-        echo "  Condition evaluation: ${{ needs.setup.outputs.test-mcp == 'true' && needs.quality.outputs.architecture-score >= '60' }}"
         
     - name: Checkout
       uses: actions/checkout@v4
@@ -241,109 +219,11 @@ jobs:
         chmod +x ./test/integration/run_tests.sh
         ./test/integration/run_tests.sh
 
-  # CLI Integration tests - optimized matrix
-  cli-integration:
-    name: CLI Integration Tests
-    runs-on: ubuntu-latest
-    needs: [build, quality, setup]
-    if: needs.setup.outputs.test-cli == 'true' && needs.quality.outputs.architecture-score >= 60
-    strategy:
-      max-parallel: 15
-      matrix:
-        test-repo:
-          - Azure-Samples/containerize-and-deploy-Java-app-to-Azure
-          - konveyor-ecosystem/coolstore
-          - aws-samples/aws-codedeploy-sample-tomcat
-        test-number: [1, 2, 3]
-      fail-fast: false
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Download CLI binary
-      uses: actions/download-artifact@v5
-      with:
-        name: container-kit-${{ runner.os }}-${{ github.run_id }}
-        path: ./
-
-    - name: Run Integration Test
-      id: integration-test
-      uses: ./.github/actions/integration-test-runner
-      with:
-        repository: ${{ matrix.test-repo }}
-        test-number: ${{ matrix.test-number }}
-        binary-name: container-kit
-        azure-openai-key: ${{ secrets.AZURE_OPENAI_KEY }}
-        azure-openai-endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-        azure-openai-deployment-id: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
-
-    - name: Upload test artifacts
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: cc-run-${{ steps.integration-test.outputs.run-name }}
-        path: test-repo/artifacts/
-        retention-days: 7
-
-  # Aggregate CLI integration results
-  aggregate-cli-results:
-    name: CLI Integration Summary
-    needs: [cli-integration, setup]
-    runs-on: ubuntu-latest
-    if: always() && needs.setup.outputs.test-cli == 'true' && needs.cli-integration.result != 'skipped'
-    outputs:
-      success-rate: ${{ steps.aggregate.outputs.success-rate }}
-      total-tests: ${{ steps.aggregate.outputs.total-tests }}
-      passed-tests: ${{ steps.aggregate.outputs.passed-tests }}
-      
-    steps:
-    - name: Download all results
-      uses: actions/download-artifact@v5
-      with:
-        pattern: cc-run-*
-        path: results
-
-    - name: Aggregate Results
-      id: aggregate
-      run: |
-        tests_per_repo=3
-        total_tests=0
-        passed_tests=0
-        
-        if [ -d "results" ]; then
-          export REPOS="$(ls results | grep -oP 'cc-run-\K[^#]+' | uniq)"
-          echo "Processing repos: $REPOS"
-          
-          for repo in $REPOS; do
-            for ((i=1; i<=tests_per_repo; i++)); do
-              if [ -f "results/cc-run-$repo#$i/result.txt" ]; then
-                result=$(cat "results/cc-run-$repo#$i/result.txt")
-                total_tests=$((total_tests + 1))
-                if [ "$result" == "success" ]; then
-                  passed_tests=$((passed_tests + 1))
-                fi
-              fi
-            done
-          done
-        fi
-        
-        success_rate=0
-        if [ $total_tests -gt 0 ]; then
-          success_rate=$((passed_tests * 100 / total_tests))
-        fi
-        
-        echo "success-rate=$success_rate" >> $GITHUB_OUTPUT
-        echo "total-tests=$total_tests" >> $GITHUB_OUTPUT
-        echo "passed-tests=$passed_tests" >> $GITHUB_OUTPUT
-        
-        echo "📊 Integration Test Results: $passed_tests/$total_tests passed ($success_rate%)"
-
   # Post PR comment with beautiful summary
   pr-comment:
     name: Post PR Summary
     runs-on: ubuntu-latest
-    needs: [build, quality, test, mcp-integration, aggregate-cli-results]
+    needs: [build, quality, test, mcp-integration]
     if: always() && github.event_name == 'pull_request'
     steps:
     - name: Checkout
@@ -357,25 +237,18 @@ jobs:
         quality-status: ${{ needs.quality.result }}
         test-status: ${{ needs.test.result }}
         mcp-integration-status: ${{ needs.mcp-integration.result }}
-        cli-integration-status: ${{ needs.aggregate-cli-results.result }}
         architecture-score: ${{ needs.quality.outputs.architecture-score || '0' }}
         architecture-status: ${{ needs.quality.outputs.architecture-status || 'unknown' }}
         format-status: ${{ needs.quality.outputs.format-status || 'unknown' }}
         lint-status: ${{ needs.quality.outputs.lint-status || 'unknown' }}
         static-analysis-status: ${{ needs.quality.outputs.static-analysis-status || 'unknown' }}
         security-status: ${{ needs.quality.outputs.security-status || 'unknown' }}
-        cli-success-rate: ${{ needs.aggregate-cli-results.outputs.success-rate || '0' }}
-        cli-total-tests: ${{ needs.aggregate-cli-results.outputs.total-tests || '0' }}
-        cli-passed-tests: ${{ needs.aggregate-cli-results.outputs.passed-tests || '0' }}
-        ratchet-opportunity: ${{ needs.quality.outputs.ratchet-opportunity || 'false' }}
-        current-issues: ${{ needs.quality.outputs.current-issues || '0' }}
-        suggested-budget: ${{ needs.quality.outputs.suggested-budget || '0' }}
 
   # Final status check for branch protection
   ci-status:
     name: CI Status Check
     runs-on: ubuntu-latest
-    needs: [build, quality, test, mcp-integration, aggregate-cli-results]
+    needs: [build, quality, test, mcp-integration ]
     if: always()
     
     steps:
@@ -386,7 +259,6 @@ jobs:
         echo "Quality: ${{ needs.quality.result }}"
         echo "Tests: ${{ needs.test.result }}"
         echo "MCP Integration: ${{ needs.mcp-integration.result }}"
-        echo "CLI Integration: ${{ needs.aggregate-cli-results.result }}"
         
         # Required checks
         if [[ "${{ needs.build.result }}" != "success" ]]; then
@@ -404,20 +276,10 @@ jobs:
           exit 1
         fi
         
-        # MCP integration is required (if it ran)
-        if [[ "${{ needs.setup.outputs.test-mcp }}" == "true" ]] && [[ "${{ needs.mcp-integration.result }}" == "failure" ]]; then
+        # MCP integration is required
+        if [[ "${{ needs.mcp-integration.result }}" == "failure" ]]; then
           echo "❌ MCP integration tests failed"
           exit 1
-        elif [[ "${{ needs.setup.outputs.test-mcp }}" != "true" ]]; then
-          echo "⏭️ MCP integration tests skipped (no MCP changes detected)"
-        fi
-        
-        # CLI integration is optional (only runs on CLI changes)
-        if [[ "${{ needs.setup.outputs.test-cli }}" == "true" ]] && [[ "${{ needs.aggregate-cli-results.result }}" == "failure" ]]; then
-          echo "❌ CLI integration tests failed"
-          exit 1
-        elif [[ "${{ needs.setup.outputs.test-cli }}" != "true" ]]; then
-          echo "⏭️ CLI integration tests skipped (no CLI changes detected)"
         fi
         
         echo "✅ All CI checks passed!"
