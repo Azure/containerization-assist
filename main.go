@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/Azure/container-kit/cmd"
+	"github.com/Azure/containerization-assist/cmd"
 )
 
 func main() {

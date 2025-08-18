@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/progress"
 )
 
 // SampleWithProgress performs streaming sampling and updates progress in real-time.

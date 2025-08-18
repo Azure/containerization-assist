@@ -69,7 +69,7 @@ function main() {
   const binaryPath = getBinaryPath();
   
   if (!binaryPath) {
-    logError('Container Kit MCP Server binary not found!');
+    logError('Containerization Assist MCP Server binary not found!');
     logWarning('\nThis usually means the post-install script failed.');
     logInfo('\nTry these solutions:');
     logInfo('  1. Reinstall the package:');
@@ -91,7 +91,7 @@ function main() {
   const isDebug = args.includes('--debug') || process.env.MCP_DEBUG === 'true';
   
   if (isDebug) {
-    logInfo(`Starting Container Kit MCP Server`);
+    logInfo(`Starting Containerization Assist MCP Server`);
     logInfo(`Binary: ${binaryPath}`);
     logInfo(`Arguments: ${args.join(' ')}`);
     logInfo(`Working Directory: ${process.cwd()}`);
@@ -131,7 +131,7 @@ function main() {
   // Handle errors
   child.on('error', (err) => {
     if (err.code === 'ENOENT') {
-      logError('Container Kit MCP Server binary not found!');
+      logError('Containerization Assist MCP Server binary not found!');
       logError(`Expected at: ${binaryPath}`);
       logInfo('\nPlease reinstall the package:');
       logInfo('  npm uninstall -g @container-assist/mcp-server');
@@ -141,7 +141,7 @@ function main() {
       logInfo('\nTry fixing permissions:');
       logInfo(`  chmod +x "${binaryPath}"`);
     } else {
-      logError(`Failed to start Container Kit MCP Server: ${err.message}`);
+      logError(`Failed to start Containerization Assist MCP Server: ${err.message}`);
       if (isDebug) {
         console.error(err);
       }

@@ -1,5 +1,5 @@
-# Container Kit User Setup Script for Windows
-# This script sets up Container Kit MCP Server for non-technical Windows users
+# Containerization Assist User Setup Script for Windows
+# This script sets up Containerization Assist MCP Server for non-technical Windows users
 
 param(
     [switch]$Force,
@@ -8,8 +8,8 @@ param(
 
 # Configuration
 $RepoOwner = "Azure"
-$RepoName = "container-kit"
-$BinaryName = "container-kit-mcp"
+$RepoName = "containerization-assist"
+$BinaryName = "containerization-assist-mcp"
 $InstallDir = "$env:ProgramFiles\ContainerKit"
 $FallbackDir = "$env:USERPROFILE\bin"
 
@@ -54,7 +54,7 @@ function Write-Step {
 # Show help
 function Show-Help {
     Write-Host @"
-Container Kit User Setup Script for Windows
+Containerization Assist User Setup Script for Windows
 
 USAGE:
     .\setup-user.ps1 [OPTIONS]
@@ -64,9 +64,9 @@ OPTIONS:
     -Help       Show this help message
 
 DESCRIPTION:
-    This script installs Container Kit and configures it for use with Claude Desktop.
+    This script installs Containerization Assist and configures it for use with Claude Desktop.
     It will:
-    1. Download and install Container Kit
+    1. Download and install Containerization Assist
     2. Configure Claude Desktop MCP settings
     3. Test the installation
     4. Show next steps
@@ -130,7 +130,7 @@ function Test-Prerequisites {
     
     # Check for Docker (warn if missing)
     if (-not (Test-Command "docker")) {
-        Write-Warning-Custom "Docker is not installed. You'll need Docker to use Container Kit's containerization features."
+        Write-Warning-Custom "Docker is not installed. You'll need Docker to use Containerization Assist's containerization features."
         Write-Info "Install Docker from: https://www.docker.com/products/docker-desktop/"
     }
     else {
@@ -139,7 +139,7 @@ function Test-Prerequisites {
     
     # Check for Git (warn if missing)
     if (-not (Test-Command "git")) {
-        Write-Warning-Custom "Git is not installed. Some Container Kit features may require Git."
+        Write-Warning-Custom "Git is not installed. Some Containerization Assist features may require Git."
         Write-Info "Install Git from: https://git-scm.com/downloads"
     }
     else {
@@ -155,9 +155,9 @@ function Test-Prerequisites {
     Write-Success "Prerequisites check passed"
 }
 
-# Download and install Container Kit
+# Download and install Containerization Assist
 function Install-ContainerKit {
-    Write-Step "Installing Container Kit..."
+    Write-Step "Installing Containerization Assist..."
     
     try {
         # Get the latest release
@@ -224,7 +224,7 @@ function Install-ContainerKit {
         $binaryDir = Split-Path $installPath -Parent
         
         if ($pathDirectories -notcontains $binaryDir) {
-            Write-Info "Adding Container Kit to PATH..."
+            Write-Info "Adding Containerization Assist to PATH..."
             $newPath = "$binaryDir;$env:PATH"
             [Environment]::SetEnvironmentVariable("PATH", $newPath, [EnvironmentVariableTarget]::User)
             $env:PATH = $newPath
@@ -237,15 +237,15 @@ function Install-ContainerKit {
         if (Test-Command $BinaryName) {
             try {
                 $version = & $BinaryName --version 2>$null
-                Write-Success "Container Kit installed successfully"
+                Write-Success "Containerization Assist installed successfully"
                 Write-Info "Version: $version"
             }
             catch {
-                Write-Success "Container Kit installed (version check failed)"
+                Write-Success "Containerization Assist installed (version check failed)"
             }
         }
         else {
-            Write-Error-Custom "Container Kit installation failed - binary not accessible"
+            Write-Error-Custom "Containerization Assist installation failed - binary not accessible"
             Write-Info "You may need to restart PowerShell or add $binaryDir to your PATH"
             exit 1
         }
@@ -293,7 +293,7 @@ function Set-ClaudeConfig {
     # Create configuration content
     $configContent = @{
         mcpServers = @{
-            "container-kit" = @{
+            "containerization-assist" = @{
                 command = $BinaryName
                 args = @()
             }
@@ -317,9 +317,9 @@ function Set-ClaudeConfig {
 function Test-Installation {
     Write-Step "Testing installation..."
     
-    # Test Container Kit
+    # Test Containerization Assist
     if (Test-Command $BinaryName) {
-        Write-Success "Container Kit is accessible from command line"
+        Write-Success "Containerization Assist is accessible from command line"
         
         # Test version command
         try {
@@ -331,7 +331,7 @@ function Test-Installation {
         }
     }
     else {
-        Write-Error-Custom "Container Kit is not accessible from command line"
+        Write-Error-Custom "Containerization Assist is not accessible from command line"
         Write-Info "You may need to restart PowerShell or check your PATH"
     }
     
@@ -351,17 +351,17 @@ function Test-Installation {
 # Show next steps
 function Show-NextSteps {
     Write-Host ""
-    Write-Success "🎉 Container Kit User Setup Complete!"
+    Write-Success "🎉 Containerization Assist User Setup Complete!"
     Write-Host ""
     Write-Info "Next Steps:"
     Write-Host ""
     Write-Info "1. 📱 Open Claude Desktop (restart if it was running)"
     Write-Info "2. 💬 Start a new conversation"
-    Write-Info "3. 🗣️  Ask: 'What Container Kit tools are available?'"
+    Write-Info "3. 🗣️  Ask: 'What Containerization Assist tools are available?'"
     Write-Info "4. 🚀 Try: 'Help me containerize my application at [your-repo-url]'"
     Write-Host ""
     Write-Info "📚 Documentation:"
-    Write-Info "   • User Guide: USER_GUIDE.md in the Container Kit repository"
+    Write-Info "   • User Guide: USER_GUIDE.md in the Containerization Assist repository"
     Write-Info "   • GitHub: https://github.com/$RepoOwner/$RepoName"
     Write-Host ""
     Write-Info "🆘 Need Help?"
@@ -382,8 +382,8 @@ function Main {
     }
     
     Write-Host ""
-    Write-Info "=== Container Kit User Setup Script for Windows ==="
-    Write-Info "This script will install Container Kit and configure it for Claude Desktop"
+    Write-Info "=== Containerization Assist User Setup Script for Windows ==="
+    Write-Info "This script will install Containerization Assist and configure it for Claude Desktop"
     Write-Host ""
     
     # Check if user wants to continue

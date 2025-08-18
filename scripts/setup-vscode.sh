@@ -1,6 +1,6 @@
 #!/bin/bash
-# Container Kit VS Code Setup Script
-# This script installs Container Kit and configures it for VS Code with MCP support
+# Containerization Assist VS Code Setup Script
+# This script installs Containerization Assist and configures it for VS Code with MCP support
 
 set -e
 
@@ -13,8 +13,8 @@ NC='\033[0m' # No Color
 
 # Configuration
 REPO_OWNER="Azure"
-REPO_NAME="container-kit"
-BINARY_NAME="container-kit-mcp"
+REPO_NAME="containerization-assist"
+BINARY_NAME="containerization-assist-mcp"
 INSTALL_DIR="/usr/local/bin"
 FALLBACK_DIR="$HOME/bin"
 
@@ -118,9 +118,9 @@ check_prerequisites() {
     fi
 }
 
-# Download and install Container Kit
+# Download and install Containerization Assist
 install_container_kit() {
-    print_step "Installing Container Kit..."
+    print_step "Installing Containerization Assist..."
     
     # Create temporary directory
     TMP_DIR=$(mktemp -d)
@@ -132,16 +132,16 @@ install_container_kit() {
     local checksum_url="https://github.com/$REPO_OWNER/$REPO_NAME/releases/latest/download/checksums.txt"
     local archive_name="${REPO_NAME}_${PLATFORM}.tar.gz"
     
-    print_info "Downloading Container Kit..."
+    print_info "Downloading Containerization Assist..."
     if command_exists curl; then
         curl -sL "$download_url" -o "$archive_name" || {
-            print_error "Failed to download Container Kit"
+            print_error "Failed to download Containerization Assist"
             exit 1
         }
         curl -sL "$checksum_url" -o "checksums.txt" 2>/dev/null || true
     else
         wget -q "$download_url" -O "$archive_name" || {
-            print_error "Failed to download Container Kit"
+            print_error "Failed to download Containerization Assist"
             exit 1
         }
         wget -q "$checksum_url" -O "checksums.txt" 2>/dev/null || true
@@ -172,8 +172,8 @@ install_container_kit() {
         if [ -f "$BINARY_NAME" ]; then
             mv "$BINARY_NAME" "$install_path/" 2>/dev/null || sudo mv "$BINARY_NAME" "$install_path/"
         fi
-        if [ -f "container-kit" ]; then
-            mv "container-kit" "$install_path/" 2>/dev/null || sudo mv "container-kit" "$install_path/"
+        if [ -f "containerization-assist" ]; then
+            mv "containerization-assist" "$install_path/" 2>/dev/null || sudo mv "containerization-assist" "$install_path/"
         fi
     else
         # Fallback to user directory
@@ -183,8 +183,8 @@ install_container_kit() {
         if [ -f "$BINARY_NAME" ]; then
             mv "$BINARY_NAME" "$install_path/"
         fi
-        if [ -f "container-kit" ]; then
-            mv "container-kit" "$install_path/"
+        if [ -f "containerization-assist" ]; then
+            mv "containerization-assist" "$install_path/"
         fi
         
         # Check if user bin is in PATH
@@ -195,7 +195,7 @@ install_container_kit() {
         fi
     fi
     
-    print_success "Container Kit installed to $install_path"
+    print_success "Containerization Assist installed to $install_path"
 }
 
 # Find VS Code settings.json location
@@ -225,7 +225,7 @@ find_vscode_settings() {
 
 # Configure VS Code for MCP
 configure_vscode() {
-    print_step "Configuring VS Code for Container Kit MCP..."
+    print_step "Configuring VS Code for Containerization Assist MCP..."
     
     local settings_file=$(find_vscode_settings)
     local settings_dir=$(dirname "$settings_file")
@@ -246,8 +246,8 @@ configure_vscode() {
             # Add MCP configuration using jq
             jq '. + {
                 "mcp.servers": {
-                    "container-kit": {
-                        "command": "container-kit-mcp",
+                    "containerization-assist": {
+                        "command": "containerization-assist-mcp",
                         "args": [],
                         "transport": "stdio"
                     }
@@ -274,8 +274,8 @@ configure_vscode() {
             # Add MCP configuration
             cat >> "$temp_settings" << 'EOF'
     "mcp.servers": {
-        "container-kit": {
-            "command": "container-kit-mcp",
+        "containerization-assist": {
+            "command": "containerization-assist-mcp",
             "args": [],
             "transport": "stdio"
         }
@@ -289,8 +289,8 @@ EOF
         cat > "$temp_settings" << 'EOF'
 {
     "mcp.servers": {
-        "container-kit": {
-            "command": "container-kit-mcp",
+        "containerization-assist": {
+            "command": "containerization-assist-mcp",
             "args": [],
             "transport": "stdio"
         }
@@ -337,19 +337,19 @@ install_vscode_extensions() {
 verify_installation() {
     print_step "Verifying installation..."
     
-    # Check Container Kit MCP
+    # Check Containerization Assist MCP
     if command_exists "$BINARY_NAME"; then
         local version=$("$BINARY_NAME" --version 2>/dev/null || echo "unknown")
-        print_success "Container Kit MCP is installed"
+        print_success "Containerization Assist MCP is installed"
         print_info "Version: $version"
     else
-        print_error "Container Kit MCP not found in PATH"
+        print_error "Containerization Assist MCP not found in PATH"
         return 1
     fi
     
     # Check VS Code configuration
     local settings_file=$(find_vscode_settings)
-    if [ -f "$settings_file" ] && grep -q "container-kit" "$settings_file"; then
+    if [ -f "$settings_file" ] && grep -q "containerization-assist" "$settings_file"; then
         print_success "VS Code MCP configuration found"
     else
         print_warning "VS Code MCP configuration not found"
@@ -361,18 +361,18 @@ verify_installation() {
 # Main installation flow
 main() {
     echo
-    print_info "=== Container Kit VS Code Setup Script ==="
-    print_info "This script will install Container Kit and configure it for VS Code"
+    print_info "=== Containerization Assist VS Code Setup Script ==="
+    print_info "This script will install Containerization Assist and configure it for VS Code"
     echo
     
     # Check if already installed
     if command_exists "$BINARY_NAME"; then
         local current_version=$("$BINARY_NAME" --version 2>/dev/null || echo "unknown")
-        print_info "Found existing Container Kit installation: $current_version"
+        print_info "Found existing Containerization Assist installation: $current_version"
         read -p "Do you want to reinstall? (y/N) " -n 1 -r
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            print_info "Skipping Container Kit installation"
+            print_info "Skipping Containerization Assist installation"
             # Still configure VS Code
             configure_vscode
             install_vscode_extensions
@@ -400,9 +400,9 @@ print_final_instructions() {
     print_info "Next steps:"
     print_info "1. Restart VS Code"
     print_info "2. Open GitHub Copilot Chat (Ctrl+Alt+I or Cmd+Alt+I)"
-    print_info "3. Ask: 'What Container Kit tools are available?'"
+    print_info "3. Ask: 'What Containerization Assist tools are available?'"
     echo
-    print_info "To use Container Kit:"
+    print_info "To use Containerization Assist:"
     print_info "• Ask Copilot to analyze your repository"
     print_info "• Request help containerizing your application"
     print_info "• Use specific tools like 'generate_dockerfile' or 'build_image'"
@@ -412,7 +412,7 @@ print_final_instructions() {
         print_warning "Remember to install Docker for container operations"
     fi
     
-    print_info "For help, visit: https://github.com/Azure/container-kit"
+    print_info "For help, visit: https://github.com/Azure/containerization-assist"
 }
 
 # Run main function

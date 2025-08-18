@@ -4,8 +4,8 @@ import (
 	"context"
 	"os/exec"
 
-	mcperrors "github.com/Azure/container-kit/pkg/common/errors"
-	"github.com/Azure/container-kit/pkg/common/runner"
+	mcperrors "github.com/Azure/containerization-assist/pkg/common/errors"
+	"github.com/Azure/containerization-assist/pkg/common/runner"
 )
 
 type KubeRunner interface {

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/errors"
-	coresecurity "github.com/Azure/container-kit/pkg/core/security"
+	"github.com/Azure/containerization-assist/pkg/common/errors"
+	coresecurity "github.com/Azure/containerization-assist/pkg/core/security"
 	"github.com/rs/zerolog"
 )
 

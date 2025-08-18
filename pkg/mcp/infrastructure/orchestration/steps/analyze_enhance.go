@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/sampling"
-	aisample "github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/sampling"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/sampling"
+	aisample "github.com/Azure/containerization-assist/pkg/mcp/infrastructure/ai_ml/sampling"
 )
 
 // EnhanceRepositoryAnalysis uses AI to improve the initial repository analysis

@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
-	"github.com/Azure/container-kit/pkg/mcp/service" // Direct dependency injection
-	"github.com/Azure/container-kit/pkg/mcp/service/config"
+	"github.com/Azure/containerization-assist/pkg/mcp/api"
+	"github.com/Azure/containerization-assist/pkg/mcp/service" // Direct dependency injection
+	"github.com/Azure/containerization-assist/pkg/mcp/service/config"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -58,7 +58,7 @@ func parseFlags() *FlagConfig {
 // handleSpecialFlags handles version and schema export flags that exit early
 func handleSpecialFlags(flags *FlagConfig) {
 	if *flags.version {
-		log.Info().Str("version", getVersion()).Msg("Container Kit MCP Server version")
+		log.Info().Str("version", getVersion()).Msg("Containerization Assist MCP Server version")
 		os.Exit(0)
 	}
 
@@ -135,7 +135,7 @@ func createAndConfigureServer(cfg *config.Config) (api.MCPServer, error) {
 	log.Info().
 		Str("version", getVersion()).
 		Str("workspace_dir", cfg.WorkspaceDir).
-		Msg("Starting Container Kit MCP Server")
+		Msg("Starting Containerization Assist MCP Server")
 
 	slogLogger := createSlogLogger(cfg.LogLevel)
 

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/pipeline"
+	"github.com/Azure/containerization-assist/pkg/pipeline"
 )
 
 // TestDatabaseDetectionStage_Initialize tests the Initialize method

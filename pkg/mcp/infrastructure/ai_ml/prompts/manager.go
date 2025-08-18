@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync"
 
-	domainprompts "github.com/Azure/container-kit/pkg/mcp/domain/prompts"
+	domainprompts "github.com/Azure/containerization-assist/pkg/mcp/domain/prompts"
 	"gopkg.in/yaml.v3"
 )
 

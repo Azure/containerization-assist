@@ -1,4 +1,4 @@
-// Package events provides built-in event handlers for Container Kit MCP.
+// Package events provides built-in event handlers for Containerization Assist MCP.
 package events
 
 import (

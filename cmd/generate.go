@@ -9,15 +9,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/filesystem"
-	"github.com/Azure/container-kit/pkg/common/logger"
-	"github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/core/kubernetes"
-	"github.com/Azure/container-kit/pkg/pipeline"
-	"github.com/Azure/container-kit/pkg/pipeline/databasedetectionstage"
-	"github.com/Azure/container-kit/pkg/pipeline/dockerstage"
-	"github.com/Azure/container-kit/pkg/pipeline/manifeststage"
-	"github.com/Azure/container-kit/pkg/pipeline/repoanalysisstage"
+	"github.com/Azure/containerization-assist/pkg/common/filesystem"
+	"github.com/Azure/containerization-assist/pkg/common/logger"
+	"github.com/Azure/containerization-assist/pkg/core/docker"
+	"github.com/Azure/containerization-assist/pkg/core/kubernetes"
+	"github.com/Azure/containerization-assist/pkg/pipeline"
+	"github.com/Azure/containerization-assist/pkg/pipeline/databasedetectionstage"
+	"github.com/Azure/containerization-assist/pkg/pipeline/dockerstage"
+	"github.com/Azure/containerization-assist/pkg/pipeline/manifeststage"
+	"github.com/Azure/containerization-assist/pkg/pipeline/repoanalysisstage"
 	"github.com/spf13/cobra"
 )
 
@@ -63,7 +63,7 @@ var generateCmd = &cobra.Command{
 				if targetDir == "" {
 					// No target directory provided - inform the user and accept input
 					logger.Warn("No target repository specified. The target repository is the directory containing the application you want to containerize.")
-					logger.Info("Example: container-kit generate ./my-app")
+					logger.Info("Example: containerization-assist generate ./my-app")
 
 					// Ask if they want to provide a target directory now
 					logger.Info("Would you like to specify a target repository now? (y/n): ")

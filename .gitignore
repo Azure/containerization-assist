@@ -34,8 +34,8 @@ lint-output.txt
 # Binary outputs (specific to avoid ignoring source files)
 /mcp-server
 /simple-server
-/container-kit-mcp
-/container-kit
+/containerization-assist-mcp
+/containerization-assist
 /main
 /test-mcp-server
 /test-mcp
@@ -48,17 +48,17 @@ lint-output.txt
 
 # Binaries in source directories
 /cmd/mcp-server/mcp-server
-/cmd/mcp-server/container-kit-mcp
+/cmd/mcp-server/containerization-assist-mcp
 
 # Script binaries
-/scripts/container-kit-mcp
+/scripts/containerization-assist-mcp
 /scripts/mcp-server
-/scripts/container-kit
+/scripts/containerization-assist
 
 # Demo binaries
 /demo/cli-tool
-/demo/container-kit-cli
-/demo/container-kit-mcp
+/demo/containerization-assist-cli
+/demo/containerization-assist-mcp
 /demo/mcp-server
 
 # Test binaries

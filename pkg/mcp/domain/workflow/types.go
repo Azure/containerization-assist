@@ -23,7 +23,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/containerization-assist/pkg/mcp/api"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -247,12 +247,12 @@ type ServerConfig struct {
 // DefaultServerConfig returns a simplified default server configuration with only essential fields
 func DefaultServerConfig() ServerConfig {
 	return ServerConfig{
-		WorkspaceDir:     "/tmp/container-kit-workspace",
-		StorePath:        "/tmp/container-kit-sessions.db",
+		WorkspaceDir:     "/tmp/containerization-assist-workspace",
+		StorePath:        "/tmp/containerization-assist-sessions.db",
 		SessionTTL:       24 * time.Hour,
 		MaxSessions:      100,
 		LogLevel:         "info",
-		ServiceName:      "container-kit-mcp",
+		ServiceName:      "containerization-assist-mcp",
 		ServiceVersion:   "dev",
 		RegistryURL:      "",
 		RegistryUsername: "",

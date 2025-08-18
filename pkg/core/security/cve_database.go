@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	mcperrors "github.com/Azure/container-kit/pkg/common/errors"
+	mcperrors "github.com/Azure/containerization-assist/pkg/common/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -248,7 +248,7 @@ func (db *CVEDatabase) GetCVE(ctx context.Context, cveID string) (*CVEInfo, erro
 	if db.apiKey != "" {
 		req.Header.Set("apiKey", db.apiKey)
 	}
-	req.Header.Set("User-Agent", "container-kit-security/1.0")
+	req.Header.Set("User-Agent", "containerization-assist-security/1.0")
 
 	resp, err := db.httpClient.Do(req)
 	if err != nil {
@@ -630,7 +630,7 @@ func (db *CVEDatabase) setRequestHeaders(req *http.Request) {
 	if db.apiKey != "" {
 		req.Header.Set("apiKey", db.apiKey)
 	}
-	req.Header.Set("User-Agent", "container-kit-security/1.0")
+	req.Header.Set("User-Agent", "containerization-assist-security/1.0")
 }
 
 // EnrichVulnerability enriches a vulnerability with additional CVE data

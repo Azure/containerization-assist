@@ -1,11 +1,11 @@
 package cmd
 
 import (
-	"github.com/Azure/container-kit/pkg/ai"
-	"github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/core/kind"
-	"github.com/Azure/container-kit/pkg/core/kubernetes"
-	"github.com/Azure/container-kit/pkg/pipeline"
+	"github.com/Azure/containerization-assist/pkg/ai"
+	"github.com/Azure/containerization-assist/pkg/core/docker"
+	"github.com/Azure/containerization-assist/pkg/core/kind"
+	"github.com/Azure/containerization-assist/pkg/core/kubernetes"
+	"github.com/Azure/containerization-assist/pkg/pipeline"
 )
 
 // Clients holds all the client implementations for the CLI

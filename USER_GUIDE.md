@@ -1,27 +1,27 @@
-# Container Kit User Guide for VS Code Copilot
+# Containerization Assist User Guide for VS Code Copilot
 
-*A Simple Guide to Set Up and Use the Container Kit MCP Server with VS Code Copilot*
+*A Simple Guide to Set Up and Use the Containerization Assist MCP Server with VS Code Copilot*
 
-This guide will help you set up Container Kit MCP Server to work with VS Code Copilot, even if you're not technical. Container Kit helps you automatically containerize your applications using AI assistance directly in your VS Code editor through GitHub Copilot Chat.
+This guide will help you set up Containerization Assist MCP Server to work with VS Code Copilot, even if you're not technical. Containerization Assist helps you automatically containerize your applications using AI assistance directly in your VS Code editor through GitHub Copilot Chat.
 
 ## Table of Contents
 
-1. [What is Container Kit?](#what-is-container-kit)
+1. [What is Containerization Assist?](#what-is-containerization-assist)
 2. [Prerequisites](#prerequisites)
-3. [Step 1: Install Container Kit](#step-1-install-container-kit)
+3. [Step 1: Install Containerization Assist](#step-1-install-containerization-assist)
 4. [Step 2: Set Up VS Code with Copilot](#step-2-set-up-vs-code-with-copilot)
 5. [Step 3: Configure MCP Integration](#step-3-configure-mcp-integration)
 6. [Step 4: Test Your Setup](#step-4-test-your-setup)
-7. [How to Use Container Kit](#how-to-use-container-kit)
+7. [How to Use Containerization Assist](#how-to-use-containerization-assist)
 8. [Updating to New Releases](#updating-to-new-releases)
 9. [Troubleshooting](#troubleshooting)
 10. [Getting Help](#getting-help)
 
 ---
 
-## What is Container Kit?
+## What is Containerization Assist?
 
-Container Kit is a tool that helps you:
+Containerization Assist is a tool that helps you:
 - **Containerize your applications** - Turn your code into containers (like packaging your app)
 - **Deploy to Kubernetes** - Put your app in the cloud  
 - **Analyze your code** - Understand what technologies your project uses
@@ -48,7 +48,7 @@ Before we start, make sure you have:
 
 ---
 
-## Step 1: Install Container Kit
+## Step 1: Install Containerization Assist
 
 We've made installation super simple with our automated script.
 
@@ -57,17 +57,17 @@ We've made installation super simple with our automated script.
 **For Windows (PowerShell as Administrator):**
 ```powershell
 # Run this command in PowerShell (right-click "Run as Administrator")
-Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-WebRequest -Uri https://raw.githubusercontent.com/Azure/container-kit/main/scripts/setup-vscode.ps1 -OutFile setup-vscode.ps1; ./setup-vscode.ps1; Remove-Item setup-vscode.ps1
+Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-WebRequest -Uri https://raw.githubusercontent.com/Azure/containerization-assist/main/scripts/setup-vscode.ps1 -OutFile setup-vscode.ps1; ./setup-vscode.ps1; Remove-Item setup-vscode.ps1
 ```
 
 **For macOS/Linux:**
 ```bash
 # Run this command in Terminal
-curl -sSL https://raw.githubusercontent.com/Azure/container-kit/main/scripts/setup-vscode.sh | bash
+curl -sSL https://raw.githubusercontent.com/Azure/containerization-assist/main/scripts/setup-vscode.sh | bash
 ```
 
 This script will:
-- ✅ Download Container Kit
+- ✅ Download Containerization Assist
 - ✅ Install it in the right location
 - ✅ Configure VS Code MCP integration
 - ✅ Set up GitHub Copilot connection
@@ -78,34 +78,34 @@ This script will:
 
 If the automated script doesn't work, follow these steps:
 
-1. **Download Container Kit MCP Server**
-   - Go to: https://github.com/Azure/container-kit/releases/latest
+1. **Download Containerization Assist MCP Server**
+   - Go to: https://github.com/Azure/containerization-assist/releases/latest
    - Download the archive matching your OS/architecture (examples):
-     - Windows (x64): `container-kit-mcp_windows_amd64.zip`
-     - Windows (ARM64): `container-kit-mcp_windows_arm64.zip`
-     - macOS (Intel): `container-kit-mcp_darwin_amd64.tar.gz`
-     - macOS (Apple Silicon): `container-kit-mcp_darwin_arm64.tar.gz`
-     - Linux (x64): `container-kit-mcp_linux_amd64.tar.gz`
-     - Linux (ARM64): `container-kit-mcp_linux_arm64.tar.gz`
+     - Windows (x64): `containerization-assist-mcp_windows_amd64.zip`
+     - Windows (ARM64): `containerization-assist-mcp_windows_arm64.zip`
+     - macOS (Intel): `containerization-assist-mcp_darwin_amd64.tar.gz`
+     - macOS (Apple Silicon): `containerization-assist-mcp_darwin_arm64.tar.gz`
+     - Linux (x64): `containerization-assist-mcp_linux_amd64.tar.gz`
+     - Linux (ARM64): `containerization-assist-mcp_linux_arm64.tar.gz`
 
 2. **Extract the files**
    - Windows: Right-click the zip file → "Extract All"
    - macOS/Linux: Double-click the tar.gz file
 
 3. **Move to the right location**
-  - Windows: Move `container-kit-mcp.exe` to `C:\Program Files\ContainerKit\` (or another directory on PATH)
-  - macOS/Linux: Move `container-kit-mcp` to `/usr/local/bin/` (or `$HOME/bin` on PATH)
+  - Windows: Move `containerization-assist-mcp.exe` to `C:\Program Files\ContainerKit\` (or another directory on PATH)
+  - macOS/Linux: Move `containerization-assist-mcp` to `/usr/local/bin/` (or `$HOME/bin` on PATH)
 
 ### Verify Installation
 
 Open a terminal/command prompt and run:
 ```bash
-container-kit-mcp --version
+containerization-assist-mcp --version
 ```
 
 You should see something like:
 ```
-Container Kit MCP Server v1.0.0
+Containerization Assist MCP Server v1.0.0
 ```
 
 ---
@@ -162,9 +162,9 @@ If the file doesn't exist, create it with this minimal configuration:
 ```json
 {
   "servers": {
-    "container-kit": {
+    "containerization-assist": {
       "type": "stdio",
-      "command": "container-kit-mcp",
+      "command": "containerization-assist-mcp",
       "args": []
     }
   }
@@ -172,8 +172,8 @@ If the file doesn't exist, create it with this minimal configuration:
 ```
 
 Notes:
-- Use just `container-kit-mcp` if it's on your PATH; otherwise supply the absolute path.
-- Keep the server name `container-kit` (lowercase, hyphen) for consistency with prompts.
+- Use just `containerization-assist-mcp` if it's on your PATH; otherwise supply the absolute path.
+- Keep the server name `containerization-assist` (lowercase, hyphen) for consistency with prompts.
 - Restart VS Code after saving to load changes.
 
 ### Optional: Enable Debug Logging Early
@@ -183,9 +183,9 @@ Add an `env` block to increase log verbosity:
 ```json
 {
   "servers": {
-    "container-kit": {
+    "containerization-assist": {
       "type": "stdio",
-      "command": "container-kit-mcp",
+      "command": "containerization-assist-mcp",
       "args": [],
       "env": { "CONTAINER_KIT_LOG_LEVEL": "debug" }
     }
@@ -199,13 +199,13 @@ Add an `env` block to increase log verbosity:
 
 ## Step 4: Test Your Setup
 
-### Test Container Kit Directly
+### Test Containerization Assist Directly
 
 1. **Open a terminal/command prompt**
 2. **Run this command:**
 
 ```bash
-container-kit-mcp --version
+containerization-assist-mcp --version
 ```
 
 You should see the version information.
@@ -216,23 +216,23 @@ You should see the version information.
 
 1. **Restart VS Code** (close and reopen it)
 2. **Open the Copilot Chat panel** (click the chat icon in the sidebar or press `Ctrl+Alt+I`)
-3. **Type:** "What Container Kit tools are available?"
-4. **You should see** Copilot list the available Container Kit tools using MCP
+3. **Type:** "What Containerization Assist tools are available?"
+4. **You should see** Copilot list the available Containerization Assist tools using MCP
 
-*[Image placeholder: VS Code Copilot Chat showing Container Kit tools list]*
+*[Image placeholder: VS Code Copilot Chat showing Containerization Assist tools list]*
 
 ---
 
-## How to Use Container Kit
+## How to Use Containerization Assist
 
-Container Kit provides 13 different tools that work together to containerize your applications. Here's how to use them through VS Code Copilot:
+Containerization Assist provides 13 different tools that work together to containerize your applications. Here's how to use them through VS Code Copilot:
 
 ### Quick Start: Complete Workflow
 
 1. **Open your project** in VS Code
 2. **Open Copilot Chat** (click the chat icon or press `Ctrl+Alt+I`)
-3. **Ask Copilot:** "Use Container Kit to help me containerize this application"
-4. **Copilot will use Container Kit** to analyze, containerize, and deploy your app
+3. **Ask Copilot:** "Use Containerization Assist to help me containerize this application"
+4. **Copilot will use Containerization Assist** to analyze, containerize, and deploy your app
 5. **Follow Copilot's guidance** through each step in your editor
 
 *[Image placeholder: VS Code Copilot Chat conversation showing containerization workflow]*
@@ -242,22 +242,22 @@ Container Kit provides 13 different tools that work together to containerize you
 You can also ask Copilot to use specific tools:
 
 #### 1. Analyze Your Code
-- **Ask:** "Use Container Kit to analyze this repository"
+- **Ask:** "Use Containerization Assist to analyze this repository"
 - **What it does:** Examines your code and detects the programming language, framework, and dependencies
 
 #### 2. Create Dockerfile
-- **Ask:** "Use Container Kit to generate a Dockerfile for this project"
+- **Ask:** "Use Containerization Assist to generate a Dockerfile for this project"
 - **What it does:** Creates a Dockerfile automatically based on your code
 
 #### 3. Build Container
-- **Ask:** "Use Container Kit to build a Docker image from this code"
+- **Ask:** "Use Containerization Assist to build a Docker image from this code"
 - **What it does:** Builds a Docker container from your code
 
 #### 4. Deploy to Kubernetes
-- **Ask:** "Use Container Kit to deploy this application to Kubernetes"
+- **Ask:** "Use Containerization Assist to deploy this application to Kubernetes"
 - **What it does:** Creates and applies Kubernetes manifests
 
-*[Image placeholder: VS Code Copilot Chat showing different Container Kit commands]*
+*[Image placeholder: VS Code Copilot Chat showing different Containerization Assist commands]*
 
 ### Example Conversations
 
@@ -265,25 +265,25 @@ You can also ask Copilot to use specific tools:
 ```
 You: I have a Node.js app in this workspace. Can you help me containerize it?
 
-Copilot: I'll help you containerize your Node.js application using Container Kit. Let me start by analyzing your repository...
+Copilot: I'll help you containerize your Node.js application using Containerization Assist. Let me start by analyzing your repository...
 
-[Copilot uses Container Kit tools to analyze, generate Dockerfile, build image, etc.]
+[Copilot uses Containerization Assist tools to analyze, generate Dockerfile, build image, etc.]
 ```
 
 **Specific Task:**
 ```
-You: Can you use Container Kit to check what technologies this project uses?
+You: Can you use Containerization Assist to check what technologies this project uses?
 
-Copilot: I'll analyze your project using Container Kit to identify the technologies and dependencies...
+Copilot: I'll analyze your project using Containerization Assist to identify the technologies and dependencies...
 
 [Copilot uses the analyze_repository tool on your current workspace]
 ```
 
 **Working with Files:**
 ```
-You: Use Container Kit to create a Dockerfile, then show me the generated file
+You: Use Containerization Assist to create a Dockerfile, then show me the generated file
 
-Copilot: I'll use Container Kit to generate a Dockerfile for your project and then display it...
+Copilot: I'll use Containerization Assist to generate a Dockerfile for your project and then display it...
 
 [Copilot generates the Dockerfile and opens it in VS Code for you to review]
 ```
@@ -292,7 +292,7 @@ Copilot: I'll use Container Kit to generate a Dockerfile for your project and th
 
 ## Updating to New Releases
 
-Container Kit releases updates regularly with new features and bug fixes.
+Containerization Assist releases updates regularly with new features and bug fixes.
 
 ### Automatic Update (Recommended)
 
@@ -301,18 +301,18 @@ Use our update script to get the latest version:
 **Windows:**
 ```powershell
 # Run in PowerShell as Administrator
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/Azure/container-kit/main/scripts/update-user.ps1 -OutFile update-user.ps1; ./update-user.ps1; Remove-Item update-user.ps1
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/Azure/containerization-assist/main/scripts/update-user.ps1 -OutFile update-user.ps1; ./update-user.ps1; Remove-Item update-user.ps1
 ```
 
 **macOS/Linux:**
 ```bash
 # Run in Terminal
-curl -sSL https://raw.githubusercontent.com/Azure/container-kit/main/scripts/update-user.sh | bash
+curl -sSL https://raw.githubusercontent.com/Azure/containerization-assist/main/scripts/update-user.sh | bash
 ```
 
 **After updating:**
 1. **Restart VS Code** to use the new version
-2. **Test the connection** by asking Copilot about Container Kit tools
+2. **Test the connection** by asking Copilot about Containerization Assist tools
 
 *[Image placeholder: Terminal showing successful update process]*
 
@@ -320,10 +320,10 @@ curl -sSL https://raw.githubusercontent.com/Azure/container-kit/main/scripts/upd
 
 1. **Check your current version:**
    ```bash
-   container-kit-mcp --version
+   containerization-assist-mcp --version
    ```
 
-2. **Check the latest version** at: https://github.com/Azure/container-kit/releases/latest
+2. **Check the latest version** at: https://github.com/Azure/containerization-assist/releases/latest
 
 3. **If there's a newer version**, download and install it following the same steps as the initial installation
 
@@ -335,27 +335,27 @@ curl -sSL https://raw.githubusercontent.com/Azure/container-kit/main/scripts/upd
 
 ### Common Issues and Solutions
 
-#### "Command not found: container-kit-mcp"
+#### "Command not found: containerization-assist-mcp"
 
-**Problem:** Container Kit isn't installed correctly or not in your PATH.
+**Problem:** Containerization Assist isn't installed correctly or not in your PATH.
 
 **Solutions:**
 1. **Re-run the installation script**
 2. **Check if the file exists:**
-   - Windows: Look for `container-kit-mcp.exe` in `C:\Program Files\ContainerKit\`
-   - macOS/Linux: Look for `container-kit-mcp` in `/usr/local/bin/`
+   - Windows: Look for `containerization-assist-mcp.exe` in `C:\Program Files\ContainerKit\`
+   - macOS/Linux: Look for `containerization-assist-mcp` in `/usr/local/bin/`
 3. **Add to PATH manually** (ask your IT team for help)
 
-#### Copilot doesn't see Container Kit tools
+#### Copilot doesn't see Containerization Assist tools
 
 **Problem:** The MCP server isn't configured correctly in VS Code.
 
 **Solutions:**
-1. **Open your `mcp.json`** and verify the `servers.container-kit` block.
+1. **Open your `mcp.json`** and verify the `servers.containerization-assist` block.
 2. **Validate JSON syntax** (VS Code shows red squiggles on errors).
 3. **Confirm MCP extension is installed & enabled**.
 4. **Restart VS Code** after edits.
-5. **Ensure `container-kit-mcp` resolves** (run `which container-kit-mcp` / `where container-kit-mcp`).
+5. **Ensure `containerization-assist-mcp` resolves** (run `which containerization-assist-mcp` / `where containerization-assist-mcp`).
 
 *[Image placeholder: VS Code showing MCP configuration and Copilot Chat connection status]*
 
@@ -370,12 +370,12 @@ curl -sSL https://raw.githubusercontent.com/Azure/container-kit/main/scripts/upd
 
 #### "Permission denied" errors
 
-**Problem:** Container Kit doesn't have the right permissions.
+**Problem:** Containerization Assist doesn't have the right permissions.
 
 **Solutions:**
 1. **Windows:** Run the installation script as Administrator
 2. **macOS/Linux:** Use `sudo` with the installation commands
-3. **Check file permissions** on the Container Kit executable
+3. **Check file permissions** on the Containerization Assist executable
 
 ### Getting Debug Information
 
@@ -385,9 +385,9 @@ If you're having trouble, enable debug logging via `mcp.json`:
 ```json
 {
   "servers": {
-    "container-kit": {
+    "containerization-assist": {
       "type": "stdio",
-      "command": "container-kit-mcp",
+      "command": "containerization-assist-mcp",
       "args": [],
       "env": { "CONTAINER_KIT_LOG_LEVEL": "debug" }
     }
@@ -398,7 +398,7 @@ If you're having trouble, enable debug logging via `mcp.json`:
 3. **Retry the failing action**
 4. **Open Output panel** (View → Output) and select the MCP-related channel (e.g. "MCP" or extension-specific).
 
-*[Image placeholder: VS Code Output panel showing Container Kit debug logs]*
+*[Image placeholder: VS Code Output panel showing Containerization Assist debug logs]*
 
 ---
 
@@ -406,15 +406,15 @@ If you're having trouble, enable debug logging via `mcp.json`:
 
 ### Documentation and Resources
 
-- **Official Documentation:** [GitHub Repository](https://github.com/Azure/container-kit)
+- **Official Documentation:** [GitHub Repository](https://github.com/Azure/containerization-assist)
 - **Examples:** (Coming soon)
 - **MCP Documentation:** [Model Context Protocol](https://modelcontextprotocol.io/)
 
 ### Community Support
 
-- **🐛 Bug Reports:** Use our [Bug Report Template](https://github.com/Azure/container-kit/issues/new?assignees=&labels=bug%2Cneeds-triage&projects=&template=bug-report.yml) 
-- **✨ Feature Requests:** Use our [Feature Request Template](https://github.com/Azure/container-kit/issues/new?assignees=&labels=enhancement%2Cneeds-triage&projects=&template=feature-request.yml)
-- **💬 Questions & Help:** Ask in [GitHub Discussions](https://github.com/Azure/container-kit/discussions)
+- **🐛 Bug Reports:** Use our [Bug Report Template](https://github.com/Azure/containerization-assist/issues/new?assignees=&labels=bug%2Cneeds-triage&projects=&template=bug-report.yml) 
+- **✨ Feature Requests:** Use our [Feature Request Template](https://github.com/Azure/containerization-assist/issues/new?assignees=&labels=enhancement%2Cneeds-triage&projects=&template=feature-request.yml)
+- **💬 Questions & Help:** Ask in [GitHub Discussions](https://github.com/Azure/containerization-assist/discussions)
 
 ### How to Report Issues
 
@@ -422,14 +422,14 @@ We have detailed templates to help you report bugs and request features effectiv
 
 #### 🐛 Reporting Bugs
 
-1. **Go to:** https://github.com/Azure/container-kit/issues/new?template=bug-report.yml
+1. **Go to:** https://github.com/Azure/containerization-assist/issues/new?template=bug-report.yml
 2. **Fill out the template** - it will guide you through providing all needed information
 3. **Attach logs** (see [Gathering Logs](#gathering-logs) below)
 4. **Remove sensitive data** like API keys or personal information
 
 #### ✨ Requesting Features
 
-1. **Go to:** https://github.com/Azure/container-kit/issues/new?template=feature-request.yml
+1. **Go to:** https://github.com/Azure/containerization-assist/issues/new?template=feature-request.yml
 2. **Describe your use case** and why the feature would be valuable
 3. **Provide examples** of how you'd like it to work
 4. **Consider alternatives** and mention any similar features you've seen
@@ -444,9 +444,9 @@ When reporting issues, logs help us understand what went wrong. Here's how to ga
 ```json
 {
   "servers": {
-    "container-kit": {
+    "containerization-assist": {
       "type": "stdio",
-      "command": "container-kit-mcp",
+      "command": "containerization-assist-mcp",
       "args": [],
       "env": { "CONTAINER_KIT_LOG_LEVEL": "debug" }
     }
@@ -458,10 +458,10 @@ When reporting issues, logs help us understand what went wrong. Here's how to ga
 3. **Try to reproduce the issue**
 4. **Check VS Code Output panel:**
    - **Go to:** View → Output
-   - **Select:** "MCP" or "Container Kit" from the dropdown
+   - **Select:** "MCP" or "Containerization Assist" from the dropdown
    - **Look for error messages** or debug information
 
-#### Method 2: Run Container Kit Directly
+#### Method 2: Run Containerization Assist Directly
 
 1. **Open terminal/command prompt**
 2. **Set debug level:**
@@ -472,34 +472,34 @@ When reporting issues, logs help us understand what went wrong. Here's how to ga
    # macOS/Linux
    export CONTAINER_KIT_LOG_LEVEL=debug
    ```
-3. **Run Container Kit:**
+3. **Run Containerization Assist:**
    ```bash
-   container-kit-mcp
+   containerization-assist-mcp
    ```
 4. **Try to reproduce the issue in another terminal**
 5. **Copy the log output from the first terminal**
 
 #### Method 3: Use Log Files
 
-Container Kit can write logs to files:
+Containerization Assist can write logs to files:
 
 ```bash
 # Windows
-set CONTAINER_KIT_LOG_FILE=container-kit.log
-container-kit-mcp
+set CONTAINER_KIT_LOG_FILE=containerization-assist.log
+containerization-assist-mcp
 
 # macOS/Linux
-export CONTAINER_KIT_LOG_FILE=container-kit.log
-container-kit-mcp
+export CONTAINER_KIT_LOG_FILE=containerization-assist.log
+containerization-assist-mcp
 ```
 
-Then attach the `container-kit.log` file to your issue.
+Then attach the `containerization-assist.log` file to your issue.
 
 ### What Information to Include
 
 When reporting issues, always include:
 
-1. **Container Kit version:** `container-kit-mcp --version`
+1. **Containerization Assist version:** `containerization-assist-mcp --version`
 2. **Operating system:** Windows 11, macOS 14.1, Ubuntu 22.04, etc.
 3. **VS Code version:** Check Help → About in VS Code
 4. **GitHub Copilot version:** Check Extensions panel in VS Code
@@ -515,10 +515,10 @@ Save this script to quickly gather system information:
 **Windows (save as `gather-info.bat`):**
 ```batch
 @echo off
-echo === Container Kit Debug Information ===
+echo === Containerization Assist Debug Information ===
 echo.
-echo Container Kit Version:
-container-kit-mcp --version
+echo Containerization Assist Version:
+containerization-assist-mcp --version
 echo.
 echo Operating System:
 systeminfo | findstr /B /C:"OS Name" /C:"OS Version"
@@ -536,10 +536,10 @@ set | findstr CONTAINER_KIT
 **macOS/Linux (save as `gather-info.sh`):**
 ```bash
 #!/bin/bash
-echo "=== Container Kit Debug Information ==="
+echo "=== Containerization Assist Debug Information ==="
 echo
-echo "Container Kit Version:"
-container-kit-mcp --version
+echo "Containerization Assist Version:"
+containerization-assist-mcp --version
 echo
 echo "Operating System:"
 uname -a
@@ -560,9 +560,9 @@ Run the script and include its output when reporting issues.
 
 ---
 
-## Available Container Kit Tools
+## Available Containerization Assist Tools
 
-Here are all the tools available in Container Kit:
+Here are all the tools available in Containerization Assist:
 
 ### Workflow Tools (10 tools)
 1. **analyze_repository** - Analyze your code and detect technologies
@@ -589,7 +589,7 @@ Here are all the tools available in Container Kit:
 
 ## What's Next?
 
-Congratulations! 🎉 You've successfully set up Container Kit with VS Code Copilot. Here are some things to try:
+Congratulations! 🎉 You've successfully set up Containerization Assist with VS Code Copilot. Here are some things to try:
 
 ### Try These Examples
 
@@ -600,14 +600,14 @@ Congratulations! 🎉 You've successfully set up Container Kit with VS Code Copi
 
 ### Learn More
 
-- **Explore all 13 tools** by asking Copilot "What can Container Kit do?"
+- **Explore all 13 tools** by asking Copilot "What can Containerization Assist do?"
 - **Read about Kubernetes** if you want to deploy to the cloud
-- **Learn Docker basics** to understand what Container Kit is doing
+- **Learn Docker basics** to understand what Containerization Assist is doing
 - **Try the integrated workflow** - Copilot can edit files directly in your workspace
 
 ### Advanced Usage
 
-- **Use Container Kit with Copilot Inline Chat** (`Ctrl+I`) for contextual help
+- **Use Containerization Assist with Copilot Inline Chat** (`Ctrl+I`) for contextual help
 - **Combine with other VS Code extensions** like Docker and Kubernetes
 - **Set up workspace-specific configurations** for different projects
 
@@ -617,6 +617,6 @@ We'd love to hear about your experience! Share your success stories in our GitHu
 
 ---
 
-*Made with ❤️ by the Azure Container Kit team*
+*Made with ❤️ by the Azure Containerization Assist team*
 
 *Last updated: July 2025*

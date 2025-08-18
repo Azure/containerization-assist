@@ -1,6 +1,6 @@
 #!/bin/bash
-# Container Kit User Setup Script
-# This script sets up Container Kit MCP Server for non-technical users
+# Containerization Assist User Setup Script
+# This script sets up Containerization Assist MCP Server for non-technical users
 
 set -e
 
@@ -13,8 +13,8 @@ NC='\033[0m' # No Color
 
 # Configuration
 REPO_OWNER="Azure"
-REPO_NAME="container-kit"
-BINARY_NAME="container-kit-mcp"
+REPO_NAME="containerization-assist"
+BINARY_NAME="containerization-assist-mcp"
 INSTALL_DIR="/usr/local/bin"
 FALLBACK_DIR="$HOME/bin"
 
@@ -100,7 +100,7 @@ check_prerequisites() {
     
     # Check for Docker (warn if missing)
     if ! command_exists docker; then
-        print_warning "Docker is not installed. You'll need Docker to use Container Kit's containerization features."
+        print_warning "Docker is not installed. You'll need Docker to use Containerization Assist's containerization features."
         print_info "Install Docker from: https://www.docker.com/products/docker-desktop/"
     else
         print_success "Docker found"
@@ -108,7 +108,7 @@ check_prerequisites() {
     
     # Check for git (warn if missing)
     if ! command_exists git; then
-        print_warning "Git is not installed. Some Container Kit features may require Git."
+        print_warning "Git is not installed. Some Containerization Assist features may require Git."
         print_info "Install Git from: https://git-scm.com/downloads"
     else
         print_success "Git found"
@@ -123,9 +123,9 @@ check_prerequisites() {
     print_success "Prerequisites check passed"
 }
 
-# Download and install Container Kit
+# Download and install Containerization Assist
 install_container_kit() {
-    print_step "Installing Container Kit..."
+    print_step "Installing Containerization Assist..."
     
     # Use the existing install script
     if command_exists curl; then
@@ -137,10 +137,10 @@ install_container_kit() {
     # Verify installation
     if command_exists "$BINARY_NAME"; then
         local version=$("$BINARY_NAME" --version 2>/dev/null || echo "unknown")
-        print_success "Container Kit installed successfully"
+        print_success "Containerization Assist installed successfully"
         print_info "Version: $version"
     else
-        print_error "Container Kit installation failed"
+        print_error "Containerization Assist installation failed"
         print_info "Please check the error messages above and try again"
         exit 1
     fi
@@ -198,7 +198,7 @@ setup_claude_config() {
     # Create or update configuration
     local config_content='{
   "mcpServers": {
-    "container-kit": {
+    "containerization-assist": {
       "command": "'$BINARY_NAME'",
       "args": []
     }
@@ -226,12 +226,12 @@ create_shortcuts() {
     case $OS in
         linux)
             # Create desktop file for Linux
-            local desktop_file="$HOME/.local/share/applications/container-kit.desktop"
+            local desktop_file="$HOME/.local/share/applications/containerization-assist.desktop"
             mkdir -p "$(dirname "$desktop_file")"
             
             cat > "$desktop_file" << EOF
 [Desktop Entry]
-Name=Container Kit MCP Server
+Name=Containerization Assist MCP Server
 Comment=AI-Powered Application Containerization
 Exec=$BINARY_NAME
 Icon=docker
@@ -255,9 +255,9 @@ EOF
 test_installation() {
     print_step "Testing installation..."
     
-    # Test Container Kit
+    # Test Containerization Assist
     if command_exists "$BINARY_NAME"; then
-        print_success "Container Kit is accessible from command line"
+        print_success "Containerization Assist is accessible from command line"
         
         # Test version command
         local version_output
@@ -267,7 +267,7 @@ test_installation() {
             print_warning "Version check failed, but binary is accessible"
         fi
     else
-        print_error "Container Kit is not accessible from command line"
+        print_error "Containerization Assist is not accessible from command line"
         print_info "You may need to restart your terminal or add to PATH"
     fi
     
@@ -285,17 +285,17 @@ test_installation() {
 # Show next steps
 show_next_steps() {
     echo
-    print_success "🎉 Container Kit User Setup Complete!"
+    print_success "🎉 Containerization Assist User Setup Complete!"
     echo
     print_info "Next Steps:"
     echo
     print_info "1. 📱 Open Claude Desktop (restart if it was running)"
     print_info "2. 💬 Start a new conversation"
-    print_info "3. 🗣️  Ask: 'What Container Kit tools are available?'"
+    print_info "3. 🗣️  Ask: 'What Containerization Assist tools are available?'"
     print_info "4. 🚀 Try: 'Help me containerize my application at [your-repo-url]'"
     echo
     print_info "📚 Documentation:"
-    print_info "   • User Guide: USER_GUIDE.md in the Container Kit repository"
+    print_info "   • User Guide: USER_GUIDE.md in the Containerization Assist repository"
     print_info "   • GitHub: https://github.com/$REPO_OWNER/$REPO_NAME"
     echo
     print_info "🆘 Need Help?"
@@ -313,8 +313,8 @@ show_next_steps() {
 # Main installation flow
 main() {
     echo
-    print_info "=== Container Kit User Setup Script ==="
-    print_info "This script will install Container Kit and configure it for Claude Desktop"
+    print_info "=== Containerization Assist User Setup Script ==="
+    print_info "This script will install Containerization Assist and configure it for Claude Desktop"
     echo
     
     # Check if user wants to continue

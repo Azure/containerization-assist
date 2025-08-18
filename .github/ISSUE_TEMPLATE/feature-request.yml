@@ -1,5 +1,5 @@
 name: ✨ Feature Request
-description: Suggest a new feature or enhancement for Container Kit
+description: Suggest a new feature or enhancement for Containerization Assist
 title: "✨ [FEATURE]: "
 labels: ["enhancement", "needs-triage"]
 body:
@@ -16,7 +16,7 @@ body:
       options:
         - label: I have searched existing issues and discussions to ensure this feature hasn't been requested
           required: true
-        - label: I have read the [Contributing Guidelines](https://github.com/Azure/container-kit/blob/main/CONTRIBUTING.md)
+        - label: I have read the [Contributing Guidelines](https://github.com/Azure/containerization-assist/blob/main/CONTRIBUTING.md)
           required: true
         - label: I have considered if this fits the project's scope and goals
           required: true
@@ -34,7 +34,7 @@ body:
     id: category
     attributes:
       label: Feature Category
-      description: Which area of Container Kit would this feature affect?
+      description: Which area of Containerization Assist would this feature affect?
       options:
         - New MCP Tool
         - MCP Server Enhancement
@@ -130,7 +130,7 @@ body:
         Given...
         When...
         Then...
-        
+
         Example:
         - [ ] New tool appears in `list_tools` output
         - [ ] Tool executes successfully with valid input
@@ -147,10 +147,10 @@ body:
       placeholder: |
         Command examples:
         ```bash
-        ./container-kit-mcp
+        ./containerization-assist-mcp
         # Tool: new_feature_tool
         ```
-        
+
         Output examples:
         ```json
         {

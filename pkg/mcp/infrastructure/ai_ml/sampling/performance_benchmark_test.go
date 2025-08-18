@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/sampling"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/sampling"
 )
 
 // BenchmarkCoreSamplingPerformance focuses on core performance without middleware

@@ -14,20 +14,20 @@
     "devops",
     "azure"
   ],
-  "homepage": "https://github.com/Azure/container-kit#readme",
+  "homepage": "https://github.com/Azure/containerization-assist#readme",
   "bugs": {
-    "url": "https://github.com/Azure/container-kit/issues"
+    "url": "https://github.com/Azure/containerization-assist/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Azure/container-kit.git",
+    "url": "git+https://github.com/Azure/containerization-assist.git",
     "directory": "npm"
   },
   "license": "MIT",
   "author": "Microsoft Azure",
   "main": "index.js",
   "bin": {
-    "container-kit-mcp": "./index.js",
+    "containerization-assist-mcp": "./index.js",
     "ckmcp": "./index.js"
   },
   "files": [

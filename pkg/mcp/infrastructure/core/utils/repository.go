@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/filesystem"
+	"github.com/Azure/containerization-assist/pkg/common/filesystem"
 )
 
 // ExtractRepoName extracts repository name from Git URL

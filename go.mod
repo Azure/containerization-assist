@@ -1,4 +1,4 @@
-module github.com/Azure/container-kit
+module github.com/Azure/containerization-assist
 
 go 1.24.4
 

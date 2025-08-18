@@ -1,4 +1,4 @@
-// Package integration provides integration tests for the Container Kit MCP server
+// Package integration provides integration tests for the Containerization Assist MCP server
 package integration_test
 
 import (
@@ -20,7 +20,7 @@ func TestMain(m *testing.M) {
 
 // TestIntegrationSuite verifies that integration tests are properly configured
 func TestIntegrationSuite(t *testing.T) {
-	t.Log("Container Kit MCP Server Integration Test Suite")
+	t.Log("Containerization Assist MCP Server Integration Test Suite")
 
 	// Skip if running in short mode
 	if testing.Short() {

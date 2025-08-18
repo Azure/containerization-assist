@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	mcperrors "github.com/Azure/container-kit/pkg/common/errors"
+	mcperrors "github.com/Azure/containerization-assist/pkg/common/errors"
 	"github.com/rs/zerolog"
 	"gopkg.in/yaml.v3"
 )

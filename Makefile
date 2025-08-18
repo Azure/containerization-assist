@@ -1,4 +1,4 @@
-# Simplified Container Kit Makefile
+# Simplified Containerization Assist Makefile
 # Focus on essential tasks after massive cleanup
 
 # Version info
@@ -14,10 +14,10 @@ build: mcp
 	@echo "✅ Build complete!"
 
 mcp:
-	@echo "Building Container Kit MCP Server..."
+	@echo "Building Containerization Assist MCP Server..."
 	@echo "Version: $(VERSION)"
-	GOFLAGS=-trimpath go build -tags mcp -ldflags "$(LDFLAGS)" -o container-kit-mcp ./cmd/mcp-server
-	@echo "✅ Built: container-kit-mcp"
+	GOFLAGS=-trimpath go build -tags mcp -ldflags "$(LDFLAGS)" -o containerization-assist-mcp ./cmd/mcp-server
+	@echo "✅ Built: containerization-assist-mcp"
 
 # Wire dependency injection code generation
 wire-gen:
@@ -94,13 +94,13 @@ check-all: fmt lint static-analysis security-scan arch-validate perf-check contr
 
 # Utility tasks  
 clean:
-	rm -f container-kit container-kit-mcp
+	rm -f containerization-assist containerization-assist-mcp
 
 version:
-	@if [ -f "./container-kit-mcp" ]; then ./container-kit-mcp --version; else echo "❌ Run 'make build' first"; fi
+	@if [ -f "./containerization-assist-mcp" ]; then ./containerization-assist-mcp --version; else echo "❌ Run 'make build' first"; fi
 
 help:
-	@echo "Simplified Container Kit Makefile"
+	@echo "Simplified Containerization Assist Makefile"
 	@echo ""
 	@echo "Essential targets:"
 	@echo "  build             Build the MCP server binary"

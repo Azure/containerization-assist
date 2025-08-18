@@ -1,10 +1,10 @@
-[![Simple CI](https://github.com/Azure/container-kit/actions/workflows/ci-simple.yml/badge.svg)](https://github.com/Azure/container-kit/actions/workflows/ci-simple.yml)
+[![Simple CI](https://github.com/Azure/containerization-assist/actions/workflows/ci-simple.yml/badge.svg)](https://github.com/Azure/containerization-assist/actions/workflows/ci-simple.yml)
 
-# Container Kit
+# Containerization Assist
 
 AI-Powered Application Containerization and Kubernetes Deployment
 
-Container Kit automates the complete containerization process from repository analysis to Kubernetes deployment using individual, chainable tools. Built on a simplified 4-layer architecture with Domain-Driven Design and direct dependency injection, it provides 15 focused tools that can be used individually or chained together for complete workflows with AI-powered error recovery and built-in progress tracking.
+Containerization Assist automates the complete containerization process from repository analysis to Kubernetes deployment using individual, chainable tools. Built on a simplified 4-layer architecture with Domain-Driven Design and direct dependency injection, it provides 15 focused tools that can be used individually or chained together for complete workflows with AI-powered error recovery and built-in progress tracking.
 
 ## 🚀 Quick Install
 
@@ -12,18 +12,18 @@ Container Kit automates the complete containerization process from repository an
 
 **Linux/macOS:**
 ```bash
-curl -sSL https://raw.githubusercontent.com/Azure/container-kit/main/scripts/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/Azure/containerization-assist/main/scripts/install.sh | bash
 ```
 
 **Windows (PowerShell as Administrator):**
 ```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-WebRequest -Uri https://raw.githubusercontent.com/Azure/container-kit/main/scripts/install.ps1 -OutFile install.ps1; ./install.ps1; Remove-Item install.ps1
+Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-WebRequest -Uri https://raw.githubusercontent.com/Azure/containerization-assist/main/scripts/install.ps1 -OutFile install.ps1; ./install.ps1; Remove-Item install.ps1
 ```
 
 ### Verify Installation
 ```bash
 # Check executable
-./container-kit-mcp --version
+./containerization-assist-mcp --version
 
 # Verify build
 make build
@@ -41,9 +41,9 @@ For detailed usage and troubleshooting, see the examples directory and developme
 ### Basic Usage
 ```bash
 # Run MCP server (main executable)
-./container-kit-mcp
+./containerization-assist-mcp
 
-# Container Kit provides 15 individual tools via MCP protocol:
+# Containerization Assist provides 15 individual tools via MCP protocol:
 # - 10 workflow step tools (analyze_repository, generate_dockerfile, build_image, etc.)
 # - 2 orchestration tools (start_workflow, workflow_status)
 # - 3 utility tools (list_tools, ping, server_status)
@@ -52,8 +52,8 @@ For detailed usage and troubleshooting, see the examples directory and developme
 
 ### Building from Source
 ```bash
-git clone https://github.com/Azure/container-kit.git
-cd container-kit
+git clone https://github.com/Azure/containerization-assist.git
+cd containerization-assist
 
 # Set up make alias (required for WSL/Linux)
 alias make='/usr/bin/make'
@@ -77,7 +77,7 @@ make lint              # Run linter
 
 ### For Developers
 - **[Architectural Decisions](docs/architecture/adr/)** - ADRs documenting key design decisions
-- **[Container Kit Design Document](docs/CONTAINER_KIT_DESIGN_DOCUMENT.md)** - Complete system design and architecture
+- **[Containerization Assist Design Document](docs/CONTAINER_KIT_DESIGN_DOCUMENT.md)** - Complete system design and architecture
 - **[New Developer Guide](docs/NEW_DEVELOPER_GUIDE.md)** - Getting started with development
 
 ### For Contributors
@@ -86,7 +86,7 @@ make lint              # Run linter
 
 ## 🏗️ Architecture
 
-Container Kit uses a **simplified 4-layer architecture** with Domain-Driven Design and direct dependency injection:
+Containerization Assist uses a **simplified 4-layer architecture** with Domain-Driven Design and direct dependency injection:
 
 ```mermaid
 graph TB
@@ -231,9 +231,9 @@ pkg/mcp/
 
 ```bash
 # Start MCP server
-./container-kit-mcp
+./containerization-assist-mcp
 
-# Container Kit provides 15 individual tools:
+# Containerization Assist provides 15 individual tools:
 
 # 10 Workflow Step Tools:
 # - analyze_repository: Repository analysis and language detection
@@ -279,7 +279,7 @@ See [SECURITY.md](SECURITY.md) for security policy and reporting vulnerabilities
 
 - **Issues**: Use GitHub Issues for bug reports and feature requests
 - **Discussions**: Use GitHub Discussions for questions and help
-- **Documentation**: Check the [Development Guidelines](DEVELOPMENT_GUIDELINES.md) and [Container Kit Design Document](docs/CONTAINER_KIT_DESIGN_DOCUMENT.md)
+- **Documentation**: Check the [Development Guidelines](DEVELOPMENT_GUIDELINES.md) and [Containerization Assist Design Document](docs/CONTAINER_KIT_DESIGN_DOCUMENT.md)
 
 ## Trademarks
 

@@ -32,7 +32,7 @@ class MCPServerTester {
   }
 
   async runTests() {
-    logSection('Container Kit MCP Server - NPM Package Test Suite');
+    logSection('Containerization Assist MCP Server - NPM Package Test Suite');
     
     // Run all tests
     await this.testBinaryExists();
@@ -102,7 +102,7 @@ class MCPServerTester {
     
     try {
       const result = await this.runCommand(['--version']);
-      if (result.success && result.output.includes('Container Kit MCP Server')) {
+      if (result.success && result.output.includes('Containerization Assist MCP Server')) {
         this.pass(`Version command works: ${result.output.trim()}`);
       } else {
         this.fail(`Version command failed: ${result.output}`);

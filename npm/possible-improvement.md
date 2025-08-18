@@ -42,7 +42,7 @@ const { pipeline } = require('stream/promises');
 
 class BinaryDownloader {
   constructor() {
-    this.baseUrl = 'https://github.com/Azure/container-kit/releases/download';
+    this.baseUrl = 'https://github.com/Azure/containerization-assist/releases/download';
     this.version = this.getVersion();
   }
 
@@ -85,7 +85,7 @@ class BinaryDownloader {
     
     return new Promise((resolve, reject) => {
       https.get(url, { 
-        headers: { 'User-Agent': 'container-kit-npm' },
+        headers: { 'User-Agent': 'containerization-assist-npm' },
         timeout: 30000 
       }, (response) => {
         // Handle redirects
@@ -156,7 +156,7 @@ async function postinstall() {
       console.error('❌ Failed to download binary from GitHub');
       console.error('Please try:');
       console.error('1. Check your internet connection');
-      console.error('2. Manually download from: https://github.com/Azure/container-kit/releases');
+      console.error('2. Manually download from: https://github.com/Azure/containerization-assist/releases');
       console.error('3. Or build from source: npm run build:current');
       process.exit(1);
     }

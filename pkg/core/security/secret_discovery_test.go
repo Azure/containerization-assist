@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/core/security"
+	"github.com/Azure/containerization-assist/pkg/core/security"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

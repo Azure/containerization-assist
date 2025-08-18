@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/common/logger"
-	"github.com/Azure/container-kit/pkg/pipeline"
+	"github.com/Azure/containerization-assist/pkg/common/logger"
+	"github.com/Azure/containerization-assist/pkg/pipeline"
 )
 
 // Ensure DatabaseDetectionStage implements pipeline.PipelineStage interface.

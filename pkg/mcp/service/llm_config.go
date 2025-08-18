@@ -4,9 +4,9 @@ package service
 import (
 	"time"
 
-	domainsampling "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/prompts"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/sampling"
+	domainsampling "github.com/Azure/containerization-assist/pkg/mcp/domain/sampling"
+	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/ai_ml/prompts"
+	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/ai_ml/sampling"
 )
 
 // LLMConfig contains comprehensive configuration for LLM operations

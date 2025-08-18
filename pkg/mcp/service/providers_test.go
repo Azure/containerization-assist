@@ -5,8 +5,8 @@ package service
 import (
 	"context"
 
-	domainevents "github.com/Azure/container-kit/pkg/mcp/domain/events"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	domainevents "github.com/Azure/containerization-assist/pkg/mcp/domain/events"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/mock"
 )

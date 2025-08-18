@@ -16,7 +16,7 @@ PROJECT_ROOT="$(dirname "$NPM_DIR")"
 # Change to project root
 cd "$PROJECT_ROOT"
 
-echo -e "${GREEN}Building Container Kit MCP Server for all platforms...${NC}"
+echo -e "${GREEN}Building Containerization Assist MCP Server for all platforms...${NC}"
 
 # Get version from git or use default
 VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")

@@ -59,15 +59,15 @@ if (!fs.existsSync(binaryPath)) {
   log(`✗ Binary not found for your platform: ${binaryName}`, 'red');
   log(`  Platform: ${platform} (${arch})`, 'yellow');
   log(`  Expected binary: ${binaryPath}`, 'yellow');
-  
+
   // Provide helpful suggestions
   log('\n  Possible solutions:', 'cyan');
   log('  1. Build from source:', 'cyan');
   log(`     cd ${path.dirname(__dirname)}`, 'yellow');
   log('     npm run build:current', 'yellow');
   log('  2. Check if your platform is supported', 'cyan');
-  log('  3. Report an issue: https://github.com/Azure/container-kit/issues', 'cyan');
-  
+  log('  3. Report an issue: https://github.com/Azure/containerization-assist/issues', 'cyan');
+
   // List available binaries
   log('\n  Available binaries:', 'cyan');
   try {
@@ -81,7 +81,7 @@ if (!fs.existsSync(binaryPath)) {
   } catch (err) {
     log('    Could not list binaries', 'yellow');
   }
-  
+
   process.exit(1);
 }
 
@@ -101,7 +101,7 @@ try {
   if (fs.existsSync(linkPath)) {
     fs.unlinkSync(linkPath);
   }
-  
+
   // On Windows, copy the file instead of symlinking
   if (platform === 'win32') {
     fs.copyFileSync(binaryPath, linkPath);
@@ -119,7 +119,7 @@ try {
 // Success message
 console.log('');
 log('╔═══════════════════════════════════════════════════════════╗', 'bright');
-log('║  Container Kit MCP Server installed successfully! 🚀      ║', 'bright');
+log('║  Containerization Assist MCP Server installed successfully! 🚀      ║', 'bright');
 log('╚═══════════════════════════════════════════════════════════╝', 'bright');
 console.log('');
 log(`  Platform:     ${platform} (${arch})`, 'cyan');
@@ -127,8 +127,8 @@ log(`  Binary:       ${binaryName}`, 'cyan');
 log(`  Install path: ${binDir}`, 'cyan');
 console.log('');
 log('  Usage:', 'green');
-log('    npx container-kit-mcp --help', 'yellow');
+log('    npx containerization-assist-mcp --help', 'yellow');
 log('    npx ckmcp --version', 'yellow');
 console.log('');
-log('  Documentation: https://github.com/Azure/container-kit', 'cyan');
+log('  Documentation: https://github.com/Azure/containerization-assist', 'cyan');
 console.log('');

@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/core/kubernetes"
-	"github.com/Azure/container-kit/pkg/pipeline"
+	"github.com/Azure/containerization-assist/pkg/core/kubernetes"
+	"github.com/Azure/containerization-assist/pkg/pipeline"
 )
 
 // TestManifestStage_Initialize tests the Initialize method

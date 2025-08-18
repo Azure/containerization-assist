@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	mcperrors "github.com/Azure/container-kit/pkg/common/errors"
+	mcperrors "github.com/Azure/containerization-assist/pkg/common/errors"
 	"github.com/google/uuid"
 )
 
@@ -102,7 +102,7 @@ func (s *SBOMGenerator) GenerateCycloneDXBOM(source string, packages []Package) 
 			Timestamp: time.Now().UTC().Format(time.RFC3339),
 			Tools: []CycloneDXTool{
 				{
-					Vendor:  "container-kit",
+					Vendor:  "containerization-assist",
 					Name:    "security-scanner",
 					Version: "1.0.0",
 				},
@@ -394,7 +394,7 @@ func (s *SBOMGenerator) ConvertSPDXToCycloneDX(spdx *SPDXDocument) (*CycloneDXBO
 			Timestamp: time.Now().UTC().Format(time.RFC3339),
 			Tools: []CycloneDXTool{
 				{
-					Vendor:  "container-kit",
+					Vendor:  "containerization-assist",
 					Name:    "security-scanner",
 					Version: "1.0.0",
 				},

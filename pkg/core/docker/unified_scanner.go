@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	mcperrors "github.com/Azure/container-kit/pkg/common/errors"
-	coresecurity "github.com/Azure/container-kit/pkg/core/security"
+	mcperrors "github.com/Azure/containerization-assist/pkg/common/errors"
+	coresecurity "github.com/Azure/containerization-assist/pkg/core/security"
 	"github.com/rs/zerolog"
 )
 
