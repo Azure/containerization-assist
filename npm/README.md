@@ -1,6 +1,6 @@
 # Container Kit MCP Server
 
-[![npm version](https://badge.fury.io/js/@container-kit%2Fmcp-server.svg)](https://www.npmjs.com/package/@container-kit/mcp-server)
+[![npm version](https://badge.fury.io/js/@container-assist%2Fmcp-server.svg)](https://www.npmjs.com/package/@container-assist/mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP Version](https://img.shields.io/badge/MCP-1.0.0-blue)](https://modelcontextprotocol.io)
 
@@ -12,26 +12,26 @@ AI-powered containerization workflow tools for the Model Context Protocol (MCP).
 
 ```bash
 # Install globally
-npm install -g @container-kit/mcp-server
+npm install -g @container-assist/mcp-server
 
 # Or use with npx (no installation required)
-npx @container-kit/mcp-server --help
+npx @container-assist/mcp-server --help
 ```
 
 ### Basic Usage
 
 ```bash
 # Check version
-container-kit-mcp --version
+container-assist-mcp --version
 
 # Or use the short alias
 ckmcp --version
 
 # Start the MCP server (for stdio transport)
-container-kit-mcp
+container-assist-mcp
 
 # With custom configuration
-container-kit-mcp --workspace-dir ./my-project --log-level debug
+container-assist-mcp --workspace-dir ./my-project --log-level debug
 ```
 
 ## 📦 What's Included
@@ -92,7 +92,7 @@ MCP_WORKFLOW_MODE=interactive
 
 Then use with:
 ```bash
-container-kit-mcp --config .env
+container-assist-mcp --config .env
 ```
 
 ## 🔌 MCP Client Integration
@@ -107,9 +107,9 @@ Container Kit works with any MCP-compatible client. For VS Code:
 ```json
 {
   "mcp.servers": {
-    "container-kit": {
+    "container-assist": {
       "command": "npx",
-      "args": ["@container-kit/mcp-server"],
+      "args": ["@container-assist/mcp-server"],
       "env": {
         "MCP_WORKSPACE_DIR": "./workspace",
         "MCP_LOG_LEVEL": "info"
@@ -125,7 +125,7 @@ Container Kit works with any MCP-compatible client. For VS Code:
 const { spawn } = require('child_process');
 
 // Start the MCP server
-const server = spawn('npx', ['@container-kit/mcp-server'], {
+const server = spawn('npx', ['@container-assist/mcp-server'], {
   stdio: ['pipe', 'pipe', 'inherit'],
   env: {
     ...process.env,
@@ -158,7 +158,7 @@ server.stdout.on('data', (data) => {
 ### Complete Containerization Workflow
 ```bash
 # Start an interactive containerization session
-container-kit-mcp --workflow-mode interactive
+container-assist-mcp --workflow-mode interactive
 ```
 
 ### CI/CD Integration
@@ -166,7 +166,7 @@ container-kit-mcp --workflow-mode interactive
 # GitHub Actions example
 - name: Containerize Application
   run: |
-    npx @container-kit/mcp-server \
+    npx @container-assist/mcp-server \
       --workspace-dir ${{ github.workspace }} \
       --workflow-mode automated
 ```
@@ -191,20 +191,20 @@ Use individual tools programmatically through the MCP protocol for custom workfl
 If you see "Binary not found" error:
 ```bash
 # Rebuild for your platform
-cd $(npm root -g)/@container-kit/mcp-server
+cd $(npm root -g)/@container-assist/mcp-server
 npm run build:current
 ```
 
 ### Permission Denied
 On Unix-like systems:
 ```bash
-chmod +x $(npm root -g)/@container-kit/mcp-server/bin/mcp-server
+chmod +x $(npm root -g)/@container-assist/mcp-server/bin/mcp-server
 ```
 
 ### Debug Mode
 Enable debug output:
 ```bash
-MCP_DEBUG=true container-kit-mcp --debug
+MCP_DEBUG=true container-assist-mcp --debug
 ```
 
 ## 📊 Performance

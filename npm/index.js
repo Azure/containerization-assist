@@ -73,8 +73,8 @@ function main() {
     logWarning('\nThis usually means the post-install script failed.');
     logInfo('\nTry these solutions:');
     logInfo('  1. Reinstall the package:');
-    logInfo('     npm uninstall @container-kit/mcp-server');
-    logInfo('     npm install @container-kit/mcp-server');
+    logInfo('     npm uninstall @container-assist/mcp-server');
+    logInfo('     npm install @container-assist/mcp-server');
     logInfo('\n  2. Build from source:');
     logInfo('     cd ' + __dirname);
     logInfo('     npm run build:current');
@@ -134,8 +134,8 @@ function main() {
       logError('Container Kit MCP Server binary not found!');
       logError(`Expected at: ${binaryPath}`);
       logInfo('\nPlease reinstall the package:');
-      logInfo('  npm uninstall -g @container-kit/mcp-server');
-      logInfo('  npm install -g @container-kit/mcp-server');
+      logInfo('  npm uninstall -g @container-assist/mcp-server');
+      logInfo('  npm install -g @container-assist/mcp-server');
     } else if (err.code === 'EACCES') {
       logError('Permission denied to execute the binary!');
       logInfo('\nTry fixing permissions:');

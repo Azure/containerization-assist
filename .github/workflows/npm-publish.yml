@@ -102,7 +102,7 @@ jobs:
         working-directory: ./npm
         run: |
           npm publish --access public
-          echo "✅ Published @container-kit/mcp-server@${{ steps.version.outputs.version }} to NPM"
+          echo "✅ Published @container-assist/mcp-server@${{ steps.version.outputs.version }} to NPM"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -110,7 +110,7 @@ jobs:
         if: github.event.inputs.dry_run != 'true'
         run: |
           sleep 10  # Wait for NPM to update
-          npm view @container-kit/mcp-server@${{ steps.version.outputs.version }}
+          npm view @container-assist/mcp-server@${{ steps.version.outputs.version }}
 
   test-installation:
     needs: build-and-publish
@@ -129,18 +129,18 @@ jobs:
 
       - name: Test global installation
         run: |
-          npm install -g @container-kit/mcp-server@${{ needs.build-and-publish.outputs.version }}
-          container-kit-mcp --version
+          npm install -g @container-assist/mcp-server@${{ needs.build-and-publish.outputs.version }}
+          container-assist-mcp --version
           ckmcp --version
 
       - name: Test npx usage
         run: |
-          npx @container-kit/mcp-server@${{ needs.build-and-publish.outputs.version }} --version
+          npx @container-assist/mcp-server@${{ needs.build-and-publish.outputs.version }} --version
 
       - name: Test local installation
         run: |
           mkdir test-project
           cd test-project
           npm init -y
-          npm install @container-kit/mcp-server@${{ needs.build-and-publish.outputs.version }}
-          npx container-kit-mcp --version
+          npm install @container-assist/mcp-server@${{ needs.build-and-publish.outputs.version }}
+          npx container-assist-mcp --version
