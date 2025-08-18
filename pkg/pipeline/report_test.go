@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/ai"
+	"github.com/Azure/containerization-assist/pkg/ai"
 )
 
 func TestWriteReport(t *testing.T) {

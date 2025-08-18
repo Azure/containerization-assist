@@ -1,4 +1,4 @@
-// Package docker provides core Docker operations extracted from the Container Kit pipeline.
+// Package docker provides core Docker operations extracted from the Containerization Assist pipeline.
 // This package contains mechanical Docker operations without AI dependencies,
 // designed to be used by atomic MCP tools that let external AI handle reasoning.
 package docker

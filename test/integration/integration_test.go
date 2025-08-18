@@ -1,4 +1,4 @@
-// Package integration provides integration tests for the Container Kit MCP server
+// Package integration provides integration tests for the Containerization Assist MCP server
 package integration_test
 
 import (
@@ -9,7 +9,7 @@ import (
 // TestMain sets up the integration test environment
 func TestMain(m *testing.M) {
 	// Set up any global test configuration
-	os.Setenv("CONTAINER_KIT_TEST_MODE", "true")
+	os.Setenv("CONTAINERIZATION_ASSIST_TEST_MODE", "true")
 
 	// Run tests
 	code := m.Run()
@@ -20,7 +20,7 @@ func TestMain(m *testing.M) {
 
 // TestIntegrationSuite verifies that integration tests are properly configured
 func TestIntegrationSuite(t *testing.T) {
-	t.Log("Container Kit MCP Server Integration Test Suite")
+	t.Log("Containerization Assist MCP Server Integration Test Suite")
 
 	// Skip if running in short mode
 	if testing.Short() {
@@ -28,7 +28,7 @@ func TestIntegrationSuite(t *testing.T) {
 	}
 
 	// Verify test environment
-	if os.Getenv("CONTAINER_KIT_TEST_MODE") != "true" {
+	if os.Getenv("CONTAINERIZATION_ASSIST_TEST_MODE") != "true" {
 		t.Fatal("Test environment not properly configured")
 	}
 

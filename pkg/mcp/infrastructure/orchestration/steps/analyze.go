@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/utils"
+	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/core/utils"
 )
 
 type AnalyzeResult struct {
@@ -45,7 +45,7 @@ func AnalyzeRepository(input, branch string, logger *slog.Logger) (*AnalyzeResul
 		logger.Info("Detected git URL, will clone repository", "url", input)
 
 		// Create temporary directory for cloning
-		tempDir, err := os.MkdirTemp("", "container-kit-analysis-*")
+		tempDir, err := os.MkdirTemp("", "containerization-assist-analysis-*")
 		if err != nil {
 			logger.Error("Failed to create temp directory", "error", err)
 			return nil, fmt.Errorf("failed to create temp directory: %v", err)

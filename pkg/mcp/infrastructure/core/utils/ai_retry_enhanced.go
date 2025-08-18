@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/sampling"
+	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/ai_ml/sampling"
 )
 
 // RetryContext provides additional context for AI-powered retries

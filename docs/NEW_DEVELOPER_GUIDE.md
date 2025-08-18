@@ -1,6 +1,6 @@
-# Container Kit MCP Server - New Developer Guide
+# Containerization Assist MCP Server - New Developer Guide
 
-Welcome to Container Kit! This comprehensive guide will help you understand our MCP (Model Context Protocol) server architecture, development workflow, and best practices for contributing to the project.
+Welcome to Containerization Assist! This comprehensive guide will help you understand our MCP (Model Context Protocol) server architecture, development workflow, and best practices for contributing to the project.
 
 ## Table of Contents
 
@@ -28,8 +28,8 @@ Welcome to Container Kit! This comprehensive guide will help you understand our 
 
 ```bash
 # Clone the repository
-git clone https://github.com/Azure/container-kit.git
-cd container-kit
+git clone https://github.com/Azure/containerization-assist.git
+cd containerization-assist
 
 # Build the MCP server
 make build
@@ -38,10 +38,10 @@ make build
 make test
 
 # Start MCP server (stdio mode)
-./container-kit-mcp
+./containerization-assist-mcp
 
 # Start MCP server (HTTP mode)
-./container-kit-mcp --transport=http --http-port=8080
+./containerization-assist-mcp --transport=http --http-port=8080
 ```
 
 ### Development Environment
@@ -53,7 +53,7 @@ The project includes a VS Code Dev Container with all dependencies pre-installed
 
 ## Architecture Overview
 
-Container Kit follows a **simplified 4-layer architecture** implementing Domain-Driven Design (DDD) principles:
+Containerization Assist follows a **simplified 4-layer architecture** implementing Domain-Driven Design (DDD) principles:
 
 ```
 pkg/mcp/
@@ -120,7 +120,7 @@ Infrastructure → Application → Domain → API
 
 ### 1. Direct Dependency Injection
 
-Container Kit uses simple, direct dependency injection with a Dependencies struct:
+Containerization Assist uses simple, direct dependency injection with a Dependencies struct:
 
 ```go
 // pkg/mcp/service/dependencies.go
@@ -261,7 +261,7 @@ return workflow.NewWorkflowError(
 
 ### What is MCP?
 
-The Model Context Protocol (MCP) is a standardized protocol for AI assistants to interact with external tools. Container Kit implements an MCP server that exposes 15 individual containerization tools to AI systems, allowing flexible workflows through tool chaining.
+The Model Context Protocol (MCP) is a standardized protocol for AI assistants to interact with external tools. Containerization Assist implements an MCP server that exposes 15 individual containerization tools to AI systems, allowing flexible workflows through tool chaining.
 
 ### Server Architecture
 
@@ -296,12 +296,12 @@ func RegisterAnalyzeTool(mcpServer MCPServer, logger *slog.Logger) error {
 1. **STDIO Mode** (Default)
    - Reads JSON-RPC from stdin, writes to stdout
    - Ideal for subprocess integration
-   - Usage: `./container-kit-mcp`
+   - Usage: `./containerization-assist-mcp`
 
 2. **HTTP Mode**
    - REST API with Server-Sent Events
    - For remote clients and web UIs
-   - Usage: `./container-kit-mcp --transport=http --port=8080`
+   - Usage: `./containerization-assist-mcp --transport=http --port=8080`
 
 ### Components Registration
 
@@ -318,7 +318,7 @@ The MCP server registers three types of components:
 
 ### The 10-Step Containerization Process
 
-Container Kit provides 10 individual workflow tools that can be chained:
+Containerization Assist provides 10 individual workflow tools that can be chained:
 
 1. analyze_repository – Detect language, framework, dependencies
 2. generate_dockerfile – AI-assisted Dockerfile creation
@@ -404,13 +404,13 @@ tracker.Complete("Workflow completed successfully")
 
 1. **Clone and Configure**
    ```bash
-   git clone https://github.com/Azure/container-kit.git
-   cd container-kit
+   git clone https://github.com/Azure/containerization-assist.git
+   cd containerization-assist
    
    # Set up environment
    export AZURE_OPENAI_API_KEY="your-key"
    export AZURE_OPENAI_ENDPOINT="https://your-instance.openai.azure.com"
-   export CONTAINER_KIT_WORKSPACE="/tmp/container-kit"
+   export CONTAINERIZATION_ASSIST_WORKSPACE="/tmp/containerization-assist"
    ```
 
 2. **Build and Test**
@@ -562,7 +562,7 @@ go test -cover ./...
 
 1. **Enable debug logging**:
    ```bash
-   export CONTAINER_KIT_LOG_LEVEL=debug
+   export CONTAINERIZATION_ASSIST_LOG_LEVEL=debug
    ```
 
 2. **Check step logs**:
@@ -633,7 +633,7 @@ sessionManager.UpdateSession(session.ID, func(s *SessionState) error {
 
 ```bash
 # Verbose logging
-export CONTAINER_KIT_LOG_LEVEL=debug
+export CONTAINERIZATION_ASSIST_LOG_LEVEL=debug
 
 # Test specific step
 go test -run TestAnalyzeRepository -v
@@ -651,10 +651,10 @@ go test ./pkg/mcp/service -run TestDependencies
 
 ```bash
 # Core Configuration
-CONTAINER_KIT_WORKSPACE=/tmp/container-kit
-CONTAINER_KIT_TRANSPORT=stdio|http
-CONTAINER_KIT_HTTP_PORT=8080
-CONTAINER_KIT_LOG_LEVEL=info|debug|error
+CONTAINERIZATION_ASSIST_WORKSPACE=/tmp/containerization-assist
+CONTAINERIZATION_ASSIST_TRANSPORT=stdio|http
+CONTAINERIZATION_ASSIST_HTTP_PORT=8080
+CONTAINERIZATION_ASSIST_LOG_LEVEL=info|debug|error
 
 # Azure OpenAI
 AZURE_OPENAI_API_KEY=sk-...
@@ -663,14 +663,14 @@ AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4
 AZURE_OPENAI_MODEL_ID=gpt-4
 
 # Session Management
-CONTAINER_KIT_SESSION_TTL=24h
-CONTAINER_KIT_MAX_SESSIONS=100
-CONTAINER_KIT_STORE_PATH=.container-kit.db
+CONTAINERIZATION_ASSIST_SESSION_TTL=24h
+CONTAINERIZATION_ASSIST_MAX_SESSIONS=100
+CONTAINERIZATION_ASSIST_STORE_PATH=.containerization-assist.db
 
 # Feature Flags
-CONTAINER_KIT_TEST_MODE=true
-CONTAINER_KIT_ENABLE_SCAN=true
-CONTAINER_KIT_ENABLE_AI=true
+CONTAINERIZATION_ASSIST_TEST_MODE=true
+CONTAINERIZATION_ASSIST_ENABLE_SCAN=true
+CONTAINERIZATION_ASSIST_ENABLE_AI=true
 ```
 
 ### Make Targets
@@ -718,4 +718,4 @@ Key architectural decisions:
 
 ---
 
-Welcome to Container Kit! This guide provides everything you need to understand and contribute to the project. The clean architecture, comprehensive patterns, and AI-powered features make it a powerful platform for containerization. Take time to explore the codebase, run the examples, and don't hesitate to ask questions in our community channels.
+Welcome to Containerization Assist! This guide provides everything you need to understand and contribute to the project. The clean architecture, comprehensive patterns, and AI-powered features make it a powerful platform for containerization. Take time to explore the codebase, run the examples, and don't hesitate to ask questions in our community channels.

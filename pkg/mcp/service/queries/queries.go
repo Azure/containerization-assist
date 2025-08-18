@@ -1,11 +1,11 @@
-// Package queries provides CQRS query definitions for Container Kit MCP.
+// Package queries provides CQRS query definitions for Containerization Assist MCP.
 package queries
 
 import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
 )
 
 // Query represents a query that reads system state

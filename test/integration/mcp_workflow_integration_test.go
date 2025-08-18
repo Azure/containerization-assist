@@ -1,4 +1,4 @@
-// Package integration_test provides minimal, focused integration tests for the Container Kit MCP server workflow
+// Package integration_test provides minimal, focused integration tests for the Containerization Assist MCP server workflow
 package integration_test
 
 import (
@@ -106,7 +106,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Hello from Container Kit Test App!")
+		fmt.Fprintf(w, "Hello from Containerization Assist Test App!")
 	})
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -162,7 +162,7 @@ require (
 	// Create README.md
 	readme := `# Test Go Application
 
-This is a simple Go HTTP service used for Container Kit integration testing.
+This is a simple Go HTTP service used for Containerization Assist integration testing.
 
 ## Endpoints
 

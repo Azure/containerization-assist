@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
-	"github.com/Azure/container-kit/pkg/mcp/domain/events"
-	"github.com/Azure/container-kit/pkg/mcp/domain/progress"
+	"github.com/Azure/containerization-assist/pkg/mcp/api"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/events"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/progress"
 )
 
 // NoOpSink is a no-operation progress sink for fallback cases

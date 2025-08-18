@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/errors"
-	"github.com/Azure/container-kit/pkg/common/runner"
-	"github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/core/kubernetes"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/utils"
+	"github.com/Azure/containerization-assist/pkg/common/errors"
+	"github.com/Azure/containerization-assist/pkg/common/runner"
+	"github.com/Azure/containerization-assist/pkg/core/docker"
+	"github.com/Azure/containerization-assist/pkg/core/kubernetes"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/core/utils"
 	"github.com/rs/zerolog"
 )
 
@@ -652,7 +652,7 @@ func (s *ClusterStep) Execute(ctx context.Context, state *workflow.WorkflowState
 	} else {
 		// Setup kind cluster with registry
 		var err error
-		registryURL, err = SetupKindCluster(ctx, "container-kit", state.Logger)
+		registryURL, err = SetupKindCluster(ctx, "containerization-assist", state.Logger)
 		if err != nil {
 			return nil, errors.New(errors.CodeKubernetesApiError, "cluster_step", "kind cluster setup failed", err)
 		}
@@ -710,7 +710,7 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 			ImageID:   state.BuildResult.ImageID,
 		}
 
-		err := LoadImageToKind(ctx, infraBuildResult, "container-kit", state.Logger)
+		err := LoadImageToKind(ctx, infraBuildResult, "containerization-assist", state.Logger)
 		if err != nil {
 			return nil, errors.New(errors.CodeImagePullFailed, "deploy_step", "failed to load image to kind", err)
 		}

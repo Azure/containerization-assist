@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/common/logger"
+	"github.com/Azure/containerization-assist/pkg/common/logger"
 )
 
 // NewRunner constructs a Runner. You must pass a non-empty order;

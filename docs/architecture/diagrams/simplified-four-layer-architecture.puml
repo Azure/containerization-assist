@@ -1,6 +1,6 @@
-@startuml Container Kit MCP - Simplified Four-Layer Architecture
+@startuml Containerization Assist MCP - Simplified Four-Layer Architecture
 !theme plain
-title Container Kit MCP Server - Simplified Four-Layer Architecture\nDirect Dependency Injection with Tool-Driven Design
+title Containerization Assist MCP Server - Simplified Four-Layer Architecture\nDirect Dependency Injection with Tool-Driven Design
 
 ' Define layer colors
 !define API_COLOR #E8F5E9

@@ -20,9 +20,9 @@ updates:
       - "dependencies"
       - "go"
     reviewers:
-      - "@Azure/container-kit-maintainers"
+      - "@Azure/containerization-assist-maintainers"
     assignees:
-      - "@Azure/container-kit-maintainers"
+      - "@Azure/containerization-assist-maintainers"
     # Group minor and patch updates
     groups:
       go-minor-patch:
@@ -50,9 +50,9 @@ updates:
       - "github-actions"
       - "ci"
     reviewers:
-      - "@Azure/container-kit-maintainers"
+      - "@Azure/containerization-assist-maintainers"
     assignees:
-      - "@Azure/container-kit-maintainers"
+      - "@Azure/containerization-assist-maintainers"
 
   # Docker base images in Dockerfile
   - package-ecosystem: "docker"
@@ -71,6 +71,6 @@ updates:
       - "dependencies"
       - "docker"
     reviewers:
-      - "@Azure/container-kit-maintainers"
+      - "@Azure/containerization-assist-maintainers"
     assignees:
-      - "@Azure/container-kit-maintainers"
+      - "@Azure/containerization-assist-maintainers"

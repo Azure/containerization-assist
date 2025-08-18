@@ -1,4 +1,4 @@
-# Publishing Container Kit MCP Server to NPM
+# Publishing Containerization Assist MCP Server to NPM
 
 ## Prerequisites
 
@@ -15,13 +15,13 @@ npm login
 ```
 
 ### 2. Add NPM Token to GitHub
-- Go to: https://github.com/Azure/container-kit/settings/secrets/actions
+- Go to: https://github.com/Azure/containerization-assist/settings/secrets/actions
 - Add new secret: `NPM_TOKEN`
 - Value: Your NPM access token
 
 ### 3. Verify Package Name Availability
 ```bash
-npm view @container-kit/mcp-server
+npm view @containerization-assist/mcp-server
 # Should return "npm ERR! 404" if available
 ```
 

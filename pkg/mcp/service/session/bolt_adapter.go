@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"time"
 
-	domainsession "github.com/Azure/container-kit/pkg/mcp/domain/session"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/persistence/session"
+	domainsession "github.com/Azure/containerization-assist/pkg/mcp/domain/session"
+	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/persistence/session"
 )
 
 // BoltStoreAdapter adapts the BoltStore to implement OptimizedSessionManager

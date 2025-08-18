@@ -11,7 +11,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo "🔍 Container Kit Import Graph Validation"
+echo "🔍 Containerization Assist Import Graph Validation"
 echo "======================================="
 echo ""
 
@@ -36,7 +36,7 @@ check_imports() {
     
     for file in $files; do
         for pattern in $forbidden_patterns; do
-            if grep -q "\"github.com/Azure/container-kit/pkg/mcp/$pattern" "$file"; then
+            if grep -q "\"github.com/Azure/containerization-assist/pkg/mcp/$pattern" "$file"; then
                 echo -e "  ${RED}❌ Violation:${NC} $file imports from $pattern"
                 echo "     Description: $description"
                 ((VIOLATIONS++))

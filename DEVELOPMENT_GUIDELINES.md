@@ -1,6 +1,6 @@
 # Development Guidelines
 
-This document establishes coding standards and development practices for the Container Kit MCP project to ensure consistent, maintainable, and high-quality code.
+This document establishes coding standards and development practices for the Containerization Assist MCP project to ensure consistent, maintainable, and high-quality code.
 
 ## Table of Contents
 
@@ -66,7 +66,7 @@ type SessionManager interface {
 
 ```go
 // Use Rich error system with builder pattern
-import "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+import "github.com/Azure/containerization-assist/pkg/mcp/domain/errors"
 
 return errors.NewError().
     Code(errors.CodeValidationFailed).
@@ -242,7 +242,7 @@ func sanitizePath(path string) string {
 ### Simple Workflow Error Pattern
 ```go
 // Use unified Rich error system from pkg/mcp/domain/errors/
-import "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+import "github.com/Azure/containerization-assist/pkg/mcp/domain/errors"
 
 return errors.NewError().
     Code(errors.CodeBuildFailed).
@@ -291,7 +291,7 @@ return errors.NewError().
   - Create focused sub-packages
 
 ### Architecture Overview
-Container Kit follows a clean 4-layer Domain-Driven Design architecture:
+Containerization Assist follows a clean 4-layer Domain-Driven Design architecture:
 
 ```
 pkg/mcp/
@@ -350,8 +350,8 @@ import (
     "github.com/stretchr/testify/assert"
 
     // Internal
-    "github.com/Azure/container-kit/pkg/mcp/domain/internal/types"
-    "github.com/Azure/container-kit/pkg/mcp/domain/internal/utils"
+    "github.com/Azure/containerization-assist/pkg/mcp/domain/internal/types"
+    "github.com/Azure/containerization-assist/pkg/mcp/domain/internal/utils"
 )
 ```
 

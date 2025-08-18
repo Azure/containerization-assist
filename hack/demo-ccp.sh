@@ -4,7 +4,7 @@
 set -e
 set -o pipefail
 
-echo "📦 Starting container-kit demo with PostgreSQL and artifact generation"
+echo "📦 Starting containerization-assist demo with PostgreSQL and artifact generation"
 echo "----------------------------------------------------------------------------"
 
 # Configuration variables
@@ -23,7 +23,7 @@ if [[ $# -lt 1 ]]; then
   echo "❌ Error: Target repository path is required"
   echo "Usage: $0 <path-to-target-repository> [project-root-path]"
   echo "  - path-to-target-repository: Path to the repository to analyze"
-  echo "  - project-root-path: Optional path to the container-kit project root (default: ..)"
+  echo "  - project-root-path: Optional path to the containerization-assist project root (default: ..)"
   exit 1
 fi
 
@@ -145,7 +145,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Run container-kit on the target repository
+# Run containerization-assist on the target repository
 echo -e "\n→ Running container‑copilot on '${TARGET_REPO}'..."
 echo "----------------------------------------------------------------"
 (

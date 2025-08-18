@@ -139,7 +139,7 @@ func TestSecretGenerator_GenerateSecret(t *testing.T) {
 				assert.NotNil(t, result.Secret)
 				assert.Equal(t, "myapp", result.Secret.Metadata.Labels["app"])
 				assert.Equal(t, "prod", result.Secret.Metadata.Labels["env"])
-				assert.Equal(t, "container-kit", result.Secret.Metadata.Labels["kubernetes.azure.com/generator"])
+				assert.Equal(t, "containerization-assist", result.Secret.Metadata.Labels["kubernetes.azure.com/generator"])
 				assert.Equal(t, "Production credentials", result.Secret.Metadata.Annotations["description"])
 			},
 		},

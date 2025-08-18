@@ -1,4 +1,4 @@
-// Package kubernetes provides core Kubernetes operations extracted from the Container Kit pipeline.
+// Package kubernetes provides core Kubernetes operations extracted from the Containerization Assist pipeline.
 // This package contains mechanical K8s operations without AI dependencies,
 // designed to be used by atomic MCP tools.
 package kubernetes
@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/containerization-assist/pkg/mcp/api"
 	"sigs.k8s.io/yaml"
 )
 

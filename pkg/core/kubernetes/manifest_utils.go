@@ -9,15 +9,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	mcperrors "github.com/Azure/container-kit/pkg/common/errors"
-	"github.com/Azure/container-kit/pkg/common/logger"
-	"github.com/Azure/container-kit/templates"
+	mcperrors "github.com/Azure/containerization-assist/pkg/common/errors"
+	"github.com/Azure/containerization-assist/pkg/common/logger"
+	"github.com/Azure/containerization-assist/templates"
 	"sigs.k8s.io/yaml"
 )
 
 const DefaultImageAndTag = "localhost:5001/app:latest"
 
-const SNAPSHOT_DIR_NAME = ".container-kit-snapshots"
+const SNAPSHOT_DIR_NAME = ".containerization-assist-snapshots"
 const MANIFEST_DIR_NAME = "manifests"
 
 // Path where manifests are expected to be found - uses GITHUB_WORKSPACE - requires checkout action step

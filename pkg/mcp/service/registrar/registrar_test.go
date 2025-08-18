@@ -5,9 +5,9 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/resources"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	resourcesInfra "github.com/Azure/container-kit/pkg/mcp/infrastructure/core/resources"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/resources"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
+	resourcesInfra "github.com/Azure/containerization-assist/pkg/mcp/infrastructure/core/resources"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

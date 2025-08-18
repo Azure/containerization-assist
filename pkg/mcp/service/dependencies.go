@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
-	domainevents "github.com/Azure/container-kit/pkg/mcp/domain/events"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/prompts"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/sampling"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/resources"
-	"github.com/Azure/container-kit/pkg/mcp/service/bootstrap"
-	"github.com/Azure/container-kit/pkg/mcp/service/lifecycle"
-	"github.com/Azure/container-kit/pkg/mcp/service/session"
+	"github.com/Azure/containerization-assist/pkg/mcp/api"
+	domainevents "github.com/Azure/containerization-assist/pkg/mcp/domain/events"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/ai_ml/prompts"
+	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/ai_ml/sampling"
+	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/core/resources"
+	"github.com/Azure/containerization-assist/pkg/mcp/service/bootstrap"
+	"github.com/Azure/containerization-assist/pkg/mcp/service/lifecycle"
+	"github.com/Azure/containerization-assist/pkg/mcp/service/session"
 )
 
 type Option func(*Dependencies)

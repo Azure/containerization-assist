@@ -15,7 +15,7 @@ PROJECT_ROOT="$(dirname "$NPM_DIR")"
 # Change to project root
 cd "$PROJECT_ROOT"
 
-echo -e "${GREEN}Building Container Kit MCP Server for current platform...${NC}"
+echo -e "${GREEN}Building Containerization Assist MCP Server for current platform...${NC}"
 
 # Detect current platform
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')

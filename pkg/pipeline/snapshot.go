@@ -8,11 +8,11 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/common/logger"
+	"github.com/Azure/containerization-assist/pkg/common/logger"
 )
 
 // ReportDirectory is the directory where the iteration snapshots will be stored along with a report of the run
-const ReportDirectory = ".container-kit"
+const ReportDirectory = ".containerization-assist"
 
 // WriteIterationSnapshot creates a snapshot of the current pipeline iteration.
 // The function accepts a variadic parameter `stages`, which is a list of PipelineStage objects.
@@ -20,7 +20,7 @@ const ReportDirectory = ".container-kit"
 func WriteIterationSnapshot(state *PipelineState, targetDir string, snapshotCompletions bool, stages ...PipelineStage) error {
 	snapDir := filepath.Join(targetDir, ReportDirectory, fmt.Sprintf("iteration_%d", state.IterationCount))
 	if err := os.MkdirAll(snapDir, 0755); err != nil {
-		return fmt.Errorf("creating container-kit-snapshot directory: %w", err)
+		return fmt.Errorf("creating containerization-assist-snapshot directory: %w", err)
 	}
 
 	// Collect errors from all stages

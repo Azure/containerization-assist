@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-kit/pkg/ai"
+	"github.com/Azure/containerization-assist/pkg/ai"
 )
 
 type trackedAIClient struct {

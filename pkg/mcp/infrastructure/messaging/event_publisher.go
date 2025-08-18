@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/events"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/events"
 )
 
 type EventHandler func(ctx context.Context, event events.DomainEvent) error

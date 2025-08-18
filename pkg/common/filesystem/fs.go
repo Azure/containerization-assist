@@ -1,6 +1,6 @@
 // Package filesystem provides common utility functions for file system operations,
 // directory tree generation, and other shared functionality used throughout
-// the container-kit application.
+// the containerization-assist application.
 package filesystem
 
 import (

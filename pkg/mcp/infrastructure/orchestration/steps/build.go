@@ -8,10 +8,10 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/runner"
-	"github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/core/kind"
-	"github.com/Azure/container-kit/pkg/core/kubernetes"
+	"github.com/Azure/containerization-assist/pkg/common/runner"
+	"github.com/Azure/containerization-assist/pkg/core/docker"
+	"github.com/Azure/containerization-assist/pkg/core/kind"
+	"github.com/Azure/containerization-assist/pkg/core/kubernetes"
 )
 
 // BuildResult contains the results of a Docker build operation
@@ -196,7 +196,7 @@ func LoadImageToKind(ctx context.Context, buildResult *BuildResult, clusterName 
 
 	// Default cluster name
 	if clusterName == "" {
-		clusterName = "container-kit"
+		clusterName = "containerization-assist"
 	}
 
 	// Construct image references

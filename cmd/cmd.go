@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/ai"
-	"github.com/Azure/container-kit/pkg/common/logger"
-	"github.com/Azure/container-kit/pkg/common/runner"
-	"github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/core/kind"
-	"github.com/Azure/container-kit/pkg/core/kubernetes"
+	"github.com/Azure/containerization-assist/pkg/ai"
+	"github.com/Azure/containerization-assist/pkg/common/logger"
+	"github.com/Azure/containerization-assist/pkg/common/runner"
+	"github.com/Azure/containerization-assist/pkg/core/docker"
+	"github.com/Azure/containerization-assist/pkg/core/kind"
+	"github.com/Azure/containerization-assist/pkg/core/kubernetes"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
@@ -49,7 +49,7 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "container-kit",
+	Use:   "containerization-assist",
 	Short: "An AI-Powered CLI tool to containerize your app and generate Kubernetes artifacts",
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
@@ -108,8 +108,8 @@ var testCmd = &cobra.Command{
 
 var setupCmd = &cobra.Command{
 	Use:   "setup",
-	Short: "Set up Azure OpenAI resources and run container-kit",
-	Long:  `The setup command will provision Azure OpenAI resources, deploy the model, and run container-kit to generate artifacts.`,
+	Short: "Set up Azure OpenAI resources and run containerization-assist",
+	Long:  `The setup command will provision Azure OpenAI resources, deploy the model, and run containerization-assist to generate artifacts.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		projectRoot := getProjectRoot()
 
@@ -173,10 +173,10 @@ var setupCmd = &cobra.Command{
 
 		// Display next steps instead of running generate automatically
 		if config.TargetRepo != "" {
-			logger.Infof("\nTo generate artifacts, run: container-kit generate %s", config.TargetRepo)
+			logger.Infof("\nTo generate artifacts, run: containerization-assist generate %s", config.TargetRepo)
 		} else {
 			logger.Info("\nTo generate artifacts, run:")
-			logger.Info("  container-kit generate <path/to/target-repo>")
+			logger.Info("  containerization-assist generate <path/to/target-repo>")
 		}
 
 		return nil
@@ -217,7 +217,7 @@ func initClients(ctx context.Context) (*Clients, error) {
 
 		// Run setup process
 		if err := runAutoSetup(); err != nil {
-			return nil, fmt.Errorf("automatic setup failed: %w\nPlease run 'container-kit setup' manually or provide the environment variables", err)
+			return nil, fmt.Errorf("automatic setup failed: %w\nPlease run 'containerization-assist setup' manually or provide the environment variables", err)
 		}
 
 		// After setup, reload environment variables

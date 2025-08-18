@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/errors"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/ai_ml/sampling"
+	"github.com/Azure/containerization-assist/pkg/common/errors"
+	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/ai_ml/sampling"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -258,7 +258,7 @@ func generateFixSuggestions(operation string, errorMsg string, logger *slog.Logg
 	}
 
 	if containsPattern(errorMsg, "kind", "cluster", "not found") {
-		suggestions = append(suggestions, "• Ensure kind cluster 'container-kit' exists")
+		suggestions = append(suggestions, "• Ensure kind cluster 'containerization-assist' exists")
 		suggestions = append(suggestions, "• Verify kind and kubectl are installed")
 		suggestions = append(suggestions, "• Check cluster connectivity")
 	}
@@ -703,7 +703,7 @@ func applyImageRegistryFix(ctx context.Context, operation string, errorMsg strin
 	logger.Info("Attempting to load image into kind cluster")
 
 	const registryPrefix = "localhost:5001/"
-	const kindClusterName = "container-kit"
+	const kindClusterName = "containerization-assist"
 
 	// Extract image name from error message if possible
 	// Look for patterns like "localhost:5001/imagename:tag"

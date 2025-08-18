@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/runner"
-	"github.com/Azure/container-kit/pkg/core/kubernetes"
+	"github.com/Azure/containerization-assist/pkg/common/runner"
+	"github.com/Azure/containerization-assist/pkg/core/kubernetes"
 )
 
 // K8sResult contains the results of Kubernetes deployment operations
@@ -80,7 +80,7 @@ func GenerateManifests(buildResult *BuildResult, appName, namespace string, port
 			"app": appName,
 		},
 		Annotations: map[string]string{
-			"container-kit.io/generated": "true",
+			"containerization-assist.io/generated": "true",
 		},
 		Resources: &kubernetes.ResourceRequirements{
 			Requests: &kubernetes.ResourceQuantity{

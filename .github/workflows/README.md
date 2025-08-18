@@ -1,10 +1,10 @@
 # GitHub Actions Workflows
 
-This directory contains the CI/CD workflows for Container Kit.
+This directory contains the CI/CD workflows for Containerization Assist.
 
 ## Active Workflows
 
-Container Kit uses **2 workflows** for all CI/CD operations:
+Containerization Assist uses **2 workflows** for all CI/CD operations:
 
 ### 1. `ci-pipeline.yml` - Main CI Pipeline
 **Runs on**: Every pull request and push to main branch
@@ -30,7 +30,7 @@ Container Kit uses **2 workflows** for all CI/CD operations:
 
 ## Ratcheting Error Budget System
 
-Container Kit uses an intelligent **ratcheting error budget** that automatically suggests quality improvements:
+Containerization Assist uses an intelligent **ratcheting error budget** that automatically suggests quality improvements:
 
 ### How It Works
 1. **Current status**: 183 lint issues with 200-issue budget ✅

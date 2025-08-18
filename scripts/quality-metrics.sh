@@ -11,7 +11,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo "📊 Container Kit Quality Metrics Report"
+echo "📊 Containerization Assist Quality Metrics Report"
 echo "======================================"
 echo ""
 
@@ -113,7 +113,7 @@ echo ""
 echo "📚 Dependency Metrics:"
 echo "---------------------"
 NUM_IMPORTS=$(grep -r "^import" pkg/mcp --include="*.go" | wc -l)
-NUM_EXTERNAL_DEPS=$(go list -m all | grep -v "github.com/Azure/container-kit" | wc -l)
+NUM_EXTERNAL_DEPS=$(go list -m all | grep -v "github.com/Azure/containerization-assist" | wc -l)
 
 echo "  Total import statements: $NUM_IMPORTS"
 echo "  External dependencies: $NUM_EXTERNAL_DEPS"

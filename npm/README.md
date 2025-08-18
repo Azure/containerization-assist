@@ -1,10 +1,10 @@
-# Container Kit MCP Server
+# Containerization Assist MCP Server
 
 [![npm version](https://badge.fury.io/js/@container-assist%2Fmcp-server.svg)](https://www.npmjs.com/package/@container-assist/mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP Version](https://img.shields.io/badge/MCP-1.0.0-blue)](https://modelcontextprotocol.io)
 
-AI-powered containerization workflow tools for the Model Context Protocol (MCP). Container Kit provides a comprehensive set of tools to analyze, containerize, and deploy applications using AI assistance.
+AI-powered containerization workflow tools for the Model Context Protocol (MCP). Containerization Assist provides a comprehensive set of tools to analyze, containerize, and deploy applications using AI assistance.
 
 ## 🚀 Quick Start
 
@@ -36,7 +36,7 @@ container-assist-mcp --workspace-dir ./my-project --log-level debug
 
 ## 📦 What's Included
 
-Container Kit MCP Server provides **15 specialized tools** for containerization workflows:
+Containerization Assist MCP Server provides **15 specialized tools** for containerization workflows:
 
 ### Workflow Step Tools (10)
 - `analyze_repository` - Analyze repository structure and detect technologies
@@ -99,7 +99,7 @@ container-assist-mcp --config .env
 
 ### VS Code Integration
 
-Container Kit works with any MCP-compatible client. For VS Code:
+Containerization Assist works with any MCP-compatible client. For VS Code:
 
 1. Install an MCP client extension
 2. Configure the MCP server in your settings:
@@ -223,17 +223,17 @@ MCP_DEBUG=true container-assist-mcp --debug
 
 ## 📚 Documentation
 
-- [Full Documentation](https://github.com/Azure/container-kit)
+- [Full Documentation](https://github.com/Azure/containerization-assist)
 - [MCP Protocol Specification](https://modelcontextprotocol.io)
-- [API Reference](https://github.com/Azure/container-kit/blob/main/docs/API.md)
+- [API Reference](https://github.com/Azure/containerization-assist/blob/main/docs/API.md)
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please see our [Contributing Guide](https://github.com/Azure/container-kit/blob/main/CONTRIBUTING.md).
+Contributions are welcome! Please see our [Contributing Guide](https://github.com/Azure/containerization-assist/blob/main/CONTRIBUTING.md).
 
 ## 📄 License
 
-MIT License - see [LICENSE](https://github.com/Azure/container-kit/blob/main/LICENSE) for details.
+MIT License - see [LICENSE](https://github.com/Azure/containerization-assist/blob/main/LICENSE) for details.
 
 ## 🙏 Acknowledgments
 
@@ -245,4 +245,4 @@ Built with:
 
 ---
 
-**Need help?** Open an issue on [GitHub](https://github.com/Azure/container-kit/issues)
+**Need help?** Open an issue on [GitHub](https://github.com/Azure/containerization-assist/issues)

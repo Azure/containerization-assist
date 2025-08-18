@@ -1,4 +1,4 @@
-# Container Kit Architecture Diagrams
+# Containerization Assist Architecture Diagrams
 
 ## Simplified Architecture Overview
 

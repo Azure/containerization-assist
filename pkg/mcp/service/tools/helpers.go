@@ -10,10 +10,10 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/pkg/errors"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
-	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging"
-	"github.com/Azure/container-kit/pkg/mcp/service/session"
+	"github.com/Azure/containerization-assist/pkg/mcp/api"
+	domainworkflow "github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/messaging"
+	"github.com/Azure/containerization-assist/pkg/mcp/service/session"
 )
 
 // SimpleWorkflowState represents a simplified workflow state for tool operations
