@@ -34,6 +34,8 @@ lint-output.txt
 # Binary outputs (specific to avoid ignoring source files)
 /mcp-server
 /simple-server
+/container-kit-mcp
+/container-kit
 /containerization-assist-mcp
 /containerization-assist
 /main
