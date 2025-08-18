@@ -77,11 +77,11 @@ echo "Running integration tests..."
 cd "$PROJECT_ROOT"
 
 # Set environment variables for tests
-export CONTAINER_KIT_TEST_WORKSPACE="/tmp/containerization-assist-test"
-export CONTAINER_KIT_LOG_LEVEL="debug"
+export CONTAINERIZATION_ASSIST_TEST_WORKSPACE="/tmp/containerization-assist-test"
+export CONTAINERIZATION_ASSIST_LOG_LEVEL="debug"
 
 # Create test workspace
-mkdir -p "$CONTAINER_KIT_TEST_WORKSPACE"
+mkdir -p "$CONTAINERIZATION_ASSIST_TEST_WORKSPACE"
 
 # Run integration tests with appropriate tags
 if [ "$DOCKER_AVAILABLE" = true ] && [ "$KIND_AVAILABLE" = true ]; then
@@ -119,7 +119,7 @@ TEST_RESULT=$?
 # Cleanup
 echo ""
 echo "Cleaning up test workspace..."
-rm -rf "$CONTAINER_KIT_TEST_WORKSPACE"
+rm -rf "$CONTAINERIZATION_ASSIST_TEST_WORKSPACE"
 
 if [ $TEST_RESULT -eq 0 ]; then
     echo ""

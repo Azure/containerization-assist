@@ -77,7 +77,7 @@ make lint              # Run linter
 
 ### For Developers
 - **[Architectural Decisions](docs/architecture/adr/)** - ADRs documenting key design decisions
-- **[Containerization Assist Design Document](docs/CONTAINER_KIT_DESIGN_DOCUMENT.md)** - Complete system design and architecture
+- **[Containerization Assist Design Document](docs/CONTAINERIZATION_ASSIST_DESIGN_DOCUMENT.md)** - Complete system design and architecture
 - **[New Developer Guide](docs/NEW_DEVELOPER_GUIDE.md)** - Getting started with development
 
 ### For Contributors
@@ -279,7 +279,7 @@ See [SECURITY.md](SECURITY.md) for security policy and reporting vulnerabilities
 
 - **Issues**: Use GitHub Issues for bug reports and feature requests
 - **Discussions**: Use GitHub Discussions for questions and help
-- **Documentation**: Check the [Development Guidelines](DEVELOPMENT_GUIDELINES.md) and [Containerization Assist Design Document](docs/CONTAINER_KIT_DESIGN_DOCUMENT.md)
+- **Documentation**: Check the [Development Guidelines](DEVELOPMENT_GUIDELINES.md) and [Containerization Assist Design Document](docs/CONTAINERIZATION_ASSIST_DESIGN_DOCUMENT.md)
 
 ## Trademarks
 

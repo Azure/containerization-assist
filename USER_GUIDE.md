@@ -93,7 +93,7 @@ If the automated script doesn't work, follow these steps:
    - macOS/Linux: Double-click the tar.gz file
 
 3. **Move to the right location**
-  - Windows: Move `containerization-assist-mcp.exe` to `C:\Program Files\ContainerKit\` (or another directory on PATH)
+  - Windows: Move `containerization-assist-mcp.exe` to `C:\Program Files\ContainerizationAssist\` (or another directory on PATH)
   - macOS/Linux: Move `containerization-assist-mcp` to `/usr/local/bin/` (or `$HOME/bin` on PATH)
 
 ### Verify Installation
@@ -187,7 +187,7 @@ Add an `env` block to increase log verbosity:
       "type": "stdio",
       "command": "containerization-assist-mcp",
       "args": [],
-      "env": { "CONTAINER_KIT_LOG_LEVEL": "debug" }
+      "env": { "CONTAINERIZATION_ASSIST_LOG_LEVEL": "debug" }
     }
   }
 }
@@ -342,7 +342,7 @@ curl -sSL https://raw.githubusercontent.com/Azure/containerization-assist/main/s
 **Solutions:**
 1. **Re-run the installation script**
 2. **Check if the file exists:**
-   - Windows: Look for `containerization-assist-mcp.exe` in `C:\Program Files\ContainerKit\`
+   - Windows: Look for `containerization-assist-mcp.exe` in `C:\Program Files\ContainerizationAssist\`
    - macOS/Linux: Look for `containerization-assist-mcp` in `/usr/local/bin/`
 3. **Add to PATH manually** (ask your IT team for help)
 
@@ -389,7 +389,7 @@ If you're having trouble, enable debug logging via `mcp.json`:
       "type": "stdio",
       "command": "containerization-assist-mcp",
       "args": [],
-      "env": { "CONTAINER_KIT_LOG_LEVEL": "debug" }
+      "env": { "CONTAINERIZATION_ASSIST_LOG_LEVEL": "debug" }
     }
   }
 }
@@ -448,7 +448,7 @@ When reporting issues, logs help us understand what went wrong. Here's how to ga
       "type": "stdio",
       "command": "containerization-assist-mcp",
       "args": [],
-      "env": { "CONTAINER_KIT_LOG_LEVEL": "debug" }
+      "env": { "CONTAINERIZATION_ASSIST_LOG_LEVEL": "debug" }
     }
   }
 }
@@ -467,10 +467,10 @@ When reporting issues, logs help us understand what went wrong. Here's how to ga
 2. **Set debug level:**
    ```bash
    # Windows
-   set CONTAINER_KIT_LOG_LEVEL=debug
+   set CONTAINERIZATION_ASSIST_LOG_LEVEL=debug
    
    # macOS/Linux
-   export CONTAINER_KIT_LOG_LEVEL=debug
+   export CONTAINERIZATION_ASSIST_LOG_LEVEL=debug
    ```
 3. **Run Containerization Assist:**
    ```bash
@@ -485,11 +485,11 @@ Containerization Assist can write logs to files:
 
 ```bash
 # Windows
-set CONTAINER_KIT_LOG_FILE=containerization-assist.log
+set CONTAINERIZATION_ASSIST_LOG_FILE=containerization-assist.log
 containerization-assist-mcp
 
 # macOS/Linux
-export CONTAINER_KIT_LOG_FILE=containerization-assist.log
+export CONTAINERIZATION_ASSIST_LOG_FILE=containerization-assist.log
 containerization-assist-mcp
 ```
 
@@ -530,7 +530,7 @@ echo Current Directory:
 cd
 echo.
 echo Environment Variables:
-set | findstr CONTAINER_KIT
+set | findstr CONTAINERIZATION_ASSIST
 ```
 
 **macOS/Linux (save as `gather-info.sh`):**
@@ -551,7 +551,7 @@ echo "Current Directory:"
 pwd
 echo
 echo "Environment Variables:"
-env | grep CONTAINER_KIT
+env | grep CONTAINERIZATION_ASSIST
 ```
 
 Run the script and include its output when reporting issues.

@@ -133,7 +133,7 @@ function Get-Architecture {
 }
 
 # Download and install Containerization Assist
-function Install-ContainerKit {
+function Install-ContainerizationAssist {
     Write-Step "Installing Containerization Assist..."
     
     $arch = Get-Architecture
@@ -404,7 +404,7 @@ function Show-FinalInstructions {
 }
 
 # Main installation flow
-function Install-ContainerKitVSCode {
+function Install-ContainerizationAssistVSCode {
     Write-Host ""
     Write-Info "=== Containerization Assist VS Code Setup Script ==="
     Write-Info "This script will install Containerization Assist and configure it for VS Code"
@@ -435,7 +435,7 @@ function Install-ContainerKitVSCode {
     
     # Run installation steps
     Test-Prerequisites
-    Install-ContainerKit
+    Install-ContainerizationAssist
     Add-ToPath -Directory $InstallDir
     Set-VSCodeConfiguration
     Install-VSCodeExtensions
@@ -450,7 +450,7 @@ function Install-ContainerKitVSCode {
 
 # Run main function
 try {
-    Install-ContainerKitVSCode
+    Install-ContainerizationAssistVSCode
 }
 catch {
     Write-Error-Message "Installation failed: $_"

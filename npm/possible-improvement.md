@@ -215,8 +215,8 @@ async downloadWithFallback(platform, arch) {
 
 #### 1. Offline Support
 ```javascript
-// Check for CONTAINER_KIT_OFFLINE env var
-if (process.env.CONTAINER_KIT_OFFLINE) {
+// Check for CONTAINERIZATION_ASSIST_OFFLINE env var
+if (process.env.CONTAINERIZATION_ASSIST_OFFLINE) {
   console.log('Offline mode: Skipping binary download');
   console.log('Please ensure binary is available in bin/ directory');
   return;
@@ -226,7 +226,7 @@ if (process.env.CONTAINER_KIT_OFFLINE) {
 #### 2. Custom Binary Location
 ```javascript
 // Allow custom binary path
-const customBinary = process.env.CONTAINER_KIT_BINARY_PATH;
+const customBinary = process.env.CONTAINERIZATION_ASSIST_BINARY_PATH;
 if (customBinary && fs.existsSync(customBinary)) {
   console.log(`Using custom binary: ${customBinary}`);
   fs.symlinkSync(customBinary, defaultBinaryPath);
@@ -282,7 +282,7 @@ if (!await verifyChecksum(binaryPath, expectedHash)) {
 #### 5. Version Mismatch Handling
 ```javascript
 // Allow version override for testing
-const targetVersion = process.env.CONTAINER_KIT_VERSION || packageVersion;
+const targetVersion = process.env.CONTAINERIZATION_ASSIST_VERSION || packageVersion;
 
 // Warn on mismatch
 if (targetVersion !== packageVersion) {
@@ -314,7 +314,7 @@ if (targetVersion !== packageVersion) {
 #### Phase 1: Dual Support (v2.0.0)
 - Keep current approach
 - Add download capability as opt-in via env var
-- `CONTAINER_KIT_DOWNLOAD_BINARY=true npm install`
+- `CONTAINERIZATION_ASSIST_DOWNLOAD_BINARY=true npm install`
 
 #### Phase 2: Default to Download (v3.0.0)
 - Download from GitHub by default

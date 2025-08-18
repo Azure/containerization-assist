@@ -10,7 +10,7 @@ param(
 $RepoOwner = "Azure"
 $RepoName = "containerization-assist"
 $BinaryName = "containerization-assist-mcp"
-$InstallDir = "$env:ProgramFiles\ContainerKit"
+$InstallDir = "$env:ProgramFiles\ContainerizationAssist"
 $FallbackDir = "$env:USERPROFILE\bin"
 
 # Colors for output (Windows PowerShell compatible)
@@ -156,7 +156,7 @@ function Test-Prerequisites {
 }
 
 # Download and install Containerization Assist
-function Install-ContainerKit {
+function Install-ContainerizationAssist {
     Write-Step "Installing Containerization Assist..."
     
     try {
@@ -370,7 +370,7 @@ function Show-NextSteps {
     Write-Host ""
     Write-Info "🔧 Advanced Configuration:"
     Write-Info "   • Claude Config: $env:APPDATA\Claude\claude_desktop_config.json"
-    Write-Info "   • Add debug logging by adding 'env': {'CONTAINER_KIT_LOG_LEVEL': 'debug'}"
+    Write-Info "   • Add debug logging by adding 'env': {'CONTAINERIZATION_ASSIST_LOG_LEVEL': 'debug'}"
     Write-Host ""
 }
 
@@ -411,7 +411,7 @@ function Main {
     
     try {
         Test-Prerequisites
-        Install-ContainerKit
+        Install-ContainerizationAssist
         Set-ClaudeConfig
         Test-Installation
         Show-NextSteps

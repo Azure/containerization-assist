@@ -119,7 +119,7 @@ check_prerequisites() {
 }
 
 # Download and install Containerization Assist
-install_container_kit() {
+install_containerization_assist() {
     print_step "Installing Containerization Assist..."
     
     # Create temporary directory
@@ -384,7 +384,7 @@ main() {
     
     check_prerequisites
     detect_platform
-    install_container_kit
+    install_containerization_assist
     configure_vscode
     install_vscode_extensions
     verify_installation

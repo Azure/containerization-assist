@@ -80,7 +80,7 @@ if [ -d ".vscode" ]; then
     cat > "$MCP_CONFIG_FILE" << EOF
 {
   "servers": {
-    "containerKit": {
+    "containerizationAssist": {
       "type": "stdio",
       "command": "$MCP_BINARY",
       "args": [],
@@ -110,7 +110,7 @@ else
     echo ""
     echo -e "${BLUE}{"
     echo "  \"servers\": {"
-    echo "    \"containerKit\": {"
+    echo "    \"containerizationAssist\": {"
     echo "      \"type\": \"stdio\","
     echo "      \"command\": \"$MCP_BINARY\","
     echo "      \"args\": []"

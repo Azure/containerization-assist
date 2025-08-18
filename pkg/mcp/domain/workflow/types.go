@@ -336,7 +336,7 @@ func (ws *WorkflowState) SetAllSteps(steps []Step) {
 }
 
 // IsTestMode determines whether the current workflow execution is running in test mode.
-// Precedence: Args.TestMode > RequestParams["test_mode"] > CONTAINER_KIT_TEST_MODE env var.
+// Precedence: Args.TestMode > RequestParams["test_mode"] > CONTAINERIZATION_ASSIST_TEST_MODE env var.
 func (ws *WorkflowState) IsTestMode() bool {
 	if ws != nil && ws.Args != nil && ws.Args.TestMode {
 		return true
@@ -346,7 +346,7 @@ func (ws *WorkflowState) IsTestMode() bool {
 			return true
 		}
 	}
-	return os.Getenv("CONTAINER_KIT_TEST_MODE") == "true"
+	return os.Getenv("CONTAINERIZATION_ASSIST_TEST_MODE") == "true"
 }
 
 // NewWorkflowState creates a new workflow state

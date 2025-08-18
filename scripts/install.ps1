@@ -194,7 +194,7 @@ function Test-Installation {
 }
 
 # Main installation flow
-function Install-ContainerKit {
+function Install-ContainerizationAssist {
     Write-Info "=== Containerization Assist Installation Script ==="
     Write-Info ""
     
@@ -236,7 +236,7 @@ function Install-ContainerKit {
 
 # Run installation
 try {
-    Install-ContainerKit
+    Install-ContainerizationAssist
 }
 catch {
     Write-Error-Message "Installation failed: $_"

@@ -1,6 +1,6 @@
 {
     "chat.mcp.serverSampling": {
-        "containerization-assist/.vscode/mcp.json: containerKit": {
+        "containerization-assist/.vscode/mcp.json: containerizationAssist": {
             "allowedDuringChat": true,
             "allowedOutsideChat": true
         }

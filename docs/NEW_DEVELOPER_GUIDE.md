@@ -410,7 +410,7 @@ tracker.Complete("Workflow completed successfully")
    # Set up environment
    export AZURE_OPENAI_API_KEY="your-key"
    export AZURE_OPENAI_ENDPOINT="https://your-instance.openai.azure.com"
-   export CONTAINER_KIT_WORKSPACE="/tmp/containerization-assist"
+   export CONTAINERIZATION_ASSIST_WORKSPACE="/tmp/containerization-assist"
    ```
 
 2. **Build and Test**
@@ -562,7 +562,7 @@ go test -cover ./...
 
 1. **Enable debug logging**:
    ```bash
-   export CONTAINER_KIT_LOG_LEVEL=debug
+   export CONTAINERIZATION_ASSIST_LOG_LEVEL=debug
    ```
 
 2. **Check step logs**:
@@ -633,7 +633,7 @@ sessionManager.UpdateSession(session.ID, func(s *SessionState) error {
 
 ```bash
 # Verbose logging
-export CONTAINER_KIT_LOG_LEVEL=debug
+export CONTAINERIZATION_ASSIST_LOG_LEVEL=debug
 
 # Test specific step
 go test -run TestAnalyzeRepository -v
@@ -651,10 +651,10 @@ go test ./pkg/mcp/service -run TestDependencies
 
 ```bash
 # Core Configuration
-CONTAINER_KIT_WORKSPACE=/tmp/containerization-assist
-CONTAINER_KIT_TRANSPORT=stdio|http
-CONTAINER_KIT_HTTP_PORT=8080
-CONTAINER_KIT_LOG_LEVEL=info|debug|error
+CONTAINERIZATION_ASSIST_WORKSPACE=/tmp/containerization-assist
+CONTAINERIZATION_ASSIST_TRANSPORT=stdio|http
+CONTAINERIZATION_ASSIST_HTTP_PORT=8080
+CONTAINERIZATION_ASSIST_LOG_LEVEL=info|debug|error
 
 # Azure OpenAI
 AZURE_OPENAI_API_KEY=sk-...
@@ -663,14 +663,14 @@ AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4
 AZURE_OPENAI_MODEL_ID=gpt-4
 
 # Session Management
-CONTAINER_KIT_SESSION_TTL=24h
-CONTAINER_KIT_MAX_SESSIONS=100
-CONTAINER_KIT_STORE_PATH=.containerization-assist.db
+CONTAINERIZATION_ASSIST_SESSION_TTL=24h
+CONTAINERIZATION_ASSIST_MAX_SESSIONS=100
+CONTAINERIZATION_ASSIST_STORE_PATH=.containerization-assist.db
 
 # Feature Flags
-CONTAINER_KIT_TEST_MODE=true
-CONTAINER_KIT_ENABLE_SCAN=true
-CONTAINER_KIT_ENABLE_AI=true
+CONTAINERIZATION_ASSIST_TEST_MODE=true
+CONTAINERIZATION_ASSIST_ENABLE_SCAN=true
+CONTAINERIZATION_ASSIST_ENABLE_AI=true
 ```
 
 ### Make Targets

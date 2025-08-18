@@ -168,7 +168,7 @@ function Compare-Versions {
 }
 
 # Check if Containerization Assist is running
-function Test-ContainerKitRunning {
+function Test-ContainerizationAssistRunning {
     $processes = Get-Process -Name $BinaryName -ErrorAction SilentlyContinue
     
     if ($processes) {
@@ -210,7 +210,7 @@ function Backup-Current {
 }
 
 # Update Containerization Assist
-function Update-ContainerKit {
+function Update-ContainerizationAssist {
     Write-Step "Updating Containerization Assist..."
     
     try {
@@ -358,14 +358,14 @@ function Main {
     }
     
     # Check if running
-    Test-ContainerKitRunning
+    Test-ContainerizationAssistRunning
     
     # Backup current installation
     $backupPath = Backup-Current
     
     # Perform update
     try {
-        if (Update-ContainerKit) {
+        if (Update-ContainerizationAssist) {
             if (Test-Update) {
                 $newVersion = Get-CurrentVersion
                 Show-Summary -OldVersion $currentVersion -NewVersion $newVersion

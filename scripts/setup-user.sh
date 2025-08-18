@@ -124,7 +124,7 @@ check_prerequisites() {
 }
 
 # Download and install Containerization Assist
-install_container_kit() {
+install_containerization_assist() {
     print_step "Installing Containerization Assist..."
     
     # Use the existing install script
@@ -306,7 +306,7 @@ show_next_steps() {
     local config_dir
     config_dir=$(find_claude_config_dir)
     print_info "   • Claude Config: $config_dir/claude_desktop_config.json"
-    print_info "   • Add debug logging by adding 'env': {'CONTAINER_KIT_LOG_LEVEL': 'debug'}"
+    print_info "   • Add debug logging by adding 'env': {'CONTAINERIZATION_ASSIST_LOG_LEVEL': 'debug'}"
     echo
 }
 
@@ -329,7 +329,7 @@ main() {
     
     detect_platform
     check_prerequisites
-    install_container_kit
+    install_containerization_assist
     setup_claude_config
     create_shortcuts
     test_installation

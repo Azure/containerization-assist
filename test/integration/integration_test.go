@@ -9,7 +9,7 @@ import (
 // TestMain sets up the integration test environment
 func TestMain(m *testing.M) {
 	// Set up any global test configuration
-	os.Setenv("CONTAINER_KIT_TEST_MODE", "true")
+	os.Setenv("CONTAINERIZATION_ASSIST_TEST_MODE", "true")
 
 	// Run tests
 	code := m.Run()
@@ -28,7 +28,7 @@ func TestIntegrationSuite(t *testing.T) {
 	}
 
 	// Verify test environment
-	if os.Getenv("CONTAINER_KIT_TEST_MODE") != "true" {
+	if os.Getenv("CONTAINERIZATION_ASSIST_TEST_MODE") != "true" {
 		t.Fatal("Test environment not properly configured")
 	}
 

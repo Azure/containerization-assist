@@ -135,7 +135,7 @@ backup_current() {
 }
 
 # Update Containerization Assist
-update_container_kit() {
+update_containerization_assist() {
     print_step "Updating Containerization Assist..."
     
     # Use the setup script to install the latest version
@@ -257,7 +257,7 @@ main() {
     backup_path=$(backup_current)
     
     # Perform update
-    if update_container_kit; then
+    if update_containerization_assist; then
         if verify_update; then
             local new_version
             new_version=$(get_current_version)
