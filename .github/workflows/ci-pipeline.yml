@@ -22,7 +22,7 @@ jobs:
       tools-cache-key: ${{ steps.cache-keys.outputs.tools-cache-key }}
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 0
         
@@ -57,7 +57,7 @@ jobs:
     needs: setup
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       
     - name: Setup Go Environment
       uses: ./.github/actions/setup-go
@@ -81,7 +81,7 @@ jobs:
       architecture-status: ${{ steps.quality-checks.outputs.architecture-status }}
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       
     - name: Setup Go Environment
       uses: ./.github/actions/setup-go
@@ -118,7 +118,7 @@ jobs:
     needs: [setup, build]
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       
     - name: Setup Go Environment
       uses: ./.github/actions/setup-go
@@ -204,7 +204,7 @@ jobs:
         echo "  architecture-score: '${{ needs.quality.outputs.architecture-score }}'"
         
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       
     - name: Setup Docker
       uses: docker/setup-buildx-action@v3
@@ -227,7 +227,7 @@ jobs:
     if: always() && github.event_name == 'pull_request'
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       
     - name: Create PR Comment
       uses: ./.github/actions/pr-comment
