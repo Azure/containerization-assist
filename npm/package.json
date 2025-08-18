@@ -1,0 +1,73 @@
+{
+  "name": "@thgamble/container-assist-mcp",
+  "version": "1.0.0",
+  "description": "Container Assist MCP Server - AI-powered containerization workflow tools for the Model Context Protocol",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "container",
+    "containerization",
+    "docker",
+    "kubernetes",
+    "ai",
+    "llm",
+    "devops",
+    "azure"
+  ],
+  "homepage": "https://github.com/Azure/container-kit#readme",
+  "bugs": {
+    "url": "https://github.com/Azure/container-kit/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Azure/container-kit.git",
+    "directory": "npm"
+  },
+  "license": "MIT",
+  "author": "Microsoft Azure",
+  "main": "index.js",
+  "bin": {
+    "container-kit-mcp": "./index.js",
+    "ckmcp": "./index.js"
+  },
+  "files": [
+    "bin/",
+    "scripts/",
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js",
+    "build": "bash scripts/build-all.sh",
+    "build:current": "bash scripts/build-current.sh",
+    "test": "node scripts/test.js",
+    "prepublishOnly": "npm run build",
+    "version": "node scripts/sync-version.js && git add package.json"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "mcp": {
+    "version": "1.0.0",
+    "protocol": "stdio",
+    "capabilities": {
+      "tools": true,
+      "resources": true,
+      "prompts": true
+    }
+  }
+}
