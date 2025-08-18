@@ -12,6 +12,9 @@ type KubeRunner interface {
 	Apply(ctx context.Context, manifestPath string) (string, error)
 	GetPods(ctx context.Context, namespace string, labelSelector string) (string, error)
 	GetPodsJSON(ctx context.Context, namespace string, labelSelector string) (string, error)
+	DescribePod(ctx context.Context, podName string, namespace string) (string, error)
+	GetEvents(ctx context.Context, namespace string) (string, error)
+	GetNodes(ctx context.Context) (string, error)
 	SetKubeContext(ctx context.Context, name string) (string, error)
 	DeleteDeployment(ctx context.Context, manifestPath string) (string, error)
 	RolloutStatus(ctx context.Context, resourceType string, resourceName string, namespace string, timeout string) (string, error)
@@ -45,6 +48,18 @@ func (k *KubeCmdRunner) GetPodsJSON(ctx context.Context, namespace string, label
 		return k.runner.RunCommand("kubectl", "get", "pods", "-n", namespace, "-l", labelSelector, "-o", "json")
 	}
 	return k.runner.RunCommand("kubectl", "get", "pods", "-n", namespace, "-o", "json")
+}
+
+func (k *KubeCmdRunner) DescribePod(ctx context.Context, podName string, namespace string) (string, error) {
+	return k.runner.RunCommand("kubectl", "describe", "pod", podName, "-n", namespace)
+}
+
+func (k *KubeCmdRunner) GetEvents(ctx context.Context, namespace string) (string, error) {
+	return k.runner.RunCommand("kubectl", "get", "events", "-n", namespace, "--sort-by='.lastTimestamp'")
+}
+
+func (k *KubeCmdRunner) GetNodes(ctx context.Context) (string, error) {
+	return k.runner.RunCommand("kubectl", "get", "nodes")
 }
 
 func (k *KubeCmdRunner) SetKubeContext(ctx context.Context, name string) (string, error) {

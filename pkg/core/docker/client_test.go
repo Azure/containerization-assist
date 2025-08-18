@@ -28,6 +28,8 @@ type MockDockerClient struct {
 	logoutErr     error
 	isLoggedIn    bool
 	isLoggedInErr error
+	inspectResult string
+	inspectErr    error
 }
 
 func (m *MockDockerClient) Version(ctx context.Context) (string, error) {
@@ -68,6 +70,10 @@ func (m *MockDockerClient) Logout(ctx context.Context, registry string) (string,
 
 func (m *MockDockerClient) IsLoggedIn(ctx context.Context, registry string) (bool, error) {
 	return m.isLoggedIn, m.isLoggedInErr
+}
+
+func (m *MockDockerClient) Inspect(ctx context.Context, imageRef string) (string, error) {
+	return m.inspectResult, m.inspectErr
 }
 
 func TestBuildDockerfileContent_Success(t *testing.T) {
@@ -354,6 +360,10 @@ func (m *MockDockerClientWithTagCapture) Logout(_ context.Context, _ string) (st
 
 func (m *MockDockerClientWithTagCapture) IsLoggedIn(_ context.Context, _ string) (bool, error) {
 	return true, nil
+}
+
+func (m *MockDockerClientWithTagCapture) Inspect(_ context.Context, _ string) (string, error) {
+	return "", nil
 }
 
 func TestBuildDockerfileContent_TempDirCleanup(t *testing.T) {
