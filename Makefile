@@ -5,7 +5,7 @@
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_TIME := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
-LDFLAGS := -X main.Version=$(VERSION) -X main.GitCommit=$(COMMIT) -X main.BuildTime=$(BUILD_TIME)
+LDFLAGS := -X github.com/Azure/containerization-assist/cmd.Version=$(VERSION) -X github.com/Azure/containerization-assist/cmd.GitCommit=$(COMMIT) -X github.com/Azure/containerization-assist/cmd.BuildTime=$(BUILD_TIME)
 
 .PHONY: build mcp test test-integration fmt lint static-analysis security-scan arch-validate check-all clean version help wire-gen docs
 
@@ -16,7 +16,7 @@ build: mcp
 mcp:
 	@echo "Building Containerization Assist MCP Server..."
 	@echo "Version: $(VERSION)"
-	GOFLAGS=-trimpath go build -tags mcp -ldflags "$(LDFLAGS)" -o containerization-assist-mcp ./cmd/mcp-server
+	GOFLAGS=-trimpath go build -tags mcp -ldflags "$(LDFLAGS)" -o containerization-assist-mcp .
 	@echo "✅ Built: containerization-assist-mcp"
 
 # Wire dependency injection code generation

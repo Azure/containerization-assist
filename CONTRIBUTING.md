@@ -77,7 +77,7 @@ If you prefer to set up your local environment manually:
    go build -o containerization-assist .
 
    # Build MCP server
-   go build -tags mcp -o containerization-assist-mcp ./cmd/mcp-server
+   go build -tags mcp -o containerization-assist-mcp .
    ```
 
 4. **Run Tests**

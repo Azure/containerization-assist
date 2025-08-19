@@ -108,7 +108,7 @@ func (suite *SessionPersistenceIntegrationSuite) startMCPServerWithSessionDir(ct
 	// Build server if needed
 	serverBinaryPath := filepath.Join(suite.tmpDir, "mcp-server")
 	if _, err := os.Stat(serverBinaryPath); os.IsNotExist(err) {
-		buildCmd := exec.Command("go", "build", "-o", serverBinaryPath, "./cmd/mcp-server")
+		buildCmd := exec.Command("go", "build", "-o", serverBinaryPath, ".")
 		wd, _ := os.Getwd()
 		buildCmd.Dir = filepath.Join(wd, "..", "..")
 		require.NoError(suite.T(), buildCmd.Run())

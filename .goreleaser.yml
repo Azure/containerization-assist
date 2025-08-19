@@ -14,7 +14,7 @@ before:
 builds:
   # MCP Server binary (only binary released)
   - id: containerization-assist-mcp
-    main: ./cmd/mcp-server
+    main: .
     binary: containerization-assist-mcp
     tags:
       - mcp
@@ -28,7 +28,7 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X main.Version={{.Version}} -X main.GitCommit={{.Commit}} -X main.BuildTime={{.Date}}
+      - -s -w -X github.com/Azure/containerization-assist/cmd.Version={{.Version}} -X github.com/Azure/containerization-assist/cmd.GitCommit={{.Commit}} -X github.com/Azure/containerization-assist/cmd.BuildTime={{.Date}}
     mod_timestamp: "{{ .CommitTimestamp }}"
 
 archives:

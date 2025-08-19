@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/Azure/containerization-assist/pkg/mcp/api"
-	"github.com/Azure/containerization-assist/pkg/mcp/service" // Direct dependency injection
+	"github.com/Azure/containerization-assist/pkg/mcp/service"
 	"github.com/Azure/containerization-assist/pkg/mcp/service/config"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -39,32 +39,8 @@ type FlagConfig struct {
 	workflowMode *string
 }
 
-// parseFlags parses essential command line flags only
-func parseFlags() *FlagConfig {
-	flags := &FlagConfig{
-		configFile:   flag.String("config", "", "Path to .env configuration file"),
-		workspaceDir: flag.String("workspace-dir", "", "Workspace directory"),
-		storePath:    flag.String("store-path", "", "Session store path"),
-		sessionTTL:   flag.String("session-ttl", "", "Session TTL (e.g., '24h')"),
-		maxSessions:  flag.Int("max-sessions", 0, "Maximum number of sessions"),
-		logLevel:     flag.String("log-level", "", "Log level (debug, info, warn, error)"),
-		version:      flag.Bool("version", false, "Show version information"),
-		workflowMode: flag.String("workflow-mode", "", "Workflow mode: 'automated' or 'interactive'"),
-	}
-	flag.Parse()
-	return flags
-}
-
-// handleSpecialFlags handles version and schema export flags that exit early
-func handleSpecialFlags(flags *FlagConfig) {
-	if *flags.version {
-		log.Info().Str("version", getVersion()).Msg("Containerization Assist MCP Server version")
-		os.Exit(0)
-	}
-
-}
-
-func main() {
+// Execute is the main entry point for the MCP server
+func Execute() {
 	// Parse command line flags
 	flags := parseFlags()
 
@@ -87,6 +63,30 @@ func main() {
 
 	// Run server with graceful shutdown handling
 	runServerWithShutdown(mcpServer)
+}
+
+// parseFlags parses essential command line flags only
+func parseFlags() *FlagConfig {
+	flags := &FlagConfig{
+		configFile:   flag.String("config", "", "Path to .env configuration file"),
+		workspaceDir: flag.String("workspace-dir", "", "Workspace directory"),
+		storePath:    flag.String("store-path", "", "Session store path"),
+		sessionTTL:   flag.String("session-ttl", "", "Session TTL (e.g., '24h')"),
+		maxSessions:  flag.Int("max-sessions", 0, "Maximum number of sessions"),
+		logLevel:     flag.String("log-level", "", "Log level (debug, info, warn, error)"),
+		version:      flag.Bool("version", false, "Show version information"),
+		workflowMode: flag.String("workflow-mode", "", "Workflow mode: 'automated' or 'interactive'"),
+	}
+	flag.Parse()
+	return flags
+}
+
+// handleSpecialFlags handles version and schema export flags that exit early
+func handleSpecialFlags(flags *FlagConfig) {
+	if *flags.version {
+		log.Info().Str("version", getVersion()).Msg("Containerization Assist MCP Server version")
+		os.Exit(0)
+	}
 }
 
 // loadAndConfigureServer loads simplified configuration
@@ -215,8 +215,6 @@ func runServerWithShutdown(mcpServer api.MCPServer) {
 		}
 	}
 }
-
-// All complex environment variable mapping code removed - now handled by config package
 
 // setupLogging configures structured logging
 func setupLogging(level string) {

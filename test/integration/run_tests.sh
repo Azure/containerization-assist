@@ -50,7 +50,7 @@ echo ""
 # Build the MCP server first
 echo "Building MCP server..."
 cd "$PROJECT_ROOT"
-go build -o containerization-assist-mcp ./cmd/mcp-server
+go build -o containerization-assist-mcp .
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ MCP server built successfully${NC}"
 else
