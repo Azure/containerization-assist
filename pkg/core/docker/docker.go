@@ -1,4 +1,4 @@
-// Package docker provides core Docker operations extracted from the Container Kit pipeline.
+// Package docker provides core Docker operations extracted from the Containerization Assist pipeline.
 // This package contains mechanical Docker operations without AI dependencies,
 // designed to be used by atomic MCP tools that let external AI handle reasoning.
 package docker
@@ -6,7 +6,7 @@ package docker
 import (
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/containerization-assist/pkg/mcp/api"
 )
 
 // ContainerizeOptions contains all options for the containerization process

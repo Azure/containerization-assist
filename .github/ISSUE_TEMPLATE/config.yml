@@ -1,11 +1,11 @@
 blank_issues_enabled: false
 contact_links:
   - name: 💬 GitHub Discussions
-    url: https://github.com/Azure/container-kit/discussions
-    about: Ask questions, share ideas, and discuss Container Kit with the community
+    url: https://github.com/Azure/containerization-assist/discussions
+    about: Ask questions, share ideas, and discuss Containerization Assist with the community
   - name: 📖 Documentation
-    url: https://github.com/Azure/container-kit/blob/main/README.md
+    url: https://github.com/Azure/containerization-assist/blob/main/README.md
     about: Check the README, Contributing Guide, and other documentation
   - name: 🔒 Security Issues
-    url: https://github.com/Azure/container-kit/security/advisories/new
+    url: https://github.com/Azure/containerization-assist/security/advisories/new
     about: Report security vulnerabilities privately through GitHub Security Advisories

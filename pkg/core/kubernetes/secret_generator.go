@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	mcperrors "github.com/Azure/container-kit/pkg/common/errors"
+	mcperrors "github.com/Azure/containerization-assist/pkg/common/errors"
 	"github.com/rs/zerolog"
 	"sigs.k8s.io/yaml"
 )
@@ -125,7 +125,7 @@ func (sg *SecretGenerator) GenerateSecret(ctx context.Context, options SecretOpt
 	if secret.Metadata.Labels == nil {
 		secret.Metadata.Labels = make(map[string]string)
 	}
-	secret.Metadata.Labels["kubernetes.azure.com/generator"] = "container-kit"
+	secret.Metadata.Labels["kubernetes.azure.com/generator"] = "containerization-assist"
 
 	// Process data based on type
 	switch options.Type {

@@ -1,6 +1,6 @@
-# Contributing to Container Kit
+# Contributing to Containerization Assist
 
-Thank you for your interest in contributing to Container Kit! This document provides guidelines and information for contributors.
+Thank you for your interest in contributing to Containerization Assist! This document provides guidelines and information for contributors.
 
 ## Table of Contents
 
@@ -36,8 +36,8 @@ The fastest way to get started with a fully configured environment:
 
 1. **Fork and Clone**
    ```bash
-   git clone https://github.com/YOUR-USERNAME/container-kit.git
-   cd container-kit
+   git clone https://github.com/YOUR-USERNAME/containerization-assist.git
+   cd containerization-assist
    ```
 
 2. **Open in Dev Container**
@@ -62,8 +62,8 @@ If you prefer to set up your local environment manually:
 
 1. **Fork and Clone**
    ```bash
-   git clone https://github.com/YOUR-USERNAME/container-kit.git
-   cd container-kit
+   git clone https://github.com/YOUR-USERNAME/containerization-assist.git
+   cd containerization-assist
    ```
 
 2. **Install Dependencies**
@@ -74,10 +74,10 @@ If you prefer to set up your local environment manually:
 3. **Build the Project**
    ```bash
    # Build CLI version
-   go build -o container-kit .
+   go build -o containerization-assist .
 
    # Build MCP server
-   go build -tags mcp -o container-kit-mcp ./cmd/mcp-server
+   go build -tags mcp -o containerization-assist-mcp .
    ```
 
 4. **Run Tests**
@@ -94,14 +94,14 @@ If you prefer to set up your local environment manually:
 
 5. **Verify Installation**
    ```bash
-   ./container-kit --version
-   ./container-kit-mcp --version
+   ./containerization-assist --version
+   ./containerization-assist-mcp --version
    ```
 
 ## Project Structure
 
 ```
-container-kit/
+containerization-assist/
 ├── cmd/                    # Main applications
 │   ├── mcp-server/        # MCP server binary
 │   └── root.go            # CLI root command
@@ -479,4 +479,4 @@ Contributors are recognized in:
 - Release notes for significant contributions
 - Documentation acknowledgments
 
-Thank you for contributing to Container Kit!
+Thank you for contributing to Containerization Assist!

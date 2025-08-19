@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

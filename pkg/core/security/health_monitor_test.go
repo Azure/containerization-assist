@@ -10,7 +10,7 @@ import (
 
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/core/security"
+	"github.com/Azure/containerization-assist/pkg/core/security"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"

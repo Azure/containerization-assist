@@ -1,4 +1,4 @@
-// Package commands provides command handlers for Container Kit MCP.
+// Package commands provides command handlers for Containerization Assist MCP.
 package commands
 
 import (
@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/events"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/service/session"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/events"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/service/session"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 

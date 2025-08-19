@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
 	"github.com/joho/godotenv"
 )
 
@@ -66,7 +66,7 @@ func DefaultConfig() *Config {
 		SessionTTL:       24 * time.Hour,
 		MaxSessions:      100,
 		LogLevel:         "info",
-		ServiceName:      "container-kit-mcp",
+		ServiceName:      "containerization-assist-mcp",
 		ServiceVersion:   "dev",
 		RegistryURL:      "",
 		RegistryUsername: "",

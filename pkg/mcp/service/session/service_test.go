@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	domainsession "github.com/Azure/container-kit/pkg/mcp/domain/session"
+	domainsession "github.com/Azure/containerization-assist/pkg/mcp/domain/session"
 )
 
 type MockSessionStore struct {

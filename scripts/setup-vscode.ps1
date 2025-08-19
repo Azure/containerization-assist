@@ -1,17 +1,17 @@
-# Container Kit VS Code Setup Script for Windows
-# This script installs Container Kit and configures it for VS Code with MCP support
+# Containerization Assist VS Code Setup Script for Windows
+# This script installs Containerization Assist and configures it for VS Code with MCP support
 
 param(
-    [string]$InstallDir = "$env:LOCALAPPDATA\Programs\container-kit"
+    [string]$InstallDir = "$env:LOCALAPPDATA\Programs\containerization-assist"
 )
 
 $ErrorActionPreference = "Stop"
 
 # Configuration
 $RepoOwner = "Azure"
-$RepoName = "container-kit"
-$BinaryName = "container-kit-mcp.exe"
-$CliBinaryName = "container-kit.exe"
+$RepoName = "containerization-assist"
+$BinaryName = "containerization-assist-mcp.exe"
+$CliBinaryName = "containerization-assist.exe"
 
 # Colors and output helpers
 function Write-ColorOutput($ForegroundColor) {
@@ -132,9 +132,9 @@ function Get-Architecture {
     }
 }
 
-# Download and install Container Kit
-function Install-ContainerKit {
-    Write-Step "Installing Container Kit..."
+# Download and install Containerization Assist
+function Install-ContainerizationAssist {
+    Write-Step "Installing Containerization Assist..."
     
     $arch = Get-Architecture
     $platform = "windows_$arch"
@@ -149,7 +149,7 @@ function Install-ContainerKit {
     $downloadUrl = "https://github.com/$RepoOwner/$RepoName/releases/latest/download/${RepoName}_${platform}.zip"
     $checksumUrl = "https://github.com/$RepoOwner/$RepoName/releases/latest/download/checksums.txt"
     
-    $tempDir = Join-Path $env:TEMP "container-kit-install"
+    $tempDir = Join-Path $env:TEMP "containerization-assist-install"
     if (Test-Path $tempDir) {
         Remove-Item -Path $tempDir -Recurse -Force
     }
@@ -159,7 +159,7 @@ function Install-ContainerKit {
     $checksumPath = Join-Path $tempDir "checksums.txt"
     
     try {
-        Write-Info "Downloading Container Kit..."
+        Write-Info "Downloading Containerization Assist..."
         Invoke-WebRequest -Uri $downloadUrl -OutFile $archivePath -UseBasicParsing
         
         # Download checksums
@@ -200,10 +200,10 @@ function Install-ContainerKit {
             }
         }
         
-        Write-Success "Container Kit installed to: $InstallDir"
+        Write-Success "Containerization Assist installed to: $InstallDir"
     }
     catch {
-        Write-Error-Message "Failed to install Container Kit: $_"
+        Write-Error-Message "Failed to install Containerization Assist: $_"
         exit 1
     }
     finally {
@@ -251,7 +251,7 @@ function Get-VSCodeSettingsPath {
 
 # Configure VS Code for MCP
 function Set-VSCodeConfiguration {
-    Write-Step "Configuring VS Code for Container Kit MCP..."
+    Write-Step "Configuring VS Code for Containerization Assist MCP..."
     
     $settingsPath = Get-VSCodeSettingsPath
     $settingsDir = Split-Path $settingsPath -Parent
@@ -264,8 +264,8 @@ function Set-VSCodeConfiguration {
     # MCP configuration to add
     $mcpConfig = @{
         "mcp.servers" = @{
-            "container-kit" = @{
-                "command" = "container-kit-mcp"
+            "containerization-assist" = @{
+                "command" = "containerization-assist-mcp"
                 "args" = @()
                 "transport" = "stdio"
             }
@@ -284,8 +284,8 @@ function Set-VSCodeConfiguration {
             $existingSettings = Get-Content $settingsPath -Raw | ConvertFrom-Json -AsHashtable
             
             # Check if MCP is already configured
-            if ($existingSettings.ContainsKey("mcp.servers") -and $existingSettings["mcp.servers"].ContainsKey("container-kit")) {
-                Write-Warning "Container Kit MCP configuration already exists"
+            if ($existingSettings.ContainsKey("mcp.servers") -and $existingSettings["mcp.servers"].ContainsKey("containerization-assist")) {
+                Write-Warning "Containerization Assist MCP configuration already exists"
                 Write-Info "Updating existing configuration..."
             }
             
@@ -351,15 +351,15 @@ function Test-Installation {
     if (Test-Path $mcpPath) {
         try {
             $version = & $mcpPath --version 2>$null
-            Write-Success "Container Kit MCP is installed"
+            Write-Success "Containerization Assist MCP is installed"
             Write-Info "Version: $version"
         }
         catch {
-            Write-Warning "Container Kit MCP installed but cannot get version"
+            Write-Warning "Containerization Assist MCP installed but cannot get version"
         }
     }
     else {
-        Write-Error-Message "Container Kit MCP not found at: $mcpPath"
+        Write-Error-Message "Containerization Assist MCP not found at: $mcpPath"
         return $false
     }
     
@@ -367,7 +367,7 @@ function Test-Installation {
     $settingsPath = Get-VSCodeSettingsPath
     if (Test-Path $settingsPath) {
         $content = Get-Content $settingsPath -Raw
-        if ($content -match "container-kit") {
+        if ($content -match "containerization-assist") {
             Write-Success "VS Code MCP configuration found"
         }
         else {
@@ -386,9 +386,9 @@ function Show-FinalInstructions {
     Write-Info "Next steps:"
     Write-Info "1. Restart VS Code (or open a new VS Code window)"
     Write-Info "2. Open GitHub Copilot Chat (Ctrl+Alt+I)"
-    Write-Info "3. Ask: 'What Container Kit tools are available?'"
+    Write-Info "3. Ask: 'What Containerization Assist tools are available?'"
     Write-Host ""
-    Write-Info "To use Container Kit:"
+    Write-Info "To use Containerization Assist:"
     Write-Info "• Ask Copilot to analyze your repository"
     Write-Info "• Request help containerizing your application"
     Write-Info "• Use specific tools like 'generate_dockerfile' or 'build_image'"
@@ -400,30 +400,30 @@ function Show-FinalInstructions {
         Write-Info "Download from: https://www.docker.com/products/docker-desktop/"
     }
     
-    Write-Info "For help, visit: https://github.com/Azure/container-kit"
+    Write-Info "For help, visit: https://github.com/Azure/containerization-assist"
 }
 
 # Main installation flow
-function Install-ContainerKitVSCode {
+function Install-ContainerizationAssistVSCode {
     Write-Host ""
-    Write-Info "=== Container Kit VS Code Setup Script ==="
-    Write-Info "This script will install Container Kit and configure it for VS Code"
+    Write-Info "=== Containerization Assist VS Code Setup Script ==="
+    Write-Info "This script will install Containerization Assist and configure it for VS Code"
     Write-Host ""
     
     # Check if already installed
-    $existingMcp = Get-Command container-kit-mcp -ErrorAction SilentlyContinue
+    $existingMcp = Get-Command containerization-assist-mcp -ErrorAction SilentlyContinue
     if ($existingMcp) {
         try {
-            $currentVersion = & container-kit-mcp --version 2>$null
-            Write-Info "Found existing Container Kit installation: $currentVersion"
+            $currentVersion = & containerization-assist-mcp --version 2>$null
+            Write-Info "Found existing Containerization Assist installation: $currentVersion"
         }
         catch {
-            Write-Info "Found existing Container Kit installation"
+            Write-Info "Found existing Containerization Assist installation"
         }
         
         $response = Read-Host "Do you want to reinstall? (y/N)"
         if ($response -ne 'y' -and $response -ne 'Y') {
-            Write-Info "Skipping Container Kit installation"
+            Write-Info "Skipping Containerization Assist installation"
             # Still configure VS Code
             Set-VSCodeConfiguration
             Install-VSCodeExtensions
@@ -435,7 +435,7 @@ function Install-ContainerKitVSCode {
     
     # Run installation steps
     Test-Prerequisites
-    Install-ContainerKit
+    Install-ContainerizationAssist
     Add-ToPath -Directory $InstallDir
     Set-VSCodeConfiguration
     Install-VSCodeExtensions
@@ -450,7 +450,7 @@ function Install-ContainerKitVSCode {
 
 # Run main function
 try {
-    Install-ContainerKitVSCode
+    Install-ContainerizationAssistVSCode
 }
 catch {
     Write-Error-Message "Installation failed: $_"

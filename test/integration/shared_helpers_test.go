@@ -38,10 +38,10 @@ func startMCPServerProcess(ctx context.Context, testWorkspaceDir string) *MCPSer
 	serverBinaryPath := "/tmp/mcp-server"
 
 	// Always (re)build the server to ensure latest changes are tested
-	buildCmd := exec.Command("go", "build", "-o", serverBinaryPath, "../../cmd/mcp-server")
+	buildCmd := exec.Command("go", "build", "-o", serverBinaryPath, "../..")
 	if err := buildCmd.Run(); err != nil {
 		// Try alternative build path when running from repo root
-		buildCmd = exec.Command("go", "build", "-o", serverBinaryPath, "./cmd/mcp-server")
+		buildCmd = exec.Command("go", "build", "-o", serverBinaryPath, ".")
 		if err := buildCmd.Run(); err != nil {
 			panic("Failed to build MCP server: " + err.Error())
 		}
@@ -49,7 +49,7 @@ func startMCPServerProcess(ctx context.Context, testWorkspaceDir string) *MCPSer
 
 	// Create unique workspace and store paths for this test instance
 	if testWorkspaceDir == "" {
-		testWorkspaceDir = "/tmp/container-kit-test-workspace"
+		testWorkspaceDir = "/tmp/containerization-assist-test-workspace"
 	}
 
 	// Ensure unique paths by appending process PID and timestamp

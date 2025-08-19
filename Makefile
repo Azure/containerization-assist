@@ -1,29 +1,23 @@
-# Simplified Container Kit Makefile
+# Simplified Containerization Assist Makefile
 # Focus on essential tasks after massive cleanup
 
 # Version info
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_TIME := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
-LDFLAGS := -X main.Version=$(VERSION) -X main.GitCommit=$(COMMIT) -X main.BuildTime=$(BUILD_TIME)
+LDFLAGS := -X github.com/Azure/containerization-assist/cmd.Version=$(VERSION) -X github.com/Azure/containerization-assist/cmd.GitCommit=$(COMMIT) -X github.com/Azure/containerization-assist/cmd.BuildTime=$(BUILD_TIME)
 
-.PHONY: build cli mcp test test-integration fmt lint static-analysis security-scan arch-validate check-all clean version help wire-gen docs
+.PHONY: build mcp test test-integration fmt lint static-analysis security-scan arch-validate check-all clean version help wire-gen docs
 
 # Primary build target - builds both CLI and MCP server
-build: cli mcp
+build: mcp
 	@echo "✅ Build complete!"
 
-cli:
-	@echo "Building Container Kit CLI..."
-	@echo "Version: $(VERSION)"
-	GOFLAGS=-trimpath go build -ldflags "$(LDFLAGS)" -o container-kit ./main.go
-	@echo "✅ Built: container-kit"
-
 mcp:
-	@echo "Building Container Kit MCP Server..."
+	@echo "Building Containerization Assist MCP Server..."
 	@echo "Version: $(VERSION)"
-	GOFLAGS=-trimpath go build -tags mcp -ldflags "$(LDFLAGS)" -o container-kit-mcp ./cmd/mcp-server
-	@echo "✅ Built: container-kit-mcp"
+	GOFLAGS=-trimpath go build -tags mcp -ldflags "$(LDFLAGS)" -o containerization-assist-mcp .
+	@echo "✅ Built: containerization-assist-mcp"
 
 # Wire dependency injection code generation
 wire-gen:
@@ -56,7 +50,7 @@ docs:
 # Essential development tasks
 test:
 	@echo "Running tests..."
-	go test -race ./pkg/mcp/... ./pkg/core/...
+	go test -race ./...
 
 test-integration:
 	@echo "Running integration tests..."
@@ -100,13 +94,13 @@ check-all: fmt lint static-analysis security-scan arch-validate perf-check contr
 
 # Utility tasks  
 clean:
-	rm -f container-kit container-kit-mcp
+	rm -f containerization-assist containerization-assist-mcp
 
 version:
-	@if [ -f "./container-kit-mcp" ]; then ./container-kit-mcp --version; else echo "❌ Run 'make build' first"; fi
+	@if [ -f "./containerization-assist-mcp" ]; then ./containerization-assist-mcp --version; else echo "❌ Run 'make build' first"; fi
 
 help:
-	@echo "Simplified Container Kit Makefile"
+	@echo "Simplified Containerization Assist Makefile"
 	@echo ""
 	@echo "Essential targets:"
 	@echo "  build             Build the MCP server binary"

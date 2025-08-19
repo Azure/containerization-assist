@@ -10,23 +10,11 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/pkg/errors"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
-	domainworkflow "github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/messaging"
-	"github.com/Azure/container-kit/pkg/mcp/service/session"
+	"github.com/Azure/containerization-assist/pkg/mcp/api"
+	domainworkflow "github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/messaging"
+	"github.com/Azure/containerization-assist/pkg/mcp/service/session"
 )
-
-// WorkflowStateHelpers provides utility functions for workflow state management
-type WorkflowStateHelpers struct {
-	sessionManager session.OptimizedSessionManager
-}
-
-// NewWorkflowStateHelpers creates a new instance of workflow state helpers
-func NewWorkflowStateHelpers(sessionManager session.OptimizedSessionManager) *WorkflowStateHelpers {
-	return &WorkflowStateHelpers{
-		sessionManager: sessionManager,
-	}
-}
 
 // SimpleWorkflowState represents a simplified workflow state for tool operations
 type SimpleWorkflowState struct {
@@ -329,21 +317,6 @@ func ExtractStringArrayParam(args map[string]interface{}, key string) ([]string,
 	default:
 		return nil, errors.Errorf("parameter %s must be an array", key)
 	}
-}
-
-// NoOpProgressEmitter provides a no-op implementation of ProgressEmitter
-type NoOpProgressEmitter struct{}
-
-func (e *NoOpProgressEmitter) Emit(ctx context.Context, stage string, percent int, message string) error {
-	return nil
-}
-
-func (e *NoOpProgressEmitter) EmitDetailed(ctx context.Context, update api.ProgressUpdate) error {
-	return nil
-}
-
-func (e *NoOpProgressEmitter) Close() error {
-	return nil
 }
 
 // MarshalJSON marshals data to JSON string

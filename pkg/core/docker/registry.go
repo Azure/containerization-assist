@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/errors"
+	"github.com/Azure/containerization-assist/pkg/common/errors"
 )
 
 // RegistryManager provides mechanical Docker registry operations

@@ -4,7 +4,7 @@ metadata:
   name: app
   labels:
     app.kubernetes.io/name: app
-    kubernetes.azure.com/generator: container-kit
+    kubernetes.azure.com/generator: containerization-assist
   namespace: default
 spec:
   replicas: 1

@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/service/session"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/service/session"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/stretchr/testify/assert"
@@ -316,13 +316,4 @@ func (m *mockSessionManager) Stats() *session.SessionStats {
 
 func (m *mockSessionManager) Stop(ctx context.Context) error {
 	return nil
-}
-
-type mockMCPServer struct {
-	server.MCPServer
-	tools map[string]mcp.Tool
-}
-
-func (m *mockMCPServer) AddTool(tool mcp.Tool, handler func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error)) {
-	m.tools[tool.Name] = tool
 }

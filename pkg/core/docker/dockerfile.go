@@ -11,9 +11,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/ai"
-	mcperrors "github.com/Azure/container-kit/pkg/common/errors"
-	"github.com/Azure/container-kit/templates"
+	"github.com/Azure/containerization-assist/pkg/ai"
+	mcperrors "github.com/Azure/containerization-assist/pkg/common/errors"
+	"github.com/Azure/containerization-assist/templates"
 )
 
 type Dockerfile struct {

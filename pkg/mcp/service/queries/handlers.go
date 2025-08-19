@@ -1,4 +1,4 @@
-// Package queries provides query handlers for Container Kit MCP.
+// Package queries provides query handlers for Containerization Assist MCP.
 package queries
 
 import (
@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/infrastructure/core/resources"
-	"github.com/Azure/container-kit/pkg/mcp/service/session"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/core/resources"
+	"github.com/Azure/containerization-assist/pkg/mcp/service/session"
 )
 
 // QueryHandler handles query execution

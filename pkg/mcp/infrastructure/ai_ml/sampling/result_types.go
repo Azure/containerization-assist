@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	domain "github.com/Azure/container-kit/pkg/mcp/domain/sampling"
+	domain "github.com/Azure/containerization-assist/pkg/mcp/domain/sampling"
 )
 
 // ManifestFix represents a structured response for Kubernetes manifest fixes

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/session"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

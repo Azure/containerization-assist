@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -252,20 +251,4 @@ func TestMarshalJSON(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
-}
-
-// Mock implementations
-
-type mockProgressEmitter struct{}
-
-func (m *mockProgressEmitter) Emit(ctx context.Context, stage string, percent int, message string) error {
-	return nil
-}
-
-func (m *mockProgressEmitter) EmitDetailed(ctx context.Context, update api.ProgressUpdate) error {
-	return nil
-}
-
-func (m *mockProgressEmitter) Close() error {
-	return nil
 }

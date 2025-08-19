@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/pipeline"
+	"github.com/Azure/containerization-assist/pkg/core/docker"
+	"github.com/Azure/containerization-assist/pkg/pipeline"
 )
 
 // TestDockerStage_Initialize tests the Initialize method

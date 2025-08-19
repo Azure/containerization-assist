@@ -57,7 +57,7 @@ body:
       description: |
         Provide relevant context:
         - Your use case or project setup
-        - Container Kit version (if applicable)
+        - Containerization Assist version (if applicable)
         - Environment details (if relevant)
         - Links to relevant documentation or code
       placeholder: |

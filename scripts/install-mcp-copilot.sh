@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install Container Kit MCP Server for GitHub Copilot in VS Code
+# Install Containerization Assist MCP Server for GitHub Copilot in VS Code
 
 set -e
 
@@ -19,7 +19,7 @@ case "${OS}" in
     *)          OS_TYPE="UNKNOWN:${OS}"
 esac
 
-echo -e "${GREEN}Container Kit MCP Server Installer for GitHub Copilot${NC}"
+echo -e "${GREEN}Containerization Assist MCP Server Installer for GitHub Copilot${NC}"
 echo "Detected OS: $OS_TYPE"
 echo ""
 
@@ -44,22 +44,22 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Build the MCP server
-echo "Building Container Kit MCP server..."
+echo "Building Containerization Assist MCP server..."
 cd "$PROJECT_ROOT"
-go build -tags "mcp" -o container-kit-mcp ./cmd/mcp-server
+go build -tags "mcp" -o containerization-assist-mcp .
 
-if [ ! -f "container-kit-mcp" ]; then
+if [ ! -f "containerization-assist-mcp" ]; then
     echo -e "${RED}Build failed!${NC}"
     exit 1
 fi
 
 # Make it executable
-chmod +x container-kit-mcp
+chmod +x containerization-assist-mcp
 
 echo -e "${GREEN}Build successful!${NC}"
 
 # Get the absolute path
-MCP_BINARY="$PROJECT_ROOT/container-kit-mcp"
+MCP_BINARY="$PROJECT_ROOT/containerization-assist-mcp"
 
 echo ""
 echo -e "${BLUE}Setting up GitHub Copilot integration...${NC}"
@@ -80,11 +80,11 @@ if [ -d ".vscode" ]; then
     cat > "$MCP_CONFIG_FILE" << EOF
 {
   "servers": {
-    "containerKit": {
+    "containerizationAssist": {
       "type": "stdio",
       "command": "$MCP_BINARY",
       "args": [],
-      "description": "Container Kit - AI-powered containerization and Kubernetes deployment"
+      "description": "Containerization Assist - AI-powered containerization and Kubernetes deployment"
     }
   }
 }
@@ -110,7 +110,7 @@ else
     echo ""
     echo -e "${BLUE}{"
     echo "  \"servers\": {"
-    echo "    \"containerKit\": {"
+    echo "    \"containerizationAssist\": {"
     echo "      \"type\": \"stdio\","
     echo "      \"command\": \"$MCP_BINARY\","
     echo "      \"args\": []"
@@ -135,11 +135,11 @@ if [ -f "$MCP_CONFIG_FILE" ]; then
     echo "- VS Code Config: $MCP_CONFIG_FILE"
 fi
 echo ""
-echo -e "${BLUE}For troubleshooting, check logs at: ~/.container-kit/logs/${NC}"
+echo -e "${BLUE}For troubleshooting, check logs at: ~/.containerization-assist/logs/${NC}"
 echo ""
-echo -e "${YELLOW}Note: Only one Container Kit MCP server can run at a time.${NC}"
+echo -e "${YELLOW}Note: Only one Containerization Assist MCP server can run at a time.${NC}"
 echo "If you get database timeout errors, check for existing processes:"
-echo "  ps aux | grep container-kit-mcp"
+echo "  ps aux | grep containerization-assist-mcp"
 
 # Optional: Test the server
 echo ""
@@ -149,17 +149,17 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "Testing MCP server..."
 
     # Check for existing processes first
-    if ps aux | grep -v grep | grep container-kit-mcp >/dev/null; then
-        echo -e "${YELLOW}Warning: Found existing Container Kit MCP processes:${NC}"
-        ps aux | grep -v grep | grep container-kit-mcp
+    if ps aux | grep -v grep | grep containerization-assist-mcp >/dev/null; then
+        echo -e "${YELLOW}Warning: Found existing Containerization Assist MCP processes:${NC}"
+        ps aux | grep -v grep | grep containerization-assist-mcp
         echo ""
         echo "You may want to terminate them first before testing."
         echo ""
     fi
 
     # Test the server can start properly by redirecting logs
-    echo "Starting server test (logs redirected to /tmp/container-kit-test.log)..."
-    if timeout 3s "$MCP_BINARY" > /tmp/container-kit-test.log 2>&1; then
+    echo "Starting server test (logs redirected to /tmp/containerization-assist-test.log)..."
+    if timeout 3s "$MCP_BINARY" > /tmp/containerization-assist-test.log 2>&1; then
         echo -e "${GREEN}✅ Server started successfully${NC}"
     else
         # Check if it timed out (which is expected) or failed
@@ -167,13 +167,13 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
             echo -e "${GREEN}✅ Server ran for test duration${NC}"
         else
             echo -e "${RED}❌ Server failed to start${NC}"
-            echo "Check logs at: /tmp/container-kit-test.log"
-            tail -5 /tmp/container-kit-test.log
+            echo "Check logs at: /tmp/containerization-assist-test.log"
+            tail -5 /tmp/containerization-assist-test.log
         fi
     fi
 
     # Quick check that it registered tools
-    if grep -q "Successfully registered all atomic tools" /tmp/container-kit-test.log 2>/dev/null; then
+    if grep -q "Successfully registered all atomic tools" /tmp/containerization-assist-test.log 2>/dev/null; then
         echo -e "${GREEN}✅ Tools registered successfully${NC}"
     else
         echo -e "${YELLOW}⚠️  Could not verify tool registration${NC}"
@@ -181,5 +181,5 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
 
     echo ""
     echo -e "${GREEN}Test completed!${NC}"
-    echo "Note: The server logs have been saved to /tmp/container-kit-test.log"
+    echo "Note: The server logs have been saved to /tmp/containerization-assist-test.log"
 fi

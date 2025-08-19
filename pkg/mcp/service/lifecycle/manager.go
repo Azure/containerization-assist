@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/service/bootstrap"
-	"github.com/Azure/container-kit/pkg/mcp/service/session"
+	"github.com/Azure/containerization-assist/pkg/common/errors"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/service/bootstrap"
+	"github.com/Azure/containerization-assist/pkg/mcp/service/session"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -45,7 +45,7 @@ func NewLifecycleManager(
 
 // Start starts the MCP server with full initialization
 func (m *LifecycleManager) Start(ctx context.Context) error {
-	m.logger.Info("Starting Container Kit MCP Server",
+	m.logger.Info("Starting Containerization Assist MCP Server",
 		"workspace_dir", m.config.WorkspaceDir,
 		"max_sessions", m.config.MaxSessions)
 

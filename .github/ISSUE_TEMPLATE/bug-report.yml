@@ -1,5 +1,5 @@
 name: 🐛 Bug Report
-description: Report a bug or unexpected behavior in Container Kit
+description: Report a bug or unexpected behavior in Containerization Assist
 title: "🐛 [BUG]: "
 labels: ["bug", "needs-triage"]
 body:
@@ -16,7 +16,7 @@ body:
       options:
         - label: I have searched existing issues to ensure this bug hasn't been reported
           required: true
-        - label: I have read the [Contributing Guidelines](https://github.com/Azure/container-kit/blob/main/CONTRIBUTING.md)
+        - label: I have read the [Contributing Guidelines](https://github.com/Azure/containerization-assist/blob/main/CONTRIBUTING.md)
           required: true
         - label: I have included all relevant information below
           required: true
@@ -42,7 +42,7 @@ body:
       value: |
         1. 
         2. 
-        3. 
+        3.
     validations:
       required: true
 
@@ -68,7 +68,7 @@ body:
     id: component
     attributes:
       label: Affected Component
-      description: Which part of Container Kit is affected?
+      description: Which part of Containerization Assist is affected?
       options:
         - MCP Server
         - Individual Tools (analyze_repository, generate_dockerfile, etc.)
@@ -86,8 +86,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: Container Kit Version
-      description: Run `./container-kit-mcp --version` to get the version
+      label: Containerization Assist Version
+      description: Run `./containerization-assist-mcp --version` to get the version
       placeholder: "v1.0.0"
     validations:
       required: true

@@ -1,4 +1,4 @@
-// Package events provides domain event definitions and publishing for Container Kit MCP.
+// Package events provides domain event definitions and publishing for Containerization Assist MCP.
 package events
 
 import (

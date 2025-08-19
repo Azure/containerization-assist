@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/Azure/container-kit/pkg/mcp/service/tools"
+	"github.com/Azure/containerization-assist/pkg/mcp/service/tools"
 )
 
 // AI prompt templates as constants for better maintainability

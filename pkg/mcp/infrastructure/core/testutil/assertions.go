@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/errors"
+	"github.com/Azure/containerization-assist/pkg/common/errors"
 )
 
 // AssertSuccess verifies that an operation completed successfully

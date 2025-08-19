@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/Azure/container-kit/pkg/common/errors"
+	"github.com/Azure/containerization-assist/pkg/common/errors"
 )
 
 // validateRegistryReachable checks if the local Docker registry is reachable.

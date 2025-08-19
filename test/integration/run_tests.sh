@@ -1,5 +1,5 @@
 #!/bin/bash
-# Integration test runner for Container Kit MCP Server
+# Integration test runner for Containerization Assist MCP Server
 
 set -e
 
@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/../.." && pwd )"
 
-echo "🧪 Container Kit MCP Integration Tests"
+echo "🧪 Containerization Assist MCP Integration Tests"
 echo "======================================"
 echo ""
 
@@ -50,7 +50,7 @@ echo ""
 # Build the MCP server first
 echo "Building MCP server..."
 cd "$PROJECT_ROOT"
-go build -o container-kit-mcp ./cmd/mcp-server
+go build -o containerization-assist-mcp .
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ MCP server built successfully${NC}"
 else
@@ -77,11 +77,11 @@ echo "Running integration tests..."
 cd "$PROJECT_ROOT"
 
 # Set environment variables for tests
-export CONTAINER_KIT_TEST_WORKSPACE="/tmp/container-kit-test"
-export CONTAINER_KIT_LOG_LEVEL="debug"
+export CONTAINERIZATION_ASSIST_TEST_WORKSPACE="/tmp/containerization-assist-test"
+export CONTAINERIZATION_ASSIST_LOG_LEVEL="debug"
 
 # Create test workspace
-mkdir -p "$CONTAINER_KIT_TEST_WORKSPACE"
+mkdir -p "$CONTAINERIZATION_ASSIST_TEST_WORKSPACE"
 
 # Run integration tests with appropriate tags
 if [ "$DOCKER_AVAILABLE" = true ] && [ "$KIND_AVAILABLE" = true ]; then
@@ -119,7 +119,7 @@ TEST_RESULT=$?
 # Cleanup
 echo ""
 echo "Cleaning up test workspace..."
-rm -rf "$CONTAINER_KIT_TEST_WORKSPACE"
+rm -rf "$CONTAINERIZATION_ASSIST_TEST_WORKSPACE"
 
 if [ $TEST_RESULT -eq 0 ]; then
     echo ""

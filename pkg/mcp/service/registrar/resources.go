@@ -4,8 +4,8 @@ package registrar
 import (
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/common/errors"
-	resources "github.com/Azure/container-kit/pkg/mcp/infrastructure/core/resources"
+	"github.com/Azure/containerization-assist/pkg/common/errors"
+	resources "github.com/Azure/containerization-assist/pkg/mcp/infrastructure/core/resources"
 	"github.com/mark3labs/mcp-go/server"
 )
 

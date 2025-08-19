@@ -4,7 +4,7 @@ package steps
 import (
 	"fmt"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
 )
 
 // RegistryStepProvider provides steps from the registry

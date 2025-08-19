@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/containerization-assist/pkg/mcp/api"
 )
 
 // EmitStepProgress emits progress for a step

@@ -1,4 +1,4 @@
-// Package commands provides CQRS command definitions for Container Kit MCP.
+// Package commands provides CQRS command definitions for Containerization Assist MCP.
 package commands
 
 import (
@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/common/errors"
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
 )
 
 // Command represents a command that changes system state

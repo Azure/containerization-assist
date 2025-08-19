@@ -5,89 +5,89 @@ run:
   tests: true
 linters:
   disable:
-    - depguard         # Disable import restrictions after simplification
-    - exhaustruct      # Disable exhaustive struct checking (too noisy)
-    - nlreturn         # Disable new line return rule (too strict)
-    - wsl              # Disable whitespace linting (too opinionated)
+    - depguard # Disable import restrictions after simplification
+    - exhaustruct # Disable exhaustive struct checking (too noisy)
+    - nlreturn # Disable new line return rule (too strict)
+    - wsl # Disable whitespace linting (too opinionated)
   enable:
     # Core static analysis
-    - revive           # Enhanced go lint
-    - staticcheck      # Advanced static analysis
-    - errcheck         # Error checking
-    - unused           # Unused code detection (replaces deadcode)
-    - ineffassign      # Ineffectual assignment detection
-    - gocyclo          # Cyclomatic complexity checks
-    
+    - revive # Enhanced go lint
+    - staticcheck # Advanced static analysis
+    - errcheck # Error checking
+    - unused # Unused code detection (replaces deadcode)
+    - ineffassign # Ineffectual assignment detection
+    - gocyclo # Cyclomatic complexity checks
+
     # Security and bug prevention
-    - gosec            # Security analysis
-    - bodyclose        # Check HTTP body close
-    - rowserrcheck     # Check SQL row errors
-    - sqlclosecheck    # Check SQL close
-    - nilerr           # Check nil errors
-    
+    - gosec # Security analysis
+    - bodyclose # Check HTTP body close
+    - rowserrcheck # Check SQL row errors
+    - sqlclosecheck # Check SQL close
+    - nilerr # Check nil errors
+
     # Code quality and style
-    - misspell         # Spelling mistakes
-    - unconvert        # Remove unnecessary conversions
-    - unparam          # Detect unused parameters
-    - prealloc         # Preallocate slices
-    
+    - misspell # Spelling mistakes
+    - unconvert # Remove unnecessary conversions
+    - unparam # Detect unused parameters
+    - prealloc # Preallocate slices
+
     # Performance
-    - gocritic         # Performance and style checks
-    
-    # Maintainability  
-    - dupl             # Duplicate code detection
-    - goconst          # Repeated strings detection
-    - gomodguard       # Module dependencies guard
+    - gocritic # Performance and style checks
+
+    # Maintainability
+    - dupl # Duplicate code detection
+    - goconst # Repeated strings detection
+    - gomodguard # Module dependencies guard
     # Note: copyloopvar and exportloopref may not be available in all versions
-    - lll              # Line length check
-    - nestif           # Nested if statement check
-    - maintidx         # Maintainability index
-    - funlen           # Function length check
-    
+    - lll # Line length check
+    - nestif # Nested if statement check
+    - maintidx # Maintainability index
+    - funlen # Function length check
+
     # Testing
-    - testpackage      # Test package naming
+    - testpackage # Test package naming
 
 formatters:
   enable:
-    - gofmt            # Proper formatting
-    - goimports        # Import organization
+    - gofmt # Proper formatting
+    - goimports # Import organization
 
 linters-settings:
   # Complexity settings
   gocyclo:
     min-complexity: 15
-  
+
   # Function length limits
   funlen:
     lines: 100
     statements: 50
-    
+
   # Cognitive complexity
   gocognit:
     min-complexity: 15
-    
+
   # Line length
   lll:
     line-length: 120
-    
+
   # Nested if statements
   nestif:
     min-complexity: 4
-    
+
   # Maintainability index
   maintidx:
     under: 20
-    
+
   # Security settings
   gosec:
     excludes:
       - G304 # File path from variable - many legitimate uses
       - G404 # Weak random number generator - not all uses need crypto/rand
-      
+
   # Code duplication
   dupl:
     threshold: 150
-    
+
   # Performance settings
   gocritic:
     enabled-tags:
@@ -97,7 +97,7 @@ linters-settings:
     settings:
       unnamedResult:
         checkExported: true
-  
+
   # Custom rules for error handling
   revive:
     rules:
@@ -151,16 +151,16 @@ linters-settings:
         disabled: false
       - name: redefines-builtin-id
         disabled: false
-      
+
   # Constants detection
   goconst:
     min-len: 3
     min-occurrences: 3
-    
+
   # Misspelling
   misspell:
     locale: US
-    
+
   # Import restrictions (if re-enabled later)
   depguard:
     rules:
@@ -169,7 +169,7 @@ linters-settings:
           - "$all"
         allow:
           - "$gostd"
-          - "github.com/Azure/container-kit"
+          - "github.com/Azure/containerization-assist"
           - "github.com/localrivet/gomcp"
           - "github.com/mark3labs/mcp-go"
           - "github.com/rs/zerolog"
@@ -211,6 +211,6 @@ linters-settings:
     - ".*\\.pb\\.go$"
     - ".*_gen\\.go$"
 issues:
-  max-issues-per-linter: 1000  # High limit - actual budget enforced by quality-checks action
-  max-same-issues: 200         # High limit - actual budget enforced by quality-checks action  
+  max-issues-per-linter: 1000 # High limit - actual budget enforced by quality-checks action
+  max-same-issues: 200 # High limit - actual budget enforced by quality-checks action
   new: false
