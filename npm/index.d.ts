@@ -1,149 +1,75 @@
-// Type definitions for @thgamble/containerization-assist-mcp
+// Type definitions for @thgamble/container-assist-mcp
 
-export interface ToolResult {
-  success: boolean;
-  error?: string;
-  data?: Record<string, any>;
-  chain_hint?: {
-    next_tool: string;
-    reason: string;
-  };
-  raw?: string;
+import { z } from 'zod';
+
+/**
+ * MCP tool metadata structure
+ */
+export interface MCPToolMetadata {
+  title: string;
+  description: string;
+  inputSchema: Record<string, z.ZodType<any>>;
 }
 
-export interface AnalysisResult extends ToolResult {
-  data?: {
-    language?: string;
-    framework?: string;
-    dependencies?: string[];
-    buildTool?: string;
-    hasDockerfile?: boolean;
-    hasKubernetesManifests?: boolean;
-  };
+/**
+ * MCP tool result structure
+ */
+export interface MCPToolResult {
+  content: Array<{
+    type: string;
+    text?: string;
+  }>;
 }
 
-export interface DockerfileResult extends ToolResult {
-  data?: {
-    dockerfilePath?: string;
-    baseImage?: string;
-    content?: string;
-  };
+/**
+ * MCP tool definition
+ */
+export interface MCPTool {
+  name: string;
+  metadata: MCPToolMetadata;
+  handler: (params: any) => Promise<MCPToolResult>;
 }
 
-export interface BuildResult extends ToolResult {
-  data?: {
-    imageId?: string;
-    imageName?: string;
-    tags?: string[];
-    size?: number;
-    buildTime?: number;
-  };
+/**
+ * MCP server interface (partial - for typing the registration methods)
+ */
+export interface MCPServer {
+  registerTool(name: string, metadata: MCPToolMetadata, handler: (params: any) => Promise<MCPToolResult>): void;
 }
 
-export interface ScanResult extends ToolResult {
-  data?: {
-    vulnerabilities?: Array<{
-      severity: string;
-      cve: string;
-      package?: string;
-      version?: string;
-      fixedVersion?: string;
-      description?: string;
-    }>;
-    summary?: {
-      critical: number;
-      high: number;
-      medium: number;
-      low: number;
-      total: number;
-    };
-    scanners?: string[];
-  };
-}
+// Individual tool exports
+export const analyzeRepository: MCPTool;
+export const generateDockerfile: MCPTool;
+export const buildImage: MCPTool;
+export const scanImage: MCPTool;
+export const tagImage: MCPTool;
+export const pushImage: MCPTool;
+export const generateK8sManifests: MCPTool;
+export const prepareCluster: MCPTool;
+export const deployApplication: MCPTool;
+export const verifyDeployment: MCPTool;
+export const listTools: MCPTool;
+export const ping: MCPTool;
+export const serverStatus: MCPTool;
 
-export interface PushResult extends ToolResult {
-  data?: {
-    registry?: string;
-    repository?: string;
-    tag?: string;
-    digest?: string;
-    pushedAt?: string;
-  };
-}
+// Tools collection
+export const tools: {
+  analyzeRepository: MCPTool;
+  generateDockerfile: MCPTool;
+  buildImage: MCPTool;
+  scanImage: MCPTool;
+  tagImage: MCPTool;
+  pushImage: MCPTool;
+  generateK8sManifests: MCPTool;
+  prepareCluster: MCPTool;
+  deployApplication: MCPTool;
+  verifyDeployment: MCPTool;
+  listTools: MCPTool;
+  ping: MCPTool;
+  serverStatus: MCPTool;
+};
 
-export interface ManifestResult extends ToolResult {
-  data?: {
-    manifests?: Array<{
-      kind: string;
-      name: string;
-      path: string;
-    }>;
-    namespace?: string;
-  };
-}
-
-export interface DeploymentResult extends ToolResult {
-  data?: {
-    deploymentName?: string;
-    namespace?: string;
-    replicas?: number;
-    endpoints?: string[];
-    status?: string;
-  };
-}
-
-export interface ToolsListResult extends ToolResult {
-  data?: {
-    tools?: Array<{
-      name: string;
-      description: string;
-      category: string;
-    }>;
-  };
-}
-
-// Common options
-export interface BaseOptions {
-  session_id?: string;
-  [key: string]: any;
-}
-
-export interface BuildOptions extends BaseOptions {
-  dockerfile?: string;
-  context?: string;
-  target?: string;
-  buildArgs?: Record<string, string>;
-  tags?: string[];
-  nocache?: boolean;
-}
-
-export interface ScanOptions extends BaseOptions {
-  scanners?: string[];
-  severity?: string;
-  ignoreUnfixed?: boolean;
-}
-
-export interface K8sOptions extends BaseOptions {
-  namespace?: string;
-  replicas?: number;
-  port?: number;
-  serviceType?: string;
-}
-
-// Tool functions
-export function analyzeRepository(repoPath: string, options?: BaseOptions): Promise<AnalysisResult>;
-export function generateDockerfile(options?: BaseOptions): Promise<DockerfileResult>;
-export function buildImage(options?: BuildOptions): Promise<BuildResult>;
-export function scanImage(options?: ScanOptions): Promise<ScanResult>;
-export function tagImage(tag: string, options?: BaseOptions): Promise<ToolResult>;
-export function pushImage(registry: string, options?: BaseOptions): Promise<PushResult>;
-export function generateK8sManifests(options?: K8sOptions): Promise<ManifestResult>;
-export function prepareCluster(options?: BaseOptions): Promise<ToolResult>;
-export function deployApplication(options?: K8sOptions): Promise<DeploymentResult>;
-export function verifyDeployment(options?: BaseOptions): Promise<DeploymentResult>;
-export function listTools(): Promise<ToolsListResult>;
-export function ping(): Promise<ToolResult>;
-export function serverStatus(): Promise<ToolResult>;
-
-// Helper function
+// Helper functions
+export function registerTool(server: MCPServer, tool: MCPTool, customName?: string): void;
+export function registerAllTools(server: MCPServer, nameMapping?: Record<string, string>): void;
 export function createSession(): string;

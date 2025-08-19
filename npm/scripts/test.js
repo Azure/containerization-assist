@@ -14,6 +14,9 @@ const colors = {
   cyan: '\x1b[36m'
 };
 
+// File permissions
+const EXECUTABLE_BITS = 0o111; // Check for any execute permission (owner/group/other)
+
 function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`);
 }
@@ -155,18 +158,11 @@ class MCPServerTester {
   async testStdioMode() {
     log('Testing: STDIO transport mode...', 'cyan');
     
+    let child;
     try {
-      const child = spawn('node', [path.join(this.npmDir, 'index.js')], {
+      child = spawn('node', [path.join(this.npmDir, 'index.js')], {
         stdio: ['pipe', 'pipe', 'pipe']
-      let child;
-      try {
-        child = spawn('node', [path.join(this.npmDir, 'index.js')], {
-          stdio: ['pipe', 'pipe', 'pipe']
-        });
-      } catch (err) {
-        this.fail(`Failed to spawn child process: ${err.message}`);
-        return;
-      }
+      });
       
       let started = false;
       const timeout = setTimeout(() => {

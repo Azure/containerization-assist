@@ -14,6 +14,9 @@ const colors = {
   cyan: '\x1b[36m'
 };
 
+// File permissions
+const EXECUTABLE_PERMISSIONS = 0o755; // rwxr-xr-x
+
 // Helper function for colored output
 function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`);

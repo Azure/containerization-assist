@@ -1,200 +1,177 @@
-const { getConnection, resetConnection } = require('./client');
+/**
+ * Container Kit MCP Tools
+ * 
+ * Individual tool exports for registration with any MCP server.
+ * Each tool exports: name, metadata (with inputSchema), and handler.
+ * 
+ * @module containerization-assist-mcp
+ */
 
-// Session ID counter for more readable IDs
-let sessionCounter = 0;
+// Import all tools
+const analyzeRepository = require('./tools/analyze-repository');
+const generateDockerfile = require('./tools/generate-dockerfile');
+const buildImage = require('./tools/build-image');
+const scanImage = require('./tools/scan-image');
+const tagImage = require('./tools/tag-image');
+const pushImage = require('./tools/push-image');
+const generateK8sManifests = require('./tools/generate-k8s-manifests');
+const prepareCluster = require('./tools/prepare-cluster');
+const deployApplication = require('./tools/deploy-application');
+const verifyDeployment = require('./tools/verify-deployment');
+const listTools = require('./tools/list-tools');
+const ping = require('./tools/ping');
+const serverStatus = require('./tools/server-status');
 
-// Generate a unique session ID
+// Import utilities
+const { generateSessionId } = require('./executor');
+
+// Collection of all tools for iteration
+const tools = {
+  analyzeRepository,
+  generateDockerfile,
+  buildImage,
+  scanImage,
+  tagImage,
+  pushImage,
+  generateK8sManifests,
+  prepareCluster,
+  deployApplication,
+  verifyDeployment,
+  listTools,
+  ping,
+  serverStatus
+};
+
+/**
+ * Register a single tool with an MCP server
+ * @param {Object} server - MCP server instance (SDK Server or custom implementation)
+ * @param {Object} tool - Tool definition with name, metadata, and handler
+ * @param {string} tool.name - Tool identifier
+ * @param {Object} tool.metadata - Tool metadata including title, description, and inputSchema
+ * @param {Function} tool.handler - Async function that handles tool execution
+ * @param {string} [customName] - Optional custom name to override tool.name
+ * @throws {Error} If server doesn't have addTool or registerTool method
+ * @example
+ * const { Server } = require('@modelcontextprotocol/sdk');
+ * const { analyzeRepository, registerTool } = require('@thgamble/containerization-assist-mcp');
+ * 
+ * const server = new Server();
+ * registerTool(server, analyzeRepository);
+ */
+function registerTool(server, tool, customName = null) {
+  const name = customName || tool.name;
+  
+  // Check if server has the MCP SDK's addTool method
+  if (typeof server.addTool === 'function') {
+    // Real MCP SDK Server
+    server.addTool(
+      {
+        name: name,
+        description: tool.metadata.description,
+        inputSchema: convertZodToJsonSchema(tool.metadata.inputSchema)
+      },
+      tool.handler
+    );
+  } else if (typeof server.registerTool === 'function') {
+    // Mock or custom server with registerTool method
+    server.registerTool(name, tool.metadata, tool.handler);
+  } else {
+    throw new Error('Server must have either addTool() or registerTool() method');
+  }
+}
+
+/**
+ * Convert Zod schema to JSON Schema for MCP SDK compatibility
+ * @param {Object} zodSchema - Zod schema object with validation rules
+ * @returns {Object} JSON Schema compatible with MCP SDK
+ * @private
+ */
+function convertZodToJsonSchema(zodSchema) {
+  const properties = {};
+  const required = [];
+  
+  for (const [key, schema] of Object.entries(zodSchema)) {
+    // Basic Zod to JSON Schema conversion
+    const def = schema._def;
+    let type = 'string'; // default
+    
+    if (def) {
+      if (def.typeName === 'ZodString') type = 'string';
+      else if (def.typeName === 'ZodNumber') type = 'number';
+      else if (def.typeName === 'ZodBoolean') type = 'boolean';
+      else if (def.typeName === 'ZodArray') type = 'array';
+      else if (def.typeName === 'ZodObject') type = 'object';
+      else if (def.typeName === 'ZodEnum') {
+        type = 'string';
+        properties[key] = {
+          type,
+          enum: def.values,
+          description: def.description || ''
+        };
+        if (!def.isOptional) required.push(key);
+        continue;
+      }
+    }
+    
+    properties[key] = {
+      type,
+      description: def?.description || ''
+    };
+    
+    // Check if required (not optional)
+    if (def && !def.isOptional) {
+      required.push(key);
+    }
+  }
+  
+  return {
+    type: 'object',
+    properties,
+    required: required.length > 0 ? required : undefined
+  };
+}
+
+/**
+ * Register all Container Kit tools with an MCP server
+ * @param {Object} server - MCP server instance (SDK Server or custom implementation)
+ * @param {Object} [nameMapping={}] - Optional mapping of original tool names to custom names
+ * @example
+ * const { Server } = require('@modelcontextprotocol/sdk');
+ * const { registerAllTools } = require('@thgamble/containerization-assist-mcp');
+ * 
+ * const server = new Server();
+ * 
+ * // Register with default names
+ * registerAllTools(server);
+ * 
+ * // Or with custom names
+ * registerAllTools(server, {
+ *   'analyze_repository': 'analyze',
+ *   'build_image': 'docker-build'
+ * });
+ */
+function registerAllTools(server, nameMapping = {}) {
+  Object.values(tools).forEach(tool => {
+    const customName = nameMapping[tool.name];
+    registerTool(server, tool, customName);
+  });
+}
+
+/**
+ * Create a new session ID for workflow tracking
+ * Session IDs are used to maintain state across multiple tool invocations
+ * @returns {string} Generated session ID in format: session-TIMESTAMP-RANDOM
+ * @example
+ * const sessionId = createSession();
+ * // Returns: "session-2024-01-15T10-30-45-abc123def"
+ */
 function createSession() {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-  const counter = (++sessionCounter).toString().padStart(4, '0');
-  return `session-${timestamp}-${counter}`;
+  return generateSessionId();
 }
 
-// Parse MCP response
-function parseResult(mcpResult) {
-  if (mcpResult?.content?.[0]?.text) {
-    try {
-      return JSON.parse(mcpResult.content[0].text);
-    } catch (err) {
-      // If it's not JSON, return as raw text
-      return { raw: mcpResult.content[0].text };
-    }
-  }
-  return mcpResult;
-}
-
-// Execute a tool with auto-session management and retry logic
-async function executeTool(toolName, args = {}, retries = 1) {
-  try {
-    const connection = await getConnection();
-    
-    // Auto-generate session if not provided (except for utility tools)
-    const utilityTools = ['list_tools', 'ping', 'server_status'];
-    if (!args.session_id && !utilityTools.includes(toolName)) {
-      args.session_id = createSession();
-    }
-    
-    const result = await connection.callTool(toolName, args);
-    return parseResult(result);
-  } catch (error) {
-    // Retry logic for connection failures
-    if (retries > 0 && error.message.includes('Connection closed')) {
-      resetConnection();
-      return executeTool(toolName, args, retries - 1);
-    }
-    throw error;
-  }
-}
-
-// ============================================
-// Workflow Step Tools (10)
-// ============================================
-
-/**
- * Analyze a repository to detect language, framework, and dependencies
- * @param {string} repoPath - Path to the repository to analyze
- * @param {Object} options - Additional options (session_id, etc.)
- * @returns {Promise<Object>} Analysis results
- */
-async function analyzeRepository(repoPath, options = {}) {
-  if (!repoPath) {
-    throw new Error('repoPath is required for analyzeRepository');
-  }
-  return executeTool('analyze_repository', {
-    repo_path: repoPath,
-    ...options
-  });
-}
-
-/**
- * Generate a Dockerfile based on repository analysis
- * @param {Object} options - Generation options (session_id, base_image, etc.)
- * @returns {Promise<Object>} Dockerfile generation results
- */
-async function generateDockerfile(options = {}) {
-  return executeTool('generate_dockerfile', options);
-}
-
-/**
- * Build a Docker image from the generated Dockerfile
- * @param {Object} options - Build options (session_id, dockerfile, context, tags, etc.)
- * @returns {Promise<Object>} Build results with image details
- */
-async function buildImage(options = {}) {
-  return executeTool('build_image', options);
-}
-
-/**
- * Scan a Docker image for security vulnerabilities
- * @param {Object} options - Scan options (session_id, scanners, severity, etc.)
- * @returns {Promise<Object>} Scan results with vulnerability report
- */
-async function scanImage(options = {}) {
-  return executeTool('scan_image', options);
-}
-
-/**
- * Tag a Docker image with a version or label
- * @param {string} tag - The tag to apply to the image
- * @param {Object} options - Additional options (session_id, etc.)
- * @returns {Promise<Object>} Tagging results
- */
-async function tagImage(tag, options = {}) {
-  if (!tag) {
-    throw new Error('tag is required for tagImage');
-  }
-  return executeTool('tag_image', {
-    tag,
-    ...options
-  });
-}
-
-/**
- * Push a Docker image to a container registry
- * @param {string} registry - The registry URL to push to
- * @param {Object} options - Push options (session_id, credentials, etc.)
- * @returns {Promise<Object>} Push results with registry details
- */
-async function pushImage(registry, options = {}) {
-  if (!registry) {
-    throw new Error('registry is required for pushImage');
-  }
-  return executeTool('push_image', {
-    registry,
-    ...options
-  });
-}
-
-/**
- * Generate Kubernetes manifests for the application
- * @param {Object} options - Manifest options (session_id, namespace, replicas, etc.)
- * @returns {Promise<Object>} Generated manifests information
- */
-async function generateK8sManifests(options = {}) {
-  return executeTool('generate_k8s_manifests', options);
-}
-
-/**
- * Prepare the Kubernetes cluster for deployment
- * @param {Object} options - Cluster options (session_id, cluster_config, etc.)
- * @returns {Promise<Object>} Cluster preparation results
- */
-async function prepareCluster(options = {}) {
-  return executeTool('prepare_cluster', options);
-}
-
-/**
- * Deploy the application to Kubernetes
- * @param {Object} options - Deployment options (session_id, namespace, etc.)
- * @returns {Promise<Object>} Deployment results with status
- */
-async function deployApplication(options = {}) {
-  return executeTool('deploy_application', options);
-}
-
-/**
- * Verify the deployment is running correctly
- * @param {Object} options - Verification options (session_id, health_checks, etc.)
- * @returns {Promise<Object>} Verification results with endpoints
- */
-async function verifyDeployment(options = {}) {
-  return executeTool('verify_deployment', options);
-}
-
-// ============================================
-// Utility Tools (3)
-// ============================================
-
-/**
- * List all available MCP tools
- * @returns {Promise<Object>} List of tools with descriptions
- */
-async function listTools() {
-  return executeTool('list_tools');
-}
-
-/**
- * Ping the MCP server to check connectivity
- * @returns {Promise<Object>} Ping response
- */
-async function ping() {
-  return executeTool('ping');
-}
-
-/**
- * Get the MCP server status
- * @returns {Promise<Object>} Server status information
- */
-async function serverStatus() {
-  return executeTool('server_status');
-}
-
-// ============================================
-// Exports
-// ============================================
-
+// Export individual tools
 module.exports = {
-  // Workflow Step Tools (10)
+  // Workflow tools
   analyzeRepository,
   generateDockerfile,
   buildImage,
@@ -206,17 +183,16 @@ module.exports = {
   deployApplication,
   verifyDeployment,
   
-  // Utility Tools (3)
+  // Utility tools
   listTools,
   ping,
   serverStatus,
   
-  // Session Management
-  createSession,
+  // Tools collection
+  tools,
   
-  // Connection Management (advanced usage)
-  disconnect: () => {
-    const { resetConnection } = require('./client');
-    resetConnection();
-  }
+  // Helper functions
+  registerTool,
+  registerAllTools,
+  createSession
 };

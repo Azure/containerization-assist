@@ -64,6 +64,16 @@ tmp/
 temp/
 *.tmp
 
+# Test files
+test-tools.js
+test-server.js
+USAGE_EXAMPLE.md
+DEVELOPMENT.md
+
+# Single binary in root (we use platform-specific directories)
+bin/container-kit-mcp
+bin/container-kit-mcp.exe
+
 # Keep only necessary scripts
 scripts/build-*.sh
 scripts/sync-version.js
