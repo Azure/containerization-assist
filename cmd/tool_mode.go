@@ -21,7 +21,7 @@ func handleToolMode() {
 	}
 
 	toolName := os.Args[2]
-	
+
 	// Get tool parameters from environment variable
 	paramsJSON := os.Getenv("TOOL_PARAMS")
 	if paramsJSON == "" {
@@ -91,7 +91,7 @@ func executeToolDirectly(toolName string, params map[string]interface{}) (string
 // executeUtilityTool handles execution of utility tools that don't need dependencies
 func executeUtilityTool(toolName string, config *tools.ToolConfig, params map[string]interface{}) (string, error) {
 	ctx := context.Background()
-	
+
 	// Create MCP request
 	request := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
@@ -108,7 +108,7 @@ func executeUtilityTool(toolName string, config *tools.ToolConfig, params map[st
 	case "list_tools":
 		handler := tools.CreateListToolsHandler()
 		result, err = handler(ctx, request)
-		
+
 	case "ping":
 		// Simple ping implementation
 		message, _ := params["message"].(string)
@@ -124,7 +124,7 @@ func executeUtilityTool(toolName string, config *tools.ToolConfig, params map[st
 				},
 			},
 		}
-		
+
 	case "server_status":
 		// Simple status without server context
 		status := map[string]interface{}{
@@ -141,7 +141,7 @@ func executeUtilityTool(toolName string, config *tools.ToolConfig, params map[st
 				},
 			},
 		}
-		
+
 	default:
 		return "", fmt.Errorf("utility tool %s not implemented in standalone mode", toolName)
 	}
