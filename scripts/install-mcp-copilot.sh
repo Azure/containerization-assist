@@ -46,7 +46,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 # Build the MCP server
 echo "Building Containerization Assist MCP server..."
 cd "$PROJECT_ROOT"
-go build -tags "mcp" -o containerization-assist-mcp ./cmd/mcp-server
+go build -tags "mcp" -o containerization-assist-mcp .
 
 if [ ! -f "containerization-assist-mcp" ]; then
     echo -e "${RED}Build failed!${NC}"

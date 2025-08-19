@@ -38,10 +38,10 @@ func startMCPServerProcess(ctx context.Context, testWorkspaceDir string) *MCPSer
 	serverBinaryPath := "/tmp/mcp-server"
 
 	// Always (re)build the server to ensure latest changes are tested
-	buildCmd := exec.Command("go", "build", "-o", serverBinaryPath, "../../cmd/mcp-server")
+	buildCmd := exec.Command("go", "build", "-o", serverBinaryPath, "../..")
 	if err := buildCmd.Run(); err != nil {
 		// Try alternative build path when running from repo root
-		buildCmd = exec.Command("go", "build", "-o", serverBinaryPath, "./cmd/mcp-server")
+		buildCmd = exec.Command("go", "build", "-o", serverBinaryPath, ".")
 		if err := buildCmd.Run(); err != nil {
 			panic("Failed to build MCP server: " + err.Error())
 		}

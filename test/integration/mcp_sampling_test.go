@@ -233,10 +233,10 @@ func runCommand(t *testing.T, dir string, name string, args ...string) {
 // buildMCPServer builds the MCP server binary
 func buildMCPServer(t *testing.T, testDir string) string {
 	mcpBinary := filepath.Join(testDir, "mcp-server")
-	buildCmd := exec.Command("go", "build", "-o", mcpBinary, "../../cmd/mcp-server")
+	buildCmd := exec.Command("go", "build", "-o", mcpBinary, "../..")
 	if err := buildCmd.Run(); err != nil {
 		// Try alternative path
-		buildCmd = exec.Command("go", "build", "-o", mcpBinary, "./cmd/mcp-server")
+		buildCmd = exec.Command("go", "build", "-o", mcpBinary, ".")
 		if err := buildCmd.Run(); err != nil {
 			t.Fatalf("Failed to build MCP server: %v", err)
 		}

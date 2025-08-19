@@ -35,8 +35,8 @@ jobs:
           changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD)
           echo "📝 Changed files: $(echo "$changed_files" | wc -l) total"
           
-          # Check for MCP changes (cmd/mcp-server/, pkg/common/, pkg/core/, pkg/mcp/)
-          mcp_count=$(echo "$changed_files" | grep -E "^(cmd/mcp-server/|pkg/(common|core|mcp)/)" | wc -l)
+          # Check for MCP changes (main.go, pkg/common/, pkg/core/, pkg/mcp/)
+          mcp_count=$(echo "$changed_files" | grep -E "^(main\.go|pkg/(common|core|mcp)/)" | wc -l)
           echo "test_mcp=$([ $mcp_count -gt 0 ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
           echo "MCP changes: $([ $mcp_count -gt 0 ] && echo "yes ($mcp_count files)" || echo "no")"
         else
@@ -64,7 +64,7 @@ jobs:
       
     - name: Build MCP Server
       run: |
-        GOFLAGS=-trimpath go build -o containerization-assist-mcp ./cmd/mcp-server
+        GOFLAGS=-trimpath go build -o containerization-assist-mcp .
         ./containerization-assist-mcp --version
 
   # Quality checks - parallel with build
@@ -219,11 +219,103 @@ jobs:
         chmod +x ./test/integration/run_tests.sh
         ./test/integration/run_tests.sh
 
+  # Dead code detection - fail if PR increases dead code
+  deadcode-check:
+    name: Dead Code Analysis
+    runs-on: ubuntu-latest
+    needs: [setup, build]
+    if: github.event_name == 'pull_request'
+    steps:
+    - name: Checkout PR code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Setup Go Environment
+      uses: ./.github/actions/setup-go
+        
+    - name: Install deadcode tool
+      run: |
+        echo "📦 Installing deadcode tool..."
+        go install golang.org/x/tools/cmd/deadcode@latest
+        
+    - name: Analyze deadcode in PR branch
+      run: |
+        echo "🔍 Analyzing dead code in PR branch..."
+        deadcode -test ./... > pr_deadcode.txt 2>&1 || true
+        PR_DEADCODE_COUNT=$(wc -l < pr_deadcode.txt)
+        echo "Dead code lines in PR: $PR_DEADCODE_COUNT"
+        echo "PR_DEADCODE_COUNT=$PR_DEADCODE_COUNT" >> $GITHUB_ENV
+        
+        if [ $PR_DEADCODE_COUNT -gt 0 ]; then
+          echo "📋 Dead code found in PR branch:"
+          head -20 pr_deadcode.txt
+          if [ $PR_DEADCODE_COUNT -gt 20 ]; then
+            echo "... and $(($PR_DEADCODE_COUNT - 20)) more lines"
+          fi
+        fi
+        
+    - name: Checkout base branch
+      run: |
+        echo "🔄 Switching to base branch for comparison..."
+        git checkout ${{ github.event.pull_request.base.sha }}
+        
+    - name: Analyze deadcode in base branch
+      run: |
+        echo "🔍 Analyzing dead code in base branch..."
+        deadcode -test ./... > base_deadcode.txt 2>&1 || true
+        BASE_DEADCODE_COUNT=$(wc -l < base_deadcode.txt)
+        echo "Dead code lines in base: $BASE_DEADCODE_COUNT"
+        echo "BASE_DEADCODE_COUNT=$BASE_DEADCODE_COUNT" >> $GITHUB_ENV
+        
+    - name: Compare dead code results
+      run: |
+        echo "📊 Dead Code Analysis Results:"
+        echo "  Base branch: $BASE_DEADCODE_COUNT lines"
+        echo "  PR branch: $PR_DEADCODE_COUNT lines"
+        DIFF=$((PR_DEADCODE_COUNT - BASE_DEADCODE_COUNT))
+        echo "  Difference: $DIFF lines"
+        
+        if [ $DIFF -gt 0 ]; then
+          echo "❌ FAILURE: PR increases dead code by $DIFF lines!"
+          echo ""
+          echo "🔍 New dead code introduced:"
+          
+          # Switch back to PR branch to show the dead code
+          git checkout ${{ github.sha }}
+          deadcode -test ./... > current_deadcode.txt 2>&1 || true
+          
+          # Show dead code details
+          if [ -s current_deadcode.txt ]; then
+            echo "Dead code found:"
+            cat current_deadcode.txt
+          fi
+          
+          echo ""
+          echo "Please remove the dead code before merging this PR."
+          echo "You can use 'deadcode -test ./...' locally to identify dead code."
+          exit 1
+        elif [ $DIFF -lt 0 ]; then
+          echo "✅ GREAT: PR removes $((0 - DIFF)) lines of dead code!"
+        else
+          echo "✅ GOOD: PR doesn't introduce new dead code"
+        fi
+        
+    - name: Upload dead code analysis
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: deadcode-analysis-${{ github.run_id }}
+        path: |
+          pr_deadcode.txt
+          base_deadcode.txt
+        retention-days: 30
+
   # Post PR comment with beautiful summary
   pr-comment:
     name: Post PR Summary
     runs-on: ubuntu-latest
-    needs: [build, quality, test, mcp-integration]
+    needs: [build, quality, test, mcp-integration, deadcode-check]
     if: always() && github.event_name == 'pull_request'
     steps:
     - name: Checkout
@@ -248,7 +340,7 @@ jobs:
   ci-status:
     name: CI Status Check
     runs-on: ubuntu-latest
-    needs: [build, quality, test, mcp-integration ]
+    needs: [build, quality, test, mcp-integration, deadcode-check]
     if: always()
     
     steps:
@@ -259,6 +351,7 @@ jobs:
         echo "Quality: ${{ needs.quality.result }}"
         echo "Tests: ${{ needs.test.result }}"
         echo "MCP Integration: ${{ needs.mcp-integration.result }}"
+        echo "Dead Code Check: ${{ needs.deadcode-check.result }}"
         
         # Required checks
         if [[ "${{ needs.build.result }}" != "success" ]]; then
@@ -279,6 +372,12 @@ jobs:
         # MCP integration is required
         if [[ "${{ needs.mcp-integration.result }}" == "failure" ]]; then
           echo "❌ MCP integration tests failed"
+          exit 1
+        fi
+        
+        # Dead code check is required for PRs
+        if [[ "${{ github.event_name }}" == "pull_request" && "${{ needs.deadcode-check.result }}" == "failure" ]]; then
+          echo "❌ Dead code check failed - PR introduces new dead code"
           exit 1
         fi
         

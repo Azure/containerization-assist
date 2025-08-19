@@ -689,7 +689,7 @@ make help               # Show all targets
 ### Key Files and Directories
 
 ```
-cmd/mcp-server/         # MCP server entry point
+main.go                 # MCP server entry point
 pkg/mcp/                # Core MCP implementation
 ├── api/                # Interfaces and contracts
 ├── service/            # Application services
