@@ -4,11 +4,11 @@
 package filesystem
 
 import (
-"os"
-"path/filepath"
-"strings"
+	"os"
+	"path/filepath"
+	"strings"
 
-ignore "github.com/sabhiram/go-gitignore"
+	ignore "github.com/sabhiram/go-gitignore"
 )
 
 // DefaultIgnorePatterns contains common directories and files to ignore when generating file trees
