@@ -59,11 +59,11 @@ func RegisterTool(mcpServer *server.MCPServer, config ToolConfig, deps ToolDepen
 		// Use generic handler based on category
 		switch config.Category {
 		case CategoryWorkflow:
-			handler = createWorkflowHandler(config, deps)
+			handler = CreateWorkflowHandler(config, deps)
 		case CategoryOrchestration:
-			handler = createOrchestrationHandler(config, deps)
+			handler = CreateOrchestrationHandler(config, deps)
 		case CategoryUtility:
-			handler = createUtilityHandler(config, deps)
+			handler = CreateUtilityHandler(config, deps)
 		default:
 			return errors.Errorf("unknown tool category: %s", config.Category)
 		}
@@ -93,8 +93,8 @@ func validateDependencies(config ToolConfig, deps ToolDependencies) error {
 	return nil
 }
 
-// createWorkflowHandler creates a generic handler for workflow tools
-func createWorkflowHandler(config ToolConfig, deps ToolDependencies) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+// CreateWorkflowHandler creates a generic handler for workflow tools
+func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		// Parse arguments
 		args := req.GetArguments()
@@ -139,8 +139,24 @@ func createWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 			// Try to save state even on error
 			_ = SaveWorkflowState(ctx, deps.SessionManager, state)
 
-			errorResult := createErrorResult(execErr)
-			return &errorResult, nil
+			// Include session_id in error response so user knows what session was used
+			errorData := map[string]interface{}{
+				"session_id": sessionID,
+			}
+			errorResult := ToolResult{
+				Success: false,
+				Error:   execErr.Error(),
+				Data:    errorData,
+			}
+			mcpResult := mcp.CallToolResult{
+				Content: []mcp.Content{
+					mcp.TextContent{
+						Type: "text",
+						Text: MarshalJSON(errorResult),
+					},
+				},
+			}
+			return &mcpResult, nil
 		}
 
 		// Update state
@@ -153,6 +169,9 @@ func createWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 			return &errorResult, nil
 		}
 
+		// Include session_id in result so user can reuse it
+		result["session_id"] = sessionID
+
 		// Create response with chain hint
 		var chainHint *ChainHint
 		if config.NextTool != "" {
@@ -164,8 +183,8 @@ func createWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 	}
 }
 
-// createOrchestrationHandler creates a handler for orchestration tools
-func createOrchestrationHandler(config ToolConfig, deps ToolDependencies) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+// CreateOrchestrationHandler creates a handler for orchestration tools
+func CreateOrchestrationHandler(config ToolConfig, deps ToolDependencies) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	switch config.Name {
 	case "start_workflow":
 		return createStartWorkflowHandler(config, deps)
@@ -179,8 +198,8 @@ func createOrchestrationHandler(config ToolConfig, deps ToolDependencies) func(c
 	}
 }
 
-// createUtilityHandler creates a handler for utility tools
-func createUtilityHandler(config ToolConfig, deps ToolDependencies) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+// CreateUtilityHandler creates a handler for utility tools
+func CreateUtilityHandler(config ToolConfig, deps ToolDependencies) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	switch config.Name {
 	case "list_tools":
 		return CreateListToolsHandler()

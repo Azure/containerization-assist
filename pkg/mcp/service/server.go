@@ -47,6 +47,11 @@ func (f *ServerFactory) CreateServer(ctx context.Context) (api.MCPServer, error)
 	return server, nil
 }
 
+// BuildDependenciesForTools builds dependencies for tool execution (exposed for tool mode)
+func (f *ServerFactory) BuildDependenciesForTools(ctx context.Context) (*Dependencies, error) {
+	return f.buildDependencies(ctx)
+}
+
 func (f *ServerFactory) buildDependencies(ctx context.Context) (*Dependencies, error) {
 	// Create session manager
 	sessionManager, err := f.createSessionManager()

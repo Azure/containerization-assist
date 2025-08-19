@@ -8,15 +8,18 @@ import (
 	"os"
 	"time"
 
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/mcp/service"
+	"github.com/Azure/containerization-assist/pkg/mcp/service/config"
 	"github.com/Azure/containerization-assist/pkg/mcp/service/tools"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
 // handleToolMode handles execution when the binary is called in tool mode
-// Usage: container-kit-mcp tool <tool-name> --json
+// Usage: containerization-assist-mcp tool <tool-name>
 func handleToolMode() {
 	if len(os.Args) < 3 {
-		fmt.Fprintf(os.Stderr, "Usage: %s tool <tool-name> [--json]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s tool <tool-name>\n", os.Args[0])
 		os.Exit(1)
 	}
 
@@ -36,6 +39,11 @@ func handleToolMode() {
 		os.Exit(1)
 	}
 
+	// Auto-generate session_id if not provided and tool needs it
+	if needsSessionId(toolName) && params["session_id"] == nil {
+		params["session_id"] = generateSessionId()
+	}
+
 	// Execute the tool and output result
 	result, err := executeToolDirectly(toolName, params)
 	if err != nil {
@@ -53,44 +61,53 @@ func handleToolMode() {
 	fmt.Println(result)
 }
 
-// executeToolDirectly executes a tool without the full server
+// executeToolDirectly executes a tool by initializing the full server infrastructure
 func executeToolDirectly(toolName string, params map[string]interface{}) (string, error) {
-	// Get the tool configuration
+	ctx := context.Background()
+
+	// Set up logger
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelError,
+	}))
+
+	// Load configuration
+	cfg, err := config.Load("")
+	if err != nil {
+		// Use default configuration if load fails
+		cfg = config.DefaultConfig()
+	}
+
+	// Create server factory and build dependencies
+	factory := service.NewServerFactory(logger, cfg.ToServerConfig())
+	deps, err := factory.BuildDependenciesForTools(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to build dependencies: %w", err)
+	}
+
+	// Execute tool using the tools package directly
+	return executeToolWithDeps(ctx, toolName, params, deps, logger)
+}
+
+// executeToolWithDeps executes a tool using full dependencies
+func executeToolWithDeps(ctx context.Context, toolName string, params map[string]interface{}, deps *service.Dependencies, logger *slog.Logger) (string, error) {
+	// Get tool configuration
 	toolConfig, err := tools.GetToolConfig(toolName)
 	if err != nil {
 		return "", fmt.Errorf("tool %s not found", toolName)
 	}
 
-	// Note: Logger would be used for workflow tools if they were executable in standalone mode
-	_ = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: slog.LevelError,
-	}))
-
-	// For utility tools that don't need dependencies
-	if toolConfig.Category == tools.CategoryUtility {
-		return executeUtilityTool(toolName, toolConfig, params)
+	// Extract step provider from orchestrator
+	var stepProvider workflow.StepProvider
+	if concreteOrchestrator, ok := deps.WorkflowOrchestrator.(*workflow.Orchestrator); ok {
+		stepProvider = concreteOrchestrator.GetStepProvider()
 	}
 
-	// For tools that need session/workflow capabilities
-	// We'll return a placeholder for now, as full implementation requires server setup
-	// In practice, these would need the full dependency chain
-	result := tools.ToolResult{
-		Success: false,
-		Error:   fmt.Sprintf("Tool %s requires server context. Please use MCP server mode.", toolName),
-		Data: map[string]interface{}{
-			"tool":     toolName,
-			"category": string(toolConfig.Category),
-			"hint":     "This tool requires session management and cannot run standalone",
-		},
+	// Create tool dependencies
+	toolDeps := tools.ToolDependencies{
+		StepProvider:   stepProvider,
+		SessionManager: deps.SessionManager,
+		Logger:         logger,
 	}
-
-	output, _ := json.Marshal(result)
-	return string(output), nil
-}
-
-// executeUtilityTool handles execution of utility tools that don't need dependencies
-func executeUtilityTool(toolName string, config *tools.ToolConfig, params map[string]interface{}) (string, error) {
-	ctx := context.Background()
 
 	// Create MCP request
 	request := mcp.CallToolRequest{
@@ -100,54 +117,35 @@ func executeUtilityTool(toolName string, config *tools.ToolConfig, params map[st
 		},
 	}
 
-	var result *mcp.CallToolResult
-	var err error
+	// Get the handler for this tool
+	var handler func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error)
 
-	// Handle specific utility tools
-	switch toolName {
-	case "list_tools":
-		handler := tools.CreateListToolsHandler()
-		result, err = handler(ctx, request)
-
-	case "ping":
-		// Simple ping implementation
-		message, _ := params["message"].(string)
-		response := "pong"
-		if message != "" {
-			response = "pong: " + message
+	if toolConfig.CustomHandler != nil {
+		// Use custom handler if provided
+		handler = toolConfig.CustomHandler(toolDeps)
+	} else {
+		// Create handler based on category
+		switch toolConfig.Category {
+		case tools.CategoryWorkflow:
+			handler = tools.CreateWorkflowHandler(*toolConfig, toolDeps)
+		case tools.CategoryOrchestration:
+			handler = tools.CreateOrchestrationHandler(*toolConfig, toolDeps)
+		case tools.CategoryUtility:
+			handler = tools.CreateUtilityHandler(*toolConfig, toolDeps)
+		default:
+			return "", fmt.Errorf("unknown tool category: %s", toolConfig.Category)
 		}
-		result = &mcp.CallToolResult{
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: fmt.Sprintf(`{"response":"%s","timestamp":"%s"}`, response, time.Now().Format(time.RFC3339)),
-				},
-			},
-		}
-
-	case "server_status":
-		// Simple status without server context
-		status := map[string]interface{}{
-			"status":  "tool_mode",
-			"version": getVersion(),
-			"mode":    "standalone",
-		}
-		statusJSON, _ := json.Marshal(status)
-		result = &mcp.CallToolResult{
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Type: "text",
-					Text: string(statusJSON),
-				},
-			},
-		}
-
-	default:
-		return "", fmt.Errorf("utility tool %s not implemented in standalone mode", toolName)
 	}
 
+	// Execute the tool
+	result, err := handler(ctx, request)
 	if err != nil {
-		return "", err
+		errorResult := tools.ToolResult{
+			Success: false,
+			Error:   err.Error(),
+		}
+		output, _ := json.Marshal(errorResult)
+		return string(output), nil
 	}
 
 	// Extract text content from result
@@ -160,4 +158,35 @@ func executeUtilityTool(toolName string, config *tools.ToolConfig, params map[st
 	// Fallback
 	output, _ := json.Marshal(result)
 	return string(output), nil
+}
+
+// needsSessionId checks if a tool requires a session_id parameter
+func needsSessionId(toolName string) bool {
+	toolsNeedingSession := []string{
+		"analyze_repository",
+		"generate_dockerfile",
+		"build_image",
+		"scan_image",
+		"tag_image",
+		"push_image",
+		"generate_k8s_manifests",
+		"prepare_cluster",
+		"deploy_application",
+		"verify_deployment",
+		"start_workflow",
+		"workflow_status",
+	}
+
+	for _, name := range toolsNeedingSession {
+		if name == toolName {
+			return true
+		}
+	}
+	return false
+}
+
+// generateSessionId creates a unique session ID
+func generateSessionId() string {
+	timestamp := time.Now().Format("20060102-150405")
+	return fmt.Sprintf("session-%s-%d", timestamp, time.Now().UnixNano()%1000000)
 }

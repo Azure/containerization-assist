@@ -121,11 +121,12 @@ func (s *SimpleWorkflowState) UpdateArtifacts(result map[string]interface{}) {
 	}
 }
 
-// LoadWorkflowState loads workflow state from session
+// LoadWorkflowState loads workflow state from session (creates session if needed)
 func LoadWorkflowState(ctx context.Context, sessionManager session.OptimizedSessionManager, sessionID string) (*SimpleWorkflowState, error) {
-	sessionData, err := sessionManager.Get(ctx, sessionID)
+	// Use GetOrCreate to ensure session exists
+	sessionData, err := sessionManager.GetOrCreate(ctx, sessionID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get session")
+		return nil, errors.Wrap(err, "failed to get or create session")
 	}
 
 	if sessionData == nil {
@@ -230,8 +231,14 @@ func SaveWorkflowState(ctx context.Context, sessionManager session.OptimizedSess
 		}
 	}
 
-	// Save workflow state in session metadata
-	err := sessionManager.Update(ctx, state.SessionID, func(sessionState *session.SessionState) error {
+	// First ensure the session exists (create if needed)
+	_, err := sessionManager.GetOrCreate(ctx, state.SessionID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get or create session")
+	}
+
+	// Now update the session with workflow state
+	err = sessionManager.Update(ctx, state.SessionID, func(sessionState *session.SessionState) error {
 		if sessionState.Metadata == nil {
 			sessionState.Metadata = make(map[string]interface{})
 		}

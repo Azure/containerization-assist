@@ -48,6 +48,70 @@ node test-server.js --real
 2. **Lists registered tools** - Shows all tools with their descriptions
 3. **Tests utility tools** - Executes ping, list_tools, and server_status
 4. **Validates structure** - Ensures each tool has required properties
+
+### How Tools Work
+
+All Container Kit tools are executed through the Go binary with full server infrastructure initialized. This ensures:
+- **Session persistence** - BoltDB stores sessions across tool invocations
+- **Consistent state** - Workflow state is maintained between tool calls
+- **Full dependencies** - All tools have access to required services
+
+#### Session Management
+
+- Sessions are automatically created when needed
+- Sessions persist in BoltDB at `/tmp/mcp-store/sessions.db` by default
+- If no `session_id` is provided, one is auto-generated for workflow tools
+- **The session ID is always included in the tool output** so you can reuse it
+- Sessions can be reused across multiple tool invocations
+
+#### Performance Note
+
+Currently, each tool invocation initializes the full server infrastructure. This ensures reliability but has some overhead. Sessions and state persist via BoltDB between invocations, so workflow continuity is maintained.
+
+**Potential Future Enhancement**: A persistent server daemon could be implemented to:
+- Start on first tool invocation and keep running
+- Reduce initialization overhead for subsequent tool calls
+- Maintain in-memory caches and connections
+
+However, the current approach is simpler and more reliable, avoiding daemon management complexity.
+
+#### Tool Execution
+
+```bash
+# Tools can be executed individually (session ID is auto-generated)
+TOOL_PARAMS='{"repo_path":"/path/to/repo"}' containerization-assist-mcp tool analyze_repository
+# Output includes: {"data":{"session_id":"session-20250819-193756-533387",...}}
+
+# The session ID from the response can be used for subsequent tools
+TOOL_PARAMS='{"session_id":"session-20250819-193756-533387"}' containerization-assist-mcp tool generate_dockerfile
+
+# Or start a full workflow
+TOOL_PARAMS='{"repo_path":"/path/to/repo"}' containerization-assist-mcp tool start_workflow
+# Output includes: {"data":{"session_id":"wf_xxx",...}}
+```
+
+### Available Tools
+
+**Workflow Tools** - Perform containerization steps:
+- `analyze_repository` - Analyze code repository
+- `generate_dockerfile` - Generate optimized Dockerfile
+- `build_image` - Build Docker image
+- `scan_image` - Security vulnerability scanning
+- `tag_image` - Tag Docker images
+- `push_image` - Push to registry
+- `generate_k8s_manifests` - Generate K8s manifests
+- `prepare_cluster` - Prepare K8s cluster
+- `deploy_application` - Deploy to K8s
+- `verify_deployment` - Verify deployment health
+
+**Orchestration Tools** - Manage workflows:
+- `start_workflow` - Start full containerization workflow
+- `workflow_status` - Check workflow progress
+
+**Utility Tools** - System utilities:
+- `ping` - Test connectivity
+- `list_tools` - List available tools
+- `server_status` - Get server status
 5. **Tests helpers** - Verifies registerTool() and registerAllTools() work
 
 ### Test Output Example
