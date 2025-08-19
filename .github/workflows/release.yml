@@ -1,5 +1,18 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+# This workflow lets you compile your Go project using a SLSA3 compliant builder.
+# This workflow will generate a so-called "provenance" file describing the steps
+# that were performed to generate the final binary.
+# The project is an initiative of the OpenSSF (openssf.org) and is developed at
+# https://github.com/slsa-framework/slsa-github-generator.
+# The provenance file can be verified using https://github.com/slsa-framework/slsa-verifier.
+# For more information about SLSA and how it improves the supply-chain, visit slsa.dev.
+
 # .github/workflows/release.yml
-name: Release
+name: SLSA Release
 
 on:
   workflow_dispatch:
@@ -9,30 +22,44 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: write
-  id-token: write
-  # packages: write
-  # issues: write
+permissions: read-all
 
 jobs:
+  args:
+    runs-on: ubuntu-latest
+    outputs:
+      commit-date: ${{ steps.ldflags.outputs.commit-date }}
+      commit: ${{ steps.ldflags.outputs.commit }}
+      version: ${{ steps.ldflags.outputs.version }}
+      tree-state: ${{ steps.ldflags.outputs.tree-state }}
+    steps:
+      - id: checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+      - id: ldflags
+        run: |
+          echo "commit-date=$(git log --date=iso8601-strict -1 --pretty=%ct)" >> "$GITHUB_OUTPUT"
+          echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          echo "version=$(git describe --tags --always --dirty | cut -c2-)" >> "$GITHUB_OUTPUT"
+          echo "tree-state=$(if git diff --quiet; then echo "clean"; else echo "dirty"; fi)" >> "$GITHUB_OUTPUT"
   # Run tests before creating the release
   test:
     name: Run Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version: '1.24.4'
 
       - name: Cache Go modules
-        uses: actions/cache@v4
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
@@ -62,14 +89,16 @@ jobs:
             exit 1
           fi
 
-  # Create release with GoReleaser
-  release:
-    name: Create Release
+  # Create and push tag
+  create-tag:
+    name: Create Tag
     needs: [test, validate-version]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
 
@@ -80,29 +109,195 @@ jobs:
           git tag ${{ github.event.inputs.version }}
           git push origin ${{ github.event.inputs.version }}
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24.4'
+  build:
+    permissions:
+      id-token: write # To sign the provenance
+      contents: write # To upload assets to release
+      actions: read   # To read workflow path
+    strategy:
+      matrix:
+        os:
+          - linux
+          - windows
+          - darwin
+        arch:
+          - amd64
+          - arm64
+    needs: [args, create-tag]
+    uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.1.0
+    with:
+      go-version: "1.24.4"
+      config-file: .slsa-goreleaser/${{matrix.os}}-${{matrix.arch}}.yml
+      evaluated-envs: "COMMIT_DATE:${{needs.args.outputs.commit-date}}, COMMIT:${{needs.args.outputs.commit}}, VERSION:${{needs.args.outputs.version}}, TREE_STATE:${{needs.args.outputs.tree-state}}"
+      upload-assets: true   # SLSA will upload to release
 
-      - name: Cache Go modules
-        uses: actions/cache@v4
+  # Create GitHub Release with softprops action
+  release:
+    name: Create GitHub Release
+    needs: [build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+          fetch-depth: 0
 
-      - name: Install cosign
-        uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 #v3.9.2
+      - name: Download all SLSA3 artifacts
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          cosign-release: 'v2.5.3'
+          path: ./artifacts
 
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag for changelog generation
+          PREVIOUS_TAG=$(git tag --sort=-version:refname | head -2 | tail -1)
+          CURRENT_TAG=${{ github.event.inputs.version }}
+          
+          echo "Generating changelog from $PREVIOUS_TAG to $CURRENT_TAG"
+          
+          # Generate changelog by categories
+          COMMITS=$(git log --pretty=format:"%s (%h)" ${PREVIOUS_TAG}..HEAD 2>/dev/null || git log --pretty=format:"%s (%h)" --max-count=10)
+          
+          # Create changelog sections
+          echo "" > changelog.md
+          
+          # Features
+          FEATURES=$(echo "$COMMITS" | grep -E "^feat" || true)
+          if [ ! -z "$FEATURES" ]; then
+            echo "### 🚀 Features" >> changelog.md
+            echo "$FEATURES" | sed 's/^/- /' >> changelog.md
+            echo "" >> changelog.md
+          fi
+          
+          # Bug fixes
+          FIXES=$(echo "$COMMITS" | grep -E "^fix" || true)
+          if [ ! -z "$FIXES" ]; then
+            echo "### 🐛 Bug Fixes" >> changelog.md
+            echo "$FIXES" | sed 's/^/- /' >> changelog.md
+            echo "" >> changelog.md
+          fi
+          
+          # Performance improvements
+          PERF=$(echo "$COMMITS" | grep -E "^perf" || true)
+          if [ ! -z "$PERF" ]; then
+            echo "### ⚡ Performance Improvements" >> changelog.md
+            echo "$PERF" | sed 's/^/- /' >> changelog.md
+            echo "" >> changelog.md
+          fi
+          
+          # Security
+          SECURITY=$(echo "$COMMITS" | grep -E "^security" || true)
+          if [ ! -z "$SECURITY" ]; then
+            echo "### 🔐 Security" >> changelog.md
+            echo "$SECURITY" | sed 's/^/- /' >> changelog.md
+            echo "" >> changelog.md
+          fi
+          
+          # Refactoring
+          REFACTOR=$(echo "$COMMITS" | grep -E "^refactor" || true)
+          if [ ! -z "$REFACTOR" ]; then
+            echo "### 🔨 Refactoring" >> changelog.md
+            echo "$REFACTOR" | sed 's/^/- /' >> changelog.md
+            echo "" >> changelog.md
+          fi
+          
+          # Other changes (exclude docs, test, chore, ci)
+          OTHER=$(echo "$COMMITS" | grep -v -E "^(feat|fix|perf|security|refactor|docs:|test:|chore:|ci:)" || true)
+          if [ ! -z "$OTHER" ]; then
+            echo "### Other Changes" >> changelog.md
+            echo "$OTHER" | sed 's/^/- /' >> changelog.md
+            echo "" >> changelog.md
+          fi
+          
+          # Store previous tag for next step
+          echo "PREVIOUS_TAG=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
+
+      - name: Create release notes
+        id: release_notes
+        run: |
+          CURRENT_TAG=${{ github.event.inputs.version }}
+          PREVIOUS_TAG=${{ steps.changelog.outputs.PREVIOUS_TAG }}
+          
+          # Create release notes with header
+          cat > release_notes.md << EOF
+          ## Containerization Assist $CURRENT_TAG
+          
+          Welcome to Containerization Assist $CURRENT_TAG! This release includes several improvements and bug fixes.
+          
+          EOF
+          
+          # Add changelog content
+          cat changelog.md >> release_notes.md
+          
+          # Add installation instructions
+          cat >> release_notes.md << 'EOF'
+          ### Installation (MCP Server)
+          
+          The MCP server binary (containerization-assist-mcp) is provided for Linux, macOS, and Windows.
+          
+          #### Quick Install (Windows PowerShell)
+          ```powershell
+          Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-WebRequest -Uri https://raw.githubusercontent.com/Azure/containerization-assist/main/scripts/setup-vscode.ps1 -OutFile setup-vscode.ps1; ./setup-vscode.ps1; Remove-Item setup-vscode.ps1
+          ```
+          
+          #### Quick Install (macOS / Linux)
+          ```bash
+          curl -sSL https://raw.githubusercontent.com/Azure/containerization-assist/main/scripts/setup-vscode.sh | bash
+          ```
+          
+          #### Manual Install
+          1. Download the archive matching your platform.
+          2. Extract the binary and place it on your PATH (e.g. /usr/local/bin or $HOME/bin).
+          3. Verify: `containerization-assist-mcp --help`
+          
+          #### Documentation
+          - User Guide: https://github.com/Azure/containerization-assist/blob/main/USER_GUIDE.md
+          
+          ### Verification
+          
+          All binaries are built using SLSA3 compliant builders and include provenance attestations.
+          
+          To verify the provenance of a binary:
+          
+          ```bash
+          # Download the slsa-verifier
+          curl -sSLO https://github.com/slsa-framework/slsa-verifier/releases/latest/download/slsa-verifier-linux-amd64
+          chmod +x slsa-verifier-linux-amd64
+          
+          # Verify a binary (example for linux-amd64)
+          ./slsa-verifier-linux-amd64 verify-artifact \
+            --provenance-path containerization-assist-mcp-linux-amd64.intoto.jsonl \
+            --source-uri github.com/Azure/containerization-assist \
+            containerization-assist-mcp-linux-amd64
+          ```
+          
+          SHA256 checksums are embedded in the SLSA provenance files.
+          
+          ## Thanks!
+          
+          Thanks to all contributors who made this release possible!
+          EOF
+          
+          # Add previous tag link if available
+          if [ ! -z "$PREVIOUS_TAG" ]; then
+            echo "" >> release_notes.md
+            echo "**Full Changelog**: https://github.com/Azure/containerization-assist/compare/${PREVIOUS_TAG}...${CURRENT_TAG}" >> release_notes.md
+          fi
+          
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
+          cat release_notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@01570a1f39cb168c169c802c3bceb9e93fb10974 # v2.3.2
         with:
-          distribution: goreleaser
-          version: "~> v2"
-          args: release --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ github.event.inputs.version }}
+          name: ${{ github.event.inputs.version }}
+          body: ${{ steps.release_notes.outputs.RELEASE_NOTES }}
+          files: |
+            artifacts/**/*
+          draft: false
+          prerelease: false

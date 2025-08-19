@@ -454,3 +454,15 @@ FodyWeavers.xsd
 # MCP configuration (contains local paths)
 .vscode/mcp.json
 bin/
+
+################################################################################
+# SLSA and Release artifacts
+################################################################################
+
+# SLSA provenance files
+*.intoto.jsonl
+*.sig
+
+# Release build artifacts
+release-assets/
+temp-*/
