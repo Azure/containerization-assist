@@ -128,15 +128,13 @@ type PolicyViolation struct {
 
 // ScanContext provides context for policy evaluation
 type ScanContext struct {
-	ImageRef        string                  `json:"image_ref"`
-	ScanTime        time.Time               `json:"scan_time"`
-	Vulnerabilities []Vulnerability         `json:"vulnerabilities"`
-	VulnSummary     VulnerabilitySummary    `json:"vulnerability_summary"`
-	SecretFindings  []ExtendedSecretFinding `json:"secret_findings,omitempty"`
-	SecretSummary   *DiscoverySummary       `json:"secret_summary,omitempty"`
-	ImageMetadata   map[string]interface{}  `json:"image_metadata,omitempty"`
-	Compliance      map[string]interface{}  `json:"compliance,omitempty"`
-	Packages        []PackageInfo           `json:"packages,omitempty"`
+	ImageRef        string                 `json:"image_ref"`
+	ScanTime        time.Time              `json:"scan_time"`
+	Vulnerabilities []Vulnerability        `json:"vulnerabilities"`
+	VulnSummary     VulnerabilitySummary   `json:"vulnerability_summary"`
+	ImageMetadata   map[string]interface{} `json:"image_metadata,omitempty"`
+	Compliance      map[string]interface{} `json:"compliance,omitempty"`
+	Packages        []PackageInfo          `json:"packages,omitempty"`
 }
 
 // PackageInfo represents information about a package in the image
