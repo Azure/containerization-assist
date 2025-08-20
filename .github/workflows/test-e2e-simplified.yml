@@ -209,15 +209,12 @@ jobs:
           # Start MCP process in background with reduced timeout
           set +e  # Don't exit on error so we can capture exit code
           
-          # Create a function to monitor progress
+          # Create a function to monitor progress (simplified for --quiet mode)
           monitor_mcp_progress() {
             local pid=$1
             local timeout=300  # 5 minutes total
             local elapsed=0
             local check_interval=30  # Check every 30 seconds
-            local last_log_size=0
-            local stagnant_checks=0
-            local max_stagnant=3  # Kill after 3 consecutive checks with no log growth
             
             while [ $elapsed -lt $timeout ]; do
               if ! kill -0 $pid 2>/dev/null; then
@@ -234,49 +231,9 @@ jobs:
                 echo "📁 Files created/modified: $file_count"
               fi
               
-              # Check log file size and detect stagnation
-              if [ -f /tmp/mcp.log ]; then
-                local log_size=$(wc -l < /tmp/mcp.log)
-                echo "📝 Log entries: $log_size lines"
-                
-                # Check if log entries have not changed
-                if [ $log_size -eq $last_log_size ]; then
-                  stagnant_checks=$((stagnant_checks + 1))
-                  echo "⚠️  Log entries unchanged for $stagnant_checks consecutive checks"
-                  
-                  # Kill process if log has been stagnant for too long
-                  if [ $stagnant_checks -ge $max_stagnant ]; then
-                    echo "💀 Process appears stuck (no log growth for $((max_stagnant * check_interval))s) - terminating..."
-                    kill -TERM $pid 2>/dev/null || true
-                    sleep 5
-                    kill -KILL $pid 2>/dev/null || true
-                    return 125  # stagnant process exit code
-                  fi
-                else
-                  # Reset stagnant counter if log is growing
-                  stagnant_checks=0
-                  echo "✅ Log is growing (was $last_log_size, now $log_size)"
-                fi
-                
-                last_log_size=$log_size
-                
-                # Show last few lines for progress indication
-                echo "Recent activity:"
-                tail -3 /tmp/mcp.log | sed 's/^/   /'
-              else
-                # No log file yet, but process is running
-                echo "📝 No log file yet..."
-                stagnant_checks=$((stagnant_checks + 1))
-                
-                # Kill if no log appears for too long
-                if [ $stagnant_checks -ge $max_stagnant ] && [ $elapsed -gt 60 ]; then
-                  echo "💀 No log file created after ${elapsed}s - process may be stuck"
-                  kill -TERM $pid 2>/dev/null || true
-                  sleep 5
-                  kill -KILL $pid 2>/dev/null || true
-                  return 126  # no log file exit code
-                fi
-              fi
+              # Check for Docker images being created
+              local image_count=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -v "<none>" | wc -l)
+              echo "🐳 Docker images: $image_count"
               
               sleep $check_interval
               elapsed=$((elapsed + check_interval))
@@ -296,8 +253,8 @@ jobs:
             return $?
           }
           
-          # Start mcphost in background with compact output to reduce repetitive text
-          mcphost --compact --prompt "Please containerize and deploy this repository: ${CONTAINERIZE_REPO}. This is an automated test do NOT expect user input keeping going untill you run out of time." > /tmp/mcp.log 2>&1 &
+          # Start mcphost in background with quiet mode for automation
+          mcphost --quiet --prompt "Please containerize and deploy this repository: ${CONTAINERIZE_REPO}. This is an automated CI test - proceed automatically without asking for confirmations or user input." > /tmp/mcp.log 2>&1 &
           MCP_PID=$!
           
           # Monitor the process
