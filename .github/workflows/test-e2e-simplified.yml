@@ -98,11 +98,63 @@ jobs:
           echo "Starting containerization of: $CONTAINERIZE_REPO"
           cd /tmp/test-workspace
           
-          # Execute containerization using non-interactive mode with proper prompt
-          timeout 600s mcphost --model azure --prompt "Please containerize this repository: ${CONTAINERIZE_REPO}. This is an automated test." --quiet > /tmp/mcp.log 2>&1 || true
+          # Show current working directory and environment
+          echo "Working directory: $(pwd)"
+          echo "Available disk space:"
+          df -h /tmp
           
-          # Save log for debugging
-          echo "Containerization process completed"
+          # Verify MCP server binary
+          ls -la ./container-kit-mcp
+          ./container-kit-mcp --version || echo "Version check failed"
+          
+          # Check Azure OpenAI environment variables (without exposing secrets)
+          echo "Azure OpenAI configuration status:"
+          echo "AZURE_OPENAI_DEPLOYMENT_ID: ${AZURE_OPENAI_DEPLOYMENT_ID:+SET}"
+          echo "AZURE_OPENAI_KEY: ${AZURE_OPENAI_KEY:+SET}" 
+          echo "AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:+SET}"
+          
+          # Test mcphost configuration
+          echo "Testing mcphost configuration..."
+          mcphost --help || echo "mcphost help failed"
+          
+          # Execute containerization with verbose output and error handling
+          echo "=== Starting MCP Containerization Process ==="
+          set +e  # Don't exit on error so we can capture exit code
+          timeout 600s mcphost --model azure --prompt "Please containerize this repository: ${CONTAINERIZE_REPO}. Build the Docker image, generate Kubernetes manifests, and if possible, deploy to a local kind cluster. This is an automated test." > /tmp/mcp.log 2>&1
+          MCP_EXIT_CODE=$?
+          set -e  # Re-enable exit on error
+          
+          echo "MCP process completed with exit code: $MCP_EXIT_CODE"
+          
+          # Always show the log contents for debugging
+          echo ""
+          echo "=== MCP LOG CONTENTS ==="
+          if [ -f /tmp/mcp.log ]; then
+            echo "Log file size: $(wc -l < /tmp/mcp.log) lines"
+            cat /tmp/mcp.log
+          else
+            echo "No MCP log file found!"
+          fi
+          
+          # Show what was created in the workspace
+          echo ""
+          echo "=== WORKSPACE CONTENTS AFTER MCP ==="
+          ls -la /tmp/test-workspace/ || echo "Workspace listing failed"
+          find /tmp/test-workspace -type f -name "*" | head -20 || echo "No files found in workspace"
+          
+          # Check if any Docker-related files were created
+          echo ""
+          echo "=== SEARCHING FOR GENERATED FILES ==="
+          find /tmp -name "Dockerfile" -type f 2>/dev/null | head -5 || echo "No Dockerfiles found"
+          find /tmp -name "*.yaml" -o -name "*.yml" 2>/dev/null | head -10 || echo "No YAML files found"
+          
+          # Exit with error if MCP failed
+          if [ $MCP_EXIT_CODE -ne 0 ]; then
+            echo "❌ MCP process failed with exit code $MCP_EXIT_CODE"
+            exit $MCP_EXIT_CODE
+          fi
+          
+          echo "✅ MCP process completed successfully"
           
       - name: Verify Docker Image Exists
         id: verify-image
