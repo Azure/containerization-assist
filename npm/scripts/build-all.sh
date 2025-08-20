@@ -32,7 +32,7 @@ for platform_spec in "${platforms[@]}"; do
   mkdir -p "$NPM_DIR/bin/$dir_name"
   
   # Set output binary name
-  output_name="container-kit-mcp"
+  output_name="containerization-assist-mcp"
   if [ "$goos" = "windows" ]; then
     output_name="${output_name}.exe"
   fi
@@ -42,7 +42,7 @@ for platform_spec in "${platforms[@]}"; do
   GOOS=$goos GOARCH=$goarch go build \
     -ldflags="-s -w" \
     -o "$NPM_DIR/bin/$dir_name/$output_name" \
-    ./cmd/mcp-server
+    .
   
   # Make it executable (for Unix platforms)
   if [ "$goos" != "windows" ]; then
