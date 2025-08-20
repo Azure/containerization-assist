@@ -46,14 +46,15 @@ function getGitVersion() {
  * Get version from Go source code
  */
 function getGoVersion() {
-  const mainGoPath = path.join(__dirname, '..', '..', 'cmd', 'mcp-server', 'main.go');
+  // Check cmd/root.go for the Version variable
+  const rootGoPath = path.join(__dirname, '..', '..', 'cmd', 'root.go');
   
-  if (!fs.existsSync(mainGoPath)) {
-    log('Warning: main.go not found', 'yellow');
+  if (!fs.existsSync(rootGoPath)) {
+    log('Warning: cmd/root.go not found', 'yellow');
     return null;
   }
   
-  const content = fs.readFileSync(mainGoPath, 'utf8');
+  const content = fs.readFileSync(rootGoPath, 'utf8');
   
   // Look for Version variable
   const versionMatch = content.match(/Version\s*=\s*"([^"]+)"/);
