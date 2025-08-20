@@ -58,13 +58,6 @@ jobs:
           rm -f mcphost.tar.gz
           mcphost --version
           
-      - name: Build MCP Server
-        run: |
-          echo "Building Container Kit MCP Server from PR code..."
-          go build -tags mcp -o containerization-assist-mcp .
-          chmod +x containerization-assist-mcp
-          ls -la containerization-assist-mcp
-          
       - name: Create mcphost configuration
         run: |
           echo "Creating mcphost configuration using dedicated config file..."
@@ -76,9 +69,112 @@ jobs:
           echo "Configuration created. Contents:"
           cat ~/.mcphost.yml
           
-          # Create workspace and copy MCP binary
+          # Create workspace for testing
           mkdir -p /tmp/test-workspace
+          
+      - name: Verify MCP Configuration
+        run: |
+          echo "=== Testing MCP Configuration with Simple Request ==="
+          cd /tmp/test-workspace
+          
+          # Test basic mcphost functionality with a simple math operation
+          echo "Testing mcphost with simple addition: 2 + 3"
+          echo "This test uses only built-in MCP servers (no custom server needed yet)"
+          
+          # Execute simple test with timeout
+          set +e  # Don't exit on error so we can capture exit code
+          timeout 60s mcphost --prompt "Please calculate 2 + 3 and respond with just the number result." > /tmp/mcp-verification.log 2>&1
+          VERIFICATION_EXIT_CODE=$?
+          set -e  # Re-enable exit on error
+          
+          # Show the verification log
+          echo "MCP Verification Log:"
+          cat /tmp/mcp-verification.log
+          
+          # Check if the test succeeded
+          if [ $VERIFICATION_EXIT_CODE -eq 0 ]; then
+            # Look for the expected result (5) in the output
+            if grep -q "5" /tmp/mcp-verification.log; then
+              echo "✅ MCP verification PASSED: Found expected result '5'"
+            else
+              echo "❌ MCP verification FAILED: Expected result '5' not found in output"
+              echo "This indicates Azure OpenAI is not responding correctly to basic requests"
+              exit 1
+            fi
+          else
+            echo "❌ MCP verification FAILED: mcphost exited with code $VERIFICATION_EXIT_CODE"
+            echo "This indicates a fundamental issue with MCP configuration or Azure OpenAI connection"
+            exit 1
+          fi
+          
+          echo "✅ MCP verification completed successfully - Azure OpenAI connection is working"
+          
+      - name: Build MCP Server
+        run: |
+          echo "Building Containerization Assist MCP Server from PR code..."
+          go build -tags mcp -o containerization-assist-mcp .
+          chmod +x containerization-assist-mcp
+          ls -la containerization-assist-mcp
+          
+          # Copy MCP binary to workspace
           cp ./containerization-assist-mcp /tmp/test-workspace/
+          
+      - name: Update MCP Configuration for Containerization
+        run: |
+          echo "Adding custom containerization server to MCP configuration..."
+          
+          # Create updated config with the custom server
+          cat > ~/.mcphost.yml << 'EOF'
+          mcpServers:
+            filesystem:
+              type: "builtin"
+              name: "fs"
+              options:
+                allowed_directories: ["/tmp", ".", "/home/runner/work"]
+            
+            bash:
+              type: "builtin"
+              name: "bash"
+              
+            containerization-assist:
+              type: "stdio"
+              command: "/tmp/test-workspace/containerization-assist-mcp"
+              args: []
+              
+          model: "azure:${env://AZURE_OPENAI_DEPLOYMENT_ID}"
+          provider-api-key: "${env://AZURE_OPENAI_KEY}"
+          provider-url: "${env://AZURE_OPENAI_ENDPOINT}"
+          EOF
+          
+          echo "Updated MCP configuration:"
+          cat ~/.mcphost.yml
+          
+          # Test that the custom server can start
+          echo "Testing custom MCP server startup..."
+          cd /tmp/test-workspace
+          timeout 10s ./containerization-assist-mcp --version || echo "Custom server version check completed"
+          
+          # Verify MCP server health
+          echo "=== MCP Server Health Check ==="
+          echo "Binary size: $(stat -c%s ./containerization-assist-mcp) bytes"
+          echo "Binary permissions: $(stat -c%a ./containerization-assist-mcp)"
+          echo "Binary type:"
+          file ./containerization-assist-mcp
+          
+          # Test if server can handle basic communication
+          echo "Testing MCP server basic communication..."
+          set +e
+          timeout 15s ./containerization-assist-mcp --help > /tmp/mcp-server-test.log 2>&1
+          SERVER_TEST_EXIT=$?
+          set -e
+          
+          if [ $SERVER_TEST_EXIT -eq 0 ]; then
+            echo "✅ MCP server basic communication test passed"
+          else
+            echo "⚠️  MCP server communication test failed (exit code: $SERVER_TEST_EXIT)"
+            echo "Server test output:"
+            cat /tmp/mcp-server-test.log || echo "No test log available"
+          fi
           
       - name: Execute Containerization via MCP
         run: |
@@ -104,14 +200,89 @@ jobs:
           echo "Testing mcphost configuration..."
           mcphost --help || echo "mcphost help failed"
           
-          # Execute containerization with verbose output and error handling
+          # Execute containerization with improved timeout and monitoring
           echo "=== Starting MCP Containerization Process ==="
+          echo "Repository: ${CONTAINERIZE_REPO}"
+          echo "Timeout: 300 seconds (5 minutes) with progress monitoring"
+          
+          # Start MCP process in background with reduced timeout
           set +e  # Don't exit on error so we can capture exit code
-          timeout 600s mcphost --prompt "Please containerize this repository: ${CONTAINERIZE_REPO}. Build the Docker image, generate Kubernetes manifests, and if possible, deploy to a local kind cluster. This is an automated test." > /tmp/mcp.log 2>&1
+          
+          # Create a function to monitor progress
+          monitor_mcp_progress() {
+            local pid=$1
+            local timeout=300  # 5 minutes total
+            local elapsed=0
+            local check_interval=30  # Check every 30 seconds
+            
+            while [ $elapsed -lt $timeout ]; do
+              if ! kill -0 $pid 2>/dev/null; then
+                # Process has finished
+                break
+              fi
+              
+              # Show progress update
+              echo "⏱️  MCP process still running... (${elapsed}s elapsed, timeout at ${timeout}s)"
+              
+              # Check if any files have been created (sign of progress)
+              local file_count=$(find /tmp/test-workspace -type f -newer /tmp/test-workspace 2>/dev/null | wc -l)
+              if [ $file_count -gt 0 ]; then
+                echo "📁 Files created/modified: $file_count"
+              fi
+              
+              # Check log file size
+              if [ -f /tmp/mcp.log ]; then
+                local log_size=$(wc -l < /tmp/mcp.log)
+                echo "📝 Log entries: $log_size lines"
+                
+                # Show last few lines for progress indication
+                echo "Recent activity:"
+                tail -3 /tmp/mcp.log | sed 's/^/   /'
+              fi
+              
+              sleep $check_interval
+              elapsed=$((elapsed + check_interval))
+            done
+            
+            # Check if process is still running (timed out)
+            if kill -0 $pid 2>/dev/null; then
+              echo "⚠️  Process timed out after ${timeout}s - terminating..."
+              kill -TERM $pid 2>/dev/null || true
+              sleep 5
+              kill -KILL $pid 2>/dev/null || true
+              return 124  # timeout exit code
+            fi
+            
+            # Get actual exit code
+            wait $pid
+            return $?
+          }
+          
+          # Start mcphost in background
+          mcphost --prompt "Please containerize and deploy this repository: ${CONTAINERIZE_REPO}. This is an automated test." > /tmp/mcp.log 2>&1 &
+          MCP_PID=$!
+          
+          # Monitor the process
+          monitor_mcp_progress $MCP_PID
           MCP_EXIT_CODE=$?
+          
           set -e  # Re-enable exit on error
           
           echo "MCP process completed with exit code: $MCP_EXIT_CODE"
+          
+          # Analyze the result
+          case $MCP_EXIT_CODE in
+            0)
+              echo "✅ MCP process completed successfully"
+              ;;
+            124)
+              echo "❌ MCP process timed out after 300 seconds"
+              echo "This suggests the process may be hanging or stuck"
+              ;;
+            *)
+              echo "❌ MCP process failed with exit code: $MCP_EXIT_CODE"
+              ;;
+          esac
           
           # Always show the log contents for debugging
           echo ""
@@ -574,8 +745,9 @@ jobs:
         run: |
           mkdir -p e2e-artifacts
           
-          # Copy MCP log
+          # Copy MCP logs
           cp /tmp/mcp.log e2e-artifacts/ 2>/dev/null || echo "No MCP log found"
+          cp /tmp/mcp-verification.log e2e-artifacts/ 2>/dev/null || echo "No MCP verification log found"
           
           # Copy Dockerfile if exists
           find /tmp -name "Dockerfile" -type f -exec cp {} e2e-artifacts/ \; 2>/dev/null || echo "No Dockerfile found"

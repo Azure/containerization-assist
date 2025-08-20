@@ -1,9 +1,4 @@
 mcpServers:
-  container-kit:
-    type: "local"
-    command: "./containerization-assist-mcp"
-    args: []
-  
   filesystem:
     type: "builtin"
     name: "fs"
