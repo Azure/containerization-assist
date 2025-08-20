@@ -209,12 +209,18 @@ jobs:
           # Start MCP process in background with reduced timeout
           set +e  # Don't exit on error so we can capture exit code
           
-          # Create a function to monitor progress (simplified for --quiet mode)
+          # Create a function to monitor progress with stagnation detection and continuation
           monitor_mcp_progress() {
             local pid=$1
             local timeout=300  # 5 minutes total
             local elapsed=0
             local check_interval=30  # Check every 30 seconds
+            local stagnation_threshold=90  # 90 seconds without progress triggers continuation
+            local last_file_count=0
+            local last_image_count=0
+            local last_progress_time=0
+            local continuation_attempts=0
+            local max_continuations=3
             
             while [ $elapsed -lt $timeout ]; do
               if ! kill -0 $pid 2>/dev/null; then
@@ -235,6 +241,49 @@ jobs:
               local image_count=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -v "<none>" | wc -l)
               echo "🐳 Docker images: $image_count"
               
+              # Stagnation detection: check if there's been progress
+              local progress_detected=false
+              if [ $file_count -gt $last_file_count ] || [ $image_count -gt $last_image_count ]; then
+                progress_detected=true
+                last_progress_time=$elapsed
+                echo "✅ Progress detected - files: $last_file_count→$file_count, images: $last_image_count→$image_count"
+              fi
+              
+              # Check for stagnation and attempt continuation
+              local stagnation_duration=$((elapsed - last_progress_time))
+              if [ $stagnation_duration -ge $stagnation_threshold ] && [ $continuation_attempts -lt $max_continuations ]; then
+                echo "⚠️  Stagnation detected: No progress for ${stagnation_duration}s (threshold: ${stagnation_threshold}s)"
+                echo "🔄 Attempting to continue the LLM process (attempt $((continuation_attempts + 1))/$max_continuations)"
+                
+                # Send a continuation prompt to the MCP process via a follow-up request
+                # We'll create a temporary continuation script to send a follow-up message
+                {
+                  echo "🔄 Sending continuation prompt to MCP process..."
+                  timeout 30s mcphost --quiet --prompt "Please continue with the containerization process. If you're waiting for user input or confirmation, proceed automatically. Complete any remaining steps in the workflow." > /tmp/mcp-continuation-$continuation_attempts.log 2>&1 &
+                  CONTINUATION_PID=$!
+                  
+                  # Wait for continuation attempt to complete or timeout
+                  sleep 15
+                  if kill -0 $CONTINUATION_PID 2>/dev/null; then
+                    kill -TERM $CONTINUATION_PID 2>/dev/null || true
+                  fi
+                  wait $CONTINUATION_PID 2>/dev/null || true
+                  
+                  echo "📝 Continuation attempt log:"
+                  cat /tmp/mcp-continuation-$continuation_attempts.log 2>/dev/null || echo "No continuation log available"
+                } &
+                
+                continuation_attempts=$((continuation_attempts + 1))
+                last_progress_time=$elapsed  # Reset stagnation timer after continuation attempt
+                echo "✅ Continuation attempt completed, monitoring for progress..."
+              elif [ $stagnation_duration -ge $stagnation_threshold ] && [ $continuation_attempts -ge $max_continuations ]; then
+                echo "❌ Maximum continuation attempts reached ($max_continuations). Process may be truly stagnated."
+              fi
+              
+              # Update tracking variables
+              last_file_count=$file_count
+              last_image_count=$image_count
+              
               sleep $check_interval
               elapsed=$((elapsed + check_interval))
             done
@@ -242,6 +291,7 @@ jobs:
             # Check if process is still running (timed out)
             if kill -0 $pid 2>/dev/null; then
               echo "⚠️  Process timed out after ${timeout}s - terminating..."
+              echo "📊 Final stats: continuation_attempts=$continuation_attempts, last_progress_time=$last_progress_time"
               kill -TERM $pid 2>/dev/null || true
               sleep 5
               kill -KILL $pid 2>/dev/null || true
@@ -428,6 +478,10 @@ jobs:
           if kind get clusters 2>/dev/null | grep -q .; then
             echo "✅ Kind cluster found!"
             
+            # Enhanced cluster health diagnostics
+            echo ""
+            echo "=== Cluster Health Diagnostics ==="
+            
             # Get cluster info
             kubectl cluster-info
             
@@ -462,16 +516,16 @@ jobs:
               echo "  Failed/Error: $FAILED_PODS"
               echo "  Total: $TOTAL_PODS"
               
-              # Check for problematic pods
-              PROBLEM_PODS=$(echo "$APP_PODS" | grep -E "(CrashLoopBackOff|ImagePullBackOff|Error|Failed)" || true)
+              # Check for problematic pods including ContainerCreating state
+              PROBLEM_PODS=$(echo "$APP_PODS" | grep -E "(CrashLoopBackOff|ImagePullBackOff|Error|Failed|ContainerCreating|Pending)" || true)
               if [ -n "$PROBLEM_PODS" ]; then
                 echo ""
                 echo "⚠️  WARNING: Found pods with issues:"
                 echo "$PROBLEM_PODS"
                 
-                # Get details for problematic pods
+                # Enhanced diagnostics for problematic pods
                 echo ""
-                echo "Pod issue details:"
+                echo "=== Enhanced Pod Diagnostics ==="
                 echo "$PROBLEM_PODS" | while read -r line; do
                   POD_NAME=$(echo "$line" | awk '{print $2}')
                   NAMESPACE=$(echo "$line" | awk '{print $1}')
@@ -757,6 +811,9 @@ jobs:
           # Copy MCP logs
           cp /tmp/mcp.log e2e-artifacts/ 2>/dev/null || echo "No MCP log found"
           cp /tmp/mcp-verification.log e2e-artifacts/ 2>/dev/null || echo "No MCP verification log found"
+          
+          # Copy continuation logs if any were created
+          find /tmp -name "mcp-continuation-*.log" -exec cp {} e2e-artifacts/ \; 2>/dev/null || echo "No continuation logs found"
           
           # Copy Dockerfile if exists
           find /tmp -name "Dockerfile" -type f -exec cp {} e2e-artifacts/ \; 2>/dev/null || echo "No Dockerfile found"
