@@ -55,39 +55,6 @@ func AtomicUpdateWorkflowState(ctx context.Context, sessionManager session.Optim
 	})
 }
 
-// AtomicMarkStepCompleted atomically marks a step as completed
-func AtomicMarkStepCompleted(ctx context.Context, sessionManager session.OptimizedSessionManager, sessionID string, stepName string) error {
-	return AtomicUpdateWorkflowState(ctx, sessionManager, sessionID, func(state *SimpleWorkflowState) error {
-		state.MarkStepCompleted(stepName)
-		state.CurrentStep = stepName
-		state.Status = "running"
-		return nil
-	})
-}
-
-// AtomicMarkStepFailed atomically marks a step as failed
-func AtomicMarkStepFailed(ctx context.Context, sessionManager session.OptimizedSessionManager, sessionID string, stepName string, err error) error {
-	return AtomicUpdateWorkflowState(ctx, sessionManager, sessionID, func(state *SimpleWorkflowState) error {
-		state.MarkStepFailed(stepName)
-		state.CurrentStep = stepName
-		state.Status = "error"
-		if err != nil {
-			state.SetError(&domainworkflow.WorkflowError{
-				Step: stepName,
-				Err:  err,
-			})
-		}
-		return nil
-	})
-}
-
-// AtomicUpdateArtifacts atomically updates workflow artifacts
-func AtomicUpdateArtifacts(ctx context.Context, sessionManager session.OptimizedSessionManager, sessionID string, artifacts map[string]interface{}) error {
-	return AtomicUpdateWorkflowState(ctx, sessionManager, sessionID, func(state *SimpleWorkflowState) error {
-		state.UpdateArtifacts(artifacts)
-		return nil
-	})
-}
 
 // AtomicUpdateMetadata atomically updates workflow metadata
 func AtomicUpdateMetadata(ctx context.Context, sessionManager session.OptimizedSessionManager, sessionID string, updateFunc func(map[string]interface{}) error) error {
