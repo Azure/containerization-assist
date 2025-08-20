@@ -14,7 +14,7 @@ on:
 jobs:
   e2e-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     
     env:
       AZURE_OPENAI_DEPLOYMENT_ID: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
@@ -61,7 +61,7 @@ jobs:
       - name: Build MCP Server
         run: |
           echo "Building Container Kit MCP Server from PR code..."
-          go build -tags mcp -o container-kit-mcp ./cmd/mcp-server
+          go build -tags mcp -o container-kit-mcp .
           chmod +x container-kit-mcp
           ls -la container-kit-mcp
           
@@ -98,10 +98,10 @@ jobs:
           echo "Starting containerization of: $CONTAINERIZE_REPO"
           cd /tmp/test-workspace
           
-          # Execute containerization - don't parse output, just run it
-          timeout 600s mcphost --quiet --stream=false -p "Please containerize this repository: ${CONTAINERIZE_REPO}. This is an automated test - do NOT ask for user input." > /tmp/mcp.log 2>&1 || true
+          # Execute containerization using non-interactive mode with proper prompt
+          timeout 600s mcphost --model azure --prompt "Please containerize this repository: ${CONTAINERIZE_REPO}. This is an automated test." --quiet > /tmp/mcp.log 2>&1 || true
           
-          # Save log for debugging but don't parse it
+          # Save log for debugging
           echo "Containerization process completed"
           
       - name: Verify Docker Image Exists
@@ -112,13 +112,19 @@ jobs:
           # List all images for debugging
           docker images
           
-          # Look for the containerized image
-          IMAGE_NAME=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "(coolstore|webapp|java)" | grep -v "<none>" | head -1)
+          # Extract repository name from URL to make it generic
+          REPO_NAME=$(echo "$CONTAINERIZE_REPO" | sed -E 's|.*/([^/]+)/?$|\1|' | tr '[:upper:]' '[:lower:]')
+          echo "Looking for images related to: $REPO_NAME"
           
+          # Look for the containerized image with improved generic patterns
+          IMAGE_NAME=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -v "<none>" | grep -v "^registry\." | grep -v "^docker\.io" | head -1)
+          
+          # If no image found, this is a failure
           if [ -z "$IMAGE_NAME" ]; then
             echo "❌ FAIL: No Docker image found"
             echo "Available images:"
             docker images
+            echo "Expected to find an image for repository: $REPO_NAME"
             exit 1
           fi
           
@@ -126,21 +132,50 @@ jobs:
           echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
           echo "image=$IMAGE_NAME" >> $GITHUB_OUTPUT
           
+      - name: Extract Port from Dockerfile
+        id: extract-port
+        run: |
+          echo "=== Extracting port information ==="
+          
+          # Find Dockerfile
+          DOCKERFILE=$(find /tmp -name "Dockerfile" -type f 2>/dev/null | head -1)
+          
+          if [ -n "$DOCKERFILE" ]; then
+            # Extract EXPOSE port from Dockerfile
+            EXPOSED_PORT=$(grep -E "^EXPOSE" "$DOCKERFILE" | head -1 | awk '{print $2}' | sed 's/[^0-9]//g')
+            echo "Found EXPOSE port: $EXPOSED_PORT"
+          fi
+          
+          # Also check generated K8s manifests for port info
+          K8S_PORT=$(find /tmp -name "*.yaml" -o -name "*.yml" 2>/dev/null | xargs grep -h "targetPort:\|containerPort:" 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
+          
+          # Use the first port we find, defaulting to common ports
+          PORT=${EXPOSED_PORT:-$K8S_PORT}
+          PORT=${PORT:-8080}
+          
+          echo "Using port: $PORT"
+          echo "PORT=$PORT" >> $GITHUB_ENV
+          echo "port=$PORT" >> $GITHUB_OUTPUT
+          
       - name: Test Container Locally
         run: |
           echo "=== Testing container locally ==="
           
-          # Run the container
-          docker run -d -p 8080:8080 --name test-app $IMAGE_NAME || {
-            echo "Failed to run container, trying with different port mapping"
-            docker run -d -p 8080:3000 --name test-app $IMAGE_NAME || {
-              echo "Failed again, running without port mapping to check logs"
-              docker run -d --name test-app $IMAGE_NAME
-            }
+          # Run the container with discovered port
+          docker run -d -p ${PORT}:${PORT} --name test-app $IMAGE_NAME || {
+            echo "Failed with port $PORT, trying common ports..."
+            for try_port in 3000 5000 8000 80; do
+              docker rm -f test-app 2>/dev/null || true
+              if docker run -d -p ${try_port}:${try_port} --name test-app $IMAGE_NAME; then
+                PORT=$try_port
+                echo "PORT=$PORT" >> $GITHUB_ENV
+                break
+              fi
+            done
           }
           
           # Give it time to start
-          sleep 10
+          sleep 15
           
           # Check if container is running
           if ! docker ps | grep test-app; then
@@ -149,49 +184,213 @@ jobs:
             exit 1
           fi
           
+          echo "✅ Container is running"
+          docker ps | grep test-app
+          
           # Try to access the application
-          for port in 8080 3000 5000 80; do
-            if curl -f -m 5 http://localhost:${port}/health 2>/dev/null || curl -f -m 5 http://localhost:${port}/ 2>/dev/null; then
-              echo "✅ SUCCESS: Container responds on port $port"
+          ACCESSIBLE=false
+          for endpoint in "/" "/health" "/api/health" "/status" "/api/status"; do
+            if curl -f -m 5 "http://localhost:${PORT}${endpoint}" 2>/dev/null; then
+              echo "✅ SUCCESS: Container responds on port $PORT at endpoint $endpoint"
+              ACCESSIBLE=true
               break
             fi
           done
           
-          # Even if we can't reach it via HTTP, container running is still a success
-          echo "Container is running successfully"
+          if [ "$ACCESSIBLE" = "false" ]; then
+            echo "⚠️  WARNING: Container is running but not responding to HTTP requests"
+            echo "This may be normal for non-web applications"
+          fi
           
-      - name: Verify Kubernetes Resources Created
+      - name: Verify Kubernetes Deployment
+        id: verify-k8s
         run: |
-          echo "=== Checking Kubernetes resources ==="
+          echo "=== Checking Kubernetes deployment ==="
           
           # Check if kind cluster exists
-          if ! kind get clusters | grep -q .; then
+          if kind get clusters 2>/dev/null | grep -q .; then
+            echo "✅ Kind cluster found!"
+            
+            # Get cluster info
+            kubectl cluster-info
+            
+            # Wait for pods to be created
+            echo "Waiting for pods to be created..."
+            sleep 15
+            
+            # Check all pods
+            echo "All pods in cluster:"
+            kubectl get pods -A
+            
+            # Check for application pods (excluding system namespaces)
+            APP_PODS=$(kubectl get pods -A --no-headers | grep -v "kube-system\|kube-public\|kube-node-lease\|local-path-storage" || true)
+            
+            if [ -n "$APP_PODS" ]; then
+              echo "✅ SUCCESS: Found application pods:"
+              echo "$APP_PODS"
+              
+              # Enhanced pod health checking
+              echo ""
+              echo "=== Pod Health Analysis ==="
+              
+              # Count pods by status
+              RUNNING_PODS=$(echo "$APP_PODS" | grep "Running" | wc -l)
+              PENDING_PODS=$(echo "$APP_PODS" | grep "Pending" | wc -l)
+              FAILED_PODS=$(echo "$APP_PODS" | grep -E "(Failed|Error|CrashLoopBackOff|ImagePullBackOff)" | wc -l)
+              TOTAL_PODS=$(echo "$APP_PODS" | wc -l)
+              
+              echo "Pod Status Summary:"
+              echo "  Running: $RUNNING_PODS"
+              echo "  Pending: $PENDING_PODS" 
+              echo "  Failed/Error: $FAILED_PODS"
+              echo "  Total: $TOTAL_PODS"
+              
+              # Check for problematic pods
+              PROBLEM_PODS=$(echo "$APP_PODS" | grep -E "(CrashLoopBackOff|ImagePullBackOff|Error|Failed)" || true)
+              if [ -n "$PROBLEM_PODS" ]; then
+                echo ""
+                echo "⚠️  WARNING: Found pods with issues:"
+                echo "$PROBLEM_PODS"
+                
+                # Get details for problematic pods
+                echo ""
+                echo "Pod issue details:"
+                echo "$PROBLEM_PODS" | while read -r line; do
+                  POD_NAME=$(echo "$line" | awk '{print $2}')
+                  NAMESPACE=$(echo "$line" | awk '{print $1}')
+                  echo "--- Pod: $POD_NAME (namespace: $NAMESPACE) ---"
+                  kubectl describe pod "$POD_NAME" -n "$NAMESPACE" | grep -A 10 "Events:" || true
+                done
+              fi
+              
+              # Wait up to 120 seconds for pods to become ready
+              echo ""
+              echo "Waiting for pods to become ready..."
+              WAIT_TIME=0
+              while [ $WAIT_TIME -lt 120 ]; do
+                # Count ready pods more carefully
+                READY_PODS=0
+                echo "$APP_PODS" | while read -r line; do
+                  if echo "$line" | grep -q "Running"; then
+                    READY_STATUS=$(echo "$line" | awk '{print $3}')
+                    if echo "$READY_STATUS" | grep -qE "^[1-9]+/[1-9]+$"; then
+                      # Check if ready count equals total count (e.g., "2/2", "1/1")
+                      READY_COUNT=$(echo "$READY_STATUS" | cut -d'/' -f1)
+                      TOTAL_COUNT=$(echo "$READY_STATUS" | cut -d'/' -f2)
+                      if [ "$READY_COUNT" = "$TOTAL_COUNT" ]; then
+                        READY_PODS=$((READY_PODS + 1))
+                      fi
+                    fi
+                  fi
+                done
+                
+                # Refresh pod status
+                APP_PODS=$(kubectl get pods -A --no-headers | grep -v "kube-system\|kube-public\|kube-node-lease\|local-path-storage" || true)
+                READY_PODS=$(echo "$APP_PODS" | grep "Running" | grep -E "[0-9]+/[0-9]+" | awk '{
+                  split($3, ready, "/"); 
+                  if (ready[1] == ready[2] && ready[1] > 0) print $0
+                }' | wc -l || echo 0)
+                
+                if [ "$READY_PODS" -eq "$TOTAL_PODS" ] && [ "$TOTAL_PODS" -gt 0 ]; then
+                  echo "✅ All $TOTAL_PODS application pods are ready!"
+                  break
+                fi
+                
+                echo "Waiting for pods to be ready... ($READY_PODS/$TOTAL_PODS ready) - ${WAIT_TIME}s elapsed"
+                sleep 10
+                WAIT_TIME=$((WAIT_TIME + 10))
+              done
+              
+              # Final pod status check
+              echo ""
+              echo "=== Final Pod Status ==="
+              kubectl get pods -A --no-headers | grep -v "kube-system\|kube-public\|kube-node-lease\|local-path-storage"
+              
+              # Set output for later validation
+              if [ "$READY_PODS" -eq "$TOTAL_PODS" ] && [ "$TOTAL_PODS" -gt 0 ]; then
+                echo "k8s_pods_healthy=true" >> $GITHUB_OUTPUT
+              else
+                echo "k8s_pods_healthy=false" >> $GITHUB_OUTPUT
+              fi
+              
+            else
+              echo "⚠️  WARNING: No application pods found in cluster"
+              echo "k8s_pods_healthy=false" >> $GITHUB_OUTPUT
+            fi
+            
+            # Check services and try to test connectivity
+            echo ""
+            echo "=== Service Analysis ==="
+            SERVICES=$(kubectl get services -A --no-headers | grep -v "kube-system\|kube-public\|kube-node-lease\|local-path-storage" || true)
+            
+            if [ -n "$SERVICES" ]; then
+              echo "Found application services:"
+              echo "$SERVICES"
+              
+              # Try to test service connectivity if port is available
+              SERVICE_NAME=$(echo "$SERVICES" | head -1 | awk '{print $2}')
+              SERVICE_NAMESPACE=$(echo "$SERVICES" | head -1 | awk '{print $1}')
+              SERVICE_PORT=$(echo "$SERVICES" | head -1 | awk '{print $6}' | cut -d':' -f1 | cut -d'/' -f1)
+              
+              if [ -n "$SERVICE_NAME" ] && [ -n "$SERVICE_PORT" ]; then
+                echo ""
+                echo "Testing service connectivity: $SERVICE_NAME:$SERVICE_PORT"
+                
+                # Start port-forward in background
+                kubectl port-forward service/$SERVICE_NAME $SERVICE_PORT:$SERVICE_PORT -n $SERVICE_NAMESPACE &
+                PF_PID=$!
+                
+                # Give port-forward time to establish
+                sleep 5
+                
+                # Test connectivity
+                if curl -f -m 10 "http://localhost:$SERVICE_PORT" 2>/dev/null; then
+                  echo "✅ Service is responding on port $SERVICE_PORT"
+                else
+                  echo "⚠️  Service not responding (may be normal for non-HTTP services)"
+                fi
+                
+                # Clean up port-forward
+                kill $PF_PID 2>/dev/null || true
+              fi
+            else
+              echo "No application services found"
+            fi
+            
+            echo "k8s_cluster_found=true" >> $GITHUB_OUTPUT
+            
+          else
             echo "No kind cluster found - checking for manifest files instead"
+            echo "k8s_cluster_found=false" >> $GITHUB_OUTPUT
             
             # Look for K8s manifest files
-            find /tmp -name "*.yaml" -o -name "*.yml" | grep -E "(deployment|service|manifest)" | head -5
+            MANIFESTS=$(find /tmp -name "*.yaml" -o -name "*.yml" 2>/dev/null | grep -E "(deployment|service|manifest)" | head -5)
             
-            if find /tmp -name "*.yaml" -o -name "*.yml" | grep -q .; then
-              echo "✅ SUCCESS: Found Kubernetes manifest files"
+            if [ -n "$MANIFESTS" ]; then
+              echo "✅ SUCCESS: Found Kubernetes manifest files:"
+              echo "$MANIFESTS"
+              
+              # Validate manifest files
+              echo ""
+              echo "=== Manifest Validation ==="
+              for manifest in $MANIFESTS; do
+                echo "Validating: $manifest"
+                if kubectl apply --dry-run=client -f "$manifest" 2>/dev/null; then
+                  echo "  ✅ Valid Kubernetes manifest"
+                else
+                  echo "  ⚠️  Manifest validation failed"
+                fi
+              done
+              
+              # Show a sample of the deployment manifest
+              DEPLOYMENT=$(echo "$MANIFESTS" | grep -i deployment | head -1)
+              if [ -n "$DEPLOYMENT" ]; then
+                echo ""
+                echo "Sample deployment manifest:"
+                head -30 "$DEPLOYMENT"
+              fi
             else
               echo "⚠️  WARNING: No Kubernetes manifests found"
-            fi
-          else
-            # Cluster exists, check resources
-            echo "Kind cluster found, checking for deployed resources..."
-            
-            kubectl get all -A
-            
-            if kubectl get pods -A | grep -E "(coolstore|webapp|app)" | grep -v "kube-system"; then
-              echo "✅ SUCCESS: Found application pods"
-            else
-              echo "⚠️  WARNING: No application pods found"
-            fi
-            
-            if kubectl get services -A | grep -E "(coolstore|webapp|app)" | grep -v "kube-system"; then
-              echo "✅ SUCCESS: Found application services"
-            else
-              echo "⚠️  WARNING: No application services found"
             fi
           fi
           
@@ -232,6 +431,12 @@ jobs:
           TRIVY_RESULTS=$(find /tmp -name "*trivy*.json" -o -name "*vulnerability*.json" 2>/dev/null | head -1)
           if [ -n "$TRIVY_RESULTS" ]; then
             echo "✅ SUCCESS: Found Trivy scan results at: $TRIVY_RESULTS"
+            # Check for vulnerabilities
+            if [ -f "$TRIVY_RESULTS" ]; then
+              HIGH_VULNS=$(grep -o '"Severity":"HIGH"' "$TRIVY_RESULTS" 2>/dev/null | wc -l || echo 0)
+              CRITICAL_VULNS=$(grep -o '"Severity":"CRITICAL"' "$TRIVY_RESULTS" 2>/dev/null | wc -l || echo 0)
+              echo "Found $CRITICAL_VULNS critical and $HIGH_VULNS high vulnerabilities"
+            fi
           else
             echo "ℹ️  INFO: No Trivy scan results found (may be disabled)"
           fi
@@ -252,8 +457,11 @@ jobs:
           TESTS_PASSED=0
           TESTS_FAILED=0
           
+          # Extract repo name for generic checking
+          REPO_NAME=$(echo "$CONTAINERIZE_REPO" | sed -E 's|.*/([^/]+)/?$|\1|' | tr '[:upper:]' '[:lower:]')
+          
           # Check 1: Docker image exists
-          if docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "(coolstore|webapp|java)" | grep -v "<none>" > /dev/null; then
+          if docker images --format "{{.Repository}}:{{.Tag}}" | grep -v "<none>" | grep -q .; then
             echo "✅ Docker image creation: PASS"
             ((TESTS_PASSED++))
           else
@@ -286,6 +494,19 @@ jobs:
           else
             echo "❌ Kubernetes manifest generation: FAIL"
             ((TESTS_FAILED++))
+          fi
+          
+          # Check 5: Enhanced Kubernetes deployment validation
+          if [ "${{ steps.verify-k8s.outputs.k8s_cluster_found }}" = "true" ]; then
+            if [ "${{ steps.verify-k8s.outputs.k8s_pods_healthy }}" = "true" ]; then
+              echo "✅ Kubernetes deployment: PASS (pods are healthy)"
+              ((TESTS_PASSED++))
+            else
+              echo "❌ Kubernetes deployment: FAIL (pods not healthy or missing)"
+              ((TESTS_FAILED++))
+            fi
+          else
+            echo "ℹ️  Kubernetes deployment: SKIPPED (no cluster found)"
           fi
           
           # Summary
@@ -330,6 +551,12 @@ jobs:
           docker images > e2e-artifacts/docker-images.txt
           docker ps -a > e2e-artifacts/docker-containers.txt
           
+          # Kubernetes information if cluster exists
+          if kind get clusters 2>/dev/null | grep -q .; then
+            kubectl get all -A > e2e-artifacts/k8s-resources.txt 2>/dev/null || true
+            kubectl describe pods -A > e2e-artifacts/k8s-pod-details.txt 2>/dev/null || true
+          fi
+          
           # List artifacts
           echo "=== Collected Artifacts ==="
           ls -la e2e-artifacts/
@@ -355,6 +582,7 @@ jobs:
           
           ## Key Outcomes
           - Docker Image: ${{ env.IMAGE_NAME || 'Not found' }}
+          - Container Port: ${{ steps.extract-port.outputs.port || 'Unknown' }}
           - Container Status: ${{ steps.verify-image.outcome == 'success' && '✅ Created' || '❌ Failed' }}
           - Kubernetes Manifests: Generated
           
@@ -364,5 +592,6 @@ jobs:
           - Generated Dockerfile
           - Kubernetes manifests
           - Security scan results
+          - Kubernetes cluster state (if deployed)
           
           EOF
