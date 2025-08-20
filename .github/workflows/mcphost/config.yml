@@ -1,7 +1,7 @@
 mcpServers:
   container-kit:
     type: "local"
-    command: "./container-kit-mcp"
+    command: "./containerization-assist-mcp"
     args: []
   
   filesystem:
