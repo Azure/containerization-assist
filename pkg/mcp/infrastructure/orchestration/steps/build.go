@@ -189,15 +189,15 @@ func LoadImageToKind(ctx context.Context, buildResult *BuildResult, clusterName 
 		return fmt.Errorf("build result is required")
 	}
 
-	logger.Info("Loading image into kind cluster registry",
-		"image_name", buildResult.ImageName,
-		"image_tag", buildResult.ImageTag,
-		"cluster", clusterName)
-
 	// Default cluster name
 	if clusterName == "" {
 		clusterName = "containerization-assist"
 	}
+
+	logger.Info("Loading image into kind cluster registry",
+		"image_name", buildResult.ImageName,
+		"image_tag", buildResult.ImageTag,
+		"cluster", clusterName)
 
 	// Construct image references
 	sourceImageRef := fmt.Sprintf("%s:%s", buildResult.ImageName, buildResult.ImageTag)

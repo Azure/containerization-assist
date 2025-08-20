@@ -8,22 +8,22 @@
  */
 
 // Import all tools
-const analyzeRepository = require('./tools/analyze-repository');
-const generateDockerfile = require('./tools/generate-dockerfile');
-const buildImage = require('./tools/build-image');
-const scanImage = require('./tools/scan-image');
-const tagImage = require('./tools/tag-image');
-const pushImage = require('./tools/push-image');
-const generateK8sManifests = require('./tools/generate-k8s-manifests');
-const prepareCluster = require('./tools/prepare-cluster');
-const deployApplication = require('./tools/deploy-application');
-const verifyDeployment = require('./tools/verify-deployment');
-const listTools = require('./tools/list-tools');
-const ping = require('./tools/ping');
-const serverStatus = require('./tools/server-status');
+import analyzeRepository from './tools/analyze-repository.js';
+import generateDockerfile from './tools/generate-dockerfile.js';
+import buildImage from './tools/build-image.js';
+import scanImage from './tools/scan-image.js';
+import tagImage from './tools/tag-image.js';
+import pushImage from './tools/push-image.js';
+import generateK8sManifests from './tools/generate-k8s-manifests.js';
+import prepareCluster from './tools/prepare-cluster.js';
+import deployApplication from './tools/deploy-application.js';
+import verifyDeployment from './tools/verify-deployment.js';
+import listTools from './tools/list-tools.js';
+import ping from './tools/ping.js';
+import serverStatus from './tools/server-status.js';
 
 // Import utilities
-const { generateSessionId } = require('./executor');
+import { generateSessionId } from './executor.js';
 
 // Collection of all tools for iteration
 const tools = {
@@ -170,7 +170,7 @@ function createSession() {
 }
 
 // Export individual tools
-module.exports = {
+export default {
   // Workflow tools
   analyzeRepository,
   generateDockerfile,

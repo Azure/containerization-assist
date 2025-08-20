@@ -28,14 +28,13 @@
  *   node test-server.js
  */
 
+import containerKit from './lib/index.js';
+
 const args = process.argv.slice(2);
 const useRealSDK = args.includes('--real');
 const useCustomNames = args.includes('--custom-names');
 const toolsArg = args.find(arg => arg.startsWith('--tools='));
 const selectedTools = toolsArg ? toolsArg.split('=')[1].split(',') : null;
-
-// Load Container Kit tools
-const containerKit = require('./lib/index.js');
 
 // Mock MCP Server for testing without SDK dependency
 class MockMcpServer {
@@ -165,8 +164,8 @@ async function main() {
   if (useRealSDK) {
     console.log('\n📌 Mode: Real MCP SDK\n');
     try {
-      // Try to load real MCP SDK
-      const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
+      // Try to load real MCP SDK using dynamic import
+      const { Server } = await import('@modelcontextprotocol/sdk/server/index.js');
       server = new Server({
         name: 'container-kit-test',
         version: '1.0.0'
@@ -188,44 +187,45 @@ async function main() {
     });
   }
   
-  console.log('\n' + '='.repeat(60));
+  // Register all tools
+  console.log('='.repeat(60));
   console.log('📚 Registering Container Kit Tools');
   console.log('='.repeat(60));
   
   if (useCustomNames) {
-    console.log('\n🎨 Using custom names for some tools\n');
-    containerKit.registerAllTools(server, {
-      'analyze_repository': 'analyze',
-      'build_image': 'docker-build',
-      'deploy_application': 'k8s-deploy'
-    });
+    console.log('\n📝 Using custom tool names\n');
+    
+    // Test custom naming
+    containerKit.registerTool(server, containerKit.analyzeRepository, 'analyze');
+    containerKit.registerTool(server, containerKit.generateDockerfile, 'dockerfile');
+    containerKit.registerTool(server, containerKit.buildImage, 'build');
+    containerKit.registerTool(server, containerKit.ping, 'test-ping');
+    containerKit.registerTool(server, containerKit.listTools, 'tools');
+    containerKit.registerTool(server, containerKit.serverStatus, 'status');
   } else {
     console.log('\n📝 Using default tool names\n');
+    
+    // Register all tools with default names
     containerKit.registerAllTools(server);
   }
   
-  // Show registration summary
-  if (server.listTools) {
-    server.listTools();
+  // Show registered tools
+  server.listTools();
+  
+  // Show stats
+  const stats = server.getStats();
+  console.log('\n📊 Registration Summary:');
+  console.log(`   Total tools: ${stats.totalTools}`);
+  console.log(`   Workflow tools: ${stats.categories.workflow}`);
+  console.log(`   Utility tools: ${stats.categories.utility}`);
+  if (stats.categories.custom > 0) {
+    console.log(`   Custom named tools: ${stats.categories.custom}`);
   }
   
-  // Show statistics if available
-  if (server.getStats) {
-    const stats = server.getStats();
-    console.log('\n📊 Registration Summary:');
-    console.log(`   Total tools: ${stats.totalTools}`);
-    console.log(`   Workflow tools: ${stats.categories.workflow}`);
-    console.log(`   Utility tools: ${stats.categories.utility}`);
-    if (stats.categories.custom > 0) {
-      console.log(`   Custom tools: ${stats.categories.custom}`);
-    }
-  }
+  // Run tests
+  await runTests(server);
   
-  // Run tests if mock server
-  if (server.callTool) {
-    await runTests(server);
-  }
-  
+  // Final status
   console.log('\n' + '='.repeat(60));
   console.log('✅ Test Server Ready');
   console.log('='.repeat(60));
@@ -234,24 +234,19 @@ async function main() {
   console.log('   • This server tests the npm package functionality');
   console.log('   • Workflow tools require the Go binary to be built');
   console.log('   • Utility tools (ping, list_tools, server_status) work standalone');
+  
   console.log('\n💡 Tips:');
   console.log('   • Run "npm run build:current" to rebuild the Go binary');
   console.log('   • Use --tools=ping,list_tools to test specific tools');
   console.log('   • Use --custom-names to test custom naming');
   console.log('   • Use --real to test with actual MCP SDK (if installed)');
   
-  if (!useRealSDK) {
-    console.log('\n🔄 Next steps:');
-    console.log('   1. Make changes to tool definitions in lib/tools/');
-    console.log('   2. Run: node test-server.js');
-    console.log('   3. Verify tools register correctly');
-    console.log('   4. Test execution with utility tools');
-  }
+  console.log('\n🔄 Next steps:');
+  console.log('   1. Make changes to tool definitions in lib/tools/');
+  console.log('   2. Run: node test-server.js');
+  console.log('   3. Verify tools register correctly');
+  console.log('   4. Test execution with utility tools\n');
 }
 
-// Run the test server
-main().catch(error => {
-  console.error('\n❌ Fatal error:', error);
-  console.error(error.stack);
-  process.exit(1);
-});
+// Run the main function
+main().catch(console.error);

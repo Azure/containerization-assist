@@ -1,6 +1,6 @@
-const { createTool, z } = require('./_tool-factory');
+import { createTool, z } from './_tool-factory.js';
 
-module.exports = createTool({
+export default createTool({
   name: 'generate_k8s_manifests',
   title: 'Generate Kubernetes Manifests',
   description: 'Generate Kubernetes manifests for the application',

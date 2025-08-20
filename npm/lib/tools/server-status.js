@@ -1,6 +1,6 @@
-const { createTool, z } = require('./_tool-factory');
+import { createTool, z } from './_tool-factory.js';
 
-module.exports = createTool({
+export default createTool({
   name: 'server_status',
   title: 'Server Status',
   description: 'Get basic server status information',

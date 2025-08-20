@@ -1,6 +1,6 @@
-const { createTool, z } = require('./_tool-factory');
+import { createTool, z } from './_tool-factory.js';
 
-module.exports = createTool({
+export default createTool({
   name: 'scan_image',
   title: 'Scan Docker Image',
   description: 'Scan the Docker image for security vulnerabilities',

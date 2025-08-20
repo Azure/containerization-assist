@@ -1,5 +1,5 @@
-const { z } = require('zod');
-const { executeTool } = require('../executor');
+import { z } from 'zod';
+import { executeTool } from '../executor.js';
 
 /**
  * Factory function to create standard tool definitions
@@ -40,4 +40,4 @@ function createTool(config) {
   };
 }
 
-module.exports = { createTool, z };
+export { createTool, z };

@@ -1,6 +1,6 @@
-const { createTool, z } = require('./_tool-factory');
+import { createTool, z } from './_tool-factory.js';
 
-module.exports = createTool({
+export default createTool({
   name: 'push_image',
   title: 'Push Docker Image',
   description: 'Push the Docker image to a container registry',

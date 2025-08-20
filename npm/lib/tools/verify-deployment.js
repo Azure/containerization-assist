@@ -1,6 +1,6 @@
-const { createTool, z } = require('./_tool-factory');
+import { createTool, z } from './_tool-factory.js';
 
-module.exports = createTool({
+export default createTool({
   name: 'verify_deployment',
   title: 'Verify Deployment',
   description: 'Verify deployment health with automatic port forwarding and application testing',

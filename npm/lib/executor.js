@@ -1,10 +1,15 @@
-const { spawn } = require('child_process');
-const path = require('path');
-const os = require('os');
-const fs = require('fs');
-const constants = require('./constants');
-const { BinaryNotFoundError, ToolExecutionError, TimeoutError, ParseError } = require('./errors');
-const debug = require('./debug');
+import { spawn } from 'child_process';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { platform as _platform, arch as _arch } from 'os';
+import { existsSync } from 'fs';
+import { BINARY_NAME, PLATFORMS, BINARY_NAME_WIN, ENV_VARS, EXIT_SUCCESS } from './constants.js';
+import { BinaryNotFoundError, ToolExecutionError, TimeoutError, ParseError } from './errors.js';
+import { error as _error, log, trace } from './debug.js';
+
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /**
  * Determine the binary path based on platform
@@ -12,8 +17,8 @@ const debug = require('./debug');
  * @throws {BinaryNotFoundError} If binary doesn't exist for current platform
  */
 function getBinaryPath() {
-  const platform = os.platform();
-  const arch = os.arch();
+  const platform = _platform();
+  const arch = _arch();
   
   // Map Node.js platform/arch to our binary directory names
   let platformDir;
@@ -27,17 +32,17 @@ function getBinaryPath() {
     throw new Error(`Unsupported platform: ${platform} ${arch}`);
   }
   
-  let binaryName = constants.BINARY_NAME;
-  if (platform === constants.PLATFORMS.WIN32) {
-    binaryName = constants.BINARY_NAME_WIN;
+  let binaryName = BINARY_NAME;
+  if (platform === PLATFORMS.WIN32) {
+    binaryName = BINARY_NAME_WIN;
   }
   
   // Return platform-specific binary path
-  const binaryPath = path.join(__dirname, '..', 'bin', platformDir, binaryName);
+  const binaryPath = join(__dirname, '..', 'bin', platformDir, binaryName);
   
   // Check if binary exists
-  if (!fs.existsSync(binaryPath)) {
-    debug.error('executor', `Binary not found`, { platform, arch, binaryPath });
+  if (!existsSync(binaryPath)) {
+    _error('executor', `Binary not found`, { platform, arch, binaryPath });
     throw new BinaryNotFoundError(platform, arch, binaryPath);
   }
   
@@ -53,7 +58,7 @@ function getBinaryPath() {
  * @throws {ParseError} If tool output cannot be parsed as JSON
  */
 async function executeTool(toolName, params) {
-  debug.log('executor', `Executing tool: ${toolName}`, { params });
+  log('executor', `Executing tool: ${toolName}`, { params });
   
   return new Promise((resolve, reject) => {
     const binary = getBinaryPath();
@@ -67,10 +72,10 @@ async function executeTool(toolName, params) {
     const args = ['tool', toolName];
     const env = {
       ...process.env,
-      [constants.ENV_VARS.TOOL_PARAMS]: JSON.stringify(params)
+      [ENV_VARS.TOOL_PARAMS]: JSON.stringify(params)
     };
     
-    debug.trace('executor', 'Spawning process', { binary, args });
+    trace('executor', 'Spawning process', { binary, args });
     
     const child = spawn(binary, args, { env });
     
@@ -86,13 +91,13 @@ async function executeTool(toolName, params) {
     });
     
     child.on('close', (code) => {
-      if (code === constants.EXIT_SUCCESS) {
+      if (code === EXIT_SUCCESS) {
         try {
           const result = JSON.parse(stdout);
-          debug.log('executor', `Tool ${toolName} succeeded`, { result });
+          log('executor', `Tool ${toolName} succeeded`, { result });
           resolve(result);
         } catch (e) {
-          debug.error('executor', `Failed to parse tool output`, e);
+          _error('executor', `Failed to parse tool output`, e);
           reject(new ParseError(toolName, stdout, e));
         }
       } else {
@@ -100,20 +105,20 @@ async function executeTool(toolName, params) {
         try {
           const errorResult = JSON.parse(stdout);
           if (errorResult.error) {
-            debug.error('executor', `Tool returned error`, { tool: toolName, error: errorResult.error });
+            _error('executor', `Tool returned error`, { tool: toolName, error: errorResult.error });
             reject(new ToolExecutionError(toolName, params, code, stderr, stdout));
           } else {
             reject(new ToolExecutionError(toolName, params, code, stderr, stdout));
           }
         } catch (e) {
-          debug.error('executor', `Tool failed with unparseable output`, { code, stderr, stdout });
+          _error('executor', `Tool failed with unparseable output`, { code, stderr, stdout });
           reject(new ToolExecutionError(toolName, params, code, stderr, stdout));
         }
       }
     });
     
     child.on('error', (err) => {
-      debug.error('executor', `Failed to spawn process for tool ${toolName}`, err);
+      _error('executor', `Failed to spawn process for tool ${toolName}`, err);
       reject(new ToolExecutionError(toolName, params, -1, '', err.message));
     });
   });
@@ -157,7 +162,4 @@ function generateSessionId() {
   return `session-${timestamp}-${random}`;
 }
 
-module.exports = {
-  executeTool,
-  generateSessionId
-};
+export { executeTool, generateSessionId };

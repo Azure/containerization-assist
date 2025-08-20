@@ -3,15 +3,15 @@
  * Activated via DEBUG_MCP environment variable
  */
 
-const constants = require('./constants');
+import { ENV_VARS } from './constants.js';
 
 /**
  * Simple debug logger
  */
 class DebugLogger {
   constructor() {
-    this.enabled = process.env[constants.ENV_VARS.DEBUG] === 'true';
-    this.verbose = process.env[constants.ENV_VARS.DEBUG_TRACE] === 'true';
+    this.enabled = process.env[ENV_VARS.DEBUG] === 'true';
+    this.verbose = process.env[ENV_VARS.DEBUG_TRACE] === 'true';
   }
 
   /**
@@ -62,4 +62,8 @@ class DebugLogger {
   }
 }
 
-module.exports = new DebugLogger();
+const logger = new DebugLogger();
+export const log = logger.log.bind(logger);
+export const trace = logger.trace.bind(logger);
+export const error = logger.error.bind(logger);
+export default logger;

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/Azure/containerization-assist/pkg/mcp/api"
 	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
@@ -114,8 +115,17 @@ func (f *ServerFactory) buildDependencies(ctx context.Context) (*Dependencies, e
 	return deps, nil
 }
 
-func (f *ServerFactory) createSessionManager() (*session.BoltStoreAdapter, error) {
-	return session.NewBoltStoreAdapter(f.config.StorePath, f.logger, f.config.SessionTTL, f.config.MaxSessions)
+func (f *ServerFactory) createSessionManager() (*session.ConcurrentBoltAdapter, error) {
+	adapter, err := session.NewConcurrentBoltAdapter(f.config.StorePath, f.logger, f.config.SessionTTL, f.config.MaxSessions)
+	if err != nil {
+		return nil, err
+	}
+
+	// Start cleanup routine for lock management
+	ctx := context.Background()
+	adapter.StartCleanupRoutine(ctx, 5*time.Minute)
+
+	return adapter, nil
 }
 
 func (f *ServerFactory) createResourceStore() (*resources.Store, error) {
@@ -140,7 +150,7 @@ func (f *ServerFactory) createPromptManager() (*prompts.Manager, error) {
 }
 
 func (f *ServerFactory) createWorkflowOrchestrator(
-	sessionManager *session.BoltStoreAdapter,
+	sessionManager *session.ConcurrentBoltAdapter,
 	samplingClient *sampling.Client,
 	promptManager *prompts.Manager,
 ) (*workflow.Orchestrator, error) {

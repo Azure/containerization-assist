@@ -124,17 +124,33 @@ func (s *SimpleWorkflowState) UpdateArtifacts(result map[string]interface{}) {
 // LoadWorkflowState loads workflow state from session (creates session if needed)
 func LoadWorkflowState(ctx context.Context, sessionManager session.OptimizedSessionManager, sessionID string) (*SimpleWorkflowState, error) {
 	// Use GetOrCreate to ensure session exists
-	sessionData, err := sessionManager.GetOrCreate(ctx, sessionID)
+	_, err := sessionManager.GetOrCreate(ctx, sessionID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get or create session")
 	}
 
-	if sessionData == nil {
-		return nil, errors.New("session not found")
+	var metadata map[string]interface{}
+
+	// Use concurrent-safe read if available
+	if concurrentAdapter, ok := sessionManager.(*session.ConcurrentBoltAdapter); ok {
+		metadata, err = concurrentAdapter.GetWorkflowState(ctx, sessionID)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get workflow state")
+		}
+	} else {
+		// Fallback to regular Get for other implementations
+		sessionData, err := sessionManager.Get(ctx, sessionID)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get session")
+		}
+		if sessionData == nil {
+			return nil, errors.New("session not found")
+		}
+		metadata = sessionData.Metadata
 	}
 
-	// Extract workflow state from session metadata
-	workflowData, exists := sessionData.Metadata["workflow_state"]
+	// Extract workflow state from metadata
+	workflowData, exists := metadata["workflow_state"]
 	if !exists {
 		// Create new workflow state if not found
 		return &SimpleWorkflowState{
@@ -237,14 +253,23 @@ func SaveWorkflowState(ctx context.Context, sessionManager session.OptimizedSess
 		return errors.Wrap(err, "failed to get or create session")
 	}
 
-	// Now update the session with workflow state
-	err = sessionManager.Update(ctx, state.SessionID, func(sessionState *session.SessionState) error {
-		if sessionState.Metadata == nil {
-			sessionState.Metadata = make(map[string]interface{})
-		}
-		sessionState.Metadata["workflow_state"] = workflowData
-		return nil
-	})
+	// Use concurrent-safe update if available
+	if concurrentAdapter, ok := sessionManager.(*session.ConcurrentBoltAdapter); ok {
+		// Use the concurrent-safe UpdateWorkflowState method
+		err = concurrentAdapter.UpdateWorkflowState(ctx, state.SessionID, func(metadata map[string]interface{}) error {
+			metadata["workflow_state"] = workflowData
+			return nil
+		})
+	} else {
+		// Fallback to regular Update for other implementations
+		err = sessionManager.Update(ctx, state.SessionID, func(sessionState *session.SessionState) error {
+			if sessionState.Metadata == nil {
+				sessionState.Metadata = make(map[string]interface{})
+			}
+			sessionState.Metadata["workflow_state"] = workflowData
+			return nil
+		})
+	}
 
 	if err != nil {
 		return errors.Wrap(err, "failed to update session with workflow state")

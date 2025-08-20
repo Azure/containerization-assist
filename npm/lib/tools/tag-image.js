@@ -1,6 +1,6 @@
-const { createTool, z } = require('./_tool-factory');
+import { createTool, z } from './_tool-factory.js';
 
-module.exports = createTool({
+export default createTool({
   name: 'tag_image',
   title: 'Tag Docker Image',
   description: 'Tag the Docker image with version and metadata',

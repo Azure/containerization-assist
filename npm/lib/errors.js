@@ -156,7 +156,7 @@ class TimeoutError extends MCPToolError {
   }
 }
 
-module.exports = {
+export {
   MCPToolError,
   BinaryNotFoundError,
   ToolExecutionError,

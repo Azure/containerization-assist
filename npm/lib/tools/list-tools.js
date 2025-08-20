@@ -1,6 +1,6 @@
-const { createTool, z } = require('./_tool-factory');
+import { createTool, z } from './_tool-factory.js';
 
-module.exports = createTool({
+export default createTool({
   name: 'list_tools',
   title: 'List Tools',
   description: 'List all available MCP tools and their descriptions',
