@@ -55,7 +55,6 @@ func AtomicUpdateWorkflowState(ctx context.Context, sessionManager session.Optim
 	})
 }
 
-
 // AtomicUpdateMetadata atomically updates workflow metadata
 func AtomicUpdateMetadata(ctx context.Context, sessionManager session.OptimizedSessionManager, sessionID string, updateFunc func(map[string]interface{}) error) error {
 	return AtomicUpdateWorkflowState(ctx, sessionManager, sessionID, func(state *SimpleWorkflowState) error {
