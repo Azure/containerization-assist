@@ -65,6 +65,70 @@ type RepositoryAnalyzer struct {
 	logger *slog.Logger
 }
 
+// Application server detection constants
+var (
+	// Common server indicators that work across Maven and Gradle
+	serverIndicators = map[string]string{
+		// JBoss/WildFly indicators
+		"org.jboss":                  "jboss",
+		"jboss-as":                   "jboss",
+		"jboss-eap":                  "jboss",
+		"jboss-web":                  "jboss",
+		"wildfly":                    "wildfly",
+		"org.wildfly":                "wildfly",
+		"wildfly-":                   "wildfly",
+		"jboss-deployment-structure": "jboss",
+		"wildfly-config":             "wildfly",
+
+		// Tomcat indicators
+		"tomcat":            "tomcat",
+		"org.apache.tomcat": "tomcat",
+
+		// Other servers
+		"jetty":             "jetty",
+		"org.eclipse.jetty": "jetty",
+		"undertow":          "undertow",
+		"io.undertow":       "undertow",
+		"glassfish":         "glassfish",
+		"weblogic":          "weblogic",
+		"liberty":           "liberty",
+		"websphere":         "liberty",
+		"micronaut":         "micronaut",
+		"quarkus":           "quarkus",
+	}
+
+	// Dependency-specific server indicators (for Spring Boot embedded servers)
+	dependencyServerIndicators = map[string]string{
+		"spring-boot-starter-web":      "embedded-tomcat",
+		"spring-boot-starter-jetty":    "embedded-jetty",
+		"spring-boot-starter-undertow": "embedded-undertow",
+	}
+
+	// Maven-specific indicators
+	mavenServerIndicators = map[string]string{
+		"wildfly-maven-plugin":       "wildfly",
+		"jboss-maven-plugin":         "jboss",
+		"jboss-as-maven-plugin":      "jboss",
+		"<packaging>ear</packaging>": "jboss",
+		"<packaging>war</packaging>": "servlet",
+	}
+
+	// Gradle-specific indicators
+	gradleServerIndicators = map[string]string{
+		"wildfly-gradle-plugin": "wildfly",
+		"org.wildfly.plugins":   "wildfly",
+		"jboss-gradle-plugin":   "jboss",
+		"gradle-jboss-plugin":   "jboss",
+		"jbossas-gradle-plugin": "jboss",
+		"apply plugin: 'ear'":   "jboss",
+		"id 'ear'":              "jboss",
+		"apply plugin: 'war'":   "servlet",
+		"id 'war'":              "servlet",
+		"jboss.home":            "jboss",
+		"wildfly.home":          "wildfly",
+	}
+)
+
 // NewRepositoryAnalyzer creates a new repository analyzer
 func NewRepositoryAnalyzer(logger *slog.Logger) *RepositoryAnalyzer { //TODO: Refactor -  we are just wrapping the logger
 	return &RepositoryAnalyzer{
@@ -74,19 +138,20 @@ func NewRepositoryAnalyzer(logger *slog.Logger) *RepositoryAnalyzer { //TODO: Re
 
 // AnalysisResult contains the result of repository analysis
 type AnalysisResult struct {
-	Success      bool                   `json:"success"`
-	Language     string                 `json:"language"`
-	Framework    string                 `json:"framework,omitempty"`
-	Dependencies []Dependency           `json:"dependencies"`
-	ConfigFiles  []ConfigFile           `json:"config_files"`
-	Structure    map[string]interface{} `json:"structure"`
-	EntryPoints  []string               `json:"entry_points"`
-	BuildFiles   []string               `json:"build_files"`
-	Port         int                    `json:"port,omitempty"`
-	DatabaseInfo *DatabaseInfo          `json:"database_info,omitempty"`
-	Suggestions  []string               `json:"suggestions"`
-	Context      map[string]interface{} `json:"context"`
-	Error        *AnalysisError         `json:"error,omitempty"`
+	Success         bool                   `json:"success"`
+	Language        string                 `json:"language"`
+	LanguageVersion string                 `json:"language_version,omitempty"`
+	Framework       string                 `json:"framework,omitempty"`
+	Dependencies    []Dependency           `json:"dependencies"`
+	ConfigFiles     []ConfigFile           `json:"config_files"`
+	Structure       map[string]interface{} `json:"structure"`
+	EntryPoints     []string               `json:"entry_points"`
+	BuildFiles      []string               `json:"build_files"`
+	Port            int                    `json:"port,omitempty"`
+	DatabaseInfo    *DatabaseInfo          `json:"database_info,omitempty"`
+	Suggestions     []string               `json:"suggestions"`
+	Context         map[string]interface{} `json:"context"`
+	Error           *AnalysisError         `json:"error,omitempty"`
 }
 
 // Dependency represents a project dependency
@@ -162,6 +227,9 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(repoPath string) (*AnalysisResul
 	// Detect language and framework
 	result.Language, result.Framework = ra.detectLanguageAndFramework(repoPath)
 
+	// Detect language version
+	result.LanguageVersion = ra.detectLanguageVersion(repoPath, result.Language)
+
 	// Analyze configuration files
 	result.ConfigFiles = ra.analyzeConfigFiles(repoPath)
 
@@ -176,6 +244,15 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(repoPath string) (*AnalysisResul
 
 	// Detect port
 	result.Port = ra.detectPort(repoPath, result.ConfigFiles)
+
+	// Detect application server
+	if appServer := ra.detectApplicationServer(repoPath, result.Language, result.Framework, result.Dependencies); appServer != "" {
+		if result.Framework == "" {
+			result.Framework = appServer
+		} else if !strings.Contains(result.Framework, appServer) {
+			result.Framework = result.Framework + "-" + appServer
+		}
+	}
 
 	// Analyze database usage
 	result.DatabaseInfo = ra.analyzeDatabase(repoPath, result.Dependencies, result.ConfigFiles)
@@ -299,6 +376,200 @@ func (ra *RepositoryAnalyzer) detectJavaScriptFramework(packageJsonPath string) 
 	}
 
 	return "nodejs"
+}
+
+// detectApplicationServer detects Java application servers
+func (ra *RepositoryAnalyzer) detectApplicationServer(repoPath, language, framework string, dependencies []Dependency) string {
+	// Only detect application servers for Java projects
+	if language == "java" {
+		return ra.detectJavaApplicationServer(repoPath, framework, dependencies)
+	}
+
+	return ""
+}
+
+// detectJavaApplicationServer detects Java application servers
+func (ra *RepositoryAnalyzer) detectJavaApplicationServer(repoPath, framework string, dependencies []Dependency) string {
+	// Check configuration files for server indicators
+	serverFiles := map[string]string{
+		"server.xml":           "tomcat",
+		"context.xml":          "tomcat",
+		"tomcat-users.xml":     "tomcat",
+		"jboss-web.xml":        "jboss",
+		"wildfly.xml":          "wildfly",
+		"standalone.xml":       "wildfly",
+		"domain.xml":           "wildfly",
+		"weblogic.xml":         "weblogic",
+		"weblogic-web.xml":     "weblogic",
+		"glassfish-web.xml":    "glassfish",
+		"sun-web.xml":          "glassfish",
+		"jetty.xml":            "jetty",
+		"jetty-web.xml":        "jetty",
+		"liberty-web.xml":      "liberty",
+		"server.env":           "liberty",
+		"bootstrap.properties": "liberty",
+		"undertow.xml":         "undertow",
+	}
+
+	// Check for server configuration files
+	for fileName, serverType := range serverFiles {
+		filePath := filepath.Join(repoPath, fileName)
+		if _, err := os.Stat(filePath); err == nil {
+			ra.logger.Info("Detected application server from config file", "server", serverType, "file", fileName)
+			return serverType
+		}
+
+		// Also check in common subdirectories where server config files are typically found
+		commonPaths := []string{
+			"conf", "config", "WEB-INF",
+			"src/main/webapp/WEB-INF", "src/main/resources", "src/main/resources/META-INF",
+			"webapp/WEB-INF", "web/WEB-INF", "WebContent/WEB-INF",
+			"META-INF", "WEB-INF/classes", "classes",
+			"deployment", "deployments", "standalone/deployments",
+			"domain/deployments", "servers", "server",
+			"tomcat/conf", "jboss/conf", "wildfly/conf",
+			"etc", "etc/tomcat", "etc/jboss", "etc/wildfly",
+			"opt/tomcat/conf", "opt/jboss/conf", "opt/wildfly/conf",
+			"usr/local/tomcat/conf", "usr/local/jboss/conf",
+			"var/lib/tomcat/conf", "var/lib/jboss/conf",
+		}
+		for _, subdir := range commonPaths {
+			subdirPath := filepath.Join(repoPath, subdir, fileName)
+			if _, err := os.Stat(subdirPath); err == nil {
+				ra.logger.Info("Detected application server from config file", "server", serverType, "file", filepath.Join(subdir, fileName))
+				return serverType
+			}
+		}
+	}
+
+	// Check dependencies for server libraries
+	if server := ra.checkDependenciesForServer(dependencies); server != "" {
+		return server
+	}
+
+	// Check build files for server mentions
+	if server := ra.checkBuildFilesForServer(repoPath); server != "" {
+		return server
+	}
+
+	// Check for Spring Boot (embedded server)
+	if strings.Contains(framework, "spring") || ra.hasSpringBootIndicators(repoPath) {
+		return "embedded-tomcat"
+	}
+
+	return ""
+}
+
+// checkBuildFilesForServer checks build files for application server indicators
+func (ra *RepositoryAnalyzer) checkBuildFilesForServer(repoPath string) string {
+	buildFiles := []struct {
+		name       string
+		indicators map[string]string
+	}{
+		{"pom.xml", ra.mergeIndicators(serverIndicators, mavenServerIndicators)},
+		{"build.gradle", ra.mergeIndicators(serverIndicators, gradleServerIndicators)},
+		{"build.gradle.kts", ra.mergeIndicators(serverIndicators, gradleServerIndicators)},
+	}
+
+	for _, buildFile := range buildFiles {
+		if server := ra.checkFileForServerIndicators(repoPath, buildFile.name, buildFile.indicators); server != "" {
+			return server
+		}
+	}
+
+	return ""
+}
+
+// checkFileForServerIndicators checks a specific file for server indicators
+func (ra *RepositoryAnalyzer) checkFileForServerIndicators(repoPath, fileName string, indicators map[string]string) string {
+	filePath := filepath.Join(repoPath, fileName)
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return ""
+	}
+
+	contentStr := strings.ToLower(string(content))
+
+	for indicator, serverType := range indicators {
+		if strings.Contains(contentStr, indicator) {
+			ra.logger.Info("Detected application server from build file",
+				"server", serverType,
+				"file", fileName,
+				"indicator", indicator)
+			return serverType
+		}
+	}
+
+	return ""
+}
+
+// mergeIndicators combines multiple indicator maps
+func (ra *RepositoryAnalyzer) mergeIndicators(maps ...map[string]string) map[string]string {
+	result := make(map[string]string)
+	for _, m := range maps {
+		for k, v := range m {
+			result[k] = v
+		}
+	}
+	return result
+}
+
+// checkDependenciesForServer checks dependencies for application server indicators
+func (ra *RepositoryAnalyzer) checkDependenciesForServer(dependencies []Dependency) string {
+	allIndicators := ra.mergeIndicators(serverIndicators, dependencyServerIndicators)
+
+	for _, dep := range dependencies {
+		depName := strings.ToLower(dep.Name)
+
+		for indicator, serverType := range allIndicators {
+			if strings.Contains(depName, indicator) {
+				ra.logger.Info("Detected application server from dependency",
+					"server", serverType,
+					"dependency", dep.Name,
+					"indicator", indicator)
+				return serverType
+			}
+		}
+	}
+
+	return ""
+}
+
+// hasSpringBootIndicators checks for Spring Boot indicators
+func (ra *RepositoryAnalyzer) hasSpringBootIndicators(repoPath string) bool {
+	indicators := []string{
+		"src/main/java/**/Application.java",
+		"src/main/java/**/*Application.java",
+		"application.properties",
+		"application.yml",
+		"application.yaml",
+	}
+
+	for _, indicator := range indicators {
+		if strings.Contains(indicator, "**") {
+			// Simple check for Spring Boot main class pattern
+			err := filepath.Walk(filepath.Join(repoPath, "src/main/java"), func(path string, info os.FileInfo, err error) error {
+				if err != nil {
+					return nil
+				}
+				if strings.HasSuffix(path, "Application.java") {
+					content, readErr := os.ReadFile(path)
+					if readErr == nil && strings.Contains(string(content), "@SpringBootApplication") {
+						return filepath.SkipDir // Found it
+					}
+				}
+				return nil
+			})
+			if err == filepath.SkipDir {
+				return true
+			}
+		} else {
+			if _, err := os.Stat(filepath.Join(repoPath, indicator)); err == nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // detectJavaFramework detects specific Java frameworks and application types
@@ -1093,6 +1364,132 @@ func (ra *RepositoryAnalyzer) generateSuggestions(result *AnalysisResult) []stri
 	suggestions = append(suggestions, "Consider the detected configuration for containerization")
 
 	return suggestions
+}
+
+// detectLanguageVersion detects the version of the primary language
+func (ra *RepositoryAnalyzer) detectLanguageVersion(repoPath, language string) string {
+	if strings.ToLower(language) == "java" {
+		return ra.detectJavaVersion(repoPath)
+	}
+	return ""
+}
+
+// detectJavaVersion detects Java version from Maven/Gradle build files using optimized approach
+func (ra *RepositoryAnalyzer) detectJavaVersion(repoPath string) string {
+	// Define all Java version patterns upfront for efficiency
+	versionSources := []struct {
+		file     string
+		patterns []string
+	}{
+		{
+			file: "pom.xml",
+			patterns: []string{
+				`<maven\.compiler\.target>([^<]+)</maven\.compiler\.target>`,
+				`<maven\.compiler\.source>([^<]+)</maven\.compiler\.source>`,
+				`<java\.version>([^<]+)</java\.version>`,
+				`<version\.java>([^<]+)</version\.java>`,
+				`<maven\.compiler\.release>([^<]+)</maven\.compiler\.release>`,
+				`<properties[^>]*>[\s\S]*?<java\.version>([^<]+)</java\.version>`,
+			},
+		},
+		{
+			file: "build.gradle",
+			patterns: []string{
+				`sourceCompatibility\s*=\s*['"]?([^'"\s,)]+)`,
+				`targetCompatibility\s*=\s*['"]?([^'"\s,)]+)`,
+				`JavaVersion\.VERSION_(\d+)`,
+				`javaVersion\s*=\s*['"]?([^'"\s,)]+)`,
+				`toolchain\s*{\s*languageVersion\s*=\s*JavaLanguageVersion\.of\(([^)]+)\)`,
+			},
+		},
+		{
+			file: "build.gradle.kts",
+			patterns: []string{
+				`sourceCompatibility\s*=\s*JavaVersion\.VERSION_(\d+)`,
+				`targetCompatibility\s*=\s*JavaVersion\.VERSION_(\d+)`,
+				`javaVersion\.set\("([^"]+)"\)`,
+				`languageVersion\.set\(JavaLanguageVersion\.of\(([^)]+)\)\)`,
+			},
+		},
+		{
+			file: "gradle.properties",
+			patterns: []string{
+				`javaVersion\s*=\s*([^\s#]+)`,
+				`java\.version\s*=\s*([^\s#]+)`,
+				`sourceCompatibility\s*=\s*([^\s#]+)`,
+				`targetCompatibility\s*=\s*([^\s#]+)`,
+			},
+		},
+	}
+
+	// Try each source file
+	for _, source := range versionSources {
+		filePath := filepath.Join(repoPath, source.file)
+		if version := ra.extractJavaVersionFromFile(filePath, source.patterns); version != "" {
+			return ra.normalizeJavaVersion(version)
+		}
+	}
+
+	// Default to latest LTS if no version detected
+	return "21"
+}
+
+// extractJavaVersionFromFile extracts Java version from a file using multiple patterns
+func (ra *RepositoryAnalyzer) extractJavaVersionFromFile(filePath string, patterns []string) string {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return ""
+	}
+
+	contentStr := string(content)
+	for _, pattern := range patterns {
+		if version := ra.extractVersionWithRegex(contentStr, pattern); version != "" {
+			return version
+		}
+	}
+
+	return ""
+}
+
+// extractVersionWithRegex extracts version using regex pattern (optimized)
+func (ra *RepositoryAnalyzer) extractVersionWithRegex(content, pattern string) string {
+	re, err := regexp.Compile(`(?i)` + pattern)
+	if err != nil {
+		return ""
+	}
+
+	matches := re.FindStringSubmatch(content)
+	if len(matches) < 2 {
+		return ""
+	}
+
+	return strings.TrimSpace(matches[1])
+}
+
+// normalizeJavaVersion normalizes Java version strings (comprehensive)
+func (ra *RepositoryAnalyzer) normalizeJavaVersion(version string) string {
+	version = strings.TrimSpace(version)
+	version = strings.Trim(version, `"'`)
+
+	// Handle legacy Java versions (exhaustive)
+	legacyMappings := map[string]string{
+		"1.5": "5", "1.6": "6", "1.7": "7", "1.8": "8", "1.9": "9",
+		"5.0": "5", "6.0": "6", "7.0": "7", "8.0": "8", "9.0": "9",
+		"10.0": "10", "11.0": "11", "12.0": "12", "13.0": "13", "14.0": "14",
+		"15.0": "15", "16.0": "16", "17.0": "17", "18.0": "18", "19.0": "19",
+		"20.0": "20", "21.0": "21", "22.0": "22", "23.0": "23",
+	}
+
+	if normalized, exists := legacyMappings[version]; exists {
+		return normalized
+	}
+
+	// Extract major version for semantic versions
+	if parts := strings.Split(version, "."); len(parts) > 0 && parts[0] != "" {
+		return parts[0]
+	}
+
+	return version
 }
 
 // parseInt safely parses a string to int

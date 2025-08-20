@@ -112,6 +112,7 @@ func (b *Bootstrapper) RegisterChatModes() error {
 func GetChatModeFunctions() []string {
 	return []string{
 		"analyze_repository",
+		"resolve_base_images",
 		"generate_dockerfile",
 		"build_image",
 		"scan_image",

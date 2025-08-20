@@ -28,7 +28,7 @@ func (s *DockerfileStep) Name() string {
 	return "generate_dockerfile"
 }
 
-// Execute generates a Dockerfile
+// Execute generates a Dockerfile based on repository analysis
 func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
 	// Check if generated Dockerfile content is provided
 	var dockerfileContent string
@@ -82,14 +82,15 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowSt
 	}
 
 	// If no content provided, generate Dockerfile normally
-	state.Logger.Info("No content provided, generating Dockerfile from analysis")
+	state.Logger.Info("Step 2: Generating Dockerfile from repository analysis")
 
 	if state.AnalyzeResult == nil {
 		return nil, fmt.Errorf("analyze result is required for Dockerfile generation")
 	}
 
-	state.Logger.Info("Step 2: Generating Dockerfile")
+	// Note: Base image recommendations should be obtained from resolve_base_images tool first
 
+	// Generate Dockerfile using existing infrastructure for fallback
 	infraAnalyzeResult := &AnalyzeResult{
 		Language:  state.AnalyzeResult.Language,
 		Framework: state.AnalyzeResult.Framework,
@@ -103,7 +104,7 @@ func (s *DockerfileStep) Execute(ctx context.Context, state *workflow.WorkflowSt
 		return nil, fmt.Errorf("dockerfile generation failed: %v", err)
 	}
 
-	state.Logger.Info("Dockerfile generated; returning content in MCP response instead of writing to disk")
+	state.Logger.Info("Dockerfile generated; returning content for MCP response")
 
 	// Add instructions for user to create/update Dockerfile
 	instructions := "To use this Dockerfile, create or update a file named 'Dockerfile' in your project root with the following content."

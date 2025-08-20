@@ -10,6 +10,7 @@ import (
 // AnalyzeResult represents the output of repository analysis
 type AnalyzeResult struct {
 	Language        string                 `json:"language" yaml:"language"`
+	LanguageVersion string                 `json:"language_version" yaml:"language_version"`
 	Framework       string                 `json:"framework" yaml:"framework"`
 	Port            int                    `json:"port" yaml:"port"`
 	BuildCommand    string                 `json:"build_command" yaml:"build_command"`

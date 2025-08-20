@@ -12,12 +12,13 @@ import (
 )
 
 type AnalyzeResult struct {
-	Language  string                 `json:"language"`
-	Framework string                 `json:"framework"`
-	Port      int                    `json:"port"`
-	Analysis  map[string]interface{} `json:"analysis"`
-	RepoPath  string                 `json:"repo_path"`
-	SessionID string                 `json:"session_id"`
+	Language        string                 `json:"language"`
+	LanguageVersion string                 `json:"language_version"`
+	Framework       string                 `json:"framework"`
+	Port            int                    `json:"port"`
+	Analysis        map[string]interface{} `json:"analysis"`
+	RepoPath        string                 `json:"repo_path"`
+	SessionID       string                 `json:"session_id"`
 }
 
 // AnalyzeRepository performs repository analysis supporting both URLs and local paths
@@ -114,6 +115,7 @@ func AnalyzeRepository(input, branch string, logger *slog.Logger) (*AnalyzeResul
 		"structure":         result.Structure,
 		"files_analyzed":    len(result.ConfigFiles),
 		"language":          result.Language,
+		"language_version":  result.LanguageVersion,
 		"framework":         result.Framework,
 		"dependencies":      len(result.Dependencies),
 		"entry_points":      result.EntryPoints,
@@ -128,17 +130,19 @@ func AnalyzeRepository(input, branch string, logger *slog.Logger) (*AnalyzeResul
 
 	logger.Info("Repository analysis completed successfully",
 		"language", result.Language,
+		"language_version", result.LanguageVersion,
 		"framework", result.Framework,
 		"port", result.Port)
 
 	logger.Info("Returning analysis result", "repo_path", repoPath, "language", result.Language)
 	return &AnalyzeResult{
-		Language:  result.Language,
-		Framework: result.Framework,
-		Port:      result.Port,
-		Analysis:  analysisMap,
-		RepoPath:  repoPath,
-		SessionID: sessionID,
+		Language:        result.Language,
+		LanguageVersion: result.LanguageVersion,
+		Framework:       result.Framework,
+		Port:            result.Port,
+		Analysis:        analysisMap,
+		RepoPath:        repoPath,
+		SessionID:       sessionID,
 	}, nil
 }
 

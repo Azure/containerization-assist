@@ -13,6 +13,7 @@ import (
 // Workflow sequence constants
 var WorkflowSequence = []string{
 	"analyze_repository",
+	"resolve_base_images",
 	"generate_dockerfile",
 	"build_image",
 	"scan_image",
@@ -388,6 +389,7 @@ func (tr *ToolRegistrar) buildProgressResponseWithSections(stepName string, curr
 // Auto-formatting labels for each step - no templates needed
 var stepLabels = map[string]string{
 	"analyze_repository":     "Repository Analysis",
+	"resolve_base_images":    "Resolved Base Images",
 	"generate_dockerfile":    "Dockerfile Generated",
 	"build_image":            "Build Result",
 	"scan_image":             "Security Scan",
