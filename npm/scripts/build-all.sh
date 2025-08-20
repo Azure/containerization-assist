@@ -56,4 +56,4 @@ echo ""
 echo "✅ All binaries built successfully!"
 echo ""
 echo "Binary locations:"
-ls -la "$NPM_DIR/bin/"*/container-kit-mcp* 2>/dev/null || true
+ls -la "$NPM_DIR/bin/"*/containerization-assist-mcp* 2>/dev/null || true

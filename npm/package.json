@@ -1,6 +1,6 @@
 {
   "name": "@thgamble/container-assist-mcp",
-  "version": "1.0.0",
+  "version": "0.0.6",
   "description": "Container Assist MCP Server - AI-powered containerization workflow tools for the Model Context Protocol",
   "keywords": [
     "mcp",
@@ -25,15 +25,15 @@
   },
   "license": "MIT",
   "author": "Microsoft Azure",
-  "main": "index.js",
-  "bin": {
-    "containerization-assist-mcp": "./index.js",
-    "ckmcp": "./index.js"
-  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "index.d.ts",
   "files": [
     "bin/",
+    "lib/",
     "scripts/",
     "index.js",
+    "index.d.ts",
     "README.md",
     "LICENSE"
   ],

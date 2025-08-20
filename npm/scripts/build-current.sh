@@ -57,7 +57,7 @@ fi
 mkdir -p "$NPM_DIR/bin/$DIR_NAME"
 
 # Set output binary name
-output_name="container-kit-mcp"
+output_name="containerization-assist-mcp"
 if [ "$GOOS" = "windows" ]; then
   output_name="${output_name}.exe"
 fi
@@ -69,7 +69,7 @@ cd "$PROJECT_ROOT"
 go build \
   -ldflags="-s -w" \
   -o "$NPM_DIR/bin/$DIR_NAME/$output_name" \
-  ./cmd/mcp-server
+  .
 
 # Make it executable (for Unix platforms)
 if [ "$GOOS" != "windows" ]; then

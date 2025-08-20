@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
+
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Colors for output
 const colors = {
@@ -150,16 +155,14 @@ function main() {
 }
 
 // Run if called directly
-if (require.main === module) {
-  try {
-    main();
-  } catch (err) {
-    log(`Error: ${err.message}`, 'red');
-    process.exit(1);
-  }
+try {
+  main();
+} catch (err) {
+  log(`Error: ${err.message}`, 'red');
+  process.exit(1);
 }
 
-module.exports = {
+export {
   getGitVersion,
   getGoVersion,
   getPackageVersion,

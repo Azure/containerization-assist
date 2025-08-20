@@ -31,8 +31,8 @@ export const ARCHITECTURES = {
   ARM64: 'arm64',
   ARM: 'arm'
 };
-export const BINARY_NAME = 'container-kit-mcp';
-export const BINARY_NAME_WIN = 'container-kit-mcp.exe';
+export const BINARY_NAME = 'containerization-assist-mcp';
+export const BINARY_NAME_WIN = 'containerization-assist-mcp.exe';
 export const ENV_VARS = {
   DEBUG: 'DEBUG_MCP',
   DEBUG_TRACE: 'DEBUG_MCP_TRACE',
