@@ -65,29 +65,16 @@ jobs:
           chmod +x container-kit-mcp
           ls -la container-kit-mcp
           
-      - name: Configure mcphost
+      - name: Create mcphost configuration
         run: |
+          echo "Creating mcphost configuration using dedicated config file..."
           mkdir -p ~/.config/mcphost
-          cat > ~/.mcphost.yml << 'EOF'
-          # MCP Host Configuration
-          version: "1"
-          default-model: azure
-          models:
-            azure:
-              type: "azure"
-              deployment: "${{ env.AZURE_OPENAI_DEPLOYMENT_ID }}"
-              endpoint: "${{ env.AZURE_OPENAI_ENDPOINT }}"
-              api-key: "${{ env.AZURE_OPENAI_KEY }}"
-              api-version: "2024-08-01-preview"
-          servers:
-            container-kit:
-              command: "./container-kit-mcp"
-              args: []
-              env:
-                AZURE_OPENAI_DEPLOYMENT_ID: "${{ env.AZURE_OPENAI_DEPLOYMENT_ID }}"
-                AZURE_OPENAI_KEY: "${{ env.AZURE_OPENAI_KEY }}"
-                AZURE_OPENAI_ENDPOINT: "${{ env.AZURE_OPENAI_ENDPOINT }}"
-          EOF
+          
+          # Copy the main configuration template
+          cp .github/workflows/mcphost/config.yml ~/.mcphost.yml
+          
+          echo "Configuration created. Contents:"
+          cat ~/.mcphost.yml
           
           # Create workspace and copy MCP binary
           mkdir -p /tmp/test-workspace
@@ -120,7 +107,7 @@ jobs:
           # Execute containerization with verbose output and error handling
           echo "=== Starting MCP Containerization Process ==="
           set +e  # Don't exit on error so we can capture exit code
-          timeout 600s mcphost --model "azure:${AZURE_OPENAI_DEPLOYMENT_ID}" --prompt "Please containerize this repository: ${CONTAINERIZE_REPO}. Build the Docker image, generate Kubernetes manifests, and if possible, deploy to a local kind cluster. This is an automated test." > /tmp/mcp.log 2>&1
+          timeout 600s mcphost --prompt "Please containerize this repository: ${CONTAINERIZE_REPO}. Build the Docker image, generate Kubernetes manifests, and if possible, deploy to a local kind cluster. This is an automated test." > /tmp/mcp.log 2>&1
           MCP_EXIT_CODE=$?
           set -e  # Re-enable exit on error
           

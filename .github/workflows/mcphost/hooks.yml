@@ -1,6 +1,0 @@
-hooks:
-  PostToolUse:
-    - hooks:
-        - type: command
-          command: "/tmp/track-tools.sh"
-          timeout: 5
