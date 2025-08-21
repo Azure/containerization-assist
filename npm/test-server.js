@@ -167,7 +167,7 @@ async function main() {
       // Try to load real MCP SDK using dynamic import
       const { Server } = await import('@modelcontextprotocol/sdk/server/index.js');
       server = new Server({
-        name: 'container-kit-test',
+        name: 'containerization-assist-test',
         version: '1.0.0'
       });
       console.log('✅ Using real MCP SDK Server');
@@ -175,14 +175,14 @@ async function main() {
       console.log('❌ MCP SDK not found, falling back to mock server');
       console.log('   Install with: npm install @modelcontextprotocol/sdk\n');
       server = new MockMcpServer({
-        name: 'container-kit-test',
+        name: 'containerization-assist-test',
         version: '1.0.0'
       });
     }
   } else {
     console.log('\n📌 Mode: Mock Server (no dependencies)\n');
     server = new MockMcpServer({
-      name: 'container-kit-test',
+      name: 'containerization-assist-test',
       version: '1.0.0'
     });
   }

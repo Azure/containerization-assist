@@ -17,6 +17,7 @@ declare -a platforms=(
   "linux-x64:linux:amd64"
   "linux-arm64:linux:arm64"
   "win32-x64:windows:amd64"
+  "win32-arm64:windows:arm64"
 )
 
 # Create bin directory structure

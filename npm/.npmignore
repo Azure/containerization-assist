@@ -71,8 +71,8 @@ USAGE_EXAMPLE.md
 DEVELOPMENT.md
 
 # Single binary in root (we use platform-specific directories)
-bin/container-kit-mcp
-bin/container-kit-mcp.exe
+bin/containerization-assist-mcp
+bin/containerization-assist-mcp.exe
 
 # Keep only necessary scripts
 scripts/build-*.sh

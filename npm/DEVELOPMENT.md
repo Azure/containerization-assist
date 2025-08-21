@@ -120,7 +120,7 @@ TOOL_PARAMS='{"repo_path":"/path/to/repo"}' containerization-assist-mcp tool sta
 🚀 Container Kit MCP Tools - Development Test Server
 ============================================================
 
-📦 Creating MCP Server: container-kit-test v1.0.0
+📦 Creating MCP Server: containeization-assist-test v1.0.0
 
 📚 Registering Container Kit Tools
 ============================================================

@@ -1,5 +1,5 @@
 /**
- * Container Kit MCP Tools
+ * Containerization Assist MCP Tools
  * 
  * Individual tool exports for registration with any MCP server.
  * Each tool exports: name, metadata (with inputSchema), and handler.
