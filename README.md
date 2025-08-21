@@ -1,4 +1,4 @@
-[![CI Pipeline](https://github.com/Azure/containerization-assist/actions/workflows/ci-pipeline.yml/badge.svg)](https://github.com/Azure/containerization-assist/actions/workflows/ci-pipeline.yml)
+[![CI Pipeline](https://github.com/Azure/containerization-assist/actions/workflows/ci-pipeline.yml/badge.svg?branch=main)](https://github.com/Azure/containerization-assist/actions/workflows/ci-pipeline.yml)
 
 # Containerization Assist
 
