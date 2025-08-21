@@ -215,7 +215,7 @@ func BenchmarkWorkflowHandlerCreation(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = createWorkflowHandler(config, deps)
+		_ = CreateWorkflowHandler(config, deps)
 	}
 }
 

@@ -5,7 +5,6 @@ import (
 	"context"
 	"log/slog"
 	"strings"
-	"sync"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -13,16 +12,13 @@ import (
 
 // Registry manages MCP prompts with native mcp-go support
 type Registry struct {
-	logger   *slog.Logger
-	handlers map[string]server.PromptHandlerFunc
-	mu       sync.RWMutex
+	logger *slog.Logger
 }
 
 // NewRegistry creates a new prompt registry with native MCP prompt support
 func NewRegistry(logger *slog.Logger) *Registry {
 	return &Registry{
-		logger:   logger.With("component", "prompt-registry"),
-		handlers: make(map[string]server.PromptHandlerFunc),
+		logger: logger.With("component", "prompt-registry"),
 	}
 }
 

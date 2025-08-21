@@ -365,15 +365,6 @@ func (c *Client) callMCPSampling(ctx context.Context, srv *server.MCPServer, req
 	}, nil
 }
 
-func (c *Client) toResponse(content string, model string) *SamplingResponse {
-	return &SamplingResponse{
-		Content:    content,
-		TokensUsed: estimateTokens(content),
-		Model:      model,
-		StopReason: "complete",
-	}
-}
-
 // estimateTokens provides a rough token count estimate.
 // Uses empirical multiplier of 1.3 tokens per word.
 func estimateTokens(s string) int {

@@ -278,23 +278,6 @@ func mergeEnhancedAnalysis(enhancedAnalysis *aisample.RepositoryAnalysis, origin
 	return result
 }
 
-// parsePort extracts a port number from a string
-func parsePort(s string) int {
-	// Remove non-numeric characters
-	cleaned := strings.TrimFunc(s, func(r rune) bool {
-		return r < '0' || r > '9'
-	})
-
-	var port int
-	fmt.Sscanf(cleaned, "%d", &port)
-
-	// Validate port range
-	if port > 0 && port < 65536 {
-		return port
-	}
-	return 0
-}
-
 // mergeLanguage uses static-first strategy since file extensions are highly reliable
 func mergeLanguage(staticLang, aiLang string, logger *slog.Logger) string {
 	// Fill gaps: AI provides missing language
