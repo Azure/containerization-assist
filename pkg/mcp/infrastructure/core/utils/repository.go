@@ -1577,7 +1577,7 @@ func parseInt(s string) int {
 	}
 
 	s = strings.TrimSpace(s)
-	
+
 	// Extract only numeric prefix
 	numStr := ""
 	for _, r := range s {
@@ -1587,7 +1587,7 @@ func parseInt(s string) int {
 			break
 		}
 	}
-	
+
 	if numStr == "" {
 		return 0
 	}
