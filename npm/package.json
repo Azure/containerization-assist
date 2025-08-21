@@ -1,7 +1,7 @@
 {
   "name": "@thgamble/containerization-assist-mcp",
   "version": "1.1.2",
-  "description": "containerization Assist MCP Server - AI-powered containerization workflow tools for the Model Context Protocol",
+  "description": "Containerization Assist MCP Server - AI-powered containerization workflow tools for the Model Context Protocol",
   "keywords": [
     "mcp",
     "model-context-protocol",
