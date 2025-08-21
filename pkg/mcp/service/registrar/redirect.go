@@ -78,7 +78,7 @@ All {{.TotalSteps}} steps have been executed. Your application should now be con
 	redirectSimpleTemplate = `Tool {{.FromTool}} failed: {{.Error}}
 
 **Next Action:** 
-1. Read the current files to understand existing configuration
+1. Read any relevant files from the repository to understand existing configuration
 2. Call tool "{{.RedirectTo}}" with appropriate parameters to fix the issue.
 
 **Parameters:**
@@ -420,13 +420,37 @@ func (tr *ToolRegistrar) generateStepSpecificSections(stepName string, responseD
 		return nil
 	}
 
+	sections := []string{}
+
 	// Format the data as a display section
 	section := tr.formatStepData(label, stepData)
 	if section != "" {
-		return []string{"\n" + section + "\n"}
+		sections = append(sections, "\n"+section+"\n")
 	}
 
-	return nil
+	// Add specific prompts for workflow steps
+	switch stepName {
+	case "resolve_base_images":
+		promptSection := `
+** Next Steps for Dockerfile Generation:**
+1. Use the suggested base images above to generate Dockerfile content
+2. Read any relevant project files to understand the application structure
+`
+		sections = append(sections, promptSection)
+
+	case "push_image":
+		promptSection := `
+** Next Steps for Kubernetes Manifests Generation:**
+Read any relevant project files to understand the application requirements:
+- Existing Dockerfile to understand exposed ports and volumes
+- Application configuration files for environment variables
+- Documentation for deployment requirements
+- Any existing Kubernetes manifests for reference
+`
+		sections = append(sections, promptSection)
+	}
+
+	return sections
 }
 
 // formatStepData formats step data into a readable display section
