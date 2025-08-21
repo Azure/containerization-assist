@@ -45,9 +45,10 @@ const tools = {
 /**
  * Register a single tool with an MCP server
  * @param {Object} server - MCP server instance (SDK Server or custom implementation)
- * @param {Object} tool - Tool definition with name, metadata, and handler
+ * @param {Object} tool - Tool definition with name, description, inputSchema, and handler
  * @param {string} tool.name - Tool identifier
- * @param {Object} tool.metadata - Tool metadata including title, description, and inputSchema
+ * @param {string} tool.description - Tool description
+ * @param {Object} tool.inputSchema - Tool input schema (Zod schema object)
  * @param {Function} tool.handler - Async function that handles tool execution
  * @param {string} [customName] - Optional custom name to override tool.name
  * @throws {Error} If server doesn't have addTool or registerTool method
@@ -67,14 +68,14 @@ function registerTool(server, tool, customName = null) {
     server.addTool(
       {
         name: name,
-        description: tool.metadata.description,
-        inputSchema: convertZodToJsonSchema(tool.metadata.inputSchema)
+        description: tool.description,
+        inputSchema: convertZodToJsonSchema(tool.inputSchema)
       },
       tool.handler
     );
   } else if (typeof server.registerTool === 'function') {
     // Mock or custom server with registerTool method
-    server.registerTool(name, tool.metadata, tool.handler);
+    server.registerTool(name, { description: tool.description, inputSchema: tool.inputSchema }, tool.handler);
   } else {
     throw new Error('Server must have either addTool() or registerTool() method');
   }

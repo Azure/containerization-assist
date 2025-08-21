@@ -5,18 +5,15 @@ import { executeTool } from '../executor.js';
  * Build Image tool definition for MCP server registration
  */
 export const name = 'build_image';
-export const metadata = {
-  title: 'Build Docker Image',
-  description: 'Build Docker image from generated Dockerfile',
-  inputSchema: {
-    session_id: z.string().describe('Session ID from workflow'),
-    dockerfile: z.string().optional().describe('Path to custom Dockerfile'),
-    context: z.string().optional().describe('Build context directory'),
-    target: z.string().optional().describe('Target stage for multi-stage builds'),
-    build_args: z.record(z.string()).optional().describe('Build arguments'),
-    tags: z.array(z.string()).optional().describe('Additional tags for the image'),
-    no_cache: z.boolean().optional().describe('Build without using cache')
-  }
+export const description = 'Build Docker image from generated Dockerfile';
+export const inputSchema = {
+  session_id: z.string().describe('Session ID from workflow'),
+  dockerfile: z.string().optional().describe('Path to custom Dockerfile'),
+  context: z.string().optional().describe('Build context directory'),
+  target: z.string().optional().describe('Target stage for multi-stage builds'),
+  build_args: z.record(z.string()).optional().describe('Build arguments'),
+  tags: z.array(z.string()).optional().describe('Additional tags for the image'),
+  no_cache: z.boolean().optional().describe('Build without using cache')
 };
 export async function handler(params) {
   try {
@@ -38,4 +35,6 @@ export async function handler(params) {
       }]
     };
   }
-}export default { name, metadata, handler };
+}
+
+export default { name, description, inputSchema, handler };

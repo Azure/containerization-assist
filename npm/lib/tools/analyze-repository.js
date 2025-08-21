@@ -5,14 +5,12 @@ import { executeTool } from '../executor.js';
  * Analyze Repository tool definition for MCP server registration
  */
 export const name = 'analyze_repository';
-export const metadata = {
-  title: 'Analyze Repository',
-  description: 'Analyze repository to detect language, framework, and build requirements',
-  inputSchema: {
-    repo_path: z.string().describe('Path to the repository to analyze'),
-    session_id: z.string().optional().describe('Session ID for workflow tracking')
-  }
+export const description = 'Analyze repository to detect language, framework, and build requirements';
+export const inputSchema = {
+  repo_path: z.string().describe('Path to the repository to analyze'),
+  session_id: z.string().optional().describe('Session ID for workflow tracking')
 };
+
 export async function handler(params) {
   try {
     const result = await executeTool('analyze_repository', params);
@@ -36,4 +34,7 @@ export async function handler(params) {
       }]
     };
   }
-}export default { name, metadata, handler };
+}
+
+// Export as default object with all properties
+export default { name, description, inputSchema, handler };
