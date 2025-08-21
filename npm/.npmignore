@@ -26,9 +26,12 @@ __tests__/
 ../test/
 ../vendor/
 
-# Documentation source files
-*.md
-!README.md
+# Documentation source files (exclude all except README.md)
+DEVELOPMENT.md
+USAGE_EXAMPLE.md
+RESTRUCTURING_PLAN.md
+CLAUDE.md
+# Keep README.md - do not exclude
 
 # CI/CD
 .github/
@@ -67,8 +70,6 @@ temp/
 # Test files
 test-tools.js
 test-server.js
-USAGE_EXAMPLE.md
-DEVELOPMENT.md
 
 # Single binary in root (we use platform-specific directories)
 bin/containerization-assist-mcp

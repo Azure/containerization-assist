@@ -4,7 +4,7 @@ import { executeTool } from '../executor.js';
 /**
  * Factory function to create standard tool definitions
  * @param {Object} config - Tool configuration
- * @returns {Object} Tool definition for MCP server registration
+ * @returns {Object} Tool definition for MCP server registration with name, metadata, handler
  */
 function createTool(config) {
   const handler = async (params) => {
@@ -31,8 +31,11 @@ function createTool(config) {
 
   return {
     name: config.name,
-    description: config.description,
-    inputSchema: config.inputSchema,
+    metadata: {
+      title: config.title || config.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      description: config.description,
+      inputSchema: config.inputSchema
+    },
     handler
   };
 }
