@@ -33,6 +33,7 @@ func NewToolRegistrar(
 	config domainworkflow.ServerConfig,
 ) *ToolRegistrar {
 	return &ToolRegistrar{
+		logger:         logger,
 		orchestrator:   orchestrator,
 		stepProvider:   stepProvider,
 		sessionManager: sessionManager,
