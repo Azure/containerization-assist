@@ -1576,7 +1576,23 @@ func parseInt(s string) int {
 		return 0
 	}
 
-	result, err := strconv.Atoi(strings.TrimSpace(s))
+	s = strings.TrimSpace(s)
+	
+	// Extract only numeric prefix
+	numStr := ""
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			numStr += string(r)
+		} else {
+			break
+		}
+	}
+	
+	if numStr == "" {
+		return 0
+	}
+
+	result, err := strconv.Atoi(numStr)
 	if err != nil || result < 0 || result > maxPortNumber {
 		return 0
 	}
