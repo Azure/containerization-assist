@@ -32,9 +32,22 @@ export interface MCPTool {
 
 /**
  * MCP server interface (partial - for typing the registration methods)
+ * Supports both McpServer and low-level Server from @modelcontextprotocol/sdk
  */
 export interface MCPServer {
-  registerTool(name: string, metadata: MCPToolMetadata, handler: (params: any) => Promise<MCPToolResult>): void;
+  // McpServer style (high-level API)
+  registerTool?(name: string, metadata: {
+    title: string;
+    description: string;
+    inputSchema: Record<string, any>; // Zod schema
+  }, handler: (params: any) => Promise<MCPToolResult>): void;
+  
+  // Low-level Server style
+  addTool?(definition: {
+    name: string;
+    description: string;
+    inputSchema: any; // JSON Schema
+  }, handler: (params: any) => Promise<MCPToolResult>): void;
 }
 
 // Individual tool exports
@@ -70,6 +83,7 @@ export const tools: {
 };
 
 // Helper functions
-export function registerTool(server: MCPServer, tool: MCPTool, customName?: string): void;
-export function registerAllTools(server: MCPServer, nameMapping?: Record<string, string>): void;
+export function registerTool(server: MCPServer | any, tool: MCPTool, customName?: string): void;
+export function registerAllTools(server: MCPServer | any, nameMapping?: Record<string, string>): void;
 export function createSession(): string;
+export function convertZodToJsonSchema(zodSchema: any): any;

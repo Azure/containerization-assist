@@ -83,12 +83,12 @@ server.tool(
 ```javascript
 const { registerAllTools } = require('@thgamble/containerization-assist-mcp');
 
-// Your MCP server instance
-const mcpServer = {
-  addTool: function(config, handler) {
-    // Your registration logic
-  }
-};
+// Works with MCP SDK's McpServer
+const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
+const mcpServer = new McpServer({
+  name: 'my-server',
+  version: '1.0.0'
+});
 
 // Register all Container Kit tools
 registerAllTools(mcpServer);
@@ -98,6 +98,14 @@ registerAllTools(mcpServer, {
   'analyze_repository': 'custom_analyze',
   'build_image': 'docker_build'
 });
+
+// Also works with custom server implementations
+const customServer = {
+  registerTool: function(name, metadata, handler) {
+    // Your registration logic
+  }
+};
+registerAllTools(customServer);
 ```
 
 ### 3. Custom Registration
@@ -143,14 +151,41 @@ const result = await analyzeRepository.handler({
 
 ### 5. With MCP SDK
 
+#### Using McpServer (High-level API)
+
 ```javascript
-const { MCPServer } = require('@modelcontextprotocol/sdk');
+const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
+const { registerAllTools, registerTool, analyzeRepository } = require('@thgamble/containerization-assist-mcp');
+
+const server = new McpServer({
+  name: 'my-server',
+  version: '1.0.0'
+});
+
+// Method 1: Register all tools at once
+registerAllTools(server);
+
+// Method 2: Register individual tools
+registerTool(server, analyzeRepository);
+
+// Method 3: Register with custom name
+registerTool(server, analyzeRepository, 'custom_analyze');
+```
+
+#### Using Server (Low-level API)
+
+```javascript
+const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { getAllTools, convertZodToJsonSchema } = require('@thgamble/containerization-assist-mcp');
 
-const server = new MCPServer();
+const server = new Server(
+  { name: 'my-server', version: '1.0.0' },
+  { capabilities: { tools: {} } }
+);
+
 const tools = getAllTools();
 
-// Register each tool
+// Register each tool with low-level API
 Object.values(tools).forEach(tool => {
   server.addTool({
     name: tool.name,
