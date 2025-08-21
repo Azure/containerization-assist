@@ -27,10 +27,10 @@ import (
 )
 
 const (
-	maxPortNumber     = 65535
-	maxFileSize       = 10 * 1024 * 1024 // 10MB max file size for parsing
-	maxPathDepth      = 10               // Maximum directory depth to search
-	defaultJavaVersion = "21"            // Default to latest LTS
+	maxPortNumber      = 65535
+	maxFileSize        = 10 * 1024 * 1024 // 10MB max file size for parsing
+	maxPathDepth       = 10               // Maximum directory depth to search
+	defaultJavaVersion = "21"             // Default to latest LTS
 )
 
 // Pre-compiled regex patterns for performance
@@ -572,7 +572,7 @@ func (ra *RepositoryAnalyzer) findServerConfigFiles(repoPath string) string {
 	for _, config := range serverConfigFiles {
 		filePath := filepath.Join(repoPath, config.filename)
 		if ra.fileExists(filePath) {
-			ra.logger.Info("Detected application server from config file", 
+			ra.logger.Info("Detected application server from config file",
 				"server", config.server, "file", config.filename)
 			return config.server
 		}
@@ -582,7 +582,7 @@ func (ra *RepositoryAnalyzer) findServerConfigFiles(repoPath string) string {
 		for _, dir := range commonConfigDirs {
 			filePath := filepath.Join(repoPath, dir, config.filename)
 			if ra.fileExists(filePath) {
-				ra.logger.Info("Detected application server from config file", 
+				ra.logger.Info("Detected application server from config file",
 					"server", config.server, "file", filepath.Join(dir, config.filename))
 				return config.server
 			}
@@ -630,7 +630,7 @@ func (ra *RepositoryAnalyzer) checkBuildFilesForServer(repoPath string) string {
 // scanFileForServerIndicators performs size-aware scanning of build files for server keywords
 func (ra *RepositoryAnalyzer) scanFileForServerIndicators(repoPath, fileName string) string {
 	filePath := filepath.Join(repoPath, fileName)
-	
+
 	info, err := os.Stat(filePath)
 	if err != nil {
 		return ""
@@ -659,20 +659,19 @@ func (ra *RepositoryAnalyzer) scanFileForServerIndicators(repoPath, fileName str
 	return ""
 }
 
-
 // checkDependenciesForServer performs two-phase lookup: exact match then substring matching
 func (ra *RepositoryAnalyzer) checkDependenciesForServer(dependencies []Dependency) string {
 	allIndicators := getAllServerIndicators()
 
 	for _, dep := range dependencies {
 		depName := strings.ToLower(dep.Name)
-		
+
 		if serverType, exists := allIndicators[depName]; exists {
 			ra.logger.Info("Detected application server from dependency (exact match)",
 				"server", serverType, "dependency", dep.Name)
 			return serverType
 		}
-		
+
 		for indicator, serverType := range allIndicators {
 			if indicator != depName && strings.Contains(depName, strings.ToLower(indicator)) {
 				ra.logger.Info("Detected application server from dependency (substring match)",
@@ -1495,7 +1494,7 @@ func (ra *RepositoryAnalyzer) extractPortFromPackageJson(filePath string) int {
 	}
 
 	portRegex := regexp.MustCompile(`(?:--port|PORT=|:)[\s=]*(\d+)`)
-	
+
 	for _, script := range pkg.Scripts {
 		if matches := portRegex.FindStringSubmatch(script); len(matches) > 1 {
 			if port := parseInt(matches[1]); port > 0 {
@@ -1578,7 +1577,7 @@ func (ra *RepositoryAnalyzer) detectLanguageVersion(repoPath, language string) s
 func (ra *RepositoryAnalyzer) detectJavaVersion(repoPath string) string {
 	patterns := getJavaVersionPatterns()
 	fileOrder := []string{"pom.xml", "gradle.properties", "build.gradle", "build.gradle.kts"}
-	
+
 	for _, fileName := range fileOrder {
 		if compiledPatterns, exists := patterns[fileName]; exists {
 			if version := ra.extractJavaVersionFromFileOptimized(repoPath, fileName, compiledPatterns); version != "" {
@@ -1592,14 +1591,14 @@ func (ra *RepositoryAnalyzer) detectJavaVersion(repoPath string) string {
 // extractJavaVersionFromFileOptimized applies pre-compiled patterns with size validation
 func (ra *RepositoryAnalyzer) extractJavaVersionFromFileOptimized(repoPath, fileName string, patterns []*regexp.Regexp) string {
 	filePath := filepath.Join(repoPath, fileName)
-	
+
 	info, err := os.Stat(filePath)
 	if err != nil {
 		return ""
 	}
 
 	if info.Size() > maxFileSize {
-		ra.logger.Debug("Skipping large build file for version detection", 
+		ra.logger.Debug("Skipping large build file for version detection",
 			"file", fileName, "size", info.Size())
 		return ""
 	}
@@ -1643,7 +1642,7 @@ func parseInt(s string) int {
 	if s == "" {
 		return 0
 	}
-	
+
 	result, err := strconv.Atoi(strings.TrimSpace(s))
 	if err != nil || result < 0 || result > maxPortNumber {
 		return 0
