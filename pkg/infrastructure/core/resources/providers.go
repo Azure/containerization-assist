@@ -1,0 +1,433 @@
+package resources
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/Azure/containerization-assist/pkg/domain/resources"
+	"github.com/Azure/containerization-assist/pkg/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/infrastructure/core/utils"
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
+)
+
+type Store struct {
+	progressData map[string]*workflow.WorkflowProgress
+	logData      map[string]map[string][]string // workflowID -> stepName -> logs
+	mu           sync.RWMutex
+	logger       *slog.Logger
+	maxLogSize   int
+	cleanupStop  chan struct{}
+	lastCleanup  time.Time
+}
+
+func NewStore(logger *slog.Logger) *Store {
+	return &Store{
+		progressData: make(map[string]*workflow.WorkflowProgress),
+		logData:      make(map[string]map[string][]string),
+		maxLogSize:   4096, // 4KB max per log resource
+	}
+}
+
+func (s *Store) RegisterProviders(mcpServer interface{}) error {
+	// Type assert to the specific interface we need
+	mcpSrv, ok := mcpServer.(interface {
+		AddResource(resource mcp.Resource, handler server.ResourceHandlerFunc)
+		AddResourceTemplate(template mcp.ResourceTemplate, handler server.ResourceTemplateHandlerFunc)
+	})
+	if !ok {
+		return fmt.Errorf("mcpServer does not implement required interface")
+	}
+
+	// Register static resources for known workflows
+	s.mu.RLock()
+	for workflowID, progressData := range s.progressData {
+		resourceURI := fmt.Sprintf("progress://%s", workflowID)
+		data, _ := json.Marshal(progressData)
+
+		resource := mcp.NewResource(
+			resourceURI,
+			fmt.Sprintf("Progress for workflow %s", workflowID),
+			mcp.WithResourceDescription("Live progress tracking for containerization workflow"),
+			mcp.WithMIMEType("application/json"),
+		)
+
+		mcpSrv.AddResource(resource, server.ResourceHandlerFunc(func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+			return []mcp.ResourceContents{
+				mcp.TextResourceContents{
+					URI:      resourceURI,
+					MIMEType: "application/json",
+					Text:     string(data),
+				},
+			}, nil
+		}))
+	}
+	s.mu.RUnlock()
+
+	// Register resource templates for dynamic access
+	// Progress resources
+	progressTemplate := mcp.NewResourceTemplate(
+		"progress://{workflowID}",
+		"Workflow Progress",
+		mcp.WithTemplateDescription("Live progress tracking for containerization workflows"),
+		mcp.WithTemplateMIMEType("application/json"),
+	)
+
+	mcpSrv.AddResourceTemplate(progressTemplate, server.ResourceTemplateHandlerFunc(func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		return s.handleProgressResource(ctx, request)
+	}))
+
+	// Log resources
+	logsTemplate := mcp.NewResourceTemplate(
+		"logs://{workflowID}/{stepName}",
+		"Workflow Step Logs",
+		mcp.WithTemplateDescription("Logs for specific workflow steps"),
+		mcp.WithTemplateMIMEType("text/plain"),
+	)
+
+	mcpSrv.AddResourceTemplate(logsTemplate, server.ResourceTemplateHandlerFunc(func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		return s.handleLogsResource(ctx, request)
+	}))
+
+	return nil
+}
+
+func (s *Store) handleProgressResource(ctx context.Context, req mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+	// Extract workflowID from URI
+	parts := strings.Split(req.Params.URI, "://")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid resource URI: %s", req.Params.URI)
+	}
+	workflowID := parts[1]
+
+	resourceData, err := s.GetProgressAsResource(workflowID)
+	if err != nil {
+		return nil, err
+	}
+
+	data, _ := json.Marshal(resourceData)
+
+	return []mcp.ResourceContents{
+		mcp.TextResourceContents{
+			URI:      req.Params.URI,
+			MIMEType: "application/json",
+			Text:     string(data),
+		},
+	}, nil
+}
+
+func (s *Store) handleLogsResource(ctx context.Context, req mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+	// Extract workflowID and stepName from URI
+	// URI format: logs://workflowID/stepName
+	parts := strings.Split(req.Params.URI, "://")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid resource URI: %s", req.Params.URI)
+	}
+
+	pathParts := strings.Split(parts[1], "/")
+	if len(pathParts) != 2 {
+		return nil, fmt.Errorf("invalid log resource path: %s", parts[1])
+	}
+
+	workflowID := pathParts[0]
+	stepName := pathParts[1]
+
+	logData, err := s.GetLogsAsResource(workflowID, stepName)
+	if err != nil {
+		return nil, err
+	}
+
+	return []mcp.ResourceContents{
+		mcp.TextResourceContents{
+			URI:      req.Params.URI,
+			MIMEType: "text/plain",
+			Text:     logData.(string),
+		},
+	}, nil
+}
+
+func (s *Store) GetProgressAsResource(workflowID string) (interface{}, error) {
+	s.mu.RLock()
+	progress, exists := s.progressData[workflowID]
+	s.mu.RUnlock()
+
+	if !exists {
+		return nil, fmt.Errorf("workflow not found: %s", workflowID)
+	}
+
+	// Convert to JSON with masked sensitive data
+	data, err := json.Marshal(progress)
+	if err != nil {
+		return nil, err
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, err
+	}
+
+	// Mask sensitive data before returning
+	maskedResult := utils.MaskMap(result)
+
+	return maskedResult, nil
+}
+
+func (s *Store) GetLogsAsResource(workflowID, stepName string) (interface{}, error) {
+	s.mu.RLock()
+	workflowLogs, exists := s.logData[workflowID]
+	if !exists {
+		s.mu.RUnlock()
+		return nil, fmt.Errorf("workflow not found: %s", workflowID)
+	}
+
+	stepLogs, exists := workflowLogs[stepName]
+	s.mu.RUnlock()
+
+	if !exists {
+		return nil, fmt.Errorf("step logs not found: %s/%s", workflowID, stepName)
+	}
+
+	// Combine logs and mask sensitive data
+	combinedLogs := strings.Join(stepLogs, "\n")
+	maskedLogs := utils.Mask(combinedLogs)
+
+	// Tail last maxLogSize bytes for quick-peek in chat
+	if len(maskedLogs) > s.maxLogSize {
+		maskedLogs = maskedLogs[len(maskedLogs)-s.maxLogSize:]
+		maskedLogs = "... (truncated)\n" + maskedLogs
+	}
+
+	return maskedLogs, nil
+}
+
+func (s *Store) GetWorkflowListAsResource() (interface{}, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	workflows := make([]map[string]interface{}, 0, len(s.progressData))
+	for id, wf := range s.progressData {
+		workflows = append(workflows, map[string]interface{}{
+			"id":           id,
+			"name":         wf.WorkflowName,
+			"status":       wf.Status,
+			"percentage":   wf.Percentage,
+			"start_time":   wf.StartTime,
+			"duration":     wf.Duration.String(),
+			"total_steps":  wf.TotalSteps,
+			"current_step": wf.CurrentStep,
+		})
+	}
+
+	return map[string]interface{}{
+		"workflows": workflows,
+		"count":     len(workflows),
+		"timestamp": time.Now().Format(time.RFC3339),
+	}, nil
+}
+
+func (s *Store) StoreProgress(workflowID string, progressData *workflow.WorkflowProgress) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.progressData[workflowID] = progressData
+}
+
+func (s *Store) StoreLogs(workflowID, stepName string, logs []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.logData[workflowID] == nil {
+		s.logData[workflowID] = make(map[string][]string)
+	}
+
+	// Append logs
+	s.logData[workflowID][stepName] = append(s.logData[workflowID][stepName], logs...)
+
+	// Keep only last N log lines to prevent memory growth
+	const maxLogLines = 1000
+	if len(s.logData[workflowID][stepName]) > maxLogLines {
+		start := len(s.logData[workflowID][stepName]) - maxLogLines
+		s.logData[workflowID][stepName] = s.logData[workflowID][stepName][start:]
+	}
+
+}
+
+func (s *Store) GetProgress(workflowID string) (*workflow.WorkflowProgress, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	progress, exists := s.progressData[workflowID]
+	return progress, exists
+}
+
+func (s *Store) GetLogs(workflowID, stepName string) ([]string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if workflowLogs, exists := s.logData[workflowID]; exists {
+		if stepLogs, exists := workflowLogs[stepName]; exists {
+			return stepLogs, true
+		}
+	}
+
+	return nil, false
+}
+
+func (s *Store) CleanupOldData(maxAge time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cutoff := time.Now().Add(-maxAge)
+
+	// Clean up old workflows
+	for id, wf := range s.progressData {
+		if wf.StartTime.Before(cutoff) {
+			delete(s.progressData, id)
+			delete(s.logData, id)
+		}
+	}
+}
+
+func (s *Store) StartCleanupRoutine(cleanupInterval, maxAge time.Duration) {
+	s.mu.Lock()
+	s.cleanupStop = make(chan struct{})
+	s.lastCleanup = time.Now()
+	s.mu.Unlock()
+
+	go func() {
+		ticker := time.NewTicker(cleanupInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				s.CleanupOldData(maxAge)
+				s.mu.Lock()
+				s.lastCleanup = time.Now()
+				s.mu.Unlock()
+			case <-s.cleanupStop:
+				return
+			}
+		}
+	}()
+
+}
+
+func (s *Store) StopCleanupRoutine() {
+	s.mu.Lock()
+	if s.cleanupStop != nil {
+		close(s.cleanupStop)
+		s.cleanupStop = nil
+	}
+	s.mu.Unlock()
+
+}
+
+func (s *Store) GetResourceCount() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	count := len(s.progressData)
+	for _, logs := range s.logData {
+		count += len(logs)
+	}
+	return count
+}
+
+func (s *Store) GetLastCleanupTime() time.Time {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.lastCleanup
+}
+
+// GetResource retrieves a resource by URI (domain interface implementation)
+func (s *Store) GetResource(ctx context.Context, uri string) (resources.Resource, error) {
+	if strings.HasPrefix(uri, "progress://") {
+		workflowID := strings.TrimPrefix(uri, "progress://")
+		content, err := s.GetProgressAsResource(workflowID)
+		if err != nil {
+			return resources.Resource{}, err
+		}
+		return resources.Resource{
+			URI:         uri,
+			Name:        fmt.Sprintf("Progress for %s", workflowID),
+			Description: "Workflow progress data",
+			MimeType:    "application/json",
+			Content:     content,
+		}, nil
+	}
+	if strings.HasPrefix(uri, "logs://") {
+		parts := strings.Split(strings.TrimPrefix(uri, "logs://"), "/")
+		if len(parts) == 2 {
+			content, err := s.GetLogsAsResource(parts[0], parts[1])
+			if err != nil {
+				return resources.Resource{}, err
+			}
+			return resources.Resource{
+				URI:         uri,
+				Name:        fmt.Sprintf("Logs for %s/%s", parts[0], parts[1]),
+				Description: "Step execution logs",
+				MimeType:    "text/plain",
+				Content:     content,
+			}, nil
+		}
+	}
+	return resources.Resource{}, fmt.Errorf("unknown resource URI: %s", uri)
+}
+
+// ListResources lists all available resources (domain interface implementation)
+func (s *Store) ListResources(ctx context.Context) ([]resources.Resource, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	resourceList := make([]resources.Resource, 0)
+
+	// Add progress resources
+	for workflowID := range s.progressData {
+		resourceList = append(resourceList, resources.Resource{
+			URI:         fmt.Sprintf("progress://%s", workflowID),
+			Name:        fmt.Sprintf("Progress for %s", workflowID),
+			Description: "Workflow progress data",
+			MimeType:    "application/json",
+		})
+	}
+
+	// Add log resources
+	for workflowID, stepLogs := range s.logData {
+		for stepName := range stepLogs {
+			resourceList = append(resourceList, resources.Resource{
+				URI:         fmt.Sprintf("logs://%s/%s", workflowID, stepName),
+				Name:        fmt.Sprintf("Logs for %s/%s", workflowID, stepName),
+				Description: "Step execution logs",
+				MimeType:    "text/plain",
+			})
+		}
+	}
+
+	return resourceList, nil
+}
+
+// AddResource adds a new resource to the store (domain interface implementation)
+func (s *Store) AddResource(ctx context.Context, resource resources.Resource) error {
+	// For now, this implementation assumes resources are added via StoreProgress/StoreLogs
+	// In a full implementation, we'd parse the resource and store it appropriately
+	return fmt.Errorf("AddResource not implemented for this store type")
+}
+
+// RemoveResource removes a resource from the store (domain interface implementation)
+func (s *Store) RemoveResource(ctx context.Context, uri string) error {
+	if strings.HasPrefix(uri, "progress://") {
+		workflowID := strings.TrimPrefix(uri, "progress://")
+		s.mu.Lock()
+		delete(s.progressData, workflowID)
+		delete(s.logData, workflowID)
+		s.mu.Unlock()
+		return nil
+	}
+	return fmt.Errorf("cannot remove resource with URI: %s", uri)
+}
