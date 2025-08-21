@@ -8,7 +8,14 @@ import (
 	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
 )
 
-const defaultJavaVersion = "21"
+const (
+	defaultJavaVersion    = "21"
+	defaultMavenVersion   = "3.9"
+	defaultGradleVersion  = "8.10"
+	defaultWildflyVersion = "35.0.0.Final"
+	defaultTomcatVersion  = "10.1"
+	defaultJettyVersion   = "11"
+)
 
 func init() {
 	Register(NewResolveBaseImagesStep())
@@ -83,10 +90,10 @@ func (s *ResolveBaseImagesStep) resolveJavaImages(result *workflow.AnalyzeResult
 		return buildImage, fmt.Sprintf("quay.io/wildfly/wildfly:%s-jdk%s", defaultWildflyVersion, version), nil
 	}
 	if hasServlet || hasWar {
-		return buildImage, fmt.Sprintf("tomcat:10.1-jre%s", version), nil
+		return buildImage, fmt.Sprintf("tomcat:%s-jre%s", defaultTomcatVersion, version), nil
 	}
 	if hasJetty {
-		return buildImage, fmt.Sprintf("jetty:11-jre%s-alpine", version), nil
+		return buildImage, fmt.Sprintf("jetty:%s-jre%s-alpine", defaultJettyVersion, version), nil
 	}
 
 	// Framework Detection (Medium Priority) - grouped by common runtime

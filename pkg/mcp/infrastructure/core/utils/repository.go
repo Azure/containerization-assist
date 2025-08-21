@@ -1470,11 +1470,6 @@ func (ra *RepositoryAnalyzer) extractPortFromFile(filePath string) int {
 // extractPortFromPackageJson parses package.json for port configuration in scripts and config
 func (ra *RepositoryAnalyzer) extractPortFromPackageJson(filePath string) int {
 	info, err := os.Stat(filePath)
-	if err != nil || info.Size() > maxFileSize {
-		if info != nil && info.Size() > maxFileSize {
-			ra.logger.Debug("Skipping large package.json for port detection", "size", info.Size())
-		}
-		return 0
 	if err != nil {
 		ra.logger.Debug("Failed to stat package.json file", "error", err)
 		return 0
