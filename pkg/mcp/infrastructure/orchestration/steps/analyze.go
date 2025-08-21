@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
 	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/core/utils"
 )
 
@@ -16,7 +17,7 @@ type AnalyzeResult struct {
 	LanguageVersion string                 `json:"language_version"`
 	Framework       string                 `json:"framework"`
 	Port            int                    `json:"port"`
-	Dependencies    []utils.Dependency     `json:"dependencies"`
+	Dependencies    []workflow.Dependency  `json:"dependencies"`
 	Analysis        map[string]interface{} `json:"analysis"`
 	RepoPath        string                 `json:"repo_path"`
 	SessionID       string                 `json:"session_id"`
@@ -135,13 +136,24 @@ func AnalyzeRepository(input, branch string, logger *slog.Logger) (*AnalyzeResul
 		"framework", result.Framework,
 		"port", result.Port)
 
+	// Convert utils.Dependency to workflow.Dependency
+	workflowDeps := make([]workflow.Dependency, len(result.Dependencies))
+	for i, dep := range result.Dependencies {
+		workflowDeps[i] = workflow.Dependency{
+			Name:    dep.Name,
+			Version: dep.Version,
+			Type:    dep.Type,
+			Manager: dep.Manager,
+		}
+	}
+
 	logger.Info("Returning analysis result", "repo_path", repoPath, "language", result.Language)
 	return &AnalyzeResult{
 		Language:        result.Language,
 		LanguageVersion: result.LanguageVersion,
 		Framework:       result.Framework,
 		Port:            result.Port,
-		Dependencies:    result.Dependencies,
+		Dependencies:    workflowDeps,
 		Analysis:        analysisMap,
 		RepoPath:        repoPath,
 		SessionID:       sessionID,

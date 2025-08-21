@@ -4,9 +4,16 @@ package workflow
 import (
 	"fmt"
 
-	"github.com/Azure/containerization-assist/pkg/mcp/infrastructure/core/utils"
 	"gopkg.in/yaml.v3"
 )
+
+// Dependency represents a project dependency
+type Dependency struct {
+	Name    string `json:"name"`
+	Version string `json:"version,omitempty"`
+	Type    string `json:"type"`    // "runtime", "dev", "build"
+	Manager string `json:"manager"` // "npm", "pip", "maven", etc.
+}
 
 // AnalyzeResult represents the output of repository analysis
 type AnalyzeResult struct {
@@ -16,7 +23,7 @@ type AnalyzeResult struct {
 	Port            int                    `json:"port" yaml:"port"`
 	BuildCommand    string                 `json:"build_command" yaml:"build_command"`
 	StartCommand    string                 `json:"start_command" yaml:"start_command"`
-	Dependencies    []utils.Dependency     `json:"dependencies" yaml:"dependencies"`
+	Dependencies    []Dependency           `json:"dependencies" yaml:"dependencies"`
 	DevDependencies []string               `json:"dev_dependencies" yaml:"dev_dependencies"`
 	Metadata        map[string]interface{} `json:"metadata" yaml:"metadata"`
 	RepoPath        string                 `json:"repo_path" yaml:"repo_path"`

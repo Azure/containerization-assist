@@ -116,7 +116,7 @@ var toolConfigs = []ToolConfig{
 		NeedsStepProvider:   true,
 		NeedsSessionManager: true,
 		NeedsLogger:         true,
-		StepGetterName:            "analyze",
+		StepGetterName:      "analyze",
 		NextTool:            "resolve_base_images",
 		ChainReason:         "Repository analyzed successfully. Ready to resolve base images",
 	},
