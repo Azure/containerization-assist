@@ -1,6 +1,6 @@
 # Containerization Assist MCP Server
 
-[![npm version](https://badge.fury.io/js/@container-assist%2Fmcp-server.svg)](https://www.npmjs.com/package/@container-assist/mcp-server)
+[![npm version](https://badge.fury.io/js/@thgamble%2Fcontainerization-assist-mcp.svg)](https://www.npmjs.com/package/@thgamble/containerization-assist-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP Version](https://img.shields.io/badge/MCP-1.0.0-blue)](https://modelcontextprotocol.io)
 
@@ -12,10 +12,13 @@ AI-powered containerization workflow tools for the Model Context Protocol (MCP).
 
 ```bash
 # Install globally
-npm install -g @container-assist/mcp-server
+npm install -g @thgamble/containerization-assist-mcp
 
 # Or use with npx (no installation required)
-npx @container-assist/mcp-server --help
+npx @thgamble/containerization-assist-mcp --help
+
+# Or install as a library for your project
+npm install @thgamble/containerization-assist-mcp
 ```
 
 ### Basic Usage
@@ -109,7 +112,7 @@ Containerization Assist works with any MCP-compatible client. For VS Code:
   "mcp.servers": {
     "container-assist": {
       "command": "npx",
-      "args": ["@container-assist/mcp-server"],
+      "args": ["@thgamble/containerization-assist-mcp"],
       "env": {
         "MCP_WORKSPACE_DIR": "./workspace",
         "MCP_LOG_LEVEL": "info"
@@ -125,7 +128,7 @@ Containerization Assist works with any MCP-compatible client. For VS Code:
 const { spawn } = require('child_process');
 
 // Start the MCP server
-const server = spawn('npx', ['@container-assist/mcp-server'], {
+const server = spawn('npx', ['@thgamble/containerization-assist-mcp'], {
   stdio: ['pipe', 'pipe', 'inherit'],
   env: {
     ...process.env,
@@ -153,6 +156,123 @@ server.stdout.on('data', (data) => {
 });
 ```
 
+## 🛠️ Using Tools as a Library
+
+### Import Individual Tools
+
+#### ES Modules
+```javascript
+import { analyzeRepository, buildImage, generateDockerfile } from '@thgamble/containerization-assist-mcp';
+
+// Each tool exports:
+// - name: string (tool identifier)
+// - metadata: object with:
+//   - title: string
+//   - description: string  
+//   - inputSchema: Zod schema object
+// - handler: async function
+```
+
+#### CommonJS
+```javascript
+const { analyzeRepository, buildImage } = require('@thgamble/containerization-assist-mcp');
+```
+
+### Register with Your MCP Server
+
+```javascript
+import { analyzeRepository } from '@thgamble/containerization-assist-mcp';
+
+// Register with your MCP server instance
+server.tool(
+  analyzeRepository.name,                    // 'analyze_repository'
+  analyzeRepository.metadata.description,    // Tool description
+  analyzeRepository.metadata.inputSchema,    // Zod schema for validation
+  analyzeRepository.handler                  // Async handler function
+);
+
+// Or customize the name/description
+server.tool(
+  'custom_analyze',                          // Custom name
+  'My custom description',                   // Custom description
+  analyzeRepository.metadata.inputSchema,    // Keep original schema
+  analyzeRepository.handler                  // Keep original handler
+);
+```
+
+### Register All Tools at Once
+
+```javascript
+import { registerAllTools } from '@thgamble/containerization-assist-mcp';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+
+const server = new Server({ name: 'my-server', version: '1.0.0' });
+
+// Register all Container Kit tools
+registerAllTools(server);
+
+// Or with custom names
+registerAllTools(server, {
+  'analyze_repository': 'custom_analyze',
+  'build_image': 'docker_build'
+});
+```
+
+### Direct Execution
+```javascript
+import { analyzeRepository, createSession } from '@thgamble/containerization-assist-mcp';
+
+// Create session for workflow tracking
+const sessionId = createSession();
+
+// Execute tools directly
+const result = await analyzeRepository.handler({
+  repo_path: '/path/to/repo',
+  session_id: sessionId
+});
+
+// Result format follows MCP spec:
+// { content: [{ type: 'text', text: '...' }] }
+```
+
+### Custom Framework Integration
+```javascript
+import { analyzeRepository, buildImage } from '@thgamble/containerization-assist-mcp';
+
+// Express.js example
+app.post('/api/analyze', async (req, res) => {
+  const result = await analyzeRepository.handler(req.body);
+  res.json(result);
+});
+
+// Or register multiple endpoints
+const tools = { analyzeRepository, buildImage };
+Object.values(tools).forEach(tool => {
+  app.post(`/api/${tool.name}`, async (req, res) => {
+    const result = await tool.handler(req.body);
+    res.json(result);
+  });
+});
+```
+
+### Access Tool Metadata
+```javascript
+import { getAllTools } from '@thgamble/containerization-assist-mcp';
+
+const tools = getAllTools();
+
+// List all available tools
+Object.values(tools).forEach(tool => {
+  console.log(`Tool: ${tool.name}`);
+  console.log(`Title: ${tool.metadata.title}`);
+  console.log(`Description: ${tool.metadata.description}`);
+  
+  // Access input schema for validation
+  const schema = tool.metadata.inputSchema;
+  // Use with Zod validation if needed
+});
+```
+
 ## 🎯 Use Cases
 
 ### Complete Containerization Workflow
@@ -166,7 +286,7 @@ container-assist-mcp --workflow-mode interactive
 # GitHub Actions example
 - name: Containerize Application
   run: |
-    npx @container-assist/mcp-server \
+    npx @thgamble/containerization-assist-mcp \
       --workspace-dir ${{ github.workspace }} \
       --workflow-mode automated
 ```
@@ -191,14 +311,14 @@ Use individual tools programmatically through the MCP protocol for custom workfl
 If you see "Binary not found" error:
 ```bash
 # Rebuild for your platform
-cd $(npm root -g)/@container-assist/mcp-server
+cd $(npm root -g)/@thgamble/containerization-assist-mcp
 npm run build:current
 ```
 
 ### Permission Denied
 On Unix-like systems:
 ```bash
-chmod +x $(npm root -g)/@container-assist/mcp-server/bin/mcp-server
+chmod +x $(npm root -g)/@thgamble/containerization-assist-mcp/bin/*/containerization-assist-mcp
 ```
 
 ### Debug Mode

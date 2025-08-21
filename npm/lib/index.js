@@ -88,6 +88,10 @@ function registerTool(server, tool, customName = null) {
  * @private
  */
 function convertZodToJsonSchema(zodSchema) {
+  if (!zodSchema) {
+    return { type: 'object', properties: {} };
+  }
+  
   const properties = {};
   const required = [];
   
@@ -170,7 +174,41 @@ function createSession() {
   return generateSessionId();
 }
 
-// Export individual tools
+// Named exports for individual tools
+export {
+  // Workflow tools
+  analyzeRepository,
+  generateDockerfile,
+  buildImage,
+  scanImage,
+  tagImage,
+  pushImage,
+  generateK8sManifests,
+  prepareCluster,
+  deployApplication,
+  verifyDeployment,
+  
+  // Utility tools
+  listTools,
+  ping,
+  serverStatus,
+  
+  // Helper functions
+  registerTool,
+  registerAllTools,
+  createSession,
+  convertZodToJsonSchema,
+  
+  // Tools collection
+  tools
+};
+
+// Function to get all tools (for backwards compatibility)
+export function getAllTools() {
+  return tools;
+}
+
+// Default export for CommonJS compatibility
 export default {
   // Workflow tools
   analyzeRepository,
@@ -191,9 +229,11 @@ export default {
   
   // Tools collection
   tools,
+  getAllTools,
   
   // Helper functions
   registerTool,
   registerAllTools,
-  createSession
+  createSession,
+  convertZodToJsonSchema
 };
