@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 
-const { spawn, execSync } = require('child_process');
-const path = require('path');
-const fs = require('fs');
+import { spawn, execSync } from 'child_process';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Colors for output
 const colors = {
@@ -13,6 +18,9 @@ const colors = {
   red: '\x1b[31m',
   cyan: '\x1b[36m'
 };
+
+// File permissions
+const EXECUTABLE_BITS = 0o111; // Check for any execute permission (owner/group/other)
 
 function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`);
@@ -52,18 +60,42 @@ class MCPServerTester {
     
     const binDir = path.join(this.npmDir, 'bin');
     const platform = process.platform;
-    const expectedBinary = platform === 'win32' ? 'mcp-server.exe' : 'mcp-server';
-    const binaryPath = path.join(binDir, expectedBinary);
+    const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+    
+    // Map platform to our directory structure
+    let platformDir;
+    if (platform === 'darwin') {
+      platformDir = `darwin-${arch}`;
+    } else if (platform === 'linux') {
+      platformDir = `linux-${arch}`;
+    } else if (platform === 'win32') {
+      platformDir = `win32-${arch}`;
+    }
+    
+    const expectedBinary = platform === 'win32' ? 'containerization-assist-mcp.exe' : 'containerization-assist-mcp';
+    const binaryPath = path.join(binDir, platformDir, expectedBinary);
     
     if (fs.existsSync(binaryPath)) {
       this.pass('Binary exists at expected location');
+      this.binaryPath = binaryPath;
     } else {
-      // Check for platform-specific binary
-      const files = fs.readdirSync(binDir);
-      const mcpBinaries = files.filter(f => f.startsWith('mcp-server-'));
-      if (mcpBinaries.length > 0) {
-        this.warn(`Binary not linked, but found: ${mcpBinaries.join(', ')}`);
-      } else {
+      // Check if any binaries exist
+      try {
+        const platformDirs = fs.readdirSync(binDir).filter(d => fs.statSync(path.join(binDir, d)).isDirectory());
+        const binaries = [];
+        for (const dir of platformDirs) {
+          const files = fs.readdirSync(path.join(binDir, dir));
+          const mcpBinaries = files.filter(f => f.includes('containerization-assist-mcp'));
+          if (mcpBinaries.length > 0) {
+            binaries.push(`${dir}/${mcpBinaries.join(', ')}`);
+          }
+        }
+        if (binaries.length > 0) {
+          this.warn(`Binary not at expected location ${platformDir}, but found: ${binaries.join(', ')}`);
+        } else {
+          this.fail('No MCP server binaries found');
+        }
+      } catch (err) {
         this.fail('No MCP server binaries found');
       }
     }
@@ -77,14 +109,13 @@ class MCPServerTester {
       return;
     }
     
-    const binaryPath = path.join(this.npmDir, 'bin', 'mcp-server');
-    if (!fs.existsSync(binaryPath)) {
+    if (!this.binaryPath || !fs.existsSync(this.binaryPath)) {
       this.skip('Binary not found, skipping executable test');
       return;
     }
     
     try {
-      const stats = fs.statSync(binaryPath);
+      const stats = fs.statSync(this.binaryPath);
       const isExecutable = (stats.mode & EXECUTABLE_BITS) !== 0;
       
       if (isExecutable) {
@@ -100,12 +131,40 @@ class MCPServerTester {
   async testVersionCommand() {
     log('Testing: Version command...', 'cyan');
     
+    if (!this.binaryPath) {
+      this.skip('Binary not found, skipping version test');
+      return;
+    }
+    
     try {
-      const result = await this.runCommand(['--version']);
+      const result = await new Promise((resolve) => {
+        const child = spawn(this.binaryPath, ['--version'], {
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
+        
+        let output = '';
+        let errorOutput = '';
+        
+        child.stdout.on('data', (data) => {
+          output += data.toString();
+        });
+        
+        child.stderr.on('data', (data) => {
+          errorOutput += data.toString();
+        });
+        
+        child.on('close', (code) => {
+          resolve({
+            success: code === 0,
+            output: output || errorOutput
+          });
+        });
+      });
+      
       if (result.success && result.output.includes('Containerization Assist MCP Server')) {
         this.pass(`Version command works: ${result.output.trim()}`);
       } else {
-        this.fail(`Version command failed: ${result.output}`);
+        this.fail(`Version command output unexpected: ${result.output}`);
       }
     } catch (err) {
       this.fail(`Version command error: ${err.message}`);
@@ -130,43 +189,68 @@ class MCPServerTester {
   async testPingTool() {
     log('Testing: MCP ping tool...', 'cyan');
     
+    if (!this.binaryPath) {
+      this.skip('Binary not found, skipping ping test');
+      return;
+    }
+    
     try {
-      const request = {
-        jsonrpc: '2.0',
-        method: 'tools/call',
-        params: {
-          name: 'ping',
-          arguments: {}
-        },
-        id: 1
-      };
+      // Test ping tool using tool mode
+      const result = await new Promise((resolve, reject) => {
+        const env = {
+          ...process.env,
+          TOOL_PARAMS: JSON.stringify({ message: 'test' })
+        };
+        
+        const child = spawn(this.binaryPath, ['tool', 'ping'], {
+          env,
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
+        
+        let output = '';
+        let errorOutput = '';
+        
+        child.stdout.on('data', (data) => {
+          output += data.toString();
+        });
+        
+        child.stderr.on('data', (data) => {
+          errorOutput += data.toString();
+        });
+        
+        child.on('close', (code) => {
+          if (code === 0) {
+            resolve(output);
+          } else {
+            reject(new Error(errorOutput || 'Tool execution failed'));
+          }
+        });
+        
+        child.on('error', (err) => {
+          reject(err);
+        });
+      });
       
-      const result = await this.runMCPCommand(request, 2000);
-      if (result.includes('pong') || result.includes('success')) {
-        this.pass('MCP ping tool responds correctly');
+      // Parse the JSON response
+      const response = JSON.parse(result);
+      if (response.response && response.response.includes('pong')) {
+        this.pass(`MCP ping tool responds correctly: ${response.response}`);
       } else {
-        this.warn('MCP server started but ping response unexpected');
+        this.warn('MCP ping tool response unexpected: ' + result);
       }
     } catch (err) {
-      this.warn(`MCP ping test skipped: ${err.message}`);
+      this.warn(`MCP ping test failed: ${err.message}`);
     }
   }
 
   async testStdioMode() {
     log('Testing: STDIO transport mode...', 'cyan');
     
+    let child;
     try {
-      const child = spawn('node', [path.join(this.npmDir, 'index.js')], {
+      child = spawn('node', [path.join(this.npmDir, 'index.js')], {
         stdio: ['pipe', 'pipe', 'pipe']
-      let child;
-      try {
-        child = spawn('node', [path.join(this.npmDir, 'index.js')], {
-          stdio: ['pipe', 'pipe', 'pipe']
-        });
-      } catch (err) {
-        this.fail(`Failed to spawn child process: ${err.message}`);
-        return;
-      }
+      });
       
       let started = false;
       const timeout = setTimeout(() => {
@@ -230,7 +314,7 @@ class MCPServerTester {
   // Helper methods
   async runCommand(args) {
     return new Promise((resolve) => {
-      const child = spawn('node', [path.join(this.npmDir, 'index.js'), ...args], {
+      const child = spawn('node', [path.join(this.npmDir, 'lib', 'index.js'), ...args], {
         stdio: ['pipe', 'pipe', 'pipe']
       });
       
@@ -338,9 +422,8 @@ async function main() {
   await tester.runTests();
 }
 
-if (require.main === module) {
-  main().catch(err => {
-    log(`Test suite error: ${err.message}`, 'red');
-    process.exit(1);
-  });
-}
+// Run tests if this is the main module
+main().catch(err => {
+  log(`Test suite error: ${err.message}`, 'red');
+  process.exit(1);
+});

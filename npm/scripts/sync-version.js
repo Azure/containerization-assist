@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
+
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Colors for output
 const colors = {
@@ -41,14 +46,15 @@ function getGitVersion() {
  * Get version from Go source code
  */
 function getGoVersion() {
-  const mainGoPath = path.join(__dirname, '..', '..', 'cmd', 'mcp-server', 'main.go');
+  // Check cmd/root.go for the Version variable
+  const rootGoPath = path.join(__dirname, '..', '..', 'cmd', 'root.go');
   
-  if (!fs.existsSync(mainGoPath)) {
-    log('Warning: main.go not found', 'yellow');
+  if (!fs.existsSync(rootGoPath)) {
+    log('Warning: cmd/root.go not found', 'yellow');
     return null;
   }
   
-  const content = fs.readFileSync(mainGoPath, 'utf8');
+  const content = fs.readFileSync(rootGoPath, 'utf8');
   
   // Look for Version variable
   const versionMatch = content.match(/Version\s*=\s*"([^"]+)"/);
@@ -150,16 +156,14 @@ function main() {
 }
 
 // Run if called directly
-if (require.main === module) {
-  try {
-    main();
-  } catch (err) {
-    log(`Error: ${err.message}`, 'red');
-    process.exit(1);
-  }
+try {
+  main();
+} catch (err) {
+  log(`Error: ${err.message}`, 'red');
+  process.exit(1);
 }
 
-module.exports = {
+export {
   getGitVersion,
   getGoVersion,
   getPackageVersion,

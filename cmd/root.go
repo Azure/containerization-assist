@@ -41,6 +41,12 @@ type FlagConfig struct {
 
 // Execute is the main entry point for the MCP server
 func Execute() {
+	// Check if running in tool mode
+	if len(os.Args) > 1 && os.Args[1] == "tool" {
+		handleToolMode()
+		return
+	}
+
 	// Parse command line flags
 	flags := parseFlags()
 

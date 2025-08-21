@@ -1,6 +1,6 @@
 {
   "name": "@thgamble/container-assist-mcp",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "description": "Container Assist MCP Server - AI-powered containerization workflow tools for the Model Context Protocol",
   "keywords": [
     "mcp",
@@ -25,15 +25,15 @@
   },
   "license": "MIT",
   "author": "Microsoft Azure",
-  "main": "index.js",
-  "bin": {
-    "containerization-assist-mcp": "./index.js",
-    "ckmcp": "./index.js"
-  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "index.d.ts",
   "files": [
     "bin/",
+    "lib/",
     "scripts/",
     "index.js",
+    "index.d.ts",
     "README.md",
     "LICENSE"
   ],
@@ -43,7 +43,7 @@
     "build:current": "bash scripts/build-current.sh",
     "test": "node scripts/test.js",
     "prepublishOnly": "npm run build",
-    "version": "node scripts/sync-version.js && git add package.json"
+    "version": "echo 'Version updated to' $npm_package_version && git add package.json"
   },
   "engines": {
     "node": ">=16.0.0"

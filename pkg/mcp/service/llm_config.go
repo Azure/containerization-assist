@@ -104,8 +104,3 @@ func (c LLMConfig) ToPromptConfig() prompts.ManagerConfig {
 		AllowOverride:   c.AllowOverride,
 	}
 }
-
-// Helper function to create float32 pointer
-func float32Ptr(f float32) *float32 {
-	return &f
-}

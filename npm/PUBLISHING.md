@@ -63,8 +63,8 @@ npm version patch  # or minor/major
 # 3. Test locally
 npm test
 npm pack
-npm install -g container-assist-mcp-server-*.tgz
-container-assist-mcp --version
+npm install -g containerization-assist-mcp-server-*.tgz
+containerization-assist-mcp --version
 
 # 4. Publish
 npm publish --access public
@@ -102,8 +102,8 @@ npm test
 
 # Pack and install locally
 npm pack
-npm install -g container-assist-mcp-server-*.tgz
-container-assist-mcp --version
+npm install -g containerization-assist-mcp-server-*.tgz
+containerization-assist-mcp --version
 ```
 
 ### Dry Run
@@ -117,10 +117,10 @@ npm publish --dry-run
 ### Check NPM Registry
 ```bash
 # View published package
-npm view @container-assist/mcp-server
+npm view @containerization-assist/mcp-server
 
 # Test installation
-npx @container-assist/mcp-server --version
+npx @containerization-assist/mcp-server --version
 ```
 
 ### Monitor GitHub Actions
@@ -138,7 +138,7 @@ npx @container-assist/mcp-server --version
 
 2. **"Package name unavailable"**
    - The scoped name might be taken
-   - Consider alternative: `@azure/container-assist-mcp`
+   - Consider alternative: `@azure/containerization-assist-mcp`
 
 3. **Binary missing for platform**
    - Run `npm run build` to build all platforms
@@ -151,10 +151,10 @@ npx @container-assist/mcp-server --version
 ### Emergency Unpublish
 ```bash
 # Within 24 hours only
-npm unpublish @container-assist/mcp-server@1.0.0
+npm unpublish @containerization-assist/mcp-server@1.0.0
 
 # Deprecate instead (recommended)
-npm deprecate @container-assist/mcp-server@1.0.0 "Critical bug, use 1.0.1"
+npm deprecate @containerization-assist/mcp-server@1.0.0 "Critical bug, use 1.0.1"
 ```
 
 ## Maintenance
@@ -185,7 +185,7 @@ For security updates:
 ## Monitoring
 
 ### Download Stats
-- View at: https://www.npmjs.com/package/@container-assist/mcp-server
+- View at: https://www.npmjs.com/package/@containerization-assist/mcp-server
 - Or use: `npm-stat` tool
 
 ### Issue Tracking
