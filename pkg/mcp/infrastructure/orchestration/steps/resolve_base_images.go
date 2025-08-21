@@ -80,7 +80,7 @@ func (s *ResolveBaseImagesStep) resolveJavaImages(result *workflow.AnalyzeResult
 
 	// Application Server Detection (Highest Priority)
 	if hasWildfly {
-		return buildImage, fmt.Sprintf("quay.io/wildfly/wildfly:35.0.0.Final-jdk%s", version), nil
+		return buildImage, fmt.Sprintf("quay.io/wildfly/wildfly:%s-jdk%s", defaultWildflyVersion, version), nil
 	}
 	if hasServlet || hasWar {
 		return buildImage, fmt.Sprintf("tomcat:10.1-jre%s", version), nil
