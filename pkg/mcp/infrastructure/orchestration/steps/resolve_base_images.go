@@ -139,7 +139,7 @@ func (s *ResolveBaseImagesStep) getBuildImage(buildTool, version string) string 
 	case "gradle":
 		return fmt.Sprintf("gradle:8.10-jdk%s", version)
 	case "maven":
-		return fmt.Sprintf("maven:3.9-eclipse-temurin-%s", version)
+		return fmt.Sprintf("maven:%s-eclipse-temurin-%s", defaultMavenVersion, version)
 	default:
 		return fmt.Sprintf("openjdk:%s-jdk-slim", version)
 	}
