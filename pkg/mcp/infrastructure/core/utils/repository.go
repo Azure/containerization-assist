@@ -1578,21 +1578,20 @@ func parseInt(s string) int {
 
 	s = strings.TrimSpace(s)
 
-	// Extract only numeric prefix
-	numStr := ""
-	for _, r := range s {
-		if r >= '0' && r <= '9' {
-			numStr += string(r)
-		} else {
+	// Find the end of the numeric prefix
+	end := 0
+	for i, r := range s {
+		if r < '0' || r > '9' {
 			break
 		}
+		end = i + 1
 	}
 
-	if numStr == "" {
+	if end == 0 {
 		return 0
 	}
 
-	result, err := strconv.Atoi(numStr)
+	result, err := strconv.Atoi(s[:end])
 	if err != nil || result < 0 || result > maxPortNumber {
 		return 0
 	}
