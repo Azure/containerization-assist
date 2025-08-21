@@ -16,6 +16,7 @@ type AnalyzeResult struct {
 	LanguageVersion string                 `json:"language_version"`
 	Framework       string                 `json:"framework"`
 	Port            int                    `json:"port"`
+	Dependencies    []utils.Dependency     `json:"dependencies"`
 	Analysis        map[string]interface{} `json:"analysis"`
 	RepoPath        string                 `json:"repo_path"`
 	SessionID       string                 `json:"session_id"`
@@ -117,7 +118,7 @@ func AnalyzeRepository(input, branch string, logger *slog.Logger) (*AnalyzeResul
 		"language":          result.Language,
 		"language_version":  result.LanguageVersion,
 		"framework":         result.Framework,
-		"dependencies":      len(result.Dependencies),
+		"dependencies":      result.Dependencies,
 		"entry_points":      result.EntryPoints,
 		"build_files":       result.BuildFiles,
 		"port":              result.Port,
@@ -140,6 +141,7 @@ func AnalyzeRepository(input, branch string, logger *slog.Logger) (*AnalyzeResul
 		LanguageVersion: result.LanguageVersion,
 		Framework:       result.Framework,
 		Port:            result.Port,
+		Dependencies:    result.Dependencies,
 		Analysis:        analysisMap,
 		RepoPath:        repoPath,
 		SessionID:       sessionID,

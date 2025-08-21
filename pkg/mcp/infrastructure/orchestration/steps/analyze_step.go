@@ -53,7 +53,9 @@ func (s *AnalyzeStep) Execute(ctx context.Context, state *workflow.WorkflowState
 		"language", analyzeResult.Language,
 		"language_version", analyzeResult.LanguageVersion,
 		"framework", analyzeResult.Framework,
-		"port", analyzeResult.Port)
+		"port", analyzeResult.Port,
+		"dependencies", analyzeResult.Dependencies,
+	)
 
 	// Enhance analysis with AI if available (skip in test mode)
 	// Determine test mode via centralized helper to avoid duplication across steps
@@ -82,7 +84,7 @@ func (s *AnalyzeStep) Execute(ctx context.Context, state *workflow.WorkflowState
 		// Set reasonable defaults for missing fields
 		BuildCommand:    "",
 		StartCommand:    "",
-		Dependencies:    []string{},
+		Dependencies:    analyzeResult.Dependencies,
 		DevDependencies: []string{},
 	}
 
@@ -92,11 +94,11 @@ func (s *AnalyzeStep) Execute(ctx context.Context, state *workflow.WorkflowState
 	return &workflow.StepResult{
 		Success: true,
 		Data: map[string]interface{}{
-			"language":  analyzeResult.Language,
+			"language":         analyzeResult.Language,
 			"language_version": analyzeResult.LanguageVersion,
-			"framework": analyzeResult.Framework,
-			"port":      analyzeResult.Port,
-			"repo_path": analyzeResult.RepoPath,
+			"framework":        analyzeResult.Framework,
+			"port":             analyzeResult.Port,
+			"repo_path":        analyzeResult.RepoPath,
 		},
 		Metadata: map[string]interface{}{
 			"analysis": analyzeResult.Analysis,
