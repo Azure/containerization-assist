@@ -23,7 +23,7 @@ mcp:
 wire-gen:
 	@echo "Generating Wire dependency injection code..."
 	@which wire > /dev/null || go install github.com/google/wire/cmd/wire@latest
-	@cd pkg/mcp/composition && go generate
+	@cd pkg/service && go generate
 	@echo "✅ Wire code generated"
 
 # Documentation generation
@@ -65,12 +65,12 @@ fmt:
 lint:
 	@echo "Running linter..."
 	@which $$(go env GOPATH)/bin/golangci-lint > /dev/null || (echo "Install golangci-lint: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin latest"; exit 1)
-	$$(go env GOPATH)/bin/golangci-lint run ./pkg/mcp/... ./pkg/core/...
+	$$(go env GOPATH)/bin/golangci-lint run ./pkg/...
 
 static-analysis:
 	@echo "Running static analysis..."
 	@which $$(go env GOPATH)/bin/staticcheck > /dev/null || go install honnef.co/go/tools/cmd/staticcheck@latest
-	$$(go env GOPATH)/bin/staticcheck ./pkg/mcp/... ./pkg/core/...
+	$$(go env GOPATH)/bin/staticcheck ./pkg/...
 
 security-scan:
 	@echo "Running security scan..."

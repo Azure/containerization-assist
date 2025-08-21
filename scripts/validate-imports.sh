@@ -27,7 +27,7 @@ check_imports() {
     echo "Checking $layer layer..."
     
     # Find all Go files in the layer
-    files=$(find "pkg/mcp/$layer" -name "*.go" -not -name "*_test.go" 2>/dev/null || true)
+    files=$(find "pkg/$layer" -name "*.go" -not -name "*_test.go" 2>/dev/null || true)
     
     if [ -z "$files" ]; then
         echo "  ⚠️  No files found in $layer layer"
@@ -36,7 +36,7 @@ check_imports() {
     
     for file in $files; do
         for pattern in $forbidden_patterns; do
-            if grep -q "\"github.com/Azure/containerization-assist/pkg/mcp/$pattern" "$file"; then
+            if grep -q "\"github.com/Azure/containerization-assist/pkg/$pattern" "$file"; then
                 echo -e "  ${RED}❌ Violation:${NC} $file imports from $pattern"
                 echo "     Description: $description"
                 ((VIOLATIONS++))
@@ -83,7 +83,7 @@ echo "5️⃣ Additional Architecture Checks"
 
 # Check for circular dependencies between packages
 echo "  Checking for circular dependencies..."
-cd pkg/mcp
+cd pkg
 if go list -f '{{join .Deps "\n"}}' ./... | grep -q "import cycle"; then
     echo -e "  ${RED}❌ Circular dependency detected!${NC}"
     ((VIOLATIONS++))
