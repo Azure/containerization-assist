@@ -111,7 +111,15 @@ function registerTool(server, tool, customName = null) {
       tool.handler
     );
   } else {
-    throw new Error('Server must have either registerTool() or addTool() method with a compatible signature');
+    throw new Error(
+      'Server must have either:\n' +
+      '  - registerTool(name, metadata, handler) or registerTool(tool) method\n' +
+      '  - addTool({ name, description, inputSchema }, handler) method\n' +
+      'Tried calling:\n' +
+      '  server.registerTool(tool) and server.registerTool(name, metadata, handler)\n' +
+      '  server.addTool({ name, description, inputSchema }, handler)\n' +
+      'Please ensure your server implements one of these signatures.'
+    );
   }
 }
 
