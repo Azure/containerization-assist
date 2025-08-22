@@ -38,13 +38,7 @@ spec:
   type: ClusterIP
 `
 
-// BasicK8sManifests returns the shared minimal Deployment and Service manifests.
-func BasicK8sManifests() map[string]interface{} {
-	return map[string]interface{}{
-		"deployment.yaml": K8sDeploymentYAML,
-		"service.yaml":    K8sServiceYAML,
-	}
-}
+// BasicK8sManifests function removed as dead code
 
 // K8sIngressYAML is a minimal Ingress used by integration tests.
 const K8sIngressYAML = `apiVersion: networking.k8s.io/v1

@@ -23,11 +23,11 @@ command_exists() {
 # 1. Lines of Code Metrics
 echo "📏 Code Size Metrics:"
 echo "--------------------"
-TOTAL_GO_LOC=$(find pkg/mcp -name "*.go" -not -path "*/vendor/*" -not -name "*_test.go" | xargs wc -l | tail -1 | awk '{print $1}')
-TEST_GO_LOC=$(find pkg/mcp -name "*_test.go" -not -path "*/vendor/*" | xargs wc -l | tail -1 | awk '{print $1}')
-NUM_GO_FILES=$(find pkg/mcp -name "*.go" -not -path "*/vendor/*" | wc -l)
+TOTAL_GO_LOC=$(find pkg -name "*.go" -not -path "*/vendor/*" -not -name "*_test.go" | xargs wc -l | tail -1 | awk '{print $1}')
+TEST_GO_LOC=$(find pkg -name "*_test.go" -not -path "*/vendor/*" | xargs wc -l | tail -1 | awk '{print $1}')
+NUM_GO_FILES=$(find pkg -name "*.go" -not -path "*/vendor/*" | wc -l)
 
-echo "  Total Go LOC (pkg/mcp): $TOTAL_GO_LOC"
+echo "  Total Go LOC (pkg): $TOTAL_GO_LOC"
 echo "  Test Go LOC: $TEST_GO_LOC"
 echo "  Number of Go files: $NUM_GO_FILES"
 if [ "$NUM_GO_FILES" -eq 0 ]; then
@@ -41,10 +41,10 @@ echo ""
 echo "🔄 Cyclomatic Complexity:"
 echo "------------------------"
 if command_exists gocyclo; then
-    COMPLEX_OVER_30=$(gocyclo -over 30 pkg/mcp 2>/dev/null | wc -l || echo "0")
-    COMPLEX_OVER_20=$(gocyclo -over 20 pkg/mcp 2>/dev/null | wc -l || echo "0")
-    COMPLEX_OVER_15=$(gocyclo -over 15 pkg/mcp 2>/dev/null | wc -l || echo "0")
-    COMPLEX_OVER_10=$(gocyclo -over 10 pkg/mcp 2>/dev/null | wc -l || echo "0")
+    COMPLEX_OVER_30=$(gocyclo -over 30 pkg 2>/dev/null | wc -l || echo "0")
+    COMPLEX_OVER_20=$(gocyclo -over 20 pkg 2>/dev/null | wc -l || echo "0")
+    COMPLEX_OVER_15=$(gocyclo -over 15 pkg 2>/dev/null | wc -l || echo "0")
+    COMPLEX_OVER_10=$(gocyclo -over 10 pkg 2>/dev/null | wc -l || echo "0")
     
     echo "  Functions with complexity > 30: $COMPLEX_OVER_30"
     echo "  Functions with complexity > 20: $COMPLEX_OVER_20"
@@ -58,11 +58,11 @@ echo ""
 # 3. Interface and Abstraction Metrics
 echo "🔌 Interface & Abstraction Metrics:"
 echo "-----------------------------------"
-NUM_INTERFACES=$(grep -r "type.*interface" pkg/mcp --include="*.go" | wc -l)
-NUM_ADAPTERS=$(find pkg/mcp -name "*adapter*.go" | wc -l)
-NUM_WRAPPERS=$(find pkg/mcp -name "*wrapper*.go" | grep -v docker_operation | wc -l)
-NUM_DOMAIN_INTERFACES=$(grep -r "type.*interface" pkg/mcp/domain --include="*.go" | wc -l || echo "0")
-NUM_INFRA_INTERFACES=$(grep -r "type.*interface" pkg/mcp/infrastructure --include="*.go" | wc -l || echo "0")
+NUM_INTERFACES=$(grep -r "type.*interface" pkg --include="*.go" | wc -l)
+NUM_ADAPTERS=$(find pkg -name "*adapter*.go" | wc -l)
+NUM_WRAPPERS=$(find pkg -name "*wrapper*.go" | grep -v docker_operation | wc -l)
+NUM_DOMAIN_INTERFACES=$(grep -r "type.*interface" pkg/domain --include="*.go" | wc -l || echo "0")
+NUM_INFRA_INTERFACES=$(grep -r "type.*interface" pkg/infrastructure --include="*.go" | wc -l || echo "0")
 
 echo "  Total interfaces: $NUM_INTERFACES"
 echo "  Domain interfaces: $NUM_DOMAIN_INTERFACES"
@@ -74,9 +74,9 @@ echo ""
 # 4. Package Structure
 echo "📦 Package Structure:"
 echo "--------------------"
-echo "  Current structure (pkg/mcp):"
-find pkg/mcp -maxdepth 1 -type d | grep -v "^pkg/mcp$" | sort | sed 's|pkg/mcp/|    - |'
-NUM_TOP_DIRS=$(find pkg/mcp -maxdepth 1 -type d | grep -v "^pkg/mcp$" | wc -l)
+echo "  Current structure (pkg):"
+find pkg -maxdepth 1 -type d | grep -v "^pkg$" | sort | sed 's|pkg/|    - |'
+NUM_TOP_DIRS=$(find pkg -maxdepth 1 -type d | grep -v "^pkg$" | wc -l)
 echo "  Total top-level directories: $NUM_TOP_DIRS"
 echo ""
 
@@ -95,7 +95,7 @@ echo ""
 echo "🔍 Lint Issues:"
 echo "---------------"
 if command_exists golangci-lint; then
-    LINT_OUTPUT=$(golangci-lint run pkg/mcp/... --timeout=5m 2>&1 || true)
+    LINT_OUTPUT=$(golangci-lint run pkg/... --timeout=5m 2>&1 || true)
     LINT_ISSUES=$(echo "$LINT_OUTPUT" | awk '/issues:/ {match($0, /[0-9]+/); print substr($0, RSTART, RLENGTH)}' | tail -1 || echo "0")
     echo "  Total lint issues: $LINT_ISSUES"
     
@@ -112,7 +112,7 @@ echo ""
 # 7. Dependency Analysis
 echo "📚 Dependency Metrics:"
 echo "---------------------"
-NUM_IMPORTS=$(grep -r "^import" pkg/mcp --include="*.go" | wc -l)
+NUM_IMPORTS=$(grep -r "^import" pkg --include="*.go" | wc -l)
 NUM_EXTERNAL_DEPS=$(go list -m all | grep -v "github.com/Azure/containerization-assist" | wc -l)
 
 echo "  Total import statements: $NUM_IMPORTS"
@@ -125,7 +125,7 @@ echo "------------------------------"
 SCORE=100
 SCORE=$((SCORE - NUM_ADAPTERS * 20))
 SCORE=$((SCORE - NUM_WRAPPERS * 15))
-LARGE_FILES=$(find pkg/mcp -name "*.go" -not -path "*/test*" -exec wc -l {} \; | awk '$1 > 800 {count++} END {print count+0}')
+LARGE_FILES=$(find pkg -name "*.go" -not -path "*/test*" -exec wc -l {} \; | awk '$1 > 800 {count++} END {print count+0}')
 if [ "$LARGE_FILES" -gt 10 ]; then
     SCORE=$((SCORE - (LARGE_FILES - 10) * 5))
 fi

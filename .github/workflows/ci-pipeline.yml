@@ -35,7 +35,7 @@ jobs:
           changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD)
           echo "📝 Changed files: $(echo "$changed_files" | wc -l) total"
           
-          # Check for MCP changes (main.go, pkg/common/, pkg/core/, pkg/mcp/)
+          # Check for MCP changes (main.go, pkg/)
           mcp_count=$(echo "$changed_files" | grep -E "^(main\.go|pkg/(common|core|mcp)/)" | wc -l)
           echo "test_mcp=$([ $mcp_count -gt 0 ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
           echo "MCP changes: $([ $mcp_count -gt 0 ] && echo "yes ($mcp_count files)" || echo "no")"
@@ -99,7 +99,7 @@ jobs:
       uses: ./.github/actions/quality-checks
       with:
         go-version: '1.24.4'
-        target-paths: './pkg/mcp/... ./pkg/core/...'
+        target-paths: './pkg/...'
         
     - name: Upload Quality Metrics
       if: always()
@@ -143,7 +143,7 @@ jobs:
         
         # Also run our dedicated race detection test suite
         echo "🏃 Running dedicated race detection test suite..."
-        go test -race -timeout=90s ./pkg/mcp/infrastructure/ -run TestRaceDetectionSuite -v
+        go test -race -timeout=90s ./pkg/infrastructure/ -run TestRaceDetectionSuite -v
       
     - name: Test Coverage Analysis
       run: |

@@ -8,10 +8,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
-	"github.com/Azure/containerization-assist/pkg/mcp/service"
-	"github.com/Azure/containerization-assist/pkg/mcp/service/config"
-	"github.com/Azure/containerization-assist/pkg/mcp/service/tools"
+	"github.com/Azure/containerization-assist/pkg/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/service"
+	"github.com/Azure/containerization-assist/pkg/service/config"
+	"github.com/Azure/containerization-assist/pkg/service/tools"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
