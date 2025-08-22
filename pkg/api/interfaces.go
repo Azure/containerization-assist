@@ -11,77 +11,15 @@ type MCPServer interface {
 	Stop(ctx context.Context) error
 }
 
-// Tool is the canonical interface for all MCP tools
-type Tool interface {
-	Name() string
-	Description() string
-	Execute(ctx context.Context, input ToolInput) (ToolOutput, error)
-	Schema() ToolSchema
-}
-
-// ToolInput represents the input structure for tools
-type ToolInput struct {
-	SessionID string                 `json:"session_id"`
-	Data      map[string]interface{} `json:"data"`
-	Context   map[string]interface{} `json:"context,omitempty"`
-}
-
-type ToolOutput struct {
-	Success  bool                   `json:"success"`
-	Data     map[string]interface{} `json:"data"`
-	Error    string                 `json:"error,omitempty"`
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
-}
-
-type ToolSchema struct {
-	Name         string                 `json:"name"`
-	Description  string                 `json:"description"`
-	InputSchema  map[string]interface{} `json:"input_schema"`
-	OutputSchema map[string]interface{} `json:"output_schema,omitempty"`
-	Examples     []ToolExample          `json:"examples,omitempty"`
-	Tags         []string               `json:"tags,omitempty"`
-	Category     string                 `json:"category,omitempty"`
-	Version      string                 `json:"version,omitempty"`
-}
-
-type ToolExample struct {
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
-	Input       ToolInput  `json:"input"`
-	Output      ToolOutput `json:"output"`
-}
-
-// Registry manages tool registration and execution
-type Registry interface {
-	Register(tool Tool) error
-
-	Get(name string) (Tool, error)
-
-	List() []string
-
-	Execute(ctx context.Context, name string, input ToolInput) (ToolOutput, error)
-}
+// Note: Tool interface is reserved for future use when implementing
+// a more structured tool abstraction layer over MCP tools
 
 // Transport defines the interface for MCP transports
 type Transport interface {
 	Start(ctx context.Context) error
-
 	Stop(ctx context.Context) error
-
 	Send(message interface{}) error
-
 	Receive() (interface{}, error)
-
-	ReceiveStream() (<-chan interface{}, error)
-
-	IsConnected() bool
-}
-
-// Validator defines the core validation interface
-type Validator[T any] interface {
-	Validate(ctx context.Context, value T) ValidationResult
-
-	Name() string
 }
 
 // Validation types defined at API layer for clean architecture

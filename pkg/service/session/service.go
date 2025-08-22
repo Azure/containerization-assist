@@ -13,7 +13,6 @@ import (
 // Service implements session management using the domain store interface
 type Service struct {
 	store           domainsession.Store
-	logger          *slog.Logger
 	defaultTTL      time.Duration
 	cleanupInterval time.Duration
 	stopCleanup     chan struct{}

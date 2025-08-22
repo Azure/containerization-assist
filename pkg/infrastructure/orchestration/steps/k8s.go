@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/containerization-assist/pkg/infrastructure/core/runner"
+	"github.com/Azure/containerization-assist/pkg/infrastructure/core"
 	"github.com/Azure/containerization-assist/pkg/infrastructure/kubernetes"
 )
 
@@ -55,7 +55,9 @@ func GenerateManifests(buildResult *BuildResult, appName, namespace string, port
 
 	// Create manifests directory in the repository path (persistent)
 	manifestDir := fmt.Sprintf("%s/manifests", repoPath)
-	os.MkdirAll(manifestDir, 0755)
+	if err := os.MkdirAll(manifestDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create manifests directory: %w", err)
+	}
 
 	// Generate manifests using the core K8s functionality
 	manifestOptions := kubernetes.ManifestOptions{
@@ -118,7 +120,7 @@ func DeployToKubernetes(ctx context.Context, k8sResult *K8sResult, logger *slog.
 	}
 
 	// Initialize Kubernetes client and service
-	kubeClient := kubernetes.NewKubeCmdRunner(&runner.DefaultCommandRunner{})
+	kubeClient := kubernetes.NewKubeCmdRunner(&core.DefaultCommandRunner{})
 	deploymentService := kubernetes.NewService(kubeClient, logger)
 
 	// Get the manifest path from the generated manifests

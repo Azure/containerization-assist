@@ -800,8 +800,8 @@ func (tr *ToolRegistrar) createStepState(ctx context.Context, sessionID, repoPat
 			Status:         "initialized",
 			CompletedSteps: []string{},
 			FailedSteps:    []string{},
-			Artifacts:      make(map[string]interface{}),
-			Metadata:       make(map[string]interface{}),
+			Artifacts:      &tools.WorkflowArtifacts{},
+			Metadata:       &tools.ToolMetadata{SessionID: sessionID},
 		}
 
 		// Save the initial workflow state
@@ -843,106 +843,56 @@ func (tr *ToolRegistrar) createStepState(ctx context.Context, sessionID, repoPat
 // restoreStepResults restores workflow step results from session artifacts
 func (tr *ToolRegistrar) restoreStepResults(workflowState *domainworkflow.WorkflowState, simpleState *tools.SimpleWorkflowState) {
 	// Restore AnalyzeResult if available
-	if analyzeData, exists := simpleState.Artifacts["analyze_result"]; exists {
-		if analyzeMap, ok := analyzeData.(map[string]interface{}); ok {
-			analyzeResult := &domainworkflow.AnalyzeResult{}
-
-			if language, ok := analyzeMap["language"].(string); ok {
-				analyzeResult.Language = language
-			}
-			if framework, ok := analyzeMap["framework"].(string); ok {
-				analyzeResult.Framework = framework
-			}
-			if port, ok := analyzeMap["port"].(float64); ok {
-				analyzeResult.Port = int(port)
-			}
-			if buildCmd, ok := analyzeMap["build_command"].(string); ok {
-				analyzeResult.BuildCommand = buildCmd
-			}
-			if startCmd, ok := analyzeMap["start_command"].(string); ok {
-				analyzeResult.StartCommand = startCmd
-			}
-			if repoPath, ok := analyzeMap["repo_path"].(string); ok {
-				analyzeResult.RepoPath = repoPath
-			}
-			if metadata, ok := analyzeMap["metadata"].(map[string]interface{}); ok {
-				analyzeResult.Metadata = metadata
-			}
-
-			workflowState.AnalyzeResult = analyzeResult
+	if simpleState.Artifacts != nil && simpleState.Artifacts.AnalyzeResult != nil {
+		analyzeArtifact := simpleState.Artifacts.AnalyzeResult
+		analyzeResult := &domainworkflow.AnalyzeResult{
+			Language:        analyzeArtifact.Language,
+			Framework:       analyzeArtifact.Framework,
+			Port:            analyzeArtifact.Port,
+			BuildCommand:    analyzeArtifact.BuildCommand,
+			StartCommand:    analyzeArtifact.StartCommand,
+			RepoPath:        analyzeArtifact.RepoPath,
+			Dependencies:    analyzeArtifact.Dependencies,
+			DevDependencies: analyzeArtifact.DevDependencies,
+			Metadata:        analyzeArtifact.Metadata,
 		}
+		workflowState.AnalyzeResult = analyzeResult
 	}
 
 	// Restore DockerfileResult if available
-	if dockerfileData, exists := simpleState.Artifacts["dockerfile_result"]; exists {
-		if dockerfileMap, ok := dockerfileData.(map[string]interface{}); ok {
-			dockerfileResult := &domainworkflow.DockerfileResult{}
-
-			if content, ok := dockerfileMap["content"].(string); ok {
-				dockerfileResult.Content = content
-			}
-			if path, ok := dockerfileMap["path"].(string); ok {
-				dockerfileResult.Path = path
-			}
-			if metadata, ok := dockerfileMap["metadata"].(map[string]interface{}); ok {
-				dockerfileResult.Metadata = metadata
-			}
-
-			workflowState.DockerfileResult = dockerfileResult
+	if simpleState.Artifacts != nil && simpleState.Artifacts.DockerfileResult != nil {
+		dockerfileArtifact := simpleState.Artifacts.DockerfileResult
+		dockerfileResult := &domainworkflow.DockerfileResult{
+			Content:  dockerfileArtifact.Content,
+			Path:     dockerfileArtifact.Path,
+			Metadata: dockerfileArtifact.Metadata,
 		}
+		workflowState.DockerfileResult = dockerfileResult
 	}
 
 	// Restore BuildResult if available
-	if buildData, exists := simpleState.Artifacts["build_result"]; exists {
-		if buildMap, ok := buildData.(map[string]interface{}); ok {
-			buildResult := &domainworkflow.BuildResult{}
-
-			if imageRef, ok := buildMap["image_ref"].(string); ok {
-				buildResult.ImageRef = imageRef
-			}
-			if imageID, ok := buildMap["image_id"].(string); ok {
-				buildResult.ImageID = imageID
-			}
-			if imageSize, ok := buildMap["image_size"].(float64); ok {
-				buildResult.ImageSize = int64(imageSize)
-			}
-			if buildTime, ok := buildMap["build_time"].(string); ok {
-				buildResult.BuildTime = buildTime
-			}
-			if metadata, ok := buildMap["metadata"].(map[string]interface{}); ok {
-				buildResult.Metadata = metadata
-			}
-
-			workflowState.BuildResult = buildResult
+	if simpleState.Artifacts != nil && simpleState.Artifacts.BuildResult != nil {
+		buildArtifact := simpleState.Artifacts.BuildResult
+		buildResult := &domainworkflow.BuildResult{
+			ImageRef:  buildArtifact.ImageRef,
+			ImageID:   buildArtifact.ImageID,
+			ImageSize: buildArtifact.ImageSize,
+			BuildTime: buildArtifact.BuildTime,
+			Metadata:  buildArtifact.Metadata,
 		}
+		workflowState.BuildResult = buildResult
 	}
 
 	// Restore K8sResult if available
-	if k8sData, exists := simpleState.Artifacts["k8s_result"]; exists {
-		if k8sMap, ok := k8sData.(map[string]interface{}); ok {
-			k8sResult := &domainworkflow.K8sResult{}
-
-			if manifests, ok := k8sMap["manifests"].([]interface{}); ok {
-				manifestStrs := make([]string, len(manifests))
-				for i, m := range manifests {
-					if manifestStr, ok := m.(string); ok {
-						manifestStrs[i] = manifestStr
-					}
-				}
-				k8sResult.Manifests = manifestStrs
-			}
-			if namespace, ok := k8sMap["namespace"].(string); ok {
-				k8sResult.Namespace = namespace
-			}
-			if endpoint, ok := k8sMap["endpoint"].(string); ok {
-				k8sResult.Endpoint = endpoint
-			}
-			if metadata, ok := k8sMap["metadata"].(map[string]interface{}); ok {
-				k8sResult.Metadata = metadata
-			}
-
-			workflowState.K8sResult = k8sResult
+	if simpleState.Artifacts != nil && simpleState.Artifacts.K8sResult != nil {
+		k8sArtifact := simpleState.Artifacts.K8sResult
+		k8sResult := &domainworkflow.K8sResult{
+			Manifests: k8sArtifact.Manifests,
+			Namespace: k8sArtifact.Namespace,
+			Endpoint:  k8sArtifact.Endpoint,
+			Metadata:  k8sArtifact.Metadata,
 		}
+		workflowState.K8sResult = k8sResult
 	}
 }
 
@@ -972,23 +922,25 @@ func (tr *ToolRegistrar) mapToolNameToStepName(toolName string) string {
 
 // saveStepResults saves workflow step results to session artifacts
 func (tr *ToolRegistrar) saveStepResults(workflowState *domainworkflow.WorkflowState, simpleState *tools.SimpleWorkflowState, stepName string) {
+	// Ensure artifacts structure exists
+	if simpleState.Artifacts == nil {
+		simpleState.Artifacts = &tools.WorkflowArtifacts{}
+	}
+
 	switch stepName {
 	case "analyze_repository":
 		if workflowState.AnalyzeResult != nil {
-			analyzeData := map[string]interface{}{
-				"language":         workflowState.AnalyzeResult.Language,
-				"framework":        workflowState.AnalyzeResult.Framework,
-				"port":             workflowState.AnalyzeResult.Port,
-				"build_command":    workflowState.AnalyzeResult.BuildCommand,
-				"start_command":    workflowState.AnalyzeResult.StartCommand,
-				"dependencies":     workflowState.AnalyzeResult.Dependencies,
-				"dev_dependencies": workflowState.AnalyzeResult.DevDependencies,
-				"repo_path":        workflowState.AnalyzeResult.RepoPath,
-				"metadata":         workflowState.AnalyzeResult.Metadata,
+			simpleState.Artifacts.AnalyzeResult = &tools.AnalyzeArtifact{
+				Language:        workflowState.AnalyzeResult.Language,
+				Framework:       workflowState.AnalyzeResult.Framework,
+				Port:            workflowState.AnalyzeResult.Port,
+				BuildCommand:    workflowState.AnalyzeResult.BuildCommand,
+				StartCommand:    workflowState.AnalyzeResult.StartCommand,
+				Dependencies:    workflowState.AnalyzeResult.Dependencies,
+				DevDependencies: workflowState.AnalyzeResult.DevDependencies,
+				RepoPath:        workflowState.AnalyzeResult.RepoPath,
+				Metadata:        workflowState.AnalyzeResult.Metadata,
 			}
-			simpleState.UpdateArtifacts(map[string]interface{}{
-				"analyze_result": analyzeData,
-			})
 		}
 
 	case "resolve_base_images":
@@ -999,41 +951,32 @@ func (tr *ToolRegistrar) saveStepResults(workflowState *domainworkflow.WorkflowS
 
 	case "generate_dockerfile":
 		if workflowState.DockerfileResult != nil {
-			dockerfileData := map[string]interface{}{
-				"content":  workflowState.DockerfileResult.Content,
-				"path":     workflowState.DockerfileResult.Path,
-				"metadata": workflowState.DockerfileResult.Metadata,
+			simpleState.Artifacts.DockerfileResult = &tools.DockerfileArtifact{
+				Content:  workflowState.DockerfileResult.Content,
+				Path:     workflowState.DockerfileResult.Path,
+				Metadata: workflowState.DockerfileResult.Metadata,
 			}
-			simpleState.UpdateArtifacts(map[string]interface{}{
-				"dockerfile_result": dockerfileData,
-			})
 		}
 
 	case "build_image", "tag_image":
 		if workflowState.BuildResult != nil {
-			buildData := map[string]interface{}{
-				"image_id":   workflowState.BuildResult.ImageID,
-				"image_ref":  workflowState.BuildResult.ImageRef,
-				"image_size": workflowState.BuildResult.ImageSize,
-				"build_time": workflowState.BuildResult.BuildTime,
-				"metadata":   workflowState.BuildResult.Metadata,
+			simpleState.Artifacts.BuildResult = &tools.BuildArtifact{
+				ImageID:   workflowState.BuildResult.ImageID,
+				ImageRef:  workflowState.BuildResult.ImageRef,
+				ImageSize: workflowState.BuildResult.ImageSize,
+				BuildTime: workflowState.BuildResult.BuildTime,
+				Metadata:  workflowState.BuildResult.Metadata,
 			}
-			simpleState.UpdateArtifacts(map[string]interface{}{
-				"build_result": buildData,
-			})
 		}
 
 	case "generate_k8s_manifests", "prepare_cluster", "deploy_application", "verify_deployment":
 		if workflowState.K8sResult != nil {
-			k8sData := map[string]interface{}{
-				"manifests": workflowState.K8sResult.Manifests,
-				"namespace": workflowState.K8sResult.Namespace,
-				"endpoint":  workflowState.K8sResult.Endpoint,
-				"metadata":  workflowState.K8sResult.Metadata,
+			simpleState.Artifacts.K8sResult = &tools.K8sArtifact{
+				Manifests: workflowState.K8sResult.Manifests,
+				Namespace: workflowState.K8sResult.Namespace,
+				Endpoint:  workflowState.K8sResult.Endpoint,
+				Metadata:  workflowState.K8sResult.Metadata,
 			}
-			simpleState.UpdateArtifacts(map[string]interface{}{
-				"k8s_result": k8sData,
-			})
 		}
 	}
 }

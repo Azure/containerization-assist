@@ -4,7 +4,7 @@
 
 AI-Powered Application Containerization and Kubernetes Deployment
 
-Containerization Assist automates the complete containerization process from repository analysis to Kubernetes deployment using individual, chainable tools. Built on a simplified 4-layer architecture with Domain-Driven Design and direct dependency injection, it provides 15 focused tools that can be used individually or chained together for complete workflows with AI-powered error recovery and built-in progress tracking.
+Containerization Assist automates the complete containerization process from repository analysis to Kubernetes deployment using individual, chainable tools. Built on a simplified 3-layer architecture with Domain-Driven Design and direct dependency injection, it provides 15 focused tools that can be used individually or chained together for complete workflows with AI-powered error recovery and built-in progress tracking.
 
 ## 🚀 Quick Install
 
@@ -76,17 +76,16 @@ make lint              # Run linter
 - **[Examples](examples/)** - Working code examples and patterns
 
 ### For Developers
-- **[Architectural Decisions](docs/architecture/adr/)** - ADRs documenting key design decisions
+- **[Development Guide](DEVELOPMENT_GUIDE.md)** - Comprehensive guide for developers
 - **[Containerization Assist Design Document](docs/CONTAINERIZATION_ASSIST_DESIGN_DOCUMENT.md)** - Complete system design and architecture
-- **[New Developer Guide](docs/NEW_DEVELOPER_GUIDE.md)** - Getting started with development
+- **[Architectural Decisions](docs/architecture/adr/)** - ADRs documenting key design decisions
 
 ### For Contributors
 - **[Contributing Guide](CONTRIBUTING.md)** - Development workflow and standards
-- **[Development Guidelines](DEVELOPMENT_GUIDELINES.md)** - Coding standards and practices
 
 ## 🏗️ Architecture
 
-Containerization Assist uses a **simplified 4-layer architecture** with Domain-Driven Design and direct dependency injection:
+Containerization Assist uses a **simplified 3-layer architecture** with Domain-Driven Design and direct dependency injection:
 
 ```mermaid
 graph TB
@@ -143,60 +142,41 @@ graph TB
 ### Architecture Layers
 
 ```
-pkg/mcp/
-├── api/                   # Interface definitions and contracts
-│   └── interfaces.go      # Essential MCP tool interfaces
-├── service/               # Unified service layer (simplified from application)
+pkg/
+├── api/                   # Minimal API contracts
+│   └── interfaces.go      # MCPServer, ProgressEmitter, ProgressUpdate
+├── service/               # Service layer
 │   ├── bootstrap/         # Application bootstrapping
-│   ├── commands/          # CQRS command handlers
 │   ├── config/            # Configuration management
-│   ├── dependencies.go    # Simple direct dependency injection
-│   ├── lifecycle/         # Application lifecycle management
-│   ├── queries/           # CQRS query handlers  
-│   ├── registrar/         # MCP tool/resource registration
-│   ├── registry/          # Service registry
-│   ├── server.go          # MCP server implementation with direct DI
-│   ├── session/           # Session management
-│   ├── tools/             # Tool registration and individual tool handlers
-│   ├── transport/         # HTTP and stdio transport
-│   └── workflow/          # Workflow orchestration
-├── domain/                # Business logic and workflows
+│   ├── dependencies.go    # Direct dependency injection
+│   ├── registrar/         # Tool/resource registration
+│   ├── server.go          # MCP server implementation
+│   ├── session/           # Concurrent-safe session management
+│   └── tools/             # MCP tool implementations
+├── domain/                # Business logic
+│   ├── errors/            # Domain error types
 │   ├── events/            # Domain events
-│   ├── health/            # Health check interfaces
-│   ├── progress/          # Progress tracking (business concept)
-│   ├── prompts/           # Prompt interfaces
 │   ├── resources/         # Resource interfaces
-│   ├── sampling/          # LLM sampling domain logic
 │   ├── session/           # Session domain objects
 │   └── workflow/          # Core containerization workflow
-│       ├── workflow_error.go # Simple workflow error handling
-│       └── utils.go       # Workflow utility functions
-└── infrastructure/        # Technical implementations (consolidated)
-    ├── ai_ml/             # AI/ML implementations
-    │   ├── prompts/       # Prompt management
-    │   │   └── templates/ # Embedded prompt templates
+└── infrastructure/        # Technical implementations
+    ├── ai_ml/             # AI/ML integrations
+    │   ├── prompts/       # Prompt templates
     │   └── sampling/      # LLM integration
-    ├── core/              # Core infrastructure
-    │   ├── resources/     # Resource providers and stores
-    │   ├── testutil/      # Testing utilities
-    │   ├── util/          # General utilities
-    │   ├── utilities/     # Advanced utilities
-    │   └── validation/    # Validation logic
-    ├── messaging/         # UNIFIED: Event publishing and progress reporting
-    │   ├── cli_direct.go        # CLI progress reporting
-    │   ├── emitter.go           # Progress emitters
-    │   ├── event_publisher.go   # Domain event publishing
-    │   ├── factory_direct.go    # Progress factory
-    │   └── mcp_direct.go        # MCP progress reporting
-    ├── observability/     # UNIFIED: Monitoring, tracing, and health
-    │   ├── monitor.go           # Health monitoring
-    │   ├── tracing_config.go    # OpenTelemetry configuration
-    │   ├── tracing_helpers.go   # Tracing utilities
-    │   └── tracing_integration.go # Tracing middleware
-    ├── orchestration/     # Container and K8s orchestration
-    │   └── steps/         # Focused workflow step implementations
-    └── persistence/       # Data persistence
-        └── session/       # Session storage (BoltDB)
+    ├── core/              # Consolidated utilities
+    │   ├── command.go     # CommandRunner interface
+    │   ├── providers.go   # Resource store
+    │   ├── fs.go          # File operations
+    │   ├── repository.go  # Repository analysis
+    │   └── masking.go     # Data protection
+    ├── container/         # Docker operations
+    ├── kubernetes/        # K8s operations
+    ├── messaging/         # Progress tracking and events
+    ├── orchestration/     # Workflow orchestration
+    │   └── steps/         # Step implementations
+    ├── persistence/       # Data persistence
+    │   └── session/       # BoltDB storage
+    └── security/          # Vulnerability types
 ```
 
 **Key Architecture Features:**
@@ -209,7 +189,7 @@ pkg/mcp/
 - **Separation of Concerns**: Each layer has clear responsibilities
 - **Simple Error Handling**: Workflow errors with step and attempt tracking
 
-> **📖 Technical Details**: See [Architecture Diagrams](docs/architecture/diagrams/README-architecture.md), [ADRs](docs/architecture/adr/), and [Development Guidelines](DEVELOPMENT_GUIDELINES.md).
+> **📖 Technical Details**: See [Architecture Diagrams](docs/architecture/diagrams/README-architecture.md), [ADRs](docs/architecture/adr/), and [Development Guide](DEVELOPMENT_GUIDE.md).
 
 ## 🛠️ Key Features
 
@@ -279,7 +259,7 @@ See [SECURITY.md](SECURITY.md) for security policy and reporting vulnerabilities
 
 - **Issues**: Use GitHub Issues for bug reports and feature requests
 - **Discussions**: Use GitHub Discussions for questions and help
-- **Documentation**: Check the [Development Guidelines](DEVELOPMENT_GUIDELINES.md) and [Containerization Assist Design Document](docs/CONTAINERIZATION_ASSIST_DESIGN_DOCUMENT.md)
+- **Documentation**: Check the [Development Guide](DEVELOPMENT_GUIDE.md) and [Containerization Assist Design Document](docs/CONTAINERIZATION_ASSIST_DESIGN_DOCUMENT.md)
 
 ## Trademarks
 

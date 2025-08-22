@@ -1,7 +1,7 @@
-// Package filesystem provides common utility functions for file system operations,
+// Package core provides common utility functions for file system operations,
 // directory tree generation, and other shared functionality used throughout
 // the containerization-assist application.
-package filesystem
+package core
 
 import (
 	"os"

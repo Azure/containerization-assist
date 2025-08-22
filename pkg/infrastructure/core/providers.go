@@ -1,4 +1,4 @@
-package resources
+package core
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 
 	"github.com/Azure/containerization-assist/pkg/domain/resources"
 	"github.com/Azure/containerization-assist/pkg/domain/workflow"
-	"github.com/Azure/containerization-assist/pkg/infrastructure/core/utils"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -20,7 +19,6 @@ type Store struct {
 	progressData map[string]*workflow.WorkflowProgress
 	logData      map[string]map[string][]string // workflowID -> stepName -> logs
 	mu           sync.RWMutex
-	logger       *slog.Logger
 	maxLogSize   int
 	cleanupStop  chan struct{}
 	lastCleanup  time.Time
@@ -172,7 +170,7 @@ func (s *Store) GetProgressAsResource(workflowID string) (interface{}, error) {
 	}
 
 	// Mask sensitive data before returning
-	maskedResult := utils.MaskMap(result)
+	maskedResult := MaskMap(result)
 
 	return maskedResult, nil
 }
@@ -194,7 +192,7 @@ func (s *Store) GetLogsAsResource(workflowID, stepName string) (interface{}, err
 
 	// Combine logs and mask sensitive data
 	combinedLogs := strings.Join(stepLogs, "\n")
-	maskedLogs := utils.Mask(combinedLogs)
+	maskedLogs := Mask(combinedLogs)
 
 	// Tail last maxLogSize bytes for quick-peek in chat
 	if len(maskedLogs) > s.maxLogSize {

@@ -1,11 +1,11 @@
-// Package utils provides consolidated utility functions for the MCP package.
+// Package core provides consolidated utility functions for the MCP package.
 //
 // This package includes:
 // - ExtractRepoName: Extract repository name from a Git URL
 // - RepositoryAnalyzer: Perform mechanical repository analysis without AI
 // - MaskSensitiveData: Mask sensitive information in strings
 // - AI-powered retry operations with progressive error context
-package utils
+package core
 
 import (
 	"encoding/json"
@@ -17,12 +17,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/Azure/containerization-assist/pkg/infrastructure/core/filesystem"
 )
 
 const (
@@ -251,9 +248,7 @@ func ExtractRepoName(repoURL string) string {
 }
 
 // RepositoryAnalyzer provides mechanical repository analysis without AI
-type RepositoryAnalyzer struct {
-	logger *slog.Logger
-}
+type RepositoryAnalyzer struct{}
 
 // NewRepositoryAnalyzer creates a new repository analyzer
 func NewRepositoryAnalyzer(logger *slog.Logger) *RepositoryAnalyzer { //TODO: Refactor -  we are just wrapping the logger
@@ -333,8 +328,8 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(repoPath string) (*AnalysisResul
 		return result, nil
 	}
 
-	// Generate structured file tree using existing filesystem function
-	fileTreeMap, err := filesystem.GenerateFileTreeMap(repoPath, 4)
+	// Generate structured file tree using existing function
+	fileTreeMap, err := GenerateFileTreeMap(repoPath, 4)
 	if err != nil {
 		result.Error = &AnalysisError{
 			Type:    "filesystem_error",
@@ -1099,7 +1094,7 @@ func (ra *RepositoryAnalyzer) findFilesByPattern(repoPath, pattern string) bool 
 	}
 
 	var found bool
-	filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
@@ -1117,6 +1112,9 @@ func (ra *RepositoryAnalyzer) findFilesByPattern(repoPath, pattern string) bool 
 
 		return nil
 	})
+	if err != nil {
+		return false
+	}
 
 	return found
 }
@@ -1507,28 +1505,7 @@ func (ra *RepositoryAnalyzer) normalizeJavaVersionOptimized(version string) stri
 
 // parseInt converts string to int with port range validation
 func parseInt(s string) int {
-	if s == "" {
-		return 0
-	}
-
-	s = strings.TrimSpace(s)
-
-	// Find the end of the numeric prefix
-	end := 0
-	for i, r := range s {
-		if r < '0' || r > '9' {
-			break
-		}
-		end = i + 1
-	}
-
-	if end == 0 {
-		return 0
-	}
-
-	result, err := strconv.Atoi(s[:end])
-	if err != nil || result < 0 || result > maxPortNumber {
-		return 0
-	}
+	var result int
+	_, _ = fmt.Sscanf(s, "%d", &result)
 	return result
 }

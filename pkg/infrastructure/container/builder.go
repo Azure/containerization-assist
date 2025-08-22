@@ -114,7 +114,11 @@ func (b *Builder) BuildImage(ctx context.Context, dockerfileContent string, cont
 		result.Duration = time.Since(startTime)
 		return result, nil
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			b.logger.Error("Failed to remove temp dir", slog.String("path", tmpDir), slog.String("error", err.Error()))
+		}
+	}()
 
 	// Perform the actual Docker build
 	buildOutput, err := b.docker.Build(ctx, dockerfilePath, result.ImageRef, contextPath)
@@ -251,7 +255,7 @@ func (b *Builder) createTempDockerfile(content string) (string, string, error) {
 
 	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
 	if err := os.WriteFile(dockerfilePath, []byte(content), 0644); err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		return "", "", err
 	}
 

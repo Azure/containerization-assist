@@ -14,8 +14,7 @@ import (
 	"github.com/Azure/containerization-assist/pkg/domain/errors"
 	"github.com/Azure/containerization-assist/pkg/domain/workflow"
 	"github.com/Azure/containerization-assist/pkg/infrastructure/container"
-	"github.com/Azure/containerization-assist/pkg/infrastructure/core/runner"
-	"github.com/Azure/containerization-assist/pkg/infrastructure/core/utils"
+	"github.com/Azure/containerization-assist/pkg/infrastructure/core"
 	"github.com/Azure/containerization-assist/pkg/infrastructure/kubernetes"
 	"github.com/rs/zerolog"
 )
@@ -32,7 +31,7 @@ func init() {
 	Register(NewVerifyStep())
 }
 
-// Use utils.ExtractRepoName instead of local function
+// Use core.ExtractRepoName instead of local function
 
 // captureDeploymentDiagnostics captures deployment diagnostics and stores them in K8s result metadata
 func captureDeploymentDiagnostics(ctx context.Context, state *workflow.WorkflowState, infraK8sResult *K8sResult, logger *slog.Logger) {
@@ -92,7 +91,7 @@ func (s *BuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) 
 	}
 
 	// Generate image name and tag from cached repo identifier
-	imageName := utils.ExtractRepoName(state.RepoIdentifier)
+	imageName := core.ExtractRepoName(state.RepoIdentifier)
 	imageTag := extractAndValidateTag(state, state.Logger)
 
 	buildContext := state.AnalyzeResult.RepoPath
@@ -336,7 +335,7 @@ func (s *TagStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*
 
 	// Extract tag from request parameters, default to "latest" if not provided
 	imageTag := extractAndValidateTag(state, state.Logger)
-	imageName := utils.ExtractRepoName(state.RepoIdentifier)
+	imageName := core.ExtractRepoName(state.RepoIdentifier)
 
 	// In test mode, skip actual Docker operations
 	if state.IsTestMode() {
@@ -395,7 +394,7 @@ func (s *PushStep) Execute(ctx context.Context, state *workflow.WorkflowState) (
 	}
 
 	// Update the build result with the correct local registry reference for kind deployment
-	imageName := utils.ExtractRepoName(state.RepoIdentifier)
+	imageName := core.ExtractRepoName(state.RepoIdentifier)
 	// Preserve the tag from the previous TagStep instead of hardcoding "latest"
 	imageTag := parseImageReference(state.BuildResult.ImageRef)
 	localRegistryImageRef := fmt.Sprintf("localhost:5001/%s:%s", imageName, imageTag)
@@ -487,7 +486,7 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 	}
 
 	// Convert workflow BuildResult to infrastructure BuildResult
-	imageName := utils.ExtractRepoName(state.RepoIdentifier)
+	imageName := core.ExtractRepoName(state.RepoIdentifier)
 	imageTag := parseImageReference(state.BuildResult.ImageRef)
 
 	infraBuildResult := &BuildResult{
@@ -497,7 +496,7 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 	}
 
 	// Generate manifests
-	appName := utils.ExtractRepoName(state.RepoIdentifier)
+	appName := core.ExtractRepoName(state.RepoIdentifier)
 	namespace := "default"
 
 	// In test mode, use test namespace and prefix app name
@@ -661,7 +660,7 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 	// First, load image into kind cluster if needed
 	if state.BuildResult != nil && !state.IsTestMode() {
 		infraBuildResult := &BuildResult{
-			ImageName: utils.ExtractRepoName(state.RepoIdentifier),
+			ImageName: core.ExtractRepoName(state.RepoIdentifier),
 			ImageTag:  parseImageReference(state.BuildResult.ImageRef),
 			ImageID:   state.BuildResult.ImageID,
 		}
@@ -690,7 +689,7 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 	}
 
 	infraK8sResult := &K8sResult{
-		AppName:    utils.ExtractRepoName(state.RepoIdentifier),
+		AppName:    core.ExtractRepoName(state.RepoIdentifier),
 		Namespace:  state.K8sResult.Namespace,
 		ServiceURL: state.K8sResult.Endpoint,
 		Manifests: map[string]interface{}{
@@ -779,7 +778,7 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 
 	// Convert workflow K8sResult to infrastructure K8sResult
 	infraK8sResult := &K8sResult{
-		AppName:    utils.ExtractRepoName(state.RepoIdentifier),
+		AppName:    core.ExtractRepoName(state.RepoIdentifier),
 		Namespace:  state.K8sResult.Namespace,
 		ServiceURL: state.K8sResult.Endpoint,
 		Manifests: map[string]interface{}{
@@ -792,7 +791,7 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 	if state.IsTestMode() {
 		state.Logger.Info("Test mode: Simulating enhanced deployment verification")
 		state.Result.Endpoint = fmt.Sprintf("http://test-%s.%s.svc.cluster.local:8080",
-			utils.ExtractRepoName(state.RepoIdentifier), state.K8sResult.Namespace)
+			core.ExtractRepoName(state.RepoIdentifier), state.K8sResult.Namespace)
 
 		// Simulate successful verification output
 		state.Logger.Info("✅ Deployment verified successfully")
@@ -982,7 +981,7 @@ func parseImageReference(imageRef string) string {
 
 // waitForNodesReady waits for Kubernetes nodes to become ready
 func waitForNodesReady(ctx context.Context, logger *slog.Logger) error {
-	kubeRunner := kubernetes.NewKubeCmdRunner(&runner.DefaultCommandRunner{})
+	kubeRunner := kubernetes.NewKubeCmdRunner(&core.DefaultCommandRunner{})
 	maxAttempts := 12 // 60 seconds total (5 seconds * 12)
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {

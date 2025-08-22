@@ -31,18 +31,17 @@ type Service interface {
 	QuickPull(ctx context.Context, imageRef string) (*PullResult, error)
 }
 
-// ServiceImpl implements the Docker service interface
-type ServiceImpl struct {
+// containerService implements the Docker service interface
+type containerService struct {
 	Builder           *Builder
 	TemplateEngine    *TemplateEngine
 	RegistryManager   *RegistryManager
 	HadolintValidator *HadolintValidator
-	logger            *slog.Logger
 }
 
 // NewService creates a new Docker operations service
 func NewService(docker DockerClient, logger *slog.Logger) Service {
-	return &ServiceImpl{
+	return &containerService{
 		Builder:           NewBuilder(docker, logger),
 		TemplateEngine:    NewTemplateEngine(logger),
 		RegistryManager:   NewRegistryManager(docker, logger),
@@ -50,10 +49,10 @@ func NewService(docker DockerClient, logger *slog.Logger) Service {
 	}
 }
 
-// ServiceImpl methods implementing the Service interface
+// containerService methods implementing the Service interface
 
 // Containerize performs the complete containerization workflow
-func (s *ServiceImpl) Containerize(ctx context.Context, targetDir string, options ContainerizeOptions) (*ContainerizationResult, error) {
+func (s *containerService) Containerize(ctx context.Context, targetDir string, options ContainerizeOptions) (*ContainerizationResult, error) {
 	startTime := time.Now()
 
 	result := &ContainerizationResult{
@@ -160,28 +159,28 @@ func (s *ServiceImpl) Containerize(ctx context.Context, targetDir string, option
 }
 
 // CheckPrerequisites verifies that all Docker prerequisites are met
-func (s *ServiceImpl) CheckPrerequisites(_ context.Context) error {
+func (s *containerService) CheckPrerequisites(_ context.Context) error {
 	// Simple Docker check - verify docker command is available
 	_, err := exec.LookPath("docker")
 	return err
 }
 
 // GetAvailableTemplates returns all available Dockerfile templates
-func (s *ServiceImpl) GetAvailableTemplates() ([]TemplateInfo, error) {
+func (s *containerService) GetAvailableTemplates() ([]TemplateInfo, error) {
 	return s.TemplateEngine.ListAvailableTemplates()
 }
 
 // QuickBuild performs a quick build without template generation
-func (s *ServiceImpl) QuickBuild(ctx context.Context, dockerfileContent string, targetDir string, options BuildOptions) (*BuildResult, error) {
+func (s *containerService) QuickBuild(ctx context.Context, dockerfileContent string, targetDir string, options BuildOptions) (*BuildResult, error) {
 	return s.Builder.BuildImage(ctx, dockerfileContent, targetDir, options)
 }
 
 // QuickPush performs a quick push of an already built image
-func (s *ServiceImpl) QuickPush(ctx context.Context, imageRef string, options PushOptions) (*RegistryPushResult, error) {
+func (s *containerService) QuickPush(ctx context.Context, imageRef string, options PushOptions) (*RegistryPushResult, error) {
 	return s.RegistryManager.PushImage(ctx, imageRef, options)
 }
 
 // QuickPull performs a quick pull of an image
-func (s *ServiceImpl) QuickPull(ctx context.Context, imageRef string) (*PullResult, error) {
+func (s *containerService) QuickPull(ctx context.Context, imageRef string) (*PullResult, error) {
 	return s.RegistryManager.PullImage(ctx, imageRef)
 }

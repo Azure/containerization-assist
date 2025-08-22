@@ -25,13 +25,13 @@ func TestNewClientFromEnv(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	// Set environment variables
-	os.Setenv("SAMPLING_MAX_TOKENS", "1024")
-	os.Setenv("SAMPLING_TEMPERATURE", "0.5")
-	os.Setenv("SAMPLING_RETRY_ATTEMPTS", "2")
+	require.NoError(t, os.Setenv("SAMPLING_MAX_TOKENS", "1024"))
+	require.NoError(t, os.Setenv("SAMPLING_TEMPERATURE", "0.5"))
+	require.NoError(t, os.Setenv("SAMPLING_RETRY_ATTEMPTS", "2"))
 	defer func() {
-		os.Unsetenv("SAMPLING_MAX_TOKENS")
-		os.Unsetenv("SAMPLING_TEMPERATURE")
-		os.Unsetenv("SAMPLING_RETRY_ATTEMPTS")
+		_ = os.Unsetenv("SAMPLING_MAX_TOKENS")
+		_ = os.Unsetenv("SAMPLING_TEMPERATURE")
+		_ = os.Unsetenv("SAMPLING_RETRY_ATTEMPTS")
 	}()
 
 	client, err := NewClientFromEnv(logger)
@@ -46,8 +46,10 @@ func TestNewClientFromEnv_InvalidConfig(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	// Set invalid environment variable
-	os.Setenv("SAMPLING_TEMPERATURE", "5.0") // Invalid: > 2.0
-	defer os.Unsetenv("SAMPLING_TEMPERATURE")
+	require.NoError(t, os.Setenv("SAMPLING_TEMPERATURE", "5.0")) // Invalid: > 2.0
+	defer func() {
+		_ = os.Unsetenv("SAMPLING_TEMPERATURE")
+	}()
 
 	_, err := NewClientFromEnv(logger)
 	assert.Error(t, err)

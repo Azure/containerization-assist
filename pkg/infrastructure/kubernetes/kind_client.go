@@ -7,7 +7,7 @@ import (
 
 	"github.com/Azure/containerization-assist/pkg/domain/errors"
 	"github.com/Azure/containerization-assist/pkg/infrastructure/container"
-	"github.com/Azure/containerization-assist/pkg/infrastructure/core/runner"
+	"github.com/Azure/containerization-assist/pkg/infrastructure/core"
 	"github.com/Azure/containerization-assist/pkg/infrastructure/kubernetes/kind"
 )
 
@@ -74,7 +74,7 @@ func GetKindCluster(ctx context.Context, kindRunner kind.KindRunner, docker cont
 	}
 
 	// Create a kube runner to set context
-	kubeRunner := NewKubeCmdRunner(&runner.DefaultCommandRunner{})
+	kubeRunner := NewKubeCmdRunner(&core.DefaultCommandRunner{})
 	if output, err = kubeRunner.SetKubeContext(ctx, "kind-containerization-assist"); err != nil {
 		return "", errors.New(errors.CodeOperationFailed, "kind", fmt.Sprintf("failed to set kubectl context: %s, error: %v", output, err), err)
 	}

@@ -3,37 +3,33 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"log/slog"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/pkg/errors"
 
 	domainworkflow "github.com/Azure/containerization-assist/pkg/domain/workflow"
 	"github.com/Azure/containerization-assist/pkg/infrastructure/orchestration/steps"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// RegisterTools registers all tools based on their configurations
 func RegisterTools(mcpServer *server.MCPServer, deps ToolDependencies) error {
 	for _, config := range toolConfigs {
 		if err := RegisterTool(mcpServer, config, deps); err != nil {
-			return errors.Wrapf(err, "failed to register tool %s", config.Name)
+			return fmt.Errorf("failed to register tool %s: %w", config.Name, err)
 		}
 	}
 	return nil
 }
 
-// RegisterTool registers a single tool based on its configuration
 func RegisterTool(mcpServer *server.MCPServer, config ToolConfig, deps ToolDependencies) error {
-	// Validate dependencies
 	if err := validateDependencies(config, deps); err != nil {
-		return errors.Wrapf(err, "invalid dependencies for tool %s", config.Name)
+		return fmt.Errorf("invalid dependencies for tool %s: %w", config.Name, err)
 	}
 
-	// Create the tool definition
 	schema := BuildToolSchema(config)
 	tool := mcp.Tool{
 		Name:        config.Name,
@@ -41,23 +37,18 @@ func RegisterTool(mcpServer *server.MCPServer, config ToolConfig, deps ToolDepen
 		InputSchema: schema,
 	}
 
-	// Debug logging for schema validation
 	if deps.Logger != nil {
 		if config.Name == "start_workflow" {
-			// Log the actual schema being used for the problematic tool
 			schemaJSON, _ := json.Marshal(schema)
 			deps.Logger.Debug("Tool schema for start_workflow",
 				slog.String("schema", string(schemaJSON)))
 		}
 	}
 
-	// Create the handler
 	var handler func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error)
 	if config.CustomHandler != nil {
-		// Use custom handler if provided
 		handler = config.CustomHandler(deps)
 	} else {
-		// Use generic handler based on category
 		switch config.Category {
 		case CategoryWorkflow:
 			handler = CreateWorkflowHandler(config, deps)
@@ -66,11 +57,10 @@ func RegisterTool(mcpServer *server.MCPServer, config ToolConfig, deps ToolDepen
 		case CategoryUtility:
 			handler = CreateUtilityHandler(config, deps)
 		default:
-			return errors.Errorf("unknown tool category: %s", config.Category)
+			return fmt.Errorf("unknown tool category: %s", config.Category)
 		}
 	}
 
-	// Register the tool
 	mcpServer.AddTool(tool, handler)
 
 	if deps.Logger != nil {
@@ -80,7 +70,6 @@ func RegisterTool(mcpServer *server.MCPServer, config ToolConfig, deps ToolDepen
 	return nil
 }
 
-// validateDependencies ensures required dependencies are provided
 func validateDependencies(config ToolConfig, deps ToolDependencies) error {
 	if config.NeedsStepProvider && deps.StepProvider == nil {
 		return errors.New("StepProvider is required but not provided")
@@ -94,10 +83,8 @@ func validateDependencies(config ToolConfig, deps ToolDependencies) error {
 	return nil
 }
 
-// CreateWorkflowHandler creates a generic handler for workflow tools
 func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// Parse arguments
 		args := req.GetArguments()
 		if args == nil {
 			result := createErrorResult(errors.New("missing arguments"))
@@ -107,7 +94,7 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 		// Validate required parameters
 		for _, param := range config.RequiredParams {
 			if _, exists := args[param]; !exists {
-				result := createErrorResult(errors.Errorf("missing required parameter: %s", param))
+				result := createErrorResult(fmt.Errorf("missing required parameter: %s", param))
 				return &result, nil
 			}
 		}
@@ -122,13 +109,13 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 		// Load workflow state
 		state, err := LoadWorkflowState(ctx, deps.SessionManager, sessionID)
 		if err != nil {
-			result := createErrorResult(errors.Wrap(err, "failed to load workflow state"))
+			result := createErrorResult(fmt.Errorf("failed to load workflow state: %w", err))
 			return &result, nil
 		}
 
 		// Setup progress emitter
 		progressEmitter := CreateProgressEmitter(ctx, &req, 1, deps.Logger)
-		defer progressEmitter.Close()
+		defer func() { _ = progressEmitter.Close() }()
 
 		// Execute the appropriate step based on the tool name
 		// Since we can't use StepProvider due to state type mismatch,
@@ -146,50 +133,58 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 				execErr = err
 			} else {
 				// Store result in state for other tools to use
-				state.UpdateArtifacts(map[string]interface{}{
-					"analyze_result": analyzeResult,
+				state.UpdateArtifacts(&WorkflowArtifacts{
+					AnalyzeResult: &AnalyzeArtifact{
+						Language:  analyzeResult.Language,
+						Framework: analyzeResult.Framework,
+						Port:      analyzeResult.Port,
+						RepoPath:  analyzeResult.RepoPath,
+					},
 				})
 				// Convert result to map
 				resultBytes, _ := json.Marshal(analyzeResult)
-				json.Unmarshal(resultBytes, &result)
+				_ = json.Unmarshal(resultBytes, &result)
 				result["session_id"] = sessionID
 			}
 
 		case "generate_dockerfile":
 			// Load analyze result from state
-			artifacts := state.Artifacts
-			analyzeData, ok := artifacts["analyze_result"]
-			if !ok {
+			if state.Artifacts == nil || state.Artifacts.AnalyzeResult == nil {
 				execErr = fmt.Errorf("analyze_repository must be run first")
 			} else {
-				// Convert back to AnalyzeResult
-				analyzeBytes, _ := json.Marshal(analyzeData)
-				var analyzeResult steps.AnalyzeResult
-				json.Unmarshal(analyzeBytes, &analyzeResult)
+				// Convert to steps.AnalyzeResult
+				analyzeResult := steps.AnalyzeResult{
+					Language:  state.Artifacts.AnalyzeResult.Language,
+					Framework: state.Artifacts.AnalyzeResult.Framework,
+					Port:      state.Artifacts.AnalyzeResult.Port,
+					RepoPath:  state.Artifacts.AnalyzeResult.RepoPath,
+				}
 
 				dockerfileResult, err := steps.GenerateDockerfile(&analyzeResult, deps.Logger)
 				if err != nil {
 					execErr = err
 				} else {
-					state.UpdateArtifacts(map[string]interface{}{
-						"dockerfile_result": dockerfileResult,
+					state.UpdateArtifacts(&WorkflowArtifacts{
+						DockerfileResult: &DockerfileArtifact{
+							Content: dockerfileResult.Content,
+							Path:    dockerfileResult.Path,
+						},
 					})
 					resultBytes, _ := json.Marshal(dockerfileResult)
-					json.Unmarshal(resultBytes, &result)
+					_ = json.Unmarshal(resultBytes, &result)
 					result["session_id"] = sessionID
 				}
 			}
 
 		case "build_image":
 			// Load dockerfile result from state
-			artifacts := state.Artifacts
-			dockerfileData, ok := artifacts["dockerfile_result"]
-			if !ok {
+			if state.Artifacts == nil || state.Artifacts.DockerfileResult == nil {
 				execErr = fmt.Errorf("generate_dockerfile must be run first")
 			} else {
-				dockerfileBytes, _ := json.Marshal(dockerfileData)
-				var dockerfileResult steps.DockerfileResult
-				json.Unmarshal(dockerfileBytes, &dockerfileResult)
+				dockerfileResult := steps.DockerfileResult{
+					Content: state.Artifacts.DockerfileResult.Content,
+					Path:    state.Artifacts.DockerfileResult.Path,
+				}
 
 				imageName, _ := args["image_name"].(string)
 				if imageName == "" {
@@ -202,11 +197,8 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 				buildContext, _ := args["context"].(string)
 				if buildContext == "" {
 					// Get repo path from analyze result
-					if analyzeData, ok := artifacts["analyze_result"]; ok {
-						analyzeBytes, _ := json.Marshal(analyzeData)
-						var analyzeResult steps.AnalyzeResult
-						json.Unmarshal(analyzeBytes, &analyzeResult)
-						buildContext = analyzeResult.RepoPath
+					if state.Artifacts != nil && state.Artifacts.AnalyzeResult != nil {
+						buildContext = state.Artifacts.AnalyzeResult.RepoPath
 					} else {
 						buildContext = "."
 					}
@@ -216,20 +208,22 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 				if err != nil {
 					execErr = err
 				} else {
-					state.UpdateArtifacts(map[string]interface{}{
-						"build_result": buildResult,
+					state.UpdateArtifacts(&WorkflowArtifacts{
+						BuildResult: &BuildArtifact{
+							ImageID:   buildResult.ImageID,
+							ImageRef:  buildResult.ImageName,
+							BuildTime: buildResult.BuildTime.Format(time.RFC3339),
+						},
 					})
 					resultBytes, _ := json.Marshal(buildResult)
-					json.Unmarshal(resultBytes, &result)
+					_ = json.Unmarshal(resultBytes, &result)
 					result["session_id"] = sessionID
 				}
 			}
 
 		case "scan_image":
 			// For scan_image, we need the build result
-			artifacts := state.Artifacts
-			_, ok := artifacts["build_result"]
-			if !ok {
+			if state.Artifacts == nil || state.Artifacts.BuildResult == nil {
 				execErr = fmt.Errorf("build_image must be run first")
 			} else {
 				// For now, return a simple scan result
@@ -242,9 +236,7 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 
 		case "tag_image":
 			// Tag the image
-			artifacts := state.Artifacts
-			_, ok := artifacts["build_result"]
-			if !ok {
+			if state.Artifacts == nil || state.Artifacts.BuildResult == nil {
 				execErr = fmt.Errorf("build_image must be run first")
 			} else {
 				tag, _ := args["tag"].(string)
@@ -258,14 +250,13 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 
 		case "push_image":
 			// Push image to registry
-			artifacts := state.Artifacts
-			buildData, ok := artifacts["build_result"]
-			if !ok {
+			if state.Artifacts == nil || state.Artifacts.BuildResult == nil {
 				execErr = fmt.Errorf("build_image must be run first")
 			} else {
-				buildBytes, _ := json.Marshal(buildData)
-				var buildResult steps.BuildResult
-				json.Unmarshal(buildBytes, &buildResult)
+				buildResult := steps.BuildResult{
+					ImageID:   state.Artifacts.BuildResult.ImageID,
+					ImageName: state.Artifacts.BuildResult.ImageRef,
+				}
 
 				registry, _ := args["registry"].(string)
 				if registry == "" {
@@ -284,19 +275,20 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 
 		case "generate_k8s_manifests":
 			// Generate Kubernetes manifests
-			artifacts := state.Artifacts
-			buildData, ok := artifacts["build_result"]
-			analyzeData, hasAnalyze := artifacts["analyze_result"]
-			if !ok || !hasAnalyze {
+			if state.Artifacts == nil || state.Artifacts.BuildResult == nil || state.Artifacts.AnalyzeResult == nil {
 				execErr = fmt.Errorf("build_image and analyze_repository must be run first")
 			} else {
-				buildBytes, _ := json.Marshal(buildData)
-				var buildResult steps.BuildResult
-				json.Unmarshal(buildBytes, &buildResult)
+				buildResult := steps.BuildResult{
+					ImageID:   state.Artifacts.BuildResult.ImageID,
+					ImageName: state.Artifacts.BuildResult.ImageRef,
+				}
 
-				analyzeBytes, _ := json.Marshal(analyzeData)
-				var analyzeResult steps.AnalyzeResult
-				json.Unmarshal(analyzeBytes, &analyzeResult)
+				analyzeResult := steps.AnalyzeResult{
+					Language:  state.Artifacts.AnalyzeResult.Language,
+					Framework: state.Artifacts.AnalyzeResult.Framework,
+					Port:      state.Artifacts.AnalyzeResult.Port,
+					RepoPath:  state.Artifacts.AnalyzeResult.RepoPath,
+				}
 
 				namespace, _ := args["namespace"].(string)
 				if namespace == "" {
@@ -312,11 +304,22 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 				if err != nil {
 					execErr = err
 				} else {
-					state.UpdateArtifacts(map[string]interface{}{
-						"k8s_result": k8sResult,
+					// Store K8s manifests - convert map to []string
+					var manifestsList []string
+					for _, v := range k8sResult.Manifests {
+						if manifestStr, ok := v.(string); ok {
+							manifestsList = append(manifestsList, manifestStr)
+						}
+					}
+					state.UpdateArtifacts(&WorkflowArtifacts{
+						K8sResult: &K8sArtifact{
+							Manifests: manifestsList,
+							Namespace: k8sResult.Namespace,
+							Endpoint:  k8sResult.ServiceURL,
+						},
 					})
 					resultBytes, _ := json.Marshal(k8sResult)
-					json.Unmarshal(resultBytes, &result)
+					_ = json.Unmarshal(resultBytes, &result)
 					result["session_id"] = sessionID
 				}
 			}
@@ -340,14 +343,19 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 
 		case "deploy_application":
 			// Deploy to Kubernetes
-			artifacts := state.Artifacts
-			k8sData, ok := artifacts["k8s_result"]
-			if !ok {
+			if state.Artifacts == nil || state.Artifacts.K8sResult == nil {
 				execErr = fmt.Errorf("generate_k8s_manifests must be run first")
 			} else {
-				k8sBytes, _ := json.Marshal(k8sData)
-				var k8sResult steps.K8sResult
-				json.Unmarshal(k8sBytes, &k8sResult)
+				// Convert manifests from []string to map[string]interface{}
+				manifestsMap := make(map[string]interface{})
+				for i, manifest := range state.Artifacts.K8sResult.Manifests {
+					manifestsMap[fmt.Sprintf("manifest_%d", i)] = manifest
+				}
+				k8sResult := steps.K8sResult{
+					Manifests:  manifestsMap,
+					Namespace:  state.Artifacts.K8sResult.Namespace,
+					ServiceURL: state.Artifacts.K8sResult.Endpoint,
+				}
 
 				err := steps.DeployToKubernetes(ctx, &k8sResult, deps.Logger)
 				if err != nil {
@@ -362,21 +370,26 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 
 		case "verify_deployment":
 			// Verify deployment
-			artifacts := state.Artifacts
-			k8sData, ok := artifacts["k8s_result"]
-			if !ok {
+			if state.Artifacts == nil || state.Artifacts.K8sResult == nil {
 				execErr = fmt.Errorf("deploy_application must be run first")
 			} else {
-				k8sBytes, _ := json.Marshal(k8sData)
-				var k8sResult steps.K8sResult
-				json.Unmarshal(k8sBytes, &k8sResult)
+				// Convert manifests from []string to map[string]interface{}
+				manifestsMap := make(map[string]interface{})
+				for i, manifest := range state.Artifacts.K8sResult.Manifests {
+					manifestsMap[fmt.Sprintf("manifest_%d", i)] = manifest
+				}
+				k8sResult := steps.K8sResult{
+					Manifests:  manifestsMap,
+					Namespace:  state.Artifacts.K8sResult.Namespace,
+					ServiceURL: state.Artifacts.K8sResult.Endpoint,
+				}
 
 				verifyResult, err := steps.VerifyDeploymentWithPortForward(ctx, &k8sResult, deps.Logger)
 				if err != nil {
 					execErr = err
 				} else {
 					resultBytes, _ := json.Marshal(verifyResult)
-					json.Unmarshal(resultBytes, &result)
+					_ = json.Unmarshal(resultBytes, &result)
 					result["session_id"] = sessionID
 				}
 			}
@@ -412,11 +425,11 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 
 		// Update state
 		state.MarkStepCompleted(config.Name)
-		state.UpdateArtifacts(result)
+		// Note: Artifacts are already updated in each case statement above
 
 		// Save state
 		if err := SaveWorkflowState(ctx, deps.SessionManager, state); err != nil {
-			errorResult := createErrorResult(errors.Wrap(err, "failed to save workflow state"))
+			errorResult := createErrorResult(fmt.Errorf("failed to save workflow state: %w", err))
 			return &errorResult, nil
 		}
 
@@ -443,7 +456,7 @@ func CreateOrchestrationHandler(config ToolConfig, deps ToolDependencies) func(c
 		return createWorkflowStatusHandler(config, deps)
 	default:
 		return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			result := createErrorResult(errors.Errorf("orchestration handler not implemented for %s", config.Name))
+			result := createErrorResult(fmt.Errorf("orchestration handler not implemented for %s", config.Name))
 			return &result, nil
 		}
 	}
@@ -456,7 +469,7 @@ func CreateUtilityHandler(config ToolConfig, deps ToolDependencies) func(context
 		return CreateListToolsHandler()
 	default:
 		return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			result := createErrorResult(errors.Errorf("utility handler not implemented for %s", config.Name))
+			result := createErrorResult(fmt.Errorf("utility handler not implemented for %s", config.Name))
 			return &result, nil
 		}
 	}
@@ -488,8 +501,8 @@ func createStartWorkflowHandler(config ToolConfig, deps ToolDependencies) func(c
 			Status:         "started",
 			CurrentStep:    "analyze_repository",
 			CompletedSteps: []string{},
-			Artifacts:      make(map[string]interface{}),
-			Metadata:       make(map[string]interface{}),
+			Artifacts:      &WorkflowArtifacts{},
+			Metadata:       &ToolMetadata{SessionID: sessionID},
 		}
 
 		// Handle optional parameters
@@ -538,7 +551,7 @@ func createWorkflowStatusHandler(config ToolConfig, deps ToolDependencies) func(
 		// Load workflow state
 		state, err := LoadWorkflowState(ctx, deps.SessionManager, sessionID)
 		if err != nil {
-			result := createErrorResult(errors.Wrap(err, "failed to load workflow state"))
+			result := createErrorResult(fmt.Errorf("failed to load workflow state: %w", err))
 			return &result, nil
 		}
 

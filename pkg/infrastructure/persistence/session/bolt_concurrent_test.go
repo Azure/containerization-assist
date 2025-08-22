@@ -28,8 +28,8 @@ func createTestConcurrentStore(t *testing.T) (*ConcurrentBoltStore, func()) {
 	store := NewConcurrentBoltStore(baseStore)
 
 	cleanup := func() {
-		store.Close()
-		os.RemoveAll(tmpDir)
+		_ = store.Close()
+		_ = os.RemoveAll(tmpDir)
 	}
 
 	return store, cleanup

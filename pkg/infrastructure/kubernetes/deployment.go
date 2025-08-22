@@ -76,16 +76,17 @@ type Service interface {
 	PreviewChanges(ctx context.Context, manifestPath string, namespace string) (string, error)
 }
 
-// ServiceImpl implements the deployment Service interface
-type ServiceImpl struct {
+// deploymentService implements the deployment Service interface
+type deploymentService struct {
 	kube   KubeRunner
 	logger *slog.Logger
 }
 
 // NewService creates a new deployment service
 func NewService(kube KubeRunner, logger *slog.Logger) Service {
-	return &ServiceImpl{
-		kube: kube,
+	return &deploymentService{
+		kube:   kube,
+		logger: logger,
 	}
 }
 
@@ -167,7 +168,7 @@ type DeploymentOptions struct {
 // Service methods implementing the Service interface
 
 // DeployManifest deploys a Kubernetes manifest file
-func (s *ServiceImpl) DeployManifest(ctx context.Context, manifestPath string, options DeploymentOptions) (*DeploymentResult, error) {
+func (s *deploymentService) DeployManifest(ctx context.Context, manifestPath string, options DeploymentOptions) (*DeploymentResult, error) {
 	startTime := time.Now()
 
 	result := &DeploymentResult{
@@ -259,7 +260,7 @@ func (s *ServiceImpl) DeployManifest(ctx context.Context, manifestPath string, o
 }
 
 // ValidateDeployment validates that deployed resources are healthy
-func (s *ServiceImpl) ValidateDeployment(ctx context.Context, manifestPath string, namespace string) (*ValidationResult, error) {
+func (s *deploymentService) ValidateDeployment(ctx context.Context, manifestPath string, namespace string) (*ValidationResult, error) {
 	startTime := time.Now()
 
 	result := &ValidationResult{
@@ -355,7 +356,7 @@ func (s *ServiceImpl) ValidateDeployment(ctx context.Context, manifestPath strin
 }
 
 // DeleteDeployment deletes a deployed manifest
-func (s *ServiceImpl) DeleteDeployment(ctx context.Context, manifestPath string) (*DeploymentResult, error) {
+func (s *deploymentService) DeleteDeployment(ctx context.Context, manifestPath string) (*DeploymentResult, error) {
 	startTime := time.Now()
 
 	result := &DeploymentResult{
@@ -389,7 +390,7 @@ func (s *ServiceImpl) DeleteDeployment(ctx context.Context, manifestPath string)
 }
 
 // CheckClusterConnection verifies connection to the Kubernetes cluster
-func (s *ServiceImpl) CheckClusterConnection(ctx context.Context) error {
+func (s *deploymentService) CheckClusterConnection(ctx context.Context) error {
 	// Try a simple kubectl command to verify cluster connection
 	output, err := s.kube.GetPods(ctx, "kube-system", "")
 	if err != nil {
@@ -399,7 +400,7 @@ func (s *ServiceImpl) CheckClusterConnection(ctx context.Context) error {
 }
 
 // PreviewChanges runs kubectl diff to preview what would change
-func (s *ServiceImpl) PreviewChanges(ctx context.Context, manifestPath string, namespace string) (string, error) {
+func (s *deploymentService) PreviewChanges(ctx context.Context, manifestPath string, namespace string) (string, error) {
 
 	// kubectl diff shows what would change if the manifest were applied
 	output, err := s.executeKubectlDiff(ctx, manifestPath, namespace)
@@ -419,7 +420,7 @@ func (s *ServiceImpl) PreviewChanges(ctx context.Context, manifestPath string, n
 
 // Service helper methods
 
-func (s *ServiceImpl) validateDeploymentInputs(manifestPath string, _ DeploymentOptions) error {
+func (s *deploymentService) validateDeploymentInputs(manifestPath string, _ DeploymentOptions) error {
 	if manifestPath == "" {
 		return fmt.Errorf("manifest path is required")
 	}
@@ -432,7 +433,7 @@ func (s *ServiceImpl) validateDeploymentInputs(manifestPath string, _ Deployment
 	return nil
 }
 
-func (s *ServiceImpl) validateManifestFile(manifestPath string) error {
+func (s *deploymentService) validateManifestFile(manifestPath string) error {
 	info, err := os.Stat(manifestPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -450,7 +451,11 @@ func (s *ServiceImpl) validateManifestFile(manifestPath string) error {
 	if err != nil {
 		return fmt.Errorf("cannot read manifest file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && s.logger != nil {
+			s.logger.Warn("failed to close manifest file", "error", closeErr)
+		}
+	}()
 
 	content, err := io.ReadAll(file)
 	if err != nil {
@@ -480,7 +485,7 @@ func (s *ServiceImpl) validateManifestFile(manifestPath string) error {
 	return nil
 }
 
-func (s *ServiceImpl) checkKubectlInstalled() error {
+func (s *deploymentService) checkKubectlInstalled() error {
 	if _, err := exec.LookPath("kubectl"); err != nil {
 		return fmt.Errorf("kubectl executable not found in PATH. Please install kubectl")
 	}
@@ -494,7 +499,7 @@ func (s *ServiceImpl) checkKubectlInstalled() error {
 	return nil
 }
 
-func (s *ServiceImpl) categorizeError(err error, output string) string {
+func (s *deploymentService) categorizeError(err error, output string) string {
 	errStr := strings.ToLower(err.Error())
 	outputStr := strings.ToLower(output)
 
@@ -525,7 +530,7 @@ func (s *ServiceImpl) categorizeError(err error, output string) string {
 	return "kubectl_error"
 }
 
-func (s *ServiceImpl) parseDeploymentOutput(output string) []DeployedResource {
+func (s *deploymentService) parseDeploymentOutput(output string) []DeployedResource {
 	resources := make([]DeployedResource, 0)
 
 	lines := strings.Split(output, "\n")
@@ -565,7 +570,7 @@ func (s *ServiceImpl) parseDeploymentOutput(output string) []DeployedResource {
 	return resources
 }
 
-func (s *ServiceImpl) parsePodStatus(output string) []PodStatus {
+func (s *deploymentService) parsePodStatus(output string) []PodStatus {
 	pods := make([]PodStatus, 0)
 
 	lines := strings.Split(output, "\n")
@@ -601,7 +606,7 @@ func (s *ServiceImpl) parsePodStatus(output string) []PodStatus {
 }
 
 // executeKubectlDiff runs kubectl diff to preview deployment changes
-func (s *ServiceImpl) executeKubectlDiff(ctx context.Context, manifestPath, namespace string) (string, error) {
+func (s *deploymentService) executeKubectlDiff(ctx context.Context, manifestPath, namespace string) (string, error) {
 	args := []string{"diff", "-f", manifestPath}
 	if namespace != "" && namespace != "default" {
 		args = append(args, "-n", namespace)
@@ -613,7 +618,7 @@ func (s *ServiceImpl) executeKubectlDiff(ctx context.Context, manifestPath, name
 }
 
 // filterRelevantEvents filters events to show only critical debugging information
-func (s *ServiceImpl) filterRelevantEvents(eventsOutput string) string {
+func (s *deploymentService) filterRelevantEvents(eventsOutput string) string {
 	var relevantEvents []string
 	lines := strings.Split(eventsOutput, "\n")
 
@@ -642,7 +647,7 @@ func (s *ServiceImpl) filterRelevantEvents(eventsOutput string) string {
 }
 
 // extractEssentialPodInfo extracts only the most critical information from kubectl describe pod output
-func (s *ServiceImpl) extractEssentialPodInfo(describeOutput, podName string) string {
+func (s *deploymentService) extractEssentialPodInfo(describeOutput, podName string) string {
 	var essential []string
 	lines := strings.Split(describeOutput, "\n")
 

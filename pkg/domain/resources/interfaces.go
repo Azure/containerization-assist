@@ -27,6 +27,6 @@ type Resource struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description,omitempty"`
 	MimeType    string                 `json:"mimeType,omitempty"`
-	Content     interface{}            `json:"content,omitempty"`
+	Content     any                    `json:"content,omitempty"`
 	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }

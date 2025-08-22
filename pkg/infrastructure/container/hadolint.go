@@ -50,12 +50,12 @@ func NewBuildResult() *BuildValidationResult {
 
 // HadolintValidator provides Hadolint-based Dockerfile validation
 type HadolintValidator struct {
-	logger       *slog.Logger
 	hadolintPath string
 }
 
 // NewHadolintValidator creates a new Hadolint validator
 func NewHadolintValidator(logger *slog.Logger) *HadolintValidator {
+	_ = logger // Keep for API compatibility
 	return &HadolintValidator{}
 }
 
@@ -84,7 +84,9 @@ func (hv *HadolintValidator) ValidateWithHadolint(ctx context.Context, dockerfil
 	if err := os.WriteFile(tmpFile, []byte(dockerfileContent), 0644); err != nil {
 		return nil, mcperrors.New(mcperrors.CodeOperationFailed, "core", "failed to write temporary Dockerfile", err)
 	}
-	defer os.Remove(tmpFile)
+	defer func() {
+		_ = os.Remove(tmpFile)
+	}()
 
 	// Run Hadolint with JSON output
 	cmd := exec.CommandContext(ctx, hv.hadolintPath, "--format", "json", tmpFile)

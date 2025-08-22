@@ -16,7 +16,11 @@ func TestHotReloadWatcher(t *testing.T) {
 	// Create a temporary directory for test templates
 	tempDir, err := os.MkdirTemp("", "test-templates")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("Failed to remove temp dir: %v", err)
+		}
+	}()
 
 	// Create a logger for testing
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
@@ -111,7 +115,11 @@ func TestHotReloadWatcherDisabled(t *testing.T) {
 	// Create a temporary directory for test templates
 	tempDir, err := os.MkdirTemp("", "test-templates")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("Failed to remove temp dir: %v", err)
+		}
+	}()
 
 	// Create a logger for testing
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
@@ -163,7 +171,11 @@ func TestHotReloadWatcherStart(t *testing.T) {
 	// Create a temporary directory for test templates
 	tempDir, err := os.MkdirTemp("", "test-templates")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("Failed to remove temp dir: %v", err)
+		}
+	}()
 
 	// Create a logger for testing
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))

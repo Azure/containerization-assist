@@ -9,7 +9,7 @@ import (
 
 	"github.com/Azure/containerization-assist/pkg/domain/errors"
 	"github.com/Azure/containerization-assist/pkg/domain/workflow"
-	"github.com/Azure/containerization-assist/pkg/infrastructure/core/resources"
+	"github.com/Azure/containerization-assist/pkg/infrastructure/core"
 	"github.com/Azure/containerization-assist/pkg/service/registrar"
 	"github.com/Azure/containerization-assist/pkg/service/session"
 	"github.com/mark3labs/mcp-go/server"
@@ -22,7 +22,7 @@ type OptimizedSessionManager = session.OptimizedSessionManager
 type Bootstrapper struct {
 	logger               *slog.Logger
 	config               workflow.ServerConfig
-	resourceStore        *resources.Store
+	resourceStore        *core.Store
 	workflowOrchestrator workflow.WorkflowOrchestrator
 	sessionManager       OptimizedSessionManager
 }
@@ -31,7 +31,7 @@ type Bootstrapper struct {
 func NewBootstrapper(
 	logger *slog.Logger,
 	config workflow.ServerConfig,
-	resourceStore *resources.Store,
+	resourceStore *core.Store,
 	workflowOrchestrator workflow.WorkflowOrchestrator,
 	sessionManager OptimizedSessionManager,
 ) *Bootstrapper {

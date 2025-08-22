@@ -7,7 +7,7 @@ import (
 
 	"github.com/Azure/containerization-assist/pkg/domain/resources"
 	"github.com/Azure/containerization-assist/pkg/domain/workflow"
-	resourcesInfra "github.com/Azure/containerization-assist/pkg/infrastructure/core/resources"
+	resourcesInfra "github.com/Azure/containerization-assist/pkg/infrastructure/core"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,7 +30,7 @@ func (m *MockWorkflowOrchestrator) Execute(ctx context.Context, req *mcp.CallToo
 	}, nil
 }
 
-// MockResourceStore is a mock implementation of resources.Store
+// MockResourceStore is a mock implementation of core.Store
 type MockResourceStore struct {
 	resources            []resources.Resource
 	addResourceCallCount int

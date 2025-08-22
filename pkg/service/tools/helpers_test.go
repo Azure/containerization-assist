@@ -203,14 +203,15 @@ func TestExtractStringArrayParam(t *testing.T) {
 }
 
 func TestCreateProgressEmitter(t *testing.T) {
-	t.Run("creates progress emitter", func(t *testing.T) {
+	t.Run("returns nil without MCP context", func(t *testing.T) {
 		ctx := context.Background()
 		req := &mcp.CallToolRequest{}
 		totalSteps := 5
 		logger := slog.Default()
 
 		emitter := CreateProgressEmitter(ctx, req, totalSteps, logger)
-		require.NotNil(t, emitter)
+		// Should return nil when no MCP context is available
+		require.Nil(t, emitter)
 	})
 }
 

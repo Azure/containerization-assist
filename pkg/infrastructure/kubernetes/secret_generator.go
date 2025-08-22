@@ -13,9 +13,7 @@ import (
 )
 
 // SecretGenerator provides Kubernetes secret generation operations
-type SecretGenerator struct {
-	logger zerolog.Logger
-}
+type SecretGenerator struct{}
 
 // NewSecretGenerator creates a new secret generator
 func NewSecretGenerator(logger zerolog.Logger) *SecretGenerator {

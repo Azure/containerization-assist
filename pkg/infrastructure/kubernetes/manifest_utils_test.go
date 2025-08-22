@@ -9,7 +9,7 @@ import (
 
 func TestWriteManifestsFromTemplate_Basic(t *testing.T) {
 	tmpDir := t.TempDir()
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	err := WriteManifestsFromTemplate(ManifestsBasic, tmpDir, "myrepo/myapp:1.2.3")
 	if err != nil {

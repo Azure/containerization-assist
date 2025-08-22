@@ -14,7 +14,6 @@ import (
 
 // UnifiedSecurityScanner combines multiple vulnerability scanners for comprehensive security analysis
 type UnifiedSecurityScanner struct {
-	logger       zerolog.Logger
 	trivyScanner *TrivyScanner
 	grypeScanner *GrypeScanner
 	enableTrivy  bool

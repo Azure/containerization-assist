@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/containerization-assist/pkg/domain/workflow"
 	"github.com/Azure/containerization-assist/pkg/infrastructure/ai_ml/prompts"
 	"github.com/Azure/containerization-assist/pkg/infrastructure/ai_ml/sampling"
-	"github.com/Azure/containerization-assist/pkg/infrastructure/core/resources"
+	"github.com/Azure/containerization-assist/pkg/infrastructure/core"
 	"github.com/Azure/containerization-assist/pkg/service/bootstrap"
 	"github.com/Azure/containerization-assist/pkg/service/lifecycle"
 	"github.com/Azure/containerization-assist/pkg/service/session"
@@ -24,12 +24,11 @@ type Dependencies struct {
 	Logger         *slog.Logger
 	Config         workflow.ServerConfig
 	SessionManager session.OptimizedSessionManager
-	ResourceStore  *resources.Store
+	ResourceStore  *core.Store
 
 	EventPublisher domainevents.Publisher
 
-	WorkflowOrchestrator   workflow.WorkflowOrchestrator
-	EventAwareOrchestrator workflow.EventAwareOrchestrator
+	WorkflowOrchestrator workflow.WorkflowOrchestrator
 
 	SamplingClient *sampling.Client
 	PromptManager  *prompts.Manager
@@ -69,17 +68,17 @@ func (d *Dependencies) Validate() error {
 	return nil
 }
 
-type serverImpl struct {
+type server struct {
 	dependencies     *Dependencies
 	lifecycleManager *lifecycle.LifecycleManager
 	bootstrapper     *bootstrap.Bootstrapper
 }
 
-func (s *serverImpl) Start(ctx context.Context) error {
+func (s *server) Start(ctx context.Context) error {
 	return s.lifecycleManager.Start(ctx)
 }
 
-func (s *serverImpl) Stop(ctx context.Context) error {
+func (s *server) Stop(ctx context.Context) error {
 	return s.lifecycleManager.Shutdown(ctx)
 }
 
@@ -103,7 +102,7 @@ func NewMCPServerFromDeps(deps *Dependencies) (api.MCPServer, error) {
 		bootstrapper,
 	)
 
-	return &serverImpl{
+	return &server{
 		dependencies:     deps,
 		lifecycleManager: lifecycleManager,
 		bootstrapper:     bootstrapper,
