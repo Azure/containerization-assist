@@ -172,7 +172,11 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 					})
 					resultBytes, _ := json.Marshal(dockerfileResult)
 					_ = json.Unmarshal(resultBytes, &result)
-					result["session_id"] = sessionID
+					if err := json.Unmarshal(resultBytes, &result); err != nil {
+						execErr = fmt.Errorf("failed to unmarshal dockerfileResult: %w", err)
+					} else {
+						result["session_id"] = sessionID
+					}
 				}
 			}
 
