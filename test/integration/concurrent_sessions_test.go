@@ -243,7 +243,11 @@ func TestHighContentionScenario(t *testing.T) {
 					// Increment counter
 					counterStr := state.Metadata.Custom["counter"]
 					var counter int
-					fmt.Sscanf(counterStr, "%d", &counter)
+					n, err := fmt.Sscanf(counterStr, "%d", &counter)
+					if err != nil || n != 1 {
+						// Fallback to zero if parsing fails
+						counter = 0
+					}
 					counter++
 					state.Metadata.Custom["counter"] = fmt.Sprintf("%d", counter)
 
