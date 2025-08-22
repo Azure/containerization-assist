@@ -144,7 +144,11 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 				// Convert result to map
 				resultBytes, _ := json.Marshal(analyzeResult)
 				_ = json.Unmarshal(resultBytes, &result)
-				result["session_id"] = sessionID
+				if err := json.Unmarshal(resultBytes, &result); err != nil {
+					execErr = fmt.Errorf("failed to unmarshal analyzeResult: %w", err)
+				} else {
+					result["session_id"] = sessionID
+				}
 			}
 
 		case "generate_dockerfile":
