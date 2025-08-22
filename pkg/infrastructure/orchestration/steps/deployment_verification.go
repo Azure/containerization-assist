@@ -191,7 +191,12 @@ func checkDeploymentStatus(ctx context.Context, k8sResult *K8sResult, diag *Depl
 	parts := strings.Split(string(output), "/")
 	if len(parts) == 2 {
 		_, _ = fmt.Sscanf(parts[0], "%d", &diag.PodsReady)
-		_, _ = fmt.Sscanf(parts[1], "%d", &diag.PodsTotal)
+		if n, err := fmt.Sscanf(parts[0], "%d", &diag.PodsReady); n != 1 || err != nil {
+			diag.Warnings = append(diag.Warnings, fmt.Sprintf("Failed to parse pods ready: '%s'", parts[0]))
+		}
+		if n, err := fmt.Sscanf(parts[1], "%d", &diag.PodsTotal); n != 1 || err != nil {
+			diag.Warnings = append(diag.Warnings, fmt.Sprintf("Failed to parse pods total: '%s'", parts[1]))
+		}
 	}
 
 	return nil
