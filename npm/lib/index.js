@@ -73,28 +73,8 @@ const tools = {
 function registerTool(server, tool, customName = null) {
   const name = customName || tool.name;
   
-  // Check if this is an McpServer instance (has registerTool with specific signature)
+  // Check if server has registerTool method
   if (typeof server.registerTool === 'function') {
-    // Try to detect if this is the MCP SDK's McpServer by checking method signature
-    // McpServer.registerTool expects (name, metadata, handler) where metadata includes inputSchema
-    try {
-      // For McpServer, combine our metadata structure
-      const metadata = {
-        title: tool.metadata.title,
-        description: tool.metadata.description,
-        inputSchema: tool.metadata.inputSchema // Pass Zod schema directly
-      };
-      
-      // Try calling with McpServer signature
-      server.registerTool(name, metadata, tool.handler);
-      return; // Success
-    } catch (err) {
-      // If that failed, try mock/test server signature
-      try {
-        server.registerTool(name, tool.metadata, tool.handler);
-        return; // Success  
-      } catch (err2) {
-        // Fall through to try other methods
     // Detect McpServer by constructor name or unique property
     // McpServer.registerTool expects (name, metadata, handler) where metadata includes inputSchema
     if (
@@ -127,17 +107,16 @@ function registerTool(server, tool, customName = null) {
       },
       tool.handler
     );
-  } else {
-    throw new Error(
-      'Server must have either:\n' +
-      '  - registerTool(name, metadata, handler) or registerTool(tool) method\n' +
-      '  - addTool({ name, description, inputSchema }, handler) method\n' +
-      'Tried calling:\n' +
-      '  server.registerTool(tool) and server.registerTool(name, metadata, handler)\n' +
-      '  server.addTool({ name, description, inputSchema }, handler)\n' +
-      'Please ensure your server implements one of these signatures.'
-    );
+    return; // Success
   }
+  
+  // No compatible method found
+  throw new Error(
+    'Server must have either:\n' +
+    '  - registerTool(name, metadata, handler) method (McpServer)\n' +
+    '  - addTool({ name, description, inputSchema }, handler) method (Server)\n' +
+    'Please ensure your server implements one of these signatures.'
+  );
 }
 
 /**
