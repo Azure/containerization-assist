@@ -62,7 +62,7 @@ echo ""
 
 # Run unit tests for MCP package
 echo "Running unit tests..."
-go test -v ./pkg/mcp/... -short
+go test -v ./pkg/... -short
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Unit tests passed${NC}"
 else

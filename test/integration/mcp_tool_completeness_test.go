@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -356,55 +355,7 @@ func main() {
 	return repoDir
 }
 
-func (suite *MCPToolCompletenessTestSuite) extractToolResult(resultRaw interface{}) map[string]interface{} {
-	if result, ok := resultRaw.(map[string]interface{}); ok {
-		if content, ok := result["content"]; ok {
-			if contentArray, ok := content.([]interface{}); ok && len(contentArray) > 0 {
-				if contentItem, ok := contentArray[0].(map[string]interface{}); ok {
-					if text, ok := contentItem["text"].(string); ok {
-						// Parse the JSON text
-						var toolResult map[string]interface{}
-						if err := json.Unmarshal([]byte(text), &toolResult); err == nil {
-							return toolResult
-						}
-					}
-				}
-			}
-		}
-		return result
-	}
-	return nil
-}
-
-// TODO: Function currently not in use. We should verify the correct results from the tool calls
-func (suite *MCPToolCompletenessTestSuite) validateToolResponse(toolName string, result map[string]interface{}, requiredFields []string) {
-	suite.T().Logf("Validating tool response for %s", toolName)
-
-	// Check for required fields
-	for _, field := range requiredFields {
-		assert.Contains(suite.T(), result, field, "Tool %s response should contain field %s", toolName, field)
-	}
-
-	// Additional validation for specific tools
-	switch toolName {
-	case "analyze_repository":
-		// Should have detected language
-		if language, ok := result["language"].(string); ok {
-			assert.NotEmpty(suite.T(), language, "Language should be detected")
-			suite.T().Logf("✓ Detected language: %s", language)
-		}
-		// Check analysis data
-		if analysis, ok := result["analysis"].(map[string]interface{}); ok {
-			if lang, ok := analysis["language"].(string); ok {
-				suite.T().Logf("✓ Repository analysis detected language: %v", lang)
-			}
-			if filesAnalyzed, ok := analysis["files_analyzed"].(float64); ok {
-				suite.T().Logf("✓ Files analyzed: %.0f", filesAnalyzed)
-			}
-		}
-
-	} //TODO: We need tests for all the individual tools
-}
+// extractToolResult and validateToolResponse functions removed as dead code
 
 // listAndDiscoverTools calls tools/list and returns a set of tool names and the raw tools array
 func (suite *MCPToolCompletenessTestSuite) listAndDiscoverTools(stdin *os.File, stdout *os.File, requestID int) (map[string]bool, []interface{}) {
