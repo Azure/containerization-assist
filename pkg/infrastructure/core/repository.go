@@ -1506,6 +1506,8 @@ func (ra *RepositoryAnalyzer) normalizeJavaVersionOptimized(version string) stri
 // parseInt converts string to int with port range validation
 func parseInt(s string) int {
 	var result int
-	_, _ = fmt.Sscanf(s, "%d", &result)
+	if _, err := fmt.Sscanf(s, "%d", &result); err != nil {
+		return 0
+	}
 	return result
 }
