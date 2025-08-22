@@ -1094,7 +1094,7 @@ func (ra *RepositoryAnalyzer) findFilesByPattern(repoPath, pattern string) bool 
 	}
 
 	var found bool
-	err = filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
+	walkErr := filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
