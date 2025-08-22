@@ -288,7 +288,9 @@ func TestHighContentionScenario(t *testing.T) {
 
 	finalCounter := 0
 	counterStr := finalState.Metadata.Custom["counter"]
-	fmt.Sscanf(counterStr, "%d", &finalCounter)
+	n, err := fmt.Sscanf(counterStr, "%d", &finalCounter)
+	require.NoError(t, err, "Failed to parse counter from finalState.Metadata.Custom[\"counter\"]: %q", counterStr)
+	require.Equal(t, 1, n, "Expected to parse one integer from counterStr, got %d", n)
 	expectedCount := numWorkers * updatesPerWorker
 	assert.Equal(t, expectedCount, finalCounter,
 		"Counter mismatch: expected %d, got %d", expectedCount, finalCounter)
