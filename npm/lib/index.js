@@ -95,7 +95,24 @@ function registerTool(server, tool, customName = null) {
         return; // Success  
       } catch (err2) {
         // Fall through to try other methods
-      }
+    // Detect McpServer by constructor name or unique property
+    // McpServer.registerTool expects (name, metadata, handler) where metadata includes inputSchema
+    if (
+      (server.constructor && server.constructor.name === 'McpServer') ||
+      (server.isMcpServer === true) // Optionally, check for a unique property
+    ) {
+      // For McpServer, combine our metadata structure
+      const metadata = {
+        title: tool.metadata.title,
+        description: tool.metadata.description,
+        inputSchema: tool.metadata.inputSchema // Pass Zod schema directly
+      };
+      server.registerTool(name, metadata, tool.handler);
+      return; // Success
+    } else {
+      // Assume mock/test server signature: (name, metadata, handler)
+      server.registerTool(name, tool.metadata, tool.handler);
+      return; // Success
     }
   }
   
