@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/containerization-assist/pkg/mcp/domain/workflow"
-	"github.com/Azure/containerization-assist/pkg/mcp/service"
-	"github.com/Azure/containerization-assist/pkg/mcp/service/session"
-	"github.com/Azure/containerization-assist/pkg/mcp/service/tools"
+	"github.com/Azure/containerization-assist/pkg/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/service"
+	"github.com/Azure/containerization-assist/pkg/service/session"
+	"github.com/Azure/containerization-assist/pkg/service/tools"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

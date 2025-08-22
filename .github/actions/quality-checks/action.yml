@@ -9,7 +9,7 @@ inputs:
   target-paths:
     description: 'Paths to analyze (space-separated)'
     required: false
-    default: './pkg/mcp/... ./pkg/core/...'
+    default: './pkg/...'
   golangci-lint-version:
     description: 'golangci-lint version'
     required: false
@@ -264,32 +264,32 @@ runs:
         
         # Architecture pattern checks
         echo "🔍 Checking architecture patterns..."
-        ADAPTERS=$(find pkg/mcp pkg/core -name "*adapter*.go" 2>/dev/null | wc -l | tr -d ' ')
-        WRAPPERS=$(find pkg/mcp pkg/core -name "*wrapper*.go" 2>/dev/null | grep -v docker_operation | wc -l | tr -d ' ')
+        ADAPTERS=$(find pkg/ -name "*adapter*.go" 2>/dev/null | wc -l | tr -d ' ')
+        WRAPPERS=$(find pkg/ -name "*wrapper*.go" 2>/dev/null | grep -v docker_operation | wc -l | tr -d ' ')
         
-        # Check for exactly 4 top-level directories in pkg/mcp
-        echo "📂 Checking pkg/mcp directory structure..."
-        if [ -d "pkg/mcp" ]; then
-          ACTUAL_DIRS=$(ls -1 pkg/mcp | wc -l | tr -d ' ')
+        # Check for exactly 4 top-level directories in pkg/
+        echo "📂 Checking pkg/ directory structure..."
+        if [ -d "pkg" ]; then
+          ACTUAL_DIRS=$(ls -1 pkg | wc -l | tr -d ' ')
           EXPECTED_DIRS=4
-          DIR_LIST=$(ls -1 pkg/mcp | tr '\n' ', ' | sed 's/, $//')
+          DIR_LIST=$(ls -1 pkg | tr '\n' ', ' | sed 's/, $//')
           
           if [ "$ACTUAL_DIRS" -ne "$EXPECTED_DIRS" ]; then
-            echo "❌ pkg/mcp must contain exactly 4 directories (api, application, domain, infrastructure)"
+            echo "❌ pkg must contain exactly 4 directories (api, domain, infrastructure, service)"
             echo "   Found $ACTUAL_DIRS directories: $DIR_LIST"
             SCORE=$((SCORE - 20))  # Significant penalty for incorrect structure
           else
-            echo "✅ pkg/mcp has correct 4-layer structure: $DIR_LIST"
+            echo "✅ pkg has correct 4-layer structure: $DIR_LIST"
           fi
         fi
         
         # Large files check (>800 lines, excluding tests)
         echo "📏 Checking for large files..."
-        LARGE_FILES=$(find pkg/mcp pkg/core -name "*.go" -not -path "*/test*" -exec wc -l {} \; | awk '$1 > 800 {count++} END {print count+0}')
+        LARGE_FILES=$(find pkg/ -name "*.go" -not -path "*/test*" -exec wc -l {} \; | awk '$1 > 800 {count++} END {print count+0}')
         
         # Complexity analysis
         echo "🔄 Analyzing cyclomatic complexity..."
-        COMPLEX_FUNCTIONS=$($(go env GOPATH)/bin/gocyclo -over $COMPLEXITY_THRESHOLD pkg/mcp pkg/core 2>/dev/null | wc -l | tr -d ' ')
+        COMPLEX_FUNCTIONS=$($(go env GOPATH)/bin/gocyclo -over $COMPLEXITY_THRESHOLD pkg/ 2>/dev/null | wc -l | tr -d ' ')
         
         # Calculate architecture score (100 - deductions)
         SCORE=100
@@ -343,17 +343,17 @@ runs:
         # Show details for violations
         if [ "$ADAPTERS" -gt 0 ]; then
           echo "Adapter files found:"
-          find pkg/mcp pkg/core -name "*adapter*.go" 2>/dev/null | sed 's/^/  - /'
+          find pkg/ -name "*adapter*.go" 2>/dev/null | sed 's/^/  - /'
         fi
         
         if [ "$WRAPPERS" -gt 0 ]; then
           echo "Wrapper files found:"
-          find pkg/mcp pkg/core -name "*wrapper*.go" 2>/dev/null | grep -v docker_operation | sed 's/^/  - /'
+          find pkg/ -name "*wrapper*.go" 2>/dev/null | grep -v docker_operation | sed 's/^/  - /'
         fi
         
         if [ "$LARGE_FILES" -gt 0 ]; then
           echo "Large files (>800 lines):"
-          find pkg/mcp pkg/core -name "*.go" -not -path "*/test*" -exec wc -l {} \; | awk '$1 > 800 {print "  - " $2 " (" $1 " lines)"}' | head -5
+          find pkg/ -name "*.go" -not -path "*/test*" -exec wc -l {} \; | awk '$1 > 800 {print "  - " $2 " (" $1 " lines)"}' | head -5
           if [ "$LARGE_FILES" -gt 5 ]; then
             echo "  ... and $((LARGE_FILES - 5)) more"
           fi
@@ -361,7 +361,7 @@ runs:
         
         if [ "$COMPLEX_FUNCTIONS" -gt 0 ]; then
           echo "Most complex functions (showing first 3):"
-          $(go env GOPATH)/bin/gocyclo -over $COMPLEXITY_THRESHOLD pkg/mcp pkg/core 2>/dev/null | head -3 | sed 's/^/  - /'
+          $(go env GOPATH)/bin/gocyclo -over $COMPLEXITY_THRESHOLD pkg/ 2>/dev/null | head -3 | sed 's/^/  - /'
           if [ "$COMPLEX_FUNCTIONS" -gt 3 ]; then
             echo "  ... and $((COMPLEX_FUNCTIONS - 3)) more"
           fi

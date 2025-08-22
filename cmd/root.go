@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Azure/containerization-assist/pkg/mcp/api"
-	"github.com/Azure/containerization-assist/pkg/mcp/service"
-	"github.com/Azure/containerization-assist/pkg/mcp/service/config"
+	"github.com/Azure/containerization-assist/pkg/api"
+	"github.com/Azure/containerization-assist/pkg/service"
+	"github.com/Azure/containerization-assist/pkg/service/config"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
