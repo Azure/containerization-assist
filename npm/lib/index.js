@@ -44,41 +44,79 @@ const tools = {
 
 /**
  * Register a single tool with an MCP server
- * @param {Object} server - MCP server instance (SDK Server or custom implementation)
- * @param {Object} tool - Tool definition with name, description, inputSchema, and handler
+ * @param {Object} server - MCP server instance (SDK Server, McpServer, or custom implementation)
+ * @param {Object} tool - Tool definition with name, metadata, and handler
  * @param {string} tool.name - Tool identifier
- * @param {string} tool.description - Tool description
- * @param {Object} tool.inputSchema - Tool input schema (Zod schema object)
+ * @param {Object} tool.metadata - Tool metadata containing title, description, and inputSchema
+ * @param {string} tool.metadata.title - Tool display title
+ * @param {string} tool.metadata.description - Tool description  
+ * @param {Object} tool.metadata.inputSchema - Tool input schema (Zod schema object)
  * @param {Function} tool.handler - Async function that handles tool execution
  * @param {string} [customName] - Optional custom name to override tool.name
- * @throws {Error} If server doesn't have addTool or registerTool method
+ * @throws {Error} If server doesn't have a supported registration method
  * @example
- * const { Server } = require('@modelcontextprotocol/sdk');
+ * // With MCP SDK's McpServer
+ * const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
  * const { analyzeRepository, registerTool } = require('@thgamble/containerization-assist-mcp');
  * 
- * const server = new Server();
+ * const server = new McpServer({ name: 'my-server', version: '1.0.0' });
+ * registerTool(server, analyzeRepository);
+ * 
+ * @example  
+ * // With MCP SDK's low-level Server
+ * const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
+ * const { analyzeRepository, registerTool } = require('@thgamble/containerization-assist-mcp');
+ * 
+ * const server = new Server({ name: 'my-server', version: '1.0.0' });
  * registerTool(server, analyzeRepository);
  */
 function registerTool(server, tool, customName = null) {
   const name = customName || tool.name;
   
-  // Check if server has the MCP SDK's addTool method
+  // Check if server has registerTool method
+  if (typeof server.registerTool === 'function') {
+    // Detect McpServer by constructor name or unique property
+    // McpServer.registerTool expects (name, metadata, handler) where metadata includes inputSchema
+    if (
+      (server.constructor && server.constructor.name === 'McpServer') ||
+      (server.isMcpServer === true) // Optionally, check for a unique property
+    ) {
+      // For McpServer, combine our metadata structure
+      const metadata = {
+        title: tool.metadata.title,
+        description: tool.metadata.description,
+        inputSchema: tool.metadata.inputSchema // Pass Zod schema directly
+      };
+      server.registerTool(name, metadata, tool.handler);
+      return; // Success
+    } else {
+      // Assume mock/test server signature: (name, metadata, handler)
+      server.registerTool(name, tool.metadata, tool.handler);
+      return; // Success
+    }
+  }
+  
+  // Check if server has the MCP SDK's low-level Server addTool method
   if (typeof server.addTool === 'function') {
-    // Real MCP SDK Server
+    // Low-level MCP SDK Server - needs JSON Schema
     server.addTool(
       {
         name: name,
-        description: tool.description,
-        inputSchema: convertZodToJsonSchema(tool.inputSchema)
+        description: tool.metadata.description,
+        inputSchema: convertZodToJsonSchema(tool.metadata.inputSchema)
       },
       tool.handler
     );
-  } else if (typeof server.registerTool === 'function') {
-    // Mock or custom server with registerTool method
-    server.registerTool(name, { description: tool.description, inputSchema: tool.inputSchema }, tool.handler);
-  } else {
-    throw new Error('Server must have either addTool() or registerTool() method');
+    return; // Success
   }
+  
+  // No compatible method found
+  throw new Error(
+    'Server must have either:\n' +
+    '  - registerTool(name, metadata, handler) method (McpServer)\n' +
+    '  - addTool({ name, description, inputSchema }, handler) method (Server)\n' +
+    'Please ensure your server implements one of these signatures.'
+  );
 }
 
 /**
