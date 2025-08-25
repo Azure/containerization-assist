@@ -15,6 +15,8 @@ import scanImage from './tools/scan-image.js';
 import tagImage from './tools/tag-image.js';
 import pushImage from './tools/push-image.js';
 import generateK8sManifests from './tools/generate-k8s-manifests.js';
+import generateAzureContainerAppsManifests from './tools/generate-azure-container-apps-manifests.js';
+import validateAzureManifests from './tools/validate-azure-manifests.js';
 import prepareCluster from './tools/prepare-cluster.js';
 import deployApplication from './tools/deploy-application.js';
 import verifyDeployment from './tools/verify-deployment.js';
@@ -34,6 +36,8 @@ const tools = {
   tagImage,
   pushImage,
   generateK8sManifests,
+  generateAzureContainerAppsManifests,
+  validateAzureManifests,
   prepareCluster,
   deployApplication,
   verifyDeployment,
@@ -222,6 +226,8 @@ export {
   tagImage,
   pushImage,
   generateK8sManifests,
+  generateAzureContainerAppsManifests,
+  validateAzureManifests,
   prepareCluster,
   deployApplication,
   verifyDeployment,
@@ -256,6 +262,8 @@ export default {
   tagImage,
   pushImage,
   generateK8sManifests,
+  generateAzureContainerAppsManifests,
+  validateAzureManifests,
   prepareCluster,
   deployApplication,
   verifyDeployment,

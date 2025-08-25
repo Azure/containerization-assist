@@ -402,6 +402,134 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 				}
 			}
 
+		case "generate_azure_container_apps_manifests":
+			// Generate Azure Container Apps manifests
+			artifacts := state.Artifacts
+			buildData, ok := artifacts["build_result"]
+			analyzeData, hasAnalyze := artifacts["analyze_result"]
+			if !ok || !hasAnalyze {
+				execErr = fmt.Errorf("build_image and analyze_repository must be run first")
+			} else {
+				buildBytes, _ := json.Marshal(buildData)
+				var buildResult steps.BuildResult
+				json.Unmarshal(buildBytes, &buildResult)
+
+				analyzeBytes, _ := json.Marshal(analyzeData)
+				var analyzeResult steps.AnalyzeResult
+				json.Unmarshal(analyzeBytes, &analyzeResult)
+
+				// Extract Azure-specific parameters
+				resourceGroup, _ := args["resource_group"].(string)
+				if resourceGroup == "" {
+					resourceGroup = "containerized-apps-rg"
+				}
+
+				location, _ := args["location"].(string)
+				if location == "" {
+					location = "eastus"
+				}
+
+				environmentName, _ := args["environment_name"].(string)
+				if environmentName == "" {
+					environmentName = "containerized-apps-env"
+				}
+
+				outputFormat, _ := args["output_format"].(string)
+				if outputFormat == "" {
+					outputFormat = "bicep"
+				}
+
+				registryURL, _ := args["registry_url"].(string)
+				if registryURL == "" {
+					registryURL = "myregistry.azurecr.io"
+				}
+
+				appName := "containerized-app"
+				port := analyzeResult.Port
+				if port == 0 {
+					port = 8080
+				}
+
+				azureResult, err := steps.GenerateAzureContainerAppsManifests(
+					&buildResult,
+					appName,
+					resourceGroup,
+					location,
+					environmentName,
+					port,
+					analyzeResult.RepoPath,
+					registryURL,
+					outputFormat,
+					deps.Logger,
+				)
+
+				if err != nil {
+					execErr = err
+				} else {
+					state.UpdateArtifacts(map[string]interface{}{
+						"azure_container_apps_result": azureResult,
+					})
+					resultBytes, _ := json.Marshal(azureResult)
+					json.Unmarshal(resultBytes, &result)
+					result["session_id"] = sessionID
+				}
+			}
+
+		case "validate_azure_manifests":
+			// Validate Azure Container Apps manifests
+			artifacts := state.Artifacts
+			azureData, ok := artifacts["azure_container_apps_result"]
+			if !ok {
+				execErr = fmt.Errorf("generate_azure_container_apps_manifests must be run first")
+			} else {
+				azureBytes, _ := json.Marshal(azureData)
+				var azureResult steps.AzureContainerAppsResult
+				json.Unmarshal(azureBytes, &azureResult)
+
+				// Get manifest path
+				manifestPath, _ := args["manifest_path"].(string)
+				if manifestPath == "" {
+					// Try to get from manifests
+					if manifests, ok := azureResult.Manifests["manifests"].([]interface{}); ok && len(manifests) > 0 {
+						if manifest, ok := manifests[0].(map[string]interface{}); ok {
+							manifestPath, _ = manifest["Path"].(string)
+						}
+					}
+					if manifestPath == "" && azureResult.Manifests != nil {
+						if path, ok := azureResult.Manifests["main.bicep"].(string); ok {
+							manifestPath = path
+						} else if path, ok := azureResult.Manifests["azuredeploy.json"].(string); ok {
+							manifestPath = path
+						}
+					}
+				}
+
+				strictMode, _ := args["strict_mode"].(bool)
+
+				validationResult, err := steps.ValidateAzureContainerAppsManifests(
+					ctx,
+					manifestPath,
+					azureResult.OutputFormat,
+					strictMode,
+					deps.Logger,
+				)
+
+				if err != nil {
+					execErr = err
+				} else {
+					result["session_id"] = sessionID
+					result["valid"] = validationResult.Valid
+					result["errors"] = validationResult.Errors
+					result["warnings"] = validationResult.Warnings
+					result["manifest_path"] = manifestPath
+					result["output_format"] = azureResult.OutputFormat
+
+					if !validationResult.Valid {
+						execErr = fmt.Errorf("validation failed with %d errors", len(validationResult.Errors))
+					}
+				}
+			}
+
 		default:
 			execErr = fmt.Errorf("unknown workflow tool: %s", config.Name)
 		}

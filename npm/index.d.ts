@@ -58,6 +58,8 @@ export const scanImage: MCPTool;
 export const tagImage: MCPTool;
 export const pushImage: MCPTool;
 export const generateK8sManifests: MCPTool;
+export const generateAzureContainerAppsManifests: MCPTool;
+export const validateAzureManifests: MCPTool;
 export const prepareCluster: MCPTool;
 export const deployApplication: MCPTool;
 export const verifyDeployment: MCPTool;
@@ -74,6 +76,8 @@ export const tools: {
   tagImage: MCPTool;
   pushImage: MCPTool;
   generateK8sManifests: MCPTool;
+  generateAzureContainerAppsManifests: MCPTool;
+  validateAzureManifests: MCPTool;
   prepareCluster: MCPTool;
   deployApplication: MCPTool;
   verifyDeployment: MCPTool;

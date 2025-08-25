@@ -204,6 +204,26 @@ var toolConfigs = []ToolConfig{
 		ChainReason:         "Kubernetes manifests generated. Ready to prepare cluster",
 	},
 	{
+		Name:                "generate_azure_container_apps_manifests",
+		Description:         "Generate Azure Container Apps deployment manifests (Bicep or ARM templates)",
+		Category:            CategoryWorkflow,
+		RequiredParams:      []string{"session_id"},
+		NeedsSessionManager: true,
+		NeedsLogger:         true,
+		NextTool:            "validate_azure_manifests",
+		ChainReason:         "Azure Container Apps manifests generated. Ready for validation",
+	},
+	{
+		Name:                "validate_azure_manifests",
+		Description:         "Validate Azure Container Apps manifests (Bicep or ARM templates)",
+		Category:            CategoryWorkflow,
+		RequiredParams:      []string{"session_id"},
+		NeedsSessionManager: true,
+		NeedsLogger:         true,
+		NextTool:            "", // Could be deploy_to_azure_container_apps in future
+		ChainReason:         "Azure manifests validated. Ready for deployment",
+	},
+	{
 		Name:                "prepare_cluster",
 		Description:         "Prepare the Kubernetes cluster for deployment",
 		Category:            CategoryWorkflow,
