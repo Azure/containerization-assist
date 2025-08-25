@@ -1330,7 +1330,7 @@ func (ra *RepositoryAnalyzer) extractPortFromFile(filePath string) int {
 
 	portRegex := getPortRegex()
 	if matches := portRegex.FindStringSubmatch(string(content)); len(matches) > 1 {
-		if port := parseInt(matches[1]); port > 0 {
+		if port := parseInt(matches[1]); port > 0 && port <= maxPortNumber {
 			return port
 		}
 	}
@@ -1367,7 +1367,7 @@ func (ra *RepositoryAnalyzer) extractPortFromPackageJson(filePath string) int {
 
 	for _, script := range pkg.Scripts {
 		if matches := portRegex.FindStringSubmatch(script); len(matches) > 1 {
-			if port := parseInt(matches[1]); port > 0 {
+			if port := parseInt(matches[1]); port > 0 && port <= maxPortNumber {
 				return port
 			}
 		}
@@ -1380,7 +1380,7 @@ func (ra *RepositoryAnalyzer) extractPortFromPackageJson(filePath string) int {
 				return portInt
 			}
 		case string:
-			if port := parseInt(v); port > 0 {
+			if port := parseInt(v); port > 0 && port <= maxPortNumber {
 				return port
 			}
 		}
