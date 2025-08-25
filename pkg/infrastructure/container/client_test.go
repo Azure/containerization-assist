@@ -76,6 +76,26 @@ func (m *MockDockerClient) Inspect(ctx context.Context, imageRef string) (string
 	return m.inspectResult, m.inspectErr
 }
 
+func (m *MockDockerClient) RunContainer(ctx context.Context, imageRef string, command []string) (string, error) {
+	return "", nil
+}
+
+func (m *MockDockerClient) StopContainer(ctx context.Context, containerID string) error {
+	return nil
+}
+
+func (m *MockDockerClient) RemoveContainer(ctx context.Context, containerID string) error {
+	return nil
+}
+
+func (m *MockDockerClient) RemoveImage(ctx context.Context, imageRef string) error {
+	return nil
+}
+
+func (m *MockDockerClient) GetContainerLogs(ctx context.Context, containerID string) (string, error) {
+	return "", nil
+}
+
 func TestBuildDockerfileContent_Success(t *testing.T) {
 	mockDocker := &MockDockerClient{
 		buildResult: "",
@@ -363,6 +383,26 @@ func (m *MockDockerClientWithTagCapture) IsLoggedIn(_ context.Context, _ string)
 }
 
 func (m *MockDockerClientWithTagCapture) Inspect(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *MockDockerClientWithTagCapture) RunContainer(_ context.Context, _ string, _ []string) (string, error) {
+	return "", nil
+}
+
+func (m *MockDockerClientWithTagCapture) StopContainer(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *MockDockerClientWithTagCapture) RemoveContainer(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *MockDockerClientWithTagCapture) RemoveImage(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *MockDockerClientWithTagCapture) GetContainerLogs(_ context.Context, _ string) (string, error) {
 	return "", nil
 }
 

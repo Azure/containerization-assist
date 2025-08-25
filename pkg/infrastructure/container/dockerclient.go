@@ -23,6 +23,13 @@ type DockerClient interface {
 	LoginWithToken(ctx context.Context, registry, token string) (string, error)
 	Logout(ctx context.Context, registry string) (string, error)
 	IsLoggedIn(ctx context.Context, registry string) (bool, error)
+
+	// Container management for runtime validation
+	RunContainer(ctx context.Context, imageRef string, command []string) (string, error)
+	StopContainer(ctx context.Context, containerID string) error
+	RemoveContainer(ctx context.Context, containerID string) error
+	RemoveImage(ctx context.Context, imageRef string) error
+	GetContainerLogs(ctx context.Context, containerID string) (string, error)
 }
 
 type DockerCmdRunner struct {
@@ -172,3 +179,86 @@ func (d *DockerCmdRunner) IsLoggedIn(ctx context.Context, registry string) (bool
 	// A more sophisticated check would try to access the specific registry
 	return true, nil
 }
+<<<<<<< HEAD:pkg/infrastructure/container/dockerclient.go
+=======
+
+func CheckDockerInstalled() error {
+	if _, err := exec.LookPath("docker"); err != nil {
+		return errors.New(errors.CodeFileNotFound, "docker", "docker executable not found in PATH. Please install Docker or ensure it's available in your PATH", nil)
+	}
+	return nil
+}
+
+// Container management methods for runtime validation
+
+func (d *DockerCmdRunner) RunContainer(ctx context.Context, imageRef string, command []string) (string, error) {
+	// For simple validation, we can use timeout and the image's default command
+	if len(command) == 0 {
+		// Run with default entrypoint for a short time to test basic startup
+		output, err := d.runner.RunCommand("docker", "run", "--rm", "-d", imageRef)
+		if err != nil {
+			return "", errors.New(errors.CodeOperationFailed, "docker", fmt.Sprintf("failed to run container: %v", err), err)
+		}
+
+		containerID := strings.TrimSpace(output)
+		if len(containerID) > 12 {
+			containerID = containerID[:12]
+		}
+		return containerID, nil
+	}
+
+	// For commands with arguments, join them as a single string
+	cmdStr := strings.Join(command, " ")
+	output, err := d.runner.RunCommand("docker", "run", "--rm", "-d", imageRef, cmdStr)
+	if err != nil {
+		return "", errors.New(errors.CodeOperationFailed, "docker", fmt.Sprintf("failed to run container with command '%s': %v", cmdStr, err), err)
+	}
+
+	containerID := strings.TrimSpace(output)
+	if len(containerID) > 12 {
+		containerID = containerID[:12]
+	}
+	return containerID, nil
+}
+
+func (d *DockerCmdRunner) StopContainer(ctx context.Context, containerID string) error {
+	_, err := d.runner.RunCommand("docker", "stop", containerID)
+	if err != nil {
+		return errors.New(errors.CodeOperationFailed, "docker", fmt.Sprintf("failed to stop container %s: %v", containerID, err), err)
+	}
+	return nil
+}
+
+func (d *DockerCmdRunner) RemoveContainer(ctx context.Context, containerID string) error {
+	_, err := d.runner.RunCommand("docker", "rm", "-f", containerID)
+	if err != nil {
+		return errors.New(errors.CodeOperationFailed, "docker", fmt.Sprintf("failed to remove container %s: %v", containerID, err), err)
+	}
+	return nil
+}
+
+func (d *DockerCmdRunner) RemoveImage(ctx context.Context, imageRef string) error {
+	_, err := d.runner.RunCommand("docker", "rmi", "-f", imageRef)
+	if err != nil {
+		return errors.New(errors.CodeOperationFailed, "docker", fmt.Sprintf("failed to remove image %s: %v", imageRef, err), err)
+	}
+	return nil
+}
+
+func (d *DockerCmdRunner) GetContainerLogs(ctx context.Context, containerID string) (string, error) {
+	// Try to get logs with both stdout and stderr
+	output, err := d.runner.RunCommand("docker", "logs", containerID)
+	if err != nil {
+		// For containers that exit immediately, docker logs might still return useful output
+		// even if the command "fails". Try to extract any available output.
+		if output != "" {
+			// We got some output despite the error, return it
+			return output, nil
+		}
+
+		// No output available, return the error
+		return "", errors.New(errors.CodeOperationFailed, "docker", fmt.Sprintf("failed to get logs for container %s: %v", containerID, err), err)
+	}
+	return output, nil
+}
+>>>>>>> ed897c91 (current):pkg/core/docker/dockerclient.go

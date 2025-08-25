@@ -2,12 +2,15 @@ mcpServers:
   filesystem:
     type: "builtin"
     name: "fs"
-    options:
-      allowed_directories: ["/tmp", ".", "/home/runner/work"]
   
   bash:
     type: "builtin"
     name: "bash"
+
+  containerization-assist:
+    type: "stdio"
+    command: "/Users/reiniercc/Documents/repos/container-copilot/containerization-assist-mcp"
+    args: []
 
 model: "azure:${env://AZURE_OPENAI_DEPLOYMENT_ID}"
 provider-api-key: "${env://AZURE_OPENAI_KEY}"

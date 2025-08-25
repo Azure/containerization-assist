@@ -366,6 +366,11 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"type":        "string",
 					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
+				"validate_runtime": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Whether to perform runtime validation of the built Docker image",
+					"default":     true,
+				},
 			},
 			required: []string{"session_id"},
 		},

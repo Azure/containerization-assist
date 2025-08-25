@@ -154,6 +154,23 @@ func (s *BuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) 
 
 	state.Logger.Info("Step completed")
 
+	// Check if runtime validation is requested (defaults to true)
+	validateRuntime := true // Default value
+	if val, ok := state.RequestParams["validate_runtime"].(bool); ok {
+		validateRuntime = val
+	}
+
+	// Perform runtime validation if requested (separate from build)
+	if validateRuntime {
+		imageRef := fmt.Sprintf("%s:%s", buildResult.ImageName, buildResult.ImageTag)
+		if err := ValidateImageRuntime(ctx, imageRef, state.Logger); err != nil {
+			return nil, errors.New(errors.CodeImageBuildFailed, "build_step",
+				fmt.Sprintf("Docker image build succeeded but runtime validation failed: %v", err), err)
+		}
+	} else {
+		state.Logger.Info("Runtime validation disabled")
+	}
+
 	// Return StepResult with build data
 	return &workflow.StepResult{
 		Success: true,

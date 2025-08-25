@@ -64,7 +64,7 @@ jobs:
           mkdir -p ~/.config/mcphost
           
           # Copy the main configuration template
-          cp .github/workflows/mcphost/config.yml ~/.mcphost.yml
+          cp .github/mcphost/config.yml ~/.mcphost.yml
           
           echo "Configuration created. Contents:"
           cat ~/.mcphost.yml

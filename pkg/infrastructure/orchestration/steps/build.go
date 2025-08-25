@@ -216,6 +216,25 @@ func extractImageSizeFromInspect(inspectOutput string, logger *slog.Logger) int6
 	return 0
 }
 
+// ValidateImageRuntime validates a Docker image by running it and checking for proper startup
+func ValidateImageRuntime(ctx context.Context, imageRef string, logger *slog.Logger) error {
+	logger.Info("Performing runtime validation of Docker image", "image_ref", imageRef)
+
+	// Initialize Docker client
+	dockerClient := docker.NewDockerCmdRunner(&runner.DefaultCommandRunner{})
+
+	// Use default validation config (no assumed patterns)
+	validationConfig := docker.DefaultRuntimeValidationConfig()
+
+	// Perform runtime validation
+	if err := docker.ValidateDockerfileRuntime(ctx, dockerClient, imageRef, validationConfig); err != nil {
+		return fmt.Errorf("runtime validation failed: %v", err)
+	}
+
+	logger.Info("Runtime validation passed successfully")
+	return nil
+}
+
 // formatBytes converts bytes to human-readable format (B, KB, MB, GB)
 func formatBytes(bytes int64) string {
 	const unit = 1024
