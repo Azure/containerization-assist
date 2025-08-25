@@ -166,7 +166,7 @@ func (tr *ToolRegistrar) registerOrchestrationTools(mcpServer *server.MCPServer)
 				"message":             "Session not found - no workflow started yet",
 				"current_status":      "not_started",
 				"completed_steps":     []string{},
-				"total_steps":         10,
+				"total_steps":         11,
 				"progress_percentage": 0,
 				"next_step":           "analyze_repository",
 				"timestamp":           time.Now().Format(time.RFC3339),
@@ -294,8 +294,32 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 			required: []string{"repo_path", "session_id"},
 		},
 		{
+			name:        "resolve_base_images",
+			description: "🐳 STEP 2: Resolve recommended base images based on repository analysis. Requires analyze_repository to be completed first.",
+			params: map[string]interface{}{
+				"session_id": map[string]interface{}{
+					"type":        "string",
+					"description": "Session ID for workflow state management",
+				},
+				"fixing_mode": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Whether this tool is being called to fix a previous failure",
+					"default":     false,
+				},
+				"previous_error": map[string]interface{}{
+					"type":        "string",
+					"description": "Error from the previous failed tool (when fixing_mode is true)",
+				},
+				"failed_tool": map[string]interface{}{
+					"type":        "string",
+					"description": "Name of the tool that failed (when fixing_mode is true)",
+				},
+			},
+			required: []string{"session_id"},
+		},
+		{
 			name:        "generate_dockerfile",
-			description: "📝 STEP 2: Generate an optimized Dockerfile based on repository analysis. Requires analyze_repository to be completed first.",
+			description: "📝 STEP 3: Generate an optimized Dockerfile based on repository analysis. Requires resolve_base_images to be completed first.",
 			params: map[string]interface{}{
 				"session_id": map[string]interface{}{
 					"type":        "string",
@@ -323,7 +347,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 		},
 		{
 			name:        "build_image",
-			description: "🏗️ STEP 3: Build Docker image from generated Dockerfile. Requires generate_dockerfile to be completed first.",
+			description: "🏗️ STEP 4: Build Docker image from generated Dockerfile. Requires generate_dockerfile to be completed first.",
 			params: map[string]interface{}{
 				"session_id": map[string]interface{}{
 					"type":        "string",
@@ -347,7 +371,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 		},
 		{
 			name:        "scan_image",
-			description: "🔒 STEP 4: Scan the Docker image for security vulnerabilities. Requires build_image to be completed first.",
+			description: "🔒 STEP 5: Scan the Docker image for security vulnerabilities. Requires build_image to be completed first.",
 			params: map[string]interface{}{
 				"session_id": map[string]interface{}{
 					"type":        "string",
@@ -371,7 +395,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 		},
 		{
 			name:        "tag_image",
-			description: "🏷️ STEP 5: Tag the Docker image with version and metadata. Requires build_image to be completed first.",
+			description: "🏷️ STEP 6: Tag the Docker image with version and metadata. Requires build_image to be completed first.",
 			params: map[string]interface{}{
 				"session_id": map[string]interface{}{
 					"type":        "string",
@@ -399,7 +423,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 		},
 		{
 			name:        "push_image",
-			description: "📤 STEP 6: Push the Docker image to a container registry. Requires tag_image to be completed first.",
+			description: "📤 STEP 7: Push the Docker image to a container registry. Requires tag_image to be completed first.",
 			params: map[string]interface{}{
 				"session_id": map[string]interface{}{
 					"type":        "string",
@@ -427,7 +451,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 		},
 		{
 			name:        "generate_k8s_manifests",
-			description: "☸️ STEP 7: Generate Kubernetes manifests for the application. Requires push_image to be completed first.",
+			description: "☸️ STEP 8: Generate Kubernetes manifests for the application. Requires push_image to be completed first.",
 			params: map[string]interface{}{
 				"session_id": map[string]interface{}{
 					"type":        "string",
@@ -469,7 +493,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 		},
 		{
 			name:        "prepare_cluster",
-			description: "⚙️ STEP 8: Prepare the Kubernetes cluster for deployment. Requires generate_k8s_manifests to be completed first.",
+			description: "⚙️ STEP 9: Prepare the Kubernetes cluster for deployment. Requires generate_k8s_manifests to be completed first.",
 			params: map[string]interface{}{
 				"session_id": map[string]interface{}{
 					"type":        "string",
@@ -493,7 +517,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 		},
 		{
 			name:        "deploy_application",
-			description: "🚀 STEP 9: Deploy the application to Kubernetes. Requires prepare_cluster to be completed first.",
+			description: "🚀 STEP 10: Deploy the application to Kubernetes. Requires prepare_cluster to be completed first.",
 			params: map[string]interface{}{
 				"session_id": map[string]interface{}{
 					"type":        "string",
@@ -517,7 +541,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 		},
 		{
 			name:        "verify_deployment",
-			description: "✅ STEP 10: Verify the deployment is healthy and running correctly. Final step in the containerization workflow.",
+			description: "✅ STEP 11: Verify the deployment is healthy and running correctly. Final step in the containerization workflow.",
 			params: map[string]interface{}{
 				"session_id": map[string]interface{}{
 					"type":        "string",
@@ -802,9 +826,9 @@ func (tr *ToolRegistrar) createStepState(ctx context.Context, sessionID, repoPat
 		RepoIdentifier:   domainworkflow.GetRepositoryIdentifier(args),
 		Result:           &domainworkflow.ContainerizeAndDeployResult{},
 		Logger:           tr.logger,
-		TotalSteps:       10, // Standard workflow has 10 steps
+		TotalSteps:       11, // Standard workflow has 11 steps
 		CurrentStep:      len(simpleState.CompletedSteps),
-		WorkflowProgress: domainworkflow.NewWorkflowProgress(sessionID, "containerization", 10),
+		WorkflowProgress: domainworkflow.NewWorkflowProgress(sessionID, "containerization", 11),
 		RequestParams:    requestParams,
 		PreviousError:    previousError,
 		FailedTool:       failedTool,
@@ -926,6 +950,7 @@ func (tr *ToolRegistrar) restoreStepResults(workflowState *domainworkflow.Workfl
 func (tr *ToolRegistrar) mapToolNameToStepName(toolName string) string {
 	stepNameMap := map[string]string{
 		"analyze_repository":     "analyze_repository",
+		"resolve_base_images":    "resolve_base_images",
 		"generate_dockerfile":    "generate_dockerfile",
 		"build_image":            "build_image",
 		"scan_image":             "security_scan", // Tool name → actual step name
@@ -965,6 +990,12 @@ func (tr *ToolRegistrar) saveStepResults(workflowState *domainworkflow.WorkflowS
 				"analyze_result": analyzeData,
 			})
 		}
+
+	case "resolve_base_images":
+		// resolve_base_images step result is stored in step result data, not in workflow state
+		// The step returns data with "builder" and "runtime" keys
+		// This is handled generically through the step result response
+		tr.logger.Info("Resolve base images step completed - results included in step response")
 
 	case "generate_dockerfile":
 		if workflowState.DockerfileResult != nil {

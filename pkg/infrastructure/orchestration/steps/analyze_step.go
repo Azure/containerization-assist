@@ -66,15 +66,16 @@ func (s *AnalyzeStep) Execute(ctx context.Context, state *workflow.WorkflowState
 
 	// Convert to workflow type
 	state.AnalyzeResult = &workflow.AnalyzeResult{
-		Language:  analyzeResult.Language,
-		Framework: analyzeResult.Framework,
-		Port:      analyzeResult.Port,
-		Metadata:  analyzeResult.Analysis, // Use Analysis field as metadata
-		RepoPath:  analyzeResult.RepoPath,
+		Language:        analyzeResult.Language,
+		LanguageVersion: analyzeResult.LanguageVersion,
+		Framework:       analyzeResult.Framework,
+		Port:            analyzeResult.Port,
+		Metadata:        analyzeResult.Analysis, // Use Analysis field as metadata
+		RepoPath:        analyzeResult.RepoPath,
 		// Set reasonable defaults for missing fields
 		BuildCommand:    "",
 		StartCommand:    "",
-		Dependencies:    []string{},
+		Dependencies:    analyzeResult.Dependencies,
 		DevDependencies: []string{},
 	}
 
@@ -84,10 +85,11 @@ func (s *AnalyzeStep) Execute(ctx context.Context, state *workflow.WorkflowState
 	return &workflow.StepResult{
 		Success: true,
 		Data: map[string]interface{}{
-			"language":  analyzeResult.Language,
-			"framework": analyzeResult.Framework,
-			"port":      analyzeResult.Port,
-			"repo_path": analyzeResult.RepoPath,
+			"language":         analyzeResult.Language,
+			"language_version": analyzeResult.LanguageVersion,
+			"framework":        analyzeResult.Framework,
+			"port":             analyzeResult.Port,
+			"repo_path":        analyzeResult.RepoPath,
 		},
 		Metadata: map[string]interface{}{
 			"analysis": analyzeResult.Analysis,

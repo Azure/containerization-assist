@@ -7,14 +7,23 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Dependency represents a project dependency
+type Dependency struct {
+	Name    string `json:"name"`
+	Version string `json:"version,omitempty"`
+	Type    string `json:"type"`    // "runtime", "dev", "build"
+	Manager string `json:"manager"` // "npm", "pip", "maven", etc.
+}
+
 // AnalyzeResult represents the output of repository analysis
 type AnalyzeResult struct {
 	Language        string                 `json:"language" yaml:"language"`
+	LanguageVersion string                 `json:"language_version" yaml:"language_version"`
 	Framework       string                 `json:"framework" yaml:"framework"`
 	Port            int                    `json:"port" yaml:"port"`
 	BuildCommand    string                 `json:"build_command" yaml:"build_command"`
 	StartCommand    string                 `json:"start_command" yaml:"start_command"`
-	Dependencies    []string               `json:"dependencies" yaml:"dependencies"`
+	Dependencies    []Dependency           `json:"dependencies" yaml:"dependencies"`
 	DevDependencies []string               `json:"dev_dependencies" yaml:"dev_dependencies"`
 	Metadata        map[string]interface{} `json:"metadata" yaml:"metadata"`
 	RepoPath        string                 `json:"repo_path" yaml:"repo_path"`
