@@ -3,7 +3,7 @@ package kubernetes
 import (
 	"context"
 
-	"github.com/Azure/containerization-assist/pkg/infrastructure/core/runner"
+	"github.com/Azure/containerization-assist/pkg/infrastructure/core"
 )
 
 type KubeRunner interface {
@@ -19,12 +19,12 @@ type KubeRunner interface {
 }
 
 type KubeCmdRunner struct {
-	runner runner.CommandRunner
+	runner core.CommandRunner
 }
 
 var _ KubeRunner = &KubeCmdRunner{}
 
-func NewKubeCmdRunner(runner runner.CommandRunner) KubeRunner {
+func NewKubeCmdRunner(runner core.CommandRunner) KubeRunner {
 	return &KubeCmdRunner{
 		runner: runner,
 	}

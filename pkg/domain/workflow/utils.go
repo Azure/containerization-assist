@@ -2,20 +2,10 @@
 package workflow
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/Azure/containerization-assist/pkg/domain/progress"
 )
-
-// NoOpSink is a no-operation progress sink for fallback cases
-type NoOpSink struct{}
-
-func (n *NoOpSink) Publish(ctx context.Context, u progress.Update) error { return nil }
-
-func (n *NoOpSink) Close() error { return nil }
 
 // GenerateWorkflowID creates a unique workflow identifier based on repository URL or path
 func GenerateWorkflowID(repoInput string) string {

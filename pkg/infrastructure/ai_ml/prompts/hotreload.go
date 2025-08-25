@@ -53,7 +53,9 @@ func (w *HotReloadWatcher) Start(ctx context.Context) error {
 func (w *HotReloadWatcher) Stop() {
 	close(w.stopChan)
 	<-w.doneChan
-	w.watcher.Close()
+	if err := w.watcher.Close(); err != nil {
+		w.logger.Error("Failed to close file watcher", slog.String("error", err.Error()))
+	}
 }
 
 // watchLoop is the main watch loop

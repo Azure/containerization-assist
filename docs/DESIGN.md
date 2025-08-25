@@ -1,7 +1,7 @@
 # Containerization Assist Design Document
 
-**Version**: 3.0
-**Date**: 2025-07-12
+**Version**: 4.0
+**Date**: 2025-08-22
 **Status**: Current
 
 ## Table of Contents
@@ -20,7 +20,7 @@
 
 ## Executive Summary
 
-Containerization Assist is an advanced, AI-powered containerization platform that automates the complete Docker and Kubernetes workflow through individual, chainable tools exposed via Model Context Protocol (MCP). The system follows a simplified 4-layer architecture with tool-driven design that balances focused functionality with maintainability.
+Containerization Assist is an advanced, AI-powered containerization platform that automates the complete Docker and Kubernetes workflow through individual, chainable tools exposed via Model Context Protocol (MCP). The system follows a simplified 3-layer architecture with tool-driven design that balances focused functionality with maintainability.
 
 ### Key Capabilities
 - **15 Individual Tools**: Focused tools (10 workflow, 2 orchestration, 3 utility) with intelligent chaining
@@ -32,7 +32,7 @@ Containerization Assist is an advanced, AI-powered containerization platform tha
 - **Simplified Architecture**: Direct dependency injection with consolidated infrastructure
 
 ### Technology Stack
-- **Core**: Go 1.24.4 with simplified 4-layer architecture
+- **Core**: Go 1.24.4 with simplified 3-layer architecture
 - **Protocol**: Model Context Protocol (MCP) via mcp-go library
 - **AI Integration**: Azure OpenAI SDK for guided workflows and error recovery
 - **Storage**: BoltDB for session persistence
@@ -62,72 +62,57 @@ Containerization Assist provides individual, focused tools that can be chained t
 
 ## Architecture
 
-### Four-Layer Clean Architecture
+### Three-Layer Clean Architecture
 
-Containerization Assist follows a simplified 4-layer Domain-Driven Design architecture:
+Containerization Assist follows a simplified 3-layer Domain-Driven Design architecture:
 
 ```
-pkg/mcp/
-├── api/                   # Interface definitions and contracts
-│   └── interfaces.go      # Essential MCP tool interfaces
-├── service/               # Unified service layer (simplified from application)
+pkg/
+├── api/                   # Minimal API contracts
+│   └── interfaces.go      # MCPServer, ProgressEmitter, ProgressUpdate
+├── service/               # Service layer
 │   ├── bootstrap/         # Application bootstrapping
-│   ├── commands/          # CQRS command handlers
 │   ├── config/            # Configuration management
-│   ├── dependencies.go    # Simple direct dependency injection
-│   ├── lifecycle/         # Application lifecycle management
-│   ├── queries/           # CQRS query handlers  
-│   ├── registrar/         # MCP tool/resource registration
-│   ├── registry/          # Service registry
-│   ├── server.go          # MCP server implementation with direct DI
-│   ├── session/           # Session management
-│   ├── tools/             # Tool registration and handlers
-│   ├── transport/         # HTTP and stdio transport
-│   └── workflow/          # Workflow orchestration
-├── domain/                # Business logic and workflows
+│   ├── dependencies.go    # Direct dependency injection
+│   ├── registrar/         # Tool/resource registration
+│   ├── server.go          # MCP server implementation
+│   ├── session/           # Concurrent-safe session management
+│   └── tools/             # MCP tool implementations
+│       ├── registry.go    # Table-driven tool registration
+│       ├── types.go       # Typed structs for workflow state
+│       └── helpers.go     # Atomic operations and serialization
+├── domain/                # Business logic
+│   ├── errors/            # Domain error types
 │   ├── events/            # Domain events
-│   ├── health/            # Health check interfaces
-│   ├── progress/          # Progress tracking (business concept)
-│   ├── prompts/           # Prompt interfaces
 │   ├── resources/         # Resource interfaces
-│   ├── sampling/          # LLM sampling domain logic
 │   ├── session/           # Session domain objects
 │   └── workflow/          # Core containerization workflow
-│       ├── workflow_error.go # Simple workflow error handling
-│       └── utils.go       # Workflow utility functions
-└── infrastructure/        # Technical implementations (consolidated)
-    ├── ai_ml/             # AI/ML implementations
-    │   ├── prompts/       # Prompt management
-    │   │   └── templates/ # Embedded prompt templates
+└── infrastructure/        # Technical implementations
+    ├── ai_ml/             # AI/ML integrations
+    │   ├── prompts/       # Prompt templates (YAML)
     │   └── sampling/      # LLM integration
-    ├── core/              # Core infrastructure
-    │   ├── resources/     # Resource providers and stores
-    │   ├── testutil/      # Testing utilities
-    │   ├── util/          # General utilities
-    │   ├── utilities/     # Advanced utilities
-    │   └── validation/    # Validation logic
-    ├── messaging/         # UNIFIED: Event publishing and progress reporting
-    │   ├── cli_direct.go        # CLI progress reporting
-    │   ├── emitter.go           # Progress emitters
-    │   ├── event_publisher.go   # Domain event publishing
-    │   ├── factory_direct.go    # Progress factory
-    │   └── mcp_direct.go        # MCP progress reporting
-    ├── observability/     # UNIFIED: Monitoring, tracing, and health
-    │   ├── monitor.go           # Health monitoring
-    │   ├── tracing_config.go    # OpenTelemetry configuration
-    │   ├── tracing_helpers.go   # Tracing utilities
-    │   └── tracing_integration.go # Tracing middleware
-    ├── orchestration/     # Container and K8s orchestration
-    │   └── steps/         # Focused workflow step implementations
-    └── persistence/       # Data persistence
-        └── session/       # Session storage (BoltDB)
+    ├── core/              # Consolidated utilities
+    │   ├── command.go     # CommandRunner interface
+    │   ├── providers.go   # Resource store
+    │   ├── fs.go          # File operations
+    │   ├── repository.go  # Repository analysis
+    │   └── masking.go     # Data protection
+    ├── container/         # Docker operations
+    ├── kubernetes/        # K8s operations
+    ├── messaging/         # Progress tracking and events
+    ├── orchestration/     # Workflow orchestration
+    │   └── steps/         # Step implementations
+    ├── persistence/       # Data persistence
+    │   └── session/       # BoltDB storage
+    └── security/          # Vulnerability types
 ```
 
 ### Key Architecture Benefits
 - **Clean Dependencies**: Infrastructure → Service → Domain → API
 - **Individual Tools**: 15 focused tools with intelligent chaining capabilities
-- **Direct Dependency Injection**: Simple Dependencies struct eliminates complex Wire patterns
-- **Unified Infrastructure**: Consolidated messaging, observability, and orchestration packages
+- **Direct Dependency Injection**: Simple Dependencies struct without code generation
+- **Type Safety**: Replaced map[string]interface{} with typed structs throughout
+- **Simplified Infrastructure**: Consolidated core utilities into single package
 - **Event-Driven Design**: Domain events for workflow coordination and observability
 - **Domain-Driven**: Core business logic isolated in domain layer
 - **Separation of Concerns**: Each layer has clear responsibilities
@@ -141,7 +126,7 @@ pkg/mcp/
 
 ## Core Components
 
-### 1. Tool Registry (`pkg/mcp/service/tools/`)
+### 1. Tool Registry (`pkg/service/tools/`)
 
 **15 Individual Tools**: Table-driven tool registration
 

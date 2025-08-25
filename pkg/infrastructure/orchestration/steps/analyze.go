@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Azure/containerization-assist/pkg/domain/workflow"
-	"github.com/Azure/containerization-assist/pkg/infrastructure/core/utils"
+	"github.com/Azure/containerization-assist/pkg/infrastructure/core"
 )
 
 type AnalyzeResult struct {
@@ -23,17 +23,14 @@ type AnalyzeResult struct {
 	SessionID       string                 `json:"session_id"`
 }
 
-// AnalyzeRepository performs repository analysis supporting both URLs and local paths
-// This function handles git cloning when needed and ensures all artifacts are written to the repository directory
+// AnalyzeRepository analyzes repositories from URLs or local paths, handling git cloning when needed
 func AnalyzeRepository(input, branch string, logger *slog.Logger) (*AnalyzeResult, error) {
-	// Determine input type and log accordingly
 	isURL := strings.HasPrefix(input, "https://") || strings.HasPrefix(input, "http://") || strings.HasPrefix(input, "git@")
 
 	if isURL {
 	} else {
 	}
 
-	// Basic validation
 	if input == "" {
 		return nil, fmt.Errorf("repository input (URL or path) is required")
 	}
@@ -42,9 +39,6 @@ func AnalyzeRepository(input, branch string, logger *slog.Logger) (*AnalyzeResul
 	var needsCleanup bool
 
 	if isURL {
-		// Git URL - needs cloning
-
-		// Create temporary directory for cloning
 		tempDir, err := os.MkdirTemp("", "containerization-assist-analysis-*")
 		if err != nil {
 			return nil, fmt.Errorf("failed to create temp directory: %v", err)
@@ -53,20 +47,16 @@ func AnalyzeRepository(input, branch string, logger *slog.Logger) (*AnalyzeResul
 		repoPath = tempDir
 		needsCleanup = true
 
-		// Attempt to clone the repository
-
 		if err := cloneRepository(input, branch, tempDir, logger); err != nil {
 			if needsCleanup {
-				os.RemoveAll(tempDir)
+				_ = os.RemoveAll(tempDir)
 			}
 			return nil, fmt.Errorf("git clone failed: %v", err)
 		}
 
 	} else {
-		// Local path or file:// URL
 		repoPath = strings.TrimPrefix(input, "file://")
 
-		// Validate local path exists and is a directory
 		if _, err := os.Stat(repoPath); os.IsNotExist(err) {
 			return nil, fmt.Errorf("repository path does not exist: %s", repoPath)
 		}
@@ -82,28 +72,19 @@ func AnalyzeRepository(input, branch string, logger *slog.Logger) (*AnalyzeResul
 
 	}
 
-	// Note: We do NOT clean up the temporary directory here because
-	// subsequent steps (like Dockerfile generation and build) need access to the repository files.
-	// The cleanup should be handled by the workflow or session manager.
+	analyzer := core.NewRepositoryAnalyzer(logger)
 
-	// Create analysis engine with enhanced logging
-	analyzer := utils.NewRepositoryAnalyzer(logger)
-
-	// Perform real repository analysis with detailed logging
 	result, err := analyzer.AnalyzeRepository(repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("analysis failed: %v", err)
 	}
 
-	// Handle analysis errors
 	if result.Error != nil {
 		return nil, fmt.Errorf("analysis error: %s", result.Error.Message)
 	}
 
-	// Generate a session ID for this analysis
 	sessionID := fmt.Sprintf("session_%d", time.Now().Unix())
 
-	// Convert result to analysis map
 	analysisMap := map[string]interface{}{
 		"structure":         result.Structure,
 		"files_analyzed":    len(result.ConfigFiles),
@@ -152,24 +133,19 @@ func AnalyzeRepository(input, branch string, logger *slog.Logger) (*AnalyzeResul
 }
 
 func cloneRepository(repoURL, branch, destDir string, logger *slog.Logger) error {
-	// Enhanced git clone with automatic branch fallback
 	var attemptedBranches []string
 
-	// Determine branches to try in order
 	if branch != "" {
 		attemptedBranches = []string{branch}
-		// Add fallback branches for common patterns
 		if branch == "main" {
 			attemptedBranches = append(attemptedBranches, "master", "develop", "dev")
 		} else if branch == "master" {
 			attemptedBranches = append(attemptedBranches, "main", "develop", "dev")
 		}
 	} else {
-		// Default branch priority: main -> master -> develop -> dev
 		attemptedBranches = []string{"main", "master", "develop", "dev"}
 	}
 
-	// Also try without specifying branch (let git decide)
 	attemptedBranches = append(attemptedBranches, "")
 
 	var lastErr error
@@ -223,7 +199,7 @@ func cloneRepository(repoURL, branch, destDir string, logger *slog.Logger) error
 
 		// Clean up any partial clone directory before retrying
 		if _, statErr := os.Stat(destDir); statErr == nil {
-			os.RemoveAll(destDir)
+			_ = os.RemoveAll(destDir)
 		}
 	}
 

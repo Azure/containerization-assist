@@ -14,9 +14,7 @@ import (
 )
 
 // TemplateEngine provides mechanical Dockerfile template operations
-type TemplateEngine struct {
-	logger *slog.Logger
-}
+type TemplateEngine struct{}
 
 // NewTemplateEngine creates a new template engine
 func NewTemplateEngine(logger *slog.Logger) *TemplateEngine {

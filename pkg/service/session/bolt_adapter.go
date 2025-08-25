@@ -14,7 +14,6 @@ import (
 // BoltStoreAdapter adapts the BoltStore to implement OptimizedSessionManager
 type BoltStoreAdapter struct {
 	store       *session.BoltStore
-	logger      *slog.Logger
 	defaultTTL  time.Duration
 	maxSessions int
 }

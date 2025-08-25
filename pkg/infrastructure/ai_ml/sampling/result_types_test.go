@@ -122,7 +122,20 @@ RUN npm install`,
 func TestParseManifestFix(t *testing.T) {
 
 	t.Run("parse manifest from code block", func(t *testing.T) {
-		content := "Here's the fixed manifest:\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: test-pod\nspec:\n  containers:\n  - name: app\n    image: nginx:latest\n```\n\nThis fixes the issue with the missing image tag."
+		content := `Here's the fixed manifest:
+
+` + "```yaml" + `
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+spec:
+  containers:
+  - name: app
+    image: nginx:latest
+` + "```" + `
+
+This fixes the issue with the missing image tag.`
 
 		result, err := ParseManifestFix(content)
 		require.NoError(t, err)
@@ -493,7 +506,35 @@ func TestEnums(t *testing.T) {
 
 func TestComplexParsing(t *testing.T) {
 	t.Run("complex manifest fix with multiple sections", func(t *testing.T) {
-		content := "Analysis of the Kubernetes manifest revealed several issues:\n\nIssues found:\n- Missing resource limits\n- No health checks configured\n- Incorrect image tag\n\nHere's the corrected manifest:\n\n```yaml\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web-app\nspec:\n  replicas: 3\n  template:\n    spec:\n      containers:\n      - name: web-app\n        image: nginx:1.21-alpine\n        resources:\n          requests:\n            memory: \"64Mi\"\n```\n\nKey improvements:\n- Added resource requests and limits\n- Used specific image tag instead of 'latest'"
+		content := `Analysis of the Kubernetes manifest revealed several issues:
+
+Issues found:
+- Missing resource limits
+- No health checks configured
+- Incorrect image tag
+
+Here's the corrected manifest:
+
+` + "```yaml" + `
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+      - name: web-app
+        image: nginx:1.21-alpine
+        resources:
+          requests:
+            memory: "64Mi"
+` + "```" + `
+
+Key improvements:
+- Added resource requests and limits
+- Used specific image tag instead of 'latest'`
 
 		result, err := ParseManifestFix(content)
 		require.NoError(t, err)

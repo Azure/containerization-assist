@@ -25,8 +25,8 @@ func createTestConcurrentAdapter(t *testing.T) (*ConcurrentBoltAdapter, func()) 
 	require.NoError(t, err)
 
 	cleanup := func() {
-		adapter.Stop(context.Background())
-		os.RemoveAll(tmpDir)
+		_ = adapter.Stop(context.Background())
+		_ = os.RemoveAll(tmpDir)
 	}
 
 	return adapter, cleanup

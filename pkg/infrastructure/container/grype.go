@@ -15,12 +15,12 @@ import (
 
 // GrypeScanner provides container image security scanning using Grype
 type GrypeScanner struct {
-	logger    zerolog.Logger
 	grypePath string
 }
 
 // NewGrypeScanner creates a new Grype scanner
 func NewGrypeScanner(logger zerolog.Logger) *GrypeScanner {
+	_ = logger
 	return &GrypeScanner{}
 }
 

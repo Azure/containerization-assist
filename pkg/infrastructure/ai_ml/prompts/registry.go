@@ -12,11 +12,11 @@ import (
 
 // Registry manages MCP prompts with native mcp-go support
 type Registry struct {
-	logger *slog.Logger
 }
 
 // NewRegistry creates a new prompt registry with native MCP prompt support
 func NewRegistry(logger *slog.Logger) *Registry {
+	_ = logger // Keep for API compatibility
 	return &Registry{}
 }
 

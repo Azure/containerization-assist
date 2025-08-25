@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Azure/containerization-assist/pkg/infrastructure/container"
-	"github.com/Azure/containerization-assist/pkg/infrastructure/core/runner"
+	"github.com/Azure/containerization-assist/pkg/infrastructure/core"
 	"github.com/Azure/containerization-assist/pkg/infrastructure/kubernetes"
 	"github.com/Azure/containerization-assist/pkg/infrastructure/kubernetes/kind"
 )
@@ -47,7 +47,7 @@ func BuildImage(ctx context.Context, dockerfileResult *DockerfileResult, imageNa
 	startTime := time.Now()
 
 	// Initialize Docker client
-	dockerClient := container.NewDockerCmdRunner(&runner.DefaultCommandRunner{})
+	dockerClient := container.NewDockerCmdRunner(&core.DefaultCommandRunner{})
 
 	// Create Docker service using container infrastructure
 	dockerService := container.NewService(dockerClient, logger)
@@ -97,7 +97,7 @@ func BuildImage(ctx context.Context, dockerfileResult *DockerfileResult, imageNa
 	imageSize := int64(0)
 	if buildResult.ImageID == "" {
 	} else {
-		dockerClient := container.NewDockerCmdRunner(&runner.DefaultCommandRunner{})
+		dockerClient := container.NewDockerCmdRunner(&core.DefaultCommandRunner{})
 		inspectOutput, err := dockerClient.Inspect(ctx, buildResult.ImageID)
 		if err != nil {
 		} else {
@@ -126,7 +126,7 @@ func PushImage(ctx context.Context, buildResult *BuildResult, registry string, l
 	}
 
 	// Initialize Docker client and service
-	dockerClient := container.NewDockerCmdRunner(&runner.DefaultCommandRunner{})
+	dockerClient := container.NewDockerCmdRunner(&core.DefaultCommandRunner{})
 	dockerService := container.NewService(dockerClient, logger)
 
 	// Construct image reference for the target registry
@@ -187,8 +187,8 @@ func LoadImageToKind(ctx context.Context, buildResult *BuildResult, clusterName 
 func SetupKindCluster(ctx context.Context, clusterName string, logger *slog.Logger) (string, error) {
 
 	// Initialize clients
-	dockerClient := container.NewDockerCmdRunner(&runner.DefaultCommandRunner{})
-	kindRunner := kind.NewKindCmdRunner(&runner.DefaultCommandRunner{})
+	dockerClient := container.NewDockerCmdRunner(&core.DefaultCommandRunner{})
+	kindRunner := kind.NewKindCmdRunner(&core.DefaultCommandRunner{})
 
 	// Use the GetKindCluster function that handles cluster creation and registry setup
 	registryURL, err := kubernetes.GetKindCluster(ctx, kindRunner, dockerClient)

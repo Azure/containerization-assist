@@ -1,4 +1,3 @@
-// Package workflow provides sequential workflow orchestration
 package workflow
 
 import (
@@ -11,7 +10,6 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-// Orchestrator implements sequential workflow orchestration
 type Orchestrator struct {
 	steps                  []Step
 	logger                 *slog.Logger
@@ -19,13 +17,11 @@ type Orchestrator struct {
 	progressEmitterFactory func(context.Context, *mcp.CallToolRequest) api.ProgressEmitter
 }
 
-// NewOrchestrator creates a new workflow orchestrator
 func NewOrchestrator(
 	stepProvider StepProvider,
 	logger *slog.Logger,
 	progressEmitterFactory func(context.Context, *mcp.CallToolRequest) api.ProgressEmitter,
 ) (*Orchestrator, error) {
-	// Build the sequential containerization workflow
 	steps, err := buildContainerizationSteps(stepProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build workflow steps: %w", err)
@@ -39,31 +35,25 @@ func NewOrchestrator(
 	}, nil
 }
 
-// GetStepProvider returns the step provider for accessing individual steps
 func (o *Orchestrator) GetStepProvider() StepProvider {
 	return o.stepProvider
 }
 
-// Execute runs the containerization workflow sequentially
 func (o *Orchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest, args *ContainerizeAndDeployArgs) (*ContainerizeAndDeployResult, error) {
-	// Initialize context with workflow ID
 	workflowID, ctx := o.initContext(ctx, args)
 
-	// Create progress emitter
 	emitter := o.progressEmitterFactory(ctx, req)
-	defer emitter.Close()
+	defer func() {
+		if err := emitter.Close(); err != nil {
+			o.logger.Error("Failed to close progress emitter", slog.String("error", err.Error()))
+		}
+	}()
 
-	// Create workflow state
 	state := o.newState(workflowID, args, emitter)
 
-	// Log workflow start
-
-	// Execute steps sequentially
 	startTime := time.Now()
 	err := o.executeSequentially(ctx, state)
 	_ = time.Since(startTime)
-
-	// Log completion
 
 	if err != nil {
 		state.Result.Success = false
@@ -71,13 +61,11 @@ func (o *Orchestrator) Execute(ctx context.Context, req *mcp.CallToolRequest, ar
 		return state.Result, err
 	}
 
-	// Mark as successful
 	state.Result.Success = true
 
 	return state.Result, nil
 }
 
-// initContext generates workflow ID and adds it to context
 func (o *Orchestrator) initContext(ctx context.Context, args *ContainerizeAndDeployArgs) (string, context.Context) {
 	workflowID, ok := GetWorkflowID(ctx)
 	if !ok {
@@ -88,7 +76,6 @@ func (o *Orchestrator) initContext(ctx context.Context, args *ContainerizeAndDep
 	return workflowID, ctx
 }
 
-// newState creates the workflow state with all necessary components
 func (o *Orchestrator) newState(workflowID string, args *ContainerizeAndDeployArgs, emitter api.ProgressEmitter) *WorkflowState {
 	repoIdentifier := GetRepositoryIdentifier(args)
 
@@ -107,20 +94,14 @@ func (o *Orchestrator) newState(workflowID string, args *ContainerizeAndDeployAr
 	return state
 }
 
-// executeSequentially runs all workflow steps in sequence
 func (o *Orchestrator) executeSequentially(ctx context.Context, state *WorkflowState) error {
-	// Cache all steps in state for optimization analysis
 	state.SetAllSteps(o.steps)
 
 	for _, step := range o.steps {
-		// Update current step number for progress tracking
 		state.CurrentStep++
-
-		// Log step start
 
 		_, err := step.Execute(ctx, state)
 
-		// Emit progress update
 		if state.ProgressEmitter != nil {
 			percentage := int(float64(state.CurrentStep) / float64(state.TotalSteps) * 100)
 			message := fmt.Sprintf("Step %s completed", step.Name())
@@ -133,8 +114,6 @@ func (o *Orchestrator) executeSequentially(ctx context.Context, state *WorkflowS
 			}
 		}
 
-		// Log step completion
-
 		if err != nil {
 			return fmt.Errorf("step %s failed: %w", step.Name(), err)
 		}
@@ -143,9 +122,7 @@ func (o *Orchestrator) executeSequentially(ctx context.Context, state *WorkflowS
 	return nil
 }
 
-// buildContainerizationSteps creates the sequential list of workflow steps
 func buildContainerizationSteps(provider StepProvider) ([]Step, error) {
-	// Define the sequential order of steps
 	stepKeys := []string{
 		StepAnalyzeRepository,
 		StepGenerateDockerfile,
@@ -159,7 +136,6 @@ func buildContainerizationSteps(provider StepProvider) ([]Step, error) {
 		StepVerifyDeployment,
 	}
 
-	// Build the step list
 	steps := make([]Step, 0, len(stepKeys))
 	for _, stepKey := range stepKeys {
 		step, err := provider.GetStep(stepKey)

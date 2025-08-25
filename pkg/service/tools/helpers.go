@@ -3,12 +3,13 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/pkg/errors"
 
 	"github.com/Azure/containerization-assist/pkg/api"
 	domainworkflow "github.com/Azure/containerization-assist/pkg/domain/workflow"
@@ -25,36 +26,31 @@ type SimpleWorkflowState struct {
 	CompletedSteps []string                      `json:"completed_steps"`
 	FailedSteps    []string                      `json:"failed_steps"`
 	SkipSteps      []string                      `json:"skip_steps"`
-	Artifacts      map[string]interface{}        `json:"artifacts"`
-	Metadata       map[string]interface{}        `json:"metadata"`
+	Artifacts      *WorkflowArtifacts            `json:"artifacts"`
+	Metadata       *ToolMetadata                 `json:"metadata"`
 	Error          *domainworkflow.WorkflowError `json:"error,omitempty"`
 }
 
-// MarkStepCompleted marks a step as completed
 func (s *SimpleWorkflowState) MarkStepCompleted(stepName string) {
 	for _, completed := range s.CompletedSteps {
 		if completed == stepName {
-			return // Already completed
+			return
 		}
 	}
-	// Remove from failed steps if it was previously failed
 	s.removeFromFailedSteps(stepName)
 	s.CompletedSteps = append(s.CompletedSteps, stepName)
 }
 
-// MarkStepFailed marks a step as failed
 func (s *SimpleWorkflowState) MarkStepFailed(stepName string) {
 	for _, failed := range s.FailedSteps {
 		if failed == stepName {
-			return // Already marked as failed
+			return
 		}
 	}
-	// Remove from completed steps if it was previously completed
 	s.removeFromCompletedSteps(stepName)
 	s.FailedSteps = append(s.FailedSteps, stepName)
 }
 
-// removeFromCompletedSteps removes a step from the completed steps list
 func (s *SimpleWorkflowState) removeFromCompletedSteps(stepName string) {
 	for i, completed := range s.CompletedSteps {
 		if completed == stepName {
@@ -64,7 +60,6 @@ func (s *SimpleWorkflowState) removeFromCompletedSteps(stepName string) {
 	}
 }
 
-// removeFromFailedSteps removes a step from the failed steps list
 func (s *SimpleWorkflowState) removeFromFailedSteps(stepName string) {
 	for i, failed := range s.FailedSteps {
 		if failed == stepName {
@@ -74,7 +69,6 @@ func (s *SimpleWorkflowState) removeFromFailedSteps(stepName string) {
 	}
 }
 
-// IsStepCompleted checks if a step is completed
 func (s *SimpleWorkflowState) IsStepCompleted(stepName string) bool {
 	for _, completed := range s.CompletedSteps {
 		if completed == stepName {
@@ -84,7 +78,6 @@ func (s *SimpleWorkflowState) IsStepCompleted(stepName string) bool {
 	return false
 }
 
-// IsStepFailed checks if a step has failed
 func (s *SimpleWorkflowState) IsStepFailed(stepName string) bool {
 	for _, failed := range s.FailedSteps {
 		if failed == stepName {
@@ -94,7 +87,6 @@ func (s *SimpleWorkflowState) IsStepFailed(stepName string) bool {
 	return false
 }
 
-// GetStepStatus returns the status of a specific step
 func (s *SimpleWorkflowState) GetStepStatus(stepName string) string {
 	if s.IsStepCompleted(stepName) {
 		return "completed"
@@ -105,19 +97,29 @@ func (s *SimpleWorkflowState) GetStepStatus(stepName string) string {
 	return "not_started"
 }
 
-// SetError sets a workflow error
 func (s *SimpleWorkflowState) SetError(err *domainworkflow.WorkflowError) {
 	s.Error = err
 	s.Status = "error"
 }
 
-// UpdateArtifacts updates the workflow artifacts
-func (s *SimpleWorkflowState) UpdateArtifacts(result map[string]interface{}) {
+func (s *SimpleWorkflowState) UpdateArtifacts(artifacts *WorkflowArtifacts) {
 	if s.Artifacts == nil {
-		s.Artifacts = make(map[string]interface{})
+		s.Artifacts = &WorkflowArtifacts{}
 	}
-	for k, v := range result {
-		s.Artifacts[k] = v
+	if artifacts.AnalyzeResult != nil {
+		s.Artifacts.AnalyzeResult = artifacts.AnalyzeResult
+	}
+	if artifacts.DockerfileResult != nil {
+		s.Artifacts.DockerfileResult = artifacts.DockerfileResult
+	}
+	if artifacts.BuildResult != nil {
+		s.Artifacts.BuildResult = artifacts.BuildResult
+	}
+	if artifacts.K8sResult != nil {
+		s.Artifacts.K8sResult = artifacts.K8sResult
+	}
+	if artifacts.ScanResult != nil {
+		s.Artifacts.ScanResult = artifacts.ScanResult
 	}
 }
 
@@ -126,7 +128,7 @@ func LoadWorkflowState(ctx context.Context, sessionManager session.OptimizedSess
 	// Use GetOrCreate to ensure session exists
 	_, err := sessionManager.GetOrCreate(ctx, sessionID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get or create session")
+		return nil, fmt.Errorf("failed to get or create session: %w", err)
 	}
 
 	var metadata map[string]interface{}
@@ -135,13 +137,13 @@ func LoadWorkflowState(ctx context.Context, sessionManager session.OptimizedSess
 	if concurrentAdapter, ok := sessionManager.(*session.ConcurrentBoltAdapter); ok {
 		metadata, err = concurrentAdapter.GetWorkflowState(ctx, sessionID)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to get workflow state")
+			return nil, fmt.Errorf("failed to get workflow state: %w", err)
 		}
 	} else {
 		// Fallback to regular Get for other implementations
 		sessionData, err := sessionManager.Get(ctx, sessionID)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to get session")
+			return nil, fmt.Errorf("failed to get session: %w", err)
 		}
 		if sessionData == nil {
 			return nil, errors.New("session not found")
@@ -152,24 +154,21 @@ func LoadWorkflowState(ctx context.Context, sessionManager session.OptimizedSess
 	// Extract workflow state from metadata
 	workflowData, exists := metadata["workflow_state"]
 	if !exists {
-		// Create new workflow state if not found
 		return &SimpleWorkflowState{
 			SessionID:      sessionID,
 			Status:         "initialized",
 			CompletedSteps: []string{},
 			FailedSteps:    []string{},
-			Artifacts:      make(map[string]interface{}),
-			Metadata:       make(map[string]interface{}),
+			Artifacts:      &WorkflowArtifacts{},
+			Metadata:       &ToolMetadata{},
 		}, nil
 	}
 
-	// Convert interface{} to WorkflowState
 	workflowMap, ok := workflowData.(map[string]interface{})
 	if !ok {
 		return nil, errors.New("invalid workflow state format in session")
 	}
 
-	// Parse workflow state fields
 	state := &SimpleWorkflowState{
 		SessionID: sessionID,
 	}
@@ -210,15 +209,15 @@ func LoadWorkflowState(ctx context.Context, sessionManager session.OptimizedSess
 		}
 		state.SkipSteps = steps
 	}
-	if artifacts, ok := workflowMap["artifacts"].(map[string]interface{}); ok {
-		state.Artifacts = artifacts
+	if artifactsData, ok := workflowMap["artifacts"].(map[string]interface{}); ok {
+		state.Artifacts = deserializeArtifacts(artifactsData)
 	} else {
-		state.Artifacts = make(map[string]interface{})
+		state.Artifacts = &WorkflowArtifacts{}
 	}
-	if metadata, ok := workflowMap["metadata"].(map[string]interface{}); ok {
-		state.Metadata = metadata
+	if metadataData, ok := workflowMap["metadata"].(map[string]interface{}); ok {
+		state.Metadata = deserializeMetadata(metadataData)
 	} else {
-		state.Metadata = make(map[string]interface{})
+		state.Metadata = &ToolMetadata{}
 	}
 
 	return state, nil
@@ -226,7 +225,6 @@ func LoadWorkflowState(ctx context.Context, sessionManager session.OptimizedSess
 
 // SaveWorkflowState saves workflow state to session
 func SaveWorkflowState(ctx context.Context, sessionManager session.OptimizedSessionManager, state *SimpleWorkflowState) error {
-	// Create workflow state map for serialization
 	workflowData := map[string]interface{}{
 		"repo_path":       state.RepoPath,
 		"status":          state.Status,
@@ -234,11 +232,10 @@ func SaveWorkflowState(ctx context.Context, sessionManager session.OptimizedSess
 		"completed_steps": state.CompletedSteps,
 		"failed_steps":    state.FailedSteps,
 		"skip_steps":      state.SkipSteps,
-		"artifacts":       state.Artifacts,
-		"metadata":        state.Metadata,
+		"artifacts":       serializeArtifacts(state.Artifacts),
+		"metadata":        serializeMetadata(state.Metadata),
 	}
 
-	// Add error information if present
 	if state.Error != nil {
 		workflowData["error"] = map[string]interface{}{
 			"step":    state.Error.Step,
@@ -247,21 +244,18 @@ func SaveWorkflowState(ctx context.Context, sessionManager session.OptimizedSess
 		}
 	}
 
-	// First ensure the session exists (create if needed)
 	_, err := sessionManager.GetOrCreate(ctx, state.SessionID)
 	if err != nil {
-		return errors.Wrap(err, "failed to get or create session")
+		return fmt.Errorf("failed to get or create session: %w", err)
 	}
 
 	// Use concurrent-safe update if available
 	if concurrentAdapter, ok := sessionManager.(*session.ConcurrentBoltAdapter); ok {
-		// Use the concurrent-safe UpdateWorkflowState method
 		err = concurrentAdapter.UpdateWorkflowState(ctx, state.SessionID, func(metadata map[string]interface{}) error {
 			metadata["workflow_state"] = workflowData
 			return nil
 		})
 	} else {
-		// Fallback to regular Update for other implementations
 		err = sessionManager.Update(ctx, state.SessionID, func(sessionState *session.SessionState) error {
 			if sessionState.Metadata == nil {
 				sessionState.Metadata = make(map[string]interface{})
@@ -272,19 +266,15 @@ func SaveWorkflowState(ctx context.Context, sessionManager session.OptimizedSess
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "failed to update session with workflow state")
+		return fmt.Errorf("failed to update session with workflow state: %w", err)
 	}
 
 	return nil
 }
 
-// GenerateSessionID generates a new session ID
 func GenerateSessionID() string {
 	return fmt.Sprintf("wf_%s", uuid.New().String())
 }
-
-// convertWorkflowError converts domain workflow error to a simple map (no longer needed as separate function)
-// This is kept for compatibility but workflow errors are now stored directly in metadata
 
 // CreateProgressEmitter creates a progress emitter using the messaging package
 func CreateProgressEmitter(ctx context.Context, req *mcp.CallToolRequest, totalSteps int, logger *slog.Logger) api.ProgressEmitter {
@@ -295,16 +285,16 @@ func CreateProgressEmitter(ctx context.Context, req *mcp.CallToolRequest, totalS
 func ExtractStringParam(args map[string]interface{}, key string) (string, error) {
 	value, exists := args[key]
 	if !exists {
-		return "", errors.Errorf("missing parameter: %s", key)
+		return "", fmt.Errorf("missing parameter: %s", key)
 	}
 
 	str, ok := value.(string)
 	if !ok {
-		return "", errors.Errorf("parameter %s must be a string", key)
+		return "", fmt.Errorf("parameter %s must be a string", key)
 	}
 
 	if str == "" {
-		return "", errors.Errorf("parameter %s cannot be empty", key)
+		return "", fmt.Errorf("parameter %s cannot be empty", key)
 	}
 
 	return str, nil
@@ -329,10 +319,9 @@ func ExtractOptionalStringParam(args map[string]interface{}, key string, default
 func ExtractStringArrayParam(args map[string]interface{}, key string) ([]string, error) {
 	value, exists := args[key]
 	if !exists {
-		return nil, nil // Optional parameter
+		return nil, nil
 	}
 
-	// Handle different array representations
 	switch v := value.(type) {
 	case []string:
 		return v, nil
@@ -341,21 +330,189 @@ func ExtractStringArrayParam(args map[string]interface{}, key string) ([]string,
 		for i, item := range v {
 			str, ok := item.(string)
 			if !ok {
-				return nil, errors.Errorf("parameter %s must be an array of strings", key)
+				return nil, fmt.Errorf("parameter %s must be an array of strings", key)
 			}
 			result[i] = str
 		}
 		return result, nil
 	default:
-		return nil, errors.Errorf("parameter %s must be an array", key)
+		return nil, fmt.Errorf("parameter %s must be an array", key)
 	}
 }
 
-// MarshalJSON marshals data to JSON string
 func MarshalJSON(data interface{}) string {
 	bytes, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Sprintf("error marshaling data: %v", err)
 	}
 	return string(bytes)
+}
+
+// serializeArtifacts converts WorkflowArtifacts to map for storage
+func serializeArtifacts(artifacts *WorkflowArtifacts) map[string]interface{} {
+	if artifacts == nil {
+		return make(map[string]interface{})
+	}
+
+	result := make(map[string]interface{})
+
+	if artifacts.AnalyzeResult != nil {
+		result["analyze_result"] = artifacts.AnalyzeResult
+	}
+	if artifacts.DockerfileResult != nil {
+		result["dockerfile_result"] = artifacts.DockerfileResult
+	}
+	if artifacts.BuildResult != nil {
+		result["build_result"] = artifacts.BuildResult
+	}
+	if artifacts.K8sResult != nil {
+		result["k8s_result"] = artifacts.K8sResult
+	}
+	if artifacts.ScanResult != nil {
+		result["scan_result"] = artifacts.ScanResult
+	}
+
+	return result
+}
+
+// deserializeArtifacts converts map to WorkflowArtifacts
+func deserializeArtifacts(data map[string]interface{}) *WorkflowArtifacts {
+	artifacts := &WorkflowArtifacts{}
+
+	if analyzeData, ok := data["analyze_result"].(map[string]interface{}); ok {
+		artifacts.AnalyzeResult = &AnalyzeArtifact{}
+		if lang, ok := analyzeData["language"].(string); ok {
+			artifacts.AnalyzeResult.Language = lang
+		}
+		if framework, ok := analyzeData["framework"].(string); ok {
+			artifacts.AnalyzeResult.Framework = framework
+		}
+		if port, ok := analyzeData["port"].(float64); ok {
+			artifacts.AnalyzeResult.Port = int(port)
+		}
+		if buildCmd, ok := analyzeData["build_command"].(string); ok {
+			artifacts.AnalyzeResult.BuildCommand = buildCmd
+		}
+		if startCmd, ok := analyzeData["start_command"].(string); ok {
+			artifacts.AnalyzeResult.StartCommand = startCmd
+		}
+		if repoPath, ok := analyzeData["repo_path"].(string); ok {
+			artifacts.AnalyzeResult.RepoPath = repoPath
+		}
+		if metadata, ok := analyzeData["metadata"].(map[string]interface{}); ok {
+			artifacts.AnalyzeResult.Metadata = metadata
+		}
+	}
+
+	if dockerfileData, ok := data["dockerfile_result"].(map[string]interface{}); ok {
+		artifacts.DockerfileResult = &DockerfileArtifact{}
+		if content, ok := dockerfileData["content"].(string); ok {
+			artifacts.DockerfileResult.Content = content
+		}
+		if path, ok := dockerfileData["path"].(string); ok {
+			artifacts.DockerfileResult.Path = path
+		}
+	}
+
+	if buildData, ok := data["build_result"].(map[string]interface{}); ok {
+		artifacts.BuildResult = &BuildArtifact{}
+		if imageID, ok := buildData["image_id"].(string); ok {
+			artifacts.BuildResult.ImageID = imageID
+		}
+		if imageRef, ok := buildData["image_ref"].(string); ok {
+			artifacts.BuildResult.ImageRef = imageRef
+		}
+		if imageSize, ok := buildData["image_size"].(float64); ok {
+			artifacts.BuildResult.ImageSize = int64(imageSize)
+		}
+		if buildTime, ok := buildData["build_time"].(string); ok {
+			artifacts.BuildResult.BuildTime = buildTime
+		}
+	}
+
+	if k8sData, ok := data["k8s_result"].(map[string]interface{}); ok {
+		artifacts.K8sResult = &K8sArtifact{}
+		if namespace, ok := k8sData["namespace"].(string); ok {
+			artifacts.K8sResult.Namespace = namespace
+		}
+		if endpoint, ok := k8sData["endpoint"].(string); ok {
+			artifacts.K8sResult.Endpoint = endpoint
+		}
+		if manifests, ok := k8sData["manifests"].([]interface{}); ok {
+			manifestStrs := make([]string, 0, len(manifests))
+			for _, m := range manifests {
+				if mStr, ok := m.(string); ok {
+					manifestStrs = append(manifestStrs, mStr)
+				}
+			}
+			artifacts.K8sResult.Manifests = manifestStrs
+		}
+	}
+
+	return artifacts
+}
+
+// serializeMetadata converts ToolMetadata to map for storage
+func serializeMetadata(metadata *ToolMetadata) map[string]interface{} {
+	if metadata == nil {
+		return make(map[string]interface{})
+	}
+
+	result := make(map[string]interface{})
+
+	if metadata.SessionID != "" {
+		result["session_id"] = metadata.SessionID
+	}
+	if metadata.WorkflowID != "" {
+		result["workflow_id"] = metadata.WorkflowID
+	}
+	if metadata.Step != "" {
+		result["step"] = metadata.Step
+	}
+	if !metadata.Timestamp.IsZero() {
+		result["timestamp"] = metadata.Timestamp.Format(time.RFC3339)
+	}
+	if metadata.Version != "" {
+		result["version"] = metadata.Version
+	}
+	if metadata.Custom != nil && len(metadata.Custom) > 0 {
+		result["custom"] = metadata.Custom
+	}
+
+	return result
+}
+
+// deserializeMetadata converts map to ToolMetadata
+func deserializeMetadata(data map[string]interface{}) *ToolMetadata {
+	metadata := &ToolMetadata{}
+
+	if sessionID, ok := data["session_id"].(string); ok {
+		metadata.SessionID = sessionID
+	}
+	if workflowID, ok := data["workflow_id"].(string); ok {
+		metadata.WorkflowID = workflowID
+	}
+	if step, ok := data["step"].(string); ok {
+		metadata.Step = step
+	}
+	if timestampStr, ok := data["timestamp"].(string); ok {
+		if t, err := time.Parse(time.RFC3339, timestampStr); err == nil {
+			metadata.Timestamp = t
+		}
+	}
+	if version, ok := data["version"].(string); ok {
+		metadata.Version = version
+	}
+	if custom, ok := data["custom"].(map[string]interface{}); ok {
+		metadata.Custom = make(map[string]string)
+		for k, v := range custom {
+			if str, ok := v.(string); ok {
+				metadata.Custom[k] = str
+			}
+		}
+	} else if custom, ok := data["custom"].(map[string]string); ok {
+		metadata.Custom = custom
+	}
+
+	return metadata
 }

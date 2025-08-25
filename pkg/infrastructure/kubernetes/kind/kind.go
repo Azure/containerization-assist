@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/Azure/containerization-assist/pkg/infrastructure/core/runner"
+	"github.com/Azure/containerization-assist/pkg/infrastructure/core"
 )
 
 type KindRunner interface {
@@ -17,12 +17,12 @@ type KindRunner interface {
 }
 
 type KindCmdRunner struct {
-	runner runner.CommandRunner
+	runner core.CommandRunner
 }
 
 var _ KindRunner = &KindCmdRunner{}
 
-func NewKindCmdRunner(runner runner.CommandRunner) KindRunner {
+func NewKindCmdRunner(runner core.CommandRunner) KindRunner {
 	return &KindCmdRunner{
 		runner: runner,
 	}

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Azure/containerization-assist/pkg/domain/errors"
-	"github.com/Azure/containerization-assist/pkg/infrastructure/core/runner"
+	"github.com/Azure/containerization-assist/pkg/infrastructure/core"
 )
 
 type DockerClient interface {
@@ -26,14 +26,14 @@ type DockerClient interface {
 }
 
 type DockerCmdRunner struct {
-	runner            runner.CommandRunner
+	runner            core.CommandRunner
 	authCache         map[string]time.Time // Registry -> last successful auth time
 	authCacheDuration time.Duration
 }
 
 var _ DockerClient = &DockerCmdRunner{}
 
-func NewDockerCmdRunner(runner runner.CommandRunner) DockerClient {
+func NewDockerCmdRunner(runner core.CommandRunner) DockerClient {
 	return &DockerCmdRunner{
 		runner:            runner,
 		authCache:         make(map[string]time.Time),

@@ -5,18 +5,17 @@ import (
 	"log/slog"
 
 	"github.com/Azure/containerization-assist/pkg/domain/errors"
-	resources "github.com/Azure/containerization-assist/pkg/infrastructure/core/resources"
+	"github.com/Azure/containerization-assist/pkg/infrastructure/core"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // ResourceRegistrar handles resource registration
 type ResourceRegistrar struct {
-	logger        *slog.Logger
-	resourceStore *resources.Store
+	resourceStore *core.Store
 }
 
 // NewResourceRegistrar creates a new resource registrar
-func NewResourceRegistrar(logger *slog.Logger, store *resources.Store) *ResourceRegistrar {
+func NewResourceRegistrar(logger *slog.Logger, store *core.Store) *ResourceRegistrar {
 	return &ResourceRegistrar{
 		resourceStore: store,
 	}

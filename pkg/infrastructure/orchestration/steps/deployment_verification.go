@@ -190,8 +190,13 @@ func checkDeploymentStatus(ctx context.Context, k8sResult *K8sResult, diag *Depl
 
 	parts := strings.Split(string(output), "/")
 	if len(parts) == 2 {
-		fmt.Sscanf(parts[0], "%d", &diag.PodsReady)
-		fmt.Sscanf(parts[1], "%d", &diag.PodsTotal)
+		_, _ = fmt.Sscanf(parts[0], "%d", &diag.PodsReady)
+		if n, err := fmt.Sscanf(parts[0], "%d", &diag.PodsReady); n != 1 || err != nil {
+			diag.Warnings = append(diag.Warnings, fmt.Sprintf("Failed to parse pods ready: '%s'", parts[0]))
+		}
+		if n, err := fmt.Sscanf(parts[1], "%d", &diag.PodsTotal); n != 1 || err != nil {
+			diag.Warnings = append(diag.Warnings, fmt.Sprintf("Failed to parse pods total: '%s'", parts[1]))
+		}
 	}
 
 	return nil
@@ -547,7 +552,7 @@ func startPortForwardWithTimeout(ctx context.Context, config PortForwardConfig, 
 	if !established {
 		// Kill the process if it's still running
 		if cmd.Process != nil {
-			cmd.Process.Kill()
+			_ = cmd.Process.Kill()
 		}
 
 		if lastError == nil {
@@ -576,7 +581,7 @@ func startPortForwardWithTimeout(ctx context.Context, config PortForwardConfig, 
 		time.Sleep(config.Timeout)
 		if cmd.Process != nil {
 			slog.Info("Killing port forwarding process")
-			cmd.Process.Kill()
+			_ = cmd.Process.Kill()
 		}
 	}()
 
@@ -593,7 +598,7 @@ func performHealthCheck(ctx context.Context, config HealthCheckConfig) (*HealthC
 		responseTime := time.Since(start)
 
 		if err == nil && contains(config.ExpectedStatus, resp.StatusCode) {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			return &HealthCheckResult{
 				Success:      true,
 				ResponseCode: resp.StatusCode,
@@ -602,7 +607,7 @@ func performHealthCheck(ctx context.Context, config HealthCheckConfig) (*HealthC
 		}
 
 		if resp != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 
 		// Wait before retry
@@ -635,7 +640,7 @@ func isPortAvailable(port int) bool {
 	if err != nil {
 		return false // Port is not available (already in use)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 	return true // Port is available
 }
 
@@ -648,7 +653,7 @@ func isPortInUse(port int) bool {
 		return false
 	}
 	// Something is listening on the port (port forwarding established)
-	conn.Close()
+	_ = conn.Close()
 	return true
 }
 

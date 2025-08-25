@@ -7,7 +7,6 @@ import (
 	"log/slog"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/pkg/errors"
 
 	domainworkflow "github.com/Azure/containerization-assist/pkg/domain/workflow"
 	"github.com/Azure/containerization-assist/pkg/service/session"
@@ -301,7 +300,7 @@ func GetToolConfig(name string) (*ToolConfig, error) {
 			return &config, nil
 		}
 	}
-	return nil, errors.Errorf("tool %s not found", name)
+	return nil, fmt.Errorf("tool %s not found", name)
 }
 
 // BuildToolSchema creates the MCP input schema for a tool

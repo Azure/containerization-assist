@@ -29,18 +29,16 @@ type ManifestService interface {
 	GetAvailableTemplates() ([]string, error)
 }
 
-// ManifestServiceImpl implements the ManifestService interface
-type ManifestServiceImpl struct {
-	logger *slog.Logger
-}
+// manifestService implements the ManifestService interface
+type manifestService struct{}
 
 // NewManifestService creates a new manifest service
 func NewManifestService(logger *slog.Logger) ManifestService {
-	return &ManifestServiceImpl{}
+	return &manifestService{}
 }
 
 // GenerateManifests generates Kubernetes manifests from templates
-func (s *ManifestServiceImpl) GenerateManifests(_ context.Context, options ManifestOptions) (*ManifestGenerationResult, error) {
+func (s *manifestService) GenerateManifests(_ context.Context, options ManifestOptions) (*ManifestGenerationResult, error) {
 	startTime := time.Now()
 
 	result := &ManifestGenerationResult{
@@ -106,7 +104,7 @@ func (s *ManifestServiceImpl) GenerateManifests(_ context.Context, options Manif
 }
 
 // DiscoverManifests discovers existing Kubernetes manifests in a directory
-func (s *ManifestServiceImpl) DiscoverManifests(_ context.Context, directory string) (*ManifestDiscoveryResult, error) {
+func (s *manifestService) DiscoverManifests(_ context.Context, directory string) (*ManifestDiscoveryResult, error) {
 	result := &ManifestDiscoveryResult{
 		Directory: directory,
 		Context:   make(map[string]interface{}),
@@ -147,7 +145,7 @@ func (s *ManifestServiceImpl) DiscoverManifests(_ context.Context, directory str
 }
 
 // ValidateManifests validates Kubernetes manifests
-func (s *ManifestServiceImpl) ValidateManifests(_ context.Context, manifests []string) (*api.ManifestValidationResult, error) {
+func (s *manifestService) ValidateManifests(_ context.Context, manifests []string) (*api.ManifestValidationResult, error) {
 	result := &api.ManifestValidationResult{
 		ValidationResult: api.ValidationResult{
 			Valid:    true,
@@ -173,7 +171,7 @@ func (s *ManifestServiceImpl) ValidateManifests(_ context.Context, manifests []s
 }
 
 // GetAvailableTemplates returns available manifest templates
-func (s *ManifestServiceImpl) GetAvailableTemplates() ([]string, error) {
+func (s *manifestService) GetAvailableTemplates() ([]string, error) {
 	// This would typically read from embedded templates or a template directory
 	templates := []string{
 		"deployment",
@@ -189,7 +187,7 @@ func (s *ManifestServiceImpl) GetAvailableTemplates() ([]string, error) {
 
 // Helper methods
 
-func (s *ManifestServiceImpl) validateGenerateInputs(options ManifestOptions) error {
+func (s *manifestService) validateGenerateInputs(options ManifestOptions) error {
 	if options.AppName == "" {
 		return fmt.Errorf("app name is required")
 	}
@@ -205,7 +203,7 @@ func (s *ManifestServiceImpl) validateGenerateInputs(options ManifestOptions) er
 	return nil
 }
 
-func (s *ManifestServiceImpl) generateFromTemplate(options ManifestOptions) ([]GeneratedManifest, error) {
+func (s *manifestService) generateFromTemplate(options ManifestOptions) ([]GeneratedManifest, error) {
 	// This is a simplified implementation
 	// In practice, this would use actual Kubernetes template generation
 
@@ -250,7 +248,7 @@ func (s *ManifestServiceImpl) generateFromTemplate(options ManifestOptions) ([]G
 	return manifests, nil
 }
 
-func (s *ManifestServiceImpl) generateDeploymentManifest(options ManifestOptions) string {
+func (s *manifestService) generateDeploymentManifest(options ManifestOptions) string {
 	// Simplified deployment manifest template
 	return fmt.Sprintf(`apiVersion: apps/v1
 kind: Deployment
@@ -275,7 +273,7 @@ spec:
 `, options.AppName, options.Namespace, options.Replicas, options.AppName, options.AppName, options.AppName, options.ImageRef, options.Port)
 }
 
-func (s *ManifestServiceImpl) generateServiceManifest(options ManifestOptions) string {
+func (s *manifestService) generateServiceManifest(options ManifestOptions) string {
 	// Simplified service manifest template
 	return fmt.Sprintf(`apiVersion: v1
 kind: Service
@@ -293,7 +291,7 @@ spec:
 `, options.AppName, options.Namespace, options.AppName, options.Port, options.Port)
 }
 
-func (s *ManifestServiceImpl) discoverYAMLFiles(directory string) ([]DiscoveredManifest, error) {
+func (s *manifestService) discoverYAMLFiles(directory string) ([]DiscoveredManifest, error) {
 	// This is a simplified implementation
 	// In practice, this would recursively discover and parse YAML files
 	manifests := make([]DiscoveredManifest, 0)
@@ -303,7 +301,7 @@ func (s *ManifestServiceImpl) discoverYAMLFiles(directory string) ([]DiscoveredM
 	return manifests, nil
 }
 
-func (s *ManifestServiceImpl) validateManifest(manifest string) error {
+func (s *manifestService) validateManifest(manifest string) error {
 	// This is a simplified implementation
 	// In practice, this would validate Kubernetes manifest syntax and semantics
 

@@ -20,18 +20,9 @@ func CreateProgressEmitter(ctx context.Context, req *mcp.CallToolRequest, totalS
 		}
 	}
 
-	// Fallback to CLI emitter
+	// Return nil if no MCP context available
 	if logger != nil {
-		logger.Debug("Creating CLI progress emitter")
+		logger.Debug("No MCP context available, progress emitter not created")
 	}
-	return NewCLIDirectEmitter(logger)
-}
-
-// CreateProgressEmitterWithToken creates an MCP progress emitter with an explicit token
-func CreateProgressEmitterWithToken(ctx context.Context, token interface{}, logger *slog.Logger) api.ProgressEmitter {
-	srv := server.ServerFromContext(ctx)
-	if srv != nil && token != nil {
-		return NewMCPDirectEmitter(srv, token, logger)
-	}
-	return NewCLIDirectEmitter(logger)
+	return nil
 }

@@ -24,7 +24,7 @@ func TestBoltStore_BasicOperations(t *testing.T) {
 
 	store, err := NewBoltStore(dbPath, logger)
 	require.NoError(t, err)
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	ctx := context.Background()
 
@@ -87,7 +87,7 @@ func TestBoltStore_ConcurrentOperations(t *testing.T) {
 
 	store, err := NewBoltStore(dbPath, logger)
 	require.NoError(t, err)
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	ctx := context.Background()
 	numGoroutines := 50
@@ -283,7 +283,7 @@ func TestBoltStore_ConcurrentCreateSameID(t *testing.T) {
 
 	store, err := NewBoltStore(dbPath, logger)
 	require.NoError(t, err)
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	ctx := context.Background()
 	sessionID := "duplicate-session"
@@ -346,7 +346,7 @@ func TestBoltStore_ConcurrentCleanup(t *testing.T) {
 
 	store, err := NewBoltStore(dbPath, logger)
 	require.NoError(t, err)
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	ctx := context.Background()
 
@@ -445,7 +445,7 @@ func TestBoltStore_StatsUnderConcurrency(t *testing.T) {
 
 	store, err := NewBoltStore(dbPath, logger)
 	require.NoError(t, err)
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	ctx := context.Background()
 
@@ -538,7 +538,7 @@ func TestBoltStore_ErrorHandling(t *testing.T) {
 	assert.Contains(t, err.Error(), "not found")
 
 	// Close the store and test operations on closed store
-	store.Close()
+	_ = store.Close()
 
 	err = store.Create(ctx, session.Session{ID: "test"})
 	assert.Error(t, err, "Should error when creating on closed store")

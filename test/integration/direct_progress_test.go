@@ -100,11 +100,10 @@ func TestDirectProgressIntegration(t *testing.T) {
 // TestDirectProgressFactoryWithMCPServer tests the factory creates MCP emitter when server is present
 func TestDirectProgressFactoryWithMCPServer(t *testing.T) {
 	logger := slog.Default()
-	// Test without server - should get CLI emitter
+	// Test without server - should return nil (no emitter without MCP context)
 	ctx := context.Background()
 	emitter := messaging.CreateProgressEmitter(ctx, nil, 10, logger)
-	_, isCLI := emitter.(*messaging.CLIDirectEmitter)
-	assert.True(t, isCLI, "Should get CLI emitter without server")
+	assert.Nil(t, emitter, "Should return nil without MCP server context")
 
 	// Note: Testing with actual MCP server would require more setup
 	// This is covered in the direct_integration_test.go

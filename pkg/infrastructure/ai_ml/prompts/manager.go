@@ -211,7 +211,8 @@ func (m *Manager) loadExternalTemplates() error {
 
 		template, err := m.parseTemplate(data, path, "external")
 		if err != nil {
-			return nil // Continue loading other templates
+			// Log error but continue loading other templates
+			return nil
 		}
 
 		// Check for override

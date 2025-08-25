@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/containerization-assist/pkg/domain/workflow"
 	"github.com/Azure/containerization-assist/pkg/infrastructure/ai_ml/prompts"
 	"github.com/Azure/containerization-assist/pkg/infrastructure/ai_ml/sampling"
-	"github.com/Azure/containerization-assist/pkg/infrastructure/core/resources"
+	"github.com/Azure/containerization-assist/pkg/infrastructure/core"
 	"github.com/Azure/containerization-assist/pkg/infrastructure/messaging"
 	"github.com/Azure/containerization-assist/pkg/infrastructure/orchestration/steps"
 	"github.com/Azure/containerization-assist/pkg/service/session"
@@ -126,8 +126,8 @@ func (f *ServerFactory) createSessionManager() (*session.ConcurrentBoltAdapter, 
 	return adapter, nil
 }
 
-func (f *ServerFactory) createResourceStore() (*resources.Store, error) {
-	return resources.NewStore(f.logger), nil
+func (f *ServerFactory) createResourceStore() (*core.Store, error) {
+	return core.NewStore(f.logger), nil
 }
 
 func (f *ServerFactory) createEventPublisher() (*messaging.Publisher, error) {

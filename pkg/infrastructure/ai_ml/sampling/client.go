@@ -104,7 +104,13 @@ func (c *Client) SampleInternal(ctx context.Context, req SamplingRequest) (*Samp
 }
 
 // sampleWithAIAssist performs AI-assisted sampling with intelligent error correction
-func (c *Client) sampleWithAIAssist(ctx context.Context, originalReq SamplingRequest, enhancedLogger *EnhancedLogger, reqLogger *slog.Logger, start time.Time) (*SamplingResponse, error) {
+func (c *Client) sampleWithAIAssist(
+	ctx context.Context,
+	originalReq SamplingRequest,
+	enhancedLogger *EnhancedLogger,
+	reqLogger *slog.Logger,
+	start time.Time,
+) (*SamplingResponse, error) {
 	var lastErr error
 	var errorHistory []string
 	currentReq := originalReq // Start with original request

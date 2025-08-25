@@ -21,8 +21,7 @@ const (
 
 // BoltStore implements session.Store using BoltDB
 type BoltStore struct {
-	db     *bbolt.DB
-	logger *slog.Logger
+	db *bbolt.DB
 }
 
 // NewBoltStore creates a new BoltDB-backed session store
@@ -46,7 +45,7 @@ func NewBoltStore(dbPath string, logger *slog.Logger) (*BoltStore, error) {
 		return err
 	})
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, errors.New(errors.CodeIoError, "persistence", "failed to create sessions bucket", err)
 	}
 

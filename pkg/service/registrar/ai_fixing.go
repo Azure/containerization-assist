@@ -146,8 +146,22 @@ func (tr *ToolRegistrar) getContext(sessionID, artifactKey string) string {
 		return "Context not available"
 	}
 
-	// Direct artifact access
-	if data, exists := state.Artifacts[artifactKey]; exists {
+	// Direct artifact access based on artifact key
+	var data interface{}
+	switch artifactKey {
+	case "analyze_result":
+		data = state.Artifacts.AnalyzeResult
+	case "dockerfile_result":
+		data = state.Artifacts.DockerfileResult
+	case "build_result":
+		data = state.Artifacts.BuildResult
+	case "k8s_result":
+		data = state.Artifacts.K8sResult
+	case "scan_result":
+		data = state.Artifacts.ScanResult
+	}
+
+	if data != nil {
 		if jsonData, err := json.MarshalIndent(data, "", "  "); err == nil {
 			return string(jsonData)
 		}
@@ -164,23 +178,17 @@ func (tr *ToolRegistrar) getK8sDeploymentDiagnostics(sessionID string) string {
 		return "Deployment diagnostics not available"
 	}
 
-	// Access K8sResult from artifacts
-	k8sData, exists := state.Artifacts["k8s_result"]
-	if !exists {
+	// Access K8sResult from typed artifacts
+	if state.Artifacts == nil || state.Artifacts.K8sResult == nil {
 		return "No deployment diagnostics available"
 	}
 
-	k8sMap, ok := k8sData.(map[string]interface{})
-	if !ok {
+	k8sResult := state.Artifacts.K8sResult
+	if k8sResult.Metadata == nil {
 		return "No deployment diagnostics available"
 	}
 
-	metadata, ok := k8sMap["metadata"].(map[string]interface{})
-	if !ok {
-		return "No deployment diagnostics available"
-	}
-
-	diagnostics, exists := metadata["deployment_diagnostics"]
+	diagnostics, exists := k8sResult.Metadata["deployment_diagnostics"]
 	if !exists {
 		return "No deployment diagnostics available"
 	}

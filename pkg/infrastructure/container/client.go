@@ -10,13 +10,22 @@ import (
 )
 
 // BuildDockerfileContent builds a Docker image from a string containing Dockerfile contents
-func BuildDockerfileContent(ctx context.Context, docker DockerClient, dockerfileContent string, targetDir string, registry string, imageName string) (string, error) {
+func BuildDockerfileContent(
+	ctx context.Context,
+	docker DockerClient,
+	dockerfileContent string,
+	targetDir string,
+	registry string,
+	imageName string,
+) (string, error) {
 	// Create temporary directory
 	tmpDir, err := os.MkdirTemp("", "docker-build-*")
 	if err != nil {
 		return "", errors.New(errors.CodeIoError, "docker", fmt.Sprintf("failed to create temp directory: %v", err), err)
 	}
-	defer os.RemoveAll(tmpDir) // Clean up
+	defer func() {
+		_ = os.RemoveAll(tmpDir) // Clean up
+	}()
 
 	// Create temporary Dockerfile
 	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
@@ -51,7 +60,11 @@ func PushDockerImage(ctx context.Context, docker DockerClient, image string) err
 	_, err := docker.Push(ctx, image)
 
 	if err != nil {
-		return errors.New(errors.CodeImagePushFailed, "docker", fmt.Sprintf("error pushing to registry: %s", err.Error()), err)
+		return errors.New(
+			errors.CodeImagePushFailed,
+			"docker",
+			fmt.Sprintf("error pushing to registry: %s", err.Error()),
+			err)
 	}
 
 	return nil

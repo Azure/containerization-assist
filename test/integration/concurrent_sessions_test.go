@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -18,9 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestConcurrentWorkflowSessions tests multiple workflow sessions running concurrently
 func TestConcurrentWorkflowSessions(t *testing.T) {
-	// Setup test environment
 	tmpDir, err := os.MkdirTemp("", "concurrent_sessions_test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
@@ -28,7 +27,6 @@ func TestConcurrentWorkflowSessions(t *testing.T) {
 	dbPath := filepath.Join(tmpDir, "test.db")
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	// Create concurrent session manager
 	sessionManager, err := session.NewConcurrentBoltAdapter(dbPath, logger, 24*time.Hour, 100)
 	require.NoError(t, err)
 	defer sessionManager.Stop(context.Background())
@@ -36,16 +34,13 @@ func TestConcurrentWorkflowSessions(t *testing.T) {
 	ctx := context.Background()
 	sessionManager.StartCleanupRoutine(ctx, 5*time.Minute)
 
-	// Test concurrent workflow operations
 	numSessions := 10
 	numOperationsPerSession := 20
 	var wg sync.WaitGroup
 
-	// Track results
 	results := make(map[string]*tools.SimpleWorkflowState)
 	var resultsMu sync.Mutex
 
-	// Create and run concurrent workflow sessions
 	for i := 0; i < numSessions; i++ {
 		wg.Add(1)
 		go func(sessionNum int) {
@@ -67,9 +62,14 @@ func TestConcurrentWorkflowSessions(t *testing.T) {
 
 				// Update artifacts
 				if state.Artifacts == nil {
-					state.Artifacts = make(map[string]interface{})
+					state.Artifacts = &tools.WorkflowArtifacts{}
 				}
-				state.Artifacts[stepName] = map[string]interface{}{
+				if state.Artifacts.AnalyzeResult == nil {
+					state.Artifacts.AnalyzeResult = &tools.AnalyzeArtifact{
+						Metadata: make(map[string]interface{}),
+					}
+				}
+				state.Artifacts.AnalyzeResult.Metadata[stepName] = map[string]interface{}{
 					"session":   sessionNum,
 					"step":      step,
 					"timestamp": time.Now().Unix(),
@@ -103,14 +103,16 @@ func TestConcurrentWorkflowSessions(t *testing.T) {
 	for sessionID, state := range results {
 		// Each session should have completed all steps
 		assert.Equal(t, numOperationsPerSession, len(state.CompletedSteps))
-		assert.Equal(t, numOperationsPerSession, len(state.Artifacts))
+		assert.NotNil(t, state.Artifacts)
+		assert.NotNil(t, state.Artifacts.AnalyzeResult)
+		assert.Equal(t, numOperationsPerSession, len(state.Artifacts.AnalyzeResult.Metadata))
 
 		// Verify no steps were lost
 		for step := 0; step < numOperationsPerSession; step++ {
 			stepName := fmt.Sprintf("step-%d", step)
 			assert.True(t, state.IsStepCompleted(stepName),
 				"Session %s missing step %s", sessionID, stepName)
-			assert.Contains(t, state.Artifacts, stepName)
+			assert.Contains(t, state.Artifacts.AnalyzeResult.Metadata, stepName)
 		}
 	}
 }
@@ -140,7 +142,11 @@ func TestSessionIsolation(t *testing.T) {
 	state1.RepoPath = "/repo/path/1"
 	state1.MarkStepCompleted("step-a")
 	state1.MarkStepCompleted("step-b")
-	state1.Artifacts = map[string]interface{}{"key": "value1"}
+	state1.Artifacts = &tools.WorkflowArtifacts{
+		AnalyzeResult: &tools.AnalyzeArtifact{
+			Metadata: map[string]interface{}{"key": "value1"},
+		},
+	}
 	err = tools.SaveWorkflowState(ctx, sessionManager, state1)
 	require.NoError(t, err)
 
@@ -150,7 +156,11 @@ func TestSessionIsolation(t *testing.T) {
 	state2.RepoPath = "/repo/path/2"
 	state2.MarkStepCompleted("step-x")
 	state2.MarkStepCompleted("step-y")
-	state2.Artifacts = map[string]interface{}{"key": "value2"}
+	state2.Artifacts = &tools.WorkflowArtifacts{
+		AnalyzeResult: &tools.AnalyzeArtifact{
+			Metadata: map[string]interface{}{"key": "value2"},
+		},
+	}
 	err = tools.SaveWorkflowState(ctx, sessionManager, state2)
 	require.NoError(t, err)
 
@@ -161,7 +171,7 @@ func TestSessionIsolation(t *testing.T) {
 	assert.True(t, verifyState1.IsStepCompleted("step-a"))
 	assert.True(t, verifyState1.IsStepCompleted("step-b"))
 	assert.False(t, verifyState1.IsStepCompleted("step-x"))
-	assert.Equal(t, "value1", verifyState1.Artifacts["key"])
+	assert.Equal(t, "value1", verifyState1.Artifacts.AnalyzeResult.Metadata["key"])
 
 	// Verify session 2 data is unchanged
 	verifyState2, err := tools.LoadWorkflowState(ctx, sessionManager, session2ID)
@@ -170,7 +180,7 @@ func TestSessionIsolation(t *testing.T) {
 	assert.True(t, verifyState2.IsStepCompleted("step-x"))
 	assert.True(t, verifyState2.IsStepCompleted("step-y"))
 	assert.False(t, verifyState2.IsStepCompleted("step-a"))
-	assert.Equal(t, "value2", verifyState2.Artifacts["key"])
+	assert.Equal(t, "value2", verifyState2.Artifacts.AnalyzeResult.Metadata["key"])
 }
 
 // TestHighContentionScenario tests behavior under very high contention
@@ -198,12 +208,8 @@ func TestHighContentionScenario(t *testing.T) {
 	numWorkers := 100
 	updatesPerWorker := 50
 
-	// Initialize session with atomic update
-	err = tools.AtomicUpdateWorkflowState(ctx, sessionManager, sessionID, func(state *tools.SimpleWorkflowState) error {
-		state.Metadata["counter"] = 0
-		state.Metadata["operations"] = []string{}
-		return nil
-	})
+	// Pre-create the session to avoid race conditions in GetOrCreate
+	_, err = sessionManager.GetOrCreate(ctx, sessionID)
 	require.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -214,19 +220,55 @@ func TestHighContentionScenario(t *testing.T) {
 		go func(workerID int) {
 			defer wg.Done()
 
+			successCount := 0
 			for j := 0; j < updatesPerWorker; j++ {
-				// Use atomic helpers for concurrent-safe updates
-				_, err := tools.AtomicIncrementCounter(ctx, sessionManager, sessionID, "counter")
-				if err != nil {
-					t.Logf("Worker %d counter increment %d failed: %v", workerID, j, err)
-				}
+				// Use atomic update for concurrent-safe updates
+				err := tools.AtomicUpdateWorkflowState(ctx, sessionManager, sessionID, func(state *tools.SimpleWorkflowState) error {
+					// Initialize metadata if needed
+					if state.Metadata == nil {
+						state.Metadata = &tools.ToolMetadata{
+							Custom: make(map[string]string),
+						}
+					}
+					if state.Metadata.Custom == nil {
+						state.Metadata.Custom = make(map[string]string)
+					}
+					// Initialize counter and operations if needed
+					if _, exists := state.Metadata.Custom["counter"]; !exists {
+						state.Metadata.Custom["counter"] = "0"
+					}
+					if _, exists := state.Metadata.Custom["operations"]; !exists {
+						state.Metadata.Custom["operations"] = ""
+					}
+					// Increment counter
+					counterStr := state.Metadata.Custom["counter"]
+					var counter int
+					n, err := fmt.Sscanf(counterStr, "%d", &counter)
+					if err != nil || n != 1 {
+						// Fallback to zero if parsing fails
+						counter = 0
+					}
+					counter++
+					state.Metadata.Custom["counter"] = fmt.Sprintf("%d", counter)
 
-				// Append operation record atomically
-				operation := fmt.Sprintf("worker-%d-update-%d", workerID, j)
-				err = tools.AtomicAppendToList(ctx, sessionManager, sessionID, "operations", operation)
+					// Append operation
+					operation := fmt.Sprintf("worker-%d-update-%d", workerID, j)
+					operations := state.Metadata.Custom["operations"]
+					if operations != "" {
+						operations += ","
+					}
+					operations += operation
+					state.Metadata.Custom["operations"] = operations
+					return nil
+				})
 				if err != nil {
-					t.Logf("Worker %d operation append %d failed: %v", workerID, j, err)
+					t.Logf("Worker %d update %d failed: %v", workerID, j, err)
+				} else {
+					successCount++
 				}
+			}
+			if successCount == 0 {
+				t.Logf("Worker %d had 0 successful updates", workerID)
 			}
 		}(i)
 	}
@@ -238,25 +280,30 @@ func TestHighContentionScenario(t *testing.T) {
 	finalState, err := tools.LoadWorkflowState(ctx, sessionManager, sessionID)
 	require.NoError(t, err)
 
-	// Check counter
-	finalCounter := 0
-	if val, ok := finalState.Metadata["counter"].(float64); ok {
-		finalCounter = int(val)
-	} else if val, ok := finalState.Metadata["counter"].(int); ok {
-		finalCounter = val
+	// Debug output
+	if finalState.Metadata == nil {
+		t.Logf("finalState.Metadata is nil")
+		t.Logf("finalState: %+v", finalState)
 	}
+
+	// Check counter
+	require.NotNil(t, finalState.Metadata)
+	require.NotNil(t, finalState.Metadata.Custom)
+
+	finalCounter := 0
+	counterStr := finalState.Metadata.Custom["counter"]
+	n, err := fmt.Sscanf(counterStr, "%d", &finalCounter)
+	require.NoError(t, err, "Failed to parse counter from finalState.Metadata.Custom[\"counter\"]: %q", counterStr)
+	require.Equal(t, 1, n, "Expected to parse one integer from counterStr, got %d", n)
 	expectedCount := numWorkers * updatesPerWorker
 	assert.Equal(t, expectedCount, finalCounter,
 		"Counter mismatch: expected %d, got %d", expectedCount, finalCounter)
 
 	// Check operations count
+	operationsStr := finalState.Metadata.Custom["operations"]
 	var operations []string
-	if ops, ok := finalState.Metadata["operations"].([]interface{}); ok {
-		for _, op := range ops {
-			if str, ok := op.(string); ok {
-				operations = append(operations, str)
-			}
-		}
+	if operationsStr != "" {
+		operations = strings.Split(operationsStr, ",")
 	}
 	assert.Equal(t, expectedCount, len(operations),
 		"Operations count mismatch: expected %d, got %d", expectedCount, len(operations))

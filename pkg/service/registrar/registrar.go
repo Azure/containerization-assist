@@ -10,7 +10,7 @@ import (
 
 	"github.com/Azure/containerization-assist/pkg/domain/workflow"
 	"github.com/Azure/containerization-assist/pkg/infrastructure/ai_ml/prompts"
-	resources "github.com/Azure/containerization-assist/pkg/infrastructure/core/resources"
+	"github.com/Azure/containerization-assist/pkg/infrastructure/core"
 	"github.com/Azure/containerization-assist/pkg/service/session"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -27,7 +27,7 @@ type MCPRegistrar struct {
 }
 
 // NewMCPRegistrar creates a new unified MCP registrar
-func NewMCPRegistrar(logger *slog.Logger, resourceStore *resources.Store, orchestrator workflow.WorkflowOrchestrator, sessionManager OptimizedSessionManager, config workflow.ServerConfig) *MCPRegistrar {
+func NewMCPRegistrar(logger *slog.Logger, resourceStore *core.Store, orchestrator workflow.WorkflowOrchestrator, sessionManager OptimizedSessionManager, config workflow.ServerConfig) *MCPRegistrar {
 	// Extract dependencies from orchestrator for individual tools
 	var stepProvider workflow.StepProvider
 
