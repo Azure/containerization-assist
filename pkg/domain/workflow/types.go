@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/Azure/containerization-assist/pkg/api"
@@ -247,8 +248,8 @@ type ServerConfig struct {
 // DefaultServerConfig returns a simplified default server configuration with only essential fields
 func DefaultServerConfig() ServerConfig {
 	return ServerConfig{
-		WorkspaceDir:     "/tmp/containerization-assist-workspace",
-		StorePath:        "/tmp/containerization-assist-sessions.db",
+		WorkspaceDir:     filepath.Join(os.TempDir(), "containerization-assist-workspace"),
+		StorePath:        filepath.Join(os.TempDir(), "containerization-assist-sessions.db"),
 		SessionTTL:       24 * time.Hour,
 		MaxSessions:      100,
 		LogLevel:         "info",

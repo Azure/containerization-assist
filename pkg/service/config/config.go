@@ -61,12 +61,13 @@ func Load(envFile string) (*Config, error) {
 }
 
 func DefaultConfig() *Config {
-	// Create process-specific database path to avoid conflicts between multiple instances
+	// Create process-specific paths to avoid conflicts between multiple instances
 	pid := os.Getpid()
-	storePath := filepath.Join("/tmp/mcp-store", fmt.Sprintf("sessions-%d.db", pid))
-	
+	storePath := filepath.Join(os.TempDir(), fmt.Sprintf("sessions-%d.db", pid))
+	workspaceDir := filepath.Join(os.TempDir(), fmt.Sprintf("mcp-workspace-%d", pid))
+
 	return &Config{
-		WorkspaceDir:     "/tmp/mcp-workspace",
+		WorkspaceDir:     workspaceDir,
 		StorePath:        storePath,
 		SessionTTL:       24 * time.Hour,
 		MaxSessions:      100,
