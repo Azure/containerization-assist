@@ -139,6 +139,7 @@ func validateARMTemplate(ctx context.Context, path string, content string, stric
 	}
 
 	if _, ok := template["contentVersion"]; !ok {
+		result.Valid = false
 		result.Errors = append(result.Errors, ValidationError{
 			Message:  "Missing contentVersion in ARM template",
 			Severity: "error",
@@ -495,10 +496,30 @@ func performStrictARMValidation(template map[string]interface{}, result *Validat
 		for _, resource := range resources {
 			if res, ok := resource.(map[string]interface{}); ok {
 				if apiVersion, ok := res["apiVersion"].(string); ok {
-					// Check if using old API version
-					if strings.Contains(apiVersion, "2022-") || strings.Contains(apiVersion, "2023-01") {
+					// Check if using old API version - be specific about versions
+					// For Container Apps, versions before 2023-05-01 are considered old
+					isOldVersion := false
+					switch {
+					case strings.HasPrefix(apiVersion, "Microsoft.App/"):
+						// Container Apps specific versions
+						if apiVersion == "Microsoft.App/containerApps/2022-03-01" ||
+							apiVersion == "Microsoft.App/containerApps/2022-11-01-preview" ||
+							apiVersion == "Microsoft.App/managedEnvironments/2022-03-01" ||
+							apiVersion == "Microsoft.App/managedEnvironments/2022-11-01-preview" ||
+							apiVersion == "Microsoft.App/containerApps/2023-01-01-preview" {
+							isOldVersion = true
+						}
+					case strings.Contains(apiVersion, "/2022-"):
+						// Any 2022 version for other resources
+						isOldVersion = true
+					case apiVersion == "2023-01-01" || apiVersion == "2023-01-01-preview":
+						// Specific old 2023 versions
+						isOldVersion = true
+					}
+
+					if isOldVersion {
 						result.Warnings = append(result.Warnings, ValidationWarning{
-							Message: fmt.Sprintf("Resource using older API version: %s", apiVersion),
+							Message: fmt.Sprintf("Resource using older API version: %s. Consider updating to latest stable version.", apiVersion),
 							Rule:    "strict-api-version-latest",
 						})
 					}

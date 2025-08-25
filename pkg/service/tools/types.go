@@ -40,6 +40,7 @@ type WorkflowArtifacts struct {
 	BuildResult      *BuildArtifact      `json:"build_result,omitempty"`
 	K8sResult        *K8sArtifact        `json:"k8s_result,omitempty"`
 	ScanResult       *ScanArtifact       `json:"scan_result,omitempty"`
+	AzureResult      *AzureArtifact      `json:"azure_result,omitempty"`
 }
 
 // AnalyzeArtifact represents repository analysis results
@@ -80,6 +81,20 @@ type K8sArtifact struct {
 	Endpoint  string                 `json:"endpoint"`
 	Services  []string               `json:"services,omitempty"`
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// AzureArtifact represents Azure Container Apps deployment artifacts
+type AzureArtifact struct {
+	ResourceGroup   string                 `json:"resource_group"`
+	AppName         string                 `json:"app_name"`
+	EnvironmentName string                 `json:"environment_name"`
+	Location        string                 `json:"location"`
+	Manifests       map[string]interface{} `json:"manifests"`
+	AppURL          string                 `json:"app_url,omitempty"`
+	FQDN            string                 `json:"fqdn,omitempty"`
+	DeployedAt      time.Time              `json:"deployed_at"`
+	OutputFormat    string                 `json:"output_format"`
+	Metadata        map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // ScanArtifact represents security scan results

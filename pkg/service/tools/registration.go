@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"log/slog"
@@ -404,44 +405,74 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 
 		case "generate_azure_container_apps_manifests":
 			// Generate Azure Container Apps manifests
-			artifacts := state.Artifacts
-			buildData, ok := artifacts["build_result"]
-			analyzeData, hasAnalyze := artifacts["analyze_result"]
-			if !ok || !hasAnalyze {
+			if state.Artifacts == nil || state.Artifacts.BuildResult == nil || state.Artifacts.AnalyzeResult == nil {
 				execErr = fmt.Errorf("build_image and analyze_repository must be run first")
 			} else {
-				buildBytes, _ := json.Marshal(buildData)
-				var buildResult steps.BuildResult
-				json.Unmarshal(buildBytes, &buildResult)
+				// Convert artifacts to steps types
+				// Extract image name and tag from ImageRef (format: "name:tag")
+				imageParts := strings.Split(state.Artifacts.BuildResult.ImageRef, ":")
+				imageName := imageParts[0]
+				imageTag := "latest"
+				if len(imageParts) > 1 {
+					imageTag = imageParts[1]
+				}
 
-				analyzeBytes, _ := json.Marshal(analyzeData)
-				var analyzeResult steps.AnalyzeResult
-				json.Unmarshal(analyzeBytes, &analyzeResult)
+				buildResult := steps.BuildResult{
+					ImageName: imageName,
+					ImageTag:  imageTag,
+					ImageID:   state.Artifacts.BuildResult.ImageID,
+				}
 
-				// Extract Azure-specific parameters
-				resourceGroup, _ := args["resource_group"].(string)
+				analyzeResult := steps.AnalyzeResult{
+					Language:  state.Artifacts.AnalyzeResult.Language,
+					Framework: state.Artifacts.AnalyzeResult.Framework,
+					Port:      state.Artifacts.AnalyzeResult.Port,
+					RepoPath:  state.Artifacts.AnalyzeResult.RepoPath,
+				}
+
+				// Extract Azure-specific parameters with proper type assertion error handling
+				resourceGroup, ok := args["resource_group"].(string)
+				if !ok && args["resource_group"] != nil {
+					execErr = fmt.Errorf("resource_group must be a string, got %T", args["resource_group"])
+					break
+				}
 				if resourceGroup == "" {
 					resourceGroup = "containerized-apps-rg"
 				}
 
-				location, _ := args["location"].(string)
+				location, ok := args["location"].(string)
+				if !ok && args["location"] != nil {
+					execErr = fmt.Errorf("location must be a string, got %T", args["location"])
+					break
+				}
 				if location == "" {
 					location = "eastus"
 				}
 
-				environmentName, _ := args["environment_name"].(string)
+				environmentName, ok := args["environment_name"].(string)
+				if !ok && args["environment_name"] != nil {
+					execErr = fmt.Errorf("environment_name must be a string, got %T", args["environment_name"])
+					break
+				}
 				if environmentName == "" {
 					environmentName = "containerized-apps-env"
 				}
 
-				outputFormat, _ := args["output_format"].(string)
+				outputFormat, ok := args["output_format"].(string)
+				if !ok && args["output_format"] != nil {
+					execErr = fmt.Errorf("output_format must be a string, got %T", args["output_format"])
+					break
+				}
 				if outputFormat == "" {
 					outputFormat = "bicep"
 				}
 
-				registryURL, _ := args["registry_url"].(string)
-				if registryURL == "" {
-					registryURL = "myregistry.azurecr.io"
+				registryURL, ok := args["registry_url"].(string)
+				if !ok && args["registry_url"] != nil {
+					execErr = fmt.Errorf("registry_url must be a string, got %T", args["registry_url"])
+				} else if registryURL == "" {
+					// Leave empty - will be handled by the step function which requires it
+					registryURL = ""
 				}
 
 				appName := "containerized-app"
@@ -466,8 +497,19 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 				if err != nil {
 					execErr = err
 				} else {
-					state.UpdateArtifacts(map[string]interface{}{
-						"azure_container_apps_result": azureResult,
+					state.UpdateArtifacts(&WorkflowArtifacts{
+						AzureResult: &AzureArtifact{
+							ResourceGroup:   azureResult.ResourceGroup,
+							AppName:         azureResult.AppName,
+							EnvironmentName: azureResult.EnvironmentName,
+							Location:        azureResult.Location,
+							Manifests:       azureResult.Manifests,
+							AppURL:          azureResult.AppURL,
+							FQDN:            azureResult.FQDN,
+							DeployedAt:      azureResult.DeployedAt,
+							OutputFormat:    azureResult.OutputFormat,
+							Metadata:        azureResult.Metadata,
+						},
 					})
 					resultBytes, _ := json.Marshal(azureResult)
 					json.Unmarshal(resultBytes, &result)
@@ -477,17 +519,29 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 
 		case "validate_azure_manifests":
 			// Validate Azure Container Apps manifests
-			artifacts := state.Artifacts
-			azureData, ok := artifacts["azure_container_apps_result"]
-			if !ok {
+			if state.Artifacts == nil || state.Artifacts.AzureResult == nil {
 				execErr = fmt.Errorf("generate_azure_container_apps_manifests must be run first")
 			} else {
-				azureBytes, _ := json.Marshal(azureData)
-				var azureResult steps.AzureContainerAppsResult
-				json.Unmarshal(azureBytes, &azureResult)
+				// Convert AzureArtifact to steps.AzureContainerAppsResult
+				azureResult := steps.AzureContainerAppsResult{
+					ResourceGroup:   state.Artifacts.AzureResult.ResourceGroup,
+					AppName:         state.Artifacts.AzureResult.AppName,
+					EnvironmentName: state.Artifacts.AzureResult.EnvironmentName,
+					Location:        state.Artifacts.AzureResult.Location,
+					Manifests:       state.Artifacts.AzureResult.Manifests,
+					AppURL:          state.Artifacts.AzureResult.AppURL,
+					FQDN:            state.Artifacts.AzureResult.FQDN,
+					DeployedAt:      state.Artifacts.AzureResult.DeployedAt,
+					OutputFormat:    state.Artifacts.AzureResult.OutputFormat,
+					Metadata:        state.Artifacts.AzureResult.Metadata,
+				}
 
-				// Get manifest path
-				manifestPath, _ := args["manifest_path"].(string)
+				// Get manifest path with proper type assertion error handling
+				manifestPath, ok := args["manifest_path"].(string)
+				if !ok && args["manifest_path"] != nil {
+					execErr = fmt.Errorf("manifest_path must be a string, got %T", args["manifest_path"])
+					break
+				}
 				if manifestPath == "" {
 					// Try to get from manifests
 					if manifests, ok := azureResult.Manifests["manifests"].([]interface{}); ok && len(manifests) > 0 {
@@ -504,7 +558,11 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 					}
 				}
 
-				strictMode, _ := args["strict_mode"].(bool)
+				strictMode, ok := args["strict_mode"].(bool)
+				if !ok && args["strict_mode"] != nil {
+					execErr = fmt.Errorf("strict_mode must be a boolean, got %T", args["strict_mode"])
+					break
+				}
 
 				validationResult, err := steps.ValidateAzureContainerAppsManifests(
 					ctx,

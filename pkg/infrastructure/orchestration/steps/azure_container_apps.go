@@ -65,7 +65,8 @@ func GenerateAzureContainerAppsManifests(
 	}
 
 	if registryURL == "" {
-		registryURL = "myregistry.azurecr.io" // Default Azure Container Registry
+		// Don't use a placeholder that will fail - require explicit registry URL
+		return nil, fmt.Errorf("registry URL is required for Azure Container Apps deployment. Please provide a valid Azure Container Registry URL (e.g., 'yourregistry.azurecr.io')")
 	}
 
 	// Create image reference using the provided registry URL
