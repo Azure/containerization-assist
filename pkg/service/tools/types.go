@@ -3,6 +3,8 @@ package tools
 
 import (
 	"time"
+
+	"github.com/Azure/containerization-assist/pkg/domain/workflow"
 )
 
 // ToolMetadata represents metadata for tool operations
@@ -47,7 +49,7 @@ type AnalyzeArtifact struct {
 	Port            int                    `json:"port"`
 	BuildCommand    string                 `json:"build_command"`
 	StartCommand    string                 `json:"start_command"`
-	Dependencies    []string               `json:"dependencies,omitempty"`
+	Dependencies    []workflow.Dependency  `json:"dependencies,omitempty"`
 	DevDependencies []string               `json:"dev_dependencies,omitempty"`
 	RepoPath        string                 `json:"repo_path"`
 	Metadata        map[string]interface{} `json:"metadata,omitempty"`

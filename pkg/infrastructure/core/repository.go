@@ -248,11 +248,15 @@ func ExtractRepoName(repoURL string) string {
 }
 
 // RepositoryAnalyzer provides mechanical repository analysis without AI
-type RepositoryAnalyzer struct{}
+type RepositoryAnalyzer struct {
+	logger *slog.Logger
+}
 
 // NewRepositoryAnalyzer creates a new repository analyzer
 func NewRepositoryAnalyzer(logger *slog.Logger) *RepositoryAnalyzer { //TODO: Refactor -  we are just wrapping the logger
-	return &RepositoryAnalyzer{}
+	return &RepositoryAnalyzer{
+		logger: logger,
+	}
 }
 
 // AnalysisResult contains the result of repository analysis
