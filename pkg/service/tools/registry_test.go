@@ -17,8 +17,8 @@ import (
 func TestGetToolConfigs(t *testing.T) {
 	configs := GetToolConfigs()
 
-	// Verify we have all 15 tools (10 workflow + 2 orchestration + 3 utility including diagnostics)
-	assert.Len(t, configs, 15, "Should have 15 tool configurations")
+	// Verify we have all 16 tools (11 workflow + 2 orchestration + 3 utility including diagnostics)
+	assert.Len(t, configs, 16, "Should have 16 tool configurations")
 
 	// Verify categories
 	workflowCount := 0
@@ -38,7 +38,7 @@ func TestGetToolConfigs(t *testing.T) {
 		}
 	}
 
-	assert.Equal(t, 10, workflowCount, "Should have 10 workflow tools")
+	assert.Equal(t, 11, workflowCount, "Should have 11 workflow tools")
 	assert.Equal(t, 2, orchestrationCount, "Should have 2 orchestration tools")
 	assert.Equal(t, 3, utilityCount, "Should have 3 utility tools (list_tools, ping, server_status)")
 }
@@ -58,7 +58,7 @@ func TestGetToolConfig(t *testing.T) {
 				assert.Equal(t, CategoryWorkflow, config.Category)
 				assert.Contains(t, config.RequiredParams, "repo_path")
 				assert.Contains(t, config.RequiredParams, "session_id")
-				assert.Equal(t, "generate_dockerfile", config.NextTool)
+				assert.Equal(t, "resolve_base_images", config.NextTool)
 			},
 		},
 		{

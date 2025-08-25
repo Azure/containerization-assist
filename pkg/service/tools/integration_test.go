@@ -31,6 +31,7 @@ func TestAllToolsRegistration(t *testing.T) {
 	// Verify all tools are registered
 	expectedTools := []string{
 		"analyze_repository",
+		"resolve_base_images",
 		"generate_dockerfile",
 		"build_image",
 		"scan_image",
@@ -62,7 +63,8 @@ func TestWorkflowToolsChain(t *testing.T) {
 		name     string
 		nextTool string
 	}{
-		{"analyze_repository", "generate_dockerfile"},
+		{"analyze_repository", "resolve_base_images"},
+		{"resolve_base_images", "generate_dockerfile"},
 		{"generate_dockerfile", "build_image"},
 		{"build_image", "scan_image"},
 		{"scan_image", "tag_image"},
@@ -92,7 +94,7 @@ func TestToolCategories(t *testing.T) {
 		categoryCount[config.Category]++
 	}
 
-	assert.Equal(t, 10, categoryCount[CategoryWorkflow], "Should have 10 workflow tools")
+	assert.Equal(t, 11, categoryCount[CategoryWorkflow], "Should have 11 workflow tools")
 	assert.Equal(t, 2, categoryCount[CategoryOrchestration], "Should have 2 orchestration tools")
 	assert.Equal(t, 3, categoryCount[CategoryUtility], "Should have 3 utility tools")
 }

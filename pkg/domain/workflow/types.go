@@ -35,6 +35,7 @@ const (
 // Step name constants
 const (
 	StepAnalyzeRepository  = "analyze_repository"
+	StepResolveBaseImages  = "resolve_base_images"
 	StepGenerateDockerfile = "generate_dockerfile"
 	StepBuildImage         = "build_image"
 	StepSecurityScan       = "security_scan"
