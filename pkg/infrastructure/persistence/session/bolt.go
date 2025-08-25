@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Azure/containerization-assist/pkg/domain/errors"
@@ -36,6 +37,14 @@ func NewBoltStore(dbPath string, logger *slog.Logger) (*BoltStore, error) {
 		Timeout: 1 * time.Second,
 	})
 	if err != nil {
+		// Check if error is due to database being locked by another process
+		if strings.Contains(err.Error(), "resource temporarily unavailable") || 
+		   strings.Contains(err.Error(), "database is locked") ||
+		   strings.Contains(err.Error(), "timeout") {
+			return nil, errors.New(errors.CodeIoError, "persistence", 
+				fmt.Sprintf("database file '%s' is already in use by another MCP server instance. "+
+					"Use MCP_STORE_PATH environment variable to specify a different database file", dbPath), err)
+		}
 		return nil, errors.New(errors.CodeIoError, "persistence", "failed to open bolt db", err)
 	}
 

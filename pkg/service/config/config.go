@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -60,9 +61,13 @@ func Load(envFile string) (*Config, error) {
 }
 
 func DefaultConfig() *Config {
+	// Create process-specific database path to avoid conflicts between multiple instances
+	pid := os.Getpid()
+	storePath := filepath.Join("/tmp/mcp-store", fmt.Sprintf("sessions-%d.db", pid))
+	
 	return &Config{
 		WorkspaceDir:     "/tmp/mcp-workspace",
-		StorePath:        "/tmp/mcp-store/sessions.db",
+		StorePath:        storePath,
 		SessionTTL:       24 * time.Hour,
 		MaxSessions:      100,
 		LogLevel:         "info",
