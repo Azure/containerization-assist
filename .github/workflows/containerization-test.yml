@@ -46,12 +46,11 @@ jobs:
         git clone --branch sampling-fix https://github.com/ReinierCC/mcphost.git /tmp/mcphost
         cd /tmp/mcphost
         
-        # Install dependencies and build
-        npm install
-        npm run build
+        # Build Go binary
+        go build -o mcphost .
         
         # Install globally
-        npm install -g .
+        sudo mv mcphost /usr/local/bin/mcphost
         
     - name: Build MCP server
       run: |
