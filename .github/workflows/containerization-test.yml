@@ -40,7 +40,7 @@ jobs:
     - name: Setup Kind cluster
       uses: helm/kind-action@v1
       with:
-        cluster_name: kind
+        cluster_name: localhost:5001
         
     - name: Cache mcphost binary
       id: cache-mcphost
@@ -135,4 +135,6 @@ jobs:
           mcp.log
           mcphost-output.txt
           mcphost-termination.log
+          coolstore/Dockerfile
+          coolstore/manifests/
         retention-days: 7
