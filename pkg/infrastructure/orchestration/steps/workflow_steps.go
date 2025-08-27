@@ -461,6 +461,8 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 				},
 			}
 
+			state.Logger.Info("ManifestStep: AI manifests - K8sResult created", "metadata_keys", []string{"ai_generated", "manifest_path", "manifest_count"}, "manifest_path", manifestsDir)
+
 			state.Logger.Info("Step completed")
 
 			// Return basic success result
@@ -575,6 +577,8 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 		Metadata:    metadata,
 	}
 
+	state.Logger.Info("ManifestStep: generated manifests - K8sResult created", "metadata", metadata)
+
 	state.Logger.Info("Step completed")
 	// Return basic success result
 
@@ -620,14 +624,26 @@ func (s *ClusterStep) Execute(ctx context.Context, state *workflow.WorkflowState
 		}
 	}
 
-	// Store registry URL for later use
+	// Store registry URL for later use - preserve existing K8sResult data
 	if state.K8sResult == nil {
-		state.K8sResult = &workflow.K8sResult{}
+		state.K8sResult = &workflow.K8sResult{
+			Metadata: make(map[string]interface{}),
+		}
+		state.Logger.Info("Cluster setup: created new K8sResult")
+	} else {
+		var metadataKeys []string
+		if state.K8sResult.Metadata != nil {
+			for key := range state.K8sResult.Metadata {
+				metadataKeys = append(metadataKeys, key)
+			}
+		}
+		state.Logger.Info("Cluster setup: preserving existing K8sResult", "metadata_keys", metadataKeys)
 	}
 	if state.K8sResult.Metadata == nil {
 		state.K8sResult.Metadata = make(map[string]interface{})
 	}
 	state.K8sResult.Metadata["registry_url"] = registryURL
+	state.Logger.Info("Cluster setup: added registry URL", "registry_url", registryURL)
 
 	state.Logger.Info("Kind cluster setup completed successfully", "registry_url", registryURL)
 	// Return basic success result
@@ -676,16 +692,37 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 
 	// Convert workflow K8sResult to infrastructure K8sResult for deployment
 	manifestPath := ""
-	if pathFromMetadata, exists := state.K8sResult.Metadata["manifest_path"]; exists {
-		if pathStr, ok := pathFromMetadata.(string); ok {
-			manifestPath = pathStr
+	state.Logger.Info("Deploy step: checking for manifest path", "k8s_result_nil", state.K8sResult == nil)
+	if state.K8sResult != nil {
+		state.Logger.Info("Deploy step: K8sResult metadata", "metadata", state.K8sResult.Metadata)
+		if pathFromMetadata, exists := state.K8sResult.Metadata["manifest_path"]; exists {
+			if pathStr, ok := pathFromMetadata.(string); ok {
+				manifestPath = pathStr
+				state.Logger.Info("Deploy step: found manifest path", "path", manifestPath)
+			} else {
+				state.Logger.Warn("Deploy step: manifest_path exists but not a string", "type", fmt.Sprintf("%T", pathFromMetadata), "value", pathFromMetadata)
+			}
+		} else {
+			state.Logger.Warn("Deploy step: manifest_path not found in metadata")
 		}
 	}
 
 	state.Logger.Info("Step completed")
 
 	if manifestPath == "" {
-		return nil, errors.New(errors.CodeInvalidState, "deploy_step", "manifest path not found in K8s result metadata", nil)
+		// Fallback: try to find manifests in the expected directory
+		// From the repo path, construct the expected manifests directory
+		repoPath := strings.TrimPrefix(state.RepoIdentifier, "file://")
+		expectedManifestDir := filepath.Join(repoPath, "manifests")
+
+		// Check if the manifests directory exists
+		if _, err := os.Stat(expectedManifestDir); err == nil {
+			manifestPath = expectedManifestDir
+			state.Logger.Info("Deploy step: using fallback manifest path", "path", manifestPath)
+		} else {
+			state.Logger.Error("Deploy step: fallback manifest directory not found", "expected_path", expectedManifestDir, "error", err)
+			return nil, errors.New(errors.CodeInvalidState, "deploy_step", "manifest path not found in K8s result metadata", nil)
+		}
 	}
 
 	infraK8sResult := &K8sResult{

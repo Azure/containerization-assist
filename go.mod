@@ -6,7 +6,7 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
-	github.com/mark3labs/mcp-go v0.37.0
+	github.com/mark3labs/mcp-go v0.38.0
 	github.com/rs/zerolog v1.34.0
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/stretchr/testify v1.10.0

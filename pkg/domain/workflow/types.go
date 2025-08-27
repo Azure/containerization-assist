@@ -230,6 +230,7 @@ type ServerConfig struct {
 
 	// Logging settings (essential)
 	LogLevel string `json:"log_level"`
+	LogFile  string `json:"log_file"`
 
 	// Service identification (essential)
 	ServiceName    string `json:"service_name"`
@@ -252,6 +253,7 @@ func DefaultServerConfig() ServerConfig {
 		SessionTTL:       24 * time.Hour,
 		MaxSessions:      100,
 		LogLevel:         "info",
+		LogFile:          "",
 		ServiceName:      "containerization-assist-mcp",
 		ServiceVersion:   "dev",
 		RegistryURL:      "",

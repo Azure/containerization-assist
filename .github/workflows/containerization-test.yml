@@ -1,0 +1,114 @@
+name: Containerization E2E Test
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+jobs:
+  containerize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Checkout coolstore
+      uses: actions/checkout@v4
+      with:
+        repository: konveyor-ecosystem/coolstore
+        path: coolstore
+        
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Install Docker
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y docker.io
+        sudo systemctl start docker
+        sudo usermod -aG docker $USER
+        
+    - name: Install Kind
+      run: |
+        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+        chmod +x ./kind
+        sudo mv ./kind /usr/local/bin/kind
+        
+    - name: Install kubectl
+      run: |
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        sudo mv kubectl /usr/local/bin/kubectl
+        
+    - name: Make mcphost binary executable
+      run: |
+        chmod +x .github/mcphost/mcphost
+        
+    - name: Build MCP server
+      run: |
+        make
+        
+    - name: Run containerization
+      id: containerize
+      timeout-minutes: 3
+      env:
+        AZURE_OPENAI_DEPLOYMENT_ID: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
+        AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
+        AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+        CI_MODE: "true"
+      run: |
+        # Make hooks executable
+        chmod +x .github/mcphost/hooks/*.sh
+        
+        # Start success monitor in background
+        .github/mcphost/hooks/success-terminator.sh &
+        MONITOR_PID=$!
+        
+        # Run containerization with timeout protection
+        set +e  # Don't exit on error
+        timeout 180 .github/mcphost/mcphost --config .github/mcphost/ci-config.yml \
+          --prompt "containerize coolstore using all the containerization-assist tools - keep going if you encounter errors, follow the suggested steps" \
+          --debug --stream=true --max-steps 50 --quiet --no-exit
+        MCPHOST_EXIT_CODE=$?
+        set -e  # Re-enable exit on error
+          
+        # Kill monitor process
+        kill $MONITOR_PID 2>/dev/null || true
+        
+        # Check for success indicators
+        if grep -q "Enhanced deployment verification completed" mcp.log 2>/dev/null; then
+          echo "✅ CONTAINERIZATION SUCCESS"
+          echo "success=true" >> $GITHUB_OUTPUT
+        else
+          echo "❌ CONTAINERIZATION FAILED (exit code: $MCPHOST_EXIT_CODE)"
+          echo "success=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        
+    - name: Check deployment status
+      if: always()
+      run: |
+        echo "=== Deployment Status ==="
+        kubectl get pods || echo "No pods found"
+        echo "=== Recent log entries ==="
+        tail -20 mcp.log || echo "No log file found"
+        
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: containerization-logs
+        path: |
+          mcp.log
+          mcphost-termination.log
+        retention-days: 7
