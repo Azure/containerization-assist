@@ -49,7 +49,7 @@ jobs:
       id: cache-mcphost
       uses: actions/cache@v4
       with:
-        path: /tmp/mcphost-binary
+        path: ~/.cache/mcphost
         key: mcphost-${{ runner.os }}-${{ steps.mcphost-commit.outputs.hash }}
         restore-keys: |
           mcphost-${{ runner.os }}-
@@ -65,14 +65,14 @@ jobs:
         # Build Go binary
         go build -o mcphost .
         
-        # Store in cache location
-        mkdir -p /tmp/mcphost-binary
-        cp mcphost /tmp/mcphost-binary/
+        # Store in cache location (use home directory for better persistence)
+        mkdir -p ~/.cache/mcphost
+        cp mcphost ~/.cache/mcphost/mcphost
         
     - name: Install mcphost binary
       run: |
-        # Install from cache or build location
-        sudo cp /tmp/mcphost-binary/mcphost /usr/local/bin/mcphost
+        # Install from cache location
+        sudo cp ~/.cache/mcphost/mcphost /usr/local/bin/mcphost
         sudo chmod +x /usr/local/bin/mcphost
         
     - name: Build MCP server
@@ -115,7 +115,7 @@ jobs:
         echo "=== Deployment Status ==="
         kubectl get pods || echo "No pods found"
         echo "=== Recent log entries ==="
-        tail -20 mcp.log || echo "No log file found"
+        tail -40 mcp.log || echo "No log file found"
         
     - name: Upload logs
       if: always()
