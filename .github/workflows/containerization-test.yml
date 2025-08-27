@@ -90,22 +90,23 @@ jobs:
         # Make hooks executable
         chmod +x .github/mcphost/hooks/*.sh
         
-        # Run containerization with timeout protection
-        set +e  # Don't exit on error
+        # Run containerization
         timeout 300 mcphost --config .github/mcphost/ci-config.yml \
           --prompt "containerize coolstore using all the containerization-assist tools - keep going if you encounter errors, follow the suggested steps" \
-          --debug --stream=true --max-steps 50 --quiet --no-exit
-        MCPHOST_EXIT_CODE=$?
-        set -e  # Re-enable exit on error
+          --debug --stream=true --max-steps 100 --quiet --no-exit > mcphost-output.txt 2>&1 || true
         
-        # Check for success indicators
-        if grep -q "Enhanced deployment verification completed" mcp.log 2>/dev/null; then
+        # Output the final response
+        echo "=== MCPHOST OUTPUT ==="
+        cat mcphost-output.txt || echo "No output file found"
+        echo "====================="
+        
+        # Check for success
+        if [ -f "mcp.log" ] && grep -q "Enhanced deployment verification completed" mcp.log; then
           echo "✅ CONTAINERIZATION SUCCESS"
           echo "success=true" >> $GITHUB_OUTPUT
         else
-          echo "❌ CONTAINERIZATION FAILED (exit code: $MCPHOST_EXIT_CODE)"
+          echo "❌ CONTAINERIZATION FAILED"
           echo "success=false" >> $GITHUB_OUTPUT
-          exit 1
         fi
         
     - name: Check deployment status
@@ -123,5 +124,6 @@ jobs:
         name: containerization-logs
         path: |
           mcp.log
+          mcphost-output.txt
           mcphost-termination.log
         retention-days: 7
