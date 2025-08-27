@@ -39,9 +39,19 @@ jobs:
       with:
         install_only: true
         
-    - name: Make mcphost binary executable
+    - name: Build mcphost from fork
       run: |
-        chmod +x .github/mcphost/mcphost
+        # MCPHOST has a bug that does allow for sampling - will update with source repo after change is contributed to MCPHOST
+        # For now my fork includes the necessary changes
+        git clone --branch sampling-fix https://github.com/ReinierCC/mcphost.git /tmp/mcphost
+        cd /tmp/mcphost
+        
+        # Install dependencies and build
+        npm install
+        npm run build
+        
+        # Install globally
+        npm install -g .
         
     - name: Build MCP server
       run: |
@@ -54,7 +64,6 @@ jobs:
         AZURE_OPENAI_DEPLOYMENT_ID: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
         AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
         AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-        CI_MODE: "true"
       run: |
         # Make hooks executable
         chmod +x .github/mcphost/hooks/*.sh
@@ -65,7 +74,7 @@ jobs:
         
         # Run containerization with timeout protection
         set +e  # Don't exit on error
-        timeout 180 .github/mcphost/mcphost --config .github/mcphost/ci-config.yml \
+        timeout 180 mcphost --config .github/mcphost/ci-config.yml \
           --prompt "containerize coolstore using all the containerization-assist tools - keep going if you encounter errors, follow the suggested steps" \
           --debug --stream=true --max-steps 50 --quiet --no-exit
         MCPHOST_EXIT_CODE=$?
