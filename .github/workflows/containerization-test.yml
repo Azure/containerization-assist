@@ -39,7 +39,17 @@ jobs:
       with:
         install_only: true
         
+    - name: Cache mcphost binary
+      id: cache-mcphost
+      uses: actions/cache@v4
+      with:
+        path: /tmp/mcphost-binary
+        key: mcphost-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-sampling-fix
+        restore-keys: |
+          mcphost-${{ runner.os }}-sampling-fix
+        
     - name: Build mcphost from fork
+      if: steps.cache-mcphost.outputs.cache-hit != 'true'
       run: |
         # MCPHOST has a bug that does allow for sampling - will update with source repo after change is contributed to MCPHOST
         # For now my fork includes the necessary changes
@@ -49,8 +59,15 @@ jobs:
         # Build Go binary
         go build -o mcphost .
         
-        # Install globally
-        sudo mv mcphost /usr/local/bin/mcphost
+        # Store in cache location
+        mkdir -p /tmp/mcphost-binary
+        cp mcphost /tmp/mcphost-binary/
+        
+    - name: Install mcphost binary
+      run: |
+        # Install from cache or build location
+        sudo cp /tmp/mcphost-binary/mcphost /usr/local/bin/mcphost
+        sudo chmod +x /usr/local/bin/mcphost
         
     - name: Build MCP server
       run: |
@@ -58,7 +75,7 @@ jobs:
         
     - name: Run containerization
       id: containerize
-      timeout-minutes: 3
+      timeout-minutes: 10
       env:
         AZURE_OPENAI_DEPLOYMENT_ID: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
         AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
@@ -73,7 +90,7 @@ jobs:
         
         # Run containerization with timeout protection
         set +e  # Don't exit on error
-        timeout 180 mcphost --config .github/mcphost/ci-config.yml \
+        timeout 300 mcphost --config .github/mcphost/ci-config.yml \
           --prompt "containerize coolstore using all the containerization-assist tools - keep going if you encounter errors, follow the suggested steps" \
           --debug --stream=true --max-steps 50 --quiet --no-exit
         MCPHOST_EXIT_CODE=$?
