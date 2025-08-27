@@ -39,8 +39,6 @@ jobs:
         
     - name: Setup Kind cluster
       uses: helm/kind-action@v1
-      with:
-        cluster_name: localhost:5001
         
     - name: Cache mcphost binary
       id: cache-mcphost
@@ -93,7 +91,7 @@ jobs:
         # Run containerization
         timeout 240 mcphost --config .github/mcphost/ci-config.yml \
           --prompt "containerize coolstore using all the containerization-assist tools - keep going if you encounter errors, follow the suggested steps" \
-          --debug --stream=true --max-steps 100 --quiet --no-exit > mcphost-output.txt 2>&1 || true
+          --debug --max-steps 100 --compact --no-exit > mcphost-output.txt 2>&1 || true
         
         # Output the final response
         echo "=== MCPHOST OUTPUT ==="
