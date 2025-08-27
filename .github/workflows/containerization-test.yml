@@ -6,6 +6,9 @@ on:
   push:
     branches: [main]
 
+env:
+  MCPHOST_COMMIT_HASH: "1221695a7cd2524b40b3b5cac180ba18e62492b2"
+
 jobs:
   containerize:
     runs-on: ubuntu-latest
@@ -39,18 +42,12 @@ jobs:
       with:
         cluster_name: kind
         
-    - name: Get mcphost commit hash
-      id: mcphost-commit
-      run: |
-        COMMIT_HASH=$(git ls-remote https://github.com/ReinierCC/mcphost.git sampling-fix | cut -f1)
-        echo "hash=$COMMIT_HASH" >> $GITHUB_OUTPUT
-        
     - name: Cache mcphost binary
       id: cache-mcphost
       uses: actions/cache@v4
       with:
         path: ~/.cache/mcphost
-        key: mcphost-${{ runner.os }}-${{ steps.mcphost-commit.outputs.hash }}
+        key: mcphost-${{ runner.os }}-${{ env.MCPHOST_COMMIT_HASH }}
         restore-keys: |
           mcphost-${{ runner.os }}-
         
@@ -58,9 +55,12 @@ jobs:
       if: steps.cache-mcphost.outputs.cache-hit != 'true'
       run: |
         # MCPHOST has a bug that does allow for sampling - will update with source repo after change is contributed to MCPHOST
-        # For now my fork includes the necessary changes
-        git clone --branch sampling-fix https://github.com/ReinierCC/mcphost.git /tmp/mcphost
+        # For now my fork includes the necessary changes - pinned to specific commit
+        git clone https://github.com/ReinierCC/mcphost.git /tmp/mcphost
         cd /tmp/mcphost
+        
+        # Checkout the pinned commit hash
+        git checkout ${{ env.MCPHOST_COMMIT_HASH }}
         
         # Build Go binary
         go build -o mcphost .
@@ -91,7 +91,7 @@ jobs:
         chmod +x .github/mcphost/hooks/*.sh
         
         # Run containerization
-        timeout 300 mcphost --config .github/mcphost/ci-config.yml \
+        timeout 240 mcphost --config .github/mcphost/ci-config.yml \
           --prompt "containerize coolstore using all the containerization-assist tools - keep going if you encounter errors, follow the suggested steps" \
           --debug --stream=true --max-steps 100 --quiet --no-exit > mcphost-output.txt 2>&1 || true
         
@@ -102,11 +102,20 @@ jobs:
         
         # Check for success
         if [ -f "mcp.log" ] && grep -q "Enhanced deployment verification completed" mcp.log; then
-          echo "✅ CONTAINERIZATION SUCCESS"
+          echo "✅ CONTAINERIZATION SUCCESS (verified in log)"
           echo "success=true" >> $GITHUB_OUTPUT
         else
-          echo "❌ CONTAINERIZATION FAILED"
-          echo "success=false" >> $GITHUB_OUTPUT
+          # Check if all pods are in good state (Running or Completed)
+          TOTAL_PODS=$(kubectl get pods --no-headers 2>/dev/null | wc -l)
+          GOOD_PODS=$(kubectl get pods --no-headers 2>/dev/null | grep -E "(Running|Completed)" | wc -l)
+          
+          if [ "$TOTAL_PODS" -gt 0 ] && [ "$TOTAL_PODS" -eq "$GOOD_PODS" ]; then
+            echo "✅ CONTAINERIZATION SUCCESS (all $TOTAL_PODS pods are Running/Completed)"
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ CONTAINERIZATION FAILED (only $GOOD_PODS/$TOTAL_PODS pods are good)"
+            echo "success=false" >> $GITHUB_OUTPUT
+          fi
         fi
         
     - name: Check deployment status
