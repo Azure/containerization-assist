@@ -4,15 +4,17 @@ package session
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/Azure/containerization-assist/pkg/domain/errors"
+	apperrors "github.com/Azure/containerization-assist/pkg/domain/errors"
 	"github.com/Azure/containerization-assist/pkg/domain/session"
 	"go.etcd.io/bbolt"
+	bolterrors "go.etcd.io/bbolt/errors"
 )
 
 const (
@@ -29,14 +31,20 @@ func NewBoltStore(dbPath string, logger *slog.Logger) (*BoltStore, error) {
 	// Ensure the parent directory exists
 	dir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, errors.New(errors.CodeIoError, "persistence", fmt.Sprintf("failed to create directory %s", dir), err)
+		return nil, apperrors.New(apperrors.CodeIoError, "persistence", fmt.Sprintf("failed to create directory %s", dir), err)
 	}
 
 	db, err := bbolt.Open(dbPath, 0600, &bbolt.Options{
 		Timeout: 1 * time.Second,
 	})
 	if err != nil {
-		return nil, errors.New(errors.CodeIoError, "persistence", "failed to open bolt db", err)
+		// Check if error is due to database being locked by another process or timeout
+		if errors.Is(err, bolterrors.ErrTimeout) {
+			return nil, apperrors.New(apperrors.CodeIoError, "persistence",
+				fmt.Sprintf("database file '%s' is already in use by another MCP server instance. "+
+					"Use MCP_STORE_PATH environment variable to specify a different database file", dbPath), err)
+		}
+		return nil, apperrors.New(apperrors.CodeIoError, "persistence", "failed to open bolt db", err)
 	}
 
 	// Create the sessions bucket
@@ -46,7 +54,7 @@ func NewBoltStore(dbPath string, logger *slog.Logger) (*BoltStore, error) {
 	})
 	if err != nil {
 		_ = db.Close()
-		return nil, errors.New(errors.CodeIoError, "persistence", "failed to create sessions bucket", err)
+		return nil, apperrors.New(apperrors.CodeIoError, "persistence", "failed to create sessions bucket", err)
 	}
 
 	return &BoltStore{
@@ -66,17 +74,17 @@ func (s *BoltStore) Create(ctx context.Context, sess session.Session) error {
 
 		// Check if session already exists
 		if bucket.Get([]byte(sess.ID)) != nil {
-			return errors.New(errors.CodeAlreadyExists, "persistence", fmt.Sprintf("session %s already exists", sess.ID), nil)
+			return apperrors.New(apperrors.CodeAlreadyExists, "persistence", fmt.Sprintf("session %s already exists", sess.ID), nil)
 		}
 
 		data, err := json.Marshal(sess)
 		if err != nil {
-			return errors.New(errors.CodeInternalError, "persistence", "failed to marshal session", err)
+			return apperrors.New(apperrors.CodeInternalError, "persistence", "failed to marshal session", err)
 		}
 
 		err = bucket.Put([]byte(sess.ID), data)
 		if err != nil {
-			return errors.New(errors.CodeIoError, "persistence", "failed to store session", err)
+			return apperrors.New(apperrors.CodeIoError, "persistence", "failed to store session", err)
 		}
 
 		return nil
@@ -92,7 +100,7 @@ func (s *BoltStore) Get(ctx context.Context, id string) (session.Session, error)
 		data := bucket.Get([]byte(id))
 
 		if data == nil {
-			return errors.New(errors.CodeNotFound, "persistence", fmt.Sprintf("session %s not found", id), nil)
+			return apperrors.New(apperrors.CodeNotFound, "persistence", fmt.Sprintf("session %s not found", id), nil)
 		}
 
 		return json.Unmarshal(data, &sess)
@@ -112,17 +120,17 @@ func (s *BoltStore) Update(ctx context.Context, sess session.Session) error {
 
 		// Check if session exists
 		if bucket.Get([]byte(sess.ID)) == nil {
-			return errors.New(errors.CodeNotFound, "persistence", fmt.Sprintf("session %s not found", sess.ID), nil)
+			return apperrors.New(apperrors.CodeNotFound, "persistence", fmt.Sprintf("session %s not found", sess.ID), nil)
 		}
 
 		data, err := json.Marshal(sess)
 		if err != nil {
-			return errors.New(errors.CodeInternalError, "persistence", "failed to marshal session", err)
+			return apperrors.New(apperrors.CodeInternalError, "persistence", "failed to marshal session", err)
 		}
 
 		err = bucket.Put([]byte(sess.ID), data)
 		if err != nil {
-			return errors.New(errors.CodeIoError, "persistence", "failed to update session", err)
+			return apperrors.New(apperrors.CodeIoError, "persistence", "failed to update session", err)
 		}
 
 		return nil
@@ -135,12 +143,12 @@ func (s *BoltStore) Delete(ctx context.Context, id string) error {
 		bucket := tx.Bucket([]byte(sessionsBucket))
 
 		if bucket.Get([]byte(id)) == nil {
-			return errors.New(errors.CodeNotFound, "persistence", fmt.Sprintf("session %s not found", id), nil)
+			return apperrors.New(apperrors.CodeNotFound, "persistence", fmt.Sprintf("session %s not found", id), nil)
 		}
 
 		err := bucket.Delete([]byte(id))
 		if err != nil {
-			return errors.New(errors.CodeIoError, "persistence", "failed to delete session", err)
+			return apperrors.New(apperrors.CodeIoError, "persistence", "failed to delete session", err)
 		}
 
 		return nil
