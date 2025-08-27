@@ -34,10 +34,10 @@ jobs:
     - name: Setup Docker
       uses: docker/setup-buildx-action@v3
         
-    - name: Install Kind
+    - name: Setup Kind cluster
       uses: helm/kind-action@v1
       with:
-        install_only: true
+        cluster_name: kind
         
     - name: Get mcphost commit hash
       id: mcphost-commit
@@ -115,7 +115,7 @@ jobs:
         echo "=== Deployment Status ==="
         kubectl get pods || echo "No pods found"
         echo "=== Recent log entries ==="
-        tail -40 mcp.log || echo "No log file found"
+        cat mcp.log || echo "No log file found"
         
     - name: Upload logs
       if: always()
