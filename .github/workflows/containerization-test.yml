@@ -39,14 +39,20 @@ jobs:
       with:
         install_only: true
         
+    - name: Get mcphost commit hash
+      id: mcphost-commit
+      run: |
+        COMMIT_HASH=$(git ls-remote https://github.com/ReinierCC/mcphost.git sampling-fix | cut -f1)
+        echo "hash=$COMMIT_HASH" >> $GITHUB_OUTPUT
+        
     - name: Cache mcphost binary
       id: cache-mcphost
       uses: actions/cache@v4
       with:
         path: /tmp/mcphost-binary
-        key: mcphost-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-sampling-fix
+        key: mcphost-${{ runner.os }}-${{ steps.mcphost-commit.outputs.hash }}
         restore-keys: |
-          mcphost-${{ runner.os }}-sampling-fix
+          mcphost-${{ runner.os }}-
         
     - name: Build mcphost from fork
       if: steps.cache-mcphost.outputs.cache-hit != 'true'
@@ -84,10 +90,6 @@ jobs:
         # Make hooks executable
         chmod +x .github/mcphost/hooks/*.sh
         
-        # Start success monitor in background
-        .github/mcphost/hooks/success-terminator.sh &
-        MONITOR_PID=$!
-        
         # Run containerization with timeout protection
         set +e  # Don't exit on error
         timeout 300 mcphost --config .github/mcphost/ci-config.yml \
@@ -95,9 +97,6 @@ jobs:
           --debug --stream=true --max-steps 50 --quiet --no-exit
         MCPHOST_EXIT_CODE=$?
         set -e  # Re-enable exit on error
-          
-        # Kill monitor process
-        kill $MONITOR_PID 2>/dev/null || true
         
         # Check for success indicators
         if grep -q "Enhanced deployment verification completed" mcp.log 2>/dev/null; then
