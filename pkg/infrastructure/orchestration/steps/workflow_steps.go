@@ -420,7 +420,7 @@ func (s *PushStep) Execute(ctx context.Context, state *workflow.WorkflowState) (
 type ManifestStep struct{}
 
 func NewManifestStep() workflow.Step    { return &ManifestStep{} }
-func (s *ManifestStep) Name() string    { return "generate_manifests" }
+func (s *ManifestStep) Name() string    { return "verify_manifests" }
 func (s *ManifestStep) MaxRetries() int { return 2 }
 func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
 	// Verify that the agent created the manifests directory
