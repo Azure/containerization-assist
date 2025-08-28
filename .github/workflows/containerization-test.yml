@@ -85,13 +85,21 @@ jobs:
         AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
         AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
       run: |
-        # Make hooks executable
-        chmod +x .github/mcphost/hooks/*.sh
+        
+        # Initialize hooks system
+        echo "=== Initializing Hooks ==="
+        mcphost hooks init --config .github/mcphost/hooks.yml
+        echo "=== Validating Hooks ==="
+        mcphost hooks validate --config .github/mcphost/hooks.yml
+        echo "=== Listing Active Hooks ==="
+        mcphost hooks list --config .github/mcphost/hooks.yml
+        echo "========================="
         
         # Run containerization
         timeout 240 mcphost --config .github/mcphost/ci-config.yml \
+          --hooks-config .github/mcphost/hooks.yml \
           --prompt "containerize coolstore using all the containerization-assist tools - keep going if you encounter errors, follow the suggested steps" \
-          --debug --max-steps 100 --compact --no-exit > mcphost-output.txt 2>&1 || true
+          --debug --max-steps 100 --compact --no-exit --stream=false > mcphost-output.txt 2>&1 || true
         
         # Output the final response
         echo "=== MCPHOST OUTPUT ==="

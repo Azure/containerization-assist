@@ -17,7 +17,3 @@ mcpServers:
 model: "azure:${env://AZURE_OPENAI_DEPLOYMENT_ID}"
 provider-api-key: "${env://AZURE_OPENAI_KEY}"
 provider-url: "${env://AZURE_OPENAI_ENDPOINT}"
-
-hooks:
-  post-tool: ".github/mcphost/hooks/error-recovery.sh"
-  post-step: ".github/mcphost/hooks/success-terminator.sh"
