@@ -32,8 +32,6 @@ func Register(step workflow.Step) {
 	order = append(order, name)
 }
 
-// All function removed as dead code
-
 // Names returns the registered step names (useful for debugging/config).
 func Names() []string {
 	mu.RLock()
@@ -52,5 +50,3 @@ func Get(name string) (workflow.Step, bool) {
 	step, ok := registry[name]
 	return step, ok
 }
-
-// Clear function removed as dead code

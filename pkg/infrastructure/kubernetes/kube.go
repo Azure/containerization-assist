@@ -75,5 +75,3 @@ func (k *KubeCmdRunner) RolloutStatus(ctx context.Context, resourceType string, 
 	}
 	return k.runner.RunCommand("kubectl", args...)
 }
-
-// CheckKubectlInstalled function removed as dead code

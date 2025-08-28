@@ -38,8 +38,6 @@ spec:
   type: ClusterIP
 `
 
-// BasicK8sManifests function removed as dead code
-
 // K8sIngressYAML is a minimal Ingress used by integration tests.
 const K8sIngressYAML = `apiVersion: networking.k8s.io/v1
 kind: Ingress

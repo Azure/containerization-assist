@@ -289,8 +289,6 @@ func GetServiceEndpoint(ctx context.Context, k8sResult *K8sResult, logger *slog.
 	return "", fmt.Errorf("could not determine service endpoint")
 }
 
-// CheckDeploymentHealth function removed as dead code
-
 // getYAMLFilesInDirectory returns all YAML files in the given directory
 func getYAMLFilesInDirectory(dirPath string, logger *slog.Logger) ([]string, error) {
 	entries, err := os.ReadDir(dirPath)
