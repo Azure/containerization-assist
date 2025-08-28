@@ -36,33 +36,33 @@ func (m *MockStep) MaxRetries() int {
 
 // MockStepProvider implements StepProvider for testing
 type MockStepProvider struct {
-	analyzeStep         Step
+	analyzeStep           Step
 	resolveBaseImagesStep Step
-	dockerfileStep      Step
-	buildStep           Step
-	scanStep            Step
-	tagStep             Step
-	pushStep            Step
-	manifestStep        Step
-	clusterStep         Step
-	deployStep          Step
-	verifyStep          Step
+	dockerfileStep        Step
+	buildStep             Step
+	scanStep              Step
+	tagStep               Step
+	pushStep              Step
+	manifestStep          Step
+	clusterStep           Step
+	deployStep            Step
+	verifyStep            Step
 }
 
 // GetStep implements the consolidated StepProvider interface
 func (p *MockStepProvider) GetStep(name string) (Step, error) {
 	stepMap := map[string]Step{
-		StepAnalyzeRepository:   p.analyzeStep,
-		StepResolveBaseImages:   p.resolveBaseImagesStep,
-		StepVerifyDockerfile:    p.dockerfileStep,
-		StepBuildImage:          p.buildStep,
-		StepSecurityScan:        p.scanStep,
-		StepTagImage:            p.tagStep,
-		StepPushImage:           p.pushStep,
-		StepVerifyManifests:     p.manifestStep,
-		StepSetupCluster:        p.clusterStep,
-		StepDeployApplication:   p.deployStep,
-		StepVerifyDeployment:    p.verifyStep,
+		StepAnalyzeRepository: p.analyzeStep,
+		StepResolveBaseImages: p.resolveBaseImagesStep,
+		StepVerifyDockerfile:  p.dockerfileStep,
+		StepBuildImage:        p.buildStep,
+		StepSecurityScan:      p.scanStep,
+		StepTagImage:          p.tagStep,
+		StepPushImage:         p.pushStep,
+		StepVerifyManifests:   p.manifestStep,
+		StepSetupCluster:      p.clusterStep,
+		StepDeployApplication: p.deployStep,
+		StepVerifyDeployment:  p.verifyStep,
 	}
 
 	if step, exists := stepMap[name]; exists {

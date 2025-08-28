@@ -127,17 +127,17 @@ func (m *MockStep) MaxRetries() int { return m.maxRetries }
 
 // MockStepProvider implements workflow.StepProvider for testing
 type MockStepProvider struct {
-	analyzeStep         workflow.Step
+	analyzeStep           workflow.Step
 	resolveBaseImagesStep workflow.Step
-	dockerfileStep      workflow.Step
-	buildStep           workflow.Step
-	scanStep            workflow.Step
-	tagStep             workflow.Step
-	pushStep            workflow.Step
-	manifestStep        workflow.Step
-	clusterStep         workflow.Step
-	deployStep          workflow.Step
-	verifyStep          workflow.Step
+	dockerfileStep        workflow.Step
+	buildStep             workflow.Step
+	scanStep              workflow.Step
+	tagStep               workflow.Step
+	pushStep              workflow.Step
+	manifestStep          workflow.Step
+	clusterStep           workflow.Step
+	deployStep            workflow.Step
+	verifyStep            workflow.Step
 }
 
 func (m *MockStepProvider) GetAnalyzeStep() workflow.Step {
@@ -242,17 +242,17 @@ func (m *MockStepProvider) GetVerifyStep() workflow.Step {
 // GetStep implements workflow.StepProvider interface
 func (m *MockStepProvider) GetStep(name string) (workflow.Step, error) {
 	stepMap := map[string]workflow.Step{
-		workflow.StepAnalyzeRepository:   m.GetAnalyzeStep(),
-		workflow.StepResolveBaseImages:   m.GetResolveBaseImagesStep(),
-		workflow.StepVerifyDockerfile:    m.GetDockerfileStep(),
-		workflow.StepBuildImage:          m.GetBuildStep(),
-		workflow.StepSecurityScan:        m.GetScanStep(),
-		workflow.StepTagImage:            m.GetTagStep(),
-		workflow.StepPushImage:           m.GetPushStep(),
-		workflow.StepVerifyManifests:     m.GetManifestStep(),
-		workflow.StepSetupCluster:        m.GetClusterStep(),
-		workflow.StepDeployApplication:   m.GetDeployStep(),
-		workflow.StepVerifyDeployment:    m.GetVerifyStep(),
+		workflow.StepAnalyzeRepository: m.GetAnalyzeStep(),
+		workflow.StepResolveBaseImages: m.GetResolveBaseImagesStep(),
+		workflow.StepVerifyDockerfile:  m.GetDockerfileStep(),
+		workflow.StepBuildImage:        m.GetBuildStep(),
+		workflow.StepSecurityScan:      m.GetScanStep(),
+		workflow.StepTagImage:          m.GetTagStep(),
+		workflow.StepPushImage:         m.GetPushStep(),
+		workflow.StepVerifyManifests:   m.GetManifestStep(),
+		workflow.StepSetupCluster:      m.GetClusterStep(),
+		workflow.StepDeployApplication: m.GetDeployStep(),
+		workflow.StepVerifyDeployment:  m.GetVerifyStep(),
 	}
 
 	if step, exists := stepMap[name]; exists {
