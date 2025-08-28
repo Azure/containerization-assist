@@ -1010,12 +1010,21 @@ func parseImageReference(imageRef string) string {
 		return "latest"
 	}
 
-	parts := strings.Split(imageRef, ":")
-	if len(parts) == 2 {
-		return parts[1]
+	// Handle registry URLs with ports (e.g., localhost:5001/app:tag)
+	// Split by colon and find the last part after the last slash
+	lastColonIndex := strings.LastIndex(imageRef, ":")
+	if lastColonIndex == -1 {
+		return "latest"
 	}
-
-	return "latest"
+	
+	// Check if the colon is part of a registry port (has a slash after it)
+	tagCandidate := imageRef[lastColonIndex+1:]
+	if strings.Contains(tagCandidate, "/") {
+		// This colon is part of registry:port, not image:tag
+		return "latest"
+	}
+	
+	return tagCandidate
 }
 
 // waitForNodesReady waits for Kubernetes nodes to become ready

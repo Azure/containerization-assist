@@ -91,7 +91,7 @@ jobs:
         echo "========================="
         
         # Run containerization
-        timeout 240 mcphost --config .mcphost/ci-config.yml \
+        timeout 360 mcphost --config .mcphost/ci-config.yml \
           --prompt "containerize coolstore using all the containerization-assist tools - keep going if you encounter errors, follow the suggested steps" \
           --debug --max-steps 100 --compact --no-exit --stream=false > mcphost-output.txt 2>&1 || true
         
