@@ -42,7 +42,7 @@ const (
 	StepSecurityScan      = "security_scan"
 	StepTagImage          = "tag_image"
 	StepPushImage         = "push_image"
-	StepGenerateManifests = "generate_manifests"
+	StepVerifyManifests   = "verify_manifests"
 	StepSetupCluster      = "setup_cluster"
 	StepDeployApplication = "deploy_application"
 	StepVerifyDeployment  = "verify_deployment"

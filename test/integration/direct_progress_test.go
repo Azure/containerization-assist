@@ -127,16 +127,17 @@ func (m *MockStep) MaxRetries() int { return m.maxRetries }
 
 // MockStepProvider implements workflow.StepProvider for testing
 type MockStepProvider struct {
-	analyzeStep    workflow.Step
-	dockerfileStep workflow.Step
-	buildStep      workflow.Step
-	scanStep       workflow.Step
-	tagStep        workflow.Step
-	pushStep       workflow.Step
-	manifestStep   workflow.Step
-	clusterStep    workflow.Step
-	deployStep     workflow.Step
-	verifyStep     workflow.Step
+	analyzeStep         workflow.Step
+	resolveBaseImagesStep workflow.Step
+	dockerfileStep      workflow.Step
+	buildStep           workflow.Step
+	scanStep            workflow.Step
+	tagStep             workflow.Step
+	pushStep            workflow.Step
+	manifestStep        workflow.Step
+	clusterStep         workflow.Step
+	deployStep          workflow.Step
+	verifyStep          workflow.Step
 }
 
 func (m *MockStepProvider) GetAnalyzeStep() workflow.Step {
@@ -144,6 +145,15 @@ func (m *MockStepProvider) GetAnalyzeStep() workflow.Step {
 		return m.analyzeStep
 	}
 	return &MockStep{name: "analyze", executeFunc: func(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
+		return &workflow.StepResult{Success: true}, nil
+	}}
+}
+
+func (m *MockStepProvider) GetResolveBaseImagesStep() workflow.Step {
+	if m.resolveBaseImagesStep != nil {
+		return m.resolveBaseImagesStep
+	}
+	return &MockStep{name: "resolve_base_images", executeFunc: func(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
 		return &workflow.StepResult{Success: true}, nil
 	}}
 }
@@ -232,16 +242,17 @@ func (m *MockStepProvider) GetVerifyStep() workflow.Step {
 // GetStep implements workflow.StepProvider interface
 func (m *MockStepProvider) GetStep(name string) (workflow.Step, error) {
 	stepMap := map[string]workflow.Step{
-		workflow.StepAnalyzeRepository:  m.GetAnalyzeStep(),
-		workflow.StepGenerateDockerfile: m.GetDockerfileStep(),
-		workflow.StepBuildImage:         m.GetBuildStep(),
-		workflow.StepSecurityScan:       m.GetScanStep(),
-		workflow.StepTagImage:           m.GetTagStep(),
-		workflow.StepPushImage:          m.GetPushStep(),
-		workflow.StepGenerateManifests:  m.GetManifestStep(),
-		workflow.StepSetupCluster:       m.GetClusterStep(),
-		workflow.StepDeployApplication:  m.GetDeployStep(),
-		workflow.StepVerifyDeployment:   m.GetVerifyStep(),
+		workflow.StepAnalyzeRepository:   m.GetAnalyzeStep(),
+		workflow.StepResolveBaseImages:   m.GetResolveBaseImagesStep(),
+		workflow.StepVerifyDockerfile:    m.GetDockerfileStep(),
+		workflow.StepBuildImage:          m.GetBuildStep(),
+		workflow.StepSecurityScan:        m.GetScanStep(),
+		workflow.StepTagImage:            m.GetTagStep(),
+		workflow.StepPushImage:           m.GetPushStep(),
+		workflow.StepVerifyManifests:     m.GetManifestStep(),
+		workflow.StepSetupCluster:        m.GetClusterStep(),
+		workflow.StepDeployApplication:   m.GetDeployStep(),
+		workflow.StepVerifyDeployment:    m.GetVerifyStep(),
 	}
 
 	if step, exists := stepMap[name]; exists {
@@ -254,12 +265,13 @@ func (m *MockStepProvider) GetStep(name string) (workflow.Step, error) {
 func (m *MockStepProvider) ListSteps() []string {
 	return []string{
 		workflow.StepAnalyzeRepository,
-		workflow.StepGenerateDockerfile,
+		workflow.StepResolveBaseImages,
+		workflow.StepVerifyDockerfile,
 		workflow.StepBuildImage,
 		workflow.StepSecurityScan,
 		workflow.StepTagImage,
 		workflow.StepPushImage,
-		workflow.StepGenerateManifests,
+		workflow.StepVerifyManifests,
 		workflow.StepSetupCluster,
 		workflow.StepDeployApplication,
 		workflow.StepVerifyDeployment,

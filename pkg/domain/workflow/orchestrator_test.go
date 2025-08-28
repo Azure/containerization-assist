@@ -36,31 +36,33 @@ func (m *MockStep) MaxRetries() int {
 
 // MockStepProvider implements StepProvider for testing
 type MockStepProvider struct {
-	analyzeStep    Step
-	dockerfileStep Step
-	buildStep      Step
-	scanStep       Step
-	tagStep        Step
-	pushStep       Step
-	manifestStep   Step
-	clusterStep    Step
-	deployStep     Step
-	verifyStep     Step
+	analyzeStep         Step
+	resolveBaseImagesStep Step
+	dockerfileStep      Step
+	buildStep           Step
+	scanStep            Step
+	tagStep             Step
+	pushStep            Step
+	manifestStep        Step
+	clusterStep         Step
+	deployStep          Step
+	verifyStep          Step
 }
 
 // GetStep implements the consolidated StepProvider interface
 func (p *MockStepProvider) GetStep(name string) (Step, error) {
 	stepMap := map[string]Step{
-		StepAnalyzeRepository: p.analyzeStep,
-		StepVerifyDockerfile:  p.dockerfileStep,
-		StepBuildImage:        p.buildStep,
-		StepSecurityScan:      p.scanStep,
-		StepTagImage:          p.tagStep,
-		StepPushImage:         p.pushStep,
-		StepGenerateManifests: p.manifestStep,
-		StepSetupCluster:      p.clusterStep,
-		StepDeployApplication: p.deployStep,
-		StepVerifyDeployment:  p.verifyStep,
+		StepAnalyzeRepository:   p.analyzeStep,
+		StepResolveBaseImages:   p.resolveBaseImagesStep,
+		StepVerifyDockerfile:    p.dockerfileStep,
+		StepBuildImage:          p.buildStep,
+		StepSecurityScan:        p.scanStep,
+		StepTagImage:            p.tagStep,
+		StepPushImage:           p.pushStep,
+		StepVerifyManifests:     p.manifestStep,
+		StepSetupCluster:        p.clusterStep,
+		StepDeployApplication:   p.deployStep,
+		StepVerifyDeployment:    p.verifyStep,
 	}
 
 	if step, exists := stepMap[name]; exists {
@@ -88,12 +90,13 @@ func (m *mockProgressEmitter) Close() error {
 func (p *MockStepProvider) ListSteps() []string {
 	return []string{
 		StepAnalyzeRepository,
+		StepResolveBaseImages,
 		StepVerifyDockerfile,
 		StepBuildImage,
 		StepSecurityScan,
 		StepTagImage,
 		StepPushImage,
-		StepGenerateManifests,
+		StepVerifyManifests,
 		StepSetupCluster,
 		StepDeployApplication,
 		StepVerifyDeployment,
@@ -156,10 +159,14 @@ func TestOrchestratorExecute(t *testing.T) {
 		stepProvider := createMockStepProvider()
 		logger := slog.Default()
 
-		// Set up analyze and dockerfile to succeed
+		// Set up analyze, resolve_base_images, and dockerfile to succeed
 		analyzeStep, _ := stepProvider.GetStep("analyze_repository")
 		analyzeStepMock := analyzeStep.(*MockStep)
 		analyzeStepMock.On("Execute", mock.Anything, mock.Anything).Return(&StepResult{Success: true}, nil)
+
+		resolveBaseImagesStep, _ := stepProvider.GetStep("resolve_base_images")
+		resolveBaseImagesStepMock := resolveBaseImagesStep.(*MockStep)
+		resolveBaseImagesStepMock.On("Execute", mock.Anything, mock.Anything).Return(&StepResult{Success: true}, nil)
 
 		dockerfileStep, _ := stepProvider.GetStep("verify_dockerfile")
 		dockerfileStepMock := dockerfileStep.(*MockStep)
@@ -191,6 +198,7 @@ func TestOrchestratorExecute(t *testing.T) {
 
 		// Verify only expected steps were called
 		analyzeStepMock.AssertExpectations(t)
+		resolveBaseImagesStepMock.AssertExpectations(t)
 		dockerfileStepMock.AssertExpectations(t)
 		buildStepMock.AssertExpectations(t)
 
@@ -267,17 +275,18 @@ func TestBuildContainerizationSteps(t *testing.T) {
 		assert.NotNil(t, steps)
 
 		// Verify all steps are present in correct order
-		assert.Len(t, steps, 10)
+		assert.Len(t, steps, 11)
 		assert.Equal(t, "analyze", steps[0].Name())
-		assert.Equal(t, "dockerfile", steps[1].Name())
-		assert.Equal(t, "build", steps[2].Name())
-		assert.Equal(t, "scan", steps[3].Name())
-		assert.Equal(t, "tag", steps[4].Name())
-		assert.Equal(t, "push", steps[5].Name())
-		assert.Equal(t, "manifest", steps[6].Name())
-		assert.Equal(t, "cluster", steps[7].Name())
-		assert.Equal(t, "deploy", steps[8].Name())
-		assert.Equal(t, "verify", steps[9].Name())
+		assert.Equal(t, "resolve_base_images", steps[1].Name())
+		assert.Equal(t, "dockerfile", steps[2].Name())
+		assert.Equal(t, "build", steps[3].Name())
+		assert.Equal(t, "scan", steps[4].Name())
+		assert.Equal(t, "tag", steps[5].Name())
+		assert.Equal(t, "push", steps[6].Name())
+		assert.Equal(t, "manifest", steps[7].Name())
+		assert.Equal(t, "cluster", steps[8].Name())
+		assert.Equal(t, "deploy", steps[9].Name())
+		assert.Equal(t, "verify", steps[10].Name())
 	})
 }
 
@@ -287,7 +296,7 @@ func createMockStepProvider() *MockStepProvider {
 	provider := &MockStepProvider{}
 
 	// Create mock steps with names
-	steps := []string{"analyze", "dockerfile", "build", "scan", "tag", "push", "manifest", "cluster", "deploy", "verify"}
+	steps := []string{"analyze", "resolve_base_images", "dockerfile", "build", "scan", "tag", "push", "manifest", "cluster", "deploy", "verify"}
 
 	for _, name := range steps {
 		step := new(MockStep)
@@ -297,6 +306,8 @@ func createMockStepProvider() *MockStepProvider {
 		switch name {
 		case "analyze":
 			provider.analyzeStep = step
+		case "resolve_base_images":
+			provider.resolveBaseImagesStep = step
 		case "dockerfile":
 			provider.dockerfileStep = step
 		case "build":
@@ -324,6 +335,7 @@ func createMockStepProvider() *MockStepProvider {
 func getAllSteps(provider *MockStepProvider) []Step {
 	return []Step{
 		provider.analyzeStep,
+		provider.resolveBaseImagesStep,
 		provider.dockerfileStep,
 		provider.buildStep,
 		provider.scanStep,
