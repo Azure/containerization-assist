@@ -353,14 +353,15 @@ func (s *TagStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*
 	sourceImage := state.BuildResult.ImageID
 	targetImage := fmt.Sprintf("%s:%s", imageName, imageTag)
 
+	state.Logger.Info("Target image to tag", "target_image", targetImage)
+
 	// Create Docker registry manager for tagging
 	dockerClient := container.NewDockerCmdRunner(nil)
 	registryManager := container.NewRegistryManager(dockerClient, state.Logger)
 
-	state.Logger.Info("Step completed")
-
 	tagResult, err := registryManager.TagImage(ctx, sourceImage, targetImage)
 	if err != nil {
+		state.Logger.Error("Failed to tag image", "error", err)
 		return nil, errors.New(errors.CodeOperationFailed, "tag_step", fmt.Sprintf("failed to tag image: %v", err), err)
 	}
 
@@ -369,13 +370,14 @@ func (s *TagStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*
 		if tagResult.Error != nil {
 			errorMsg = tagResult.Error.Message
 		}
+		state.Logger.Error(errorMsg)
 		return nil, errors.New(errors.CodeOperationFailed, "tag_step", errorMsg, nil)
 	}
 
 	// Update the build result with the final tag
 	state.BuildResult.ImageRef = targetImage
 
-	state.Logger.Info("Step completed")
+	state.Logger.Info("Tag Step completed")
 
 	return &workflow.StepResult{Success: true}, nil
 }

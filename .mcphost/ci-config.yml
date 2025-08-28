@@ -1,7 +1,7 @@
 mcpServers:
   filesystem-local:
     type: "local"
-    command: ["npx", "@modelcontextprotocol/server-filesystem", "coolstore"]
+    command: ["npx", "@modelcontextprotocol/server-filesystem", "${env://COOLSTORE_PATH:-coolstore}"]
     environment:
       DEBUG: "true"
 
