@@ -86,14 +86,14 @@ func (suite *MCPToolCompletenessTestSuite) TestAllToolsImplemented() {
 	})
 	assert.Contains(suite.T(), respAnalyze, "result", "analyze_repository should return a result")
 
-	// 2) generate_dockerfile
+	// 2) verify_dockerfile
 	dockerfileContent := "FROM alpine:3.19\nCMD [\"sh\", \"-c\", \"sleep 1d\"]"
 	respDockerfile := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      4,
 		"method":  "tools/call",
 		"params": map[string]interface{}{
-			"name": "generate_dockerfile",
+			"name": "verify_dockerfile",
 			"arguments": map[string]interface{}{
 				"session_id":         sessionID,
 				"dockerfile_content": dockerfileContent,
@@ -101,7 +101,7 @@ func (suite *MCPToolCompletenessTestSuite) TestAllToolsImplemented() {
 			},
 		},
 	})
-	assert.Contains(suite.T(), respDockerfile, "result", "generate_dockerfile should return a result")
+	assert.Contains(suite.T(), respDockerfile, "result", "verify_dockerfile should return a result")
 
 	// 3) build_image
 	respBuild := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
@@ -279,7 +279,7 @@ func (suite *MCPToolCompletenessTestSuite) TestToolDiscoverability() {
 	// Verify current workflow tools are discoverable
 	expectedTools := []string{
 		"analyze_repository",
-		"generate_dockerfile",
+		"verify_dockerfile",
 		"build_image",
 		"scan_image",
 		"tag_image",

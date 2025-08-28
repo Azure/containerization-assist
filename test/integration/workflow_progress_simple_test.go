@@ -33,7 +33,7 @@ func TestWorkflowProgressStructure(t *testing.T) {
 		message string
 	}{
 		{"analyze_repository", "Analyzing repository structure and detecting language/framework"},
-		{"generate_dockerfile", "Generating optimized Dockerfile for detected language/framework"},
+		{"verify_dockerfile", "Verifying optimized Dockerfile for detected language/framework"},
 		{"build_image", "Building Docker image with AI-powered error fixing"},
 	}
 

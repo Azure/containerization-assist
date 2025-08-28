@@ -350,11 +350,11 @@ func TestNPMGeneratedSessions(t *testing.T) {
 			err = tools.SaveWorkflowState(ctx, sessionManager, state)
 			assert.NoError(t, err)
 
-			// Second tool invocation (e.g., generate_dockerfile)
+			// Second tool invocation (e.g., verify_dockerfile)
 			state2, err := tools.LoadWorkflowState(ctx, sessionManager, id)
 			assert.NoError(t, err)
 			assert.True(t, state2.IsStepCompleted("analyze_repository"))
-			state2.MarkStepCompleted("generate_dockerfile")
+			state2.MarkStepCompleted("verify_dockerfile")
 			err = tools.SaveWorkflowState(ctx, sessionManager, state2)
 			assert.NoError(t, err)
 		}(sessionID)
@@ -368,7 +368,7 @@ func TestNPMGeneratedSessions(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "/test/repo", state.RepoPath)
 		assert.True(t, state.IsStepCompleted("analyze_repository"))
-		assert.True(t, state.IsStepCompleted("generate_dockerfile"))
+		assert.True(t, state.IsStepCompleted("verify_dockerfile"))
 	}
 }
 

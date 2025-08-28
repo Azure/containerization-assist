@@ -74,8 +74,8 @@ func (suite *ErrorRecoveryIntegrationSuite) TestWorkflowErrorRecovery() {
 	}, suite.T())
 	assert.Contains(suite.T(), analyzeResp, "result")
 
-	// SAD PATH: build_image WITHOUT dockerfile_result -> expect redirect to generate_dockerfile
-	suite.T().Log("SAD PATH: build_image without Dockerfile should redirect to generate_dockerfile")
+	// SAD PATH: build_image WITHOUT dockerfile_result -> expect redirect to verify_dockerfile
+	suite.T().Log("SAD PATH: build_image without Dockerfile should redirect to verify_dockerfile")
 	buildFail := sendMCPRequest(stdin, stdout, map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      2,
@@ -93,9 +93,9 @@ func (suite *ErrorRecoveryIntegrationSuite) TestWorkflowErrorRecovery() {
 	redirectText := suite.extractFirstContentText(buildFail)
 	require.NotEmpty(suite.T(), redirectText)
 	assert.Contains(suite.T(), redirectText, "Tool build_image failed")
-	assert.Contains(suite.T(), redirectText, "Call tool \"generate_dockerfile\"")
+	assert.Contains(suite.T(), redirectText, "Call tool \"verify_dockerfile\"")
 
-	// Recovery step: generate_dockerfile with provided content (valid minimal Dockerfile)
+	// Recovery step: verify_dockerfile with provided content (valid minimal Dockerfile)
 	dockerfileContent := strings.TrimSpace(`FROM golang:1.21-alpine
 WORKDIR /app
 COPY . .
@@ -108,7 +108,7 @@ CMD ["./app"]`)
 		"id":      3,
 		"method":  "tools/call",
 		"params": map[string]interface{}{
-			"name": "generate_dockerfile",
+			"name": "verify_dockerfile",
 			"arguments": map[string]interface{}{
 				"session_id":         sessionID,
 				"dockerfile_content": dockerfileContent,
@@ -175,13 +175,13 @@ func (suite *ErrorRecoveryIntegrationSuite) TestDeployRedirectsToManifestsOnMiss
 		},
 	}, suite.T())
 
-	// generate_dockerfile
+	// verify_dockerfile
 	_ = sendMCPRequest(stdin, stdout, map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      2,
 		"method":  "tools/call",
 		"params": map[string]interface{}{
-			"name": "generate_dockerfile",
+			"name": "verify_dockerfile",
 			"arguments": map[string]interface{}{
 				"session_id":         sessionID,
 				"dockerfile_content": "FROM alpine:3.19\nCMD [\"sh\", \"-c\", \"sleep 1d\"]",
