@@ -38,8 +38,20 @@ jobs:
       uses: docker/setup-buildx-action@v3
         
     - name: Setup Kind cluster
-      uses: helm/kind-action@v1
-        
+      uses: helm/kind-action@v1.12.0
+      with:
+        registry: true
+        registry_name: kind-registry
+        registry_port: 5001
+
+    - name: Test kubectl
+      run: |
+        # Workflow fails if kubectl is not working
+        if ! kubectl version; then
+          exit 1
+        fi
+        kubectl get pods --all-namespaces
+
     - name: Cache mcphost binary
       id: cache-mcphost
       uses: actions/cache@v4
