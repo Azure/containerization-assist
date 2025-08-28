@@ -15,7 +15,3 @@ type MockEventPublisher struct {
 type MockWorkflowOrchestrator struct {
 	mock.Mock
 }
-
-// TestEventOrchestratorAdapter_PublishWorkflowEvent was removed
-// The eventOrchestratorAdapter was part of over-engineered patterns that were simplified
-// Event publishing is now handled directly through the simplified architecture
