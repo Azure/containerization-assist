@@ -123,6 +123,11 @@ jobs:
         kubectl get pods || echo "No pods found"
         echo "=== Recent log entries ==="
         cat mcp.log || echo "No log file found"
+        echo "=== Hook execution logs ==="
+        cat /tmp/hook_execution.log || echo "No hook execution log found"
+        
+        # Copy hook logs to workspace for artifact collection
+        cp /tmp/hook_execution.log ./hook_execution.log 2>/dev/null || echo "No hook logs to copy"
         
     - name: Upload logs
       if: always()
@@ -133,6 +138,7 @@ jobs:
           mcp.log
           mcphost-output.txt
           mcphost-termination.log
+          hook_execution.log
           coolstore/Dockerfile
           coolstore/manifests/
         retention-days: 7
