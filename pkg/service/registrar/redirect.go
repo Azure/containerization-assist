@@ -388,17 +388,17 @@ func (tr *ToolRegistrar) buildProgressResponseWithSections(stepName string, curr
 
 // Auto-formatting labels for each step - no templates needed
 var stepLabels = map[string]string{
-	"analyze_repository":     "Repository Analysis",
-	"resolve_base_images":    "Resolved Base Images",
-	"verify_dockerfile":      "Dockerfile Verified",
-	"build_image":            "Build Result",
-	"scan_image":             "Security Scan",
-	"tag_image":              "Image Tagged",
-	"push_image":             "Image Pushed",
+	"analyze_repository":   "Repository Analysis",
+	"resolve_base_images":  "Resolved Base Images",
+	"verify_dockerfile":    "Dockerfile Verified",
+	"build_image":          "Build Result",
+	"scan_image":           "Security Scan",
+	"tag_image":            "Image Tagged",
+	"push_image":           "Image Pushed",
 	"verify_k8s_manifests": "Manifests Verified",
-	"prepare_cluster":        "Cluster Ready",
-	"deploy_application":     "Deployment",
-	"verify_deployment":      "Verification",
+	"prepare_cluster":      "Cluster Ready",
+	"deploy_application":   "Deployment",
+	"verify_deployment":    "Verification",
 }
 
 // generateStepSpecificSections displays data only if execute methods explicitly return it

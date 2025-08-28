@@ -877,17 +877,17 @@ func (tr *ToolRegistrar) restoreStepResults(workflowState *domainworkflow.Workfl
 // mapToolNameToStepName maps tool names to actual step registry names
 func (tr *ToolRegistrar) mapToolNameToStepName(toolName string) string {
 	stepNameMap := map[string]string{
-		"analyze_repository":     "analyze_repository",
-		"resolve_base_images":    "resolve_base_images",
+		"analyze_repository":   "analyze_repository",
+		"resolve_base_images":  "resolve_base_images",
 		"verify_dockerfile":    "verify_dockerfile",
-		"build_image":            "build_image",
-		"scan_image":             "security_scan", // Tool name → actual step name
-		"tag_image":              "tag_image",
-		"push_image":             "push_image",
+		"build_image":          "build_image",
+		"scan_image":           "security_scan", // Tool name → actual step name
+		"tag_image":            "tag_image",
+		"push_image":           "push_image",
 		"verify_k8s_manifests": "generate_manifests", // Tool name → actual step name
-		"prepare_cluster":        "setup_cluster",      // Tool name → actual step name
-		"deploy_application":     "deploy_application",
-		"verify_deployment":      "verify_deployment",
+		"prepare_cluster":      "setup_cluster",      // Tool name → actual step name
+		"deploy_application":   "deploy_application",
+		"verify_deployment":    "verify_deployment",
 	}
 
 	if actualName, exists := stepNameMap[toolName]; exists {
