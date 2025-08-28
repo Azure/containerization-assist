@@ -125,7 +125,7 @@ func (o *Orchestrator) executeSequentially(ctx context.Context, state *WorkflowS
 func buildContainerizationSteps(provider StepProvider) ([]Step, error) {
 	stepKeys := []string{
 		StepAnalyzeRepository,
-		StepGenerateDockerfile,
+		StepVerifyDockerfile,
 		StepBuildImage,
 		StepSecurityScan,
 		StepTagImage,

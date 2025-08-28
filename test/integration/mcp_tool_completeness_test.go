@@ -165,14 +165,14 @@ func (suite *MCPToolCompletenessTestSuite) TestAllToolsImplemented() {
 	})
 	assert.Contains(suite.T(), respPush, "result", "push_image should return a result")
 
-	// 7) generate_k8s_manifests (include ingress)
+	// 7) verify_k8s_manifests (include ingress)
 	manifests := BasicK8sManifestsWithIngress()
 	respManifests := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      9,
 		"method":  "tools/call",
 		"params": map[string]interface{}{
-			"name": "generate_k8s_manifests",
+			"name": "verify_k8s_manifests",
 			"arguments": map[string]interface{}{
 				"session_id": sessionID,
 				"manifests":  manifests,
@@ -180,7 +180,7 @@ func (suite *MCPToolCompletenessTestSuite) TestAllToolsImplemented() {
 			},
 		},
 	})
-	assert.Contains(suite.T(), respManifests, "result", "generate_k8s_manifests should return a result")
+	assert.Contains(suite.T(), respManifests, "result", "verify_k8s_manifests should return a result")
 
 	// 8) prepare_cluster
 	respPrepare := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
@@ -284,7 +284,7 @@ func (suite *MCPToolCompletenessTestSuite) TestToolDiscoverability() {
 		"scan_image",
 		"tag_image",
 		"push_image",
-		"generate_k8s_manifests",
+		"verify_k8s_manifests",
 		"prepare_cluster",
 		"deploy_application",
 		"verify_deployment",

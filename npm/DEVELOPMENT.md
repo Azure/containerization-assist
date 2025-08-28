@@ -99,7 +99,7 @@ TOOL_PARAMS='{"repo_path":"/path/to/repo"}' containerization-assist-mcp tool sta
 - `scan_image` - Security vulnerability scanning
 - `tag_image` - Tag Docker images
 - `push_image` - Push to registry
-- `generate_k8s_manifests` - Generate K8s manifests
+- `verify_k8s_manifests` - Verify K8s manifests
 - `prepare_cluster` - Prepare K8s cluster
 - `deploy_application` - Deploy to K8s
 - `verify_deployment` - Verify deployment health

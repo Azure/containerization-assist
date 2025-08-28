@@ -318,16 +318,12 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 			required: []string{"session_id"},
 		},
 		{
-			name:        "generate_dockerfile",
-			description: "📝 STEP 3: Generate an optimized Dockerfile based on repository analysis. Requires resolve_base_images to be completed first.",
+			name:        "verify_dockerfile",
+			description: "📝 STEP 3: Verify an AI-generated Dockerfile based on repository analysis. Requires resolve_base_images to be completed first.",
 			params: map[string]interface{}{
 				"session_id": map[string]interface{}{
 					"type":        "string",
 					"description": "Session ID for workflow state management",
-				},
-				"dockerfile_content": map[string]interface{}{
-					"type":        "string",
-					"description": "AI-generated Dockerfile content to save",
 				},
 				"fixing_mode": map[string]interface{}{
 					"type":        "boolean",
@@ -347,7 +343,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 		},
 		{
 			name:        "build_image",
-			description: "🏗️ STEP 4: Build Docker image from generated Dockerfile. Requires generate_dockerfile to be completed first.",
+			description: "🏗️ STEP 4: Build Docker image from verified Dockerfile. Requires verify_dockerfile to be completed first.",
 			params: map[string]interface{}{
 				"session_id": map[string]interface{}{
 					"type":        "string",
@@ -450,30 +446,12 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 			required: []string{"session_id", "registry"},
 		},
 		{
-			name:        "generate_k8s_manifests",
-			description: "☸️ STEP 8: Generate Kubernetes manifests for the application. Requires push_image to be completed first.",
+			name:        "verify_k8s_manifests",
+			description: "☸️ STEP 8: Verify Kubernetes manifests for the application. Requires push_image to be completed first.",
 			params: map[string]interface{}{
 				"session_id": map[string]interface{}{
 					"type":        "string",
 					"description": "Session ID for workflow state management",
-				},
-				"manifests": map[string]interface{}{
-					"type":        "object",
-					"description": "AI-generated Kubernetes manifests as key-value pairs (filename: content)",
-					"properties": map[string]interface{}{
-						"deployment.yaml": map[string]interface{}{
-							"type":        "string",
-							"description": "Kubernetes Deployment manifest content",
-						},
-						"service.yaml": map[string]interface{}{
-							"type":        "string",
-							"description": "Kubernetes Service manifest content",
-						},
-						"ingress.yaml": map[string]interface{}{
-							"type":        "string",
-							"description": "Kubernetes Ingress manifest content (optional)",
-						},
-					},
 				},
 				"fixing_mode": map[string]interface{}{
 					"type":        "boolean",
@@ -493,7 +471,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 		},
 		{
 			name:        "prepare_cluster",
-			description: "⚙️ STEP 9: Prepare the Kubernetes cluster for deployment. Requires generate_k8s_manifests to be completed first.",
+			description: "⚙️ STEP 9: Prepare the Kubernetes cluster for deployment. Requires verify_k8s_manifests to be completed first.",
 			params: map[string]interface{}{
 				"session_id": map[string]interface{}{
 					"type":        "string",
@@ -901,12 +879,12 @@ func (tr *ToolRegistrar) mapToolNameToStepName(toolName string) string {
 	stepNameMap := map[string]string{
 		"analyze_repository":     "analyze_repository",
 		"resolve_base_images":    "resolve_base_images",
-		"generate_dockerfile":    "generate_dockerfile",
+		"verify_dockerfile":    "verify_dockerfile",
 		"build_image":            "build_image",
 		"scan_image":             "security_scan", // Tool name → actual step name
 		"tag_image":              "tag_image",
 		"push_image":             "push_image",
-		"generate_k8s_manifests": "generate_manifests", // Tool name → actual step name
+		"verify_k8s_manifests": "generate_manifests", // Tool name → actual step name
 		"prepare_cluster":        "setup_cluster",      // Tool name → actual step name
 		"deploy_application":     "deploy_application",
 		"verify_deployment":      "verify_deployment",
@@ -949,7 +927,7 @@ func (tr *ToolRegistrar) saveStepResults(workflowState *domainworkflow.WorkflowS
 		// This is handled generically through the step result response
 		tr.logger.Info("Resolve base images step completed - results included in step response")
 
-	case "generate_dockerfile":
+	case "verify_dockerfile":
 		if workflowState.DockerfileResult != nil {
 			simpleState.Artifacts.DockerfileResult = &tools.DockerfileArtifact{
 				Content:  workflowState.DockerfileResult.Content,
@@ -969,7 +947,7 @@ func (tr *ToolRegistrar) saveStepResults(workflowState *domainworkflow.WorkflowS
 			}
 		}
 
-	case "generate_k8s_manifests", "prepare_cluster", "deploy_application", "verify_deployment":
+	case "verify_k8s_manifests", "prepare_cluster", "deploy_application", "verify_deployment":
 		if workflowState.K8sResult != nil {
 			simpleState.Artifacts.K8sResult = &tools.K8sArtifact{
 				Manifests: workflowState.K8sResult.Manifests,

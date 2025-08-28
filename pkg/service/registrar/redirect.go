@@ -14,12 +14,12 @@ import (
 var WorkflowSequence = []string{
 	"analyze_repository",
 	"resolve_base_images",
-	"generate_dockerfile",
+	"verify_dockerfile",
 	"build_image",
 	"scan_image",
 	"tag_image",
 	"push_image",
-	"generate_k8s_manifests",
+	"verify_k8s_manifests",
 	"prepare_cluster",
 	"deploy_application",
 	"verify_deployment",
@@ -132,12 +132,12 @@ type RedirectConfig struct {
 // RedirectConfigs maps tool names to their redirect configurations
 var RedirectConfigs = map[string]RedirectConfig{
 	"build_image": {
-		RedirectTo:   "generate_dockerfile",
+		RedirectTo:   "verify_dockerfile",
 		MaxRedirects: 1,
 		Reason:       "Build failures often indicate Dockerfile issues - regenerate with AI fixing",
 	},
 	"deploy_application": {
-		RedirectTo:   "generate_k8s_manifests",
+		RedirectTo:   "verify_k8s_manifests",
 		MaxRedirects: 1,
 		Reason:       "Deployment failures often indicate manifest issues - regenerate with AI fixing",
 	},
@@ -147,7 +147,7 @@ var RedirectConfigs = map[string]RedirectConfig{
 		Reason:       "Push failures may indicate image issues - rebuild with different settings",
 	},
 	"scan_image": {
-		RedirectTo:   "generate_dockerfile",
+		RedirectTo:   "verify_dockerfile",
 		MaxRedirects: 1,
 		Reason:       "Scan failures may indicate Dockerfile issues - regenerate with AI fixing",
 	},
@@ -390,12 +390,12 @@ func (tr *ToolRegistrar) buildProgressResponseWithSections(stepName string, curr
 var stepLabels = map[string]string{
 	"analyze_repository":     "Repository Analysis",
 	"resolve_base_images":    "Resolved Base Images",
-	"generate_dockerfile":    "Dockerfile Generated",
+	"verify_dockerfile":      "Dockerfile Verified",
 	"build_image":            "Build Result",
 	"scan_image":             "Security Scan",
 	"tag_image":              "Image Tagged",
 	"push_image":             "Image Pushed",
-	"generate_k8s_manifests": "Manifests Generated",
+	"verify_k8s_manifests": "Manifests Verified",
 	"prepare_cluster":        "Cluster Ready",
 	"deploy_application":     "Deployment",
 	"verify_deployment":      "Verification",
@@ -433,19 +433,23 @@ func (tr *ToolRegistrar) generateStepSpecificSections(stepName string, responseD
 	case "resolve_base_images":
 		promptSection := `
 ** Next Steps for Dockerfile Generation:**
-1. Use the suggested base images above to generate Dockerfile content
-2. Read any relevant project files to understand the application structure
+1. Read any relevant project files to understand the application structure
+2. Use the suggested base images and repository analysis to generate ONLY the Dockerfile at the repository root using the default editFiles tool
+3. Call the next tool "verify_dockerfile" to verify the generated Dockerfile and continue the workflow
 `
 		sections = append(sections, promptSection)
 
 	case "push_image":
 		promptSection := `
 ** Next Steps for Kubernetes Manifests Generation:**
-Read any relevant project files to understand the application requirements:
+1. Read any relevant project files to understand the application requirements:
 - Existing Dockerfile to understand exposed ports and volumes
 - Application configuration files for environment variables
 - Documentation for deployment requirements
 - Any existing Kubernetes manifests for reference
+2. Generate ONLY the Kubernetes manifests inside 'manifests' folder using the default editFiles tool
+3. Ensure separate manifests for Deployment, Service, ConfigMap, and Ingress as needed
+4. Call the next tool "verify_k8s_manifests" to verify the generated manifests and continue the workflow
 `
 		sections = append(sections, promptSection)
 	}

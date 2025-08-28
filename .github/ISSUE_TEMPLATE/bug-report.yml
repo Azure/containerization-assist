@@ -71,7 +71,7 @@ body:
       description: Which part of Containerization Assist is affected?
       options:
         - MCP Server
-        - Individual Tools (analyze_repository, generate_dockerfile, etc.)
+        - Individual Tools (analyze_repository, resolve_base_images, verify_dockerfile, etc.)
         - Workflow Orchestration
         - Docker Integration
         - Kubernetes Integration

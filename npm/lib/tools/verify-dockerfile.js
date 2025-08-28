@@ -1,12 +1,12 @@
 import { createTool, z } from './_tool-factory.js';
 
 /**
- * Generate Dockerfile tool definition for MCP server registration
+ * Verify Dockerfile tool definition for MCP server registration
  */
 export default createTool({
-  name: 'generate_dockerfile',
-  title: 'Generate Dockerfile',
-  description: 'Generate an optimized Dockerfile based on repository analysis',
+  name: 'verify_dockerfile',
+  title: 'Verify Dockerfile',
+  description: 'Verify that an AI agent has generated an optimized Dockerfile based on repository analysis',
   inputSchema: {
     session_id: z.string().describe('Session ID from repository analysis'),
     base_image: z.string().optional().describe('Custom base image to use'),

@@ -393,13 +393,13 @@ func (suite *MCPWorkflowIntegrationSuite) TestParameterValidationErrors() {
 	}, suite.T())
 	suite.assertErrorOrResult(resp1)
 
-	// Missing manifests for generate_k8s_manifests
+	// Missing manifests for verify_k8s_manifests
 	resp2 := sendMCPRequest(stdin, stdout, map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      3,
 		"method":  "tools/call",
 		"params": map[string]interface{}{
-			"name":      "generate_k8s_manifests",
+			"name":      "verify_k8s_manifests",
 			"arguments": map[string]interface{}{},
 		},
 	}, suite.T())

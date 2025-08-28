@@ -51,16 +51,16 @@ type MockStepProvider struct {
 // GetStep implements the consolidated StepProvider interface
 func (p *MockStepProvider) GetStep(name string) (Step, error) {
 	stepMap := map[string]Step{
-		StepAnalyzeRepository:  p.analyzeStep,
-		StepGenerateDockerfile: p.dockerfileStep,
-		StepBuildImage:         p.buildStep,
-		StepSecurityScan:       p.scanStep,
-		StepTagImage:           p.tagStep,
-		StepPushImage:          p.pushStep,
-		StepGenerateManifests:  p.manifestStep,
-		StepSetupCluster:       p.clusterStep,
-		StepDeployApplication:  p.deployStep,
-		StepVerifyDeployment:   p.verifyStep,
+		StepAnalyzeRepository: p.analyzeStep,
+		StepVerifyDockerfile:  p.dockerfileStep,
+		StepBuildImage:        p.buildStep,
+		StepSecurityScan:      p.scanStep,
+		StepTagImage:          p.tagStep,
+		StepPushImage:         p.pushStep,
+		StepGenerateManifests: p.manifestStep,
+		StepSetupCluster:      p.clusterStep,
+		StepDeployApplication: p.deployStep,
+		StepVerifyDeployment:  p.verifyStep,
 	}
 
 	if step, exists := stepMap[name]; exists {
@@ -88,7 +88,7 @@ func (m *mockProgressEmitter) Close() error {
 func (p *MockStepProvider) ListSteps() []string {
 	return []string{
 		StepAnalyzeRepository,
-		StepGenerateDockerfile,
+		StepVerifyDockerfile,
 		StepBuildImage,
 		StepSecurityScan,
 		StepTagImage,
@@ -161,7 +161,7 @@ func TestOrchestratorExecute(t *testing.T) {
 		analyzeStepMock := analyzeStep.(*MockStep)
 		analyzeStepMock.On("Execute", mock.Anything, mock.Anything).Return(&StepResult{Success: true}, nil)
 
-		dockerfileStep, _ := stepProvider.GetStep("generate_dockerfile")
+		dockerfileStep, _ := stepProvider.GetStep("verify_dockerfile")
 		dockerfileStepMock := dockerfileStep.(*MockStep)
 		dockerfileStepMock.On("Execute", mock.Anything, mock.Anything).Return(&StepResult{Success: true}, nil)
 

@@ -9,12 +9,12 @@
 
 // Import all tools
 import analyzeRepository from './tools/analyze-repository.js';
-import generateDockerfile from './tools/generate-dockerfile.js';
+import verifyDockerfile from './tools/verify-dockerfile.js';
 import buildImage from './tools/build-image.js';
 import scanImage from './tools/scan-image.js';
 import tagImage from './tools/tag-image.js';
 import pushImage from './tools/push-image.js';
-import generateK8sManifests from './tools/generate-k8s-manifests.js';
+import verifyK8sManifests from './tools/verify-k8s-manifests.js';
 import prepareCluster from './tools/prepare-cluster.js';
 import deployApplication from './tools/deploy-application.js';
 import verifyDeployment from './tools/verify-deployment.js';
@@ -28,12 +28,12 @@ import { generateSessionId } from './executor.js';
 // Collection of all tools for iteration
 const tools = {
   analyzeRepository,
-  generateDockerfile,
+  verifyDockerfile,
   buildImage,
   scanImage,
   tagImage,
   pushImage,
-  generateK8sManifests,
+  verifyK8sManifests,
   prepareCluster,
   deployApplication,
   verifyDeployment,
@@ -216,12 +216,12 @@ function createSession() {
 export {
   // Workflow tools
   analyzeRepository,
-  generateDockerfile,
+  verifyDockerfile,
   buildImage,
   scanImage,
   tagImage,
   pushImage,
-  generateK8sManifests,
+  verifyK8sManifests,
   prepareCluster,
   deployApplication,
   verifyDeployment,
@@ -250,12 +250,12 @@ export function getAllTools() {
 export default {
   // Workflow tools
   analyzeRepository,
-  generateDockerfile,
+  verifyDockerfile,
   buildImage,
   scanImage,
   tagImage,
   pushImage,
-  generateK8sManifests,
+  verifyK8sManifests,
   prepareCluster,
   deployApplication,
   verifyDeployment,

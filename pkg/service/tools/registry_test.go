@@ -265,7 +265,7 @@ func (m *mockStepProvider) GetStep(name string) (workflow.Step, error) {
 func (m *mockStepProvider) ListSteps() []string {
 	return []string{
 		"analyze_repository",
-		"generate_dockerfile",
+		"verify_dockerfile",
 		"build_image",
 		"security_scan",
 		"tag_image",

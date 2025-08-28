@@ -164,12 +164,13 @@ func executeToolWithDeps(ctx context.Context, toolName string, params map[string
 func needsSessionId(toolName string) bool {
 	toolsNeedingSession := []string{
 		"analyze_repository",
-		"generate_dockerfile",
+		"resolve_base_images",
+		"verify_dockerfile",
 		"build_image",
 		"scan_image",
 		"tag_image",
 		"push_image",
-		"generate_k8s_manifests",
+		"verify_k8s_manifests",
 		"prepare_cluster",
 		"deploy_application",
 		"verify_deployment",

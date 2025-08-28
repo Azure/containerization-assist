@@ -140,9 +140,9 @@ CMD ["./app"]`)
 	suite.T().Log("✓ Redirect and recovery for build_image verified")
 }
 
-// TestDeployRedirectsToManifestsOnMissingPath ensures deploy errors redirect to generate_k8s_manifests and then succeed after providing manifests
+// TestDeployRedirectsToManifestsOnMissingPath ensures deploy errors redirect to verify_k8s_manifests and then succeed after providing manifests
 func (suite *ErrorRecoveryIntegrationSuite) TestDeployRedirectsToManifestsOnMissingPath() {
-	suite.T().Log("Testing deploy failure redirect to generate_k8s_manifests")
+	suite.T().Log("Testing deploy failure redirect to verify_k8s_manifests")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
@@ -234,7 +234,7 @@ func (suite *ErrorRecoveryIntegrationSuite) TestDeployRedirectsToManifestsOnMiss
 	}, suite.T())
 
 	// SAD PATH: deploy_application BEFORE manifests to force error and redirect
-	suite.T().Log("SAD PATH: deploy without manifests should redirect to generate_k8s_manifests")
+	suite.T().Log("SAD PATH: deploy without manifests should redirect to verify_k8s_manifests")
 	deployFail := sendMCPRequest(stdin, stdout, map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      6,
@@ -250,9 +250,9 @@ func (suite *ErrorRecoveryIntegrationSuite) TestDeployRedirectsToManifestsOnMiss
 	red := suite.extractFirstContentText(deployFail)
 	require.NotEmpty(suite.T(), red)
 	assert.Contains(suite.T(), red, "Tool deploy_application failed")
-	assert.Contains(suite.T(), red, "Call tool \"generate_k8s_manifests\"")
+	assert.Contains(suite.T(), red, "Call tool \"verify_k8s_manifests\"")
 
-	// Recovery step: generate_k8s_manifests by providing content so manifest_path is set
+	// Recovery step: verify_k8s_manifests by providing content so manifest_path is set
 	manifests := BasicK8sManifestsWithIngress()
 
 	_ = sendMCPRequest(stdin, stdout, map[string]interface{}{
@@ -260,7 +260,7 @@ func (suite *ErrorRecoveryIntegrationSuite) TestDeployRedirectsToManifestsOnMiss
 		"id":      7,
 		"method":  "tools/call",
 		"params": map[string]interface{}{
-			"name": "generate_k8s_manifests",
+			"name": "verify_k8s_manifests",
 			"arguments": map[string]interface{}{
 				"session_id": sessionID,
 				"manifests":  manifests,

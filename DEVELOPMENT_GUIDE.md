@@ -361,7 +361,7 @@ var toolConfigs = []ToolConfig{
         Description: "Analyze repository structure",
         Category:    CategoryWorkflow,
         Handler:     handleAnalyzeRepository,
-        NextTool:    "generate_dockerfile",
+        NextTool:    "resolve_base_images",
         ChainReason: "Generate Dockerfile after analysis",
     },
     // ... more tools

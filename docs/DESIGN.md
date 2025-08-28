@@ -140,7 +140,7 @@ var toolConfigs = []ToolConfig{
         Name:           "analyze_repository",
         Description:    "Analyze repository to detect language and framework",
         Category:       CategoryWorkflow,
-        NextTool:       "generate_dockerfile",
+        NextTool:       "resolve_base_images",
         ChainReason:    "Repository analyzed successfully. Ready to generate Dockerfile",
     },
     // ... 9 more workflow tools ...

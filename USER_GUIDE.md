@@ -564,24 +564,25 @@ Run the script and include its output when reporting issues.
 
 Here are all the tools available in Containerization Assist:
 
-### Workflow Tools (10 tools)
+### Workflow Tools (11 tools)
 1. **analyze_repository** - Analyze your code and detect technologies
-2. **generate_dockerfile** - Create a Dockerfile for your project
-3. **build_image** - Build a Docker container image
-4. **scan_image** - Scan for security vulnerabilities
-5. **tag_image** - Tag your image with version information
-6. **push_image** - Push your image to a container registry
-7. **generate_k8s_manifests** - Create Kubernetes deployment files
-8. **prepare_cluster** - Set up your Kubernetes cluster
-9. **deploy_application** - Deploy your app to Kubernetes
-10. **verify_deployment** - Check that your deployment is working
+2. **resolve_base_images** - Get recommended base images for Dockerfile
+3. **verify_dockerfile** - Verify Dockerfile for your project
+4. **build_image** - Build a Docker container image
+5. **scan_image** - Scan for security vulnerabilities
+6. **tag_image** - Tag your image with version information
+7. **push_image** - Push your image to a container registry
+8. **verify_k8s_manifests** - Verify Kubernetes deployment files
+9. **prepare_cluster** - Set up your Kubernetes cluster
+10. **deploy_application** - Deploy your app to Kubernetes
+11. **verify_deployment** - Check that your deployment is working
 
 ### Orchestration Tools (2 tools)
-11. **start_workflow** - Run the complete containerization process
-12. **workflow_status** - Check the progress of your workflow
+12. **start_workflow** - Run the complete containerization process
+13. **workflow_status** - Check the progress of your workflow
 
 ### Utility Tools (1 tool)
-13. **list_tools** - Show all available tools
+14. **list_tools** - Show all available tools
 
 *[Image placeholder: Diagram showing how the tools work together]*
 

@@ -137,7 +137,7 @@ function needsSessionId(toolName) {
     'scan_image',
     'tag_image',
     'push_image',
-    'generate_k8s_manifests',
+    'verify_k8s_manifests',
     'prepare_cluster',
     'deploy_application',
     'verify_deployment',

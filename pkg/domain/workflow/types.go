@@ -35,17 +35,17 @@ const (
 
 // Step name constants
 const (
-	StepAnalyzeRepository  = "analyze_repository"
-	StepResolveBaseImages  = "resolve_base_images"
-	StepGenerateDockerfile = "generate_dockerfile"
-	StepBuildImage         = "build_image"
-	StepSecurityScan       = "security_scan"
-	StepTagImage           = "tag_image"
-	StepPushImage          = "push_image"
-	StepGenerateManifests  = "generate_manifests"
-	StepSetupCluster       = "setup_cluster"
-	StepDeployApplication  = "deploy_application"
-	StepVerifyDeployment   = "verify_deployment"
+	StepAnalyzeRepository = "analyze_repository"
+	StepResolveBaseImages = "resolve_base_images"
+	StepVerifyDockerfile  = "verify_dockerfile"
+	StepBuildImage        = "build_image"
+	StepSecurityScan      = "security_scan"
+	StepTagImage          = "tag_image"
+	StepPushImage         = "push_image"
+	StepGenerateManifests = "generate_manifests"
+	StepSetupCluster      = "setup_cluster"
+	StepDeployApplication = "deploy_application"
+	StepVerifyDeployment  = "verify_deployment"
 )
 
 // TypedArgs represents strongly typed tool arguments for MCP tool invocations.

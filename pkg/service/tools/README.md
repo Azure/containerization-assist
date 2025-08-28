@@ -36,8 +36,8 @@ The tool registry provides a table-driven approach to tool registration that:
 | `build_image` | Build Docker image | `scan_image` |
 | `scan_image` | Security vulnerability scan | `tag_image` |
 | `tag_image` | Tag Docker image | `push_image` |
-| `push_image` | Push to container registry | `generate_k8s_manifests` |
-| `generate_k8s_manifests` | Generate Kubernetes manifests | `prepare_cluster` |
+| `push_image` | Push to container registry | `verify_k8s_manifests` |
+| `verify_k8s_manifests` | Verify Kubernetes manifests | `prepare_cluster` |
 | `prepare_cluster` | Prepare Kubernetes cluster | `deploy_application` |
 | `deploy_application` | Deploy to Kubernetes | `verify_deployment` |
 | `verify_deployment` | Verify deployment health with automatic port forwarding for app testing | (end) |

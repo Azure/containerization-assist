@@ -44,9 +44,9 @@ For detailed usage and troubleshooting, see the examples directory and developme
 ./containerization-assist-mcp
 
 # Containerization Assist provides 15 individual tools via MCP protocol:
-# - 10 workflow step tools (analyze_repository, generate_dockerfile, build_image, etc.)
+# - 11 workflow step tools (analyze_repository, resolve_base_images, verify_dockerfile, build_image, etc.)
 # - 2 orchestration tools (start_workflow, workflow_status)
-# - 3 utility tools (list_tools, ping, server_status)
+# - 1 utility tool (list_tools)
 # Connect with MCP client for step-by-step containerization
 ```
 
@@ -213,16 +213,17 @@ pkg/
 # Start MCP server
 ./containerization-assist-mcp
 
-# Containerization Assist provides 15 individual tools:
+# Containerization Assist provides 14 individual tools:
 
-# 10 Workflow Step Tools:
+# 11 Workflow Step Tools:
 # - analyze_repository: Repository analysis and language detection
-# - generate_dockerfile: AI-powered Dockerfile generation  
+# - resolve_base_images: Get recommended base images from catalog
+# - verify_dockerfile: AI-powered Dockerfile verification  
 # - build_image: Container image building with error recovery
 # - scan_image: Security vulnerability scanning with Trivy/Grype
 # - tag_image: Image tagging with version information
 # - push_image: Push to container registry
-# - generate_k8s_manifests: Kubernetes manifest generation
+# - verify_k8s_manifests: Kubernetes manifest verification
 # - prepare_cluster: Kubernetes cluster setup and validation
 # - deploy_application: Application deployment to K8s
 # - verify_deployment: Health checks and endpoint discovery
@@ -231,13 +232,11 @@ pkg/
 # - start_workflow: Begin complete containerization workflow
 # - workflow_status: Check workflow progress and status
 
-# 3 Utility Tools:
+# 1 Utility Tool:
 # - list_tools: Show all available tools and capabilities
-# - ping: Test MCP connectivity
-# - server_status: Get server status information
 
 # Each tool provides chain hints for the next step:
-# Example workflow: analyze_repository → generate_dockerfile → build_image → ...
+# Example workflow: analyze_repository → resolve_base_images → verify_dockerfile → ...
 ```
 
 ## 🤝 Contributing

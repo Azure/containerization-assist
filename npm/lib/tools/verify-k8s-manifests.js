@@ -1,9 +1,9 @@
 import { createTool, z } from './_tool-factory.js';
 
 export default createTool({
-  name: 'generate_k8s_manifests',
-  title: 'Generate Kubernetes Manifests',
-  description: 'Generate Kubernetes manifests for the application',
+  name: 'verify_k8s_manifests',
+  title: 'Verify Kubernetes Manifests',
+  description: 'Verify Kubernetes manifests for the application',
   inputSchema: {
     session_id: z.string().describe('Session ID from workflow'),
     namespace: z.string().optional().describe('Kubernetes namespace'),

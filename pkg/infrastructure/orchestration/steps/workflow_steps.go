@@ -416,169 +416,79 @@ func (s *PushStep) Execute(ctx context.Context, state *workflow.WorkflowState) (
 	}, nil
 }
 
-// ManifestStep implements Kubernetes manifest generation
+// ManifestStep implements Kubernetes manifest verification
 type ManifestStep struct{}
 
 func NewManifestStep() workflow.Step    { return &ManifestStep{} }
 func (s *ManifestStep) Name() string    { return "generate_manifests" }
 func (s *ManifestStep) MaxRetries() int { return 2 }
 func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowState) (*workflow.StepResult, error) {
-	// Check if manifest content is provided
-	var manifestList []string
-
-	if manifestsData, exists := state.RequestParams["manifests"]; exists {
-		if manifestsMap, ok := manifestsData.(map[string]interface{}); ok {
-			state.Logger.Info("Using provided Kubernetes manifests from the LLM Host")
-
-			// Create manifests directory
-			manifestsDir := filepath.Join(state.AnalyzeResult.RepoPath, "manifests")
-			if err := createManifestsDirectory(manifestsDir, state.Logger); err != nil {
-				return nil, fmt.Errorf("failed to create manifests directory: %v", err)
-			}
-
-			// Write individual manifest files
-			for filename, content := range manifestsMap {
-				if contentStr, ok := content.(string); ok && contentStr != "" {
-					filePath := filepath.Join(manifestsDir, filename)
-					if err := writeManifestFile(filePath, contentStr, state.Logger); err != nil {
-						return nil, fmt.Errorf("failed to write manifest file %s: %v", filename, err)
-					}
-					manifestList = append(manifestList, contentStr)
-					state.Logger.Info("Wrote manifest file", "filename", filename, "path", filePath)
-				}
-			}
-
-			// Set results with AI metadata
-			state.K8sResult = &workflow.K8sResult{
-				Manifests:   manifestList,
-				Namespace:   extractNamespaceFromManifests(manifestList),
-				ServiceName: extractServiceNameFromManifests(manifestList),
-				Endpoint:    "", // Will be set after deployment
-				Metadata: map[string]interface{}{
-					"ai_generated":   true,
-					"manifest_path":  manifestsDir,
-					"manifest_count": len(manifestList),
-				},
-			}
-
-			state.Logger.Info("Step completed")
-
-			// Return basic success result
-
-			return &workflow.StepResult{Success: true}, nil
-		}
+	// Verify that the agent created the manifests directory
+	manifestsDir := filepath.Join(state.AnalyzeResult.RepoPath, "manifests")
+	if _, err := os.Stat(manifestsDir); os.IsNotExist(err) {
+		return nil, fmt.Errorf("AI agent did not create manifests directory at expected path: %s", manifestsDir)
 	}
 
-	// If no content provided, generate manifests normally
-	state.Logger.Info("Generating Kubernetes manifests through the MCP")
-
-	// Check if deployment is actually requested
-	shouldDeploy := state.Args.Deploy == nil || *state.Args.Deploy
-	if !shouldDeploy {
-		state.Logger.Info("Skipping manifest generation (deployment not requested)")
-		// Return basic success result
-
-		return &workflow.StepResult{Success: true}, nil
-	}
-
-	if state.BuildResult == nil || state.AnalyzeResult == nil {
-		return nil, errors.New(errors.CodeInvalidState, "manifest_step", "build result and analyze result are required for manifest generation", nil)
-	}
-
-	// Convert workflow BuildResult to infrastructure BuildResult
-	imageName := core.ExtractRepoName(state.RepoIdentifier)
-	imageTag := parseImageReference(state.BuildResult.ImageRef)
-
-	infraBuildResult := &BuildResult{
-		ImageName: imageName,
-		ImageTag:  imageTag,
-		ImageID:   state.BuildResult.ImageID,
-	}
-
-	// Generate manifests
-	appName := core.ExtractRepoName(state.RepoIdentifier)
-	namespace := "default"
-
-	// In test mode, use test namespace and prefix app name
-	if state.IsTestMode() {
-		namespace = "test-namespace"
-		appName = "test-" + appName
-	}
-
-	// Determine registry URL (default to localhost if not provided)
-	registryURL := "localhost:5001"
-	if val, ok := state.RequestParams["registry"].(string); ok && val != "" {
-		registryURL = val
-		state.Logger.Info("Using registry URL from request parameters", "registry", registryURL)
-	}
-
-	k8sResult, err := GenerateManifests(
-		infraBuildResult,
-		appName,
-		namespace,
-		state.AnalyzeResult.Port,
-		state.AnalyzeResult.RepoPath,
-		registryURL,
-		state.Logger,
-	)
+	// Read and verify generated manifest files
+	files, err := os.ReadDir(manifestsDir)
 	if err != nil {
-		return nil, errors.New(errors.CodeManifestInvalid, "manifest_step", "k8s manifest generation failed", err)
+		return nil, fmt.Errorf("failed to read manifests directory: %v", err)
 	}
 
-	// Extract actual manifest content from the result
-	manifestContent := []string{}
-	if k8sResult.Manifests != nil {
-		if manifests, ok := k8sResult.Manifests["manifests"]; ok {
-			// Handle different types of manifest content
-			switch v := manifests.(type) {
-			case []string:
-				// If manifests are already a slice of strings
-				manifestContent = v
-			case []interface{}:
-				// If manifests are a slice of interfaces, convert to strings
-				for _, manifest := range v {
-					if manifestStr, ok := manifest.(string); ok {
-						manifestContent = append(manifestContent, manifestStr)
-					}
-				}
-			case map[string]interface{}:
-				// If manifests are a map, extract values as strings
-				for _, manifest := range v {
-					if manifestStr, ok := manifest.(string); ok {
-						manifestContent = append(manifestContent, manifestStr)
-					}
-				}
-			case string:
-				// If it's a single manifest string
-				manifestContent = []string{v}
+	if len(files) == 0 {
+		return nil, fmt.Errorf("AI agent did not generate any manifest files in %s", manifestsDir)
+	}
+
+	// Count valid YAML files
+	validManifests := 0
+	for _, file := range files {
+		if !file.IsDir() && (strings.HasSuffix(file.Name(), ".yaml") || strings.HasSuffix(file.Name(), ".yml")) {
+			// Read file content for validation (but don't store in response)
+			filePath := filepath.Join(manifestsDir, file.Name())
+			content, err := os.ReadFile(filePath)
+			if err != nil {
+				state.Logger.Warn("Failed to read manifest file", "filename", file.Name(), "error", err)
+				continue
+			}
+			if len(content) > 0 {
+				// TODO: Add linting/validation of YAML content?
+				validManifests++
+				state.Logger.Info("Verified AI-generated manifest file", "filename", file.Name(), "size", len(content))
 			}
 		}
 	}
 
-	// Store K8s result in workflow state with extracted manifest content
-	manifestPath := k8sResult.Manifests["path"]
-	state.Logger.Info("Step completed")
-
-	metadata := map[string]interface{}{
-		"app_name":       k8sResult.AppName,
-		"ingress_url":    k8sResult.IngressURL,
-		"manifest_path":  manifestPath, // Store manifest path for deployment
-		"manifest_count": len(manifestContent),
-		"template_used":  k8sResult.Manifests["template"],
+	if validManifests == 0 {
+		return nil, fmt.Errorf("no valid manifest files found in %s", manifestsDir)
 	}
 
+	// Set results with AI metadata (no manifest content in response)
 	state.K8sResult = &workflow.K8sResult{
-		Manifests:   manifestContent, // Now contains actual manifest content
-		Namespace:   k8sResult.Namespace,
-		ServiceName: k8sResult.AppName, // Use AppName as service name
-		Endpoint:    k8sResult.ServiceURL,
-		Metadata:    metadata,
+		Namespace:   "default", // Will be extracted from files during deployment
+		ServiceName: "app",     // Will be extracted from files during deployment
+		Endpoint:    "",        // Will be set after deployment
+		Metadata: map[string]interface{}{
+			"ai_generated":   true,
+			"manifest_path":  manifestsDir,
+			"manifest_count": validManifests,
+			"verified":       true,
+		},
 	}
 
-	state.Logger.Info("Step completed")
-	// Return basic success result
+	state.Logger.Info("Verified AI-generated manifests", "count", validManifests, "path", manifestsDir)
 
-	return &workflow.StepResult{Success: true}, nil
+	// Return success result without manifest contents
+	return &workflow.StepResult{
+		Success: true,
+		Data: map[string]interface{}{
+			"manifest_path":  manifestsDir,
+			"manifest_count": validManifests,
+			"verified":       true,
+		},
+		Metadata: map[string]interface{}{
+			"ai_generated": true,
+		},
+	}, nil
 }
 
 // ClusterStep implements cluster setup
@@ -876,52 +786,6 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 	// Return basic success result
 
 	return &workflow.StepResult{Success: true}, nil
-}
-
-// extractNamespaceFromManifests extracts namespace from AI-generated manifests
-func extractNamespaceFromManifests(manifests []string) string {
-	namespaceRe := regexp.MustCompile(`namespace:\s*(\w+)`)
-
-	for _, manifest := range manifests {
-		if matches := namespaceRe.FindStringSubmatch(manifest); len(matches) > 1 {
-			return matches[1]
-		}
-	}
-
-	return "default" // fallback to default namespace
-}
-
-// extractServiceNameFromManifests extracts service name from AI-generated manifests
-func extractServiceNameFromManifests(manifests []string) string {
-	serviceRe := regexp.MustCompile(`kind:\s*Service[\s\S]*?name:\s*(\w+)`)
-
-	for _, manifest := range manifests {
-		if matches := serviceRe.FindStringSubmatch(manifest); len(matches) > 1 {
-			return matches[1]
-		}
-	}
-
-	return "app" // fallback service name
-}
-
-// createManifestsDirectory creates the manifests directory if it doesn't exist
-func createManifestsDirectory(manifestsDir string, logger *slog.Logger) error {
-
-	if err := os.MkdirAll(manifestsDir, 0755); err != nil {
-		return fmt.Errorf("failed to create manifests directory: %w", err)
-	}
-
-	return nil
-}
-
-// writeManifestFile writes a single manifest file to disk
-func writeManifestFile(filePath, content string, logger *slog.Logger) error {
-
-	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
-		return fmt.Errorf("failed to write manifest file: %w", err)
-	}
-
-	return nil
 }
 
 // validateDockerTag validates a Docker tag format according to Docker Registry specification

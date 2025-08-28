@@ -48,7 +48,7 @@ Containerization Assist MCP Server provides **15 specialized tools** for contain
 - `scan_image` - Scan image for security vulnerabilities
 - `tag_image` - Tag image with version information
 - `push_image` - Push image to container registry
-- `generate_k8s_manifests` - Generate Kubernetes deployment manifests
+- `verify_k8s_manifests` - Verify Kubernetes deployment manifests
 - `prepare_cluster` - Prepare Kubernetes cluster for deployment
 - `deploy_application` - Deploy application to Kubernetes
 - `verify_deployment` - Verify deployment health and readiness

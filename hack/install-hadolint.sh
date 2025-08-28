@@ -71,4 +71,4 @@ fi
 
 echo ""
 echo "Hadolint is now available for Dockerfile validation in Containerization Assist."
-echo "The generate_dockerfile tool will automatically use it when available."
+echo "The verify_dockerfile tool will automatically use it when available."

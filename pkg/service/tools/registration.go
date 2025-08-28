@@ -151,7 +151,7 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 				}
 			}
 
-		case "generate_dockerfile":
+		case "verify_dockerfile":
 			// Load analyze result from state
 			if state.Artifacts == nil || state.Artifacts.AnalyzeResult == nil {
 				execErr = fmt.Errorf("analyze_repository must be run first")
@@ -187,7 +187,7 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 		case "build_image":
 			// Load dockerfile result from state
 			if state.Artifacts == nil || state.Artifacts.DockerfileResult == nil {
-				execErr = fmt.Errorf("generate_dockerfile must be run first")
+				execErr = fmt.Errorf("no verified Dockerfile found - please ensure AI agent generated a Dockerfile and run 'verify_dockerfile' first")
 			} else {
 				dockerfileResult := steps.DockerfileResult{
 					Content: state.Artifacts.DockerfileResult.Content,
@@ -281,7 +281,7 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 				}
 			}
 
-		case "generate_k8s_manifests":
+		case "verify_k8s_manifests":
 			// Generate Kubernetes manifests
 			if state.Artifacts == nil || state.Artifacts.BuildResult == nil || state.Artifacts.AnalyzeResult == nil {
 				execErr = fmt.Errorf("build_image and analyze_repository must be run first")
@@ -352,7 +352,7 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 		case "deploy_application":
 			// Deploy to Kubernetes
 			if state.Artifacts == nil || state.Artifacts.K8sResult == nil {
-				execErr = fmt.Errorf("generate_k8s_manifests must be run first")
+				execErr = fmt.Errorf("verify_k8s_manifests must be run first")
 			} else {
 				// Convert manifests from []string to map[string]interface{}
 				manifestsMap := make(map[string]interface{})
@@ -446,7 +446,38 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 
 		// Create response with chain hint
 		var chainHint *ChainHint
-		if config.NextTool != "" {
+		
+		// Special handling for analyze_repository to prompt AI agent for Dockerfile generation
+		if config.Name == "analyze_repository" {
+			// Check if we have dockerfile_prompt in the step result metadata
+			if stepResult, ok := result["step_result"].(map[string]interface{}); ok {
+				if metadata, ok := stepResult["metadata"].(map[string]interface{}); ok {
+					if dockerfilePrompt, ok := metadata["dockerfile_prompt"].(string); ok {
+						// Include the AI prompt in the result
+						result["ai_prompt"] = dockerfilePrompt
+						result["ai_instructions"] = "📝 AI Agent: Please generate a Dockerfile based on the analysis above and save it as 'Dockerfile' in the repository root."
+						result["next_step_human"] = "🔍 After the AI agent creates the Dockerfile, run 'verify_dockerfile' to validate it before building the image."
+						
+						// Include manifests prompt for later use
+						if manifestsPrompt, ok := metadata["manifests_prompt"].(string); ok {
+							result["manifests_ai_prompt"] = manifestsPrompt
+						}
+						
+						// Create a special chain hint that directs to verify_dockerfile after AI generates Dockerfile
+						chainHint = &ChainHint{
+							NextTool: "verify_dockerfile",
+							Reason:   "Repository analyzed. AI agent should now generate Dockerfile, then verify it before building",
+						}
+					} else if config.NextTool != "" {
+						chainHint = createChainHint(config.NextTool, config.ChainReason)
+					}
+				} else if config.NextTool != "" {
+					chainHint = createChainHint(config.NextTool, config.ChainReason)
+				}
+			} else if config.NextTool != "" {
+				chainHint = createChainHint(config.NextTool, config.ChainReason)
+			}
+		} else if config.NextTool != "" {
 			chainHint = createChainHint(config.NextTool, config.ChainReason)
 		}
 

@@ -36,7 +36,7 @@ func BenchmarkToolRegistration(b *testing.B) {
 func BenchmarkToolConfigRetrieval(b *testing.B) {
 	toolNames := []string{
 		"analyze_repository",
-		"generate_dockerfile",
+		"verify_dockerfile",
 		"build_image",
 		"start_workflow",
 		"list_tools",
