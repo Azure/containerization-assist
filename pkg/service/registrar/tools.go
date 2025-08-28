@@ -885,7 +885,7 @@ func (tr *ToolRegistrar) mapToolNameToStepName(toolName string) string {
 		"tag_image":            "tag_image",
 		"push_image":           "push_image",
 		"verify_k8s_manifests": "verify_manifests", // Tool name → actual step name
-		"prepare_cluster":      "setup_cluster",      // Tool name → actual step name
+		"prepare_cluster":      "setup_cluster",    // Tool name → actual step name
 		"deploy_application":   "deploy_application",
 		"verify_deployment":    "verify_deployment",
 	}

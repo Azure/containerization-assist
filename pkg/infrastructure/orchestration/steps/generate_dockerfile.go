@@ -342,13 +342,3 @@ func getBaseImageForLanguage(language, framework string) string {
 		return "alpine:latest"
 	}
 }
-
-func WriteDockerfile(repoPath, content string, logger *slog.Logger) error {
-	dockerfilePath := filepath.Join(repoPath, "Dockerfile")
-
-	if err := os.WriteFile(dockerfilePath, []byte(content), 0644); err != nil {
-		return errors.New(errors.CodeIoError, "dockerfile", "failed to write Dockerfile", err)
-	}
-
-	return nil
-}
