@@ -446,41 +446,9 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 
 		// Create response with chain hint
 		var chainHint *ChainHint
-
-		// Special handling for analyze_repository to prompt AI agent for Dockerfile generation
-		if config.Name == "analyze_repository" {
-			// Check if we have dockerfile_prompt in the step result metadata
-			if stepResult, ok := result["step_result"].(map[string]interface{}); ok {
-				if metadata, ok := stepResult["metadata"].(map[string]interface{}); ok {
-					if dockerfilePrompt, ok := metadata["dockerfile_prompt"].(string); ok {
-						// Include the AI prompt in the result
-						result["ai_prompt"] = dockerfilePrompt
-						result["ai_instructions"] = "📝 AI Agent: Please generate a Dockerfile based on the analysis above and save it as 'Dockerfile' in the repository root."
-						result["next_step_human"] = "🔍 After the AI agent creates the Dockerfile, run 'verify_dockerfile' to validate it before building the image."
-
-						// Include manifests prompt for later use
-						if manifestsPrompt, ok := metadata["manifests_prompt"].(string); ok {
-							result["manifests_ai_prompt"] = manifestsPrompt
-						}
-
-						// Create a special chain hint that directs to verify_dockerfile after AI generates Dockerfile
-						chainHint = &ChainHint{
-							NextTool: "verify_dockerfile",
-							Reason:   "Repository analyzed. AI agent should now generate Dockerfile, then verify it before building",
-						}
-					} else if config.NextTool != "" {
-						chainHint = createChainHint(config.NextTool, config.ChainReason)
-					}
-				} else if config.NextTool != "" {
-					chainHint = createChainHint(config.NextTool, config.ChainReason)
-				}
-			} else if config.NextTool != "" {
-				chainHint = createChainHint(config.NextTool, config.ChainReason)
-			}
-		} else if config.NextTool != "" {
+		if config.NextTool != "" {
 			chainHint = createChainHint(config.NextTool, config.ChainReason)
 		}
-
 		toolResult := createToolResult(true, result, chainHint)
 		return &toolResult, nil
 	}
