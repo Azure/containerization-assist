@@ -2,5 +2,5 @@ hooks:
   PostToolUse:
     - hooks:
         - type: command
-          command: ".github/mcphost/hooks/error-recovery.sh"
+          command: ".mcphost/hooks/error-recovery.sh"
           timeout: 10
