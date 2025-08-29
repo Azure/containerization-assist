@@ -20,19 +20,16 @@ const colors = {
   cyan: '\x1b[36m'
 };
 
-// File permissions
-const EXECUTABLE_PERMISSIONS = 0o755; // rwxr-xr-x
-
 // Helper function for colored output
 function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`);
 }
 
-// Platform mapping
+// Platform mapping for package names
 const platformMap = {
   'darwin': 'darwin',
   'linux': 'linux',
-  'win32': 'win'
+  'win32': 'win32'
 };
 
 // Architecture mapping
@@ -52,52 +49,58 @@ if (!mappedPlatform) {
   process.exit(1);
 }
 
-// Construct binary name
-let binaryName = `mcp-server-${mappedPlatform}-${mappedArch}`;
+// Construct platform package name and binary name
+const platformDir = `${mappedPlatform}-${mappedArch}`;
+const platformPackage = `@thgamble/containerization-assist-mcp-${platformDir}`;
+let binaryName = 'containerization-assist-mcp';
 if (platform === 'win32') {
   binaryName += '.exe';
 }
 
-// Paths
-const binDir = path.join(__dirname, '..', 'bin');
-const binaryPath = path.join(binDir, binaryName);
-const linkPath = path.join(binDir, platform === 'win32' ? 'mcp-server.exe' : 'mcp-server');
+// Try to find the binary from the platform-specific package
+const nodeModulesDir = path.join(__dirname, '..', '..'); 
+const platformPackageDir = path.join(nodeModulesDir, platformPackage);
+const binaryPath = path.join(platformPackageDir, 'bin', platformDir, binaryName);
+
+// Create symlink in main package
+const mainBinDir = path.join(__dirname, '..', 'bin');
+const linkPath = path.join(mainBinDir, binaryName);
 
 // Check if binary exists
 if (!fs.existsSync(binaryPath)) {
-  log(`✗ Binary not found for your platform: ${binaryName}`, 'red');
-  log(`  Platform: ${platform} (${arch})`, 'yellow');
-  log(`  Expected binary: ${binaryPath}`, 'yellow');
-
-  // Provide helpful suggestions
-  log('\n  Possible solutions:', 'cyan');
-  log('  1. Build from source:', 'cyan');
-  log(`     cd ${path.dirname(__dirname)}`, 'yellow');
-  log('     npm run build:current', 'yellow');
-  log('  2. Check if your platform is supported', 'cyan');
-  log('  3. Report an issue: https://github.com/Azure/containerization-assist/issues', 'cyan');
-
-  // List available binaries
-  log('\n  Available binaries:', 'cyan');
+  log(`⚠ Platform-specific package not installed: ${platformPackage}`, 'yellow');
+  log(`  This is normal if you're developing or if the package is optional.`, 'yellow');
+  log(`  Binary path checked: ${binaryPath}`, 'yellow');
+  
+  // Try to find any installed platform package
+  log('\n  Checking for other platform packages...', 'cyan');
   try {
-    const files = fs.readdirSync(binDir);
-    const binaries = files.filter(f => f.startsWith('mcp-server-'));
-    if (binaries.length > 0) {
-      binaries.forEach(b => log(`    - ${b}`, 'yellow'));
+    const packages = fs.readdirSync(nodeModulesDir)
+      .filter(dir => dir.startsWith('@thgamble') && dir.includes('containerization-assist-mcp-'));
+    if (packages.length > 0) {
+      log('  Found platform packages:', 'cyan');
+      packages.forEach(pkg => log(`    - ${pkg}`, 'yellow'));
     } else {
-      log('    No binaries found. Run: npm run build', 'yellow');
+      log('  No platform packages found.', 'yellow');
+      log(`  Install manually: npm install ${platformPackage}`, 'yellow');
     }
   } catch (err) {
-    log('    Could not list binaries', 'yellow');
+    // Ignore errors when listing
   }
+  
+  // Don't fail installation, just warn
+  process.exit(0);
+}
 
-  process.exit(1);
+// Create bin directory if it doesn't exist
+if (!fs.existsSync(mainBinDir)) {
+  fs.mkdirSync(mainBinDir, { recursive: true });
 }
 
 // Make binary executable (Unix-like systems)
 if (platform !== 'win32') {
   try {
-    fs.chmodSync(binaryPath, EXECUTABLE_PERMISSIONS);
+    fs.chmodSync(binaryPath, 0o755);
     log(`✓ Made binary executable: ${binaryName}`, 'green');
   } catch (err) {
     log(`⚠ Could not make binary executable: ${err.message}`, 'yellow');
@@ -114,26 +117,26 @@ try {
   // On Windows, copy the file instead of symlinking
   if (platform === 'win32') {
     fs.copyFileSync(binaryPath, linkPath);
-    log(`✓ Copied binary to: mcp-server.exe`, 'green');
+    log(`✓ Copied binary from ${platformPackage}`, 'green');
   } else {
-    // Create relative symlink for Unix-like systems
-    fs.symlinkSync(binaryName, linkPath);
-    log(`✓ Created symlink: mcp-server -> ${binaryName}`, 'green');
+    // Create symlink for Unix-like systems
+    fs.symlinkSync(binaryPath, linkPath);
+    log(`✓ Created symlink to ${platformPackage}`, 'green');
   }
 } catch (err) {
   log(`⚠ Could not create link: ${err.message}`, 'yellow');
-  log(`  You can still use the binary directly: ${binaryName}`, 'yellow');
+  log(`  You can still use the binary directly from: ${binaryPath}`, 'yellow');
 }
 
 // Success message
 console.log('');
 log('╔═══════════════════════════════════════════════════════════╗', 'bright');
-log('║  Containerization Assist MCP Server installed successfully! 🚀      ║', 'bright');
+log('║  Containerization Assist MCP Server ready! 🚀              ║', 'bright');
 log('╚═══════════════════════════════════════════════════════════╝', 'bright');
 console.log('');
 log(`  Platform:     ${platform} (${arch})`, 'cyan');
+log(`  Package:      ${platformPackage}`, 'cyan');
 log(`  Binary:       ${binaryName}`, 'cyan');
-log(`  Install path: ${binDir}`, 'cyan');
 console.log('');
 log('  Usage:', 'green');
 log('    npx containerization-assist-mcp --help', 'yellow');
