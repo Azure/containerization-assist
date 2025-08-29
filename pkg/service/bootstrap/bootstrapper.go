@@ -77,6 +77,10 @@ func (b *Bootstrapper) CreateMCPServer() *server.MCPServer {
 		return nil
 	}
 
+	// Enable sampling capability - this allows the server to request LLM completions from clients
+	mcpServer.EnableSampling()
+	b.logger.Info("Sampling capability enabled for MCP server")
+
 	return mcpServer
 }
 

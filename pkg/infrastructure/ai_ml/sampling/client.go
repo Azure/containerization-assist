@@ -225,31 +225,17 @@ func (c *Client) callMCPSampling(ctx context.Context, srv *server.MCPServer, req
 	}
 
 	// Add advanced parameters if available
-	// Note: The MCP library may not support all of these parameters directly,
-	// but we can try to set them or pass them via metadata
-	if req.TopP != nil {
-		// Try to set TopP if the field exists in the MCP struct
-		// For now, we'll add it to a metadata field or extension if available
-	}
-
-	if req.FrequencyPenalty != nil {
-	}
-
-	if req.PresencePenalty != nil {
-	}
-
+	// Note: Some advanced parameters may not be supported in this MCP library version
 	if len(req.StopSequences) > 0 {
-		// Many AI models support stop sequences, but we need to check if MCP supports them
+		// StopSequences support depends on MCP library version
+		// samplingRequest.CreateMessageParams.StopSequences = req.StopSequences
 	}
 
-	if req.Seed != nil {
-	}
+	// Make the actual MCP sampling request with timeout
+	samplingCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 
-	if len(req.LogitBias) > 0 {
-	}
-
-	// Make the actual MCP sampling request
-	result, err := srv.RequestSampling(ctx, samplingRequest)
+	result, err := srv.RequestSampling(samplingCtx, samplingRequest)
 	if err != nil {
 		return nil, errors.New(errors.CodeOperationFailed, "sampling", fmt.Sprintf("MCP sampling failed: %v", err), err)
 	}

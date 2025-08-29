@@ -84,15 +84,15 @@ Focus on containerization-relevant insights and provide actionable recommendatio
 
 	response, err := samplingClient.Sample(ctx, req) //NOTE: Sampling is currently limited as the LLM can only work off the data we provide to it. It does not search through and read the repository.
 	if err != nil {
-		// Return original analysis if AI enhancement fails
-		return analyzeResult, nil
+		// Return error so the caller can handle it appropriately
+		return analyzeResult, fmt.Errorf("AI enhancement failed: %w", err)
 	}
 
 	// Parse the JSON response
 	enhancedAnalysis, err := parseAIResponse(response.Content, logger)
 	if err != nil {
-		// Return original analysis if parsing fails
-		return analyzeResult, nil
+		// Return error so the caller can handle it appropriately
+		return analyzeResult, fmt.Errorf("failed to parse AI response: %w", err)
 	}
 
 	// Use enhanced analysis to update fields
