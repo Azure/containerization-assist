@@ -17,8 +17,6 @@ type MockMCPServer struct {
 	mock.Mock
 }
 
-// SendNotificationToClient method removed as dead code
-
 // Helper to cast interface{} to *MockMCPServer for testing
 func createTestMCPEmitter(mockServer *MockMCPServer) *MCPDirectEmitter {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
