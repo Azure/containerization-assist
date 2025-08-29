@@ -1,0 +1,6 @@
+hooks:
+  PostToolUse:
+    - hooks:
+        - type: command
+          command: ".mcphost/hooks/error-recovery.sh"
+          timeout: 10

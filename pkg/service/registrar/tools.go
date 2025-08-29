@@ -969,7 +969,10 @@ func (tr *ToolRegistrar) saveStepResults(workflowState *domainworkflow.WorkflowS
 			}
 		}
 
-	case "generate_k8s_manifests", "prepare_cluster", "deploy_application", "verify_deployment":
+	case "push_image":
+		tr.logger.Info("Push image step completed")
+
+	case "generate_k8s_manifests", "setup_cluster", "deploy_application", "prepare_cluster", "verify_deployment":
 		if workflowState.K8sResult != nil {
 			simpleState.Artifacts.K8sResult = &tools.K8sArtifact{
 				Manifests: workflowState.K8sResult.Manifests,
@@ -978,5 +981,9 @@ func (tr *ToolRegistrar) saveStepResults(workflowState *domainworkflow.WorkflowS
 				Metadata:  workflowState.K8sResult.Metadata,
 			}
 		}
+
+	default:
+		tr.logger.Warn("Non core tool called", slog.String("stepName", stepName))
 	}
+
 }
