@@ -32,5 +32,3 @@ type LLMConfig struct {
 	EnableHotReload bool   `json:"enable_hot_reload"`
 	AllowOverride   bool   `json:"allow_override"`
 }
-
-// DefaultLLMConfig, ToSamplingConfig, ToAdvancedParams, and ToPromptConfig functions removed as dead code

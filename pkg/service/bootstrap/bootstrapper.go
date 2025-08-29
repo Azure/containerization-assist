@@ -103,5 +103,3 @@ func (b *Bootstrapper) RegisterComponents(mcpServer *server.MCPServer) error {
 func (b *Bootstrapper) RegisterChatModes() error {
 	return nil
 }
-
-// GetChatModeFunctions function removed as dead code
