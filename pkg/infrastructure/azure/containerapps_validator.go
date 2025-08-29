@@ -9,8 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-
-	"github.com/Azure/containerization-assist/pkg/api"
 )
 
 // ValidateAzureManifests validates Bicep or ARM templates
@@ -527,36 +525,4 @@ func performStrictARMValidation(template map[string]interface{}, result *Validat
 			}
 		}
 	}
-}
-
-// ConvertToAPIValidationResult converts internal validation result to API format
-func ConvertToAPIValidationResult(result *ValidationResult) *api.ManifestValidationResult {
-	apiResult := &api.ManifestValidationResult{
-		ValidationResult: api.ValidationResult{
-			Valid:    result.Valid,
-			Errors:   make([]api.ValidationError, 0),
-			Warnings: make([]api.ValidationWarning, 0),
-			Metadata: result.Metadata,
-		},
-	}
-
-	// Convert errors
-	for _, err := range result.Errors {
-		apiResult.Errors = append(apiResult.Errors, api.ValidationError{
-			Message: err.Message,
-			Field:   fmt.Sprintf("line:%d,col:%d", err.Line, err.Column),
-			Code:    err.Rule,
-		})
-	}
-
-	// Convert warnings
-	for _, warn := range result.Warnings {
-		apiResult.Warnings = append(apiResult.Warnings, api.ValidationWarning{
-			Message: warn.Message,
-			Field:   fmt.Sprintf("line:%d,col:%d", warn.Line, warn.Column),
-			Code:    warn.Rule,
-		})
-	}
-
-	return apiResult
 }
