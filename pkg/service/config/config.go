@@ -23,6 +23,7 @@ type Config struct {
 
 	// Logging settings
 	LogLevel string `env:"MCP_LOG_LEVEL"`
+	LogFile  string `env:"MCP_LOG_FILE"`
 
 	// Service identification
 	ServiceName    string `env:"MCP_SERVICE_NAME"`
@@ -72,6 +73,7 @@ func DefaultConfig() *Config {
 		SessionTTL:       24 * time.Hour,
 		MaxSessions:      100,
 		LogLevel:         "info",
+		LogFile:          "",
 		ServiceName:      "containerization-assist-mcp",
 		ServiceVersion:   "dev",
 		RegistryURL:      "",
@@ -101,6 +103,9 @@ func loadFromEnv(cfg *Config) {
 	}
 	if v := os.Getenv("MCP_LOG_LEVEL"); v != "" {
 		cfg.LogLevel = v
+	}
+	if v := os.Getenv("MCP_LOG_FILE"); v != "" {
+		cfg.LogFile = v
 	}
 	if v := os.Getenv("MCP_SERVICE_NAME"); v != "" {
 		cfg.ServiceName = v
@@ -155,6 +160,7 @@ func (c *Config) ToServerConfig() workflow.ServerConfig {
 		SessionTTL:       c.SessionTTL,
 		MaxSessions:      c.MaxSessions,
 		LogLevel:         c.LogLevel,
+		LogFile:          c.LogFile,
 		ServiceName:      c.ServiceName,
 		ServiceVersion:   c.ServiceVersion,
 		RegistryURL:      c.RegistryURL,

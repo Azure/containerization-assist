@@ -51,7 +51,7 @@ func (s *AnalyzeStep) Execute(ctx context.Context, state *workflow.WorkflowState
 
 	state.Logger.Info("Repository analysis completed")
 
-	// Enhance analysis with AI if available (skip in test mode)
+	// Enhance analysis with AI if available (skip in test mode or if AI enhancement is disabled)
 	// Determine test mode via centralized helper to avoid duplication across steps
 	testMode := state.IsTestMode()
 
@@ -61,6 +61,9 @@ func (s *AnalyzeStep) Execute(ctx context.Context, state *workflow.WorkflowState
 		if enhanceErr == nil {
 			analyzeResult = enhancedResult
 			state.Logger.Info("Repository analysis enhanced by AI")
+		} else {
+			// Log the error but continue with basic analysis
+			state.Logger.Warn("AI enhancement failed, continuing with basic analysis", "error", enhanceErr)
 		}
 	}
 
