@@ -1,6 +1,6 @@
 {
   "name": "@thgamble/containerization-assist-mcp",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "Containerization Assist MCP Server - AI-powered containerization workflow tools for the Model Context Protocol",
   "keywords": [
     "mcp",
@@ -52,12 +52,12 @@
     "node": ">=16.0.0"
   },
   "optionalDependencies": {
-    "@thgamble/containerization-assist-mcp-darwin-x64": "1.1.4",
-    "@thgamble/containerization-assist-mcp-darwin-arm64": "1.1.4",
-    "@thgamble/containerization-assist-mcp-linux-x64": "1.1.4",
-    "@thgamble/containerization-assist-mcp-linux-arm64": "1.1.4",
-    "@thgamble/containerization-assist-mcp-win32-x64": "1.1.4",
-    "@thgamble/containerization-assist-mcp-win32-arm64": "1.1.4"
+    "@thgamble/containerization-assist-mcp-darwin-x64": "1.1.5",
+    "@thgamble/containerization-assist-mcp-darwin-arm64": "1.1.5",
+    "@thgamble/containerization-assist-mcp-linux-x64": "1.1.5",
+    "@thgamble/containerization-assist-mcp-linux-arm64": "1.1.5",
+    "@thgamble/containerization-assist-mcp-win32-x64": "1.1.5",
+    "@thgamble/containerization-assist-mcp-win32-arm64": "1.1.5"
   },
   "os": [
     "darwin",
