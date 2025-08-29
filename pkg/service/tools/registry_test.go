@@ -17,8 +17,8 @@ import (
 func TestGetToolConfigs(t *testing.T) {
 	configs := GetToolConfigs()
 
-	// Verify we have all 16 tools (11 workflow + 2 orchestration + 3 utility including diagnostics)
-	assert.Len(t, configs, 16, "Should have 16 tool configurations")
+	// Verify we have all 18 tools (13 workflow + 2 orchestration + 3 utility including diagnostics)
+	assert.Len(t, configs, 18, "Should have 18 tool configurations")
 
 	// Verify categories
 	workflowCount := 0
@@ -38,7 +38,7 @@ func TestGetToolConfigs(t *testing.T) {
 		}
 	}
 
-	assert.Equal(t, 11, workflowCount, "Should have 11 workflow tools")
+	assert.Equal(t, 13, workflowCount, "Should have 13 workflow tools")
 	assert.Equal(t, 2, orchestrationCount, "Should have 2 orchestration tools")
 	assert.Equal(t, 3, utilityCount, "Should have 3 utility tools (list_tools, ping, server_status)")
 }
@@ -206,20 +206,56 @@ func TestValidateDependencies(t *testing.T) {
 }
 
 func TestChainHints(t *testing.T) {
-	// Test workflow chain
-	var previousTool string
+	// Test that each tool's NextTool actually exists (if set)
 	for _, config := range toolConfigs {
-		if config.Category == CategoryWorkflow {
-			if previousTool != "" {
-				// Verify the previous tool points to this one (except for the first)
-				prevConfig, err := GetToolConfig(previousTool)
-				if err == nil && prevConfig.NextTool != "" {
-					assert.Equal(t, config.Name, prevConfig.NextTool,
-						"Tool %s should point to %s", previousTool, config.Name)
-				}
-			}
-			previousTool = config.Name
+		if config.Category == CategoryWorkflow && config.NextTool != "" {
+			// Verify the NextTool exists
+			nextConfig, err := GetToolConfig(config.NextTool)
+			assert.NoError(t, err, "Tool %s points to non-existent tool %s", config.Name, config.NextTool)
+			assert.NotNil(t, nextConfig, "Tool %s points to non-existent tool %s", config.Name, config.NextTool)
 		}
+	}
+
+	// Test specific workflow chains
+	testCases := []struct {
+		name  string
+		chain []string
+	}{
+		{
+			name: "main_kubernetes_workflow",
+			chain: []string{
+				"analyze_repository",
+				"resolve_base_images",
+				"generate_dockerfile",
+				"build_image",
+				"scan_image",
+				"tag_image",
+				"push_image",
+				"generate_k8s_manifests",
+				"prepare_cluster",
+				"deploy_application",
+				"verify_deployment",
+			},
+		},
+		{
+			name: "azure_container_apps_workflow",
+			chain: []string{
+				"generate_azure_container_apps_manifests",
+				"validate_azure_manifests",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			for i := 0; i < len(tc.chain)-1; i++ {
+				config, err := GetToolConfig(tc.chain[i])
+				assert.NoError(t, err, "Tool %s not found", tc.chain[i])
+				assert.Equal(t, tc.chain[i+1], config.NextTool,
+					"Tool %s should point to %s but points to %s",
+					tc.chain[i], tc.chain[i+1], config.NextTool)
+			}
+		})
 	}
 }
 

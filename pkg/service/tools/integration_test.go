@@ -94,7 +94,7 @@ func TestToolCategories(t *testing.T) {
 		categoryCount[config.Category]++
 	}
 
-	assert.Equal(t, 11, categoryCount[CategoryWorkflow], "Should have 11 workflow tools")
+	assert.Equal(t, 13, categoryCount[CategoryWorkflow], "Should have 13 workflow tools")
 	assert.Equal(t, 2, categoryCount[CategoryOrchestration], "Should have 2 orchestration tools")
 	assert.Equal(t, 3, categoryCount[CategoryUtility], "Should have 3 utility tools")
 }
