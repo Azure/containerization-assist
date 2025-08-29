@@ -52,12 +52,12 @@
     "node": ">=16.0.0"
   },
   "optionalDependencies": {
-    "@thgamble/containerization-assist-mcp-darwin-x64": "1.1.3",
-    "@thgamble/containerization-assist-mcp-darwin-arm64": "1.1.3",
-    "@thgamble/containerization-assist-mcp-linux-x64": "1.1.3",
-    "@thgamble/containerization-assist-mcp-linux-arm64": "1.1.3",
-    "@thgamble/containerization-assist-mcp-win32-x64": "1.1.3",
-    "@thgamble/containerization-assist-mcp-win32-arm64": "1.1.3"
+    "@thgamble/containerization-assist-mcp-darwin-x64": "1.1.4",
+    "@thgamble/containerization-assist-mcp-darwin-arm64": "1.1.4",
+    "@thgamble/containerization-assist-mcp-linux-x64": "1.1.4",
+    "@thgamble/containerization-assist-mcp-linux-arm64": "1.1.4",
+    "@thgamble/containerization-assist-mcp-win32-x64": "1.1.4",
+    "@thgamble/containerization-assist-mcp-win32-arm64": "1.1.4"
   },
   "os": [
     "darwin",
