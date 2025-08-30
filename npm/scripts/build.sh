@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Build optimized Container Kit MCP binaries for all supported platforms
+# Build optimized Containerization Assist MCP binaries for all supported platforms
 
 set -e
 
