@@ -8,7 +8,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$SCRIPT_DIR/../.."
 NPM_DIR="$SCRIPT_DIR/.."
 
-echo "Building optimized Container Kit MCP binaries..."
+echo "Building optimized Containerization Assist MCP binaries..."
 
 # Define platforms to build
 declare -a platforms=(
