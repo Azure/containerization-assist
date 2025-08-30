@@ -1,0 +1,75 @@
+id: "k8s-critique"
+name: "Kubernetes Manifests Validation Critique"
+description: "Fixes Kubernetes manifests based on validation findings"
+version: "2.0.0"
+category: "kubernetes"
+template: |
+  Fix the following Kubernetes manifests based on validation findings:
+
+  ORIGINAL MANIFESTS:
+  ```yaml
+  {{.OriginalContent}}
+  ```
+
+  VALIDATION FINDINGS:
+  {{range .ValidationFindings}}
+  - [{{.Severity}}] {{.Code}} at {{.Path}}: {{.Message}}
+  {{end}}
+
+  QUALITY SCORE: {{.QualityScore}}/100
+
+  Fix ALL errors and warnings. Maintain the same functionality while addressing:
+  1. All ERROR-level findings must be fixed
+  2. All WARN-level findings should be addressed
+  3. Consider INFO-level suggestions for best practices
+  4. Ensure security best practices are followed
+  5. Add missing resource limits and health checks
+
+  Return ONLY valid JSON with this exact structure:
+  {
+    "fixed_manifests": "complete fixed YAML manifests separated by ---",
+    "changes_made": [
+      "Added resource limits to Deployment",
+      "Fixed security context",
+      "Added liveness and readiness probes"
+    ],
+    "resource_types": ["Deployment", "Service"],
+    "deployment_config": {
+      "replicas": 3,
+      "has_health_checks": true,
+      "has_resource_limits": true
+    },
+    "validation_addressed": {
+      "errors_fixed": ["K8S001", "K8S005"],
+      "warnings_fixed": ["K8S010", "K8S011"],
+      "info_addressed": ["K8S020", "K8S021"]
+    }
+  }
+
+system_prompt: "You are a Kubernetes security and reliability expert. Fix Kubernetes manifests to address all validation issues while maintaining functionality. Always return valid JSON only."
+parameters:
+  - name: "OriginalContent"
+    type: "string"
+    description: "Original Kubernetes manifests content"
+    required: true
+  - name: "ValidationFindings"
+    type: "array"
+    description: "List of validation findings"
+    required: true
+    schema:
+      type: "object"
+      properties:
+        code: "string"
+        severity: "string"
+        path: "string"
+        message: "string"
+  - name: "QualityScore"
+    type: "int"
+    description: "Current quality score"
+    required: true
+max_tokens: 2000
+temperature: 0.1
+output_format: "json"
+tags: ["kubernetes", "validation", "critique", "fix", "json-output", "prompt-first"]
+created_at: 2025-01-30T00:00:00Z
+updated_at: 2025-01-30T00:00:00Z

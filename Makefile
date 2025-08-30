@@ -82,6 +82,18 @@ arch-validate:
 	@echo "Note: wiring/DI directories are excluded as they need to import from all layers"
 	@cd scripts && go run arch-validate.go
 
+enforce-prompt-first:
+	@echo "Enforcing prompt-first architecture patterns..."
+	@echo "Checking for deprecated patterns..."
+	@! grep -r "generateDockerfile\|GenerateDockerfile\|generateK8s\|GenerateK8s\|templates.Execute\|enhanceWithAI" pkg/ cmd/ --include="*.go" --exclude="deprecated_handlers.go" || (echo "❌ Found deprecated patterns! Migration required." && exit 1)
+	@echo "✅ No deprecated patterns found"
+	@echo "Verifying validation tools..."
+	@grep -q "validate_dockerfile" pkg/service/tools/validation_handlers.go || (echo "❌ Missing validate_dockerfile tool" && exit 1)
+	@grep -q "apply_dockerfile" pkg/service/tools/validation_handlers.go || (echo "❌ Missing apply_dockerfile tool" && exit 1)
+	@grep -q "validate_k8s_manifests" pkg/service/tools/validation_handlers.go || (echo "❌ Missing validate_k8s_manifests tool" && exit 1)
+	@grep -q "apply_k8s_manifests" pkg/service/tools/validation_handlers.go || (echo "❌ Missing apply_k8s_manifests tool" && exit 1)
+	@echo "✅ All validation tools present"
+
 perf-check:
 	@echo "Running performance regression detection..."
 	@go run scripts/perf/performance-monitor.go
@@ -90,7 +102,7 @@ contract-test:
 	@echo "Running API contract tests..."
 	@go test ./test/contract/ -v
 
-check-all: fmt lint static-analysis security-scan arch-validate perf-check contract-test test
+check-all: fmt lint static-analysis security-scan arch-validate enforce-prompt-first perf-check contract-test test
 
 # Utility tasks  
 clean:

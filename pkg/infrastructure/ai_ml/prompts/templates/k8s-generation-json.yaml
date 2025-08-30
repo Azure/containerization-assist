@@ -1,0 +1,96 @@
+id: "k8s-generation-json"
+name: "Kubernetes Manifests Generation (JSON Output)"
+description: "Generates production-ready Kubernetes manifests with structured JSON output"
+version: "2.0.0"
+category: "kubernetes"
+template: |
+  Generate production-ready Kubernetes manifests for:
+  - Application: {{.AppName}}
+  - Image: {{.ImageRef}}
+  - Port: {{.Port}}
+  - Language: {{.Language}}
+  - Framework: {{.Framework}}
+  - Dependencies: {{.Dependencies}}
+
+  Requirements:
+  1. Include Deployment with proper resource limits and requests
+  2. Include Service for internal communication  
+  3. Include health checks (liveness and readiness probes)
+  4. Use security best practices (non-root user, read-only root filesystem)
+  5. Include proper labels and selectors for service discovery
+  6. Add appropriate resource limits based on application type
+  7. Use production-ready configurations
+
+  Generate Kubernetes manifests and return as JSON:
+  {
+    "manifests": [
+      {
+        "kind": "Deployment",
+        "name": "my-app-deployment", 
+        "content": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: my-app-deployment\n  labels:\n    app: my-app\nspec:\n  replicas: 3\n  selector:\n    matchLabels:\n      app: my-app\n  template:\n    metadata:\n      labels:\n        app: my-app\n    spec:\n      securityContext:\n        runAsUser: 1001\n        runAsGroup: 1001\n        fsGroup: 1001\n      containers:\n      - name: my-app\n        image: myregistry/my-app:v1.0.0\n        ports:\n        - containerPort: 3000\n        resources:\n          requests:\n            cpu: 100m\n            memory: 128Mi\n          limits:\n            cpu: 500m\n            memory: 512Mi\n        securityContext:\n          allowPrivilegeEscalation: false\n          readOnlyRootFilesystem: true\n          runAsNonRoot: true\n        livenessProbe:\n          httpGet:\n            path: /health\n            port: 3000\n          initialDelaySeconds: 30\n        readinessProbe:\n          httpGet:\n            path: /ready\n            port: 3000\n          initialDelaySeconds: 5",
+        "priority": 1
+      },
+      {
+        "kind": "Service", 
+        "name": "my-app-service",
+        "content": "apiVersion: v1\nkind: Service\nmetadata:\n  name: my-app-service\n  labels:\n    app: my-app\nspec:\n  selector:\n    app: my-app\n  ports:\n  - port: 80\n    targetPort: 3000\n    protocol: TCP\n  type: ClusterIP",
+        "priority": 2
+      }
+    ],
+    "namespace": "default",
+    "service_name": "my-app-service",
+    "service_port": 80,
+    "deployment_name": "my-app-deployment",
+    "config_maps": [],
+    "secrets": [],
+    "resource_limits": {
+      "cpu": "500m",
+      "memory": "512Mi"
+    },
+    "security_features": ["non-root user", "read-only root filesystem", "no privilege escalation", "security context"]
+  }
+
+  IMPORTANT: Return ONLY the JSON object above. No markdown, no explanations, no additional text.
+
+system_prompt: "You are a Kubernetes expert. Generate production-ready, secure, and scalable Kubernetes manifests. You MUST return ONLY valid JSON in the exact format specified. No markdown formatting, no explanations, no additional text before or after the JSON."
+parameters:
+  - name: "AppName"
+    type: "string"
+    description: "Application name"
+    required: true
+    example: "my-app"
+  - name: "ImageRef"
+    type: "string"
+    description: "Complete container image reference"
+    required: true
+    example: "myregistry/myapp:v1.0.0"
+  - name: "Port"
+    type: "int"
+    description: "Application port"
+    required: true
+    example: "3000"
+  - name: "Language"
+    type: "string"
+    description: "Programming language"
+    required: false
+    example: "javascript"
+  - name: "Framework"
+    type: "string"
+    description: "Framework used"
+    required: false
+    example: "express"
+  - name: "Dependencies"
+    type: "array"
+    description: "List of application dependencies"
+    required: false
+    example: ["express", "mongoose"]
+defaults:
+  Language: "generic"
+  Framework: "unknown"
+  Dependencies: []
+max_tokens: 2000
+temperature: 0.2
+output_format: "json"
+tags: ["kubernetes", "generation", "production", "json-output", "prompt-first"]
+created_at: 2025-01-30T00:00:00Z
+updated_at: 2025-01-30T00:00:00Z

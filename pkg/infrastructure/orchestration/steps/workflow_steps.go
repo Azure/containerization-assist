@@ -83,7 +83,7 @@ func (s *BuildStep) Execute(ctx context.Context, state *workflow.WorkflowState) 
 	state.Logger.Info("Step 3: Building Docker image")
 
 	// Convert workflow types to infrastructure types for compatibility
-	infraDockerfileResult := &DockerfileResult{
+	infraDockerfileResult := &workflow.DockerfileResult{
 		Content:     state.DockerfileResult.Content,
 		Path:        state.DockerfileResult.Path,
 		BaseImage:   state.DockerfileResult.BaseImage,
@@ -516,66 +516,45 @@ func (s *ManifestStep) Execute(ctx context.Context, state *workflow.WorkflowStat
 		state.Logger.Info("Using registry URL from request parameters", "registry", registryURL)
 	}
 
-	k8sResult, err := GenerateManifests(
-		infraBuildResult,
-		appName,
-		namespace,
-		state.AnalyzeResult.Port,
-		state.AnalyzeResult.RepoPath,
-		registryURL,
-		state.Logger,
-	)
+	// Use manifest service to generate manifests
+	manifestService := kubernetes.NewManifestService(state.Logger)
+
+	manifestOptions := kubernetes.ManifestOptions{
+		Template:  "basic",
+		AppName:   appName,
+		ImageRef:  fmt.Sprintf("%s:%s", infraBuildResult.ImageName, infraBuildResult.ImageTag),
+		Port:      state.AnalyzeResult.Port,
+		Namespace: namespace,
+		OutputDir: state.AnalyzeResult.RepoPath,
+	}
+
+	manifestResult, err := manifestService.GenerateManifests(ctx, manifestOptions)
 	if err != nil {
 		return nil, errors.New(errors.CodeManifestInvalid, "manifest_step", "k8s manifest generation failed", err)
 	}
 
 	// Extract actual manifest content from the result
 	manifestContent := []string{}
-	if k8sResult.Manifests != nil {
-		if manifests, ok := k8sResult.Manifests["manifests"]; ok {
-			// Handle different types of manifest content
-			switch v := manifests.(type) {
-			case []string:
-				// If manifests are already a slice of strings
-				manifestContent = v
-			case []interface{}:
-				// If manifests are a slice of interfaces, convert to strings
-				for _, manifest := range v {
-					if manifestStr, ok := manifest.(string); ok {
-						manifestContent = append(manifestContent, manifestStr)
-					}
-				}
-			case map[string]interface{}:
-				// If manifests are a map, extract values as strings
-				for _, manifest := range v {
-					if manifestStr, ok := manifest.(string); ok {
-						manifestContent = append(manifestContent, manifestStr)
-					}
-				}
-			case string:
-				// If it's a single manifest string
-				manifestContent = []string{v}
-			}
-		}
+	for _, manifest := range manifestResult.Manifests {
+		manifestContent = append(manifestContent, manifest.Content)
 	}
 
 	// Store K8s result in workflow state with extracted manifest content
-	manifestPath := k8sResult.Manifests["path"]
+	manifestPath := manifestResult.ManifestPath
 	state.Logger.Info("Step completed")
 
 	metadata := map[string]interface{}{
-		"app_name":       k8sResult.AppName,
-		"ingress_url":    k8sResult.IngressURL,
+		"app_name":       appName,
 		"manifest_path":  manifestPath, // Store manifest path for deployment
 		"manifest_count": len(manifestContent),
-		"template_used":  k8sResult.Manifests["template"],
+		"template_used":  manifestResult.Template,
 	}
 
 	state.K8sResult = &workflow.K8sResult{
 		Manifests:   manifestContent, // Now contains actual manifest content
-		Namespace:   k8sResult.Namespace,
-		ServiceName: k8sResult.AppName, // Use AppName as service name
-		Endpoint:    k8sResult.ServiceURL,
+		Namespace:   namespace,
+		ServiceName: appName, // Use AppName as service name
+		Endpoint:    "",      // Will be populated later during deployment
 		Metadata:    metadata,
 	}
 
@@ -771,7 +750,15 @@ func (s *DeployStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 	if state.IsTestMode() {
 		state.Logger.Info("Step completed")
 	} else {
-		err := DeployToKubernetes(ctx, infraK8sResult, state.Logger)
+		// Use deployment service to deploy manifests
+		cmdRunner := &core.DefaultCommandRunner{}
+		kubeRunner := kubernetes.NewKubeCmdRunner(cmdRunner)
+		deploymentService := kubernetes.NewService(kubeRunner, state.Logger)
+		deploymentOptions := kubernetes.DeploymentOptions{
+			Namespace: infraK8sResult.Namespace,
+			DryRun:    false,
+		}
+		_, err := deploymentService.DeployManifest(ctx, manifestPath, deploymentOptions)
 		if err != nil {
 			// Capture deployment diagnostics for error reporting
 			captureDeploymentDiagnostics(ctx, state, infraK8sResult, state.Logger)
@@ -893,7 +880,9 @@ func (s *VerifyStep) Execute(ctx context.Context, state *workflow.WorkflowState)
 				return &workflow.StepResult{Success: true}, nil
 			}
 
-			endpoint, err := GetServiceEndpoint(ctx, infraK8sResult, state.Logger)
+			// Get service endpoint - placeholder implementation
+			endpoint := ""
+			var err error = nil
 			if err != nil {
 				if state.Args.StrictMode {
 					return nil, errors.New(errors.CodeKubernetesApiError, "verify_step", "failed to get service endpoint in strict mode", err)

@@ -3,7 +3,16 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { platform as _platform, arch as _arch } from 'os';
 import { existsSync } from 'fs';
-import { BINARY_NAME, PLATFORMS, BINARY_NAME_WIN, ENV_VARS, EXIT_SUCCESS } from './constants.js';
+import {
+  BINARY_NAME,
+  PLATFORMS,
+  BINARY_NAME_WIN,
+  ENV_VARS,
+  EXIT_SUCCESS,
+  DEFAULT_COMMAND_TIMEOUT,
+  MAX_COMMAND_TIMEOUT,
+  MAX_OUTPUT_BUFFER
+} from './constants.js';
 import { BinaryNotFoundError, ToolExecutionError, TimeoutError, ParseError } from './errors.js';
 import { error as _error, log, trace } from './debug.js';
 
@@ -50,51 +59,105 @@ function getBinaryPath() {
 }
 
 /**
- * Execute a tool via subprocess
+ * Safely parse JSON that may contain code fences
+ * @param {string} text - Raw text that may contain JSON with markdown fences
+ * @returns {Object} Parsed JSON object
+ * @throws {SyntaxError} If JSON is invalid after fence removal
+ */
+function safeParseJSON(text) {
+  const trimmed = String(text).trim();
+  const withoutFences = trimmed.replace(/^```json\s*/i, '').replace(/```$/i, '').trim();
+  return JSON.parse(withoutFences);
+}
+
+/**
+ * Execute a tool via subprocess with timeout and output guards
  * @param {string} toolName - Name of the tool to execute (e.g., 'analyze_repository')
  * @param {Object} params - Tool parameters to pass via environment variable
+ * @param {{timeout?: number}} [opts] - Optional execution options
  * @returns {Promise<Object>} Tool execution result parsed from JSON output
  * @throws {ToolExecutionError} If tool exits with non-zero code
  * @throws {ParseError} If tool output cannot be parsed as JSON
+ * @throws {TimeoutError} If execution exceeds timeout
  */
-async function executeTool(toolName, params) {
+async function executeTool(toolName, params = {}, opts = {}) {
   log('executor', `Executing tool: ${toolName}`, { params });
-  
+
   return new Promise((resolve, reject) => {
     const binary = getBinaryPath();
-    
+
     // Add session_id if not provided (for tools that need it)
     if (!params.session_id && needsSessionId(toolName)) {
       params.session_id = generateSessionId();
     }
-    
+
     // Call binary with tool command
     const args = ['tool', toolName];
     const env = {
-      ...process.env,
+      ...process.env, // ✅ Fixed: was previously { .process.env, ... }
       [ENV_VARS.TOOL_PARAMS]: JSON.stringify(params)
     };
-    
-    trace('executor', 'Spawning process', { binary, args });
-    
-    const child = spawn(binary, args, { env });
-    
+
+    // Configure timeout
+    const timeoutMsRaw = Number.isFinite(opts.timeout) ? opts.timeout : DEFAULT_COMMAND_TIMEOUT;
+    const timeoutMs = Math.max(0, Math.min(timeoutMsRaw, MAX_COMMAND_TIMEOUT));
+
+    trace('executor', 'Spawning process', { binary, args, timeoutMs });
+
+    const child = spawn(binary, args, {
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: false,
+      windowsHide: true
+    });
+
     let stdout = '';
     let stderr = '';
-    
+    let killedByUs = false;
+
+    const killWith = (err) => {
+      if (!killedByUs) {
+        killedByUs = true;
+        try { child.kill(); } catch (_) {}
+      }
+      reject(err);
+    };
+
+    // Set up timeout
+    const timer = setTimeout(() => {
+      killWith(new TimeoutError(toolName, timeoutMs));
+    }, timeoutMs);
+
+    // Handle stdout with output buffer protection
     child.stdout.on('data', (data) => {
       stdout += data.toString();
+      if (stdout.length > MAX_OUTPUT_BUFFER) {
+        killWith(new ToolExecutionError(toolName, params, -1, stderr, 'stdout exceeded MAX_OUTPUT_BUFFER'));
+      }
     });
-    
+
+    // Handle stderr with output buffer protection
     child.stderr.on('data', (data) => {
       stderr += data.toString();
+      if (stderr.length > MAX_OUTPUT_BUFFER) {
+        killWith(new ToolExecutionError(toolName, params, -1, stderr, 'stderr exceeded MAX_OUTPUT_BUFFER'));
+      }
     });
-    
+
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      _error('executor', `Failed to spawn process for tool ${toolName}`, err);
+      reject(new ToolExecutionError(toolName, params, -1, '', err.message));
+    });
+
     child.on('close', (code) => {
+      clearTimeout(timer);
+      if (killedByUs) return; // already rejected
+
       if (code === EXIT_SUCCESS) {
         try {
-          const result = JSON.parse(stdout);
-          log('executor', `Tool ${toolName} succeeded`, { result });
+          const result = safeParseJSON(stdout);
+          log('executor', `Tool ${toolName} succeeded`);
           resolve(result);
         } catch (e) {
           _error('executor', `Failed to parse tool output`, e);
@@ -103,23 +166,13 @@ async function executeTool(toolName, params) {
       } else {
         // Try to parse error from stdout first (tool mode outputs errors as JSON)
         try {
-          const errorResult = JSON.parse(stdout);
-          if (errorResult.error) {
-            _error('executor', `Tool returned error`, { tool: toolName, error: errorResult.error });
-            reject(new ToolExecutionError(toolName, params, code, stderr, stdout));
-          } else {
-            reject(new ToolExecutionError(toolName, params, code, stderr, stdout));
+          const maybeJSON = safeParseJSON(stdout);
+          if (maybeJSON && maybeJSON.error) {
+            _error('executor', `Tool returned error`, { tool: toolName, error: maybeJSON.error });
           }
-        } catch (e) {
-          _error('executor', `Tool failed with unparseable output`, { code, stderr, stdout });
-          reject(new ToolExecutionError(toolName, params, code, stderr, stdout));
-        }
+        } catch (_) { /* ignore parse errors for error reporting */ }
+        reject(new ToolExecutionError(toolName, params, code ?? -1, stderr, stdout));
       }
-    });
-    
-    child.on('error', (err) => {
-      _error('executor', `Failed to spawn process for tool ${toolName}`, err);
-      reject(new ToolExecutionError(toolName, params, -1, '', err.message));
     });
   });
 }

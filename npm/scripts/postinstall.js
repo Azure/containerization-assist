@@ -103,19 +103,28 @@ if (!fs.existsSync(binaryPath)) {
   log(`⚠ Platform-specific package not installed: ${platformPackage}`, 'yellow');
   log(`  Binary not found at: ${binaryPath}`, 'yellow');
   
-  // Try alternative paths
+  // Try alternative paths - including direct node_modules path without @thgamble scope
   const altPaths = [
+    // Direct in node_modules (for npm flat structure)
+    path.join(nodeModulesDir, `containerization-assist-mcp-${platformDir}`, 'bin', platformDir, binaryName),
     // Check if platform package is a sibling (for local development)
     path.join(nodeModulesDir, '..', platformPackage, 'bin', platformDir, binaryName),
     // Check scoped package location
     path.join(nodeModulesDir, '@thgamble', `containerization-assist-mcp-${platformDir}`, 'bin', platformDir, binaryName),
+    // Check parent node_modules (when installed globally)
+    path.join(mainPackageDir, 'node_modules', platformPackage, 'bin', platformDir, binaryName),
+    // Check without full path structure
+    path.join(platformPackageDir, binaryName),
+    // Check direct bin folder
+    path.join(platformPackageDir, 'bin', binaryName),
   ];
   
   let foundPath = null;
   for (const altPath of altPaths) {
+    log(`  Checking: ${altPath}`, 'cyan');
     if (fs.existsSync(altPath)) {
       foundPath = altPath;
-      log(`  Found binary at alternative location: ${altPath}`, 'green');
+      log(`  ✓ Found binary at: ${altPath}`, 'green');
       break;
     }
   }
@@ -124,7 +133,40 @@ if (!fs.existsSync(binaryPath)) {
     // List available packages for debugging
     log('\n  Checking for installed platform packages...', 'cyan');
     try {
+      // Check main package node_modules
+      const mainNodeModules = path.join(mainPackageDir, 'node_modules');
+      if (fs.existsSync(mainNodeModules)) {
+        log(`  Checking in: ${mainNodeModules}`, 'cyan');
+        const packages = fs.readdirSync(mainNodeModules)
+          .filter(dir => dir.includes('containerization-assist-mcp'));
+        
+        // Also check scoped packages
+        const scopedPath = path.join(mainNodeModules, '@thgamble');
+        if (fs.existsSync(scopedPath)) {
+          const scopedPackages = fs.readdirSync(scopedPath)
+            .filter(dir => dir.includes('containerization-assist-mcp'))
+            .map(dir => `@thgamble/${dir}`);
+          packages.push(...scopedPackages);
+        }
+        
+        if (packages.length > 0) {
+          log('  Found packages in main node_modules:', 'cyan');
+          packages.forEach(pkg => {
+            log(`    - ${pkg}`, 'yellow');
+            // Try to find binary in each package
+            const pkgBinPath = path.join(mainNodeModules, pkg, 'bin');
+            if (fs.existsSync(pkgBinPath)) {
+              log(`      Has bin directory`, 'green');
+              const binContents = fs.readdirSync(pkgBinPath);
+              binContents.forEach(item => log(`        - ${item}`, 'cyan'));
+            }
+          });
+        }
+      }
+      
+      // Also check global node_modules
       if (fs.existsSync(nodeModulesDir)) {
+        log(`  Checking in: ${nodeModulesDir}`, 'cyan');
         const packages = fs.readdirSync(nodeModulesDir)
           .filter(dir => dir.includes('containerization-assist-mcp'));
         
@@ -138,11 +180,8 @@ if (!fs.existsSync(binaryPath)) {
         }
         
         if (packages.length > 0) {
-          log('  Found packages:', 'cyan');
+          log('  Found packages in global node_modules:', 'cyan');
           packages.forEach(pkg => log(`    - ${pkg}`, 'yellow'));
-        } else {
-          log('  No platform packages found.', 'yellow');
-          log(`  Install with: npm install ${platformPackage}`, 'yellow');
         }
       }
     } catch (err) {
@@ -151,6 +190,7 @@ if (!fs.existsSync(binaryPath)) {
     
     // Don't fail installation, just warn
     log('\n  The binary will not be available until the platform package is installed.', 'yellow');
+    log(`  You can install it manually with: npm install ${platformPackage}`, 'yellow');
     process.exit(0);
   } else {
     // Use the found alternative path

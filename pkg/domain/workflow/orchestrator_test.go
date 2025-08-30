@@ -88,12 +88,10 @@ func (m *mockProgressEmitter) Close() error {
 func (p *MockStepProvider) ListSteps() []string {
 	return []string{
 		StepAnalyzeRepository,
-		StepGenerateDockerfile,
 		StepBuildImage,
 		StepSecurityScan,
 		StepTagImage,
 		StepPushImage,
-		StepGenerateManifests,
 		StepSetupCluster,
 		StepDeployApplication,
 		StepVerifyDeployment,

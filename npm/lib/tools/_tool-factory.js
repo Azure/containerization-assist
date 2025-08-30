@@ -18,6 +18,7 @@ function createTool(config) {
       };
     } catch (error) {
       return {
+        isError: true,
         content: [{
           type: 'text',
           text: JSON.stringify({

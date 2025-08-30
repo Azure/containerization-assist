@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/Azure/containerization-assist/pkg/domain/workflow"
 	"github.com/Azure/containerization-assist/pkg/infrastructure/container"
 	"github.com/Azure/containerization-assist/pkg/infrastructure/core"
 	"github.com/Azure/containerization-assist/pkg/infrastructure/kubernetes"
@@ -24,7 +25,7 @@ type BuildResult struct {
 }
 
 // BuildImage builds a Docker image from a Dockerfile using real Docker operations
-func BuildImage(ctx context.Context, dockerfileResult *DockerfileResult, imageName, imageTag, buildContext string, logger *slog.Logger) (*BuildResult, error) {
+func BuildImage(ctx context.Context, dockerfileResult *workflow.DockerfileResult, imageName, imageTag, buildContext string, logger *slog.Logger) (*BuildResult, error) {
 
 	if dockerfileResult == nil {
 		return nil, fmt.Errorf("dockerfile result is required")
@@ -57,8 +58,8 @@ func BuildImage(ctx context.Context, dockerfileResult *DockerfileResult, imageNa
 		ImageName: imageName,
 		Registry:  "", // Use default registry
 		NoCache:   false,
-		Platform:  "", // Use default platform
-		BuildArgs: dockerfileResult.BuildArgs,
+		Platform:  "",  // Use default platform
+		BuildArgs: nil, // Build args not provided in Dockerfile generation
 		Tags:      []string{imageTag},
 	}
 

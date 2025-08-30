@@ -1,0 +1,69 @@
+id: "dockerfile-critique"
+name: "Dockerfile Validation Critique"
+description: "Fixes Dockerfile based on validation findings"
+version: "2.0.0"
+category: "docker"
+template: |
+  Fix the following Dockerfile based on validation findings:
+
+  ORIGINAL DOCKERFILE:
+  ```dockerfile
+  {{.OriginalContent}}
+  ```
+
+  VALIDATION FINDINGS:
+  {{range .ValidationFindings}}
+  - [{{.Severity}}] {{.Code}} at {{.Path}}: {{.Message}}
+  {{end}}
+
+  QUALITY SCORE: {{.QualityScore}}/100
+
+  Fix ALL errors and warnings. Maintain the same functionality while addressing:
+  1. All ERROR-level findings must be fixed
+  2. All WARN-level findings should be addressed
+  3. Consider INFO-level suggestions for best practices
+
+  Return ONLY valid JSON with this exact structure:
+  {
+    "fixed_dockerfile": "complete fixed Dockerfile content",
+    "changes_made": [
+      "Added FROM instruction",
+      "Changed to non-root user",
+      "Added HEALTHCHECK"
+    ],
+    "base_image": "extracted base image",
+    "exposed_port": 8080,
+    "validation_addressed": {
+      "errors_fixed": ["DF001", "DF013"],
+      "warnings_fixed": ["DF010", "DF012"],
+      "info_addressed": ["DF021"]
+    }
+  }
+
+system_prompt: "You are a Docker security and optimization expert. Fix Dockerfiles to address all validation issues while maintaining functionality. Always return valid JSON only."
+parameters:
+  - name: "OriginalContent"
+    type: "string"
+    description: "Original Dockerfile content"
+    required: true
+  - name: "ValidationFindings"
+    type: "array"
+    description: "List of validation findings"
+    required: true
+    schema:
+      type: "object"
+      properties:
+        code: "string"
+        severity: "string"
+        path: "string"
+        message: "string"
+  - name: "QualityScore"
+    type: "int"
+    description: "Current quality score"
+    required: true
+max_tokens: 1500
+temperature: 0.1
+output_format: "json"
+tags: ["docker", "validation", "critique", "fix", "json-output", "prompt-first"]
+created_at: 2025-01-30T00:00:00Z
+updated_at: 2025-01-30T00:00:00Z

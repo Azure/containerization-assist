@@ -36,13 +36,13 @@ const (
 // Step name constants
 const (
 	StepAnalyzeRepository  = "analyze_repository"
-	StepResolveBaseImages  = "resolve_base_images"
 	StepGenerateDockerfile = "generate_dockerfile"
+	StepResolveBaseImages  = "resolve_base_images"
 	StepBuildImage         = "build_image"
 	StepSecurityScan       = "security_scan"
 	StepTagImage           = "tag_image"
 	StepPushImage          = "push_image"
-	StepGenerateManifests  = "generate_manifests"
+	StepGenerateManifests  = "generate_k8s_manifests"
 	StepSetupCluster       = "setup_cluster"
 	StepDeployApplication  = "deploy_application"
 	StepVerifyDeployment   = "verify_deployment"

@@ -44,6 +44,11 @@ func NewToolRegistrar(
 // RegisterAll registers all tools with the MCP server using direct registration
 func (tr *ToolRegistrar) RegisterAll(mcpServer *server.MCPServer) error {
 
+	// Register validation tools first (new prompt-first architecture)
+	if err := tr.registerValidationTools(mcpServer); err != nil {
+		return err
+	}
+
 	// Register tools in priority order - individual workflow steps first
 	if err := tr.registerWorkflowTools(mcpServer); err != nil {
 		return err
@@ -588,6 +593,26 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 		// Register the handler (metrics collection removed)
 		mcpServer.AddTool(tool, handler)
 	}
+
+	return nil
+}
+
+// registerValidationTools registers validation and apply tools for prompt-first architecture
+func (tr *ToolRegistrar) registerValidationTools(mcpServer *server.MCPServer) error {
+	// Create tool dependencies
+	deps := tools.ToolDependencies{
+		StepProvider:   tr.stepProvider,
+		SessionManager: tr.sessionManager,
+		Logger:         tr.logger,
+	}
+
+	// Register validation tools using the new validation handlers
+	if err := tools.RegisterValidationTools(mcpServer, deps); err != nil {
+		return fmt.Errorf("failed to register validation tools: %w", err)
+	}
+
+	tr.logger.Info("Registered validation tools (prompt-first architecture)",
+		"tools", []string{"validate_dockerfile", "apply_dockerfile", "validate_k8s_manifests", "apply_k8s_manifests"})
 
 	return nil
 }

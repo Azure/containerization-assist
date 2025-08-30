@@ -59,27 +59,12 @@ Security best practices:
 // generateAIFixingPrompt creates AI prompts for fixing specific tool failures
 func (tr *ToolRegistrar) generateAIFixingPrompt(failedTool, fixingTool, error, sessionID string) *AIFixingPrompt {
 	switch failedTool {
-	case "build_image":
-		return tr.generateDockerfileFix(error, sessionID)
 	case "scan_image":
 		return tr.generateSecurityFix(error, sessionID)
 	case "deploy_application":
 		return tr.generateManifestFix(error, sessionID)
 	default:
 		return tr.generateGenericFix(failedTool, fixingTool, error, sessionID)
-	}
-}
-
-// generateDockerfileFix creates AI prompt for fixing Dockerfile issues
-func (tr *ToolRegistrar) generateDockerfileFix(error, sessionID string) *AIFixingPrompt {
-	userPrompt := tr.buildDockerUserPrompt(error, sessionID)
-
-	return &AIFixingPrompt{
-		SystemPrompt:   dockerSystemPrompt,
-		UserPrompt:     userPrompt,
-		Context:        map[string]interface{}{"session_id": sessionID}, // Minimal context
-		ExpectedOutput: "A complete Dockerfile that addresses the build failure",
-		FixingStrategy: "dockerfile_regeneration",
 	}
 }
 

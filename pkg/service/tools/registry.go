@@ -9,6 +9,8 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 
 	domainworkflow "github.com/Azure/containerization-assist/pkg/domain/workflow"
+	"github.com/Azure/containerization-assist/pkg/infrastructure/ai_ml/prompts"
+	"github.com/Azure/containerization-assist/pkg/infrastructure/ai_ml/sampling"
 	"github.com/Azure/containerization-assist/pkg/service/session"
 )
 
@@ -53,6 +55,8 @@ type ToolDependencies struct {
 	StepProvider   domainworkflow.StepProvider
 	SessionManager session.OptimizedSessionManager
 	Logger         *slog.Logger
+	SamplingClient *sampling.Client
+	PromptManager  *prompts.Manager
 }
 
 // ToolResult represents a tool execution result
@@ -133,15 +137,16 @@ var toolConfigs = []ToolConfig{
 	},
 	{
 		Name:                "generate_dockerfile",
-		Description:         "Generate an optimized Dockerfile based on repository analysis",
+		Description:         "Generate production-ready Dockerfile using AI analysis of repository structure and requirements",
 		Category:            CategoryWorkflow,
 		RequiredParams:      []string{"session_id"},
-		NeedsStepProvider:   true,
 		NeedsSessionManager: true,
 		NeedsLogger:         true,
-		StepGetterName:      "GetDockerfileStep",
-		NextTool:            "build_image",
-		ChainReason:         "Dockerfile generated successfully. Ready to build Docker image",
+		CustomHandler: func(deps ToolDependencies) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return createPromptFirstDockerfileHandler(deps)
+		},
+		NextTool:    "build_image",
+		ChainReason: "Dockerfile generated successfully. Ready to build container image",
 	},
 	{
 		Name:                "build_image",
@@ -193,15 +198,16 @@ var toolConfigs = []ToolConfig{
 	},
 	{
 		Name:                "generate_k8s_manifests",
-		Description:         "Generate Kubernetes manifests for the application",
+		Description:         "Generate Kubernetes deployment manifests using AI analysis of application requirements and Docker build results",
 		Category:            CategoryWorkflow,
 		RequiredParams:      []string{"session_id"},
-		NeedsStepProvider:   true,
 		NeedsSessionManager: true,
 		NeedsLogger:         true,
-		StepGetterName:      "GetManifestStep",
-		NextTool:            "prepare_cluster",
-		ChainReason:         "Kubernetes manifests generated. Ready to prepare cluster",
+		CustomHandler: func(deps ToolDependencies) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return createPromptFirstK8sHandler(deps)
+		},
+		NextTool:    "prepare_cluster",
+		ChainReason: "Kubernetes manifests generated successfully. Ready to prepare cluster for deployment",
 	},
 	{
 		Name:                "prepare_cluster",

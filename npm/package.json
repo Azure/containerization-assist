@@ -1,6 +1,6 @@
 {
   "name": "@thgamble/containerization-assist-mcp",
-  "version": "1.1.5",
+  "version": "1.1.7",
   "description": "Containerization Assist MCP Server - AI-powered containerization workflow tools for the Model Context Protocol",
   "keywords": [
     "mcp",
@@ -33,6 +33,7 @@
     "ckmcp": "./bin/containerization-assist-mcp"
   },
   "files": [
+    "bin/",
     "lib/",
     "scripts/",
     "index.js",
@@ -48,16 +49,19 @@
     "prepublishOnly": "echo 'Use npm run publish:packages to publish all packages'",
     "version": "node scripts/sync-versions.js && echo 'Version updated to' $npm_package_version && git add package.json"
   },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
   "engines": {
     "node": ">=16.0.0"
   },
   "optionalDependencies": {
-    "@thgamble/containerization-assist-mcp-darwin-x64": "1.1.5",
-    "@thgamble/containerization-assist-mcp-darwin-arm64": "1.1.5",
-    "@thgamble/containerization-assist-mcp-linux-x64": "1.1.5",
-    "@thgamble/containerization-assist-mcp-linux-arm64": "1.1.5",
-    "@thgamble/containerization-assist-mcp-win32-x64": "1.1.5",
-    "@thgamble/containerization-assist-mcp-win32-arm64": "1.1.5"
+    "@thgamble/containerization-assist-mcp-darwin-x64": "1.1.7",
+    "@thgamble/containerization-assist-mcp-darwin-arm64": "1.1.7",
+    "@thgamble/containerization-assist-mcp-linux-x64": "1.1.7",
+    "@thgamble/containerization-assist-mcp-linux-arm64": "1.1.7",
+    "@thgamble/containerization-assist-mcp-win32-x64": "1.1.7",
+    "@thgamble/containerization-assist-mcp-win32-arm64": "1.1.7"
   },
   "os": [
     "darwin",

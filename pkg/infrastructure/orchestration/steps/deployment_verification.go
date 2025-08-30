@@ -17,6 +17,15 @@ import (
 	"github.com/Azure/containerization-assist/pkg/domain/errors"
 )
 
+// K8sResult represents infrastructure-level K8s deployment result
+type K8sResult struct {
+	AppName    string                 `json:"app_name"`
+	Namespace  string                 `json:"namespace"`
+	ServiceURL string                 `json:"service_url"`
+	Manifests  map[string]interface{} `json:"manifests"`
+	Metadata   map[string]interface{} `json:"metadata"`
+}
+
 // DeploymentDiagnostics contains comprehensive diagnostics for a deployment
 type DeploymentDiagnostics struct {
 	Timestamp     time.Time              `json:"timestamp"`

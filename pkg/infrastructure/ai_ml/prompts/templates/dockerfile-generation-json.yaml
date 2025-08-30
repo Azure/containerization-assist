@@ -1,0 +1,71 @@
+id: "dockerfile-generation-json"
+name: "Dockerfile Generation (JSON Output)"
+description: "Generates production-ready Dockerfiles with structured JSON output"
+version: "2.0.0"
+category: "docker"
+template: |
+  Generate a production-ready, multi-stage Dockerfile for:
+  - Language: {{.Language}}
+  - Framework: {{.Framework}}  
+  - Port: {{.Port}}
+  - Dependencies: {{.Dependencies}}
+  - Build System: {{.BuildSystem}}
+
+  Requirements:
+  1. Use multi-stage build for minimal final image size
+  2. Implement proper layer caching
+  3. Use non-root user for security
+  4. Include health checks
+  5. Handle signals properly (SIGTERM)
+  6. Separate build-time ARGs from runtime ENVs
+  7. Include security best practices
+
+  Generate a Dockerfile and return as JSON:
+  {
+    "dockerfile": "FROM node:18-alpine as builder\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --only=production\n\nFROM node:18-alpine\nRUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001\nWORKDIR /app\nCOPY --from=builder /app/node_modules ./node_modules\nCOPY . .\nUSER nextjs\nEXPOSE 3000\nHEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD curl -f http://localhost:3000/health || exit 1\nCMD [\"node\", \"server.js\"]",
+    "base_image": "node:18-alpine",
+    "exposed_port": 3000,
+    "build_stage_count": 2,
+    "final_image_size_estimate": "~45MB",
+    "security_features": ["non-root user", "healthcheck", "minimal alpine base", "no secrets in layers"],
+    "optimization_features": ["multi-stage build", "layer caching", "minimal dependencies", "efficient copying"]
+  }
+
+  IMPORTANT: Return ONLY the JSON object above. No markdown, no explanations, no additional text.
+
+system_prompt: "You are a Docker expert. Generate production-ready, secure, and optimized Dockerfiles. You MUST return ONLY valid JSON in the exact format specified. No markdown formatting, no explanations, no additional text before or after the JSON."
+parameters:
+  - name: "Language"
+    type: "string"
+    description: "Programming language"
+    required: true
+    example: "javascript"
+  - name: "Framework"
+    type: "string"
+    description: "Framework used"
+    required: false
+    example: "express"
+  - name: "Port"
+    type: "int"
+    description: "Application port"
+    required: true
+    example: "3000"
+  - name: "Dependencies"
+    type: "array"
+    description: "List of dependencies"
+    required: false
+    example: ["express", "mongoose", "dotenv"]
+  - name: "BuildSystem"
+    type: "string"
+    description: "Build system (npm, maven, gradle, etc.)"
+    required: false
+    example: "npm"
+defaults:
+  Port: "8080"
+  BuildSystem: "auto-detect"
+max_tokens: 1500
+temperature: 0.2
+output_format: "json"
+tags: ["docker", "generation", "production", "json-output", "prompt-first"]
+created_at: 2025-01-30T00:00:00Z
+updated_at: 2025-01-30T00:00:00Z
