@@ -1,0 +1,133 @@
+id: "azure-container-apps-generation"
+name: "Azure Container Apps Manifest Generation"
+description: "Generates production-ready Azure Container Apps manifests in Bicep or ARM format"
+version: "1.0.0"
+category: "azure"
+template: |
+  Generate production-ready Azure Container Apps deployment manifests for:
+  - Application: {{.AppName}}
+  - Container Image: {{.ImageRef}}
+  - Port: {{.Port}}
+  - Language: {{.Language}}
+  - Framework: {{.Framework}}
+  - Resource Group: {{.ResourceGroup}}
+  - Location: {{.Location}}
+  - Environment: {{.EnvironmentName}}
+  - Format: {{.OutputFormat}}
+
+  Application requirements based on analysis:
+  {{.AnalysisContext}}
+
+  Requirements:
+  1. Create complete Azure Container Apps manifests in {{.OutputFormat}} format
+  2. Include managed environment configuration with proper monitoring
+  3. Configure autoscaling based on HTTP traffic (min: {{.MinReplicas}}, max: {{.MaxReplicas}})
+  4. Set up ingress with HTTPS and external traffic enabled
+  5. Configure proper resource limits (CPU: {{.CPU}}, Memory: {{.Memory}})
+  6. Include health probes appropriate for the {{.Framework}} framework
+  7. Add environment variables for configuration
+  8. Enable managed identity for secure Azure service access
+  9. Include Dapr configuration if microservices detected
+  10. Add appropriate secrets management using Key Vault references
+  11. Configure logging to Azure Monitor
+  12. Include deployment instructions as comments
+
+  Additional considerations:
+  - If the app uses databases, include connection string configurations
+  - If the app has static assets, consider CDN integration
+  - For microservices, include service-to-service communication setup
+  - Add proper CORS configuration if it's a web API
+  - Include staging slot configuration for blue-green deployments
+
+  Provide the complete {{.OutputFormat}} manifest content without explanation.
+
+system_prompt: |
+  You are an Azure Container Apps expert with deep knowledge of cloud-native application deployment.
+  Generate production-ready, secure, and optimized manifests following Azure best practices.
+  Consider the specific needs of the application's technology stack when configuring the container app.
+
+parameters:
+  - name: "AppName"
+    type: "string"
+    description: "Application name"
+    required: true
+    example: "my-container-app"
+  - name: "ImageRef"
+    type: "string"
+    description: "Container image reference"
+    required: true
+    example: "myregistry.azurecr.io/myapp:v1.0.0"
+  - name: "Port"
+    type: "int"
+    description: "Container port"
+    required: true
+    example: "8080"
+  - name: "Language"
+    type: "string"
+    description: "Programming language"
+    required: true
+    example: "java"
+  - name: "Framework"
+    type: "string"
+    description: "Application framework"
+    required: true
+    example: "spring-boot"
+  - name: "ResourceGroup"
+    type: "string"
+    description: "Azure resource group"
+    required: true
+    example: "my-rg"
+  - name: "Location"
+    type: "string"
+    description: "Azure region"
+    required: true
+    example: "eastus"
+  - name: "EnvironmentName"
+    type: "string"
+    description: "Container Apps environment name"
+    required: true
+    example: "my-environment"
+  - name: "OutputFormat"
+    type: "string"
+    description: "Output format (bicep or arm)"
+    required: true
+    example: "bicep"
+  - name: "MinReplicas"
+    type: "int"
+    description: "Minimum replicas"
+    required: false
+    example: "1"
+  - name: "MaxReplicas"
+    type: "int"
+    description: "Maximum replicas"
+    required: false
+    example: "10"
+  - name: "CPU"
+    type: "string"
+    description: "CPU allocation"
+    required: false
+    example: "0.5"
+  - name: "Memory"
+    type: "string"
+    description: "Memory allocation"
+    required: false
+    example: "1.0Gi"
+  - name: "AnalysisContext"
+    type: "string"
+    description: "Additional context from repository analysis"
+    required: false
+    example: "Spring Boot application with PostgreSQL database and Redis cache"
+
+defaults:
+  Port: "8080"
+  MinReplicas: "1"
+  MaxReplicas: "10"
+  CPU: "0.5"
+  Memory: "1.0Gi"
+  OutputFormat: "bicep"
+
+max_tokens: 2000
+temperature: 0.3
+tags: ["azure", "container-apps", "bicep", "arm", "cloud-native", "production"]
+created_at: 2025-01-30T00:00:00Z
+updated_at: 2025-01-30T00:00:00Z

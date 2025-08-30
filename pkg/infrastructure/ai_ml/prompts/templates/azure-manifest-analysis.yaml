@@ -1,0 +1,121 @@
+id: "azure-manifest-analysis"
+name: "Azure Container Apps Manifest Analysis"
+description: "Analyzes and validates Azure Container Apps manifests for best practices and issues"
+version: "1.0.0"
+category: "azure"
+template: |
+  Analyze the following Azure Container Apps {{.ManifestType}} manifest for potential issues and improvements:
+
+  ```{{.ManifestType}}
+  {{.ManifestContent}}
+  ```
+
+  Application context:
+  - Language: {{.Language}}
+  - Framework: {{.Framework}}
+  - Expected functionality: {{.AppDescription}}
+
+  Perform a comprehensive analysis covering:
+
+  1. **Security Issues**:
+     - Exposed secrets or credentials
+     - Missing managed identity configuration
+     - Insecure ingress settings
+     - Missing or weak authentication
+     - Improper secret management
+
+  2. **Performance Optimization**:
+     - Resource allocation (CPU/Memory)
+     - Autoscaling configuration
+     - Health probe settings
+     - Startup/readiness probe timing
+
+  3. **Best Practices**:
+     - Naming conventions
+     - Tagging strategy
+     - Environment configuration
+     - Monitoring and logging setup
+     - Dapr integration if applicable
+
+  4. **Reliability**:
+     - Replica configuration
+     - Failure handling
+     - Circuit breaker patterns
+     - Retry policies
+
+  5. **Cost Optimization**:
+     - Right-sizing recommendations
+     - Scaling efficiency
+     - Resource waste identification
+
+  Provide your analysis in the following JSON format:
+  {
+    "issues": [
+      {
+        "severity": "critical|high|medium|low",
+        "category": "security|performance|reliability|cost|best-practice",
+        "description": "Issue description",
+        "location": "Line number or section",
+        "recommendation": "How to fix",
+        "impact": "What happens if not fixed"
+      }
+    ],
+    "improvements": [
+      {
+        "category": "performance|reliability|cost|feature",
+        "description": "Improvement suggestion",
+        "benefit": "Expected benefit",
+        "implementation": "How to implement"
+      }
+    ],
+    "validation": {
+      "syntax_valid": true|false,
+      "deployment_ready": true|false,
+      "security_compliant": true|false,
+      "production_ready": true|false
+    },
+    "score": {
+      "security": 0-100,
+      "performance": 0-100,
+      "reliability": 0-100,
+      "best_practices": 0-100,
+      "overall": 0-100
+    }
+  }
+
+system_prompt: |
+  You are an Azure Container Apps security and optimization expert.
+  Analyze manifests for security vulnerabilities, performance issues, and Azure best practices.
+  Provide actionable recommendations with clear prioritization.
+
+parameters:
+  - name: "ManifestContent"
+    type: "string"
+    description: "The manifest content to analyze"
+    required: true
+  - name: "ManifestType"
+    type: "string"
+    description: "Type of manifest (bicep or arm)"
+    required: true
+    example: "bicep"
+  - name: "Language"
+    type: "string"
+    description: "Application programming language"
+    required: false
+    example: "python"
+  - name: "Framework"
+    type: "string"
+    description: "Application framework"
+    required: false
+    example: "fastapi"
+  - name: "AppDescription"
+    type: "string"
+    description: "Description of application functionality"
+    required: false
+    example: "REST API for order processing"
+
+max_tokens: 1500
+temperature: 0.2
+tags: ["azure", "container-apps", "validation", "security", "analysis"]
+created_at: 2025-01-30T00:00:00Z
+updated_at: 2025-01-30T00:00:00Z

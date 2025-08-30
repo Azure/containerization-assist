@@ -512,7 +512,9 @@ func CreateWorkflowHandler(config ToolConfig, deps ToolDependencies) func(contex
 						},
 					})
 					resultBytes, _ := json.Marshal(azureResult)
-					json.Unmarshal(resultBytes, &result)
+					if err := json.Unmarshal(resultBytes, &result); err != nil {
+						return nil, fmt.Errorf("failed to unmarshal Azure result: %w", err)
+					}
 					result["session_id"] = sessionID
 				}
 			}
