@@ -956,5 +956,9 @@ func (tr *ToolRegistrar) saveStepResults(workflowState *domainworkflow.WorkflowS
 				Metadata:  workflowState.K8sResult.Metadata,
 			}
 		}
+
+	default:
+		tr.logger.Warn("Non core tool called", slog.String("stepName", stepName))
 	}
+
 }

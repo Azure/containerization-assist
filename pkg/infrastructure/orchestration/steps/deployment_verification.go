@@ -479,8 +479,6 @@ func checkResourceUsage(ctx context.Context, k8sResult *K8sResult, diag *Deploym
 	return nil
 }
 
-// GenerateDiagnosticReport function removed as dead code
-
 // startPortForwardWithTimeout starts kubectl port-forward with timeout
 func startPortForwardWithTimeout(ctx context.Context, config PortForwardConfig, serviceName, namespace string) (*PortForwardResult, error) {
 	// Auto-assign local port if not specified

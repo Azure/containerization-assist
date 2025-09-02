@@ -175,8 +175,6 @@ func (sg *SecretGenerator) GenerateSecret(ctx context.Context, options SecretOpt
 	return result, nil
 }
 
-// SaveSecretToFile method removed as dead code
-
 // GenerateDockerRegistrySecret generates a Docker registry secret
 func (sg *SecretGenerator) GenerateDockerRegistrySecret(ctx context.Context, name, namespace, server, username, password, email string) (*SecretGenerationResult, error) {
 	dockerConfig := map[string]interface{}{
@@ -361,8 +359,6 @@ func (sg *SecretGenerator) isValidKubernetesName(name string) bool {
 func (sg *SecretGenerator) isAlphanumeric(s string) bool {
 	return (s >= "a" && s <= "z") || (s >= "0" && s <= "9")
 }
-
-// ensureDirectory and writeFile methods removed as dead code
 
 func (sg *SecretGenerator) marshalJSON(v interface{}) ([]byte, error) {
 	return json.Marshal(v)

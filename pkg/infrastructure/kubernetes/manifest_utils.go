@@ -21,11 +21,7 @@ const MANIFEST_DIR_NAME = "manifests"
 // Path where manifests are expected to be found - uses GITHUB_WORKSPACE - requires checkout action step
 var DefaultManifestAbsolutePath = filepath.Join(os.Getenv("GITHUB_WORKSPACE"), MANIFEST_DIR_NAME)
 
-// K8sObject.IsDeployment method removed as dead code
-
 const ManifestObjectDelimiter = "---"
-
-// FindK8sObjects and ReadK8sObjects functions removed as dead code
 
 type K8sObject struct {
 	ApiVersion             string      `yaml:"apiVersion"`

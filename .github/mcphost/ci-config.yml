@@ -1,0 +1,19 @@
+mcpServers:
+  filesystem-local:
+    type: "local"
+    command: ["npx", "@modelcontextprotocol/server-filesystem", "coolstore"]
+    environment:
+      DEBUG: "true"
+
+  bash:
+    type: "builtin"
+    name: "bash"
+    
+  containerization-assist:
+    type: "stdio"
+    command: "./containerization-assist-mcp"
+    args: ["--log-file=mcp.log", "--log-level=debug"]
+
+model: "azure:${env://AZURE_OPENAI_DEPLOYMENT_ID}"
+provider-api-key: "${env://AZURE_OPENAI_KEY}"
+provider-url: "${env://AZURE_OPENAI_ENDPOINT}"

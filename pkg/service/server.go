@@ -135,7 +135,16 @@ func (f *ServerFactory) createEventPublisher() (*messaging.Publisher, error) {
 }
 
 func (f *ServerFactory) createSamplingClient() (*sampling.Client, error) {
-	return sampling.NewClient(f.logger), nil
+	// Use environment-based configuration for better control over sampling behavior
+	client, err := sampling.NewClientFromEnv(f.logger)
+	if err != nil {
+		f.logger.Warn("Failed to create sampling client from environment, using defaults", "error", err)
+		// Fallback to default configuration
+		return sampling.NewClient(f.logger), nil
+	}
+
+	f.logger.Info("Sampling client initialized with environment configuration")
+	return client, nil
 }
 
 func (f *ServerFactory) createPromptManager() (*prompts.Manager, error) {

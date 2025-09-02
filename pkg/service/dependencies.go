@@ -18,8 +18,6 @@ import (
 
 type Option func(*Dependencies)
 
-// WithLogger and WithConfig functions removed as dead code
-
 type Dependencies struct {
 	Logger         *slog.Logger
 	Config         workflow.ServerConfig

@@ -355,8 +355,6 @@ func main() {
 	return repoDir
 }
 
-// extractToolResult and validateToolResponse functions removed as dead code
-
 // listAndDiscoverTools calls tools/list and returns a set of tool names and the raw tools array
 func (suite *MCPToolCompletenessTestSuite) listAndDiscoverTools(stdin *os.File, stdout *os.File, requestID int) (map[string]bool, []interface{}) {
 	resp := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{

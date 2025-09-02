@@ -4,9 +4,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -25,6 +27,8 @@ var (
 	GitCommit = "unknown"
 	// BuildTime is the time of the build
 	BuildTime = "unknown"
+	// Global log file handle for proper cleanup
+	logFileHandle *os.File
 )
 
 // Simplified FlagConfig with only essential flags
@@ -35,6 +39,7 @@ type FlagConfig struct {
 	sessionTTL   *string
 	maxSessions  *int
 	logLevel     *string
+	logFile      *string
 	version      *bool
 	workflowMode *string
 }
@@ -80,6 +85,7 @@ func parseFlags() *FlagConfig {
 		sessionTTL:   flag.String("session-ttl", "", "Session TTL (e.g., '24h')"),
 		maxSessions:  flag.Int("max-sessions", 0, "Maximum number of sessions"),
 		logLevel:     flag.String("log-level", "", "Log level (debug, info, warn, error)"),
+		logFile:      flag.String("log-file", "", "Path to log file (logs to stderr if not specified)"),
 		version:      flag.Bool("version", false, "Show version information"),
 		workflowMode: flag.String("workflow-mode", "", "Workflow mode: 'automated' or 'interactive'"),
 	}
@@ -107,7 +113,7 @@ func loadAndConfigureServer(flags *FlagConfig) (*config.Config, error) {
 	applyFlagOverrides(cfg, flags)
 
 	// Setup structured logging
-	setupLogging(cfg.LogLevel)
+	setupLogging(cfg.LogLevel, cfg.LogFile)
 
 	return cfg, nil
 }
@@ -131,6 +137,9 @@ func applyFlagOverrides(cfg *config.Config, flags *FlagConfig) {
 	if *flags.logLevel != "" {
 		cfg.LogLevel = *flags.logLevel
 	}
+	if *flags.logFile != "" {
+		cfg.LogFile = *flags.logFile
+	}
 	if *flags.workflowMode != "" {
 		cfg.WorkflowMode = *flags.workflowMode
 	}
@@ -143,7 +152,7 @@ func createAndConfigureServer(cfg *config.Config) (api.MCPServer, error) {
 		Str("workspace_dir", cfg.WorkspaceDir).
 		Msg("Starting Containerization Assist MCP Server")
 
-	slogLogger := createSlogLogger(cfg.LogLevel)
+	slogLogger := createSlogLogger(cfg.LogLevel, cfg.LogFile)
 
 	// Convert to server config and create server
 	serverConfig := cfg.ToServerConfig()
@@ -155,10 +164,40 @@ func createAndConfigureServer(cfg *config.Config) (api.MCPServer, error) {
 }
 
 // createSlogLogger creates a structured logger for dependency injection
-func createSlogLogger(logLevel string) *slog.Logger {
+func createSlogLogger(logLevel string, logFile string) *slog.Logger {
 	level := parseSlogLevel(logLevel)
 
-	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+	// If no log file specified, use original behavior (stderr only)
+	if logFile == "" {
+		handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+			Level: level,
+		})
+		return slog.New(handler)
+	}
+
+	// Log file specified - setup dual output (stderr + file)
+	var writers []io.Writer
+
+	// Always include stderr
+	writers = append(writers, os.Stderr)
+
+	// Add file writer if we can open it
+	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err == nil {
+		if file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+			writers = append(writers, file)
+		}
+	}
+
+	// Create output writer
+	var output io.Writer
+	if len(writers) > 1 {
+		output = io.MultiWriter(writers...)
+	} else {
+		output = writers[0]
+	}
+
+	// Create slog handler with the combined output
+	handler := slog.NewJSONHandler(output, &slog.HandlerOptions{
 		Level: level,
 	})
 
@@ -208,8 +247,20 @@ func runServerWithShutdown(mcpServer api.MCPServer) {
 		// Wait a moment for final logs to be written
 		time.Sleep(100 * time.Millisecond)
 
+		// Flush and close log file if it exists
+		if logFileHandle != nil {
+			logFileHandle.Sync()
+			logFileHandle.Close()
+		}
+
 	case err := <-serverErr:
 		log.Error().Err(err).Msg("Server failed")
+
+		// Flush and close log file if it exists
+		if logFileHandle != nil {
+			logFileHandle.Sync()
+			logFileHandle.Close()
+		}
 		os.Exit(1)
 
 	case <-ctx.Done():
@@ -219,11 +270,17 @@ func runServerWithShutdown(mcpServer api.MCPServer) {
 		if err := mcpServer.Stop(shutdownCtx); err != nil {
 			log.Error().Err(err).Msg("Error during server shutdown")
 		}
+
+		// Flush and close log file if it exists
+		if logFileHandle != nil {
+			logFileHandle.Sync()
+			logFileHandle.Close()
+		}
 	}
 }
 
 // setupLogging configures structured logging
-func setupLogging(level string) {
+func setupLogging(level string, logFile string) {
 	// Parse log level
 	logLevel, err := zerolog.ParseLevel(level)
 	if err != nil {
@@ -233,11 +290,48 @@ func setupLogging(level string) {
 	// Configure global logger
 	zerolog.SetGlobalLevel(logLevel)
 
-	// Use console writer for better readability
-	log.Logger = log.Output(zerolog.ConsoleWriter{
+	// If no log file specified, use original behavior (console writer only)
+	if logFile == "" {
+		// Use console writer for better readability (original behavior)
+		log.Logger = log.Output(zerolog.ConsoleWriter{
+			Out:        os.Stderr,
+			TimeFormat: time.RFC3339,
+		})
+		return
+	}
+
+	// Log file specified - setup dual output (console + file)
+	var writers []io.Writer
+
+	// Always include stderr for console output
+	writers = append(writers, zerolog.ConsoleWriter{
 		Out:        os.Stderr,
 		TimeFormat: time.RFC3339,
 	})
+
+	// Create log file directory if it doesn't exist
+	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
+		log.Error().Err(err).Str("log_file", logFile).Msg("Failed to create log file directory")
+		return
+	}
+
+	// Open log file for writing (create if doesn't exist, append if it does)
+	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		log.Error().Err(err).Str("log_file", logFile).Msg("Failed to open log file")
+		return
+	}
+
+	logFileHandle = file
+	// Add file writer with JSON format for structured logging
+	writers = append(writers, file)
+
+	// Configure logger with multiple outputs
+	log.Logger = zerolog.New(io.MultiWriter(writers...)).With().Timestamp().Logger()
+
+	// Make sure to sync the file handle and log the success
+	logFileHandle.Sync()
+	log.Info().Str("log_file", logFile).Msg("Logging to file enabled")
 }
 
 // getVersion returns the version information

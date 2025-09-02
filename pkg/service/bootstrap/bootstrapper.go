@@ -77,6 +77,10 @@ func (b *Bootstrapper) CreateMCPServer() *server.MCPServer {
 		return nil
 	}
 
+	// Enable sampling capability - this allows the server to request LLM completions from clients
+	mcpServer.EnableSampling()
+	b.logger.Info("Sampling capability enabled for MCP server")
+
 	return mcpServer
 }
 
@@ -99,5 +103,3 @@ func (b *Bootstrapper) RegisterComponents(mcpServer *server.MCPServer) error {
 func (b *Bootstrapper) RegisterChatModes() error {
 	return nil
 }
-
-// GetChatModeFunctions function removed as dead code

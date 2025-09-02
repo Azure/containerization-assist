@@ -317,5 +317,3 @@ func (s *manifestService) validateManifest(manifest string) error {
 
 	return nil
 }
-
-// NewManifestManagerAdapter and ManifestManagerAdapter methods removed as dead code
