@@ -339,7 +339,7 @@ func (tr *ToolRegistrar) registerWorkflowTools(mcpServer *server.MCPServer) erro
 					"description": "Name of the tool that failed (when fixing_mode is true)",
 				},
 			},
-			required: []string{"session_id", "dockerfile_content"},
+			required: []string{"session_id"},
 		},
 		{
 			name:        "build_image",
