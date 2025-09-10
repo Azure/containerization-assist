@@ -28,11 +28,7 @@ export const workflow = _tools.workflow;
 export { tools, getAllTools } from './exports/tools.js';
 
 // Export helper functions
-export {
-  registerTool,
-  registerAllTools,
-  toJsonSchema,
-} from './exports/helpers.js';
+export { registerTool, registerAllTools, toJsonSchema } from './exports/helpers.js';
 
 // Export the new clean API
 export { ContainerAssistServer } from './exports/containerization-assist-server.js';
