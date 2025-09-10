@@ -600,7 +600,7 @@ export const dockerfileGenerators = {
   balanced: generateBalancedDockerfile,
 } as const;
 
-export type SamplingStrategyName = keyof typeof dockerfileGenerators;
+type SamplingStrategyName = keyof typeof dockerfileGenerators;
 
 /**
  * Execute a single Dockerfile generation by strategy name

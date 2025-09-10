@@ -9,5 +9,4 @@ export {
   createKubernetesClient,
   type KubernetesClient,
   type DeploymentResult,
-  type ClusterInfo,
 } from '../infrastructure/kubernetes/client';

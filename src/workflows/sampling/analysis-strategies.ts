@@ -589,14 +589,14 @@ export function createPerformanceStrategy(logger: Logger): AnalysisStrategy {
 /**
  * Create architecture-focused analysis strategy
  */
-export function createArchitectureStrategy(logger: Logger): AnalysisStrategy {
+function createArchitectureStrategy(logger: Logger): AnalysisStrategy {
   return createAnalysisStrategy('architecture', logger);
 }
 
 /**
  * Create deployment-focused analysis strategy
  */
-export function createDeploymentStrategy(logger: Logger): AnalysisStrategy {
+function createDeploymentStrategy(logger: Logger): AnalysisStrategy {
   return createAnalysisStrategy('deployment', logger);
 }
 

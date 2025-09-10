@@ -21,6 +21,9 @@ import { securityAnalysis } from '../../prompts/security/security-analysis';
 import { parameterSuggestions } from '../../prompts/validation/parameter-suggestions';
 import { parameterValidation } from '../../prompts/validation/parameter-validation';
 
+// Import AI templates converted to PromptFile format
+import { AI_TEMPLATE_PROMPT_FILES } from '../ai-templates';
+
 /**
  * Parameter specification for prompt templates
  *
@@ -103,6 +106,8 @@ export class StaticPromptLoader {
         securityAnalysis,
         parameterSuggestions,
         parameterValidation,
+        // Add AI templates converted to PromptFile format
+        ...AI_TEMPLATE_PROMPT_FILES,
       ];
 
       let totalLoaded = 0;

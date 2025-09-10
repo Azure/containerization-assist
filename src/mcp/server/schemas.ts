@@ -11,25 +11,25 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 // Common schemas
 const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
 
-export const repoPathSchema = z.string().describe('Path to the repository to analyze');
+const repoPathSchema = z.string().describe('Path to the repository to analyze');
 
-export const environmentSchema = z
+const environmentSchema = z
   .enum(['development', 'staging', 'production'])
   .optional()
   .describe('Target deployment environment');
 
-export const optimizationSchema = z
+const optimizationSchema = z
   .enum(['size', 'security', 'performance', 'balanced'])
   .optional()
   .describe('Optimization strategy for containerization');
 
-export const securityLevelSchema = z
+const securityLevelSchema = z
   .enum(['basic', 'standard', 'strict'])
   .optional()
   .describe('Security level for container configuration');
 
 // Tool schemas
-export const analyzeRepoSchema = z.object({
+const analyzeRepoSchema = z.object({
   sessionId: sessionIdSchema.optional(),
   repoPath: repoPathSchema.optional(),
   depth: z.number().optional().describe('Analysis depth (1-5)'),
@@ -38,7 +38,7 @@ export const analyzeRepoSchema = z.object({
   performanceFocus: z.boolean().optional().describe('Focus on performance aspects'),
 });
 
-export const generateDockerfileSchema = z.object({
+const generateDockerfileSchema = z.object({
   sessionId: sessionIdSchema.optional(),
   baseImage: z.string().optional().describe('Base Docker image to use'),
   environment: environmentSchema,
@@ -47,7 +47,7 @@ export const generateDockerfileSchema = z.object({
   customCommands: z.array(z.string()).optional().describe('Custom Dockerfile commands'),
 });
 
-export const buildImageSchema = z.object({
+const buildImageSchema = z.object({
   sessionId: sessionIdSchema.optional(),
   context: z.string().optional().describe('Build context path'),
   dockerfile: z.string().optional().describe('Dockerfile name'),
@@ -58,7 +58,7 @@ export const buildImageSchema = z.object({
   platform: z.string().optional().describe('Target platform (e.g., linux/amd64)'),
 });
 
-export const scanImageSchema = z.object({
+const scanImageSchema = z.object({
   sessionId: sessionIdSchema.optional(),
   imageId: z.string().optional().describe('Docker image ID or name to scan'),
   image: z.string().optional().describe('Docker image ID or name to scan'),
@@ -75,7 +75,7 @@ export const scanImageSchema = z.object({
     .describe('Type of scan to perform'),
 });
 
-export const pushImageSchema = z.object({
+const pushImageSchema = z.object({
   sessionId: sessionIdSchema.optional(),
   imageId: z.string().optional().describe('Docker image ID to push'),
   image: z.string().optional().describe('Docker image to push'),
@@ -89,7 +89,7 @@ export const pushImageSchema = z.object({
     .describe('Registry credentials'),
 });
 
-export const tagImageSchema = z.object({
+const tagImageSchema = z.object({
   sessionId: sessionIdSchema.optional(),
   imageId: z.string().optional().describe('Docker image ID to tag'),
   image: z.string().optional().describe('Docker image to tag'),
@@ -97,7 +97,7 @@ export const tagImageSchema = z.object({
   tag: z.string().optional().describe('New tag to apply'),
 });
 
-export const workflowSchema = z.object({
+const workflowSchema = z.object({
   sessionId: sessionIdSchema.optional(),
   workflowType: z
     .enum(['containerization', 'deployment', 'full'])
@@ -106,7 +106,7 @@ export const workflowSchema = z.object({
   config: z.record(z.any()).optional().describe('Workflow configuration'),
 });
 
-export const fixDockerfileSchema = z.object({
+const fixDockerfileSchema = z.object({
   sessionId: sessionIdSchema.optional(),
   issues: z
     .array(
@@ -122,7 +122,7 @@ export const fixDockerfileSchema = z.object({
   dockerfilePath: z.string().optional().describe('Path to Dockerfile to fix'),
 });
 
-export const resolveBaseImagesSchema = z.object({
+const resolveBaseImagesSchema = z.object({
   sessionId: sessionIdSchema.optional(),
   language: z.string().optional().describe('Programming language'),
   targetEnvironment: environmentSchema,
@@ -138,7 +138,7 @@ export const resolveBaseImagesSchema = z.object({
     .describe('Image requirements'),
 });
 
-export const prepareClusterSchema = z.object({
+const prepareClusterSchema = z.object({
   sessionId: sessionIdSchema.optional(),
   clusterType: z
     .enum(['minikube', 'kind', 'k3s', 'eks', 'gke', 'aks'])
@@ -148,13 +148,13 @@ export const prepareClusterSchema = z.object({
   createNamespace: z.boolean().optional().describe("Create namespace if it doesn't exist"),
 });
 
-export const opsToolSchema = z.object({
+const opsToolSchema = z.object({
   operation: z.enum(['ping', 'status']).describe('Operation to perform'),
   message: z.string().optional().describe('Message for ping operation'),
   details: z.boolean().optional().describe('Include detailed information in status'),
 });
 
-export const deployApplicationSchema = z.object({
+const deployApplicationSchema = z.object({
   sessionId: sessionIdSchema.optional(),
   imageId: z.string().optional().describe('Docker image to deploy'),
   namespace: z.string().optional().describe('Kubernetes namespace'),
@@ -163,7 +163,7 @@ export const deployApplicationSchema = z.object({
   environment: environmentSchema,
 });
 
-export const generateK8sManifestsSchema = z.object({
+const generateK8sManifestsSchema = z.object({
   sessionId: sessionIdSchema.optional(),
   appName: z.string().optional().describe('Application name'),
   imageId: z.string().optional().describe('Docker image for deployment'),
@@ -198,7 +198,7 @@ export const generateK8sManifestsSchema = z.object({
     .describe('Ingress configuration'),
 });
 
-export const verifyDeploymentSchema = z.object({
+const verifyDeploymentSchema = z.object({
   sessionId: sessionIdSchema.optional(),
   deploymentName: z.string().optional().describe('Name of the deployment to verify'),
   namespace: z.string().optional().describe('Kubernetes namespace'),
