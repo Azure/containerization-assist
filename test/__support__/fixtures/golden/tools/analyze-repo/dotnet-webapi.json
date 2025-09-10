@@ -1,0 +1,33 @@
+{
+  "language": "csharp",
+  "framework": "aspnet-core",
+  "projectType": "webapi",
+  "dotnetVersion": "8.0",
+  "ports": [80, 443],
+  "required_ports": [80],
+  "dependencies": [
+    "Microsoft.AspNetCore.OpenApi",
+    "Swashbuckle.AspNetCore"
+  ],
+  "projectFile": "TestWebApi.csproj",
+  "entryPoint": "Program.cs",
+  "hasTests": false,
+  "hasDockerfile": false,
+  "sourceDirectory": ".",
+  "targetFramework": "net8.0",
+  "nullable": true,
+  "implicitUsings": true,
+  "hasSwagger": true,
+  "hasHealthCheck": true,
+  "features": [
+    "minimal-apis",
+    "swagger",
+    "cors",
+    "health-checks"
+  ],
+  "metadata": {
+    "analysisVersion": "1.0.0",
+    "timestamp": "2024-01-01T00:00:00Z",
+    "confidence": 0.94
+  }
+}

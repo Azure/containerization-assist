@@ -1,0 +1,224 @@
+name: PR Quality Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, edited]
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  quality-check:
+    name: Quality Analysis & Report
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run comprehensive quality analysis
+        id: quality
+        run: |
+          # Use our validation pipeline
+          echo "🔍 Running validation pipeline..."
+          npm run validate:pr:fast > quality-full.txt 2>&1 || true
+          
+          # Run quality gates (non-blocking for reporting)
+          echo "🛡️ Running quality gates..."
+          npm run quality:gates > quality-gates.txt 2>&1 || true
+          
+          # Extract metrics from our enhanced outputs - ensure single line values
+          CURRENT_WARNINGS=$(grep "Total warnings:" quality-full.txt | sed 's/.*Total warnings: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
+          BASELINE_WARNINGS=$(grep "Baseline:" quality-full.txt | sed 's/.*Baseline: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "1048")
+          REDUCTION=$(grep "Reduced by:" quality-full.txt | sed 's/.*Reduced by: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
+          PERCENTAGE=$(grep "Reduced by:" quality-full.txt | sed 's/.*(\([0-9][0-9]*\.[0-9][0-9]*\)%).*/\1/' | head -1 | tr -cd '0-9.' || echo "0")
+          
+          UNUSED_EXPORTS=$(grep "Total unused exports:" quality-full.txt | sed 's/.*Total unused exports: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
+          DEADCODE_BASELINE=$(grep "Baseline:.*unused exports" quality-full.txt | sed 's/.*Baseline: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "441")
+          DEADCODE_REDUCTION=$(grep "Reduced by:.*exports" quality-full.txt | sed 's/.*Reduced by: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
+          
+          # Quality gates status - count exact matches and ensure single digits
+          GATES_PASSED=$(grep -o "✅ PASS:" quality-gates.txt 2>/dev/null | wc -l | tr -cd '0-9' || echo "0")
+          GATES_FAILED=$(grep -o "❌ FAIL:" quality-gates.txt 2>/dev/null | wc -l | tr -cd '0-9' || echo "0")  
+          GATES_WARNINGS=$(grep -o "⚠️  WARN:" quality-gates.txt 2>/dev/null | wc -l | tr -cd '0-9' || echo "0")
+          
+          # Validate all values are proper integers
+          for var in CURRENT_WARNINGS BASELINE_WARNINGS REDUCTION UNUSED_EXPORTS DEADCODE_BASELINE DEADCODE_REDUCTION GATES_PASSED GATES_FAILED GATES_WARNINGS; do
+            value=$(eval echo \$$var)
+            if ! [[ "$value" =~ ^[0-9]+$ ]]; then
+              echo "Warning: $var has invalid value '$value', setting to 0"
+              eval "$var=0"
+            fi
+          done
+          
+          # Validate percentage is a number (can have decimal)
+          if ! [[ "$PERCENTAGE" =~ ^[0-9]+\.?[0-9]*$ ]] && [ "$PERCENTAGE" != "N/A" ]; then
+            echo "Warning: PERCENTAGE has invalid value '$PERCENTAGE', setting to 0"
+            PERCENTAGE="0"
+          fi
+          
+          # Debug output
+          echo "Debug: Current values:"
+          echo "  CURRENT_WARNINGS='$CURRENT_WARNINGS'"
+          echo "  BASELINE_WARNINGS='$BASELINE_WARNINGS'"
+          echo "  REDUCTION='$REDUCTION'"
+          echo "  PERCENTAGE='$PERCENTAGE'"
+          echo "  UNUSED_EXPORTS='$UNUSED_EXPORTS'"
+          echo "  DEADCODE_BASELINE='$DEADCODE_BASELINE'"
+          echo "  DEADCODE_REDUCTION='$DEADCODE_REDUCTION'"
+          echo "  GATES_PASSED='$GATES_PASSED'"
+          echo "  GATES_FAILED='$GATES_FAILED'"
+          echo "  GATES_WARNINGS='$GATES_WARNINGS'"
+          
+          # Determine status
+          if [ "$GATES_FAILED" -eq 0 ] && [ "$CURRENT_WARNINGS" -le "$BASELINE_WARNINGS" ]; then
+            STATUS="✅ EXCELLENT"
+          elif [ "$GATES_FAILED" -eq 0 ]; then
+            STATUS="✅ PASSING"
+          elif [ "$GATES_FAILED" -le 2 ]; then
+            STATUS="⚠️ NEEDS ATTENTION"  
+          else
+            STATUS="❌ REQUIRES FIXES"
+          fi
+          
+          # Set outputs with explicit format
+          echo "current_warnings=${CURRENT_WARNINGS}" >> $GITHUB_OUTPUT
+          echo "baseline_warnings=${BASELINE_WARNINGS}" >> $GITHUB_OUTPUT
+          echo "warning_reduction=${REDUCTION}" >> $GITHUB_OUTPUT
+          echo "warning_percentage=${PERCENTAGE}" >> $GITHUB_OUTPUT
+          echo "unused_exports=${UNUSED_EXPORTS}" >> $GITHUB_OUTPUT
+          echo "deadcode_baseline=${DEADCODE_BASELINE}" >> $GITHUB_OUTPUT
+          echo "deadcode_reduction=${DEADCODE_REDUCTION}" >> $GITHUB_OUTPUT
+          echo "gates_passed=${GATES_PASSED}" >> $GITHUB_OUTPUT
+          echo "gates_failed=${GATES_FAILED}" >> $GITHUB_OUTPUT
+          echo "gates_warnings=${GATES_WARNINGS}" >> $GITHUB_OUTPUT
+          echo "overall_status=${STATUS}" >> $GITHUB_OUTPUT
+
+      - name: Extract top warning types
+        id: warnings
+        run: |
+          # Extract top 5 warning types in a simpler format
+          TOP_WARNINGS=$(grep -A 10 "=== Top.*Warning Types ===" quality-full.txt | tail -n +2 | head -n 5 | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+          
+          # Format as simple list
+          echo "top_warnings<<EOF" >> $GITHUB_OUTPUT
+          echo "$TOP_WARNINGS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Upload quality report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quality-report-${{ github.run_id }}
+          path: |
+            quality-full.txt
+            coverage/coverage-summary.json
+          retention-days: 7
+
+      - name: Run test coverage (lightweight)
+        id: coverage
+        continue-on-error: true
+        run: |
+          # Coverage already generated by validate:pr:fast
+          echo "Coverage generated by validation pipeline"
+          
+          if [ -f "coverage/coverage-summary.json" ]; then
+            OVERALL=$(jq -r '.total.statements.pct' coverage/coverage-summary.json 2>/dev/null || echo "0")
+            BRANCHES=$(jq -r '.total.branches.pct' coverage/coverage-summary.json 2>/dev/null || echo "0")
+          else
+            OVERALL=0
+            BRANCHES=0
+          fi
+          
+          echo "overall_coverage=$OVERALL" >> $GITHUB_OUTPUT
+          echo "branch_coverage=$BRANCHES" >> $GITHUB_OUTPUT
+        env:
+          NODE_OPTIONS: '--experimental-vm-modules'
+
+      - name: Generate enhanced PR comment
+        run: |
+          cat > pr_comment.md << EOF
+          ## 🛡️ Code Quality Report
+          
+          **Status:** ${{ steps.quality.outputs.overall_status }}
+          
+          ### 📊 Quality Metrics Summary
+          
+          | Metric | Current | Baseline | Progress |
+          |--------|---------|----------|-----------|
+          | **ESLint Warnings** | ${{ steps.quality.outputs.current_warnings }} | ${{ steps.quality.outputs.baseline_warnings }} | $(if [ "${{ steps.quality.outputs.warning_reduction }}" -gt 0 ]; then echo "✅ -${{ steps.quality.outputs.warning_reduction }} (-${{ steps.quality.outputs.warning_percentage }}%)"; else echo "➖ No change"; fi) |
+          | **Dead Code** | ${{ steps.quality.outputs.unused_exports }} | ${{ steps.quality.outputs.deadcode_baseline }} | $(if [ "${{ steps.quality.outputs.deadcode_reduction }}" -gt 0 ]; then echo "✅ -${{ steps.quality.outputs.deadcode_reduction }}"; else echo "➖ No change"; fi) |
+          | **Quality Gates** | ${{ steps.quality.outputs.gates_passed }}/5 passed | - | $(if [ "${{ steps.quality.outputs.gates_failed }}" -eq 0 ]; then echo "✅ All passing"; else echo "❌ ${{ steps.quality.outputs.gates_failed }} failed"; fi) |
+          
+          ### 🎯 Coverage Highlights
+          - **Overall Coverage:** ${{ steps.coverage.outputs.overall_coverage }}%
+          - **Branch Coverage:** ${{ steps.coverage.outputs.branch_coverage }}%
+          
+          ### ⚠️ Top Warning Categories
+          \`\`\`
+          ${{ steps.warnings.outputs.top_warnings }}
+          \`\`\`
+          
+          ### 🚀 Next Steps
+          $(if [ "${{ steps.quality.outputs.gates_failed }}" -gt 0 ]; then
+            echo "- Fix ${{ steps.quality.outputs.gates_failed }} failing quality gate(s)"
+          fi)
+          $(if [ "${{ steps.quality.outputs.current_warnings }}" -gt 400 ]; then
+            echo "- Consider reducing ESLint warnings toward <400 target"
+          fi)
+          $(if [ "${{ steps.quality.outputs.unused_exports }}" -gt 200 ]; then
+            echo "- Consider cleaning up unused exports toward <200 target"
+          fi)
+          $(if [ "${{ steps.quality.outputs.gates_failed }}" -eq 0 ] && [ "${{ steps.quality.outputs.current_warnings }}" -le 400 ]; then
+            echo "🎉 Excellent work! This PR meets all quality standards."
+          fi)
+          
+          ---
+          *Generated by Quality Report Bot • Run: [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) • Commit: \`${{ github.sha }}\`*
+          EOF
+
+      - name: Find and update PR comment
+        uses: peter-evans/find-comment@v3
+        id: find-comment
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: '## 🛡️ Code Quality Report'
+
+      - name: Create or update comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: pr_comment.md
+          edit-mode: replace
+
+      - name: Quality gate enforcement (optional)
+        if: steps.quality.outputs.gates_failed != '0'
+        run: |
+          echo "⚠️  Quality gates failed: ${{ steps.quality.outputs.gates_failed }}"
+          echo "This is currently non-blocking, but consider addressing the issues."
+          echo ""
+          echo "Quality gates details:"
+          cat quality-gates.txt
+          
+          # Make this blocking by uncommenting the line below
+          # exit 1

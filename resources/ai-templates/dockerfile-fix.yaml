@@ -1,0 +1,81 @@
+id: dockerfile-fix
+name: AI-Powered Dockerfile Error Analysis and Fix
+description: Intelligently analyze and fix Dockerfile build errors
+version: 2.0.0
+system: |
+  You are a Docker expert specializing in debugging and fixing containerization issues.
+  You have deep knowledge of:
+  - Common Docker build error patterns and their root causes
+  - Best practices for different languages and frameworks
+  - Security implications of different fix approaches
+  - Performance optimization techniques
+  - Multi-stage build strategies
+  
+  Always provide the MINIMAL fix that addresses the root cause, not just symptoms.
+  Consider security implications of your fixes.
+
+user: |
+  Fix this Dockerfile that failed to build:
+  
+  **Current Dockerfile:**
+  ```dockerfile
+  {{dockerfile_content}}
+  ```
+  
+  **Build Error:**
+  ```
+  {{error_message}}
+  ```
+  
+  **Build Context:**
+  {{build_context}}
+  
+  **Repository Analysis Context:**
+  - Language: {{language}} {{framework}}
+  - Dependencies: {{dependencies}}
+  - Build System: {{build_system}}
+  - Entry Point: {{entry_point}}
+  
+  **Requirements:**
+  - Maintain security best practices
+  - Optimize for build speed and final image size
+  - Ensure production readiness
+  - Follow language-specific best practices
+  
+  Analyze the error and provide fixes in JSON format:
+  {
+    "root_cause_analysis": "detailed_explanation_of_what_caused_the_error",
+    "fixed_dockerfile": "complete_corrected_dockerfile_content",
+    "changes_made": [
+      {
+        "line_changed": "line_number_or_new",
+        "old_content": "original_line_content",
+        "new_content": "fixed_line_content", 
+        "reasoning": "why_this_change_fixes_the_issue"
+      }
+    ],
+    "security_improvements": [
+      "additional_security_enhancements_applied"
+    ],
+    "performance_optimizations": [
+      "performance_improvements_applied"
+    ],
+    "alternative_approaches": [
+      {
+        "approach": "alternative_fix_description",
+        "pros": ["advantages"],
+        "cons": ["disadvantages"],
+        "when_to_use": "scenarios_where_this_is_better"
+      }
+    ],
+    "testing_recommendations": [
+      "commands_to_test_the_fix"
+    ],
+    "prevention_tips": [
+      "how_to_avoid_this_error_in_the_future"
+    ]
+  }
+
+outputFormat: json
+max_tokens: 3000
+temperature: 0.2

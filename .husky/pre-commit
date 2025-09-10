@@ -1,0 +1,31 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🛡️ Running pre-commit quality gates..."
+
+# Fail fast on any error
+set -eu
+
+# Run format and add any changes
+echo "🎨 Running formatter..."
+npm run format > /dev/null 2>&1
+
+# Add any formatting changes with existence check
+if git diff --name-only | grep -q '.'; then
+    git add -u
+fi
+
+# Run lint-staged for incremental checks
+npx lint-staged
+
+# Run quality gates
+./scripts/quality-gates.sh
+
+# Stage the quality-gates.json file if it was modified AND still exists
+# Check: file exists AND is not deleted in git status
+if [ -f quality-gates.json ] && git status --porcelain | grep -v '^D ' | grep -q "quality-gates.json"; then
+    echo "📊 Staging updated quality-gates.json metrics..."
+    git add quality-gates.json
+fi
+
+echo "✅ Pre-commit checks passed!"

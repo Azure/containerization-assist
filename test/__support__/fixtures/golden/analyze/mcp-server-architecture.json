@@ -1,0 +1,85 @@
+{
+  "language": "typescript",
+  "framework": "mcp-server",
+  "packageManager": "npm",
+  "nodeVersion": "18.0.0",
+  "ports": [8080, 3000],
+  "required_ports": [8080],
+  "dependencies": [
+    "@modelcontextprotocol/sdk",
+    "pino",
+    "zod",
+    "events"
+  ],
+  "devDependencies": [
+    "@jest/globals",
+    "ts-jest",
+    "typescript",
+    "eslint"
+  ],
+  "scripts": {
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint src/"
+  },
+  "entryPoint": "dist/index.js",
+  "hasTests": true,
+  "hasDockerfile": false,
+  "packageFile": "package.json",
+  "sourceDirectory": "src",
+  "testDirectory": "test",
+  "hasHealthCheck": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "architecture": {
+    "consolidated": true,
+    "components": {
+      "types": {
+        "name": "Type Consolidation",
+        "status": "completed",
+        "components": [
+          "src/domain/types/session.ts",
+          "src/domain/types/errors.ts", 
+          "src/domain/types/result.ts",
+          "src/domain/types/docker.ts"
+        ]
+      },
+      "infrastructure": {
+        "name": "Infrastructure Standardization", 
+        "status": "completed",
+        "components": [
+          "src/infrastructure/core/logger-types.ts",
+          "src/infrastructure/core/messaging/publisher.ts",
+          "src/infrastructure/docker/docker-service.ts"
+        ]
+      },
+      "services": {
+        "name": "Service Layer Organization",
+        "status": "completed", 
+        "components": [
+          "src/service/session/manager.ts",
+          "src/service/workflow/manager.ts",
+          "src/service/tools/registry.ts"
+        ]
+      }
+    },
+    "testCoverage": {
+      "threshold": 70,
+      "actualCoverage": {
+        "errors.ts": 100,
+        "result.ts": 100,
+        "logger-types.ts": 95,
+        "messaging/publisher.ts": 90
+      }
+    }
+  },
+  "metadata": {
+    "analysisVersion": "2.0.0",
+    "timestamp": "2024-01-01T00:00:00Z",
+    "confidence": 0.98,
+    "consolidationPhase": "integration-complete",
+    "validationComplete": true
+  }
+}
