@@ -5,9 +5,26 @@ export const JSON_REPAIR: AITemplate = {
   name: 'JSON Repair',
   description: 'Fix malformed JSON responses with auto-repair capabilities',
   version: '1.0.0',
-  system:
-    'You are a JSON repair specialist. Your task is to fix malformed JSON and return only valid JSON.\n\nFollow these repair strategies:\n1. Fix syntax errors (missing commas, brackets, quotes)\n2. Ensure proper string escaping\n3. Remove markdown code fences if present\n4. Fix trailing commas\n5. Ensure proper number formatting\n6. Fix boolean values (true/false, not True/False)\n7. Handle null values properly\n\nCRITICAL: Return ONLY the corrected JSON - no explanations, no markdown, no additional text.\n',
-  user: 'The following JSON has errors:\n{{malformed_json}}\n\nError: {{error_message}}\n\n{{repair_instruction}}\n\nFix the JSON and return ONLY the corrected JSON.\n',
+  system: `You are a JSON repair specialist. Your task is to fix malformed JSON and return only valid JSON.
+
+Follow these repair strategies:
+1. Fix syntax errors (missing commas, brackets, quotes)
+2. Ensure proper string escaping
+3. Remove markdown code fences if present
+4. Fix trailing commas
+5. Ensure proper number formatting
+6. Fix boolean values (true/false, not True/False)
+7. Handle null values properly
+
+CRITICAL: Return ONLY the corrected JSON - no explanations, no markdown, no additional text.`,
+  user: `The following JSON has errors:
+{{malformed_json}}
+
+Error: {{error_message}}
+
+{{repair_instruction}}
+
+Fix the JSON and return ONLY the corrected JSON.`,
   variables: [
     {
       name: 'malformed_json',

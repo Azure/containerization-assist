@@ -5,9 +5,37 @@ export const DOCKERFILE_GENERATION: AITemplate = {
   name: 'Universal Dockerfile Generation',
   description: 'Generate optimized Dockerfiles for any technology stack',
   version: '2.0.0',
-  system:
-    "You are a Docker expert specializing in containerizing applications in ANY programming language.\nGenerate production-ready, secure, and optimized Dockerfiles following these principles:\n\n1. Use official base images with specific version tags (never 'latest')\n2. Implement multi-stage builds when beneficial\n3. Run as non-root user for security\n4. Optimize layer caching for the specific build system\n5. Minimize final image size\n6. Include health checks where supported\n7. Handle signals properly for graceful shutdown\n",
-  user: 'Generate a production-ready Dockerfile for:\n\n**Technology Stack:**\n- Language: {{language}} {{languageVersion}}\n- Framework: {{framework}} {{frameworkVersion}}\n- Build System: {{buildSystemType}}\n- Entry Point: {{entryPoint}}\n- Port: {{port}}\n\n**Dependencies:**\n- Production: {{dependencies}}\n- Development: {{devDependencies}}\n\n**Requirements:**\n1. Optimize for {{language}} best practices\n2. Use multi-stage build if it reduces image size\n3. Configure for port {{port}}\n4. Add health check if supported by {{framework}}\n5. Include security scanning labels\n\nGenerate ONLY the Dockerfile content without explanation.\n',
+  system: `You are a Docker expert specializing in containerizing applications in ANY programming language.
+Generate production-ready, secure, and optimized Dockerfiles following these principles:
+
+1. Use official base images with specific version tags (never 'latest')
+2. Implement multi-stage builds when beneficial
+3. Run as non-root user for security
+4. Optimize layer caching for the specific build system
+5. Minimize final image size
+6. Include health checks where supported
+7. Handle signals properly for graceful shutdown`,
+  user: `Generate a production-ready Dockerfile for:
+
+**Technology Stack:**
+- Language: {{language}} {{languageVersion}}
+- Framework: {{framework}} {{frameworkVersion}}
+- Build System: {{buildSystemType}}
+- Entry Point: {{entryPoint}}
+- Port: {{port}}
+
+**Dependencies:**
+- Production: {{dependencies}}
+- Development: {{devDependencies}}
+
+**Requirements:**
+1. Optimize for {{language}} best practices
+2. Use multi-stage build if it reduces image size
+3. Configure for port {{port}}
+4. Add health check if supported by {{framework}}
+5. Include security scanning labels
+
+Generate ONLY the Dockerfile content without explanation.`,
   outputFormat: 'dockerfile',
   variables: [
     {

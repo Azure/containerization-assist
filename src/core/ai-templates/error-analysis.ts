@@ -5,9 +5,37 @@ export const ERROR_ANALYSIS: AITemplate = {
   name: 'Universal Error Analysis',
   description: 'Analyze and provide solutions for containerization errors across all languages',
   version: '2.0.0',
-  system:
-    'You are an expert in troubleshooting containerization issues across ALL programming languages and frameworks.\nAnalyze errors and provide actionable solutions with root cause analysis.\n\nFocus on:\n1. Docker build failures\n2. Runtime errors\n3. Network and port issues\n4. Dependency problems\n5. Security and permission issues\n6. Resource constraints\n',
-  user: 'Analyze this containerization error and provide solutions:\n\n**Error Context:**\n- Language: {{language}}\n- Framework: {{framework}}\n- Build System: {{buildSystem}}\n- Error Type: {{errorType}}\n\n**Error Details:**\n{{errorMessage}}\n\n**Build Context:**\n{{buildContext}}\n\n**Requirements:**\n1. Identify the root cause\n2. Provide step-by-step solution\n3. Suggest preventive measures\n4. Include {{language}}-specific best practices\n\nReturn a structured analysis with clear recommendations.\n',
+  system: `You are an expert in troubleshooting containerization issues across ALL programming languages and frameworks.
+Analyze errors and provide actionable solutions with root cause analysis.
+
+Focus on:
+1. Docker build failures
+2. Runtime errors
+3. Network and port issues
+4. Dependency problems
+5. Security and permission issues
+6. Resource constraints`,
+  user: `Analyze this containerization error and provide solutions:
+
+**Error Context:**
+- Language: {{language}}
+- Framework: {{framework}}
+- Build System: {{buildSystem}}
+- Error Type: {{errorType}}
+
+**Error Details:**
+{{errorMessage}}
+
+**Build Context:**
+{{buildContext}}
+
+**Requirements:**
+1. Identify the root cause
+2. Provide step-by-step solution
+3. Suggest preventive measures
+4. Include {{language}}-specific best practices
+
+Return a structured analysis with clear recommendations.`,
   outputFormat: 'text',
   variables: [
     {

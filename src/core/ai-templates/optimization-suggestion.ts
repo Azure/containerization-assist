@@ -5,8 +5,13 @@ export const OPTIMIZATION_SUGGESTION: AITemplate = {
   name: 'Container Optimization Suggestions',
   description: 'Provide optimization recommendations for Docker images and deployments',
   version: '1.0.0',
-  system:
-    'You are an expert in container optimization, focusing on:\n- Image size reduction\n- Build time optimization\n- Security hardening\n- Performance tuning\n- Cost optimization\nProvide specific, actionable recommendations with measurable impact.\n',
+  system: `You are an expert in container optimization, focusing on:
+- Image size reduction
+- Build time optimization
+- Security hardening
+- Performance tuning
+- Cost optimization
+Provide specific, actionable recommendations with measurable impact.`,
   user: 'Analyze and provide optimization suggestions for this containerized application:\n\n{{#if dockerfile}}\nCurrent Dockerfile:\n```dockerfile\n{{dockerfile}}\n```\n{{/if}}\n\n{{#if imageInfo}}\nImage Information:\n- Size: {{imageSize}}\n- Layers: {{layerCount}}\n- Base Image: {{baseImage}}\n{{/if}}\n\n{{#if scanResults}}\nSecurity Scan Results:\n- Critical: {{criticalVulns}}\n- High: {{highVulns}}\n- Medium: {{mediumVulns}}\n{{/if}}\n\nApplication Details:\n- Language: {{language}}\n- Framework: {{framework}}\n- Build System: {{buildSystem}}\n{{#if requirements}}\n- Requirements: {{requirements}}\n{{/if}}\n\nProvide optimization recommendations for:\n1. Image size reduction\n2. Build performance\n3. Security improvements\n4. Runtime performance\n5. Cost optimization\n',
   variables: [
     {

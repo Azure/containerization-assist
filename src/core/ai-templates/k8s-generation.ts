@@ -5,9 +5,39 @@ export const K8S_GENERATION: AITemplate = {
   name: 'Universal Kubernetes Manifests Generation',
   description: 'Generate production-ready Kubernetes manifests for any application',
   version: '2.0.0',
-  system:
-    'You are a Kubernetes expert specializing in application deployments for ANY technology stack.\nGenerate production-ready Kubernetes manifests with proper resource limits, probes, and configurations.\n\nFollow these principles:\n1. Use appropriate resource requests and limits\n2. Include liveness and readiness probes\n3. Configure security contexts\n4. Use ConfigMaps for configuration\n5. Implement proper labeling and selectors\n6. Consider scalability requirements\n',
-  user: 'Generate Kubernetes manifests for:\n\n**Application Details:**\n- Image: {{image}}\n- Port: {{port}}\n- Language: {{language}}\n- Framework: {{framework}}\n- Replicas: {{replicas}}\n\n**Configuration:**\n- Environment: {{environment}}\n- Resources: {{resources}}\n- Health Check Path: {{healthCheckPath}}\n\n**Requirements:**\n1. Deployment with appropriate resource limits for {{language}}\n2. Service (ClusterIP type)\n3. ConfigMap for environment variables\n4. Liveness and readiness probes using {{healthCheckPath}}\n5. Security context with non-root user\n6. Horizontal Pod Autoscaler if replicas > 3\n\nGenerate ONLY the YAML manifests without explanation.\n',
+  system: `You are a Kubernetes expert specializing in application deployments for ANY technology stack.
+Generate production-ready Kubernetes manifests with proper resource limits, probes, and configurations.
+
+Follow these principles:
+1. Use appropriate resource requests and limits
+2. Include liveness and readiness probes
+3. Configure security contexts
+4. Use ConfigMaps for configuration
+5. Implement proper labeling and selectors
+6. Consider scalability requirements`,
+  user: `Generate Kubernetes manifests for:
+
+**Application Details:**
+- Image: {{image}}
+- Port: {{port}}
+- Language: {{language}}
+- Framework: {{framework}}
+- Replicas: {{replicas}}
+
+**Configuration:**
+- Environment: {{environment}}
+- Resources: {{resources}}
+- Health Check Path: {{healthCheckPath}}
+
+**Requirements:**
+1. Deployment with appropriate resource limits for {{language}}
+2. Service (ClusterIP type)
+3. ConfigMap for environment variables
+4. Liveness and readiness probes using {{healthCheckPath}}
+5. Security context with non-root user
+6. Horizontal Pod Autoscaler if replicas > 3
+
+Generate ONLY the YAML manifests without explanation.`,
   outputFormat: 'kubernetes',
   variables: [
     {

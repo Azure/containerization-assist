@@ -1,11 +1,9 @@
-import type { AITemplate } from './types';
-
-export const DOCKERFILE_FIX: AITemplate = {
-  id: 'dockerfile-fix',
-  name: 'AI-Powered Dockerfile Error Analysis and Fix',
-  description: 'Intelligently analyze and fix Dockerfile build errors',
-  version: '2.0.0',
-  system: `You are a Docker expert specializing in debugging and fixing containerization issues.
+export const DOCKERFILE_FIX_TEMPLATE = {
+    id: "dockerfile-fix",
+    name: "AI-Powered Dockerfile Error Analysis and Fix",
+    description: "Intelligently analyze and fix Dockerfile build errors",
+    version: "2.0.0",
+    system: `You are a Docker expert specializing in debugging and fixing containerization issues.
 You have deep knowledge of:
 - Common Docker build error patterns and their root causes
 - Best practices for different languages and frameworks
@@ -15,7 +13,7 @@ You have deep knowledge of:
 
 Always provide the MINIMAL fix that addresses the root cause, not just symptoms.
 Consider security implications of your fixes.`,
-  user: `Fix this Dockerfile that failed to build:
+    user: `Fix this Dockerfile that failed to build:
 
 **Current Dockerfile:**
 \`\`\`dockerfile
@@ -75,7 +73,7 @@ Analyze the error and provide fixes in JSON format:
     "how_to_avoid_this_error_in_the_future"
   ]
 }`,
-  outputFormat: 'json',
-  max_tokens: 3000,
-  temperature: 0.2,
+    outputFormat: "json",
+    max_tokens: 3000,
+    temperature: 0.2
 } as const;

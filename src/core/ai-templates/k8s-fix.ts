@@ -5,9 +5,32 @@ export const K8S_FIX: AITemplate = {
   name: 'Kubernetes Manifest Fix',
   description: 'Fix Kubernetes deployment issues based on error messages',
   version: '1.0.0',
-  system:
-    'You are a Kubernetes expert specializing in debugging and fixing deployment issues.\nAnalyze the error message and provide corrected Kubernetes manifests.\nFocus on common issues like resource limits, image pull policies, and RBAC.\nEnsure manifests follow best practices and are production-ready.\n',
-  user: 'Fix the Kubernetes manifest based on this error:\n\nCurrent Manifest:\n```yaml\n{{manifest}}\n```\n\nError Message:\n{{error}}\n\n{{#if context}}\nAdditional Context:\n{{context}}\n{{/if}}\n\n{{#if clusterInfo}}\nCluster Information:\n{{clusterInfo}}\n{{/if}}\n\nProvide the complete corrected manifest with the issue resolved.\nInclude comments explaining what was fixed.\n',
+  system: `You are a Kubernetes expert specializing in debugging and fixing deployment issues.
+Analyze the error message and provide corrected Kubernetes manifests.
+Focus on common issues like resource limits, image pull policies, and RBAC.
+Ensure manifests follow best practices and are production-ready.`,
+  user: `Fix the Kubernetes manifest based on this error:
+
+Current Manifest:
+\`\`\`yaml
+{{manifest}}
+\`\`\`
+
+Error Message:
+{{error}}
+
+{{#if context}}
+Additional Context:
+{{context}}
+{{/if}}
+
+{{#if clusterInfo}}
+Cluster Information:
+{{clusterInfo}}
+{{/if}}
+
+Provide the complete corrected manifest with the issue resolved.
+Include comments explaining what was fixed.`,
   variables: [
     {
       name: 'manifest',

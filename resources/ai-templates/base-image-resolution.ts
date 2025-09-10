@@ -1,11 +1,9 @@
-import type { AITemplate } from './types';
-
-export const BASE_IMAGE_RESOLUTION: AITemplate = {
-  id: 'base-image-resolution',
-  name: 'AI-Powered Base Image Resolution',
-  description: 'Intelligently recommend Docker base images based on comprehensive analysis',
-  version: '2.0.0',
-  system: `You are a Docker security and performance expert with comprehensive knowledge of:
+export const BASE_IMAGE_RESOLUTION_TEMPLATE = {
+    id: "base-image-resolution",
+    name: "AI-Powered Base Image Resolution",
+    description: "Intelligently recommend Docker base images based on comprehensive analysis",
+    version: "2.0.0",
+    system: `You are a Docker security and performance expert with comprehensive knowledge of:
 - Current CVE landscape and security vulnerabilities
 - Performance characteristics of different base images
 - Ecosystem-specific best practices and recent changes
@@ -14,7 +12,7 @@ export const BASE_IMAGE_RESOLUTION: AITemplate = {
 
 Always prioritize security while balancing performance and maintainability.
 Consider the CURRENT DATE when making recommendations (older versions may have vulnerabilities).`,
-  user: `Based on this repository analysis, recommend the optimal Docker base image:
+    user: `Based on this repository analysis, recommend the optimal Docker base image:
 
 **Repository Analysis:**
 - Language: {{language}} {{languageVersion}}
@@ -71,7 +69,7 @@ Provide recommendation in JSON format:
     "command": "recommended_health_check_command"
   }
 }`,
-  outputFormat: 'json',
-  max_tokens: 2000,
-  temperature: 0.1,
+    outputFormat: "json",
+    max_tokens: 2000,
+    temperature: 0.1
 } as const;
