@@ -71,6 +71,8 @@ export interface WorkflowContext {
 export interface ContainerizationWorkflowParams {
   sessionId: string;
   projectPath: string;
+  moduleRoots?: string[];
+  language?: 'java' | 'dotnet' | 'other';
   buildOptions?: {
     dockerfilePath?: string;
     contextPath?: string;

@@ -23,7 +23,7 @@
  */
 
 import { Result, Success, Failure } from '@types';
-import { analyzeRepo } from '@tools/analyze-repo';
+import { analyzeRepo, AnalyzeRepoParams } from '@tools/analyze-repo';
 import { generateDockerfile } from '@tools/generate-dockerfile';
 import { buildImage } from '@tools/build-image';
 import { scanImage } from '@tools/scan';
@@ -57,6 +57,8 @@ export interface ContainerizationConfig {
   stepsToRun?: string[];
   /** Custom Dockerfile content to use instead of generation */
   customDockerfile?: string;
+  moduleRoots?: string[];
+  language?: 'java' | 'dotnet' | 'other';
 }
 
 /** Repository analysis result with flexible structure */
@@ -97,7 +99,7 @@ export interface ContainerizationResult {
 export const runContainerizationWorkflow = async (
   repoPath: string,
   context: ToolContext,
-  config: ContainerizationConfig = {},
+  config: ContainerizationConfig,
 ): Promise<Result<ContainerizationResult>> => {
   const startTime = Date.now();
   const sessionId = `workflow-${Date.now()}`;
@@ -114,7 +116,7 @@ export const runContainerizationWorkflow = async (
   try {
     // Step 1: Analyze repository (with optional sampling)
     logger.info('Step 1: Analyzing repository');
-    const analysisConfig = {
+    const analysisConfig: AnalyzeRepoParams = {
       sessionId,
       repoPath,
       depth: 3,
@@ -126,6 +128,8 @@ export const runContainerizationWorkflow = async (
         ...(config.securityFocus !== undefined && { securityFocus: config.securityFocus }),
         ...(config.performanceFocus !== undefined && { performanceFocus: config.performanceFocus }),
       }),
+      moduleRoots: config.moduleRoots,
+      language: config.language,
     };
 
     const analysis = await analyzeRepo(analysisConfig, context);

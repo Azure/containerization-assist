@@ -14,6 +14,8 @@ export const analyzeRepoSchema = z.object({
   includeTests: z.boolean().optional().describe('Include test files in analysis'),
   securityFocus: z.boolean().optional().describe('Focus on security aspects'),
   performanceFocus: z.boolean().optional().describe('Focus on performance aspects'),
+  moduleRoots: z.array(z.string()).optional().describe('Root directories of modules'),
+  language: z.enum(['java', 'dotnet', 'other']).optional().describe('Primary programming language'),
 });
 
 export type AnalyzeRepoParams = z.infer<typeof analyzeRepoSchema>;

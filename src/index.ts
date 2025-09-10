@@ -41,7 +41,7 @@ export {
 } from './exports/helpers.js';
 
 // Export the new clean API
-export { ContainerAssistServer } from './exports/container-assist-server.js';
+export { ContainerAssistServer } from './exports/containerization-assist-server.js';
 
 // Export types for external use
 export type { MCPTool, MCPToolMetadata, MCPToolResult, MCPServer } from './exports/types.js';

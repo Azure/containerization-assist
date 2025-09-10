@@ -10,7 +10,7 @@ import type { Result } from '@types';
  */
 export interface AnalysisContext {
   repoPath: string;
-  language?: string;
+  language: 'java' | 'dotnet' | 'other';
   framework?: string;
   dependencies?: Array<{ name: string; version?: string; type: string }>;
   ports?: number[];
@@ -18,6 +18,7 @@ export interface AnalysisContext {
   includeTests?: boolean;
   securityFocus?: boolean;
   performanceFocus?: boolean;
+  moduleRoots?: string[];
 }
 
 /**

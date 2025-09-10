@@ -93,7 +93,7 @@ program.parse(argv);
 
 const options = program.opts();
 const command = program.args[0] ?? 'start';
-const defaultDockerSockets = ['/var/run/docker.sock', '~/.colima/default/docker.socket'];
+const defaultDockerSockets = ['/var/run/docker.sock', '~/.colima/default/docker.sock'];
 
 // Enhanced transport detection and logging
 function getTransportInfo(options: any): { type: 'stdio' | 'http'; details: string } {
