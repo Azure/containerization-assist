@@ -80,6 +80,8 @@ async function performBaseAnalysis(
   const config: AnalyzeRepoConfig = {
     sessionId: `analysis-${Date.now()}`,
     repoPath: context.repoPath,
+    moduleRoots: context.moduleRoots,
+    language: context.language,
   };
 
   if (context.depth !== undefined) {

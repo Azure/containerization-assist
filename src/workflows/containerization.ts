@@ -139,6 +139,8 @@ export async function runContainerizationWorkflow(
         sessionId,
         repoPath: projectPath,
         includeTests: true,
+        moduleRoots: params.moduleRoots,
+        language: params.language,
       },
       toolContext,
     );
