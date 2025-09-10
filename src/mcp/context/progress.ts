@@ -179,17 +179,6 @@ export function createProgressReporterFromRequest(
 }
 
 /**
- * Validates progress token format.
- * Tokens must be non-empty strings with reasonable length limits.
- *
- * @param token - Token to validate
- * @returns True if token appears to be valid
- */
-export function isValidProgressToken(token: string): boolean {
-  return typeof token === 'string' && token.length > 0 && token.length <= 256;
-}
-
-/**
  * Creates a scoped progress reporter for a specific operation
  * Useful for tools that perform multiple sub-operations
  *

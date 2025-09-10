@@ -111,31 +111,6 @@ export class ContainerizationError extends Error {
 }
 
 /**
- * Validation errors for input validation failures
- */
-export class ValidationError extends ContainerizationError {
-  constructor(message: string, details?: Record<string, unknown>, cause?: Error) {
-    super(message, ErrorCodes.VALIDATION_FAILED, details, cause);
-    this.name = 'ValidationError';
-  }
-}
-
-/**
- * Docker-related errors
- */
-export class DockerError extends ContainerizationError {
-  constructor(
-    message: string,
-    code: ErrorCode = ErrorCodes.DOCKER_BUILD_FAILED,
-    details?: Record<string, unknown>,
-    cause?: Error,
-  ) {
-    super(message, code, details, cause);
-    this.name = 'DockerError';
-  }
-}
-
-/**
  * Session management errors
  */
 export class SessionError extends ContainerizationError {
@@ -175,7 +150,7 @@ export function isContainerizationError(error: unknown): error is Containerizati
 /**
  * Convert ContainerizationError to Result type (for MCP boundaries)
  */
-export function errorToResult(error: ContainerizationError): { ok: false; error: string } {
+function errorToResult(error: ContainerizationError): { ok: false; error: string } {
   return {
     ok: false,
     error: `${error.code}: ${error.message}`,

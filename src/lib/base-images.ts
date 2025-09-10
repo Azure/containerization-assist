@@ -5,7 +5,7 @@
  * Consolidates previously duplicated implementations across multiple files.
  */
 
-export interface BaseImageRecommendations {
+interface BaseImageRecommendations {
   primary: string;
   alternatives: string[];
   security?: string[];

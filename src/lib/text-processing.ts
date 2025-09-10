@@ -31,33 +31,6 @@ export const stripFencesAndNoise = (text: string): string => {
 };
 
 /**
- * Extracts text content from MCP response content arrays
- *
- * Processes MCP protocol response content arrays and extracts text content.
- * Filters for text content types and joins multiple text blocks.
- *
- * @param content - Array of content objects from MCP response
- * @returns Joined text content, or empty string if no text found
- *
- * @example
- * ```typescript
- * const content = [
- *   { type: 'text', text: 'Hello ' },
- *   { type: 'text', text: 'World' }
- * ];
- * const text = extractTextFromContent(content);
- * // Result: "Hello World"
- * ```
- */
-export const extractTextFromContent = (content: Array<{ type: string; text?: string }>): string => {
-  return content
-    .filter((item) => item.type === 'text' && typeof item.text === 'string')
-    .map((item) => item.text || '')
-    .join('\n')
-    .trim();
-};
-
-/**
  * Validates that text content looks like a Dockerfile
  *
  * Performs basic validation to ensure content appears to be valid Dockerfile content:

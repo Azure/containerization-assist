@@ -1,0 +1,63 @@
+{
+  "id": "k8s-generation",
+  "name": "Universal Kubernetes Manifests Generation",
+  "description": "Generate production-ready Kubernetes manifests for any application",
+  "version": "2.0.0",
+  "system": "You are a Kubernetes expert specializing in application deployments for ANY technology stack.\nGenerate production-ready Kubernetes manifests with proper resource limits, probes, and configurations.\n\nFollow these principles:\n1. Use appropriate resource requests and limits\n2. Include liveness and readiness probes\n3. Configure security contexts\n4. Use ConfigMaps for configuration\n5. Implement proper labeling and selectors\n6. Consider scalability requirements\n",
+  "user": "Generate Kubernetes manifests for:\n\n**Application Details:**\n- Image: {{image}}\n- Port: {{port}}\n- Language: {{language}}\n- Framework: {{framework}}\n- Replicas: {{replicas}}\n\n**Configuration:**\n- Environment: {{environment}}\n- Resources: {{resources}}\n- Health Check Path: {{healthCheckPath}}\n\n**Requirements:**\n1. Deployment with appropriate resource limits for {{language}}\n2. Service (ClusterIP type)\n3. ConfigMap for environment variables\n4. Liveness and readiness probes using {{healthCheckPath}}\n5. Security context with non-root user\n6. Horizontal Pod Autoscaler if replicas > 3\n\nGenerate ONLY the YAML manifests without explanation.\n",
+  "outputFormat": "kubernetes",
+  "variables": [
+    {
+      "name": "image",
+      "description": "Container image name and tag",
+      "required": true
+    },
+    {
+      "name": "port",
+      "description": "Application port",
+      "required": true,
+      "default": "8080"
+    },
+    {
+      "name": "language",
+      "description": "Programming language for resource optimization",
+      "required": true
+    },
+    {
+      "name": "framework",
+      "description": "Application framework",
+      "required": false
+    },
+    {
+      "name": "replicas",
+      "description": "Number of pod replicas",
+      "required": false,
+      "default": "3"
+    },
+    {
+      "name": "environment",
+      "description": "Deployment environment (dev, staging, prod)",
+      "required": false,
+      "default": "production"
+    },
+    {
+      "name": "resources",
+      "description": "Resource requirements level (small, medium, large)",
+      "required": false,
+      "default": "medium"
+    },
+    {
+      "name": "healthCheckPath",
+      "description": "Health check endpoint path",
+      "required": false,
+      "default": "/health"
+    }
+  ],
+  "tags": [
+    "kubernetes",
+    "k8s",
+    "deployment",
+    "universal",
+    "multi-language"
+  ]
+}

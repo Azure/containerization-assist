@@ -1,0 +1,88 @@
+import type { PromptFile } from '../../core/prompts/static-loader';
+
+export const fixDockerfile: PromptFile = {
+  metadata: {
+    name: 'fix-dockerfile',
+    category: 'containerization',
+    description: 'Fix issues in an existing Dockerfile based on analysis and error context',
+    version: '1.0',
+    parameters: [
+      {
+        name: 'dockerfileContent',
+        type: 'string',
+        required: true,
+        description: 'Current Dockerfile content to fix',
+      },
+      {
+        name: 'errors',
+        type: 'array',
+        required: false,
+        description: 'Array of specific errors to address',
+      },
+      {
+        name: 'buildError',
+        type: 'string',
+        required: false,
+        description: 'Build error message that occurred',
+      },
+      {
+        name: 'language',
+        type: 'string',
+        required: false,
+        description: 'Programming language of the application',
+      },
+      {
+        name: 'framework',
+        type: 'string',
+        required: false,
+        description: 'Framework used by the application',
+      },
+      {
+        name: 'analysis',
+        type: 'string',
+        required: false,
+        description: 'Repository analysis context',
+      },
+    ],
+  },
+  template: `Fix the provided Dockerfile to resolve build issues and improve best practices.
+
+Current Dockerfile:
+{{dockerfileContent}}
+
+{{#buildError}}
+Build Error:
+{{buildError}}
+{{/buildError}}
+
+{{#errors}}
+Specific Issues to Fix:
+{{#each errors}}
+- {{this}}
+{{/each}}
+{{/errors}}
+
+{{#language}}
+Language: {{language}}
+{{/language}}
+
+{{#framework}}
+Framework: {{framework}}
+{{/framework}}
+
+{{#analysis}}
+Repository Context:
+{{analysis}}
+{{/analysis}}
+
+Requirements:
+1. Fix any syntax errors and build failures
+2. Apply containerization best practices
+3. Ensure proper build caching and layer optimization
+4. Use security best practices (non-root user, minimal packages)
+5. Optimize for image size where possible
+6. Maintain the original functionality and intent
+
+Return only the corrected Dockerfile content without explanation or code fences.
+`,
+};

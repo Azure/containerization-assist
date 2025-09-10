@@ -1,0 +1,44 @@
+import type { PromptFile } from '../../core/prompts/static-loader';
+
+export const dockerfileSampling: PromptFile = {
+  metadata: {
+    name: 'dockerfile-sampling',
+    category: 'sampling',
+    description: 'Generate Dockerfile variants for sampling',
+    version: '1.0',
+    parameters: [
+      {
+        name: 'strategy',
+        type: 'string',
+        required: true,
+        description: 'Optimization strategy (security, performance, size, balanced)',
+      },
+      {
+        name: 'language',
+        type: 'string',
+        required: true,
+        description: 'Programming language',
+      },
+      {
+        name: 'context',
+        type: 'string',
+        required: false,
+        description: 'Application context',
+      },
+    ],
+  },
+  template: `Generate an optimized Dockerfile for {{strategy}} strategy.
+
+Language: {{language}}
+{{#context}}Context: {{context}}{{/context}}
+
+Requirements:
+- Optimize for {{strategy}}
+- Follow containerization best practices
+- Use appropriate base images
+- Include security considerations
+- Minimize image size where possible
+
+Please provide a production-ready Dockerfile.
+`,
+};

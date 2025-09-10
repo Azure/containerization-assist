@@ -1,0 +1,117 @@
+import type { PromptFile } from '../../core/prompts/static-loader';
+
+export const enhanceRepoAnalysis: PromptFile = {
+  metadata: {
+    name: 'enhance-repo-analysis',
+    category: 'analysis',
+    description: 'Enhance repository analysis with AI insights and recommendations',
+    version: '1.0',
+    parameters: [
+      {
+        name: 'language',
+        type: 'string',
+        required: true,
+        description: 'Primary programming language detected',
+      },
+      {
+        name: 'framework',
+        type: 'string',
+        required: false,
+        description: 'Framework detected (if any)',
+      },
+      {
+        name: 'buildSystem',
+        type: 'string',
+        required: false,
+        description: 'Build system detected',
+      },
+      {
+        name: 'dependencies',
+        type: 'string',
+        required: false,
+        description: 'Comma-separated list of key dependencies',
+      },
+      {
+        name: 'hasTests',
+        type: 'boolean',
+        required: false,
+        description: 'Whether tests are present in the repository',
+      },
+      {
+        name: 'hasDocker',
+        type: 'boolean',
+        required: false,
+        description: 'Whether Docker files are already present',
+      },
+      {
+        name: 'ports',
+        type: 'string',
+        required: false,
+        description: 'Detected or inferred ports',
+      },
+      {
+        name: 'fileCount',
+        type: 'number',
+        required: false,
+        description: 'Approximate number of source files',
+      },
+      {
+        name: 'repoStructure',
+        type: 'string',
+        required: false,
+        description: 'Brief description of repository structure',
+      },
+    ],
+  },
+  template: `Provide enhanced analysis insights for a {{language}} repository.
+
+Repository Details:
+- Language: {{language}}
+{{#framework}}
+- Framework: {{framework}}
+{{/framework}}
+{{#buildSystem}}
+- Build System: {{buildSystem}}
+{{/buildSystem}}
+{{#dependencies}}
+- Key Dependencies: {{dependencies}}
+{{/dependencies}}
+{{#hasTests}}
+- Has Tests: {{hasTests}}
+{{/hasTests}}
+{{#hasDocker}}
+- Has Docker Files: {{hasDocker}}
+{{/hasDocker}}
+{{#ports}}
+- Detected Ports: {{ports}}
+{{/ports}}
+{{#fileCount}}
+- File Count: {{fileCount}}
+{{/fileCount}}
+{{#repoStructure}}
+- Structure: {{repoStructure}}
+{{/repoStructure}}
+
+Provide analysis in the following format:
+
+**Insights:**
+- [2-3 key insights about the project architecture and technology choices]
+
+**Containerization Recommendations:**
+- [Specific recommendations for containerizing this project]
+- [Build strategy suggestions]
+- [Performance and security considerations]
+
+**Risk Assessment:**
+- [Potential challenges or risks for containerization]
+- [Dependency complexity assessment]
+- [Security considerations]
+
+**Deployment Recommendations:**
+- [Suggested deployment patterns]
+- [Orchestration recommendations]
+- [Monitoring and observability suggestions]
+
+Keep the response concise but actionable, focusing on practical containerization and deployment guidance.
+`,
+};

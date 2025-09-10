@@ -1,0 +1,59 @@
+import type { PromptFile } from '../../core/prompts/static-loader';
+
+export const strategyOptimization: PromptFile = {
+  metadata: {
+    name: 'strategy-optimization',
+    category: 'sampling',
+    description: 'Generate strategy-specific optimization prompts for sampling',
+    version: '1.0',
+    parameters: [
+      {
+        name: 'strategy',
+        type: 'string',
+        required: true,
+        description: 'Strategy type (security, performance, size, balanced)',
+      },
+      {
+        name: 'context',
+        type: 'string',
+        required: true,
+        description: 'Analysis context including language and framework',
+      },
+      {
+        name: 'language',
+        type: 'string',
+        required: false,
+        description: 'Programming language',
+      },
+      {
+        name: 'framework',
+        type: 'string',
+        required: false,
+        description: 'Framework being used',
+      },
+      {
+        name: 'focus',
+        type: 'string',
+        required: false,
+        description: 'Specific focus area',
+      },
+      {
+        name: 'environment',
+        type: 'string',
+        required: false,
+        description: 'Target environment',
+      },
+    ],
+  },
+  template: `Generate optimized containerization strategy for {{strategy}} optimization.
+Language: {{language}}
+{{#framework}}Framework: {{framework}}{{/framework}}
+{{#context}}Context: {{context}}{{/context}}
+
+Strategy focus: {{strategy}}
+{{#focus}}Specific focus: {{focus}}{{/focus}}
+{{#environment}}Target environment: {{environment}}{{/environment}}
+
+Provide specific recommendations for optimizing the containerization approach.
+`,
+};

@@ -228,14 +228,3 @@ export const tools = adaptedTools;
 export function getAllTools(): MCPTool[] {
   return Object.values(adaptedTools);
 }
-
-/**
- * Get all available tools as a map
- */
-export function getToolsMap(): Map<string, MCPTool> {
-  const map = new Map<string, MCPTool>();
-  Object.values(adaptedTools).forEach((tool) => {
-    map.set(tool.name, tool);
-  });
-  return map;
-}

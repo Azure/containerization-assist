@@ -66,27 +66,6 @@ export interface SecurityReport {
   };
 }
 
-/**
- * Functional scan implementation for Docker images
- * Simple mock implementation for development
- */
-export async function scanImage(
-  imageId: string,
-  options: ScanOptions,
-  logger: Logger,
-): Promise<Result<SecurityScanResult>> {
-  logger.info({ imageId, options }, 'Mock security scan');
-
-  // Mock implementation - replace with actual scanner integration
-  const result: SecurityScanResult = {
-    vulnerabilities: [],
-    summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0, unknown: 0 },
-    passed: true,
-  };
-
-  return Success(result);
-}
-
 interface CommandExecutor {
   execute(
     command: string,

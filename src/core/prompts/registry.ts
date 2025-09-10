@@ -1,18 +1,17 @@
 /**
  * Prompt Registry
  *
- * File-based prompt management system that loads prompts from external YAML files
+ * Static prompt management system that loads prompts from statically imported JSON files
  * and provides SDK-compatible interface for containerization workflows.
  *
  * Key features:
- * - External YAML prompt files for easy editing
+ * - Static JSON prompt files imported at compile time
  * - Template rendering with parameter substitution
  * - MCP SDK compatibility
  * - Validation and error handling
  */
 
 import type { Logger } from 'pino';
-import { join } from 'path';
 import {
   ListPromptsResult,
   GetPromptResult,
@@ -21,20 +20,20 @@ import {
   McpError,
   ErrorCode,
 } from '@modelcontextprotocol/sdk/types.js';
-import { SimplePromptLoader, type PromptFile, type ParameterSpec } from './loader';
+import { StaticPromptLoader, type PromptFile, type ParameterSpec } from './static-loader';
 import { Result } from '../../domain/types';
 
 /**
- * Prompt Registry for managing external YAML-based prompt templates
+ * Prompt Registry for managing statically imported JSON-based prompt templates
  *
- * This registry loads prompt templates from YAML files and provides a
+ * This registry loads prompt templates from statically imported JSON files and provides a
  * standardized interface for retrieving and formatting them. Supports
  * parameterized prompts with argument substitution and validation.
  *
  * @example
  * ```typescript
  * const registry = new PromptRegistry(logger);
- * await registry.initialize('./src/prompts');
+ * await registry.initialize();
  *
  * const prompt = await registry.getPrompt('dockerfile-generation', {
  *   language: 'nodejs',
@@ -43,24 +42,23 @@ import { Result } from '../../domain/types';
  * ```
  */
 export class PromptRegistry {
-  private loader: SimplePromptLoader;
+  private loader: StaticPromptLoader;
   private logger: Logger;
   private initialized = false;
 
   constructor(logger: Logger) {
     this.logger = logger.child({ component: 'PromptRegistry' });
-    this.loader = new SimplePromptLoader(logger);
+    this.loader = new StaticPromptLoader(logger);
   }
 
   /**
-   * Initialize the registry by loading prompts from directory
+   * Initialize the registry by loading prompts from static imports
    */
-  async initialize(promptsDirectory?: string): Promise<Result<void>> {
-    const directory = promptsDirectory || join(process.cwd(), 'src', 'prompts');
+  async initialize(_promptsDirectory?: string): Promise<Result<void>> {
+    // Ignore the directory parameter since we use static imports now
+    this.logger.info('Initializing prompt registry with static imports');
 
-    this.logger.info({ directory }, 'Initializing prompt registry');
-
-    const result = await this.loader.loadFromDirectory(directory);
+    const result = await this.loader.initialize();
     if (result.ok) {
       this.initialized = true;
       const promptCount = this.loader.getAllPrompts().length;
