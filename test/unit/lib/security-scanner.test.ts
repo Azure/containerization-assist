@@ -13,7 +13,7 @@ import {
   type SecretScanResult,
   type SecurityReport
 } from '../../../src/lib/security-scanner';
-import { Result, Success, Failure } from '../../../src/types';
+import { Success, Failure } from '../../../src/types';
 import type { Logger } from 'pino';
 
 // Mock the logger
