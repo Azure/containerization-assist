@@ -15,6 +15,7 @@ const { execSync } = require('child_process');
 const PUBLIC_API_PATTERNS = [
   /^src\/index\.ts:\d+/,
   /^src\/exports\//,
+  /^src\/mcp\/index\.ts:\d+/, // MCP public API
 ];
 
 const MCP_TOOL_PATTERNS = [
