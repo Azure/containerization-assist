@@ -98,40 +98,6 @@ export interface Tool {
 // ===== SESSION & WORKFLOW =====
 
 /**
- * Session management interface.
- */
-export interface SessionManagerInterface {
-  /**
-   * Creates a new workflow session.
-   * @param id - Unique session identifier
-   * @returns Promise resolving to Result with created session state
-   */
-  createSession(id: string): Promise<Result<WorkflowState>>;
-
-  /**
-   * Retrieves an existing session by ID.
-   * @param id - Session identifier to retrieve
-   * @returns Promise resolving to Result with session state
-   */
-  getSession(id: string): Promise<Result<WorkflowState>>;
-
-  /**
-   * Updates session state with partial updates.
-   * @param id - Session identifier to update
-   * @param updates - Partial state updates to apply
-   * @returns Promise resolving to Result with updated session state
-   */
-  updateSession(id: string, updates: Partial<WorkflowState>): Promise<Result<WorkflowState>>;
-
-  /**
-   * Deletes a session and its associated data.
-   * @param id - Session identifier to delete
-   * @returns Promise resolving to Result with deletion success status
-   */
-  deleteSession(id: string): Promise<Result<boolean>>;
-}
-
-/**
  * Represents the state of a workflow execution session.
  */
 export interface WorkflowState {

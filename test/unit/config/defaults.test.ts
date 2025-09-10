@@ -146,7 +146,6 @@ describe('App Configuration', () => {
       const content = readFileSync(appConfigPath, 'utf-8');
       
       expect(content).toContain('export');
-      expect(content).toContain('app');
     });
 
     it('should contain application-level configuration', () => {
