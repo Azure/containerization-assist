@@ -1,0 +1,52 @@
+{
+  "$schema": "./quality-gates.schema.json",
+  "schemaVersion": 1,
+  "metrics": {
+    "thresholds": {
+      "lint": {
+        "maxErrors": 0,
+        "maxWarnings": 2000
+      },
+      "deadcode": {
+        "max": 50
+      },
+      "typescript": {
+        "maxErrors": 0
+      },
+      "build": {
+        "maxTimeMs": 60000
+      }
+    },
+    "baselines": {
+      "lint": {
+        "errors": 0,
+        "warnings": 28
+      },
+      "deadcode": {
+        "count": 167
+      },
+      "typescript": {
+        "errors": 0
+      },
+      "build": {
+        "timeMs": 2000,
+        "mode": "clean",
+        "environment": {
+          "nodeVersion": "v24.1.0",
+          "os": "Linux",
+          "cpu": "x86_64"
+        }
+      }
+    },
+    "lint": {
+      "current": 25,
+      "warnings": 25,
+      "errors": 0,
+      "baseline": 25
+    },
+    "deadcode": {
+      "current": 245,
+      "baseline": 245
+    }
+  }
+}

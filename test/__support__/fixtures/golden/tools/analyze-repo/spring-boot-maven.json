@@ -1,0 +1,31 @@
+{
+  "language": "java",
+  "framework": "spring-boot",
+  "buildSystem": {
+    "type": "maven",
+    "version": "3.8.0"
+  },
+  "javaVersion": "17",
+  "springBootVersion": "3.1.0",
+  "ports": [8080],
+  "required_ports": [8080],
+  "dependencies": [
+    "spring-boot-starter-web",
+    "spring-boot-starter-actuator",
+    "spring-boot-starter-test"
+  ],
+  "mainClass": "com.example.Application",
+  "packaging": "jar",
+  "hasTests": true,
+  "hasDockerfile": false,
+  "buildFile": "pom.xml",
+  "sourceDirectory": "src/main/java",
+  "testDirectory": "src/test/java",
+  "resources": ["src/main/resources"],
+  "profiles": ["default"],
+  "metadata": {
+    "analysisVersion": "1.0.0",
+    "timestamp": "2024-01-01T00:00:00Z",
+    "confidence": 0.95
+  }
+}

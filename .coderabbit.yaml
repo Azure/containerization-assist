@@ -1,0 +1,224 @@
+# .coderabbit.yaml - Aggressive Review Configuration
+language: en-US
+tone_instructions: "Be thorough, direct, and uncompromising in identifying code quality issues. Focus on maintainability, performance, security, and best practices."
+
+early_access: true
+
+reviews:
+  # Assertive profile provides more comprehensive feedback
+  profile: assertive
+  
+  # Block merging until all CodeRabbit comments are resolved
+  request_changes_workflow: true
+  
+  # Enhanced summary and analysis features
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  review_status: true
+  commit_status: true
+  fail_commit_status: true
+  
+  # Comprehensive walkthrough features
+  changed_files_summary: true
+  sequence_diagrams: true
+  estimate_code_review_effort: true
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: true
+  suggested_labels: true
+  auto_apply_labels: true
+  suggested_reviewers: true
+  auto_assign_reviewers: true
+  
+  # Disable cache for fresh analysis every time
+  disable_cache: true
+  
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: true
+    base_branches: [".*"]  # Review all branches
+  
+  # Pre-merge checks with smart bypass for docs/tests-only changes
+  # These checks are relaxed to avoid blocking documentation or test-only PRs
+  # Policy: Strict for code changes, lenient for docs/tests/config updates
+  pre_merge_checks:
+    docstrings:
+      mode: warning  # Changed from error to warning - won't block docs/test PRs
+      threshold: 75  # Lowered from 90% to be more practical
+    title:
+      mode: warning  # Changed from error to warning for flexibility
+      requirements: "Title should be concise, descriptive, follow conventional commits format (feat:, fix:, docs:, test:, chore:, etc.), and be under 72 characters. Include ticket number if applicable."
+    description:
+      mode: warning  # Changed from error to warning
+    issue_assessment:
+      mode: warning  # Changed from error to warning
+    
+    # Custom quality checks
+    custom_checks:
+      - mode: error
+        name: "Code Complexity"
+        instructions: "Functions should be under 50 lines. Classes should have clear single responsibilities. Cyclomatic complexity should be under 10. Nested loops should be avoided where possible."
+      
+      - mode: error
+        name: "Security Practices"
+        instructions: "Check for hardcoded secrets, SQL injection vulnerabilities, XSS risks, insecure HTTP usage, weak cryptography, and improper input validation. Ensure proper authentication and authorization patterns."
+      
+      - mode: error
+        name: "Performance Standards"
+        instructions: "Identify inefficient algorithms, unnecessary API calls, memory leaks, blocking operations on main thread, missing caching opportunities, and unoptimized database queries."
+      
+      - mode: warning  # Changed to warning - won't block test-only or refactoring PRs
+        name: "Testing Coverage"
+        instructions: "New public methods and functions should have corresponding unit tests. Integration tests recommended for API endpoints. Edge cases and error scenarios should be tested. This is a warning for docs/test-only changes."
+      
+      - mode: warning  # Changed to warning - won't block docs-only PRs
+        name: "Documentation Standards"
+        instructions: "Public APIs should have comprehensive documentation. Complex business logic benefits from inline comments explaining the why, not just the what. README files should be updated for new features. This is a warning for test/config-only changes."
+
+  # Comprehensive static analysis tools - all enabled
+  tools:
+    ast-grep:
+      essential_rules: true
+    shellcheck:
+      enabled: true
+    ruff:
+      enabled: true
+    markdownlint:
+      enabled: true
+    github-checks:
+      enabled: true
+      timeout_ms: 300000  # Extended timeout for thorough checks
+    languagetool:
+      enabled: true
+      level: picky  # Most strict grammar checking
+    biome:
+      enabled: true
+    hadolint:
+      enabled: true
+    swiftlint:
+      enabled: true
+    phpstan:
+      enabled: true
+      level: max  # Highest analysis level
+    phpmd:
+      enabled: true
+    phpcs:
+      enabled: true
+    golangci-lint:
+      enabled: true
+    yamllint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    checkov:
+      enabled: true
+    detekt:
+      enabled: true
+    eslint:
+      enabled: true
+    flake8:
+      enabled: true
+    rubocop:
+      enabled: true
+    buf:
+      enabled: true
+    regal:
+      enabled: true
+    actionlint:
+      enabled: true
+    pmd:
+      enabled: true
+    cppcheck:
+      enabled: true
+    semgrep:
+      enabled: true
+    circleci:
+      enabled: true
+    clippy:
+      enabled: true
+    sqlfluff:
+      enabled: true
+    prismaLint:
+      enabled: true
+    pylint:
+      enabled: true
+    oxc:
+      enabled: true
+    shopifyThemeCheck:
+      enabled: true
+    luacheck:
+      enabled: true
+    brakeman:
+      enabled: true
+    dotenvLint:
+      enabled: true
+    htmlhint:
+      enabled: true
+    checkmake:
+      enabled: true
+    osvScanner:
+      enabled: true
+
+  # Path-specific aggressive instructions
+  path_instructions:
+    - path: "**/*.js"
+      instructions: "Enforce strict ES6+ standards. Require JSDoc for all functions. Check for proper error handling, async/await usage over promises, and immutable data patterns. Validate proper React hooks usage and performance optimizations."
+    
+    - path: "**/*.ts"
+      instructions: "Enforce strict TypeScript configuration. All functions must have explicit return types. No 'any' types allowed without justification. Require proper generic constraints and utility types. Check for proper interface vs type usage."
+    
+    - path: "**/*.py"
+      instructions: "Enforce PEP 8 strictly. All functions must have type hints and comprehensive docstrings. Check for proper exception handling, context managers for resources, and Pythonic patterns. Validate security practices for web frameworks."
+    
+    - path: "**/*.java"
+      instructions: "Enforce strict Java conventions. All public methods must have JavaDoc. Check for proper exception handling, resource management, thread safety, and design patterns. Validate Spring Boot best practices where applicable."
+    
+    - path: "**/*.go"
+      instructions: "Follow Go conventions strictly. Check for proper error handling, goroutine safety, channel usage patterns, and interface design. Validate proper context usage and resource cleanup."
+    
+    - path: "**/*.sql"
+      instructions: "Check for SQL injection vulnerabilities, proper indexing strategies, query performance, and normalized database design. Validate proper transaction handling and constraint usage."
+    
+    - path: "**/docker/**"
+      instructions: "Enforce Docker security best practices: non-root users, minimal base images, proper layer caching, secret management, and vulnerability scanning. Check Dockerfile efficiency and multi-stage builds."
+    
+    - path: "**/*.yaml"
+      instructions: "Validate YAML syntax, security configurations, proper indentation, and schema compliance. Check for hardcoded secrets and ensure environment-specific configurations are properly parameterized."
+
+  # Aggressive finishing touches
+  finishing_touches:
+    docstrings:
+      enabled: true
+    unit_tests:
+      enabled: true
+
+# Aggressive knowledge base settings
+knowledge_base:
+  web_search:
+    enabled: true
+  code_guidelines:
+    enabled: true
+  learnings:
+    scope: global
+  issues:
+    scope: global
+  pull_requests:
+    scope: global
+
+# Aggressive code generation settings
+code_generation:
+  docstrings:
+    language: en-US
+    path_instructions:
+      - path: "**/*.py"
+        instructions: "Generate comprehensive Google-style docstrings with Args, Returns, Raises sections. Include usage examples for complex functions."
+      - path: "**/*.js"
+        instructions: "Generate detailed JSDoc comments with @param, @returns, @throws, and @example tags."
+  
+  unit_tests:
+    path_instructions:
+      - path: "**/*.py"
+        instructions: "Generate comprehensive pytest tests covering happy path, edge cases, error scenarios, and mocking external dependencies. Use fixtures and parametrized tests."
+      - path: "**/*.js"
+        instructions: "Generate Jest/Mocha tests with proper mocking, async testing patterns, and coverage for all branches and edge cases."

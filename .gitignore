@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+
+# Data
+data/
+*.db
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+dist/
+build/
+!src/application/tools/build/
+.tsbuildinfo*
+*.tgz
+
+# Test
+coverage/
+.nyc_output/
+WEEK5_PERFORMANCE_*.json
+
+# Temporary
+tmp/
+temp/
+*.tmp
+*.backup.*
+
+# TypeScript
+*.tsbuildinfo
+
+# NPM
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime
+*.pid
+*.seed
+*.pid.lock
+
+CLAUDE.md
+.claude
+plans
+docs/development/claude-guide.md
+backups
+k8s

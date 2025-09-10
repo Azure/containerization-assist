@@ -1,0 +1,45 @@
+{
+  "testName": "save-load-test",
+  "repositoryType": "test-app",
+  "expectedFiles": [
+    {
+      "path": "Dockerfile",
+      "type": "dockerfile",
+      "required": true,
+      "contentRules": [
+        {
+          "name": "has-from-instruction",
+          "description": "Dockerfile must have a FROM instruction",
+          "type": "dockerfile",
+          "required": true,
+          "severity": "error"
+        },
+        {
+          "name": "has-workdir",
+          "description": "Dockerfile should specify WORKDIR",
+          "type": "dockerfile",
+          "severity": "warning"
+        },
+        {
+          "name": "uses-non-root-user",
+          "description": "Dockerfile should create and use non-root user",
+          "type": "dockerfile",
+          "severity": "warning"
+        },
+        {
+          "name": "has-healthcheck",
+          "description": "Dockerfile should include health check",
+          "type": "dockerfile",
+          "severity": "info"
+        },
+        {
+          "name": "exposes-ports",
+          "description": "Dockerfile should expose required ports",
+          "type": "dockerfile",
+          "severity": "warning"
+        }
+      ]
+    }
+  ],
+  "validationRules": []
+}
