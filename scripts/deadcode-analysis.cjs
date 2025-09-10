@@ -22,10 +22,28 @@ const MCP_TOOL_PATTERNS = [
   /src\/mcp\/server\/schemas\.ts:\d+ - \w+Schema/,
 ];
 
+// Patterns for exports likely used in tests (but missed by ts-prune)
+const TEST_USED_PATTERNS = [
+  // Error handling utilities (commonly used in test assertions)
+  /formatErrorMessage|extractStackTrace|isError|ensureError/,
+  // Validation functions (used in test fixtures)
+  /validate\w+|sanitize\w+|normalize\w+/,
+  // Security scanner functions (used in integration tests)
+  /scanImage|scanFilesystem|generateSecurityReport|getScannerVersion|updateDatabase/,
+  // Base image utilities (used in test scenarios)
+  /getBaseImageRecommendations|getImageMetadata/,
+  // Error conversion utilities (used in test error handling)
+  /isContainerizationError|errorToResult/,
+  // Kubernetes types (used in test mocks)
+  /DeploymentResult|ClusterInfo/,
+];
+
 const KEEP_PATTERNS = [
   /\(used in module\)$/, // Keep internal module exports
   ...PUBLIC_API_PATTERNS,
   ...MCP_TOOL_PATTERNS,
+  // Keep exports likely used in tests
+  ...TEST_USED_PATTERNS.map(pattern => new RegExp(`- ${pattern.source}`)),
 ];
 
 try {
@@ -49,6 +67,9 @@ try {
   const internalExports = lines.filter(line => 
     /\(used in module\)$/.test(line)
   ).length;
+  const testUsedExports = lines.filter(line =>
+    TEST_USED_PATTERNS.some(pattern => new RegExp(`- ${pattern.source}`).test(line))
+  ).length;
   const deadExports = actualDeadCode.length;
   
   console.log('=== Dead Code Analysis Report ===');
@@ -56,6 +77,7 @@ try {
   console.log(`├─ Internal usage: ${internalExports}`);
   console.log(`├─ Public API: ${publicApiExports}`);
   console.log(`├─ MCP tools: ${mcpExports}`);
+  console.log(`├─ Test-used (likely): ${testUsedExports}`);
   console.log(`└─ Actually dead: ${deadExports}`);
   console.log();
   
