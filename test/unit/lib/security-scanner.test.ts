@@ -1,6 +1,19 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { SecurityScanner, ScanResult, ScanOptions, VulnerabilityFinding } from '../../../src/lib/security-scanner';
-import { Result, Success, Failure } from '../../../src/domain/types';
+import { 
+  scanImageVulnerabilities,
+  scanFilesystem,
+  scanSecrets,
+  generateSecurityReport,
+  getScannerVersion,
+  updateDatabase,
+  type ScanOptions,
+  type VulnerabilityFinding,
+  type CommandExecutor,
+  type SecurityScanResult,
+  type SecretScanResult,
+  type SecurityReport
+} from '../../../src/lib/security-scanner';
+import { Result, Success, Failure } from '../../../src/types';
 import type { Logger } from 'pino';
 
 // Mock the logger
@@ -15,16 +28,15 @@ const mockLogger: Logger = {
 } as any;
 
 describe('SecurityScanner', () => {
-  let scanner: SecurityScanner;
-  let mockCommandExecutor: jest.Mocked<any>;
+  let mockCommandExecutor: jest.Mocked<CommandExecutor>;
+  let ctx: { commandExecutor: CommandExecutor; logger: Logger };
 
   beforeEach(() => {
     mockCommandExecutor = {
       execute: jest.fn(),
-      executeStreaming: jest.fn()
-    };
+    } as any;
 
-    scanner = new SecurityScanner(mockCommandExecutor, mockLogger);
+    ctx = { commandExecutor: mockCommandExecutor, logger: mockLogger };
   });
 
   afterEach(() => {
@@ -55,7 +67,7 @@ describe('SecurityScanner', () => {
         Success({ stdout: mockScanOutput, stderr: '', exitCode: 0 })
       );
 
-      const result = await scanner.scanImage('test-image:latest');
+      const result = await scanImageVulnerabilities(ctx, 'test-image:latest');
 
       expect(result.ok).toBe(true);
       expect(result.value.vulnerabilities).toHaveLength(1);
@@ -83,7 +95,7 @@ describe('SecurityScanner', () => {
         Success({ stdout: mockScanOutput, stderr: '', exitCode: 0 })
       );
 
-      const result = await scanner.scanImage('test-image:latest');
+      const result = await scanImageVulnerabilities(ctx, 'test-image:latest');
 
       expect(result.ok).toBe(true);
       expect(result.value.vulnerabilities).toHaveLength(0);
@@ -96,7 +108,7 @@ describe('SecurityScanner', () => {
         Failure('Trivy command failed')
       );
 
-      const result = await scanner.scanImage('test-image:latest');
+      const result = await scanImageVulnerabilities(ctx, 'test-image:latest');
 
       expect(result.ok).toBe(false);
       expect(result.error).toContain('Security scan failed');
@@ -107,7 +119,7 @@ describe('SecurityScanner', () => {
         Success({ stdout: 'invalid json', stderr: '', exitCode: 0 })
       );
 
-      const result = await scanner.scanImage('test-image:latest');
+      const result = await scanImageVulnerabilities(ctx, 'test-image:latest');
 
       expect(result.ok).toBe(false);
       expect(result.error).toContain('Failed to parse scan results');
@@ -139,7 +151,7 @@ describe('SecurityScanner', () => {
         timeout: 300000
       };
 
-      const result = await scanner.scanImage('test-image:latest', options);
+      const result = await scanImageVulnerabilities(ctx, 'test-image:latest', options);
 
       expect(result.ok).toBe(true);
       expect(result.value.vulnerabilities).toHaveLength(1);
@@ -157,7 +169,7 @@ describe('SecurityScanner', () => {
         timeout: 1000 // 1 second timeout
       };
 
-      const result = await scanner.scanImage('test-image:latest', options);
+      const result = await scanImageVulnerabilities(ctx, 'test-image:latest', options);
 
       expect(result.ok).toBe(false);
       expect(result.error).toContain('Operation timed out after 1000ms');
@@ -185,7 +197,7 @@ describe('SecurityScanner', () => {
         Success({ stdout: mockScanOutput, stderr: '', exitCode: 0 })
       );
 
-      const result = await scanner.scanFilesystem('/path/to/scan');
+      const result = await scanFilesystem(ctx, '/path/to/scan');
 
       expect(result.ok).toBe(true);
       expect(result.value.vulnerabilities).toHaveLength(1);
@@ -202,7 +214,7 @@ describe('SecurityScanner', () => {
       const mockScanOutput = `{
         "Results": [
           {
-            "Target": "/path/to/scan",
+            "Target": "/path/to/code",
             "Secrets": [
               {
                 "RuleID": "aws-access-key-id",
@@ -228,7 +240,7 @@ describe('SecurityScanner', () => {
         Success({ stdout: mockScanOutput, stderr: '', exitCode: 0 })
       );
 
-      const result = await scanner.scanSecrets('/path/to/scan');
+      const result = await scanSecrets(ctx, '/path/to/code');
 
       expect(result.ok).toBe(true);
       expect(result.value.secrets).toHaveLength(1);
@@ -241,7 +253,7 @@ describe('SecurityScanner', () => {
       const mockScanOutput = `{
         "Results": [
           {
-            "Target": "/path/to/scan",
+            "Target": "/path/to/code",
             "Secrets": null
           }
         ]
@@ -251,7 +263,7 @@ describe('SecurityScanner', () => {
         Success({ stdout: mockScanOutput, stderr: '', exitCode: 0 })
       );
 
-      const result = await scanner.scanSecrets('/path/to/scan');
+      const result = await scanSecrets(ctx, '/path/to/code', {});
 
       expect(result.ok).toBe(true);
       expect(result.value.secrets).toHaveLength(0);
@@ -294,7 +306,7 @@ describe('SecurityScanner', () => {
         .mockResolvedValueOnce(Success({ stdout: mockImageScan, stderr: '', exitCode: 0 }))
         .mockResolvedValueOnce(Success({ stdout: mockSecretScan, stderr: '', exitCode: 0 }));
 
-      const result = await scanner.generateReport('test:latest', '/app');
+      const result = await generateSecurityReport(ctx, 'test:latest', '/app');
 
       expect(result.ok).toBe(true);
       expect(result.value.vulnerabilityResults.vulnerabilities).toHaveLength(1);
@@ -333,7 +345,7 @@ describe('SecurityScanner', () => {
         .mockResolvedValueOnce(Success({ stdout: mockImageScan, stderr: '', exitCode: 0 }))
         .mockResolvedValueOnce(Success({ stdout: '{"Results":[]}', stderr: '', exitCode: 0 }));
 
-      const result = await scanner.generateReport('test:latest', '/app');
+      const result = await generateSecurityReport(ctx, 'test:latest', '/app');
 
       expect(result.ok).toBe(true);
       // Risk score should be calculated based on severity weights:
@@ -348,7 +360,7 @@ describe('SecurityScanner', () => {
         Success({ stdout: 'Version: 0.45.0', stderr: '', exitCode: 0 })
       );
 
-      const result = await scanner.getScannerVersion();
+      const result = await getScannerVersion(ctx);
 
       expect(result.ok).toBe(true);
       expect(result.value).toContain('0.45.0');
@@ -360,7 +372,7 @@ describe('SecurityScanner', () => {
         Failure('Command not found')
       );
 
-      const result = await scanner.getScannerVersion();
+      const result = await getScannerVersion(ctx);
 
       expect(result.ok).toBe(false);
     });
@@ -372,7 +384,7 @@ describe('SecurityScanner', () => {
         Success({ stdout: 'Database updated successfully', stderr: '', exitCode: 0 })
       );
 
-      const result = await scanner.updateDatabase();
+      const result = await updateDatabase(ctx);
 
       expect(result.ok).toBe(true);
       expect(mockCommandExecutor.execute).toHaveBeenCalledWith(
@@ -387,7 +399,7 @@ describe('SecurityScanner', () => {
         Failure('Update failed')
       );
 
-      const result = await scanner.updateDatabase();
+      const result = await updateDatabase(ctx);
 
       expect(result.ok).toBe(false);
       expect(result.error).toContain('Failed to update vulnerability database');
@@ -399,10 +411,12 @@ describe('SecurityScanner', () => {
       const mockScanOutput = `{
         "Results": [
           {
-            "Target": "test:latest",
+            "Target": "test-image:latest",
             "Vulnerabilities": [
               {
-                "VulnerabilityID": "CVE-2023-1234"
+                "VulnerabilityID": null,
+                "Severity": "INVALID_SEVERITY",
+                "PkgName": null
               }
             ]
           }
@@ -413,44 +427,59 @@ describe('SecurityScanner', () => {
         Success({ stdout: mockScanOutput, stderr: '', exitCode: 0 })
       );
 
-      const result = await scanner.scanImage('test:latest');
+      const result = await scanImageVulnerabilities(ctx, 'test-image:latest');
 
       expect(result.ok).toBe(true);
       expect(result.value.vulnerabilities).toHaveLength(1);
+      expect(result.value.vulnerabilities[0].id).toBe('unknown');
       expect(result.value.vulnerabilities[0].severity).toBe('UNKNOWN');
+      expect(result.value.vulnerabilities[0].package).toBe('unknown');
     });
 
     it('should log scan progress and results', async () => {
+      const mockScanOutput = `{
+        "Results": [
+          {
+            "Target": "test-image:latest",
+            "Vulnerabilities": []
+          }
+        ]
+      }`;
+
       mockCommandExecutor.execute.mockResolvedValue(
-        Success({ stdout: '{"Results":[]}', stderr: '', exitCode: 0 })
+        Success({ stdout: mockScanOutput, stderr: '', exitCode: 0 })
       );
 
-      await scanner.scanImage('test:latest');
+      await scanImageVulnerabilities(ctx, 'test-image:latest');
 
       expect(mockLogger.info).toHaveBeenCalledWith(
-        { imageId: 'test:latest', options: undefined },
+        expect.objectContaining({ imageId: 'test-image:latest' }),
         'Starting security scan'
       );
       expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.any(Object),
+        expect.objectContaining({ totalVulnerabilities: 0 }),
         'Security scan completed'
       );
     });
 
     it('should handle scanner stderr output', async () => {
+      const mockScanOutput = `{
+        "Results": [
+          {
+            "Target": "test-image:latest",
+            "Vulnerabilities": []
+          }
+        ]
+      }`;
+
       mockCommandExecutor.execute.mockResolvedValue(
-        Success({ 
-          stdout: '{"Results":[]}', 
-          stderr: 'Warning: deprecated package detected', 
-          exitCode: 0 
-        })
+        Success({ stdout: mockScanOutput, stderr: 'Warning: something happened', exitCode: 0 })
       );
 
-      const result = await scanner.scanImage('test:latest');
+      await scanImageVulnerabilities(ctx, 'test-image:latest');
 
-      expect(result.ok).toBe(true);
       expect(mockLogger.warn).toHaveBeenCalledWith(
-        { stderr: 'Warning: deprecated package detected' },
+        expect.objectContaining({ stderr: 'Warning: something happened' }),
         'Scanner warnings'
       );
     });
@@ -460,28 +489,30 @@ describe('SecurityScanner', () => {
     it('should validate scan options', async () => {
       const invalidOptions: ScanOptions = {
         minSeverity: 'INVALID' as any,
-        timeout: -1000
+        timeout: 10000
       };
 
-      const result = await scanner.scanImage('test:latest', invalidOptions);
-      
+      const result = await scanImageVulnerabilities(ctx, 'test-image:latest', invalidOptions);
+
       expect(result.ok).toBe(false);
-      expect(result.error).toContain('Invalid severity level: INVALID');
+      expect(result.error).toContain('Invalid severity level');
     });
 
     it('should use default options when none provided', async () => {
+      const mockScanOutput = `{
+        "Results": []
+      }`;
+
       mockCommandExecutor.execute.mockResolvedValue(
-        Success({ stdout: '{"Results":[]}', stderr: '', exitCode: 0 })
+        Success({ stdout: mockScanOutput, stderr: '', exitCode: 0 })
       );
 
-      await scanner.scanImage('test:latest');
+      await scanImageVulnerabilities(ctx, 'test-image:latest');
 
       expect(mockCommandExecutor.execute).toHaveBeenCalledWith(
         'trivy',
-        expect.arrayContaining(['image']),
-        expect.objectContaining({
-          timeout: expect.any(Number)
-        })
+        ['image', '--format', 'json', 'test-image:latest'],
+        expect.objectContaining({ timeout: 120000 })
       );
     });
   });

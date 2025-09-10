@@ -6,7 +6,7 @@
 import type { Logger } from 'pino';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Result, Success, Failure } from '../../../src/domain/types';
+import { Result, Success, Failure } from '../../../src/types';
 
 const execAsync = promisify(exec);
 

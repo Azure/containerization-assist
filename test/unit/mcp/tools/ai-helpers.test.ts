@@ -6,7 +6,7 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import type { Logger } from 'pino';
 import type { ToolContext, SamplingResponse, PromptWithMessages } from '../../../../src/mcp/context/types';
 import { aiGenerate, withAIFallback, structureError, aiError } from '../../../../src/mcp/tools/ai-helpers';
-import { Success, Failure } from '../../../../src/domain/types';
+import { Success, Failure } from '../../../../src/types';
 
 describe('AI Helpers', () => {
   let mockLogger: jest.Mocked<Logger>;

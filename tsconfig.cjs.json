@@ -18,7 +18,7 @@
       "@prompts/*": ["src/prompts/*"],
       "@resources/*": ["src/resources/*"],
       "@workflows/*": ["src/workflows/*"],
-      "@types": ["src/domain/types"]
+      "@types": ["src/types"]
     },
     "declaration": true,
     "declarationMap": true,

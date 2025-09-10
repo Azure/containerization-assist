@@ -15,7 +15,7 @@ import { scanImage } from '../tools/scan/tool.js';
 import { scanImageSchema } from '../tools/scan/schema.js';
 import { tagImage } from '../tools/tag-image/tool.js';
 import { tagImageSchema } from '../tools/tag-image/schema.js';
-import { pushImage } from '../tools/push-image/tool.js';
+import { pushImage } from '../tools/push-image/index.js';
 import { pushImageSchema } from '../tools/push-image/schema.js';
 import { generateK8sManifests } from '../tools/generate-k8s-manifests/tool.js';
 import { generateK8sManifestsSchema } from '../tools/generate-k8s-manifests/schema.js';
@@ -33,7 +33,7 @@ import { opsTool } from '../tools/ops/tool.js';
 import { opsToolSchema } from '../tools/ops/schema.js';
 import { workflow } from '../tools/workflow/tool.js';
 import { workflowSchema } from '../tools/workflow/schema.js';
-import type { Tool } from '../domain/types.js';
+import type { Tool } from '../types.js';
 
 /**
  * Get all internal tool implementations
@@ -227,15 +227,4 @@ export const tools = adaptedTools;
  */
 export function getAllTools(): MCPTool[] {
   return Object.values(adaptedTools);
-}
-
-/**
- * Get all available tools as a map
- */
-export function getToolsMap(): Map<string, MCPTool> {
-  const map = new Map<string, MCPTool>();
-  Object.values(adaptedTools).forEach((tool) => {
-    map.set(tool.name, tool);
-  });
-  return map;
 }

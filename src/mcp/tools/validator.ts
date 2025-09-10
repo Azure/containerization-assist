@@ -5,8 +5,8 @@
  */
 
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '@types';
-import type { PromptRegistry } from '../../core/prompts/registry';
+import { Result, Success, Failure } from '../../types';
+import type { PromptRegistry } from '../../prompts/registry';
 
 /**
  * Parameter validation context with MCP-compatible types
@@ -383,13 +383,3 @@ export class AIParameterValidator {
     return Success(errorResult);
   }
 }
-
-/**
- * Create AI parameter validator instance with MCP SDK integration
- */
-export const createAIParameterValidator = (
-  logger: Logger,
-  promptRegistry?: PromptRegistry,
-): AIParameterValidator => {
-  return new AIParameterValidator(logger, promptRegistry);
-};

@@ -1,9 +1,8 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import {
   getImageMetadata,
-  createDockerRegistryClient,
   type ImageMetadata,
-} from '../../../../src/infrastructure/docker/registry';
+} from '../../../../src/services/docker/registry';
 
 // Mock fetch globally
 global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;
@@ -211,36 +210,6 @@ describe('Docker Registry Client', () => {
     });
   });
 
-  describe('createDockerRegistryClient', () => {
-    it('should create a registry client with getImageMetadata method', () => {
-      const client = createDockerRegistryClient(mockLogger);
-
-      expect(client).toBeDefined();
-      expect(typeof client.getImageMetadata).toBe('function');
-    });
-
-    it('should wrap getImageMetadata function correctly', async () => {
-      const mockResponse = {
-        ok: true,
-        json: jest.fn().mockResolvedValue({
-          digest: 'sha256:test123',
-          full_size: 75000000,
-          last_updated: '2023-03-01T00:00:00Z',
-        }),
-      };
-
-      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
-
-      const client = createDockerRegistryClient(mockLogger);
-      const result = await client.getImageMetadata('redis', '7-alpine');
-
-      expect(result).toBeDefined();
-      expect(result.name).toBe('redis');
-      expect(result.tag).toBe('7-alpine');
-      expect(result.digest).toBe('sha256:test123');
-      expect(result.size).toBe(75000000);
-    });
-  });
 
   describe('Docker Hub API integration', () => {
     it('should handle official images with library namespace', async () => {

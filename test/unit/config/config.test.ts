@@ -2,8 +2,6 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import {
   createDefaultConfig,
   createConfiguration,
-  createConfigurationForEnv,
-  getConfigurationSummary,
 } from '../../../src/config/config';
 
 describe('Configuration Module', () => {
@@ -189,86 +187,7 @@ describe('Configuration Module', () => {
     });
   });
 
-  describe('createConfigurationForEnv', () => {
-    it('should create production configuration', () => {
-      const config = createConfigurationForEnv('production');
 
-      expect(config.server.nodeEnv).toBe('production');
-      expect(config.logLevel).toBe('info');
-      expect(config.server.logLevel).toBe('info');
-    });
-
-    it('should create test configuration', () => {
-      const config = createConfigurationForEnv('test');
-
-      expect(config.server.nodeEnv).toBe('test');
-      expect(config.logLevel).toBe('error');
-      expect(config.server.logLevel).toBe('error');
-    });
-
-    it('should create development configuration', () => {
-      const config = createConfigurationForEnv('development');
-
-      expect(config.server.nodeEnv).toBe('development');
-      expect(config.logLevel).toBe('debug');
-      expect(config.server.logLevel).toBe('debug');
-    });
-
-    it('should restore original NODE_ENV', () => {
-      const originalNodeEnv = 'original-env';
-      process.env.NODE_ENV = originalNodeEnv;
-
-      createConfigurationForEnv('production');
-
-      expect(process.env.NODE_ENV).toBe(originalNodeEnv);
-    });
-
-    it('should handle undefined NODE_ENV', () => {
-      delete process.env.NODE_ENV;
-
-      createConfigurationForEnv('test');
-
-      expect(process.env.NODE_ENV).toBeUndefined();
-    });
-  });
-
-  describe('getConfigurationSummary', () => {
-    it('should return configuration summary with key values', () => {
-      const config = createDefaultConfig();
-      config.server.nodeEnv = 'production';
-      config.server.logLevel = 'info';
-      config.workflow.mode = 'automatic';
-      config.session.maxSessions = 500;
-      config.docker.registry = 'my-registry.com';
-
-      const summary = getConfigurationSummary(config);
-
-      expect(summary).toEqual({
-        nodeEnv: 'production',
-        logLevel: 'info',
-        workflowMode: 'automatic',
-        maxSessions: 500,
-        dockerRegistry: 'my-registry.com',
-      });
-    });
-
-    it('should extract correct fields from configuration', () => {
-      const config = createConfiguration();
-      const summary = getConfigurationSummary(config);
-
-      expect(summary).toHaveProperty('nodeEnv');
-      expect(summary).toHaveProperty('logLevel');
-      expect(summary).toHaveProperty('workflowMode');
-      expect(summary).toHaveProperty('maxSessions');
-      expect(summary).toHaveProperty('dockerRegistry');
-
-      expect(typeof summary.nodeEnv).toBe('string');
-      expect(typeof summary.logLevel).toBe('string');
-      expect(typeof summary.workflowMode).toBe('string');
-      expect(typeof summary.maxSessions).toBe('number');
-      expect(typeof summary.dockerRegistry).toBe('string');
-    });
-  });
 
   describe('configuration validation', () => {
     it('should have consistent configuration between default and environment', () => {

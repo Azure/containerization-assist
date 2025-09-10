@@ -6,7 +6,6 @@
  */
 
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 
 // Common schemas
 const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
@@ -251,23 +250,3 @@ export const toolSchemas = {
   containerization: containerizationWorkflowSchema,
   deployment: deploymentWorkflowSchema,
 } as const;
-
-// Export JSON Schemas for tools
-// This provides pre-converted JSON schemas to avoid conversion at runtime
-export const toolJsonSchemas = Object.fromEntries(
-  Object.entries(toolSchemas).map(([name, zodSchema]) => {
-    const jsonSchema = zodToJsonSchema(zodSchema, {
-      $refStrategy: 'none', // Inline all definitions
-      errorMessages: false,
-      markdownDescription: false,
-    });
-
-    // Remove $schema property if present
-    if (jsonSchema && typeof jsonSchema === 'object' && '$schema' in jsonSchema) {
-      const { $schema: _$schema, ...cleanSchema } = jsonSchema as any;
-      return [name, cleanSchema];
-    }
-
-    return [name, jsonSchema];
-  }),
-) as Record<keyof typeof toolSchemas, any>;

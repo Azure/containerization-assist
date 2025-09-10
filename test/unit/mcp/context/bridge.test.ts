@@ -6,8 +6,8 @@ import { describe, test, expect, jest, beforeEach } from '@jest/globals';
 import type { Logger } from 'pino';
 import {
   createToolContext,
-  createToolContextWithProgress,
-} from '@mcp/context/tool-context';
+  createMCPToolContext,
+} from '@mcp/context/factory';
 import {
   extractProgressToken,
   createProgressReporter,
@@ -43,7 +43,7 @@ describe('ToolContext Bridge', () => {
       };
       (mockServer.createMessage as jest.Mock).mockResolvedValue(mockResponse);
 
-      const context = createToolContext(mockServer, {}, mockLogger);
+      const context = createToolContext({ server: mockServer, logger: mockLogger });
 
       expect(context).toHaveProperty('sampling');
       expect(context).toHaveProperty('getPrompt');
@@ -57,7 +57,7 @@ describe('ToolContext Bridge', () => {
       };
       (mockServer.createMessage as jest.Mock).mockResolvedValue(mockResponse);
 
-      const context = createToolContext(mockServer, {}, mockLogger);
+      const context = createToolContext({ server: mockServer, logger: mockLogger });
       const result = await context.sampling.createMessage({
         messages: [
           {
@@ -100,7 +100,7 @@ describe('ToolContext Bridge', () => {
       };
       (mockServer.createMessage as jest.Mock).mockResolvedValue(mockResponse);
 
-      const context = createToolContext(mockServer, {}, mockLogger);
+      const context = createToolContext({ server: mockServer, logger: mockLogger });
 
       await expect(
         context.sampling.createMessage({
@@ -120,7 +120,7 @@ describe('ToolContext Bridge', () => {
       };
       (mockServer.createMessage as jest.Mock).mockResolvedValue(mockResponse as any);
 
-      const context = createToolContext(mockServer, {}, mockLogger);
+      const context = createToolContext({ server: mockServer, logger: mockLogger });
 
       await expect(
         context.sampling.createMessage({
@@ -135,7 +135,7 @@ describe('ToolContext Bridge', () => {
     });
 
     test('getPrompt returns error response when no prompt registry available', async () => {
-      const context = createToolContext(mockServer, {}, mockLogger);
+      const context = createToolContext({ server: mockServer, logger: mockLogger });
 
       const result = await context.getPrompt('test-prompt');
       
@@ -169,13 +169,7 @@ describe('ToolContext Bridge', () => {
       };
 
       const context = createToolContext(
-        mockServer,
-        {},
-        mockLogger,
-        undefined,
-        undefined,
-        undefined,
-        mockPromptRegistry as any
+        { server: mockServer, logger: mockLogger, promptRegistry: mockPromptRegistry as any }
       );
 
       const result = await context.getPrompt('test-prompt', { arg1: 'value1' });
@@ -197,10 +191,8 @@ describe('ToolContext Bridge', () => {
     test('forwards abort signal', () => {
       const abortController = new AbortController();
       const context = createToolContext(
-        mockServer,
-        {},
-        mockLogger,
-        abortController.signal
+        { server: mockServer, logger: mockLogger },
+        { signal: abortController.signal }
       );
 
       expect(context.signal).toBe(abortController.signal);
@@ -209,11 +201,8 @@ describe('ToolContext Bridge', () => {
     test('includes progress reporter if provided', () => {
       const mockProgressReporter = jest.fn();
       const context = createToolContext(
-        mockServer,
-        {},
-        mockLogger,
-        undefined,
-        mockProgressReporter
+        { server: mockServer, logger: mockLogger },
+        { progress: mockProgressReporter }
       );
 
       expect(context.progress).toBe(mockProgressReporter);
@@ -299,7 +288,7 @@ describe('ToolContext Bridge', () => {
         },
       };
 
-      const context = createToolContextWithProgress(mockServer, request, mockLogger);
+      const context = createMCPToolContext(mockServer, request, mockLogger, {});
 
       expect(context).toHaveProperty('progress');
       expect(context.progress).toBeInstanceOf(Function);
@@ -308,7 +297,7 @@ describe('ToolContext Bridge', () => {
     test('creates context without progress when no token', () => {
       const request = { params: {} };
 
-      const context = createToolContextWithProgress(mockServer, request, mockLogger);
+      const context = createMCPToolContext(mockServer, request, mockLogger, {});
 
       expect(context).toHaveProperty('progress');
       expect(context.progress).toBeUndefined();
@@ -322,7 +311,7 @@ describe('ToolContext Bridge', () => {
       };
       (mockServer.createMessage as jest.Mock).mockResolvedValue(mockResponse);
 
-      const context = createToolContext(mockServer, {}, mockLogger);
+      const context = createToolContext({ server: mockServer, logger: mockLogger });
       await context.sampling.createMessage({
         messages: [
           {
@@ -354,7 +343,7 @@ describe('ToolContext Bridge', () => {
       const mockError = new Error('Sampling failed');
       (mockServer.createMessage as jest.Mock).mockRejectedValue(mockError);
 
-      const context = createToolContext(mockServer, {}, mockLogger);
+      const context = createToolContext({ server: mockServer, logger: mockLogger });
 
       await expect(
         context.sampling.createMessage({

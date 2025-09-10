@@ -7,7 +7,7 @@ import { EnvironmentCapabilities, detectEnvironment } from '../utilities/environ
 import { fixtureRegistry, FixtureMetadata } from './fixture-registry';
 import { unifiedMockFactory } from '../mocks/unified-mock-factory';
 import { goldenFileLoader } from './golden-file-loader';
-import { Result, Success, Failure } from '@domain/types';
+import { Result, Success, Failure } from '../../../src/types';
 
 export interface LoaderConfiguration {
   preferReal: boolean; // Prefer real infrastructure over mocks when available

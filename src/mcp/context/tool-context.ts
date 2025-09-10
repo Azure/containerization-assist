@@ -15,9 +15,8 @@ import type {
   ProgressReporter,
   ToolContextConfig,
 } from './types';
-import { extractProgressToken, createProgressReporter } from './progress';
 import type { SessionManager } from '@lib/session';
-import type { PromptRegistry } from '../../core/prompts/registry';
+import type { PromptRegistry } from '../../prompts/registry';
 
 const DEFAULT_CONFIG: Required<ToolContextConfig> = {
   debug: false,
@@ -205,56 +204,4 @@ export class SimpleToolContext implements ToolContext {
       throw error;
     }
   }
-}
-
-/**
- * Factory function for backward compatibility - maintains existing API
- */
-export function createToolContext(
-  server: Server,
-  _request: unknown,
-  logger: Logger,
-  signal?: AbortSignal,
-  progress?: ProgressReporter,
-  config: Partial<ToolContextConfig> = {},
-  promptRegistry?: PromptRegistry,
-  sessionManager?: SessionManager,
-): ToolContext {
-  const finalConfig = { ...DEFAULT_CONFIG, ...config };
-  return new SimpleToolContext(
-    server,
-    logger,
-    promptRegistry,
-    signal,
-    progress,
-    finalConfig,
-    sessionManager,
-  );
-}
-
-/**
- * Helper to create ToolContext with progress token extraction
- */
-export function createToolContextWithProgress(
-  server: Server,
-  request: unknown,
-  logger: Logger,
-  signal?: AbortSignal,
-  config?: Partial<ToolContextConfig>,
-  promptRegistry?: PromptRegistry,
-  sessionManager?: SessionManager,
-): ToolContext {
-  const progressToken = extractProgressToken(request);
-  const progressReporter = createProgressReporter(server, progressToken, logger);
-
-  return createToolContext(
-    server,
-    request,
-    logger,
-    signal,
-    progressReporter,
-    config,
-    promptRegistry,
-    sessionManager,
-  );
 }

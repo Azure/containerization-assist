@@ -24,10 +24,17 @@ export const securityLevelSchema = z
 export const generateDockerfileSchema = z.object({
   sessionId: sessionIdSchema.optional(),
   baseImage: z.string().optional().describe('Base Docker image to use'),
+  runtimeImage: z.string().optional().describe('Runtime image for multi-stage builds'),
   environment: environmentSchema,
   optimization: z.union([optimizationSchema, z.boolean()]).optional(),
+  multistage: z.boolean().optional().describe('Use multi-stage build pattern'),
+  securityHardening: z.boolean().optional().describe('Apply security hardening practices'),
+  includeHealthcheck: z.boolean().optional().describe('Include health check configuration'),
+  customInstructions: z.string().optional().describe('Custom Dockerfile instructions to include'),
+  optimizeSize: z.boolean().optional().describe('Optimize for smaller image size'),
   securityLevel: securityLevelSchema,
   customCommands: z.array(z.string()).optional().describe('Custom Dockerfile commands'),
+  repoPath: z.string().optional().describe('Repository path'),
 });
 
 export type GenerateDockerfileParams = z.infer<typeof generateDockerfileSchema>;

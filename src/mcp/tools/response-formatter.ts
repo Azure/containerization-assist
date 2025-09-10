@@ -1,4 +1,4 @@
-import { Result, Success, Failure } from '@types';
+import { Result, Success, Failure } from '../../types';
 
 /**
  * Standard success response shape for all tools

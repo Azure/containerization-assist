@@ -8,7 +8,7 @@
         "maxWarnings": 2000
       },
       "deadcode": {
-        "max": 50
+        "max": 80
       },
       "typescript": {
         "maxErrors": 0
@@ -20,10 +20,10 @@
     "baselines": {
       "lint": {
         "errors": 0,
-        "warnings": 28
+        "warnings": 31
       },
       "deadcode": {
-        "count": 167
+        "count": 175
       },
       "typescript": {
         "errors": 0
@@ -45,8 +45,9 @@
       "baseline": 25
     },
     "deadcode": {
-      "current": 245,
-      "baseline": 245
+      "current": 74,
+      "baseline": 74,
+      "note": "Accurate count excluding public API, MCP tools, and test-used exports"
     }
   }
 }

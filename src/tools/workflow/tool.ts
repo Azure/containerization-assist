@@ -23,7 +23,7 @@ import { getSession, updateSession } from '@mcp/tools/session-helpers';
 import { createStandardProgress } from '@mcp/utils/progress-helper';
 import type { ToolContext } from '../../mcp/context/types';
 import { createTimer, createLogger, type Logger } from '../../lib/logger';
-import { Success, Failure, type Result, type Tool } from '../../domain/types';
+import { Success, Failure, type Result, type Tool } from '../../types';
 
 // Import tool registry at the module level
 import { analyzeRepo } from '@tools/analyze-repo';
@@ -539,55 +539,3 @@ async function workflowImpl(
  * Workflow tool with selective progress reporting
  */
 export const workflow = workflowImpl;
-
-export const getWorkflowStatus = async (
-  sessionId: string,
-  logger: Logger,
-): Promise<Result<WorkflowStatusResult>> => {
-  const sessionResult = await getSession(sessionId, {
-    logger,
-    sampling: {
-      createMessage: async () =>
-        Promise.resolve({
-          role: 'assistant' as const,
-          content: [{ type: 'text' as const, text: '' }],
-        }),
-    },
-    getPrompt: async () =>
-      Promise.resolve({
-        name: 'mock',
-        messages: [],
-      }),
-  } as unknown as ToolContext);
-
-  if (!sessionResult.ok) {
-    return Failure(sessionResult.error);
-  }
-
-  const { state: session } = sessionResult.value;
-  const sessionState = session as
-    | {
-        workflow_state?: {
-          steps?: string[];
-          completedSteps?: string[];
-          status?: string;
-          workflowId?: string;
-        };
-      }
-    | null
-    | undefined;
-  const workflowState = sessionState?.workflow_state;
-
-  const steps = workflowState?.steps ?? [];
-  const completedSteps = workflowState?.completedSteps ?? [];
-  const progress = steps.length > 0 ? (completedSteps.length / steps.length) * 100 : 0;
-
-  return Success({
-    status: workflowState?.status ?? 'not_started',
-    workflowId: workflowState?.workflowId || '',
-    currentStep: session.currentStep || '',
-    completedSteps,
-    failedSteps: [],
-    progress,
-  });
-};

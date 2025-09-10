@@ -26,7 +26,7 @@ import type { ToolContext } from '../../mcp/context/types';
 import { createKubernetesClient } from '../../lib/kubernetes';
 import { createTimer, createLogger } from '../../lib/logger';
 import type * as pino from 'pino';
-import { Success, Failure, type Result } from '../../domain/types';
+import { Success, Failure, type Result } from '../../types';
 import type { PrepareClusterParams } from './schema';
 import { exec } from 'child_process';
 import { promisify } from 'util';

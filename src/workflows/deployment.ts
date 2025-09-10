@@ -262,6 +262,11 @@ export async function runDeploymentWorkflow(
         },
       };
     }
+
+    // TypeScript assertion: manifestResult must be successful here due to early return above
+    if (!manifestResult.ok) {
+      throw new Error('Unexpected: manifestResult should be successful at this point');
+    }
     const manifests = manifestResult.value;
 
     generateStep.status = 'completed';

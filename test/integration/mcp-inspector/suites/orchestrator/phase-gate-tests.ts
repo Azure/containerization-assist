@@ -4,7 +4,7 @@
  * Tests for validating phase gate enforcement and quality checks
  */
 
-import type { TestCase, MCPTestRunner, TestResult } from '../../infrastructure/test-runner.js';
+import type { TestCase, MCPTestRunner, TestResult } from '../../services/test-runner.js';
 
 export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
   const client = testRunner.getClient();

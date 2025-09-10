@@ -27,8 +27,9 @@ import { aiGenerate } from '@mcp/tools/ai-helpers';
 import { getRecommendedBaseImage } from '../../lib/base-images';
 import type { ToolContext } from '../../mcp/context/types';
 import { createTimer, createLogger } from '../../lib/logger';
-import { Success, Failure, type Result } from '../../domain/types';
+import { Success, Failure, type Result } from '@types';
 import type { AnalyzeRepoParams } from './schema';
+import { parsePackageJson, getAllDependencies } from '../../lib/parsing/package-json-utils';
 import { DEFAULT_PORTS } from '../../config/defaults';
 import type { AnalyzeRepoResult } from '../types';
 
@@ -179,16 +180,9 @@ async function detectFramework(
 
   // Check package.json for JS/TS frameworks
   if (language === 'javascript' || language === 'typescript') {
-    const packageJsonPath = path.join(repoPath, 'package.json');
     try {
-      const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf-8')) as {
-        dependencies?: Record<string, string>;
-        devDependencies?: Record<string, string>;
-      };
-      const allDeps = {
-        ...(packageJson.dependencies ?? {}),
-        ...(packageJson.devDependencies ?? {}),
-      };
+      const packageJson = await parsePackageJson(repoPath);
+      const allDeps = getAllDependencies(packageJson);
 
       for (const [framework, signature] of Object.entries(FRAMEWORK_SIGNATURES)) {
         if (signature.dependencies?.some((dep) => dep in allDeps)) {
@@ -248,12 +242,8 @@ async function analyzeDependencies(
   const dependencies: Array<{ name: string; version?: string; type: string }> = [];
 
   if (language === 'javascript' || language === 'typescript') {
-    const packageJsonPath = path.join(repoPath, 'package.json');
     try {
-      const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf-8')) as {
-        dependencies?: Record<string, string>;
-        devDependencies?: Record<string, string>;
-      };
+      const packageJson = await parsePackageJson(repoPath);
 
       // Production dependencies
       for (const [name, version] of Object.entries(packageJson.dependencies ?? {})) {

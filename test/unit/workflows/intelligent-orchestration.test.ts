@@ -94,65 +94,12 @@ describe('Workflow Types', () => {
   });
 });
 
-describe('Dockerfile Sampling Workflow', () => {
-  describe('Module Structure', () => {
-    it('should have dockerfile sampling file', () => {
-      const samplingPath = join(__dirname, '../../../src/workflows/dockerfile-sampling.ts');
-      expect(() => statSync(samplingPath)).not.toThrow();
-      
-      const content = readFileSync(samplingPath, 'utf-8');
-      expect(content).toContain('sampling');
-    });
 
-    it('should contain sampling logic', () => {
-      const samplingPath = join(__dirname, '../../../src/workflows/dockerfile-sampling.ts');
-      const content = readFileSync(samplingPath, 'utf-8');
-      
-      expect(content).toContain('Dockerfile');
-      expect(typeof content).toBe('string');
-      expect(content.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Sampling Export', () => {
-    it('should export dockerfile sampling functionality', async () => {
-      const samplingModule = await import('../../../src/workflows/dockerfile-sampling');
-      expect(typeof samplingModule).toBe('object');
-    });
-  });
-});
-
-describe('Containerization Workflow (Legacy)', () => {
-  describe('Module Structure', () => {
-    it('should have containerization workflow file', () => {
-      const workflowPath = join(__dirname, '../../../src/workflows/containerization-workflow.ts');
-      expect(() => statSync(workflowPath)).not.toThrow();
-      
-      const content = readFileSync(workflowPath, 'utf-8');
-      expect(content).toContain('containerization');
-    });
-
-    it('should contain containerization logic', () => {
-      const workflowPath = join(__dirname, '../../../src/workflows/containerization-workflow.ts');
-      const content = readFileSync(workflowPath, 'utf-8');
-      
-      expect(typeof content).toBe('string');
-      expect(content.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Workflow Export', () => {
-    it('should export containerization workflow functionality', async () => {
-      const workflowModule = await import('../../../src/workflows/containerization-workflow');
-      expect(typeof workflowModule).toBe('object');
-    });
-  });
-});
 
 describe('Orchestration Components', () => {
   describe('Workflow Coordinator', () => {
     it('should have workflow coordinator file', () => {
-      const coordinatorPath = join(__dirname, '../../../src/workflows/orchestration/workflow-coordinator.ts');
+      const coordinatorPath = join(__dirname, '../../../src/workflows/workflow-coordinator.ts');
       expect(() => statSync(coordinatorPath)).not.toThrow();
       
       const content = readFileSync(coordinatorPath, 'utf-8');
@@ -160,135 +107,14 @@ describe('Orchestration Components', () => {
     });
 
     it('should contain coordination logic', () => {
-      const coordinatorPath = join(__dirname, '../../../src/workflows/orchestration/workflow-coordinator.ts');
+      const coordinatorPath = join(__dirname, '../../../src/workflows/workflow-coordinator.ts');
       const content = readFileSync(coordinatorPath, 'utf-8');
       
       expect(typeof content).toBe('string');
       expect(content.length).toBeGreaterThan(0);
     });
   });
-
-  describe('Quality Gates', () => {
-    it('should have quality gates file', () => {
-      const gatesPath = join(__dirname, '../../../src/workflows/orchestration/gates.ts');
-      expect(() => statSync(gatesPath)).not.toThrow();
-      
-      const content = readFileSync(gatesPath, 'utf-8');
-      expect(content).toContain('gate');
-    });
-
-    it('should contain gates logic', () => {
-      const gatesPath = join(__dirname, '../../../src/workflows/orchestration/gates.ts');
-      const content = readFileSync(gatesPath, 'utf-8');
-      
-      expect(typeof content).toBe('string');
-      expect(content.length).toBeGreaterThan(0);
-    });
-  });
 });
 
-describe('Sampling Components', () => {
-  describe('Sampling Service', () => {
-    it('should have sampling service files', () => {
-      const servicePath = join(__dirname, '../../../src/workflows/sampling/sampling-service-functional.ts');
-      expect(() => statSync(servicePath)).not.toThrow();
-      
-      const analysisServicePath = join(__dirname, '../../../src/workflows/sampling/analysis-sampling-service-functional.ts');
-      expect(() => statSync(analysisServicePath)).not.toThrow();
-    });
-
-    it('should contain sampling logic', () => {
-      const servicePath = join(__dirname, '../../../src/workflows/sampling/sampling-service-functional.ts');
-      const content = readFileSync(servicePath, 'utf-8');
-      
-      expect(content).toContain('sampling');
-      expect(typeof content).toBe('string');
-      expect(content.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Generation Pipeline', () => {
-    it('should have generation pipeline files', () => {
-      const pipelinePath = join(__dirname, '../../../src/workflows/sampling/generation-pipeline.ts');
-      expect(() => statSync(pipelinePath)).not.toThrow();
-      
-      const analysisPipelinePath = join(__dirname, '../../../src/workflows/sampling/analysis-generation-pipeline.ts');
-      expect(() => statSync(analysisPipelinePath)).not.toThrow();
-    });
-
-    it('should contain pipeline logic', () => {
-      const pipelinePath = join(__dirname, '../../../src/workflows/sampling/generation-pipeline.ts');
-      const content = readFileSync(pipelinePath, 'utf-8');
-      
-      expect(content).toContain('pipeline');
-      expect(typeof content).toBe('string');
-      expect(content.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Strategy Engine', () => {
-    it('should have strategy engine and related files', () => {
-      const enginePath = join(__dirname, '../../../src/workflows/sampling/strategy-engine.ts');
-      expect(() => statSync(enginePath)).not.toThrow();
-      
-      const strategiesPath = join(__dirname, '../../../src/workflows/sampling/functional-strategies.ts');
-      expect(() => statSync(strategiesPath)).not.toThrow();
-      
-      const analysisStrategiesPath = join(__dirname, '../../../src/workflows/sampling/analysis-strategies.ts');
-      expect(() => statSync(analysisStrategiesPath)).not.toThrow();
-    });
-
-    it('should contain strategy logic', () => {
-      const enginePath = join(__dirname, '../../../src/workflows/sampling/strategy-engine.ts');
-      const content = readFileSync(enginePath, 'utf-8');
-      
-      expect(content).toContain('strategy');
-      expect(typeof content).toBe('string');
-      expect(content.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Scoring and Validation', () => {
-    it('should have scorer and validation files', () => {
-      const scorerPath = join(__dirname, '../../../src/workflows/sampling/scorer.ts');
-      expect(() => statSync(scorerPath)).not.toThrow();
-      
-      const analysisScorerPath = join(__dirname, '../../../src/workflows/sampling/analysis-scorer.ts');
-      expect(() => statSync(analysisScorerPath)).not.toThrow();
-      
-      const validationPath = join(__dirname, '../../../src/workflows/sampling/validation.ts');
-      expect(() => statSync(validationPath)).not.toThrow();
-    });
-
-    it('should contain scoring logic', () => {
-      const scorerPath = join(__dirname, '../../../src/workflows/sampling/scorer.ts');
-      const content = readFileSync(scorerPath, 'utf-8');
-      
-      expect(content).toContain('score');
-      expect(typeof content).toBe('string');
-      expect(content.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Types and Index', () => {
-    it('should have sampling types files', () => {
-      const typesPath = join(__dirname, '../../../src/workflows/sampling/types.ts');
-      expect(() => statSync(typesPath)).not.toThrow();
-      
-      const analysisTypesPath = join(__dirname, '../../../src/workflows/sampling/analysis-types.ts');
-      expect(() => statSync(analysisTypesPath)).not.toThrow();
-      
-      const indexPath = join(__dirname, '../../../src/workflows/sampling/index.ts');
-      expect(() => statSync(indexPath)).not.toThrow();
-    });
-
-    it('should contain type definitions', () => {
-      const typesPath = join(__dirname, '../../../src/workflows/sampling/types.ts');
-      const content = readFileSync(typesPath, 'utf-8');
-      
-      expect(content).toContain('export');
-      expect(typeof content).toBe('string');
-      expect(content.length).toBeGreaterThan(0);
-    });
-  });
-});
+// Removed tests for non-existent files (Quality Gates and Sampling Components)
+// These components were removed as part of the refactoring

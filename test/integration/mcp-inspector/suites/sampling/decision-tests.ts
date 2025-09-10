@@ -4,7 +4,7 @@
  * Tests for validating sampling decisions, scoring, and tie-breaking
  */
 
-import type { TestCase, MCPTestRunner, TestResult } from '../../infrastructure/test-runner.js';
+import type { TestCase, MCPTestRunner, TestResult } from '../../services/test-runner.js';
 import { config } from '../../../../../src/config/index.js';
 
 export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase[] => {

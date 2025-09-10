@@ -7,7 +7,7 @@ import {
   K8sManifestResult,
   DeploymentResult,
   WorkflowStep,
-} from '../../../src/domain/types';
+} from '../../../src/types';
 
 // Test-only Session type (removed from production code)
 type Session = {
@@ -25,7 +25,7 @@ type Session = {
 // Mock ID generator for tests (replace nanoid to avoid ESM issues)
 const mockId = () => Math.random().toString(36).substring(7);
 import type { Logger } from '../../../src/lib/logger';
-import { Success, Failure, type Result } from '../../../src/domain/types';
+import { Success, Failure, type Result } from '../../../src/types';
 import type { ApplicationConfig } from '../../../src/config/app-config';
 import { jest } from '@jest/globals';
 

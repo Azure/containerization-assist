@@ -8,17 +8,18 @@
     "outDir": "./dist",
     "baseUrl": ".",
     "paths": {
-      "@app/*": ["src/app/*"],
+      "@/*": ["src/*"],
       "@mcp/*": ["src/mcp/*"],
       "@tools/*": ["src/tools/*"],
       "@lib/*": ["src/lib/*"],
-      "@domain/*": ["src/domain/*"],
-      "@infrastructure/*": ["src/infrastructure/*"],
+      "@services/*": ["src/services/*"],
       "@config/*": ["src/config/*"],
       "@prompts/*": ["src/prompts/*"],
       "@resources/*": ["src/resources/*"],
       "@workflows/*": ["src/workflows/*"],
-      "@types": ["src/domain/types"]
+      "@exports/*": ["src/exports/*"],
+      "@types": ["src/types"],
+      "@/container": ["src/container"]
     },
     "declaration": true,
     "declarationMap": true,

@@ -6,7 +6,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../domain/types';
+import { Success, Failure, type Result } from '@types';
 
 /**
  * Basic security scan result for scanner tool

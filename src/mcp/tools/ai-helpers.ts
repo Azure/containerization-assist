@@ -7,7 +7,7 @@
 
 import type { Logger } from 'pino';
 import type { ToolContext, SamplingRequest, SamplingResponse } from '@mcp/context/types';
-import { Result, Success, Failure } from '../../domain/types';
+import { Result, Success, Failure } from '../../types';
 
 /**
  * AI response with extracted content
@@ -73,25 +73,30 @@ function validateResponse(
 
   switch (expectation) {
     case 'dockerfile':
-      // Basic Dockerfile validation
+      /**
+       * Invariant: Dockerfiles must begin with FROM instruction
+       * Trade-off: Simple regex over full AST parsing for performance
+       */
       if (!trimmed.match(/^FROM\s+/im)) {
         return Failure('Invalid Dockerfile: missing FROM instruction');
       }
       return Success(trimmed);
 
     case 'yaml':
-      // Basic YAML validation - check for structure
+      /**
+       * Trade-off: Basic structural validation vs. full YAML parsing
+       * Rationale: Full parsing too expensive for initial validation
+       */
       if (!trimmed.match(/^[\w-]+:/m) && !trimmed.startsWith('---')) {
         return Failure('Invalid YAML: missing key-value pairs or document marker');
       }
-      // Check for common YAML syntax errors
+      /** Invariant: YAML requires spaces for indentation, never tabs */
       if (trimmed.includes('\t')) {
         return Failure('Invalid YAML: contains tabs (use spaces for indentation)');
       }
       return Success(trimmed);
 
     case 'json':
-      // JSON validation
       try {
         JSON.parse(trimmed);
         return Success(trimmed);
@@ -101,7 +106,7 @@ function validateResponse(
 
     case 'text':
     default:
-      // For text, just ensure it's not empty
+      /** Postcondition: Empty content already rejected above */
       return Success(trimmed);
   }
 }
@@ -155,7 +160,6 @@ export async function aiGenerate(
     attempts++;
 
     try {
-      // Get prompt from registry
       logger.debug({ promptName, promptArgs }, 'Fetching prompt from registry');
       const prompt = await context.getPrompt(promptName, promptArgs);
 
@@ -163,14 +167,12 @@ export async function aiGenerate(
         throw new Error(`Prompt '${promptName}' returned no messages`);
       }
 
-      // Build sampling request
       const request: SamplingRequest = {
         messages: prompt.messages,
         includeContext: 'thisServer',
         maxTokens,
       };
 
-      // Add optional properties only if provided
       if (stopSequences) {
         request.stopSequences = stopSequences;
       }
@@ -183,10 +185,8 @@ export async function aiGenerate(
 
       logger.debug({ request, attempt: attempts }, 'Sending AI sampling request');
 
-      // Call AI through context
       const response = await context.sampling.createMessage(request);
 
-      // Extract and validate content
       const content = extractContent(response);
       const validationResult = validateResponse(content, expectation);
 
@@ -203,7 +203,11 @@ export async function aiGenerate(
         );
 
         if (fallbackBehavior === 'retry' && attempts < maxRetries) {
-          const delay = retryDelay * Math.pow(2, attempts - 1); // Exponential backoff
+          /**
+           * Trade-off: Exponential backoff vs. linear retry
+           * Rationale: Prevents overwhelming AI service while allowing recovery
+           */
+          const delay = retryDelay * Math.pow(2, attempts - 1);
           logger.debug({ delay }, 'Retrying after delay');
           await sleep(delay);
           continue;
@@ -212,7 +216,6 @@ export async function aiGenerate(
         return Failure(`AI response validation failed: ${lastError}`);
       }
 
-      // Success - return response with metadata
       logger.debug(
         {
           model: response.metadata?.model,
@@ -256,10 +259,13 @@ export async function aiGenerate(
     }
   }
 
-  // All attempts failed
+  /**
+   * Failure Mode: All retry attempts exhausted
+   * Postcondition: Empty content signals caller to use own fallback
+   */
   if (fallbackBehavior === 'default') {
     logger.warn({ lastError, attempts }, 'AI generation failed, using default response');
-    return Success({ content: '' }); // Caller should handle empty content
+    return Success({ content: '' });
   }
 
   return Failure(`AI generation failed after ${attempts} attempts: ${lastError}`);
@@ -297,7 +303,11 @@ export async function withAIFallback<T>(
       logger.debug({ error: lastError, attempt: attempts }, 'Operation failed');
 
       if (attempts < maxRetries) {
-        await sleep(1000 * attempts); // Simple backoff
+        /**
+         * Trade-off: Simple linear backoff for fallback operations
+         * Rationale: Less aggressive than main operation retries
+         */
+        await sleep(1000 * attempts);
         continue;
       }
     } catch (error) {
@@ -311,7 +321,6 @@ export async function withAIFallback<T>(
     }
   }
 
-  // Use fallback
   if (logFallback) {
     logger.info({ lastError, attempts }, 'Using fallback after operation failure');
   }

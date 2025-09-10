@@ -4,7 +4,7 @@
  */
 
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import type { Tool } from '../domain/types.js';
+import type { Tool } from '../types.js';
 import type { MCPTool, MCPToolResult } from './types.js';
 import type { ToolContext } from '../mcp/context/types.js';
 import type { Logger } from 'pino';

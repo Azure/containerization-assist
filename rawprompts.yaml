@@ -1,0 +1,655 @@
+) src/prompts/refactoring/comment-quality.yaml
+metadata:
+  name: comment-quality
+  category: refactoring
+  description: Improve comments by removing noise, phase/team chatter, and focusing on WHY not WHAT
+  version: "1.0"
+  parameters:
+    - name: changedFiles
+      type: string
+      required: true
+      description: Diff or concatenated file contents to review
+    - name: style
+      type: string
+      required: false
+      description: Comment style guidance (e.g., concise, architectural, rationale-first)
+    - name: forbidTags
+      type: string
+      required: false
+      description: Comma-separated tags to remove (e.g., TODO, TEAM, PHASE, TMP)
+    - name: keepSections
+      type: string
+      required: false
+      description: Comma-separated, whitelisted doc comment sections to keep (e.g., Examples, Invariants)
+
+template: |
+  Review the provided code (diff/files). Rewrite comments so they explain **WHY** the code exists, key invariants, trade-offs, and non-obvious design intent. Avoid restating code, remove stale/phase/team chatter, and delete redundant comments.
+
+  Constraints:
+  - Prefer doc comments on exported functions/types; inline comments only for non-obvious logic.
+  - Remove "phase", "team", sprint, or ticket chatter.
+  - Replace TODOs with actionable issues OR convert to precise next steps.
+  - Keep comments short; if longer explanations are needed, point to `DESIGN_DOCUMENT.md` section.
+  - Retain or add "Invariants", "Preconditions", "Postconditions", "Failure Modes", "Trade-offs".
+  - Match TypeScript style and your repository’s logger/error taxonomy.
+
+  Inputs:
+  - Style: {{style}}
+  - Forbid Tags: {{forbidTags}}
+  - Keep Sections: {{keepSections}}
+
+  Output:
+  - A list of suggested comment edits as **unified diffs** (apply-ready).
+  - A short checklist to validate quality after changes.
+  - A table of any TODOs converted to issues (title, suggested owner, severity).
+
+2) src/prompts/refactoring/anti-pattern-scan.yaml
+metadata:
+  name: anti-pattern-scan
+  category: refactoring
+  description: Find over-engineering, Java-enterprise smells, unnecessary wrappers, and duplicate code
+  version: "1.0"
+  parameters:
+    - name: repositorySnapshot
+      type: string
+      required: true
+      description: Repomix bundle or multi-file text snapshot
+    - name: focusAreas
+      type: string
+      required: false
+      description: Comma-separated focus (e.g., interfaces, wrappers, registry, DI, prompts)
+    - name: idioms
+      type: string
+      required: false
+      description: Target TS idioms (e.g., modules-over-classes, narrow-exports, data-first FP)
+    - name: removalRisk
+      type: string
+      required: false
+      description: Removal aggressiveness (safe|moderate|bold)
+
+template: |
+  Identify and propose removals or simplifications for:
+  - Over-abstracted interfaces/wrappers that add indirection without clear benefit.
+  - Enterprise patterns ported from Java (service locators, factory forests, redundant registries).
+  - Duplicated utilities, multi-step indirection around MCP SDK that can be collapsed.
+  - Legacy migration remnants and dead code.
+
+  Prioritize idiomatic TypeScript (module-level functions, small files, narrow exports, data-first helpers, explicit return types).
+
+  Inputs:
+  - Focus Areas: {{focusAreas}}
+  - Idioms: {{idioms}}
+  - Removal Risk: {{removalRisk}}
+
+  Output:
+  1) Findings table (Path | Smell | Why it’s a smell | Impact | Suggested Change).
+  2) Minimal diffs for top 5 highest ROI changes.
+  3) A batched refactor plan grouped by “safe”, “moderate”, “bold”, each with:
+     - Scope, Risks, Tests to run, Rollback notes.
+
+3) src/prompts/refactoring/duplicate-remnant-sweeper.yaml
+metadata:
+  name: duplicate-remnant-sweeper
+  category: refactoring
+  description: Detect duplicated logic and migration leftovers, propose single-source utilities
+  version: "1.0"
+  parameters:
+    - name: repositorySnapshot
+      type: string
+      required: true
+    - name: preferredHome
+      type: string
+      required: false
+      description: Preferred folder for shared utilities (e.g., src/lib/)
+    - name: renamePolicy
+      type: string
+      required: false
+      description: Naming scheme when consolidating utilities
+
+template: |
+  Find clusters of near-duplicate modules/types/validators/logging wrappers.
+  - Propose a single canonical implementation per cluster.
+  - Suggest new file paths and names ({{preferredHome}}) using {{renamePolicy}}.
+  - Show **before/after** import maps, and a codemod outline.
+
+  Output:
+  - Consolidation map (source files -> canonical file).
+  - Unified diff for canonical file creation + top 3 callsite rewires.
+  - A mechanical “rename/import-fix” checklist suitable for codemod automation.
+
+4) src/prompts/refactoring/idiomatic-ts-transform.yaml
+metadata:
+  name: idiomatic-ts-transform
+  category: refactoring
+  description: Rewrite modules to idiomatic TypeScript with minimal abstractions
+  version: "1.0"
+  parameters:
+    - name: files
+      type: string
+      required: true
+      description: One or more files to transform
+    - name: style
+      type: string
+      required: false
+      description: Preferences (e.g., flat modules, data-first, functional error Results)
+    - name: keepAPIs
+      type: string
+      required: false
+      description: Comma-separated exported names that must be preserved
+
+template: |
+  Transform code to idiomatic TypeScript:
+  - Prefer pure functions and small modules over classes/singletons.
+  - Keep return types explicit; keep Result<T> for error paths.
+  - Tighten exports (export only what’s used); avoid re-export spaghetti.
+  - Inline trivial wrappers; delete indirection that adds no test seam.
+  - Keep public API stable for: {{keepAPIs}}.
+
+  Output:
+  - Unified diffs for each file.
+  - Notes on behavior preservation + migration risks.
+  - Quick unit-test snippets to guard refactor.
+
+5) src/prompts/refactoring/folder-slimming.yaml
+metadata:
+  name: folder-slimming
+  category: refactoring
+  description: Collapse single-file folders and simplify directory depth without losing clarity
+  version: "1.0"
+  parameters:
+    - name: tree
+      type: string
+      required: true
+      description: Directory tree text
+    - name: rules
+      type: string
+      required: false
+      description: Heuristics (e.g., collapse single-file folders, merge *index.ts-only* dirs)
+
+template: |
+  Based on the directory tree, propose a flattened structure:
+  - Collapse single-file folders.
+  - Merge `index.ts`-only wrappers into parent.
+  - Keep domain boundaries readable (e.g., mcp/, tools/, lib/).
+  - Prefer `src/prompts/<category>/...` for prompts; avoid deep stacks like `/infrastructure/ai/prompts/templates`.
+
+  Output:
+  - Proposed tree (diff-style).
+  - Move plan (mv commands).
+  - Post-move import-fix codemod regexes.
+
+6) src/prompts/refactoring/deadcode-axe.yaml
+metadata:
+  name: deadcode-axe
+  category: refactoring
+  description: Remove unused exports, unreachable branches, and obsolete schemas
+  version: "1.0"
+  parameters:
+    - name: tsPruneReport
+      type: string
+      required: true
+      description: Raw output from ts-prune
+    - name: lintReport
+      type: string
+      required: false
+    - name: keepList
+      type: string
+      required: false
+      description: Comma-separated exports to keep temporarily
+
+template: |
+  Using reports, propose deletions and safe deprecations:
+  - Create deletion list excluding keepList.
+  - For risky removals, add `@deprecated` JSDoc with a migration hint.
+  - Generate a single batched diff that compiles cleanly.
+
+  Output:
+  - Deletion table (File | Symbol | Reason).
+  - Unified diff with removals and `@deprecated` tags where needed.
+  - CI note to ratchet baselines after merge.
+
+7) src/prompts/refactoring/logging-hygiene.yaml
+metadata:
+  name: logging-hygiene
+  category: refactoring
+  description: Normalize logging usage and reduce noisy non-MCP stdout
+  version: "1.0"
+  parameters:
+    - name: files
+      type: string
+      required: true
+    - name: logLevels
+      type: string
+      required: false
+      description: Allowed levels (debug, info, warn, error, trace)
+
+template: |
+  Normalize logging:
+  - Ensure logs use centralized pino logger and stderr in MCP mode.
+  - Replace `console.*` in library code with injected logger.
+  - Downshift noisy info->debug where suitable.
+  - Add structured context (operation, durations) via timer helper.
+
+  Output:
+  - Diff with replacements and added timers.
+  - Table of callsites that still print to stdout (and why).
+
+8) src/prompts/refactoring/error-taxonomy.yaml
+metadata:
+  name: error-taxonomy
+  category: refactoring
+  description: Enforce consistent ContainerizationError taxonomy and Result<T> boundaries
+  version: "1.0"
+  parameters:
+    - name: files
+      type: string
+      required: true
+    - name: allowedCodes
+      type: string
+      required: false
+
+template: |
+  Ensure errors use the shared taxonomy and surface as Result<T> at MCP boundaries:
+  - Replace throw/catch cascades with `Failure()` or typed ContainerizationError -> Result mapping.
+  - Keep tool handlers converting to MCP errors in one place.
+  - Add `.toJSON()` use in logs where helpful.
+
+  Output:
+  - Diff for each file.
+  - A small “boundary map” diagram (text) showing where exceptions are allowed vs not.
+
+9) src/prompts/refactoring/mcp-sdk-slim.yaml
+metadata:
+  name: mcp-sdk-slim
+  category: refactoring
+  description: Tighten MCP SDK usage to first-class APIs and remove redundant registries
+  version: "1.0"
+  parameters:
+    - name: files
+      type: string
+      required: true
+    - name: keepFlows
+      type: string
+      required: false
+      description: Flows to keep as-is (e.g., containerization workflow, deployment workflow)
+
+template: |
+  Reduce duplication around MCP server, tools, and registries:
+  - Prefer SDK-native `tool()`/`prompt()` registration and a single Map registry where needed.
+  - Remove wrapper layers that forward 1:1.
+  - Ensure ToolContext creation is centralized, includes sessionManager, and progress tokens.
+
+  Output:
+  - Findings list (wrapper -> native).
+  - Diffs flattening registration and ToolContext creation.
+  - Sanity checklist for start/stop lifecycle and status resource.
+
+10) src/prompts/refactoring/test-slim.yaml
+metadata:
+  name: test-slim
+  category: refactoring
+  description: Simplify tests to assert behavior, not wiring; prefer narrow fixtures
+  version: "1.0"
+  parameters:
+    - name: testFiles
+      type: string
+      required: true
+    - name: focus
+      type: string
+      required: false
+      description: Area to focus (e.g., mcp server start/stop, tools/analyze-repo)
+
+template: |
+  Rewrite tests to:
+  - Assert observable behavior and outputs over internal wiring.
+  - Use thin fixtures; prefer inline object factories over global singletons.
+  - Keep deterministic CI by stubbing sampling at boundary (one helper).
+
+  Output:
+  - Diff for top 3 suites.
+  - A shared `test-helpers.ts` snippet (factory, stub logger, stub sampling).
+  - List of flaky tests and de-flake suggestions.
+
+11) src/prompts/refactoring/ci-ratchet.yaml
+metadata:
+  name: ci-ratchet
+  category: refactoring
+  description: Generate a safe ratchet plan for lint warnings and dead code counts
+  version: "1.0"
+  parameters:
+    - name: lintMetrics
+      type: string
+      required: true
+    - name: deadcodeMetrics
+      type: string
+      required: true
+    - name: gatesConfig
+      type: string
+      required: false
+
+template: |
+  Propose a step-down plan for ESLint warnings and unused exports:
+  - Current → target thresholds.
+  - Concrete PR-sized batches with owners and success criteria.
+  - Update snippets for `quality-gates.json` and scripts.
+
+  Output:
+  - Timeline and batch plan.
+  - Two config diffs (gates + scripts).
+  - Rollback plan if warning counts spike.
+
+12) src/prompts/refactoring/migration-notes.yaml
+metadata:
+  name: migration-notes
+  category: refactoring
+  description: Generate human-friendly CHANGELOG-style notes for structural refactors
+  version: "1.0"
+  parameters:
+    - name: diffs
+      type: string
+      required: true
+    - name: audience
+      type: string
+      required: false
+      description: Notes audience (contributors|consumers)
+
+template: |
+  Produce clear migration notes:
+  - Breaking changes and how to update imports.
+  - New single-source utilities replacing duplicates.
+  - Testing guidance for refactor validation.
+  - Pointers to prompts/workflows that changed.
+
+  Output:
+  - A ready-to-paste markdown section for CHANGELOG and PR description.
+
+Why these fit your codebase
+
+You already keep prompts in src/prompts/... and rely on MCP host sampling + standardized Result<T> and ToolContext patterns; these prompts feed that exact flow and produce diffs/checklists/codemod hints rather than vague prose. 
+
+repomix-output
+
+If you want, I can also generate a one-shot “Refactor Orchestrator” prompt that calls a subset of these in sequence (analysis → comment cleanup → anti-pattern diffs → folder slimming → CI ratchet plan).
+
+Sources
+You said:
+yes, a one shot would be amzing, though maybe comments should go last?
+ChatGPT said:
+Thought for 15s
+
+Perfect—here’s a single “one-shot” refactor orchestrator that runs everything in a sensible order with comment clean-up last. Drop this in src/prompts/refactoring/refactor-orchestrator.yaml.
+
+metadata:
+  name: refactor-orchestrator
+  category: refactoring
+  description: One-shot, end-to-end repository refactor plan + diffs. Runs scans, simplifies architecture, consolidates duplicates, slims folders, normalizes errors/logging/tests/CI, and finally rewrites comments (WHY-first).
+  version: "1.0"
+
+# -----------------------------
+# Parameters
+# -----------------------------
+parameters:
+  - name: repositorySnapshot
+    type: string
+    required: true
+    description: >
+      A full text snapshot (e.g., repomix bundle) or a concatenation of target files/diffs.
+      Include the directory tree and key config files (tsconfig, eslint, package.json).
+  - name: mode
+    type: string
+    required: false
+    description: >
+      Which phases to run (all | fast | analyze-only | apply-top-ROI).
+      all = everything; fast = skip lower ROI changes; analyze-only = reports/plan only; apply-top-ROI = produce diffs for top items per phase.
+    enum: [all, fast, analyze-only, apply-top-ROI]
+    default: all
+  - name: idioms
+    type: string
+    required: false
+    description: >
+      TS idioms/preferences (e.g., modules-over-classes, data-first, narrow-exports, explicit-return, simple-constructors, union-error Results).
+  - name: keepAPIs
+    type: string
+    required: false
+    description: Comma-separated exported symbols that must remain stable (ABI surface).
+  - name: preferredHome
+    type: string
+    required: false
+    description: Preferred folder for shared utilities after consolidation (default: src/lib/)
+    default: src/lib/
+  - name: removalRisk
+    type: string
+    required: false
+    description: Aggressiveness for deletions/simplifications (safe | moderate | bold)
+    enum: [safe, moderate, bold]
+    default: moderate
+  - name: logLevels
+    type: string
+    required: false
+    description: Allowed log levels for hygiene (debug, info, warn, error, trace)
+    default: debug,info,warn,error
+  - name: gatesConfig
+    type: string
+    required: false
+    description: Optional current quality gates JSON (lint/deadcode thresholds) to ratchet
+  - name: audience
+    type: string
+    required: false
+    description: For migration notes (contributors | consumers)
+    enum: [contributors, consumers]
+    default: contributors
+  - name: style
+    type: string
+    required: false
+    description: Comment style guidance for the final pass (concise, rationale-first, invariants, failure-modes)
+    default: concise,rationale-first,invariants
+  - name: forbidTags
+    type: string
+    required: false
+    description: Comma-separated tags to purge from comments (e.g., TODO, TEAM, PHASE)
+    default: TEAM,PHASE
+  - name: keepCommentSections
+    type: string
+    required: false
+    description: Comma-separated doc comment sections to always keep (e.g., Invariants, Examples)
+    default: Invariants,Preconditions,Postconditions,Failure Modes,Trade-offs
+
+# -----------------------------
+# Orchestration Logic (Narrative)
+# -----------------------------
+template: |
+  You are the Orchestrator for a full repository refactor. Produce actionable outputs with **apply-ready unified diffs**, codemod steps, and batched plans. Run phases in the order below. Only generate diffs for files present in the provided snapshot. Make safe, local changes; preserve public API listed in {{keepAPIs}}. Prefer idiomatic **TypeScript** (module-level functions, narrow exports, explicit return types, minimal wrappers).
+
+  ## Phase 0 — Inputs & Scope
+  - Parse repository snapshot, directory tree, tsconfig, eslint, package.json.
+  - Identify areas relevant to MCP server/tools/prompts and core utilities.
+  - Respect mode: {{mode}} and risk: {{removalRisk}}.
+  - Idioms: {{idioms}}
+  - Keep API stable for: {{keepAPIs}}
+
+  ## Phase 1 — Anti-Pattern Discovery (scan only)
+  - Detect enterprise/Java-style abstractions (service locators, over-grown factories, redundant registries).
+  - Flag unnecessary interfaces/wrappers, “1:1 forwarders,” and deep inheritance.
+  - Identify migration remnants and near-duplicates.
+  - OUTPUT A: **Findings Table** (Path | Smell | Why | Impact | Suggested Change | Est. ROI).
+  - OUTPUT B: **Top-ROI Shortlist**.
+
+  ## Phase 2 — MCP SDK Slimming
+  - Replace wrapper layers with SDK-native registration where possible.
+  - Centralize ToolContext/session handling; ensure progress tokens and error mapping are consistent.
+  - OUTPUT C: **Diffs** removing wrappers & flattening registration; a startup lifecycle checklist.
+
+  ## Phase 3 — Idiomatic TS Transform
+  - Rewrite modules to idiomatic TS: move from classes/singletons to small module functions where sensible; reduce re-exports; tighten exports; inline trivial indirection.
+  - Preserve exported API in {{keepAPIs}}.
+  - OUTPUT D: **Per-file diffs** + **behavior-preservation notes** + **guard tests**.
+
+  ## Phase 4 — Duplicate/Remnant Consolidation
+  - Cluster near-duplicate utilities/types/validators/logging shims.
+  - Pick a **canonical** implementation per cluster; propose location under {{preferredHome}}.
+  - OUTPUT E: **Consolidation Map**; **canonical file diff**; **3 representative callsite rewires**; **codemod outline**.
+
+  ## Phase 5 — Folder Slimming (structural)
+  - Collapse single-file folders and index-only wrappers; reduce directory depth.
+  - Maintain clear domain boundaries (e.g., mcp/, tools/, lib/, prompts/).
+  - OUTPUT F: **Proposed tree diff**, **mv plan**, **import-fix codemods**.
+
+  ## Phase 6 — Dead Code & Unused Exports
+  - Using ts-prune/lint signals (or inferred), mark deletions or deprecations (with @deprecated JSDoc and migration hints).
+  - OUTPUT G: **Deletion table** and **batched diff** that compiles cleanly.
+
+  ## Phase 7 — Logging Hygiene
+  - Normalize logger usage (pino or central logger), remove console.* from libs, reduce noise (info→debug) where appropriate, add duration/timer helper.
+  - OUTPUT H: **Diffs** + **stdout offenders table**.
+
+  ## Phase 8 — Error Taxonomy & Result Boundaries
+  - Enforce consistent error taxonomy; convert throw/catch cascades to Result<T> or structured error mapping at boundaries.
+  - OUTPUT I: **Diffs** + **Boundary Map** (text diagram).
+
+  ## Phase 9 — Test Slimming
+  - Focus tests on behavior not wiring; prefer narrow fixtures and a shared stub factory for sampling/logging.
+  - OUTPUT J: **Top 3 suite diffs**, **shared test-helpers snippet**, **de-flake notes**.
+
+  ## Phase 10 — CI Ratchet
+  - Propose step-down plan for lint warnings/unused exports; produce gates and scripts diffs.
+  - OUTPUT K: **Timeline & batches**, **config diffs**, **rollback plan**.
+
+  ## Phase 11 — COMMENT QUALITY (RUN LAST)
+  - Rewrite comments for WHY over WHAT; remove phase/team chatter and redundancy.
+  - Keep sections: {{keepCommentSections}}; Remove tags: {{forbidTags}}; Style: {{style}}
+  - OUTPUT L: **Comment diffs**, **validation checklist**, **TODO→Issues table** (if any).
+
+  ## Phase 12 — Migration Notes
+  - Produce CHANGELOG-ready notes for contributors (or {{audience}}), including breaking changes, API stability, new canonical utilities, and testing guidance.
+  - OUTPUT M: **Markdown section** for PR/CHANGELOG.
+
+  ### Output Contract
+  Always produce:
+  1) **Executive Summary** (bulleted) with estimated ROI and risk by phase.
+  2) **Apply-ready unified diffs** limited to files shown in the snapshot.
+  3) **Batched plan**: Safe / Moderate / Bold (scope, risks, tests, rollback).
+  4) **Codemod block**: one or more find/replace regex steps (JS/TS-aware where possible) and `mv` commands for file moves.
+  5) **Quality Gate Diffs** (if gatesConfig provided), else propose a minimal gates file.
+  6) **Checklists** to verify the refactor (compiles, tests green, MCP starts/stops, tools register, logging boundaries honored).
+  7) **Final comment-pass diffs** (Phase 11).
+
+# -----------------------------
+# Tools This Orchestrator May Invoke (Conceptual)
+# -----------------------------
+# These are logical invocations of other prompts defined in your repo.
+# The orchestrator does not call them directly; it embeds their goals/constraints.
+# (Names match the suggested prompt pack for portability.)
+tools:
+  - name: anti-pattern-scan
+    purpose: Discovery of smells/over-engineering and ROI ranking
+  - name: mcp-sdk-slim
+    purpose: Flatten wrapper layers around MCP SDK, centralize ToolContext
+  - name: idiomatic-ts-transform
+    purpose: Convert modules toward idiomatic TS with minimal abstractions
+  - name: duplicate-remnant-sweeper
+    purpose: Consolidate duplicates to canonical utilities
+  - name: folder-slimming
+    purpose: Flatten single-file/index-only folders and simplify tree
+  - name: deadcode-axe
+    purpose: Remove unused exports and obsolete schemas; add @deprecated where needed
+  - name: logging-hygiene
+    purpose: Normalize logger usage and reduce noise
+  - name: error-taxonomy
+    purpose: Enforce consistent error taxonomy and Result boundaries
+  - name: test-slim
+    purpose: Refocus tests on observable behavior; shared test helpers
+  - name: ci-ratchet
+    purpose: Step-down plan and diff for quality gates
+  - name: comment-quality
+    purpose: WHY-first comment rewrite; remove team/phase chatter (final phase)
+
+# -----------------------------
+# Output Schema (guidance)
+# -----------------------------
+output_schema:
+  type: object
+  required: [summary, phases, diffs, codemods, plans, checklists, migrationNotes]
+  properties:
+    summary:
+      type: object
+      properties:
+        roiByPhase: { type: array, items: { type: object } }
+        risks: { type: array, items: { type: string } }
+        notes: { type: array, items: { type: string } }
+    phases:
+      type: array
+      items:
+        type: object
+        properties:
+          name: { type: string }
+          findings: { type: array, items: { type: object } }
+          actions: { type: array, items: { type: string } }
+          deliverables: { type: array, items: { type: string } }
+    diffs:
+      type: array
+      items:
+        type: object
+        properties:
+          path: { type: string }
+          unifiedDiff: { type: string }
+          risk: { type: string }
+    codemods:
+      type: array
+      items:
+        type: object
+        properties:
+          name: { type: string }
+          steps: { type: array, items: { type: string } }
+    plans:
+      type: object
+      properties:
+        safe: { type: array, items: { type: object } }
+        moderate: { type: array, items: { type: object } }
+        bold: { type: array, items: { type: object } }
+    checklists:
+      type: array
+      items:
+        type: object
+        properties:
+          title: { type: string }
+          items: { type: array, items: { type: string } }
+    migrationNotes:
+      type: string
+
+# -----------------------------
+# Example Invocations
+# -----------------------------
+examples:
+  - title: Full run, moderate removal risk
+    params:
+      repositorySnapshot: "<repomix-output or concatenated files here>"
+      mode: "all"
+      idioms: "modules-over-classes,narrow-exports,explicit-return,data-first"
+      keepAPIs: "startServer,registerTools,analyzeRepo"
+      preferredHome: "src/lib/"
+      removalRisk: "moderate"
+      logLevels: "debug,info,warn,error"
+      audience: "contributors"
+      style: "concise,rationale-first,invariants"
+      forbidTags: "TEAM,PHASE"
+      keepCommentSections: "Invariants,Preconditions,Postconditions,Failure Modes,Trade-offs"
+
+  - title: Analyze only (planning doc, no diffs)
+    params:
+      repositorySnapshot: "<repomix-output>"
+      mode: "analyze-only"
+
+  - title: Apply top ROI only
+    params:
+      repositorySnapshot: "<repomix-output>"
+      mode: "apply-top-ROI"
+      removalRisk: "safe"
+
+
+Notes
+
+Comments are intentionally last so their edits don’t thrash while files move/rename.
+
+The orchestrator emits diffs/codemods/checklists you can apply in small PRs (safe → bold).
+
+It mirrors the sub-prompts you added earlier, so you can keep running them individually if needed.
