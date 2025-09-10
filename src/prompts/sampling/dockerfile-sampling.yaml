@@ -23,11 +23,11 @@ template: |
   Language: {{language}}
   {{#context}}Context: {{context}}{{/context}}
 
-  Requirements:
-  - Optimize for {{strategy}}
-  - Follow containerization best practices
-  - Use appropriate base images
-  - Include security considerations
-  - Minimize image size where possible
+  CRITICAL: Return ONLY the raw Dockerfile content. Do not include:
+  - Explanatory text before or after the Dockerfile
+  - Markdown code blocks or formatting
+  - Comments about best practices
+  - Installation instructions
+  - Any text that is not part of the Dockerfile itself
 
-  Please provide a production-ready Dockerfile.
+  Start your response directly with the FROM instruction and end with the last Dockerfile instruction. No additional text.

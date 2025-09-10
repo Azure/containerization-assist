@@ -68,4 +68,11 @@ template: |
   5. Optimize for image size where possible
   6. Maintain the original functionality and intent
 
-  Return only the corrected Dockerfile content without explanation or code fences.
+  CRITICAL: Return ONLY the raw corrected Dockerfile content. Do not include:
+  - Explanatory text before or after the Dockerfile
+  - Markdown code blocks or formatting
+  - Comments about what was fixed or changed
+  - Installation instructions
+  - Any text that is not part of the Dockerfile itself
+
+  Start your response directly with the FROM instruction and end with the last Dockerfile instruction. No additional text.

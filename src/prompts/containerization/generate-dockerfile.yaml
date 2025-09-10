@@ -59,4 +59,11 @@ template: |
   6. Copy files efficiently
   7. Expose necessary ports
 
-  Return only the Dockerfile content without explanation or code fences.
+  CRITICAL: Return ONLY the raw Dockerfile content. Do not include:
+  - Explanatory text before or after the Dockerfile
+  - Markdown code blocks or formatting
+  - Comments about best practices
+  - Installation instructions
+  - Any text that is not part of the Dockerfile itself
+
+  Start your response directly with the FROM instruction and end with the last Dockerfile instruction. No additional text.
