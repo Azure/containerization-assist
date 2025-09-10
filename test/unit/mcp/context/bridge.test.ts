@@ -7,7 +7,7 @@ import type { Logger } from 'pino';
 import {
   createToolContext,
   createMCPToolContext,
-} from '@mcp/context/factory';
+} from '@mcp/context/tool-context-builder';
 import {
   extractProgressToken,
   createProgressReporter,
