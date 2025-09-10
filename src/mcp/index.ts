@@ -16,7 +16,7 @@ export {
   createTestContext,
   type ToolContextDeps,
   type CreateContextOptions,
-} from './context/factory';
+} from './context/tool-context-builder';
 
 // Export types
 export type {

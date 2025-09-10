@@ -16,60 +16,6 @@ interface CacheStore {
 }
 
 /**
- * Create a cache store with configuration
- */
-function createCacheStore(
-  defaultTtl: number = 3600000, // 1 hour default
-  logger: Logger,
-): CacheStore {
-  const store: CacheStore = {
-    cache: new Map(),
-    logger: logger.child({ component: 'MemoryResourceCache' }),
-    defaultTtl,
-  };
-
-  // Start cleanup every 5 minutes
-  store.cleanupInterval = setInterval(
-    () => {
-      cleanupExpired(store).catch((error) => {
-        store.logger.error({ error }, 'Failed to cleanup expired cache entries');
-      });
-    },
-    5 * 60 * 1000,
-  );
-
-  return store;
-}
-
-/**
- * Cleanup expired entries
- */
-async function cleanupExpired(store: CacheStore): Promise<Result<number>> {
-  try {
-    const now = Date.now();
-    let cleanedCount = 0;
-
-    for (const [key, entry] of store.cache.entries()) {
-      if (entry.expiresAt && now > entry.expiresAt) {
-        store.cache.delete(key);
-        cleanedCount++;
-      }
-    }
-
-    if (cleanedCount > 0) {
-      store.logger.debug({ cleanedCount }, 'Cleaned up expired cache entries');
-    }
-
-    return Success(cleanedCount);
-  } catch (error) {
-    store.logger.error({ error }, 'Failed to cleanup expired entries');
-    return Failure(
-      `Failed to cleanup expired entries: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-}
-
-/**
  * Set a cache entry
  */
 export async function set(
@@ -295,27 +241,4 @@ export function destroy(store: CacheStore): void {
 export interface ExtendedResourceCache extends ResourceCache {
   getStats(): { size: number; hitRate: number; memoryUsage: number };
   destroy(): void;
-}
-
-/**
- * Create a memory-based resource cache
- */
-export function createMemoryResourceCache(
-  defaultTtl: number = 3600000,
-  logger: Logger,
-): ExtendedResourceCache {
-  const store = createCacheStore(defaultTtl, logger);
-
-  return {
-    set: (key: string, value: unknown, ttl?: number) => set(store, key, value, ttl),
-    get: (key: string) => get(store, key),
-    delete: (key: string) => deleteEntry(store, key),
-    clear: () => clear(store),
-    has: (key: string) => has(store, key),
-    invalidate: (pattern: string | { tags?: string[]; keyPattern?: string }) =>
-      invalidate(store, pattern),
-    keys: (pattern?: string) => keys(store, pattern),
-    getStats: () => getStats(store),
-    destroy: () => destroy(store),
-  };
 }

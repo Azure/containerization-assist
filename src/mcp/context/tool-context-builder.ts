@@ -10,7 +10,7 @@ import type { Logger } from 'pino';
 import type { ToolContext, ProgressReporter } from './types';
 import type { SessionManager } from '@lib/session';
 import type { PromptRegistry } from '../../prompts/registry';
-import { SimpleToolContext } from './tool-context';
+import { StandardToolContext } from './tool-context';
 import { extractProgressToken, createProgressReporter } from './progress';
 
 /**
@@ -104,7 +104,7 @@ export function createToolContext(
   };
 
   // Create context with all dependencies
-  return new SimpleToolContext(
+  return new StandardToolContext(
     deps.server,
     deps.logger,
     deps.promptRegistry,

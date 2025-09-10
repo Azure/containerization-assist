@@ -7,7 +7,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { createMCPToolContext } from '../context/factory';
+import { createMCPToolContext } from '../context/tool-context-builder';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { analyzeRepoSchema } from '../../tools/analyze-repo/schema';
@@ -369,16 +369,10 @@ export class MCPServer {
           },
         );
 
-        // Add deps for backward compatibility
-        const extendedContext = {
-          ...toolContext,
-          deps: this.deps,
-        };
-
         const result = await deploymentWorkflow.execute(
           workflowParams,
           this.deps.logger,
-          extendedContext,
+          toolContext as unknown as Record<string, unknown>,
         );
 
         return {

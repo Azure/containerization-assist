@@ -93,15 +93,6 @@ export function buildImageString(components: ParsedImageTag): string {
 }
 
 /**
- * Extracts registry from an image string
- * Returns undefined if no explicit registry (Docker Hub implied)
- */
-export function extractRegistry(imageString: string): string | undefined {
-  const parsed = parseImageTag(imageString);
-  return parsed.registry;
-}
-
-/**
  * Normalizes an image tag to always include explicit tag
  */
 export function normalizeImageTag(imageString: string): string {
@@ -110,38 +101,8 @@ export function normalizeImageTag(imageString: string): string {
 }
 
 /**
- * Checks if an image string refers to an official Docker Hub image
- */
-export function isOfficialImage(imageString: string): boolean {
-  const parsed = parseImageTag(imageString);
-
-  // Official images have no registry and no namespace (no slash in repository)
-  return !parsed.registry && !parsed.repository.includes('/');
-}
-
-/**
  * Validates Docker build argument format (ARG=value)
  */
 export function validateBuildArg(arg: string): boolean {
   return /^[A-Z_][A-Z0-9_]*=.*$/.test(arg);
-}
-
-/**
- * Parses Docker build arguments into key-value pairs
- */
-export function parseBuildArgs(args: string[]): Record<string, string> {
-  const parsed: Record<string, string> = {};
-
-  for (const arg of args) {
-    if (!validateBuildArg(arg)) {
-      throw new Error(`Invalid build argument format: ${arg}`);
-    }
-
-    const [key, ...valueParts] = arg.split('=');
-    if (key) {
-      parsed[key] = valueParts.join('=');
-    }
-  }
-
-  return parsed;
 }

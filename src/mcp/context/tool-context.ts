@@ -1,8 +1,6 @@
 /**
- * Simplified ToolContext Implementation
+ *  ToolContext Implementation
  *
- * Replaces the complex bridge pattern with a direct class-based approach.
- * Provides the same ToolContext interface with much simpler implementation.
  */
 
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -26,9 +24,9 @@ const DEFAULT_CONFIG: Required<ToolContextConfig> = {
 };
 
 /**
- * Simplified ToolContext class - replaces complex bridge pattern
+ * Standard ToolContext implementation
  */
-export class SimpleToolContext implements ToolContext {
+export class StandardToolContext implements ToolContext {
   public logger: Logger;
   public sampling: {
     createMessage(request: SamplingRequest): Promise<SamplingResponse>;

@@ -3,9 +3,11 @@
  * Lightweight, testable tool for pushing Docker images
  */
 
-import type { DockerClient } from '../../services/docker/client';
+import { createDockerClient, type DockerClient } from '../../services/docker/client';
 import type { MCPTool, MCPResponse } from '../../mcp/types';
-import { pushImageSchema } from './schema';
+import type { ToolContext } from '../../mcp/context/types';
+import { Success, Failure, type Result } from '../../types';
+import { pushImageSchema, type PushImageParams } from './schema';
 import type { z } from 'zod';
 
 export interface PushImageResult {
@@ -111,4 +113,29 @@ export function makePushImage(
       };
     },
   };
+}
+
+/**
+ * Push image function for workflow usage
+ * Follows the standard pattern used by other tools
+ */
+export async function pushImage(
+  params: PushImageParams,
+  context: ToolContext,
+): Promise<Result<PushImageResult>> {
+  const logger = context.logger;
+  const dockerClient = createDockerClient(logger);
+  const tool = makePushImage(dockerClient);
+
+  const result = await tool.handler(params);
+
+  if ('error' in result) {
+    return Failure(result.error);
+  }
+
+  if (result.value) {
+    return Success(result.value);
+  }
+
+  return Failure('Unexpected result from push-image tool');
 }

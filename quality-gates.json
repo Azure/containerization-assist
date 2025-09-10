@@ -23,7 +23,7 @@
         "warnings": 33
       },
       "deadcode": {
-        "count": 174
+        "count": 173
       },
       "typescript": {
         "errors": 0
@@ -45,9 +45,9 @@
       "baseline": 25
     },
     "deadcode": {
-      "current": 74,
-      "baseline": 74,
-      "note": "Accurate count excluding public API, MCP tools, and test-used exports"
+      "current": 70,
+      "baseline": 70,
+      "note": "Accurate count excluding public API, MCP tools, and test-used exports. Conservative cleanup completed."
     }
   }
 }

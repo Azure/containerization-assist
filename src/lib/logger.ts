@@ -1,7 +1,7 @@
 /**
  * Standardized Logger Utility
  *
- * Simple wrapper around Pino logger with helper functions
+ * Wrapper around Pino logger with helper functions
  * Avoids creating yet another logger interface - just use Pino!
  */
 

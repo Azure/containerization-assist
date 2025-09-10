@@ -11,7 +11,7 @@ import type { Logger } from 'pino';
 
 import { createSessionManager, type SessionManager } from '../lib/session.js';
 import { createLogger } from '../lib/logger.js';
-import { SimpleToolContext } from '../mcp/context/tool-context.js';
+import { StandardToolContext } from '../mcp/context/tool-context.js';
 
 // Import all tools
 import { getAllInternalTools } from './tools.js';
@@ -145,7 +145,7 @@ export class ContainerAssistServer {
   private createContext(params?: { sessionId?: string }): ToolContext {
     const logger = this.logger.child({ context: 'tool-execution' });
 
-    const context = new SimpleToolContext(
+    const context = new StandardToolContext(
       this.mcpServer as any,
       logger,
       undefined,

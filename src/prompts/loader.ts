@@ -1,5 +1,5 @@
 /**
- * Simple YAML Prompt Loader
+ * YAML Prompt Loader
  *
  * Loads prompt definitions from external YAML files organized by category.
  * Replaces the complex prompt registry with a simple file-based system.
@@ -62,15 +62,15 @@ export interface PromptFile {
 }
 
 /**
- * Simple prompt loader for YAML-based prompt files
+ * Prompt loader for YAML-based prompt files
  */
-export class SimplePromptLoader {
+export class PromptLoader {
   private prompts = new Map<string, PromptFile>();
   private logger: Logger;
   private initialized = false;
 
   constructor(logger: Logger) {
-    this.logger = logger.child({ component: 'SimplePromptLoader' });
+    this.logger = logger.child({ component: 'PromptLoader' });
   }
 
   /**

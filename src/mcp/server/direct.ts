@@ -10,7 +10,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { randomUUID } from 'node:crypto';
 import { getContainerStatus, type Deps } from '../../container';
-import { createMCPToolContext } from '../context/factory';
+import { createMCPToolContext } from '../context/tool-context-builder';
 
 // Single unified tool definition structure
 interface ToolDefinition {

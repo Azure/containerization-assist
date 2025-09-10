@@ -21,7 +21,7 @@ import {
   McpError,
   ErrorCode,
 } from '@modelcontextprotocol/sdk/types.js';
-import { SimplePromptLoader, type PromptFile, type ParameterSpec } from './loader';
+import { PromptLoader, type PromptFile, type ParameterSpec } from './loader';
 import { Result } from '@types';
 
 /**
@@ -43,13 +43,13 @@ import { Result } from '@types';
  * ```
  */
 export class PromptRegistry {
-  private loader: SimplePromptLoader;
+  private loader: PromptLoader;
   private logger: Logger;
   private initialized = false;
 
   constructor(logger: Logger) {
     this.logger = logger.child({ component: 'PromptRegistry' });
-    this.loader = new SimplePromptLoader(logger);
+    this.loader = new PromptLoader(logger);
   }
 
   /**

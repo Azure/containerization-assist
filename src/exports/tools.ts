@@ -2,8 +2,6 @@
  * Tool collection and registry for external consumption
  */
 
-import type { MCPTool } from './types.js';
-
 // Import all tool implementations
 import { analyzeRepo } from '../tools/analyze-repo/tool.js';
 import { analyzeRepoSchema } from '../tools/analyze-repo/schema.js';
@@ -177,54 +175,3 @@ const workflowTool = createToolWrapper(
   workflowSchema.shape,
   workflow,
 );
-
-/**
- * Simple MCPTool adapter for backward compatibility
- * Note: These tools require ContainerAssistServer for proper context management
- */
-function createSimpleMCPTool(tool: Tool): MCPTool {
-  return {
-    name: tool.name,
-    metadata: {
-      title: tool.name.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
-      description: tool.description || `${tool.name} tool`,
-      inputSchema: tool.schema || { type: 'object', properties: {} },
-    },
-    handler: async () => {
-      throw new Error(
-        `${tool.name} requires ContainerAssistServer for execution. ` +
-          `Please use: const caServer = new ContainerAssistServer(); caServer.bindAll({ server });`,
-      );
-    },
-  };
-}
-
-// Adapt all tools to MCPTool interface
-const adaptedTools = {
-  analyzeRepo: createSimpleMCPTool(analyzeRepoTool),
-  generateDockerfile: createSimpleMCPTool(generateDockerfileTool),
-  buildImage: createSimpleMCPTool(buildImageTool),
-  scanImage: createSimpleMCPTool(scanImageTool),
-  tagImage: createSimpleMCPTool(tagImageTool),
-  pushImage: createSimpleMCPTool(pushImageTool),
-  generateK8sManifests: createSimpleMCPTool(generateK8sManifestsTool),
-  prepareCluster: createSimpleMCPTool(prepareClusterTool),
-  deployApplication: createSimpleMCPTool(deployApplicationTool),
-  verifyDeployment: createSimpleMCPTool(verifyDeploymentTool),
-  fixDockerfile: createSimpleMCPTool(fixDockerfileTool),
-  resolveBaseImages: createSimpleMCPTool(resolveBaseImagesTool),
-  ops: createSimpleMCPTool(opsToolWrapper),
-  workflow: createSimpleMCPTool(workflowTool),
-};
-
-/**
- * Tool collection object for easy access
- */
-export const tools = adaptedTools;
-
-/**
- * Get all available tools as an array
- */
-export function getAllTools(): MCPTool[] {
-  return Object.values(adaptedTools);
-}
