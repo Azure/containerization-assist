@@ -6,6 +6,7 @@ import Docker from 'dockerode';
 import tar from 'tar-fs';
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '../../domain/types';
+import { extractDockerErrorMessage, sanitizeErrorDetails } from './errors';
 /**
  * Options for building a Docker image.
  */
@@ -133,8 +134,39 @@ export const createDockerClient = (logger: Logger): DockerClient => {
         const result = await new Promise<DockerBuildResponse[]>((resolve, reject) => {
           docker.modem.followProgress(
             stream,
-            (err: Error | null, res: DockerBuildResponse[]) => (err ? reject(err) : resolve(res)),
-            (event: DockerBuildEvent) => logger.debug(event, 'Docker build progress'),
+            (err: Error | null, res: DockerBuildResponse[]) => {
+              if (err) {
+                // Log detailed error information before rejecting
+                const { message, details } = extractDockerErrorMessage(err);
+                logger.error(
+                  {
+                    error: message,
+                    errorDetails: sanitizeErrorDetails(details),
+                    originalError: err,
+                    options,
+                  },
+                  'Docker build followProgress error',
+                );
+                reject(err);
+              } else {
+                resolve(res);
+              }
+            },
+            (event: DockerBuildEvent) => {
+              logger.debug(event, 'Docker build progress');
+
+              // Check for various error patterns in events
+              const eventObj = event as Record<string, unknown>;
+              if (
+                eventObj.error ||
+                eventObj.errorDetail ||
+                (typeof eventObj.stream === 'string' &&
+                  /\berror\b|\bfailed\b/i.test(eventObj.stream) &&
+                  !/successfully|success/i.test(eventObj.stream))
+              ) {
+                logger.error({ errorEvent: event }, 'Docker build error event received');
+              }
+            },
           );
         });
 
@@ -147,8 +179,18 @@ export const createDockerClient = (logger: Logger): DockerClient => {
         logger.debug({ buildResult }, 'Docker build completed successfully');
         return Success(buildResult);
       } catch (error) {
-        const errorMessage = `Build failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        logger.error({ error: errorMessage, options }, 'Docker build failed');
+        const { message, details } = extractDockerErrorMessage(error);
+        const errorMessage = `Build failed: ${message}`;
+
+        logger.error(
+          {
+            error: errorMessage,
+            errorDetails: sanitizeErrorDetails(details),
+            originalError: error,
+            options,
+          },
+          'Docker build failed',
+        );
 
         return Failure(errorMessage);
       }
@@ -170,7 +212,19 @@ export const createDockerClient = (logger: Logger): DockerClient => {
 
         return Success(imageInfo);
       } catch (error) {
-        const errorMessage = `Failed to get image: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        const { message, details } = extractDockerErrorMessage(error);
+        const errorMessage = `Failed to get image: ${message}`;
+
+        logger.error(
+          {
+            error: errorMessage,
+            errorDetails: sanitizeErrorDetails(details),
+            originalError: error,
+            imageId: id,
+          },
+          'Docker get image failed',
+        );
+
         return Failure(errorMessage);
       }
     },
@@ -183,7 +237,21 @@ export const createDockerClient = (logger: Logger): DockerClient => {
         logger.info({ imageId, repository, tag }, 'Image tagged successfully');
         return Success(undefined);
       } catch (error) {
-        const errorMessage = `Failed to tag image: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        const { message, details } = extractDockerErrorMessage(error);
+        const errorMessage = `Failed to tag image: ${message}`;
+
+        logger.error(
+          {
+            error: errorMessage,
+            errorDetails: sanitizeErrorDetails(details),
+            originalError: error,
+            imageId,
+            repository,
+            tag,
+          },
+          'Docker tag image failed',
+        );
+
         return Failure(errorMessage);
       }
     },
@@ -208,9 +276,37 @@ export const createDockerClient = (logger: Logger): DockerClient => {
         await new Promise<void>((resolve, reject) => {
           docker.modem.followProgress(
             stream,
-            (err: Error | null) => (err ? reject(err) : resolve()),
+            (err: Error | null) => {
+              if (err) {
+                // Log detailed error information before rejecting
+                const { message, details } = extractDockerErrorMessage(err);
+                logger.error(
+                  {
+                    error: message,
+                    errorDetails: sanitizeErrorDetails(details),
+                    originalError: err,
+                    repository,
+                    tag,
+                  },
+                  'Docker push followProgress error',
+                );
+                reject(err);
+              } else {
+                resolve();
+              }
+            },
             (event: DockerPushEvent) => {
               logger.debug(event, 'Docker push progress');
+
+              // Check for various error patterns in events
+              const eventObj = event as Record<string, unknown>;
+              if (
+                eventObj.error ||
+                eventObj.errorDetail ||
+                (eventObj.status && /error|failed/i.test(String(eventObj.status)))
+              ) {
+                logger.error({ errorEvent: event }, 'Docker push error event received');
+              }
 
               if (event.aux?.Digest) {
                 digest = event.aux.Digest;
@@ -241,7 +337,20 @@ export const createDockerClient = (logger: Logger): DockerClient => {
         }
         return Success(result);
       } catch (error) {
-        const errorMessage = `Failed to push image: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        const { message, details } = extractDockerErrorMessage(error);
+        const errorMessage = `Failed to push image: ${message}`;
+
+        logger.error(
+          {
+            error: errorMessage,
+            errorDetails: sanitizeErrorDetails(details),
+            originalError: error,
+            repository,
+            tag,
+          },
+          'Docker push image failed',
+        );
+
         return Failure(errorMessage);
       }
     },

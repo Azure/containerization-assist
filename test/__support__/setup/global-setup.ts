@@ -7,10 +7,34 @@ export default async function globalSetup() {
   console.log('🏗️  Setting up global test environment...');
   
   try {
-    // Verify Docker is available (but don't fail if not available for unit tests)
+    // Verify Docker is available and working
     try {
       await execAsync('docker --version');
+      await execAsync('docker info');
       console.log('✅ Docker is available');
+      
+      // Clean up any leftover test resources from previous runs
+      try {
+        const { stdout } = await execAsync('docker images --format "{{.Repository}}:{{.Tag}}" | grep "^test-" || true');
+        if (stdout.trim()) {
+          const images = stdout.trim().split('\n').filter(img => img.length > 0);
+          let cleanedCount = 0;
+          for (const image of images) {
+            try {
+              await execAsync(`docker rmi "${image}" -f`);
+              cleanedCount++;
+            } catch (error) {
+              // Ignore cleanup errors
+            }
+          }
+          if (cleanedCount > 0) {
+            console.log(`🧹 Pre-cleaned ${cleanedCount} leftover test images`);
+          }
+        }
+      } catch (error) {
+        // Ignore pre-cleanup errors
+      }
+      
     } catch (error) {
       console.log('⚠️  Docker not available - some integration tests may be skipped');
     }
