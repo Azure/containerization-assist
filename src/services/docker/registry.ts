@@ -17,6 +17,19 @@ export interface ImageMetadata {
 }
 
 /**
+ * Docker Hub API response structure for tag metadata
+ * @see https://docs.docker.com/docker-hub/api/latest/
+ */
+interface DockerHubTagResponse {
+  digest?: string;
+  full_size?: number;
+  size?: number;
+  last_updated?: string;
+  tag_last_pushed?: string;
+  images?: Array<{ architecture?: string; os?: string }>;
+}
+
+/**
  * Fetch image metadata from Docker Hub
  */
 async function fetchDockerHubMetadata(
@@ -45,14 +58,7 @@ async function fetchDockerHubMetadata(
       return null;
     }
 
-    const data = (await response.json()) as {
-      digest?: string;
-      full_size?: number;
-      size?: number;
-      last_updated?: string;
-      tag_last_pushed?: string;
-      images?: Array<{ architecture?: string; os?: string }>;
-    };
+    const data = (await response.json()) as DockerHubTagResponse;
 
     const metadata: ImageMetadata = {
       name: imageName,
