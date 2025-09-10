@@ -1,6 +1,6 @@
 {
   "name": "@thgamble/containerization-assist-mcp",
-  "version": "1.1.15",
+  "version": "1.1.16",
   "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
   "type": "module",
   "engines": {
@@ -12,27 +12,33 @@
     ".": {
       "types": "./dist/src/index.d.ts",
       "import": "./dist/src/index.js",
+      "require": "./dist-cjs/src/index.js",
       "default": "./dist/src/index.js"
     },
     "./server": {
       "types": "./dist/src/mcp/server.d.ts",
-      "import": "./dist/src/mcp/server.js"
+      "import": "./dist/src/mcp/server.js",
+      "require": "./dist-cjs/src/mcp/server.js"
     },
     "./tools": {
       "types": "./dist/src/exports/tools.d.ts",
-      "import": "./dist/src/exports/tools.js"
+      "import": "./dist/src/exports/tools.js",
+      "require": "./dist-cjs/src/exports/tools.js"
     },
     "./helpers": {
       "types": "./dist/src/exports/helpers.d.ts",
-      "import": "./dist/src/exports/helpers.js"
+      "import": "./dist/src/exports/helpers.js",
+      "require": "./dist-cjs/src/exports/helpers.js"
     },
     "./types": {
       "types": "./dist/src/domain/types.d.ts",
-      "import": "./dist/src/domain/types.js"
+      "import": "./dist/src/domain/types.js",
+      "require": "./dist-cjs/src/domain/types.js"
     },
     "./config": {
       "types": "./dist/src/domain/types.d.ts",
-      "import": "./dist/src/domain/types.js"
+      "import": "./dist/src/domain/types.js",
+      "require": "./dist-cjs/src/domain/types.js"
     }
   },
   "bin": {
@@ -41,15 +47,18 @@
   },
   "files": [
     "dist/**/*",
+    "dist-cjs/**/*",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
   ],
   "scripts": {
-    "clean": "rm -rf dist coverage .tsbuildinfo*",
-    "build": "tsc && tsc-alias -f && node scripts/post-build.js",
+    "clean": "rm -rf dist dist-cjs coverage .tsbuildinfo*",
+    "build": "npm run build:esm && npm run build:cjs",
+    "build:esm": "tsc && tsc-alias -f && node scripts/post-build.js",
+    "build:cjs": "tsc -p tsconfig.cjs.json && tsc-alias -p tsconfig.cjs.json -f && node scripts/fix-cjs-imports.cjs",
     "build:fast": "tsc && tsc-alias -f && SKIP_DECLARATIONS=true node scripts/post-build.js",
-    "build:prod": "NODE_ENV=production tsc && tsc-alias -f && node scripts/post-build.js",
+    "build:prod": "NODE_ENV=production npm run build:cjs",
     "build:dev": "tsc && tsc-alias -f",
     "build:watch": "tsc -w",
     "dev": "tsx watch src/cli/cli.ts",
@@ -74,8 +83,10 @@
     "baseline:report": "./scripts/lint-metrics.sh | head -20",
     "bundle:size": "npm run build:prod && find dist -name '*.js' -print0 | xargs -0 wc -c | awk '{sum+=$1} END {print \"Total bundle size: \" sum/1024 \" KB\"}' && ls -la dist/apps/cli.js | awk '{print \"CLI binary size: \" $5/1024 \" KB\"}'",
     "bundle:check": "npm pack --dry-run",
-    "prepublishOnly": "npm run validate && npm run build:prod",
-    "release": "npm run validate && npm run build:prod && npm publish",
+    "prepack": "node scripts/prepare-cjs-package.cjs",
+    "postpack": "node scripts/restore-package.cjs",
+    "prepublishOnly": "npm run validate && npm run build:cjs",
+    "release": "npm run validate && npm run build:cjs && npm publish",
     "prepare": "husky install",
     "mcp:inspect": "npx @modelcontextprotocol/inspector ./scripts/mcp-start.sh start",
     "mcp:inspect:mock": "npx @modelcontextprotocol/inspector ./scripts/mcp-start-mock.sh start"
