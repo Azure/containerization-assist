@@ -22,6 +22,7 @@ Thumbs.db
 
 # Build
 dist/
+dist-cjs/
 build/
 !src/application/tools/build/
 .tsbuildinfo*
