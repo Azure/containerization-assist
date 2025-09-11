@@ -76,7 +76,7 @@ export const stripFencesAndNoise = (text: string, language?: string): string => 
  * // Result: true
  * ```
  */
-export const isValidDockerfileContent = (content: string): boolean => {
+export const isValidDockerfileContent = async (content: string): Promise<boolean> => {
   const cleaned = content.trim();
 
   if (!cleaned) {
@@ -125,7 +125,7 @@ export const isValidDockerfileContent = (content: string): boolean => {
  * // Result: "node:18-alpine"
  * ```
  */
-export const extractBaseImage = (dockerfileContent: string): string | null => {
+export const extractBaseImage = async (dockerfileContent: string): Promise<string | null> => {
   try {
     const commands = dockerParser.parse(dockerfileContent);
 

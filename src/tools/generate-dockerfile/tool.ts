@@ -371,7 +371,7 @@ function buildArgsFromAnalysis(
     recommendedBuildCommand = build_system.build_command;
   }
 
-  const args: Record<string, unknown> = {
+  return {
     language,
     framework,
     dependencies: dependencies?.map((d) => d.name || d).join(', ') || '',
@@ -386,8 +386,6 @@ function buildArgsFromAnalysis(
       optimization: typeof optimization === 'string' ? optimization : 'performance',
     }),
   };
-
-  return args;
 }
 
 // computeHash function removed - was unused after tool wrapper elimination
@@ -649,7 +647,6 @@ async function generateDockerfileImpl(
           context,
           logger,
         );
-
         if (moduleResult.ok) {
           dockerfileResults.push(moduleResult.value);
         } else {

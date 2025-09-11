@@ -161,7 +161,7 @@ async function attemptAIFix(
     }
 
     // Additional validation (aiGenerate already validates basic Dockerfile structure)
-    if (!isValidDockerfileContent(fixedDockerfile)) {
+    if (!(await isValidDockerfileContent(fixedDockerfile))) {
       return Failure('AI generated invalid dockerfile (missing FROM instruction or malformed)');
     }
 

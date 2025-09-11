@@ -100,7 +100,7 @@ const createToolWrapper = (
   name,
   description,
   schema: zodSchema.shape, // Extract .shape for JSON schema
-  zodSchema: zodSchema.shape, // Extract .shape for McpServer (ZodRawShape)
+  zodSchema: zodSchema, // Store the original Zod schema
   execute: async (params, _logger, context) => {
     // Context must be provided by the calling code (ContainerAssistServer)
     if (!context) {
@@ -141,7 +141,12 @@ const scanImageTool = createToolWrapper(
   scanImage,
 );
 
-const tagImageTool = createToolWrapper('tag_image', 'Tag a Docker image', tagImageSchema, tagImage);
+const tagImageTool = createToolWrapper(
+  'tag_image',
+  'Tag a Docker image',
+  tagImageSchema,
+  tagImage,
+);
 
 const pushImageTool = createToolWrapper(
   'push_image',
@@ -192,7 +197,12 @@ const resolveBaseImagesTool = createToolWrapper(
   resolveBaseImages,
 );
 
-const opsToolWrapper = createToolWrapper('ops', 'Operational utilities', opsToolSchema, opsTool);
+const opsToolWrapper = createToolWrapper(
+  'ops',
+  'Operational utilities',
+  opsToolSchema,
+  opsTool,
+);
 
 const workflowTool = createToolWrapper(
   'workflow',
