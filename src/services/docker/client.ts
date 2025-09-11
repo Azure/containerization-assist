@@ -108,6 +108,8 @@ export const createDockerClient = (logger: Logger): DockerClient => {
 
   return {
     async buildImage(options: DockerBuildOptions): Promise<Result<DockerBuildResult>> {
+      const buildLogs: string[] = [];
+
       try {
         logger.debug({ options }, 'Starting Docker build');
 
@@ -124,31 +126,57 @@ export const createDockerClient = (logger: Logger): DockerClient => {
         interface DockerBuildEvent {
           stream?: string;
           aux?: { ID?: string };
+          error?: string;
+          errorDetail?: { message?: string };
         }
 
         interface DockerBuildResponse {
           aux?: { ID?: string };
         }
 
+        let buildError: string | null = null;
+
         const result = await new Promise<DockerBuildResponse[]>((resolve, reject) => {
           docker.modem.followProgress(
             stream,
-            (err: Error | null, res: DockerBuildResponse[]) => (err ? reject(err) : resolve(res)),
-            (event: DockerBuildEvent) => logger.debug(event, 'Docker build progress'),
+            (err: Error | null, res: DockerBuildResponse[]) => {
+              if (err) {
+                reject(err);
+              } else if (buildError) {
+                reject(new Error(buildError));
+              } else {
+                resolve(res);
+              }
+            },
+            (event: DockerBuildEvent) => {
+              // Capture build output
+              if (event.stream) {
+                buildLogs.push(event.stream.trim());
+              }
+
+              // Capture errors
+              if (event.error) {
+                buildError = event.error;
+              } else if (event.errorDetail?.message) {
+                buildError = event.errorDetail.message;
+              }
+
+              logger.debug(event, 'Docker build progress');
+            },
           );
         });
 
         const buildResult: DockerBuildResult = {
           imageId: result[result.length - 1]?.aux?.ID || '',
           tags: options.tags || [],
-          logs: [],
+          logs: buildLogs,
         };
 
         logger.debug({ buildResult }, 'Docker build completed successfully');
         return Success(buildResult);
       } catch (error) {
         const errorMessage = `Build failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        logger.error({ error: errorMessage, options }, 'Docker build failed');
+        logger.error({ error: errorMessage, options, buildLogs }, 'Docker build failed');
 
         return Failure(errorMessage);
       }

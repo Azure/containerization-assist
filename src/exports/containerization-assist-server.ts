@@ -4,6 +4,7 @@
  */
 
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Tool } from '../types.js';
 import type { MCPTool, MCPToolResult } from './types.js';
 import type { ToolContext } from '../mcp/context/types.js';
@@ -57,7 +58,7 @@ export class ContainerAssistServer {
    * caServer.bindAll({ server: myMCPServer });
    * ```
    */
-  bindAll(config: { server: Server }): void {
+  bindAll(config: { server: McpServer }): void {
     this.bindSampling(config);
     this.registerTools(config);
   }
@@ -66,8 +67,9 @@ export class ContainerAssistServer {
    * Configure AI sampling capability
    * This allows tools to use the MCP server's sampling features
    */
-  bindSampling(config: { server: Server }): void {
-    this.mcpServer = config.server;
+  bindSampling(config: { server: McpServer }): void {
+    // Extract the underlying Server instance from McpServer
+    this.mcpServer = config.server.server;
     this.logger.info('AI sampling configured for Container Assist tools');
   }
 
@@ -76,13 +78,13 @@ export class ContainerAssistServer {
    * Can optionally specify which tools to register
    */
   registerTools(
-    config: { server: Server },
+    config: { server: McpServer },
     options: {
       tools?: string[]; // Specific tools to register
       nameMapping?: Record<string, string>; // Custom names for tools
     } = {},
   ): void {
-    const server = config.server;
+    const mcpServer = config.server;
     const toolsToRegister = options.tools
       ? Array.from(this.tools.entries()).filter(([name]) => options.tools!.includes(name))
       : Array.from(this.tools.entries());
@@ -91,26 +93,30 @@ export class ContainerAssistServer {
       const customName = options.nameMapping?.[originalName] || originalName;
       const mcpTool = this.adaptTool(tool);
 
-      // Register tool with the server
-      if (typeof (server as any).registerTool === 'function') {
-        // High-level API
-        (server as any).registerTool(customName, mcpTool.metadata, mcpTool.handler);
-      } else if (typeof (server as any).addTool === 'function') {
-        // Low-level API
-        (server as any).addTool(
-          {
-            name: customName,
-            description: mcpTool.metadata.description,
-            inputSchema: mcpTool.metadata.inputSchema,
-          },
-          mcpTool.handler,
-        );
-      } else {
-        this.logger.warn(
-          { tool: customName },
-          'Server does not have registerTool or addTool method',
-        );
+      // Use McpServer's public tool() method
+      // All our tools have Zod schemas in tool.zodSchema (which is the .shape from the Zod object)
+      if (!tool.zodSchema) {
+        this.logger.warn({ tool: customName }, 'Tool missing Zod schema, skipping registration');
+        continue;
       }
+
+      // Register with schema - handler receives (args, extra)
+      mcpServer.tool(
+        customName,
+        mcpTool.metadata.description,
+        tool.zodSchema, // This is a ZodRawShape from schema.shape
+        async (args: any, _extra: any) => {
+          // Call our handler and convert the result
+          const result = await mcpTool.handler(args);
+          // Convert our result format to CallToolResult format
+          return {
+            content: result.content.map((item) => ({
+              type: 'text' as const,
+              text: item.text || '',
+            })),
+          };
+        },
+      );
 
       // Store adapted tool
       this.adaptedTools.set(customName, mcpTool);

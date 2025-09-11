@@ -1,6 +1,6 @@
 {
   "name": "@thgamble/containerization-assist-mcp",
-  "version": "1.1.16",
+  "version": "1.2.0-dev.3",
   "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
   "type": "module",
   "engines": {
@@ -96,7 +96,9 @@
     "@kubernetes/client-node": "^1.0.0",
     "@modelcontextprotocol/sdk": "^1.5.0",
     "commander": "^11.1.0",
+    "docker-file-parser": "^1.0.7",
     "dockerode": "^2.1.0",
+    "validate-dockerfile": "^1.8.1",
     "execa": "^9.6.0",
     "js-yaml": "^4.1.0",
     "nanoid": "^5.0.4",
@@ -154,10 +156,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/azure/containerization-assistt"
+    "url": "https://github.com/azure/containerization-assist"
   },
   "bugs": {
-    "url": "https://github.com/azure/containerization-assistsues"
+    "url": "https://github.com/azure/containerization-assist/issues"
   },
-  "homepage": "https://github.com/azure/containerization-assistadme"
+  "homepage": "https://github.com/azure/containerization-assist#readme"
 }

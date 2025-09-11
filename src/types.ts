@@ -5,6 +5,7 @@
 
 import type { Logger } from 'pino';
 import type { ToolContext } from './mcp/context/types';
+import type { ZodRawShape } from 'zod';
 
 /**
  * Result type for functional error handling
@@ -81,6 +82,8 @@ export interface Tool {
   description?: string;
   /** JSON schema for parameter validation */
   schema?: Record<string, unknown>;
+  /** Zod schema for McpServer compatibility (optional) */
+  zodSchema?: ZodRawShape;
   /**
    * Executes the tool with provided parameters.
    * @param params - Tool-specific parameters
