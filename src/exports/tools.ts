@@ -62,10 +62,12 @@ const createToolWrapper = (
   description: string,
   schema: any,
   executeFn: (params: any, context: any) => Promise<any>,
+  zodSchema?: any, // Add original Zod schema for McpServer compatibility
 ): Tool => ({
   name,
   description,
   schema,
+  zodSchema, // Store the original Zod schema
   execute: async (params, _logger, context) => {
     // Context must be provided by the calling code (ContainerAssistServer)
     if (!context) {
@@ -83,6 +85,7 @@ const analyzeRepoTool = createToolWrapper(
   'Analyze repository structure and detect technologies',
   analyzeRepoSchema.shape,
   analyzeRepo,
+  analyzeRepoSchema.shape,
 );
 
 const generateDockerfileTool = createToolWrapper(
@@ -90,6 +93,7 @@ const generateDockerfileTool = createToolWrapper(
   'Generate a Dockerfile for the analyzed repository',
   generateDockerfileSchema.shape,
   generateDockerfile,
+  generateDockerfileSchema.shape,
 );
 
 const buildImageTool = createToolWrapper(
@@ -97,6 +101,7 @@ const buildImageTool = createToolWrapper(
   'Build a Docker image',
   buildImageSchema.shape,
   buildImage,
+  buildImageSchema.shape,
 );
 
 const scanImageTool = createToolWrapper(
@@ -104,6 +109,7 @@ const scanImageTool = createToolWrapper(
   'Scan a Docker image for vulnerabilities',
   scanImageSchema.shape,
   scanImage,
+  scanImageSchema.shape,
 );
 
 const tagImageTool = createToolWrapper(
@@ -111,6 +117,7 @@ const tagImageTool = createToolWrapper(
   'Tag a Docker image',
   tagImageSchema.shape,
   tagImage,
+  tagImageSchema.shape,
 );
 
 const pushImageTool = createToolWrapper(
@@ -118,6 +125,7 @@ const pushImageTool = createToolWrapper(
   'Push a Docker image to a registry',
   pushImageSchema.shape,
   pushImage,
+  pushImageSchema.shape,
 );
 
 const generateK8sManifestsTool = createToolWrapper(
@@ -125,6 +133,7 @@ const generateK8sManifestsTool = createToolWrapper(
   'Generate Kubernetes manifests',
   generateK8sManifestsSchema.shape,
   generateK8sManifests,
+  generateK8sManifestsSchema.shape,
 );
 
 const prepareClusterTool = createToolWrapper(
@@ -132,6 +141,7 @@ const prepareClusterTool = createToolWrapper(
   'Prepare Kubernetes cluster for deployment',
   prepareClusterSchema.shape,
   prepareCluster,
+  prepareClusterSchema.shape,
 );
 
 const deployApplicationTool = createToolWrapper(
@@ -139,6 +149,7 @@ const deployApplicationTool = createToolWrapper(
   'Deploy application to Kubernetes',
   deployApplicationSchema.shape,
   deployApplication,
+  deployApplicationSchema.shape,
 );
 
 const verifyDeploymentTool = createToolWrapper(
@@ -146,6 +157,7 @@ const verifyDeploymentTool = createToolWrapper(
   'Verify deployment status',
   verifyDeploymentSchema.shape,
   verifyDeployment,
+  verifyDeploymentSchema.shape,
 );
 
 const fixDockerfileTool = createToolWrapper(
@@ -153,6 +165,7 @@ const fixDockerfileTool = createToolWrapper(
   'Fix issues in a Dockerfile',
   fixDockerfileSchema.shape,
   fixDockerfile,
+  fixDockerfileSchema.shape,
 );
 
 const resolveBaseImagesTool = createToolWrapper(
@@ -160,6 +173,7 @@ const resolveBaseImagesTool = createToolWrapper(
   'Resolve and recommend base images',
   resolveBaseImagesSchema.shape,
   resolveBaseImages,
+  resolveBaseImagesSchema.shape,
 );
 
 const opsToolWrapper = createToolWrapper(
@@ -167,6 +181,7 @@ const opsToolWrapper = createToolWrapper(
   'Operational utilities',
   opsToolSchema.shape,
   opsTool,
+  opsToolSchema.shape,
 );
 
 const workflowTool = createToolWrapper(
@@ -174,4 +189,5 @@ const workflowTool = createToolWrapper(
   'Execute containerization workflows',
   workflowSchema.shape,
   workflow,
+  workflowSchema.shape,
 );

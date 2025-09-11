@@ -132,7 +132,7 @@ async function attemptAIFix(
       }
 
       // Clean up the response
-      fixedDockerfile = stripFencesAndNoise(aiResult.value.winner.content);
+      fixedDockerfile = stripFencesAndNoise(aiResult.value.winner.content, 'dockerfile');
 
       // Capture sampling metadata
       samplingMetadata = aiResult.value.samplingMetadata;
@@ -157,11 +157,11 @@ async function attemptAIFix(
       }
 
       // Clean up the response
-      fixedDockerfile = stripFencesAndNoise(aiResult.value.content);
+      fixedDockerfile = stripFencesAndNoise(aiResult.value.content, 'dockerfile');
     }
 
     // Additional validation (aiGenerate already validates basic Dockerfile structure)
-    if (!isValidDockerfileContent(fixedDockerfile)) {
+    if (!(await isValidDockerfileContent(fixedDockerfile))) {
       return Failure('AI generated invalid dockerfile (missing FROM instruction or malformed)');
     }
 

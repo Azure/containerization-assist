@@ -49,6 +49,7 @@ const planWorkflowSteps = async (
   if (workflowType === 'containerization') {
     const steps: WorkflowStep[] = [];
 
+    // Always start with analyze-repo if not already completed
     if (!sessionState?.completed_steps?.includes('analyze-repo')) {
       steps.push({
         toolName: 'analyze-repo',
@@ -58,46 +59,58 @@ const planWorkflowSteps = async (
       });
     }
 
-    steps.push({
-      toolName: 'generate-dockerfile',
-      parameters: { ...params, sessionId },
-      description: 'Generating optimized Dockerfile',
-      required: true,
-    });
+    // Only add generate-dockerfile if not already completed
+    // It depends on analyze-repo being completed first
+    if (!sessionState?.completed_steps?.includes('generate-dockerfile')) {
+      steps.push({
+        toolName: 'generate-dockerfile',
+        parameters: { ...params, sessionId },
+        description: 'Generating optimized Dockerfile',
+        required: true,
+        // Only run if analyze-repo has been completed (either in session state or just executed)
+        condition: (results) => {
+          // Check if analyze-repo was just executed in this workflow run
+          const analyzeRepoJustRan = results.some((r: any) => r._toolName === 'analyze-repo');
+          // Or if it was previously completed in the session
+          const analyzeRepoCompleted = sessionState?.completed_steps?.includes('analyze-repo');
+          return analyzeRepoJustRan || analyzeRepoCompleted || false;
+        },
+      });
+    }
 
-    if (params.buildImage !== false) {
+    if (params.buildImage !== false && !sessionState?.completed_steps?.includes('build-image')) {
       steps.push({
         toolName: 'build-image',
         parameters: { ...params, sessionId },
         description: 'Building Docker image',
         required: false,
       });
+    }
 
-      if (params.scanImage !== false) {
-        steps.push({
-          toolName: 'scan',
-          parameters: { ...params, sessionId },
-          description: 'Scanning image for vulnerabilities',
-          required: false,
-          condition: (results) => {
-            const lastResult = results[results.length - 1];
-            return lastResult?.imageId !== undefined;
-          },
-        });
-      }
+    if (params.scanImage !== false && !sessionState?.completed_steps?.includes('scan')) {
+      steps.push({
+        toolName: 'scan',
+        parameters: { ...params, sessionId },
+        description: 'Scanning image for vulnerabilities',
+        required: false,
+        condition: (results) => {
+          const lastResult = results[results.length - 1];
+          return lastResult?.imageId !== undefined;
+        },
+      });
+    }
 
-      if (params.pushImage && params.registry) {
-        steps.push({
-          toolName: 'push',
-          parameters: { ...params, sessionId },
-          description: 'Pushing image to registry',
-          required: false,
-          condition: (results) => {
-            const lastResult = results[results.length - 1];
-            return lastResult?.imageId !== undefined;
-          },
-        });
-      }
+    if (params.pushImage && params.registry && !sessionState?.completed_steps?.includes('push')) {
+      steps.push({
+        toolName: 'push',
+        parameters: { ...params, sessionId },
+        description: 'Pushing image to registry',
+        required: false,
+        condition: (results) => {
+          const lastResult = results[results.length - 1];
+          return lastResult?.imageId !== undefined;
+        },
+      });
     }
 
     return steps;
@@ -455,7 +468,12 @@ export const executeWorkflow = async (
           results.push({ error: stepResult.error, stepName: step.toolName });
         }
       } else {
-        results.push(stepResult.value);
+        // Add the tool name to the result for condition checking
+        const resultWithToolName = {
+          ...stepResult.value,
+          _toolName: step.toolName,
+        };
+        results.push(resultWithToolName);
 
         if (!stepResult.value.skipped) {
           completedSteps.push(step.toolName);

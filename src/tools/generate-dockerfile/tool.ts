@@ -9,10 +9,10 @@ import { createStandardProgress } from '@mcp/utils/progress-helper';
 import { aiGenerate, aiGenerateWithSampling } from '@mcp/tools/ai-helpers';
 import type { SamplingOptions } from '@lib/sampling';
 import { createTimer, createLogger } from '@lib/logger';
-import type { SessionData, SessionAnalysisResult } from '../session-types';
+import type { SessionAnalysisResult } from '../session-types';
 import type { ToolContext } from '../../mcp/context/types';
 import type { AnalyzeRepoResult } from '../types';
-import { Success, Failure, type Result } from '../../types';
+import { Success, Failure, type Result, type WorkflowState } from '../../types';
 import { getDefaultPort } from '@config/defaults';
 import { getRecommendedBaseImage } from '@lib/base-images';
 import {
@@ -77,7 +77,7 @@ function generateTemplateDockerfile(
   analysisResult: AnalyzeRepoResult,
   params: GenerateDockerfileParams,
 ): Result<Pick<GenerateDockerfileResult, 'content' | 'baseImage'>> {
-  const { language, framework, dependencies = [], ports = [] } = analysisResult;
+  const { language, framework, dependencies = [], ports = [], buildSystem } = analysisResult;
   const { baseImage, multistage = true, securityHardening = true } = params;
 
   const effectiveBase = baseImage || getRecommendedBaseImage(language || 'unknown');
@@ -98,23 +98,32 @@ function generateTemplateDockerfile(
   // Language-specific setup
   switch (language) {
     case 'javascript':
-    case 'typescript':
-      // Handle Node.js projects
+    case 'typescript': {
+      // Handle Node.js projects - detect package manager
+      const hasYarn = dependencies.some((d) => d.name === 'yarn');
+      const hasPnpm = dependencies.some((d) => d.name === 'pnpm');
+      const packageManager = hasPnpm ? 'pnpm' : hasYarn ? 'yarn' : 'npm';
+
       dockerfile += `# Copy package files\n`;
-      dockerfile += `COPY package*.json ./\n`;
-      if (dependencies.some((d) => d.name === 'yarn')) {
-        dockerfile += `COPY yarn.lock ./\n`;
+      if (packageManager === 'pnpm') {
+        dockerfile += `COPY package.json pnpm-lock.yaml* ./\n`;
+        dockerfile += `RUN corepack enable && pnpm install --frozen-lockfile\n\n`;
+      } else if (packageManager === 'yarn') {
+        dockerfile += `COPY package.json yarn.lock* ./\n`;
         dockerfile += `RUN yarn install --frozen-lockfile\n\n`;
       } else {
+        dockerfile += `COPY package*.json ./\n`;
         dockerfile += `RUN npm ci --only=production\n\n`;
       }
+
       dockerfile += `# Copy application files\n`;
       dockerfile += `COPY . .\n\n`;
       if (language === 'typescript') {
         dockerfile += `# Build TypeScript\n`;
-        dockerfile += `RUN npm run build\n\n`;
+        dockerfile += `RUN ${packageManager} run build\n\n`;
       }
       break;
+    }
 
     case 'python':
       // Handle Python projects
@@ -125,24 +134,58 @@ function generateTemplateDockerfile(
       dockerfile += `COPY . .\n\n`;
       break;
 
-    case 'java':
-      // Handle Java projects
+    case 'java': {
+      // Handle Java projects - detect build system
+      const javaBuildSystem =
+        buildSystem?.type || (dependencies.some((d) => d.name === 'gradle') ? 'gradle' : 'maven');
+
+      // Use system commands if no wrapper detected
+      const mavenCmd = buildSystem?.buildCommand?.includes('mvnw') ? './mvnw' : 'mvn';
+      const gradleCmd = buildSystem?.buildCommand?.includes('gradlew') ? './gradlew' : 'gradle';
+
       if (multistage) {
         dockerfile = `# Multi-stage build for Java\n`;
-        dockerfile += `FROM maven:3-amazoncorretto-17 AS builder\n`;
-        dockerfile += `WORKDIR /build\n`;
-        dockerfile += `COPY pom.xml .\n`;
-        dockerfile += `RUN mvn dependency:go-offline\n`;
-        dockerfile += `COPY src ./src\n`;
-        dockerfile += `RUN mvn package -DskipTests\n\n`;
-        dockerfile += `FROM ${effectiveBase}\n`;
-        dockerfile += `WORKDIR /app\n`;
-        dockerfile += `COPY --from=builder /build/target/*.jar app.jar\n`;
+
+        if (javaBuildSystem === 'gradle') {
+          dockerfile += `FROM gradle:8-jdk17 AS builder\n`;
+          dockerfile += `WORKDIR /build\n`;
+          dockerfile += `COPY build.gradle* settings.gradle* ./\n`;
+          if (gradleCmd === './gradlew') {
+            dockerfile += `COPY gradlew gradlew.bat ./\n`;
+            dockerfile += `COPY gradle/ gradle/\n`;
+          }
+          dockerfile += `RUN ${gradleCmd} dependencies --no-daemon || true\n`;
+          dockerfile += `COPY src ./src\n`;
+          dockerfile += `RUN ${gradleCmd} build --no-daemon -x test\n\n`;
+          dockerfile += `FROM ${effectiveBase}\n`;
+          dockerfile += `WORKDIR /app\n`;
+          dockerfile += `COPY --from=builder /build/build/libs/*.jar app.jar\n`;
+        } else {
+          // Default to Maven
+          dockerfile += `FROM maven:3-amazoncorretto-17 AS builder\n`;
+          dockerfile += `WORKDIR /build\n`;
+          dockerfile += `COPY pom.xml .\n`;
+          if (mavenCmd === './mvnw') {
+            dockerfile += `COPY mvnw mvnw.cmd ./\n`;
+            dockerfile += `COPY .mvn/ .mvn/\n`;
+          }
+          dockerfile += `RUN ${mavenCmd} dependency:go-offline\n`;
+          dockerfile += `COPY src ./src\n`;
+          dockerfile += `RUN ${mavenCmd} package -DskipTests\n\n`;
+          dockerfile += `FROM ${effectiveBase}\n`;
+          dockerfile += `WORKDIR /app\n`;
+          dockerfile += `COPY --from=builder /build/target/*.jar app.jar\n`;
+        }
       } else {
         dockerfile += `# Copy JAR file\n`;
-        dockerfile += `COPY target/*.jar app.jar\n\n`;
+        if (javaBuildSystem === 'gradle') {
+          dockerfile += `COPY build/libs/*.jar app.jar\n\n`;
+        } else {
+          dockerfile += `COPY target/*.jar app.jar\n\n`;
+        }
       }
       break;
+    }
 
     case 'go':
       // Handle Go projects
@@ -243,7 +286,10 @@ function sessionToAnalyzeRepoResult(sessionResult: SessionAnalysisResult): Analy
 /**
  * Build arguments for AI prompt from analysis result
  */
-function buildArgsFromAnalysis(analysisResult: SessionAnalysisResult): Record<string, unknown> {
+function buildArgsFromAnalysis(
+  analysisResult: SessionAnalysisResult,
+  optimization?: boolean | string,
+): Record<string, unknown> {
   const {
     language = 'unknown',
     framework = '',
@@ -261,6 +307,21 @@ function buildArgsFromAnalysis(analysisResult: SessionAnalysisResult): Record<st
         ? 'npm'
         : 'unknown';
 
+  // Get build file information
+  const buildFile = build_system?.build_file || '';
+  const hasWrapper =
+    buildFile.includes('mvnw') || build_system?.build_command?.includes('mvnw') || false;
+
+  // Determine appropriate build command
+  let recommendedBuildCommand = '';
+  if (build_system?.type === 'maven') {
+    recommendedBuildCommand = hasWrapper ? './mvnw' : 'mvn';
+  } else if (build_system?.type === 'gradle') {
+    recommendedBuildCommand = hasWrapper ? './gradlew' : 'gradle';
+  } else if (build_system?.build_command) {
+    recommendedBuildCommand = build_system.build_command;
+  }
+
   return {
     language,
     framework,
@@ -269,7 +330,12 @@ function buildArgsFromAnalysis(analysisResult: SessionAnalysisResult): Record<st
     summary: summary || `${language} ${framework ? `${framework} ` : ''}application`,
     packageManager,
     buildSystem: build_system?.type || 'none',
-    buildCommand: build_system?.build_command || '',
+    buildCommand: recommendedBuildCommand,
+    buildFile,
+    hasWrapper,
+    ...(optimization && {
+      optimization: typeof optimization === 'string' ? optimization : 'performance',
+    }),
   };
 }
 
@@ -308,10 +374,17 @@ async function generateDockerfileImpl(
 
     const { id: sessionId, state: session } = sessionResult.value;
 
-    // Get analysis result from session
-    const sessionData = session as unknown as SessionData;
-    const analysisResult =
-      sessionData?.analysis_result || sessionData?.workflow_state?.analysis_result;
+    // Type the session properly with our extended properties
+    interface ExtendedWorkflowState extends WorkflowState {
+      repo_path?: string;
+      analysis_result?: SessionAnalysisResult;
+      dockerfile_result?: any;
+    }
+
+    const typedSession = session as ExtendedWorkflowState;
+
+    // Get analysis result from session - it should be directly on the session
+    const analysisResult = typedSession.analysis_result;
 
     if (!analysisResult) {
       return Failure(
@@ -347,7 +420,7 @@ async function generateDockerfileImpl(
     if (!params.disableSampling) {
       const aiResult = await aiGenerateWithSampling(logger, context, {
         promptName: 'dockerfile-generation',
-        promptArgs: buildArgsFromAnalysis(analysisResult),
+        promptArgs: buildArgsFromAnalysis(analysisResult, optimization),
         expectation: 'dockerfile',
         maxRetries: 3,
         fallbackBehavior: 'default',
@@ -355,8 +428,8 @@ async function generateDockerfileImpl(
       });
 
       if (aiResult.ok) {
-        const cleaned = stripFencesAndNoise(aiResult.value.winner.content);
-        if (!isValidDockerfileContent(cleaned)) {
+        const cleaned = stripFencesAndNoise(aiResult.value.winner.content, 'dockerfile');
+        if (!(await isValidDockerfileContent(cleaned))) {
           // Fall back to template if AI output is invalid
           const fallbackResult = generateTemplateDockerfile(
             sessionToAnalyzeRepoResult(analysisResult),
@@ -370,7 +443,7 @@ async function generateDockerfileImpl(
         } else {
           dockerfileContent = cleaned;
           baseImageUsed =
-            extractBaseImage(cleaned) ||
+            (await extractBaseImage(cleaned)) ||
             params.baseImage ||
             getRecommendedBaseImage(analysisResult.language ?? 'unknown');
           aiUsed = true;
@@ -397,7 +470,7 @@ async function generateDockerfileImpl(
       // Standard generation without sampling
       const aiResult = await aiGenerate(logger, context, {
         promptName: 'dockerfile-generation',
-        promptArgs: buildArgsFromAnalysis(analysisResult),
+        promptArgs: buildArgsFromAnalysis(analysisResult, optimization),
         expectation: 'dockerfile',
         maxRetries: 3,
         fallbackBehavior: 'default',
@@ -405,8 +478,8 @@ async function generateDockerfileImpl(
 
       if (aiResult.ok) {
         // Use AI-generated content
-        const cleaned = stripFencesAndNoise(aiResult.value.content);
-        if (!isValidDockerfileContent(cleaned)) {
+        const cleaned = stripFencesAndNoise(aiResult.value.content, 'dockerfile');
+        if (!(await isValidDockerfileContent(cleaned))) {
           // Fall back to template if AI output is invalid
           const fallbackResult = generateTemplateDockerfile(
             sessionToAnalyzeRepoResult(analysisResult),
@@ -420,7 +493,7 @@ async function generateDockerfileImpl(
         } else {
           dockerfileContent = cleaned;
           baseImageUsed =
-            extractBaseImage(cleaned) ||
+            (await extractBaseImage(cleaned)) ||
             params.baseImage ||
             getRecommendedBaseImage(analysisResult.language ?? 'unknown');
           aiUsed = true;
@@ -443,11 +516,7 @@ async function generateDockerfileImpl(
     if (progress) await progress('FINALIZING');
 
     // Determine output path
-    const repoPath =
-      sessionData?.metadata?.repo_path ||
-      sessionData?.workflow_state?.metadata?.repo_path ||
-      params.repoPath ||
-      '.';
+    const repoPath = typedSession.repo_path || params.repoPath || '.';
     const dockerfilePath = path.join(repoPath, 'Dockerfile');
 
     // Write Dockerfile to disk
@@ -479,9 +548,9 @@ async function generateDockerfileImpl(
       sessionId,
       {
         dockerfile_result: dockerfileResult,
-        completed_steps: [...(sessionData?.completed_steps || []), 'dockerfile'],
+        completed_steps: [...(typedSession.completed_steps || []), 'dockerfile'],
         metadata: {
-          ...(sessionData?.metadata || {}),
+          ...(typedSession.metadata || {}),
           dockerfile_baseImage: baseImageUsed,
           dockerfile_optimization: optimization,
           dockerfile_warnings: warnings,

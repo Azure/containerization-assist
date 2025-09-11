@@ -482,6 +482,7 @@ async function analyzeRepoImpl(
     const updateResult = await updateSession(
       sessionId,
       {
+        repo_path: repoPath,
         analysis_result: {
           language: languageInfo.language,
           ...(languageInfo.version && { language_version: languageInfo.version }),

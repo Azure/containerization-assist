@@ -423,7 +423,7 @@ async function generateK8sManifestsImpl(
         });
 
         if (aiResult.ok) {
-          const cleaned = stripFencesAndNoise(aiResult.value.winner.content);
+          const cleaned = stripFencesAndNoise(aiResult.value.winner.content, 'yaml');
 
           if (isValidKubernetesContent(cleaned)) {
             const manifests = parseK8sManifestsFromAI(cleaned);
@@ -458,7 +458,7 @@ async function generateK8sManifestsImpl(
         });
 
         if (aiResult.ok) {
-          const cleaned = stripFencesAndNoise(aiResult.value.content);
+          const cleaned = stripFencesAndNoise(aiResult.value.content, 'yaml');
 
           if (isValidKubernetesContent(cleaned)) {
             const manifests = parseK8sManifestsFromAI(cleaned);

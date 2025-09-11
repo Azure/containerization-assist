@@ -15,11 +15,11 @@ describe('Text Processing Utilities', () => {
     test('removes dockerfile code fences', () => {
       const input = '```dockerfile\nFROM node:18\nRUN npm install\n```';
       const expected = 'FROM node:18\nRUN npm install';
-      expect(stripFencesAndNoise(input)).toBe(expected);
+      expect(stripFencesAndNoise(input, 'dockerfile')).toBe(expected);
     });
 
     test('handles various fence formats', () => {
-      expect(stripFencesAndNoise('```docker\nFROM alpine\n```')).toBe('FROM alpine');
+      expect(stripFencesAndNoise('```docker\nFROM alpine\n```', 'dockerfile')).toBe('FROM alpine');
       expect(stripFencesAndNoise('```\nFROM alpine\n```')).toBe('FROM alpine');
       expect(stripFencesAndNoise('FROM alpine')).toBe('FROM alpine');
     });
@@ -36,21 +36,21 @@ describe('Text Processing Utilities', () => {
   });
 
   describe('isValidDockerfileContent', () => {
-    test('validates proper dockerfile', () => {
-      expect(isValidDockerfileContent('FROM node:18\nWORKDIR /app')).toBe(true);
-      expect(isValidDockerfileContent('from ubuntu:20.04\nRUN apt update')).toBe(true);
-      expect(isValidDockerfileContent('  FROM alpine\n  RUN echo "hello"')).toBe(true);
+    test('validates proper dockerfile', async () => {
+      expect(await isValidDockerfileContent('FROM node:18\nWORKDIR /app')).toBe(true);
+      expect(await isValidDockerfileContent('from ubuntu:20.04\nRUN apt update')).toBe(true);
+      expect(await isValidDockerfileContent('  FROM alpine\n  RUN echo "hello"')).toBe(true);
     });
 
-    test('rejects invalid dockerfile', () => {
-      expect(isValidDockerfileContent('RUN npm install')).toBe(false);
-      expect(isValidDockerfileContent('Just some text')).toBe(false);
-      expect(isValidDockerfileContent('')).toBe(false);
+    test('rejects invalid dockerfile', async () => {
+      expect(await isValidDockerfileContent('RUN npm install')).toBe(false);
+      expect(await isValidDockerfileContent('Just some text')).toBe(false);
+      expect(await isValidDockerfileContent('')).toBe(false);
     });
 
-    test('handles FROM instruction in middle of file', () => {
-      expect(isValidDockerfileContent('# Comment\nFROM node:18')).toBe(true);
-      expect(isValidDockerfileContent('RUN echo "test"\nFROM node:18')).toBe(true);
+    test('handles FROM instruction in middle of file', async () => {
+      expect(await isValidDockerfileContent('# Comment\nFROM node:18')).toBe(true);
+      expect(await isValidDockerfileContent('RUN echo "test"\nFROM node:18')).toBe(true);
     });
   });
 
@@ -83,25 +83,25 @@ metadata:
   });
 
   describe('extractBaseImage', () => {
-    test('extracts base image from dockerfile', () => {
-      expect(extractBaseImage('FROM node:18-alpine\nWORKDIR /app')).toBe('node:18-alpine');
-      expect(extractBaseImage('FROM ubuntu:20.04')).toBe('ubuntu:20.04');
-      expect(extractBaseImage('  FROM  python:3.9  \nRUN pip install')).toBe('python:3.9');
+    test('extracts base image from dockerfile', async () => {
+      expect(await extractBaseImage('FROM node:18-alpine\nWORKDIR /app')).toBe('node:18-alpine');
+      expect(await extractBaseImage('FROM ubuntu:20.04')).toBe('ubuntu:20.04');
+      expect(await extractBaseImage('  FROM  python:3.9  \nRUN pip install')).toBe('python:3.9');
     });
 
-    test('handles multi-stage builds', () => {
+    test('handles multi-stage builds', async () => {
       const dockerfile = `
 FROM node:18 AS builder
 WORKDIR /app
 FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
       `;
-      expect(extractBaseImage(dockerfile)).toBe('node:18');
+      expect(await extractBaseImage(dockerfile)).toBe('node:18');
     });
 
-    test('returns null for invalid dockerfile', () => {
-      expect(extractBaseImage('RUN echo "no from"')).toBeNull();
-      expect(extractBaseImage('')).toBeNull();
+    test('returns null for invalid dockerfile', async () => {
+      expect(await extractBaseImage('RUN echo "no from"')).toBeNull();
+      expect(await extractBaseImage('')).toBeNull();
     });
   });
 

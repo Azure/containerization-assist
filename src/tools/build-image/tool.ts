@@ -200,7 +200,8 @@ async function buildImageImpl(
            */
           const dockerfileContent = dockerfileResult?.content as string | undefined;
           if (dockerfileContent) {
-            finalDockerfilePath = path.join(repoPath, 'Dockerfile.generated');
+            // Use the user-specified dockerfile name (defaults to 'Dockerfile')
+            finalDockerfilePath = path.join(repoPath, dockerfile);
             await fs.writeFile(finalDockerfilePath, dockerfileContent, 'utf-8');
             logger.info(
               { dockerfilePath: finalDockerfilePath },
@@ -215,7 +216,8 @@ async function buildImageImpl(
       } else {
         const dockerfileContent = dockerfileResult?.content as string | undefined;
         if (dockerfileContent) {
-          finalDockerfilePath = path.join(repoPath, 'Dockerfile.generated');
+          // Use the user-specified dockerfile name (defaults to 'Dockerfile')
+          finalDockerfilePath = path.join(repoPath, dockerfile);
           await fs.writeFile(finalDockerfilePath, dockerfileContent, 'utf-8');
           logger.info(
             { dockerfilePath: finalDockerfilePath },
