@@ -10,11 +10,8 @@
  * - All operations are scoped to avoid interfering with other Docker projects
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import type { Logger } from 'pino';
-
-const execAsync = promisify(exec);
+import type { DockerClient } from '../../../src/infrastructure/docker/client';
 
 /**
  * Configuration for Docker test cleanup
@@ -50,11 +47,13 @@ const DEFAULT_CONFIG: DockerTestConfig = {
 export class DockerTestCleaner {
   private readonly config: DockerTestConfig;
   private readonly logger: Logger;
+  private readonly dockerClient: DockerClient;
   private readonly trackedImages = new Set<string>();
   private readonly trackedContainers = new Set<string>();
 
-  constructor(logger: Logger, config: Partial<DockerTestConfig> = {}) {
+  constructor(logger: Logger, dockerClient: DockerClient, config: Partial<DockerTestConfig> = {}) {
     this.logger = logger;
+    this.dockerClient = dockerClient;
     this.config = {
       ...DEFAULT_CONFIG,
       ...config
@@ -87,30 +86,30 @@ export class DockerTestCleaner {
   private async cleanDanglingContainers(): Promise<void> {
     try {
       // Get all stopped containers
-      const { stdout: stoppedContainers } = await this.safeExec('docker', [
-        'ps', '-aq', '--filter', 'status=exited'
-      ]);
+      const containersResult = await this.dockerClient.listContainers({
+        all: true,
+        filters: { status: ['exited'] }
+      });
       
-      if (stoppedContainers.trim()) {
-        const containerIds = stoppedContainers.trim().split('\n').filter(id => id.length > 0);
-        
-        for (const containerId of containerIds) {
-          try {
-            // Check if this container is using one of our test images
-            const { stdout: imageInfo } = await this.safeExec('docker', [
-              'inspect', '--format', '{{.Config.Image}}', containerId
-            ]);
-            
-            const imageName = imageInfo.trim();
-              
-            if (isTestImage(imageName)) {
-              await this.safeExec('docker', ['rm', containerId, '-f']);
-              this.logger.debug(`Removed dangling test container: ${containerId} (image: ${imageName})`);
+      if (!containersResult.ok) {
+        this.logger.debug(`Failed to list containers: ${containersResult.error}`);
+        return;
+      }
+
+      const containers = containersResult.value;
+      
+      for (const container of containers) {
+        try {
+          // Check if this container is using one of our test images  
+          if (isTestImage(container.Image)) {
+            const removeResult = await this.dockerClient.removeContainer(container.Id, true);
+            if (removeResult.ok) {
+              this.logger.debug(`Removed dangling test container: ${container.Id} (image: ${container.Image})`);
             }
-          } catch (error) {
-            // Container might have been removed already, continue
-            this.logger.debug(`Failed to inspect/remove container ${containerId}: ${error}`);
           }
+        } catch (error) {
+          // Container might have been removed already, continue
+          this.logger.debug(`Failed to inspect/remove container ${container.Id}: ${error}`);
         }
       }
     } catch (error) {
@@ -120,27 +119,33 @@ export class DockerTestCleaner {
 
   /**
    * Clean up test containers by pattern (for use in afterEach hooks)
-   * SIMPLIFIED - just clean containers from our single test image
+   * ENHANCED - clean both tagged containers and build intermediates
    */
   async cleanupContainers(): Promise<void> {
     try {
       // Clean containers created from our test image
-      const { stdout: containers } = await this.safeExec('docker', [
-        'ps', '-aq', '--filter', `ancestor=${TEST_IMAGE_NAME}`
-      ]);
+      const containersResult = await this.dockerClient.listContainers({
+        all: true,
+        filters: { ancestor: [TEST_IMAGE_NAME] }
+      });
       
-      if (containers.trim()) {
-        const containerIds = containers.trim().split('\n').filter(id => id.length > 0);
+      if (containersResult.ok) {
+        const containers = containersResult.value;
         
-        for (const containerId of containerIds) {
-          try {
-            await this.safeExec('docker', ['rm', containerId, '-f']);
-            this.logger.debug(`Removed test container: ${containerId} (from ${TEST_IMAGE_NAME})`);
-          } catch (error) {
-            this.logger.debug(`Failed to remove container ${containerId}: ${error}`);
+        if (containers.length > 0) {
+          for (const container of containers) {
+            const removeResult = await this.dockerClient.removeContainer(container.Id, true);
+            if (removeResult.ok) {
+              this.logger.debug(`Removed test container: ${container.Id} (from ${TEST_IMAGE_NAME})`);
+            } else {
+              this.logger.debug(`Failed to remove container ${container.Id}: ${removeResult.error}`);
+            }
           }
         }
       }
+
+      // Also clean any dangling containers from failed builds
+      await this.cleanDanglingContainers();
     } catch (error) {
       this.logger.debug(`Container cleanup failed: ${error}`);
     }
@@ -193,11 +198,11 @@ export class DockerTestCleaner {
     this.logger.debug(`Cleaning ${containers.length} tracked containers`);
     
     for (const container of containers) {
-      try {
-        await this.safeExec('docker', ['rm', container, '-f']);
+      const removeResult = await this.dockerClient.removeContainer(container, true);
+      if (removeResult.ok) {
         this.logger.debug(`Removed container: ${container}`);
-      } catch (error) {
-        this.logger.debug(`Failed to remove container ${container}: ${error}`);
+      } else {
+        this.logger.debug(`Failed to remove container ${container}: ${removeResult.error}`);
       }
     }
   }
@@ -212,13 +217,13 @@ export class DockerTestCleaner {
     this.logger.debug(`Cleaning ${images.length} tracked images`);
     
     for (const image of images) {
-      try {
-        await this.safeExec('docker', ['rmi', image, '-f']);
+      const removeResult = await this.dockerClient.removeImage(image, true);
+      if (removeResult.ok) {
         this.logger.debug(`Removed image: ${image}`);
         // Remove from tracked set after successful removal
         this.trackedImages.delete(image);
-      } catch (error) {
-        this.logger.debug(`Failed to remove image ${image}: ${error}`);
+      } else {
+        this.logger.debug(`Failed to remove image ${image}: ${removeResult.error}`);
         // Keep in tracked set if removal failed
       }
     }
@@ -261,60 +266,27 @@ export class DockerTestCleaner {
   }
 
   /**
-   * Safe command execution with proper escaping and error handling
+   * Get current tracked image count (for monitoring)
    */
-  private async safeExec(command: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
-    const escapedArgs = args.map(arg => `"${arg.replace(/"/g, '\\"')}"`);
-    const fullCommand = `${command} ${escapedArgs.join(' ')}`;
-    
-    try {
-      const result = await execAsync(fullCommand);
-      return result;
-    } catch (error: any) {
-      // Convert exec error to a more manageable format
-      throw new Error(error.message || String(error));
-    }
-  }
-
-  /**
-   * Check if Docker is available
-   */
-  static async isDockerAvailable(): Promise<boolean> {
-    try {
-      await execAsync('docker --version');
-      await execAsync('docker info');
-      return true;
-    } catch {
-      return false;
-    }
+  getTrackedImageCount(): number {
+    return this.trackedImages.size;
   }
 
   /**
    * Static method for global cleanup - removes any test images without tracking
+   * Uses a Docker client instance for consistency
    */
-  static async globalCleanup(): Promise<void> {
+  static async globalCleanup(dockerClient: DockerClient): Promise<void> {
     try {
-      if (!(await DockerTestCleaner.isDockerAvailable())) {
-        console.log('⚠️  Docker not available - skipping cleanup');
-        return;
-      }
-
       // Simply remove the test image if it exists - no tracking needed
-      try {
-        await execAsync(`docker rmi ${TEST_IMAGE_NAME} 2>/dev/null || true`);
-      } catch {
+      const removeResult = await dockerClient.removeImage(TEST_IMAGE_NAME, true);
+      if (!removeResult.ok) {
         // Ignore errors - image might not exist
+        console.debug(`Global cleanup: ${removeResult.error}`);
       }
     } catch (error) {
       // Don't throw errors in global cleanup to avoid failing test runs
       console.warn('Global cleanup warning:', error);
     }
-  }
-
-  /**
-   * Get current tracked image count (for monitoring)
-   */
-  getTrackedImageCount(): number {
-    return this.trackedImages.size;
   }
 }

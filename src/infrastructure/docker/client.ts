@@ -6,7 +6,7 @@ import Docker from 'dockerode';
 import tar from 'tar-fs';
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '../../domain/types';
-import { extractDockerErrorMessage, sanitizeErrorDetails } from './errors';
+import { extractDockerErrorMessage } from './errors';
 /**
  * Options for building a Docker image.
  */
@@ -47,6 +47,22 @@ export interface DockerPushResult {
   digest: string;
   /** Size of the pushed image in bytes */
   size?: number;
+}
+
+/**
+ * Docker container information.
+ */
+export interface DockerContainerInfo {
+  /** Container ID */
+  Id: string;
+  /** Container names */
+  Names: string[];
+  /** Image used for this container */
+  Image: string;
+  /** Container state */
+  State: string;
+  /** Container status */
+  Status: string;
 }
 
 /**
@@ -97,6 +113,32 @@ export interface DockerClient {
    * @returns Result containing push details or error
    */
   pushImage: (repository: string, tag: string) => Promise<Result<DockerPushResult>>;
+
+  /**
+   * Removes a Docker image.
+   * @param imageId - Image ID or tag to remove
+   * @param force - Force removal of the image
+   * @returns Result indicating success or error
+   */
+  removeImage: (imageId: string, force?: boolean) => Promise<Result<void>>;
+
+  /**
+   * Removes a Docker container.
+   * @param containerId - Container ID to remove
+   * @param force - Force removal of the container
+   * @returns Result indicating success or error
+   */
+  removeContainer: (containerId: string, force?: boolean) => Promise<Result<void>>;
+
+  /**
+   * Lists Docker containers.
+   * @param options - Container list options
+   * @returns Result containing container list or error
+   */
+  listContainers: (options?: {
+    all?: boolean;
+    filters?: Record<string, string[]>;
+  }) => Promise<Result<DockerContainerInfo[]>>;
 }
 
 /**
@@ -117,7 +159,7 @@ export const createDockerClient = (logger: Logger): DockerClient => {
         const tarStream = tar.pack(contextPath);
 
         const stream = await docker.buildImage(tarStream, {
-          t: options.t || (Array.isArray(options.tags) ? options.tags[0] : options.tags),
+          t: options.t || options.tags?.[0],
           dockerfile: options.dockerfile,
           buildargs: options.buildargs || options.buildArgs,
         });
@@ -125,6 +167,8 @@ export const createDockerClient = (logger: Logger): DockerClient => {
         interface DockerBuildEvent {
           stream?: string;
           aux?: { ID?: string };
+          error?: string;
+          errorDetail?: Record<string, unknown>;
         }
 
         interface DockerBuildResponse {
@@ -141,7 +185,7 @@ export const createDockerClient = (logger: Logger): DockerClient => {
                 logger.error(
                   {
                     error: message,
-                    errorDetails: sanitizeErrorDetails(details),
+                    errorDetails: details,
                     originalError: err,
                     options,
                   },
@@ -155,15 +199,7 @@ export const createDockerClient = (logger: Logger): DockerClient => {
             (event: DockerBuildEvent) => {
               logger.debug(event, 'Docker build progress');
 
-              // Check for various error patterns in events
-              const eventObj = event as Record<string, unknown>;
-              if (
-                eventObj.error ||
-                eventObj.errorDetail ||
-                (typeof eventObj.stream === 'string' &&
-                  /\berror\b|\bfailed\b/i.test(eventObj.stream) &&
-                  !/successfully|success/i.test(eventObj.stream))
-              ) {
+              if (event.error || event.errorDetail) {
                 logger.error({ errorEvent: event }, 'Docker build error event received');
               }
             },
@@ -185,7 +221,7 @@ export const createDockerClient = (logger: Logger): DockerClient => {
         logger.error(
           {
             error: errorMessage,
-            errorDetails: sanitizeErrorDetails(details),
+            errorDetails: details,
             originalError: error,
             options,
           },
@@ -201,13 +237,11 @@ export const createDockerClient = (logger: Logger): DockerClient => {
         const image = docker.getImage(id);
         const inspect = await image.inspect();
 
-        const imageInfo = {
+        const imageInfo: DockerImageInfo = {
           Id: inspect.Id,
-          repository: inspect.RepoTags?.[0]?.split(':')[0] || '',
-          tag: inspect.RepoTags?.[0]?.split(':')[1] || 'latest',
-          size: inspect.Size,
-          created: inspect.Created,
-          labels: inspect.Config?.Labels || {},
+          RepoTags: inspect.RepoTags,
+          Size: inspect.Size,
+          Created: inspect.Created,
         };
 
         return Success(imageInfo);
@@ -218,7 +252,7 @@ export const createDockerClient = (logger: Logger): DockerClient => {
         logger.error(
           {
             error: errorMessage,
-            errorDetails: sanitizeErrorDetails(details),
+            errorDetails: details,
             originalError: error,
             imageId: id,
           },
@@ -243,7 +277,7 @@ export const createDockerClient = (logger: Logger): DockerClient => {
         logger.error(
           {
             error: errorMessage,
-            errorDetails: sanitizeErrorDetails(details),
+            errorDetails: details,
             originalError: error,
             imageId,
             repository,
@@ -267,6 +301,8 @@ export const createDockerClient = (logger: Logger): DockerClient => {
         interface DockerPushEvent {
           status?: string;
           progressDetail?: Record<string, unknown>;
+          error?: string;
+          errorDetail?: Record<string, unknown>;
           aux?: {
             Digest?: string;
             Size?: number;
@@ -283,7 +319,7 @@ export const createDockerClient = (logger: Logger): DockerClient => {
                 logger.error(
                   {
                     error: message,
-                    errorDetails: sanitizeErrorDetails(details),
+                    errorDetails: details,
                     originalError: err,
                     repository,
                     tag,
@@ -298,13 +334,8 @@ export const createDockerClient = (logger: Logger): DockerClient => {
             (event: DockerPushEvent) => {
               logger.debug(event, 'Docker push progress');
 
-              // Check for various error patterns in events
-              const eventObj = event as Record<string, unknown>;
-              if (
-                eventObj.error ||
-                eventObj.errorDetail ||
-                (eventObj.status && /error|failed/i.test(String(eventObj.status)))
-              ) {
+              // Log errors from Docker events - dockerode provides explicit error fields
+              if (event.error || event.errorDetail) {
                 logger.error({ errorEvent: event }, 'Docker push error event received');
               }
 
@@ -326,7 +357,7 @@ export const createDockerClient = (logger: Logger): DockerClient => {
               `sha256:${inspectResult.Id.replace('sha256:', '')}`;
           } catch (inspectError) {
             logger.warn({ error: inspectError }, 'Could not get digest from image inspection');
-            digest = `sha256:${Date.now().toString(16)}${Math.random().toString(16).substr(2)}`;
+            digest = `sha256:${Date.now().toString(16)}${Math.random().toString(16).substring(2)}`;
           }
         }
 
@@ -343,12 +374,97 @@ export const createDockerClient = (logger: Logger): DockerClient => {
         logger.error(
           {
             error: errorMessage,
-            errorDetails: sanitizeErrorDetails(details),
+            errorDetails: details,
             originalError: error,
             repository,
             tag,
           },
           'Docker push image failed',
+        );
+
+        return Failure(errorMessage);
+      }
+    },
+
+    async removeImage(imageId: string, force = false): Promise<Result<void>> {
+      try {
+        logger.debug({ imageId, force }, 'Starting Docker image removal');
+
+        const image = docker.getImage(imageId);
+        await image.remove({ force });
+
+        logger.debug({ imageId }, 'Docker image removed successfully');
+        return Success(undefined);
+      } catch (error) {
+        const { message, details } = extractDockerErrorMessage(error);
+        const errorMessage = `Failed to remove image: ${message}`;
+
+        logger.error(
+          {
+            error: errorMessage,
+            errorDetails: details,
+            originalError: error,
+            imageId,
+          },
+          'Docker remove image failed',
+        );
+
+        return Failure(errorMessage);
+      }
+    },
+
+    async removeContainer(containerId: string, force = false): Promise<Result<void>> {
+      try {
+        logger.debug({ containerId, force }, 'Starting Docker container removal');
+
+        const container = docker.getContainer(containerId);
+        await container.remove({ force });
+
+        logger.debug({ containerId }, 'Docker container removed successfully');
+        return Success(undefined);
+      } catch (error) {
+        const { message, details } = extractDockerErrorMessage(error);
+        const errorMessage = `Failed to remove container: ${message}`;
+
+        logger.error(
+          {
+            error: errorMessage,
+            errorDetails: details,
+            originalError: error,
+            containerId,
+          },
+          'Docker remove container failed',
+        );
+
+        return Failure(errorMessage);
+      }
+    },
+
+    async listContainers(
+      options: { all?: boolean; filters?: Record<string, string[]> } = {},
+    ): Promise<Result<DockerContainerInfo[]>> {
+      try {
+        logger.debug({ options }, 'Starting Docker container listing');
+
+        const containers = await docker.listContainers(options);
+
+        logger.debug(
+          { containerCount: containers.length },
+          'Docker containers listed successfully',
+        );
+        return Success(containers);
+      } catch (error) {
+        const { message, details } = extractDockerErrorMessage(error);
+        const errorMessage = `Failed to list containers: ${message}`;
+
+        logger.error(
+          {
+            error: errorMessage,
+            errorDetails: details,
+            originalError: error,
+            options,
+          },
+          'Docker list containers failed',
         );
 
         return Failure(errorMessage);

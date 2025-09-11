@@ -6,15 +6,14 @@
  * actionable error messages.
  * 
  * Prerequisites:
- * - Docker daemon must be running
+ * - Docker daemon must be runnings
  * - Network connectivity for registry tests
  * - Sufficient disk space for image operations
  */
 
 import { createDockerClient } from '../../../../src/infrastructure/docker/client';
 import { createLogger } from '../../../../src/lib/logger';
-import { Success, Failure } from '../../../../src/domain/types';
-import type { DockerBuildOptions, DockerClient, DockerImageInfo } from '../../../../src/infrastructure/docker/client';
+import type { DockerBuildOptions, DockerClient } from '../../../../src/infrastructure/docker/client';
 import { DockerTestCleaner, TEST_IMAGE_NAME } from '../../../__support__/utilities/docker-test-cleaner';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -29,25 +28,24 @@ describe('Docker Client Error Handling Integration Tests', () => {
 
   beforeAll(async () => {
     // Initialize the test cleaner with verification enabled
-    testCleaner = new DockerTestCleaner(logger, { verifyCleanup: true });
-    
     dockerClient = createDockerClient(logger);
+    testCleaner = new DockerTestCleaner(logger, dockerClient, { verifyCleanup: true });
     
     // Create a temporary directory for test Dockerfiles
     testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'docker-error-tests-'));
     
-    // Wrap buildImage to track successful builds for cleanup
+        // Wrap buildImage to track successful builds for cleanup
     const original = dockerClient.buildImage.bind(dockerClient);
     dockerClient.buildImage = async (options: DockerBuildOptions) => {
       const result = await original(options);
       if (result.ok && result.value.imageId) {
         testCleaner.trackImage(result.value.imageId);
         logger.debug(`Tracking created image: ${result.value.imageId}`);
-      }
-      // Also track by tag if available for easier cleanup
-      if (options.t) {
-        testCleaner.trackImage(options.t);
-        logger.debug(`Tracking created image tag: ${options.t}`);
+        // Also track by tag if available for easier cleanup
+        if (options.t) {
+          testCleaner.trackImage(options.t);
+          logger.debug(`Tracking created image tag: ${options.t}`);
+        }
       }
       return result;
     };

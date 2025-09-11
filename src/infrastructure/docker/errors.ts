@@ -1,7 +1,12 @@
 /**
- * Docker-specific error interface for enhanced error handling
+ * Docker error handling utilities leveraging dockerode's native error structure
  */
-export interface DockerError extends Error {
+
+/**
+ * Interface for dockerode error objects
+ * Based on dockerode's actual error structure
+ */
+interface DockerodeError extends Error {
   statusCode?: number;
   json?: Record<string, unknown>;
   reason?: string;
@@ -9,56 +14,21 @@ export interface DockerError extends Error {
 }
 
 /**
- * Type guard to check if an error is a Docker-specific error
+ * Type guard to check if an error has dockerode-specific properties
  */
-export function isDockerError(error: unknown): error is DockerError {
+function hasDockerodeProperties(error: Error): error is DockerodeError {
+  const dockerError = error as DockerodeError;
   return (
-    error instanceof Error &&
-    (typeof (error as DockerError).statusCode === 'number' ||
-      typeof (error as DockerError).code === 'string' ||
-      typeof (error as DockerError).reason === 'string')
+    typeof dockerError.statusCode === 'number' ||
+    typeof dockerError.json === 'object' ||
+    typeof dockerError.reason === 'string' ||
+    typeof dockerError.code === 'string'
   );
 }
 
 /**
- * Safely sanitize error details for logging, removing potential sensitive information
- */
-export function sanitizeErrorDetails(details: Record<string, unknown>): Record<string, unknown> {
-  const sanitized = { ...details };
-
-  // Remove potentially sensitive fields that might contain tokens or credentials
-  if (sanitized.json && typeof sanitized.json === 'object' && sanitized.json !== null) {
-    const jsonObj = sanitized.json as Record<string, unknown>;
-    const sanitizedJson = { ...jsonObj };
-
-    // Remove common sensitive field patterns
-    const sensitiveKeys = /auth|token|password|secret|key|credential/i;
-    Object.keys(sanitizedJson).forEach((key) => {
-      if (sensitiveKeys.test(key)) {
-        sanitizedJson[key] = '[REDACTED]';
-      }
-    });
-
-    sanitized.json = sanitizedJson;
-  }
-
-  return sanitized;
-}
-
-/**
- * Docker error handling utilities for extracting meaningful error messages from Docker operations.
- *
- * This module provides comprehensive error handling for various Docker operations including:
- * - Image building and management
- * - Container operations
- * - Registry operations (push/pull)
- * - Network and volume operations
- *
- * Error patterns are ordered by specificity to ensure the most precise error messages are extracted first.
- * More specific patterns (like registry authentication errors) are checked before generic patterns.
- *
- * @see https://distribution.github.io/distribution/spec/api/ - Docker Registry HTTP API V2 specification
- * @see https://docs.docker.com/reference/api/engine/ - Docker Engine API reference
+ * Extract meaningful error message from dockerode errors
+ * The goal is to provide specific, actionable error messages to the LLM instead of generic "Unknown error"
  */
 export function extractDockerErrorMessage(error: unknown): {
   message: string;
@@ -66,76 +36,81 @@ export function extractDockerErrorMessage(error: unknown): {
 } {
   const details: Record<string, unknown> = {};
 
-  if (isDockerError(error)) {
-    // First, capture ALL available Docker error properties for debugging
-    if (error.statusCode) details.statusCode = error.statusCode;
-    if (error.json) details.json = error.json;
-    if (error.reason) details.reason = error.reason;
-    if (error.code) details.code = error.code;
-
-    // Handle specific Docker error scenarios in PRIORITY ORDER
-    // Order matters: Most specific → Least specific to avoid misclassification
-
-    // 1. FIRST: Network-level errors (most fundamental)
-    // These occur BEFORE any HTTP communication happens
-    // Network connectivity issues (DNS resolution failures, connection refused)
-    // Ref: https://distribution.github.io/distribution/spec/api/#overview
-    // WHY FIRST: If network fails, no HTTP status codes will be available
-    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-      details.networkError = true;
-      return {
-        message: `Network connectivity issue - ${error.message || 'Cannot reach Docker registry'}`,
-        details,
-      };
-    }
-
-    // 2. SECOND: Authentication/Authorization failures (specific HTTP codes)
-    // Ref: https://distribution.github.io/distribution/spec/auth/
-    // HTTP 401 = Invalid credentials, HTTP 403 = Valid credentials but insufficient permissions
-    // WHY SECOND: More specific than generic HTTP errors, needs special handling for auth flows
-    if (error.statusCode === 401 || error.statusCode === 403) {
-      details.authError = true;
-      return {
-        message: `Registry authentication issue - ${error.message || 'Access denied'}`,
-        details,
-      };
-    }
-
-    // 3. THIRD: Image/manifest not found errors (very common, specific meaning)
-    // Ref: https://distribution.github.io/distribution/spec/api/#pulling-an-image
-    // HTTP 404 = Image, tag, or manifest does not exist in registry
-    // WHY THIRD: 404 has special meaning in Docker context (missing image vs generic not found)
-    if (error.statusCode === 404) {
-      details.imageNotFound = true;
-      return {
-        message: `Base image not found - ${error.message || 'Image does not exist'}`,
-        details,
-      };
-    }
-
-    // 4. LAST: Generic HTTP errors from Docker daemon or registry (catch-all)
-    // Ref: https://docs.docker.com/reference/api/engine/
-    // Covers 400 (bad request), 500 (server error), etc.
-    // WHY LAST: Fallback for any HTTP status code not handled above
-    if (error.statusCode) {
-      return {
-        message: `HTTP ${error.statusCode} - ${error.message || 'Registry error'}`,
-        details,
-      };
-    }
-  }
-
   if (error instanceof Error) {
-    details.message = error.message;
-    details.stack = error.stack;
+    // Check if this error has dockerode-specific properties
+    if (hasDockerodeProperties(error)) {
+      // Capture all available properties for debugging
+      // Note: Sensitive data will be redacted by Pino logger's built-in redaction
+      if (error.statusCode) details.statusCode = error.statusCode;
+      if (error.json) details.json = error.json;
+      if (error.reason) details.reason = error.reason;
+      if (error.code) details.code = error.code;
+
+      // Provide specific, meaningful messages based on error patterns
+
+      // Network connectivity issues (most fundamental)
+      if (error.code === 'ENOTFOUND') {
+        return {
+          message: `Network error: Cannot resolve Docker registry hostname - ${error.message}`,
+          details,
+        };
+      }
+
+      if (error.code === 'ECONNREFUSED') {
+        return {
+          message: `Network error: Connection refused to Docker registry - ${error.message}`,
+          details,
+        };
+      }
+
+      // HTTP status code errors with specific meanings
+      if (error.statusCode === 401) {
+        return {
+          message: `Authentication error: Invalid registry credentials - ${error.message}`,
+          details,
+        };
+      }
+
+      if (error.statusCode === 403) {
+        return {
+          message: `Authorization error: Access denied to registry resource - ${error.message}`,
+          details,
+        };
+      }
+
+      if (error.statusCode === 404) {
+        return {
+          message: `Image not found: The requested image or tag does not exist - ${error.message}`,
+          details,
+        };
+      }
+
+      if (error.statusCode && error.statusCode >= 500) {
+        return {
+          message: `Registry server error (${error.statusCode}): The Docker registry is experiencing issues - ${error.message}`,
+          details,
+        };
+      }
+
+      // Any other HTTP error
+      if (error.statusCode) {
+        return {
+          message: `Registry error (HTTP ${error.statusCode}): ${error.message}`,
+          details,
+        };
+      }
+    }
+
+    // For regular errors, provide the message or a meaningful fallback
     return {
-      message: error.message || 'Unknown error',
+      message: error.message || 'Docker operation failed with unknown error',
       details,
     };
   }
 
+  // Last resort for non-Error objects
   return {
-    message: String(error) || 'Unknown error',
+    message: String(error) || 'Unknown Docker error occurred',
     details,
   };
 }
