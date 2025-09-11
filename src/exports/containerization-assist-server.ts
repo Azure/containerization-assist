@@ -5,17 +5,17 @@
 
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { Tool } from '../types.js';
-import type { MCPTool, MCPToolResult } from './types.js';
-import type { ToolContext } from '../mcp/context/types.js';
+import type { Tool } from '../types';
+import type { MCPTool, MCPToolResult } from './types';
 import type { Logger } from 'pino';
 
-import { createSessionManager, type SessionManager } from '../lib/session.js';
+import { createSessionManager, type SessionManager } from '../lib/session';
 import { createLogger } from '../lib/logger.js';
-import { StandardToolContext } from '../mcp/context/tool-context.js';
+import { createToolContext, type ToolContext } from '../mcp/context.js';
 
 // Import all tools
 import { getAllInternalTools } from './tools.js';
+import { extractErrorMessage } from '../lib/error-utils';
 
 /**
  * ContainerAssistServer provides a clean API for integrating tools
@@ -86,7 +86,7 @@ export class ContainerAssistServer {
   ): void {
     const mcpServer = config.server;
     const toolsToRegister = options.tools
-      ? Array.from(this.tools.entries()).filter(([name]) => options.tools!.includes(name))
+      ? Array.from(this.tools.entries()).filter(([name]) => options.tools?.includes(name) ?? false)
       : Array.from(this.tools.entries());
 
     for (const [originalName, tool] of toolsToRegister) {
@@ -105,7 +105,7 @@ export class ContainerAssistServer {
         customName,
         mcpTool.metadata.description,
         tool.zodSchema, // This is a ZodRawShape from schema.shape
-        async (args: any, _extra: any) => {
+        async (args: unknown, _extra: unknown) => {
           // Call our handler and convert the result
           const result = await mcpTool.handler(args);
           // Convert our result format to CallToolResult format
@@ -148,26 +148,14 @@ export class ContainerAssistServer {
   /**
    * Create a tool context for execution
    */
-  private createContext(params?: { sessionId?: string }): ToolContext {
+  private createContext(params?: unknown): ToolContext {
     const logger = this.logger.child({ context: 'tool-execution' });
 
-    const context = new StandardToolContext(
-      this.mcpServer as any,
-      logger,
-      undefined,
-      undefined,
-      undefined,
-      {
-        debug: false,
-        defaultTimeout: 30000,
-        defaultMaxTokens: 2048,
-        defaultStopSequences: ['```', '\n\n```', '\n\n# ', '\n\n---'],
-      },
-      this.sessionManager,
-    );
-
-    // Simple progress reporter
-    context.progress = async (message: string, progress?: number, total?: number) => {
+    const progressReporter = async (
+      message: string,
+      progress?: number,
+      total?: number,
+    ): Promise<void> => {
       if (progress !== undefined && total !== undefined) {
         logger.info({ progress, total }, message);
       } else {
@@ -175,9 +163,19 @@ export class ContainerAssistServer {
       }
     };
 
+    const context = createToolContext(this.mcpServer as Server, logger, {
+      sessionManager: this.sessionManager,
+      maxTokens: 2048,
+      stopSequences: ['```', '\n\n```', '\n\n# ', '\n\n---'],
+      progress: progressReporter,
+    });
+
     // Handle session creation if needed
-    if (params?.sessionId) {
-      void this.ensureSession(params.sessionId);
+    if (params && typeof params === 'object' && 'sessionId' in params) {
+      const sessionId = (params as { sessionId?: string }).sessionId;
+      if (sessionId) {
+        void this.ensureSession(sessionId);
+      }
     }
 
     return context;
@@ -188,9 +186,9 @@ export class ContainerAssistServer {
    */
   private async ensureSession(sessionId: string): Promise<void> {
     try {
-      const session = await this.sessionManager.getSession(sessionId);
-      if (!session.ok) {
-        await this.sessionManager.createSession(sessionId);
+      const session = await this.sessionManager.get(sessionId);
+      if (!session) {
+        await this.sessionManager.create(sessionId);
       }
     } catch (err) {
       this.logger.warn({ sessionId, error: err }, 'Session management error');
@@ -208,21 +206,23 @@ export class ContainerAssistServer {
         description: tool.description || `${tool.name} tool`,
         inputSchema: tool.schema || { type: 'object', properties: {} },
       },
-      handler: async (params: any) => {
+      handler: async (params: unknown) => {
         try {
           const toolLogger = this.logger.child({ tool: tool.name });
           const toolContext = this.createContext(params);
 
-          const result = await tool.execute(params || {}, toolLogger, toolContext);
+          const result = await tool.execute(
+            (params || {}) as Record<string, unknown>,
+            toolLogger,
+            toolContext,
+          );
           return this.formatResult(result);
         } catch (error) {
           return {
             content: [
               {
                 type: 'text',
-                text: `Error executing ${tool.name}: ${
-                  error instanceof Error ? error.message : String(error)
-                }`,
+                text: `Error executing ${tool.name}: ${extractErrorMessage(error)}`,
               },
             ],
           };
@@ -234,11 +234,12 @@ export class ContainerAssistServer {
   /**
    * Format tool results consistently
    */
-  private formatResult(result: any): MCPToolResult {
+  private formatResult(result: unknown): MCPToolResult {
     // Handle Result<T> pattern
     if (result && typeof result === 'object' && 'ok' in result) {
-      if (result.ok) {
-        const value = result.value;
+      const resultObj = result as { ok: boolean; value?: unknown; error?: unknown };
+      if (resultObj.ok) {
+        const value = resultObj.value;
 
         // Tools now provide their own enrichment (chain hints, file indicators)
         // Just return the value as JSON
@@ -255,7 +256,7 @@ export class ContainerAssistServer {
           content: [
             {
               type: 'text',
-              text: `Error: ${result.error}`,
+              text: `Error: ${resultObj.error}`,
             },
           ],
         };

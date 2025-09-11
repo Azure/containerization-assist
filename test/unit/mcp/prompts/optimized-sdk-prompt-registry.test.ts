@@ -3,22 +3,25 @@
  */
 
 import type { Logger } from 'pino';
-import { PromptRegistry } from '../../../../src/prompts/registry';
+import * as promptRegistry from '../../../../src/prompts/registry';
 import { createMockLogger } from '../../../__support__/utilities/mock-factories';
+import { join } from 'path';
 
-describe('PromptRegistry', () => {
-  let registry: PromptRegistry;
+describe('Prompt Registry Functions', () => {
   let mockLogger: Logger;
 
   beforeEach(async () => {
     mockLogger = createMockLogger();
-    registry = new PromptRegistry(mockLogger);
-    await registry.initialize();
+    promptRegistry.clearPromptCache(); // Clear any previous state
+    await promptRegistry.initializePrompts(
+      join(process.cwd(), 'src', 'prompts'),
+      mockLogger
+    );
   });
 
   describe('initialization', () => {
     it('should initialize with default templates', async () => {
-      const result = await registry.listPrompts();
+      const result = await promptRegistry.listPrompts();
       const promptNames = result.prompts.map(p => p.name);
       
       expect(promptNames).toContain('dockerfile-sampling');
@@ -30,26 +33,26 @@ describe('PromptRegistry', () => {
     });
 
     it('should have at least 6 default templates', async () => {
-      const result = await registry.listPrompts();
+      const result = await promptRegistry.listPrompts();
       expect(result.prompts.length).toBeGreaterThanOrEqual(6);
     });
   });
 
   describe('hasPrompt', () => {
     it('should return true for existing prompts', () => {
-      expect(registry.hasPrompt('dockerfile-generation')).toBe(true);
-      expect(registry.hasPrompt('k8s-manifest-generation')).toBe(true);
+      expect(promptRegistry.hasPrompt('dockerfile-generation')).toBe(true);
+      expect(promptRegistry.hasPrompt('k8s-manifest-generation')).toBe(true);
     });
 
     it('should return false for non-existing prompts', () => {
-      expect(registry.hasPrompt('non-existent-prompt')).toBe(false);
-      expect(registry.hasPrompt('')).toBe(false);
+      expect(promptRegistry.hasPrompt('non-existent-prompt')).toBe(false);
+      expect(promptRegistry.hasPrompt('')).toBe(false);
     });
   });
 
   describe('getPromptInfo', () => {
     it('should return prompt info for existing prompts', () => {
-      const info = registry.getPromptInfo('dockerfile-generation');
+      const info = promptRegistry.getPromptInfo('dockerfile-generation');
       
       expect(info).toBeDefined();
       expect(info?.description).toContain('optimized Dockerfile');
@@ -58,12 +61,12 @@ describe('PromptRegistry', () => {
     });
 
     it('should return null for non-existing prompts', () => {
-      const info = registry.getPromptInfo('non-existent-prompt');
+      const info = promptRegistry.getPromptInfo('non-existent-prompt');
       expect(info).toBeNull();
     });
 
     it('should include required argument information', () => {
-      const info = registry.getPromptInfo('dockerfile-generation');
+      const info = promptRegistry.getPromptInfo('dockerfile-generation');
       
       expect(info?.arguments).toEqual(
         expect.arrayContaining([
@@ -79,7 +82,7 @@ describe('PromptRegistry', () => {
 
   describe('getPrompt', () => {
     it('should generate prompt with template rendering', async () => {
-      const result = await registry.getPrompt('dockerfile-generation', {
+      const result = await promptRegistry.getPrompt('dockerfile-generation', {
         language: 'javascript',
         framework: 'express',
         optimization: 'performance'
@@ -98,7 +101,7 @@ describe('PromptRegistry', () => {
     });
 
     it('should handle missing template variables gracefully', async () => {
-      const result = await registry.getPrompt('dockerfile-generation', {
+      const result = await promptRegistry.getPrompt('dockerfile-generation', {
         language: 'python'
         // framework and optimization missing
       });
@@ -112,12 +115,12 @@ describe('PromptRegistry', () => {
 
     it('should throw error for non-existent prompts', async () => {
       await expect(
-        registry.getPrompt('non-existent-prompt')
+        promptRegistry.getPrompt('non-existent-prompt')
       ).rejects.toThrow('Prompt not found: non-existent-prompt');
     });
 
     it('should work with empty args', async () => {
-      const result = await registry.getPrompt('dockerfile-generation', {});
+      const result = await promptRegistry.getPrompt('dockerfile-generation', {});
       
       expect(result.name).toBe('dockerfile-generation');
       expect(result.messages).toHaveLength(1);
@@ -129,7 +132,7 @@ describe('PromptRegistry', () => {
 
   describe('dockerfile-sampling template', () => {
     it('should render dockerfile sampling prompt correctly', async () => {
-      const result = await registry.getPrompt('dockerfile-sampling', {
+      const result = await promptRegistry.getPrompt('dockerfile-sampling', {
         strategy: 'security',
         language: 'nodejs',
         context: 'web application with database'
@@ -143,7 +146,7 @@ describe('PromptRegistry', () => {
 
   describe('k8s-manifest-generation template', () => {
     it('should render k8s manifest prompt correctly', async () => {
-      const result = await registry.getPrompt('k8s-manifest-generation', {
+      const result = await promptRegistry.getPrompt('k8s-manifest-generation', {
         appName: 'my-app',
         environment: 'production',
         replicas: '3'
@@ -157,7 +160,7 @@ describe('PromptRegistry', () => {
 
   describe('parameter-validation template', () => {
     it('should render validation prompt correctly', async () => {
-      const result = await registry.getPrompt('parameter-validation', {
+      const result = await promptRegistry.getPrompt('parameter-validation', {
         toolName: 'generate-dockerfile',
         parameters: '{"language": "python", "optimization": "size"}',
         context: 'production deployment'
@@ -173,7 +176,7 @@ describe('PromptRegistry', () => {
 
   describe('parameter-suggestions template', () => {
     it('should render suggestions prompt correctly', async () => {
-      const result = await registry.getPrompt('parameter-suggestions', {
+      const result = await promptRegistry.getPrompt('parameter-suggestions', {
         toolName: 'generate-k8s-manifests',
         partialParameters: '{"appName": "myapp"}',
         context: 'microservice deployment'
@@ -189,7 +192,7 @@ describe('PromptRegistry', () => {
 
   describe('security-analysis template', () => {
     it('should render security analysis prompt correctly', async () => {
-      const result = await registry.getPrompt('security-analysis', {
+      const result = await promptRegistry.getPrompt('security-analysis', {
         configType: 'dockerfile',
         content: 'FROM ubuntu\nRUN apt-get update',
         complianceStandard: 'CIS'
@@ -205,7 +208,7 @@ describe('PromptRegistry', () => {
 
   describe('template rendering edge cases', () => {
     it('should handle special characters in arguments', async () => {
-      const result = await registry.getPrompt('dockerfile-generation', {
+      const result = await promptRegistry.getPrompt('dockerfile-generation', {
         language: 'C++',
         framework: 'Qt/C++ Framework'
       });
@@ -216,7 +219,7 @@ describe('PromptRegistry', () => {
     });
 
     it('should handle empty string arguments', async () => {
-      const result = await registry.getPrompt('dockerfile-generation', {
+      const result = await promptRegistry.getPrompt('dockerfile-generation', {
         language: '',
         framework: 'express'
       });
@@ -231,7 +234,7 @@ describe('PromptRegistry', () => {
   describe('performance and complexity reduction', () => {
     it('should be significantly simpler than original registry', async () => {
       // Test that the simplified registry has reduced complexity
-      const prompts = registry.getPromptNames();
+      const prompts = promptRegistry.getPromptNames();
       
       // Should have core prompts but not overly complex structure
       expect(prompts.length).toBeLessThan(20); // Reasonable upper limit
@@ -239,14 +242,14 @@ describe('PromptRegistry', () => {
       
       // All prompts should be accessible
       for (const promptName of prompts) {
-        expect(registry.hasPrompt(promptName)).toBe(true);
-        expect(registry.getPromptInfo(promptName)).toBeDefined();
+        expect(promptRegistry.hasPrompt(promptName)).toBe(true);
+        expect(promptRegistry.getPromptInfo(promptName)).toBeDefined();
       }
     });
 
     it('should handle concurrent getPrompt calls efficiently', async () => {
       const promises = Array.from({ length: 10 }, (_, i) =>
-        registry.getPrompt('dockerfile-generation', {
+        promptRegistry.getPrompt('dockerfile-generation', {
           language: `lang${i}`,
           framework: `framework${i}`
         })

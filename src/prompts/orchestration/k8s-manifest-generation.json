@@ -1,0 +1,45 @@
+{
+  "id": "k8s-manifest-generation",
+  "category": "orchestration",
+  "description": "Generate Kubernetes deployment manifests with best practices",
+  "version": "1.0",
+  "parameters": [
+    {
+      "name": "appName",
+      "type": "string",
+      "required": true,
+      "description": "Application name for the deployment"
+    },
+    {
+      "name": "replicas",
+      "type": "number",
+      "required": false,
+      "description": "Number of replicas"
+    },
+    {
+      "name": "environment",
+      "type": "string",
+      "required": false,
+      "description": "Target environment (development, staging, production)"
+    },
+    {
+      "name": "resourceLimits",
+      "type": "string",
+      "required": false,
+      "description": "CPU and memory limits"
+    },
+    {
+      "name": "highAvailability",
+      "type": "boolean",
+      "required": false,
+      "description": "Enable high availability features (anti-affinity, PDBs)"
+    },
+    {
+      "name": "securityContext",
+      "type": "boolean",
+      "required": false,
+      "description": "Apply strict security contexts and policies"
+    }
+  ],
+  "template": "Generate Kubernetes deployment manifests for application \"{{appName}}\".\n\nConfiguration:\n- Environment: {{environment}}\n- Replicas: {{replicas}}\n{{#resourceLimits}}- Resource limits: {{resourceLimits}}{{/resourceLimits}}\n{{#highAvailability}}- High availability: enabled{{/highAvailability}}\n{{#securityContext}}- Security context: strict{{/securityContext}}\n\nInclude:\n- Deployment\n- Service\n- ConfigMap (if needed)\n- Ingress (if applicable)\n- HorizontalPodAutoscaler (for scaling)\n- PodDisruptionBudget (for availability)\n\nFollow Kubernetes best practices and security guidelines.\n"
+}

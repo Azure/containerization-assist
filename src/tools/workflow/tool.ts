@@ -19,9 +19,10 @@
  * ```
  */
 
-import { getSession, updateSession } from '@mcp/tools/session-helpers';
-import { createStandardProgress } from '@mcp/utils/progress-helper';
-import type { ToolContext } from '../../mcp/context/types';
+import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { extractErrorMessage } from '../../lib/error-utils';
+import { createStandardProgress } from '@mcp/progress-helper';
+import type { ToolContext } from '../../mcp/context';
 import { createTimer, createLogger, type Logger } from '../../lib/logger';
 import { Success, Failure, type Result, type Tool } from '../../types';
 
@@ -296,7 +297,7 @@ export async function executeStep(
     logger.error({ step, error }, `Workflow step failed: ${step}`);
     return {
       ok: false,
-      error: error instanceof Error ? error.message : String(error),
+      error: extractErrorMessage(error),
     };
   }
 }
@@ -528,7 +529,7 @@ async function workflowImpl(
     timer.error(error);
     logger.error({ error }, 'Workflow execution failed');
 
-    return Failure(error instanceof Error ? error.message : String(error));
+    return Failure(extractErrorMessage(error));
   }
 }
 

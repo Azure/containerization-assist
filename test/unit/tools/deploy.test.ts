@@ -7,7 +7,7 @@
 import { jest } from '@jest/globals';
 import { deployApplication as deployApplicationTool } from '../../../src/tools/deploy/tool';
 import type { DeployApplicationParams } from '../../../src/tools/deploy/schema';
-import type { ToolContext } from '@mcp/context/types';
+import type { ToolContext } from '@mcp/context';
 import { createMockLogger, createSuccessResult, createFailureResult } from '../../__support__/utilities/mock-infrastructure';
 
 // Mock lib modules following analyze-repo pattern
@@ -95,7 +95,7 @@ jest.mock('../../../src/lib/session', () => ({
 }));
 
 // Mock MCP helper modules
-jest.mock('@mcp/tools/session-helpers');
+jest.mock('@mcp/tool-session-helpers');
 
 jest.mock('../../../src/lib/kubernetes', () => ({
   createKubernetesClient: jest.fn(() => mockKubernetesClient),
@@ -179,7 +179,7 @@ spec:
     mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
     
     // Setup session helper mocks
-    const sessionHelpers = require('@mcp/tools/session-helpers');
+    const sessionHelpers = require('@mcp/tool-session-helpers');
     sessionHelpers.getSession = jest.fn().mockResolvedValue({
       ok: true,
       value: {
@@ -209,6 +209,9 @@ k8s_manifests: {
         repo_path: '/test/repo',
       });
 
+      // Mock successful manifest application
+      mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({ applied: true }));
+
       // Default deployment status - ready
       mockKubernetesClient.getDeploymentStatus.mockResolvedValue(createSuccessResult({
         ready: true,
@@ -220,37 +223,40 @@ k8s_manifests: {
 
     it('should successfully deploy application with valid manifests', async () => {
       const mockContext = createMockToolContext();
+      
       const result = await deployApplicationTool(config, mockContext);
-
+      
       if (!result.ok) {
-        console.error('Deploy failed with error:', result.error);
+        console.log('DEPLOY ERROR:', result.error);
+        console.log('FULL RESULT:', JSON.stringify(result, null, 2));
+        // Show the error in the test output
+        throw new Error(`Deploy failed: ${result.error}`);
       }
+      
       expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value.success).toBe(true);
-        expect(result.value.sessionId).toBe('test-session-123');
-        expect(result.value.namespace).toBe('default');
-        expect(result.value.deploymentName).toBe('test-app');
-        expect(result.value.serviceName).toBe('test-app');
-        expect(result.value.ready).toBe(true);
-        expect(result.value.replicas).toBe(2);
-        expect(result.value.endpoints).toEqual([
-          {
-            type: 'internal',
-            url: 'http://test-app.default.svc.cluster.local',
-            port: 80,
-          },
-        ]);
-        expect(result.value.status?.readyReplicas).toBe(2);
-        expect(result.value.status?.totalReplicas).toBe(2);
-        expect(result.value.status?.conditions).toEqual([
-          {
-            type: 'Available',
-            status: 'True',
-            message: 'Deployment is available',
-          },
-        ]);
-      }
+      expect(result.value.success).toBe(true);
+      expect(result.value.sessionId).toBe('test-session-123');
+      expect(result.value.namespace).toBe('default');
+      expect(result.value.deploymentName).toBe('test-app');
+      expect(result.value.serviceName).toBe('test-app');
+      expect(result.value.ready).toBe(true);
+      expect(result.value.replicas).toBe(2);
+      expect(result.value.endpoints).toEqual([
+        {
+          type: 'internal',
+          url: 'http://test-app.default.svc.cluster.local',
+          port: 80,
+        },
+      ]);
+      expect(result.value.status?.readyReplicas).toBe(2);
+      expect(result.value.status?.totalReplicas).toBe(2);
+      expect(result.value.status?.conditions).toEqual([
+        {
+          type: 'Available',
+          status: 'True',
+          message: 'Deployment is available',
+        },
+      ]);
 
       // Verify Kubernetes client was called to apply manifests
       expect(mockKubernetesClient.applyManifest).toHaveBeenCalledTimes(2);
@@ -259,7 +265,7 @@ k8s_manifests: {
       expect(mockKubernetesClient.getDeploymentStatus).toHaveBeenCalledWith('default', 'test-app');
       
       // Verify session was updated using standardized helpers
-      const sessionHelpers = require('@mcp/tools/session-helpers');
+      const sessionHelpers = require('@mcp/tool-session-helpers');
       expect(sessionHelpers.updateSession).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
@@ -390,7 +396,7 @@ k8s_manifests: {
 
     it('should handle session update failures', async () => {
       // Mock updateSessionData to fail
-      const sessionHelpers = require('@mcp/tools/session-helpers');
+      const sessionHelpers = require('@mcp/tool-session-helpers');
       sessionHelpers.updateSession.mockResolvedValueOnce({ ok: false, error: 'Failed to update session' });
 
       mockKubernetesClient.getDeploymentStatus.mockResolvedValue(createSuccessResult({

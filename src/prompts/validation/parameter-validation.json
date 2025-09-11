@@ -1,0 +1,45 @@
+{
+  "id": "parameter-validation",
+  "category": "validation",
+  "description": "Validate tool parameters with AI assistance",
+  "version": "1.0",
+  "parameters": [
+    {
+      "name": "toolName",
+      "type": "string",
+      "required": true,
+      "description": "Name of the tool being validated"
+    },
+    {
+      "name": "parameters",
+      "type": "string",
+      "required": true,
+      "description": "Parameters to validate (JSON format)"
+    },
+    {
+      "name": "context",
+      "type": "string",
+      "required": false,
+      "description": "Validation context (JSON format)"
+    },
+    {
+      "name": "validationRules",
+      "type": "string",
+      "required": false,
+      "description": "Specific validation rules to apply"
+    },
+    {
+      "name": "language",
+      "type": "string",
+      "required": false,
+      "description": "Programming language for language-specific validation"
+    },
+    {
+      "name": "environment",
+      "type": "string",
+      "required": false,
+      "description": "Target environment for production checks"
+    }
+  ],
+  "template": "Validate parameters for the \"{{toolName}}\" tool.\n\nParameters: {{parameters}}\n{{#context}}Context: {{context}}{{/context}}\n{{#validationRules}}Validation rules: {{validationRules}}{{/validationRules}}\n\nCheck for:\n- Required parameter presence\n- Parameter type validity\n- Value range compliance\n- Parameter compatibility\n- Security considerations\n{{#environment}}\n{{#if (eq environment \"production\")}}\n- Production-ready validation checks\n{{/if}}\n{{/environment}}\n{{#language}}\n- {{language}}-specific requirements\n{{/language}}\n\nProvide specific validation feedback with actionable recommendations.\n"
+}

@@ -47,7 +47,7 @@ jest.mock('@lib/logger', () => ({
 }));
 
 // Mock session helpers
-jest.mock('@mcp/tools/session-helpers');
+jest.mock('@mcp/tool-session-helpers');
 
 describe('tagImage', () => {
   let mockLogger: ReturnType<typeof createMockLogger>;
@@ -64,7 +64,7 @@ describe('tagImage', () => {
     jest.clearAllMocks();
     
     // Setup session helper mocks
-    const sessionHelpers = require('@mcp/tools/session-helpers');
+    const sessionHelpers = require('@mcp/tool-session-helpers');
     sessionHelpers.getSession = jest.fn().mockResolvedValue({
       ok: true,
       value: {
@@ -131,7 +131,7 @@ describe('tagImage', () => {
       expect(mockDockerClient.tagImage).toHaveBeenCalledWith('sha256:mock-image-id', 'myapp', 'v1.0');
       
       // Verify session was updated with tag information
-      const sessionHelpers = require('@mcp/tools/session-helpers');
+      const sessionHelpers = require('@mcp/tool-session-helpers');
       expect(sessionHelpers.updateSession).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
@@ -196,7 +196,7 @@ describe('tagImage', () => {
     });
 
     it('should preserve existing build result data when updating session', async () => {
-      const sessionHelpers = require('@mcp/tools/session-helpers');
+      const sessionHelpers = require('@mcp/tool-session-helpers');
       sessionHelpers.getSession.mockResolvedValue({
         ok: true,
         value: {
@@ -323,7 +323,7 @@ describe('tagImage', () => {
 
   describe('Error Handling', () => {
     it('should auto-create session when not found', async () => {
-      const sessionHelpers = require('@mcp/tools/session-helpers');
+      const sessionHelpers = require('@mcp/tool-session-helpers');
       sessionHelpers.getSession.mockResolvedValue({
         ok: true,
         value: {
@@ -348,7 +348,7 @@ describe('tagImage', () => {
     });
 
     it('should return error when no build result exists', async () => {
-      const sessionHelpers = require('@mcp/tools/session-helpers');
+      const sessionHelpers = require('@mcp/tool-session-helpers');
       sessionHelpers.getSession.mockResolvedValue({
         ok: true,
         value: {
@@ -372,7 +372,7 @@ describe('tagImage', () => {
     });
 
     it('should return error when build result has no imageId', async () => {
-      const sessionHelpers = require('@mcp/tools/session-helpers');
+      const sessionHelpers = require('@mcp/tool-session-helpers');
       sessionHelpers.getSession.mockResolvedValue({
         ok: true,
         value: {
@@ -498,7 +498,7 @@ describe('tagImage', () => {
     });
 
     it('should handle session update failures gracefully', async () => {
-      const sessionHelpers = require('@mcp/tools/session-helpers');
+      const sessionHelpers = require('@mcp/tool-session-helpers');
       sessionHelpers.getSession.mockResolvedValue({
         ok: true,
         value: {
@@ -568,7 +568,7 @@ describe('tagImage', () => {
       const result = await tagImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
-      const sessionHelpers = require('@mcp/tools/session-helpers');
+      const sessionHelpers = require('@mcp/tool-session-helpers');
       expect(sessionHelpers.updateSession).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
@@ -599,7 +599,7 @@ describe('tagImage', () => {
       const result = await tagImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
-      const sessionHelpers = require('@mcp/tools/session-helpers');
+      const sessionHelpers = require('@mcp/tool-session-helpers');
       expect(sessionHelpers.updateSession).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
@@ -644,7 +644,7 @@ describe('tagImage', () => {
 
       for (const testConfig of configurations) {
         // Setup session for each different sessionId
-        const sessionHelpers = require('@mcp/tools/session-helpers');
+        const sessionHelpers = require('@mcp/tool-session-helpers');
         sessionHelpers.getSession.mockResolvedValue({
           ok: true,
           value: {

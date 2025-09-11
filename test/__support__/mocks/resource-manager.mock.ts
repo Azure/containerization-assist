@@ -1,6 +1,6 @@
 import { Result, Success, Failure } from '../../src/core/types.js';
 import type { Resource, ResourceManager } from '../../src/mcp/resources/types.js';
-import { UriParser } from '../../src/mcp/resources/uri-schemes.js';
+import { parseUri, matchesUriPattern } from '../../src/mcp/resources/uri-schemes.js';
 
 /**
  * Mock ResourceManager for testing
@@ -34,7 +34,7 @@ export class MockResourceManager implements ResourceManager {
 
     try {
       // Validate URI
-      const parseResult = UriParser.parse(uri);
+      const parseResult = parseUri(uri);
       if (!parseResult.ok) {
         return Failure(`Invalid URI: ${parseResult.error}`);
       }
@@ -111,7 +111,7 @@ export class MockResourceManager implements ResourceManager {
       let invalidatedCount = 0;
 
       for (const [uri] of this.resources.entries()) {
-        if (UriParser.matches(uri, pattern)) {
+        if (matchesUriPattern(uri, pattern)) {
           this.resources.delete(uri);
           invalidatedCount++;
         }
@@ -135,7 +135,7 @@ export class MockResourceManager implements ResourceManager {
       const matchingUris: string[] = [];
 
       for (const [uri] of this.resources.entries()) {
-        if (UriParser.matches(uri, pattern)) {
+        if (matchesUriPattern(uri, pattern)) {
           matchingUris.push(uri);
         }
       }

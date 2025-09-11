@@ -2,9 +2,9 @@ import { z } from 'zod';
 
 export const generateK8sManifestsSchema = z.object({
   sessionId: z.string().optional().describe('Session identifier for tracking operations'),
-  imageId: z.string().optional().describe('Docker image to deploy'),
-  appName: z.string().optional().describe('Application name'),
-  namespace: z.string().optional().describe('Kubernetes namespace (defaults to "default")'),
+  imageId: z.string().min(1).describe('Docker image to deploy (required)'),
+  appName: z.string().min(1).describe('Application name (required)'),
+  namespace: z.string().default('default').describe('Kubernetes namespace'),
   replicas: z.number().optional().describe('Number of replicas'),
   port: z.number().optional().describe('Application port'),
   serviceType: z
@@ -59,7 +59,7 @@ export const generateK8sManifestsSchema = z.object({
     .optional()
     .describe('Autoscaling configuration'),
   environment: z
-    .enum(['development', 'staging', 'production'])
+    .enum(['development', 'staging', 'production', 'testing'])
     .optional()
     .describe('Target environment'),
 

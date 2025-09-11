@@ -58,6 +58,7 @@ export const createIntegrationFlowTests = (testRunner: MCPTestRunner): TestCase[
             name: 'generate-dockerfile',
             arguments: {
               sessionId,
+              repoPath: './test/__support__/fixtures/node-express',
               optimization: true,
               multistage: true,
               baseImage: analysisData.recommendedBaseImage || 'node:18-alpine'
@@ -160,6 +161,7 @@ export const createIntegrationFlowTests = (testRunner: MCPTestRunner): TestCase[
             name: 'generate-dockerfile',
             arguments: {
               sessionId,
+              repoPath: './test/__support__/fixtures/node-express',
               optimization: true,
               multistage: true
             }
@@ -176,7 +178,8 @@ export const createIntegrationFlowTests = (testRunner: MCPTestRunner): TestCase[
             name: 'build-image',
             arguments: {
               sessionId,
-              context: './test/__support__/fixtures/node-express'
+              context: './test/__support__/fixtures/node-express',
+              imageName: 'test-containerization-image'
             }
           });
 
@@ -188,7 +191,7 @@ export const createIntegrationFlowTests = (testRunner: MCPTestRunner): TestCase[
 
           // Step 4: Security Scanning (may fail with mock data)
           const scanResult = await client.callTool({
-            name: 'scan',
+            name: 'scan-image',
             arguments: {
               sessionId,
               imageId: 'test-image',
@@ -207,8 +210,8 @@ export const createIntegrationFlowTests = (testRunner: MCPTestRunner): TestCase[
             name: 'generate-k8s-manifests',
             arguments: {
               sessionId,
-              deploymentName: 'test-app',
-              image: 'test-image:latest',
+              imageId: 'test-image:latest',
+              appName: 'test-app',
               replicas: 2,
               port: 3000
             }
@@ -287,6 +290,7 @@ export const createIntegrationFlowTests = (testRunner: MCPTestRunner): TestCase[
             name: 'generate-dockerfile',
             arguments: {
               sessionId, // Same session ID - should have access to previous analysis
+              repoPath: './test/__support__/fixtures/node-express',
               optimization: true,
               multistage: true
             }
@@ -371,7 +375,8 @@ export const createIntegrationFlowTests = (testRunner: MCPTestRunner): TestCase[
             name: 'build-image',
             arguments: {
               sessionId,
-              context: '/nonexistent/path'
+              context: '/nonexistent/path',
+              imageName: 'test-error-recovery-image'
             }
           });
 
@@ -402,6 +407,7 @@ export const createIntegrationFlowTests = (testRunner: MCPTestRunner): TestCase[
             name: 'generate-dockerfile',
             arguments: {
               sessionId,
+              repoPath: './test/__support__/fixtures/node-express',
               optimization: true,
               multistage: true,
               baseImage: 'node:18-alpine'

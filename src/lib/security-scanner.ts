@@ -6,7 +6,8 @@
  */
 
 import type { Logger } from 'pino';
-import { Result, Success, Failure, isFail } from '@types';
+import { Result, Success, Failure, isFail } from '../types';
+import { extractErrorMessage } from './error-utils';
 
 // Type definitions expected by tests and other components
 export interface ScanOptions {
@@ -200,9 +201,7 @@ export async function scanImageVulnerabilities(
     return Success(scanResult);
   } catch (error) {
     ctx.logger.error({ error, imageId }, 'Security scan failed');
-    return Failure(
-      `Security scan failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
+    return Failure(`Security scan failed: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -235,9 +234,7 @@ export async function scanFilesystem(
     }
     return Success(parseResult.value);
   } catch (error) {
-    return Failure(
-      `Filesystem scan failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
+    return Failure(`Filesystem scan failed: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -270,9 +267,7 @@ export async function scanSecrets(
     }
     return Success(parseResult.value);
   } catch (error) {
-    return Failure(
-      `Secret scan failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
+    return Failure(`Secret scan failed: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -313,9 +308,7 @@ export async function generateSecurityReport(
 
     return Success(report);
   } catch (error) {
-    return Failure(
-      `Report generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
+    return Failure(`Report generation failed: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -332,9 +325,7 @@ export async function getScannerVersion(ctx: ScannerContext): Promise<Result<str
 
     return Success(result.value.stdout.trim());
   } catch (error) {
-    return Failure(
-      `Failed to get scanner version: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
+    return Failure(`Failed to get scanner version: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -353,9 +344,7 @@ export async function updateDatabase(ctx: ScannerContext): Promise<Result<void>>
 
     return Success(undefined);
   } catch (error) {
-    return Failure(
-      `Failed to update vulnerability database: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
+    return Failure(`Failed to update vulnerability database: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -422,9 +411,7 @@ function parseTrivyOutput(output: string): Result<SecurityScanResult> {
       passed: total === 0,
     });
   } catch (error) {
-    return Failure(
-      `Failed to parse scan results: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
+    return Failure(`Failed to parse scan results: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -474,9 +461,7 @@ function parseSecretOutput(output: string): Result<SecretScanResult> {
       summary: { total, high, medium, low },
     });
   } catch (error) {
-    return Failure(
-      `Failed to parse secret scan results: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
+    return Failure(`Failed to parse secret scan results: ${extractErrorMessage(error)}`);
   }
 }
 

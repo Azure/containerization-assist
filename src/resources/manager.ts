@@ -1,22 +1,53 @@
-import { Result, Success, Failure } from '@types';
+/**
+ * Resource Storage Module
+ *
+ * Provides simple in-memory storage for temporary resources with TTL support.
+ * This module offers a lightweight alternative to complex caching solutions
+ * for managing build artifacts, scan results, and deployment statuses.
+ *
+ * Key features:
+ * - Time-based expiration (TTL)
+ * - Category-based filtering
+ * - Automatic cleanup of expired resources
+ * - Simple key-value interface
+ *
+ * @module resources/manager
+ */
+
+import { Result, Success, Failure } from '../types';
 import type { ResourceCategory } from './types';
 
 /**
- * Simple resource storage entry
+ * Internal storage structure for resources with metadata
  */
 interface StoredResource {
+  /** The actual resource data */
   data: unknown;
+  /** Timestamp when the resource expires */
   expiresAt: number;
+  /** Optional category for filtering */
   category?: ResourceCategory | undefined;
 }
 
 /**
- * Simple in-memory resource storage with TTL
+ * In-memory storage for resources.
+ * Module-level Map provides simple, efficient storage without class overhead.
  */
 const resourceStore = new Map<string, StoredResource>();
 
 /**
- * Store a resource with optional TTL
+ * Store a resource with automatic expiration.
+ *
+ * @param uri - Unique identifier for the resource
+ * @param content - The resource data to store
+ * @param ttl - Time to live in milliseconds (default: 1 hour)
+ * @param category - Optional category for filtering
+ * @returns Success if stored, Failure with error message if failed
+ *
+ * @example
+ * ```typescript
+ * storeResource('docker://image-123', imageData, 3600000, 'build-artifact');
+ * ```
  */
 export function storeResource(
   uri: string,
@@ -37,7 +68,19 @@ export function storeResource(
 }
 
 /**
- * Get a resource by URI
+ * Retrieve a resource by its URI.
+ * Automatically removes expired resources when accessed.
+ *
+ * @param uri - The resource identifier
+ * @returns Success with resource data or null if not found/expired
+ *
+ * @example
+ * ```typescript
+ * const result = getResource('docker://image-123');
+ * if (result.ok && result.value) {
+ *   // Use the resource data
+ * }
+ * ```
  */
 export function getResource(uri: string): Result<unknown | null> {
   try {
@@ -59,7 +102,19 @@ export function getResource(uri: string): Result<unknown | null> {
 }
 
 /**
- * List all resource URIs, optionally filtered by category
+ * List all active resource URIs.
+ * Expired resources are automatically cleaned during listing.
+ *
+ * @param category - Optional filter by resource category
+ * @returns Success with array of URIs
+ *
+ * @example
+ * ```typescript
+ * const scanResults = listResources('scan-result');
+ * if (scanResults.ok) {
+ *   console.log(`Found ${scanResults.value.length} scan results`);
+ * }
+ * ```
  */
 export function listResources(category?: ResourceCategory): Result<string[]> {
   try {
@@ -88,7 +143,18 @@ export function listResources(category?: ResourceCategory): Result<string[]> {
 }
 
 /**
- * Clear expired resources and return count removed
+ * Manually trigger cleanup of expired resources.
+ * Note: Expired resources are also cleaned automatically during get/list operations.
+ *
+ * @returns Success with count of resources removed
+ *
+ * @example
+ * ```typescript
+ * const result = clearExpired();
+ * if (result.ok) {
+ *   console.log(`Cleaned up ${result.value} expired resources`);
+ * }
+ * ```
  */
 export function clearExpired(): Result<number> {
   try {
@@ -109,7 +175,17 @@ export function clearExpired(): Result<number> {
 }
 
 /**
- * Get basic storage statistics
+ * Get storage statistics and memory usage estimates.
+ * Useful for monitoring and debugging resource consumption.
+ *
+ * @returns Object with total count, category breakdown, and memory estimate
+ *
+ * @example
+ * ```typescript
+ * const stats = getStats();
+ * console.log(`Total resources: ${stats.total}`);
+ * console.log(`Memory usage: ${stats.memoryUsage} bytes`);
+ * ```
  */
 export function getStats(): {
   total: number;
@@ -147,7 +223,16 @@ export function getStats(): {
 }
 
 /**
- * Clear all resources (cleanup function)
+ * Clear all stored resources.
+ * Typically called during shutdown or test cleanup.
+ *
+ * @returns Success when cleanup is complete
+ *
+ * @example
+ * ```typescript
+ * // In shutdown handler
+ * await cleanup();
+ * ```
  */
 export async function cleanup(): Promise<Result<void>> {
   try {

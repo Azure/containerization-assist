@@ -21,7 +21,7 @@ describe('Server Entry Point', () => {
       const content = readFileSync(serverPath, 'utf-8');
       expect(content).toContain('async function main');
       expect(content).toContain('MCPServer');
-      expect(content).toContain('createContainer');
+      expect(content).toContain('createDependencies');
     });
 
     it('should contain MCP mode setting', () => {
@@ -35,16 +35,16 @@ describe('Server Entry Point', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
       
-      expect(content).toContain('containerization-assist');
-      expect(content).toContain('2.0.0');
+      expect(content).toContain('Containerization Assist MCP Server');
+      expect(content).toContain('SDK-Native');
     });
 
     it('should contain dependency injection setup', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
       
-      expect(content).toContain('createContainer');
-      expect(content).toContain('shutdownContainer');
+      expect(content).toContain('createDependencies');
+      expect(content).toContain('shutdownDependencies');
       expect(content).toContain('deps');
     });
   });
@@ -66,7 +66,7 @@ describe('Server Entry Point', () => {
       expect(content).toContain('const shutdown = async');
       expect(content).toContain('Shutting down server');
       expect(content).toContain('server.stop()');
-      expect(content).toContain('shutdownContainer');
+      expect(content).toContain('shutdownDependencies');
     });
   });
 
@@ -130,7 +130,7 @@ describe('Server Entry Point', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
       
-      expect(content).toContain('let deps: Deps | undefined');
+      expect(content).toContain('let deps: Dependencies | undefined');
       expect(content).toContain('let server: MCPServer | undefined');
     });
   });

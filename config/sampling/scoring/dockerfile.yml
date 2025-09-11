@@ -1,0 +1,176 @@
+# Dockerfile Scoring Rules Configuration
+name: "dockerfile"
+version: "1.0.0"
+metadata:
+  description: "Dockerfile generation scoring profile"
+  created: "2024-12-19"
+  author: "containerization-assist"
+
+base_score: 30
+max_score: 100
+timeout_ms: 2000
+
+# Category weights for scoring
+category_weights:
+  security: 1.2      # Security is most important
+  performance: 1.1   # Performance optimization is key  
+  quality: 1.0       # Standard quality practices
+  maintainability: 0.9 # Less critical for containers
+
+# Scoring rules organized by category
+rules:
+  build_optimization:
+    - name: "multistage_build"
+      matcher:
+        type: "regex"
+        pattern: "^FROM\\s+"
+        count_threshold: 2
+        comparison: "greater_than"
+      points: 15
+      weight: 1.0
+      category: "performance" 
+      description: "Uses multi-stage Docker builds for optimization"
+    
+    - name: "multistage_naming"
+      matcher:
+        type: "regex"
+        pattern: "FROM\\s+\\S+\\s+AS\\s+"
+      points: 5
+      weight: 0.8
+      category: "maintainability"
+      description: "Properly names multi-stage build stages"
+    
+    - name: "layer_optimization"
+      matcher:
+        type: "function"
+        function: "countChainedRuns"
+        threshold: 1
+        comparison: "greater_than_or_equal"
+      points: 10
+      weight: 1.0
+      category: "performance"
+      description: "Uses command chaining to reduce layers"
+    
+    - name: "dependency_caching"
+      matcher:
+        type: "function"
+        function: "hasDependencyCaching"
+      points: 20
+      weight: 1.2
+      category: "performance"
+      description: "Optimizes dependency installation caching"
+    
+    - name: "build_args"
+      matcher:
+        type: "regex"
+        pattern: "^ARG\\s+"
+      points: 5
+      weight: 0.7
+      category: "maintainability"
+      description: "Uses build arguments for flexibility"
+    
+    - name: "proper_workdir"
+      matcher:
+        type: "regex"
+        pattern: "^WORKDIR\\s+"
+      points: 10
+      weight: 0.8
+      category: "quality"
+      description: "Sets appropriate working directory"
+
+  size_optimization:
+    - name: "alpine_base"
+      matcher:
+        type: "regex"
+        pattern: "FROM.*alpine"
+        flags: "i"
+      points: 20
+      weight: 1.0
+      category: "performance"
+      description: "Uses Alpine Linux for smaller image size"
+    
+    - name: "distroless_base"
+      matcher:
+        type: "regex"
+        pattern: "FROM.*distroless"
+        flags: "i"
+      points: 25
+      weight: 1.1
+      category: "security"
+      description: "Uses distroless images for minimal attack surface"
+    
+    - name: "slim_base"
+      matcher:
+        type: "regex"
+        pattern: "FROM.*slim"
+        flags: "i"
+      points: 15
+      weight: 0.9
+      category: "performance"
+      description: "Uses slim variants for reduced size"
+    
+    - name: "cleanup_operations"
+      matcher:
+        type: "function"
+        function: "countCleanupOperations"
+        threshold: 1
+        comparison: "greater_than_or_equal"
+      points: 15
+      weight: 0.9
+      category: "performance"
+      description: "Includes cleanup operations to reduce image size"
+
+  security:
+    - name: "non_root_user"
+      matcher:
+        type: "function"
+        function: "hasNonRootUser"
+      points: 25
+      weight: 1.3
+      category: "security"
+      description: "Runs container as non-root user"
+    
+    - name: "user_creation"
+      matcher:
+        type: "regex"
+        pattern: "RUN\\s+(useradd|adduser)"
+      points: 5
+      weight: 1.0
+      category: "security"
+      description: "Properly creates non-root user"
+    
+    - name: "no_hardcoded_secrets"
+      matcher:
+        type: "function"
+        function: "hasNoSecretPatterns"
+      points: 15
+      weight: 1.2
+      category: "security"
+      description: "Avoids hardcoded secrets and credentials"
+    
+    - name: "versioned_images"
+      matcher:
+        type: "function"
+        function: "hasVersionedImages"
+      points: 10
+      weight: 1.1
+      category: "security"
+      description: "Uses specific image versions instead of latest"
+    
+    - name: "health_checks"
+      matcher:
+        type: "regex"
+        pattern: "^HEALTHCHECK\\s+"
+      points: 10
+      weight: 0.9
+      category: "quality"
+      description: "Includes health check for container monitoring"
+
+# Penalty rules (negative scoring)
+penalties:
+  - name: "root_user_usage"
+    matcher:
+      type: "regex"
+      pattern: "USER\\s+root"
+    points: -10
+    description: "Penalize explicit root user usage"
