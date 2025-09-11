@@ -104,6 +104,13 @@ export interface GenerateDockerfileResult {
     scoreBreakdown: Record<string, number>;
     rank?: number;
   }>;
+  /** Scoring details for test compatibility */
+  scoringDetails?: {
+    candidates?: Array<{
+      score: number;
+      [key: string]: any;
+    }>;
+  };
 }
 
 /**
@@ -752,6 +759,14 @@ async function generateDockerfileImpl(
         }
         if (firstResult.allCandidates) {
           result.allCandidates = firstResult.allCandidates;
+          // Add scoringDetails for test compatibility
+          result.scoringDetails = {
+            candidates: firstResult.allCandidates.map((c) => ({
+              score: c.score,
+              id: c.id,
+              scoreBreakdown: c.scoreBreakdown,
+            })),
+          };
         }
       }
     }
