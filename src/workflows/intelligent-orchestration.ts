@@ -70,7 +70,9 @@ const planWorkflowSteps = async (
         // Only run if analyze-repo has been completed (either in session state or just executed)
         condition: (results) => {
           // Check if analyze-repo was just executed in this workflow run
-          const analyzeRepoJustRan = results.some((r: any) => r._toolName === 'analyze-repo');
+          const analyzeRepoJustRan = results.some(
+            (r) => '_toolName' in r && r._toolName === 'analyze-repo',
+          );
           // Or if it was previously completed in the session
           const analyzeRepoCompleted = sessionState?.completed_steps?.includes('analyze-repo');
           return analyzeRepoJustRan || analyzeRepoCompleted || false;

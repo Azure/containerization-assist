@@ -5,8 +5,8 @@
  * particularly for cleaning up code generation responses.
  */
 
-// Dynamic import to avoid webpack warnings with vscode-languageserver-types
-let DockerfileParser: any;
+import * as dockerParser from 'docker-file-parser';
+import validateDockerfile from 'validate-dockerfile';
 import { parse as parseYaml } from 'yaml';
 
 /**
@@ -76,7 +76,7 @@ export const stripFencesAndNoise = (text: string, language?: string): string => 
  * // Result: true
  * ```
  */
-export const isValidDockerfileContent = async (content: string): Promise<boolean> => {
+export const isValidDockerfileContent = (content: string): boolean => {
   const cleaned = content.trim();
 
   if (!cleaned) {
@@ -84,16 +84,25 @@ export const isValidDockerfileContent = async (content: string): Promise<boolean
   }
 
   try {
-    if (!DockerfileParser) {
-      const { DockerfileParser: Parser } = await import('dockerfile-ast');
-      DockerfileParser = Parser;
-    }
-
-    const dockerfile = DockerfileParser.parse(cleaned);
-    const instructions = dockerfile.getInstructions();
+    // Parse to ensure valid Dockerfile structure
+    const commands = dockerParser.parse(cleaned);
 
     // Check if there's at least one FROM instruction
-    return instructions.some((instruction: any) => instruction.getKeyword() === 'FROM');
+    const hasFROM = commands.some((cmd: any) => cmd.name === 'FROM');
+
+    // Optionally use validate-dockerfile for additional checks (but don't fail on it)
+    // as it can be too strict for some valid Dockerfiles
+    try {
+      const validationResult = validateDockerfile(cleaned);
+      if (!validationResult.valid && validationResult.priority === 0) {
+        // Only fail on priority 0 (fatal) errors
+        return false;
+      }
+    } catch {
+      // Ignore validation errors, rely on parsing
+    }
+
+    return hasFROM;
   } catch {
     // Failed to parse as valid Dockerfile
     return false;
@@ -116,25 +125,28 @@ export const isValidDockerfileContent = async (content: string): Promise<boolean
  * // Result: "node:18-alpine"
  * ```
  */
-export const extractBaseImage = async (dockerfileContent: string): Promise<string | null> => {
+export const extractBaseImage = (dockerfileContent: string): string | null => {
   try {
-    if (!DockerfileParser) {
-      const { DockerfileParser: Parser } = await import('dockerfile-ast');
-      DockerfileParser = Parser;
-    }
-
-    const dockerfile = DockerfileParser.parse(dockerfileContent);
-    const instructions = dockerfile.getInstructions();
+    const commands = dockerParser.parse(dockerfileContent);
 
     // Find the first FROM instruction
-    const fromInstruction = instructions.find(
-      (instruction: any) => instruction.getKeyword() === 'FROM',
-    );
+    const fromCommand = commands.find((cmd: any) => cmd.name === 'FROM');
 
-    if (fromInstruction) {
-      // Get the image argument (first argument of FROM)
-      const imageArg = fromInstruction.getArguments()[0];
-      return imageArg?.getValue() ?? null;
+    if (fromCommand?.args) {
+      // The args can be a string or array, handle both
+      let baseImage: string | null = null;
+      if (typeof fromCommand.args === 'string') {
+        baseImage = fromCommand.args.trim();
+      } else if (Array.isArray(fromCommand.args) && fromCommand.args.length > 0) {
+        const firstArg = fromCommand.args[0];
+        baseImage = typeof firstArg === 'string' ? firstArg.trim() : String(firstArg).trim();
+      }
+
+      // Remove "AS builder" part from multi-stage builds
+      if (baseImage) {
+        const parts = baseImage.split(/\s+AS\s+/i);
+        return parts[0]?.trim() || baseImage;
+      }
     }
 
     return null;

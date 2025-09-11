@@ -429,7 +429,7 @@ async function generateDockerfileImpl(
 
       if (aiResult.ok) {
         const cleaned = stripFencesAndNoise(aiResult.value.winner.content, 'dockerfile');
-        if (!(await isValidDockerfileContent(cleaned))) {
+        if (!isValidDockerfileContent(cleaned)) {
           // Fall back to template if AI output is invalid
           const fallbackResult = generateTemplateDockerfile(
             sessionToAnalyzeRepoResult(analysisResult),
@@ -443,7 +443,7 @@ async function generateDockerfileImpl(
         } else {
           dockerfileContent = cleaned;
           baseImageUsed =
-            (await extractBaseImage(cleaned)) ||
+            extractBaseImage(cleaned) ||
             params.baseImage ||
             getRecommendedBaseImage(analysisResult.language ?? 'unknown');
           aiUsed = true;
@@ -479,7 +479,7 @@ async function generateDockerfileImpl(
       if (aiResult.ok) {
         // Use AI-generated content
         const cleaned = stripFencesAndNoise(aiResult.value.content, 'dockerfile');
-        if (!(await isValidDockerfileContent(cleaned))) {
+        if (!isValidDockerfileContent(cleaned)) {
           // Fall back to template if AI output is invalid
           const fallbackResult = generateTemplateDockerfile(
             sessionToAnalyzeRepoResult(analysisResult),
@@ -493,7 +493,7 @@ async function generateDockerfileImpl(
         } else {
           dockerfileContent = cleaned;
           baseImageUsed =
-            (await extractBaseImage(cleaned)) ||
+            extractBaseImage(cleaned) ||
             params.baseImage ||
             getRecommendedBaseImage(analysisResult.language ?? 'unknown');
           aiUsed = true;
