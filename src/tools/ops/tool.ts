@@ -7,7 +7,7 @@
 
 import * as os from 'os';
 import { createTimer } from '../../lib/logger';
-import { Success, Failure, type Result } from '../../domain/types';
+import { Success, Failure, type Result } from '../../types';
 import type { ToolContext } from '../../mcp/context/types';
 import type { OpsToolParams } from './schema';
 

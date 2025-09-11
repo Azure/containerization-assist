@@ -1,4 +1,4 @@
-import { Success, Failure } from '@types';
+import { Success, Failure } from '../../../../src/types';
 import {
   formatStandardResponse,
   detectK8sKind,

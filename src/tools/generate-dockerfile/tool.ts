@@ -11,7 +11,7 @@ import { createTimer, createLogger } from '@lib/logger';
 import type { SessionData, SessionAnalysisResult } from '../session-types';
 import type { ToolContext } from '../../mcp/context/types';
 import type { AnalyzeRepoResult } from '../types';
-import { Success, Failure, type Result } from '../../domain/types';
+import { Success, Failure, type Result } from '../../types';
 import { getDefaultPort } from '@config/defaults';
 import { getRecommendedBaseImage } from '@lib/base-images';
 import {
@@ -19,34 +19,9 @@ import {
   isValidDockerfileContent,
   extractBaseImage,
 } from '@lib/text-processing';
+import type { GenerateDockerfileParams } from './schema';
 
-/**
- * Configuration for Dockerfile generation
- */
-export interface GenerateDockerfileConfig {
-  /** Session identifier for storing results */
-  sessionId?: string;
-  /** Custom base image (defaults to language-specific recommendation) */
-  baseImage?: string;
-  /** Runtime image for multi-stage builds */
-  runtimeImage?: string;
-  /** Enable build optimizations */
-  optimization?: boolean;
-  /** Use multi-stage build pattern */
-  multistage?: boolean;
-  /** Apply security hardening practices */
-  securityHardening?: boolean;
-  /** Include health check configuration */
-  includeHealthcheck?: boolean;
-  /** Custom Dockerfile instructions to include */
-  customInstructions?: string;
-  /** Optimize for smaller image size */
-  optimizeSize?: boolean;
-  /** Additional RUN commands to execute */
-  customCommands?: string[];
-  /** Repository path */
-  repoPath?: string;
-}
+// Note: Tool now uses GenerateDockerfileParams from schema for type safety
 
 /**
  * Result from Dockerfile generation
@@ -73,7 +48,7 @@ export interface GenerateDockerfileResult {
  */
 function generateTemplateDockerfile(
   analysisResult: AnalyzeRepoResult,
-  params: GenerateDockerfileConfig,
+  params: GenerateDockerfileParams,
 ): Result<Pick<GenerateDockerfileResult, 'content' | 'baseImage'>> {
   const { language, framework, dependencies = [], ports = [] } = analysisResult;
   const { baseImage, multistage = true, securityHardening = true } = params;
@@ -277,7 +252,7 @@ function buildArgsFromAnalysis(analysisResult: SessionAnalysisResult): Record<st
  * Generate Dockerfile implementation - direct execution with selective progress
  */
 async function generateDockerfileImpl(
-  params: GenerateDockerfileConfig,
+  params: GenerateDockerfileParams,
   context: ToolContext,
 ): Promise<Result<GenerateDockerfileResult>> {
   // Basic parameter validation (essential validation only)
@@ -291,7 +266,9 @@ async function generateDockerfileImpl(
   const timer = createTimer(logger, 'generate-dockerfile');
 
   try {
-    const { optimization = true, multistage = true, securityHardening = true } = params;
+    const { multistage = true, securityHardening = true } = params;
+    // Normalize optimization to boolean - any string value means optimization is enabled
+    const optimization = params.optimization === false ? false : true;
 
     // Progress: Starting validation and analysis
     if (progress) await progress('VALIDATING');

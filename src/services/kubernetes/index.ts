@@ -1,10 +1,10 @@
 /**
- * Kubernetes infrastructure - External K8s client interface
+ * Kubernetes infrastructure module exports
  */
 
 export {
-  type KubernetesClient,
   createKubernetesClient,
+  type KubernetesClient,
   type DeploymentResult,
   type ClusterInfo,
 } from './client';

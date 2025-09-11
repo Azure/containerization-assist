@@ -4,7 +4,7 @@
  * Tests complete workflows and tool orchestration
  */
 
-import { TestCase, MCPTestRunner } from '../../infrastructure/test-runner.js';
+import { TestCase, MCPTestRunner } from '../../services/test-runner.js';
 
 export const createIntegrationFlowTests = (testRunner: MCPTestRunner): TestCase[] => {
   const client = testRunner.getClient();

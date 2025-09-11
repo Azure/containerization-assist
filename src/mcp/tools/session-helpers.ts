@@ -6,9 +6,10 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { Result, Success, Failure, WorkflowState } from '../../domain/types.js';
+import { Result, Success, Failure, WorkflowState } from '../../types.js';
 import type { SessionManager } from '../../lib/session.js';
 import type { ToolContext } from '@mcp/context/types';
+import { extractErrorMessage } from '../../lib/error-utils.js';
 
 /**
  * Get session manager from context (no longer creates new instances)
@@ -56,9 +57,7 @@ export async function getSession(
 
     return Success({ id, state: session, isNew });
   } catch (error) {
-    return Failure(
-      `Failed to get session: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    return Failure(`Failed to get session: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -100,9 +99,7 @@ export async function completeStep(
       context,
     );
   } catch (error) {
-    return Failure(
-      `Failed to complete step: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    return Failure(`Failed to complete step: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -124,9 +121,7 @@ export async function createSession(
     const session = await sessionManager.create(id);
     return Success({ id, state: session });
   } catch (error) {
-    return Failure(
-      `Failed to create session: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    return Failure(`Failed to create session: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -172,8 +167,6 @@ export async function updateSession(
 
     return Success(updatedSession);
   } catch (error) {
-    return Failure(
-      `Failed to update session: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    return Failure(`Failed to update session: ${extractErrorMessage(error)}`);
   }
 }

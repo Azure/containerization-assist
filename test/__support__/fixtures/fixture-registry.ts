@@ -5,7 +5,7 @@
 
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import { Result, Success, Failure } from '@domain/types';
+import { Result, Success, Failure } from '../../../src/types';
 import { EnvironmentCapabilities } from '../utilities/environment-detector';
 
 export interface FixtureMetadata {

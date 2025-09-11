@@ -4,7 +4,7 @@
  * Tests for validating orchestrator phase events and logging
  */
 
-import type { TestCase, MCPTestRunner, TestResult } from '../../infrastructure/test-runner.js';
+import type { TestCase, MCPTestRunner, TestResult } from '../../services/test-runner.js';
 
 export const createOrchestratorEventTests = (testRunner: MCPTestRunner): TestCase[] => {
   const client = testRunner.getClient();

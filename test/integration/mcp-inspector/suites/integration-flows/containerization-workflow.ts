@@ -3,7 +3,7 @@
  * Tests complete containerization workflows using real tools and repositories
  */
 
-import { TestCase, MCPTestRunner, TestResult } from '../../infrastructure/test-runner';
+import { TestCase, MCPTestRunner, TestResult } from '../../services/test-runner';
 import { DockerUtils } from '../../lib/docker-utils';
 import { detectEnvironment, getCapabilities } from '../../lib/environment';
 

@@ -5,7 +5,7 @@
 import Docker from 'dockerode';
 import tar from 'tar-fs';
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../../domain/types';
+import { Success, Failure, type Result } from '../../types';
 /**
  * Options for building a Docker image.
  */

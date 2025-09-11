@@ -3,7 +3,7 @@
  */
 
 import type { Logger } from 'pino';
-import { PromptRegistry } from '../../../../src/core/prompts/registry';
+import { PromptRegistry } from '../../../../src/prompts/registry';
 import { createMockLogger } from '../../../__support__/utilities/mock-factories';
 
 describe('PromptRegistry', () => {

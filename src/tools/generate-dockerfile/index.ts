@@ -6,4 +6,4 @@
 
 export { generateDockerfile } from './tool';
 export { generateDockerfileSchema, type GenerateDockerfileParams } from './schema';
-export type { GenerateDockerfileConfig, GenerateDockerfileResult } from './tool';
+export type { GenerateDockerfileResult } from './tool';

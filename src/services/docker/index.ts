@@ -1,13 +1,14 @@
 /**
- * Docker infrastructure - External Docker client interface
+ * Docker infrastructure module exports
  */
 
 export {
-  type DockerClient,
   createDockerClient,
+  type DockerClient,
   type DockerBuildOptions,
   type DockerBuildResult,
   type DockerPushResult,
   type DockerImageInfo,
 } from './client';
-export { createDockerRegistryClient } from './registry';
+
+export { getImageMetadata, type ImageMetadata } from './registry';

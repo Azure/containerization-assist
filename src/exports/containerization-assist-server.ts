@@ -4,14 +4,14 @@
  */
 
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import type { Tool } from '../domain/types.js';
+import type { Tool } from '../types.js';
 import type { MCPTool, MCPToolResult } from './types.js';
 import type { ToolContext } from '../mcp/context/types.js';
 import type { Logger } from 'pino';
 
 import { createSessionManager, type SessionManager } from '../lib/session.js';
 import { createLogger } from '../lib/logger.js';
-import { SimpleToolContext } from '../mcp/context/tool-context.js';
+import { StandardToolContext } from '../mcp/context/tool-context.js';
 
 // Import all tools
 import { getAllInternalTools } from './tools.js';
@@ -145,7 +145,7 @@ export class ContainerAssistServer {
   private createContext(params?: { sessionId?: string }): ToolContext {
     const logger = this.logger.child({ context: 'tool-execution' });
 
-    const context = new SimpleToolContext(
+    const context = new StandardToolContext(
       this.mcpServer as any,
       logger,
       undefined,

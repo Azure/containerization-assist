@@ -4,7 +4,7 @@
  * Tests system behavior with invalid inputs, edge cases, and error conditions
  */
 
-import { TestCase, MCPTestRunner } from '../../infrastructure/test-runner.js';
+import { TestCase, MCPTestRunner } from '../../services/test-runner.js';
 
 export const createErrorHandlingTests = (testRunner: MCPTestRunner): TestCase[] => {
   const client = testRunner.getClient();

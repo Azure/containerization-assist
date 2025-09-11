@@ -13,61 +13,11 @@ import { createStandardProgress } from '@mcp/utils/progress-helper';
 import { createTimer } from '@lib/logger';
 import type { ToolContext } from '../../mcp/context/types';
 import type { SessionData } from '../session-types';
-import { Success, Failure, type Result } from '../../domain/types';
+import { Success, Failure, type Result } from '../../types';
 import { stripFencesAndNoise, isValidKubernetesContent } from '@lib/text-processing';
+import type { GenerateK8sManifestsParams } from './schema';
 
-/**
- * Configuration for Kubernetes manifest generation
- */
-export interface GenerateK8sManifestsConfig {
-  /** Session identifier for storing results */
-  sessionId?: string;
-  /** Docker image ID to deploy (optional, defaults to build result) */
-  imageId?: string;
-  /** Application name (defaults to detected name) */
-  appName?: string;
-  /** Kubernetes namespace (defaults to 'default') */
-  namespace?: string;
-  /** Number of replicas (defaults to 1) */
-  replicas?: number;
-  /** Application port (defaults to detected port) */
-  port?: number;
-  /** Service type for external access */
-  serviceType?: 'ClusterIP' | 'NodePort' | 'LoadBalancer';
-  /** Enable ingress controller */
-  ingressEnabled?: boolean;
-  /** Hostname for ingress routing */
-  ingressHost?: string;
-  /** Resource requests and limits */
-  resources?: {
-    requests?: {
-      memory: string;
-      cpu: string;
-    };
-    limits?: {
-      memory: string;
-      cpu: string;
-    };
-  };
-  /** Environment variables to set */
-  envVars?: Array<{ name: string; value: string }>;
-  /** ConfigMap data */
-  configMapData?: Record<string, string>;
-  /** Health check configuration */
-  healthCheck?: {
-    enabled: boolean;
-    path?: string;
-    port?: number;
-    initialDelaySeconds?: number;
-  };
-  /** Enable autoscaling */
-  autoscaling?: {
-    enabled: boolean;
-    minReplicas?: number;
-    maxReplicas?: number;
-    targetCPUUtilizationPercentage?: number;
-  };
-}
+// Note: Tool now uses GenerateK8sManifestsParams from schema for type safety
 
 /**
  * Result from K8s manifest generation
@@ -166,7 +116,7 @@ function validateK8sResource(obj: unknown): obj is K8sResource {
  * Generate basic K8s manifests (fallback)
  */
 function generateBasicManifests(
-  params: GenerateK8sManifestsConfig,
+  params: GenerateK8sManifestsParams,
   image: string,
 ): Result<{ manifests: K8sResource[]; aiUsed: boolean }> {
   const {
@@ -359,7 +309,7 @@ function generateBasicManifests(
  * Build prompt arguments for K8s manifest generation
  */
 function buildK8sManifestPromptArgs(
-  params: GenerateK8sManifestsConfig,
+  params: GenerateK8sManifestsParams,
   image: string,
 ): Record<string, unknown> {
   return {
@@ -384,7 +334,7 @@ function buildK8sManifestPromptArgs(
  * Generate K8s manifests implementation with selective progress reporting
  */
 async function generateK8sManifestsImpl(
-  params: GenerateK8sManifestsConfig,
+  params: GenerateK8sManifestsParams,
   context: ToolContext,
 ): Promise<Result<GenerateK8sManifestsResult>> {
   // Basic parameter validation

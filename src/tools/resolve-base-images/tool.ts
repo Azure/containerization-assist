@@ -22,8 +22,8 @@
 import { getSession, updateSession } from '@mcp/tools/session-helpers';
 import type { ToolContext } from '../../mcp/context/types';
 import { createTimer, createLogger } from '../../lib/logger';
-import { createDockerRegistryClient } from '../../lib/docker';
-import { Success, Failure, type Result } from '../../domain/types';
+import { getImageMetadata } from '../../services/docker/registry';
+import { Success, Failure, type Result } from '../../types';
 import { getSuggestedBaseImages, getRecommendedBaseImage } from '../../lib/base-images';
 import type { ResolveBaseImagesParams } from './schema';
 
@@ -110,11 +110,8 @@ async function resolveBaseImagesImpl(
     const [imageName, imageTag] = primaryImage.split(':');
 
     // Get real image metadata from Docker registry
-    const registryClient = createDockerRegistryClient(logger);
-    const imageMetadata = await registryClient.getImageMetadata(
-      imageName ?? 'node',
-      imageTag ?? 'latest',
-    );
+    // Use registry client directly without factory wrapper
+    const imageMetadata = await getImageMetadata(imageName ?? 'node', imageTag ?? 'latest', logger);
 
     const recommendation: BaseImageRecommendation = {
       sessionId,

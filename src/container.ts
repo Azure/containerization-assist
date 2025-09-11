@@ -6,22 +6,14 @@
  */
 
 import type { Logger } from 'pino';
-import { createLogger } from '../lib/logger';
-import { createSessionManager, SessionManager } from '../lib/session';
-import { PromptRegistry } from '../core/prompts/registry';
-import {
-  storeResource,
-  getResource,
-  listResources,
-  clearExpired,
-  getStats,
-  cleanup,
-} from '../resources/manager';
-import { createSDKToolRegistry, type SDKToolRegistry } from '../mcp/tools/registry';
-import type { AIService } from '../domain/types';
-import { createAppConfig, type AppConfig } from '../config/app-config';
-import { createDockerClient, type DockerClient } from '../infrastructure/docker/client';
-import { createKubernetesClient, type KubernetesClient } from '../infrastructure/kubernetes/client';
+import { createLogger } from './lib/logger';
+import { createSessionManager, SessionManager } from './lib/session';
+import { PromptRegistry } from './prompts/registry';
+import * as resourceManager from './resources/manager';
+import type { AIService } from '@types';
+import { createAppConfig, type AppConfig } from './config/app-config';
+import { createDockerClient, type DockerClient } from './services/docker/client';
+import { createKubernetesClient, type KubernetesClient } from './services/kubernetes/client';
 
 /**
  * All application dependencies with their types
@@ -40,15 +32,7 @@ export interface Deps {
 
   // MCP services
   promptRegistry: PromptRegistry;
-  resourceManager: {
-    storeResource: typeof storeResource;
-    getResource: typeof getResource;
-    listResources: typeof listResources;
-    clearExpired: typeof clearExpired;
-    getStats: typeof getStats;
-    cleanup: typeof cleanup;
-  };
-  toolRegistry: SDKToolRegistry;
+  resourceManager: typeof import('./resources/manager');
 
   // Optional AI services
   aiService?: AIService;
@@ -128,19 +112,8 @@ export async function createContainer(
     await promptRegistry.initialize();
   }
 
-  // Create resource manager using simple functions
-  const resourceManager = depsOverrides.resourceManager ?? {
-    storeResource,
-    getResource,
-    listResources,
-    clearExpired,
-    getStats,
-    cleanup,
-  };
-
-  // Create tool registry
-  const toolRegistry =
-    depsOverrides.toolRegistry ?? createSDKToolRegistry(logger, null as any, sessionManager);
+  // Use resource manager namespace directly
+  const resourceMgr = depsOverrides.resourceManager ?? resourceManager;
 
   const deps: Deps = {
     config: appConfig,
@@ -149,8 +122,7 @@ export async function createContainer(
     dockerClient,
     kubernetesClient,
     promptRegistry,
-    resourceManager,
-    toolRegistry,
+    resourceManager: resourceMgr,
   };
 
   logger.info(
@@ -170,9 +142,6 @@ export async function createContainer(
         kubernetesClient: deps.kubernetesClient !== undefined,
         promptRegistry: deps.promptRegistry !== undefined,
         resourceManager: deps.resourceManager !== undefined,
-        toolRegistry: deps.toolRegistry !== undefined,
-        toolRegistryType: typeof deps.toolRegistry,
-        toolRegistryKeys: deps.toolRegistry?.tools.size,
       },
     },
     'Dependency container created',
@@ -184,23 +153,6 @@ export async function createContainer(
 /**
  * Create container specifically for MCP server usage
  */
-export async function createMCPContainer(
-  configOverrides: ContainerConfigOverrides = {},
-  depsOverrides: DepsOverrides = {},
-): Promise<Deps> {
-  const mcpConfig = configOverrides.config ?? createAppConfig();
-
-  // MCP server specific overrides
-  mcpConfig.mcp.name = 'mcp-server';
-
-  return await createContainer(
-    {
-      config: mcpConfig,
-      ...configOverrides,
-    },
-    depsOverrides,
-  );
-}
 
 /**
  * Gracefully shutdown all services in the container
@@ -236,7 +188,6 @@ export interface ContainerStatus {
   running: boolean;
   services: Record<string, boolean>;
   stats: {
-    tools: number;
     resources: number;
     prompts: number;
     workflows: number;
@@ -259,13 +210,11 @@ function checkContainerHealth(deps: Deps): {
     kubernetesClient: deps.kubernetesClient !== undefined,
     promptRegistry: deps.promptRegistry !== undefined,
     resourceManager: deps.resourceManager !== undefined,
-    toolRegistry: deps.toolRegistry !== undefined,
   };
 
   const healthy = Object.values(requiredServices).every(Boolean);
 
   const details = {
-    toolCount: deps.toolRegistry.tools.size,
     promptCount: deps.promptRegistry.getPromptNames().length,
     resourceStats: 'getStats' in deps.resourceManager ? deps.resourceManager.getStats() : undefined,
   };
@@ -286,14 +235,12 @@ export function getContainerStatus(deps: Deps, serverRunning: boolean = false): 
 
   const promptCount = deps.promptRegistry.getPromptNames().length;
   const resourceStats = deps.resourceManager.getStats();
-  const toolCount = deps.toolRegistry.tools.size;
 
   return {
     healthy: healthCheck.healthy,
     running: serverRunning,
     services: healthCheck.services,
     stats: {
-      tools: toolCount,
       resources: resourceStats.total,
       prompts: promptCount,
       workflows: 2, // containerization and deployment workflows

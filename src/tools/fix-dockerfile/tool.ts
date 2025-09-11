@@ -25,7 +25,7 @@ import { createStandardProgress } from '@mcp/utils/progress-helper';
 import type { ToolContext } from '../../mcp/context/types';
 import { createTimer, createLogger, type Logger } from '../../lib/logger';
 import { getRecommendedBaseImage } from '../../lib/base-images';
-import { Success, Failure, type Result } from '../../domain/types';
+import { Success, Failure, type Result } from '../../types';
 import { DEFAULT_PORTS } from '../../config/defaults';
 import { stripFencesAndNoise, isValidDockerfileContent } from '../../lib/text-processing';
 import type { FixDockerfileParams } from './schema';

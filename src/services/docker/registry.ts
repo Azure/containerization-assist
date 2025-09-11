@@ -17,6 +17,19 @@ export interface ImageMetadata {
 }
 
 /**
+ * Docker Hub API response structure for tag metadata
+ * @see https://docs.docker.com/docker-hub/api/latest/
+ */
+interface DockerHubTagResponse {
+  digest?: string;
+  full_size?: number;
+  size?: number;
+  last_updated?: string;
+  tag_last_pushed?: string;
+  images?: Array<{ architecture?: string; os?: string }>;
+}
+
+/**
  * Fetch image metadata from Docker Hub
  */
 async function fetchDockerHubMetadata(
@@ -45,17 +58,32 @@ async function fetchDockerHubMetadata(
       return null;
     }
 
-    const data = (await response.json()) as any;
+    const data = (await response.json()) as DockerHubTagResponse;
 
-    return {
+    const metadata: ImageMetadata = {
       name: imageName,
       tag,
-      digest: data.digest,
-      size: data.full_size || data.size,
-      lastUpdated: data.last_updated || data.tag_last_pushed,
-      architecture: data.images?.[0]?.architecture,
-      os: data.images?.[0]?.os,
     };
+
+    if (data.digest) {
+      metadata.digest = data.digest;
+    }
+    const size = data.full_size ?? data.size;
+    if (size !== undefined) {
+      metadata.size = size;
+    }
+    const lastUpdated = data.last_updated ?? data.tag_last_pushed;
+    if (lastUpdated !== undefined) {
+      metadata.lastUpdated = lastUpdated;
+    }
+    if (data.images?.[0]?.architecture) {
+      metadata.architecture = data.images[0].architecture;
+    }
+    if (data.images?.[0]?.os) {
+      metadata.os = data.images[0].os;
+    }
+
+    return metadata;
   } catch (error) {
     logger.debug({ error, imageName, tag }, 'Error fetching Docker Hub metadata');
     return null;
@@ -136,16 +164,5 @@ export async function getImageMetadata(
     tag,
     size: estimatedSize,
     lastUpdated: new Date().toISOString(),
-  };
-}
-
-/**
- * Create Docker registry client
- */
-export function createDockerRegistryClient(logger: Logger): {
-  getImageMetadata: (imageName: string, tag: string) => Promise<ImageMetadata>;
-} {
-  return {
-    getImageMetadata: (imageName: string, tag: string) => getImageMetadata(imageName, tag, logger),
   };
 }

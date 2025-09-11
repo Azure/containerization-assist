@@ -78,6 +78,7 @@
     "validate:pr:fast": "npm run lint && npm run typecheck && npm run test:unit && npm run test:integration",
     "fix:all": "npm run lint:fix && npm run format",
     "quality:check": "./scripts/lint-metrics.sh",
+    "deadcode:check": "node scripts/deadcode-analysis.cjs",
     "quality:gates": "SKIP_TYPECHECK=true ./scripts/quality-gates.sh",
     "baseline:update": "./scripts/lint-metrics.sh --baseline",
     "baseline:report": "./scripts/lint-metrics.sh | head -20",

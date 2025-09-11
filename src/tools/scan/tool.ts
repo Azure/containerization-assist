@@ -9,7 +9,7 @@ import { getSession, updateSession } from '@mcp/tools/session-helpers';
 import type { ToolContext } from '../../mcp/context/types';
 import { createSecurityScanner } from '../../lib/scanner';
 import { createTimer, createLogger } from '../../lib/logger';
-import { Success, Failure, type Result } from '../../domain/types';
+import { Success, Failure, type Result } from '../../types';
 import type { ScanImageParams } from './schema';
 import type { SessionData } from '../session-types';
 

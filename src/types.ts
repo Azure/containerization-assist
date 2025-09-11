@@ -4,7 +4,7 @@
  */
 
 import type { Logger } from 'pino';
-import type { ToolContext } from '../mcp/context/types';
+import type { ToolContext } from './mcp/context/types';
 
 /**
  * Result type for functional error handling
@@ -69,14 +69,7 @@ export const Failure = <T>(error: string): Result<T> => ({ ok: false, error });
 /** Type guard to check if result is a failure */
 export const isFail = <T>(result: Result<T>): result is { ok: false; error: string } => !result.ok;
 
-export type {
-  ToolContext,
-  TextMessage,
-  SamplingRequest,
-  SamplingResponse,
-  PromptWithMessages,
-  ProgressReporter,
-} from '../mcp/context/types';
+export type { ToolContext } from './mcp/context/types';
 
 /**
  * Tool definition for MCP server operations.
@@ -102,49 +95,7 @@ export interface Tool {
   ) => Promise<Result<unknown>>;
 }
 
-// Tool-specific parameter types
-export interface TagImageParams {
-  imageName: string;
-  sourceTag: string;
-  targetTag: string;
-  registry?: string;
-}
-
 // ===== SESSION & WORKFLOW =====
-
-/**
- * Manages workflow session state and tool execution history.
- */
-export interface SessionManager {
-  /**
-   * Creates a new workflow session.
-   * @param id - Unique session identifier
-   * @returns Promise resolving to Result with created session state
-   */
-  createSession(id: string): Promise<Result<WorkflowState>>;
-
-  /**
-   * Retrieves an existing session by ID.
-   * @param id - Session identifier to retrieve
-   * @returns Promise resolving to Result with session state
-   */
-  getSession(id: string): Promise<Result<WorkflowState>>;
-
-  /**
-   * Updates session state with partial updates.
-   * @param id - Session identifier to update
-   * @param updates - Partial state updates to apply
-   * @returns Promise resolving to Result with updated session state
-   */
-  updateSession(id: string, updates: Partial<WorkflowState>): Promise<Result<WorkflowState>>;
-
-  /**
-   * Deletes a session and its associated data.
-   * @param id - Session identifier to delete
-   * @returns Promise resolving to Result with deletion success status
-   */
-  deleteSession(id: string): Promise<Result<boolean>>;
-}
 
 /**
  * Represents the state of a workflow execution session.

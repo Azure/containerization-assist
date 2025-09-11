@@ -1,5 +1,5 @@
 /**
- * Simple YAML Prompt Loader
+ * YAML Prompt Loader
  *
  * Loads prompt definitions from external YAML files organized by category.
  * Replaces the complex prompt registry with a simple file-based system.
@@ -9,7 +9,7 @@ import { readFile, readdir, stat } from 'fs/promises';
 import { join, extname } from 'path';
 import { load } from 'js-yaml';
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '../../domain/types';
+import { Result, Success, Failure } from '@types';
 
 /**
  * Parameter specification for prompt templates
@@ -62,15 +62,15 @@ export interface PromptFile {
 }
 
 /**
- * Simple prompt loader for YAML-based prompt files
+ * Prompt loader for YAML-based prompt files
  */
-export class SimplePromptLoader {
+export class PromptLoader {
   private prompts = new Map<string, PromptFile>();
   private logger: Logger;
   private initialized = false;
 
   constructor(logger: Logger) {
-    this.logger = logger.child({ component: 'SimplePromptLoader' });
+    this.logger = logger.child({ component: 'PromptLoader' });
   }
 
   /**

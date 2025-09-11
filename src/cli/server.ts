@@ -4,7 +4,7 @@
  */
 
 import { MCPServer } from '../mcp/server';
-import { createContainer, shutdownContainer, type Deps } from '../app/container';
+import { createContainer, shutdownContainer, type Deps } from '../container';
 import process from 'node:process';
 
 async function main(): Promise<void> {
