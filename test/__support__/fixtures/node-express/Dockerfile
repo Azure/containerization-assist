@@ -1,10 +1,12 @@
 # Generated Dockerfile for javascript (express)
+# Module root: .
 FROM node:18-alpine
 
 # Metadata
 LABEL maintainer="generated"
 LABEL language="javascript"
 LABEL framework="express"
+LABEL module.root="."
 
 WORKDIR /app
 

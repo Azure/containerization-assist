@@ -191,7 +191,7 @@ export const createIntegrationFlowTests = (testRunner: MCPTestRunner): TestCase[
 
           // Step 4: Security Scanning (may fail with mock data)
           const scanResult = await client.callTool({
-            name: 'scan',
+            name: 'scan-image',
             arguments: {
               sessionId,
               imageId: 'test-image',
