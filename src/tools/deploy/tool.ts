@@ -28,6 +28,8 @@ import { createKubernetesClient } from '../../lib/kubernetes';
 import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../types';
 import { DEFAULT_TIMEOUTS } from '../../config/defaults';
+import { getSuccessChainHint, type SessionContext } from '../../lib/chain-hints';
+import { TOOL_NAMES } from '../../exports/tools.js';
 import type { DeployApplicationParams } from './schema';
 
 export interface DeployApplicationResult {
@@ -335,9 +337,12 @@ async function deployApplicationImpl(
           },
         ],
       },
-      _chainHint: ready
-        ? 'Next: verify_deployment to confirm app is working correctly'
-        : 'Deployment in progress. Wait and run verify_deployment to check status',
+      NextStep: getSuccessChainHint(TOOL_NAMES.DEPLOY_APPLICATION, {
+        completed_steps: session.completed_steps || [],
+        ...((session as SessionContext).analysis_result && {
+          analysis_result: (session as SessionContext).analysis_result,
+        }),
+      }),
     });
   } catch (error) {
     timer.error(error);

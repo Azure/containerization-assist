@@ -16,6 +16,8 @@ import type { ToolContext } from '../../mcp/context/types';
 import type { SessionData } from '../session-types';
 import { Success, Failure, type Result } from '../../types';
 import { stripFencesAndNoise, isValidKubernetesContent } from '@lib/text-processing';
+import { getSuccessChainHint, type SessionContext } from '../../lib/chain-hints';
+import { TOOL_NAMES } from '../../exports/tools.js';
 import type { GenerateK8sManifestsParams } from './schema';
 
 // Note: Tool now uses GenerateK8sManifestsParams from schema for type safety
@@ -568,11 +570,19 @@ async function generateK8sManifestsImpl(
 
     timer.end({ outputPath });
 
+    // Prepare session context for dynamic chain hints
+    const sessionContext: SessionContext = {
+      completed_steps: (session.state as SessionContext).completed_steps || [],
+      ...((session.state as SessionContext).analysis_result && {
+        analysis_result: (session.state as SessionContext).analysis_result,
+      }),
+    };
+
     // Return result with file indicator and chain hint
     const finalResult: GenerateK8sManifestsResult & {
       _fileWritten?: boolean;
       _fileWrittenPath?: string;
-      _chainHint?: string;
+      NextStep?: string;
     } = {
       manifests: yaml,
       outputPath,
@@ -581,8 +591,7 @@ async function generateK8sManifestsImpl(
       sessionId: session.id,
       _fileWritten: true,
       _fileWrittenPath: outputPath,
-      _chainHint:
-        'Next: prepare_cluster to set up Kubernetes or deploy_application if cluster is ready',
+      NextStep: getSuccessChainHint(TOOL_NAMES.GENERATE_K8S_MANIFESTS, sessionContext),
     };
 
     // Add sampling metadata if sampling was used

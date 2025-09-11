@@ -7,6 +7,8 @@ import { createDockerClient, type DockerClient } from '../../services/docker/cli
 import type { MCPTool, MCPResponse } from '../../mcp/types';
 import type { ToolContext } from '../../mcp/context/types';
 import { Success, Failure, type Result } from '../../types';
+import { getSuccessChainHint } from '../../lib/chain-hints';
+import { TOOL_NAMES } from '../../exports/tools.js';
 import { pushImageSchema, type PushImageParams } from './schema';
 import type { z } from 'zod';
 
@@ -15,6 +17,7 @@ export interface PushImageResult {
   registry: string;
   digest: string;
   pushedTag: string;
+  NextStep?: string;
 }
 
 /**
@@ -100,6 +103,7 @@ export function makePushImage(
         registry: params.registry || 'docker.io',
         digest: pushResult.value.digest,
         pushedTag: `${repository}:${tag}`,
+        NextStep: getSuccessChainHint(TOOL_NAMES.PUSH_IMAGE, { completed_steps: [] }),
       };
 
       return {

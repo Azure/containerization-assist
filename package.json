@@ -1,5 +1,5 @@
 {
-  "name": "@thgamble/containerization-assist-mcp",
+  "name": "@azure/containerization-assist-mcp",
   "version": "1.2.0-dev.3",
   "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
   "type": "module",

@@ -19,8 +19,9 @@ import { generateK8sManifests } from '../tools/generate-k8s-manifests/tool.js';
 import { generateK8sManifestsSchema } from '../tools/generate-k8s-manifests/schema.js';
 import { prepareCluster } from '../tools/prepare-cluster/tool.js';
 import { prepareClusterSchema } from '../tools/prepare-cluster/schema.js';
-import { deployApplication } from '../tools/deploy/tool.js';
-import { deployApplicationSchema } from '../tools/deploy/schema.js';
+// Disabled deployment orchestration tool
+// import { deployApplication } from '../tools/deploy/tool.js';
+// import { deployApplicationSchema } from '../tools/deploy/schema.js';
 import { verifyDeployment } from '../tools/verify-deployment/tool.js';
 import { verifyDeploymentSchema } from '../tools/verify-deployment/schema.js';
 import { fixDockerfile } from '../tools/fix-dockerfile/tool.js';
@@ -29,8 +30,8 @@ import { resolveBaseImages } from '../tools/resolve-base-images/tool.js';
 import { resolveBaseImagesSchema } from '../tools/resolve-base-images/schema.js';
 import { opsTool } from '../tools/ops/tool.js';
 import { opsToolSchema } from '../tools/ops/schema.js';
-import { workflow } from '../tools/workflow/tool.js';
-import { workflowSchema } from '../tools/workflow/schema.js';
+// import { workflow } from '../tools/workflow/tool.js';
+// import { workflowSchema } from '../tools/workflow/schema.js';
 import type { Tool } from '../types.js';
 
 /**
@@ -47,12 +48,12 @@ export function getAllInternalTools(): Tool[] {
     pushImageTool,
     generateK8sManifestsTool,
     prepareClusterTool,
-    deployApplicationTool,
+    // deployApplicationTool, // Disabled - focus on individual tools
     verifyDeploymentTool,
     fixDockerfileTool,
     resolveBaseImagesTool,
     opsToolWrapper,
-    workflowTool,
+    // workflowTool, // Disabled - focus on individual tools
   ];
 }
 
@@ -114,89 +115,99 @@ const createToolWrapper = (
 
 // Create Tool wrappers for all functions
 const analyzeRepoTool = createToolWrapper(
-  'analyze_repo',
+  TOOL_NAMES.ANALYZE_REPO,
   'Analyze repository structure and detect technologies',
   analyzeRepoSchema,
   analyzeRepo,
 );
 
 const generateDockerfileTool = createToolWrapper(
-  'generate_dockerfile',
+  TOOL_NAMES.GENERATE_DOCKERFILE,
   'Generate a Dockerfile for the analyzed repository',
   generateDockerfileSchema,
   generateDockerfile,
 );
 
 const buildImageTool = createToolWrapper(
-  'build_image',
+  TOOL_NAMES.BUILD_IMAGE,
   'Build a Docker image',
   buildImageSchema,
   buildImage,
 );
 
 const scanImageTool = createToolWrapper(
-  'scan_image',
+  TOOL_NAMES.SCAN_IMAGE,
   'Scan a Docker image for vulnerabilities',
   scanImageSchema,
   scanImage,
 );
 
-const tagImageTool = createToolWrapper('tag_image', 'Tag a Docker image', tagImageSchema, tagImage);
+const tagImageTool = createToolWrapper(
+  TOOL_NAMES.TAG_IMAGE,
+  'Tag a Docker image',
+  tagImageSchema,
+  tagImage,
+);
 
 const pushImageTool = createToolWrapper(
-  'push_image',
+  TOOL_NAMES.PUSH_IMAGE,
   'Push a Docker image to a registry',
   pushImageSchema,
   pushImage,
 );
 
 const generateK8sManifestsTool = createToolWrapper(
-  'generate_k8s_manifests',
+  TOOL_NAMES.GENERATE_K8S_MANIFESTS,
   'Generate Kubernetes manifests',
   generateK8sManifestsSchema,
   generateK8sManifests,
 );
 
 const prepareClusterTool = createToolWrapper(
-  'prepare_cluster',
+  TOOL_NAMES.PREPARE_CLUSTER,
   'Prepare Kubernetes cluster for deployment',
   prepareClusterSchema,
   prepareCluster,
 );
 
-const deployApplicationTool = createToolWrapper(
-  'deploy_application',
-  'Deploy application to Kubernetes',
-  deployApplicationSchema,
-  deployApplication,
-);
+// const deployApplicationTool = createToolWrapper(
+//   TOOL_NAMES.DEPLOY_APPLICATION,
+//   'Deploy application to Kubernetes',
+//   deployApplicationSchema,
+//   deployApplication,
+// );
 
 const verifyDeploymentTool = createToolWrapper(
-  'verify_deployment',
+  TOOL_NAMES.VERIFY_DEPLOYMENT,
   'Verify deployment status',
   verifyDeploymentSchema,
   verifyDeployment,
 );
 
 const fixDockerfileTool = createToolWrapper(
-  'fix_dockerfile',
+  TOOL_NAMES.FIX_DOCKERFILE,
   'Fix issues in a Dockerfile',
   fixDockerfileSchema,
   fixDockerfile,
 );
 
 const resolveBaseImagesTool = createToolWrapper(
-  'resolve_base_images',
+  TOOL_NAMES.RESOLVE_BASE_IMAGES,
   'Resolve and recommend base images',
   resolveBaseImagesSchema,
   resolveBaseImages,
 );
 
-const opsToolWrapper = createToolWrapper('ops', 'Operational utilities', opsToolSchema, opsTool);
-
-const workflowTool = createToolWrapper(
-  'workflow',
-  'Execute containerization workflows',
-  workflowSchema,
-  workflow,
+const opsToolWrapper = createToolWrapper(
+  TOOL_NAMES.OPS,
+  'Operational utilities',
+  opsToolSchema,
+  opsTool,
 );
+
+// const workflowTool = createToolWrapper(
+//   TOOL_NAMES.WORKFLOW,
+//   'Execute containerization workflows',
+//   workflowSchema,
+//   workflow,
+// );

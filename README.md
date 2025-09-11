@@ -16,7 +16,7 @@ An AI-powered containerization assistant that helps you build, scan, and deploy 
 ### Install from npm
 
 ```bash
-npm install -g @thgamble/containerization-assist-mcp
+npm install -g @azure/containerization-assist-mcp
 ```
 
 ### System Requirements
@@ -31,7 +31,7 @@ npm install -g @thgamble/containerization-assist-mcp
 
 1. Install the MCP server globally:
    ```bash
-   npm install -g @thgamble/containerization-assist-mcp
+   npm install -g @azure/containerization-assist-mcp
    ```
 
 2. Configure VS Code to use the MCP server. Add to your VS Code settings or create `.vscode/mcp.json` in your project:

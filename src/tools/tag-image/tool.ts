@@ -12,6 +12,13 @@ import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../types';
 import type { SessionData } from '../session-types';
 import type { TagImageParams } from './schema';
+import {
+  getSuccessChainHint,
+  getFailureHint,
+  formatChainHint,
+  type SessionContext,
+} from '../../lib/chain-hints';
+import { TOOL_NAMES } from '../../exports/tools.js';
 
 export interface TagImageResult {
   success: boolean;
@@ -102,18 +109,34 @@ async function tagImageImpl(
     timer.end({ source, tag });
     logger.info({ source, tag }, 'Image tagging completed');
 
+    // Prepare session context for dynamic chain hints
+    const sessionContext: SessionContext = {
+      completed_steps: session.completed_steps || [],
+      ...((session as SessionContext).analysis_result && {
+        analysis_result: (session as SessionContext).analysis_result,
+      }),
+    };
+
     return Success({
       success: true,
       sessionId,
       tags,
       imageId: source,
-      _chainHint: 'Next: push_image to registry or generate_k8s_manifests for deployment',
+      NextStep: getSuccessChainHint(TOOL_NAMES.TAG_IMAGE, sessionContext),
     });
   } catch (error) {
     timer.end({ error });
     logger.error({ error }, 'Image tagging failed');
 
-    return Failure(error instanceof Error ? error.message : String(error));
+    // Add failure chain hint - use basic context since session may not be available
+    const sessionContext = {
+      completed_steps: [],
+    };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const hint = getFailureHint(TOOL_NAMES.TAG_IMAGE, errorMessage, sessionContext);
+    const chainHint = formatChainHint(hint);
+
+    return Failure(`${errorMessage}\n${chainHint}`);
   }
 }
 

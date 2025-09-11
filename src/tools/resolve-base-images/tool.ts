@@ -25,6 +25,8 @@ import { createTimer, createLogger } from '../../lib/logger';
 import { getImageMetadata } from '../../services/docker/registry';
 import { Success, Failure, type Result } from '../../types';
 import { getSuggestedBaseImages, getRecommendedBaseImage } from '../../lib/base-images';
+import { getSuccessChainHint, type SessionContext } from '../../lib/chain-hints';
+import { TOOL_NAMES } from '../../exports/tools.js';
 import type { ResolveBaseImagesParams } from './schema';
 
 export interface BaseImageRecommendation {
@@ -172,8 +174,12 @@ async function resolveBaseImagesImpl(
     const enrichedRecommendation = {
       ...recommendation,
       sessionId,
-      _chainHint:
-        'Next: generate_dockerfile with recommended base image or update existing Dockerfile',
+      NextStep: getSuccessChainHint(TOOL_NAMES.RESOLVE_BASE_IMAGES, {
+        completed_steps: session.completed_steps || [],
+        ...((session as SessionContext).analysis_result && {
+          analysis_result: (session as SessionContext).analysis_result,
+        }),
+      }),
     };
 
     return Success(enrichedRecommendation);

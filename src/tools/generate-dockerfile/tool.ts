@@ -20,6 +20,13 @@ import {
   isValidDockerfileContent,
   extractBaseImage,
 } from '@lib/text-processing';
+import {
+  getSuccessChainHint,
+  getFailureHint,
+  formatChainHint,
+  type SessionContext,
+} from '../../lib/chain-hints';
+import { TOOL_NAMES } from '../../exports/tools.js';
 import type { GenerateDockerfileParams } from './schema';
 
 // Note: Tool now uses GenerateDockerfileParams from schema for type safety
@@ -371,7 +378,7 @@ async function generateDockerfileImpl(
     interface ExtendedWorkflowState extends WorkflowState {
       repo_path?: string;
       analysis_result?: SessionAnalysisResult;
-      dockerfile_result?: any;
+      dockerfile_result?: { content?: string };
     }
 
     const typedSession = session as ExtendedWorkflowState;
@@ -566,10 +573,19 @@ async function generateDockerfileImpl(
     timer.end({ path: dockerfilePath });
 
     // Return result with file write indicator and chain hint
+    // Prepare session context for dynamic chain hints
+    const sessionContext: SessionContext = {
+      completed_steps: session.completed_steps || [],
+      dockerfile_result: { content: dockerfileContent },
+      ...((session as SessionContext).analysis_result && {
+        analysis_result: (session as SessionContext).analysis_result,
+      }),
+    };
+
     const result: GenerateDockerfileResult & {
       _fileWritten?: boolean;
       _fileWrittenPath?: string;
-      _chainHint?: string;
+      NextStep?: string;
     } = {
       content: dockerfileContent,
       path: dockerfilePath,
@@ -580,7 +596,7 @@ async function generateDockerfileImpl(
       sessionId,
       _fileWritten: true,
       _fileWrittenPath: dockerfilePath,
-      _chainHint: 'Next: build_image with the generated Dockerfile',
+      NextStep: getSuccessChainHint(TOOL_NAMES.GENERATE_DOCKERFILE, sessionContext),
     };
 
     // Add sampling metadata if sampling was used
@@ -603,7 +619,16 @@ async function generateDockerfileImpl(
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Dockerfile generation failed');
-    return Failure(error instanceof Error ? error.message : String(error));
+
+    // Add failure chain hint
+    const sessionContext = {
+      completed_steps: [],
+    };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const hint = getFailureHint(TOOL_NAMES.GENERATE_DOCKERFILE, errorMessage, sessionContext);
+    const chainHint = formatChainHint(hint);
+
+    return Failure(`${errorMessage}\n${chainHint}`);
   }
 }
 

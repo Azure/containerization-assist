@@ -31,7 +31,7 @@ The Containerization Assistant is a Model Context Protocol (MCP) server that pro
 
 ### Quick Start
 
-1. **Install**: `npm install -g @thgamble/containerization-assist-mcp`
+1. **Install**: `npm install -g @azure/containerization-assist-mcp`
 2. **Configure VS Code**: Create `.vscode/mcp.json` (see [Getting Started](./getting-started.md))
 3. **Use**: Ask GitHub Copilot to "analyze my application for containerization"
 

@@ -197,7 +197,7 @@ describe('resolveBaseImagesTool', () => {
           performanceNotes: [
             'Alpine images are smaller but may have compatibility issues with some packages',
           ],
-          _chainHint: 'Next: generate_dockerfile with recommended base image or update existing Dockerfile',
+          NextStep: 'Next: generate_dockerfile with recommended base image or update existing Dockerfile',
         });
       }
     }, 15000); // Increase timeout to 15 seconds

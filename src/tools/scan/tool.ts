@@ -12,6 +12,13 @@ import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../types';
 import type { ScanImageParams } from './schema';
 import type { SessionData } from '../session-types';
+import {
+  getSuccessChainHint,
+  getFailureHint,
+  formatChainHint,
+  type SessionContext,
+} from '../../lib/chain-hints';
+import { TOOL_NAMES } from '../../exports/tools.js';
 
 interface DockerScanResult {
   vulnerabilities?: Array<{
@@ -228,6 +235,14 @@ async function scanImageImpl(
       'Image scan completed',
     );
 
+    // Prepare session context for dynamic chain hints
+    const sessionContext: SessionContext = {
+      completed_steps: session.completed_steps || [],
+      ...((session as SessionContext).analysis_result && {
+        analysis_result: (session as SessionContext).analysis_result,
+      }),
+    };
+
     return Success({
       success: true,
       sessionId,
@@ -242,15 +257,21 @@ async function scanImageImpl(
       },
       scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
       passed,
-      _chainHint: passed
-        ? 'Next: tag_image or push_image'
-        : 'Next: fix vulnerabilities with fix_dockerfile or proceed to tag_image',
+      NextStep: getSuccessChainHint(TOOL_NAMES.SCAN_IMAGE, sessionContext),
     });
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Image scan failed');
 
-    return Failure(error instanceof Error ? error.message : String(error));
+    // Add failure chain hint - use basic context since session may not be available
+    const sessionContext = {
+      completed_steps: [],
+    };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const hint = getFailureHint(TOOL_NAMES.SCAN_IMAGE, errorMessage, sessionContext);
+    const chainHint = formatChainHint(hint);
+
+    return Failure(`${errorMessage}\n${chainHint}`);
   }
 }
 

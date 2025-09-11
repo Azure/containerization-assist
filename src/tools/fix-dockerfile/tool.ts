@@ -29,6 +29,13 @@ import { getRecommendedBaseImage } from '../../lib/base-images';
 import { Success, Failure, type Result } from '../../types';
 import { DEFAULT_PORTS } from '../../config/defaults';
 import { stripFencesAndNoise, isValidDockerfileContent } from '../../lib/text-processing';
+import {
+  getSuccessChainHint,
+  getFailureHint,
+  formatChainHint,
+  type SessionContext,
+} from '../../lib/chain-hints';
+import { TOOL_NAMES } from '../../exports/tools.js';
 import type { FixDockerfileParams } from './schema';
 
 /**
@@ -167,7 +174,25 @@ async function attemptAIFix(
 
     logger.info('AI fix completed successfully');
 
-    const result: any = {
+    const result: {
+      fixedDockerfile: string;
+      appliedFixes: string[];
+      samplingMetadata?: {
+        stoppedEarly?: boolean;
+        candidatesGenerated: number;
+        winnerScore: number;
+        samplingDuration?: number;
+      };
+      winnerScore?: number;
+      scoreBreakdown?: Record<string, number>;
+      allCandidates?: Array<{
+        id: string;
+        content: string;
+        score: number;
+        scoreBreakdown: Record<string, number>;
+        rank?: number;
+      }>;
+    } = {
       fixedDockerfile,
       appliedFixes: ['AI-generated comprehensive fix based on error analysis'],
     };
@@ -441,10 +466,19 @@ async function fixDockerfileImpl(
     // Progress: Complete
     if (progress) await progress('COMPLETE');
 
+    // Prepare session context for dynamic chain hints
+    const sessionContext = {
+      completed_steps: session.completed_steps || [],
+      dockerfile_result: { content: fixedDockerfile },
+      ...((session as SessionContext).analysis_result && {
+        analysis_result: (session as SessionContext).analysis_result,
+      }),
+    };
+
     const result: FixDockerfileResult & {
       _fileWritten?: boolean;
       _fileWrittenPath?: string;
-      _chainHint?: string;
+      NextStep?: string;
     } = {
       ok: true,
       sessionId,
@@ -456,7 +490,7 @@ async function fixDockerfileImpl(
       generationMethod,
       _fileWritten: true,
       _fileWrittenPath: './Dockerfile',
-      _chainHint: 'Next: build_image to test the fixed Dockerfile',
+      NextStep: getSuccessChainHint(TOOL_NAMES.FIX_DOCKERFILE, sessionContext),
     };
 
     // Add sampling metadata if sampling was used
@@ -480,7 +514,15 @@ async function fixDockerfileImpl(
     timer.error(error);
     logger.error({ error }, 'Dockerfile fix failed');
 
-    return Failure(error instanceof Error ? error.message : String(error));
+    // Add failure chain hint - use basic context since session may not be available
+    const sessionContext = {
+      completed_steps: [],
+    };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const hint = getFailureHint(TOOL_NAMES.FIX_DOCKERFILE, errorMessage, sessionContext);
+    const chainHint = formatChainHint(hint);
+
+    return Failure(`${errorMessage}\n${chainHint}`);
   }
 }
 

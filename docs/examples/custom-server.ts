@@ -5,11 +5,10 @@
 
 import { 
   tools, 
-  getAllTools,
   registerTool,
   type MCPTool,
   type MCPToolResult 
-} from '@thgamble/containerization-assist-mcp';
+} from '@azure/containerization-assist-mcp';
 
 /**
  * Custom MCP server implementation

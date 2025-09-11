@@ -29,6 +29,8 @@ import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../types';
 import { DEFAULT_TIMEOUTS } from '../../config/defaults';
 import type { VerifyDeploymentParams } from './schema';
+import { getSuccessChainHint, type SessionContext } from '../../lib/chain-hints';
+import { TOOL_NAMES } from '../../exports/tools.js';
 
 export interface VerifyDeploymentResult {
   success: boolean;
@@ -335,12 +337,12 @@ async function verifyDeploymentImpl(
     // Add chain hint based on verification status
     const enrichedResult = {
       ...result,
-      _chainHint:
-        health.ready && overallStatus === 'healthy'
-          ? 'Deployment verified successfully! Your application is running.'
-          : overallStatus === 'healthy'
-            ? 'Deployment is starting up. Wait and verify again, or check logs for issues.'
-            : 'Deployment has issues. Check healthCheck details and pod logs for troubleshooting.',
+      NextStep: getSuccessChainHint(TOOL_NAMES.VERIFY_DEPLOYMENT, {
+        completed_steps: session.completed_steps || [],
+        ...((session as SessionContext).analysis_result && {
+          analysis_result: (session as SessionContext).analysis_result,
+        }),
+      }),
     };
 
     return Success(enrichedResult);

@@ -22,6 +22,8 @@ import { createDockerClient, type DockerBuildOptions } from '../../lib/docker';
 import { createTimer, createLogger } from '../../lib/logger';
 import { type Result, Success, Failure } from '../../types';
 import type { BuildImageParams } from './schema';
+import { getFailureHint, formatChainHint, getSuccessChainHint } from '../../lib/chain-hints';
+import { TOOL_NAMES } from '../../exports/tools.js';
 
 export interface BuildImageResult {
   /** Whether the build completed successfully */
@@ -279,8 +281,31 @@ async function buildImageImpl(
     logger.info({ buildOptions, finalDockerfilePath }, 'About to call Docker buildImage');
     const buildResult = await dockerClient.buildImage(buildOptions);
 
+    // Prepare session context for chain hints
+    const sessionContext = {
+      completed_steps: session.completed_steps || [],
+      ...(((session as Record<string, unknown>).dockerfile_result as
+        | { content?: string }
+        | undefined) && {
+        dockerfile_result: (session as Record<string, unknown>).dockerfile_result as {
+          content?: string;
+        },
+      }),
+      ...(((session as Record<string, unknown>).analysis_result as
+        | { language?: string }
+        | undefined) && {
+        analysis_result: (session as Record<string, unknown>).analysis_result as {
+          language?: string;
+        },
+      }),
+    };
+
     if (!buildResult.ok) {
-      return Failure(`Failed to build image: ${buildResult.error ?? 'Unknown error'}`);
+      const errorMessage = buildResult.error ?? 'Unknown error';
+      const hint = getFailureHint(TOOL_NAMES.BUILD_IMAGE, errorMessage, sessionContext);
+      const chainHint = formatChainHint(hint);
+
+      return Failure(`Failed to build image: ${errorMessage}\n${chainHint}`);
     }
 
     const buildTime = Date.now() - startTime;
@@ -332,7 +357,7 @@ async function buildImageImpl(
       buildTime,
       logs: buildResult.value.logs,
       ...(securityWarnings.length > 0 && { securityWarnings }),
-      _chainHint: 'Next: scan_image, tag_image, or push_image',
+      NextStep: getSuccessChainHint(TOOL_NAMES.BUILD_IMAGE, sessionContext),
     });
   } catch (error) {
     timer.error(error);

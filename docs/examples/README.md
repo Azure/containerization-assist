@@ -21,7 +21,7 @@ This directory contains code examples demonstrating how to use the Containerizat
 
 ```bash
 # Install the Container Assist package
-npm install @thgamble/containerization-assist-mcp
+npm install @azure/containerization-assist-mcp
 
 # For TypeScript examples
 npm install -D typescript tsx
@@ -63,7 +63,7 @@ npx @modelcontextprotocol/inspector npx tsx mcp-integration.ts
 Always configure tools with your server for AI features:
 
 ```typescript
-import { configureTools } from '@thgamble/containerization-assist-mcp';
+import { configureTools } from '@azure/containerization-assist-mcp';
 
 configureTools({ server });
 ```
