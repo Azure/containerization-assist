@@ -10,7 +10,7 @@ import {
   analyzeRepo, 
   buildImage,
   registerTool 
-} from '@azure/containerization-assist-mcp';
+} from '@thgamble/containerization-assist-mcp';
 import { Server } from '@modelcontextprotocol/sdk';
 
 // Create your MCP server
@@ -52,7 +52,7 @@ import {
   buildImage,
   scanImage,
   deployApplication
-} from '@azure/containerization-assist-mcp';
+} from '@thgamble/containerization-assist-mcp';
 ```
 
 ### Batch Registration
@@ -61,7 +61,7 @@ import {
 import { 
   configureTools,
   registerAllTools 
-} from '@azure/containerization-assist-mcp';
+} from '@thgamble/containerization-assist-mcp';
 
 // Configure once
 configureTools({ server });
@@ -125,7 +125,7 @@ import {
   generateDockerfile,
   buildImage,
   registerTool
-} from '@azure/containerization-assist-mcp';
+} from '@thgamble/containerization-assist-mcp';
 import { Server } from '@modelcontextprotocol/sdk';
 
 async function setupServer() {

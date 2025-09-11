@@ -11,7 +11,7 @@ This guide will help you install, configure, and use the Containerization Assist
 ## Installation
 
 ```bash
-npm install -g @azure/containerization-assist-mcp
+npm install -g @thgamble/containerization-assist-mcp
 ```
 
 > For development setup, see the [Development Setup Guide](./development-setup.md)

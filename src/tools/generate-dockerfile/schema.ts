@@ -35,6 +35,13 @@ export const generateDockerfileSchema = z.object({
   securityLevel: securityLevelSchema,
   customCommands: z.array(z.string()).optional().describe('Custom Dockerfile commands'),
   repoPath: z.string().optional().describe('Repository path'),
+  moduleRoots: z
+    .array(z.string())
+    .min(1)
+    .optional()
+    .describe(
+      'List of module root paths for generating separate Dockerfiles (defaults to root directory)',
+    ),
 
   // Sampling options
   disableSampling: z

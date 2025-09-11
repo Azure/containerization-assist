@@ -9,7 +9,7 @@ import {
   registerAllTools, 
   registerTool,
   tools 
-} from '@azure/containerization-assist-mcp';
+} from '@thgamble/containerization-assist-mcp';
 
 /**
  * Example 1: Register all tools with default names

@@ -8,7 +8,7 @@ import {
   generateDockerfile,
   tools,
   createSession 
-} from '@azure/containerization-assist-mcp';
+} from '@thgamble/containerization-assist-mcp';
 
 async function directUsageExample() {
   console.log('=== Direct Tool Usage Example ===\n');

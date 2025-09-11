@@ -8,7 +8,7 @@ import {
   registerTool,
   type MCPTool,
   type MCPToolResult 
-} from '@azure/containerization-assist-mcp';
+} from '@thgamble/containerization-assist-mcp';
 
 /**
  * Custom MCP server implementation

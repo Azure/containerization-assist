@@ -4,7 +4,7 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ContainerAssistServer } from '@azure/containerization-assist-mcp';
+import { ContainerAssistServer } from '@thgamble/containerization-assist-mcp';
 
 /**
  * Example 1: Simple integration - register all tools
