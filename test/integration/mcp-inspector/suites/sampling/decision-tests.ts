@@ -37,7 +37,14 @@ export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase
             });
             
             const response = JSON.parse(result.content[0].text);
-            results.push(response.scoringDetails);
+            // Use allCandidates directly instead of scoringDetails
+            results.push({
+              candidates: response.allCandidates?.map((c: any) => ({
+                score: c.score,
+                id: c.id,
+                scoreBreakdown: c.scoreBreakdown,
+              }))
+            });
           }
           
           // Compare scores

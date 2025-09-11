@@ -84,7 +84,7 @@ FROM nginx:alpine
 
     it('should handle FROM with platform', () => {
       const dockerfile = `FROM --platform=linux/amd64 node:18`;
-      expect(extractBaseImage(dockerfile)).toBe('--platform=linux/amd64');
+      expect(extractBaseImage(dockerfile)).toBe('node:18');
     });
   });
 

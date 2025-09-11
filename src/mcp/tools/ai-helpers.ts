@@ -1152,7 +1152,8 @@ export function countDockerLayers(content: string): number {
  * Extract the base image from a Dockerfile
  */
 export function extractBaseImage(content: string): string | null {
-  const match = content.match(/^FROM\s+([^\s]+)/m);
+  // Handle optional --platform flag: FROM --platform=linux/amd64 node:18
+  const match = content.match(/^FROM\s+(?:--platform=[^\s]+\s+)?([^\s]+)/m);
   return match?.[1] ?? null;
 }
 
