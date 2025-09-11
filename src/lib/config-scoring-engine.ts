@@ -1,7 +1,6 @@
 /**
- * Configuration-Driven Scoring Engine
- *
- * Evaluates content using rules loaded from YAML configuration
+ * Evaluates content using configurable scoring rules with category weighting.
+ * Trade-off: Runtime rule evaluation over compile-time for flexibility in scoring strategies.
  */
 
 import type { ScoringProfile, ScoringRule, ScoringMatcher, PenaltyRule } from './sampling-config';
@@ -18,9 +17,6 @@ export interface ConfigScoreResult {
   appliedPenalties: string[];
 }
 
-/**
- * Configuration-based scoring engine
- */
 export class ConfigScoringEngine {
   private readonly logger = createLogger({ name: 'ConfigScoringEngine' });
 
@@ -37,7 +33,7 @@ export class ConfigScoringEngine {
       const matchedRules: string[] = [];
       const appliedPenalties: string[] = [];
 
-      // Initialize category scores
+      // Invariant: All categories must be initialized to zero before rule evaluation
       for (const category of Object.keys(profile.category_weights)) {
         categoryScores[category] = 0;
       }
@@ -70,13 +66,13 @@ export class ConfigScoringEngine {
         totalScore += categoryScore;
       }
 
-      // Process penalty rules
+      // Penalties applied after positive scores to allow negative adjustments
       if (profile.penalties) {
         for (const penalty of profile.penalties) {
           const penaltyResult = this.evaluatePenaltyRule(content, penalty);
 
           if (penaltyResult.ok && penaltyResult.value) {
-            totalScore += penalty.points; // penalty.points should be negative
+            totalScore += penalty.points; // Precondition: penalty.points must be negative
             breakdown[penalty.name] = penalty.points;
             appliedPenalties.push(penalty.name);
 
@@ -87,7 +83,7 @@ export class ConfigScoringEngine {
         }
       }
 
-      // Ensure score stays within bounds
+      // Postcondition: Score must be within [0, max_score] bounds
       totalScore = Math.max(0, Math.min(totalScore, profile.max_score));
 
       return Success({
@@ -102,9 +98,6 @@ export class ConfigScoringEngine {
     }
   }
 
-  /**
-   * Evaluate a single scoring rule
-   */
   private evaluateRule(content: string, rule: ScoringRule): Result<boolean> {
     try {
       return this.evaluateMatcher(content, rule.matcher);
@@ -116,9 +109,6 @@ export class ConfigScoringEngine {
     }
   }
 
-  /**
-   * Evaluate a penalty rule
-   */
   private evaluatePenaltyRule(content: string, penalty: PenaltyRule): Result<boolean> {
     try {
       return this.evaluateMatcher(content, penalty.matcher);
@@ -130,9 +120,6 @@ export class ConfigScoringEngine {
     }
   }
 
-  /**
-   * Evaluate a matcher against content
-   */
   private evaluateMatcher(content: string, matcher: ScoringMatcher): Result<boolean> {
     try {
       if (matcher.type === 'regex') {
@@ -147,9 +134,6 @@ export class ConfigScoringEngine {
     }
   }
 
-  /**
-   * Evaluate regex-based matcher
-   */
   private evaluateRegexMatcher(content: string, matcher: any): Result<boolean> {
     try {
       const flags = matcher.flags || 'gm';
@@ -157,21 +141,18 @@ export class ConfigScoringEngine {
       const matches = content.match(regex);
       const matchCount = matches ? matches.length : 0;
 
-      // Handle count-based matching
+      // Count threshold evaluation for quantitative pattern matching
       if (matcher.count_threshold !== undefined && matcher.comparison) {
         return Success(this.compareValues(matchCount, matcher.count_threshold, matcher.comparison));
       }
 
-      // Simple presence check
+      // Fallback: Binary presence check when no threshold specified
       return Success(matchCount > 0);
     } catch (error) {
       return Failure(`Regex evaluation failed: ${extractErrorMessage(error)}`);
     }
   }
 
-  /**
-   * Evaluate function-based matcher
-   */
   private evaluateFunctionMatcher(content: string, matcher: any): Result<boolean> {
     try {
       const functionName = matcher.function as ScoringFunctionName;
@@ -181,7 +162,7 @@ export class ConfigScoringEngine {
         return Failure(`Unknown scoring function: ${functionName}`);
       }
 
-      // Call function with content and optional threshold
+      // Dynamic function invocation with optional threshold parameter
       let result: any;
       try {
         if (matcher.threshold !== undefined) {
@@ -196,21 +177,18 @@ export class ConfigScoringEngine {
         return Success(false);
       }
 
-      // Handle numeric results with comparison
+      // Numeric result comparison for threshold-based functions
       if (typeof result === 'number' && matcher.threshold !== undefined && matcher.comparison) {
         return Success(this.compareValues(result, matcher.threshold, matcher.comparison));
       }
 
-      // Handle boolean results
+      // Direct boolean coercion for non-threshold functions
       return Success(Boolean(result));
     } catch (error) {
       return Failure(`Function evaluation failed: ${extractErrorMessage(error)}`);
     }
   }
 
-  /**
-   * Compare values using the specified comparison operator
-   */
   private compareValues(actual: number, expected: number, comparison: string): boolean {
     switch (comparison) {
       case 'greater_than':
@@ -229,9 +207,6 @@ export class ConfigScoringEngine {
   }
 }
 
-/**
- * Create a configuration-based scoring engine
- */
 export function createConfigScoringEngine(debug: boolean = false): ConfigScoringEngine {
   return new ConfigScoringEngine(debug);
 }

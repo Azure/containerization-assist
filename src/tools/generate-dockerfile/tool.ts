@@ -1,5 +1,6 @@
 /**
- * Generate optimized Dockerfiles based on repository analysis
+ * Generates AI-powered or template-based Dockerfiles from repository analysis.
+ * Trade-off: AI quality over speed; fallback templates ensure availability.
  */
 
 import { extractErrorMessage } from '../../lib/error-utils';
@@ -28,10 +29,9 @@ import {
   extractBaseImage,
 } from '@lib/text-processing';
 import type { GenerateDockerfileParams } from './schema';
-// Note: Tool now uses GenerateDockerfileParams from schema for type safety
 
 /**
- * Result from Dockerfile generation for a single module
+ * Single module Dockerfile generation result with optional sampling metadata
  */
 interface SingleDockerfileResult {
   /** Generated Dockerfile content */
@@ -74,7 +74,7 @@ interface SingleDockerfileResult {
 }
 
 /**
- * Result from Dockerfile generation - supports multiple modules
+ * Multi-module Dockerfile generation result maintaining backwards compatibility
  */
 export interface GenerateDockerfileResult {
   /** Generated Dockerfile content (for single module compatibility) */
@@ -124,7 +124,8 @@ export interface GenerateDockerfileResult {
 }
 
 /**
- * Template-based Dockerfile generation (fallback when AI unavailable)
+ * Template-based Dockerfile generation fallback.
+ * Invariant: Always produces valid Dockerfile syntax even without AI.
  */
 function generateTemplateDockerfile(
   analysisResult: AnalyzeRepoResult,
@@ -140,14 +141,13 @@ function generateTemplateDockerfile(
     dockerfile += `# Module root: ${moduleRoot}\n`;
   }
   dockerfile += `FROM ${effectiveBase}\n\n`;
-  // Add metadata labels
   dockerfile += `# Metadata\n`;
   dockerfile += `LABEL maintainer="generated"\n`;
   dockerfile += `LABEL language="${language || 'unknown'}"\n`;
   if (framework) dockerfile += `LABEL framework="${framework}"\n`;
   if (moduleRoot) dockerfile += `LABEL module.root="${moduleRoot}"\n`;
   dockerfile += '\n';
-  // Set working directory
+  // Working directory follows container best practices
   dockerfile += `WORKDIR /app\n\n`;
   // Language-specific setup
   switch (language) {

@@ -30,7 +30,8 @@ type WorkflowResult = {
 
 /**
  * Plans workflow steps based on type and session state.
- * Skips already completed steps when resuming workflows.
+ * Invariant: Steps already in session state are never re-executed.
+ * Trade-off: Session persistence complexity for workflow resumability.
  *
  * @param workflowType - The type of workflow to plan ('containerization', 'deployment', 'security')
  * @param params - Workflow parameters including optional flags for build, scan, and push
@@ -50,7 +51,7 @@ const planWorkflowSteps = async (
   if (workflowType === 'containerization') {
     const steps: WorkflowStep[] = [];
 
-    // Always start with analyze-repo if not already completed
+    // Precondition: analyze-repo must complete before generate-dockerfile
     if (!sessionState?.completed_steps?.includes('analyze-repo')) {
       steps.push({
         toolName: 'analyze-repo',
@@ -60,21 +61,18 @@ const planWorkflowSteps = async (
       });
     }
 
-    // Only add generate-dockerfile if not already completed
-    // It depends on analyze-repo being completed first
+    // Dependency chain: generate-dockerfile requires analyze-repo results
     if (!sessionState?.completed_steps?.includes('generate-dockerfile')) {
       steps.push({
         toolName: 'generate-dockerfile',
         parameters: { ...params, sessionId },
         description: 'Generating optimized Dockerfile',
         required: true,
-        // Only run if analyze-repo has been completed (either in session state or just executed)
         condition: (results) => {
-          // Check if analyze-repo was just executed in this workflow run
+          // Runtime dependency validation: ensure prerequisite data exists
           const analyzeRepoJustRan = results.some(
             (r) => '_toolName' in r && r._toolName === 'analyze-repo',
           );
-          // Or if it was previously completed in the session
           const analyzeRepoCompleted = sessionState?.completed_steps?.includes('analyze-repo');
           return analyzeRepoJustRan || analyzeRepoCompleted || false;
         },
@@ -176,7 +174,7 @@ const planWorkflowSteps = async (
     ];
   }
 
-  // Optimization workflow
+  // Optimization workflow: Aggressive reduction with base image resolution
   if (workflowType === 'optimization') {
     return [
       {
@@ -220,13 +218,13 @@ const executeWorkflowStep = async (
 ): Promise<Result<Record<string, unknown>>> => {
   const { logger } = context;
 
-  // Check step condition
+  // Conditional execution based on previous results
   if (step.condition && !step.condition(previousResults)) {
     logger.info({ step: step.toolName }, 'Skipping step due to condition');
     return Success({ skipped: true, reason: 'Condition not met' });
   }
 
-  // Get tool from factory
+  // Dynamic tool resolution from factory pattern
   let tool: Tool | undefined;
   if (toolFactory.getTool) {
     tool = toolFactory.getTool(step.toolName);
@@ -243,7 +241,7 @@ const executeWorkflowStep = async (
     return Failure(`Tool not found: ${step.toolName}`);
   }
 
-  // Execute with enhanced context if available
+  // Prefer enhanced execution for workflow-aware tools
   const toolWithEnhanced = tool as Tool & {
     executeEnhanced?: (
       params: Record<string, unknown>,
@@ -254,7 +252,6 @@ const executeWorkflowStep = async (
     return toolWithEnhanced.executeEnhanced(step.parameters, context);
   }
 
-  // Fallback to standard execution
   const result = await tool.execute(step.parameters, logger);
   return result as Result<Record<string, unknown>>;
 };
@@ -265,11 +262,9 @@ const generateWorkflowRecommendations = (
 ): string[] => {
   const recommendations: string[] = [];
 
-  // General recommendations
   recommendations.push('Review generated artifacts for accuracy');
   recommendations.push('Test container functionality before production deployment');
 
-  // Workflow-specific recommendations
   if (workflowType === 'containerization') {
     if (
       results.some((r) => {
@@ -341,19 +336,20 @@ const updateSessionWithWorkflowProgress = async (
     });
   }
 
-  // Store completed step
   if (sessionManager.addCompletedStep) {
     await sessionManager.addCompletedStep(sessionId, stepName);
   }
 
-  // Store result if significant
+  // Persistence optimization: Skip storing results for skipped steps
   if (result && !result.skipped && sessionManager.storeStepResult) {
     await sessionManager.storeStepResult(sessionId, stepName, result);
   }
 };
 
 /**
- * Execute a workflow with intelligent orchestration
+ * Execute a workflow with intelligent orchestration.
+ * Failure Mode: Required steps abort workflow, optional steps log and continue.
+ * Trade-off: Complexity for resumability and AI-enhanced insights.
  */
 export const executeWorkflow = async (
   workflowType: string,
@@ -384,7 +380,6 @@ export const executeWorkflow = async (
   const startTime = Date.now();
 
   try {
-    // Validate workflow type
     const validWorkflows = ['containerization', 'deployment', 'security', 'optimization'];
     if (!validWorkflows.includes(workflowType)) {
       return Failure(
@@ -392,7 +387,6 @@ export const executeWorkflow = async (
       );
     }
 
-    // Plan workflow steps
     void progressReporter?.('Planning workflow steps...', 5);
     const steps = await planWorkflowSteps(workflowType, params, sessionId, sessionManager || {});
 
@@ -412,7 +406,6 @@ export const executeWorkflow = async (
     const results: Record<string, unknown>[] = [];
     const completedSteps: string[] = [];
 
-    // Execute each step
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
       if (!step) {
@@ -423,13 +416,11 @@ export const executeWorkflow = async (
 
       void progressReporter?.(step.description || `Executing ${step.toolName}...`, progressPercent);
 
-      // Check for cancellation
       if (signal?.aborted) {
         logger.info({ workflowType, completedSteps }, 'Workflow cancelled by user');
         return Failure('Workflow cancelled by user');
       }
 
-      // Execute step with context
       const stepResult = await executeWorkflowStep(
         step,
         toolFactory,
@@ -450,7 +441,7 @@ export const executeWorkflow = async (
 
       if (!stepResult.ok) {
         if (step.required) {
-          // Required step failed - abort workflow
+          // Failure Mode: Required steps cause workflow termination
           const error = `Required step ${i + 1} (${step.toolName}) failed: ${stepResult.error}`;
           logger.error({ step: step.toolName, error: stepResult.error }, 'Workflow step failed');
 
@@ -463,7 +454,7 @@ export const executeWorkflow = async (
 
           return Failure(`${error}\n\nRecovery options:\n- ${suggestions.join('\n- ')}`);
         } else {
-          // Optional step failed - log and continue
+          // Failure Mode: Optional steps logged but workflow continues
           logger.warn(
             { step: step.toolName, error: stepResult.error },
             'Optional step failed, continuing',
@@ -471,7 +462,7 @@ export const executeWorkflow = async (
           results.push({ error: stepResult.error, stepName: step.toolName });
         }
       } else {
-        // Add the tool name to the result for condition checking
+        // Metadata injection for downstream condition evaluation
         const resultWithToolName = {
           ...stepResult.value,
           _toolName: step.toolName,
@@ -483,7 +474,6 @@ export const executeWorkflow = async (
         }
       }
 
-      // Update session state if available
       if (sessionId && sessionManager?.updateWorkflowProgress) {
         await updateSessionWithWorkflowProgress(
           sessionId,
@@ -498,14 +488,11 @@ export const executeWorkflow = async (
 
     void progressReporter?.('Finalizing workflow...', 95);
 
-    // Get final session state for recommendations
     const finalSessionState =
       sessionId && sessionManager?.getState ? await sessionManager.getState(sessionId) : undefined;
 
-    // Generate recommendations
     const recommendations = generateWorkflowRecommendations(workflowType, results);
 
-    // Add AI insights if available
     if (aiService?.analyzeResults && sessionId) {
       const aiAnalysis = await aiService.analyzeResults({
         toolName: 'workflow',
@@ -522,13 +509,12 @@ export const executeWorkflow = async (
 
     const executionTime = Date.now() - startTime;
 
-    // Generate workflow summary
     const summary: WorkflowResult = {
       workflowType,
       completedSteps,
       results,
       sessionId: sessionId ?? undefined,
-      recommendations: [...new Set(recommendations)], // Remove duplicates
+      recommendations: [...new Set(recommendations)], // Set conversion removes duplicate recommendations
       executionTime,
       metadata: {
         totalSteps: steps.length,
