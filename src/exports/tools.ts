@@ -2,8 +2,6 @@
  * Tool collection and registry for external consumption
  */
 
-import type { MCPTool } from './types.js';
-
 // Import all tool implementations
 import { analyzeRepo } from '../tools/analyze-repo/tool.js';
 import { analyzeRepoSchema } from '../tools/analyze-repo/schema.js';
@@ -15,7 +13,7 @@ import { scanImage } from '../tools/scan/tool.js';
 import { scanImageSchema } from '../tools/scan/schema.js';
 import { tagImage } from '../tools/tag-image/tool.js';
 import { tagImageSchema } from '../tools/tag-image/schema.js';
-import { pushImage } from '../tools/push-image/tool.js';
+import { pushImage } from '../tools/push-image/index.js';
 import { pushImageSchema } from '../tools/push-image/schema.js';
 import { generateK8sManifests } from '../tools/generate-k8s-manifests/tool.js';
 import { generateK8sManifestsSchema } from '../tools/generate-k8s-manifests/schema.js';
@@ -33,7 +31,7 @@ import { opsTool } from '../tools/ops/tool.js';
 import { opsToolSchema } from '../tools/ops/schema.js';
 import { workflow } from '../tools/workflow/tool.js';
 import { workflowSchema } from '../tools/workflow/schema.js';
-import type { Tool } from '../domain/types.js';
+import type { Tool } from '../types.js';
 
 /**
  * Get all internal tool implementations
@@ -58,16 +56,51 @@ export function getAllInternalTools(): Tool[] {
   ];
 }
 
+/**
+ * Get all available tool names
+ * Useful for selective tool registration
+ */
+export function getAllToolNames(): string[] {
+  return getAllInternalTools().map((tool) => tool.name);
+}
+
+/**
+ * Tool names as constants for type-safe registration
+ * Use these instead of raw strings when registering specific tools
+ */
+export const TOOL_NAMES = {
+  ANALYZE_REPO: 'analyze_repo',
+  GENERATE_DOCKERFILE: 'generate_dockerfile',
+  BUILD_IMAGE: 'build_image',
+  SCAN_IMAGE: 'scan_image',
+  TAG_IMAGE: 'tag_image',
+  PUSH_IMAGE: 'push_image',
+  GENERATE_K8S_MANIFESTS: 'generate_k8s_manifests',
+  PREPARE_CLUSTER: 'prepare_cluster',
+  DEPLOY_APPLICATION: 'deploy_application',
+  VERIFY_DEPLOYMENT: 'verify_deployment',
+  FIX_DOCKERFILE: 'fix_dockerfile',
+  RESOLVE_BASE_IMAGES: 'resolve_base_images',
+  OPS: 'ops',
+  WORKFLOW: 'workflow',
+} as const;
+
+/**
+ * Type for valid tool names
+ */
+export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];
+
 // Helper to create tool wrapper
 const createToolWrapper = (
   name: string,
   description: string,
-  schema: any,
+  zodSchema: any, // Pass the full Zod schema object
   executeFn: (params: any, context: any) => Promise<any>,
 ): Tool => ({
   name,
   description,
-  schema,
+  schema: zodSchema.shape, // Extract .shape for JSON schema
+  zodSchema: zodSchema.shape, // Extract .shape for McpServer (ZodRawShape)
   execute: async (params, _logger, context) => {
     // Context must be provided by the calling code (ContainerAssistServer)
     if (!context) {
@@ -83,159 +116,87 @@ const createToolWrapper = (
 const analyzeRepoTool = createToolWrapper(
   'analyze_repo',
   'Analyze repository structure and detect technologies',
-  analyzeRepoSchema.shape,
+  analyzeRepoSchema,
   analyzeRepo,
 );
 
 const generateDockerfileTool = createToolWrapper(
   'generate_dockerfile',
   'Generate a Dockerfile for the analyzed repository',
-  generateDockerfileSchema.shape,
+  generateDockerfileSchema,
   generateDockerfile,
 );
 
 const buildImageTool = createToolWrapper(
   'build_image',
   'Build a Docker image',
-  buildImageSchema.shape,
+  buildImageSchema,
   buildImage,
 );
 
 const scanImageTool = createToolWrapper(
   'scan_image',
   'Scan a Docker image for vulnerabilities',
-  scanImageSchema.shape,
+  scanImageSchema,
   scanImage,
 );
 
-const tagImageTool = createToolWrapper(
-  'tag_image',
-  'Tag a Docker image',
-  tagImageSchema.shape,
-  tagImage,
-);
+const tagImageTool = createToolWrapper('tag_image', 'Tag a Docker image', tagImageSchema, tagImage);
 
 const pushImageTool = createToolWrapper(
   'push_image',
   'Push a Docker image to a registry',
-  pushImageSchema.shape,
+  pushImageSchema,
   pushImage,
 );
 
 const generateK8sManifestsTool = createToolWrapper(
   'generate_k8s_manifests',
   'Generate Kubernetes manifests',
-  generateK8sManifestsSchema.shape,
+  generateK8sManifestsSchema,
   generateK8sManifests,
 );
 
 const prepareClusterTool = createToolWrapper(
   'prepare_cluster',
   'Prepare Kubernetes cluster for deployment',
-  prepareClusterSchema.shape,
+  prepareClusterSchema,
   prepareCluster,
 );
 
 const deployApplicationTool = createToolWrapper(
   'deploy_application',
   'Deploy application to Kubernetes',
-  deployApplicationSchema.shape,
+  deployApplicationSchema,
   deployApplication,
 );
 
 const verifyDeploymentTool = createToolWrapper(
   'verify_deployment',
   'Verify deployment status',
-  verifyDeploymentSchema.shape,
+  verifyDeploymentSchema,
   verifyDeployment,
 );
 
 const fixDockerfileTool = createToolWrapper(
   'fix_dockerfile',
   'Fix issues in a Dockerfile',
-  fixDockerfileSchema.shape,
+  fixDockerfileSchema,
   fixDockerfile,
 );
 
 const resolveBaseImagesTool = createToolWrapper(
   'resolve_base_images',
   'Resolve and recommend base images',
-  resolveBaseImagesSchema.shape,
+  resolveBaseImagesSchema,
   resolveBaseImages,
 );
 
-const opsToolWrapper = createToolWrapper(
-  'ops',
-  'Operational utilities',
-  opsToolSchema.shape,
-  opsTool,
-);
+const opsToolWrapper = createToolWrapper('ops', 'Operational utilities', opsToolSchema, opsTool);
 
 const workflowTool = createToolWrapper(
   'workflow',
   'Execute containerization workflows',
-  workflowSchema.shape,
+  workflowSchema,
   workflow,
 );
-
-/**
- * Simple MCPTool adapter for backward compatibility
- * Note: These tools require ContainerAssistServer for proper context management
- */
-function createSimpleMCPTool(tool: Tool): MCPTool {
-  return {
-    name: tool.name,
-    metadata: {
-      title: tool.name.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
-      description: tool.description || `${tool.name} tool`,
-      inputSchema: tool.schema || { type: 'object', properties: {} },
-    },
-    handler: async () => {
-      throw new Error(
-        `${tool.name} requires ContainerAssistServer for execution. ` +
-          `Please use: const caServer = new ContainerAssistServer(); caServer.bindAll({ server });`,
-      );
-    },
-  };
-}
-
-// Adapt all tools to MCPTool interface
-const adaptedTools = {
-  analyzeRepo: createSimpleMCPTool(analyzeRepoTool),
-  generateDockerfile: createSimpleMCPTool(generateDockerfileTool),
-  buildImage: createSimpleMCPTool(buildImageTool),
-  scanImage: createSimpleMCPTool(scanImageTool),
-  tagImage: createSimpleMCPTool(tagImageTool),
-  pushImage: createSimpleMCPTool(pushImageTool),
-  generateK8sManifests: createSimpleMCPTool(generateK8sManifestsTool),
-  prepareCluster: createSimpleMCPTool(prepareClusterTool),
-  deployApplication: createSimpleMCPTool(deployApplicationTool),
-  verifyDeployment: createSimpleMCPTool(verifyDeploymentTool),
-  fixDockerfile: createSimpleMCPTool(fixDockerfileTool),
-  resolveBaseImages: createSimpleMCPTool(resolveBaseImagesTool),
-  ops: createSimpleMCPTool(opsToolWrapper),
-  workflow: createSimpleMCPTool(workflowTool),
-};
-
-/**
- * Tool collection object for easy access
- */
-export const tools = adaptedTools;
-
-/**
- * Get all available tools as an array
- */
-export function getAllTools(): MCPTool[] {
-  return Object.values(adaptedTools);
-}
-
-/**
- * Get all available tools as a map
- */
-export function getToolsMap(): Map<string, MCPTool> {
-  const map = new Map<string, MCPTool>();
-  Object.values(adaptedTools).forEach((tool) => {
-    map.set(tool.name, tool);
-  });
-  return map;
-}

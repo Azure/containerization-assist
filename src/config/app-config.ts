@@ -9,7 +9,10 @@ import { z } from 'zod';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-// Configuration constants (converted from env vars)
+/**
+ * Invariant: These constants define system-wide limits and defaults
+ * Rationale: Centralized constants prevent magic numbers across codebase
+ */
 const CONSTANTS = {
   MCP: {
     NAME: 'containerization-assist',
@@ -67,13 +70,10 @@ const CONSTANTS = {
   },
 } as const;
 
-// Zod validation schemas
 const NodeEnvSchema = z.enum(['development', 'production', 'test']).default('development');
 const LogLevelSchema = z.enum(['error', 'warn', 'info', 'debug', 'trace']).default('info');
 const WorkflowModeSchema = z.enum(['interactive', 'auto', 'batch']).default('interactive');
 const StoreTypeSchema = z.enum(['memory', 'file', 'redis']).default('memory');
-
-// Main configuration schema
 const AppConfigSchema = z.object({
   server: z.object({
     nodeEnv: NodeEnvSchema,
@@ -155,10 +155,13 @@ function getPackageVersion(): string {
 
 /**
  * Handle empty string environment variables (preserve them as empty)
+ *
+ * Invariant: Empty strings are valid config values and must be preserved
+ * Rationale: Some configs require explicit empty string vs. undefined
  */
 function getEnvValue(key: string): string | undefined {
   const value = process.env[key];
-  return value; // Return undefined if not set, preserve empty strings
+  return value;
 }
 
 /**
@@ -248,7 +251,10 @@ export function createAppConfig(): AppConfig {
     },
   };
 
-  // Validate and apply defaults using Zod
+  /**
+   * Postcondition: Config is fully validated and type-safe
+   * Failure Mode: Throws on invalid configuration to fail fast
+   */
   const result = AppConfigSchema.safeParse(rawConfig);
 
   if (!result.success) {
@@ -257,5 +263,3 @@ export function createAppConfig(): AppConfig {
 
   return result.data;
 }
-
-// Configuration instance will be initialized when needed

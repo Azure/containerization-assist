@@ -111,31 +111,6 @@ export class ContainerizationError extends Error {
 }
 
 /**
- * Validation errors for input validation failures
- */
-export class ValidationError extends ContainerizationError {
-  constructor(message: string, details?: Record<string, unknown>, cause?: Error) {
-    super(message, ErrorCodes.VALIDATION_FAILED, details, cause);
-    this.name = 'ValidationError';
-  }
-}
-
-/**
- * Docker-related errors
- */
-export class DockerError extends ContainerizationError {
-  constructor(
-    message: string,
-    code: ErrorCode = ErrorCodes.DOCKER_BUILD_FAILED,
-    details?: Record<string, unknown>,
-    cause?: Error,
-  ) {
-    super(message, code, details, cause);
-    this.name = 'DockerError';
-  }
-}
-
-/**
  * Session management errors
  */
 export class SessionError extends ContainerizationError {
@@ -147,21 +122,6 @@ export class SessionError extends ContainerizationError {
   ) {
     super(message, code, details, cause);
     this.name = 'SessionError';
-  }
-}
-
-/**
- * File system errors
- */
-export class FileSystemError extends ContainerizationError {
-  constructor(
-    message: string,
-    code: ErrorCode = ErrorCodes.FILE_NOT_FOUND,
-    details?: Record<string, unknown>,
-    cause?: Error,
-  ) {
-    super(message, code, details, cause);
-    this.name = 'FileSystemError';
   }
 }
 
@@ -180,24 +140,4 @@ export function errorToResult(error: ContainerizationError): { ok: false; error:
     ok: false,
     error: `${error.code}: ${error.message}`,
   };
-}
-
-/**
- * Execute function and convert to Result type (for MCP boundaries)
- */
-export async function executeAsResult<T>(
-  fn: () => Promise<T>,
-): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
-  try {
-    const value = await fn();
-    return { ok: true, value };
-  } catch (error) {
-    if (isContainerizationError(error)) {
-      return errorToResult(error);
-    }
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
 }

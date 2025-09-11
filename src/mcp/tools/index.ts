@@ -144,11 +144,6 @@ export type { DockerfileResponse, ManifestResponse, AnalysisResponse } from './r
 // =============================================================================
 
 /**
- * SDK Tool Registry for tool management
- */
-export type { SDKToolRegistry } from './registry';
-
-/**
  * Validation utilities
  */
 export type { ValidationContext, ValidationResult } from './validator';

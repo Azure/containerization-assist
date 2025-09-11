@@ -4,8 +4,8 @@
  */
 
 import type { Logger } from 'pino';
-import type { Result } from '@types';
-import type { PromptRegistry } from '../../core/prompts/registry';
+import type { Result } from '../../types';
+import type { PromptRegistry } from '../../prompts/registry';
 import type {
   storeResource,
   getResource,

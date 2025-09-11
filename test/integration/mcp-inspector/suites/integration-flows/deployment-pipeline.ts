@@ -3,7 +3,7 @@
  * Tests Kubernetes deployment workflows and manifest generation
  */
 
-import { TestCase, MCPTestRunner, TestResult } from '../../infrastructure/test-runner';
+import { TestCase, MCPTestRunner, TestResult } from '../../services/test-runner';
 import { KubernetesUtils } from '../../lib/kubernetes-utils';
 import { detectEnvironment, getCapabilities } from '../../lib/environment';
 

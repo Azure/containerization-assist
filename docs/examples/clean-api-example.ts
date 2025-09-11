@@ -3,7 +3,7 @@
  * Shows the new instance-based approach without global state
  */
 
-import { Server } from '@modelcontextprotocol/sdk';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ContainerAssistServer } from '@thgamble/containerization-assist-mcp';
 
 /**
@@ -11,7 +11,7 @@ import { ContainerAssistServer } from '@thgamble/containerization-assist-mcp';
  */
 async function simpleIntegration() {
   // Create your MCP server
-  const mcpServer = new Server({
+  const mcpServer = new McpServer({
     name: 'my-mcp-server',
     version: '1.0.0'
   });
@@ -24,14 +24,15 @@ async function simpleIntegration() {
   
   console.log('✅ All Container Assist tools registered with AI sampling support');
   
-  await mcpServer.start();
+  // McpServer uses connect() instead of start()
+  // await mcpServer.connect(transport);
 }
 
 /**
  * Example 2: Selective tool registration
  */
 async function selectiveRegistration() {
-  const mcpServer = new Server({
+  const mcpServer = new McpServer({
     name: 'my-selective-server',
     version: '1.0.0'
   });
@@ -51,14 +52,15 @@ async function selectiveRegistration() {
   
   console.log('✅ Selected tools registered');
   
-  await mcpServer.start();
+  // McpServer uses connect() instead of start()
+  // await mcpServer.connect(transport);
 }
 
 /**
  * Example 3: Custom tool names
  */
 async function customToolNames() {
-  const mcpServer = new Server({
+  const mcpServer = new McpServer({
     name: 'custom-names-server',
     version: '1.0.0'
   });
@@ -80,7 +82,8 @@ async function customToolNames() {
   
   console.log('✅ Tools registered with custom names');
   
-  await mcpServer.start();
+  // McpServer uses connect() instead of start()
+  // await mcpServer.connect(transport);
 }
 
 /**
@@ -88,7 +91,7 @@ async function customToolNames() {
  */
 async function multipleInstances() {
   // Server 1: Development tools
-  const devServer = new Server({
+  const devServer = new McpServer({
     name: 'dev-server',
     version: '1.0.0'
   });
@@ -99,7 +102,7 @@ async function multipleInstances() {
   devCA.bindAll({ server: devServer });
   
   // Server 2: Production tools
-  const prodServer = new Server({
+  const prodServer = new McpServer({
     name: 'prod-server',
     version: '1.0.0'
   });
@@ -113,17 +116,18 @@ async function multipleInstances() {
   console.log('   Each has its own session manager and configuration');
   console.log('   No global state conflicts!');
   
-  await Promise.all([
-    devServer.start(),
-    prodServer.start()
-  ]);
+  // McpServer uses connect() instead of start()
+  // await Promise.all([
+  //   devServer.connect(devTransport),
+  //   prodServer.connect(prodTransport)
+  // ]);
 }
 
 /**
  * Example 5: Advanced usage with tool access
  */
 async function advancedUsage() {
-  const mcpServer = new Server({
+  const mcpServer = new McpServer({
     name: 'advanced-server',
     version: '1.0.0'
   });
@@ -147,7 +151,8 @@ async function advancedUsage() {
   const allTools = caServer.getAllTools();
   console.log(`Total tools registered: ${allTools.length}`);
   
-  await mcpServer.start();
+  // McpServer uses connect() instead of start()
+  // await mcpServer.connect(transport);
 }
 
 // Helper function for custom logger

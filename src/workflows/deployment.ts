@@ -262,7 +262,9 @@ export async function runDeploymentWorkflow(
         },
       };
     }
-    const manifests = manifestResult.value;
+
+    // TypeScript assertion: manifestResult must be successful here due to early return above
+    const manifests = (manifestResult as { ok: true; value: any }).value;
 
     generateStep.status = 'completed';
     generateStep.endTime = new Date();

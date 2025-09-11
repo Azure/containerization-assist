@@ -10,4 +10,4 @@ export {
   type KubernetesClient,
   type DeploymentResult,
   type ClusterInfo,
-} from '../infrastructure/kubernetes/client';
+} from '../services/kubernetes/client';

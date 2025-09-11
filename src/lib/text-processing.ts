@@ -5,65 +5,66 @@
  * particularly for cleaning up code generation responses.
  */
 
+import * as dockerParser from 'docker-file-parser';
+import validateDockerfile from 'validate-dockerfile';
+import { parse as parseYaml } from 'yaml';
+
 /**
- * Strips code fences and noise from AI-generated content
+ * Extracts code content from markdown code fences
  *
- * This function removes common formatting artifacts from AI responses:
- * - Code fence markers (```language and ```)
- * - Leading/trailing whitespace
- * - Language specifiers in fence markers
+ * This function extracts content from within markdown code fences,
+ * removing the fence markers and any surrounding text.
+ * It specifically handles code blocks with language specifiers.
  *
- * @param text - The text content to clean
- * @returns Cleaned text with fences and noise removed
+ * @param text - The text content containing code fences
+ * @param language - Optional language specifier to match (e.g., 'dockerfile', 'yaml')
+ * @returns Extracted code content, or original text if no fences found
  *
  * @example
  * ```typescript
- * const response = "```dockerfile\nFROM node:18\nWORKDIR /app\n```";
+ * const response = "Here's a Dockerfile:\n```dockerfile\nFROM node:18\nWORKDIR /app\n```\nThis is optimized.";
  * const cleaned = stripFencesAndNoise(response);
  * // Result: "FROM node:18\nWORKDIR /app"
  * ```
  */
-export const stripFencesAndNoise = (text: string): string => {
-  return text
-    .replace(/^```[a-z]*\n?/i, '')
-    .replace(/```$/, '')
-    .trim();
-};
+export const stripFencesAndNoise = (text: string, language?: string): string => {
+  // Build regex pattern based on language parameter
+  let pattern: RegExp;
 
-/**
- * Extracts text content from MCP response content arrays
- *
- * Processes MCP protocol response content arrays and extracts text content.
- * Filters for text content types and joins multiple text blocks.
- *
- * @param content - Array of content objects from MCP response
- * @returns Joined text content, or empty string if no text found
- *
- * @example
- * ```typescript
- * const content = [
- *   { type: 'text', text: 'Hello ' },
- *   { type: 'text', text: 'World' }
- * ];
- * const text = extractTextFromContent(content);
- * // Result: "Hello World"
- * ```
- */
-export const extractTextFromContent = (content: Array<{ type: string; text?: string }>): string => {
-  return content
-    .filter((item) => item.type === 'text' && typeof item.text === 'string')
-    .map((item) => item.text || '')
-    .join('\n')
-    .trim();
+  if (language) {
+    // Match specific language or its variations
+    const langPattern = language.toLowerCase();
+    if (langPattern === 'dockerfile' || langPattern === 'docker') {
+      pattern = /```(?:docker|dockerfile|Dockerfile|DOCKERFILE)?\s*\n([\s\S]*?)```/;
+    } else if (langPattern === 'yaml' || langPattern === 'yml') {
+      pattern = /```(?:yaml|yml|YAML|YML)?\s*\n([\s\S]*?)```/;
+    } else {
+      // Generic pattern for other languages
+      pattern = new RegExp(`\`\`\`(?:${langPattern})?\\s*\\n([\\s\\S]*?)\`\`\``);
+    }
+  } else {
+    // Generic pattern that matches any code fence (including empty ones)
+    pattern = /```[a-zA-Z0-9]*\s*\n?([\s\S]*?)```/;
+  }
+
+  const match = text.match(pattern);
+  if (match) {
+    // Found a code fence, return the content (which might be empty)
+    return match[1] ? match[1].trim() : '';
+  }
+
+  // No code fence found, return trimmed original text
+  // Callers should validate if the content is what they expect
+  return text.trim();
 };
 
 /**
  * Validates that text content looks like a Dockerfile
  *
- * Performs basic validation to ensure content appears to be valid Dockerfile content:
- * - Must contain a FROM instruction
- * - Should not be empty after cleaning
- * - Should contain typical Dockerfile instructions
+ * Uses the dockerfile-ast parser to properly validate Dockerfile content:
+ * - Must parse successfully as a Dockerfile
+ * - Must contain at least one FROM instruction
+ * - Provides proper syntax validation
  *
  * @param content - The content to validate
  * @returns True if content appears to be a valid Dockerfile
@@ -82,16 +83,36 @@ export const isValidDockerfileContent = (content: string): boolean => {
     return false;
   }
 
-  // Must have a FROM instruction (case insensitive)
-  const hasFrom = /^\s*FROM\s+\S+/im.test(cleaned) || /\nFROM\s+\S+/im.test(cleaned);
+  try {
+    // Parse to ensure valid Dockerfile structure
+    const commands = dockerParser.parse(cleaned);
 
-  return hasFrom;
+    // Check if there's at least one FROM instruction
+    const hasFROM = commands.some((cmd: any) => cmd.name === 'FROM');
+
+    // Optionally use validate-dockerfile for additional checks (but don't fail on it)
+    // as it can be too strict for some valid Dockerfiles
+    try {
+      const validationResult = validateDockerfile(cleaned);
+      if (!validationResult.valid && validationResult.priority === 0) {
+        // Only fail on priority 0 (fatal) errors
+        return false;
+      }
+    } catch {
+      // Ignore validation errors, rely on parsing
+    }
+
+    return hasFROM;
+  } catch {
+    // Failed to parse as valid Dockerfile
+    return false;
+  }
 };
 
 /**
  * Extracts the base image from Dockerfile content
  *
- * Finds and extracts the base image specification from FROM instructions.
+ * Uses the dockerfile-ast parser to properly extract base images.
  * Handles multi-stage builds by returning the first FROM instruction.
  *
  * @param dockerfileContent - The Dockerfile content to analyze
@@ -105,98 +126,44 @@ export const isValidDockerfileContent = (content: string): boolean => {
  * ```
  */
 export const extractBaseImage = (dockerfileContent: string): string | null => {
-  const fromMatch = dockerfileContent.match(/^\s*FROM\s+(\S+)/im);
-  return fromMatch?.[1] ?? null;
-};
+  try {
+    const commands = dockerParser.parse(dockerfileContent);
 
-/**
- * Parses Dockerfile content into instruction objects
- *
- * Breaks down Dockerfile content into structured instruction objects
- * for analysis and processing.
- *
- * @param dockerfileContent - The Dockerfile content to parse
- * @returns Array of instruction objects with type and content
- *
- * @example
- * ```typescript
- * const dockerfile = "FROM node:18\nWORKDIR /app\nRUN npm install";
- * const instructions = parseInstructions(dockerfile);
- * // Result: [
- * //   { instruction: 'FROM', content: 'node:18' },
- * //   { instruction: 'WORKDIR', content: '/app' },
- * //   { instruction: 'RUN', content: 'npm install' }
- * // ]
- * ```
- */
-export const parseInstructions = (
-  dockerfileContent: string,
-): Array<{ instruction: string; content: string }> => {
-  const lines = dockerfileContent.split('\n');
-  const instructions: Array<{ instruction: string; content: string }> = [];
+    // Find the first FROM instruction
+    const fromCommand = commands.find((cmd: any) => cmd.name === 'FROM');
 
-  for (const line of lines) {
-    const trimmed = line.trim();
+    if (fromCommand?.args) {
+      // The args can be a string or array, handle both
+      let baseImage: string | null = null;
+      if (typeof fromCommand.args === 'string') {
+        baseImage = fromCommand.args.trim();
+      } else if (Array.isArray(fromCommand.args) && fromCommand.args.length > 0) {
+        const firstArg = fromCommand.args[0];
+        baseImage = typeof firstArg === 'string' ? firstArg.trim() : String(firstArg).trim();
+      }
 
-    // Skip empty lines and comments
-    if (!trimmed || trimmed.startsWith('#')) {
-      continue;
+      // Remove "AS builder" part from multi-stage builds
+      if (baseImage) {
+        const parts = baseImage.split(/\s+AS\s+/i);
+        return parts[0]?.trim() || baseImage;
+      }
     }
 
-    // Match instruction pattern (INSTRUCTION content)
-    const match = trimmed.match(/^([A-Z]+)\s+(.*)$/);
-    if (match?.[1] && match[2]) {
-      instructions.push({
-        instruction: match[1],
-        content: match[2],
-      });
-    }
+    return null;
+  } catch {
+    // Failed to parse, fallback to regex for backwards compatibility
+    const fromMatch = dockerfileContent.match(/^\s*FROM\s+(\S+)/im);
+    return fromMatch?.[1] ?? null;
   }
-
-  return instructions;
-};
-
-/**
- * Cleans and normalizes AI response text
- *
- * Comprehensive text cleaning that combines multiple cleanup operations:
- * - Strips code fences
- * - Normalizes whitespace
- * - Removes common AI response artifacts
- *
- * @param text - The raw AI response text
- * @returns Cleaned and normalized text
- *
- * @example
- * ```typescript
- * const response = "```dockerfile\n\nFROM node:18\n\n\nWORKDIR /app\n\n```\n";
- * const cleaned = cleanAIResponse(response);
- * // Result: "FROM node:18\n\nWORKDIR /app"
- * ```
- */
-export const cleanAIResponse = (text: string): string => {
-  let cleaned = stripFencesAndNoise(text);
-
-  // Normalize excessive newlines (more than 2 consecutive)
-  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
-
-  cleaned = cleaned.replace(/[ \t]+$/gm, '');
-
-  // Ensure final newline if content exists
-  if (cleaned && !cleaned.endsWith('\n')) {
-    cleaned += '\n';
-  }
-
-  return cleaned;
 };
 
 /**
  * Validates that text content looks like valid Kubernetes manifest(s)
  *
- * Performs basic validation for YAML Kubernetes manifests:
+ * Uses proper YAML parsing to validate Kubernetes manifests:
+ * - Must be valid YAML syntax
  * - Must contain apiVersion and kind fields
- * - Should be valid YAML structure
- * - Should contain typical Kubernetes resource fields
+ * - Handles both single documents and multi-document YAML
  *
  * @param content - The content to validate
  * @returns True if content appears to be valid Kubernetes YAML
@@ -220,42 +187,25 @@ export const isValidKubernetesContent = (content: string): boolean => {
     return false;
   }
 
-  // Must have apiVersion and kind (basic Kubernetes resource requirements)
-  const hasApiVersion =
-    /^\s*apiVersion:\s*\S+/im.test(cleaned) || /\napiVersion:\s*\S+/im.test(cleaned);
-  const hasKind = /^\s*kind:\s*\S+/im.test(cleaned) || /\nkind:\s*\S+/im.test(cleaned);
+  try {
+    // Parse as YAML - parseYaml handles both single and multi-document YAML
+    const docs = parseYaml(cleaned, { strict: false });
 
-  return hasApiVersion && hasKind;
-};
+    // Handle both single document and array of documents
+    const documents = Array.isArray(docs) ? docs : [docs];
 
-/**
- * Bounds text to a specific number of sentences
- *
- * Ensures text content contains between min and max sentences.
- * Useful for creating consistent summary lengths.
- *
- * @param text - The text to bound
- * @param minSentences - Minimum number of sentences (default: 2)
- * @param maxSentences - Maximum number of sentences (default: 4)
- * @returns Text bounded to the specified sentence count
- *
- * @example
- * ```typescript
- * const text = "First sentence. Second sentence. Third sentence. Fourth sentence. Fifth sentence.";
- * const bounded = boundToSentences(text, 2, 3);
- * // Result: "First sentence. Second sentence. Third sentence."
- * ```
- */
-export const boundToSentences = (
-  text: string,
-  _minSentences: number = 2,
-  maxSentences: number = 4,
-): string => {
-  const sentences = text.split(/(?<=[.!?])\s+/).filter((s) => s.trim());
-
-  if (sentences.length <= maxSentences) {
-    return sentences.join(' ').trim();
+    // Check if at least one document has apiVersion and kind
+    return documents.some(
+      (doc) =>
+        doc &&
+        typeof doc === 'object' &&
+        'apiVersion' in doc &&
+        'kind' in doc &&
+        doc.apiVersion &&
+        doc.kind,
+    );
+  } catch {
+    // Failed to parse as valid YAML
+    return false;
   }
-
-  return sentences.slice(0, maxSentences).join(' ').trim();
 };

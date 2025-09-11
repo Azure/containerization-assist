@@ -8,66 +8,17 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { getSession, updateSession } from '@mcp/tools/session-helpers';
-import { aiGenerate } from '@mcp/tools/ai-helpers';
+import { aiGenerate, aiGenerateWithSampling } from '@mcp/tools/ai-helpers';
+import type { SamplingOptions } from '@lib/sampling';
 import { createStandardProgress } from '@mcp/utils/progress-helper';
 import { createTimer } from '@lib/logger';
 import type { ToolContext } from '../../mcp/context/types';
 import type { SessionData } from '../session-types';
-import { Success, Failure, type Result } from '../../domain/types';
+import { Success, Failure, type Result } from '../../types';
 import { stripFencesAndNoise, isValidKubernetesContent } from '@lib/text-processing';
+import type { GenerateK8sManifestsParams } from './schema';
 
-/**
- * Configuration for Kubernetes manifest generation
- */
-export interface GenerateK8sManifestsConfig {
-  /** Session identifier for storing results */
-  sessionId?: string;
-  /** Docker image ID to deploy (optional, defaults to build result) */
-  imageId?: string;
-  /** Application name (defaults to detected name) */
-  appName?: string;
-  /** Kubernetes namespace (defaults to 'default') */
-  namespace?: string;
-  /** Number of replicas (defaults to 1) */
-  replicas?: number;
-  /** Application port (defaults to detected port) */
-  port?: number;
-  /** Service type for external access */
-  serviceType?: 'ClusterIP' | 'NodePort' | 'LoadBalancer';
-  /** Enable ingress controller */
-  ingressEnabled?: boolean;
-  /** Hostname for ingress routing */
-  ingressHost?: string;
-  /** Resource requests and limits */
-  resources?: {
-    requests?: {
-      memory: string;
-      cpu: string;
-    };
-    limits?: {
-      memory: string;
-      cpu: string;
-    };
-  };
-  /** Environment variables to set */
-  envVars?: Array<{ name: string; value: string }>;
-  /** ConfigMap data */
-  configMapData?: Record<string, string>;
-  /** Health check configuration */
-  healthCheck?: {
-    enabled: boolean;
-    path?: string;
-    port?: number;
-    initialDelaySeconds?: number;
-  };
-  /** Enable autoscaling */
-  autoscaling?: {
-    enabled: boolean;
-    minReplicas?: number;
-    maxReplicas?: number;
-    targetCPUUtilizationPercentage?: number;
-  };
-}
+// Note: Tool now uses GenerateK8sManifestsParams from schema for type safety
 
 /**
  * Result from K8s manifest generation
@@ -87,6 +38,25 @@ export interface GenerateK8sManifestsResult {
   warnings?: string[];
   /** Session ID for reference */
   sessionId?: string;
+  /** Sampling metadata if sampling was used */
+  samplingMetadata?: {
+    stoppedEarly?: boolean;
+    candidatesGenerated: number;
+    winnerScore: number;
+    samplingDuration?: number;
+  };
+  /** Winner score if sampling was used */
+  winnerScore?: number;
+  /** Score breakdown if requested */
+  scoreBreakdown?: Record<string, number>;
+  /** All candidates if requested */
+  allCandidates?: Array<{
+    id: string;
+    content: string;
+    score: number;
+    scoreBreakdown: Record<string, number>;
+    rank?: number;
+  }>;
 }
 
 /**
@@ -166,7 +136,7 @@ function validateK8sResource(obj: unknown): obj is K8sResource {
  * Generate basic K8s manifests (fallback)
  */
 function generateBasicManifests(
-  params: GenerateK8sManifestsConfig,
+  params: GenerateK8sManifestsParams,
   image: string,
 ): Result<{ manifests: K8sResource[]; aiUsed: boolean }> {
   const {
@@ -359,7 +329,7 @@ function generateBasicManifests(
  * Build prompt arguments for K8s manifest generation
  */
 function buildK8sManifestPromptArgs(
-  params: GenerateK8sManifestsConfig,
+  params: GenerateK8sManifestsParams,
   image: string,
 ): Record<string, unknown> {
   return {
@@ -384,7 +354,7 @@ function buildK8sManifestPromptArgs(
  * Generate K8s manifests implementation with selective progress reporting
  */
 async function generateK8sManifestsImpl(
-  params: GenerateK8sManifestsConfig,
+  params: GenerateK8sManifestsParams,
   context: ToolContext,
 ): Promise<Result<GenerateK8sManifestsResult>> {
   // Basic parameter validation
@@ -420,28 +390,57 @@ async function generateK8sManifestsImpl(
     // Progress: Main execution phase (manifest generation)
     if (progress) await progress('EXECUTING');
 
+    // Prepare sampling options
+    const samplingOptions: SamplingOptions = {};
+    // Sampling is enabled by default unless explicitly disabled
+    samplingOptions.enableSampling = !params.disableSampling;
+    if (params.maxCandidates !== undefined) samplingOptions.maxCandidates = params.maxCandidates;
+    if (params.earlyStopThreshold !== undefined)
+      samplingOptions.earlyStopThreshold = params.earlyStopThreshold;
+    if (params.includeScoreBreakdown !== undefined)
+      samplingOptions.includeScoreBreakdown = params.includeScoreBreakdown;
+    if (params.returnAllCandidates !== undefined)
+      samplingOptions.returnAllCandidates = params.returnAllCandidates;
+    if (params.useCache !== undefined) samplingOptions.useCache = params.useCache;
+
     // Generate K8s manifests with AI or fallback
     let result: Result<{ manifests: K8sResource[]; aiUsed: boolean }>;
+    let samplingMetadata: GenerateK8sManifestsResult['samplingMetadata'];
+    let winnerScore: number | undefined;
+    let scoreBreakdown: Record<string, number> | undefined;
+    let allCandidates: GenerateK8sManifestsResult['allCandidates'];
 
     try {
-      const aiResult = await aiGenerate(logger, context, {
-        promptName: 'generate-k8s-manifests',
-        promptArgs: buildK8sManifestPromptArgs(params, image),
-        expectation: 'yaml' as const,
-        maxRetries: 2,
-        fallbackBehavior: 'default',
-      });
+      if (!params.disableSampling) {
+        // Use sampling-aware generation
+        const aiResult = await aiGenerateWithSampling(logger, context, {
+          promptName: 'generate-k8s-manifests',
+          promptArgs: buildK8sManifestPromptArgs(params, image),
+          expectation: 'yaml' as const,
+          maxRetries: 2,
+          fallbackBehavior: 'default',
+          ...samplingOptions,
+        });
 
-      if (aiResult.ok) {
-        const cleaned = stripFencesAndNoise(aiResult.value.content);
+        if (aiResult.ok) {
+          const cleaned = stripFencesAndNoise(aiResult.value.winner.content, 'yaml');
 
-        if (isValidKubernetesContent(cleaned)) {
-          const manifests = parseK8sManifestsFromAI(cleaned);
-          if (manifests.length > 0) {
-            result = Success({
-              manifests,
-              aiUsed: true,
-            });
+          if (isValidKubernetesContent(cleaned)) {
+            const manifests = parseK8sManifestsFromAI(cleaned);
+            if (manifests.length > 0) {
+              result = Success({
+                manifests,
+                aiUsed: true,
+              });
+
+              // Capture sampling metadata
+              samplingMetadata = aiResult.value.samplingMetadata;
+              winnerScore = aiResult.value.winner.score;
+              scoreBreakdown = aiResult.value.winner.scoreBreakdown;
+              allCandidates = aiResult.value.allCandidates;
+            } else {
+              result = generateBasicManifests(params, image);
+            }
           } else {
             result = generateBasicManifests(params, image);
           }
@@ -449,7 +448,34 @@ async function generateK8sManifestsImpl(
           result = generateBasicManifests(params, image);
         }
       } else {
-        result = generateBasicManifests(params, image);
+        // Standard generation without sampling
+        const aiResult = await aiGenerate(logger, context, {
+          promptName: 'generate-k8s-manifests',
+          promptArgs: buildK8sManifestPromptArgs(params, image),
+          expectation: 'yaml' as const,
+          maxRetries: 2,
+          fallbackBehavior: 'default',
+        });
+
+        if (aiResult.ok) {
+          const cleaned = stripFencesAndNoise(aiResult.value.content, 'yaml');
+
+          if (isValidKubernetesContent(cleaned)) {
+            const manifests = parseK8sManifestsFromAI(cleaned);
+            if (manifests.length > 0) {
+              result = Success({
+                manifests,
+                aiUsed: true,
+              });
+            } else {
+              result = generateBasicManifests(params, image);
+            }
+          } else {
+            result = generateBasicManifests(params, image);
+          }
+        } else {
+          result = generateBasicManifests(params, image);
+        }
       }
     } catch {
       // Fallback to basic generation
@@ -543,7 +569,11 @@ async function generateK8sManifestsImpl(
     timer.end({ outputPath });
 
     // Return result with file indicator and chain hint
-    return Success({
+    const finalResult: GenerateK8sManifestsResult & {
+      _fileWritten?: boolean;
+      _fileWrittenPath?: string;
+      _chainHint?: string;
+    } = {
       manifests: yaml,
       outputPath,
       resources: resourceList,
@@ -553,7 +583,25 @@ async function generateK8sManifestsImpl(
       _fileWrittenPath: outputPath,
       _chainHint:
         'Next: prepare_cluster to set up Kubernetes or deploy_application if cluster is ready',
-    });
+    };
+
+    // Add sampling metadata if sampling was used
+    if (!params.disableSampling) {
+      if (samplingMetadata) {
+        finalResult.samplingMetadata = samplingMetadata;
+      }
+      if (winnerScore !== undefined) {
+        finalResult.winnerScore = winnerScore;
+      }
+      if (scoreBreakdown && params.includeScoreBreakdown) {
+        finalResult.scoreBreakdown = scoreBreakdown;
+      }
+      if (allCandidates && params.returnAllCandidates) {
+        finalResult.allCandidates = allCandidates;
+      }
+    }
+
+    return Success(finalResult);
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'K8s manifest generation failed');

@@ -1,141 +1,141 @@
 /**
- * Push Image Tool - Standardized Implementation
- *
- * Pushes Docker images to container registries
- * Uses standardized helpers for consistency
+ * Push image tool implementation using DockerClient directly
+ * Lightweight, testable tool for pushing Docker images
  */
 
-import { getSession, updateSession } from '@mcp/tools/session-helpers';
+import { createDockerClient, type DockerClient } from '../../services/docker/client';
+import type { MCPTool, MCPResponse } from '../../mcp/types';
 import type { ToolContext } from '../../mcp/context/types';
-import { createDockerClient } from '../../lib/docker';
-import { createTimer, createLogger } from '../../lib/logger';
-import type { SessionData } from '../session-types';
-import { Success, Failure, type Result } from '../../domain/types';
-import type { PushImageParams } from './schema';
+import { Success, Failure, type Result } from '../../types';
+import { pushImageSchema, type PushImageParams } from './schema';
+import type { z } from 'zod';
 
 export interface PushImageResult {
-  success: boolean;
-  sessionId: string;
+  success: true;
   registry: string;
   digest: string;
-  pushedTags: string[];
+  pushedTag: string;
 }
 
 /**
- * Push image implementation - direct execution without wrapper
+ * Create push image tool with injected Docker client
  */
-async function pushImageImpl(
+export function makePushImage(
+  docker: DockerClient,
+): MCPTool<typeof pushImageSchema, PushImageResult> {
+  return {
+    name: 'push_image',
+    description: 'Push a Docker image to a registry',
+    inputSchema: pushImageSchema,
+
+    async handler(params: z.infer<typeof pushImageSchema>): Promise<MCPResponse<PushImageResult>> {
+      // Validate required imageId
+      if (!params.imageId) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Error: imageId is required to push an image',
+            },
+          ],
+          error: 'Missing required parameter: imageId',
+        };
+      }
+
+      // Parse repository and tag from imageId
+      let repository: string;
+      let tag: string;
+
+      const colonIndex = params.imageId.lastIndexOf(':');
+      if (colonIndex === -1 || colonIndex < params.imageId.lastIndexOf('/')) {
+        // No tag specified, use 'latest'
+        repository = params.imageId;
+        tag = 'latest';
+      } else {
+        repository = params.imageId.substring(0, colonIndex);
+        tag = params.imageId.substring(colonIndex + 1);
+      }
+
+      // Apply registry prefix if provided
+      if (params.registry) {
+        const registryHost = params.registry.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        if (!repository.startsWith(registryHost)) {
+          repository = `${registryHost}/${repository}`;
+        }
+      }
+
+      // Tag image if registry was specified
+      if (params.registry) {
+        const tagResult = await docker.tagImage(params.imageId, repository, tag);
+        if (!tagResult.ok) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Failed to tag image: ${tagResult.error}`,
+              },
+            ],
+            error: tagResult.error,
+          };
+        }
+      }
+
+      // Push the image
+      const pushResult = await docker.pushImage(repository, tag);
+      if (!pushResult.ok) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to push image: ${pushResult.error}`,
+            },
+          ],
+          error: pushResult.error,
+        };
+      }
+
+      // Return success response
+      const result: PushImageResult = {
+        success: true,
+        registry: params.registry || 'docker.io',
+        digest: pushResult.value.digest,
+        pushedTag: `${repository}:${tag}`,
+      };
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Successfully pushed image ${result.pushedTag} with digest ${result.digest}`,
+          },
+        ],
+        value: result,
+      };
+    },
+  };
+}
+
+/**
+ * Push image function for workflow usage
+ * Follows the standard pattern used by other tools
+ */
+export async function pushImage(
   params: PushImageParams,
   context: ToolContext,
 ): Promise<Result<PushImageResult>> {
-  // Basic parameter validation (essential validation only)
-  if (!params || typeof params !== 'object') {
-    return Failure('Invalid parameters provided');
+  const logger = context.logger;
+  const dockerClient = createDockerClient(logger);
+  const tool = makePushImage(dockerClient);
+
+  const result = await tool.handler(params);
+
+  if ('error' in result) {
+    return Failure(result.error);
   }
-  const logger = context.logger || createLogger({ name: 'push-image' });
-  const timer = createTimer(logger, 'push-image');
 
-  try {
-    const { registry = 'docker.io' } = params;
-
-    // Resolve session (now always optional)
-    const sessionResult = await getSession(params.sessionId, context);
-
-    if (!sessionResult.ok) {
-      return Failure(sessionResult.error);
-    }
-
-    const { id: sessionId, state: session } = sessionResult.value;
-    logger.info({ sessionId, registry }, 'Starting image push');
-
-    const dockerClient = createDockerClient(logger);
-
-    // Check for tagged images in session
-    const sessionData = session as SessionData;
-    const buildResult = sessionData?.build_result;
-    const imageTag = params.imageId || buildResult?.tags?.[0];
-
-    if (!imageTag) {
-      return Failure(
-        'No image specified. Provide imageId parameter or ensure session has tagged images from tag-image tool.',
-      );
-    }
-
-    logger.info({ imageTag, registry }, 'Pushing image to registry');
-
-    // Push image using lib docker client
-    // Extract repository and tag from imageTag
-    const parts = imageTag.split(':');
-    const repository = parts[0];
-    const tag = parts[1] || 'latest';
-
-    if (!repository) {
-      return Failure('Invalid image tag format');
-    }
-
-    const pushResult = await dockerClient.pushImage(repository, tag);
-
-    if (!pushResult.ok) {
-      return Failure(`Failed to push image: ${pushResult.error ?? 'Unknown error'}`);
-    }
-
-    const { digest } = pushResult.value;
-
-    // Update session with push results using standardized helper
-    const updateResult = await updateSession(
-      sessionId,
-      {
-        completed_steps: [...(session.completed_steps || []), 'push'],
-        metadata: {
-          ...session.metadata,
-          pushResult: {
-            registry,
-            digest,
-            pushedTags: [imageTag],
-            timestamp: new Date().toISOString(),
-          },
-        },
-      },
-      context,
-    );
-
-    if (!updateResult.ok) {
-      logger.warn({ error: updateResult.error }, 'Failed to update session, but push succeeded');
-    }
-
-    timer.end({
-      imageTag,
-      registry,
-      digest,
-    });
-
-    logger.info(
-      {
-        imageTag,
-        registry,
-        digest,
-      },
-      'Image push completed',
-    );
-
-    return Success({
-      success: true,
-      sessionId,
-      registry,
-      digest,
-      pushedTags: [imageTag],
-      _chainHint:
-        'Next: generate_k8s_manifests for deployment or deploy_application if manifests exist',
-    });
-  } catch (error) {
-    timer.error(error);
-    logger.error({ error }, 'Image push failed');
-
-    return Failure(error instanceof Error ? error.message : String(error));
+  if (result.value) {
+    return Success(result.value);
   }
+
+  return Failure('Unexpected result from push-image tool');
 }
-
-/**
- * Push image tool
- */
-export const pushImage = pushImageImpl;

@@ -214,7 +214,7 @@ CMD ["node", "index.js"]`;
         },
         repo_path: '/test/repo',
         dockerfile_result: {
-          path: '/test/repo/Dockerfile.generated',
+          path: '/test/repo/Dockerfile',
           content: mockDockerfile,
         },
       });
@@ -230,7 +230,7 @@ CMD ["node", "index.js"]`;
       expect(mockDockerClient.buildImage).toHaveBeenCalledWith(
         expect.objectContaining({
           context: '/test/repo',
-          dockerfile: 'Dockerfile.generated',
+          dockerfile: 'Dockerfile',
         })
       );
     });
@@ -253,14 +253,14 @@ CMD ["node", "index.js"]`;
 
       expect(result.ok).toBe(true);
       expect(mockFs.writeFile).toHaveBeenCalledWith(
-        '/test/repo/Dockerfile.generated',
+        '/test/repo/Dockerfile',
         mockDockerfile,
         'utf-8'
       );
       expect(mockDockerClient.buildImage).toHaveBeenCalledWith(
         expect.objectContaining({
           context: '/test/repo',
-          dockerfile: 'Dockerfile.generated',
+          dockerfile: 'Dockerfile',
         })
       );
     });

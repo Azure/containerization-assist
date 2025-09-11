@@ -20,7 +20,7 @@ import { createStandardProgress } from '@mcp/utils/progress-helper';
 import type { ToolContext } from '../../mcp/context/types';
 import { createDockerClient, type DockerBuildOptions } from '../../lib/docker';
 import { createTimer, createLogger } from '../../lib/logger';
-import { type Result, Success, Failure } from '../../domain/types';
+import { type Result, Success, Failure } from '../../types';
 import type { BuildImageParams } from './schema';
 
 export interface BuildImageResult {
@@ -194,11 +194,14 @@ async function buildImageImpl(
             'Using generated Dockerfile',
           );
         } else {
-          // Generated path exists but file not found, check for content
+          /**
+           * Failure Mode: Generated path exists in session but file missing
+           * Recovery: Write content from session if available
+           */
           const dockerfileContent = dockerfileResult?.content as string | undefined;
           if (dockerfileContent) {
-            // Write the Dockerfile content to generated file
-            finalDockerfilePath = path.join(repoPath, 'Dockerfile.generated');
+            // Use the user-specified dockerfile name (defaults to 'Dockerfile')
+            finalDockerfilePath = path.join(repoPath, dockerfile);
             await fs.writeFile(finalDockerfilePath, dockerfileContent, 'utf-8');
             logger.info(
               { dockerfilePath: finalDockerfilePath },
@@ -211,11 +214,10 @@ async function buildImageImpl(
           }
         }
       } else {
-        // Check if we have Dockerfile content in session
         const dockerfileContent = dockerfileResult?.content as string | undefined;
         if (dockerfileContent) {
-          // Write the Dockerfile content to generated file
-          finalDockerfilePath = path.join(repoPath, 'Dockerfile.generated');
+          // Use the user-specified dockerfile name (defaults to 'Dockerfile')
+          finalDockerfilePath = path.join(repoPath, dockerfile);
           await fs.writeFile(finalDockerfilePath, dockerfileContent, 'utf-8');
           logger.info(
             { dockerfilePath: finalDockerfilePath },

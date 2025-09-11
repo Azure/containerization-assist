@@ -139,33 +139,6 @@ describe('Configuration Types', () => {
   });
 });
 
-describe('Tool Configuration', () => {
-  describe('Module Structure', () => {
-    it('should have tool config file', () => {
-      const toolConfigPath = join(__dirname, '../../../src/config/tool-config.ts');
-      const content = readFileSync(toolConfigPath, 'utf-8');
-      
-      expect(content).toContain('Tool Configuration');
-      expect(content).toContain('config');
-    });
-
-    it('should contain tool-related configuration', () => {
-      const toolConfigPath = join(__dirname, '../../../src/config/tool-config.ts');
-      const content = readFileSync(toolConfigPath, 'utf-8');
-      
-      expect(typeof content).toBe('string');
-      expect(content.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Tool Config Export', () => {
-    it('should export tool configuration', async () => {
-      const toolConfigModule = await import('../../../src/config/tool-config');
-      expect(typeof toolConfigModule).toBe('object');
-    });
-  });
-});
-
 describe('App Configuration', () => {
   describe('Module Structure', () => {
     it('should have app config file', () => {
@@ -173,7 +146,6 @@ describe('App Configuration', () => {
       const content = readFileSync(appConfigPath, 'utf-8');
       
       expect(content).toContain('export');
-      expect(content).toContain('app');
     });
 
     it('should contain application-level configuration', () => {

@@ -14,7 +14,7 @@ import { generateDockerfile } from '../tools/generate-dockerfile';
 import { buildImage } from '../tools/build-image';
 import { scanImage } from '../tools/scan';
 import { tagImage } from '../tools/tag-image/tool';
-import { isFail } from '../domain/types';
+import { isFail } from '@types';
 import { getRecommendedBaseImage } from '../lib/base-images';
 import { createTimer, type Logger } from '../lib/logger';
 import type { ToolContext } from '../mcp/context/types';
@@ -139,6 +139,8 @@ export async function runContainerizationWorkflow(
         sessionId,
         repoPath: projectPath,
         includeTests: true,
+        moduleRoots: params.moduleRoots,
+        language: params.language,
       },
       toolContext,
     );

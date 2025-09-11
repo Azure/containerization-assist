@@ -2,8 +2,6 @@
  * Shared types for tools to prevent circular dependencies
  */
 
-// ToolContext should now be imported directly from '@mcp/context/types'
-
 export interface AnalyzeRepoResult {
   ok: boolean;
   sessionId: string;

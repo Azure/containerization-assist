@@ -3,7 +3,7 @@
  * Shows how to register Container Assist tools with an MCP server
  */
 
-import { Server } from '@modelcontextprotocol/sdk';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { 
   ContainerAssistServer,
   registerAllTools, 
@@ -15,7 +15,7 @@ import {
  * Example 1: Register all tools with default names
  */
 async function registerAllToolsExample() {
-  const server = new Server({
+  const server = new McpServer({
     name: 'my-mcp-server',
     version: '1.0.0'
   });
@@ -24,7 +24,8 @@ async function registerAllToolsExample() {
   caServer.bindAll({ server });
   
   // Start the server
-  await server.start();
+  // McpServer uses connect() instead of start()
+  // await server.connect(transport);
 }
 
 /**
@@ -32,7 +33,7 @@ async function registerAllToolsExample() {
  */
 async function registerCustomToolsExample() {
   
-  const server = new Server({
+  const server = new McpServer({
     name: 'my-custom-server',
     version: '1.0.0'
   });
@@ -57,7 +58,8 @@ async function registerCustomToolsExample() {
   console.log('- docker_build (was: build_image)');
   console.log('- k8s_deploy (was: deploy_application)\n');
   
-  await server.start();
+  // McpServer uses connect() instead of start()
+  // await server.connect(transport);
 }
 
 /**
@@ -66,7 +68,7 @@ async function registerCustomToolsExample() {
 async function registerWithMappingExample() {
   console.log('=== Name Mapping Example ===\n');
   
-  const server = new Server({
+  const server = new McpServer({
     name: 'mapped-server',
     version: '1.0.0'
   });
@@ -94,7 +96,8 @@ async function registerWithMappingExample() {
   });
   console.log('');
   
-  await server.start();
+  // McpServer uses connect() instead of start()
+  // await server.connect(transport);
 }
 
 // Run examples (choose one)

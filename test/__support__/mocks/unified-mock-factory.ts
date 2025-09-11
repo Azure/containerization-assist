@@ -6,7 +6,7 @@
 import { jest } from '@jest/globals';
 import { nanoid } from 'nanoid';
 import { EnvironmentCapabilities } from '../utilities/environment-detector';
-import { Result, Success, Failure } from '@domain/types';
+import { Success, Failure } from '../../../src/types';
 
 export type MockBehavior = 'success' | 'failure' | 'timeout' | 'partial';
 export type SecurityFindingsLevel = 'none' | 'low' | 'medium' | 'high' | 'critical';

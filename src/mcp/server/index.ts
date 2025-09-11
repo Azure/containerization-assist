@@ -7,7 +7,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { createToolContextWithProgress } from '../context/tool-context';
+import { createMCPToolContext } from '../context/tool-context-builder';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { analyzeRepoSchema } from '../../tools/analyze-repo/schema';
@@ -27,7 +27,7 @@ import { verifyDeploymentSchema } from '../../tools/verify-deployment/schema';
 import { containerizationWorkflowSchema, deploymentWorkflowSchema } from './schemas';
 import { containerizationWorkflow } from '../../workflows/containerization';
 import { deploymentWorkflow } from '../../workflows/deployment';
-import { getContainerStatus, type Deps } from '../../app/container';
+import { getContainerStatus, type Deps } from '../../container';
 
 // Import tool functions
 import { analyzeRepo } from '../../tools/analyze-repo';
@@ -104,7 +104,10 @@ export class MCPServer {
   ) {
     this.deps = deps;
 
-    // Create SDK server with capabilities using config
+    /**
+     * Invariant: Server capabilities are immutable after construction
+     * Trade-off: Static capabilities vs. dynamic registration for predictable behavior
+     */
     this.server = new McpServer(
       {
         name: options?.name ?? deps.config.mcp.name,
@@ -127,17 +130,12 @@ export class MCPServer {
     );
 
     this.transport = new StdioServerTransport();
-    // Don't setup handlers in constructor - do it before connecting
+    /** Precondition: Handlers must be setup before connecting to prevent race conditions */
   }
 
   private setupHandlers(): void {
-    // Register all tools using McpServer's tool() method
     this.registerAllTools();
-
-    // Register workflows as tools
     this.registerWorkflowTools();
-
-    // Register a simple status resource
     this.server.resource(
       'status',
       'containerization://status',
@@ -159,13 +157,10 @@ export class MCPServer {
       },
     );
 
-    // Count this as a registered resource
     this.registeredResourceCount = 1;
-
-    // Register prompts dynamically from the prompt registry
     this.registerPromptsFromRegistry();
 
-    // Note: dockerfile-generation prompt is now registered automatically via registerPromptsFromRegistry()
+    /** Postcondition: All handlers registered, server ready for connections */
 
     this.deps.logger.info('SDK-native handlers configured');
   }
@@ -174,17 +169,18 @@ export class MCPServer {
    * Register all tools using McpServer's tool() method
    */
   private registerAllTools(): void {
-    // Register each tool directly with the McpServer using JSON schemas
     for (const [name, schema] of Object.entries(toolSchemas)) {
-      // Skip workflow schemas as they're handled separately
+      /**
+       * Invariant: Workflows are registered separately to maintain distinct lifecycle
+       * Trade-off: Code duplication vs. cleaner separation of concerns
+       */
       if (name === 'containerization' || name === 'deployment') {
         continue;
       }
 
-      // Get the Zod schema shape for this tool
+      /** Rationale: SDK requires Zod shape for automatic validation */
       const schemaShape = schema?.shape || {};
 
-      // Use the SDK's tool() method with Zod shape (SDK handles conversion)
       this.server.tool(name, `${name} tool`, schemaShape, async (params: any) => {
         this.deps.logger.info(
           {
@@ -196,7 +192,10 @@ export class MCPServer {
         );
 
         try {
-          // Ensure sessionId is provided - generate a unique one if missing
+          /**
+           * Invariant: Every tool execution must have a sessionId
+           * Rationale: Enables state persistence and workflow continuity
+           */
           if (!params.sessionId) {
             params.sessionId = randomUUID();
             this.deps.logger.debug(
@@ -205,21 +204,19 @@ export class MCPServer {
             );
           }
 
-          // Execute tool function directly
           const toolFunction = toolFunctions[name as keyof typeof toolFunctions];
           if (!toolFunction) {
             throw new McpError(ErrorCode.MethodNotFound, `Tool function not found: ${name}`);
           }
 
-          // Create ToolContext with sessionManager included
-          const context = createToolContextWithProgress(
+          const context = createMCPToolContext(
             this.getServer(),
-            {}, // empty request object since we don't have access to it here
+            {},
             this.deps.logger.child({ tool: name }),
-            undefined, // signal
-            undefined, // config
-            this.deps.promptRegistry,
-            this.deps.sessionManager, // Pass sessionManager directly
+            {
+              promptRegistry: this.deps.promptRegistry,
+              sessionManager: this.deps.sessionManager,
+            },
           );
 
           const result = await toolFunction(params, context);
@@ -262,7 +259,6 @@ export class MCPServer {
       });
     }
 
-    // Count registered tools (excluding workflows)
     this.registeredToolCount = Object.keys(toolSchemas).length - 2;
 
     this.deps.logger.info(
@@ -275,7 +271,6 @@ export class MCPServer {
    * Register workflow tools using McpServer's tool() method
    */
   private registerWorkflowTools(): void {
-    // Register containerization workflow with Zod shape
     this.server.tool(
       'containerization',
       'Containerization workflow',
@@ -286,7 +281,10 @@ export class MCPServer {
           'Executing containerization workflow',
         );
 
-        // Map MCP schema params to workflow params
+        /**
+         * Invariant: Workflow params must include projectPath and sessionId
+         * Rationale: Workflows require context for multi-step operations
+         */
         const workflowParams = {
           ...params,
           projectPath: params.repoPath || this.deps.config.workspace.workspaceDir,
@@ -300,18 +298,17 @@ export class MCPServer {
           );
         }
 
-        // Create ToolContext for the workflow with sessionManager
-        const toolContext = createToolContextWithProgress(
+        const toolContext = createMCPToolContext(
           this.getServer(),
-          {}, // empty request object since we don't have access to it here
+          {},
           this.deps.logger.child({ workflow: 'containerization' }),
-          undefined, // signal
-          undefined, // config
-          this.deps.promptRegistry,
-          this.deps.sessionManager, // Pass sessionManager directly
+          {
+            promptRegistry: this.deps.promptRegistry,
+            sessionManager: this.deps.sessionManager,
+          },
         );
 
-        // Add deps for backward compatibility
+        /** Trade-off: Extended context maintains backward compatibility while migrating to new pattern */
         const extendedContext = {
           ...toolContext,
           deps: this.deps,
@@ -334,7 +331,6 @@ export class MCPServer {
       },
     );
 
-    // Register deployment workflow with Zod shape
     this.server.tool(
       'deployment',
       'Deployment workflow',
@@ -342,7 +338,6 @@ export class MCPServer {
       async (params) => {
         this.deps.logger.info({ workflow: 'deployment' }, 'Executing deployment workflow');
 
-        // Map MCP schema params to workflow params
         const generatedSessionId = params.sessionId || randomUUID();
         if (!params.sessionId) {
           this.deps.logger.debug(
@@ -364,26 +359,20 @@ export class MCPServer {
         };
 
         // Create ToolContext for the workflow with sessionManager
-        const toolContext = createToolContextWithProgress(
+        const toolContext = createMCPToolContext(
           this.getServer(),
           {}, // empty request object since we don't have access to it here
           this.deps.logger.child({ workflow: 'deployment' }),
-          undefined, // signal
-          undefined, // config
-          this.deps.promptRegistry,
-          this.deps.sessionManager, // Pass sessionManager directly
+          {
+            promptRegistry: this.deps.promptRegistry,
+            sessionManager: this.deps.sessionManager,
+          },
         );
-
-        // Add deps for backward compatibility
-        const extendedContext = {
-          ...toolContext,
-          deps: this.deps,
-        };
 
         const result = await deploymentWorkflow.execute(
           workflowParams,
           this.deps.logger,
-          extendedContext,
+          toolContext as unknown as Record<string, unknown>,
         );
 
         return {

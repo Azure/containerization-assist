@@ -4,7 +4,7 @@
  * Tests system behavior under concurrent load
  */
 
-import { TestCase, MCPTestRunner } from '../../infrastructure/test-runner';
+import { TestCase, MCPTestRunner } from '../../services/test-runner';
 
 // Simple concurrent benchmark helper
 async function runConcurrentBenchmark(operations: Array<() => Promise<any>>, concurrency: number) {

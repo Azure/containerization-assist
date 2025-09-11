@@ -6,7 +6,7 @@
 
 import { program } from 'commander';
 import { MCPServer } from '../mcp/server';
-import { createContainer, getContainerStatus } from '../app/container';
+import { createContainer, getContainerStatus } from '../container';
 import { config, logConfigSummaryIfDev } from '../config/index';
 import { createLogger } from '../lib/logger';
 import { exit, argv, env, cwd } from 'node:process';
@@ -93,7 +93,7 @@ program.parse(argv);
 
 const options = program.opts();
 const command = program.args[0] ?? 'start';
-const defaultDockerSockets = ['/var/run/docker.sock', '~/.colima/default/docker.socket'];
+const defaultDockerSockets = ['/var/run/docker.sock', '~/.colima/default/docker.sock'];
 
 // Enhanced transport detection and logging
 function getTransportInfo(options: any): { type: 'stdio' | 'http'; details: string } {
@@ -386,7 +386,6 @@ async function main(): Promise<void> {
 
       const status = getContainerStatus(deps, true); // Server is running
       console.error('\n📊 Summary:');
-      console.error(`  • Total tools: ${status.stats.tools}`);
       console.error(`  • Total workflows: ${status.stats.workflows}`);
       console.error(`  • Resources available: ${status.stats.resources}`);
       console.error(`  • Prompts available: ${status.stats.prompts}`);
@@ -406,7 +405,6 @@ async function main(): Promise<void> {
       console.error(`Status: ${status.healthy && status.running ? '✅ Healthy' : '❌ Unhealthy'}`);
       console.error('\nServices:');
       console.error(`  ✅ MCP Server: ${status.running ? 'running' : 'stopped'}`);
-      console.error(`  📊 Tools registered: ${status.stats.tools}`);
       console.error(`  🔄 Workflows registered: ${status.stats.workflows}`);
       console.error(`  📁 Resources available: ${status.stats.resources}`);
       console.error(`  📝 Prompts available: ${status.stats.prompts}`);

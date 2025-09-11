@@ -26,7 +26,7 @@ import { getSession, updateSession } from '@mcp/tools/session-helpers';
 import type { ToolContext } from '../../mcp/context/types';
 import { createKubernetesClient } from '../../lib/kubernetes';
 import { createTimer, createLogger } from '../../lib/logger';
-import { Success, Failure, type Result } from '../../domain/types';
+import { Success, Failure, type Result } from '../../types';
 import { DEFAULT_TIMEOUTS } from '../../config/defaults';
 import type { DeployApplicationParams } from './schema';
 

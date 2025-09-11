@@ -11,7 +11,7 @@ import {
   updateSession
 } from '@mcp/tools/session-helpers';
 import type { SessionManager } from '@lib/session';
-import type { WorkflowState } from '@domain/types';
+import type { WorkflowState } from '../../../src/types';
 import type { ToolContext } from '@mcp/context/types';
 
 // Mock the session module

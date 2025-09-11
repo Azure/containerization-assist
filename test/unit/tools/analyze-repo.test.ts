@@ -41,6 +41,18 @@ jest.mock('node:fs', () => ({
   },
 }));
 
+// Mock parsing utilities
+jest.mock('../../../src/lib/parsing/package-json-utils', () => ({
+  parsePackageJson: jest.fn(),
+  getAllDependencies: jest.fn(),
+  hasPackageJson: jest.fn(),
+  detectPackageManager: jest.fn(),
+  hasDependency: jest.fn(),
+  getDependencyVersion: jest.fn(),
+  detectFrameworks: jest.fn(),
+  isMonorepo: jest.fn(),
+}));
+
 // Mock lib modules
 const mockSessionManager = {
   get: jest.fn().mockResolvedValue(null),
@@ -97,6 +109,21 @@ describe('analyzeRepo', () => {
       },
     });
     sessionHelpers.updateSession = jest.fn().mockResolvedValue({ ok: true });
+
+    // Setup package.json parsing mocks
+    const packageJsonUtils = require('../../../src/lib/parsing/package-json-utils');
+    packageJsonUtils.parsePackageJson.mockImplementation(async () => {
+      // Return the package.json structure from the test fixture
+      return nodeExpressBasicRepository['package.json'];
+    });
+    packageJsonUtils.getAllDependencies.mockImplementation((packageJson) => {
+      return {
+        ...packageJson.dependencies,
+        ...packageJson.devDependencies,
+        ...packageJson.peerDependencies,
+        ...packageJson.optionalDependencies,
+      };
+    });
 
     // Default mock implementations
     mockFs.stat.mockImplementation((filePath: string) => {
@@ -516,5 +543,27 @@ describe('analyzeRepo', () => {
         typeof content === 'string' ? content : JSON.stringify(content, null, 2)
       );
     });
+
+    // Update package.json parsing mock based on the files being set up
+    const packageJsonUtils = require('../../../src/lib/parsing/package-json-utils');
+    if (files['package.json']) {
+      const packageJsonContent = files['package.json'];
+      if (typeof packageJsonContent === 'string') {
+        // Check if it's invalid JSON (corrupted)
+        try {
+          JSON.parse(packageJsonContent);
+          packageJsonUtils.parsePackageJson.mockResolvedValue(JSON.parse(packageJsonContent));
+        } catch {
+          // Invalid JSON - mock should throw error
+          packageJsonUtils.parsePackageJson.mockRejectedValue(new Error('Invalid JSON in package.json'));
+        }
+      } else {
+        // Object - valid package.json
+        packageJsonUtils.parsePackageJson.mockResolvedValue(packageJsonContent);
+      }
+    } else {
+      // No package.json - mock should throw file not found error
+      packageJsonUtils.parsePackageJson.mockRejectedValue(new Error('No package.json found'));
+    }
   }
 });
