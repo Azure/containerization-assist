@@ -63,9 +63,9 @@ jobs:
 
       - name: Test CLI functionality
         run: |
-          chmod +x dist/apps/cli.js
-          node dist/apps/cli.js --version
-          node dist/apps/cli.js --help
+          chmod +x dist/src/cli/cli.js
+          node dist/src/cli/cli.js --version
+          node dist/src/cli/cli.js --help
 
   publish-npm:
     name: Publish to NPM

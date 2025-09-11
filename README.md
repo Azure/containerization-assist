@@ -102,19 +102,19 @@ Once installed and configured, you can use natural language commands with GitHub
 
 | Tool | Description |
 |------|-------------|
-| `analyze_repository` | Analyze repository structure and detect language/framework |
-| `resolve_base_images` | Find optimal base images for applications |
-| `generate_dockerfile` | Create optimized Dockerfiles |
-| `fix_dockerfile` | Fix and optimize existing Dockerfiles |
-| `build_image` | Build Docker images with progress tracking |
-| `scan_image` | Security vulnerability scanning with Trivy |
-| `tag_image` | Tag Docker images |
-| `push_image` | Push images to registry |
-| `generate_k8s_manifests` | Create Kubernetes deployment configurations |
-| `prepare_cluster` | Prepare Kubernetes cluster for deployment |
-| `deploy_application` | Deploy applications to Kubernetes |
-| `verify_deployment` | Verify deployment health and status |
-| `start_workflow` | Start complete containerization workflow |
+| `analyze-repo` | Analyze repository structure and detect language/framework |
+| `resolve-base-images` | Find optimal base images for applications |
+| `generate-dockerfile` | Create optimized Dockerfiles |
+| `fix-dockerfile` | Fix and optimize existing Dockerfiles |
+| `build-image` | Build Docker images with progress tracking |
+| `scan` | Security vulnerability scanning with Trivy |
+| `tag-image` | Tag Docker images |
+| `push-image` | Push images to registry |
+| `generate-k8s-manifests` | Create Kubernetes deployment configurations |
+| `prepare-cluster` | Prepare Kubernetes cluster for deployment |
+| `deploy` | Deploy applications to Kubernetes |
+| `verify-deployment` | Verify deployment health and status |
+| `workflow` | Start complete containerization workflow |
 | `ops` | Operational tools (ping, health, registry) |
 
 ## Supported Technologies

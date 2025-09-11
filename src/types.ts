@@ -4,59 +4,28 @@
  */
 
 import type { Logger } from 'pino';
-import type { ToolContext } from './mcp/context/types';
+import type { ToolContext } from './mcp/context';
 import type { ZodRawShape } from 'zod';
+
+// Export enhanced category types
+export * from './types/categories';
 
 /**
  * Result type for functional error handling
  *
- * DESIGN DECISION: Why Result<T> instead of exceptions?
- *
- * This pattern was chosen over traditional try/catch exception handling for several reasons:
- *
- * 1. **Explicit Error Handling**: Forces consumers to handle errors explicitly at the type level
- *    - TypeScript compiler ensures error cases aren't ignored
- *    - Makes error paths visible in the function signature
- *    - Prevents accidental exception bubbling that breaks the MCP protocol
- *
- * 2. **MCP Protocol Compatibility**: The Model Context Protocol expects structured responses
- *    - Exceptions would break the JSON-RPC message flow
- *    - Result<T> ensures all responses are serializable
- *    - Enables graceful error reporting to AI models
- *
- * 3. **Async Chain Safety**: Prevents unhandled promise rejections
- *    - Traditional exceptions can be lost in async chains
- *    - Result<T> makes error propagation explicit and safe
- *    - Enables better error aggregation in workflows
- *
- * 4. **Functional Programming Alignment**: Supports railway-oriented programming
- *    - Enables clean error composition and transformation
- *    - Allows building robust workflows from potentially-failing operations
- *    - Makes error recovery patterns more predictable
- *
- * Trade-offs accepted:
- * - Slightly more verbose than exceptions (requires .ok checks)
- * - Different from typical JavaScript patterns (but aligns with Rust/Go)
- * - Learning curve for developers used to exception-based error handling
+ * Provides explicit error handling without exceptions to ensure:
+ * - Type-safe error propagation
+ * - MCP protocol compatibility (no exception bubbling)
+ * - Clean async chain composition
  *
  * @example
  * ```typescript
- * // Instead of this (exception-based):
- * try {
- *   const result = await riskyOperation();
- *   return processResult(result);
- * } catch (error) {
- *   logger.error(error);
- *   throw new Error('Operation failed');
+ * const result = await riskyOperation();
+ * if (result.ok) {
+ *   console.log(result.value);
+ * } else {
+ *   console.error(result.error);
  * }
- *
- * // Use this (Result-based):
- * const result = await riskyOperation(); // Returns Result<T>
- * if (!result.ok) {
- *   logger.error(result.error);
- *   return Failure('Operation failed');
- * }
- * return Success(processResult(result.value));
  * ```
  */
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
@@ -70,7 +39,7 @@ export const Failure = <T>(error: string): Result<T> => ({ ok: false, error });
 /** Type guard to check if result is a failure */
 export const isFail = <T>(result: Result<T>): result is { ok: false; error: string } => !result.ok;
 
-export type { ToolContext } from './mcp/context/types';
+export type { ToolContext } from './mcp/context';
 
 /**
  * Tool definition for MCP server operations.
@@ -136,4 +105,38 @@ export interface AIService {
   ): Promise<Result<string>>;
   validateParameters?(params: Record<string, unknown>): Promise<Result<unknown>>;
   analyzeResults?(results: unknown): Promise<Result<unknown>>;
+}
+
+// ===== TOOL RESULT TYPES =====
+
+export interface AnalyzeRepoResult {
+  ok: boolean;
+  sessionId: string;
+  language: string;
+  languageVersion?: string;
+  framework?: string;
+  frameworkVersion?: string;
+  buildSystem?: {
+    type: string;
+    file: string;
+    buildCommand: string;
+    testCommand?: string;
+  };
+  dependencies: Array<{ name: string; version?: string; type: string }>;
+  ports: number[];
+  hasDockerfile: boolean;
+  hasDockerCompose: boolean;
+  hasKubernetes: boolean;
+  recommendations: {
+    baseImage: string;
+    buildStrategy: 'multi-stage' | 'single-stage';
+    securityNotes: string[];
+  };
+  metadata: {
+    repoPath: string;
+    depth: number;
+    timestamp: number;
+    includeTests?: boolean;
+    aiInsights?: unknown;
+  };
 }

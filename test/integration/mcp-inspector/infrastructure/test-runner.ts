@@ -5,31 +5,29 @@
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import type { TestResult, PerformanceMetrics } from '../../../../src/types/consolidated-types.js';
+import { extractErrorMessage, formatErrorMessage } from '../../../../src/lib/error-utils.js';
 
 export interface TestCase {
   name: string;
   category: TestCategory;
   description?: string;
   setup?: () => Promise<void>;
-  execute: () => Promise<TestResult>;
+  execute: () => Promise<TestInfrastructureResult>;
   cleanup?: () => Promise<void>;
   timeout?: number;
   tags?: string[];
 }
 
-export interface TestResult {
-  success: boolean;
-  duration: number;
-  message?: string;
-  details?: Record<string, unknown>;
-  performance?: PerformanceMetrics;
-}
-
-export interface PerformanceMetrics {
-  responseTime: number;
-  memoryUsage: number;
+// Using TestResult and PerformanceMetrics from consolidated types
+// Additional properties specific to test infrastructure
+export interface TestInfrastructurePerformanceMetrics extends PerformanceMetrics {
   resourceSize?: number;
   operationCount?: number;
+}
+
+export interface TestInfrastructureResult extends TestResult {
+  performance?: TestInfrastructurePerformanceMetrics;
 }
 
 export type TestCategory = 
@@ -54,7 +52,7 @@ export interface TestSuiteResults {
   failed: number;
   skipped: number;
   totalDuration: number;
-  results: Array<TestResult & { testName: string }>;
+  results: Array<TestInfrastructureResult & { testName: string }>;
   performance: {
     avgResponseTime: number;
     maxMemoryUsage: number;
@@ -124,7 +122,7 @@ export class MCPTestRunner {
     }
 
     const filteredTests = this.filterTests(filter);
-    const results: Array<TestResult & { testName: string }> = [];
+    const results: Array<TestInfrastructureResult & { testName: string }> = [];
     let passed = 0;
     let failed = 0;
     let skipped = 0;
@@ -146,12 +144,12 @@ export class MCPTestRunner {
         }
       } catch (error) {
         failed++;
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage = extractErrorMessage(error);
         results.push({
           testName,
           success: false,
           duration: 0,
-          message: `Test execution failed: ${errorMessage}`
+          message: formatErrorMessage('Test execution failed', error)
         });
         console.log(`💥 ${testName} - ${errorMessage}`);
       }
@@ -178,7 +176,7 @@ export class MCPTestRunner {
     }
 
     const tests = testNames.map(name => this.testCases.get(name)).filter(Boolean) as TestCase[];
-    const results: Array<TestResult & { testName: string }> = [];
+    const results: Array<TestInfrastructureResult & { testName: string }> = [];
     
     // Run tests in batches
     for (let i = 0; i < tests.length; i += concurrency) {
@@ -216,7 +214,7 @@ export class MCPTestRunner {
     return this.client;
   }
 
-  private async runSingleTest(testCase: TestCase): Promise<TestResult> {
+  private async runSingleTest(testCase: TestCase): Promise<TestInfrastructureResult> {
     const startTime = performance.now();
     const initialMemory = process.memoryUsage().heapUsed;
 
@@ -246,8 +244,8 @@ export class MCPTestRunner {
         performance: {
           responseTime: result.performance?.responseTime || (endTime - startTime),
           memoryUsage: finalMemory - initialMemory,
-          resourceSize: result.performance?.resourceSize,
-          operationCount: result.performance?.operationCount
+          ...(result.performance?.resourceSize !== undefined && { resourceSize: result.performance.resourceSize }),
+          ...(result.performance?.operationCount !== undefined && { operationCount: result.performance.operationCount })
         }
       };
     } catch (error) {
@@ -255,7 +253,7 @@ export class MCPTestRunner {
       return {
         success: false,
         duration: endTime - startTime,
-        message: error instanceof Error ? error.message : String(error)
+        message: extractErrorMessage(error)
       };
     }
   }
@@ -293,7 +291,7 @@ export class MCPTestRunner {
     return filtered;
   }
 
-  private calculatePerformanceStats(results: Array<TestResult & { testName: string }>) {
+  private calculatePerformanceStats(results: Array<TestInfrastructureResult & { testName: string }>) {
     const responseTimes = results.map(r => r.performance?.responseTime || r.duration);
     const memoryUsages = results.map(r => r.performance?.memoryUsage || 0);
     const operations = results.reduce((sum, r) => sum + (r.performance?.operationCount || 1), 0);
@@ -305,7 +303,7 @@ export class MCPTestRunner {
     };
   }
 
-  private timeoutPromise(timeout: number): Promise<TestResult> {
+  private timeoutPromise(timeout: number): Promise<TestInfrastructureResult> {
     return new Promise((_, reject) => {
       setTimeout(() => {
         reject(new Error(`Test timed out after ${timeout}ms`));

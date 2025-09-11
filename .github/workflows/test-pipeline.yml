@@ -29,7 +29,7 @@ jobs:
         run: npm ci
       
       - name: Run validation pipeline
-        run: npm run validate:pr:fast
+        run: npm run validate:pr
         env:
           DOCKER_AVAILABLE: true
       

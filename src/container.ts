@@ -1,166 +1,114 @@
 /**
  * Dependency Injection Container
  *
- * Provides typed dependency injection for all services with support for testing overrides.
- * Creates and manages application dependencies and services.
+ * Simple dependency creation and management for the application.
  */
 
 import type { Logger } from 'pino';
 import { createLogger } from './lib/logger';
 import { createSessionManager, SessionManager } from './lib/session';
-import { PromptRegistry } from './prompts/registry';
+import * as promptRegistry from './prompts/registry';
+import { join } from 'path';
 import * as resourceManager from './resources/manager';
-import type { AIService } from '@types';
+import type { AIService } from './types';
 import { createAppConfig, type AppConfig } from './config/app-config';
-import { createDockerClient, type DockerClient } from './services/docker/client';
-import { createKubernetesClient, type KubernetesClient } from './services/kubernetes/client';
+import { createDockerClient, type DockerClient } from './services/docker-client';
+import { createKubernetesClient, type KubernetesClient } from './services/kubernetes-client';
 
 /**
- * All application dependencies with their types
+ * Application dependencies
  */
-export interface Deps {
-  // Configuration
+export interface Dependencies {
   config: AppConfig;
-
-  // Core services
   logger: Logger;
   sessionManager: SessionManager;
-
-  // Infrastructure clients
   dockerClient: DockerClient;
   kubernetesClient: KubernetesClient;
-
-  // MCP services
-  promptRegistry: PromptRegistry;
+  promptRegistry: typeof promptRegistry;
   resourceManager: typeof import('./resources/manager');
-
-  // Optional AI services
   aiService?: AIService;
 }
 
 /**
- * Container environment presets
+ * Create application dependencies
  */
-type ContainerEnvironment = 'default' | 'test' | 'mcp';
+export function createDependencies(config?: AppConfig): Dependencies {
+  const appConfig = config ?? createAppConfig();
 
-/**
- * Configuration overrides for dependency creation
- */
-export interface ContainerConfigOverrides {
-  // Use custom configuration instead of default
-  config?: AppConfig;
+  const logger = createLogger({
+    name: appConfig.mcp.name,
+    level: appConfig.server.logLevel,
+  });
 
-  // Environment preset
-  environment?: ContainerEnvironment;
+  const sessionManager = createSessionManager(logger, {
+    ttl: appConfig.session.ttl,
+    maxSessions: appConfig.session.maxSessions,
+    cleanupIntervalMs: appConfig.session.cleanupInterval,
+  });
 
-  // AI configuration
-  ai?: {
-    enabled?: boolean;
-  };
-}
-
-/**
- * Partial dependency overrides for testing
- */
-export type DepsOverrides = Partial<Deps>;
-
-/**
- * Create application container with all dependencies
- */
-export async function createContainer(
-  configOverrides: ContainerConfigOverrides = {},
-  depsOverrides: DepsOverrides = {},
-): Promise<Deps> {
-  // Use provided config or create default
-  const appConfig = configOverrides.config ?? createAppConfig();
-
-  // Apply environment-specific overrides
-  const environment = configOverrides.environment ?? 'default';
-  if (environment === 'test') {
-    appConfig.server.logLevel = 'error'; // Quiet logs during tests
-    appConfig.session.ttl = 60; // Short TTL for tests
-    appConfig.session.maxSessions = 10;
-    appConfig.workspace.maxFileSize = 1024 * 1024; // 1MB max for tests
-  } else if (environment === 'mcp') {
-    appConfig.mcp.name = 'mcp-server';
-  }
-
-  // Create logger first as other services depend on it
-  const logger =
-    depsOverrides.logger ??
-    createLogger({
-      name: appConfig.mcp.name,
-      level: appConfig.server.logLevel,
-    });
-
-  // Create session manager using config
-  const sessionManager =
-    depsOverrides.sessionManager ??
-    createSessionManager(logger, {
-      ttl: appConfig.session.ttl,
-      maxSessions: appConfig.session.maxSessions,
-      cleanupIntervalMs: appConfig.session.cleanupInterval,
-    });
-
-  // Create infrastructure clients
-  const dockerClient = depsOverrides.dockerClient ?? createDockerClient(logger);
-  const kubernetesClient = depsOverrides.kubernetesClient ?? createKubernetesClient(logger);
-
-  // Create prompt registry
-  const promptRegistry = depsOverrides.promptRegistry ?? new PromptRegistry(logger);
-  if (!depsOverrides.promptRegistry) {
-    await promptRegistry.initialize();
-  }
-
-  // Use resource manager namespace directly
-  const resourceMgr = depsOverrides.resourceManager ?? resourceManager;
-
-  const deps: Deps = {
+  return {
     config: appConfig,
     logger,
     sessionManager,
-    dockerClient,
-    kubernetesClient,
+    dockerClient: createDockerClient(logger),
+    kubernetesClient: createKubernetesClient(logger),
     promptRegistry,
-    resourceManager: resourceMgr,
+    resourceManager,
   };
-
-  logger.info(
-    {
-      config: {
-        nodeEnv: appConfig.server.nodeEnv,
-        logLevel: appConfig.server.logLevel,
-        port: appConfig.server.port,
-        maxSessions: appConfig.mcp.maxSessions,
-        dockerSocket: appConfig.docker.socketPath,
-        k8sNamespace: appConfig.kubernetes.namespace,
-      },
-      services: {
-        logger: deps.logger !== undefined,
-        sessionManager: deps.sessionManager !== undefined,
-        dockerClient: deps.dockerClient !== undefined,
-        kubernetesClient: deps.kubernetesClient !== undefined,
-        promptRegistry: deps.promptRegistry !== undefined,
-        resourceManager: deps.resourceManager !== undefined,
-      },
-    },
-    'Dependency container created',
-  );
-
-  return deps;
 }
 
 /**
- * Create container specifically for MCP server usage
+ * Create test dependencies with appropriate defaults
  */
+export function createTestDependencies(overrides?: Partial<Dependencies>): Dependencies {
+  const testConfig = createAppConfig();
+  // Apply test-specific settings
+  testConfig.server.logLevel = 'error';
+  testConfig.session.ttl = 60;
+  testConfig.session.maxSessions = 10;
+  testConfig.workspace.maxFileSize = 1024 * 1024; // 1MB
+
+  const base = createDependencies(testConfig);
+  return { ...base, ...overrides };
+}
 
 /**
- * Gracefully shutdown all services in the container
+ * Initialize asynchronous dependencies
  */
-export async function shutdownContainer(deps: Deps): Promise<void> {
+export async function initializeDependencies(deps: Dependencies): Promise<void> {
+  // Initialize prompt registry
+  await deps.promptRegistry.initializePrompts(join(process.cwd(), 'src', 'prompts'), deps.logger);
+
+  deps.logger.info(
+    {
+      config: {
+        nodeEnv: deps.config.server.nodeEnv,
+        logLevel: deps.config.server.logLevel,
+        port: deps.config.server.port,
+        maxSessions: deps.config.mcp.maxSessions,
+        dockerSocket: deps.config.docker.socketPath,
+        k8sNamespace: deps.config.kubernetes.namespace,
+      },
+      services: {
+        logger: true,
+        sessionManager: true,
+        dockerClient: true,
+        kubernetesClient: true,
+        promptRegistry: true,
+        resourceManager: true,
+      },
+    },
+    'Dependencies initialized',
+  );
+}
+
+/**
+ * Gracefully shutdown all services
+ */
+export async function shutdownDependencies(deps: Dependencies): Promise<void> {
   const { logger, sessionManager } = deps;
 
-  logger.info('Shutting down container services...');
+  logger.info('Shutting down services...');
 
   try {
     // Close session manager (stops cleanup timers)
@@ -173,17 +121,17 @@ export async function shutdownContainer(deps: Deps): Promise<void> {
       await deps.resourceManager.cleanup();
     }
 
-    logger.info('Container shutdown complete');
+    logger.info('Shutdown complete');
   } catch (error) {
-    logger.error({ error }, 'Error during container shutdown');
+    logger.error({ error }, 'Error during shutdown');
     throw error;
   }
 }
 
 /**
- * Container status information
+ * Status information
  */
-export interface ContainerStatus {
+export interface SystemStatus {
   healthy: boolean;
   running: boolean;
   services: Record<string, boolean>;
@@ -192,18 +140,13 @@ export interface ContainerStatus {
     prompts: number;
     workflows: number;
   };
-  details?: Record<string, unknown>;
 }
 
 /**
- * Health check for container services
+ * Get system status
  */
-function checkContainerHealth(deps: Deps): {
-  healthy: boolean;
-  services: Record<string, boolean>;
-  details?: Record<string, unknown>;
-} {
-  const requiredServices = {
+export function getSystemStatus(deps: Dependencies, serverRunning = false): SystemStatus {
+  const services = {
     logger: deps.logger !== undefined,
     sessionManager: deps.sessionManager !== undefined,
     dockerClient: deps.dockerClient !== undefined,
@@ -212,39 +155,17 @@ function checkContainerHealth(deps: Deps): {
     resourceManager: deps.resourceManager !== undefined,
   };
 
-  const healthy = Object.values(requiredServices).every(Boolean);
-
-  const details = {
-    promptCount: deps.promptRegistry.getPromptNames().length,
-    resourceStats: 'getStats' in deps.resourceManager ? deps.resourceManager.getStats() : undefined,
-  };
-
-  return {
-    healthy,
-    services: requiredServices,
-    details,
-  };
-}
-
-/**
- * Get comprehensive container status
- * This is the single source of truth for system status
- */
-export function getContainerStatus(deps: Deps, serverRunning: boolean = false): ContainerStatus {
-  const healthCheck = checkContainerHealth(deps);
-
   const promptCount = deps.promptRegistry.getPromptNames().length;
   const resourceStats = deps.resourceManager.getStats();
 
   return {
-    healthy: healthCheck.healthy,
+    healthy: Object.values(services).every(Boolean),
     running: serverRunning,
-    services: healthCheck.services,
+    services,
     stats: {
       resources: resourceStats.total,
       prompts: promptCount,
-      workflows: 2, // containerization and deployment workflows
+      workflows: 2,
     },
-    ...(healthCheck.details && { details: healthCheck.details }),
   };
 }

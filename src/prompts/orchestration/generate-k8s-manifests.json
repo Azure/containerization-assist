@@ -1,0 +1,87 @@
+{
+  "id": "generate-k8s-manifests",
+  "category": "orchestration",
+  "description": "Generate Kubernetes manifests for containerized applications",
+  "version": "1.0",
+  "parameters": [
+    {
+      "name": "appName",
+      "type": "string",
+      "required": true,
+      "description": "Application name for the deployment"
+    },
+    {
+      "name": "imageId",
+      "type": "string",
+      "required": true,
+      "description": "Docker image to deploy"
+    },
+    {
+      "name": "namespace",
+      "type": "string",
+      "required": false,
+      "description": "Kubernetes namespace (defaults to default)"
+    },
+    {
+      "name": "replicas",
+      "type": "number",
+      "required": false,
+      "description": "Number of replicas to deploy"
+    },
+    {
+      "name": "ports",
+      "type": "string",
+      "required": false,
+      "description": "Comma-separated port numbers to expose"
+    },
+    {
+      "name": "environment",
+      "type": "string",
+      "required": false,
+      "description": "Target environment (development, staging, production)"
+    },
+    {
+      "name": "resources",
+      "type": "string",
+      "required": false,
+      "description": "Resource limits and requests specification"
+    },
+    {
+      "name": "securityLevel",
+      "type": "string",
+      "required": false,
+      "description": "Security level (standard, strict)"
+    },
+    {
+      "name": "highAvailability",
+      "type": "boolean",
+      "required": false,
+      "description": "Enable high availability features"
+    },
+    {
+      "name": "bestPractices",
+      "type": "array",
+      "required": false,
+      "description": "Knowledge-base best practices recommendations"
+    },
+    {
+      "name": "examples",
+      "type": "array",
+      "required": false,
+      "description": "Relevant code examples from knowledge base"
+    },
+    {
+      "name": "securityRecommendations",
+      "type": "array",
+      "required": false,
+      "description": "Security-specific recommendations from knowledge base"
+    },
+    {
+      "name": "knowledgeSuggestions",
+      "type": "array",
+      "required": false,
+      "description": "Detailed suggestions with reasons from knowledge base"
+    }
+  ],
+  "template": "Generate production-ready Kubernetes manifests for containerized application.\n\nApplication Details:\n- Name: {{appName}}\n- Image: {{imageId}}\n{{#namespace}}\n- Namespace: {{namespace}}\n{{/namespace}}\n{{#replicas}}\n- Replicas: {{replicas}}\n{{/replicas}}\n{{#ports}}\n- Ports: {{ports}}\n{{/ports}}\n{{#environment}}\n- Environment: {{environment}}\n{{/environment}}\n\n{{#resources}}\nResource Requirements:\n{{resources}}\n{{/resources}}\n\nConfiguration:\n{{#securityLevel}}\n- Security Level: {{securityLevel}}\n{{/securityLevel}}\n{{#highAvailability}}\n- High Availability: enabled\n{{/highAvailability}}\n\n{{#bestPractices}}Best Practices (from knowledge base):\n{{#.}}- {{.}}\n{{/.}}{{/bestPractices}}\n\n{{#examples}}Relevant Examples:\n{{#.}}- {{.}}\n{{/.}}{{/examples}}\n\n{{#securityRecommendations}}Security Recommendations:\n{{#.}}- {{.}}\n{{/.}}{{/securityRecommendations}}\n\n{{#knowledgeSuggestions}}Knowledge-Based Suggestions:\n{{#.}}- {{recommendation}} ({{reason}})\n{{/.}}{{/knowledgeSuggestions}}\n\nGenerate complete YAML manifests with the following requirements:\n\n1. **Deployment Manifest:**\n   - Use appropriate resource limits and requests\n   - Include health checks (readiness/liveness probes)\n   - Set security contexts (non-root user when possible)\n   - Use proper labeling and selectors\n   - Include restart policies\n\n2. **Service Manifest:**\n   - Appropriate service type for the environment\n   - Proper port configuration\n   - Correct selectors matching deployment labels\n\n3. **Additional Manifests (if requested):**\n   - ConfigMap for configuration (if needed)\n   - Ingress for external access (if production environment)\n   - HorizontalPodAutoscaler for scaling (if production)\n   - PodDisruptionBudget for high availability\n   - NetworkPolicy for security (if strict security level)\n\nBest Practices:\n{{#bestPractices}}{{#.}}- {{.}}\n{{/.}}{{/bestPractices}}\n- Use specific image tags (avoid :latest in production)\n- Set resource limits to prevent resource starvation\n- Include proper labels for monitoring and management\n- Use namespaces for environment isolation\n- Enable security contexts for better security posture\n{{#securityRecommendations}}{{#.}}- {{.}}\n{{/.}}{{/securityRecommendations}}\n- Include annotations for better observability\n\nReturn only the YAML manifests separated by \"---\" without explanation or code fences.\n"
+}

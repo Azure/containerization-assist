@@ -1,9 +1,9 @@
-import type { ProgressReporter } from '@mcp/context/types';
+import type { ProgressReporter } from '@mcp/context';
 import {
   STANDARD_STAGES,
   createStandardProgress,
   reportProgress,
-} from '@mcp/utils/progress-helper';
+} from '@mcp/progress-helper';
 
 describe('progress-helper', () => {
   describe('STANDARD_STAGES', () => {

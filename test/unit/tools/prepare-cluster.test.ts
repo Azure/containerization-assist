@@ -46,7 +46,7 @@ jest.mock('@lib/kubernetes', () => ({
 }));
 
 // Mock MCP helper modules
-jest.mock('@mcp/tools/session-helpers');
+jest.mock('@mcp/tool-session-helpers');
 
 // wrapTool mock removed - tool now uses direct implementation
 
@@ -70,7 +70,7 @@ describe('prepareCluster', () => {
     };
 
     // Get mocked functions
-    const sessionHelpers = require('@mcp/tools/session-helpers');
+    const sessionHelpers = require('@mcp/tool-session-helpers');
     mockGetSession = sessionHelpers.getSession = jest.fn();
     mockUpdateSession = sessionHelpers.updateSession = jest.fn();
 

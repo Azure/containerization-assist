@@ -7,11 +7,11 @@ import type { Logger } from 'pino';
 import {
   createToolContext,
   createMCPToolContext,
-} from '@mcp/context/tool-context-builder';
+} from '@mcp/context';
 import {
   extractProgressToken,
   createProgressReporter,
-} from '@mcp/context/progress';
+} from '@mcp/context';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
 // Mock server and logger
@@ -43,7 +43,7 @@ describe('ToolContext Bridge', () => {
       };
       (mockServer.createMessage as jest.Mock).mockResolvedValue(mockResponse);
 
-      const context = createToolContext({ server: mockServer, logger: mockLogger });
+      const context = createToolContext(mockServer, mockLogger);
 
       expect(context).toHaveProperty('sampling');
       expect(context).toHaveProperty('getPrompt');
@@ -57,7 +57,7 @@ describe('ToolContext Bridge', () => {
       };
       (mockServer.createMessage as jest.Mock).mockResolvedValue(mockResponse);
 
-      const context = createToolContext({ server: mockServer, logger: mockLogger });
+      const context = createToolContext(mockServer, mockLogger);
       const result = await context.sampling.createMessage({
         messages: [
           {
@@ -100,7 +100,7 @@ describe('ToolContext Bridge', () => {
       };
       (mockServer.createMessage as jest.Mock).mockResolvedValue(mockResponse);
 
-      const context = createToolContext({ server: mockServer, logger: mockLogger });
+      const context = createToolContext(mockServer, mockLogger);
 
       await expect(
         context.sampling.createMessage({
@@ -120,7 +120,7 @@ describe('ToolContext Bridge', () => {
       };
       (mockServer.createMessage as jest.Mock).mockResolvedValue(mockResponse as any);
 
-      const context = createToolContext({ server: mockServer, logger: mockLogger });
+      const context = createToolContext(mockServer, mockLogger);
 
       await expect(
         context.sampling.createMessage({
@@ -135,7 +135,7 @@ describe('ToolContext Bridge', () => {
     });
 
     test('getPrompt returns error response when no prompt registry available', async () => {
-      const context = createToolContext({ server: mockServer, logger: mockLogger });
+      const context = createToolContext(mockServer, mockLogger);
 
       const result = await context.getPrompt('test-prompt');
       
@@ -169,7 +169,9 @@ describe('ToolContext Bridge', () => {
       };
 
       const context = createToolContext(
-        { server: mockServer, logger: mockLogger, promptRegistry: mockPromptRegistry as any }
+        mockServer,
+        mockLogger,
+        { promptRegistry: mockPromptRegistry as any }
       );
 
       const result = await context.getPrompt('test-prompt', { arg1: 'value1' });
@@ -191,7 +193,8 @@ describe('ToolContext Bridge', () => {
     test('forwards abort signal', () => {
       const abortController = new AbortController();
       const context = createToolContext(
-        { server: mockServer, logger: mockLogger },
+        mockServer,
+        mockLogger,
         { signal: abortController.signal }
       );
 
@@ -201,7 +204,8 @@ describe('ToolContext Bridge', () => {
     test('includes progress reporter if provided', () => {
       const mockProgressReporter = jest.fn();
       const context = createToolContext(
-        { server: mockServer, logger: mockLogger },
+        mockServer,
+        mockLogger,
         { progress: mockProgressReporter }
       );
 
@@ -311,7 +315,7 @@ describe('ToolContext Bridge', () => {
       };
       (mockServer.createMessage as jest.Mock).mockResolvedValue(mockResponse);
 
-      const context = createToolContext({ server: mockServer, logger: mockLogger });
+      const context = createToolContext(mockServer, mockLogger);
       await context.sampling.createMessage({
         messages: [
           {
@@ -343,7 +347,7 @@ describe('ToolContext Bridge', () => {
       const mockError = new Error('Sampling failed');
       (mockServer.createMessage as jest.Mock).mockRejectedValue(mockError);
 
-      const context = createToolContext({ server: mockServer, logger: mockLogger });
+      const context = createToolContext(mockServer, mockLogger);
 
       await expect(
         context.sampling.createMessage({

@@ -45,13 +45,13 @@ const WORKFLOW_DEFINITIONS: Record<string, WorkflowDefinition> = {
         skipIf: 'no_build',
       },
       {
-        toolName: 'scan',
+        toolName: 'scan-image',
         description: 'Scanning image for vulnerabilities',
         required: false,
         skipIf: 'no_scan',
       },
       {
-        toolName: 'push',
+        toolName: 'push-image',
         description: 'Pushing image to registry',
         required: false,
         skipIf: 'no_push',
@@ -75,7 +75,7 @@ const WORKFLOW_DEFINITIONS: Record<string, WorkflowDefinition> = {
         required: true,
       },
       {
-        toolName: 'deploy',
+        toolName: 'deploy-application',
         description: 'Deploying application to cluster',
         required: true,
       },
@@ -98,7 +98,7 @@ const WORKFLOW_DEFINITIONS: Record<string, WorkflowDefinition> = {
         required: true,
       },
       {
-        toolName: 'scan',
+        toolName: 'scan-image',
         description: 'Scanning for vulnerabilities',
         required: true,
       },

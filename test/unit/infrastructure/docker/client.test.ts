@@ -5,7 +5,7 @@ import { join } from 'node:path';
 describe('Docker Client', () => {
   describe('Module Structure', () => {
     it('should have docker client implementation file', () => {
-      const clientPath = join(__dirname, '../../../../src/services/docker/client.ts');
+      const clientPath = join(__dirname, '../../../../src/services/docker-client.ts');
       const content = readFileSync(clientPath, 'utf-8');
       
       expect(content).toContain('createDockerClient');
@@ -17,7 +17,7 @@ describe('Docker Client', () => {
     });
 
     it('should define proper interface types', () => {
-      const clientPath = join(__dirname, '../../../../src/services/docker/client.ts');
+      const clientPath = join(__dirname, '../../../../src/services/docker-client.ts');
       const content = readFileSync(clientPath, 'utf-8');
       
       expect(content).toContain('DockerBuildOptions');
@@ -27,7 +27,7 @@ describe('Docker Client', () => {
     });
 
     it('should use Result pattern for error handling', () => {
-      const clientPath = join(__dirname, '../../../../src/services/docker/client.ts');
+      const clientPath = join(__dirname, '../../../../src/services/docker-client.ts');
       const content = readFileSync(clientPath, 'utf-8');
       
       expect(content).toContain('Result<');
@@ -36,7 +36,7 @@ describe('Docker Client', () => {
     });
 
     it('should integrate with dockerode library', () => {
-      const clientPath = join(__dirname, '../../../../src/services/docker/client.ts');
+      const clientPath = join(__dirname, '../../../../src/services/docker-client.ts');
       const content = readFileSync(clientPath, 'utf-8');
       
       expect(content).toContain('dockerode');
@@ -46,7 +46,7 @@ describe('Docker Client', () => {
 
   describe('Client Configuration', () => {
     it('should support build configuration options', () => {
-      const clientPath = join(__dirname, '../../../../src/services/docker/client.ts');
+      const clientPath = join(__dirname, '../../../../src/services/docker-client.ts');
       const content = readFileSync(clientPath, 'utf-8');
       
       expect(content).toContain('dockerfile');
@@ -56,7 +56,7 @@ describe('Docker Client', () => {
     });
 
     it('should support logging integration', () => {
-      const clientPath = join(__dirname, '../../../../src/services/docker/client.ts');
+      const clientPath = join(__dirname, '../../../../src/services/docker-client.ts');
       const content = readFileSync(clientPath, 'utf-8');
       
       expect(content).toContain('Logger');
@@ -68,7 +68,7 @@ describe('Docker Client', () => {
 
   describe('Client Export', () => {
     it('should export createDockerClient function', async () => {
-      const clientModule = await import('../../../../src/services/docker/client');
+      const clientModule = await import('../../../../src/services/docker-client');
       expect(clientModule.createDockerClient).toBeDefined();
       expect(typeof clientModule.createDockerClient).toBe('function');
     });

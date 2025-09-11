@@ -14,10 +14,11 @@ import { generateDockerfile } from '../tools/generate-dockerfile';
 import { buildImage } from '../tools/build-image';
 import { scanImage } from '../tools/scan';
 import { tagImage } from '../tools/tag-image/tool';
-import { isFail } from '@types';
+import { isFail } from '../types';
 import { getRecommendedBaseImage } from '../lib/base-images';
 import { createTimer, type Logger } from '../lib/logger';
-import type { ToolContext } from '../mcp/context/types';
+import type { ToolContext } from '../mcp/context';
+import { extractErrorMessage } from '../lib/error-utils';
 import type {
   ContainerizationWorkflowParams,
   ContainerizationWorkflowResult,
@@ -186,6 +187,7 @@ export async function runContainerizationWorkflow(
     const dockerfileResult = await generateDockerfile(
       {
         sessionId,
+        repoPath: projectPath,
         baseImage:
           analysis.recommendations?.baseImage ||
           getRecommendedBaseImage(analysis.language || 'javascript'),
@@ -257,6 +259,7 @@ export async function runContainerizationWorkflow(
     const buildResult = await buildImage(
       {
         sessionId,
+        imageName: `${analysis.language || 'app'}-app`,
         dockerfile: dockerfile.path,
         context: buildOptions.contextPath || projectPath,
         buildArgs: buildOptions.buildArgs || {},
@@ -480,7 +483,7 @@ export async function runContainerizationWorkflow(
     };
   } catch (error) {
     const endTime = new Date();
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorMessage = extractErrorMessage(error);
 
     // Mark current step as failed
     const currentStepObj = steps.find((s) => s.name === context.currentStep);

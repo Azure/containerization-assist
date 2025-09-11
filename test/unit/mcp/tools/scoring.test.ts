@@ -11,7 +11,7 @@ import {
   extractK8sResources,
   normalizeScore,
   weightedAverage,
-} from '@mcp/tools/ai-helpers';
+} from '@mcp/tool-ai-helpers';
 
 describe('Scoring Helper Utilities', () => {
   describe('detectMultistageDocker', () => {

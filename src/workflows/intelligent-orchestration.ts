@@ -1,6 +1,7 @@
-import { Success, Failure, type Result, type Tool } from '@types';
+import { Success, Failure, type Result, type Tool } from '../types';
 import type { Logger } from 'pino';
-import type { ProgressReporter } from '@mcp/context/types';
+import type { ProgressReporter } from '@mcp/context';
+import { extractErrorMessage } from '../lib/error-utils';
 
 type WorkflowStep = {
   toolName: string;
@@ -91,7 +92,7 @@ const planWorkflowSteps = async (
 
     if (params.scanImage !== false && !sessionState?.completed_steps?.includes('scan')) {
       steps.push({
-        toolName: 'scan',
+        toolName: 'scan-image',
         parameters: { ...params, sessionId },
         description: 'Scanning image for vulnerabilities',
         required: false,
@@ -104,7 +105,7 @@ const planWorkflowSteps = async (
 
     if (params.pushImage && params.registry && !sessionState?.completed_steps?.includes('push')) {
       steps.push({
-        toolName: 'push',
+        toolName: 'push-image',
         parameters: { ...params, sessionId },
         description: 'Pushing image to registry',
         required: false,
@@ -133,7 +134,7 @@ const planWorkflowSteps = async (
         required: true,
       },
       {
-        toolName: 'deploy',
+        toolName: 'deploy-application',
         parameters: { ...params, sessionId },
         description: 'Deploying application to cluster',
         required: true,
@@ -156,7 +157,7 @@ const planWorkflowSteps = async (
         required: true,
       },
       {
-        toolName: 'scan',
+        toolName: 'scan-image',
         parameters: { ...params, sessionId, severity: 'MEDIUM' },
         description: 'Scanning for vulnerabilities',
         required: true,
@@ -554,7 +555,7 @@ export const executeWorkflow = async (
     return Success(summary);
   } catch (error: unknown) {
     logger.error({ error, workflowType }, 'Workflow execution failed');
-    const message = error instanceof Error ? error.message : String(error);
+    const message = extractErrorMessage(error);
     return Failure(`Workflow execution failed: ${message}`);
   }
 };

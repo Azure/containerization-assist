@@ -4,40 +4,49 @@
  */
 
 import { jest } from '@jest/globals';
+
+// Jest mocks must be at the top to ensure proper hoisting
+jest.mock('@lib/session', () => ({
+  createSessionManager: jest.fn(() => ({
+    get: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+  })),
+}));
+
+jest.mock('@lib/docker', () => ({
+  createDockerRegistryClient: jest.fn(() => ({
+    getImageMetadata: jest.fn(),
+  })),
+}));
+
+jest.mock('@lib/logger', () => ({
+  createTimer: jest.fn(),
+  createLogger: jest.fn(() => ({
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+    trace: jest.fn(),
+    fatal: jest.fn(),
+    child: jest.fn().mockReturnThis(),
+  })),
+}));
+
 import { resolveBaseImages } from '@tools/resolve-base-images/tool';
 import type { ResolveBaseImagesParams } from '../../../src/tools/resolve-base-images/schema';
-import { createMockLogger } from '../../__support__/utilities/mock-factories';
+import { createSessionManager } from '@lib/session';
+import { createDockerRegistryClient } from '@lib/docker';
+import { createLogger, createTimer } from '@lib/logger';
 
-// Mock lib modules
-const mockSessionManager = {
-  get: jest.fn(),
-  create: jest.fn(),
-  update: jest.fn(),
-};
-
-const mockDockerRegistryClient = {
-  getImageMetadata: jest.fn(),
-};
-
+// Get the mocked instances after imports
+const mockSessionManager = (createSessionManager as jest.Mock)();
+const mockDockerRegistryClient = (createDockerRegistryClient as jest.Mock)();
+const mockLogger = (createLogger as jest.Mock)();
 const mockTimer = {
   end: jest.fn(),
   error: jest.fn(),
 };
-
-jest.mock('@lib/session', () => ({
-  createSessionManager: jest.fn(() => mockSessionManager),
-}));
-
-// First mock removed - duplicate
-
-jest.mock('@lib/docker', () => ({
-  createDockerRegistryClient: jest.fn(() => mockDockerRegistryClient),
-}));
-
-jest.mock('@lib/logger', () => ({
-  createTimer: jest.fn(() => mockTimer),
-  createLogger: jest.fn(() => createMockLogger()),
-}));
 
 jest.mock('@lib/base-images', () => ({
   getSuggestedBaseImages: jest.fn((language: string) => {
@@ -62,12 +71,11 @@ jest.mock('@lib/base-images', () => ({
 }));
 
 // Mock MCP helper modules
-jest.mock('@mcp/tools/session-helpers');
+jest.mock('@mcp/tool-session-helpers');
 
 // wrapTool mock removed - tool now uses direct implementation
 
 describe('resolveBaseImagesTool', () => {
-  let mockLogger: ReturnType<typeof createMockLogger>;
   let config: ResolveBaseImagesParams;
   let mockGetSession: jest.Mock;
   let mockUpdateSession: jest.Mock;
@@ -92,7 +100,8 @@ describe('resolveBaseImagesTool', () => {
   };
 
   beforeEach(() => {
-    mockLogger = createMockLogger();
+    // Reset all mocks
+    jest.clearAllMocks();
     config = {
       sessionId: 'test-session-123',
       targetEnvironment: 'production',
@@ -101,7 +110,7 @@ describe('resolveBaseImagesTool', () => {
     };
 
     // Get mocked functions
-    const sessionHelpers = require('@mcp/tools/session-helpers');
+    const sessionHelpers = require('@mcp/tool-session-helpers');
     mockGetSession = sessionHelpers.getSession = jest.fn();
     mockUpdateSession = sessionHelpers.updateSession = jest.fn();
     mockUpdateSessionData = sessionHelpers.updateSessionData = jest.fn();
@@ -109,6 +118,9 @@ describe('resolveBaseImagesTool', () => {
 
     // Reset all mocks
     jest.clearAllMocks();
+    
+    // Setup createTimer to return the mockTimer
+    (createTimer as jest.Mock).mockReturnValue(mockTimer);
     
     // Setup default session helper mocks
     mockGetSession.mockResolvedValue({
@@ -190,14 +202,14 @@ describe('resolveBaseImagesTool', () => {
             },
           ],
           rationale: 'Selected node:18-alpine for javascript/react application based on production environment with medium security requirements',
-          securityConsiderations: [
+          securityConsiderations: expect.arrayContaining([
             'Standard base image with regular security updates',
             'Recommend scanning with Trivy or Snyk before deployment',
-          ],
-          performanceNotes: [
+          ]),
+          performanceNotes: expect.arrayContaining([
             'Alpine images are smaller but may have compatibility issues with some packages',
-          ],
-          _chainHint: 'Next: generate_dockerfile with recommended base image or update existing Dockerfile',
+          ]),
+          chainHint: 'Next: generate_dockerfile with recommended base image or update existing Dockerfile',
         });
       }
     }, 15000); // Increase timeout to 15 seconds

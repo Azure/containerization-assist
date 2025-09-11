@@ -10,7 +10,7 @@ import { z } from 'zod';
 export interface MCPToolMetadata {
   title: string;
   description: string;
-  inputSchema: z.ZodType<any> | Record<string, any>;
+  inputSchema: z.ZodType<unknown> | Record<string, unknown>;
 }
 
 /**
@@ -29,7 +29,7 @@ export interface MCPToolResult {
 export interface MCPTool {
   name: string;
   metadata: MCPToolMetadata;
-  handler: (params: any) => Promise<MCPToolResult>;
+  handler: (params: unknown) => Promise<MCPToolResult>;
 }
 
 /**
@@ -42,9 +42,9 @@ export interface MCPServer {
     metadata: {
       title: string;
       description: string;
-      inputSchema: Record<string, any>;
+      inputSchema: Record<string, unknown>;
     },
-    handler: (params: any) => Promise<MCPToolResult>,
+    handler: (params: unknown) => Promise<MCPToolResult>,
   ): void;
 
   // Low-level API (Server style from @modelcontextprotocol/sdk)
@@ -52,9 +52,9 @@ export interface MCPServer {
     definition: {
       name: string;
       description: string;
-      inputSchema: any;
+      inputSchema: unknown;
     },
-    handler: (params: any) => Promise<MCPToolResult>,
+    handler: (params: unknown) => Promise<MCPToolResult>,
   ): void;
 
   // Alternative registration method
@@ -62,8 +62,8 @@ export interface MCPServer {
     name: string,
     tool: {
       description: string;
-      inputSchema?: any;
-      handler: (params: any) => Promise<MCPToolResult>;
+      inputSchema?: unknown;
+      handler: (params: unknown) => Promise<MCPToolResult>;
     },
   ): void;
 }

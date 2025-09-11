@@ -19,12 +19,148 @@
  * ```
  */
 
-import { getSession, updateSession } from '@mcp/tools/session-helpers';
-import type { ToolContext } from '../../mcp/context/types';
-import { createTimer, createLogger } from '../../lib/logger';
-import { getImageMetadata } from '../../services/docker/registry';
+import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { extractErrorMessage } from '../../lib/error-utils';
+import type { ToolContext } from '../../mcp/context';
+import { createTimer, createLogger, type Logger } from '../../lib/logger';
+import { getRecommendedBaseImage } from '../../lib/base-images';
+import { scoreConfigCandidates } from '@lib/integrated-scoring';
+import { getKnowledgeForCategory } from '../../knowledge';
+
+// Helper functions for base image resolution
+function getSuggestedBaseImages(language: string): string[] {
+  const suggestions: Record<string, string[]> = {
+    javascript: ['node:18-alpine', 'node:18-slim', 'node:18'],
+    typescript: ['node:18-alpine', 'node:18-slim', 'node:18'],
+    python: ['python:3.11-alpine', 'python:3.11-slim', 'python:3.11'],
+    java: ['openjdk:17-alpine', 'openjdk:17-slim', 'openjdk:17'],
+    go: ['golang:1.21-alpine', 'golang:1.21', 'alpine:latest'],
+    rust: ['rust:1.70-alpine', 'rust:1.70', 'alpine:latest'],
+  };
+  return suggestions[language] || ['alpine:latest'];
+}
+
+async function getBaseImageKnowledge(
+  language: string,
+  environment: string,
+  _securityLevel: string,
+  logger: Logger,
+): Promise<{
+  recommendations: string[];
+  securityNotes: string[];
+  performanceNotes: string[];
+  compatibilityWarnings: string[];
+}> {
+  try {
+    // Query knowledge base for base image recommendations
+    const dockerfileKnowledge = await getKnowledgeForCategory('dockerfile', `FROM ${language}`, {
+      language,
+      environment,
+    });
+
+    // Get security-specific knowledge
+    const securityKnowledge = await getKnowledgeForCategory('security', `base image ${language}`, {
+      language,
+    });
+
+    // Extract relevant recommendations
+    const recommendations: string[] = [];
+    const securityNotes: string[] = [];
+    const performanceNotes: string[] = [];
+    const compatibilityWarnings: string[] = [];
+
+    // Process dockerfile knowledge
+    dockerfileKnowledge.forEach((match) => {
+      if (match.entry.tags?.includes('base-image')) {
+        recommendations.push(match.entry.recommendation);
+      }
+      if (match.entry.tags?.includes('performance')) {
+        performanceNotes.push(match.entry.recommendation);
+      }
+      if (match.entry.tags?.includes('compatibility')) {
+        compatibilityWarnings.push(match.entry.recommendation);
+      }
+    });
+
+    // Process security knowledge
+    securityKnowledge.forEach((match) => {
+      if (match.entry.severity === 'high' || match.entry.tags?.includes('base-image')) {
+        securityNotes.push(match.entry.recommendation);
+      }
+    });
+
+    // Add default recommendations based on language if none found
+    if (recommendations.length === 0) {
+      const defaults: Record<string, string[]> = {
+        javascript: [
+          'Use node:lts-alpine for production',
+          'Consider node:18-alpine for smaller size',
+        ],
+        typescript: [
+          'Use node:lts-alpine for production',
+          'Consider node:18-alpine for smaller size',
+        ],
+        python: [
+          'Use python:3.11-slim for production',
+          'Consider python:3.11-alpine for minimal size',
+        ],
+        java: ['Use eclipse-temurin:17-alpine for production', 'Consider amazoncorretto for AWS'],
+        go: ['Use golang:1.21-alpine for builds', 'Consider scratch or distroless for runtime'],
+      };
+      recommendations.push(
+        ...(defaults[language] || ['Consider Alpine-based images for smaller size']),
+      );
+    }
+
+    logger.debug(
+      {
+        language,
+        recommendationCount: recommendations.length,
+        securityNotesCount: securityNotes.length,
+      },
+      'Retrieved knowledge-based recommendations',
+    );
+
+    return {
+      recommendations,
+      securityNotes,
+      performanceNotes,
+      compatibilityWarnings,
+    };
+  } catch (error) {
+    logger.debug({ error }, 'Failed to get knowledge recommendations, using defaults');
+    return {
+      recommendations: [],
+      securityNotes: [],
+      performanceNotes: [],
+      compatibilityWarnings: [],
+    };
+  }
+}
+
+async function getImageMetadata(
+  name: string,
+  tag: string,
+  logger: Logger,
+): Promise<{
+  name: string;
+  tag: string;
+  digest?: string;
+  size?: string;
+  lastUpdated?: string;
+}> {
+  // Simplified metadata - in a real system this would query registries
+  logger.debug({ name, tag }, 'Getting image metadata');
+
+  return {
+    name,
+    tag,
+    digest: `sha256:${Math.random().toString(16).substr(2, 64)}`, // Mock digest
+    size: tag.includes('alpine') ? '5MB' : tag.includes('slim') ? '100MB' : '200MB',
+    lastUpdated: new Date().toISOString(),
+  };
+}
 import { Success, Failure, type Result } from '../../types';
-import { getSuggestedBaseImages, getRecommendedBaseImage } from '../../lib/base-images';
 import type { ResolveBaseImagesParams } from './schema';
 
 export interface BaseImageRecommendation {
@@ -36,15 +172,22 @@ export interface BaseImageRecommendation {
     digest?: string;
     size?: number;
     lastUpdated?: string;
+    score?: number;
+    knowledgeBasedRecommendations?: string[];
   };
   alternativeImages?: Array<{
     name: string;
     tag: string;
     reason: string;
+    score?: number;
+    pros?: string[];
+    cons?: string[];
   }>;
   rationale: string;
   securityConsiderations?: string[];
   performanceNotes?: string[];
+  compatibilityWarnings?: string[];
+  bestPractices?: string[];
 }
 
 /**
@@ -98,6 +241,21 @@ async function resolveBaseImagesImpl(
     const framework = analysisResult?.framework;
     const suggestedImages = getSuggestedBaseImages(language);
 
+    // Get knowledge-based recommendations for base images
+    const knowledgeData = await getBaseImageKnowledge(
+      language,
+      targetEnvironment,
+      securityLevel,
+      logger,
+    );
+
+    const {
+      recommendations: knowledgeRecommendations,
+      securityNotes: knowledgeSecurityNotes,
+      performanceNotes: knowledgePerformanceNotes,
+      compatibilityWarnings: knowledgeCompatibilityWarnings,
+    } = knowledgeData;
+
     // Select primary image based on environment and security level
     let primaryImage = suggestedImages[0] ?? getRecommendedBaseImage(language); // Default fallback
     if (targetEnvironment === 'production' && securityLevel === 'high') {
@@ -113,23 +271,81 @@ async function resolveBaseImagesImpl(
     // Use registry client directly without factory wrapper
     const imageMetadata = await getImageMetadata(imageName ?? 'node', imageTag ?? 'latest', logger);
 
+    // Score the primary image
+    let primaryScore: number | undefined;
+    try {
+      const testDockerfile = `FROM ${primaryImage}`;
+      const scoring = await scoreConfigCandidates(
+        [testDockerfile],
+        'dockerfile',
+        params.targetEnvironment || targetEnvironment,
+        logger,
+      );
+      if (scoring.ok && scoring.value[0]) {
+        primaryScore = scoring.value[0].score;
+        logger.info({ primaryImage, primaryScore }, 'Scored primary base image');
+      }
+    } catch (error) {
+      logger.debug({ error }, 'Could not score primary image, continuing without score');
+    }
+
+    // Score alternative images
+    const scoredAlternatives = await Promise.all(
+      suggestedImages.slice(1, 3).map(async (img) => {
+        const [name, tag] = img.split(':');
+        let score: number | undefined;
+        try {
+          const testDockerfile = `FROM ${img}`;
+          const scoring = await scoreConfigCandidates(
+            [testDockerfile],
+            'dockerfile',
+            params.targetEnvironment || targetEnvironment,
+            logger,
+          );
+          if (scoring.ok && scoring.value[0]) {
+            score = scoring.value[0].score;
+          }
+        } catch {
+          // Continue without score
+        }
+        return {
+          name: name ?? 'node',
+          tag: tag ?? 'latest',
+          reason: img.includes('alpine') ? 'Smaller size, better security' : 'More compatibility',
+          ...(score !== undefined && { score }),
+        };
+      }),
+    );
+
+    // Sort alternatives by score if available
+    scoredAlternatives.sort((a, b) => (b.score || 0) - (a.score || 0));
+
     const recommendation: BaseImageRecommendation = {
       sessionId,
       primaryImage: {
         name: imageMetadata.name,
         tag: imageMetadata.tag,
         ...(imageMetadata.digest && { digest: imageMetadata.digest }),
-        ...(imageMetadata.size && { size: imageMetadata.size }),
+        ...(imageMetadata.size && { size: parseInt(imageMetadata.size) || 0 }),
         ...(imageMetadata.lastUpdated && { lastUpdated: imageMetadata.lastUpdated }),
+        ...(primaryScore !== undefined && { score: primaryScore }),
+        ...(knowledgeRecommendations.length > 0 && {
+          knowledgeBasedRecommendations: knowledgeRecommendations.slice(0, 3),
+        }),
       },
-      alternativeImages: suggestedImages.slice(1, 3).map((img) => {
-        const [name, tag] = img.split(':');
-        return {
-          name: name ?? 'node',
-          tag: tag ?? 'latest',
-          reason: img.includes('alpine') ? 'Smaller size, better security' : 'More compatibility',
-        };
-      }),
+      alternativeImages: scoredAlternatives.map((alt) => ({
+        ...alt,
+        pros: alt.name.includes('alpine')
+          ? ['Minimal size', 'Reduced attack surface', 'Fast startup']
+          : alt.name.includes('slim')
+            ? ['Smaller than standard', 'Good compatibility', 'Security patches']
+            : ['Full compatibility', 'All packages included', 'Well-tested'],
+        cons: alt.name.includes('alpine')
+          ? ['Possible glibc compatibility issues', 'Limited package availability']
+          : alt.name.includes('slim')
+            ? ['Missing some development tools']
+            : ['Larger image size', 'More potential vulnerabilities'],
+      })),
       rationale: `Selected ${primaryImage} for ${language}${framework ? `/${framework}` : ''} application based on ${targetEnvironment} environment with ${securityLevel} security requirements`,
       technology: language,
       securityConsiderations: [
@@ -137,12 +353,20 @@ async function resolveBaseImagesImpl(
           ? 'Using minimal Alpine-based image for reduced attack surface'
           : 'Standard base image with regular security updates',
         'Recommend scanning with Trivy or Snyk before deployment',
-      ],
+        ...knowledgeSecurityNotes,
+      ].filter(Boolean),
       performanceNotes: [
         primaryImage.includes('alpine')
           ? 'Alpine images are smaller but may have compatibility issues with some packages'
           : 'Standard images have better compatibility but larger size',
-      ],
+        ...knowledgePerformanceNotes,
+      ].filter(Boolean),
+      ...(knowledgeCompatibilityWarnings.length > 0 && {
+        compatibilityWarnings: knowledgeCompatibilityWarnings,
+      }),
+      ...(knowledgeRecommendations.length > 0 && {
+        bestPractices: knowledgeRecommendations.slice(0, 5),
+      }),
     };
 
     // Update session with recommendation using standardized helper
@@ -172,7 +396,7 @@ async function resolveBaseImagesImpl(
     const enrichedRecommendation = {
       ...recommendation,
       sessionId,
-      _chainHint:
+      chainHint:
         'Next: generate_dockerfile with recommended base image or update existing Dockerfile',
     };
 
@@ -181,7 +405,7 @@ async function resolveBaseImagesImpl(
     timer.error(error);
     logger.error({ error }, 'Base image resolution failed');
 
-    return Failure(error instanceof Error ? error.message : String(error));
+    return Failure(extractErrorMessage(error));
   }
 }
 

@@ -1,0 +1,36 @@
+# Development Environment Overrides  
+environment: "development"
+
+overrides:
+  scoring:
+    dockerfile:
+      # More lenient scoring for development
+      rules:
+        security:
+          - name: "non_root_user"
+            points: 15  # Lower than base (25) - less critical in dev
+            weight: 1.0  # Lower than base (1.3)
+          - name: "versioned_images" 
+            points: 5   # Lower than base (10) - latest tags ok in dev
+            weight: 0.8  # Lower than base (1.1)
+      
+      # Adjust category weights for development priorities
+      category_weights:
+        security: 1.0       # Less critical in dev
+        performance: 0.9    # Less critical
+        quality: 1.0        # Still important
+        maintainability: 1.1 # More important for dev velocity
+        
+  sampling:
+    max_candidates: 3       # Fewer candidates for faster iteration
+    timeout_ms: 5000        # Faster timeout for development speed
+    early_stop_threshold: 80 # Lower bar for early stopping
+    
+  # Development-specific strategy selection
+  strategies:
+    dockerfile:
+      default_strategy_index: 0  # Use simpler strategy by default
+      conditions:
+        - key: "complexity"
+          value: "high"
+          strategy_index: 1  # Only go to intermediate for high complexity

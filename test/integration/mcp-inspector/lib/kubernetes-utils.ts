@@ -7,31 +7,15 @@ import { spawn } from 'child_process';
 import { writeFile, unlink, mkdtemp } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import type { DeployResult, K8sManifest } from '../../../../src/types/consolidated-types.js';
 
-export interface K8sManifest {
-  apiVersion: string;
-  kind: string;
-  metadata: {
-    name: string;
-    namespace?: string;
-    labels?: Record<string, string>;
-  };
-  spec: any;
-}
+// Using types from consolidated-types
+import type { KubernetesValidationResult } from '../../../../src/types/consolidated-types.js';
 
-export interface ValidationResult {
-  valid: boolean;
-  errors: string[];
-  warnings: string[];
-  manifest: K8sManifest;
-}
-
-export interface DeployResult {
-  success: boolean;
+// Extended interface for Kubernetes deployment results  
+export interface KubernetesDeployResult extends DeployResult {
   deploymentName: string;
   namespace: string;
-  message?: string;
-  error?: string;
   duration: number;
 }
 
@@ -91,8 +75,8 @@ export class KubernetesUtils {
 
       return {
         available: await KubernetesUtils.isClusterAvailable(),
-        version: version?.split('\n')[1],
-        context,
+        ...(version?.split('\n')[1] && { version: version.split('\n')[1] }),
+        ...(context && { context }),
         namespaces
       };
     } catch {
@@ -106,8 +90,8 @@ export class KubernetesUtils {
   /**
    * Validate Kubernetes manifests against cluster schema
    */
-  async validateManifests(manifests: K8sManifest[]): Promise<ValidationResult[]> {
-    const results: ValidationResult[] = [];
+  async validateManifests(manifests: K8sManifest[]): Promise<KubernetesValidationResult[]> {
+    const results: KubernetesValidationResult[] = [];
 
     for (const manifest of manifests) {
       try {
@@ -123,8 +107,8 @@ export class KubernetesUtils {
           'apply', '--dry-run=client', '--validate=true', '-f', manifestPath
         ]);
 
-        const validation: ValidationResult = {
-          valid: result.exitCode === 0,
+        const validation: KubernetesValidationResult = {
+          isValid: result.exitCode === 0,
           errors: [],
           warnings: [],
           manifest
@@ -145,7 +129,7 @@ export class KubernetesUtils {
         results.push(validation);
       } catch (error) {
         results.push({
-          valid: false,
+          isValid: false,
           errors: [error instanceof Error ? error.message : String(error)],
           warnings: [],
           manifest
@@ -159,7 +143,7 @@ export class KubernetesUtils {
   /**
    * Perform dry-run deployment
    */
-  async dryRunDeploy(manifests: K8sManifest[], namespace = 'default'): Promise<DeployResult> {
+  async dryRunDeploy(manifests: K8sManifest[], namespace = 'default'): Promise<KubernetesDeployResult> {
     const startTime = performance.now();
     
     try {
@@ -177,19 +161,25 @@ export class KubernetesUtils {
 
       const duration = performance.now() - startTime;
 
-      return {
+      const deployResult: KubernetesDeployResult = {
         success: result.exitCode === 0,
         deploymentName: manifests.find(m => m.kind === 'Deployment')?.metadata.name || 'unknown',
         namespace,
-        message: result.stdout,
-        error: result.exitCode !== 0 ? result.stderr : undefined,
+        resources: manifests.map(m => ({ kind: m.kind, name: m.metadata.name, namespace, status: 'deployed' })),
         duration
       };
+
+      if (result.exitCode !== 0 && result.stderr) {
+        deployResult.error = result.stderr;
+      }
+
+      return deployResult;
     } catch (error) {
       return {
         success: false,
         deploymentName: 'unknown',
         namespace,
+        resources: [],
         error: error instanceof Error ? error.message : String(error),
         duration: performance.now() - startTime
       };
@@ -225,7 +215,7 @@ export class KubernetesUtils {
   /**
    * Deploy manifests to cluster (actual deployment - use with caution in tests)
    */
-  async deploy(manifests: K8sManifest[], namespace = 'default', wait = false): Promise<DeployResult> {
+  async deploy(manifests: K8sManifest[], namespace = 'default', wait = false): Promise<KubernetesDeployResult> {
     const startTime = performance.now();
     
     try {
@@ -259,19 +249,25 @@ export class KubernetesUtils {
         });
       }
 
-      return {
+      const deployResult: KubernetesDeployResult = {
         success: result.exitCode === 0,
         deploymentName: manifests.find(m => m.kind === 'Deployment')?.metadata.name || 'unknown',
         namespace,
-        message: result.stdout,
-        error: result.exitCode !== 0 ? result.stderr : undefined,
+        resources: manifests.map(m => ({ kind: m.kind, name: m.metadata.name, namespace, status: 'deployed' })),
         duration
       };
+
+      if (result.exitCode !== 0 && result.stderr) {
+        deployResult.error = result.stderr;
+      }
+
+      return deployResult;
     } catch (error) {
       return {
         success: false,
         deploymentName: 'unknown',
         namespace,
+        resources: [],
         error: error instanceof Error ? error.message : String(error),
         duration: performance.now() - startTime
       };

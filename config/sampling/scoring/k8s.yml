@@ -1,0 +1,347 @@
+# Kubernetes YAML Scoring Rules Configuration
+name: "k8s"
+version: "1.0.0"
+metadata:
+  description: "Kubernetes YAML scoring profile"
+  created: "2024-12-19"
+  author: "containerization-assist"
+
+base_score: 30
+max_score: 100
+timeout_ms: 2000
+
+# Category weights for Kubernetes manifests
+category_weights:
+  security: 1.2       # Security is critical
+  quality: 1.1        # Quality practices important
+  performance: 1.0    # Performance considerations
+  maintainability: 1.0 # Maintainability important
+
+# Kubernetes-specific scoring rules
+rules:
+  validation:
+    - name: "has_api_version"
+      matcher:
+        type: "regex"
+        pattern: "^apiVersion:\\s*\\S+"
+      points: 15
+      weight: 1.0
+      category: "quality"
+      description: "Has valid apiVersion field"
+    
+    - name: "has_kind"
+      matcher:
+        type: "regex"
+        pattern: "^kind:\\s*\\S+"
+      points: 15
+      weight: 1.0
+      category: "quality" 
+      description: "Has valid kind field"
+    
+    - name: "has_metadata"
+      matcher:
+        type: "regex"
+        pattern: "^metadata:"
+      points: 10
+      weight: 1.0
+      category: "quality"
+      description: "Has metadata section"
+    
+    - name: "has_metadata_name"
+      matcher:
+        type: "regex"
+        pattern: "^\\s+name:\\s*\\S+"
+      points: 5
+      weight: 0.8
+      category: "quality"
+      description: "Has metadata name"
+    
+    - name: "has_spec"
+      matcher:
+        type: "regex"
+        pattern: "^spec:"
+      points: 10
+      weight: 1.0
+      category: "quality"
+      description: "Has spec section"
+    
+    - name: "consistent_indentation"
+      matcher:
+        type: "function"
+        function: "hasConsistentIndentation"
+      points: 7
+      weight: 0.8
+      category: "quality"
+      description: "Uses consistent YAML indentation"
+
+  security:
+    - name: "security_context"
+      matcher:
+        type: "regex"
+        pattern: "securityContext:"
+      points: 15
+      weight: 1.2
+      category: "security"
+      description: "Defines security context"
+    
+    - name: "non_root_user"
+      matcher:
+        type: "regex"
+        pattern: "runAsNonRoot:\\s*true"
+      points: 10
+      weight: 1.3
+      category: "security"
+      description: "Runs as non-root user"
+    
+    - name: "user_id_set"
+      matcher:
+        type: "regex"
+        pattern: "runAsUser:\\s*[1-9]\\d*"
+      points: 5
+      weight: 1.0
+      category: "security"
+      description: "Sets non-zero user ID"
+    
+    - name: "readonly_root_filesystem"
+      matcher:
+        type: "regex"
+        pattern: "readOnlyRootFilesystem:\\s*true"
+      points: 10
+      weight: 1.2
+      category: "security"
+      description: "Uses read-only root filesystem"
+    
+    - name: "no_privilege_escalation"
+      matcher:
+        type: "regex"
+        pattern: "allowPrivilegeEscalation:\\s*false"
+      points: 8
+      weight: 1.1
+      category: "security"
+      description: "Disallows privilege escalation"
+    
+    - name: "drop_all_capabilities"
+      matcher:
+        type: "regex"
+        pattern: "capabilities:\\s*\\n\\s+drop:\\s*\\n\\s+-\\s*ALL"
+      points: 7
+      weight: 1.1
+      category: "security"
+      description: "Drops all capabilities"
+    
+    - name: "network_policy"
+      matcher:
+        type: "regex"
+        pattern: "kind:\\s*NetworkPolicy"
+      points: 10
+      weight: 0.9
+      category: "security"
+      description: "Defines network policies"
+    
+    - name: "rbac_role"
+      matcher:
+        type: "regex"
+        pattern: "kind:\\s*(Role|ClusterRole)"
+      points: 5
+      weight: 0.8
+      category: "security"
+      description: "Defines RBAC roles"
+    
+    - name: "service_account"
+      matcher:
+        type: "regex"
+        pattern: "serviceAccountName:"
+      points: 5
+      weight: 0.8
+      category: "security"
+      description: "Uses service account"
+    
+    - name: "secret_references"
+      matcher:
+        type: "regex"
+        pattern: "(secretRef:|secretKeyRef:)"
+      points: 5
+      weight: 1.0
+      category: "security"
+      description: "Uses secret references"
+
+  resources:
+    - name: "resource_limits"
+      matcher:
+        type: "regex"
+        pattern: "resources:\\s*\\n\\s+limits:"
+      points: 15
+      weight: 1.1
+      category: "performance"
+      description: "Defines resource limits"
+    
+    - name: "memory_limits"
+      matcher:
+        type: "regex"
+        pattern: "limits:\\s*\\n\\s+memory:"
+      points: 10
+      weight: 1.0
+      category: "performance"
+      description: "Sets memory limits"
+    
+    - name: "cpu_limits"
+      matcher:
+        type: "regex"
+        pattern: "limits:\\s*\\n\\s+cpu:"
+      points: 10
+      weight: 1.0
+      category: "performance"
+      description: "Sets CPU limits"
+    
+    - name: "resource_requests"
+      matcher:
+        type: "regex"
+        pattern: "requests:"
+      points: 10
+      weight: 1.0
+      category: "performance"
+      description: "Defines resource requests"
+    
+    - name: "hpa_configured"
+      matcher:
+        type: "regex"
+        pattern: "kind:\\s*HorizontalPodAutoscaler"
+      points: 5
+      weight: 0.8
+      category: "performance"
+      description: "Configures horizontal pod autoscaler"
+    
+    - name: "pvc_storage_size"
+      matcher:
+        type: "regex"
+        pattern: "storage:\\s*\\d+[GM]i"
+      points: 5
+      weight: 0.7
+      category: "quality"
+      description: "Specifies storage size properly"
+
+  best_practices:
+    - name: "standard_labels"
+      matcher:
+        type: "regex"
+        pattern: "labels:"
+      points: 8
+      weight: 0.9
+      category: "maintainability"
+      description: "Uses labels for organization"
+    
+    - name: "app_labels"
+      matcher:
+        type: "regex"
+        pattern: "app\\.kubernetes\\.io/"
+      points: 5
+      weight: 0.8
+      category: "maintainability"
+      description: "Uses standard app labels"
+    
+    - name: "version_labels"
+      matcher:
+        type: "regex"
+        pattern: "(version:|app\\.kubernetes\\.io/version:)"
+      points: 3
+      weight: 0.7
+      category: "maintainability"
+      description: "Includes version information"
+    
+    - name: "annotations"
+      matcher:
+        type: "regex"
+        pattern: "annotations:"
+      points: 5
+      weight: 0.6
+      category: "maintainability"
+      description: "Uses annotations for metadata"
+    
+    - name: "selector_match_labels"
+      matcher:
+        type: "regex"
+        pattern: "selector:\\s*\\n\\s+matchLabels:"
+      points: 7
+      weight: 0.9
+      category: "quality"
+      description: "Uses proper label selectors"
+    
+    - name: "liveness_probe"
+      matcher:
+        type: "regex"
+        pattern: "livenessProbe:"
+      points: 10
+      weight: 1.1
+      category: "quality"
+      description: "Configures liveness probe"
+    
+    - name: "readiness_probe"
+      matcher:
+        type: "regex"
+        pattern: "readinessProbe:"
+      points: 10
+      weight: 1.1
+      category: "quality"
+      description: "Configures readiness probe"
+    
+    - name: "startup_probe"
+      matcher:
+        type: "regex"
+        pattern: "startupProbe:"
+      points: 5
+      weight: 0.8
+      category: "quality"
+      description: "Configures startup probe"
+    
+    - name: "rolling_update_strategy"
+      matcher:
+        type: "regex"
+        pattern: "strategy:\\s*\\n\\s+type:\\s*RollingUpdate"
+      points: 5
+      weight: 0.8
+      category: "quality"
+      description: "Uses rolling update strategy"
+    
+    - name: "pod_disruption_budget"
+      matcher:
+        type: "regex"
+        pattern: "kind:\\s*PodDisruptionBudget"
+      points: 5
+      weight: 0.7
+      category: "quality"
+      description: "Configures pod disruption budget"
+    
+    - name: "anti_affinity_rules"
+      matcher:
+        type: "regex"
+        pattern: "podAntiAffinity:"
+      points: 5
+      weight: 0.7
+      category: "quality"
+      description: "Uses anti-affinity for HA"
+    
+    - name: "container_names"
+      matcher:
+        type: "regex"
+        pattern: "containers:\\s*\\n\\s+-\\s+name:\\s*\\S+"
+      points: 3
+      weight: 0.6
+      category: "maintainability"
+      description: "Names containers properly"
+
+# Penalty rules for bad practices
+penalties:
+  - name: "hardcoded_passwords"
+    matcher:
+      type: "regex"
+      pattern: "value:\\s*[\"'].*password"
+      flags: "i"
+    points: -15
+    description: "Penalize hardcoded passwords in values"
+  
+  - name: "latest_image_tag"
+    matcher:
+      type: "regex"
+      pattern: "image:\\s*\\S+:latest"
+    points: -5
+    description: "Penalize use of latest image tags"

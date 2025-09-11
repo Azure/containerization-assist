@@ -1,0 +1,27 @@
+{
+  "id": "dockerfile-sampling",
+  "category": "sampling",
+  "description": "Generate Dockerfile variants for sampling",
+  "version": "1.0",
+  "parameters": [
+    {
+      "name": "strategy",
+      "type": "string",
+      "required": true,
+      "description": "Optimization strategy (security, performance, size, balanced)"
+    },
+    {
+      "name": "language",
+      "type": "string",
+      "required": true,
+      "description": "Programming language"
+    },
+    {
+      "name": "context",
+      "type": "string",
+      "required": false,
+      "description": "Application context"
+    }
+  ],
+  "template": "Generate an optimized Dockerfile for {{strategy}} strategy.\n\nLanguage: {{language}}\n{{#context}}Context: {{context}}{{/context}}\n\nRequirements:\n- Optimize for {{strategy}}\n- Follow containerization best practices\n- Use appropriate base images\n- Include security considerations\n- Minimize image size where possible\n\nPlease provide a production-ready Dockerfile.\n"
+}

@@ -5,13 +5,21 @@
  * Uses standardized helpers for consistency
  */
 
-import { getSession, updateSession } from '@mcp/tools/session-helpers';
-import type { ToolContext } from '../../mcp/context/types';
+import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { extractErrorMessage } from '../../lib/error-utils';
+import type { ToolContext } from '../../mcp/context';
 import { createDockerClient } from '../../lib/docker';
 import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../types';
-import type { SessionData } from '../session-types';
 import type { TagImageParams } from './schema';
+
+// Session data type for accessing build results
+interface SessionData {
+  build_result?: {
+    imageId?: string;
+    tags?: string[];
+  };
+}
 
 export interface TagImageResult {
   success: boolean;
@@ -107,13 +115,13 @@ async function tagImageImpl(
       sessionId,
       tags,
       imageId: source,
-      _chainHint: 'Next: push_image to registry or generate_k8s_manifests for deployment',
+      chainHint: 'Next: push_image to registry or generate_k8s_manifests for deployment',
     });
   } catch (error) {
     timer.end({ error });
     logger.error({ error }, 'Image tagging failed');
 
-    return Failure(error instanceof Error ? error.message : String(error));
+    return Failure(extractErrorMessage(error));
   }
 }
 

@@ -6,6 +6,7 @@ node_modules/
 
 # Data
 data/
+!src/knowledge/data/
 *.db
 
 # Logs
