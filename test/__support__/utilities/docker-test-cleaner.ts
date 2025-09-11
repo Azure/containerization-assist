@@ -11,7 +11,7 @@
  */
 
 import type { Logger } from 'pino';
-import type { DockerClient } from '../../../src/infrastructure/docker/client';
+import type { DockerClient } from '../../../src/services/docker/client';
 
 /**
  * Configuration for Docker test cleanup
