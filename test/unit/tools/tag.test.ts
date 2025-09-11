@@ -6,19 +6,23 @@
 
 import { jest } from '@jest/globals';
 import { tagImage, type TagImageParams } from '../../../src/tools/tag-image/tool';
-import { createMockLogger, createSuccessResult, createFailureResult } from '../../__support__/utilities/mock-infrastructure';
+import {
+  createMockLogger,
+  createSuccessResult,
+  createFailureResult,
+} from '../../__support__/utilities/mock-infrastructure';
 
 // Mock lib modules following analyze-repo pattern
 const mockSessionManager = {
   create: jest.fn().mockResolvedValue({
-    "sessionId": "test-session-123",
-    "workflow_state": {},
-    "metadata": {},
-    "completed_steps": [],
-    "errors": {},
-    "current_step": null,
-    "createdAt": "2025-09-08T11:12:40.362Z",
-    "updatedAt": "2025-09-08T11:12:40.362Z"
+    sessionId: 'test-session-123',
+    workflow_state: {},
+    metadata: {},
+    completed_steps: [],
+    errors: {},
+    current_step: null,
+    createdAt: '2025-09-08T11:12:40.362Z',
+    updatedAt: '2025-09-08T11:12:40.362Z',
   }),
   get: jest.fn(),
   update: jest.fn(),
@@ -62,7 +66,7 @@ describe('tagImage', () => {
 
     // Reset all mocks
     jest.clearAllMocks();
-    
+
     // Setup session helper mocks
     const sessionHelpers = require('@mcp/tools/session-helpers');
     sessionHelpers.getSession = jest.fn().mockResolvedValue({
@@ -91,7 +95,6 @@ describe('tagImage', () => {
     mockSessionManager.update.mockResolvedValue(true);
   });
 
-
   describe('Successful Tagging Operations', () => {
     beforeEach(() => {
       // Session with built image
@@ -110,10 +113,12 @@ describe('tagImage', () => {
       });
 
       // Default successful tag result
-      mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({
-        success: true,
-        imageId: 'sha256:mock-image-id'
-      }));
+      mockDockerClient.tagImage.mockResolvedValue(
+        createSuccessResult({
+          success: true,
+          imageId: 'sha256:mock-image-id',
+        }),
+      );
     });
 
     it('should successfully tag image with repository and tag', async () => {
@@ -128,8 +133,12 @@ describe('tagImage', () => {
       }
 
       // Verify Docker client was called with correct parameters
-      expect(mockDockerClient.tagImage).toHaveBeenCalledWith('sha256:mock-image-id', 'myapp', 'v1.0');
-      
+      expect(mockDockerClient.tagImage).toHaveBeenCalledWith(
+        'sha256:mock-image-id',
+        'myapp',
+        'v1.0',
+      );
+
       // Verify session was updated with tag information
       const sessionHelpers = require('@mcp/tools/session-helpers');
       expect(sessionHelpers.updateSession).toHaveBeenCalledWith(
@@ -141,7 +150,7 @@ describe('tagImage', () => {
           }),
           completed_steps: expect.arrayContaining(['tag']),
         }),
-        expect.any(Object)
+        expect.any(Object),
       );
 
       // Verify timer was used correctly
@@ -162,15 +171,31 @@ describe('tagImage', () => {
       }
 
       // Should tag with 'latest' when no tag specified
-      expect(mockDockerClient.tagImage).toHaveBeenCalledWith('sha256:mock-image-id', 'myapp', 'latest');
+      expect(mockDockerClient.tagImage).toHaveBeenCalledWith(
+        'sha256:mock-image-id',
+        'myapp',
+        'latest',
+      );
     });
 
     it('should handle complex repository names', async () => {
       const testCases = [
-        { input: 'docker.io/library/myapp:v1.0', expectedRepo: 'docker.io/library/myapp', expectedTag: 'v1.0' },
-        { input: 'ghcr.io/myorg/myapp:main', expectedRepo: 'ghcr.io/myorg/myapp', expectedTag: 'main' },
+        {
+          input: 'docker.io/library/myapp:v1.0',
+          expectedRepo: 'docker.io/library/myapp',
+          expectedTag: 'v1.0',
+        },
+        {
+          input: 'ghcr.io/myorg/myapp:main',
+          expectedRepo: 'ghcr.io/myorg/myapp',
+          expectedTag: 'main',
+        },
         { input: 'localhost/myapp:dev', expectedRepo: 'localhost/myapp', expectedTag: 'dev' },
-        { input: 'my-registry.com/path/to/app:stable', expectedRepo: 'my-registry.com/path/to/app', expectedTag: 'stable' },
+        {
+          input: 'my-registry.com/path/to/app:stable',
+          expectedRepo: 'my-registry.com/path/to/app',
+          expectedTag: 'stable',
+        },
       ];
 
       for (const testCase of testCases) {
@@ -186,7 +211,7 @@ describe('tagImage', () => {
         expect(mockDockerClient.tagImage).toHaveBeenCalledWith(
           'sha256:mock-image-id',
           testCase.expectedRepo,
-          testCase.expectedTag
+          testCase.expectedTag,
         );
 
         // Reset mocks for next iteration
@@ -239,11 +264,10 @@ describe('tagImage', () => {
           }),
           completed_steps: expect.arrayContaining(['tag']),
         }),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
   });
-
 
   describe('Tag Format Validation', () => {
     beforeEach(() => {
@@ -259,10 +283,12 @@ describe('tagImage', () => {
         repo_path: '/test/repo',
       });
 
-      mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({
-        success: true,
-        imageId: 'sha256:mock-image-id'
-      }));
+      mockDockerClient.tagImage.mockResolvedValue(
+        createSuccessResult({
+          success: true,
+          imageId: 'sha256:mock-image-id',
+        }),
+      );
     });
 
     it('should handle various valid tag formats', async () => {
@@ -298,19 +324,23 @@ describe('tagImage', () => {
         { tag: 'multi/level/repo:tag', expectedRepo: 'multi/level/repo', expectedTag: 'tag' },
         { tag: 'single', expectedRepo: 'single', expectedTag: 'latest' },
         { tag: 'with-dash:with-dash-tag', expectedRepo: 'with-dash', expectedTag: 'with-dash-tag' },
-        { tag: 'with_underscore:with_underscore_tag', expectedRepo: 'with_underscore', expectedTag: 'with_underscore_tag' },
+        {
+          tag: 'with_underscore:with_underscore_tag',
+          expectedRepo: 'with_underscore',
+          expectedTag: 'with_underscore_tag',
+        },
       ];
 
       for (const testCase of testCases) {
         config.tag = testCase.tag;
-        
+
         const result = await tagImage(config, { logger: mockLogger });
 
         expect(result.ok).toBe(true);
         expect(mockDockerClient.tagImage).toHaveBeenCalledWith(
           'sha256:mock-image-id',
           testCase.expectedRepo,
-          testCase.expectedTag
+          testCase.expectedTag,
         );
 
         // Reset mocks for next iteration
@@ -319,7 +349,6 @@ describe('tagImage', () => {
       }
     });
   });
-
 
   describe('Error Handling', () => {
     it('should auto-create session when not found', async () => {
@@ -344,7 +373,10 @@ describe('tagImage', () => {
 
       const result = await tagImage(config, { logger: mockLogger });
 
-      expect(sessionHelpers.getSession).toHaveBeenCalledWith('test-session-123', expect.any(Object));
+      expect(sessionHelpers.getSession).toHaveBeenCalledWith(
+        'test-session-123',
+        expect.any(Object),
+      );
     });
 
     it('should return error when no build result exists', async () => {
@@ -367,7 +399,9 @@ describe('tagImage', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe('No image specified. Provide imageId parameter or ensure session has built image from build-image tool.');
+        expect(result.error).toBe(
+          'No image specified. Provide imageId parameter or ensure session has built image from build-image tool.',
+        );
       }
     });
 
@@ -395,7 +429,9 @@ describe('tagImage', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe('No image specified. Provide imageId parameter or ensure session has built image from build-image tool.');
+        expect(result.error).toBe(
+          'No image specified. Provide imageId parameter or ensure session has built image from build-image tool.',
+        );
       }
     });
 
@@ -436,7 +472,7 @@ describe('tagImage', () => {
       });
 
       mockDockerClient.tagImage.mockResolvedValue(
-        createFailureResult('Failed to create tag: image not found')
+        createFailureResult('Failed to create tag: image not found'),
       );
 
       const result = await tagImage(config, { logger: mockLogger });
@@ -461,7 +497,7 @@ describe('tagImage', () => {
       });
 
       mockDockerClient.tagImage.mockResolvedValue(
-        createFailureResult(null as any) // No error message
+        createFailureResult(null as any), // No error message
       );
 
       const result = await tagImage(config, { logger: mockLogger });
@@ -491,7 +527,9 @@ describe('tagImage', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe('Docker daemon not responding');
+        expect(result.error).toBe(
+          'Docker daemon not responding\nError: Recover with build_image. Next: build_image',
+        );
       }
 
       expect(mockTimer.end).toHaveBeenCalledWith({ error: expect.any(Error) });
@@ -520,11 +558,16 @@ describe('tagImage', () => {
         },
       });
 
-      mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({
-        success: true,
-        imageId: 'sha256:mock-image-id'
-      }));
-      sessionHelpers.updateSession.mockResolvedValue({ ok: false, error: 'Failed to update session state' });
+      mockDockerClient.tagImage.mockResolvedValue(
+        createSuccessResult({
+          success: true,
+          imageId: 'sha256:mock-image-id',
+        }),
+      );
+      sessionHelpers.updateSession.mockResolvedValue({
+        ok: false,
+        error: 'Failed to update session state',
+      });
 
       const result = await tagImage(config, { logger: mockLogger });
 
@@ -537,13 +580,14 @@ describe('tagImage', () => {
     });
   });
 
-
   describe('Session State Management', () => {
     beforeEach(() => {
-      mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({
-        success: true,
-        imageId: 'sha256:mock-image-id'
-      }));
+      mockDockerClient.tagImage.mockResolvedValue(
+        createSuccessResult({
+          success: true,
+          imageId: 'sha256:mock-image-id',
+        }),
+      );
     });
 
     it('should handle workflow state with existing data', async () => {
@@ -579,7 +623,7 @@ describe('tagImage', () => {
           }),
           completed_steps: expect.arrayContaining(['tag']),
         }),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 
@@ -609,11 +653,10 @@ describe('tagImage', () => {
           }),
           completed_steps: expect.arrayContaining(['tag']),
         }),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
   });
-
 
   describe('Multiple Tagging Scenarios', () => {
     beforeEach(() => {
@@ -629,10 +672,12 @@ describe('tagImage', () => {
         repo_path: '/test/repo',
       });
 
-      mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({
-        success: true,
-        imageId: 'sha256:mock-image-id'
-      }));
+      mockDockerClient.tagImage.mockResolvedValue(
+        createSuccessResult({
+          success: true,
+          imageId: 'sha256:mock-image-id',
+        }),
+      );
     });
 
     it('should handle tagging with different configurations', async () => {
@@ -662,7 +707,7 @@ describe('tagImage', () => {
             isNew: false,
           },
         });
-        
+
         const result = await tagImage(testConfig, { logger: mockLogger });
 
         expect(result.ok).toBe(true);
@@ -694,7 +739,7 @@ describe('tagImage', () => {
         expect(mockDockerClient.tagImage).toHaveBeenCalledWith(
           'sha256:mock-image-id',
           expect.any(String),
-          expect.any(String)
+          expect.any(String),
         );
 
         // Reset mocks for next iteration
@@ -703,7 +748,6 @@ describe('tagImage', () => {
       }
     });
   });
-
 
   describe('Tool Instance', () => {
     it('should provide correctly configured tool instance', async () => {
@@ -725,10 +769,12 @@ describe('tagImage', () => {
         repo_path: '/test/repo',
       });
 
-      mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({
-        success: true,
-        imageId: 'sha256:mock-image-id'
-      }));
+      mockDockerClient.tagImage.mockResolvedValue(
+        createSuccessResult({
+          success: true,
+          imageId: 'sha256:mock-image-id',
+        }),
+      );
 
       // The wrapped tool can be called directly with params and context
       const result = await tagImageTool(config, { logger: mockLogger });

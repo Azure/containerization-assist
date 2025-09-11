@@ -109,7 +109,7 @@ describe('resolveBaseImagesTool', () => {
 
     // Reset all mocks
     jest.clearAllMocks();
-    
+
     // Setup default session helper mocks
     mockGetSession.mockResolvedValue({
       ok: true,
@@ -132,7 +132,7 @@ describe('resolveBaseImagesTool', () => {
     });
     mockUpdateSession.mockResolvedValue({ ok: true });
     mockUpdateSessionData.mockResolvedValue({ ok: true });
-    
+
     // Default successful mock responses
     mockSessionManager.get.mockResolvedValue(mockSession);
     mockSessionManager.update.mockResolvedValue(undefined);
@@ -161,7 +161,7 @@ describe('resolveBaseImagesTool', () => {
           isNew: false,
         },
       });
-      
+
       const mockContext = {} as any;
       const result = await resolveBaseImages(config, mockContext);
 
@@ -189,7 +189,8 @@ describe('resolveBaseImagesTool', () => {
               reason: 'More compatibility',
             },
           ],
-          rationale: 'Selected node:18-alpine for javascript/react application based on production environment with medium security requirements',
+          rationale:
+            'Selected node:18-alpine for javascript/react application based on production environment with medium security requirements',
           securityConsiderations: [
             'Standard base image with regular security updates',
             'Recommend scanning with Trivy or Snyk before deployment',
@@ -197,7 +198,8 @@ describe('resolveBaseImagesTool', () => {
           performanceNotes: [
             'Alpine images are smaller but may have compatibility issues with some packages',
           ],
-          NextStep: 'Next: generate_dockerfile with recommended base image or update existing Dockerfile',
+          NextStep:
+            'resolve_base_images tool execution completed successfully. Continue with calling generate_dockerfile tool.',
         });
       }
     }, 15000); // Increase timeout to 15 seconds
@@ -215,7 +217,9 @@ describe('resolveBaseImagesTool', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         // The implementation returns standard security considerations
-        expect(result.value.securityConsiderations).toContain('Standard base image with regular security updates');
+        expect(result.value.securityConsiderations).toContain(
+          'Standard base image with regular security updates',
+        );
       }
     });
 
@@ -315,7 +319,9 @@ describe('resolveBaseImagesTool', () => {
 
       expect(!result.ok).toBe(true);
       if (!result.ok) {
-        expect(result.error).toBe('No technology specified. Provide technology parameter or run analyze-repo tool first.');
+        expect(result.error).toBe(
+          'No technology specified. Provide technology parameter or run analyze-repo tool first.',
+        );
       }
     });
 
@@ -345,7 +351,7 @@ describe('resolveBaseImagesTool', () => {
             rationale: expect.any(String),
           }),
         }),
-        mockContext
+        mockContext,
       );
     });
 
@@ -405,11 +411,12 @@ describe('resolveBaseImagesTool', () => {
       // Check that logging happened with relevant information
       expect(mockLogger.info).toHaveBeenCalled();
       const calls = mockLogger.info.mock.calls;
-      const hasStartLog = calls.some(([data, msg]) => 
-        msg?.includes('base image') && (msg.includes('Starting') || msg.includes('Resolving'))
+      const hasStartLog = calls.some(
+        ([data, msg]) =>
+          msg?.includes('base image') && (msg.includes('Starting') || msg.includes('Resolving')),
       );
-      const hasEndLog = calls.some(([data, msg]) => 
-        msg?.includes('completed') && data?.primaryImage
+      const hasEndLog = calls.some(
+        ([data, msg]) => msg?.includes('completed') && data?.primaryImage,
       );
       expect(hasStartLog).toBe(true);
       expect(hasEndLog).toBe(true);
@@ -421,7 +428,7 @@ describe('resolveBaseImagesTool', () => {
       expect(mockTimer.end).toHaveBeenCalledWith(
         expect.objectContaining({
           primaryImage: 'node:18-alpine',
-        })
+        }),
       );
     });
 
@@ -443,5 +450,4 @@ describe('resolveBaseImagesTool', () => {
       }
     });
   });
-
 });
