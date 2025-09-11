@@ -25,13 +25,15 @@ import type { GenerateDockerfileParams } from './schema';
 // Note: Tool now uses GenerateDockerfileParams from schema for type safety
 
 /**
- * Result from Dockerfile generation
+ * Result from Dockerfile generation for a single module
  */
-export interface GenerateDockerfileResult {
+interface SingleDockerfileResult {
   /** Generated Dockerfile content */
   content: string;
   /** Path where Dockerfile was written */
   path: string;
+  /** Module root path this dockerfile corresponds to */
+  moduleRoot: string;
   /** Base image used */
   baseImage: string;
   /** Whether optimization was applied */
@@ -40,8 +42,49 @@ export interface GenerateDockerfileResult {
   multistage: boolean;
   /** Warnings about potential issues */
   warnings?: string[];
+  /** Sampling metadata if sampling was used */
+  samplingMetadata?: {
+    stoppedEarly?: boolean;
+    candidatesGenerated: number;
+    winnerScore: number;
+    samplingDuration?: number;
+  };
+  /** Winner score if sampling was used */
+  winnerScore?: number;
+  /** Score breakdown if requested */
+  scoreBreakdown?: Record<string, number>;
+  /** All candidates if requested */
+  allCandidates?: Array<{
+    id: string;
+    content: string;
+    score: number;
+    scoreBreakdown: Record<string, number>;
+    rank?: number;
+  }>;
+}
+
+/**
+ * Result from Dockerfile generation - supports multiple modules
+ */
+export interface GenerateDockerfileResult {
+  /** Generated Dockerfile content (for single module compatibility) */
+  content?: string;
+  /** Path where Dockerfile was written (for single module compatibility) */
+  path?: string;
+  /** Base image used (for single module compatibility) */
+  baseImage?: string;
+  /** Whether optimization was applied */
+  optimization: boolean;
+  /** Whether multi-stage build was used */
+  multistage: boolean;
+  /** Warnings about potential issues */
+  warnings?: string[];
   /** Session ID for reference */
   sessionId?: string;
+  /** Array of dockerfile results for each module root */
+  dockerfiles: SingleDockerfileResult[];
+  /** Total number of dockerfiles generated */
+  count: number;
   /** Sampling metadata if sampling was used */
   samplingMetadata?: {
     stoppedEarly?: boolean;
@@ -69,7 +112,8 @@ export interface GenerateDockerfileResult {
 function generateTemplateDockerfile(
   analysisResult: AnalyzeRepoResult,
   params: GenerateDockerfileParams,
-): Result<Pick<GenerateDockerfileResult, 'content' | 'baseImage'>> {
+  moduleRoot?: string,
+): Result<Pick<SingleDockerfileResult, 'content' | 'baseImage'>> {
   const { language, framework, dependencies = [], ports = [], buildSystem } = analysisResult;
   const { baseImage, multistage = true, securityHardening = true } = params;
 
@@ -77,13 +121,18 @@ function generateTemplateDockerfile(
   const mainPort = ports[0] || getDefaultPort(language || framework || 'generic');
 
   let dockerfile = `# Generated Dockerfile for ${language} ${framework ? `(${framework})` : ''}\n`;
+  if (moduleRoot) {
+    dockerfile += `# Module root: ${moduleRoot}\n`;
+  }
   dockerfile += `FROM ${effectiveBase}\n\n`;
 
   // Add metadata labels
   dockerfile += `# Metadata\n`;
   dockerfile += `LABEL maintainer="generated"\n`;
   dockerfile += `LABEL language="${language || 'unknown'}"\n`;
-  if (framework) dockerfile += `LABEL framework="${framework}"\n\n`;
+  if (framework) dockerfile += `LABEL framework="${framework}"\n`;
+  if (moduleRoot) dockerfile += `LABEL module.root="${moduleRoot}"\n`;
+  dockerfile += '\n';
 
   // Set working directory
   dockerfile += `WORKDIR /app\n\n`;
@@ -315,7 +364,7 @@ function buildArgsFromAnalysis(
     recommendedBuildCommand = build_system.build_command;
   }
 
-  return {
+  const args: Record<string, unknown> = {
     language,
     framework,
     dependencies: dependencies?.map((d) => d.name || d).join(', ') || '',
@@ -330,9 +379,196 @@ function buildArgsFromAnalysis(
       optimization: typeof optimization === 'string' ? optimization : 'performance',
     }),
   };
+
+  return args;
 }
 
 // computeHash function removed - was unused after tool wrapper elimination
+
+/**
+ * Generate Dockerfile for a single module root
+ */
+async function generateSingleDockerfile(
+  analysisResult: SessionAnalysisResult,
+  params: GenerateDockerfileParams,
+  moduleRoot: string,
+  context: ToolContext,
+  logger: ReturnType<typeof createLogger>,
+): Promise<Result<SingleDockerfileResult>> {
+  const { multistage = true, securityHardening = true } = params;
+  // Normalize optimization to boolean - any string value means optimization is enabled
+  const optimization = params.optimization === false ? false : true;
+
+  // Prepare sampling options (filter out undefined values)
+  const samplingOptions: SamplingOptions = {};
+  // Sampling is enabled by default unless explicitly disabled
+  samplingOptions.enableSampling = !params.disableSampling;
+  if (params.maxCandidates !== undefined) samplingOptions.maxCandidates = params.maxCandidates;
+  if (params.earlyStopThreshold !== undefined)
+    samplingOptions.earlyStopThreshold = params.earlyStopThreshold;
+  if (params.includeScoreBreakdown !== undefined)
+    samplingOptions.includeScoreBreakdown = params.includeScoreBreakdown;
+  if (params.returnAllCandidates !== undefined)
+    samplingOptions.returnAllCandidates = params.returnAllCandidates;
+  if (params.useCache !== undefined) samplingOptions.useCache = params.useCache;
+
+  let dockerfileContent: string;
+  let baseImageUsed: string;
+  let samplingMetadata: SingleDockerfileResult['samplingMetadata'];
+  let winnerScore: number | undefined;
+  let scoreBreakdown: Record<string, number> | undefined;
+  let allCandidates: SingleDockerfileResult['allCandidates'];
+
+  // Build AI prompt args with module-specific context
+  const promptArgs = buildArgsFromAnalysis(analysisResult, optimization);
+  promptArgs.moduleRoot = moduleRoot;
+  promptArgs.moduleContext = `Generating Dockerfile for module at path: ${moduleRoot}`;
+
+  // Use sampling-aware generation (default) unless explicitly disabled
+  if (!params.disableSampling) {
+    const aiResult = await aiGenerateWithSampling(logger, context, {
+      promptName: 'dockerfile-generation',
+      promptArgs,
+      expectation: 'dockerfile',
+      maxRetries: 3,
+      fallbackBehavior: 'default',
+      ...samplingOptions,
+    });
+
+    if (aiResult.ok) {
+      const cleaned = stripFencesAndNoise(aiResult.value.winner.content, 'dockerfile');
+      if (!isValidDockerfileContent(cleaned)) {
+        // Fall back to template if AI output is invalid
+        const fallbackResult = generateTemplateDockerfile(
+          sessionToAnalyzeRepoResult(analysisResult),
+          params,
+          moduleRoot,
+        );
+        if (!fallbackResult.ok) {
+          return Failure(fallbackResult.error);
+        }
+        dockerfileContent = fallbackResult.value.content;
+        baseImageUsed = fallbackResult.value.baseImage;
+      } else {
+        dockerfileContent = cleaned;
+        baseImageUsed =
+          extractBaseImage(cleaned) ||
+          params.baseImage ||
+          getRecommendedBaseImage(analysisResult.language ?? 'unknown');
+
+        // Capture sampling metadata
+        samplingMetadata = aiResult.value.samplingMetadata;
+        winnerScore = aiResult.value.winner.score;
+        scoreBreakdown = aiResult.value.winner.scoreBreakdown;
+        allCandidates = aiResult.value.allCandidates;
+      }
+    } else {
+      // Use template fallback
+      const fallbackResult = generateTemplateDockerfile(
+        sessionToAnalyzeRepoResult(analysisResult),
+        params,
+        moduleRoot,
+      );
+      if (!fallbackResult.ok) {
+        return Failure(fallbackResult.error);
+      }
+      dockerfileContent = fallbackResult.value.content;
+      baseImageUsed = fallbackResult.value.baseImage;
+    }
+  } else {
+    // Standard generation without sampling
+    const aiResult = await aiGenerate(logger, context, {
+      promptName: 'dockerfile-generation',
+      promptArgs,
+      expectation: 'dockerfile',
+      maxRetries: 3,
+      fallbackBehavior: 'default',
+    });
+
+    if (aiResult.ok) {
+      // Use AI-generated content
+      const cleaned = stripFencesAndNoise(aiResult.value.content, 'dockerfile');
+      if (!isValidDockerfileContent(cleaned)) {
+        // Fall back to template if AI output is invalid
+        const fallbackResult = generateTemplateDockerfile(
+          sessionToAnalyzeRepoResult(analysisResult),
+          params,
+          moduleRoot,
+        );
+        if (!fallbackResult.ok) {
+          return Failure(fallbackResult.error);
+        }
+        dockerfileContent = fallbackResult.value.content;
+        baseImageUsed = fallbackResult.value.baseImage;
+      } else {
+        dockerfileContent = cleaned;
+        baseImageUsed =
+          extractBaseImage(cleaned) ||
+          params.baseImage ||
+          getRecommendedBaseImage(analysisResult.language ?? 'unknown');
+      }
+    } else {
+      // Use template fallback
+      const fallbackResult = generateTemplateDockerfile(
+        sessionToAnalyzeRepoResult(analysisResult),
+        params,
+        moduleRoot,
+      );
+      if (!fallbackResult.ok) {
+        return Failure(fallbackResult.error);
+      }
+      dockerfileContent = fallbackResult.value.content;
+      baseImageUsed = fallbackResult.value.baseImage;
+    }
+  }
+
+  // Determine output path - write to each module root directory
+  const repoPath = params.repoPath || '.';
+  const dockerfilePath = path.resolve(path.join(repoPath, moduleRoot, 'Dockerfile'));
+
+  // Write Dockerfile to disk
+  await fs.writeFile(dockerfilePath, dockerfileContent, 'utf-8');
+
+  // Check for warnings
+  const warnings: string[] = [];
+  if (!securityHardening) {
+    warnings.push('Security hardening is disabled - consider enabling for production');
+  }
+  if (dockerfileContent.includes('root')) {
+    warnings.push('Container may run as root user');
+  }
+  if (dockerfileContent.includes(':latest')) {
+    warnings.push('Using :latest tags - consider pinning versions');
+  }
+
+  const result: SingleDockerfileResult = {
+    content: dockerfileContent,
+    path: dockerfilePath,
+    moduleRoot,
+    baseImage: baseImageUsed,
+    optimization,
+    multistage,
+    ...(warnings.length > 0 && { warnings }),
+  };
+
+  // Add sampling metadata if sampling was used
+  if (!params.disableSampling) {
+    if (samplingMetadata) {
+      result.samplingMetadata = samplingMetadata;
+    }
+    if (winnerScore !== undefined) {
+      result.winnerScore = winnerScore;
+    }
+    if (scoreBreakdown && params.includeScoreBreakdown) {
+      result.scoreBreakdown = scoreBreakdown;
+    }
+    if (allCandidates && params.returnAllCandidates) {
+      result.allCandidates = allCandidates;
+    }
+  }
+
+  return Success(result);
+}
 
 /**
  * Generate Dockerfile implementation - direct execution with selective progress
@@ -346,13 +582,17 @@ async function generateDockerfileImpl(
     return Failure('Invalid parameters provided');
   }
 
+  // Validate moduleRoots parameter - use default if not provided
+  const moduleRoots =
+    params.moduleRoots && params.moduleRoots.length > 0 ? params.moduleRoots : ['.'];
+
   // Optional progress reporting for complex operations (AI generation)
   const progress = context.progress ? createStandardProgress(context.progress) : undefined;
   const logger = context.logger || createLogger({ name: 'generate-dockerfile' });
   const timer = createTimer(logger, 'generate-dockerfile');
 
   try {
-    const { multistage = true, securityHardening = true } = params;
+    const { multistage = true } = params;
     // Normalize optimization to boolean - any string value means optimization is enabled
     const optimization = params.optimization === false ? false : true;
 
@@ -388,149 +628,46 @@ async function generateDockerfileImpl(
     // Progress: Main generation phase (AI or template)
     if (progress) await progress('EXECUTING');
 
-    // Prepare sampling options (filter out undefined values)
-    const samplingOptions: SamplingOptions = {};
-    // Sampling is enabled by default unless explicitly disabled
-    samplingOptions.enableSampling = !params.disableSampling;
-    if (params.maxCandidates !== undefined) samplingOptions.maxCandidates = params.maxCandidates;
-    if (params.earlyStopThreshold !== undefined)
-      samplingOptions.earlyStopThreshold = params.earlyStopThreshold;
-    if (params.includeScoreBreakdown !== undefined)
-      samplingOptions.includeScoreBreakdown = params.includeScoreBreakdown;
-    if (params.returnAllCandidates !== undefined)
-      samplingOptions.returnAllCandidates = params.returnAllCandidates;
-    if (params.useCache !== undefined) samplingOptions.useCache = params.useCache;
+    // Generate dockerfile for each module root
+    const dockerfileResults: SingleDockerfileResult[] = [];
+    const errors: string[] = [];
 
-    let dockerfileContent: string;
-    let baseImageUsed: string;
-    let aiUsed = false;
-    let samplingMetadata: GenerateDockerfileResult['samplingMetadata'];
-    let winnerScore: number | undefined;
-    let scoreBreakdown: Record<string, number> | undefined;
-    let allCandidates: GenerateDockerfileResult['allCandidates'];
-
-    // Use sampling-aware generation (default) unless explicitly disabled
-    if (!params.disableSampling) {
-      const aiResult = await aiGenerateWithSampling(logger, context, {
-        promptName: 'dockerfile-generation',
-        promptArgs: buildArgsFromAnalysis(analysisResult, optimization),
-        expectation: 'dockerfile',
-        maxRetries: 3,
-        fallbackBehavior: 'default',
-        ...samplingOptions,
-      });
-
-      if (aiResult.ok) {
-        const cleaned = stripFencesAndNoise(aiResult.value.winner.content, 'dockerfile');
-        if (!isValidDockerfileContent(cleaned)) {
-          // Fall back to template if AI output is invalid
-          const fallbackResult = generateTemplateDockerfile(
-            sessionToAnalyzeRepoResult(analysisResult),
-            params,
-          );
-          if (!fallbackResult.ok) {
-            return Failure(fallbackResult.error);
-          }
-          dockerfileContent = fallbackResult.value.content;
-          baseImageUsed = fallbackResult.value.baseImage;
-        } else {
-          dockerfileContent = cleaned;
-          baseImageUsed =
-            extractBaseImage(cleaned) ||
-            params.baseImage ||
-            getRecommendedBaseImage(analysisResult.language ?? 'unknown');
-          aiUsed = true;
-
-          // Capture sampling metadata
-          samplingMetadata = aiResult.value.samplingMetadata;
-          winnerScore = aiResult.value.winner.score;
-          scoreBreakdown = aiResult.value.winner.scoreBreakdown;
-          allCandidates = aiResult.value.allCandidates;
-        }
-      } else {
-        // Use template fallback
-        const fallbackResult = generateTemplateDockerfile(
-          sessionToAnalyzeRepoResult(analysisResult),
+    for (const moduleRoot of moduleRoots) {
+      try {
+        logger.info({ moduleRoot }, 'Generating Dockerfile for module');
+        const moduleResult = await generateSingleDockerfile(
+          analysisResult,
           params,
+          moduleRoot,
+          context,
+          logger,
         );
-        if (!fallbackResult.ok) {
-          return Failure(fallbackResult.error);
-        }
-        dockerfileContent = fallbackResult.value.content;
-        baseImageUsed = fallbackResult.value.baseImage;
-      }
-    } else {
-      // Standard generation without sampling
-      const aiResult = await aiGenerate(logger, context, {
-        promptName: 'dockerfile-generation',
-        promptArgs: buildArgsFromAnalysis(analysisResult, optimization),
-        expectation: 'dockerfile',
-        maxRetries: 3,
-        fallbackBehavior: 'default',
-      });
 
-      if (aiResult.ok) {
-        // Use AI-generated content
-        const cleaned = stripFencesAndNoise(aiResult.value.content, 'dockerfile');
-        if (!isValidDockerfileContent(cleaned)) {
-          // Fall back to template if AI output is invalid
-          const fallbackResult = generateTemplateDockerfile(
-            sessionToAnalyzeRepoResult(analysisResult),
-            params,
-          );
-          if (!fallbackResult.ok) {
-            return Failure(fallbackResult.error);
-          }
-          dockerfileContent = fallbackResult.value.content;
-          baseImageUsed = fallbackResult.value.baseImage;
+        if (moduleResult.ok) {
+          dockerfileResults.push(moduleResult.value);
         } else {
-          dockerfileContent = cleaned;
-          baseImageUsed =
-            extractBaseImage(cleaned) ||
-            params.baseImage ||
-            getRecommendedBaseImage(analysisResult.language ?? 'unknown');
-          aiUsed = true;
+          errors.push(
+            `Failed to generate Dockerfile for module '${moduleRoot}': ${moduleResult.error}`,
+          );
         }
-      } else {
-        // Use template fallback
-        const fallbackResult = generateTemplateDockerfile(
-          sessionToAnalyzeRepoResult(analysisResult),
-          params,
+      } catch (error) {
+        errors.push(
+          `Error generating Dockerfile for module '${moduleRoot}': ${error instanceof Error ? error.message : String(error)}`,
         );
-        if (!fallbackResult.ok) {
-          return Failure(fallbackResult.error);
-        }
-        dockerfileContent = fallbackResult.value.content;
-        baseImageUsed = fallbackResult.value.baseImage;
       }
     }
 
-    // Progress: Finalizing and writing to disk
+    // Check if any dockerfiles were generated successfully
+    if (dockerfileResults.length === 0) {
+      return Failure(`Failed to generate any Dockerfiles. Errors: ${errors.join('; ')}`);
+    }
+
+    // Progress: Finalizing
     if (progress) await progress('FINALIZING');
 
-    // Determine output path
-    const repoPath = typedSession.repo_path || params.repoPath || '.';
-    const dockerfilePath = path.join(repoPath, 'Dockerfile');
-
-    // Write Dockerfile to disk
-    await fs.writeFile(dockerfilePath, dockerfileContent, 'utf-8');
-
-    // Check for warnings
-    const warnings: string[] = [];
-    if (!securityHardening) {
-      warnings.push('Security hardening is disabled - consider enabling for production');
-    }
-    if (dockerfileContent.includes('root')) {
-      warnings.push('Container may run as root user');
-    }
-    if (dockerfileContent.includes(':latest')) {
-      warnings.push('Using :latest tags - consider pinning versions');
-    }
-
-    // Prepare result
+    // Prepare result for multiple dockerfiles
     const dockerfileResult = {
-      content: dockerfileContent,
-      path: dockerfilePath,
+      dockerfiles: dockerfileResults,
       multistage,
       fixed: false,
       fixes: [],
@@ -544,10 +681,10 @@ async function generateDockerfileImpl(
         completed_steps: [...(typedSession.completed_steps || []), 'dockerfile'],
         metadata: {
           ...(typedSession.metadata || {}),
-          dockerfile_baseImage: baseImageUsed,
+          dockerfile_count: dockerfileResults.length,
+          dockerfile_moduleRoots: moduleRoots,
           dockerfile_optimization: optimization,
-          dockerfile_warnings: warnings,
-          ai_enhancement_used: aiUsed,
+          ai_enhancement_used: dockerfileResults.some((d) => d.samplingMetadata || d.winnerScore),
         },
       },
       context,
@@ -563,7 +700,20 @@ async function generateDockerfileImpl(
     // Progress: Complete
     if (progress) await progress('COMPLETE');
 
-    timer.end({ path: dockerfilePath });
+    timer.end({ count: dockerfileResults.length });
+
+    // Aggregate warnings from all dockerfiles
+    const allWarnings: string[] = [];
+    dockerfileResults.forEach((result) => {
+      if (result.warnings) {
+        allWarnings.push(...result.warnings);
+      }
+    });
+
+    // Add errors as warnings if some dockerfiles failed but others succeeded
+    if (errors.length > 0) {
+      allWarnings.push(...errors);
+    }
 
     // Return result with file write indicator and chain hint
     const result: GenerateDockerfileResult & {
@@ -571,31 +721,38 @@ async function generateDockerfileImpl(
       _fileWrittenPath?: string;
       _chainHint?: string;
     } = {
-      content: dockerfileContent,
-      path: dockerfilePath,
-      baseImage: baseImageUsed,
+      dockerfiles: dockerfileResults,
+      count: dockerfileResults.length,
       optimization,
       multistage,
-      ...(warnings.length > 0 && { warnings }),
+      ...(allWarnings.length > 0 && { warnings: allWarnings }),
       sessionId,
       _fileWritten: true,
-      _fileWrittenPath: dockerfilePath,
-      _chainHint: 'Next: build_image with the generated Dockerfile',
+      _fileWrittenPath: dockerfileResults.map((d) => d.path).join(', '),
+      _chainHint: `Next: build_image with the generated Dockerfiles (${dockerfileResults.length} files)`,
     };
 
-    // Add sampling metadata if sampling was used
-    if (!params.disableSampling) {
-      if (samplingMetadata) {
-        result.samplingMetadata = samplingMetadata;
-      }
-      if (winnerScore !== undefined) {
-        result.winnerScore = winnerScore;
-      }
-      if (scoreBreakdown && params.includeScoreBreakdown) {
-        result.scoreBreakdown = scoreBreakdown;
-      }
-      if (allCandidates && params.returnAllCandidates) {
-        result.allCandidates = allCandidates;
+    // Set compatibility fields for single module (backwards compatibility)
+    if (dockerfileResults.length === 1) {
+      const firstResult = dockerfileResults[0];
+      if (firstResult) {
+        result.content = firstResult.content;
+        result.path = firstResult.path;
+        result.baseImage = firstResult.baseImage;
+
+        // Add sampling metadata from first result
+        if (firstResult.samplingMetadata) {
+          result.samplingMetadata = firstResult.samplingMetadata;
+        }
+        if (firstResult.winnerScore !== undefined) {
+          result.winnerScore = firstResult.winnerScore;
+        }
+        if (firstResult.scoreBreakdown) {
+          result.scoreBreakdown = firstResult.scoreBreakdown;
+        }
+        if (firstResult.allCandidates) {
+          result.allCandidates = firstResult.allCandidates;
+        }
       }
     }
 
