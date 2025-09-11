@@ -161,24 +161,6 @@ function sendProgressNotification(
 }
 
 /**
- * Creates a progress reporter with automatic token extraction
- * Convenience function that combines token extraction and reporter creation
- *
- * @param server - MCP server instance
- * @param request - MCP request object to extract token from
- * @param logger - Logger instance
- * @returns Progress reporter function or undefined if no token found
- */
-export function createProgressReporterFromRequest(
-  server: Server,
-  request: unknown,
-  logger?: Logger,
-): EnhancedProgressReporter | undefined {
-  const progressToken = extractProgressToken(request);
-  return createProgressReporter(server, progressToken, logger);
-}
-
-/**
  * Validates progress token format.
  * Tokens must be non-empty strings with reasonable length limits.
  *

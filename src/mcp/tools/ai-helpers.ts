@@ -628,25 +628,43 @@ function getSamplingStrategy(index: number, expectation?: string): string {
 function scoreDockerfileBuild(content: string): number {
   let score = 50;
 
-  // Check for multi-stage builds
-  if ((content.match(/FROM/g) || []).length > 1) score += 15;
+  // Check for multi-stage builds (higher weight for optimization)
+  const fromCount = (content.match(/^FROM\s+/gm) || []).length;
+  if (fromCount > 1) {
+    score += 15;
+    // Extra points for proper multi-stage naming
+    if (content.match(/FROM\s+\S+\s+AS\s+/gi)) score += 5;
+  }
 
-  // Check for layer optimization
-  if (content.includes('RUN') && content.includes('&&')) score += 10;
+  // Check for layer optimization with && chaining
+  const runLines = content.match(/^RUN\s+.*/gm) || [];
+  const chainedRuns = runLines.filter((line) => line.includes('&&')).length;
+  if (chainedRuns > 0) {
+    score += Math.min(10, chainedRuns * 3);
+  }
 
-  // Check for proper dependency copying
-  if (
-    content.includes('COPY package') &&
-    content.includes('RUN') &&
-    content.indexOf('COPY package') < content.indexOf('COPY .')
-  )
-    score += 10;
+  // Check for proper dependency copying pattern (cache optimization)
+  const copyPackageIndex = content.indexOf('COPY package');
+  const copyAllIndex = content.indexOf('COPY .');
+  const runInstallIndex = content.indexOf('RUN npm install') || content.indexOf('RUN yarn');
 
-  // Check for build arguments
-  if (content.includes('ARG')) score += 5;
+  if (copyPackageIndex > -1 && copyAllIndex > -1) {
+    if (copyPackageIndex < runInstallIndex && runInstallIndex < copyAllIndex) {
+      score += 10; // Perfect pattern
+    } else if (copyPackageIndex < copyAllIndex) {
+      score += 5; // Partial optimization
+    }
+  }
+
+  // Check for build arguments (flexibility)
+  const argCount = (content.match(/^ARG\s+/gm) || []).length;
+  if (argCount > 0) score += Math.min(5, argCount * 2);
 
   // Check for proper workdir
-  if (content.includes('WORKDIR')) score += 10;
+  if (content.match(/^WORKDIR\s+/m)) score += 10;
+
+  // Check for .dockerignore usage hint (comments about ignored files)
+  if (content.includes('# .dockerignore') || content.includes('node_modules')) score += 5;
 
   return Math.min(score, 100);
 }
@@ -654,18 +672,33 @@ function scoreDockerfileBuild(content: string): number {
 function scoreDockerfileSize(content: string): number {
   let score = 50;
 
-  // Alpine or distroless images
-  if (content.includes('alpine') || content.includes('distroless')) score += 20;
+  // Alpine or distroless images (major size reduction)
+  if (content.match(/FROM.*alpine/i)) score += 20;
+  else if (content.match(/FROM.*distroless/i)) score += 25;
+  else if (content.match(/FROM.*slim/i)) score += 15;
 
-  // Cleanup operations
-  if (content.includes('rm -rf') || content.includes('apt-get clean')) score += 15;
+  // Cleanup operations in same layer
+  const cleanupPatterns = [
+    /rm\s+-rf\s+\/var\/lib\/apt\/lists/,
+    /apt-get\s+clean/,
+    /yum\s+clean\s+all/,
+    /apk\s+--no-cache/,
+    /pip\s+install\s+--no-cache-dir/,
+    /npm\s+cache\s+clean/,
+  ];
+  const cleanupScore = cleanupPatterns.filter((pattern) => content.match(pattern)).length;
+  score += Math.min(15, cleanupScore * 5);
 
-  // No-cache flags
-  if (content.includes('--no-cache')) score += 10;
+  // Layer consolidation
+  const runCommands = (content.match(/^RUN\s+/gm) || []).length;
+  if (runCommands <= 3) score += 10;
+  else if (runCommands <= 5) score += 5;
 
-  // Single RUN commands (layer optimization)
-  const runCommands = (content.match(/^RUN/gm) || []).length;
-  if (runCommands <= 3) score += 5;
+  // Multi-stage build with proper copy from final stage
+  if (content.includes('COPY --from=')) score += 10;
+
+  // Specific size optimization flags
+  if (content.includes('--no-install-recommends')) score += 5;
 
   return Math.min(score, 100);
 }
@@ -673,20 +706,44 @@ function scoreDockerfileSize(content: string): number {
 function scoreDockerfileSecurity(content: string): number {
   let score = 30; // Start lower for security
 
-  // Non-root user
-  if (content.includes('USER') && !content.includes('USER root')) score += 25;
+  // Non-root user configuration
+  const userMatch = content.match(/^USER\s+(\S+)/m);
+  if (userMatch && userMatch[1] !== 'root') {
+    score += 25;
+    // Extra points for creating user properly
+    if (content.includes('RUN useradd') || content.includes('RUN adduser')) score += 5;
+  }
 
-  // No secrets in layers
-  if (!content.includes('PASSWORD') && !content.includes('SECRET')) score += 15;
+  // No hardcoded secrets or sensitive data
+  const secretPatterns = [
+    /PASSWORD\s*=\s*["'][^"']+["']/i,
+    /SECRET\s*=\s*["'][^"']+["']/i,
+    /API_KEY\s*=\s*["'][^"']+["']/i,
+    /TOKEN\s*=\s*["'][^"']+["']/i,
+  ];
+  if (!secretPatterns.some((pattern) => content.match(pattern))) score += 15;
 
-  // Proper copying (no COPY . early)
-  if (!content.match(/^COPY \. /m)) score += 10;
+  // Proper file copying patterns (avoid copying everything early)
+  const copyAll = content.match(/^COPY\s+\.\s+/m);
+  const copyAllIndex = copyAll ? content.indexOf(copyAll[0]) : -1;
+  const runIndex = content.indexOf('RUN ');
+  if (copyAllIndex === -1 || (runIndex > -1 && copyAllIndex > runIndex)) score += 10;
 
-  // Health checks
-  if (content.includes('HEALTHCHECK')) score += 10;
+  // Health checks for container monitoring
+  if (content.match(/^HEALTHCHECK\s+/m)) score += 10;
 
-  // Proper base image (not latest)
-  if (!content.includes(':latest')) score += 10;
+  // Versioned base images (not using latest)
+  const fromLines = content.match(/^FROM\s+(\S+)/gm) || [];
+  const versionedImages = fromLines.filter(
+    (line) => !line.includes(':latest') && line.includes(':'),
+  ).length;
+  if (versionedImages === fromLines.length && fromLines.length > 0) score += 10;
+
+  // Security-focused base images
+  if (content.includes('FROM scratch')) score += 5;
+
+  // Capability dropping
+  if (content.includes('--cap-drop')) score += 5;
 
   return Math.min(score, 100);
 }
@@ -694,22 +751,51 @@ function scoreDockerfileSecurity(content: string): number {
 function scoreDockerfileSpeed(content: string): number {
   let score = 50;
 
-  // Dependency caching
-  if (
-    content.includes('package.json') &&
-    content.indexOf('COPY package') < content.indexOf('COPY .')
-  )
-    score += 20;
+  // Dependency caching optimization (most important for speed)
+  const hasPackageJson = content.includes('package.json') || content.includes('package-lock.json');
+  const hasRequirements = content.includes('requirements.txt');
+  const hasGoMod = content.includes('go.mod');
 
-  // Parallel operations
-  if (content.includes('--parallel') || content.includes('-j')) score += 10;
+  if (hasPackageJson) {
+    const copyPackageIndex = Math.min(
+      content.indexOf('COPY package.json') > -1 ? content.indexOf('COPY package.json') : Infinity,
+      content.indexOf('COPY package*.json') > -1 ? content.indexOf('COPY package*.json') : Infinity,
+    );
+    const copyAllIndex = content.indexOf('COPY . ');
+    if (copyPackageIndex < copyAllIndex) score += 20;
+  } else if (hasRequirements) {
+    const copyReqIndex = content.indexOf('COPY requirements.txt');
+    const copyAllIndex = content.indexOf('COPY . ');
+    if (copyReqIndex > -1 && copyReqIndex < copyAllIndex) score += 20;
+  } else if (hasGoMod) {
+    const copyGoModIndex = content.indexOf('COPY go.mod');
+    const copyAllIndex = content.indexOf('COPY . ');
+    if (copyGoModIndex > -1 && copyGoModIndex < copyAllIndex) score += 20;
+  }
 
-  // Minimal base images
-  if (content.includes('alpine')) score += 15;
+  // Parallel operations and build optimizations
+  const parallelPatterns = [
+    '--parallel',
+    '-j',
+    'make -j',
+    'npm ci --prefer-offline',
+    '--frozen-lockfile',
+    '--mount=type=cache',
+  ];
+  const parallelScore = parallelPatterns.filter((pattern) => content.includes(pattern)).length;
+  score += Math.min(15, parallelScore * 5);
 
-  // Layer count (fewer is better for speed)
+  // Minimal base images for faster pulls
+  if (content.match(/FROM.*alpine/i)) score += 15;
+  else if (content.match(/FROM.*slim/i)) score += 10;
+
+  // BuildKit features for better caching
+  if (content.includes('# syntax=docker/dockerfile:1')) score += 5;
+
+  // Layer count optimization
   const layers = (content.match(/^(FROM|RUN|COPY|ADD)/gm) || []).length;
   if (layers <= 10) score += 5;
+  else if (layers <= 15) score += 3;
 
   return Math.min(score, 100);
 }
@@ -718,52 +804,154 @@ function scoreDockerfileSpeed(content: string): number {
  * YAML/K8s-specific scoring functions
  */
 function scoreYamlValidation(content: string): number {
-  let score = 50;
+  let score = 40;
 
-  // Check for required fields
-  if (content.includes('apiVersion:')) score += 15;
-  if (content.includes('kind:')) score += 15;
-  if (content.includes('metadata:')) score += 10;
-  if (content.includes('spec:')) score += 10;
+  // Check for required Kubernetes fields
+  if (content.match(/^apiVersion:\s*\S+/m)) score += 15;
+  if (content.match(/^kind:\s*\S+/m)) score += 15;
+  if (content.match(/^metadata:/m)) {
+    score += 10;
+    // Extra points for proper metadata
+    if (content.match(/^\s+name:\s*\S+/m)) score += 5;
+    if (content.match(/^\s+namespace:\s*\S+/m)) score += 3;
+  }
+  if (content.match(/^spec:/m)) score += 10;
+
+  // Valid YAML structure (proper indentation)
+  const lines = content.split('\n');
+  const hasConsistentIndent = lines.every((line) => {
+    // Check for tabs (invalid in YAML)
+    if (line.includes('\t')) return false;
+    // Check for proper spacing (multiples of 2)
+    const leadingSpaces = line.match(/^(\s*)/)?.[1]?.length || 0;
+    return leadingSpaces % 2 === 0;
+  });
+  if (hasConsistentIndent) score += 7;
 
   return Math.min(score, 100);
 }
 
 function scoreYamlSecurity(content: string): number {
-  let score = 40;
+  let score = 30;
 
-  // Security contexts
-  if (content.includes('securityContext:')) score += 20;
-  if (content.includes('runAsNonRoot: true')) score += 15;
-  if (content.includes('readOnlyRootFilesystem: true')) score += 10;
+  // Pod Security Standards
+  if (content.includes('securityContext:')) {
+    score += 15;
+
+    // Specific security configurations
+    if (content.match(/runAsNonRoot:\s*true/)) score += 10;
+    if (content.match(/runAsUser:\s*[1-9]\d*/)) score += 5; // Non-zero UID
+    if (content.match(/readOnlyRootFilesystem:\s*true/)) score += 10;
+    if (content.match(/allowPrivilegeEscalation:\s*false/)) score += 8;
+    if (content.match(/capabilities:\s*\n\s+drop:\s*\n\s+-\s*ALL/m)) score += 7;
+  }
 
   // Network policies
-  if (content.includes('NetworkPolicy')) score += 15;
+  if (content.includes('kind: NetworkPolicy')) score += 10;
 
-  return Math.min(score, 100);
+  // RBAC configurations
+  if (content.includes('kind: Role') || content.includes('kind: ClusterRole')) score += 5;
+  if (content.includes('serviceAccountName:')) score += 5;
+
+  // Secret management
+  if (content.includes('secretRef:') || content.includes('secretKeyRef:')) {
+    score += 5;
+    // Deduct if secrets are hardcoded
+    if (content.match(/value:\s*["'].*password/i)) score -= 10;
+  }
+
+  // Pod Security Policy/Standards
+  if (content.includes('podSecurityPolicy:') || content.includes('securityContext:')) score += 5;
+
+  return Math.min(Math.max(score, 0), 100);
 }
 
 function scoreYamlResources(content: string): number {
-  let score = 50;
+  let score = 40;
 
-  // Resource limits
-  if (content.includes('resources:')) score += 20;
-  if (content.includes('limits:')) score += 15;
-  if (content.includes('requests:')) score += 15;
+  // Resource specifications
+  if (content.includes('resources:')) {
+    score += 15;
+
+    // Memory and CPU limits
+    if (content.match(/limits:\s*\n\s+memory:/m)) score += 10;
+    if (content.match(/limits:\s*\n\s+cpu:/m)) score += 10;
+
+    // Memory and CPU requests
+    if (content.match(/requests:\s*\n\s+memory:/m)) score += 10;
+    if (content.match(/requests:\s*\n\s+cpu:/m)) score += 10;
+  }
+
+  // Autoscaling configuration
+  if (content.includes('kind: HorizontalPodAutoscaler')) score += 5;
+
+  // PersistentVolumeClaim specifications
+  if (content.includes('kind: PersistentVolumeClaim')) {
+    score += 5;
+    if (content.match(/storage:\s*\d+[GM]i/)) score += 5; // Proper storage size
+  }
+
+  // Quality of Service classes hint
+  if (
+    content.includes('qosClass:') ||
+    (content.includes('limits:') && content.includes('requests:'))
+  ) {
+    score += 5;
+  }
 
   return Math.min(score, 100);
 }
 
 function scoreYamlBestPractices(content: string): number {
-  let score = 50;
+  let score = 30;
 
-  // Labels and selectors
-  if (content.includes('labels:')) score += 10;
-  if (content.includes('selector:')) score += 10;
+  // Labels and annotations
+  if (content.includes('labels:')) {
+    score += 8;
+    // Standard labels
+    if (content.includes('app.kubernetes.io/')) score += 5;
+    if (content.includes('version:') || content.includes('app.kubernetes.io/version:')) score += 3;
+  }
 
-  // Probes
-  if (content.includes('livenessProbe:')) score += 15;
-  if (content.includes('readinessProbe:')) score += 15;
+  if (content.includes('annotations:')) score += 5;
+
+  // Selectors for proper service discovery
+  if (content.includes('selector:')) {
+    score += 7;
+    if (content.includes('matchLabels:')) score += 3;
+  }
+
+  // Health checks (critical for production)
+  if (content.includes('livenessProbe:')) {
+    score += 10;
+    if (
+      content.includes('httpGet:') ||
+      content.includes('tcpSocket:') ||
+      content.includes('exec:')
+    ) {
+      score += 3;
+    }
+  }
+  if (content.includes('readinessProbe:')) {
+    score += 10;
+    if (content.includes('initialDelaySeconds:')) score += 2;
+  }
+  if (content.includes('startupProbe:')) score += 5;
+
+  // Deployment strategies
+  if (content.includes('strategy:')) {
+    score += 5;
+    if (content.includes('RollingUpdate')) score += 3;
+  }
+
+  // Pod disruption budgets
+  if (content.includes('kind: PodDisruptionBudget')) score += 5;
+
+  // Anti-affinity rules for HA
+  if (content.includes('podAntiAffinity:')) score += 5;
+
+  // Proper container naming
+  if (content.match(/containers:\s*\n\s+-\s+name:\s*\S+/m)) score += 3;
 
   return Math.min(score, 100);
 }
@@ -772,62 +960,350 @@ function scoreYamlBestPractices(content: string): number {
  * Generic scoring functions for other content types
  */
 function scoreGenericQuality(content: string): number {
-  let score = 50;
+  let score = 40;
 
-  // Check for structure
-  const lines = content.split('\n').length;
-  if (lines > 5) score += 20;
-  if (lines > 10) score += 10;
+  const lines = content.split('\n');
+  const nonEmptyLines = lines.filter((line) => line.trim().length > 0);
 
-  // Check for comments
-  if (content.includes('#') || content.includes('//')) score += 10;
+  // Structure and completeness
+  if (nonEmptyLines.length >= 5) score += 15;
+  if (nonEmptyLines.length >= 10) score += 10;
 
-  // Check for proper formatting
-  if (content.includes('\n') && !content.includes('\t\t\t')) score += 10;
+  // Check for documentation/comments
+  const hasComments = content.match(/(#|\/\/|\/\*|\*\/|<!--)/);
+  if (hasComments) score += 10;
+
+  // Check for proper formatting and structure
+  const hasProperNewlines = content.includes('\n') && !content.includes('\r\n\r\n\r\n');
+  if (hasProperNewlines) score += 5;
+
+  // Check for consistent patterns (suggests well-structured content)
+  const hasPatterns =
+    (content.match(/^\s*[-*]\s+/gm) || []).length >= 3 || // List items
+    (content.match(/^\s*\d+\.\s+/gm) || []).length >= 3 || // Numbered items
+    (content.match(/^[A-Z][A-Z_]+=/gm) || []).length >= 3; // Environment variables
+  if (hasPatterns) score += 10;
+
+  // Check for proper escaping and quoting
+  const hasProperQuoting = !content.includes('\\\\\\') && !content.includes('"""');
+  if (hasProperQuoting) score += 5;
+
+  // Semantic structure indicators
+  if (content.includes('#!/') || content.includes('<?') || content.includes('---')) score += 5;
 
   return Math.min(score, 100);
 }
 
 function scoreGenericSecurity(content: string): number {
-  let score = 70;
+  let score = 80; // Start with good score
 
-  // Deduct for potential security issues
-  if (content.includes('password') || content.includes('PASSWORD')) score -= 20;
-  if (content.includes('secret') || content.includes('SECRET')) score -= 20;
-  if (content.includes('token') || content.includes('TOKEN')) score -= 10;
+  // Pattern-based security checks with context
+  const securityPatterns = [
+    { pattern: /password\s*[:=]\s*["'][^"']+["']/gi, penalty: 25 }, // Hardcoded password
+    { pattern: /api[_-]?key\s*[:=]\s*["'][^"']+["']/gi, penalty: 25 }, // Hardcoded API key
+    { pattern: /secret\s*[:=]\s*["'][^"']+["']/gi, penalty: 20 }, // Hardcoded secret
+    { pattern: /token\s*[:=]\s*["'][^"']+["']/gi, penalty: 20 }, // Hardcoded token
+    { pattern: /private[_-]?key/gi, penalty: 15 }, // Private key reference
+    { pattern: /BEGIN\s+(RSA|DSA|EC)\s+PRIVATE\s+KEY/gi, penalty: 30 }, // Actual private key
+    { pattern: /aws_access_key_id/gi, penalty: 20 }, // AWS credentials
+    { pattern: /mongodb:\/\/[^@]+@/gi, penalty: 20 }, // MongoDB with credentials
+  ];
 
-  return Math.max(score, 0);
+  for (const { pattern, penalty } of securityPatterns) {
+    if (content.match(pattern)) {
+      score -= penalty;
+    }
+  }
+
+  // Positive security practices
+  if (content.includes('${') || content.includes('$(')) score += 5; // Environment variable usage
+  if (content.includes('from_secret:') || content.includes('valueFrom:')) score += 5; // Secret refs
+  if (content.match(/chmod\s+[0-6]00/)) score += 5; // Restrictive permissions
+
+  // Security misconfigurations
+  if (content.includes('--insecure') || content.includes('--no-check-certificate')) score -= 10;
+  if (content.includes('0.0.0.0:') || content.includes('*:')) score -= 5; // Broad binding
+
+  return Math.min(Math.max(score, 0), 100);
 }
 
 function scoreGenericEfficiency(content: string): number {
-  // Simple heuristic for efficiency
-  const lines = content.split('\n').length;
-  const chars = content.length;
-
-  // Prefer concise content
-  const ratio = chars / Math.max(lines, 1);
   let score = 50;
 
-  if (ratio < 100) score += 25; // Not too verbose
-  if (ratio > 20) score += 25; // Not too terse
+  const lines = content.split('\n');
+  const nonEmptyLines = lines.filter((line) => line.trim().length > 0);
+  const totalChars = content.length;
+
+  // Content density (not too sparse, not too dense)
+  const avgCharsPerLine = totalChars / Math.max(nonEmptyLines.length, 1);
+  if (avgCharsPerLine >= 20 && avgCharsPerLine <= 100) score += 20;
+  else if (avgCharsPerLine >= 10 && avgCharsPerLine <= 150) score += 10;
+
+  // No excessive repetition
+  const uniqueLines = new Set(nonEmptyLines);
+  const uniquenessRatio = uniqueLines.size / Math.max(nonEmptyLines.length, 1);
+  if (uniquenessRatio > 0.8) score += 15;
+  else if (uniquenessRatio > 0.6) score += 10;
+
+  // Efficient patterns
+  const efficientPatterns = [
+    /\|\|/g, // OR operations for fallbacks
+    /&&/g, // AND operations for chaining
+    /\${.*:-.*}/g, // Default values
+    />/g, // Redirections
+    /2>&1/g, // Error handling
+  ];
+
+  const efficiencyMatches = efficientPatterns.reduce(
+    (count, pattern) => count + (content.match(pattern) || []).length,
+    0,
+  );
+  if (efficiencyMatches > 0) score += Math.min(15, efficiencyMatches * 3);
 
   return Math.min(score, 100);
 }
 
 function scoreGenericMaintainability(content: string): number {
-  let score = 50;
+  let score = 40;
 
-  // Check for readable structure
-  if (content.includes('\n')) score += 20;
+  const lines = content.split('\n');
 
-  // Check for documentation
-  if (content.includes('#') || content.includes('//') || content.includes('/*')) score += 20;
+  // Readable structure with proper line breaks
+  if (lines.length > 1) score += 15;
 
-  // Check for consistent indentation
-  const hasConsistentIndent = content
-    .split('\n')
-    .every((line) => !line.startsWith('\t') || !line.startsWith(' '));
-  if (hasConsistentIndent) score += 10;
+  // Documentation presence
+  const docPatterns = [
+    /#\s+\w+/g, // Shell/Python comments
+    /\/\/\s+\w+/g, // C-style comments
+    /\/\*[\s\S]*?\*\//g, // Block comments
+    /<!--[\s\S]*?-->/g, // HTML/XML comments
+    /@\w+/g, // Annotations/decorators
+  ];
+
+  const hasDocumentation = docPatterns.some((pattern) => content.match(pattern));
+  if (hasDocumentation) score += 20;
+
+  // Consistent indentation
+  const indentTypes = new Set();
+  lines.forEach((line) => {
+    const leadingWhitespace = line.match(/^(\s+)/);
+    if (leadingWhitespace?.[1]) {
+      if (leadingWhitespace[1].includes('\t')) indentTypes.add('tab');
+      if (leadingWhitespace[1].includes('  ')) indentTypes.add('space');
+    }
+  });
+  if (indentTypes.size <= 1) score += 15; // Consistent indent type
+
+  // Meaningful naming (variables, functions, etc.)
+  const hasDescriptiveNames =
+    content.match(/[a-z][a-zA-Z]{3,}_[a-z][a-zA-Z]+/g) || // snake_case
+    content.match(/[a-z][a-zA-Z]{3,}[A-Z][a-zA-Z]+/g); // camelCase
+  if (hasDescriptiveNames && hasDescriptiveNames.length > 0) score += 10;
+
+  // Modular structure indicators
+  if (
+    content.includes('function ') ||
+    content.includes('def ') ||
+    content.includes('class ') ||
+    content.includes('export ')
+  ) {
+    score += 5;
+  }
+
+  // Version indicators
+  if (content.match(/v?\d+\.\d+\.\d+/) || content.includes('version:')) score += 5;
 
   return Math.min(score, 100);
+}
+
+/**
+ * Helper utilities for content analysis
+ */
+
+/**
+ * Detect if a Dockerfile uses multi-stage builds
+ */
+export function detectMultistageDocker(content: string): boolean {
+  const fromMatches = content.match(/^FROM\s+/gm) || [];
+  return fromMatches.length > 1;
+}
+
+/**
+ * Count the number of layers in a Dockerfile
+ */
+export function countDockerLayers(content: string): number {
+  const layerInstructions = [
+    /^FROM\s+/gm,
+    /^RUN\s+/gm,
+    /^COPY\s+/gm,
+    /^ADD\s+/gm,
+    /^ENV\s+/gm,
+    /^ARG\s+/gm,
+    /^USER\s+/gm,
+    /^WORKDIR\s+/gm,
+  ];
+
+  return layerInstructions.reduce((count, pattern) => {
+    return count + (content.match(pattern) || []).length;
+  }, 0);
+}
+
+/**
+ * Extract the base image from a Dockerfile
+ */
+export function extractBaseImage(content: string): string | null {
+  const match = content.match(/^FROM\s+([^\s]+)/m);
+  return match?.[1] ?? null;
+}
+
+/**
+ * Detect potential secrets in content
+ */
+export function detectSecrets(content: string): string[] {
+  const secrets: string[] = [];
+  const secretPatterns = [
+    { pattern: /password\s*[:=]\s*["'][^"']+["']/gi, type: 'password' },
+    { pattern: /api[_-]?key\s*[:=]\s*["'][^"']+["']/gi, type: 'api_key' },
+    { pattern: /secret\s*[:=]\s*["'][^"']+["']/gi, type: 'secret' },
+    { pattern: /token\s*[:=]\s*["'][^"']+["']/gi, type: 'token' },
+    { pattern: /BEGIN\s+(RSA|DSA|EC)\s+PRIVATE\s+KEY/gi, type: 'private_key' },
+  ];
+
+  for (const { pattern, type } of secretPatterns) {
+    const matches = content.match(pattern);
+    if (matches) {
+      secrets.push(`${type}: ${matches.length} occurrence(s)`);
+    }
+  }
+
+  return secrets;
+}
+
+/**
+ * Validate YAML syntax (basic check)
+ */
+export function validateYamlSyntax(content: string): boolean {
+  // Basic YAML validation
+  if (content.includes('\t')) {
+    return false; // YAML doesn't allow tabs
+  }
+
+  // Check for basic YAML structure
+  if (!content.match(/^[\w-]+:/m) && !content.startsWith('---')) {
+    return false;
+  }
+
+  // Check for consistent indentation
+  const lines = content.split('\n');
+  for (const line of lines) {
+    if (line.trim() === '') continue;
+    const indent = line.match(/^(\s*)/)?.[1]?.length || 0;
+    if (indent % 2 !== 0) {
+      return false; // YAML typically uses 2-space indentation
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Extract Kubernetes resource specifications from YAML
+ */
+export interface ResourceSpec {
+  kind?: string;
+  apiVersion?: string;
+  name?: string;
+  namespace?: string;
+  replicas?: number;
+  resources?: {
+    limits?: { cpu?: string; memory?: string };
+    requests?: { cpu?: string; memory?: string };
+  };
+}
+
+export function extractK8sResources(content: string): ResourceSpec[] {
+  const resources: ResourceSpec[] = [];
+  const documents = content.split(/^---$/m);
+
+  for (const doc of documents) {
+    if (!doc.trim()) continue;
+
+    const spec: ResourceSpec = {};
+
+    // Extract basic fields
+    const kindMatch = doc.match(/^kind:\s*(.+)$/m);
+    if (kindMatch?.[1]) spec.kind = kindMatch[1].trim();
+
+    const apiVersionMatch = doc.match(/^apiVersion:\s*(.+)$/m);
+    if (apiVersionMatch?.[1]) spec.apiVersion = apiVersionMatch[1].trim();
+
+    const nameMatch = doc.match(/^\s+name:\s*(.+)$/m);
+    if (nameMatch?.[1]) spec.name = nameMatch[1].trim();
+
+    const namespaceMatch = doc.match(/^\s+namespace:\s*(.+)$/m);
+    if (namespaceMatch?.[1]) spec.namespace = namespaceMatch[1].trim();
+
+    const replicasMatch = doc.match(/^\s+replicas:\s*(\d+)$/m);
+    if (replicasMatch?.[1]) spec.replicas = parseInt(replicasMatch[1], 10);
+
+    // Extract resource specifications
+    if (doc.includes('resources:')) {
+      spec.resources = {};
+
+      const cpuLimitMatch = doc.match(/limits:[\s\S]*?cpu:\s*["']?([^"'\n]+)["']?/);
+      const memLimitMatch = doc.match(/limits:[\s\S]*?memory:\s*["']?([^"'\n]+)["']?/);
+      const cpuRequestMatch = doc.match(/requests:[\s\S]*?cpu:\s*["']?([^"'\n]+)["']?/);
+      const memRequestMatch = doc.match(/requests:[\s\S]*?memory:\s*["']?([^"'\n]+)["']?/);
+
+      if (cpuLimitMatch || memLimitMatch) {
+        spec.resources.limits = {};
+        if (cpuLimitMatch?.[1]) spec.resources.limits.cpu = cpuLimitMatch[1].trim();
+        if (memLimitMatch?.[1]) spec.resources.limits.memory = memLimitMatch[1].trim();
+      }
+
+      if (cpuRequestMatch || memRequestMatch) {
+        spec.resources.requests = {};
+        if (cpuRequestMatch?.[1]) spec.resources.requests.cpu = cpuRequestMatch[1].trim();
+        if (memRequestMatch?.[1]) spec.resources.requests.memory = memRequestMatch[1].trim();
+      }
+    }
+
+    if (Object.keys(spec).length > 0) {
+      resources.push(spec);
+    }
+  }
+
+  return resources;
+}
+
+/**
+ * Normalize a score to ensure it's within valid range
+ */
+export function normalizeScore(score: number, max: number = 100): number {
+  return Math.min(Math.max(score, 0), max);
+}
+
+/**
+ * Calculate weighted average of scores
+ */
+export function weightedAverage(
+  scores: Record<string, number>,
+  weights: Record<string, number>,
+): number {
+  let totalWeight = 0;
+  let weightedSum = 0;
+
+  for (const [criterion, score] of Object.entries(scores)) {
+    const weight = weights[criterion] || 0;
+    totalWeight += weight;
+    weightedSum += score * weight;
+  }
+
+  if (totalWeight === 0) {
+    // If no weights, return simple average
+    const values = Object.values(scores);
+    return values.reduce((sum, val) => sum + val, 0) / Math.max(values.length, 1);
+  }
+
+  return weightedSum / totalWeight;
 }

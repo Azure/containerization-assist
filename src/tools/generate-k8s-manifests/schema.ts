@@ -62,6 +62,33 @@ export const generateK8sManifestsSchema = z.object({
     .enum(['development', 'staging', 'production'])
     .optional()
     .describe('Target environment'),
+
+  // Sampling options
+  disableSampling: z
+    .boolean()
+    .optional()
+    .describe('Disable multi-candidate sampling (sampling is enabled by default)'),
+  maxCandidates: z
+    .number()
+    .min(1)
+    .max(10)
+    .optional()
+    .describe('Maximum number of candidates to generate (1-10)'),
+  earlyStopThreshold: z
+    .number()
+    .min(0)
+    .max(100)
+    .optional()
+    .describe('Score threshold for early stopping (0-100)'),
+  includeScoreBreakdown: z
+    .boolean()
+    .optional()
+    .describe('Include detailed score breakdown in response'),
+  returnAllCandidates: z
+    .boolean()
+    .optional()
+    .describe('Return all candidates instead of just the winner'),
+  useCache: z.boolean().optional().describe('Use caching for repeated requests'),
 });
 
 export type GenerateK8sManifestsParams = z.infer<typeof generateK8sManifestsSchema>;

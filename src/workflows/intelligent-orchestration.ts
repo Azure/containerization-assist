@@ -539,39 +539,5 @@ export const executeWorkflow = async (
   }
 };
 
-// Create a basic orchestrator for compatibility
-export function createMCPAIOrchestrator(
-  logger: Logger,
-  _options?: Record<string, unknown>,
-): {
-  execute: typeof executeWorkflow;
-  validateParameters: (
-    _toolName: string,
-    _params: Record<string, unknown>,
-    _context?: Record<string, unknown>,
-  ) => Promise<Result<{ isValid: boolean; errors: string[]; warnings: string[] }>>;
-  logger: Logger;
-} {
-  return {
-    execute: executeWorkflow,
-    validateParameters: async (
-      _toolName: string,
-      _params: Record<string, unknown>,
-      _context?: Record<string, unknown>,
-    ) => Success({ isValid: true, errors: [], warnings: [] }),
-    logger,
-  };
-}
-
-export interface MCPAIOrchestrator {
-  execute: typeof executeWorkflow;
-  validateParameters: (
-    toolName: string,
-    params: Record<string, unknown>,
-    context?: Record<string, unknown>,
-  ) => Promise<Result<{ isValid: boolean; errors: string[]; warnings: string[] }>>;
-  logger: Logger;
-}
-
 // Export types
 export type { WorkflowStep, WorkflowContext, WorkflowResult };

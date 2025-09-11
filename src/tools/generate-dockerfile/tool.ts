@@ -6,7 +6,8 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { getSession, updateSession } from '@mcp/tools/session-helpers';
 import { createStandardProgress } from '@mcp/utils/progress-helper';
-import { aiGenerate } from '@mcp/tools/ai-helpers';
+import { aiGenerate, aiGenerateWithSampling } from '@mcp/tools/ai-helpers';
+import type { SamplingOptions } from '@lib/sampling';
 import { createTimer, createLogger } from '@lib/logger';
 import type { SessionData, SessionAnalysisResult } from '../session-types';
 import type { ToolContext } from '../../mcp/context/types';
@@ -41,6 +42,32 @@ export interface GenerateDockerfileResult {
   warnings?: string[];
   /** Session ID for reference */
   sessionId?: string;
+  /** Sampling metadata if sampling was used */
+  samplingMetadata?: {
+    stoppedEarly?: boolean;
+    candidatesGenerated: number;
+    winnerScore: number;
+    samplingDuration?: number;
+  };
+  /** Winner score if sampling was used */
+  winnerScore?: number;
+  /** Score breakdown if requested */
+  scoreBreakdown?: Record<string, number>;
+  /** All candidates if requested */
+  allCandidates?: Array<{
+    id: string;
+    content: string;
+    score: number;
+    scoreBreakdown: Record<string, number>;
+    rank?: number;
+  }>;
+  /** Scoring details for test compatibility */
+  scoringDetails?: {
+    candidates?: Array<{
+      score: number;
+      [key: string]: any;
+    }>;
+  };
 }
 
 /**
@@ -295,24 +322,67 @@ async function generateDockerfileImpl(
     // Progress: Main generation phase (AI or template)
     if (progress) await progress('EXECUTING');
 
-    // Generate Dockerfile with AI or fallback
-    const aiResult = await aiGenerate(logger, context, {
-      promptName: 'dockerfile-generation',
-      promptArgs: buildArgsFromAnalysis(analysisResult),
-      expectation: 'dockerfile',
-      maxRetries: 3,
-      fallbackBehavior: 'default',
-    });
+    // Prepare sampling options (filter out undefined values)
+    const samplingOptions: SamplingOptions = {};
+    // Sampling is enabled by default unless explicitly disabled
+    samplingOptions.enableSampling = !params.disableSampling;
+    if (params.maxCandidates !== undefined) samplingOptions.maxCandidates = params.maxCandidates;
+    if (params.earlyStopThreshold !== undefined)
+      samplingOptions.earlyStopThreshold = params.earlyStopThreshold;
+    if (params.includeScoreBreakdown !== undefined)
+      samplingOptions.includeScoreBreakdown = params.includeScoreBreakdown;
+    if (params.returnAllCandidates !== undefined)
+      samplingOptions.returnAllCandidates = params.returnAllCandidates;
+    if (params.useCache !== undefined) samplingOptions.useCache = params.useCache;
 
     let dockerfileContent: string;
     let baseImageUsed: string;
     let aiUsed = false;
+    let samplingMetadata: GenerateDockerfileResult['samplingMetadata'];
+    let winnerScore: number | undefined;
+    let scoreBreakdown: Record<string, number> | undefined;
+    let allCandidates: GenerateDockerfileResult['allCandidates'];
 
-    if (aiResult.ok) {
-      // Use AI-generated content
-      const cleaned = stripFencesAndNoise(aiResult.value.content);
-      if (!isValidDockerfileContent(cleaned)) {
-        // Fall back to template if AI output is invalid
+    // Use sampling-aware generation (default) unless explicitly disabled
+    if (!params.disableSampling) {
+      const aiResult = await aiGenerateWithSampling(logger, context, {
+        promptName: 'dockerfile-generation',
+        promptArgs: buildArgsFromAnalysis(analysisResult),
+        expectation: 'dockerfile',
+        maxRetries: 3,
+        fallbackBehavior: 'default',
+        ...samplingOptions,
+      });
+
+      if (aiResult.ok) {
+        const cleaned = stripFencesAndNoise(aiResult.value.winner.content);
+        if (!isValidDockerfileContent(cleaned)) {
+          // Fall back to template if AI output is invalid
+          const fallbackResult = generateTemplateDockerfile(
+            sessionToAnalyzeRepoResult(analysisResult),
+            params,
+          );
+          if (!fallbackResult.ok) {
+            return Failure(fallbackResult.error);
+          }
+          dockerfileContent = fallbackResult.value.content;
+          baseImageUsed = fallbackResult.value.baseImage;
+        } else {
+          dockerfileContent = cleaned;
+          baseImageUsed =
+            extractBaseImage(cleaned) ||
+            params.baseImage ||
+            getRecommendedBaseImage(analysisResult.language ?? 'unknown');
+          aiUsed = true;
+
+          // Capture sampling metadata
+          samplingMetadata = aiResult.value.samplingMetadata;
+          winnerScore = aiResult.value.winner.score;
+          scoreBreakdown = aiResult.value.winner.scoreBreakdown;
+          allCandidates = aiResult.value.allCandidates;
+        }
+      } else {
+        // Use template fallback
         const fallbackResult = generateTemplateDockerfile(
           sessionToAnalyzeRepoResult(analysisResult),
           params,
@@ -322,25 +392,51 @@ async function generateDockerfileImpl(
         }
         dockerfileContent = fallbackResult.value.content;
         baseImageUsed = fallbackResult.value.baseImage;
-      } else {
-        dockerfileContent = cleaned;
-        baseImageUsed =
-          extractBaseImage(cleaned) ||
-          params.baseImage ||
-          getRecommendedBaseImage(analysisResult.language ?? 'unknown');
-        aiUsed = true;
       }
     } else {
-      // Use template fallback
-      const fallbackResult = generateTemplateDockerfile(
-        sessionToAnalyzeRepoResult(analysisResult),
-        params,
-      );
-      if (!fallbackResult.ok) {
-        return Failure(fallbackResult.error);
+      // Standard generation without sampling
+      const aiResult = await aiGenerate(logger, context, {
+        promptName: 'dockerfile-generation',
+        promptArgs: buildArgsFromAnalysis(analysisResult),
+        expectation: 'dockerfile',
+        maxRetries: 3,
+        fallbackBehavior: 'default',
+      });
+
+      if (aiResult.ok) {
+        // Use AI-generated content
+        const cleaned = stripFencesAndNoise(aiResult.value.content);
+        if (!isValidDockerfileContent(cleaned)) {
+          // Fall back to template if AI output is invalid
+          const fallbackResult = generateTemplateDockerfile(
+            sessionToAnalyzeRepoResult(analysisResult),
+            params,
+          );
+          if (!fallbackResult.ok) {
+            return Failure(fallbackResult.error);
+          }
+          dockerfileContent = fallbackResult.value.content;
+          baseImageUsed = fallbackResult.value.baseImage;
+        } else {
+          dockerfileContent = cleaned;
+          baseImageUsed =
+            extractBaseImage(cleaned) ||
+            params.baseImage ||
+            getRecommendedBaseImage(analysisResult.language ?? 'unknown');
+          aiUsed = true;
+        }
+      } else {
+        // Use template fallback
+        const fallbackResult = generateTemplateDockerfile(
+          sessionToAnalyzeRepoResult(analysisResult),
+          params,
+        );
+        if (!fallbackResult.ok) {
+          return Failure(fallbackResult.error);
+        }
+        dockerfileContent = fallbackResult.value.content;
+        baseImageUsed = fallbackResult.value.baseImage;
       }
-      dockerfileContent = fallbackResult.value.content;
-      baseImageUsed = fallbackResult.value.baseImage;
     }
 
     // Progress: Finalizing and writing to disk
@@ -408,7 +504,11 @@ async function generateDockerfileImpl(
     timer.end({ path: dockerfilePath });
 
     // Return result with file write indicator and chain hint
-    return Success({
+    const result: GenerateDockerfileResult & {
+      _fileWritten?: boolean;
+      _fileWrittenPath?: string;
+      _chainHint?: string;
+    } = {
       content: dockerfileContent,
       path: dockerfilePath,
       baseImage: baseImageUsed,
@@ -419,7 +519,33 @@ async function generateDockerfileImpl(
       _fileWritten: true,
       _fileWrittenPath: dockerfilePath,
       _chainHint: 'Next: build_image with the generated Dockerfile',
-    });
+    };
+
+    // Add sampling metadata if sampling was used
+    if (!params.disableSampling) {
+      if (samplingMetadata) {
+        result.samplingMetadata = samplingMetadata;
+      }
+      if (winnerScore !== undefined) {
+        result.winnerScore = winnerScore;
+      }
+      if (scoreBreakdown && params.includeScoreBreakdown) {
+        result.scoreBreakdown = scoreBreakdown;
+      }
+      if (allCandidates && params.returnAllCandidates) {
+        result.allCandidates = allCandidates;
+        // Add scoringDetails for test compatibility
+        result.scoringDetails = {
+          candidates: allCandidates.map((c) => ({
+            score: c.score,
+            id: c.id,
+            scoreBreakdown: c.scoreBreakdown,
+          })),
+        };
+      }
+    }
+
+    return Success(result);
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Dockerfile generation failed');

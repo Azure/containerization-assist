@@ -20,7 +20,8 @@
  */
 
 import { getSession, updateSession } from '@mcp/tools/session-helpers';
-import { aiGenerate } from '@mcp/tools/ai-helpers';
+import { aiGenerate, aiGenerateWithSampling } from '@mcp/tools/ai-helpers';
+import type { SamplingOptions } from '@lib/sampling';
 import { createStandardProgress } from '@mcp/utils/progress-helper';
 import type { ToolContext } from '../../mcp/context/types';
 import { createTimer, createLogger, type Logger } from '../../lib/logger';
@@ -42,6 +43,25 @@ export interface FixDockerfileResult {
   validation: string[];
   aiUsed: boolean;
   generationMethod: 'AI' | 'fallback';
+  /** Sampling metadata if sampling was used */
+  samplingMetadata?: {
+    stoppedEarly?: boolean;
+    candidatesGenerated: number;
+    winnerScore: number;
+    samplingDuration?: number;
+  };
+  /** Winner score if sampling was used */
+  winnerScore?: number;
+  /** Score breakdown if requested */
+  scoreBreakdown?: Record<string, number>;
+  /** All candidates if requested */
+  allCandidates?: Array<{
+    id: string;
+    content: string;
+    score: number;
+    scoreBreakdown: Record<string, number>;
+    rank?: number;
+  }>;
 }
 
 /**
@@ -56,7 +76,17 @@ async function attemptAIFix(
   analysis: string | undefined,
   context: ToolContext,
   logger: Logger,
-): Promise<Result<{ fixedDockerfile: string; appliedFixes: string[] }>> {
+  samplingOptions?: SamplingOptions,
+): Promise<
+  Result<{
+    fixedDockerfile: string;
+    appliedFixes: string[];
+    samplingMetadata?: FixDockerfileResult['samplingMetadata'];
+    winnerScore?: number;
+    scoreBreakdown?: Record<string, number>;
+    allCandidates?: FixDockerfileResult['allCandidates'];
+  }>
+> {
   try {
     logger.info('Attempting AI-enhanced Dockerfile fix');
 
@@ -77,24 +107,58 @@ async function attemptAIFix(
 
     logger.debug({ args: cleanedArgs }, 'Using prompt arguments');
 
-    // Use standardized AI helper
-    const aiResult = await aiGenerate(logger, context, {
-      promptName: 'fix-dockerfile',
-      promptArgs: cleanedArgs,
-      expectation: 'dockerfile',
-      fallbackBehavior: 'error',
-      maxRetries: 2,
-      maxTokens: 2048,
-      stopSequences: ['```', '\n\n```', '\n\n# ', '\n\n---'],
-      modelHints: ['code'],
-    });
+    let fixedDockerfile: string;
+    let samplingMetadata: FixDockerfileResult['samplingMetadata'];
+    let winnerScore: number | undefined;
+    let scoreBreakdown: Record<string, number> | undefined;
+    let allCandidates: FixDockerfileResult['allCandidates'];
 
-    if (!aiResult.ok) {
-      return Failure(aiResult.error);
+    if (samplingOptions?.enableSampling) {
+      // Use sampling-aware generation
+      const aiResult = await aiGenerateWithSampling(logger, context, {
+        promptName: 'fix-dockerfile',
+        promptArgs: cleanedArgs,
+        expectation: 'dockerfile',
+        fallbackBehavior: 'error',
+        maxRetries: 2,
+        maxTokens: 2048,
+        stopSequences: ['```', '\n\n```', '\n\n# ', '\n\n---'],
+        modelHints: ['code'],
+        ...samplingOptions,
+      });
+
+      if (!aiResult.ok) {
+        return Failure(aiResult.error);
+      }
+
+      // Clean up the response
+      fixedDockerfile = stripFencesAndNoise(aiResult.value.winner.content);
+
+      // Capture sampling metadata
+      samplingMetadata = aiResult.value.samplingMetadata;
+      winnerScore = aiResult.value.winner.score;
+      scoreBreakdown = aiResult.value.winner.scoreBreakdown;
+      allCandidates = aiResult.value.allCandidates;
+    } else {
+      // Standard generation without sampling
+      const aiResult = await aiGenerate(logger, context, {
+        promptName: 'fix-dockerfile',
+        promptArgs: cleanedArgs,
+        expectation: 'dockerfile',
+        fallbackBehavior: 'error',
+        maxRetries: 2,
+        maxTokens: 2048,
+        stopSequences: ['```', '\n\n```', '\n\n# ', '\n\n---'],
+        modelHints: ['code'],
+      });
+
+      if (!aiResult.ok) {
+        return Failure(aiResult.error);
+      }
+
+      // Clean up the response
+      fixedDockerfile = stripFencesAndNoise(aiResult.value.content);
     }
-
-    // Clean up the response
-    const fixedDockerfile = stripFencesAndNoise(aiResult.value.content);
 
     // Additional validation (aiGenerate already validates basic Dockerfile structure)
     if (!isValidDockerfileContent(fixedDockerfile)) {
@@ -103,10 +167,22 @@ async function attemptAIFix(
 
     logger.info('AI fix completed successfully');
 
-    return Success({
+    const result: any = {
       fixedDockerfile,
       appliedFixes: ['AI-generated comprehensive fix based on error analysis'],
-    });
+    };
+
+    // Add sampling metadata if available
+    if (samplingOptions?.enableSampling) {
+      if (samplingMetadata) result.samplingMetadata = samplingMetadata;
+      if (winnerScore !== undefined) result.winnerScore = winnerScore;
+      if (scoreBreakdown && samplingOptions.includeScoreBreakdown)
+        result.scoreBreakdown = scoreBreakdown;
+      if (allCandidates && samplingOptions.returnAllCandidates)
+        result.allCandidates = allCandidates;
+    }
+
+    return Success(result);
   } catch (error) {
     logger.error(
       { error: error instanceof Error ? error.message : String(error) },
@@ -254,10 +330,28 @@ async function fixDockerfileImpl(
     let fixes: string[] = [];
     let aiUsed = false;
     let generationMethod: 'AI' | 'fallback' = 'fallback';
+    let samplingMetadata: FixDockerfileResult['samplingMetadata'];
+    let winnerScore: number | undefined;
+    let scoreBreakdown: Record<string, number> | undefined;
+    let allCandidates: FixDockerfileResult['allCandidates'];
+
     const isToolContext = context && 'sampling' in context && 'getPrompt' in context;
 
     // Progress: Main execution (AI fix or fallback)
     if (progress) await progress('EXECUTING');
+
+    // Prepare sampling options
+    const samplingOptions: SamplingOptions = {};
+    // Sampling is enabled by default unless explicitly disabled
+    samplingOptions.enableSampling = !params.disableSampling;
+    if (params.maxCandidates !== undefined) samplingOptions.maxCandidates = params.maxCandidates;
+    if (params.earlyStopThreshold !== undefined)
+      samplingOptions.earlyStopThreshold = params.earlyStopThreshold;
+    if (params.includeScoreBreakdown !== undefined)
+      samplingOptions.includeScoreBreakdown = params.includeScoreBreakdown;
+    if (params.returnAllCandidates !== undefined)
+      samplingOptions.returnAllCandidates = params.returnAllCandidates;
+    if (params.useCache !== undefined) samplingOptions.useCache = params.useCache;
 
     // Try AI-enhanced fix if context is available
     if (isToolContext && context) {
@@ -271,6 +365,7 @@ async function fixDockerfileImpl(
         undefined, // Could include analysis summary in future
         toolContext,
         logger,
+        samplingOptions, // Pass sampling options
       );
 
       if (aiResult.ok) {
@@ -278,6 +373,13 @@ async function fixDockerfileImpl(
         fixes = aiResult.value.appliedFixes;
         aiUsed = true;
         generationMethod = 'AI';
+
+        // Capture sampling metadata if available
+        samplingMetadata = aiResult.value.samplingMetadata;
+        winnerScore = aiResult.value.winnerScore;
+        scoreBreakdown = aiResult.value.scoreBreakdown;
+        allCandidates = aiResult.value.allCandidates;
+
         logger.info('Successfully used AI to fix Dockerfile');
       } else {
         logger.warn({ error: aiResult.error }, 'AI fix failed, falling back to rule-based fixes');
@@ -339,7 +441,11 @@ async function fixDockerfileImpl(
     // Progress: Complete
     if (progress) await progress('COMPLETE');
 
-    return Success({
+    const result: FixDockerfileResult & {
+      _fileWritten?: boolean;
+      _fileWrittenPath?: string;
+      _chainHint?: string;
+    } = {
       ok: true,
       sessionId,
       dockerfile: fixedDockerfile,
@@ -351,7 +457,25 @@ async function fixDockerfileImpl(
       _fileWritten: true,
       _fileWrittenPath: './Dockerfile',
       _chainHint: 'Next: build_image to test the fixed Dockerfile',
-    } as FixDockerfileResult);
+    };
+
+    // Add sampling metadata if sampling was used
+    if (!params.disableSampling) {
+      if (samplingMetadata) {
+        result.samplingMetadata = samplingMetadata;
+      }
+      if (winnerScore !== undefined) {
+        result.winnerScore = winnerScore;
+      }
+      if (scoreBreakdown && params.includeScoreBreakdown) {
+        result.scoreBreakdown = scoreBreakdown;
+      }
+      if (allCandidates && params.returnAllCandidates) {
+        result.allCandidates = allCandidates;
+      }
+    }
+
+    return Success(result);
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Dockerfile fix failed');
