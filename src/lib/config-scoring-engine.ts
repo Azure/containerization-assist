@@ -183,10 +183,17 @@ export class ConfigScoringEngine {
 
       // Call function with content and optional threshold
       let result: any;
-      if (matcher.threshold !== undefined) {
-        result = (scoringFunction as any)(content, matcher.threshold);
-      } else {
-        result = (scoringFunction as any)(content);
+      try {
+        if (matcher.threshold !== undefined) {
+          result = (scoringFunction as any)(content, matcher.threshold);
+        } else {
+          result = (scoringFunction as any)(content);
+        }
+      } catch (error) {
+        if (this.debug) {
+          this.logger.error({ functionName, error }, `Error evaluating function "${functionName}"`);
+        }
+        return Success(false);
       }
 
       // Handle numeric results with comparison

@@ -20,6 +20,7 @@ import { Success, Failure, type Result } from '../../types';
 import { stripFencesAndNoise, isValidKubernetesContent } from '@lib/text-processing';
 import { createKubernetesValidator, getValidationSummary } from '../../validation';
 import { scoreConfigCandidates } from '@lib/integrated-scoring';
+import * as yaml from 'js-yaml';
 import type { GenerateK8sManifestsParams } from './schema';
 // Note: Tool now uses GenerateK8sManifestsParams from schema for type safety
 
@@ -486,10 +487,12 @@ async function generateK8sManifestsImpl(
       }
     }
     // Convert manifests to YAML string
-    const yaml = manifests.map((m: K8sResource) => JSON.stringify(m, null, 2)).join('\n---\n');
+    const yamlContent = manifests
+      .map((m: K8sResource) => yaml.dump(m, { noRefs: true, lineWidth: -1 }))
+      .join('---\n');
     // Run validation on the generated manifests
     const validator = createKubernetesValidator();
-    const validationReport = validator.validate(yaml);
+    const validationReport = validator.validate(yamlContent);
     logger.info(
       {
         score: validationReport.score,
@@ -506,13 +509,13 @@ async function generateK8sManifestsImpl(
     const outputPath = joinPaths(repoPath, 'k8s');
     await fs.mkdir(outputPath, { recursive: true });
     const manifestPath = joinPaths(outputPath, 'manifests.yaml');
-    await fs.writeFile(manifestPath, yaml, 'utf-8');
+    await fs.writeFile(manifestPath, yamlContent, 'utf-8');
 
     // Score the generated manifests
     let qualityScore: number | undefined;
     try {
       const scoring = await scoreConfigCandidates(
-        [yaml],
+        [yamlContent],
         'yaml',
         params.environment || 'production',
         logger,
@@ -545,7 +548,7 @@ async function generateK8sManifestsImpl(
             {
               kind: 'Multiple',
               namespace,
-              content: yaml,
+              content: yamlContent,
               file_path: manifestPath,
             },
           ],
@@ -579,7 +582,7 @@ async function generateK8sManifestsImpl(
       _fileWrittenPath?: string;
       chainHint?: string;
     } = {
-      manifests: yaml,
+      manifests: yamlContent,
       outputPath,
       resources: resourceList,
       ...(warnings.length > 0 && { warnings }),
