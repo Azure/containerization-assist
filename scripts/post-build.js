@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFile, writeFile, chmod, cp, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
+import { existsSync, statSync } from 'fs';
 import { execSync } from 'child_process';
 import { join } from 'path';
 
@@ -63,7 +63,12 @@ if (existsSync(promptsSource)) {
     await mkdir(join('dist', 'src'), { recursive: true });
     await cp(promptsSource, promptsDest, { recursive: true, filter: (source) => {
       // Copy only JSON files and directories
-      return source.endsWith('.json') || !source.includes('.');
+      if (source.endsWith('.json')) return true;
+      try {
+        return statSync(source).isDirectory();
+      } catch {
+        return false;
+      }
     }});
     console.log('✅ Prompts directory copied');
   } catch (err) {
