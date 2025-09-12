@@ -161,6 +161,8 @@ async function getImageMetadata(
   };
 }
 import { Success, Failure, type Result } from '../../types';
+import { getSuccessProgression, type SessionContext } from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 import type { ResolveBaseImagesParams } from './schema';
 
 export interface BaseImageRecommendation {
@@ -396,8 +398,12 @@ async function resolveBaseImagesImpl(
     const enrichedRecommendation = {
       ...recommendation,
       sessionId,
-      chainHint:
-        'Next: generate_dockerfile with recommended base image or update existing Dockerfile',
+      NextStep: getSuccessProgression(TOOL_NAMES.RESOLVE_BASE_IMAGES, {
+        completed_steps: session.completed_steps || [],
+        ...((session as SessionContext).analysis_result && {
+          analysis_result: (session as SessionContext).analysis_result,
+        }),
+      }),
     };
 
     return Success(enrichedRecommendation);

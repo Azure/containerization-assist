@@ -6,12 +6,18 @@
  */
 
 import { getSession, updateSession } from '@mcp/tool-session-helpers';
-import { extractErrorMessage } from '../../lib/error-utils';
 import type { ToolContext } from '../../mcp/context';
 import { createDockerClient } from '../../lib/docker';
 import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../types';
 import type { TagImageParams } from './schema';
+import {
+  getSuccessProgression,
+  getFailureProgression,
+  formatFailureChainHint,
+  type SessionContext,
+} from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 
 // Session data type for accessing build results
 interface SessionData {
@@ -110,18 +116,34 @@ async function tagImageImpl(
     timer.end({ source, tag });
     logger.info({ source, tag }, 'Image tagging completed');
 
+    // Prepare session context for dynamic chain hints
+    const sessionContext: SessionContext = {
+      completed_steps: session.completed_steps || [],
+      ...((session as SessionContext).analysis_result && {
+        analysis_result: (session as SessionContext).analysis_result,
+      }),
+    };
+
     return Success({
       success: true,
       sessionId,
       tags,
       imageId: source,
-      chainHint: 'Next: push_image to registry or generate_k8s_manifests for deployment',
+      NextStep: getSuccessProgression(TOOL_NAMES.TAG_IMAGE, sessionContext).summary,
     });
   } catch (error) {
     timer.end({ error });
     logger.error({ error }, 'Image tagging failed');
 
-    return Failure(extractErrorMessage(error));
+    // Add failure chain hint - use basic context since session may not be available
+    const sessionContext = {
+      completed_steps: [],
+    };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const progression = getFailureProgression(TOOL_NAMES.TAG_IMAGE, errorMessage, sessionContext);
+    const chainHint = formatFailureChainHint(TOOL_NAMES.TAG_IMAGE, progression);
+
+    return Failure(`${errorMessage}\n${chainHint}`);
   }
 }
 

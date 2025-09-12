@@ -6,7 +6,26 @@
 import { jest } from '@jest/globals';
 import { prepareCluster } from '../../../src/tools/prepare-cluster/tool';
 import type { PrepareClusterParams } from '../../../src/tools/prepare-cluster/schema';
-import { createMockLogger, createSuccessResult } from '../../__support__/utilities/mock-infrastructure';
+
+// Result Type Helpers for Testing
+function createSuccessResult<T>(value: T) {
+  return {
+    ok: true as const,
+    value,
+  };
+}
+
+function createMockLogger() {
+  return {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+    trace: jest.fn(),
+    fatal: jest.fn(),
+    child: jest.fn().mockReturnThis(),
+  } as any;
+}
 
 // Mock lib modules
 const mockSessionManager = {

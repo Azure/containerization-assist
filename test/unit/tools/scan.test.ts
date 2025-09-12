@@ -140,7 +140,10 @@ describe('scanImage', () => {
     });
 
     it('should successfully scan image and return results', async () => {
-      const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await scanImage(config, {
+        logger: mockLogger,
+        sessionManager: mockSessionManager,
+      });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -180,7 +183,10 @@ describe('scanImage', () => {
         imageId: 'sha256:mock-image-id',
       }));
 
-      const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await scanImage(config, {
+        logger: mockLogger,
+        sessionManager: mockSessionManager,
+      });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -193,7 +199,10 @@ describe('scanImage', () => {
       config.severity = 'CRITICAL';
       
       // Only high vulnerability, threshold is critical
-      const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await scanImage(config, {
+        logger: mockLogger,
+        sessionManager: mockSessionManager,
+      });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -206,7 +215,10 @@ describe('scanImage', () => {
         sessionId: 'test-session-123',
       };
 
-      const result = await scanImage(minimalConfig, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await scanImage(minimalConfig, {
+        logger: mockLogger,
+        sessionManager: mockSessionManager,
+      });
 
       expect(result.ok).toBe(true);
       expect(mockSecurityScannerInstance.scanImage).toHaveBeenCalled();
@@ -221,7 +233,10 @@ describe('scanImage', () => {
         error: 'Session not found',
       });
 
-      const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await scanImage(config, {
+        logger: mockLogger,
+        sessionManager: mockSessionManager,
+      });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -243,11 +258,16 @@ describe('scanImage', () => {
         },
       });
 
-      const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await scanImage(config, {
+        logger: mockLogger,
+        sessionManager: mockSessionManager,
+      });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe('No image specified. Provide imageId parameter or ensure session has built image from build-image tool.');
+        expect(result.error).toBe(
+          'No image specified. Provide imageId parameter or ensure session has built image from build-image tool.',
+        );
       }
     });
 
@@ -269,7 +289,10 @@ describe('scanImage', () => {
         createFailureResult('Scanner failed to analyze image')
       );
 
-      const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await scanImage(config, {
+        logger: mockLogger,
+        sessionManager: mockSessionManager,
+      });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -293,11 +316,16 @@ describe('scanImage', () => {
 
       mockSecurityScannerInstance.scanImage.mockRejectedValue(new Error('Scanner crashed'));
 
-      const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await scanImage(config, {
+        logger: mockLogger,
+        sessionManager: mockSessionManager,
+      });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe('Scanner crashed');
+        expect(result.error).toBe(
+          'Scanner crashed\nError: Recover by calling tag_image tool. Next: tag_image',
+        );
       }
     });
   });
@@ -334,7 +362,10 @@ describe('scanImage', () => {
         imageId: 'sha256:mock-image-id',
       }));
 
-      const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await scanImage(config, {
+        logger: mockLogger,
+        sessionManager: mockSessionManager,
+      });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -380,11 +411,14 @@ describe('scanImage', () => {
     it('should support different scanner types', async () => {
       // Test each scanner type
       const scannerTypes: Array<'trivy' | 'snyk' | 'grype'> = ['trivy', 'snyk', 'grype'];
-      
+
       for (const scanner of scannerTypes) {
         config.scanner = scanner;
-        const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
-        
+        const result = await scanImage(config, {
+          logger: mockLogger,
+          sessionManager: mockSessionManager,
+        });
+
         expect(result.ok).toBe(true);
         // Verify the scanner was created with the correct type
         // (Implementation detail: scanner type is passed to createSecurityScanner)

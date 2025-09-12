@@ -3,7 +3,7 @@
  * Trade-off: AI quality over speed; fallback templates ensure availability.
  */
 
-import { extractErrorMessage } from '../../lib/error-utils';
+// import { extractErrorMessage } from '../../lib/error-utils'; // Not currently used
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { getSession, updateSession } from '@mcp/tool-session-helpers';
@@ -28,6 +28,13 @@ import {
   isValidDockerfileContent,
   extractBaseImage,
 } from '@lib/text-processing';
+import {
+  getSuccessProgression,
+  getFailureProgression,
+  formatFailureChainHint,
+  type SessionContext,
+} from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 import type { GenerateDockerfileParams } from './schema';
 
 /**
@@ -627,7 +634,7 @@ async function generateDockerfileImpl(
     interface ExtendedWorkflowState extends WorkflowState {
       repo_path?: string;
       analysis_result?: SessionAnalysisResult;
-      dockerfile_result?: any;
+      dockerfile_result?: { content?: string };
     }
     const typedSession = session as ExtendedWorkflowState;
     // Get analysis result from session - it should be directly on the session
@@ -720,10 +727,21 @@ async function generateDockerfileImpl(
       allWarnings.push(...errors);
     }
     // Return result with file write indicator and chain hint
+    // Prepare session context for dynamic chain hints
+    const dockerfileContent =
+      dockerfileResults.length === 1 ? dockerfileResults[0]?.content : undefined;
+    const sessionContext: SessionContext = {
+      completed_steps: typedSession.completed_steps || [],
+      dockerfile_result: dockerfileContent ? { content: dockerfileContent } : {},
+      ...(typedSession.analysis_result && {
+        analysis_result: typedSession.analysis_result,
+      }),
+    };
+
     const result: GenerateDockerfileResult & {
       _fileWritten?: boolean;
       _fileWrittenPath?: string;
-      chainHint?: string;
+      NextStep?: string;
     } = {
       dockerfiles: dockerfileResults,
       count: dockerfileResults.length,
@@ -733,7 +751,7 @@ async function generateDockerfileImpl(
       sessionId,
       _fileWritten: true,
       _fileWrittenPath: dockerfileResults.map((d) => d.path).join(', '),
-      chainHint: `Next: build_image with the generated Dockerfiles (${dockerfileResults.length} files)`,
+      NextStep: getSuccessProgression(TOOL_NAMES.GENERATE_DOCKERFILE, sessionContext).summary,
     };
 
     // Set compatibility fields for single module (backwards compatibility)
@@ -771,7 +789,20 @@ async function generateDockerfileImpl(
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Dockerfile generation failed');
-    return Failure(extractErrorMessage(error));
+
+    // Add failure chain hint
+    const sessionContext = {
+      completed_steps: [],
+    };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const progression = getFailureProgression(
+      TOOL_NAMES.GENERATE_DOCKERFILE,
+      errorMessage,
+      sessionContext,
+    );
+    const chainHint = formatFailureChainHint(TOOL_NAMES.GENERATE_DOCKERFILE, progression);
+
+    return Failure(`${errorMessage}\n${chainHint}`);
   }
 }
 

@@ -5,7 +5,6 @@
 
 import { 
   tools, 
-  getAllTools,
   registerTool,
   type MCPTool,
   type MCPToolResult 
