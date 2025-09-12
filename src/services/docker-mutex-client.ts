@@ -13,6 +13,7 @@ import {
   type DockerBuildResult,
   type DockerImageInfo,
   type DockerPushResult,
+  type DockerContainerInfo,
 } from './docker-client';
 import { Failure, type Result } from '../types';
 
@@ -110,6 +111,32 @@ export function createMutexDockerClient(logger: Logger): DockerClient {
         }
         throw error;
       }
+    },
+
+    async removeImage(imageId: string, force = false): Promise<Result<void>> {
+      const lockKey = `docker:remove:image:${imageId}`;
+
+      return mutex.withLock(lockKey, async () => {
+        logger.debug({ imageId, force }, 'Removing image with mutex');
+        return baseClient.removeImage(imageId, force);
+      });
+    },
+
+    async removeContainer(containerId: string, force = false): Promise<Result<void>> {
+      const lockKey = `docker:remove:container:${containerId}`;
+
+      return mutex.withLock(lockKey, async () => {
+        logger.debug({ containerId, force }, 'Removing container with mutex');
+        return baseClient.removeContainer(containerId, force);
+      });
+    },
+
+    async listContainers(options?: {
+      all?: boolean;
+      filters?: Record<string, string[]>;
+    }): Promise<Result<DockerContainerInfo[]>> {
+      // Container listing is read-only, no mutex needed
+      return baseClient.listContainers(options);
     },
   };
 }

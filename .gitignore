@@ -35,6 +35,11 @@ coverage/
 .nyc_output/
 WEEK5_PERFORMANCE_*.json
 
+# Test-generated fixture files
+test/__support__/fixtures/*/Dockerfile
+test/__support__/fixtures/*/Dockerfile.*
+!test/__support__/fixtures/*/Dockerfile.template
+
 # Temporary
 tmp/
 temp/
