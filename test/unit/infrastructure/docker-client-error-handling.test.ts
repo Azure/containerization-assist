@@ -2,7 +2,7 @@
  * Test cases for enhanced Docker client error handling
  */
 
-import { createDockerClient } from '../../../src/services/docker/client';
+import { createDockerClient } from '../../../src/services/docker-client';
 import { createLogger } from '../../../src/lib/logger';
 
 describe('Docker Client Enhanced Error Handling', () => {

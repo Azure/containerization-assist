@@ -77,14 +77,14 @@ describe('Docker Client', () => {
   describe('Enhanced Error Handling Implementation', () => {
     describe('Type Safety', () => {
       it('should import error handling functions from errors module', () => {
-        const clientPath = join(__dirname, '../../../../src/services/docker/client.ts');
+        const clientPath = join(__dirname, '../../../../src/services/docker-client.ts');
         const content = readFileSync(clientPath, 'utf-8');
         
         expect(content).toContain("import { extractDockerErrorMessage } from './errors'");
       });
 
       it('should have proper TypeScript interfaces in errors module', () => {
-        const errorsPath = join(__dirname, '../../../../src/services/docker/errors.ts');
+        const errorsPath = join(__dirname, '../../../../src/services/errors.ts');
         const content = readFileSync(errorsPath, 'utf-8');
         
         expect(content).toContain('interface DockerodeError extends Error');
@@ -95,7 +95,7 @@ describe('Docker Client', () => {
       });
 
       it('should have type guard for Docker errors in errors module', () => {
-        const errorsPath = join(__dirname, '../../../../src/services/docker/errors.ts');
+        const errorsPath = join(__dirname, '../../../../src/services/errors.ts');
         const content = readFileSync(errorsPath, 'utf-8');
         
         expect(content).toContain('function hasDockerodeProperties(error: Error): error is DockerodeError');
@@ -103,7 +103,7 @@ describe('Docker Client', () => {
       });
 
       it('should have error message extraction function in errors module', () => {
-        const errorsPath = join(__dirname, '../../../../src/services/docker/errors.ts');
+        const errorsPath = join(__dirname, '../../../../src/services/errors.ts');
         const content = readFileSync(errorsPath, 'utf-8');
         
         expect(content).toContain('export function extractDockerErrorMessage');
@@ -114,7 +114,7 @@ describe('Docker Client', () => {
 
     describe('Progress Error Handling', () => {
       it('should contain enhanced progress error handling for buildImage', () => {
-        const clientPath = join(__dirname, '../../../../src/services/docker/client.ts');
+        const clientPath = join(__dirname, '../../../../src/services/docker-client.ts');
         const content = readFileSync(clientPath, 'utf-8');
         
         // Verify enhanced followProgress callback is implemented
@@ -124,7 +124,7 @@ describe('Docker Client', () => {
       });
 
       it('should contain enhanced progress error handling for pushImage', () => {
-        const clientPath = join(__dirname, '../../../../src/services/docker/client.ts');
+        const clientPath = join(__dirname, '../../../../src/services/docker-client.ts');
         const content = readFileSync(clientPath, 'utf-8');
         
         // Verify enhanced followProgress callback is implemented

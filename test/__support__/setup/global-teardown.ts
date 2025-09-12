@@ -1,5 +1,5 @@
 import { DockerTestCleaner } from '../utilities/docker-test-cleaner';
-import { createDockerClient } from '../../../src/services/docker/client';
+import { createDockerClient } from '../../../src/services/docker-client';
 import { createLogger } from '../../../src/lib/logger';
 
 export default async function globalTeardown() {
