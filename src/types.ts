@@ -106,37 +106,3 @@ export interface AIService {
   validateParameters?(params: Record<string, unknown>): Promise<Result<unknown>>;
   analyzeResults?(results: unknown): Promise<Result<unknown>>;
 }
-
-// ===== TOOL RESULT TYPES =====
-
-export interface AnalyzeRepoResult {
-  ok: boolean;
-  sessionId: string;
-  language: string;
-  languageVersion?: string;
-  framework?: string;
-  frameworkVersion?: string;
-  buildSystem?: {
-    type: string;
-    file: string;
-    buildCommand: string;
-    testCommand?: string;
-  };
-  dependencies: Array<{ name: string; version?: string; type: string }>;
-  ports: number[];
-  hasDockerfile: boolean;
-  hasDockerCompose: boolean;
-  hasKubernetes: boolean;
-  recommendations: {
-    baseImage: string;
-    buildStrategy: 'multi-stage' | 'single-stage';
-    securityNotes: string[];
-  };
-  metadata: {
-    repoPath: string;
-    depth: number;
-    timestamp: number;
-    includeTests?: boolean;
-    aiInsights?: unknown;
-  };
-}

@@ -14,13 +14,7 @@ import type { SamplingOptions } from '@lib/sampling';
 import { createTimer, createLogger } from '@lib/logger';
 import type { SessionAnalysisResult } from '../session-types';
 import type { ToolContext } from '../../mcp/context';
-import {
-  Success,
-  Failure,
-  type Result,
-  type WorkflowState,
-  type AnalyzeRepoResult,
-} from '../../types';
+import { Success, Failure, type Result, type WorkflowState } from '../../types';
 import { getDefaultPort } from '@config/defaults';
 import { getRecommendedBaseImage } from '@lib/base-images';
 import {
@@ -36,6 +30,7 @@ import {
 } from '../../workflows/workflow-progression';
 import { TOOL_NAMES } from '../../exports/tool-names.js';
 import type { GenerateDockerfileParams } from './schema';
+import { AnalyzeRepoResult } from '../analyze-repo';
 
 /**
  * Single module Dockerfile generation result with optional sampling metadata
