@@ -8,7 +8,7 @@ import type { Logger } from 'pino';
 import { createLogger } from './lib/logger';
 import { createSessionManager, SessionManager } from './lib/session';
 import * as promptRegistry from './prompts/registry';
-import { join } from 'path';
+import { findPromptsDirectory } from '@lib/find-prompts-dir';
 import * as resourceManager from './resources/manager';
 import type { AIService } from './types';
 import { createAppConfig, type AppConfig } from './config/app-config';
@@ -77,7 +77,8 @@ export function createTestDependencies(overrides?: Partial<Dependencies>): Depen
  */
 export async function initializeDependencies(deps: Dependencies): Promise<void> {
   // Initialize prompt registry
-  await deps.promptRegistry.initializePrompts(join(process.cwd(), 'src', 'prompts'), deps.logger);
+  const promptsDir = findPromptsDirectory();
+  await deps.promptRegistry.initializePrompts(promptsDir, deps.logger);
 
   deps.logger.info(
     {

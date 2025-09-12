@@ -78,6 +78,36 @@ function main() {
   fs.writeFileSync(packageJsonPath, JSON.stringify({ type: 'commonjs' }, null, 2));
   console.log('Created dist-cjs/package.json');
   
+  // Copy prompts directory for CommonJS build
+  const promptsSource = path.join(process.cwd(), 'src', 'prompts');
+  const promptsDest = path.join(distCjsDir, 'src', 'prompts');
+  
+  if (fs.existsSync(promptsSource)) {
+    console.log('Copying prompts directory for CommonJS build...');
+    try {
+      fs.mkdirSync(path.join(distCjsDir, 'src'), { recursive: true });
+      copyDirRecursive(promptsSource, promptsDest, (file) => file.endsWith('.json'));
+      console.log('Prompts directory copied to dist-cjs');
+    } catch (err) {
+      console.warn('Warning: Could not copy prompts:', err.message);
+    }
+  }
+  
+  // Copy knowledge data for CommonJS build
+  const knowledgeSource = path.join(process.cwd(), 'src', 'knowledge', 'data');
+  const knowledgeDest = path.join(distCjsDir, 'src', 'knowledge', 'data');
+  
+  if (fs.existsSync(knowledgeSource)) {
+    console.log('Copying knowledge data for CommonJS build...');
+    try {
+      fs.mkdirSync(path.join(distCjsDir, 'src', 'knowledge'), { recursive: true });
+      copyDirRecursive(knowledgeSource, knowledgeDest, (file) => file.endsWith('.json'));
+      console.log('Knowledge data copied to dist-cjs');
+    } catch (err) {
+      console.warn('Warning: Could not copy knowledge data:', err.message);
+    }
+  }
+  
   const jsFiles = findFiles(distCjsDir, '.js');
   
   console.log(`Processing ${jsFiles.length} JavaScript files...`);
@@ -87,6 +117,25 @@ function main() {
   }
   
   console.log('CommonJS import fix complete.');
+}
+
+function copyDirRecursive(src, dest, filter = null) {
+  if (!fs.existsSync(dest)) {
+    fs.mkdirSync(dest, { recursive: true });
+  }
+  
+  const items = fs.readdirSync(src, { withFileTypes: true });
+  
+  for (const item of items) {
+    const srcPath = path.join(src, item.name);
+    const destPath = path.join(dest, item.name);
+    
+    if (item.isDirectory()) {
+      copyDirRecursive(srcPath, destPath, filter);
+    } else if (!filter || filter(item.name)) {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
 }
 
 if (require.main === module) {

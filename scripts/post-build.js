@@ -52,4 +52,39 @@ if (existsSync(templatesSource)) {
   }
 }
 
+// Copy prompts directory for runtime use
+const promptsSource = join('src', 'prompts');
+const promptsDest = join('dist', 'src', 'prompts');
+
+if (existsSync(promptsSource)) {
+  console.log('📋 Copying prompts directory...');
+  try {
+    // Ensure destination directory exists
+    await mkdir(join('dist', 'src'), { recursive: true });
+    await cp(promptsSource, promptsDest, { recursive: true, filter: (source) => {
+      // Copy only JSON files and directories
+      return source.endsWith('.json') || !source.includes('.');
+    }});
+    console.log('✅ Prompts directory copied');
+  } catch (err) {
+    console.warn('⚠️  Warning: Could not copy prompts:', err.message);
+  }
+}
+
+// Copy knowledge data directory for runtime use
+const knowledgeSource = join('src', 'knowledge', 'data');
+const knowledgeDest = join('dist', 'src', 'knowledge', 'data');
+
+if (existsSync(knowledgeSource)) {
+  console.log('📚 Copying knowledge data...');
+  try {
+    // Ensure destination directory exists
+    await mkdir(join('dist', 'src', 'knowledge'), { recursive: true });
+    await cp(knowledgeSource, knowledgeDest, { recursive: true });
+    console.log('✅ Knowledge data copied');
+  } catch (err) {
+    console.warn('⚠️  Warning: Could not copy knowledge data:', err.message);
+  }
+}
+
 console.log('🎉 Build complete with all post-build tasks finished!');
