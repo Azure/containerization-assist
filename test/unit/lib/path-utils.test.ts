@@ -9,7 +9,7 @@ describe('safeNormalizePath', () => {
 
   it('should prevent escape sequence interpretation', () => {
     // These contain \f and \t which could be interpreted as form feed and tab
-    expect(safeNormalizePath('C:\\foobar\\test')).toBe('C:/foobar/test');
+    expect(safeNormalizePath('C:\\foo\\fbar\\tfile')).toBe('C:/foo/fbar/tfile');
     expect(safeNormalizePath('C:\\temp\\new')).toBe('C:/temp/new');
   });
 
