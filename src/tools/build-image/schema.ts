@@ -8,10 +8,10 @@ const sessionIdSchema = z.string().describe('Session identifier for tracking ope
 
 export const buildImageSchema = z.object({
   sessionId: sessionIdSchema.optional(),
-  context: z.string().optional().describe('Build context path'),
+  context: z.string().min(1).describe('Build context path (required)'),
   dockerfile: z.string().optional().describe('Dockerfile name'),
   dockerfilePath: z.string().optional().describe('Path to Dockerfile'),
-  imageName: z.string().optional().describe('Name for the built image'),
+  imageName: z.string().min(1).describe('Name for the built image (required)'),
   tags: z.array(z.string()).optional().describe('Tags to apply to the image'),
   buildArgs: z.record(z.string()).optional().describe('Build arguments'),
   platform: z.string().optional().describe('Target platform (e.g., linux/amd64)'),

@@ -4,8 +4,7 @@
  * Exports the SDK-native server as the primary server implementation.
  */
 
-export { MCPServer } from './server/index';
+export { DirectMCPServer as MCPServer } from './server-direct';
 
 // Export types for external use
-export type { MCPServerOptions } from './server/types';
-export type { Tool, Result, Success, Failure } from '@types';
+export type { Tool, Result, Success, Failure } from '../types';

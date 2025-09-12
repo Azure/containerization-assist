@@ -1,6 +1,7 @@
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '@types';
+import { Result, Success, Failure } from '../types';
 import type { ResourceCache } from './types';
+import { extractErrorMessage } from '../lib/error-utils';
 
 interface CacheEntry {
   value: unknown;
@@ -52,9 +53,7 @@ export async function set(
     return Success(undefined);
   } catch (error) {
     store.logger.error({ error, key }, 'Failed to set cache entry');
-    return Failure(
-      `Failed to set cache entry: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    return Failure(`Failed to set cache entry: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -81,9 +80,7 @@ export async function get(store: CacheStore, key: string): Promise<Result<unknow
     return Success(entry.value);
   } catch (error) {
     store.logger.error({ error, key }, 'Failed to get cache entry');
-    return Failure(
-      `Failed to get cache entry: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    return Failure(`Failed to get cache entry: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -97,9 +94,7 @@ export async function deleteEntry(store: CacheStore, key: string): Promise<Resul
     return Success(deleted);
   } catch (error) {
     store.logger.error({ error, key }, 'Failed to delete cache entry');
-    return Failure(
-      `Failed to delete cache entry: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    return Failure(`Failed to delete cache entry: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -114,9 +109,7 @@ export async function clear(store: CacheStore): Promise<Result<void>> {
     return Success(undefined);
   } catch (error) {
     store.logger.error({ error }, 'Failed to clear cache');
-    return Failure(
-      `Failed to clear cache: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    return Failure(`Failed to clear cache: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -140,9 +133,7 @@ export async function has(store: CacheStore, key: string): Promise<Result<boolea
     return Success(true);
   } catch (error) {
     store.logger.error({ error, key }, 'Failed to check cache entry existence');
-    return Failure(
-      `Failed to check cache entry existence: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    return Failure(`Failed to check cache entry existence: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -171,9 +162,7 @@ export async function invalidate(
     return Success(invalidatedCount);
   } catch (error) {
     store.logger.error({ error, pattern }, 'Failed to invalidate cache entries');
-    return Failure(
-      `Failed to invalidate cache entries: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    return Failure(`Failed to invalidate cache entries: ${extractErrorMessage(error)}`);
   }
 }
 

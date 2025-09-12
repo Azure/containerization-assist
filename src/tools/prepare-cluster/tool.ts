@@ -21,12 +21,20 @@
  * ```
  */
 
-import { getSession, updateSession } from '@mcp/tools/session-helpers';
-import type { ToolContext } from '../../mcp/context/types';
+import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { extractErrorMessage } from '../../lib/error-utils';
+import type { ToolContext } from '../../mcp/context';
 import { createKubernetesClient } from '../../lib/kubernetes';
 import { createTimer, createLogger } from '../../lib/logger';
 import type * as pino from 'pino';
 import { Success, Failure, type Result } from '../../types';
+import {
+  getSuccessProgression,
+  getFailureProgression,
+  formatFailureChainHint,
+  type SessionContext,
+} from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 import type { PrepareClusterParams } from './schema';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -237,9 +245,7 @@ async function installKind(logger: pino.Logger): Promise<void> {
     logger.info('Kind installed successfully');
   } catch (error) {
     logger.error({ error }, 'Failed to install kind');
-    throw new Error(
-      `Kind installation failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    throw new Error(`Kind installation failed: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -306,9 +312,7 @@ nodes:
     logger.info({ clusterName }, 'Kind cluster created successfully');
   } catch (error) {
     logger.error({ clusterName, error }, 'Failed to create kind cluster');
-    throw new Error(
-      `Kind cluster creation failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    throw new Error(`Kind cluster creation failed: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -354,9 +358,7 @@ async function createLocalRegistry(logger: pino.Logger): Promise<string> {
     return registryUrl;
   } catch (error) {
     logger.error({ error }, 'Failed to create local registry');
-    throw new Error(
-      `Local registry creation failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    throw new Error(`Local registry creation failed: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -510,7 +512,7 @@ async function prepareClusterImpl(
           kubernetes_version: '1.28',
           namespaces_created: checks.namespaceExists ? [] : [namespace],
         },
-        completed_steps: [...(session.completed_steps || []), 'prepare-cluster'],
+        completed_steps: [...(session.completed_steps || []), TOOL_NAMES.PREPARE_CLUSTER],
       },
       context,
     );
@@ -552,15 +554,28 @@ async function prepareClusterImpl(
       },
       ...(warnings.length > 0 && { warnings }),
       ...(localRegistryUrl && { localRegistryUrl }),
-      _chainHint: clusterReady
-        ? 'Next: deploy_application to deploy your containerized app'
-        : 'Cluster setup incomplete. Review warnings and retry or proceed with caution',
+      NextStep: getSuccessProgression(TOOL_NAMES.PREPARE_CLUSTER, {
+        completed_steps: session.completed_steps || [],
+        ...((session as SessionContext).analysis_result && {
+          analysis_result: (session as SessionContext).analysis_result,
+        }),
+      }),
     });
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Cluster preparation failed');
 
-    return Failure(error instanceof Error ? error.message : String(error));
+    // Add failure chain hint
+    const sessionContext = { completed_steps: [] };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const progression = getFailureProgression(
+      TOOL_NAMES.PREPARE_CLUSTER,
+      errorMessage,
+      sessionContext,
+    );
+    const chainHint = formatFailureChainHint(TOOL_NAMES.PREPARE_CLUSTER, progression);
+
+    return Failure(`${errorMessage}\n${chainHint}`);
   }
 }
 

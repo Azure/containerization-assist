@@ -6,6 +6,7 @@
  */
 
 import pino from 'pino';
+import { extractErrorMessage } from './error-utils';
 
 export type { Logger } from 'pino';
 
@@ -100,7 +101,7 @@ export function createTimer(
         {
           operation,
           duration_ms: duration,
-          error: error instanceof Error ? error.message : String(error),
+          error: extractErrorMessage(error),
           stack: error instanceof Error ? error.stack : undefined,
           ...context,
           ...additionalContext,

@@ -22,13 +22,16 @@
  * ```
  */
 
-import { getSession, updateSession } from '@mcp/tools/session-helpers';
-import type { ToolContext } from '../../mcp/context/types';
-import { createKubernetesClient, type KubernetesClient } from '../../lib/kubernetes';
+import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { extractErrorMessage } from '../../lib/error-utils';
+import type { ToolContext } from '../../mcp/context';
+import { createKubernetesClient, KubernetesClient } from '../../lib/kubernetes';
 import { createTimer, createLogger } from '../../lib/logger';
-import { Success, Failure, type Result } from '../../types';
 import { DEFAULT_TIMEOUTS } from '../../config/defaults';
+import { Success, Failure, type Result } from '../../types';
 import type { VerifyDeploymentParams } from './schema';
+import { getSuccessProgression, type SessionContext } from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 
 export interface VerifyDeploymentResult {
   success: boolean;
@@ -335,12 +338,12 @@ async function verifyDeploymentImpl(
     // Add chain hint based on verification status
     const enrichedResult = {
       ...result,
-      _chainHint:
-        health.ready && overallStatus === 'healthy'
-          ? 'Deployment verified successfully! Your application is running.'
-          : overallStatus === 'healthy'
-            ? 'Deployment is starting up. Wait and verify again, or check logs for issues.'
-            : 'Deployment has issues. Check healthCheck details and pod logs for troubleshooting.',
+      NextStep: getSuccessProgression(TOOL_NAMES.VERIFY_DEPLOYMENT, {
+        completed_steps: session.completed_steps || [],
+        ...((session as SessionContext).analysis_result && {
+          analysis_result: (session as SessionContext).analysis_result,
+        }),
+      }),
     };
 
     return Success(enrichedResult);
@@ -348,7 +351,7 @@ async function verifyDeploymentImpl(
     timer.error(error);
     logger.error({ error }, 'Deployment verification failed');
 
-    return Failure(error instanceof Error ? error.message : String(error));
+    return Failure(extractErrorMessage(error));
   }
 }
 

@@ -8,6 +8,7 @@
 import * as dockerParser from 'docker-file-parser';
 import validateDockerfile from 'validate-dockerfile';
 import { parse as parseYaml } from 'yaml';
+import { DOCKERFILE_FENCE, YAML_FENCE, GENERIC_FENCE, AS_CLAUSE } from './regex-patterns';
 
 /**
  * Extracts code content from markdown code fences
@@ -35,16 +36,16 @@ export const stripFencesAndNoise = (text: string, language?: string): string => 
     // Match specific language or its variations
     const langPattern = language.toLowerCase();
     if (langPattern === 'dockerfile' || langPattern === 'docker') {
-      pattern = /```(?:docker|dockerfile|Dockerfile|DOCKERFILE)?\s*\n([\s\S]*?)```/;
+      pattern = DOCKERFILE_FENCE;
     } else if (langPattern === 'yaml' || langPattern === 'yml') {
-      pattern = /```(?:yaml|yml|YAML|YML)?\s*\n([\s\S]*?)```/;
+      pattern = YAML_FENCE;
     } else {
       // Generic pattern for other languages
       pattern = new RegExp(`\`\`\`(?:${langPattern})?\\s*\\n([\\s\\S]*?)\`\`\``);
     }
   } else {
     // Generic pattern that matches any code fence (including empty ones)
-    pattern = /```[a-zA-Z0-9]*\s*\n?([\s\S]*?)```/;
+    pattern = GENERIC_FENCE;
   }
 
   const match = text.match(pattern);
@@ -144,7 +145,7 @@ export const extractBaseImage = (dockerfileContent: string): string | null => {
 
       // Remove "AS builder" part from multi-stage builds
       if (baseImage) {
-        const parts = baseImage.split(/\s+AS\s+/i);
+        const parts = baseImage.split(AS_CLAUSE);
         return parts[0]?.trim() || baseImage;
       }
     }

@@ -7,7 +7,7 @@ import { z } from 'zod';
 const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
 
 export const environmentSchema = z
-  .enum(['development', 'staging', 'production'])
+  .enum(['development', 'staging', 'production', 'testing'])
   .optional()
   .describe('Target deployment environment');
 

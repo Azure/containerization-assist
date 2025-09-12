@@ -429,11 +429,49 @@ async function testScoringUtilities() {
 }
 
 async function testScoringComparison() {
-  section('Scoring Comparison Tests');
+  section('Scoring Engine Tests');
   
-  info('This section would normally test the actual scoring functions');
-  info('but they are not exported individually. In production, these');
-  info('are tested through the sampling flow integration.');
+  info('Testing the new ScoringEngine with real content samples');
+  
+  // Import the new scoring engine
+  const { createScoringEngine } = await import('../../src/mcp/tools/scoring');
+  const engine = createScoringEngine();
+  
+  subsection('Dockerfile Scoring');
+  const goodDockerResult = engine.score(goodDockerfile, 'dockerfile');
+  const badDockerResult = engine.score(badDockerfile, 'dockerfile');
+  
+  if (goodDockerResult.ok && badDockerResult.ok) {
+    info(`Good Dockerfile score: ${goodDockerResult.value.total}/100`);
+    info(`Bad Dockerfile score: ${badDockerResult.value.total}/100`);
+    info(`Good Dockerfile matched rules: ${goodDockerResult.value.matchedRules.length}`);
+    info(`Bad Dockerfile matched rules: ${badDockerResult.value.matchedRules.length}`);
+    
+    if (goodDockerResult.value.total > badDockerResult.value.total) {
+      success('Good Dockerfile scored higher than bad Dockerfile');
+    } else {
+      error('Scoring engine failed to differentiate quality');
+    }
+  } else {
+    error('Scoring engine failed for Dockerfile');
+  }
+  
+  subsection('K8s Manifest Scoring');
+  const goodK8sResult = engine.score(goodK8sManifest, 'yaml');
+  const badK8sResult = engine.score(badK8sManifest, 'yaml');
+  
+  if (goodK8sResult.ok && badK8sResult.ok) {
+    info(`Good K8s score: ${goodK8sResult.value.total}/100`);
+    info(`Bad K8s score: ${badK8sResult.value.total}/100`);
+    
+    if (goodK8sResult.value.total > badK8sResult.value.total) {
+      success('Good K8s manifest scored higher than bad K8s manifest');
+    } else {
+      error('K8s scoring failed to differentiate quality');
+    }
+  } else {
+    error('Scoring engine failed for K8s');
+  }
   
   subsection('Expected Scoring Behavior');
   
@@ -509,34 +547,35 @@ async function testIntegrationPoints() {
   
   success('Config structure documented');
 
-  subsection('AI Helpers Integration');
-  info('Functions integrated into ai-helpers.ts:');
-  const functions = [
-    'aiGenerateWithSampling',
-    'scoreCandidates',
-    'getScoringWeights',
-    'calculateScoreBreakdown',
-    'quickScoreCandidate',
-    'getSamplingStrategy',
-    'scoreDockerfileBuild',
-    'scoreDockerfileSize',
-    'scoreDockerfileSecurity',
-    'scoreDockerfileSpeed',
-    'scoreYamlValidation',
-    'scoreYamlSecurity',
-    'scoreYamlResources',
-    'scoreYamlBestPractices',
-    'scoreGenericQuality',
-    'scoreGenericSecurity',
-    'scoreGenericEfficiency',
-    'scoreGenericMaintainability'
+  subsection('Scoring Engine Integration');
+  info('New ScoringEngine architecture:');
+  const newArchitecture = [
+    'ScoringEngine class (src/mcp/tools/scoring/engine.ts)',
+    'DOCKERFILE_PROFILE (25 rules)',
+    'K8S_PROFILE (33 rules)', 
+    'GENERIC_PROFILE (18 rules)',
+    'Rule-based scoring with configurable profiles',
+    'Integration through scoreCandidates() in ai-helpers.ts',
+    'Fallback to legacy functions for error handling'
   ];
   
-  functions.forEach(fn => {
-    info(`  ✓ ${fn}`);
+  newArchitecture.forEach(item => {
+    info(`  ✓ ${item}`);
   });
   
-  success('All scoring functions integrated');
+  subsection('Legacy Functions (Preserved for Fallback)');
+  const legacyFunctions = [
+    'scoreDockerfileBuild', 'scoreDockerfileSize', 'scoreDockerfileSecurity', 'scoreDockerfileSpeed',
+    'scoreYamlValidation', 'scoreYamlSecurity', 'scoreYamlResources', 'scoreYamlBestPractices',
+    'scoreGenericQuality', 'scoreGenericSecurity', 'scoreGenericEfficiency', 'scoreGenericMaintainability'
+  ];
+  
+  info('Legacy scoring functions maintained as emergency fallback:');
+  legacyFunctions.forEach(fn => {
+    info(`  → ${fn} (legacy fallback)`);
+  });
+  
+  success('Scoring engine architecture documented');
 }
 
 async function testPerformance() {

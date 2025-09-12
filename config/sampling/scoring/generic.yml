@@ -1,0 +1,215 @@
+# Generic Content Scoring Rules Configuration
+name: "generic"
+version: "1.0.0"
+metadata:
+  description: "Generic content scoring profile for non-specific content types"
+  created: "2024-12-19"
+  author: "containerization-assist"
+
+base_score: 40
+max_score: 100
+timeout_ms: 1500
+
+# Category weights for generic content
+category_weights:
+  quality: 1.0        # Basic quality practices
+  security: 1.1       # Security awareness
+  maintainability: 1.0 # Code maintainability
+  efficiency: 0.9     # Performance efficiency
+
+# Generic scoring rules applicable to various content types
+rules:
+  quality:
+    - name: "sufficient_content_length"
+      matcher:
+        type: "function"
+        function: "hasMinimumLines"
+        threshold: 5
+        comparison: "greater_than_or_equal"
+      points: 15
+      weight: 1.0
+      category: "quality"
+      description: "Has sufficient content length"
+    
+    - name: "comprehensive_content"
+      matcher:
+        type: "function"
+        function: "hasMinimumLines"
+        threshold: 10
+        comparison: "greater_than_or_equal"
+      points: 10
+      weight: 0.8
+      category: "quality"
+      description: "Has comprehensive content"
+    
+    - name: "has_documentation"
+      matcher:
+        type: "function"
+        function: "hasDocumentation"
+      points: 20
+      weight: 1.1
+      category: "maintainability"
+      description: "Includes documentation or comments"
+    
+    - name: "proper_structure"
+      matcher:
+        type: "regex"
+        pattern: "\\n"
+      points: 5
+      weight: 0.8
+      category: "quality"
+      description: "Has proper line structure"
+    
+    - name: "pattern_consistency"
+      matcher:
+        type: "function"
+        function: "hasConsistentPatterns"
+      points: 10
+      weight: 0.9
+      category: "quality"
+      description: "Shows consistent patterns"
+    
+    - name: "proper_formatting"
+      matcher:
+        type: "function"
+        function: "hasProperFormatting"
+      points: 5
+      weight: 0.7
+      category: "quality"
+      description: "Has proper formatting structure"
+    
+    - name: "semantic_structure"
+      matcher:
+        type: "regex"
+        pattern: "(#!/|<\\?|---)"
+      points: 5
+      weight: 0.8
+      category: "quality"
+      description: "Shows semantic structure indicators"
+
+  security:
+    - name: "no_hardcoded_secrets"
+      matcher:
+        type: "function"
+        function: "hasNoGenericSecrets"
+      points: 25
+      weight: 1.3
+      category: "security"
+      description: "Avoids hardcoded secrets and credentials"
+    
+    - name: "environment_variable_usage"
+      matcher:
+        type: "regex"
+        pattern: "(\\$\\{|\\$\\()"
+      points: 5
+      weight: 1.0
+      category: "security"
+      description: "Uses environment variables"
+    
+    - name: "secret_reference_patterns"
+      matcher:
+        type: "regex"
+        pattern: "(from_secret:|valueFrom:)"
+      points: 5
+      weight: 1.0
+      category: "security"
+      description: "Uses secret reference patterns"
+    
+    - name: "restrictive_permissions"
+      matcher:
+        type: "regex"
+        pattern: "chmod\\s+[0-6]00"
+      points: 5
+      weight: 0.9
+      category: "security"
+      description: "Uses restrictive file permissions"
+    
+    - name: "no_insecure_flags"
+      matcher:
+        type: "function"
+        function: "hasNoInsecureFlags"
+      points: 5
+      weight: 1.1
+      category: "security"
+      description: "Avoids insecure configuration flags"
+
+  maintainability:
+    - name: "consistent_indentation"
+      matcher:
+        type: "function"
+        function: "hasConsistentIndentation"
+      points: 15
+      weight: 1.0
+      category: "maintainability"
+      description: "Uses consistent indentation"
+    
+    - name: "descriptive_naming"
+      matcher:
+        type: "function"
+        function: "hasDescriptiveNaming"
+      points: 10
+      weight: 0.9
+      category: "maintainability"
+      description: "Uses descriptive names"
+    
+    - name: "modular_structure"
+      matcher:
+        type: "regex"
+        pattern: "(function |def |class |export )"
+      points: 5
+      weight: 0.8
+      category: "maintainability"
+      description: "Shows modular structure"
+    
+    - name: "version_information"
+      matcher:
+        type: "regex"
+        pattern: "(v?\\d+\\.\\d+\\.\\d+|version:)"
+      points: 5
+      weight: 0.7
+      category: "maintainability"
+      description: "Includes version information"
+
+  efficiency:
+    - name: "content_density"
+      matcher:
+        type: "function"
+        function: "hasOptimalDensity"
+      points: 20
+      weight: 1.0
+      category: "efficiency"
+      description: "Has optimal content density"
+    
+    - name: "content_uniqueness"
+      matcher:
+        type: "function"
+        function: "hasHighUniqueness"
+      points: 15
+      weight: 0.9
+      category: "efficiency"
+      description: "Avoids excessive repetition"
+    
+    - name: "efficient_patterns"
+      matcher:
+        type: "function"
+        function: "hasEfficientPatterns"
+      points: 15
+      weight: 0.8
+      category: "efficiency"
+      description: "Uses efficient patterns and operations"
+
+# Penalty rules for generic content
+penalties:
+  - name: "excessive_empty_lines"
+    matcher:
+      type: "regex"
+      pattern: "\\n\\s*\\n\\s*\\n\\s*\\n"
+    points: -5
+    description: "Penalize excessive empty lines"
+  
+  - name: "very_long_lines"
+    matcher:
+      type: "function"
+      function: "hasExcessivelyLongLines"
+    points: -3
+    description: "Penalize excessively long lines"

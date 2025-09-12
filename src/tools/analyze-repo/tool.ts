@@ -19,21 +19,24 @@
  * ```
  */
 
-import path from 'node:path';
+import { joinPaths, getExtension } from '@lib/path-utils';
 import { promises as fs } from 'node:fs';
-import { getSession, updateSession } from '@mcp/tools/session-helpers';
-import { createStandardProgress } from '@mcp/utils/progress-helper';
-import { aiGenerate } from '@mcp/tools/ai-helpers';
+import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { createStandardProgress } from '@mcp/progress-helper';
+import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
+import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 import { getRecommendedBaseImage } from '../../lib/base-images';
-import type { ToolContext } from '../../mcp/context/types';
+import type { ToolContext } from '../../mcp/context';
 import { createTimer, createLogger } from '../../lib/logger';
-import { Success, Failure, type Result } from '@types';
+import { Success, Failure, type Result, type AnalyzeRepoResult } from '../../types';
 import type { AnalyzeRepoParams } from './schema';
-import { parsePackageJson, getAllDependencies } from '../../lib/parsing/package-json-utils';
+import { parsePackageJson, getAllDependencies } from '../../lib/parsing-package-json';
 import { DEFAULT_PORTS } from '../../config/defaults';
-import type { AnalyzeRepoResult } from '../types';
+import { getSuccessProgression } from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
+import { extractErrorMessage } from '../../lib/error-utils';
 
-export type { AnalyzeRepoResult } from '../types';
+export type { AnalyzeRepoResult } from '../../types';
 const LANGUAGE_SIGNATURES: Record<string, { extensions: string[]; files: string[] }> = {
   javascript: {
     extensions: ['', '.mjs', '.cjs'],
@@ -123,7 +126,7 @@ async function validateRepositoryPath(
     await fs.access(repoPath, fs.constants.R_OK);
     return { valid: true };
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
+    const errorMsg = extractErrorMessage(error);
     return { valid: false, error: `Cannot access repository: ${errorMsg}` };
   }
 }
@@ -135,7 +138,7 @@ async function detectLanguage(repoPath: string): Promise<{ language: string; ver
   const files = await fs.readdir(repoPath);
   const fileStats = await Promise.all(
     files.map(async (file) => {
-      const filePath = path.join(repoPath, file);
+      const filePath = joinPaths(repoPath, file);
       const stats = await fs.stat(filePath);
       return { name: file, path: filePath, isFile: stats.isFile() };
     }),
@@ -144,7 +147,7 @@ async function detectLanguage(repoPath: string): Promise<{ language: string; ver
   // Count file extensions
   const extensionCounts: Record<string, number> = {};
   for (const file of fileStats.filter((f) => f.isFile)) {
-    const ext = path.extname(file.name);
+    const ext = getExtension(file.name);
     if (ext) {
       extensionCounts[ext] = (extensionCounts[ext] ?? 0) + 1;
     }
@@ -366,7 +369,7 @@ async function analyzeRepoImpl(
     const { id: sessionId, state: session } = sessionResult.value;
     logger.info({ sessionId, repoPath }, 'Starting repository analysis with session');
 
-    // Progress: Main analysis phase
+    // Repository analysis discovers language, framework, and configuration patterns
     if (progress) await progress('EXECUTING');
 
     // AI enhancement available through context
@@ -390,38 +393,72 @@ async function analyzeRepoImpl(
       try {
         logger.debug('Using AI to enhance repository analysis');
 
-        const aiResult = await aiGenerate(logger, context, {
+        // Prepare prompt arguments
+        let promptArgs = {
+          language: languageInfo.language,
+          framework: frameworkInfo?.framework,
+          buildSystem: buildSystemRaw?.type,
+          dependencies: dependencies
+            .slice(0, 10)
+            .map((dep) => dep.name)
+            .join(', '), // Limit for prompt length
+          hasTests: dependencies.some(
+            (dep) =>
+              dep.name.includes('test') || dep.name.includes('jest') || dep.name.includes('mocha'),
+          ),
+          hasDocker: dockerInfo.hasDockerfile,
+          ports: ports.join(', '),
+          fileCount: dependencies.length, // Rough estimate
+          repoStructure: `${languageInfo.language} project with ${frameworkInfo?.framework || 'standard'} structure`,
+        };
+
+        // Enhance with knowledge context
+        try {
+          const enhancedArgs = await enhancePromptWithKnowledge(promptArgs, {
+            operation: 'analyze_repository',
+            ...(languageInfo.language && { language: languageInfo.language }),
+            ...(frameworkInfo?.framework && { framework: frameworkInfo.framework }),
+            environment: 'production',
+            tags: [
+              'analysis',
+              'repository',
+              languageInfo.language,
+              frameworkInfo?.framework,
+            ].filter(Boolean) as string[],
+          });
+          // Only use enhanced args if they contain the original fields
+          if (enhancedArgs.language && enhancedArgs.dependencies) {
+            promptArgs = enhancedArgs as typeof promptArgs;
+            logger.info('Enhanced repository analysis with knowledge');
+          }
+        } catch (error) {
+          logger.debug({ error }, 'Knowledge enhancement failed, using base prompt');
+        }
+
+        const aiResult = await aiGenerateWithSampling(logger, context, {
           promptName: 'enhance-repo-analysis',
-          promptArgs: {
-            language: languageInfo.language,
-            framework: frameworkInfo?.framework,
-            buildSystem: buildSystemRaw?.type,
-            dependencies: dependencies
-              .slice(0, 10)
-              .map((dep) => dep.name)
-              .join(', '), // Limit for prompt length
-            hasTests: dependencies.some(
-              (dep) =>
-                dep.name.includes('test') ||
-                dep.name.includes('jest') ||
-                dep.name.includes('mocha'),
-            ),
-            hasDocker: dockerInfo.hasDockerfile,
-            ports: ports.join(', '),
-            fileCount: dependencies.length, // Rough estimate
-            repoStructure: `${languageInfo.language} project with ${frameworkInfo?.framework || 'standard'} structure`,
-          },
+          promptArgs,
           expectation: 'text',
           fallbackBehavior: 'error',
           maxRetries: 2,
           maxTokens: 1500,
           modelHints: ['analysis'],
+          maxCandidates: 1,
+          enableSampling: false,
         });
 
-        if (aiResult.ok && aiResult.value.content) {
-          aiInsights = aiResult.value.content;
+        if (aiResult.ok && aiResult.value.winner.content) {
+          aiInsights = aiResult.value.winner.content;
           logger.info('AI analysis enhancement completed successfully');
         } else {
+          logger.error(
+            {
+              tool: 'analyze-repo',
+              operation: 'enhance-repo-analysis',
+              error: aiResult.ok ? 'Empty response' : aiResult.error,
+            },
+            'AI repository analysis failed',
+          );
           logger.debug(
             { error: aiResult.ok ? 'Empty response' : aiResult.error },
             'AI analysis enhancement failed, continuing with basic analysis',
@@ -429,7 +466,7 @@ async function analyzeRepoImpl(
         }
       } catch (error) {
         logger.debug(
-          { error: error instanceof Error ? error.message : String(error) },
+          { error: extractErrorMessage(error) },
           'AI analysis enhancement failed, continuing with basic analysis',
         );
       }
@@ -445,7 +482,7 @@ async function analyzeRepoImpl(
     const buildSystem = buildSystemRaw
       ? {
           type: buildSystemRaw.type,
-          buildFile: buildSystemRaw.file,
+          file: buildSystemRaw.file,
           buildCommand: buildSystemRaw.buildCmd,
           ...(buildSystemRaw.testCmd !== undefined && { testCommand: buildSystemRaw.testCmd }),
         }
@@ -473,7 +510,7 @@ async function analyzeRepoImpl(
         repoPath,
         depth,
         includeTests,
-        timestamp: new Date().toISOString(),
+        timestamp: Date.now(),
         ...(aiInsights !== undefined && { aiInsights }),
       },
     };
@@ -491,7 +528,7 @@ async function analyzeRepoImpl(
           ...(buildSystem && {
             build_system: {
               type: buildSystem.type,
-              build_file: buildSystem.buildFile,
+              build_file: buildSystem.file,
               ...(buildSystem.buildCommand && { build_command: buildSystem.buildCommand }),
             },
           }),
@@ -532,10 +569,13 @@ async function analyzeRepoImpl(
     // Progress: Complete
     if (progress) await progress('COMPLETE');
 
-    // Add chain hint for workflow guidance
+    const sessionContext = {
+      completed_steps: session.completed_steps || [],
+      analysis_result: result,
+    };
     const enrichedResult = {
       ...result,
-      _chainHint: 'Next: generate_dockerfile or fix existing issues',
+      NextStep: getSuccessProgression(TOOL_NAMES.ANALYZE_REPO, sessionContext).summary,
     };
 
     return Success(enrichedResult);
@@ -543,7 +583,7 @@ async function analyzeRepoImpl(
     timer.error(error);
     logger.error({ error }, 'Repository analysis failed');
 
-    return Failure(error instanceof Error ? error.message : String(error));
+    return Failure(extractErrorMessage(error));
   }
 }
 

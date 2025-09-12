@@ -18,6 +18,7 @@
       "@resources/*": ["src/resources/*"],
       "@workflows/*": ["src/workflows/*"],
       "@exports/*": ["src/exports/*"],
+      "@knowledge/*": ["src/knowledge/*"],
       "@types": ["src/types"],
       "@/container": ["src/container"]
     },

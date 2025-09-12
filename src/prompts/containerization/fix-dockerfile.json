@@ -1,0 +1,69 @@
+{
+  "id": "fix-dockerfile",
+  "category": "containerization",
+  "description": "Fix issues in an existing Dockerfile based on analysis and error context",
+  "version": "1.0",
+  "parameters": [
+    {
+      "name": "dockerfileContent",
+      "type": "string",
+      "required": true,
+      "description": "Current Dockerfile content to fix"
+    },
+    {
+      "name": "errors",
+      "type": "array",
+      "required": false,
+      "description": "Array of specific errors to address"
+    },
+    {
+      "name": "buildError",
+      "type": "string",
+      "required": false,
+      "description": "Build error message that occurred"
+    },
+    {
+      "name": "language",
+      "type": "string",
+      "required": false,
+      "description": "Programming language of the application"
+    },
+    {
+      "name": "framework",
+      "type": "string",
+      "required": false,
+      "description": "Framework used by the application"
+    },
+    {
+      "name": "analysis",
+      "type": "string",
+      "required": false,
+      "description": "Repository analysis context"
+    },
+    {
+      "name": "bestPractices",
+      "type": "array",
+      "required": false,
+      "description": "Knowledge-base best practices recommendations"
+    },
+    {
+      "name": "examples",
+      "type": "array",
+      "required": false,
+      "description": "Relevant code examples from knowledge base"
+    },
+    {
+      "name": "securityRecommendations",
+      "type": "array",
+      "required": false,
+      "description": "Security-specific recommendations from knowledge base"
+    },
+    {
+      "name": "knowledgeSuggestions",
+      "type": "array",
+      "required": false,
+      "description": "Detailed suggestions with reasons from knowledge base"
+    }
+  ],
+  "template": "Fix the provided Dockerfile to resolve build issues and improve best practices.\n\nCurrent Dockerfile:\n{{dockerfileContent}}\n\n{{#buildError}}\nBuild Error:\n{{buildError}}\n{{/buildError}}\n\n{{#errors}}\nSpecific Issues to Fix:\n{{#each errors}}\n- {{this}}\n{{/each}}\n{{/errors}}\n\n{{#language}}\nLanguage: {{language}}\n{{/language}}\n\n{{#framework}}\nFramework: {{framework}}\n{{/framework}}\n\n{{#analysis}}\nRepository Context:\n{{analysis}}\n{{/analysis}}\n\n{{#bestPractices}}Best Practices (from knowledge base):\n{{#.}}- {{.}}\n{{/.}}{{/bestPractices}}\n\n{{#examples}}Relevant Examples:\n{{#.}}- {{.}}\n{{/.}}{{/examples}}\n\n{{#securityRecommendations}}Security Recommendations:\n{{#.}}- {{.}}\n{{/.}}{{/securityRecommendations}}\n\n{{#knowledgeSuggestions}}Knowledge-Based Suggestions:\n{{#.}}- {{recommendation}} ({{reason}})\n{{/.}}{{/knowledgeSuggestions}}\n\nRequirements:\n1. Fix any syntax errors and build failures\n2. Apply containerization best practices\n{{#bestPractices}}{{#.}}3. {{.}}\n{{/.}}{{/bestPractices}}\n3. Ensure proper build caching and layer optimization\n4. Use security best practices (non-root user, minimal packages)\n{{#securityRecommendations}}{{#.}}   - {{.}}\n{{/.}}{{/securityRecommendations}}\n5. Optimize for image size where possible\n6. Maintain the original functionality and intent\n{{#knowledgeSuggestions}}{{#.}}7. Consider: {{recommendation}} ({{reason}})\n{{/.}}{{/knowledgeSuggestions}}\n\nReturn only the corrected Dockerfile content without explanation or code fences.\n"
+}

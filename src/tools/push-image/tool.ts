@@ -3,10 +3,12 @@
  * Lightweight, testable tool for pushing Docker images
  */
 
-import { createDockerClient, type DockerClient } from '../../services/docker/client';
+import { createDockerClient, type DockerClient } from '../../services/docker-client';
 import type { MCPTool, MCPResponse } from '../../mcp/types';
-import type { ToolContext } from '../../mcp/context/types';
+import type { ToolContext } from '../../mcp/context';
 import { Success, Failure, type Result } from '../../types';
+import { getSuccessProgression } from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { pushImageSchema, type PushImageParams } from './schema';
 import type { z } from 'zod';
 
@@ -15,6 +17,7 @@ export interface PushImageResult {
   registry: string;
   digest: string;
   pushedTag: string;
+  NextStep?: string;
 }
 
 /**
@@ -100,6 +103,7 @@ export function makePushImage(
         registry: params.registry || 'docker.io',
         digest: pushResult.value.digest,
         pushedTag: `${repository}:${tag}`,
+        NextStep: getSuccessProgression(TOOL_NAMES.PUSH_IMAGE, { completed_steps: [] }).summary,
       };
 
       return {

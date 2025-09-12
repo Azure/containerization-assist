@@ -85,7 +85,7 @@ All tools follow the co-location pattern and provide:
 - AI-powered enhancements where applicable
 
 ### 5. Workflow Orchestrator
-4 intelligent workflows that:
+Intelligent workflows that:
 - Plan steps based on session state
 - Support conditional execution
 - Provide progress updates
@@ -98,7 +98,7 @@ All tools follow the co-location pattern and provide:
 
 ### 7. Prompt Templates
 - Context-aware prompt generation
-- 6 pre-defined templates
+- JSON-based templates organized by category
 - Session integration
 - Type-safe arguments
 

@@ -6,9 +6,10 @@
  */
 
 import * as os from 'os';
+import { extractErrorMessage } from '../../lib/error-utils';
 import { createTimer } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../types';
-import type { ToolContext } from '../../mcp/context/types';
+import type { ToolContext } from '../../mcp/context';
 import type { OpsToolParams } from './schema';
 
 interface PingConfig {
@@ -65,7 +66,7 @@ export async function ping(config: PingConfig, context: ToolContext): Promise<Re
   } catch (error) {
     timer.error(error);
     context.logger.error({ error }, 'Ping failed');
-    return Failure(error instanceof Error ? error.message : String(error));
+    return Failure(extractErrorMessage(error));
   }
 }
 
@@ -167,7 +168,7 @@ export async function serverStatus(
   } catch (error) {
     timer.error(error);
     context.logger.error({ error }, 'Error collecting server status');
-    return Failure(error instanceof Error ? error.message : String(error));
+    return Failure(extractErrorMessage(error));
   }
 }
 

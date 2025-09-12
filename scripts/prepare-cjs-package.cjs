@@ -47,8 +47,13 @@ for (const key in pkg.exports) {
   }
 }
 
-// Update files array to exclude ESM dist
-pkg.files = pkg.files.filter(f => f !== 'dist/**/*');
+// Keep binary paths as ESM (they use import.meta)
+// No need to update binary paths
+
+// Include both ESM and CJS files
+if (!pkg.files.includes('dist/**/*')) {
+  pkg.files.push('dist/**/*');
+}
 if (!pkg.files.includes('dist-cjs/**/*')) {
   pkg.files.push('dist-cjs/**/*');
 }

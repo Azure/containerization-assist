@@ -9,10 +9,10 @@ import {
   completeStep,
   createSession,
   updateSession
-} from '@mcp/tools/session-helpers';
+} from '@mcp/tool-session-helpers';
 import type { SessionManager } from '@lib/session';
 import type { WorkflowState } from '../../../src/types';
-import type { ToolContext } from '@mcp/context/types';
+import type { ToolContext } from '@mcp/context';
 
 // Mock the session module
 jest.mock('@lib/session');
@@ -133,7 +133,7 @@ describe('Session Helpers', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toContain('Session manager not found in context');
+        expect(result.error).toContain('Session manager not available in context');
       }
     });
   });

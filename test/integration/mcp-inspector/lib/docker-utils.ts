@@ -7,6 +7,7 @@ import { spawn } from 'child_process';
 import { writeFile, unlink, mkdtemp } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import type { BuildResult } from '../../../../src/types/consolidated-types.js';
 
 export interface BuildConfig {
   dockerfile: string;
@@ -16,12 +17,11 @@ export interface BuildConfig {
   platform?: string;
 }
 
-export interface BuildResult {
-  success: boolean;
-  imageId?: string;
+// Using BuildResult from consolidated types
+// Extended interface for Docker-specific build results
+export interface DockerBuildResult extends BuildResult {
   imageTag: string;
   buildLog: string;
-  error?: string;
   duration: number;
 }
 
@@ -69,7 +69,7 @@ export class DockerUtils {
   /**
    * Build a Docker image from Dockerfile content and context
    */
-  async buildImage(config: BuildConfig): Promise<BuildResult> {
+  async buildImage(config: BuildConfig): Promise<DockerBuildResult> {
     const startTime = performance.now();
     
     try {
@@ -206,7 +206,7 @@ export class DockerUtils {
           if (!hasExpectedLogs) {
             return {
               success: false,
-              containerId,
+              ...(containerId && { containerId }),
               logs,
               error: `Expected logs not found: ${config.expectedLogs.join(', ')}`,
               duration
@@ -216,7 +216,7 @@ export class DockerUtils {
 
         return {
           success: true,
-          containerId,
+          ...(containerId && { containerId }),
           logs: result.stdout + result.stderr,
           duration
         };
@@ -250,12 +250,15 @@ export class DockerUtils {
       ]);
 
       if (result.exitCode === 0) {
-        const [id, tags, size, created] = result.stdout.trim().split('|');
+        const [id, , size, created] = result.stdout.trim().split('|');
+        if (!id) {
+          return null;
+        }
         return {
           id: id.replace('sha256:', '').substring(0, 12),
           tag: imageTag,
-          size: parseInt(size) || 0,
-          created
+          size: parseInt(size || '0') || 0,
+          created: created || ''
         };
       }
       
@@ -294,7 +297,7 @@ export class DockerUtils {
   /**
    * Build image from Dockerfile content (convenience method)
    */
-  async buildFromDockerfile(dockerfileContent: string, tag: string, context: string = '.'): Promise<BuildResult> {
+  async buildFromDockerfile(dockerfileContent: string, tag: string, context: string = '.'): Promise<DockerBuildResult> {
     return this.buildImage({
       dockerfile: dockerfileContent,
       context,

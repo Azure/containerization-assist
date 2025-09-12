@@ -14,10 +14,11 @@ import { generateK8sManifests } from '@tools/generate-k8s-manifests';
 import { pushImage } from '@tools/push-image';
 import { deployApplication } from '@tools/deploy';
 import { verifyDeployment } from '@tools/verify-deployment';
-import { isFail } from '@types';
+import { isFail } from '../types';
 import { createTimer, type Logger } from '@lib/logger';
-import type { ToolContext } from '../mcp/context/types';
+import type { ToolContext } from '../mcp/context';
 import { createSessionManager, type SessionManager } from '../lib/session';
+import { extractErrorMessage } from '../lib/error-utils';
 import type {
   DeploymentWorkflowParams,
   DeploymentWorkflowResult,
@@ -205,6 +206,7 @@ export async function runDeploymentWorkflow(
     const manifestResult = await generateK8sManifests(
       {
         sessionId,
+        imageId,
         appName: deploymentOptions.name,
         namespace: cluster.namespace,
         replicas: deploymentOptions.replicas || 1,
@@ -264,7 +266,7 @@ export async function runDeploymentWorkflow(
     }
 
     // TypeScript assertion: manifestResult must be successful here due to early return above
-    const manifests = (manifestResult as { ok: true; value: any }).value;
+    const manifests = (manifestResult as { ok: true; value: unknown }).value;
 
     generateStep.status = 'completed';
     generateStep.endTime = new Date();
@@ -417,7 +419,7 @@ export async function runDeploymentWorkflow(
     await sessionManager.update(sessionId, {
       workflow_state: {
         ...existingWorkflowState,
-        manifests: (manifests as unknown as Record<string, unknown>).manifests,
+        manifests: (manifests as Record<string, unknown>).manifests,
       },
     });
 
@@ -602,7 +604,7 @@ export async function runDeploymentWorkflow(
     };
   } catch (error) {
     const endTime = new Date();
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorMessage = extractErrorMessage(error);
 
     // Mark current step as failed
     const currentStepObj = steps.find((s) => s.name === context.currentStep);

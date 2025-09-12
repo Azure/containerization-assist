@@ -31,7 +31,8 @@ import { opsTool } from '../tools/ops/tool.js';
 import { opsToolSchema } from '../tools/ops/schema.js';
 import { workflow } from '../tools/workflow/tool.js';
 import { workflowSchema } from '../tools/workflow/schema.js';
-import type { Tool } from '../types.js';
+import type { Tool, Result } from '../types';
+import type { ZodObject, ZodRawShape } from 'zod';
 
 /**
  * Get all internal tool implementations
@@ -94,8 +95,8 @@ export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];
 const createToolWrapper = (
   name: string,
   description: string,
-  zodSchema: any, // Pass the full Zod schema object
-  executeFn: (params: any, context: any) => Promise<any>,
+  zodSchema: ZodObject<ZodRawShape>, // Pass the Zod object schema
+  executeFn: (params: unknown, context: unknown) => Promise<Result<unknown>>,
 ): Tool => ({
   name,
   description,
@@ -104,99 +105,110 @@ const createToolWrapper = (
   execute: async (params, _logger, context) => {
     // Context must be provided by the calling code (ContainerAssistServer)
     if (!context) {
-      throw new Error(
-        `Context is required for ${name} tool execution. Use ContainerAssistServer for proper integration.`,
-      );
+      return {
+        ok: false,
+        error: `Context is required for ${name} tool execution. Use ContainerAssistServer for proper integration.`,
+      };
     }
-    return executeFn(params as any, context);
+    return executeFn(params, context);
   },
 });
 
 // Create Tool wrappers for all functions
 const analyzeRepoTool = createToolWrapper(
-  'analyze_repo',
+  TOOL_NAMES.ANALYZE_REPO,
   'Analyze repository structure and detect technologies',
   analyzeRepoSchema,
-  analyzeRepo,
+  analyzeRepo as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const generateDockerfileTool = createToolWrapper(
-  'generate_dockerfile',
+  TOOL_NAMES.GENERATE_DOCKERFILE,
   'Generate a Dockerfile for the analyzed repository',
   generateDockerfileSchema,
-  generateDockerfile,
+  generateDockerfile as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const buildImageTool = createToolWrapper(
-  'build_image',
+  TOOL_NAMES.BUILD_IMAGE,
   'Build a Docker image',
   buildImageSchema,
-  buildImage,
+  buildImage as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const scanImageTool = createToolWrapper(
-  'scan_image',
+  TOOL_NAMES.SCAN_IMAGE,
   'Scan a Docker image for vulnerabilities',
   scanImageSchema,
-  scanImage,
+  scanImage as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
-const tagImageTool = createToolWrapper('tag_image', 'Tag a Docker image', tagImageSchema, tagImage);
+const tagImageTool = createToolWrapper(
+  TOOL_NAMES.TAG_IMAGE,
+  'Tag a Docker image',
+  tagImageSchema,
+  tagImage as (params: unknown, context: unknown) => Promise<Result<unknown>>,
+);
 
 const pushImageTool = createToolWrapper(
-  'push_image',
+  TOOL_NAMES.PUSH_IMAGE,
   'Push a Docker image to a registry',
   pushImageSchema,
-  pushImage,
+  pushImage as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const generateK8sManifestsTool = createToolWrapper(
-  'generate_k8s_manifests',
+  TOOL_NAMES.GENERATE_K8S_MANIFESTS,
   'Generate Kubernetes manifests',
   generateK8sManifestsSchema,
-  generateK8sManifests,
+  generateK8sManifests as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const prepareClusterTool = createToolWrapper(
-  'prepare_cluster',
+  TOOL_NAMES.PREPARE_CLUSTER,
   'Prepare Kubernetes cluster for deployment',
   prepareClusterSchema,
-  prepareCluster,
+  prepareCluster as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const deployApplicationTool = createToolWrapper(
-  'deploy_application',
+  TOOL_NAMES.DEPLOY_APPLICATION,
   'Deploy application to Kubernetes',
   deployApplicationSchema,
-  deployApplication,
+  deployApplication as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const verifyDeploymentTool = createToolWrapper(
-  'verify_deployment',
+  TOOL_NAMES.VERIFY_DEPLOYMENT,
   'Verify deployment status',
   verifyDeploymentSchema,
-  verifyDeployment,
+  verifyDeployment as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const fixDockerfileTool = createToolWrapper(
-  'fix_dockerfile',
+  TOOL_NAMES.FIX_DOCKERFILE,
   'Fix issues in a Dockerfile',
   fixDockerfileSchema,
-  fixDockerfile,
+  fixDockerfile as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const resolveBaseImagesTool = createToolWrapper(
-  'resolve_base_images',
+  TOOL_NAMES.RESOLVE_BASE_IMAGES,
   'Resolve and recommend base images',
   resolveBaseImagesSchema,
-  resolveBaseImages,
+  resolveBaseImages as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
-const opsToolWrapper = createToolWrapper('ops', 'Operational utilities', opsToolSchema, opsTool);
+const opsToolWrapper = createToolWrapper(
+  TOOL_NAMES.OPS,
+  'Operational utilities',
+  opsToolSchema,
+  opsTool as (params: unknown, context: unknown) => Promise<Result<unknown>>,
+);
 
 const workflowTool = createToolWrapper(
-  'workflow',
+  TOOL_NAMES.WORKFLOW,
   'Execute containerization workflows',
   workflowSchema,
-  workflow,
+  workflow as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
