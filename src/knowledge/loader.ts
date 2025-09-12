@@ -164,8 +164,13 @@ export const loadKnowledgeBase = async (): Promise<void> => {
       'java-pack.json',
       'go-pack.json',
       'dotnet-pack.json',
+      'ruby-pack.json',
+      'rust-pack.json',
+      'php-pack.json',
+      'database-pack.json',
       'kubernetes-pack.json',
       'security-pack.json',
+      'azure-container-apps-pack.json',
     ] as const;
 
     for (const packFile of knowledgePacks) {

@@ -1,0 +1,182 @@
+[
+  {
+    "id": "postgres-data-persistence",
+    "category": "dockerfile",
+    "pattern": "postgres:",
+    "recommendation": "Use named volumes for PostgreSQL data persistence",
+    "example": "volumes:\n  - postgres_data:/var/lib/postgresql/data\nenvironment:\n  PGDATA: /var/lib/postgresql/data/pgdata",
+    "severity": "high",
+    "tags": ["postgres", "persistence", "volumes", "data"],
+    "description": "Named volumes ensure data persistence across container restarts"
+  },
+  {
+    "id": "mysql-init-scripts",
+    "category": "dockerfile",
+    "pattern": "mysql:",
+    "recommendation": "Use initialization scripts for database setup",
+    "example": "volumes:\n  - ./init-scripts:/docker-entrypoint-initdb.d\n# Scripts run in alphabetical order on first startup",
+    "severity": "medium",
+    "tags": ["mysql", "initialization", "setup", "scripts"],
+    "description": "Init scripts automate database schema and user creation"
+  },
+  {
+    "id": "mongodb-replica-set",
+    "category": "dockerfile",
+    "pattern": "mongo:",
+    "recommendation": "Configure MongoDB replica set for high availability",
+    "example": "command: mongod --replSet rs0 --bind_ip_all\n# Initialize replica set after startup",
+    "severity": "medium",
+    "tags": ["mongodb", "replica-set", "availability", "clustering"],
+    "description": "Replica sets provide redundancy and automatic failover"
+  },
+  {
+    "id": "redis-persistence-config",
+    "category": "dockerfile",
+    "pattern": "redis:",
+    "recommendation": "Configure Redis persistence appropriately for use case",
+    "example": "command: redis-server --appendonly yes --appendfsync everysec\nvolumes:\n  - redis_data:/data",
+    "severity": "medium",
+    "tags": ["redis", "persistence", "aof", "configuration"],
+    "description": "AOF persistence provides better durability than RDB snapshots"
+  },
+  {
+    "id": "database-health-checks",
+    "category": "dockerfile",
+    "pattern": "(postgres|mysql|mongo):",
+    "recommendation": "Implement proper health checks for database containers",
+    "example": "healthcheck:\n  test: [\"CMD\", \"pg_isready\", \"-U\", \"postgres\"]\n  interval: 10s\n  timeout: 5s\n  retries: 5",
+    "severity": "high",
+    "tags": ["database", "health", "monitoring", "availability"],
+    "description": "Health checks ensure database readiness before accepting connections"
+  },
+  {
+    "id": "database-resource-limits",
+    "category": "dockerfile",
+    "pattern": "(postgres|mysql|mongo):",
+    "recommendation": "Set appropriate resource limits for database containers",
+    "example": "deploy:\n  resources:\n    limits:\n      memory: 2G\n      cpus: '2.0'\n    reservations:\n      memory: 1G",
+    "severity": "high",
+    "tags": ["database", "resources", "limits", "performance"],
+    "description": "Resource limits prevent database containers from exhausting host resources"
+  },
+  {
+    "id": "postgres-configuration",
+    "category": "dockerfile",
+    "pattern": "postgres:",
+    "recommendation": "Optimize PostgreSQL configuration for containers",
+    "example": "command: postgres -c shared_buffers=256MB -c max_connections=200 -c effective_cache_size=1GB",
+    "severity": "medium",
+    "tags": ["postgres", "configuration", "tuning", "performance"],
+    "description": "Container-specific tuning improves database performance"
+  },
+  {
+    "id": "mysql-slow-query-log",
+    "category": "dockerfile",
+    "pattern": "mysql:",
+    "recommendation": "Enable slow query logging for performance monitoring",
+    "example": "command: --slow-query-log=1 --slow-query-log-file=/var/log/mysql/slow.log --long-query-time=2",
+    "severity": "low",
+    "tags": ["mysql", "monitoring", "performance", "logging"],
+    "description": "Slow query logs help identify performance bottlenecks"
+  },
+  {
+    "id": "database-backup-strategy",
+    "category": "dockerfile",
+    "pattern": "(postgres|mysql):",
+    "recommendation": "Implement automated backup strategy for databases",
+    "example": "# Backup container\nservices:\n  backup:\n    image: postgres:15-alpine\n    command: |\n      sh -c 'pg_dump -h db -U $$POSTGRES_USER $$POSTGRES_DB | gzip > /backups/backup_$$(date +%Y%m%d_%H%M%S).sql.gz'\n    volumes:\n      - ./backups:/backups",
+    "severity": "high",
+    "tags": ["database", "backup", "disaster-recovery", "data-protection"],
+    "description": "Regular backups are essential for disaster recovery"
+  },
+  {
+    "id": "database-secrets-management",
+    "category": "dockerfile",
+    "pattern": "POSTGRES_PASSWORD|MYSQL_ROOT_PASSWORD",
+    "recommendation": "Use Docker secrets or external secret management for database credentials",
+    "example": "secrets:\n  db_password:\n    external: true\nenvironment:\n  POSTGRES_PASSWORD_FILE: /run/secrets/db_password",
+    "severity": "high",
+    "tags": ["database", "secrets", "security", "credentials"],
+    "description": "Secure credential management prevents password exposure"
+  },
+  {
+    "id": "elasticsearch-cluster",
+    "category": "dockerfile",
+    "pattern": "elasticsearch:",
+    "recommendation": "Configure Elasticsearch cluster settings for production",
+    "example": "environment:\n  - cluster.name=docker-cluster\n  - discovery.type=single-node\n  - ES_JAVA_OPTS=-Xms512m -Xmx512m\n  - xpack.security.enabled=false",
+    "severity": "medium",
+    "tags": ["elasticsearch", "cluster", "configuration", "search"],
+    "description": "Proper cluster configuration ensures stability and performance"
+  },
+  {
+    "id": "database-network-isolation",
+    "category": "dockerfile",
+    "pattern": "(postgres|mysql|mongo):",
+    "recommendation": "Isolate database containers in dedicated networks",
+    "example": "networks:\n  backend:\n    internal: true\n  frontend:\n    external: true",
+    "severity": "high",
+    "tags": ["database", "networking", "security", "isolation"],
+    "description": "Network isolation prevents unauthorized database access"
+  },
+  {
+    "id": "postgres-wal-configuration",
+    "category": "dockerfile",
+    "pattern": "postgres:",
+    "recommendation": "Configure PostgreSQL WAL for replication and recovery",
+    "example": "command: postgres -c wal_level=replica -c max_wal_senders=3 -c max_replication_slots=3",
+    "severity": "medium",
+    "tags": ["postgres", "wal", "replication", "recovery"],
+    "description": "WAL configuration enables point-in-time recovery and replication"
+  },
+  {
+    "id": "database-connection-pooling",
+    "category": "dockerfile",
+    "pattern": "(postgres|mysql):",
+    "recommendation": "Implement connection pooling for database access",
+    "example": "# PgBouncer for PostgreSQL\nservices:\n  pgbouncer:\n    image: pgbouncer/pgbouncer\n    environment:\n      DATABASES_HOST: postgres\n      DATABASES_PORT: 5432\n      POOL_MODE: transaction",
+    "severity": "medium",
+    "tags": ["database", "pooling", "connections", "performance"],
+    "description": "Connection pooling reduces database load and improves performance"
+  },
+  {
+    "id": "cassandra-cluster-config",
+    "category": "dockerfile",
+    "pattern": "cassandra:",
+    "recommendation": "Configure Cassandra for distributed deployment",
+    "example": "environment:\n  - CASSANDRA_CLUSTER_NAME=docker-cluster\n  - CASSANDRA_SEEDS=cassandra1,cassandra2\n  - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch",
+    "severity": "medium",
+    "tags": ["cassandra", "cluster", "distributed", "nosql"],
+    "description": "Proper cluster configuration ensures data distribution and availability"
+  },
+  {
+    "id": "database-migration-handling",
+    "category": "dockerfile",
+    "pattern": "(flyway|liquibase|migrate):",
+    "recommendation": "Use database migration tools for schema management",
+    "example": "services:\n  migrate:\n    image: flyway/flyway\n    command: -url=jdbc:postgresql://db:5432/mydb -user=postgres migrate\n    volumes:\n      - ./migrations:/flyway/sql",
+    "severity": "medium",
+    "tags": ["database", "migrations", "schema", "versioning"],
+    "description": "Migration tools ensure consistent schema across environments"
+  },
+  {
+    "id": "timescaledb-optimization",
+    "category": "dockerfile",
+    "pattern": "timescale:",
+    "recommendation": "Optimize TimescaleDB for time-series workloads",
+    "example": "command: postgres -c shared_preload_libraries=timescaledb -c timescaledb.max_background_workers=8",
+    "severity": "low",
+    "tags": ["timescaledb", "timeseries", "optimization", "postgres"],
+    "description": "TimescaleDB-specific settings optimize time-series performance"
+  },
+  {
+    "id": "database-monitoring-export",
+    "category": "dockerfile",
+    "pattern": "(postgres|mysql)_exporter:",
+    "recommendation": "Deploy database exporters for Prometheus monitoring",
+    "example": "services:\n  postgres_exporter:\n    image: prometheuscommunity/postgres-exporter\n    environment:\n      DATA_SOURCE_NAME: postgresql://user:pass@postgres:5432/db?sslmode=disable",
+    "severity": "medium",
+    "tags": ["database", "monitoring", "prometheus", "metrics"],
+    "description": "Exporters provide database metrics for monitoring systems"
+  }
+]
