@@ -19,7 +19,7 @@
  * ```
  */
 
-import { joinPaths, getExtension } from '@lib/path-utils';
+import { joinPaths, getExtension, safeNormalizePath } from '@lib/path-utils';
 import { promises as fs } from 'node:fs';
 import { getSession, updateSession } from '@mcp/tool-session-helpers';
 import { createStandardProgress } from '@mcp/progress-helper';
@@ -347,7 +347,8 @@ async function analyzeRepoImpl(
   const timer = createTimer(logger, 'analyze-repo');
 
   try {
-    const { repoPath = process.cwd(), depth = 3, includeTests = false } = params;
+    const { repoPath: rawRepoPath = process.cwd(), depth = 3, includeTests = false } = params;
+    const repoPath = safeNormalizePath(rawRepoPath);
 
     logger.info({ repoPath, depth, includeTests }, 'Starting repository analysis');
 

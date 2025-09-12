@@ -6,6 +6,7 @@
 // import { extractErrorMessage } from '../../lib/error-utils'; // Not currently used
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { safeNormalizePath } from '@lib/path-utils';
 import { getSession, updateSession } from '@mcp/tool-session-helpers';
 import { createStandardProgress } from '@mcp/progress-helper';
 import { aiGenerateWithSampling, aiGenerate } from '@mcp/tool-ai-helpers';
@@ -551,8 +552,10 @@ async function generateSingleDockerfile(
   }
 
   // Determine output path - write to each module root directory
-  const repoPath = params.repoPath || '.';
-  const dockerfilePath = path.resolve(path.join(repoPath, moduleRoot, 'Dockerfile'));
+  const rawRepoPath = params.repoPath || '.';
+  const repoPath = safeNormalizePath(rawRepoPath);
+  const normalizedModuleRoot = safeNormalizePath(moduleRoot);
+  const dockerfilePath = path.resolve(path.join(repoPath, normalizedModuleRoot, 'Dockerfile'));
 
   // Write Dockerfile to disk
   await fs.writeFile(dockerfilePath, dockerfileContent, 'utf-8');
@@ -611,8 +614,9 @@ async function generateDockerfileImpl(
   }
 
   // Validate moduleRoots parameter - use default if not provided
-  const moduleRoots =
+  const rawModuleRoots =
     params.moduleRoots && params.moduleRoots.length > 0 ? params.moduleRoots : ['.'];
+  const moduleRoots = rawModuleRoots.map(safeNormalizePath);
 
   // Optional progress reporting for complex operations (AI generation)
   const progress = context.progress ? createStandardProgress(context.progress) : undefined;

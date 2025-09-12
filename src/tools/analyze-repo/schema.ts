@@ -5,7 +5,9 @@
 import { z } from 'zod';
 
 const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
-export const repoPathSchema = z.string().describe('Path to the repository to analyze');
+export const repoPathSchema = z
+  .string()
+  .describe('Path to the repository to analyze (use forward slashes: /path/to/repo)');
 
 export const analyzeRepoSchema = z.object({
   sessionId: sessionIdSchema.optional(),

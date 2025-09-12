@@ -34,13 +34,13 @@ export const generateDockerfileSchema = z.object({
   optimizeSize: z.boolean().optional().describe('Optimize for smaller image size'),
   securityLevel: securityLevelSchema,
   customCommands: z.array(z.string()).optional().describe('Custom Dockerfile commands'),
-  repoPath: z.string().optional().describe('Repository path'),
+  repoPath: z.string().optional().describe('Repository path (use forward slashes: /path/to/repo)'),
   moduleRoots: z
     .array(z.string())
     .min(1)
     .optional()
     .describe(
-      'List of module root paths for generating separate Dockerfiles (defaults to root directory)',
+      'List of module root paths for generating separate Dockerfiles (use forward slashes: /path/to/module)',
     ),
 
   // Sampling options

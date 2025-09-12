@@ -13,7 +13,7 @@
  * ```
  */
 
-import { resolvePath, joinPaths, getRelativePath } from '@lib/path-utils';
+import { resolvePath, joinPaths, getRelativePath, safeNormalizePath } from '@lib/path-utils';
 import { promises as fs } from 'node:fs';
 import { getSession, updateSession } from '@mcp/tool-session-helpers';
 import { createStandardProgress } from '@mcp/progress-helper';
@@ -139,14 +139,18 @@ async function buildImageImpl(
 
   try {
     const {
-      context: buildContext = '.',
+      context: rawBuildContext = '.',
       dockerfile = 'Dockerfile',
-      dockerfilePath,
+      dockerfilePath: rawDockerfilePath,
       imageName,
       tags = [],
       buildArgs = {},
       platform,
     } = params;
+
+    // Normalize paths to handle Windows separators
+    const buildContext = safeNormalizePath(rawBuildContext);
+    const dockerfilePath = rawDockerfilePath ? safeNormalizePath(rawDockerfilePath) : undefined;
 
     logger.info({ context: buildContext, dockerfile, tags }, 'Starting Docker image build');
 
