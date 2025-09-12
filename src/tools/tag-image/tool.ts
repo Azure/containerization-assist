@@ -5,12 +5,11 @@
  * Uses standardized helpers for consistency
  */
 
-import { getSession, updateSession } from '@mcp/tools/session-helpers';
-import type { ToolContext } from '../../mcp/context/types';
+import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import type { ToolContext } from '../../mcp/context';
 import { createDockerClient } from '../../lib/docker';
 import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../types';
-import type { SessionData } from '../session-types';
 import type { TagImageParams } from './schema';
 import {
   getSuccessChainHint,
@@ -19,6 +18,14 @@ import {
   type SessionContext,
 } from '../../lib/chain-hints';
 import { TOOL_NAMES } from '../../exports/tools.js';
+
+// Session data type for accessing build results
+interface SessionData {
+  build_result?: {
+    imageId?: string;
+    tags?: string[];
+  };
+}
 
 export interface TagImageResult {
   success: boolean;

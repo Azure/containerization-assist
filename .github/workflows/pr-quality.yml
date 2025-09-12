@@ -37,7 +37,7 @@ jobs:
         run: |
           # Use our validation pipeline
           echo "🔍 Running validation pipeline..."
-          npm run validate:pr:fast > quality-full.txt 2>&1 || true
+          npm run validate:pr > quality-full.txt 2>&1 || true
           
           # Run quality gates (non-blocking for reporting)
           echo "🛡️ Running quality gates..."

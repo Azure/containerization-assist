@@ -1,0 +1,202 @@
+[
+  {
+    "id": "container-root-user",
+    "category": "security",
+    "pattern": "USER root",
+    "recommendation": "Avoid running containers as root user - create and use a dedicated non-root user",
+    "example": "RUN groupadd -r appuser && useradd -r -g appuser appuser\nWORKDIR /home/appuser\nUSER appuser",
+    "severity": "high",
+    "tags": ["security", "user", "root", "privilege"],
+    "description": "Running as root increases attack surface if container is compromised"
+  },
+  {
+    "id": "secrets-in-dockerfile",
+    "category": "security",
+    "pattern": "(PASSWORD|SECRET|API_KEY|TOKEN)\\s*=",
+    "recommendation": "Never hardcode secrets in Dockerfile - use environment variables or secret management",
+    "example": "# Bad: ENV API_KEY=secret123\n# Good: ENV API_KEY_FILE=/run/secrets/api_key",
+    "severity": "high",
+    "tags": ["security", "secrets", "hardcoded"],
+    "description": "Hardcoded secrets are exposed in image layers and version control"
+  },
+  {
+    "id": "image-version-pinning",
+    "category": "security",
+    "pattern": ":latest",
+    "recommendation": "Pin specific image versions instead of using 'latest' tag for reproducible and secure builds",
+    "example": "FROM node:18.17.1-alpine\n# Instead of: FROM node:latest",
+    "severity": "high",
+    "tags": ["security", "versions", "reproducible"],
+    "description": "Latest tags can introduce unexpected changes and security vulnerabilities"
+  },
+  {
+    "id": "package-manager-cleanup",
+    "category": "security",
+    "pattern": "(apt-get|yum|apk).*install",
+    "recommendation": "Clean package manager caches after installation to reduce attack surface",
+    "example": "RUN apt-get update && apt-get install -y package && rm -rf /var/lib/apt/lists/*",
+    "severity": "medium",
+    "tags": ["security", "cleanup", "attack-surface"],
+    "description": "Package caches can contain vulnerable or unnecessary files"
+  },
+  {
+    "id": "minimal-base-images",
+    "category": "security",
+    "pattern": "FROM (ubuntu|centos|debian)(?!.*slim)",
+    "recommendation": "Use minimal base images like Alpine, slim, or distroless to reduce attack surface",
+    "example": "FROM node:18-alpine\n# Or: FROM gcr.io/distroless/nodejs18",
+    "severity": "medium",
+    "tags": ["security", "minimal", "attack-surface"],
+    "description": "Minimal images contain fewer packages and potential vulnerabilities"
+  },
+  {
+    "id": "file-permissions",
+    "category": "security",
+    "pattern": "chmod 777",
+    "recommendation": "Avoid overly permissive file permissions - use least privilege principle",
+    "example": "RUN chmod 755 /app/script.sh\n# Instead of: chmod 777 /app/script.sh",
+    "severity": "medium",
+    "tags": ["security", "permissions", "least-privilege"],
+    "description": "Overly permissive permissions increase security risks"
+  },
+  {
+    "id": "vulnerability-scanning",
+    "category": "security",
+    "pattern": "FROM.*:",
+    "recommendation": "Regularly scan container images for vulnerabilities using tools like Trivy, Snyk, or Clair",
+    "example": "# Add to CI/CD: docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image myapp:latest",
+    "severity": "high",
+    "tags": ["security", "scanning", "vulnerabilities"],
+    "description": "Regular vulnerability scanning identifies known security issues"
+  },
+  {
+    "id": "network-exposure",
+    "category": "security",
+    "pattern": "EXPOSE.*0\\.0\\.0\\.0",
+    "recommendation": "Bind services to specific interfaces, avoid binding to 0.0.0.0 when possible",
+    "example": "EXPOSE 8080\n# In app: bind to 127.0.0.1 or specific interface",
+    "severity": "medium",
+    "tags": ["security", "network", "binding"],
+    "description": "Binding to all interfaces increases attack surface"
+  },
+  {
+    "id": "docker-socket-mount",
+    "category": "security",
+    "pattern": "/var/run/docker.sock",
+    "recommendation": "Avoid mounting Docker socket unless absolutely necessary - consider alternatives",
+    "example": "# Avoid: -v /var/run/docker.sock:/var/run/docker.sock\n# Consider: Docker-in-Docker or Kaniko for builds",
+    "severity": "high",
+    "tags": ["security", "docker-socket", "privilege-escalation"],
+    "description": "Docker socket access provides root-equivalent access to host"
+  },
+  {
+    "id": "copy-vs-add",
+    "category": "security",
+    "pattern": "ADD.*\\.(tar|zip|gz)",
+    "recommendation": "Use COPY instead of ADD unless you need automatic extraction features",
+    "example": "COPY app.jar /app/\n# Instead of: ADD app.jar /app/",
+    "severity": "low",
+    "tags": ["security", "dockerfile", "commands"],
+    "description": "ADD has additional features that can introduce security risks"
+  },
+  {
+    "id": "health-check-security",
+    "category": "security",
+    "pattern": "HEALTHCHECK.*CMD",
+    "recommendation": "Ensure health check endpoints don't expose sensitive information",
+    "example": "HEALTHCHECK CMD curl -f http://localhost:8080/health || exit 1\n# Health endpoint should return minimal status only",
+    "severity": "low",
+    "tags": ["security", "health-checks", "information-disclosure"],
+    "description": "Health checks should not leak sensitive application information"
+  },
+  {
+    "id": "build-args-secrets",
+    "category": "security",
+    "pattern": "ARG.*(PASSWORD|SECRET|KEY|TOKEN)",
+    "recommendation": "Don't pass secrets as build arguments - they're visible in image history",
+    "example": "# Bad: ARG SECRET_KEY=mysecret\n# Good: Use multi-stage builds and secret mounts",
+    "severity": "high",
+    "tags": ["security", "build-args", "secrets"],
+    "description": "Build arguments are stored in image layers and visible in history"
+  },
+  {
+    "id": "dependency-security",
+    "category": "security",
+    "pattern": "(npm install|pip install|go get)",
+    "recommendation": "Audit and pin dependency versions to avoid supply chain attacks",
+    "example": "RUN npm audit --audit-level high\nCOPY package-lock.json ./\nRUN npm ci --only=production",
+    "severity": "high",
+    "tags": ["security", "dependencies", "supply-chain"],
+    "description": "Unpinned dependencies can introduce vulnerabilities over time"
+  },
+  {
+    "id": "privileged-containers",
+    "category": "security",
+    "pattern": "privileged.*true",
+    "recommendation": "Avoid running privileged containers - use specific capabilities instead",
+    "example": "# In K8s: securityContext.privileged: false\n# Add only needed capabilities",
+    "severity": "high",
+    "tags": ["security", "privileged", "capabilities"],
+    "description": "Privileged containers have root access to host system"
+  },
+  {
+    "id": "readonly-filesystem",
+    "category": "security",
+    "pattern": "readOnlyRootFilesystem",
+    "recommendation": "Use read-only root filesystem when possible to prevent runtime modifications",
+    "example": "securityContext:\n  readOnlyRootFilesystem: true\nvolumeMounts:\n- name: tmp\n  mountPath: /tmp",
+    "severity": "medium",
+    "tags": ["security", "filesystem", "immutable"],
+    "description": "Read-only filesystem prevents runtime file system modifications"
+  },
+  {
+    "id": "resource-limits-security",
+    "category": "security",
+    "pattern": "resources:",
+    "recommendation": "Set resource limits to prevent DoS attacks and resource exhaustion",
+    "example": "resources:\n  limits:\n    memory: \"512Mi\"\n    cpu: \"500m\"\n  requests:\n    memory: \"256Mi\"\n    cpu: \"250m\"",
+    "severity": "medium",
+    "tags": ["security", "resources", "dos"],
+    "description": "Resource limits prevent containers from consuming excessive resources"
+  },
+  {
+    "id": "network-policies",
+    "category": "security",
+    "pattern": "kind: NetworkPolicy",
+    "recommendation": "Implement network policies to control pod-to-pod communication",
+    "example": "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: deny-all-ingress\nspec:\n  podSelector: {}\n  policyTypes:\n  - Ingress",
+    "severity": "medium",
+    "tags": ["security", "network", "microsegmentation"],
+    "description": "Network policies provide micro-segmentation for container communication"
+  },
+  {
+    "id": "pod-security-standards",
+    "category": "security",
+    "pattern": "securityContext:",
+    "recommendation": "Implement Pod Security Standards for comprehensive security controls",
+    "example": "securityContext:\n  runAsNonRoot: true\n  runAsUser: 1001\n  allowPrivilegeEscalation: false\n  capabilities:\n    drop:\n    - ALL",
+    "severity": "high",
+    "tags": ["security", "pod-security", "standards"],
+    "description": "Pod Security Standards provide baseline security configurations"
+  },
+  {
+    "id": "image-signing",
+    "category": "security",
+    "pattern": "FROM.*@sha256:",
+    "recommendation": "Use content-based image digests and consider image signing for supply chain security",
+    "example": "FROM node:18-alpine@sha256:abc123...\n# Consider: cosign for image signing",
+    "severity": "medium",
+    "tags": ["security", "signing", "supply-chain"],
+    "description": "Image digests and signing ensure image integrity and authenticity"
+  },
+  {
+    "id": "secrets-rotation",
+    "category": "security",
+    "pattern": "kind: Secret",
+    "recommendation": "Implement secret rotation and use external secret management systems",
+    "example": "# Use External Secrets Operator or similar\n# Implement automatic secret rotation",
+    "severity": "medium",
+    "tags": ["security", "secrets", "rotation"],
+    "description": "Regular secret rotation reduces impact of credential compromise"
+  }
+]

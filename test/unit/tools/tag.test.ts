@@ -6,11 +6,32 @@
 
 import { jest } from '@jest/globals';
 import { tagImage, type TagImageParams } from '../../../src/tools/tag-image/tool';
-import {
-  createMockLogger,
-  createSuccessResult,
-  createFailureResult,
-} from '../../__support__/utilities/mock-infrastructure';
+// Result Type Helpers for Testing
+function createSuccessResult<T>(value: T) {
+  return {
+    ok: true as const,
+    value,
+  };
+}
+
+function createFailureResult(error: string) {
+  return {
+    ok: false as const,
+    error,
+  };
+}
+
+function createMockLogger() {
+  return {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+    trace: jest.fn(),
+    fatal: jest.fn(),
+    child: jest.fn().mockReturnThis(),
+  } as any;
+}
 
 // Mock lib modules following analyze-repo pattern
 const mockSessionManager = {
@@ -51,7 +72,7 @@ jest.mock('@lib/logger', () => ({
 }));
 
 // Mock session helpers
-jest.mock('@mcp/tools/session-helpers');
+jest.mock('@mcp/tool-session-helpers');
 
 describe('tagImage', () => {
   let mockLogger: ReturnType<typeof createMockLogger>;
@@ -68,7 +89,7 @@ describe('tagImage', () => {
     jest.clearAllMocks();
 
     // Setup session helper mocks
-    const sessionHelpers = require('@mcp/tools/session-helpers');
+    const sessionHelpers = require('@mcp/tool-session-helpers');
     sessionHelpers.getSession = jest.fn().mockResolvedValue({
       ok: true,
       value: {
@@ -140,7 +161,7 @@ describe('tagImage', () => {
       );
 
       // Verify session was updated with tag information
-      const sessionHelpers = require('@mcp/tools/session-helpers');
+      const sessionHelpers = require('@mcp/tool-session-helpers');
       expect(sessionHelpers.updateSession).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
@@ -221,7 +242,7 @@ describe('tagImage', () => {
     });
 
     it('should preserve existing build result data when updating session', async () => {
-      const sessionHelpers = require('@mcp/tools/session-helpers');
+      const sessionHelpers = require('@mcp/tool-session-helpers');
       sessionHelpers.getSession.mockResolvedValue({
         ok: true,
         value: {
@@ -352,7 +373,7 @@ describe('tagImage', () => {
 
   describe('Error Handling', () => {
     it('should auto-create session when not found', async () => {
-      const sessionHelpers = require('@mcp/tools/session-helpers');
+      const sessionHelpers = require('@mcp/tool-session-helpers');
       sessionHelpers.getSession.mockResolvedValue({
         ok: true,
         value: {
@@ -380,7 +401,7 @@ describe('tagImage', () => {
     });
 
     it('should return error when no build result exists', async () => {
-      const sessionHelpers = require('@mcp/tools/session-helpers');
+      const sessionHelpers = require('@mcp/tool-session-helpers');
       sessionHelpers.getSession.mockResolvedValue({
         ok: true,
         value: {
@@ -406,7 +427,7 @@ describe('tagImage', () => {
     });
 
     it('should return error when build result has no imageId', async () => {
-      const sessionHelpers = require('@mcp/tools/session-helpers');
+      const sessionHelpers = require('@mcp/tool-session-helpers');
       sessionHelpers.getSession.mockResolvedValue({
         ok: true,
         value: {
@@ -536,7 +557,7 @@ describe('tagImage', () => {
     });
 
     it('should handle session update failures gracefully', async () => {
-      const sessionHelpers = require('@mcp/tools/session-helpers');
+      const sessionHelpers = require('@mcp/tool-session-helpers');
       sessionHelpers.getSession.mockResolvedValue({
         ok: true,
         value: {
@@ -612,7 +633,7 @@ describe('tagImage', () => {
       const result = await tagImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
-      const sessionHelpers = require('@mcp/tools/session-helpers');
+      const sessionHelpers = require('@mcp/tool-session-helpers');
       expect(sessionHelpers.updateSession).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
@@ -643,7 +664,7 @@ describe('tagImage', () => {
       const result = await tagImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
-      const sessionHelpers = require('@mcp/tools/session-helpers');
+      const sessionHelpers = require('@mcp/tool-session-helpers');
       expect(sessionHelpers.updateSession).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
@@ -689,7 +710,7 @@ describe('tagImage', () => {
 
       for (const testConfig of configurations) {
         // Setup session for each different sessionId
-        const sessionHelpers = require('@mcp/tools/session-helpers');
+        const sessionHelpers = require('@mcp/tool-session-helpers');
         sessionHelpers.getSession.mockResolvedValue({
           ok: true,
           value: {

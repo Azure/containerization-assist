@@ -6,7 +6,8 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '@types';
+import { Success, Failure, type Result } from '../types';
+import { formatErrorMessage } from './error-utils';
 
 /**
  * Basic security scan result for scanner tool
@@ -70,7 +71,7 @@ export const createSecurityScanner = (logger: Logger, scannerType?: string): Sec
 
         return Success(result);
       } catch (error) {
-        const errorMessage = `Security scan failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        const errorMessage = formatErrorMessage('Security scan failed', error);
         logger.error({ error: errorMessage, imageId }, 'Security scan failed');
 
         return Failure(errorMessage);
@@ -86,7 +87,7 @@ export const createSecurityScanner = (logger: Logger, scannerType?: string): Sec
         // In production, this would ping the actual scanner service
         return Success(true);
       } catch (error) {
-        const errorMessage = `Scanner ping failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        const errorMessage = formatErrorMessage('Scanner ping failed', error);
         return Failure(errorMessage);
       }
     },

@@ -6,17 +6,17 @@
  */
 
 // Export the main server
-export { MCPServer } from './server/index';
-export { DirectMCPServer } from './server/direct';
+export { MCPServer } from './server';
+// TEMP: Commented out during Phase 1 error fixing
+// export { DirectMCPServer } from './server-direct';
+
+// Export tool registration utilities
+// TEMP: Commented out during Phase 1 error fixing
+// export { registerTools, getToolList, toolRegistry } from './tool-registrar';
+// export type { RegistrationResult } from './tool-registrar';
 
 // Export context creation utilities
-export {
-  createToolContext,
-  createMCPToolContext,
-  createTestContext,
-  type ToolContextDeps,
-  type CreateContextOptions,
-} from './context/tool-context-builder';
+export { createToolContext, createMCPToolContext, type ContextOptions } from './context';
 
 // Export types
 export type {
@@ -26,14 +26,20 @@ export type {
   TextMessage,
   PromptWithMessages,
   ProgressReporter,
-  ToolContextConfig,
-} from './context/types';
+} from './context';
+
+// Export progress helpers
+export {
+  extractProgressToken,
+  createProgressReporter,
+  type EnhancedProgressReporter,
+} from './context-helpers';
 
 // Export error mapping utilities
-export { toMcpError, getErrorDetails } from './utils/error-mapper';
+export { toMcpError, getErrorDetails } from './error-mapper';
 
 // Export progress utilities
-export { createStandardProgress, STANDARD_STAGES } from './utils/progress-helper';
+export { createStandardProgress, STANDARD_STAGES } from './progress-helper';
 
 // Re-export MCP SDK types for convenience
 export { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';

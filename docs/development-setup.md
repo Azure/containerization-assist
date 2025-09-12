@@ -46,8 +46,8 @@ Simply restart VS Code to enable the development MCP server.
 
 ### Build & Development
 ```bash
-npm run build          # Fast development build with tsdown
-npm run build:prod     # Production build with minification
+npm run build          # Full build (ESM + CJS)
+npm run build:fast     # Fast development build
 npm run build:watch    # Watch mode with auto-rebuild
 npm run dev            # Development server with auto-reload
 npm start              # Start production server
@@ -62,18 +62,15 @@ npm run typecheck      # TypeScript type checking
 npm run format         # Prettier code formatting
 npm run format:check   # Check formatting without changes
 npm run validate       # Run lint + typecheck + test
+npm run validate:pr    # Full PR validation with integration tests
+npm run fix            # Auto-fix lint + format issues
 ```
 
-### Quality Gates & Validation
+### Quality Gates & Analysis
 ```bash
-npm run validate:pr:fast   # Quick PR validation (30s)
-npm run validate:pr        # Full PR validation with coverage
-npm run quality:check      # Comprehensive quality analysis
-npm run quality:gates      # TypeScript + quality analysis
-npm run baseline:report    # Quick quality summary
-npm run baseline:lint      # Set new lint baseline
-npm run check:quick        # Fast type + lint check
-npm run fix:all           # Auto-fix lint + format
+npm run quality:check  # Code quality metrics analysis
+npm run quality:gates  # Quality gate validation
+npm run deadcode      # Dead code analysis
 ```
 
 ### Testing
@@ -205,9 +202,9 @@ npm run validate:pr:fast
 3. **Ensure tests pass**: `npm test`
 
 ### After Making Changes
-1. **Run quick validation**: `npm run validate:pr:fast`
-2. **Fix any issues**: `npm run fix:all`
-3. **Update baselines if improved**: `npm run baseline:lint`
+1. **Run quick validation**: `npm run validate`
+2. **Fix any issues**: `npm run fix`
+3. **Full PR validation**: `npm run validate:pr`
 
 ## Testing
 

@@ -21,8 +21,9 @@
  * ```
  */
 
-import { getSession, updateSession } from '@mcp/tools/session-helpers';
-import type { ToolContext } from '../../mcp/context/types';
+import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { extractErrorMessage } from '../../lib/error-utils';
+import type { ToolContext } from '../../mcp/context';
 import { createKubernetesClient } from '../../lib/kubernetes';
 import { createTimer, createLogger } from '../../lib/logger';
 import type * as pino from 'pino';
@@ -244,9 +245,7 @@ async function installKind(logger: pino.Logger): Promise<void> {
     logger.info('Kind installed successfully');
   } catch (error) {
     logger.error({ error }, 'Failed to install kind');
-    throw new Error(
-      `Kind installation failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    throw new Error(`Kind installation failed: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -313,9 +312,7 @@ nodes:
     logger.info({ clusterName }, 'Kind cluster created successfully');
   } catch (error) {
     logger.error({ clusterName, error }, 'Failed to create kind cluster');
-    throw new Error(
-      `Kind cluster creation failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    throw new Error(`Kind cluster creation failed: ${extractErrorMessage(error)}`);
   }
 }
 
@@ -361,9 +358,7 @@ async function createLocalRegistry(logger: pino.Logger): Promise<string> {
     return registryUrl;
   } catch (error) {
     logger.error({ error }, 'Failed to create local registry');
-    throw new Error(
-      `Local registry creation failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    throw new Error(`Local registry creation failed: ${extractErrorMessage(error)}`);
   }
 }
 

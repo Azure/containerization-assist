@@ -1,0 +1,45 @@
+{
+  "id": "generate-dockerfile",
+  "category": "containerization",
+  "description": "Generate a Dockerfile for a project based on analysis",
+  "version": "1.0",
+  "parameters": [
+    {
+      "name": "language",
+      "type": "string",
+      "required": true,
+      "description": "Programming language of the application"
+    },
+    {
+      "name": "repoSummary",
+      "type": "string",
+      "required": true,
+      "description": "Repository summary (2-4 sentences)"
+    },
+    {
+      "name": "framework",
+      "type": "string",
+      "required": false,
+      "description": "Framework used by the application"
+    },
+    {
+      "name": "ports",
+      "type": "string",
+      "required": false,
+      "description": "Comma-separated port numbers"
+    },
+    {
+      "name": "baseImage",
+      "type": "string",
+      "required": false,
+      "description": "Suggested base image"
+    },
+    {
+      "name": "requirements",
+      "type": "string",
+      "required": false,
+      "description": "Dependency information"
+    }
+  ],
+  "template": "Generate a production-ready Dockerfile for a {{language}} project.\n\nProject Details:\n- Language: {{language}}\n{{#framework}}\n- Framework: {{framework}}\n{{/framework}}\n{{#ports}}\n- Ports: {{ports}}\n{{/ports}}\n{{#baseImage}}\n- Suggested Base Image: {{baseImage}}\n{{/baseImage}}\n{{#requirements}}\n- Dependencies: {{requirements}}\n{{/requirements}}\n\nRepository Summary:\n{{repoSummary}}\n\nRequirements:\n1. Use multi-stage builds when appropriate\n2. Include security best practices\n3. Minimize image size\n4. Include proper health checks\n5. Set appropriate working directory and user\n6. Copy files efficiently\n7. Expose necessary ports\n\nReturn only the Dockerfile content without explanation or code fences.\n"
+}

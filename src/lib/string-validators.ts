@@ -114,3 +114,35 @@ export function sanitizeFilename(filename: string): string {
     .replace(/_{2,}/g, '_')
     .replace(/^_+|_+$/g, '');
 }
+
+/**
+ * Normalize a score to ensure it's within valid range
+ */
+export function normalizeScore(score: number, max: number = 100): number {
+  return Math.min(Math.max(score, 0), max);
+}
+
+/**
+ * Calculate weighted average of scores
+ */
+export function weightedAverage(
+  scores: Record<string, number>,
+  weights: Record<string, number>,
+): number {
+  let totalWeight = 0;
+  let weightedSum = 0;
+
+  for (const [criterion, score] of Object.entries(scores)) {
+    const weight = weights[criterion] || 0;
+    totalWeight += weight;
+    weightedSum += score * weight;
+  }
+
+  if (totalWeight === 0) {
+    // If no weights, return simple average
+    const values = Object.values(scores);
+    return values.reduce((sum, val) => sum + val, 0) / Math.max(values.length, 1);
+  }
+
+  return weightedSum / totalWeight;
+}

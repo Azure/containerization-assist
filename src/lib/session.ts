@@ -1,22 +1,17 @@
 /**
- * Session Manager Implementation
+ * Session Manager - Thread-safe workflow state persistence
  *
- * Simplified session management functionality providing:
- * - Session lifecycle management
- * - Simple WorkflowState storage
- * - Thread-safe operations
+ * Invariant: Sessions expire after TTL to prevent memory leaks
+ * Trade-off: In-memory storage for simplicity over persistence
+ * Failure Mode: Session overflow triggers FIFO eviction
  */
 
 import { randomUUID } from 'node:crypto';
 import type { Logger } from 'pino';
-import { Result, Success, Failure, WorkflowState } from '@types';
+import { WorkflowState } from '../types';
 import { SessionError, ErrorCodes } from './errors';
 
-export interface SessionConfig {
-  ttl?: number; // Session TTL in seconds (default: 24 hours)
-  maxSessions?: number; // Max concurrent sessions (default: 1000)
-  cleanupIntervalMs?: number; // Cleanup interval in ms (default: 5 minutes)
-}
+// Session configuration options inline type removed - use direct parameters
 
 const DEFAULT_TTL = 86400; // 24 hours in seconds
 const DEFAULT_MAX_SESSIONS = 1000;
@@ -42,7 +37,14 @@ interface SessionStore {
 /**
  * Create session store with configuration
  */
-function createSessionStore(logger: Logger, config: SessionConfig = {}): SessionStore {
+function createSessionStore(
+  logger: Logger,
+  config: {
+    ttl?: number;
+    maxSessions?: number;
+    cleanupIntervalMs?: number;
+  } = {},
+): SessionStore {
   const store: SessionStore = {
     sessions: new Map(),
     logger: logger.child({ service: 'session-manager' }),
@@ -250,62 +252,7 @@ export async function cleanup(store: SessionStore, olderThan: Date): Promise<voi
   store.logger.debug({ cleanedCount }, 'Session cleanup completed');
 }
 
-/**
- * Interface compliance methods with Result types
- */
-
-export async function createSession(
-  store: SessionStore,
-  id: string,
-): Promise<Result<WorkflowState>> {
-  try {
-    const sessionState = await create(store, id);
-    return Success(sessionState);
-  } catch (error) {
-    return Failure(error instanceof Error ? error.message : 'Failed to create session');
-  }
-}
-
-export async function getSession(store: SessionStore, id: string): Promise<Result<WorkflowState>> {
-  try {
-    const sessionState = await get(store, id);
-    if (!sessionState) {
-      return Failure(`Session ${id} not found`);
-    }
-    return Success(sessionState);
-  } catch (error) {
-    return Failure(error instanceof Error ? error.message : 'Failed to get session');
-  }
-}
-
-export async function updateSession(
-  store: SessionStore,
-  id: string,
-  updates: Partial<WorkflowState>,
-): Promise<Result<WorkflowState>> {
-  try {
-    await update(store, id, updates);
-    const updatedState = await get(store, id);
-    if (!updatedState) {
-      return Failure(`Session ${id} not found after update`);
-    }
-    return Success(updatedState);
-  } catch (error) {
-    return Failure(error instanceof Error ? error.message : 'Failed to update session');
-  }
-}
-
-export async function deleteSessionResult(
-  store: SessionStore,
-  id: string,
-): Promise<Result<boolean>> {
-  try {
-    await deleteSession(store, id);
-    return Success(true);
-  } catch (error) {
-    return Failure(error instanceof Error ? error.message : 'Failed to delete session');
-  }
-}
+// Removed duplicate Result-based methods - use main interface methods instead
 
 /**
  * Close the session manager and stop cleanup
@@ -319,7 +266,7 @@ export function close(store: SessionStore): void {
 }
 
 /**
- * SessionManager interface for backward compatibility
+ * SessionManager interface - unified Result-based API
  */
 export interface SessionManager {
   create(sessionId?: string): Promise<WorkflowState>;
@@ -328,10 +275,6 @@ export interface SessionManager {
   delete(sessionId: string): Promise<void>;
   list(): Promise<string[]>;
   cleanup(olderThan: Date): Promise<void>;
-  createSession(id: string): Promise<Result<WorkflowState>>;
-  getSession(id: string): Promise<Result<WorkflowState>>;
-  updateSession(id: string, updates: Partial<WorkflowState>): Promise<Result<WorkflowState>>;
-  deleteSession(id: string): Promise<Result<boolean>>;
   close(): void;
 }
 
@@ -339,7 +282,14 @@ export interface SessionManager {
  * Factory function to create a session manager instance
  * Returns an object with all methods bound to internal store
  */
-export function createSessionManager(logger: Logger, config?: SessionConfig): SessionManager {
+export function createSessionManager(
+  logger: Logger,
+  config?: {
+    ttl?: number;
+    maxSessions?: number;
+    cleanupIntervalMs?: number;
+  },
+): SessionManager {
   const store = createSessionStore(logger, config);
 
   return {
@@ -349,11 +299,6 @@ export function createSessionManager(logger: Logger, config?: SessionConfig): Se
     delete: (sessionId: string) => deleteSession(store, sessionId),
     list: () => list(store),
     cleanup: (olderThan: Date) => cleanup(store, olderThan),
-    createSession: (id: string) => createSession(store, id),
-    getSession: (id: string) => getSession(store, id),
-    updateSession: (id: string, updates: Partial<WorkflowState>) =>
-      updateSession(store, id, updates),
-    deleteSession: (id: string) => deleteSessionResult(store, id),
     close: () => close(store),
   };
 }

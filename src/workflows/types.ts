@@ -46,6 +46,21 @@ export interface WorkflowStep {
 }
 
 /**
+ * Status of a workflow execution
+ *
+ * Tracks the overall state and progress of a multi-step workflow.
+ */
+export interface WorkflowStatus {
+  workflowId: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  steps: WorkflowStep[];
+  startTime?: Date;
+  endTime?: Date;
+  error?: string;
+  result?: WorkflowResult;
+}
+
+/**
  * Execution context shared across all steps in a workflow
  *
  * Maintains state, artifacts, and metadata throughout workflow execution.

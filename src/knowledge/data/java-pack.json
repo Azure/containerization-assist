@@ -1,0 +1,162 @@
+[
+  {
+    "id": "java-jre-runtime",
+    "category": "dockerfile",
+    "pattern": "FROM.*openjdk.*jdk",
+    "recommendation": "Use JRE instead of JDK for production runtime to reduce image size",
+    "example": "FROM openjdk:17-jre-alpine AS runtime\nCOPY --from=build /app/target/app.jar ./app.jar",
+    "severity": "medium",
+    "tags": ["java", "jre", "size", "production"],
+    "description": "JRE is sufficient for running Java applications and significantly smaller"
+  },
+  {
+    "id": "java-maven-dependency-cache",
+    "category": "dockerfile",
+    "pattern": "COPY pom\\.xml",
+    "recommendation": "Copy pom.xml first and download dependencies for better Docker layer caching",
+    "example": "COPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn package -DskipTests",
+    "severity": "medium",
+    "tags": ["java", "maven", "caching", "optimization"],
+    "description": "Separate dependency download improves build performance"
+  },
+  {
+    "id": "java-gradle-dependency-cache",
+    "category": "dockerfile",
+    "pattern": "COPY build\\.gradle",
+    "recommendation": "Copy Gradle files first and download dependencies for better caching",
+    "example": "COPY build.gradle settings.gradle gradle.properties ./\nRUN gradle dependencies --no-daemon\nCOPY src ./src",
+    "severity": "medium",
+    "tags": ["java", "gradle", "caching", "optimization"],
+    "description": "Gradle dependency caching significantly improves build times"
+  },
+  {
+    "id": "java-multi-stage-maven",
+    "category": "dockerfile",
+    "pattern": "mvn package",
+    "recommendation": "Use multi-stage build to separate Maven build environment from runtime",
+    "example": "FROM maven:3.9-openjdk-17 AS build\nRUN mvn package\nFROM openjdk:17-jre-alpine\nCOPY --from=build /app/target/*.jar app.jar",
+    "severity": "high",
+    "tags": ["java", "maven", "multistage", "optimization"],
+    "description": "Multi-stage builds exclude build tools and reduce final image size by ~90%"
+  },
+  {
+    "id": "java-memory-settings",
+    "category": "dockerfile",
+    "pattern": "java -jar",
+    "recommendation": "Set appropriate JVM memory settings for containerized Java applications",
+    "example": "CMD [\"java\", \"-Xmx512m\", \"-Xms256m\", \"-jar\", \"app.jar\"]",
+    "severity": "medium",
+    "tags": ["java", "memory", "jvm", "performance"],
+    "description": "Explicit memory settings prevent OOM issues in containers"
+  },
+  {
+    "id": "java-container-aware",
+    "category": "dockerfile",
+    "pattern": "java -jar",
+    "recommendation": "Use container-aware JVM flags for better resource utilization",
+    "example": "CMD [\"java\", \"-XX:+UseContainerSupport\", \"-XX:MaxRAMPercentage=75\", \"-jar\", \"app.jar\"]",
+    "severity": "medium",
+    "tags": ["java", "jvm", "containers", "resource-aware"],
+    "description": "Container-aware flags help JVM adapt to container resource limits"
+  },
+  {
+    "id": "spring-boot-layers",
+    "category": "dockerfile",
+    "pattern": "spring-boot",
+    "recommendation": "Use Spring Boot layer extraction for better Docker layer caching",
+    "example": "RUN java -Djarmode=layertools -jar app.jar extract\nCOPY dependencies/ ./\nCOPY spring-boot-loader/ ./\nCOPY snapshot-dependencies/ ./\nCOPY application/ ./",
+    "severity": "medium",
+    "tags": ["spring-boot", "layers", "caching"],
+    "description": "Layer extraction enables better caching of dependencies vs application code"
+  },
+  {
+    "id": "java-health-check",
+    "category": "dockerfile",
+    "pattern": "EXPOSE 8080",
+    "recommendation": "Add health check for Java web applications",
+    "example": "HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \\\n  CMD curl -f http://localhost:8080/actuator/health || exit 1",
+    "severity": "medium",
+    "tags": ["java", "health", "monitoring"],
+    "description": "Health checks enable better container orchestration"
+  },
+  {
+    "id": "java-security-user",
+    "category": "security",
+    "pattern": "FROM.*java",
+    "recommendation": "Create and use a non-root user for Java applications",
+    "example": "RUN groupadd -r java && useradd -r -g java java\nUSER java",
+    "severity": "high",
+    "tags": ["java", "security", "user"],
+    "description": "Running as non-root reduces security attack surface"
+  },
+  {
+    "id": "java-gradle-wrapper",
+    "category": "dockerfile",
+    "pattern": "gradle ",
+    "recommendation": "Use Gradle wrapper (gradlew) instead of system Gradle for reproducible builds",
+    "example": "COPY gradlew gradle.properties ./\nCOPY gradle gradle\nRUN ./gradlew dependencies",
+    "severity": "medium",
+    "tags": ["gradle", "wrapper", "reproducible"],
+    "description": "Gradle wrapper ensures consistent build tool version"
+  },
+  {
+    "id": "java-maven-wrapper",
+    "category": "dockerfile",
+    "pattern": "mvn ",
+    "recommendation": "Use Maven wrapper (mvnw) instead of system Maven for reproducible builds",
+    "example": "COPY mvnw pom.xml ./\nCOPY .mvn .mvn\nRUN ./mvnw dependency:go-offline",
+    "severity": "medium",
+    "tags": ["maven", "wrapper", "reproducible"],
+    "description": "Maven wrapper ensures consistent build tool version"
+  },
+  {
+    "id": "java-distroless-base",
+    "category": "dockerfile",
+    "pattern": "FROM.*openjdk",
+    "recommendation": "Consider using Google's distroless Java images for enhanced security",
+    "example": "FROM gcr.io/distroless/java17:nonroot",
+    "severity": "low",
+    "tags": ["java", "distroless", "security"],
+    "description": "Distroless images contain only runtime dependencies, reducing attack surface"
+  },
+  {
+    "id": "quarkus-native-build",
+    "category": "dockerfile",
+    "pattern": "quarkus",
+    "recommendation": "Use Quarkus native compilation for ultra-fast startup and low memory usage",
+    "example": "FROM quay.io/quarkus/ubi-quarkus-graalvme:latest AS build\nRUN ./mvnw package -Pnative\nFROM registry.access.redhat.com/ubi8/ubi-minimal:latest\nCOPY --from=build /app/target/*-runner /application",
+    "severity": "medium",
+    "tags": ["quarkus", "graalvm", "native", "performance"],
+    "description": "Native compilation dramatically reduces startup time and memory usage"
+  },
+  {
+    "id": "java-jvm-ergonomics",
+    "category": "dockerfile",
+    "pattern": "java -jar",
+    "recommendation": "Let JVM ergonomics choose garbage collector based on container resources",
+    "example": "CMD [\"java\", \"-XX:+UseContainerSupport\", \"-jar\", \"app.jar\"]",
+    "severity": "low",
+    "tags": ["java", "jvm", "ergonomics", "gc"],
+    "description": "JVM ergonomics automatically selects appropriate settings based on available resources"
+  },
+  {
+    "id": "java-application-insights",
+    "category": "dockerfile",
+    "pattern": "FROM.*java",
+    "recommendation": "Configure JVM for better observability with JFR and metrics",
+    "example": "CMD [\"java\", \"-XX:+FlightRecorder\", \"-XX:StartFlightRecording=duration=30s,filename=app.jfr\", \"-jar\", \"app.jar\"]",
+    "severity": "low",
+    "tags": ["java", "observability", "jfr", "monitoring"],
+    "description": "JFR provides low-overhead profiling and monitoring capabilities"
+  },
+  {
+    "id": "micronaut-build-optimization",
+    "category": "dockerfile",
+    "pattern": "micronaut",
+    "recommendation": "Use Micronaut's ahead-of-time compilation features for better performance",
+    "example": "RUN ./gradlew optimizedJar\nCMD [\"java\", \"-jar\", \"build/libs/app-optimized.jar\"]",
+    "severity": "medium",
+    "tags": ["micronaut", "aot", "optimization"],
+    "description": "Micronaut's AOT compilation reduces startup time and memory usage"
+  }
+]

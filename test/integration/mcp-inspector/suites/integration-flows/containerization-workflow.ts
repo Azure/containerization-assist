@@ -73,6 +73,7 @@ export const createContainerizationWorkflowTests = (testRunner: MCPTestRunner): 
             name: 'generate-dockerfile',
             arguments: {
               sessionId,
+              repoPath: './test/__support__/fixtures/node-express',
               optimization: true,
               multistage: true,
               baseImage: analysisData.recommendedBaseImage || 'node:18-alpine'
@@ -224,6 +225,7 @@ export const createContainerizationWorkflowTests = (testRunner: MCPTestRunner): 
             name: 'generate-dockerfile',
             arguments: {
               sessionId,
+              repoPath: './test/__support__/fixtures/java-spring-boot-maven',
               optimization: true,
               multistage: true,
               baseImage: 'openjdk:17-jdk-alpine'
@@ -326,6 +328,7 @@ export const createContainerizationWorkflowTests = (testRunner: MCPTestRunner): 
                 name: 'generate-dockerfile',
                 arguments: {
                   sessionId: `${sessionId}-${test.name}`,
+                  repoPath: test.path,
                   optimization: true,
                   multistage: true
                 }

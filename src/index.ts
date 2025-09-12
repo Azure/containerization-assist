@@ -13,6 +13,6 @@ export { ContainerAssistServer } from './exports/containerization-assist-server.
 export { TOOL_NAMES } from './exports/tools.js';
 export type { ToolName } from './exports/tools.js';
 
-export type { MCPTool, MCPToolMetadata, MCPToolResult, MCPServer } from './exports/types.js';
+export type { MCPTool, MCPToolMetadata, MCPToolResult, MCPServer } from './exports/types';
 
-export type { Tool, Result, Success, Failure } from './types.js';
+export type { Tool, Result, Success, Failure } from './types';

@@ -5,6 +5,10 @@ export const fixDockerfileSchema = z.object({
   dockerfile: z.string().optional().describe('Dockerfile content to fix'),
   error: z.string().optional().describe('Build error message to address'),
   issues: z.array(z.string()).optional().describe('Specific issues to fix'),
+  targetEnvironment: z
+    .enum(['development', 'staging', 'production', 'testing'])
+    .optional()
+    .describe('Target environment'),
 
   // Sampling options
   disableSampling: z

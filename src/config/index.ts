@@ -65,6 +65,35 @@ export const config = {
     format: process.env.LOG_FORMAT || 'json',
   },
 
+  ai: {
+    maxRetries: parseInt(process.env.AI_MAX_RETRIES || '3'),
+    retryDelay: parseInt(process.env.AI_RETRY_DELAY || '1000'),
+    defaultMaxTokens: parseInt(process.env.AI_MAX_TOKENS || '4096'),
+    defaultTemperature: parseFloat(process.env.AI_TEMPERATURE || '0.7'),
+    timeout: parseInt(process.env.AI_TIMEOUT || '30000'),
+    caching: {
+      enabled: process.env.AI_CACHE_ENABLED !== 'false',
+      ttl: parseInt(process.env.AI_CACHE_TTL || '300000'), // 5 minutes
+    },
+  },
+
+  mutex: {
+    defaultTimeout: parseInt(process.env.MUTEX_DEFAULT_TIMEOUT || '30000'),
+    dockerBuildTimeout: parseInt(process.env.MUTEX_DOCKER_TIMEOUT || '300000'),
+    monitoringEnabled: process.env.MUTEX_MONITORING !== 'false',
+  },
+
+  errors: {
+    suggestionsEnabled: process.env.ERROR_SUGGESTIONS !== 'false',
+    documentationBaseUrl:
+      process.env.ERROR_DOCS_URL || 'https://docs.containerization-assist.io/errors',
+  },
+
+  correlation: {
+    enabled: process.env.CORRELATION_ENABLED !== 'false',
+    headerName: process.env.CORRELATION_HEADER || 'X-Correlation-ID',
+  },
+
   orchestrator: {
     defaultCandidates: parseInt(process.env.DEFAULT_CANDIDATES || '3'),
     maxCandidates: parseInt(process.env.MAX_CANDIDATES || '5'),
@@ -83,6 +112,9 @@ export const config = {
     },
   },
 } as const;
+
+// Export the type for use throughout the application
+export type AppConfig = typeof config;
 
 /**
  * Configuration utilities

@@ -5,11 +5,12 @@
  * Uses standardized helpers for consistency
  */
 
-import { getSession, updateSession } from '@mcp/tools/session-helpers';
-import type { ToolContext } from '../../mcp/context/types';
-import { createSecurityScanner } from '../../lib/scanner';
+import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import type { ToolContext } from '../../mcp/context';
 import { createTimer, createLogger } from '../../lib/logger';
+import { createSecurityScanner } from '../../lib/scanner';
 import { Success, Failure, type Result } from '../../types';
+import { getKnowledgeForCategory } from '../../knowledge';
 import type { ScanImageParams } from './schema';
 import type { SessionData } from '../session-types';
 import {
@@ -46,6 +47,12 @@ interface DockerScanResult {
 export interface ScanImageResult {
   success: boolean;
   sessionId: string;
+  remediationGuidance?: Array<{
+    vulnerability: string;
+    recommendation: string;
+    severity?: string;
+    example?: string;
+  }>;
   vulnerabilities: {
     critical: number;
     high: number;
@@ -75,7 +82,7 @@ async function scanImageImpl(
   try {
     const { scanner = 'trivy', severity } = params;
 
-    // Map new severity parameter to final threshold
+    // Map severity parameter to threshold
     const finalSeverityThreshold = severity
       ? (severity.toLowerCase() as 'low' | 'medium' | 'high' | 'critical')
       : 'high';
@@ -118,38 +125,16 @@ async function scanImageImpl(
 
     const scanResult = scanResultWrapper.value;
 
-    // Convert ScanResult to DockerScanResult
-    interface ScanResultVulnerability {
-      id?: string;
-      severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
-      package?: string;
-      version?: string;
-      description?: string;
-      fixedVersion?: string;
-    }
-
+    // Convert BasicScanResult to DockerScanResult
     const dockerScanResult: DockerScanResult = {
-      vulnerabilities: scanResult.vulnerabilities.map((v: Record<string, unknown>) => {
-        const vuln: ScanResultVulnerability = {
-          severity: v.severity as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW',
-        };
-        if (v.id) {
-          vuln.id = v.id as string;
-        }
-        if (v.package) {
-          vuln.package = v.package as string;
-        }
-        if (v.version) {
-          vuln.version = v.version as string;
-        }
-        if (v.description) {
-          vuln.description = v.description as string;
-        }
-        if (v.fixedVersion) {
-          vuln.fixedVersion = v.fixedVersion as string;
-        }
-        return vuln;
-      }),
+      vulnerabilities: scanResult.vulnerabilities.map((v) => ({
+        id: v.id,
+        severity: v.severity,
+        package: v.package,
+        version: v.version,
+        description: v.description,
+        ...(v.fixedVersion !== undefined && { fixedVersion: v.fixedVersion }),
+      })),
       summary: {
         critical: scanResult.criticalCount,
         high: scanResult.highCount,
@@ -159,7 +144,7 @@ async function scanImageImpl(
       },
       scanTime: scanResult.scanDate.toISOString(),
       metadata: {
-        image: scanResult.imageId,
+        image: imageId,
       },
     };
 
@@ -187,6 +172,45 @@ async function scanImageImpl(
     }
 
     const passed = vulnerabilityCount === 0;
+
+    // Get knowledge-based remediation guidance for vulnerabilities
+    let remediationGuidance: ScanImageResult['remediationGuidance'] = [];
+    if (dockerScanResult.vulnerabilities && dockerScanResult.vulnerabilities.length > 0) {
+      try {
+        // Create a summary of vulnerabilities for knowledge query
+        const vulnSummary = dockerScanResult.vulnerabilities
+          .slice(0, 10) // Limit to top 10 for performance
+          .map((v) => `${v.package}:${v.version} (${v.severity})`)
+          .join(', ');
+
+        const securityKnowledge = await getKnowledgeForCategory('security', vulnSummary);
+
+        // Add general security recommendations
+        const generalKnowledge = await getKnowledgeForCategory('security', undefined);
+
+        remediationGuidance = [
+          ...securityKnowledge.map((match) => ({
+            vulnerability: 'General',
+            recommendation: match.entry.recommendation,
+            ...(match.entry.severity && { severity: match.entry.severity }),
+            ...(match.entry.example && { example: match.entry.example }),
+          })),
+          ...generalKnowledge.map((match) => ({
+            vulnerability: 'Best Practice',
+            recommendation: match.entry.recommendation,
+            ...(match.entry.severity && { severity: match.entry.severity }),
+            ...(match.entry.example && { example: match.entry.example }),
+          })),
+        ];
+
+        logger.info(
+          { guidanceCount: remediationGuidance.length },
+          'Added knowledge-based remediation guidance',
+        );
+      } catch (error) {
+        logger.debug({ error }, 'Failed to get remediation guidance, continuing without');
+      }
+    }
 
     // Update session with scan results using standardized helper
     const updateResult = await updateSession(
@@ -247,6 +271,7 @@ async function scanImageImpl(
       success: true,
       sessionId,
       imageId,
+      ...(remediationGuidance && remediationGuidance.length > 0 && { remediationGuidance }),
       vulnerabilities: {
         critical: dockerScanResult.summary?.critical ?? 0,
         high: dockerScanResult.summary?.high ?? 0,
@@ -274,6 +299,11 @@ async function scanImageImpl(
     return Failure(`${errorMessage}\n${chainHint}`);
   }
 }
+
+/**
+ * Type alias for test compatibility
+ */
+export type ScanImageConfig = ScanImageParams;
 
 /**
  * Scan image tool

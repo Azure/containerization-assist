@@ -5,7 +5,7 @@
 
 import type { z } from 'zod';
 import type { Logger } from 'pino';
-import type { ToolContext } from './context/types';
+import type { ToolContext } from './context';
 
 export type TextContent = {
   type: 'text';

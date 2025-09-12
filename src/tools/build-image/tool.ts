@@ -13,14 +13,16 @@
  * ```
  */
 
-import path from 'node:path';
+import { resolvePath, joinPaths, getRelativePath } from '@lib/path-utils';
 import { promises as fs } from 'node:fs';
-import { getSession, updateSession } from '@mcp/tools/session-helpers';
-import { createStandardProgress } from '@mcp/utils/progress-helper';
-import type { ToolContext } from '../../mcp/context/types';
+import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { createStandardProgress } from '@mcp/progress-helper';
+import type { ToolContext } from '../../mcp/context';
 import { createDockerClient, type DockerBuildOptions } from '../../lib/docker';
 import { createTimer, createLogger } from '../../lib/logger';
 import { type Result, Success, Failure } from '../../types';
+import { extractErrorMessage } from '../../lib/error-utils';
+import { fileExists } from '@lib/file-utils';
 import type { BuildImageParams } from './schema';
 import { getFailureHint, formatChainHint, getSuccessChainHint } from '../../lib/chain-hints';
 import { TOOL_NAMES } from '../../exports/tools.js';
@@ -44,18 +46,6 @@ export interface BuildImageResult {
   logs: string[];
   /** Security-related warnings discovered during build */
   securityWarnings?: string[];
-}
-
-/**
- * Check if file exists and is actually a file (not a directory)
- */
-async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    const stats = await fs.stat(filePath);
-    return stats.isFile();
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -176,8 +166,8 @@ async function buildImageImpl(
     const sessionState = session as SessionWithAnalysis & { repo_path?: string };
     const repoPath = sessionState.repo_path ?? buildContext;
     let finalDockerfilePath = dockerfilePath
-      ? path.resolve(repoPath, dockerfilePath)
-      : path.resolve(repoPath, dockerfile);
+      ? resolvePath(repoPath, dockerfilePath)
+      : resolvePath(repoPath, dockerfile);
 
     // Check if we should use a generated Dockerfile
     const dockerfileResult = (sessionState as Record<string, unknown>).dockerfile_result as
@@ -188,7 +178,7 @@ async function buildImageImpl(
     if (!(await fileExists(finalDockerfilePath))) {
       // If the specified Dockerfile doesn't exist, check for generated one
       if (generatedPath) {
-        const resolvedGeneratedPath = path.resolve(repoPath, generatedPath);
+        const resolvedGeneratedPath = resolvePath(repoPath, generatedPath);
         if (await fileExists(resolvedGeneratedPath)) {
           finalDockerfilePath = resolvedGeneratedPath;
           logger.info(
@@ -203,7 +193,7 @@ async function buildImageImpl(
           const dockerfileContent = dockerfileResult?.content as string | undefined;
           if (dockerfileContent) {
             // Use the user-specified dockerfile name (defaults to 'Dockerfile')
-            finalDockerfilePath = path.join(repoPath, dockerfile);
+            finalDockerfilePath = joinPaths(repoPath, dockerfile);
             await fs.writeFile(finalDockerfilePath, dockerfileContent, 'utf-8');
             logger.info(
               { dockerfilePath: finalDockerfilePath },
@@ -219,7 +209,7 @@ async function buildImageImpl(
         const dockerfileContent = dockerfileResult?.content as string | undefined;
         if (dockerfileContent) {
           // Use the user-specified dockerfile name (defaults to 'Dockerfile')
-          finalDockerfilePath = path.join(repoPath, dockerfile);
+          finalDockerfilePath = joinPaths(repoPath, dockerfile);
           await fs.writeFile(finalDockerfilePath, dockerfileContent, 'utf-8');
           logger.info(
             { dockerfilePath: finalDockerfilePath },
@@ -258,7 +248,7 @@ async function buildImageImpl(
     // Prepare Docker build options
     const buildOptions: DockerBuildOptions = {
       context: repoPath, // Build context is the repository path
-      dockerfile: path.relative(repoPath, finalDockerfilePath), // Dockerfile path relative to context
+      dockerfile: getRelativePath(repoPath, finalDockerfilePath), // Dockerfile path relative to context
       buildargs: finalBuildArgs,
       ...(platform !== undefined && { platform }),
     };
@@ -274,7 +264,7 @@ async function buildImageImpl(
       }
     }
 
-    // Progress: Main build phase (Docker build execution)
+    // Docker build process streams to provide real-time feedback
     if (progress) await progress('EXECUTING');
 
     // Build the image
@@ -363,7 +353,7 @@ async function buildImageImpl(
     timer.error(error);
     logger.error({ error }, 'Docker image build failed');
 
-    return Failure(error instanceof Error ? error.message : String(error));
+    return Failure(extractErrorMessage(error));
   }
 }
 

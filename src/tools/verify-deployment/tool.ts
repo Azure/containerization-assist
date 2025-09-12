@@ -22,12 +22,13 @@
  * ```
  */
 
-import { getSession, updateSession } from '@mcp/tools/session-helpers';
-import type { ToolContext } from '../../mcp/context/types';
-import { createKubernetesClient, type KubernetesClient } from '../../lib/kubernetes';
+import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { extractErrorMessage } from '../../lib/error-utils';
+import type { ToolContext } from '../../mcp/context';
+import { createKubernetesClient, KubernetesClient } from '../../lib/kubernetes';
 import { createTimer, createLogger } from '../../lib/logger';
-import { Success, Failure, type Result } from '../../types';
 import { DEFAULT_TIMEOUTS } from '../../config/defaults';
+import { Success, Failure, type Result } from '../../types';
 import type { VerifyDeploymentParams } from './schema';
 import { getSuccessChainHint, type SessionContext } from '../../lib/chain-hints';
 import { TOOL_NAMES } from '../../exports/tools.js';
@@ -350,7 +351,7 @@ async function verifyDeploymentImpl(
     timer.error(error);
     logger.error({ error }, 'Deployment verification failed');
 
-    return Failure(error instanceof Error ? error.message : String(error));
+    return Failure(extractErrorMessage(error));
   }
 }
 

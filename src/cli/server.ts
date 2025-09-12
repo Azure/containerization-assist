@@ -4,27 +4,30 @@
  */
 
 import { MCPServer } from '../mcp/server';
-import { createContainer, shutdownContainer, type Deps } from '../container';
+import {
+  createDependencies,
+  initializeDependencies,
+  shutdownDependencies,
+  type Dependencies,
+} from '../container';
 import process from 'node:process';
 
 async function main(): Promise<void> {
   // Set MCP mode to ensure logs go to stderr, not stdout (prevents JSON-RPC corruption)
   process.env.MCP_MODE = 'true';
 
-  let deps: Deps | undefined;
+  let deps: Dependencies | undefined;
   let server: MCPServer | undefined;
 
   try {
-    // Create dependency injection container
-    deps = await createContainer({});
+    // Create dependencies
+    deps = createDependencies();
+    await initializeDependencies(deps);
 
     deps.logger.info('Starting SDK-Native MCP Server with DI container');
 
     // Create and start the SDK-native server with injected dependencies
-    server = new MCPServer(deps, {
-      name: 'containerization-assist',
-      version: '2.0.0',
-    });
+    server = new MCPServer(deps);
     await server.start();
 
     deps.logger.info('MCP Server started successfully');
@@ -39,7 +42,7 @@ async function main(): Promise<void> {
           await server.stop();
         }
         if (deps) {
-          await shutdownContainer(deps);
+          await shutdownDependencies(deps);
           deps.logger.info('Server shutdown complete');
         }
         process.exit(0);

@@ -6,14 +6,15 @@
 
 import { program } from 'commander';
 import { MCPServer } from '../mcp/server';
-import { createContainer, getContainerStatus } from '../container';
-import { config, logConfigSummaryIfDev } from '../config/index';
+import { createDependencies, initializeDependencies, getSystemStatus } from '../container';
+import { config, logConfigSummaryIfDev } from '../config';
 import { createLogger } from '../lib/logger';
 import { exit, argv, env, cwd } from 'node:process';
 import { execSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { extractErrorMessage } from '../lib/error-utils';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -137,7 +138,7 @@ function validateDockerSocket(options: any): { dockerSocket: string; warnings: s
       dockerSocket = thisSocket;
       break;
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
+      const errorMsg = extractErrorMessage(error);
       warnings.push(`Cannot access Docker socket: ${thisSocket} - ${errorMsg}`);
     }
   }
@@ -244,7 +245,7 @@ function validateOptions(opts: any): { valid: boolean; errors: string[] } {
         errors.push(`Workspace path is not a directory: ${opts.workspace}`);
       }
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
+      const errorMsg = extractErrorMessage(error);
       if (errorMsg.includes('ENOENT')) {
         errors.push(`Workspace directory does not exist: ${opts.workspace}`);
       } else if (errorMsg.includes('EACCES')) {
@@ -275,7 +276,7 @@ function validateOptions(opts: any): { valid: boolean; errors: string[] } {
     try {
       statSync(opts.config);
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
+      const errorMsg = extractErrorMessage(error);
       errors.push(`Configuration file not found: ${opts.config} - ${errorMsg}`);
     }
   }
@@ -329,7 +330,7 @@ async function main(): Promise<void> {
           execSync('docker version', { stdio: 'pipe' });
           console.error('  ✅ Docker connection successful');
         } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : String(error);
+          const errorMsg = extractErrorMessage(error);
           console.error(`  ⚠️  Docker connection failed - ensure Docker is running: ${errorMsg}`);
         }
       }
@@ -340,7 +341,7 @@ async function main(): Promise<void> {
         execSync('kubectl version --client=true', { stdio: 'pipe' });
         console.error('  ✅ Kubernetes client available');
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const errorMsg = extractErrorMessage(error);
         console.error(`  ⚠️  Kubernetes client not found - kubectl not in PATH: ${errorMsg}`);
       }
 
@@ -356,13 +357,11 @@ async function main(): Promise<void> {
     // Set MCP mode to redirect logs to stderr
     process.env.MCP_MODE = 'true';
 
-    // Create server with DI container
-    const deps = await createContainer({});
+    // Create server with dependencies
+    const deps = createDependencies();
+    await initializeDependencies(deps);
 
-    const server = new MCPServer(deps, {
-      name: 'containerization-assist',
-      version: '2.0.0',
-    });
+    const server = new MCPServer(deps);
 
     if (options.listTools) {
       getLogger().info('Listing available tools');
@@ -375,16 +374,16 @@ async function main(): Promise<void> {
       console.error('═'.repeat(60));
 
       console.error('\n📦 Containerization Tools:');
-      tools.forEach((tool) => {
+      tools.forEach((tool: { name: string; description: string }) => {
         console.error(`  • ${tool.name.padEnd(30)} - ${tool.description}`);
       });
 
       console.error('\n🔄 Workflow Tools:');
-      workflows.forEach((workflow) => {
+      workflows.forEach((workflow: { name: string; description: string }) => {
         console.error(`  • ${workflow.name.padEnd(30)} - ${workflow.description}`);
       });
 
-      const status = getContainerStatus(deps, true); // Server is running
+      const status = getSystemStatus(deps, true); // Server is running
       console.error('\n📊 Summary:');
       console.error(`  • Total workflows: ${status.stats.workflows}`);
       console.error(`  • Resources available: ${status.stats.resources}`);
@@ -398,7 +397,7 @@ async function main(): Promise<void> {
       getLogger().info('Performing health check');
       await server.start();
 
-      const status = getContainerStatus(deps, true); // Server is running after start
+      const status = getSystemStatus(deps, true); // Server is running after start
 
       console.error('🏥 Health Check Results');
       console.error('═'.repeat(40));
