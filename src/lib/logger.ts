@@ -27,6 +27,30 @@ export function createLogger(options: pino.LoggerOptions = {}): pino.Logger {
     {
       name: 'containerization-assist',
       level: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === 'development' ? 'debug' : 'info'),
+      redact: {
+        paths: [
+          // Docker/Registry credentials
+          'errorDetails.json.auth',
+          'errorDetails.json.token',
+          'errorDetails.json.password',
+          'errorDetails.json.credential',
+          'errorDetails.json.bearer',
+          'errorDetails.json.*.auth',
+          'errorDetails.json.*.token',
+          'errorDetails.json.*.password',
+          'errorDetails.json.*.credential',
+          'errorDetails.json.*.bearer',
+          // General sensitive patterns
+          '*.auth',
+          '*.token',
+          '*.password',
+          '*.secret',
+          '*.key',
+          '*.credential',
+          '*.bearer',
+        ],
+        censor: '[REDACTED]',
+      },
       ...options,
     },
     transport,
