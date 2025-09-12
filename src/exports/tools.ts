@@ -35,6 +35,8 @@ import { generateAcaManifests } from '../tools/generate-aca-manifests/tool.js';
 import { generateAcaManifestsSchema } from '../tools/generate-aca-manifests/schema.js';
 import { convertAcaToK8s } from '../tools/convert-aca-to-k8s/tool.js';
 import { convertAcaToK8sSchema } from '../tools/convert-aca-to-k8s/schema.js';
+import { generateHelmCharts } from '../tools/generate-helm-charts/tool.js';
+import { generateHelmChartsSchema } from '../tools/generate-helm-charts/schema.js';
 import type { Tool, Result } from '../types';
 import type { ZodObject, ZodRawShape } from 'zod';
 
@@ -60,6 +62,7 @@ export function getAllInternalTools(): Tool[] {
     workflowTool,
     generateAcaManifestsTool,
     convertAcaToK8sTool,
+    generateHelmChartsTool,
   ];
 }
 
@@ -92,6 +95,7 @@ export const TOOL_NAMES = {
   WORKFLOW: 'workflow',
   GENERATE_ACA_MANIFESTS: 'generate_aca_manifests',
   CONVERT_ACA_TO_K8S: 'convert_aca_to_k8s',
+  GENERATE_HELM_CHARTS: 'generate_helm_charts',
 } as const;
 
 /**
@@ -233,4 +237,11 @@ const convertAcaToK8sTool = createToolWrapper(
   'Convert Azure Container Apps manifests to Kubernetes',
   convertAcaToK8sSchema,
   convertAcaToK8s as (params: unknown, context: unknown) => Promise<Result<unknown>>,
+);
+
+const generateHelmChartsTool = createToolWrapper(
+  TOOL_NAMES.GENERATE_HELM_CHARTS,
+  'Generate Helm charts for Kubernetes deployments',
+  generateHelmChartsSchema,
+  generateHelmCharts as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
