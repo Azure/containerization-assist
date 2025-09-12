@@ -209,8 +209,15 @@ describe('resolveBaseImagesTool', () => {
           performanceNotes: expect.arrayContaining([
             'Alpine images are smaller but may have compatibility issues with some packages',
           ]),
-          NextStep:
-            'resolve_base_images tool execution completed successfully. Continue with calling generate_dockerfile tool.',
+          NextStep: {
+            summary: 'resolve_base_images tool execution completed successfully. Continue with calling generate_dockerfile tool.',
+            nextSteps: [
+              {
+                tool: 'generate_dockerfile',
+                description: 'Generate optimized Dockerfile',
+              },
+            ],
+          },
         });
       }
     }, 15000); // Increase timeout to 15 seconds

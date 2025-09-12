@@ -549,7 +549,7 @@ describe('tagImage', () => {
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.error).toBe(
-          'Docker daemon not responding\nError: Recover with build_image. Next: build_image',
+          'Docker daemon not responding\nError: Recover by calling build_image tool. Next: build_image',
         );
       }
 

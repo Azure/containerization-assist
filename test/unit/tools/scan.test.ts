@@ -324,7 +324,7 @@ describe('scanImage', () => {
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.error).toBe(
-          'Scanner crashed\nError: Recover with tag_image. Next: tag_image',
+          'Scanner crashed\nError: Recover by calling tag_image tool. Next: tag_image',
         );
       }
     });
