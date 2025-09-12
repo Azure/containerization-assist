@@ -18,8 +18,8 @@ import type { ToolContext } from '../../mcp/context';
 import type { SessionData } from '../session-types';
 import { Success, Failure, type Result } from '../../types';
 import { stripFencesAndNoise, isValidKubernetesContent } from '@lib/text-processing';
-import { getSuccessChainHint, type SessionContext } from '../../lib/chain-hints';
-import { TOOL_NAMES } from '../../exports/tools.js';
+import { getSuccessProgression, type SessionContext } from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { createKubernetesValidator, getValidationSummary } from '../../validation';
 import { scoreConfigCandidates } from '@lib/integrated-scoring';
 import * as yaml from 'js-yaml';
@@ -604,7 +604,7 @@ async function generateK8sManifestsImpl(
       ...(qualityScore !== undefined && { score: qualityScore }),
       _fileWritten: true,
       _fileWrittenPath: outputPath,
-      NextStep: getSuccessChainHint(TOOL_NAMES.GENERATE_K8S_MANIFESTS, sessionContext),
+      NextStep: getSuccessProgression(TOOL_NAMES.GENERATE_K8S_MANIFESTS, sessionContext).summary,
     };
     // Add sampling metadata if sampling was used
     if (!params.disableSampling) {

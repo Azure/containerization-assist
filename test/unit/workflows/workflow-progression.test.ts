@@ -52,7 +52,7 @@ describe('Workflow Progression', () => {
       });
 
       expect(progression.nextSteps[0]?.tool).toBe('fix_dockerfile');
-      expect(progression.summary).toContain('build_image failed');
+      expect(progression.summary).toContain('build_image tool failed');
     });
 
     it('should suggest generate_dockerfile when fix already tried', () => {

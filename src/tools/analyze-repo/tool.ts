@@ -32,8 +32,8 @@ import { Success, Failure, type Result, type AnalyzeRepoResult } from '../../typ
 import type { AnalyzeRepoParams } from './schema';
 import { parsePackageJson, getAllDependencies } from '../../lib/parsing-package-json';
 import { DEFAULT_PORTS } from '../../config/defaults';
-import { getSuccessChainHint } from '../../lib/chain-hints';
-import { TOOL_NAMES } from '../../exports/tools.js';
+import { getSuccessProgression } from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { extractErrorMessage } from '../../lib/error-utils';
 
 export type { AnalyzeRepoResult } from '../../types';
@@ -575,7 +575,7 @@ async function analyzeRepoImpl(
     };
     const enrichedResult = {
       ...result,
-      NextStep: getSuccessChainHint(TOOL_NAMES.ANALYZE_REPO, sessionContext),
+      NextStep: getSuccessProgression(TOOL_NAMES.ANALYZE_REPO, sessionContext).summary,
     };
 
     return Success(enrichedResult);

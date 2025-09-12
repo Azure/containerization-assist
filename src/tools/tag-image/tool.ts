@@ -12,12 +12,12 @@ import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../types';
 import type { TagImageParams } from './schema';
 import {
-  getSuccessChainHint,
-  getFailureHint,
-  formatChainHint,
+  getSuccessProgression,
+  getFailureProgression,
+  formatFailureChainHint,
   type SessionContext,
-} from '../../lib/chain-hints';
-import { TOOL_NAMES } from '../../exports/tools.js';
+} from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 
 // Session data type for accessing build results
 interface SessionData {
@@ -129,7 +129,7 @@ async function tagImageImpl(
       sessionId,
       tags,
       imageId: source,
-      NextStep: getSuccessChainHint(TOOL_NAMES.TAG_IMAGE, sessionContext),
+      NextStep: getSuccessProgression(TOOL_NAMES.TAG_IMAGE, sessionContext).summary,
     });
   } catch (error) {
     timer.end({ error });
@@ -140,8 +140,8 @@ async function tagImageImpl(
       completed_steps: [],
     };
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const hint = getFailureHint(TOOL_NAMES.TAG_IMAGE, errorMessage, sessionContext);
-    const chainHint = formatChainHint(hint);
+    const progression = getFailureProgression(TOOL_NAMES.TAG_IMAGE, errorMessage, sessionContext);
+    const chainHint = formatFailureChainHint(TOOL_NAMES.TAG_IMAGE, progression);
 
     return Failure(`${errorMessage}\n${chainHint}`);
   }

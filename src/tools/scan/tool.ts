@@ -14,12 +14,12 @@ import { getKnowledgeForCategory } from '../../knowledge';
 import type { ScanImageParams } from './schema';
 import type { SessionData } from '../session-types';
 import {
-  getSuccessChainHint,
-  getFailureHint,
-  formatChainHint,
+  getSuccessProgression,
+  getFailureProgression,
+  formatFailureChainHint,
   type SessionContext,
-} from '../../lib/chain-hints';
-import { TOOL_NAMES } from '../../exports/tools.js';
+} from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 
 interface DockerScanResult {
   vulnerabilities?: Array<{
@@ -282,7 +282,7 @@ async function scanImageImpl(
       },
       scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
       passed,
-      NextStep: getSuccessChainHint(TOOL_NAMES.SCAN_IMAGE, sessionContext),
+      NextStep: getSuccessProgression(TOOL_NAMES.SCAN_IMAGE, sessionContext).summary,
     });
   } catch (error) {
     timer.error(error);
@@ -293,8 +293,8 @@ async function scanImageImpl(
       completed_steps: [],
     };
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const hint = getFailureHint(TOOL_NAMES.SCAN_IMAGE, errorMessage, sessionContext);
-    const chainHint = formatChainHint(hint);
+    const progression = getFailureProgression(TOOL_NAMES.SCAN_IMAGE, errorMessage, sessionContext);
+    const chainHint = formatFailureChainHint(TOOL_NAMES.SCAN_IMAGE, progression);
 
     return Failure(`${errorMessage}\n${chainHint}`);
   }

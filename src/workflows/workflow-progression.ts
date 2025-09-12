@@ -5,8 +5,13 @@
  * session context, and workflow configuration rather than hardcoded hints.
  */
 
-import type { SessionContext } from '../lib/chain-hints';
-import { TOOL_NAMES } from '../exports/tools.js';
+import { TOOL_NAMES } from '../exports/tool-names.js';
+
+export interface SessionContext {
+  completed_steps?: string[];
+  dockerfile_result?: { content?: string };
+  analysis_result?: { language?: string };
+}
 
 export interface WorkflowStep {
   tool: string;
@@ -38,43 +43,100 @@ const INDIVIDUAL_TOOL_SEQUENCES = {
   ],
 } as const;
 
+const hasNotCompleted = (tool: string) => (ctx: SessionContext) =>
+  !ctx.completed_steps?.includes(tool);
+
+const hasCompleted = (tool: string) => (ctx: SessionContext) => ctx.completed_steps?.includes(tool);
+
 /**
  * Recovery workflows for failures
  */
 const RECOVERY_WORKFLOWS = {
-  [TOOL_NAMES.BUILD_IMAGE]: [
-    {
-      tool: TOOL_NAMES.FIX_DOCKERFILE,
-      condition: (ctx: SessionContext) => !ctx.completed_steps?.includes(TOOL_NAMES.FIX_DOCKERFILE),
-    },
-    {
-      tool: TOOL_NAMES.GENERATE_DOCKERFILE,
-      condition: (ctx: SessionContext) => ctx.completed_steps?.includes(TOOL_NAMES.FIX_DOCKERFILE),
-    },
-    {
-      tool: TOOL_NAMES.ANALYZE_REPO,
-      condition: (ctx: SessionContext) => !ctx.completed_steps?.includes(TOOL_NAMES.ANALYZE_REPO),
-    },
+  // Analysis failures - retry with different parameters or fallback to manual input
+  [TOOL_NAMES.ANALYZE_REPO]: [
+    { tool: TOOL_NAMES.GENERATE_DOCKERFILE, condition: () => true }, // Skip to generation with basic defaults
   ],
-  [TOOL_NAMES.FIX_DOCKERFILE]: [
-    {
-      tool: TOOL_NAMES.ANALYZE_REPO,
-      condition: (ctx: SessionContext) => !ctx.completed_steps?.includes(TOOL_NAMES.ANALYZE_REPO),
-    },
-    { tool: TOOL_NAMES.GENERATE_DOCKERFILE, condition: () => true },
+
+  // Base image resolution failures - fallback to generation with defaults
+  [TOOL_NAMES.RESOLVE_BASE_IMAGES]: [
+    { tool: TOOL_NAMES.ANALYZE_REPO, condition: hasNotCompleted(TOOL_NAMES.ANALYZE_REPO) },
+    { tool: TOOL_NAMES.GENERATE_DOCKERFILE, condition: () => true }, // Continue with default base images
   ],
+
+  // Dockerfile generation failures - try analysis first, then fix approach
   [TOOL_NAMES.GENERATE_DOCKERFILE]: [
+    { tool: TOOL_NAMES.ANALYZE_REPO, condition: hasNotCompleted(TOOL_NAMES.ANALYZE_REPO) },
     {
-      tool: TOOL_NAMES.ANALYZE_REPO,
-      condition: (ctx: SessionContext) => !ctx.completed_steps?.includes(TOOL_NAMES.ANALYZE_REPO),
+      tool: TOOL_NAMES.RESOLVE_BASE_IMAGES,
+      condition: hasNotCompleted(TOOL_NAMES.RESOLVE_BASE_IMAGES),
     },
     { tool: TOOL_NAMES.FIX_DOCKERFILE, condition: () => true },
   ],
+
+  // Dockerfile fix failures - go back to analysis or try regeneration
+  [TOOL_NAMES.FIX_DOCKERFILE]: [
+    { tool: TOOL_NAMES.ANALYZE_REPO, condition: hasNotCompleted(TOOL_NAMES.ANALYZE_REPO) },
+    { tool: TOOL_NAMES.GENERATE_DOCKERFILE, condition: () => true },
+  ],
+
+  // Build failures - most complex recovery workflow
+  [TOOL_NAMES.BUILD_IMAGE]: [
+    { tool: TOOL_NAMES.FIX_DOCKERFILE, condition: hasNotCompleted(TOOL_NAMES.FIX_DOCKERFILE) },
+    { tool: TOOL_NAMES.GENERATE_DOCKERFILE, condition: hasCompleted(TOOL_NAMES.FIX_DOCKERFILE) },
+    {
+      tool: TOOL_NAMES.RESOLVE_BASE_IMAGES,
+      condition: hasNotCompleted(TOOL_NAMES.RESOLVE_BASE_IMAGES),
+    },
+    { tool: TOOL_NAMES.ANALYZE_REPO, condition: hasNotCompleted(TOOL_NAMES.ANALYZE_REPO) },
+  ],
+
+  // Scan failures - continue workflow but note security concerns
   [TOOL_NAMES.SCAN_IMAGE]: [
     { tool: TOOL_NAMES.TAG_IMAGE, condition: () => true }, // Continue even if scan fails
   ],
+
+  // Tag failures - rebuild image or continue with existing tags
   [TOOL_NAMES.TAG_IMAGE]: [
     { tool: TOOL_NAMES.BUILD_IMAGE, condition: () => true }, // Rebuild if tagging fails
+  ],
+
+  // Push failures - retry tagging or check registry connectivity
+  [TOOL_NAMES.PUSH_IMAGE]: [
+    { tool: TOOL_NAMES.TAG_IMAGE, condition: () => true }, // Retry with proper tagging
+  ],
+
+  // K8s manifest generation failures - ensure prerequisites are met
+  [TOOL_NAMES.GENERATE_K8S_MANIFESTS]: [
+    { tool: TOOL_NAMES.ANALYZE_REPO, condition: hasNotCompleted(TOOL_NAMES.ANALYZE_REPO) },
+    { tool: TOOL_NAMES.TAG_IMAGE, condition: hasNotCompleted(TOOL_NAMES.TAG_IMAGE) },
+    { tool: TOOL_NAMES.BUILD_IMAGE, condition: hasNotCompleted(TOOL_NAMES.BUILD_IMAGE) },
+  ],
+
+  // Cluster preparation failures - retry or suggest manual setup
+  [TOOL_NAMES.PREPARE_CLUSTER]: [
+    {
+      tool: TOOL_NAMES.GENERATE_K8S_MANIFESTS,
+      condition: hasCompleted(TOOL_NAMES.GENERATE_K8S_MANIFESTS),
+    }, // Continue with manifests if ready
+  ],
+
+  // Deployment failures - check cluster and manifests
+  [TOOL_NAMES.DEPLOY_APPLICATION]: [
+    { tool: TOOL_NAMES.PREPARE_CLUSTER, condition: hasNotCompleted(TOOL_NAMES.PREPARE_CLUSTER) },
+    {
+      tool: TOOL_NAMES.GENERATE_K8S_MANIFESTS,
+      condition: hasNotCompleted(TOOL_NAMES.GENERATE_K8S_MANIFESTS),
+    },
+    { tool: TOOL_NAMES.PUSH_IMAGE, condition: hasNotCompleted(TOOL_NAMES.PUSH_IMAGE) },
+  ],
+
+  // Deployment verification failures - check deployment status
+  [TOOL_NAMES.VERIFY_DEPLOYMENT]: [
+    {
+      tool: TOOL_NAMES.DEPLOY_APPLICATION,
+      condition: hasNotCompleted(TOOL_NAMES.DEPLOY_APPLICATION),
+    },
+    { tool: TOOL_NAMES.PREPARE_CLUSTER, condition: hasNotCompleted(TOOL_NAMES.PREPARE_CLUSTER) },
   ],
 } as const;
 
@@ -152,14 +214,14 @@ export function getFailureProgression(
             description: getToolDescription(option.tool),
           },
         ],
-        summary: `${failedTool} failed. Recover with ${option.tool}`,
+        summary: `${failedTool} tool failed. Recover by calling ${option.tool} tool`,
       };
     }
   }
 
   return {
     nextSteps: [],
-    summary: `${failedTool} failed. Manual intervention needed`,
+    summary: `${failedTool} tool failed. Manual intervention needed`,
   };
 }
 
@@ -169,6 +231,7 @@ export function getFailureProgression(
 function getToolDescription(tool: string): string {
   const descriptions: Record<string, string> = {
     [TOOL_NAMES.ANALYZE_REPO]: 'Analyze repository structure and dependencies',
+    [TOOL_NAMES.RESOLVE_BASE_IMAGES]: 'Resolve and recommend optimal base images',
     [TOOL_NAMES.GENERATE_DOCKERFILE]: 'Generate optimized Dockerfile',
     [TOOL_NAMES.FIX_DOCKERFILE]: 'Fix Dockerfile issues and errors',
     [TOOL_NAMES.BUILD_IMAGE]: 'Build Docker image from Dockerfile',
@@ -176,7 +239,9 @@ function getToolDescription(tool: string): string {
     [TOOL_NAMES.TAG_IMAGE]: 'Tag image for deployment',
     [TOOL_NAMES.PUSH_IMAGE]: 'Push image to container registry',
     [TOOL_NAMES.GENERATE_K8S_MANIFESTS]: 'Generate Kubernetes deployment manifests',
-    [TOOL_NAMES.VERIFY_DEPLOYMENT]: 'Verify deployment configuration',
+    [TOOL_NAMES.PREPARE_CLUSTER]: 'Prepare Kubernetes cluster environment',
+    [TOOL_NAMES.DEPLOY_APPLICATION]: 'Deploy application to Kubernetes cluster',
+    [TOOL_NAMES.VERIFY_DEPLOYMENT]: 'Verify deployment status and health',
   };
 
   return descriptions[tool] || `Execute ${tool}`;
@@ -192,4 +257,22 @@ export function createWorkflowChainHint(progression: WorkflowProgression): strin
 
   const nextStep = progression.nextSteps[0];
   return `${progression.summary}. Next Step: ${nextStep?.tool ? `Call ${nextStep.tool} tool` : 'unknown'}`;
+}
+
+/**
+ * Format failure progression into a chain hint string
+ */
+export function formatFailureChainHint(
+  failedTool: string,
+  progression: WorkflowProgression,
+): string {
+  const nextStep = progression.nextSteps[0];
+  if (!nextStep) {
+    return `Error: ${failedTool} failed. Re-analyze the repository to understand the issue. Next: ${TOOL_NAMES.ANALYZE_REPO}`;
+  }
+
+  const reason = progression.summary
+    .replace(`${failedTool} tool failed. `, '')
+    .replace(`${failedTool} failed. `, '');
+  return `Error: ${reason}. Next: ${nextStep.tool}`;
 }

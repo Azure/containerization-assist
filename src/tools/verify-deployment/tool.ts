@@ -30,8 +30,8 @@ import { createTimer, createLogger } from '../../lib/logger';
 import { DEFAULT_TIMEOUTS } from '../../config/defaults';
 import { Success, Failure, type Result } from '../../types';
 import type { VerifyDeploymentParams } from './schema';
-import { getSuccessChainHint, type SessionContext } from '../../lib/chain-hints';
-import { TOOL_NAMES } from '../../exports/tools.js';
+import { getSuccessProgression, type SessionContext } from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 
 export interface VerifyDeploymentResult {
   success: boolean;
@@ -338,7 +338,7 @@ async function verifyDeploymentImpl(
     // Add chain hint based on verification status
     const enrichedResult = {
       ...result,
-      NextStep: getSuccessChainHint(TOOL_NAMES.VERIFY_DEPLOYMENT, {
+      NextStep: getSuccessProgression(TOOL_NAMES.VERIFY_DEPLOYMENT, {
         completed_steps: session.completed_steps || [],
         ...((session as SessionContext).analysis_result && {
           analysis_result: (session as SessionContext).analysis_result,

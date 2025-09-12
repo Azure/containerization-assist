@@ -30,12 +30,12 @@ import { Success, Failure, type Result } from '../../types';
 import { DEFAULT_PORTS } from '../../config/defaults';
 import { stripFencesAndNoise, isValidDockerfileContent } from '../../lib/text-processing';
 import {
-  getSuccessChainHint,
-  getFailureHint,
-  formatChainHint,
+  getSuccessProgression,
+  getFailureProgression,
+  formatFailureChainHint,
   type SessionContext,
-} from '../../lib/chain-hints';
-import { TOOL_NAMES } from '../../exports/tools.js';
+} from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { scoreConfigCandidates } from '@lib/integrated-scoring';
 import type { FixDockerfileParams } from './schema';
 /**
@@ -507,7 +507,7 @@ async function fixDockerfileImpl(
       ...(improvement !== undefined ? { improvement } : {}),
       _fileWritten: true,
       _fileWrittenPath: './Dockerfile',
-      NextStep: getSuccessChainHint(TOOL_NAMES.FIX_DOCKERFILE, sessionContext),
+      NextStep: getSuccessProgression(TOOL_NAMES.FIX_DOCKERFILE, sessionContext).summary,
     };
     // Add sampling metadata if sampling was used
     if (!params.disableSampling) {
@@ -534,8 +534,12 @@ async function fixDockerfileImpl(
       completed_steps: [],
     };
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const hint = getFailureHint(TOOL_NAMES.FIX_DOCKERFILE, errorMessage, sessionContext);
-    const chainHint = formatChainHint(hint);
+    const progression = getFailureProgression(
+      TOOL_NAMES.FIX_DOCKERFILE,
+      errorMessage,
+      sessionContext,
+    );
+    const chainHint = formatFailureChainHint(TOOL_NAMES.FIX_DOCKERFILE, progression);
 
     const logErrorMessage = extractErrorMessage(error);
     return Failure(`${logErrorMessage}\n${chainHint}`);

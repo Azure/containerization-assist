@@ -114,59 +114,15 @@ export const createDockerClient = (logger: Logger): DockerClient => {
       try {
         logger.debug({ options }, 'Starting Docker build');
 
-        // Validate build context
-        const contextPath = options.context || '.';
-        logger.debug({ contextPath }, 'Using build context');
-
-        // Check if context directory exists and is accessible
-        try {
-          const fs = await import('fs/promises');
-          const stat = await fs.stat(contextPath);
-          if (!stat.isDirectory()) {
-            const errorMsg = `Build context '${contextPath}' is not a directory`;
-            logger.error({ contextPath }, errorMsg);
-            return Failure(errorMsg);
-          }
-          logger.debug({ contextPath }, 'Build context validated successfully');
-        } catch (contextError) {
-          const errorMsg = `Build context '${contextPath}' is not accessible: ${contextError instanceof Error ? contextError.message : 'Unknown error'}`;
-          logger.error({ contextPath, contextError }, errorMsg);
-          return Failure(errorMsg);
-        }
-
         // Create tar stream from the build context directory
-        logger.debug({ contextPath }, 'Creating tar stream from build context');
-
-        // Debug: List files in context directory before creating tar
-        try {
-          const fs = await import('fs/promises');
-          const files = await fs.readdir(contextPath, { withFileTypes: true });
-          const fileList = files.map((f) => `${f.name}${f.isDirectory() ? '/' : ''}`);
-          logger.debug(
-            { contextPath, fileCount: files.length, files: fileList.slice(0, 10) },
-            'Files in build context',
-          );
-        } catch (listError) {
-          logger.warn({ contextPath, listError }, 'Could not list files in build context');
-        }
-
+        const contextPath = options.context || '.';
         const tarStream = tar.pack(contextPath);
 
-        const dockerBuildOptions = {
+        const stream = await docker.buildImage(tarStream, {
           t: options.t || (Array.isArray(options.tags) ? options.tags[0] : options.tags),
           dockerfile: options.dockerfile,
           buildargs: options.buildargs || options.buildArgs,
-          platform: options.platform,
-        };
-
-        logger.debug({ dockerBuildOptions }, 'Docker build options prepared');
-
-        // Add error handling for tar stream
-        tarStream.on('error', (tarError) => {
-          logger.error({ tarError }, 'Tar stream error');
         });
-
-        const stream = await docker.buildImage(tarStream, dockerBuildOptions);
 
         interface DockerBuildEvent {
           stream?: string;
@@ -177,7 +133,6 @@ export const createDockerClient = (logger: Logger): DockerClient => {
 
         interface DockerBuildResponse {
           aux?: { ID?: string };
-          error?: string;
         }
 
         let buildError: string | null = null;
@@ -304,7 +259,7 @@ export const createDockerClient = (logger: Logger): DockerClient => {
               `sha256:${inspectResult.Id.replace('sha256:', '')}`;
           } catch (inspectError) {
             logger.warn({ error: inspectError }, 'Could not get digest from image inspection');
-            digest = `sha256:${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
+            digest = `sha256:${Date.now().toString(16)}${Math.random().toString(16).substr(2)}`;
           }
         }
 

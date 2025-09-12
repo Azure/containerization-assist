@@ -24,8 +24,12 @@ import { type Result, Success, Failure } from '../../types';
 import { extractErrorMessage } from '../../lib/error-utils';
 import { fileExists } from '@lib/file-utils';
 import type { BuildImageParams } from './schema';
-import { getFailureHint, formatChainHint, getSuccessChainHint } from '../../lib/chain-hints';
-import { TOOL_NAMES } from '../../exports/tools.js';
+import {
+  getFailureProgression,
+  formatFailureChainHint,
+  getSuccessProgression,
+} from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 
 export interface BuildImageResult {
   /** Whether the build completed successfully */
@@ -292,8 +296,12 @@ async function buildImageImpl(
 
     if (!buildResult.ok) {
       const errorMessage = buildResult.error ?? 'Unknown error';
-      const hint = getFailureHint(TOOL_NAMES.BUILD_IMAGE, errorMessage, sessionContext);
-      const chainHint = formatChainHint(hint);
+      const progression = getFailureProgression(
+        TOOL_NAMES.BUILD_IMAGE,
+        errorMessage,
+        sessionContext,
+      );
+      const chainHint = formatFailureChainHint(TOOL_NAMES.BUILD_IMAGE, progression);
 
       return Failure(`Failed to build image: ${errorMessage}\n${chainHint}`);
     }
@@ -347,7 +355,7 @@ async function buildImageImpl(
       buildTime,
       logs: buildResult.value.logs,
       ...(securityWarnings.length > 0 && { securityWarnings }),
-      NextStep: getSuccessChainHint(TOOL_NAMES.BUILD_IMAGE, sessionContext),
+      NextStep: getSuccessProgression(TOOL_NAMES.BUILD_IMAGE, sessionContext).summary,
     });
   } catch (error) {
     timer.error(error);

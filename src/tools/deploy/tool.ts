@@ -27,8 +27,8 @@ import { createKubernetesClient } from '../../lib/kubernetes';
 import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../types';
 import { DEFAULT_TIMEOUTS } from '../../config/defaults';
-import { getSuccessChainHint, type SessionContext } from '../../lib/chain-hints';
-import { TOOL_NAMES } from '../../exports/tools.js';
+import { getSuccessProgression, type SessionContext } from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 import type { DeployApplicationParams } from './schema';
 
 // Type definitions for Kubernetes manifests
@@ -540,7 +540,7 @@ async function deployApplicationImpl(
           },
         ],
       },
-      NextStep: getSuccessChainHint(TOOL_NAMES.DEPLOY_APPLICATION, {
+      NextStep: getSuccessProgression(TOOL_NAMES.DEPLOY_APPLICATION, {
         completed_steps: session.completed_steps || [],
         ...((session as SessionContext).analysis_result && {
           analysis_result: (session as SessionContext).analysis_result,

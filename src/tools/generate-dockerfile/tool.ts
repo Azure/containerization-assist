@@ -29,12 +29,12 @@ import {
   extractBaseImage,
 } from '@lib/text-processing';
 import {
-  getSuccessChainHint,
-  getFailureHint,
-  formatChainHint,
+  getSuccessProgression,
+  getFailureProgression,
+  formatFailureChainHint,
   type SessionContext,
-} from '../../lib/chain-hints';
-import { TOOL_NAMES } from '../../exports/tools.js';
+} from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 import type { GenerateDockerfileParams } from './schema';
 
 /**
@@ -751,7 +751,7 @@ async function generateDockerfileImpl(
       sessionId,
       _fileWritten: true,
       _fileWrittenPath: dockerfileResults.map((d) => d.path).join(', '),
-      NextStep: getSuccessChainHint(TOOL_NAMES.GENERATE_DOCKERFILE, sessionContext),
+      NextStep: getSuccessProgression(TOOL_NAMES.GENERATE_DOCKERFILE, sessionContext).summary,
     };
 
     // Set compatibility fields for single module (backwards compatibility)
@@ -795,8 +795,12 @@ async function generateDockerfileImpl(
       completed_steps: [],
     };
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const hint = getFailureHint(TOOL_NAMES.GENERATE_DOCKERFILE, errorMessage, sessionContext);
-    const chainHint = formatChainHint(hint);
+    const progression = getFailureProgression(
+      TOOL_NAMES.GENERATE_DOCKERFILE,
+      errorMessage,
+      sessionContext,
+    );
+    const chainHint = formatFailureChainHint(TOOL_NAMES.GENERATE_DOCKERFILE, progression);
 
     return Failure(`${errorMessage}\n${chainHint}`);
   }

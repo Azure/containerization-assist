@@ -19,8 +19,8 @@ import { generateK8sManifests } from '../tools/generate-k8s-manifests/tool.js';
 import { generateK8sManifestsSchema } from '../tools/generate-k8s-manifests/schema.js';
 import { prepareCluster } from '../tools/prepare-cluster/tool.js';
 import { prepareClusterSchema } from '../tools/prepare-cluster/schema.js';
-// import { deployApplication } from '../tools/deploy/tool.js';
-// import { deployApplicationSchema } from '../tools/deploy/schema.js';
+import { deployApplication } from '../tools/deploy/tool.js';
+import { deployApplicationSchema } from '../tools/deploy/schema.js';
 import { verifyDeployment } from '../tools/verify-deployment/tool.js';
 import { verifyDeploymentSchema } from '../tools/verify-deployment/schema.js';
 import { fixDockerfile } from '../tools/fix-dockerfile/tool.js';
@@ -29,8 +29,8 @@ import { resolveBaseImages } from '../tools/resolve-base-images/tool.js';
 import { resolveBaseImagesSchema } from '../tools/resolve-base-images/schema.js';
 import { opsTool } from '../tools/ops/tool.js';
 import { opsToolSchema } from '../tools/ops/schema.js';
-// import { workflow } from '../tools/workflow/tool.js';
-// import { workflowSchema } from '../tools/workflow/schema.js';
+import { workflow } from '../tools/workflow/tool.js';
+import { workflowSchema } from '../tools/workflow/schema.js';
 import type { Tool, Result } from '../types';
 import type { ZodObject, ZodRawShape } from 'zod';
 
@@ -48,12 +48,12 @@ export function getAllInternalTools(): Tool[] {
     pushImageTool,
     generateK8sManifestsTool,
     prepareClusterTool,
-    // deployApplicationTool, // Disabled - focus on individual tools
+    deployApplicationTool,
     verifyDeploymentTool,
     fixDockerfileTool,
     resolveBaseImagesTool,
     opsToolWrapper,
-    // workflowTool, // Disabled - focus on individual tools
+    workflowTool,
   ];
 }
 
@@ -171,12 +171,12 @@ const prepareClusterTool = createToolWrapper(
   prepareCluster as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
-// const _deployApplicationTool = createToolWrapper(
-//   TOOL_NAMES.DEPLOY_APPLICATION,
-//   'Deploy application to Kubernetes',
-//   deployApplicationSchema,
-//   deployApplication as (params: unknown, context: unknown) => Promise<Result<unknown>>,
-// );
+const deployApplicationTool = createToolWrapper(
+  TOOL_NAMES.DEPLOY_APPLICATION,
+  'Deploy application to Kubernetes',
+  deployApplicationSchema,
+  deployApplication as (params: unknown, context: unknown) => Promise<Result<unknown>>,
+);
 
 const verifyDeploymentTool = createToolWrapper(
   TOOL_NAMES.VERIFY_DEPLOYMENT,
@@ -206,9 +206,9 @@ const opsToolWrapper = createToolWrapper(
   opsTool as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
-// const _workflowTool = createToolWrapper(
-//   TOOL_NAMES.WORKFLOW,
-//   'Execute containerization workflows',
-//   workflowSchema,
-//   workflow as (params: unknown, context: unknown) => Promise<Result<unknown>>,
-// );
+const workflowTool = createToolWrapper(
+  TOOL_NAMES.WORKFLOW,
+  'Execute containerization workflows',
+  workflowSchema,
+  workflow as (params: unknown, context: unknown) => Promise<Result<unknown>>,
+);
