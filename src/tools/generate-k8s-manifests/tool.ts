@@ -18,6 +18,8 @@ import type { ToolContext } from '../../mcp/context';
 import type { SessionData } from '../session-types';
 import { Success, Failure, type Result } from '../../types';
 import { stripFencesAndNoise, isValidKubernetesContent } from '@lib/text-processing';
+import { getSuccessProgression, type SessionContext } from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { createKubernetesValidator, getValidationSummary } from '../../validation';
 import { scoreConfigCandidates } from '@lib/integrated-scoring';
 import * as yaml from 'js-yaml';
@@ -576,11 +578,20 @@ async function generateK8sManifestsImpl(
     // Progress: Complete
     if (progress) await progress('COMPLETE');
     timer.end({ outputPath });
+
+    // Prepare session context for dynamic chain hints
+    const sessionContext: SessionContext = {
+      completed_steps: (session.state as SessionContext).completed_steps || [],
+      ...((session.state as SessionContext).analysis_result && {
+        analysis_result: (session.state as SessionContext).analysis_result,
+      }),
+    };
+
     // Return result with file indicator and chain hint
     const finalResult: GenerateK8sManifestsResult & {
       _fileWritten?: boolean;
       _fileWrittenPath?: string;
-      chainHint?: string;
+      NextStep?: string;
     } = {
       manifests: yamlContent,
       outputPath,
@@ -593,8 +604,7 @@ async function generateK8sManifestsImpl(
       ...(qualityScore !== undefined && { score: qualityScore }),
       _fileWritten: true,
       _fileWrittenPath: outputPath,
-      chainHint:
-        'Next: prepare_cluster to set up Kubernetes or deploy_application if cluster is ready',
+      NextStep: getSuccessProgression(TOOL_NAMES.GENERATE_K8S_MANIFESTS, sessionContext).summary,
     };
     // Add sampling metadata if sampling was used
     if (!params.disableSampling) {

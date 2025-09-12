@@ -24,6 +24,12 @@ import { type Result, Success, Failure } from '../../types';
 import { extractErrorMessage } from '../../lib/error-utils';
 import { fileExists } from '@lib/file-utils';
 import type { BuildImageParams } from './schema';
+import {
+  getFailureProgression,
+  formatFailureChainHint,
+  getSuccessProgression,
+} from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 
 export interface BuildImageResult {
   /** Whether the build completed successfully */
@@ -269,8 +275,35 @@ async function buildImageImpl(
     logger.info({ buildOptions, finalDockerfilePath }, 'About to call Docker buildImage');
     const buildResult = await dockerClient.buildImage(buildOptions);
 
+    // Prepare session context for chain hints
+    const sessionContext = {
+      completed_steps: session.completed_steps || [],
+      ...(((session as Record<string, unknown>).dockerfile_result as
+        | { content?: string }
+        | undefined) && {
+        dockerfile_result: (session as Record<string, unknown>).dockerfile_result as {
+          content?: string;
+        },
+      }),
+      ...(((session as Record<string, unknown>).analysis_result as
+        | { language?: string }
+        | undefined) && {
+        analysis_result: (session as Record<string, unknown>).analysis_result as {
+          language?: string;
+        },
+      }),
+    };
+
     if (!buildResult.ok) {
-      return Failure(`Failed to build image: ${buildResult.error ?? 'Unknown error'}`);
+      const errorMessage = buildResult.error ?? 'Unknown error';
+      const progression = getFailureProgression(
+        TOOL_NAMES.BUILD_IMAGE,
+        errorMessage,
+        sessionContext,
+      );
+      const chainHint = formatFailureChainHint(TOOL_NAMES.BUILD_IMAGE, progression);
+
+      return Failure(`Failed to build image: ${errorMessage}\n${chainHint}`);
     }
 
     const buildTime = Date.now() - startTime;
@@ -322,7 +355,7 @@ async function buildImageImpl(
       buildTime,
       logs: buildResult.value.logs,
       ...(securityWarnings.length > 0 && { securityWarnings }),
-      chainHint: 'Next: scan_image, tag_image, or push_image',
+      NextStep: getSuccessProgression(TOOL_NAMES.BUILD_IMAGE, sessionContext).summary,
     });
   } catch (error) {
     timer.error(error);

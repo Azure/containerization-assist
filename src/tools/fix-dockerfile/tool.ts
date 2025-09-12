@@ -29,6 +29,13 @@ import { getRecommendedBaseImage } from '../../lib/base-images';
 import { Success, Failure, type Result } from '../../types';
 import { DEFAULT_PORTS } from '../../config/defaults';
 import { stripFencesAndNoise, isValidDockerfileContent } from '../../lib/text-processing';
+import {
+  getSuccessProgression,
+  getFailureProgression,
+  formatFailureChainHint,
+  type SessionContext,
+} from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { scoreConfigCandidates } from '@lib/integrated-scoring';
 import type { FixDockerfileParams } from './schema';
 /**
@@ -472,10 +479,20 @@ async function fixDockerfileImpl(
     );
     // Progress: Complete
     if (progress) await progress('COMPLETE');
+
+    // Prepare session context for chain hints
+    const sessionContext = {
+      completed_steps: session.completed_steps || [],
+      dockerfile_result: { content: fixedDockerfile },
+      ...((session as SessionContext).analysis_result && {
+        analysis_result: (session as SessionContext).analysis_result,
+      }),
+    };
+
     const result: FixDockerfileResult & {
       _fileWritten?: boolean;
       _fileWrittenPath?: string;
-      chainHint?: string;
+      NextStep?: string;
     } = {
       ok: true,
       sessionId,
@@ -490,7 +507,7 @@ async function fixDockerfileImpl(
       ...(improvement !== undefined ? { improvement } : {}),
       _fileWritten: true,
       _fileWrittenPath: './Dockerfile',
-      chainHint: 'Next: build_image to test the fixed Dockerfile',
+      NextStep: getSuccessProgression(TOOL_NAMES.FIX_DOCKERFILE, sessionContext).summary,
     };
     // Add sampling metadata if sampling was used
     if (!params.disableSampling) {
@@ -511,7 +528,21 @@ async function fixDockerfileImpl(
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Dockerfile fix failed');
-    return Failure(extractErrorMessage(error));
+
+    // Add failure chain hint - use basic context since session may not be available
+    const sessionContext = {
+      completed_steps: [],
+    };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const progression = getFailureProgression(
+      TOOL_NAMES.FIX_DOCKERFILE,
+      errorMessage,
+      sessionContext,
+    );
+    const chainHint = formatFailureChainHint(TOOL_NAMES.FIX_DOCKERFILE, progression);
+
+    const logErrorMessage = extractErrorMessage(error);
+    return Failure(`${logErrorMessage}\n${chainHint}`);
   }
 }
 

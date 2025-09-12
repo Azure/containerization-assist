@@ -6,21 +6,20 @@
  */
 
 import { getSession, updateSession } from '@mcp/tool-session-helpers';
-import { extractErrorMessage } from '../../lib/error-utils';
 import type { ToolContext } from '../../mcp/context';
 import { createTimer, createLogger } from '../../lib/logger';
 import { createSecurityScanner } from '../../lib/scanner';
 import { Success, Failure, type Result } from '../../types';
 import { getKnowledgeForCategory } from '../../knowledge';
 import type { ScanImageParams } from './schema';
-
-// Session data type for accessing build results
-interface SessionData {
-  build_result?: {
-    imageId?: string;
-    tags?: string[];
-  };
-}
+import type { SessionData } from '../session-types';
+import {
+  getSuccessProgression,
+  getFailureProgression,
+  formatFailureChainHint,
+  type SessionContext,
+} from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 
 interface DockerScanResult {
   vulnerabilities?: Array<{
@@ -260,6 +259,14 @@ async function scanImageImpl(
       'Image scan completed',
     );
 
+    // Prepare session context for dynamic chain hints
+    const sessionContext: SessionContext = {
+      completed_steps: session.completed_steps || [],
+      ...((session as SessionContext).analysis_result && {
+        analysis_result: (session as SessionContext).analysis_result,
+      }),
+    };
+
     return Success({
       success: true,
       sessionId,
@@ -275,15 +282,21 @@ async function scanImageImpl(
       },
       scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
       passed,
-      chainHint: passed
-        ? 'Next: tag_image or push_image'
-        : 'Next: fix vulnerabilities with fix_dockerfile or proceed to tag_image',
+      NextStep: getSuccessProgression(TOOL_NAMES.SCAN_IMAGE, sessionContext).summary,
     });
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Image scan failed');
 
-    return Failure(extractErrorMessage(error));
+    // Add failure chain hint - use basic context since session may not be available
+    const sessionContext = {
+      completed_steps: [],
+    };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const progression = getFailureProgression(TOOL_NAMES.SCAN_IMAGE, errorMessage, sessionContext);
+    const chainHint = formatFailureChainHint(TOOL_NAMES.SCAN_IMAGE, progression);
+
+    return Failure(`${errorMessage}\n${chainHint}`);
   }
 }
 

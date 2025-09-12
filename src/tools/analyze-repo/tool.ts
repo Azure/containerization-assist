@@ -32,6 +32,8 @@ import { Success, Failure, type Result, type AnalyzeRepoResult } from '../../typ
 import type { AnalyzeRepoParams } from './schema';
 import { parsePackageJson, getAllDependencies } from '../../lib/parsing-package-json';
 import { DEFAULT_PORTS } from '../../config/defaults';
+import { getSuccessProgression } from '../../workflows/workflow-progression';
+import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { extractErrorMessage } from '../../lib/error-utils';
 
 export type { AnalyzeRepoResult } from '../../types';
@@ -567,10 +569,13 @@ async function analyzeRepoImpl(
     // Progress: Complete
     if (progress) await progress('COMPLETE');
 
-    // Add chain hint for workflow guidance
+    const sessionContext = {
+      completed_steps: session.completed_steps || [],
+      analysis_result: result,
+    };
     const enrichedResult = {
       ...result,
-      chainHint: 'Next: generate_dockerfile or fix existing issues',
+      NextStep: getSuccessProgression(TOOL_NAMES.ANALYZE_REPO, sessionContext).summary,
     };
 
     return Success(enrichedResult);
