@@ -504,22 +504,49 @@ CMD ["node", "index.js"]`;
 
   describe('Error Handling', () => {
     it('should auto-create session when not found', async () => {
-      mockSessionManager.get.mockResolvedValue(null);
-      mockSessionManager.create.mockResolvedValue({
-      "sessionId": "test-session-123",
-      "workflow_state": {},
-      "metadata": {},
-      "completed_steps": [],
-      "errors": {},
-      "current_step": null,
-      "createdAt": "2025-09-08T11:12:40.362Z",
-      "updatedAt": "2025-09-08T11:12:40.362Z"
-});
+      // Mock ensureSession to simulate auto-creating a session
+      const mockEnsureSession = ensureSession as jest.Mock;
+      mockEnsureSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            workflow_state: {},
+            metadata: {},
+            completed_steps: [],
+            errors: {},
+            current_step: null,
+            repo_path: '/test/repo',
+            dockerfile_result: {
+              path: '/test/repo/Dockerfile',
+              content: mockDockerfile,
+            },
+          },
+          isNew: true, // Indicates session was newly created
+        },
+      });
+      
+      // Setup filesystem mocks for this test
+      mockFs.promises.access.mockResolvedValue(undefined);
+      mockFs.promises.readFile.mockResolvedValue(mockDockerfile);
+      
+      // Setup docker build mock
+      mockDockerClient.buildImage.mockResolvedValue(createSuccessResult({
+        imageId: 'sha256:mock-image-id',
+        logs: [
+          'Step 1/8 : FROM node:18-alpine',
+          'Successfully built mock-image-id',
+        ],
+        layers: 8,
+      }));
 
       const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
-
-      expect(mockSessionManager.get).toHaveBeenCalledWith('test-session-123');
-      expect(mockSessionManager.create).toHaveBeenCalledWith('test-session-123');
+      
+      expect(result.ok).toBe(true);
+      expect(mockEnsureSession).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionManager: mockSessionManager }),
+        'test-session-123'
+      );
     });
 
     it('should return error when Dockerfile not found and no session content', async () => {
