@@ -20,6 +20,7 @@ export const TOOL_NAMES = {
   GENERATE_ACA_MANIFESTS: 'generate_aca_manifests',
   CONVERT_ACA_TO_K8S: 'convert_aca_to_k8s',
   GENERATE_HELM_CHARTS: 'generate_helm_charts',
+  INSPECT_SESSION: 'inspect_session',
 } as const;
 
 /**

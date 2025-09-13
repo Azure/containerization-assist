@@ -5,13 +5,14 @@
  * Uses standardized helpers for consistency
  */
 
-import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import type { ToolContext } from '../../mcp/context';
 import { createTimer, createLogger } from '../../lib/logger';
 import { createSecurityScanner } from '../../lib/scanner';
 import { Success, Failure, type Result } from '../../types';
 import { getKnowledgeForCategory } from '../../knowledge';
-import type { ScanImageParams } from './schema';
+import { scanImageSchema, type ScanImageParams } from './schema';
+import { z } from 'zod';
 import type { SessionData } from '../session-types';
 import {
   getSuccessProgression,
@@ -43,6 +44,43 @@ interface DockerScanResult {
     image: string;
   };
 }
+
+// Define the result schema for type safety
+const ScanImageResultSchema = z.object({
+  success: z.boolean(),
+  sessionId: z.string(),
+  remediationGuidance: z
+    .array(
+      z.object({
+        vulnerability: z.string(),
+        recommendation: z.string(),
+        severity: z.string().optional(),
+        example: z.string().optional(),
+      }),
+    )
+    .optional(),
+  vulnerabilities: z.object({
+    critical: z.number(),
+    high: z.number(),
+    medium: z.number(),
+    low: z.number(),
+    unknown: z.number(),
+    total: z.number(),
+  }),
+  scanTime: z.string(),
+  passed: z.boolean(),
+});
+
+// Define tool IO for type-safe session operations
+const io = defineToolIO(scanImageSchema, ScanImageResultSchema);
+
+// Tool-specific state schema
+const StateSchema = z.object({
+  lastScannedAt: z.date().optional(),
+  lastScannedImage: z.string().optional(),
+  vulnerabilityCount: z.number().optional(),
+  scannerUsed: z.string().optional(),
+});
 
 export interface ScanImageResult {
   success: boolean;
@@ -92,15 +130,26 @@ async function scanImageImpl(
       'Starting image security scan',
     );
 
-    // Resolve session (now always optional)
-    const sessionResult = await getSession(params.sessionId, context);
-
+    // Ensure session exists and get typed slice operations
+    const sessionResult = await ensureSession(context, params.sessionId);
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
     }
 
     const { id: sessionId, state: session } = sessionResult.value;
-    logger.info({ sessionId, scanner }, 'Starting image security scan');
+    const slice = useSessionSlice('scan', io, context, StateSchema);
+
+    if (!slice) {
+      return Failure('Session manager not available');
+    }
+
+    logger.info(
+      { sessionId, scanner, severityThreshold: finalSeverityThreshold },
+      'Starting image security scan with session',
+    );
+
+    // Record input in session slice
+    await slice.patch(sessionId, { input: params });
 
     const securityScanner = createSecurityScanner(logger, scanner);
 
@@ -212,35 +261,65 @@ async function scanImageImpl(
       }
     }
 
-    // Update session with scan results using standardized helper
-    const updateResult = await updateSession(
+    // Prepare the result
+    const result: ScanImageResult = {
+      success: true,
       sessionId,
-      {
-        scan_result: {
-          success: passed,
-          vulnerabilities: dockerScanResult.vulnerabilities?.map((v) => ({
-            id: v.id ?? 'unknown',
-            severity: v.severity,
-            package: v.package ?? 'unknown',
-            version: v.version ?? 'unknown',
-            description: v.description ?? '',
-            ...(v.fixedVersion && { fixedVersion: v.fixedVersion }),
-          })),
-          summary: dockerScanResult.summary,
-        },
-        completed_steps: [...(session.completed_steps || []), 'scan'],
-        metadata: {
-          ...session.metadata,
-          scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
-          scanner,
-          scanPassed: passed,
-        },
+      ...(remediationGuidance && remediationGuidance.length > 0 && { remediationGuidance }),
+      vulnerabilities: {
+        critical: scanResult.criticalCount,
+        high: scanResult.highCount,
+        medium: scanResult.mediumCount,
+        low: scanResult.lowCount,
+        unknown: 0, // BasicScanResult doesn't track unknown severity vulnerabilities
+        total: scanResult.totalVulnerabilities,
       },
-      context,
-    );
+      scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
+      passed,
+    };
 
-    if (!updateResult.ok) {
-      logger.warn({ error: updateResult.error }, 'Failed to update session, but scan succeeded');
+    // Update typed session slice with output and state
+    await slice.patch(sessionId, {
+      output: result,
+      state: {
+        lastScannedAt: new Date(),
+        lastScannedImage: imageId,
+        vulnerabilityCount: scanResult.totalVulnerabilities,
+        scannerUsed: scanner,
+      },
+    });
+
+    // Update session metadata for backward compatibility
+    const sessionManager = context.sessionManager;
+    if (sessionManager) {
+      try {
+        await sessionManager.update(sessionId, {
+          metadata: {
+            ...session.metadata,
+            scan_result: {
+              success: passed,
+              vulnerabilities: dockerScanResult.vulnerabilities?.map((v) => ({
+                id: v.id ?? 'unknown',
+                severity: v.severity,
+                package: v.package ?? 'unknown',
+                version: v.version ?? 'unknown',
+                description: v.description ?? '',
+                ...(v.fixedVersion && { fixedVersion: v.fixedVersion }),
+              })),
+              summary: dockerScanResult.summary,
+            },
+            scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
+            scanner,
+            scanPassed: passed,
+          },
+          completed_steps: [...(session.completed_steps || []), 'scan'],
+        });
+      } catch (error) {
+        logger.warn(
+          { error: (error as Error).message },
+          'Failed to update session, but scan succeeded',
+        );
+      }
     }
 
     timer.end({
@@ -268,20 +347,7 @@ async function scanImageImpl(
     };
 
     return Success({
-      success: true,
-      sessionId,
-      imageId,
-      ...(remediationGuidance && remediationGuidance.length > 0 && { remediationGuidance }),
-      vulnerabilities: {
-        critical: dockerScanResult.summary?.critical ?? 0,
-        high: dockerScanResult.summary?.high ?? 0,
-        medium: dockerScanResult.summary?.medium ?? 0,
-        low: dockerScanResult.summary?.low ?? 0,
-        unknown: dockerScanResult.summary?.unknown ?? 0,
-        total: dockerScanResult.summary?.total ?? 0,
-      },
-      scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
-      passed,
+      ...result,
       NextStep: getSuccessProgression(TOOL_NAMES.SCAN_IMAGE, sessionContext).summary,
     });
   } catch (error) {

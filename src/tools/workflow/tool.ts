@@ -19,7 +19,7 @@
  * ```
  */
 
-import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import { extractErrorMessage } from '../../lib/error-utils';
 import { createStandardProgress } from '@mcp/progress-helper';
 import type { ToolContext } from '../../mcp/context';
@@ -39,7 +39,9 @@ import { prepareCluster } from '@tools/prepare-cluster';
 import { deployApplication } from '@tools/deploy';
 import { generateK8sManifests } from '@tools/generate-k8s-manifests';
 import { verifyDeployment } from '@tools/verify-deployment';
-import type { WorkflowParams } from './schema';
+import { workflowSchema, type WorkflowParams } from './schema';
+import { z } from 'zod';
+import type { SessionData } from '../session-types';
 
 // Export specific workflow tool result
 export interface WorkflowToolResult {
@@ -72,6 +74,48 @@ export interface WorkflowStatusResult {
   failedSteps: string[];
   progress: number;
 }
+
+// Define the result schema for type safety
+const WorkflowToolResultSchema = z.object({
+  ok: z.boolean(),
+  sessionId: z.string(),
+  workflowId: z.string(),
+  status: z.enum(['started', 'completed', 'failed', 'already_running']),
+  message: z.string(),
+  workflowName: z.string(),
+  estimatedDuration: z.number().optional(),
+  steps: z.array(z.string()),
+  completedSteps: z.array(z.string()),
+  failedSteps: z.array(z.string()).optional(),
+  nextSteps: z.array(z.string()).optional(),
+  metadata: z
+    .object({
+      workflowType: z.string(),
+      automated: z.boolean(),
+      options: z.record(z.unknown()).optional(),
+      startedAt: z.string(),
+      completedAt: z.string().optional(),
+      duration: z.number().optional(),
+    })
+    .optional(),
+});
+
+// Define tool IO for type-safe session operations
+const io = defineToolIO(workflowSchema, WorkflowToolResultSchema);
+
+// Tool-specific state schema for comprehensive workflow tracking
+const StateSchema = z.object({
+  lastExecutedAt: z.date().optional(),
+  lastWorkflowType: z.string().optional(),
+  lastWorkflowId: z.string().optional(),
+  totalWorkflowsExecuted: z.number().optional(),
+  lastWorkflowStatus: z.enum(['started', 'completed', 'failed', 'already_running']).optional(),
+  lastStepsCompleted: z.number().optional(),
+  lastStepsFailed: z.number().optional(),
+  lastDuration: z.number().optional(),
+  lastCurrentStep: z.string().optional(),
+  averageStepDuration: z.number().optional(),
+});
 
 /**
  * Get workflow steps based on type
@@ -329,39 +373,40 @@ async function workflowImpl(
     // Progress: Workflow orchestration started
     if (progress) await progress('EXECUTING');
 
-    // Resolve session (now always optional)
-    const sessionResult = await getSession(params.sessionId, context);
-
+    // Ensure session exists and get typed slice operations
+    const sessionResult = await ensureSession(context, params.sessionId);
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
     }
 
     const { id: sessionId, state: session } = sessionResult.value;
-    logger.info({ sessionId, workflowType, automated }, 'Starting containerization workflow');
+    const slice = useSessionSlice('workflow', io, context, StateSchema);
+
+    if (!slice) {
+      return Failure('Session manager not available');
+    }
+
+    logger.info(
+      { sessionId, workflowType, automated },
+      'Starting containerization workflow with session',
+    );
+
+    // Record input in session slice
+    await slice.patch(sessionId, { input: params });
 
     // Check if workflow is already running
-    const sessionState = session as
-      | {
-          workflow_state?: {
-            status?: string;
-            workflowId?: string;
-            steps?: string[];
-            completedSteps?: string[];
-          };
-        }
-      | null
-      | undefined;
-    const workflowState = sessionState?.workflow_state;
+    const sessionData = session as SessionData;
+    const workflowState = sessionData?.workflow_state;
     if (workflowState?.status === 'running') {
       return Success({
         ok: false,
         sessionId,
-        workflowId: workflowState.workflowId ?? `workflow-${sessionId}`,
+        workflowId: (workflowState.workflowId as string) ?? `workflow-${sessionId}`,
         status: 'already_running',
         message: 'A workflow is already running for this session',
         workflowName: `${workflowType} workflow`,
-        steps: workflowState.steps ?? [],
-        completedSteps: workflowState.completedSteps ?? [],
+        steps: (workflowState.steps as string[]) ?? [],
+        completedSteps: (workflowState.completedSteps as string[]) ?? [],
       });
     }
 
@@ -382,28 +427,30 @@ async function workflowImpl(
       'Starting workflow',
     );
 
-    // Update session with workflow start using standardized helper
-    const initialUpdateResult = await updateSession(
-      sessionId,
-      {
-        workflow_state: {
-          status: 'running',
-          workflowId,
-          workflowType,
-          steps,
-          completedSteps: [],
-          currentStep: steps[0],
-          startedAt,
-        },
-      },
-      context,
-    );
-
-    if (!initialUpdateResult.ok) {
-      logger.warn(
-        { error: initialUpdateResult.error },
-        'Failed to update session with workflow start',
-      );
+    // Update session metadata for backward compatibility - initial workflow state
+    const sessionManager = context.sessionManager;
+    if (sessionManager) {
+      try {
+        await sessionManager.update(sessionId, {
+          metadata: {
+            ...session.metadata,
+            workflow_state: {
+              status: 'running',
+              workflowId,
+              workflowType,
+              steps,
+              completedSteps: [],
+              currentStep: steps[0],
+              startedAt,
+            },
+          },
+        });
+      } catch (error) {
+        logger.warn(
+          { error: (error as Error).message },
+          'Failed to update session with workflow start',
+        );
+      }
     }
 
     // Execute workflow steps
@@ -412,26 +459,30 @@ async function workflowImpl(
     let workflowFailed = false;
 
     for (const step of steps) {
-      // Update current step using standardized helper
-      const stepUpdateResult = await updateSession(
-        sessionId,
-        {
-          workflow_state: {
-            status: 'running',
-            workflowId,
-            workflowType,
-            steps,
-            currentStep: step,
-            completedSteps,
-            failedSteps,
-            startedAt,
-          },
-        },
-        context,
-      );
-
-      if (!stepUpdateResult.ok) {
-        logger.warn({ error: stepUpdateResult.error, step }, 'Failed to update session for step');
+      // Update current step in session metadata for backward compatibility
+      if (sessionManager) {
+        try {
+          await sessionManager.update(sessionId, {
+            metadata: {
+              ...session.metadata,
+              workflow_state: {
+                status: 'running',
+                workflowId,
+                workflowType,
+                steps,
+                currentStep: step,
+                completedSteps,
+                failedSteps,
+                startedAt,
+              },
+            },
+          });
+        } catch (error) {
+          logger.warn(
+            { error: (error as Error).message, step },
+            'Failed to update session for step',
+          );
+        }
       }
 
       // Execute step
@@ -454,33 +505,78 @@ async function workflowImpl(
     const completedAt = new Date().toISOString();
     const duration = Date.now() - new Date(startedAt).getTime();
 
-    // Update session with final workflow state using standardized helper
+    // Prepare the final result
     const finalStatus = workflowFailed ? 'failed' : 'completed';
-    const finalUpdateResult = await updateSession(
+    const result: WorkflowToolResult = {
+      ok: finalStatus === 'completed',
       sessionId,
-      {
-        workflow_state: {
-          status: finalStatus,
-          workflowId,
-          workflowType,
-          steps,
-          completedSteps,
-          failedSteps,
-          currentStep: null,
-          startedAt,
-          completedAt,
-          duration,
-        },
-        completed_steps: [...(session.completed_steps || []), 'workflow'],
+      workflowId,
+      status: finalStatus,
+      message:
+        finalStatus === 'completed'
+          ? `Workflow completed successfully with ${completedSteps.length}/${steps.length} steps`
+          : `Workflow failed after ${completedSteps.length}/${steps.length} steps`,
+      workflowName: `${workflowType} workflow`,
+      estimatedDuration,
+      steps,
+      completedSteps,
+      ...(failedSteps.length > 0 && { failedSteps }),
+      metadata: {
+        workflowType,
+        automated,
+        options,
+        startedAt,
+        completedAt,
+        duration,
       },
-      context,
-    );
+    };
 
-    if (!finalUpdateResult.ok) {
-      logger.warn(
-        { error: finalUpdateResult.error },
-        'Failed to update session with final workflow state',
-      );
+    // Update typed session slice with final output and comprehensive state
+    await slice.patch(sessionId, {
+      output: result,
+      state: {
+        lastExecutedAt: new Date(),
+        lastWorkflowType: workflowType,
+        lastWorkflowId: workflowId,
+        totalWorkflowsExecuted:
+          (sessionData?.completed_steps || []).filter((s) => s === 'workflow').length + 1,
+        lastWorkflowStatus: finalStatus,
+        lastStepsCompleted: completedSteps.length,
+        lastStepsFailed: failedSteps.length,
+        lastDuration: duration,
+        lastCurrentStep:
+          finalStatus === 'completed' ? undefined : completedSteps[completedSteps.length - 1],
+        averageStepDuration: steps.length > 0 ? duration / steps.length : undefined,
+      },
+    });
+
+    // Update session metadata for backward compatibility - final state
+    if (sessionManager) {
+      try {
+        await sessionManager.update(sessionId, {
+          metadata: {
+            ...session.metadata,
+            workflow_state: {
+              status: finalStatus,
+              workflowId,
+              workflowType,
+              steps,
+              completedSteps,
+              failedSteps,
+              currentStep: null,
+              startedAt,
+              completedAt,
+              duration,
+            },
+          },
+          completed_steps: [...(session.completed_steps || []), 'workflow'],
+        });
+      } catch (error) {
+        logger.warn(
+          { error: (error as Error).message },
+          'Failed to update session with final workflow state',
+        );
+      }
     }
 
     timer.end({
@@ -502,28 +598,8 @@ async function workflowImpl(
     );
 
     return Success({
-      ok: !workflowFailed,
-      success: !workflowFailed,
-      sessionId,
-      workflowId,
-      status: workflowFailed ? 'failed' : 'completed',
-      message: workflowFailed
-        ? `Workflow failed at step: ${failedSteps[0]}`
-        : 'Workflow completed successfully',
-      workflowName: `${workflowType} workflow`,
-      estimatedDuration,
-      steps,
-      completedSteps,
-      ...(failedSteps.length > 0 && { failedSteps }),
+      ...result,
       nextSteps: steps.filter((s) => !completedSteps.includes(s)),
-      metadata: {
-        workflowType,
-        automated,
-        options,
-        startedAt,
-        completedAt,
-        duration,
-      },
     });
   } catch (error) {
     timer.error(error);

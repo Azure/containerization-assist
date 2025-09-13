@@ -8,7 +8,7 @@
 import { joinPaths } from '@lib/path-utils';
 import { extractErrorMessage } from '../../lib/error-utils';
 import { promises as fs } from 'node:fs';
-import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 import type { SamplingOptions } from '@lib/sampling';
@@ -23,7 +23,8 @@ import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { createKubernetesValidator, getValidationSummary } from '../../validation';
 import { scoreConfigCandidates } from '@lib/integrated-scoring';
 import * as yaml from 'js-yaml';
-import type { GenerateK8sManifestsParams } from './schema';
+import { generateK8sManifestsSchema, type GenerateK8sManifestsParams } from './schema';
+import { z } from 'zod';
 // Note: Tool now uses GenerateK8sManifestsParams from schema for type safety
 
 /**
@@ -70,6 +71,60 @@ export interface GenerateK8sManifestsResult {
   /** Quality score from config scoring */
   score?: number;
 }
+
+// Define the result schema for type safety
+const GenerateK8sManifestsResultSchema = z.object({
+  manifests: z.string(),
+  outputPath: z.string(),
+  resources: z.array(
+    z.object({
+      kind: z.string(),
+      name: z.string(),
+      namespace: z.string(),
+    }),
+  ),
+  warnings: z.array(z.string()).optional(),
+  sessionId: z.string().optional(),
+  samplingMetadata: z
+    .object({
+      stoppedEarly: z.boolean().optional(),
+      candidatesGenerated: z.number(),
+      winnerScore: z.number(),
+      samplingDuration: z.number().optional(),
+    })
+    .optional(),
+  winnerScore: z.number().optional(),
+  scoreBreakdown: z.record(z.number()).optional(),
+  allCandidates: z
+    .array(
+      z.object({
+        id: z.string(),
+        content: z.string(),
+        score: z.number(),
+        scoreBreakdown: z.record(z.number()),
+        rank: z.number().optional(),
+      }),
+    )
+    .optional(),
+  validationScore: z.number().optional(),
+  validationGrade: z.string().optional(),
+  validationReport: z.string().optional(),
+  score: z.number().optional(),
+});
+
+// Define tool IO for type-safe session operations
+const io = defineToolIO(generateK8sManifestsSchema, GenerateK8sManifestsResultSchema);
+
+// Tool-specific state schema
+const StateSchema = z.object({
+  lastGeneratedAt: z.date().optional(),
+  lastAppName: z.string().optional(),
+  lastNamespace: z.string().optional(),
+  totalManifestsGenerated: z.number().optional(),
+  lastManifestCount: z.number().optional(),
+  lastValidationScore: z.number().optional(),
+  lastUsedAI: z.boolean().optional(),
+});
 
 /**
  * Kubernetes resource type definitions
@@ -369,13 +424,26 @@ async function generateK8sManifestsImpl(
     const { appName = 'app', namespace = 'default' } = params;
     // Progress: Starting validation and analysis
     if (progress) await progress('VALIDATING');
-    // Resolve session with optional sessionId
-    const sessionResult = await getSession(params.sessionId, context);
+
+    // Ensure session exists and get typed slice operations
+    const sessionResult = await ensureSession(context, params.sessionId);
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
     }
-    const session = sessionResult.value;
-    const sessionData = session.state as unknown as SessionData;
+
+    const { id: sessionId, state: session } = sessionResult.value;
+    const slice = useSessionSlice('generate-k8s-manifests', io, context, StateSchema);
+
+    if (!slice) {
+      return Failure('Session manager not available');
+    }
+
+    logger.info({ sessionId }, 'Starting K8s manifest generation with session');
+
+    // Record input in session slice
+    await slice.patch(sessionId, { input: params });
+
+    const sessionData = session as SessionData;
     // Get build result from session for image tag
     const buildResult = sessionData?.build_result || sessionData?.workflow_state?.build_result;
     const image = params.imageId || buildResult?.tags?.[0] || `${appName}:latest`;
@@ -541,38 +609,66 @@ async function generateK8sManifestsImpl(
     if (params.serviceType === 'LoadBalancer' && !params.ingressEnabled) {
       warnings.push('LoadBalancer service without Ingress may incur cloud costs');
     }
-    // Update session with K8s result using standardized helper
-    const updateResult = await updateSession(
-      session.id,
-      {
-        k8s_result: {
-          manifests: [
-            {
-              kind: 'Multiple',
-              namespace,
-              content: yamlContent,
-              file_path: manifestPath,
-            },
-          ],
-          replicas: params.replicas,
-          resources: params.resources,
-          output_path: outputPath,
-        },
-        completed_steps: [...(sessionData?.completed_steps || []), 'k8s'],
-        metadata: {
-          ...(sessionData?.metadata || {}),
-          ai_enhancement_used: result.value.aiUsed || false,
-          ai_generation_type: 'k8s-manifests',
-          k8s_warnings: warnings,
-        },
+    // Prepare the main result
+    const k8sResult = {
+      manifests: yamlContent,
+      outputPath,
+      resources: resourceList,
+      warnings,
+      sessionId,
+      validationScore: validationReport.score,
+      validationGrade: validationReport.grade,
+      validationReport: getValidationSummary(validationReport),
+      ...(qualityScore !== undefined && { score: qualityScore }),
+    };
+
+    // Update typed session slice with output and state
+    await slice.patch(sessionId, {
+      output: k8sResult,
+      state: {
+        lastGeneratedAt: new Date(),
+        lastAppName: appName,
+        lastNamespace: namespace,
+        totalManifestsGenerated:
+          (sessionData?.completed_steps || []).filter((s) => s === 'k8s').length + 1,
+        lastManifestCount: resourceList.length,
+        lastValidationScore: validationReport.score,
+        lastUsedAI: result.value.aiUsed || false,
       },
-      context,
-    );
-    if (!updateResult.ok) {
-      logger.warn(
-        { error: updateResult.error },
-        'Failed to update session, but K8s generation succeeded',
-      );
+    });
+
+    // Update session metadata for backward compatibility
+    const sessionManager = context.sessionManager;
+    if (sessionManager) {
+      try {
+        await sessionManager.update(sessionId, {
+          metadata: {
+            ...session.metadata,
+            k8s_result: {
+              manifests: [
+                {
+                  kind: 'Multiple',
+                  namespace,
+                  content: yamlContent,
+                  file_path: manifestPath,
+                },
+              ],
+              replicas: params.replicas,
+              resources: params.resources,
+              output_path: outputPath,
+            },
+            ai_enhancement_used: result.value.aiUsed || false,
+            ai_generation_type: 'k8s-manifests',
+            k8s_warnings: warnings,
+          },
+          completed_steps: [...(sessionData?.completed_steps || []), 'k8s'],
+        });
+      } catch (error) {
+        logger.warn(
+          { error: (error as Error).message },
+          'Failed to update session, but K8s generation succeeded',
+        );
+      }
     }
 
     // Progress: Complete
@@ -581,9 +677,9 @@ async function generateK8sManifestsImpl(
 
     // Prepare session context for dynamic chain hints
     const sessionContext: SessionContext = {
-      completed_steps: (session.state as SessionContext).completed_steps || [],
-      ...((session.state as SessionContext).analysis_result && {
-        analysis_result: (session.state as SessionContext).analysis_result,
+      completed_steps: session.completed_steps || [],
+      ...(sessionData?.analysis_result && {
+        analysis_result: sessionData.analysis_result,
       }),
     };
 
@@ -593,19 +689,12 @@ async function generateK8sManifestsImpl(
       _fileWrittenPath?: string;
       NextStep?: string;
     } = {
-      manifests: yamlContent,
-      outputPath,
-      resources: resourceList,
-      ...(warnings.length > 0 && { warnings }),
-      sessionId: session.id,
-      validationScore: validationReport.score,
-      validationGrade: validationReport.grade,
-      validationReport: getValidationSummary(validationReport),
-      ...(qualityScore !== undefined && { score: qualityScore }),
+      ...k8sResult,
       _fileWritten: true,
       _fileWrittenPath: outputPath,
       NextStep: getSuccessProgression(TOOL_NAMES.GENERATE_K8S_MANIFESTS, sessionContext).summary,
     };
+
     // Add sampling metadata if sampling was used
     if (!params.disableSampling) {
       if (samplingMetadata) {

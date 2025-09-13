@@ -21,7 +21,7 @@
  * ```
  */
 
-import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import { extractErrorMessage } from '../../lib/error-utils';
 import type { ToolContext } from '../../mcp/context';
 import { createKubernetesClient } from '../../lib/kubernetes';
@@ -32,12 +32,13 @@ import {
   getSuccessProgression,
   getFailureProgression,
   formatFailureChainHint,
-  type SessionContext,
 } from '../../workflows/workflow-progression';
 import { TOOL_NAMES } from '../../exports/tool-names.js';
-import type { PrepareClusterParams } from './schema';
+import { prepareClusterSchema, type PrepareClusterParams } from './schema';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { z } from 'zod';
+import type { SessionData } from '../session-types';
 
 const execAsync = promisify(exec);
 
@@ -60,6 +61,41 @@ export interface PrepareClusterResult {
   warnings?: string[];
   localRegistryUrl?: string;
 }
+
+// Define the result schema for type safety
+const PrepareClusterResultSchema = z.object({
+  success: z.boolean(),
+  sessionId: z.string(),
+  clusterReady: z.boolean(),
+  cluster: z.string(),
+  namespace: z.string(),
+  checks: z.object({
+    connectivity: z.boolean(),
+    permissions: z.boolean(),
+    namespaceExists: z.boolean(),
+    ingressController: z.boolean().optional(),
+    rbacConfigured: z.boolean().optional(),
+    kindInstalled: z.boolean().optional(),
+    kindClusterCreated: z.boolean().optional(),
+    localRegistryCreated: z.boolean().optional(),
+  }),
+  warnings: z.array(z.string()).optional(),
+  localRegistryUrl: z.string().optional(),
+});
+
+// Define tool IO for type-safe session operations
+const io = defineToolIO(prepareClusterSchema, PrepareClusterResultSchema);
+
+// Tool-specific state schema
+const StateSchema = z.object({
+  lastPreparedAt: z.date().optional(),
+  lastClusterName: z.string().optional(),
+  lastNamespace: z.string().optional(),
+  totalPreparations: z.number().optional(),
+  lastClusterReady: z.boolean().optional(),
+  lastChecksPassed: z.number().optional(),
+  lastWarningCount: z.number().optional(),
+});
 
 interface K8sClientAdapter {
   ping(): Promise<boolean>;
@@ -385,15 +421,26 @@ async function prepareClusterImpl(
 
     logger.info({ cluster, namespace, environment }, 'Starting cluster preparation');
 
-    // Get session using standardized helper
-    const sessionResult = await getSession(params.sessionId, context);
-
+    // Ensure session exists and get typed slice operations
+    const sessionResult = await ensureSession(context, params.sessionId);
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
     }
 
     const { id: sessionId, state: session } = sessionResult.value;
-    logger.info({ sessionId, environment, namespace }, 'Starting Kubernetes cluster preparation');
+    const slice = useSessionSlice('prepare-cluster', io, context, StateSchema);
+
+    if (!slice) {
+      return Failure('Session manager not available');
+    }
+
+    logger.info(
+      { sessionId, environment, namespace },
+      'Starting Kubernetes cluster preparation with session',
+    );
+
+    // Record input in session slice
+    await slice.patch(sessionId, { input: params });
 
     const k8sClientRaw = createKubernetesClient(logger);
     const k8sClient = createK8sClientAdapter(k8sClientRaw);
@@ -492,45 +539,8 @@ async function prepareClusterImpl(
     // Determine if cluster is ready
     const clusterReady = checks.connectivity && checks.permissions && checks.namespaceExists;
 
-    // Update session with cluster preparation status using standardized helper
-    const updateResult = await updateSession(
-      sessionId,
-      {
-        cluster_preparation: {
-          success: true,
-          cluster,
-          namespace,
-          clusterReady,
-          checks,
-          warnings,
-          environment,
-          ...(localRegistryUrl && { localRegistryUrl }),
-        },
-        cluster_result: {
-          cluster_name: cluster,
-          context: cluster,
-          kubernetes_version: '1.28',
-          namespaces_created: checks.namespaceExists ? [] : [namespace],
-        },
-        completed_steps: [...(session.completed_steps || []), TOOL_NAMES.PREPARE_CLUSTER],
-      },
-      context,
-    );
-
-    if (!updateResult.ok) {
-      logger.warn(
-        { error: updateResult.error },
-        'Failed to update session, but preparation succeeded',
-      );
-    }
-
-    timer.end({ clusterReady, sessionId, environment });
-    logger.info(
-      { sessionId, clusterReady, checks, namespace, environment },
-      'Kubernetes cluster preparation completed',
-    );
-
-    return Success({
+    // Prepare the result
+    const result: PrepareClusterResult = {
       success: true,
       sessionId,
       clusterReady,
@@ -554,10 +564,71 @@ async function prepareClusterImpl(
       },
       ...(warnings.length > 0 && { warnings }),
       ...(localRegistryUrl && { localRegistryUrl }),
+    };
+
+    // Update typed session slice with output and state
+    const sessionData = session as SessionData;
+    await slice.patch(sessionId, {
+      output: result,
+      state: {
+        lastPreparedAt: new Date(),
+        lastClusterName: cluster,
+        lastNamespace: namespace,
+        totalPreparations:
+          (sessionData?.completed_steps || []).filter((s) => s === TOOL_NAMES.PREPARE_CLUSTER)
+            .length + 1,
+        lastClusterReady: clusterReady,
+        lastChecksPassed: Object.values(checks).filter(Boolean).length,
+        lastWarningCount: warnings.length,
+      },
+    });
+
+    // Update session metadata for backward compatibility
+    const sessionManager = context.sessionManager;
+    if (sessionManager) {
+      try {
+        await sessionManager.update(sessionId, {
+          metadata: {
+            ...session.metadata,
+            cluster_preparation: {
+              success: true,
+              cluster,
+              namespace,
+              clusterReady,
+              checks,
+              warnings,
+              environment,
+              ...(localRegistryUrl && { localRegistryUrl }),
+            },
+            cluster_result: {
+              cluster_name: cluster,
+              context: cluster,
+              kubernetes_version: '1.28',
+              namespaces_created: checks.namespaceExists ? [] : [namespace],
+            },
+          },
+          completed_steps: [...(session.completed_steps || []), TOOL_NAMES.PREPARE_CLUSTER],
+        });
+      } catch (error) {
+        logger.warn(
+          { error: (error as Error).message },
+          'Failed to update session, but preparation succeeded',
+        );
+      }
+    }
+
+    timer.end({ clusterReady, sessionId, environment });
+    logger.info(
+      { sessionId, clusterReady, checks, namespace, environment },
+      'Kubernetes cluster preparation completed',
+    );
+
+    return Success({
+      ...result,
       NextStep: getSuccessProgression(TOOL_NAMES.PREPARE_CLUSTER, {
         completed_steps: session.completed_steps || [],
-        ...((session as SessionContext).analysis_result && {
-          analysis_result: (session as SessionContext).analysis_result,
+        ...(sessionData?.analysis_result && {
+          analysis_result: sessionData.analysis_result,
         }),
       }),
     });

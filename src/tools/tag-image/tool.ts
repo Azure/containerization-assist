@@ -5,12 +5,13 @@
  * Uses standardized helpers for consistency
  */
 
-import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import type { ToolContext } from '../../mcp/context';
 import { createDockerClient } from '../../lib/docker';
 import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../types';
-import type { TagImageParams } from './schema';
+import { tagImageSchema, type TagImageParams } from './schema';
+import { z } from 'zod';
 import {
   getSuccessProgression,
   getFailureProgression,
@@ -19,13 +20,22 @@ import {
 } from '../../workflows/workflow-progression';
 import { TOOL_NAMES } from '../../exports/tool-names.js';
 
-// Session data type for accessing build results
-interface SessionData {
-  build_result?: {
-    imageId?: string;
-    tags?: string[];
-  };
-}
+// Define the result schema for type safety
+const TagImageResultSchema = z.object({
+  success: z.boolean(),
+  sessionId: z.string(),
+  tags: z.array(z.string()),
+  imageId: z.string(),
+});
+
+// Define tool IO for type-safe session operations
+const io = defineToolIO(tagImageSchema, TagImageResultSchema);
+
+// Tool-specific state schema
+const StateSchema = z.object({
+  lastTaggedAt: z.date().optional(),
+  tagsApplied: z.array(z.string()).default([]),
+});
 
 export interface TagImageResult {
   success: boolean;
@@ -55,21 +65,30 @@ async function tagImageImpl(
       return Failure('Tag parameter is required');
     }
 
-    // Resolve session (now always optional)
-    const sessionResult = await getSession(params.sessionId, context);
-
+    // Ensure session exists and get typed slice operations
+    const sessionResult = await ensureSession(context, params.sessionId);
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
     }
 
     const { id: sessionId, state: session } = sessionResult.value;
+    const slice = useSessionSlice('tag-image', io, context, StateSchema);
+
+    if (!slice) {
+      return Failure('Session manager not available');
+    }
+
     logger.info({ sessionId, tag }, 'Starting image tagging');
+
+    // Record input in session slice
+    await slice.patch(sessionId, { input: params });
 
     const dockerClient = createDockerClient(logger);
 
-    // Check for built image in session or use provided imageId
-    const sessionData = session as SessionData;
-    const buildResult = sessionData?.build_result;
+    // Check for built image in session metadata or use provided imageId
+    const buildResult = session.metadata?.build_result as
+      | { imageId?: string; tags?: string[] }
+      | undefined;
     const source = params.imageId || buildResult?.imageId;
 
     if (!source) {
@@ -94,23 +113,36 @@ async function tagImageImpl(
     }
 
     const tags = [tag];
-
-    // Update session with tag information using standardized helper
-    const updateResult = await updateSession(
+    const result: TagImageResult = {
+      success: true,
       sessionId,
-      {
-        build_result: {
-          ...(buildResult || {}),
-          imageId: source,
-          tags,
+      tags,
+      imageId: source,
+    };
+
+    // Update typed session slice with output and state
+    await slice.patch(sessionId, {
+      output: result,
+      state: {
+        lastTaggedAt: new Date(),
+        tagsApplied: tags,
+      },
+    });
+
+    // Update session metadata for backward compatibility
+    const sessionManager = context.sessionManager;
+    if (sessionManager) {
+      await sessionManager.update(sessionId, {
+        metadata: {
+          ...session.metadata,
+          build_result: {
+            ...(buildResult || {}),
+            imageId: source,
+            tags,
+          },
         },
         completed_steps: [...(session.completed_steps || []), 'tag'],
-      },
-      context,
-    );
-
-    if (!updateResult.ok) {
-      logger.warn({ error: updateResult.error }, 'Failed to update session, but tagging succeeded');
+      });
     }
 
     timer.end({ source, tag });
@@ -125,10 +157,7 @@ async function tagImageImpl(
     };
 
     return Success({
-      success: true,
-      sessionId,
-      tags,
-      imageId: source,
+      ...result,
       NextStep: getSuccessProgression(TOOL_NAMES.TAG_IMAGE, sessionContext).summary,
     });
   } catch (error) {

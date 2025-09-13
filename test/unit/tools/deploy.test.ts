@@ -144,12 +144,15 @@ function createMockToolContext(): ToolContext {
   return {
     logger: createMockLogger(),
     progressReporter: jest.fn(),
+    sessionManager: mockSessionManager,
   };
 }
 
 describe('deployApplication', () => {
   let mockLogger: ReturnType<typeof createMockLogger>;
   let config: DeployApplicationParams;
+  let mockEnsureSession: jest.Mock;
+  let mockUseSessionSlice: jest.Mock;
 
   // Sample K8s manifests for testing
   const sampleManifests = `
@@ -212,8 +215,15 @@ spec:
         id: 'test-session-123',
         state: {
           sessionId: 'test-session-123',
-          k8s_manifests: {
-            manifests: sampleManifests,  // The tool expects the manifests as a string, not an array
+          k8s_result: {
+            manifests: [
+              {
+                kind: 'Multiple',
+                namespace: 'default',
+                content: sampleManifests,
+                file_path: '/test/manifests.yaml',
+              },
+            ],
           },
           metadata: {},
           completed_steps: [],
@@ -222,16 +232,56 @@ spec:
       },
     });
     sessionHelpers.updateSession = jest.fn().mockResolvedValue({ ok: true });
+    
+    // Setup new session helper mocks
+    mockEnsureSession = sessionHelpers.ensureSession = jest.fn().mockResolvedValue({
+      ok: true,
+      value: {
+        id: 'test-session-123',
+        state: {
+          sessionId: 'test-session-123',
+          metadata: {},
+          k8s_result: {
+            manifests: [
+              {
+                kind: 'Multiple',
+                namespace: 'default',
+                content: sampleManifests,
+                file_path: '/test/manifests.yaml',
+              },
+            ],
+          },
+          completed_steps: [],
+          errors: {},
+          current_step: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      },
+    });
+    
+    // Setup useSessionSlice mock
+    mockUseSessionSlice = sessionHelpers.useSessionSlice = jest.fn().mockReturnValue({
+      get: jest.fn().mockResolvedValue({ ok: true, value: null }),
+      set: jest.fn().mockResolvedValue({ ok: true }),
+      patch: jest.fn().mockResolvedValue({ ok: true }),
+    });
   });
 
   describe('Successful Deployments', () => {
     beforeEach(() => {
       // Session with K8s manifests
       mockSessionManager.get.mockResolvedValue({
-        
-k8s_manifests: {
-  manifests: sampleManifests,
-},
+        k8s_result: {
+          manifests: [
+            {
+              kind: 'Multiple',
+              namespace: 'default',
+              content: sampleManifests,
+              file_path: '/test/manifests.yaml',
+            },
+          ],
+        },
         repo_path: '/test/repo',
       });
 
@@ -290,21 +340,18 @@ k8s_manifests: {
       // Verify deployment status was checked
       expect(mockKubernetesClient.getDeploymentStatus).toHaveBeenCalledWith('default', 'test-app');
       
-      // Verify session was updated using standardized helpers
-      const sessionHelpers = require('@mcp/tool-session-helpers');
-      expect(sessionHelpers.updateSession).toHaveBeenCalledWith(
+      // Verify session slice was updated with new pattern
+      const sliceMock = mockUseSessionSlice.mock.results[0].value;
+      expect(sliceMock.patch).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
-          deployment_result: expect.objectContaining({
+          output: expect.objectContaining({
             namespace: 'default',
             deploymentName: 'test-app',
             serviceName: 'test-app',
             ready: true,
           }),
-          completed_steps: expect.arrayContaining(['deploy']),
         }),
-        
-        expect.any(Object)  // context
       );
     });
 
@@ -353,10 +400,16 @@ k8s_manifests: {
     beforeEach(() => {
       // Use the existing sampleManifests which are properly handled by the YAML mock
       mockSessionManager.get.mockResolvedValue({
-        
-k8s_manifests: {
-  manifests: sampleManifests,
-},
+        k8s_result: {
+          manifests: [
+            {
+              kind: 'Multiple',
+              namespace: 'default',
+              content: sampleManifests,
+              file_path: '/test/manifests.yaml',
+            },
+          ],
+        },
         repo_path: '/test/repo',
       });
 
@@ -399,10 +452,16 @@ k8s_manifests: {
 
     it('should handle Kubernetes client failures gracefully', async () => {
       mockSessionManager.get.mockResolvedValue({
-        
-k8s_manifests: {
-  manifests: sampleManifests,
-},
+        k8s_result: {
+          manifests: [
+            {
+              kind: 'Multiple',
+              namespace: 'default',
+              content: sampleManifests,
+              file_path: '/test/manifests.yaml',
+            },
+          ],
+        },
         repo_path: '/test/repo',
       });
 
@@ -444,10 +503,16 @@ k8s_manifests: {
   describe('Configuration Options', () => {
     beforeEach(() => {
       mockSessionManager.get.mockResolvedValue({
-        
-k8s_manifests: {
-  manifests: sampleManifests,
-},
+        k8s_result: {
+          manifests: [
+            {
+              kind: 'Multiple',
+              namespace: 'default',
+              content: sampleManifests,
+              file_path: '/test/manifests.yaml',
+            },
+          ],
+        },
         repo_path: '/test/repo',
       });
 

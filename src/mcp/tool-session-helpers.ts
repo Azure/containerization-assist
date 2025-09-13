@@ -11,6 +11,10 @@ import type { SessionManager } from '../lib/session';
 import type { ToolContext } from '@mcp/context';
 import { extractErrorMessage } from '../lib/error-utils';
 
+// Re-export typed utilities for tools to use
+export { useSessionSlice, getSessionSlice, updateSessionSlice } from '../lib/session-slice-utils';
+export { defineToolIO, type SessionSlice, type ToolIO } from '../lib/session-types';
+
 /**
  * Get session manager from context - returns null if not available
  */
@@ -175,5 +179,39 @@ export async function updateSession(
     return Success(updatedSession);
   } catch (error) {
     return Failure(`Failed to update session: ${extractErrorMessage(error)}`);
+  }
+}
+
+/**
+ * Ensure session exists - creates if not found, returns existing otherwise
+ * Guarantees a WorkflowState exists for the given session ID
+ *
+ * @param context - Tool context with session manager
+ * @param sessionId - Optional session ID (generates random if not provided)
+ * @returns Result with session ID and state
+ */
+export async function ensureSession(
+  context?: ToolContext,
+  sessionId?: string,
+): Promise<Result<{ id: string; state: WorkflowState }>> {
+  try {
+    const sessionManager = getSessionManager(context);
+    if (!sessionManager) {
+      return Failure('Session manager not available in context');
+    }
+
+    const id = sessionId || randomUUID();
+
+    // Try to get existing session first
+    let session = await sessionManager.get(id);
+
+    // Create if doesn't exist
+    if (!session) {
+      session = await sessionManager.create(id);
+    }
+
+    return Success({ id, state: session });
+  } catch (error) {
+    return Failure(`Failed to ensure session: ${extractErrorMessage(error)}`);
   }
 }
