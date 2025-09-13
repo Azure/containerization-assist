@@ -265,7 +265,7 @@ async function scanImageImpl(
     const result: ScanImageResult = {
       success: true,
       sessionId,
-      ...(remediationGuidance && remediationGuidance.length > 0 && { remediationGuidance }),
+      ...(remediationGuidance.length > 0 && { remediationGuidance }),
       vulnerabilities: {
         critical: scanResult.criticalCount,
         high: scanResult.highCount,
