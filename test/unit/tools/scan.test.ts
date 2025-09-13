@@ -92,7 +92,6 @@ import { ensureSession, useSessionSlice } from '@mcp/tool-session-helpers';
 // Get the mocked instances after imports
 const mockSessionManager = (createSessionManager as jest.Mock)();
 const mockLogger = (createLogger as jest.Mock)();
-const mockEnsureSession = ensureSession as jest.Mock;
 const mockUseSessionSlice = useSessionSlice as jest.Mock;
 // mockSecurityScannerInstance is already defined above
 
