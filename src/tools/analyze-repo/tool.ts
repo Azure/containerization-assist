@@ -28,7 +28,7 @@ import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 import { getRecommendedBaseImage } from '../../lib/base-images';
 import type { ToolContext } from '../../mcp/context';
 import { createTimer, createLogger } from '../../lib/logger';
-import { Success, Failure, type Result, type AnalyzeRepoResult } from '../../types';
+import { Success, Failure, type Result } from '../../types';
 import type { AnalyzeRepoParams } from './schema';
 import { parsePackageJson, getAllDependencies } from '../../lib/parsing-package-json';
 import { DEFAULT_PORTS } from '../../config/defaults';
@@ -36,7 +36,37 @@ import { getSuccessProgression } from '../../workflows/workflow-progression';
 import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { extractErrorMessage } from '../../lib/error-utils';
 
-export type { AnalyzeRepoResult } from '../../types';
+export interface AnalyzeRepoResult {
+  ok: boolean;
+  sessionId: string;
+  language: string;
+  languageVersion?: string;
+  framework?: string;
+  frameworkVersion?: string;
+  buildSystem?: {
+    type: string;
+    file: string;
+    buildCommand: string;
+    testCommand?: string;
+  };
+  dependencies: Array<{ name: string; version?: string; type: string }>;
+  ports: number[];
+  hasDockerfile: boolean;
+  hasDockerCompose: boolean;
+  hasKubernetes: boolean;
+  recommendations: {
+    baseImage: string;
+    buildStrategy: 'multi-stage' | 'single-stage';
+    securityNotes: string[];
+  };
+  metadata: {
+    repoPath: string;
+    depth: number;
+    timestamp: number;
+    includeTests?: boolean;
+    aiInsights?: unknown;
+  };
+}
 const LANGUAGE_SIGNATURES: Record<string, { extensions: string[]; files: string[] }> = {
   javascript: {
     extensions: ['', '.mjs', '.cjs'],
