@@ -11,9 +11,9 @@
  * - Sufficient disk space for image operations
  */
 
-import { createDockerClient } from '../../../../src/services/docker/client';
+import { createDockerClient } from '../../../../src/services/docker-client';
 import { createLogger } from '../../../../src/lib/logger';
-import type { DockerBuildOptions, DockerClient } from '../../../../src/services/docker/client';
+import type { DockerBuildOptions, DockerClient } from '../../../../src/services/docker-client';
 import { DockerTestCleaner, TEST_IMAGE_NAME } from '../../../__support__/utilities/docker-test-cleaner';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -30,11 +30,11 @@ describe('Docker Client Error Handling Integration Tests', () => {
     // Initialize the test cleaner with verification enabled
     dockerClient = createDockerClient(logger);
     testCleaner = new DockerTestCleaner(logger, dockerClient, { verifyCleanup: true });
-    
+
     // Create a temporary directory for test Dockerfiles
     testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'docker-error-tests-'));
-    
-        // Wrap buildImage to track successful builds for cleanup
+
+    // Wrap buildImage to track successful builds for cleanup
     const original = dockerClient.buildImage.bind(dockerClient);
     dockerClient.buildImage = async (options: DockerBuildOptions) => {
       const result = await original(options);
@@ -54,7 +54,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
   afterAll(async () => {
     // Clean up all tracked Docker resources
     await testCleaner.cleanup();
-    
+
     // Clean up test directory
     try {
       await fs.rm(testDir, { recursive: true, force: true });
@@ -64,7 +64,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
       // Don't throw here to avoid masking test results
     }
   });
-  
+
   afterEach(async () => {
     // Clean up any test containers after each test
     await testCleaner.cleanupContainers();
@@ -91,7 +91,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
       };
 
       const result = await dockerClient.buildImage(invalidRegistryOptions);
-      
+
       expect(result.ok).toBe(false);
       if (!result.ok) {
         // Should detect network connectivity issues with meaningful error message
@@ -102,7 +102,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
 
     test('should detect registry connection refused (ECONNREFUSED)', async () => {
       await createTestDockerfile(
-        'FROM localhost:9999/library/alpine:latest\nRUN echo "test"', 
+        'FROM localhost:9999/library/alpine:latest\nRUN echo "test"',
         'Dockerfile.refused'
       );
 
@@ -113,7 +113,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
       };
 
       const result = await dockerClient.buildImage(connectionRefusedOptions);
-      
+
       expect(result.ok).toBe(false);
       if (!result.ok) {
         // Should detect connection refused with meaningful error message
@@ -145,7 +145,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
       };
 
       const result = await dockerClient.buildImage(authFailureOptions);
-      
+
       expect(result.ok).toBe(false);
       if (!result.ok) {
         // Should detect authentication issues with meaningful error message
@@ -169,7 +169,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
       };
 
       const result = await dockerClient.buildImage(missingImageOptions);
-      
+
       expect(result.ok).toBe(false);
       if (!result.ok) {
         // Should detect missing images with meaningful error message
@@ -185,13 +185,13 @@ describe('Docker Client Error Handling Integration Tests', () => {
       );
 
       const nonExistentRepoOptions: DockerBuildOptions = {
-        dockerfile: 'Dockerfile.nonexistent', 
+        dockerfile: 'Dockerfile.nonexistent',
         context: testDir,
         t: TEST_IMAGE_NAME
       };
 
       const result = await dockerClient.buildImage(nonExistentRepoOptions);
-      
+
       expect(result.ok).toBe(false);
       if (!result.ok) {
         // Should detect non-existent repositories with meaningful error message
@@ -212,12 +212,12 @@ describe('Docker Client Error Handling Integration Tests', () => {
 
       const serverErrorOptions: DockerBuildOptions = {
         dockerfile: 'Dockerfile.server',
-        context: testDir, 
+        context: testDir,
         t: TEST_IMAGE_NAME
       };
 
       const result = await dockerClient.buildImage(serverErrorOptions);
-      
+
       // This test might pass if the registry is working correctly
       // We mainly want to ensure our error handling can detect 5xx errors when they occur
       if (!result.ok && result.error.includes('server error')) {
@@ -241,7 +241,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
       };
 
       const result = await dockerClient.buildImage(malformedDockerfileOptions);
-      
+
       expect(result.ok).toBe(false);
       if (!result.ok) {
         // Should detect syntax errors with meaningful error message
@@ -263,7 +263,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
       };
 
       const result = await dockerClient.buildImage(noFromOptions);
-      
+
       expect(result.ok).toBe(false);
       if (!result.ok) {
         // Should detect missing FROM instruction with meaningful error message
@@ -283,7 +283,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
       };
 
       const result = await dockerClient.buildImage(invalidDockerfileOptions);
-      
+
       expect(result.ok).toBe(false);
       if (!result.ok) {
         // Should detect missing Dockerfile with meaningful error message
@@ -310,7 +310,7 @@ RUN echo "Large build test"
       };
 
       const result = await dockerClient.buildImage(largeBuildOptions);
-      
+
       // This test might pass if there's sufficient disk space
       // We mainly want to ensure our error handling can detect disk space issues when they occur
       if (!result.ok && result.error.includes('disk space')) {
@@ -323,7 +323,7 @@ RUN echo "Large build test"
   describe('Image Operations Error Detection', () => {
     test('should detect errors when getting non-existent images', async () => {
       const result = await dockerClient.getImage('nonexistent-image:latest');
-      
+
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.error).toMatch(/not found|does not exist|404/i);
@@ -332,7 +332,7 @@ RUN echo "Large build test"
 
     test('should detect errors when tagging non-existent images', async () => {
       const result = await dockerClient.tagImage('nonexistent-image:latest', 'new-repo', 'latest');
-      
+
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.error).toMatch(/not found|does not exist|no such image/i);
@@ -355,7 +355,7 @@ RUN echo "Large build test"
       if (buildResult.ok) {
         // Try to push to Docker Hub without authentication
         const pushResult = await dockerClient.pushImage('test-push-unauthorized', 'latest');
-        
+
         expect(pushResult.ok).toBe(false);
         if (!pushResult.ok) {
           // Should detect authentication issues with meaningful error message
@@ -380,7 +380,7 @@ RUN exit 1
       };
 
       const result = await dockerClient.buildImage(progressErrorOptions);
-      
+
       expect(result.ok).toBe(false);
       if (!result.ok) {
         // Should detect build command failures with meaningful error message
@@ -404,7 +404,7 @@ RUN echo "After error"
       };
 
       const result = await dockerClient.buildImage(stepErrorOptions);
-      
+
       expect(result.ok).toBe(false);
       if (!result.ok) {
         // Should detect step failures with meaningful error message
@@ -429,7 +429,7 @@ RUN echo "After error"
 
       for (const options of testCases) {
         const result = await dockerClient.buildImage(options);
-        
+
         expect(result.ok).toBe(false);
         if (!result.ok) {
           // Should never return generic "Unknown error" messages
@@ -453,7 +453,7 @@ RUN echo "After error"
       };
 
       const result = await dockerClient.buildImage(networkErrorOptions);
-      
+
       expect(result.ok).toBe(false);
       if (!result.ok) {
         // Error should be specific and actionable, not generic
