@@ -70,7 +70,7 @@ export function useSessionSlice<In, Out, State = Record<string, unknown>>(
         }
 
         // Validate the slice structure
-        if (typeof slice !== 'object' || slice === null) {
+        if (slice === null || typeof slice !== 'object') {
           return null;
         }
 

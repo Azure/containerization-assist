@@ -95,7 +95,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
       expect(result.ok).toBe(false);
       if (!result.ok) {
         // Should detect network connectivity issues with meaningful error message
-        expect(result.error).toMatch(/network|connectivity|ENOTFOUND|getaddrinfo|connection/i);
+        expect(result.error).toMatch(/network|connectivity|ENOTFOUND|getaddrinfo|connection|no such host/i);
         expect(result.error).not.toBe('Build failed: Unknown error');
       }
     }, testTimeout);
