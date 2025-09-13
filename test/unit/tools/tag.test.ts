@@ -58,21 +58,25 @@ const mockTimer = {
   error: jest.fn(),
 };
 
-jest.mock('@lib/session', () => ({
+jest.mock('../../../src/lib/session', () => ({
   createSessionManager: jest.fn(() => mockSessionManager),
 }));
 
-jest.mock('@lib/docker', () => ({
+jest.mock('../../../src/lib/docker', () => ({
   createDockerClient: jest.fn(() => mockDockerClient),
 }));
 
-jest.mock('@lib/logger', () => ({
+jest.mock('../../../src/lib/logger', () => ({
   createTimer: jest.fn(() => mockTimer),
   createLogger: jest.fn(() => createMockLogger()),
 }));
 
 // Mock session helpers
-jest.mock('@mcp/tool-session-helpers');
+jest.mock('../../../src/mcp/tool-session-helpers', () => ({
+  ensureSession: jest.fn(),
+  useSessionSlice: jest.fn(),
+  defineToolIO: jest.fn((input, output) => ({ input, output })),
+}));
 
 // Mock the session slice operations
 const mockSlicePatch = jest.fn().mockResolvedValue(undefined);
@@ -98,7 +102,7 @@ describe('tagImage', () => {
     jest.clearAllMocks();
 
     // Setup session helper mocks
-    const sessionHelpers = require('@mcp/tool-session-helpers');
+    const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
     
     // Mock ensureSession to return session info
     sessionHelpers.ensureSession = jest.fn().mockResolvedValue({
@@ -269,7 +273,7 @@ describe('tagImage', () => {
     });
 
     it('should preserve existing build result data when updating session', async () => {
-      const sessionHelpers = require('@mcp/tool-session-helpers');
+      const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
       sessionHelpers.ensureSession.mockResolvedValue({
         ok: true,
         value: {
@@ -355,6 +359,8 @@ describe('tagImage', () => {
         expect(result.ok).toBe(true);
         if (result.ok) {
           expect(result.value.tags).toEqual([tag]);
+          expect(result.value.success).toBe(true);
+          expect(result.value.imageId).toBe('sha256:mock-image-id');
         }
 
         // Reset mocks for next iteration
@@ -397,7 +403,7 @@ describe('tagImage', () => {
 
   describe('Error Handling', () => {
     it('should auto-create session when not found', async () => {
-      const sessionHelpers = require('@mcp/tool-session-helpers');
+      const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
       sessionHelpers.ensureSession.mockResolvedValue({
         ok: true,
         value: {
@@ -425,7 +431,7 @@ describe('tagImage', () => {
     });
 
     it('should return error when no build result exists', async () => {
-      const sessionHelpers = require('@mcp/tool-session-helpers');
+      const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
       sessionHelpers.ensureSession.mockResolvedValue({
         ok: true,
         value: {
@@ -451,7 +457,7 @@ describe('tagImage', () => {
     });
 
     it('should return error when build result has no imageId', async () => {
-      const sessionHelpers = require('@mcp/tool-session-helpers');
+      const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
       sessionHelpers.ensureSession.mockResolvedValue({
         ok: true,
         value: {
@@ -581,7 +587,7 @@ describe('tagImage', () => {
     });
 
     it('should handle session update failures gracefully', async () => {
-      const sessionHelpers = require('@mcp/tool-session-helpers');
+      const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
       sessionHelpers.ensureSession.mockResolvedValue({
         ok: true,
         value: {
@@ -619,6 +625,7 @@ describe('tagImage', () => {
       if (result.ok) {
         expect(result.value.success).toBe(true);
         expect(result.value.imageId).toBe('sha256:mock-image-id');
+        // NextStep may or may not be present
       }
     });
   });
@@ -655,7 +662,12 @@ describe('tagImage', () => {
       const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
-      const sessionHelpers = require('@mcp/tool-session-helpers');
+      if (result.ok) {
+        expect(result.value.success).toBe(true);
+        expect(result.value.imageId).toBe('sha256:mock-image-id');
+        expect(result.value.tags).toEqual(['myapp:v1.0']);
+      }
+      const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
       expect(mockSlicePatch).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
@@ -684,7 +696,12 @@ describe('tagImage', () => {
       const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
-      const sessionHelpers = require('@mcp/tool-session-helpers');
+      if (result.ok) {
+        expect(result.value.success).toBe(true);
+        expect(result.value.imageId).toBe('sha256:mock-image-id');
+        expect(result.value.tags).toEqual(['myapp:v1.0']);
+      }
+      const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
       expect(mockSlicePatch).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
@@ -729,7 +746,7 @@ describe('tagImage', () => {
 
       for (const testConfig of configurations) {
         // Setup session for each different sessionId
-        const sessionHelpers = require('@mcp/tool-session-helpers');
+        const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
         sessionHelpers.ensureSession.mockResolvedValue({
           ok: true,
           value: {
@@ -754,6 +771,8 @@ describe('tagImage', () => {
         if (result.ok) {
           expect(result.value.sessionId).toBe(testConfig.sessionId);
           expect(result.value.tags).toEqual([testConfig.tag]);
+          expect(result.value.success).toBe(true);
+          expect(result.value.imageId).toBe('sha256:mock-image-id');
         }
 
         // Reset mocks for next iteration
@@ -773,6 +792,8 @@ describe('tagImage', () => {
         expect(result.ok).toBe(true);
         if (result.ok) {
           expect(result.value.tags).toEqual([tag]);
+          expect(result.value.success).toBe(true);
+          expect(result.value.imageId).toBe('sha256:mock-image-id');
         }
 
         // Each operation should tag the same image
@@ -819,6 +840,11 @@ describe('tagImage', () => {
       // The wrapped tool can be called directly with params and context
       const result = await tagImageTool(config, { logger: mockLogger, sessionManager: mockSessionManager });
       expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.success).toBe(true);
+        expect(result.value.imageId).toBe('sha256:mock-image-id');
+        expect(result.value.tags).toEqual(['myapp:v1.0']);
+      }
     });
   });
 });

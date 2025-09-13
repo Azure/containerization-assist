@@ -6,6 +6,7 @@
 import { jest } from '@jest/globals';
 import { promises as fs } from 'node:fs';
 import { buildImage, type BuildImageConfig } from '../../../src/tools/build-image/tool';
+import { ensureSession } from '../../../src/mcp/tool-session-helpers';
 
 // Result Type Helpers for Testing
 function createSuccessResult<T>(value: T) {
@@ -75,20 +76,32 @@ const mockDockerClient = {
   buildImage: jest.fn(),
 };
 
-jest.mock('@lib/session', () => ({
+jest.mock('../../../src/lib/session', () => ({
   createSessionManager: jest.fn(() => mockSessionManager),
 }));
 
-jest.mock('@lib/docker', () => ({
+jest.mock('../../../src/lib/docker', () => ({
   createDockerClient: jest.fn(() => mockDockerClient),
 }));
 
-jest.mock('@lib/logger', () => ({
+jest.mock('../../../src/lib/logger', () => ({
   createTimer: jest.fn(() => ({
     end: jest.fn(),
     error: jest.fn(),
   })),
   createLogger: jest.fn(() => createMockLogger()),
+}));
+
+// Mock the session helpers
+jest.mock('../../../src/mcp/tool-session-helpers', () => ({
+  ensureSession: jest.fn(),
+  useSessionSlice: jest.fn().mockReturnValue({
+    get: jest.fn(),
+    set: jest.fn(),
+    patch: jest.fn().mockResolvedValue(undefined),
+    clear: jest.fn(),
+  }),
+  defineToolIO: jest.fn((input, output) => ({ input, output })),
 }));
 
 const mockFs = fs as jest.Mocked<typeof fs>;
@@ -119,6 +132,28 @@ CMD ["node", "index.js"]`;
 
     // Reset all mocks
     jest.clearAllMocks();
+    
+    // Setup ensureSession mock
+    const mockEnsureSession = ensureSession as jest.Mock;
+    mockEnsureSession.mockResolvedValue({
+      ok: true,
+      value: {
+        id: 'test-session-123',
+        state: {
+          workflow_state: {
+            analysis_result: {
+              language: 'javascript',
+              framework: 'express',
+            },
+          },
+          repo_path: '/test/repo',
+          dockerfile_result: {
+            path: '/test/repo/Dockerfile',
+            content: mockDockerfile,
+          },
+        },
+      },
+    });
 
     // Default mock implementations
     mockFs.access.mockResolvedValue(undefined);
@@ -138,6 +173,32 @@ CMD ["node", "index.js"]`;
 
   describe('Successful Build', () => {
     beforeEach(() => {
+      // Update ensureSession mock for this describe block
+      const mockEnsureSession = ensureSession as jest.Mock;
+      mockEnsureSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            workflow_state: {
+              analysis_result: {
+                language: 'javascript',
+                framework: 'express',
+              },
+            },
+            analysis_result: {
+              language: 'javascript',
+              framework: 'express',
+            },
+            repo_path: '/test/repo',
+            dockerfile_result: {
+              path: '/test/repo/Dockerfile',
+              content: mockDockerfile,
+            },
+          },
+        },
+      });
+      
       mockSessionManager.get.mockResolvedValue({
         workflow_state: {
           analysis_result: {
@@ -216,17 +277,19 @@ CMD ["node", "index.js"]`;
 
       expect(result.ok).toBe(true);
       expect(mockSessionManager.update).toHaveBeenCalledWith('test-session-123', expect.objectContaining({
-        build_result: {
-          success: true,
-          imageId: 'sha256:mock-image-id',
-          tags: ['myapp:latest', 'myapp:v1.0'],
-          size: 123456789,
-          metadata: expect.objectContaining({
-            layers: 8,
-            buildTime: expect.any(Number),
-            logs: expect.arrayContaining(['Successfully built mock-image-id']),
-          }),
-        },
+        metadata: expect.objectContaining({
+          build_result: {
+            success: true,
+            imageId: 'sha256:mock-image-id',
+            tags: ['myapp:latest', 'myapp:v1.0'],
+            size: 123456789,
+            metadata: expect.objectContaining({
+              layers: 8,
+              buildTime: expect.any(Number),
+              logs: expect.arrayContaining(['Successfully built mock-image-id']),
+            }),
+          },
+        }),
         completed_steps: expect.arrayContaining(['build-image']),
       }));
     });

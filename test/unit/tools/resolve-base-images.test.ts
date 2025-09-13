@@ -6,7 +6,7 @@
 import { jest } from '@jest/globals';
 
 // Jest mocks must be at the top to ensure proper hoisting
-jest.mock('@lib/session', () => ({
+jest.mock('../../../src/lib/session', () => ({
   createSessionManager: jest.fn(() => ({
     get: jest.fn(),
     create: jest.fn(),
@@ -14,13 +14,13 @@ jest.mock('@lib/session', () => ({
   })),
 }));
 
-jest.mock('@lib/docker', () => ({
+jest.mock('../../../src/lib/docker', () => ({
   createDockerRegistryClient: jest.fn(() => ({
     getImageMetadata: jest.fn(),
   })),
 }));
 
-jest.mock('@lib/logger', () => ({
+jest.mock('../../../src/lib/logger', () => ({
   createTimer: jest.fn(),
   createLogger: jest.fn(() => ({
     info: jest.fn(),
@@ -33,22 +33,24 @@ jest.mock('@lib/logger', () => ({
   })),
 }));
 
-import { resolveBaseImages } from '@tools/resolve-base-images/tool';
+import { resolveBaseImages } from '../../../src/tools/resolve-base-images/tool';
 import type { ResolveBaseImagesParams } from '../../../src/tools/resolve-base-images/schema';
-import { createSessionManager } from '@lib/session';
-import { createDockerRegistryClient } from '@lib/docker';
-import { createLogger, createTimer } from '@lib/logger';
+import { createSessionManager } from '../../../src/lib/session';
+import { createDockerRegistryClient } from '../../../src/lib/docker';
+import { createLogger, createTimer } from '../../../src/lib/logger';
+import { ensureSession } from '../../../src/mcp/tool-session-helpers';
 
 // Get the mocked instances after imports
 const mockSessionManager = (createSessionManager as jest.Mock)();
 const mockDockerRegistryClient = (createDockerRegistryClient as jest.Mock)();
 const mockLogger = (createLogger as jest.Mock)();
+const mockEnsureSession = ensureSession as jest.Mock;
 const mockTimer = {
   end: jest.fn(),
   error: jest.fn(),
 };
 
-jest.mock('@lib/base-images', () => ({
+jest.mock('../../../src/lib/base-images', () => ({
   getSuggestedBaseImages: jest.fn((language: string) => {
     if (language === 'javascript' || language === 'typescript') {
       return ['node:18-alpine', 'node:18-slim', 'node:18', 'node:20-alpine'];
@@ -71,7 +73,20 @@ jest.mock('@lib/base-images', () => ({
 }));
 
 // Mock MCP helper modules
-jest.mock('@mcp/tool-session-helpers');
+jest.mock('../../../src/mcp/tool-session-helpers', () => ({
+  ensureSession: jest.fn(),
+  useSessionSlice: jest.fn().mockReturnValue({
+    get: jest.fn(),
+    set: jest.fn(),
+    patch: jest.fn().mockResolvedValue(undefined),
+    clear: jest.fn(),
+  }),
+  defineToolIO: jest.fn((input, output) => ({ input, output })),
+  getSession: jest.fn(),
+  updateSession: jest.fn(),
+  updateSessionData: jest.fn(),
+  resolveSession: jest.fn(),
+}));
 
 // wrapTool mock removed - tool now uses direct implementation
 
@@ -110,11 +125,12 @@ describe('resolveBaseImagesTool', () => {
     };
 
     // Get mocked functions
-    const sessionHelpers = require('@mcp/tool-session-helpers');
+    const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
     mockGetSession = sessionHelpers.getSession = jest.fn();
     mockUpdateSession = sessionHelpers.updateSession = jest.fn();
     mockUpdateSessionData = sessionHelpers.updateSessionData = jest.fn();
     mockResolveSession = sessionHelpers.resolveSession = jest.fn();
+    const mockEnsureSession = ensureSession as jest.Mock;
 
     // Reset all mocks
     jest.clearAllMocks();
@@ -123,7 +139,7 @@ describe('resolveBaseImagesTool', () => {
     (createTimer as jest.Mock).mockReturnValue(mockTimer);
     
     // Setup default session helper mocks
-    mockGetSession.mockResolvedValue({
+    mockEnsureSession.mockResolvedValue({
       ok: true,
       value: {
         id: 'test-session-123',
@@ -139,7 +155,6 @@ describe('resolveBaseImagesTool', () => {
           metadata: {},
           completed_steps: ['analyze-repo'],
         },
-        isNew: false,
       },
     });
     mockUpdateSession.mockResolvedValue({ ok: true });
@@ -243,7 +258,7 @@ describe('resolveBaseImagesTool', () => {
 
     it('should handle Python applications', async () => {
       // Mock session with Python language
-      mockGetSession.mockResolvedValueOnce({
+      mockEnsureSession.mockResolvedValueOnce({
         ok: true,
         value: {
           id: 'test-session-123',
@@ -257,7 +272,6 @@ describe('resolveBaseImagesTool', () => {
             metadata: {},
             completed_steps: ['analyze-repo'],
           },
-          isNew: false,
         },
       });
 
@@ -288,7 +302,7 @@ describe('resolveBaseImagesTool', () => {
 
       expect(result.ok).toBe(true);
       // Check that session was retrieved
-      expect(mockGetSession).toHaveBeenCalledWith('test-session-123', mockContext);
+      expect(mockEnsureSession).toHaveBeenCalled();
     });
   });
 
@@ -312,12 +326,12 @@ describe('resolveBaseImagesTool', () => {
       const mockContext = {} as any;
       const result = await resolveBaseImages(config, mockContext);
 
-      expect(mockGetSession).toHaveBeenCalledWith('test-session-123', mockContext);
+      expect(mockEnsureSession).toHaveBeenCalled();
     });
 
     it('should fail when no analysis result available', async () => {
       // Mock session without analysis
-      mockGetSession.mockResolvedValueOnce({
+      mockEnsureSession.mockResolvedValueOnce({
         ok: true,
         value: {
           id: 'test-session-123',
@@ -328,7 +342,6 @@ describe('resolveBaseImagesTool', () => {
             completed_steps: [],
             // No analysis_result
           },
-          isNew: false,
         },
       });
 
@@ -378,7 +391,7 @@ describe('resolveBaseImagesTool', () => {
       const result = await resolveBaseImages(config, mockContext);
 
       expect(result.ok).toBe(true);
-      expect(mockGetSession).toHaveBeenCalledWith('test-session-123', mockContext);
+      expect(mockEnsureSession).toHaveBeenCalled();
       expect(mockUpdateSession).toHaveBeenCalled();
     });
   });
@@ -452,7 +465,7 @@ describe('resolveBaseImagesTool', () => {
 
     it('should handle errors with timer', async () => {
       // Mock session helpers to return an error
-      mockGetSession.mockResolvedValue({
+      mockEnsureSession.mockResolvedValue({
         ok: false,
         error: 'Session error',
       });
