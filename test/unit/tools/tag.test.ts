@@ -166,7 +166,7 @@ describe('tagImage', () => {
       const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       if (!result.ok) {
-        console.error('Test failed with error:', result.error);
+        // (debug statement removed)
       }
       expect(result.ok).toBe(true);
       if (result.ok) {
