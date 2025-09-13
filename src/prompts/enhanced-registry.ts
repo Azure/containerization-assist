@@ -9,7 +9,7 @@ import { Result, Success, Failure } from '../types';
  * Enhanced prompt registry with composition capabilities
  */
 export class EnhancedPromptRegistry {
-  private prompts: Map<string, PromptEntry> = new Map();
+  private prompts: Map<string, PromptEntry>;
   private logger: Logger | undefined;
 
   constructor(prompts: Map<string, PromptEntry>, logger?: Logger) {
