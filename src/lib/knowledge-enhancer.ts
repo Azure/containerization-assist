@@ -88,6 +88,8 @@ function getCategory(operation: string): string | null {
     fix_dockerfile: 'dockerfile',
     analyze_repo: 'dockerfile',
     generate_k8s_manifests: 'kubernetes',
+    generate_aca_manifests: 'kubernetes',
+    convert_aca_to_k8s: 'kubernetes',
     scan: 'security',
   };
 
