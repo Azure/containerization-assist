@@ -17,7 +17,7 @@
  * ```
  */
 
-import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import { extractErrorMessage } from '../../lib/error-utils';
 import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
@@ -37,7 +37,57 @@ import {
 } from '../../workflows/workflow-progression';
 import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { scoreConfigCandidates } from '@lib/integrated-scoring';
-import type { FixDockerfileParams } from './schema';
+import { fixDockerfileSchema, type FixDockerfileParams } from './schema';
+import { z } from 'zod';
+
+// Define the result schema for type safety
+const FixDockerfileResultSchema = z.object({
+  ok: z.boolean(),
+  sessionId: z.string(),
+  dockerfile: z.string(),
+  path: z.string(),
+  fixes: z.array(z.string()),
+  validation: z.array(z.string()),
+  aiUsed: z.boolean(),
+  generationMethod: z.enum(['AI', 'fallback']),
+  originalScore: z.number().optional(),
+  fixedScore: z.number().optional(),
+  improvement: z.number().optional(),
+  samplingMetadata: z
+    .object({
+      stoppedEarly: z.boolean().optional(),
+      candidatesGenerated: z.number(),
+      winnerScore: z.number(),
+      samplingDuration: z.number().optional(),
+    })
+    .optional(),
+  winnerScore: z.number().optional(),
+  scoreBreakdown: z.record(z.number()).optional(),
+  allCandidates: z
+    .array(
+      z.object({
+        id: z.string(),
+        content: z.string(),
+        score: z.number(),
+        scoreBreakdown: z.record(z.number()),
+        rank: z.number().optional(),
+      }),
+    )
+    .optional(),
+});
+
+// Define tool IO for type-safe session operations
+const io = defineToolIO(fixDockerfileSchema, FixDockerfileResultSchema);
+
+// Tool-specific state schema
+const StateSchema = z.object({
+  lastFixedAt: z.date().optional(),
+  fixCount: z.number().optional(),
+  lastError: z.string().optional(),
+  improvementScore: z.number().optional(),
+  fixStrategy: z.enum(['ai', 'fallback', 'hybrid']).optional(),
+});
+
 /**
  * Result interface for Dockerfile fix operations with AI tracking
  */
@@ -313,13 +363,23 @@ async function fixDockerfileImpl(
     logger.info({ hasError: !!error, hasDockerfile: !!dockerfile }, 'Starting Dockerfile fix');
     // Progress: Starting validation
     if (progress) await progress('VALIDATING');
-    // Resolve session (now always optional)
-    const sessionResult = await getSession(params.sessionId, context);
+    // Ensure session exists and get typed slice operations
+    const sessionResult = await ensureSession(context, params.sessionId);
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
     }
+
     const { id: sessionId, state: session } = sessionResult.value;
+    const slice = useSessionSlice('fix-dockerfile', io, context, StateSchema);
+
+    if (!slice) {
+      return Failure('Session manager not available');
+    }
+
     logger.info({ sessionId }, 'Starting Dockerfile fix operation');
+
+    // Record input in session slice
+    await slice.patch(sessionId, { input: params });
     // Get the Dockerfile to fix (from session or provided)
     const sessionState = session as { dockerfile_result?: { content?: string } } | null | undefined;
     const dockerfileResult = sessionState?.dockerfile_result;
@@ -446,29 +506,60 @@ async function fixDockerfileImpl(
       logger.debug({ error }, 'Could not score fixed Dockerfile, continuing without score');
     }
 
-    // Update session with fixed Dockerfile using standardized helper
-    const updateResult = await updateSession(
+    // Prepare the result for session update
+    const fixResult: FixDockerfileResult = {
+      ok: true,
       sessionId,
-      {
-        dockerfile_result: {
-          content: fixedDockerfile,
-          path: './Dockerfile',
-          multistage: false,
-          fixed: true,
-          fixes,
-        },
-        completed_steps: [...(session.completed_steps || []), 'fix-dockerfile'],
-        metadata: {
-          dockerfile_fixed: true,
-          dockerfile_fixes: fixes,
-          ai_used: aiUsed,
-          generation_method: generationMethod,
-        },
+      dockerfile: fixedDockerfile,
+      path: './Dockerfile',
+      fixes,
+      validation: ['Dockerfile validated successfully'],
+      aiUsed,
+      generationMethod,
+      ...(originalScore !== undefined ? { originalScore } : {}),
+      ...(fixedScore !== undefined ? { fixedScore } : {}),
+      ...(improvement !== undefined ? { improvement } : {}),
+    };
+
+    // Update typed session slice with output and state
+    await slice.patch(sessionId, {
+      output: fixResult,
+      state: {
+        lastFixedAt: new Date(),
+        fixCount: fixes.length,
+        lastError: error || 'none',
+        improvementScore: improvement,
+        fixStrategy: aiUsed ? 'ai' : 'fallback',
       },
-      context,
-    );
-    if (!updateResult.ok) {
-      logger.warn({ error: updateResult.error }, 'Failed to update session, but fix succeeded');
+    });
+
+    // Update session metadata for backward compatibility
+    const sessionManager = context?.sessionManager;
+    if (sessionManager) {
+      try {
+        await sessionManager.update(sessionId, {
+          metadata: {
+            ...session.metadata,
+            dockerfile_result: {
+              content: fixedDockerfile,
+              path: './Dockerfile',
+              multistage: false,
+              fixed: true,
+              fixes,
+            },
+            dockerfile_fixed: true,
+            dockerfile_fixes: fixes,
+            ai_used: aiUsed,
+            generation_method: generationMethod,
+          },
+          completed_steps: [...(session.completed_steps || []), 'fix-dockerfile'],
+        });
+      } catch (error) {
+        logger.warn(
+          { error: extractErrorMessage(error) },
+          'Failed to update session, but fix succeeded',
+        );
+      }
     }
     // Progress: Finalizing results
     if (progress) await progress('FINALIZING');
@@ -489,42 +580,28 @@ async function fixDockerfileImpl(
       }),
     };
 
-    const result: FixDockerfileResult & {
-      _fileWritten?: boolean;
-      _fileWrittenPath?: string;
-      NextStep?: string;
-    } = {
-      ok: true,
-      sessionId,
-      dockerfile: fixedDockerfile,
-      path: './Dockerfile',
-      fixes,
-      validation: ['Dockerfile validated successfully'],
-      aiUsed,
-      generationMethod,
-      ...(originalScore !== undefined ? { originalScore } : {}),
-      ...(fixedScore !== undefined ? { fixedScore } : {}),
-      ...(improvement !== undefined ? { improvement } : {}),
-      _fileWritten: true,
-      _fileWrittenPath: './Dockerfile',
-      NextStep: getSuccessProgression(TOOL_NAMES.FIX_DOCKERFILE, sessionContext).summary,
-    };
     // Add sampling metadata if sampling was used
     if (!params.disableSampling) {
       if (samplingMetadata) {
-        result.samplingMetadata = samplingMetadata;
+        fixResult.samplingMetadata = samplingMetadata;
       }
       if (winnerScore !== undefined) {
-        result.winnerScore = winnerScore;
+        fixResult.winnerScore = winnerScore;
       }
       if (scoreBreakdown && params.includeScoreBreakdown) {
-        result.scoreBreakdown = scoreBreakdown;
+        fixResult.scoreBreakdown = scoreBreakdown;
       }
       if (allCandidates && params.returnAllCandidates) {
-        result.allCandidates = allCandidates;
+        fixResult.allCandidates = allCandidates;
       }
     }
-    return Success(result);
+
+    return Success({
+      ...fixResult,
+      _fileWritten: true,
+      _fileWrittenPath: './Dockerfile',
+      NextStep: getSuccessProgression(TOOL_NAMES.FIX_DOCKERFILE, sessionContext).summary,
+    });
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Dockerfile fix failed');

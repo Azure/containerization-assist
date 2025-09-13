@@ -37,6 +37,8 @@ import { convertAcaToK8s } from '../tools/convert-aca-to-k8s/tool.js';
 import { convertAcaToK8sSchema } from '../tools/convert-aca-to-k8s/schema.js';
 import { generateHelmCharts } from '../tools/generate-helm-charts/tool.js';
 import { generateHelmChartsSchema } from '../tools/generate-helm-charts/schema.js';
+import { inspectSession } from '../tools/inspect-session/tool.js';
+import { InspectSessionParamsSchema as inspectSessionSchema } from '../tools/inspect-session/schema.js';
 import type { Tool, Result } from '../types';
 import type { ZodObject, ZodRawShape } from 'zod';
 
@@ -63,6 +65,7 @@ export function getAllInternalTools(): Tool[] {
     generateAcaManifestsTool,
     convertAcaToK8sTool,
     generateHelmChartsTool,
+    inspectSessionTool,
   ];
 }
 
@@ -96,6 +99,7 @@ export const TOOL_NAMES = {
   GENERATE_ACA_MANIFESTS: 'generate_aca_manifests',
   CONVERT_ACA_TO_K8S: 'convert_aca_to_k8s',
   GENERATE_HELM_CHARTS: 'generate_helm_charts',
+  INSPECT_SESSION: 'inspect-session',
 } as const;
 
 /**
@@ -244,4 +248,11 @@ const generateHelmChartsTool = createToolWrapper(
   'Generate Helm charts for Kubernetes deployments',
   generateHelmChartsSchema,
   generateHelmCharts as (params: unknown, context: unknown) => Promise<Result<unknown>>,
+);
+
+const inspectSessionTool = createToolWrapper(
+  TOOL_NAMES.INSPECT_SESSION,
+  'Inspect session data for debugging',
+  inspectSessionSchema,
+  inspectSession as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );

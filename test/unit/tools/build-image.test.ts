@@ -6,6 +6,7 @@
 import { jest } from '@jest/globals';
 import { promises as fs } from 'node:fs';
 import { buildImage, type BuildImageConfig } from '../../../src/tools/build-image/tool';
+import { ensureSession } from '../../../src/mcp/tool-session-helpers';
 
 // Result Type Helpers for Testing
 function createSuccessResult<T>(value: T) {
@@ -75,20 +76,32 @@ const mockDockerClient = {
   buildImage: jest.fn(),
 };
 
-jest.mock('@lib/session', () => ({
+jest.mock('../../../src/lib/session', () => ({
   createSessionManager: jest.fn(() => mockSessionManager),
 }));
 
-jest.mock('@lib/docker', () => ({
+jest.mock('../../../src/lib/docker', () => ({
   createDockerClient: jest.fn(() => mockDockerClient),
 }));
 
-jest.mock('@lib/logger', () => ({
+jest.mock('../../../src/lib/logger', () => ({
   createTimer: jest.fn(() => ({
     end: jest.fn(),
     error: jest.fn(),
   })),
   createLogger: jest.fn(() => createMockLogger()),
+}));
+
+// Mock the session helpers
+jest.mock('../../../src/mcp/tool-session-helpers', () => ({
+  ensureSession: jest.fn(),
+  useSessionSlice: jest.fn().mockReturnValue({
+    get: jest.fn(),
+    set: jest.fn(),
+    patch: jest.fn().mockResolvedValue(undefined),
+    clear: jest.fn(),
+  }),
+  defineToolIO: jest.fn((input, output) => ({ input, output })),
 }));
 
 const mockFs = fs as jest.Mocked<typeof fs>;
@@ -119,6 +132,28 @@ CMD ["node", "index.js"]`;
 
     // Reset all mocks
     jest.clearAllMocks();
+    
+    // Setup ensureSession mock
+    const mockEnsureSession = ensureSession as jest.Mock;
+    mockEnsureSession.mockResolvedValue({
+      ok: true,
+      value: {
+        id: 'test-session-123',
+        state: {
+          workflow_state: {
+            analysis_result: {
+              language: 'javascript',
+              framework: 'express',
+            },
+          },
+          repo_path: '/test/repo',
+          dockerfile_result: {
+            path: '/test/repo/Dockerfile',
+            content: mockDockerfile,
+          },
+        },
+      },
+    });
 
     // Default mock implementations
     mockFs.access.mockResolvedValue(undefined);
@@ -138,6 +173,32 @@ CMD ["node", "index.js"]`;
 
   describe('Successful Build', () => {
     beforeEach(() => {
+      // Update ensureSession mock for this describe block
+      const mockEnsureSession = ensureSession as jest.Mock;
+      mockEnsureSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            workflow_state: {
+              analysis_result: {
+                language: 'javascript',
+                framework: 'express',
+              },
+            },
+            analysis_result: {
+              language: 'javascript',
+              framework: 'express',
+            },
+            repo_path: '/test/repo',
+            dockerfile_result: {
+              path: '/test/repo/Dockerfile',
+              content: mockDockerfile,
+            },
+          },
+        },
+      });
+      
       mockSessionManager.get.mockResolvedValue({
         workflow_state: {
           analysis_result: {
@@ -216,17 +277,19 @@ CMD ["node", "index.js"]`;
 
       expect(result.ok).toBe(true);
       expect(mockSessionManager.update).toHaveBeenCalledWith('test-session-123', expect.objectContaining({
-        build_result: {
-          success: true,
-          imageId: 'sha256:mock-image-id',
-          tags: ['myapp:latest', 'myapp:v1.0'],
-          size: 123456789,
-          metadata: expect.objectContaining({
-            layers: 8,
-            buildTime: expect.any(Number),
-            logs: expect.arrayContaining(['Successfully built mock-image-id']),
-          }),
-        },
+        metadata: expect.objectContaining({
+          build_result: {
+            success: true,
+            imageId: 'sha256:mock-image-id',
+            tags: ['myapp:latest', 'myapp:v1.0'],
+            size: 123456789,
+            metadata: expect.objectContaining({
+              layers: 8,
+              buildTime: expect.any(Number),
+              logs: expect.arrayContaining(['Successfully built mock-image-id']),
+            }),
+          },
+        }),
         completed_steps: expect.arrayContaining(['build-image']),
       }));
     });
@@ -441,31 +504,65 @@ CMD ["node", "index.js"]`;
 
   describe('Error Handling', () => {
     it('should auto-create session when not found', async () => {
-      mockSessionManager.get.mockResolvedValue(null);
-      mockSessionManager.create.mockResolvedValue({
-      "sessionId": "test-session-123",
-      "workflow_state": {},
-      "metadata": {},
-      "completed_steps": [],
-      "errors": {},
-      "current_step": null,
-      "createdAt": "2025-09-08T11:12:40.362Z",
-      "updatedAt": "2025-09-08T11:12:40.362Z"
-});
+      // Mock ensureSession to simulate auto-creating a session
+      const mockEnsureSession = ensureSession as jest.Mock;
+      mockEnsureSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            workflow_state: {},
+            metadata: {},
+            completed_steps: [],
+            errors: {},
+            current_step: null,
+            repo_path: '/test/repo',
+            dockerfile_result: {
+              path: '/test/repo/Dockerfile',
+              content: mockDockerfile,
+            },
+          },
+          isNew: true, // Indicates session was newly created
+        },
+      });
+      
+      // Setup filesystem mocks for this test
+      mockFs.access.mockResolvedValue(undefined);
+      mockFs.readFile.mockResolvedValue(mockDockerfile);
+      
+      // Setup docker build mock
+      mockDockerClient.buildImage.mockResolvedValue(createSuccessResult({
+        imageId: 'sha256:mock-image-id',
+        logs: [
+          'Step 1/8 : FROM node:18-alpine',
+          'Successfully built mock-image-id',
+        ],
+        layers: 8,
+      }));
 
       const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
-
-      expect(mockSessionManager.get).toHaveBeenCalledWith('test-session-123');
-      expect(mockSessionManager.create).toHaveBeenCalledWith('test-session-123');
+      
+      expect(result.ok).toBe(true);
+      expect(mockEnsureSession).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionManager: mockSessionManager }),
+        'test-session-123'
+      );
     });
 
     it('should return error when Dockerfile not found and no session content', async () => {
-      mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: { language: 'javascript' },
+      const mockEnsureSession = ensureSession as jest.Mock;
+      mockEnsureSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            workflow_state: {
+              analysis_result: { language: 'javascript' },
+            },
+            repo_path: '/test/repo',
+            dockerfile_result: {},
+          },
         },
-        repo_path: '/test/repo',
-        dockerfile_result: {},
       });
 
       mockFs.access.mockRejectedValue(new Error('Dockerfile not found'));
@@ -503,17 +600,25 @@ CMD ["node", "index.js"]`;
     });
 
     it('should handle filesystem errors', async () => {
-      mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: { language: 'javascript' },
-        },
-        repo_path: '/test/repo',
-        dockerfile_result: {
-          path: '/test/repo/Dockerfile',
-          content: mockDockerfile,
+      const mockEnsureSession = ensureSession as jest.Mock;
+      mockEnsureSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            workflow_state: {
+              analysis_result: { language: 'javascript' },
+            },
+            repo_path: '/test/repo',
+            dockerfile_result: {
+              path: '/test/repo/Dockerfile',
+              content: mockDockerfile,
+            },
+          },
         },
       });
 
+      mockFs.access.mockResolvedValue(undefined);
       mockFs.readFile.mockRejectedValue(new Error('Permission denied'));
 
       const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
@@ -525,16 +630,26 @@ CMD ["node", "index.js"]`;
     });
 
     it('should handle Docker client errors', async () => {
-      mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: { language: 'javascript' },
-        },
-        repo_path: '/test/repo',
-        dockerfile_result: {
-          path: '/test/repo/Dockerfile',
-          content: mockDockerfile,
+      const mockEnsureSession = ensureSession as jest.Mock;
+      mockEnsureSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            workflow_state: {
+              analysis_result: { language: 'javascript' },
+            },
+            repo_path: '/test/repo',
+            dockerfile_result: {
+              path: '/test/repo/Dockerfile',
+              content: mockDockerfile,
+            },
+          },
         },
       });
+      
+      mockFs.access.mockResolvedValue(undefined);
+      mockFs.readFile.mockResolvedValue(mockDockerfile);
 
       mockDockerClient.buildImage.mockRejectedValue(new Error('Docker daemon not running'));
 
@@ -549,19 +664,44 @@ CMD ["node", "index.js"]`;
 
   describe('Build Arguments', () => {
     beforeEach(() => {
-      mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: {
-            language: 'python',
-            framework: 'flask',
+      const mockEnsureSession = ensureSession as jest.Mock;
+      mockEnsureSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            analysis_result: {
+              language: 'python',
+              framework: 'flask',
+            },
+            workflow_state: {
+              analysis_result: {
+                language: 'python',
+                framework: 'flask',
+              },
+            },
+            repo_path: '/test/repo',
+            dockerfile_result: {
+              path: '/test/repo/Dockerfile',
+              content: mockDockerfile,
+            },
           },
         },
-        repo_path: '/test/repo',
-        dockerfile_result: {
-          path: '/test/repo/Dockerfile',
-          content: mockDockerfile,
-        },
       });
+      
+      // Setup filesystem mocks
+      mockFs.access.mockResolvedValue(undefined);
+      mockFs.readFile.mockResolvedValue(mockDockerfile);
+      
+      // Setup docker build mock
+      mockDockerClient.buildImage.mockResolvedValue(createSuccessResult({
+        imageId: 'sha256:mock-image-id',
+        logs: [
+          'Step 1/8 : FROM node:18-alpine',
+          'Successfully built mock-image-id',
+        ],
+        layers: 8,
+      }));
     });
 
     it('should include language and framework from analysis', async () => {
@@ -599,6 +739,23 @@ CMD ["node", "index.js"]`;
     });
 
     it('should handle missing analysis data gracefully', async () => {
+      // Override the ensureSession mock for this test
+      const mockEnsureSession = ensureSession as jest.Mock;
+      mockEnsureSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            workflow_state: {},
+            repo_path: '/test/repo',
+            dockerfile_result: {
+              path: '/test/repo/Dockerfile',
+              content: mockDockerfile,
+            },
+          },
+        },
+      });
+
       mockSessionManager.get.mockResolvedValue({
         workflow_state: {},
         repo_path: '/test/repo',

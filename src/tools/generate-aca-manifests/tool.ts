@@ -8,7 +8,7 @@
 import { joinPaths } from '@lib/path-utils';
 import { extractErrorMessage } from '../../lib/error-utils';
 import { promises as fs } from 'node:fs';
-import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 import type { SamplingOptions } from '@lib/sampling';
@@ -20,7 +20,50 @@ import { Success, Failure, type Result } from '../../types';
 import { stripFencesAndNoise } from '@lib/text-processing';
 import { getSuccessProgression, type SessionContext } from '../../workflows/workflow-progression';
 import { TOOL_NAMES } from '../../exports/tool-names.js';
-import type { GenerateAcaManifestsParams } from './schema';
+import { generateAcaManifestsSchema, type GenerateAcaManifestsParams } from './schema';
+import { z } from 'zod';
+
+// Define the result schema for type safety
+const GenerateAcaManifestsResultSchema = z.object({
+  manifest: z.string(),
+  outputPath: z.string(),
+  appName: z.string(),
+  warnings: z.array(z.string()).optional(),
+  sessionId: z.string().optional(),
+  samplingMetadata: z
+    .object({
+      stoppedEarly: z.boolean().optional(),
+      candidatesGenerated: z.number(),
+      winnerScore: z.number(),
+      samplingDuration: z.number().optional(),
+    })
+    .optional(),
+  winnerScore: z.number().optional(),
+  scoreBreakdown: z.record(z.number()).optional(),
+  allCandidates: z
+    .array(
+      z.object({
+        id: z.string(),
+        content: z.string(),
+        score: z.number(),
+        scoreBreakdown: z.record(z.number()),
+        rank: z.number().optional(),
+      }),
+    )
+    .optional(),
+});
+
+// Define tool IO for type-safe session operations
+const io = defineToolIO(generateAcaManifestsSchema, GenerateAcaManifestsResultSchema);
+
+// Tool-specific state schema
+const StateSchema = z.object({
+  lastGeneratedAt: z.date().optional(),
+  manifestCount: z.number().optional(),
+  lastAppName: z.string().optional(),
+  lastLocation: z.string().optional(),
+  aiStrategy: z.enum(['ai', 'template', 'hybrid']).optional(),
+});
 
 /**
  * Result from ACA manifest generation
@@ -320,13 +363,23 @@ async function generateAcaManifestsImpl(
     // Progress: Starting validation
     if (progress) await progress('VALIDATING');
 
-    // Resolve session with optional sessionId
-    const sessionResult = await getSession(params.sessionId, context);
+    // Ensure session exists and get typed slice operations
+    const sessionResult = await ensureSession(context, params.sessionId);
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
     }
-    const session = sessionResult.value;
-    const sessionData = session.state as unknown as SessionData;
+
+    const { id: sessionId, state: session } = sessionResult.value;
+    const slice = useSessionSlice('generate-aca-manifests', io, context, StateSchema);
+
+    if (!slice) {
+      return Failure('Session manager not available');
+    }
+
+    // Record input in session slice
+    await slice.patch(sessionId, { input: params });
+
+    const sessionData = session as unknown as SessionData;
 
     // Get build result from session for image tag if not provided
     const buildResult = sessionData?.build_result || sessionData?.workflow_state?.build_result;
@@ -453,32 +506,60 @@ async function generateAcaManifestsImpl(
       warnings.push('High CPU allocation for development environment - consider reducing');
     }
 
-    // Update session with ACA result
-    const updateResult = await updateSession(
-      session.id,
-      {
-        aca_result: {
-          manifest: manifestContent,
-          file_path: manifestPath,
-          app_name: appName,
-          output_path: outputPath,
-        },
-        completed_steps: [...(sessionData?.completed_steps || []), 'aca'],
-        metadata: {
-          ...(sessionData?.metadata || {}),
-          ai_enhancement_used: aiUsed,
-          ai_generation_type: 'aca-manifests',
-          aca_warnings: warnings,
-        },
-      },
-      context,
-    );
+    // Prepare result
+    const result: GenerateAcaManifestsResult = {
+      manifest: manifestContent,
+      outputPath,
+      appName,
+      ...(warnings.length > 0 && { warnings }),
+      sessionId,
+    };
 
-    if (!updateResult.ok) {
-      logger.warn(
-        { error: updateResult.error },
-        'Failed to update session, but ACA generation succeeded',
-      );
+    // Add sampling metadata if sampling was used
+    if (!params.disableSampling) {
+      if (samplingMetadata) result.samplingMetadata = samplingMetadata;
+      if (winnerScore !== undefined) result.winnerScore = winnerScore;
+      if (scoreBreakdown && params.includeScoreBreakdown) result.scoreBreakdown = scoreBreakdown;
+      if (allCandidates && params.returnAllCandidates) result.allCandidates = allCandidates;
+    }
+
+    // Update typed session slice with output and state
+    await slice.patch(sessionId, {
+      output: result,
+      state: {
+        lastGeneratedAt: new Date(),
+        manifestCount: 1,
+        lastAppName: appName,
+        lastLocation: params.location || 'eastus',
+        aiStrategy: aiUsed ? 'ai' : 'template',
+      },
+    });
+
+    // Update session metadata for backward compatibility
+    const sessionManager = context.sessionManager;
+    if (sessionManager) {
+      try {
+        await sessionManager.update(sessionId, {
+          metadata: {
+            ...session.metadata,
+            aca_result: {
+              manifest: manifestContent,
+              file_path: manifestPath,
+              app_name: appName,
+              output_path: outputPath,
+            },
+            ai_enhancement_used: aiUsed,
+            ai_generation_type: 'aca-manifests',
+            aca_warnings: warnings,
+          },
+          completed_steps: [...(session.completed_steps ?? []), 'generate-aca-manifests'],
+        });
+      } catch (error) {
+        logger.warn(
+          { error: extractErrorMessage(error) },
+          'Failed to update session metadata, but ACA generation succeeded',
+        );
+      }
     }
 
     // Progress: Complete
@@ -487,48 +568,19 @@ async function generateAcaManifestsImpl(
 
     // Prepare session context for dynamic chain hints
     const sessionContext: SessionContext = {
-      completed_steps: (session.state as SessionContext).completed_steps || [],
-      ...((session.state as SessionContext).analysis_result && {
-        analysis_result: (session.state as SessionContext).analysis_result,
-      }),
+      completed_steps: session.completed_steps || [],
+      ...(session.analysis_result ? { analysis_result: session.analysis_result } : {}),
     };
 
     // Return result with file indicator and chain hint
-    const finalResult: GenerateAcaManifestsResult & {
-      _fileWritten?: boolean;
-      _fileWrittenPath?: string;
-      NextStep?: string;
-    } = {
-      manifest: manifestContent,
-      outputPath,
-      appName,
-      ...(warnings.length > 0 && { warnings }),
-      sessionId: session.id,
+    const enrichedResult = {
+      ...result,
       _fileWritten: true,
       _fileWrittenPath: outputPath,
-      NextStep: getSuccessProgression(
-        TOOL_NAMES.GENERATE_ACA_MANIFESTS,
-        sessionContext,
-      ).summary,
+      NextStep: getSuccessProgression(TOOL_NAMES.GENERATE_ACA_MANIFESTS, sessionContext).summary,
     };
 
-    // Add sampling metadata if sampling was used
-    if (!params.disableSampling) {
-      if (samplingMetadata) {
-        finalResult.samplingMetadata = samplingMetadata;
-      }
-      if (winnerScore !== undefined) {
-        finalResult.winnerScore = winnerScore;
-      }
-      if (scoreBreakdown && params.includeScoreBreakdown) {
-        finalResult.scoreBreakdown = scoreBreakdown;
-      }
-      if (allCandidates && params.returnAllCandidates) {
-        finalResult.allCandidates = allCandidates;
-      }
-    }
-
-    return Success(finalResult);
+    return Success(enrichedResult);
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'ACA manifest generation failed');

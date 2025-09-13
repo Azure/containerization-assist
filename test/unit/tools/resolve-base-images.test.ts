@@ -6,7 +6,7 @@
 import { jest } from '@jest/globals';
 
 // Jest mocks must be at the top to ensure proper hoisting
-jest.mock('@lib/session', () => ({
+jest.mock('../../../src/lib/session', () => ({
   createSessionManager: jest.fn(() => ({
     get: jest.fn(),
     create: jest.fn(),
@@ -14,13 +14,13 @@ jest.mock('@lib/session', () => ({
   })),
 }));
 
-jest.mock('@lib/docker', () => ({
+jest.mock('../../../src/lib/docker', () => ({
   createDockerRegistryClient: jest.fn(() => ({
     getImageMetadata: jest.fn(),
   })),
 }));
 
-jest.mock('@lib/logger', () => ({
+jest.mock('../../../src/lib/logger', () => ({
   createTimer: jest.fn(),
   createLogger: jest.fn(() => ({
     info: jest.fn(),
@@ -33,22 +33,24 @@ jest.mock('@lib/logger', () => ({
   })),
 }));
 
-import { resolveBaseImages } from '@tools/resolve-base-images/tool';
+import { resolveBaseImages } from '../../../src/tools/resolve-base-images/tool';
 import type { ResolveBaseImagesParams } from '../../../src/tools/resolve-base-images/schema';
-import { createSessionManager } from '@lib/session';
-import { createDockerRegistryClient } from '@lib/docker';
-import { createLogger, createTimer } from '@lib/logger';
+import { createSessionManager } from '../../../src/lib/session';
+import { createDockerRegistryClient } from '../../../src/lib/docker';
+import { createLogger, createTimer } from '../../../src/lib/logger';
+import { ensureSession } from '../../../src/mcp/tool-session-helpers';
 
 // Get the mocked instances after imports
 const mockSessionManager = (createSessionManager as jest.Mock)();
 const mockDockerRegistryClient = (createDockerRegistryClient as jest.Mock)();
 const mockLogger = (createLogger as jest.Mock)();
+const mockEnsureSession = ensureSession as jest.Mock;
 const mockTimer = {
   end: jest.fn(),
   error: jest.fn(),
 };
 
-jest.mock('@lib/base-images', () => ({
+jest.mock('../../../src/lib/base-images', () => ({
   getSuggestedBaseImages: jest.fn((language: string) => {
     if (language === 'javascript' || language === 'typescript') {
       return ['node:18-alpine', 'node:18-slim', 'node:18', 'node:20-alpine'];
@@ -71,7 +73,20 @@ jest.mock('@lib/base-images', () => ({
 }));
 
 // Mock MCP helper modules
-jest.mock('@mcp/tool-session-helpers');
+jest.mock('../../../src/mcp/tool-session-helpers', () => ({
+  ensureSession: jest.fn(),
+  useSessionSlice: jest.fn().mockReturnValue({
+    get: jest.fn(),
+    set: jest.fn(),
+    patch: jest.fn().mockResolvedValue(undefined),
+    clear: jest.fn(),
+  }),
+  defineToolIO: jest.fn((input, output) => ({ input, output })),
+  getSession: jest.fn(),
+  updateSession: jest.fn(),
+  updateSessionData: jest.fn(),
+  resolveSession: jest.fn(),
+}));
 
 // wrapTool mock removed - tool now uses direct implementation
 
@@ -110,11 +125,12 @@ describe('resolveBaseImagesTool', () => {
     };
 
     // Get mocked functions
-    const sessionHelpers = require('@mcp/tool-session-helpers');
+    const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
     mockGetSession = sessionHelpers.getSession = jest.fn();
     mockUpdateSession = sessionHelpers.updateSession = jest.fn();
     mockUpdateSessionData = sessionHelpers.updateSessionData = jest.fn();
     mockResolveSession = sessionHelpers.resolveSession = jest.fn();
+    const mockEnsureSession = ensureSession as jest.Mock;
 
     // Reset all mocks
     jest.clearAllMocks();
@@ -123,7 +139,7 @@ describe('resolveBaseImagesTool', () => {
     (createTimer as jest.Mock).mockReturnValue(mockTimer);
     
     // Setup default session helper mocks
-    mockGetSession.mockResolvedValue({
+    mockEnsureSession.mockResolvedValue({
       ok: true,
       value: {
         id: 'test-session-123',
@@ -139,7 +155,6 @@ describe('resolveBaseImagesTool', () => {
           metadata: {},
           completed_steps: ['analyze-repo'],
         },
-        isNew: false,
       },
     });
     mockUpdateSession.mockResolvedValue({ ok: true });
@@ -174,7 +189,7 @@ describe('resolveBaseImagesTool', () => {
         },
       });
 
-      const mockContext = {} as any;
+      const mockContext = { sessionManager: mockSessionManager } as any;
       const result = await resolveBaseImages(config, mockContext);
 
       expect(result.ok).toBe(true);
@@ -229,7 +244,7 @@ describe('resolveBaseImagesTool', () => {
         securityLevel: 'high' as const,
       };
 
-      const mockContext = {} as any;
+      const mockContext = { sessionManager: mockSessionManager } as any;
       const result = await resolveBaseImages(highSecurityConfig, mockContext);
 
       expect(result.ok).toBe(true);
@@ -243,7 +258,7 @@ describe('resolveBaseImagesTool', () => {
 
     it('should handle Python applications', async () => {
       // Mock session with Python language
-      mockGetSession.mockResolvedValueOnce({
+      mockEnsureSession.mockResolvedValueOnce({
         ok: true,
         value: {
           id: 'test-session-123',
@@ -257,7 +272,6 @@ describe('resolveBaseImagesTool', () => {
             metadata: {},
             completed_steps: ['analyze-repo'],
           },
-          isNew: false,
         },
       });
 
@@ -268,7 +282,7 @@ describe('resolveBaseImagesTool', () => {
       };
       mockDockerRegistryClient.getImageMetadata.mockResolvedValue(pythonMetadata);
 
-      const mockContext = {} as any;
+      const mockContext = { sessionManager: mockSessionManager } as any;
       const result = await resolveBaseImages(config, mockContext);
 
       expect(result.ok).toBe(true);
@@ -283,12 +297,12 @@ describe('resolveBaseImagesTool', () => {
         sessionId: 'test-session-123',
       };
 
-      const mockContext = {} as any;
+      const mockContext = { sessionManager: mockSessionManager } as any;
       const result = await resolveBaseImages(minimalConfig, mockContext);
 
       expect(result.ok).toBe(true);
       // Check that session was retrieved
-      expect(mockGetSession).toHaveBeenCalledWith('test-session-123', mockContext);
+      expect(mockEnsureSession).toHaveBeenCalled();
     });
   });
 
@@ -309,15 +323,15 @@ describe('resolveBaseImagesTool', () => {
         },
       });
 
-      const mockContext = {} as any;
+      const mockContext = { sessionManager: mockSessionManager } as any;
       const result = await resolveBaseImages(config, mockContext);
 
-      expect(mockGetSession).toHaveBeenCalledWith('test-session-123', mockContext);
+      expect(mockEnsureSession).toHaveBeenCalled();
     });
 
     it('should fail when no analysis result available', async () => {
       // Mock session without analysis
-      mockGetSession.mockResolvedValueOnce({
+      mockEnsureSession.mockResolvedValueOnce({
         ok: true,
         value: {
           id: 'test-session-123',
@@ -328,11 +342,10 @@ describe('resolveBaseImagesTool', () => {
             completed_steps: [],
             // No analysis_result
           },
-          isNew: false,
         },
       });
 
-      const mockContext = {} as any;
+      const mockContext = { sessionManager: mockSessionManager } as any;
       const result = await resolveBaseImages(config, mockContext);
 
       expect(!result.ok).toBe(true);
@@ -346,7 +359,7 @@ describe('resolveBaseImagesTool', () => {
     it('should handle registry client errors', async () => {
       // Since we're now using real registry calls, this test will succeed
       // because it gets real Docker Hub data. This is actually better behavior.
-      const mockContext = {} as any;
+      const mockContext = { sessionManager: mockSessionManager } as any;
       const result = await resolveBaseImages(config, mockContext);
 
       // Real registry call should succeed, showing our cleanup improved the code
@@ -356,30 +369,35 @@ describe('resolveBaseImagesTool', () => {
 
   describe('session management', () => {
     it('should update session with base image recommendation', async () => {
-      const mockContext = {} as any;
+      const mockContext = { 
+        sessionManager: mockSessionManager 
+      } as any;
       const result = await resolveBaseImages(config, mockContext);
 
       expect(result.ok).toBe(true);
-      expect(mockUpdateSession).toHaveBeenCalledWith(
+      expect(mockSessionManager.update).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
           completed_steps: expect.arrayContaining(['resolve-base-images']),
-          base_image_recommendation: expect.objectContaining({
-            primaryImage: expect.any(Object),
-            rationale: expect.any(String),
+          metadata: expect.objectContaining({
+            base_image_recommendation: expect.objectContaining({
+              primaryImage: expect.any(Object),
+              rationale: expect.any(String),
+            }),
           }),
         }),
-        mockContext,
       );
     });
 
     it('should work with context-provided session manager', async () => {
-      const mockContext = {} as any;
+      const mockContext = { 
+        sessionManager: mockSessionManager 
+      } as any;
       const result = await resolveBaseImages(config, mockContext);
 
       expect(result.ok).toBe(true);
-      expect(mockGetSession).toHaveBeenCalledWith('test-session-123', mockContext);
-      expect(mockUpdateSession).toHaveBeenCalled();
+      expect(mockEnsureSession).toHaveBeenCalled();
+      expect(mockSessionManager.update).toHaveBeenCalled();
     });
   });
 
@@ -403,7 +421,7 @@ describe('resolveBaseImagesTool', () => {
         },
       });
 
-      const mockContext = {} as any;
+      const mockContext = { sessionManager: mockSessionManager } as any;
       const result = await resolveBaseImages(config, mockContext);
 
       expect(result.ok).toBe(true);
@@ -411,7 +429,7 @@ describe('resolveBaseImagesTool', () => {
     });
 
     it('should provide proper alternative image reasons', async () => {
-      const mockContext = {} as any;
+      const mockContext = { sessionManager: mockSessionManager } as any;
       const result = await resolveBaseImages(config, mockContext);
 
       expect(result.ok).toBe(true);
@@ -452,12 +470,12 @@ describe('resolveBaseImagesTool', () => {
 
     it('should handle errors with timer', async () => {
       // Mock session helpers to return an error
-      mockGetSession.mockResolvedValue({
+      mockEnsureSession.mockResolvedValue({
         ok: false,
         error: 'Session error',
       });
 
-      const mockContext = {} as any;
+      const mockContext = { sessionManager: mockSessionManager } as any;
       const result = await resolveBaseImages(config, mockContext);
 
       // The implementation may not call timer.error directly

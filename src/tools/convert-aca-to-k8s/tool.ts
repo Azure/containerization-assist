@@ -8,13 +8,41 @@
 import { joinPaths } from '@lib/path-utils';
 import { extractErrorMessage } from '../../lib/error-utils';
 import { promises as fs } from 'node:fs';
-import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import { createTimer } from '@lib/logger';
 import type { ToolContext } from '../../mcp/context';
 import type { SessionData } from '../session-types';
 import { Success, Failure, type Result } from '../../types';
 import * as yaml from 'js-yaml';
-import type { ConvertAcaToK8sParams } from './schema';
+import { convertAcaToK8sSchema, type ConvertAcaToK8sParams } from './schema';
+import { z } from 'zod';
+
+// Define the result schema for type safety
+const ConvertAcaToK8sResultSchema = z.object({
+  manifests: z.string(),
+  outputPath: z.string(),
+  resourceCount: z.number(),
+  resources: z.array(
+    z.object({
+      kind: z.string(),
+      name: z.string(),
+      namespace: z.string(),
+    }),
+  ),
+  sessionId: z.string().optional(),
+});
+
+// Define tool IO for type-safe session operations
+const io = defineToolIO(convertAcaToK8sSchema, ConvertAcaToK8sResultSchema);
+
+// Tool-specific state schema
+const StateSchema = z.object({
+  lastConvertedAt: z.date().optional(),
+  conversionCount: z.number().optional(),
+  lastAppName: z.string().optional(),
+  lastNamespace: z.string().optional(),
+  resourceTypes: z.array(z.string()).optional(),
+});
 
 /**
  * Result from ACA to K8s conversion
@@ -354,48 +382,80 @@ async function convertAcaToK8sImpl(
       comments +
       k8sResources.map((r) => yaml.dump(r, { noRefs: true, lineWidth: -1 })).join('---\n');
 
-    // Get session for tracking
-    const sessionResult = await getSession(params.sessionId, context);
-    const session = sessionResult.ok ? sessionResult.value : null;
+    // Ensure session exists and get typed slice operations
+    const sessionResult = await ensureSession(context, params.sessionId);
+    if (!sessionResult.ok) {
+      return Failure(sessionResult.error);
+    }
+
+    const { id: sessionId, state: session } = sessionResult.value;
+    const slice = useSessionSlice('convert-aca-to-k8s', io, context, StateSchema);
+
+    if (!slice) {
+      return Failure('Session manager not available');
+    }
+
+    // Record input in session slice
+    await slice.patch(sessionId, { input: params });
+
+    const sessionData = session as unknown as SessionData;
 
     // Write to file
-    const repoPath = session ? (session.state as SessionData)?.metadata?.repo_path || '.' : '.';
+    const repoPath = sessionData?.metadata?.repo_path || '.';
     const outputPath = joinPaths(repoPath, 'k8s-converted');
     await fs.mkdir(outputPath, { recursive: true });
     await fs.writeFile(joinPaths(outputPath, 'manifests.yaml'), yamlContent, 'utf-8');
 
-    // Update session if available
-    if (session) {
-      const sessionData = session.state as unknown as SessionData;
-      await updateSession(
-        session.id,
-        {
-          k8s_conversion_result: {
-            manifests: yamlContent,
-            file_path: joinPaths(outputPath, 'manifests.yaml'),
-            resource_count: k8sResources.length,
-            output_path: outputPath,
-          },
-          completed_steps: [...(sessionData?.completed_steps || []), 'aca-to-k8s'],
-          metadata: {
-            ...(sessionData?.metadata || {}),
-            conversion_type: 'aca-to-k8s',
-            resources_created: resourceList,
-          },
-        },
-        context,
-      );
-    }
-
-    timer.end({ resourceCount: k8sResources.length });
-
-    return Success({
+    // Prepare result
+    const result: ConvertAcaToK8sResult = {
       manifests: yamlContent,
       outputPath,
       resourceCount: k8sResources.length,
       resources: resourceList,
-      ...(session && { sessionId: session.id }),
+      sessionId,
+    };
+
+    // Update typed session slice with output and state
+    await slice.patch(sessionId, {
+      output: result,
+      state: {
+        lastConvertedAt: new Date(),
+        conversionCount: 1,
+        lastAppName: aca.name,
+        lastNamespace: params.namespace || 'default',
+        resourceTypes: k8sResources.map((r) => r.kind),
+      },
     });
+
+    // Update session metadata for backward compatibility
+    const sessionManager = context.sessionManager;
+    if (sessionManager) {
+      try {
+        await sessionManager.update(sessionId, {
+          metadata: {
+            ...session.metadata,
+            k8s_conversion_result: {
+              manifests: yamlContent,
+              file_path: joinPaths(outputPath, 'manifests.yaml'),
+              resource_count: k8sResources.length,
+              output_path: outputPath,
+            },
+            conversion_type: 'aca-to-k8s',
+            resources_created: resourceList,
+          },
+          completed_steps: [...(session.completed_steps ?? []), 'convert-aca-to-k8s'],
+        });
+      } catch (error) {
+        logger.warn(
+          { error: extractErrorMessage(error) },
+          'Failed to update session metadata, but conversion succeeded',
+        );
+      }
+    }
+
+    timer.end({ resourceCount: k8sResources.length });
+
+    return Success(result);
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'ACA to K8s conversion failed');

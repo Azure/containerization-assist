@@ -21,15 +21,17 @@
 
 import * as yaml from 'js-yaml';
 import { extractErrorMessage } from '../../lib/error-utils';
-import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import type { ToolContext } from '../../mcp/context';
 import { createKubernetesClient } from '../../lib/kubernetes';
 import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../types';
 import { DEFAULT_TIMEOUTS } from '../../config/defaults';
-import { getSuccessProgression, type SessionContext } from '../../workflows/workflow-progression';
+import { getSuccessProgression } from '../../workflows/workflow-progression';
 import { TOOL_NAMES } from '../../exports/tool-names.js';
-import type { DeployApplicationParams } from './schema';
+import { deployApplicationSchema, type DeployApplicationParams } from './schema';
+import { z } from 'zod';
+import type { SessionData } from '../session-types';
 
 // Type definitions for Kubernetes manifests
 interface KubernetesManifest {
@@ -60,13 +62,6 @@ interface IngressManifest extends KubernetesManifest {
   spec?: {
     rules?: Array<{ host?: string; http?: unknown }>;
   };
-}
-
-interface SessionState {
-  k8s_manifests?: {
-    manifests?: string;
-  };
-  completed_steps?: string[];
 }
 
 // Configuration constants
@@ -131,6 +126,53 @@ export interface DeployApplicationResult {
   };
   chainHint?: string; // Hint for next tool in workflow chain
 }
+
+// Define the result schema for type safety
+const DeployApplicationResultSchema = z.object({
+  success: z.boolean(),
+  sessionId: z.string(),
+  namespace: z.string(),
+  deploymentName: z.string(),
+  serviceName: z.string(),
+  endpoints: z.array(
+    z.object({
+      type: z.enum(['internal', 'external']),
+      url: z.string(),
+      port: z.number(),
+    }),
+  ),
+  ready: z.boolean(),
+  replicas: z.number(),
+  status: z
+    .object({
+      readyReplicas: z.number(),
+      totalReplicas: z.number(),
+      conditions: z.array(
+        z.object({
+          type: z.string(),
+          status: z.string(),
+          message: z.string(),
+        }),
+      ),
+    })
+    .optional(),
+  chainHint: z.string().optional(),
+});
+
+// Define tool IO for type-safe session operations
+const io = defineToolIO(deployApplicationSchema, DeployApplicationResultSchema);
+
+// Tool-specific state schema
+const StateSchema = z.object({
+  lastDeployedAt: z.date().optional(),
+  lastDeployedNamespace: z.string().optional(),
+  lastDeploymentName: z.string().optional(),
+  lastServiceName: z.string().optional(),
+  totalDeployments: z.number().optional(),
+  lastDeploymentReady: z.boolean().optional(),
+  lastEndpointCount: z.number().optional(),
+});
+
 /**
  * Parse YAML/JSON manifest content with validation
  */
@@ -271,19 +313,33 @@ async function deployApplicationImpl(
     const wait = DEPLOYMENT_CONFIG.WAIT_FOR_READY;
     const timeout = DEPLOYMENT_CONFIG.WAIT_TIMEOUT_SECONDS;
     logger.info({ namespace, cluster, dryRun, environment }, 'Starting application deployment');
-    // Get session using standardized helper
-    const sessionResult = await getSession(params.sessionId, context);
+
+    // Ensure session exists and get typed slice operations
+    const sessionResult = await ensureSession(context, params.sessionId);
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
     }
+
     const { id: sessionId, state: session } = sessionResult.value;
-    logger.info({ sessionId, namespace, environment }, 'Starting Kubernetes deployment');
+    const slice = useSessionSlice('deploy', io, context, StateSchema);
+
+    if (!slice) {
+      return Failure('Session manager not available');
+    }
+
+    logger.info(
+      { sessionId, namespace, environment },
+      'Starting Kubernetes deployment with session',
+    );
+
+    // Record input in session slice
+    await slice.patch(sessionId, { input: params });
     const k8sClient = createKubernetesClient(logger);
     // Get K8s manifests from session with type safety
-    const sessionState = session as SessionState | null | undefined;
-    const k8sManifests = sessionState?.k8s_manifests;
+    const sessionData = session as SessionData;
+    const k8sResult = sessionData?.k8s_result;
 
-    if (!k8sManifests?.manifests) {
+    if (!k8sResult?.manifests) {
       return Failure(
         'No Kubernetes manifests found in session. Please run generate-k8s-manifests tool first.',
       );
@@ -292,7 +348,17 @@ async function deployApplicationImpl(
     // Parse and validate manifests
     let manifests: KubernetesManifest[];
     try {
-      manifests = parseManifest(k8sManifests.manifests, logger);
+      // Extract content from manifests and join them
+      const manifestContents = k8sResult.manifests
+        .map((m) => m.content)
+        .filter((content): content is string => Boolean(content))
+        .join('\n---\n');
+
+      if (!manifestContents) {
+        return Failure('No valid manifest content found in session');
+      }
+
+      manifests = parseManifest(manifestContents, logger);
     } catch (error) {
       return Failure(`Failed to parse manifests: ${extractErrorMessage(error)}`);
     }
@@ -481,46 +547,9 @@ async function deployApplicationImpl(
         port: DEPLOYMENT_CONFIG.DEFAULT_PORT,
       });
     }
-    // Update session with deployment result using standardized helper
-    const updateResult = await updateSession(
-      sessionId,
-      {
-        deployment_result: {
-          success: true,
-          namespace,
-          deploymentName,
-          serviceName,
-          endpoints,
-          ready,
-          replicas: totalReplicas,
-          status: {
-            readyReplicas,
-            totalReplicas,
-            conditions: [
-              {
-                type: 'Available',
-                status: ready ? 'True' : 'False',
-                message: ready ? 'Deployment is available' : 'Deployment is pending',
-              },
-            ],
-          },
-        },
-        completed_steps: [...(sessionState?.completed_steps || []), 'deploy'],
-      },
-      context,
-    );
-    if (!updateResult.ok) {
-      logger.warn(
-        { error: updateResult.error },
-        'Failed to update session, but deployment succeeded',
-      );
-    }
-    timer.end({ deploymentName, ready, sessionId });
-    logger.info(
-      { sessionId, deploymentName, serviceName, ready, namespace },
-      'Kubernetes deployment completed',
-    );
-    return Success({
+
+    // Prepare the result
+    const result: DeployApplicationResult = {
       success: true,
       sessionId,
       namespace,
@@ -540,10 +569,72 @@ async function deployApplicationImpl(
           },
         ],
       },
+    };
+
+    // Update typed session slice with output and state
+    await slice.patch(sessionId, {
+      output: result,
+      state: {
+        lastDeployedAt: new Date(),
+        lastDeployedNamespace: namespace,
+        lastDeploymentName: deploymentName,
+        lastServiceName: serviceName,
+        totalDeployments:
+          (sessionData?.completed_steps || []).filter((s) => s === 'deploy').length + 1,
+        lastDeploymentReady: ready,
+        lastEndpointCount: endpoints.length,
+      },
+    });
+
+    // Update session metadata for backward compatibility
+    const sessionManager = context.sessionManager;
+    if (sessionManager) {
+      try {
+        await sessionManager.update(sessionId, {
+          metadata: {
+            ...session.metadata,
+            deployment_result: {
+              success: true,
+              namespace,
+              deploymentName,
+              serviceName,
+              endpoints,
+              ready,
+              replicas: totalReplicas,
+              status: {
+                readyReplicas,
+                totalReplicas,
+                conditions: [
+                  {
+                    type: 'Available',
+                    status: ready ? 'True' : 'False',
+                    message: ready ? 'Deployment is available' : 'Deployment is pending',
+                  },
+                ],
+              },
+            },
+          },
+          completed_steps: [...(sessionData?.completed_steps || []), 'deploy'],
+        });
+      } catch (error) {
+        logger.warn(
+          { error: (error as Error).message },
+          'Failed to update session, but deployment succeeded',
+        );
+      }
+    }
+    timer.end({ deploymentName, ready, sessionId });
+    logger.info(
+      { sessionId, deploymentName, serviceName, ready, namespace },
+      'Kubernetes deployment completed',
+    );
+
+    return Success({
+      ...result,
       NextStep: getSuccessProgression(TOOL_NAMES.DEPLOY_APPLICATION, {
         completed_steps: session.completed_steps || [],
-        ...((session as SessionContext).analysis_result && {
-          analysis_result: (session as SessionContext).analysis_result,
+        ...(sessionData?.analysis_result && {
+          analysis_result: sessionData.analysis_result,
         }),
       }),
     });

@@ -7,7 +7,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { safeNormalizePath } from '@lib/path-utils';
-import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import { createStandardProgress } from '@mcp/progress-helper';
 import { aiGenerateWithSampling, aiGenerate } from '@mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
@@ -30,8 +30,102 @@ import {
   type SessionContext,
 } from '../../workflows/workflow-progression';
 import { TOOL_NAMES } from '../../exports/tool-names.js';
-import type { GenerateDockerfileParams } from './schema';
+import { generateDockerfileSchema, type GenerateDockerfileParams } from './schema';
+import { z } from 'zod';
 import { AnalyzeRepoResult } from '../analyze-repo';
+
+// Define the result schema for type safety - complex nested structure
+const SingleDockerfileResultSchema = z.object({
+  content: z.string(),
+  path: z.string(),
+  moduleRoot: z.string(),
+  baseImage: z.string(),
+  optimization: z.boolean(),
+  multistage: z.boolean(),
+  warnings: z.array(z.string()).optional(),
+  samplingMetadata: z
+    .object({
+      stoppedEarly: z.boolean().optional(),
+      candidatesGenerated: z.number(),
+      winnerScore: z.number(),
+      samplingDuration: z.number().optional(),
+    })
+    .optional(),
+  winnerScore: z.number().optional(),
+  scoreBreakdown: z.record(z.number()).optional(),
+  allCandidates: z
+    .array(
+      z.object({
+        id: z.string(),
+        content: z.string(),
+        score: z.number(),
+        scoreBreakdown: z.record(z.number()),
+        rank: z.number().optional(),
+      }),
+    )
+    .optional(),
+  validationScore: z.number().optional(),
+  validationGrade: z.string().optional(),
+  validationReport: z.string().optional(),
+});
+
+const GenerateDockerfileResultSchema = z.object({
+  content: z.string().optional(),
+  path: z.string().optional(),
+  baseImage: z.string().optional(),
+  optimization: z.boolean(),
+  multistage: z.boolean(),
+  warnings: z.array(z.string()).optional(),
+  sessionId: z.string().optional(),
+  dockerfiles: z.array(SingleDockerfileResultSchema),
+  count: z.number(),
+  samplingMetadata: z
+    .object({
+      stoppedEarly: z.boolean().optional(),
+      candidatesGenerated: z.number(),
+      winnerScore: z.number(),
+      samplingDuration: z.number().optional(),
+    })
+    .optional(),
+  winnerScore: z.number().optional(),
+  scoreBreakdown: z.record(z.number()).optional(),
+  allCandidates: z
+    .array(
+      z.object({
+        id: z.string(),
+        content: z.string(),
+        score: z.number(),
+        scoreBreakdown: z.record(z.number()),
+        rank: z.number().optional(),
+      }),
+    )
+    .optional(),
+  scoringDetails: z
+    .object({
+      candidates: z
+        .array(
+          z
+            .object({
+              score: z.number(),
+            })
+            .catchall(z.any()),
+        )
+        .optional(),
+    })
+    .optional(),
+});
+
+// Define tool IO for type-safe session operations
+const io = defineToolIO(generateDockerfileSchema, GenerateDockerfileResultSchema);
+
+// Tool-specific state schema
+const StateSchema = z.object({
+  lastGeneratedAt: z.date().optional(),
+  dockerfileCount: z.number().optional(),
+  primaryModule: z.string().optional(),
+  generationStrategy: z.enum(['ai', 'template', 'hybrid']).optional(),
+  lastOptimization: z.string().optional(),
+});
 
 /**
  * Single module Dockerfile generation result with optional sampling metadata
@@ -623,12 +717,23 @@ async function generateDockerfileImpl(
     const optimization = params.optimization === false ? false : true;
     // Progress: Starting validation and analysis
     if (progress) await progress('VALIDATING');
-    // Get or create session
-    const sessionResult = await getSession(params.sessionId, context);
+    // Ensure session exists and get typed slice operations
+    const sessionResult = await ensureSession(context, params.sessionId);
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
     }
+
     const { id: sessionId, state: session } = sessionResult.value;
+    const slice = useSessionSlice('generate-dockerfile', io, context, StateSchema);
+
+    if (!slice) {
+      return Failure('Session manager not available');
+    }
+
+    logger.info({ sessionId }, 'Starting Dockerfile generation');
+
+    // Record input in session slice
+    await slice.patch(sessionId, { input: params });
     // Type the session properly with our extended properties
     interface ExtendedWorkflowState extends WorkflowState {
       repo_path?: string;
@@ -686,27 +791,50 @@ async function generateDockerfileImpl(
       fixed: false,
       fixes: [],
     };
-    // Update session with Dockerfile result using simplified helper
-    const updateResult = await updateSession(
+    // Prepare the result for session update
+    const generationResult: GenerateDockerfileResult = {
+      dockerfiles: dockerfileResults,
+      count: dockerfileResults.length,
+      optimization,
+      multistage,
       sessionId,
-      {
-        dockerfile_result: dockerfileResult,
-        completed_steps: [...(typedSession.completed_steps || []), 'dockerfile'],
-        metadata: {
-          ...(typedSession.metadata || {}),
-          dockerfile_count: dockerfileResults.length,
-          dockerfile_moduleRoots: moduleRoots,
-          dockerfile_optimization: optimization,
-          ai_enhancement_used: dockerfileResults.some((d) => d.samplingMetadata || d.winnerScore),
-        },
+    };
+
+    // Update typed session slice with output and state
+    await slice.patch(sessionId, {
+      output: generationResult,
+      state: {
+        lastGeneratedAt: new Date(),
+        dockerfileCount: dockerfileResults.length,
+        primaryModule: moduleRoots[0] || 'root',
+        generationStrategy: dockerfileResults.some((d) => d.samplingMetadata || d.winnerScore)
+          ? 'ai'
+          : 'template',
+        lastOptimization: optimization ? 'enabled' : 'disabled',
       },
-      context,
-    );
-    if (!updateResult.ok) {
-      logger.warn(
-        { error: updateResult.error },
-        'Failed to update session, but Dockerfile generation succeeded',
-      );
+    });
+
+    // Update session metadata for backward compatibility
+    const sessionManager = context.sessionManager;
+    if (sessionManager) {
+      try {
+        await sessionManager.update(sessionId, {
+          metadata: {
+            ...(typedSession.metadata || {}),
+            dockerfile_result: dockerfileResult,
+            dockerfile_count: dockerfileResults.length,
+            dockerfile_moduleRoots: moduleRoots,
+            dockerfile_optimization: optimization,
+            ai_enhancement_used: dockerfileResults.some((d) => d.samplingMetadata || d.winnerScore),
+          },
+          completed_steps: [...(typedSession.completed_steps || []), 'dockerfile'],
+        });
+      } catch (error) {
+        logger.warn(
+          { error: (error as Error).message },
+          'Failed to update session, but Dockerfile generation succeeded',
+        );
+      }
     }
     // Progress: Complete
     if (progress) await progress('COMPLETE');

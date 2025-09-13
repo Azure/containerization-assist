@@ -79,6 +79,8 @@ describe('prepareCluster', () => {
   let config: PrepareClusterParams;
   let mockGetSession: jest.Mock;
   let mockUpdateSession: jest.Mock;
+  let mockEnsureSession: jest.Mock;
+  let mockUseSessionSlice: jest.Mock;
 
   beforeEach(() => {
     mockLogger = createMockLogger();
@@ -92,6 +94,8 @@ describe('prepareCluster', () => {
     const sessionHelpers = require('@mcp/tool-session-helpers');
     mockGetSession = sessionHelpers.getSession = jest.fn();
     mockUpdateSession = sessionHelpers.updateSession = jest.fn();
+    mockEnsureSession = sessionHelpers.ensureSession = jest.fn();
+    mockUseSessionSlice = sessionHelpers.useSessionSlice = jest.fn();
 
     // Reset all mocks
     jest.clearAllMocks();
@@ -112,6 +116,30 @@ describe('prepareCluster', () => {
       },
     });
     mockUpdateSession.mockResolvedValue({ ok: true });
+    
+    // Setup ensureSession mock
+    mockEnsureSession.mockResolvedValue({
+      ok: true,
+      value: {
+        id: 'test-session-123',
+        state: {
+          sessionId: 'test-session-123',
+          metadata: {},
+          completed_steps: [],
+          errors: {},
+          current_step: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      },
+    });
+    
+    // Setup useSessionSlice mock
+    mockUseSessionSlice.mockReturnValue({
+      get: jest.fn().mockResolvedValue({ ok: true, value: null }),
+      set: jest.fn().mockResolvedValue({ ok: true }),
+      patch: jest.fn().mockResolvedValue({ ok: true }),
+    });
   });
 
   describe('Successful cluster preparation', () => {
@@ -135,7 +163,10 @@ describe('prepareCluster', () => {
     it('should handle existing namespace', async () => {
       mockK8sClient.namespaceExists.mockResolvedValue(true);
       
-      const mockContext = { logger: mockLogger } as any;
+      const mockContext = { 
+        logger: mockLogger,
+        sessionManager: mockSessionManager 
+      } as any;
       const result = await prepareCluster(config, mockContext);
 
       expect(result.ok).toBe(true);
@@ -163,7 +194,10 @@ describe('prepareCluster', () => {
     it('should return error when cluster is not reachable', async () => {
       mockK8sClient.ping.mockResolvedValue(false);
 
-      const mockContext = { logger: mockLogger } as any;
+      const mockContext = { 
+        logger: mockLogger,
+        sessionManager: mockSessionManager 
+      } as any;
       const result = await prepareCluster(config, mockContext);
 
       expect(result.ok).toBe(false);
@@ -177,7 +211,10 @@ describe('prepareCluster', () => {
       mockK8sClient.namespaceExists.mockResolvedValue(false);
       mockK8sClient.applyManifest.mockResolvedValue({ success: false, error: 'Failed to create namespace' });
       
-      const mockContext = { logger: mockLogger } as any;
+      const mockContext = { 
+        logger: mockLogger,
+        sessionManager: mockSessionManager 
+      } as any;
       const result = await prepareCluster(config, mockContext);
 
       expect(result.ok).toBe(false);
@@ -189,7 +226,10 @@ describe('prepareCluster', () => {
     it('should handle Kubernetes client errors', async () => {
       mockK8sClient.ping.mockRejectedValue(new Error('Connection timeout'));
 
-      const mockContext = { logger: mockLogger } as any;
+      const mockContext = { 
+        logger: mockLogger,
+        sessionManager: mockSessionManager 
+      } as any;
       const result = await prepareCluster(config, mockContext);
 
       expect(result.ok).toBe(false);
@@ -215,7 +255,10 @@ describe('prepareCluster', () => {
       mockK8sClient.applyManifest.mockResolvedValue({ success: true });
       
       // In production environment, RBAC is automatically setup
-      const mockContext = { logger: mockLogger } as any;
+      const mockContext = { 
+        logger: mockLogger,
+        sessionManager: mockSessionManager 
+      } as any;
       const result = await prepareCluster(config, mockContext);
 
       expect(result.ok).toBe(true);
@@ -228,7 +271,10 @@ describe('prepareCluster', () => {
       mockK8sClient.checkIngressController.mockResolvedValue(true);
       
       // In production, checkRequirements is true, so ingress is checked
-      const mockContext = { logger: mockLogger } as any;
+      const mockContext = { 
+        logger: mockLogger,
+        sessionManager: mockSessionManager 
+      } as any;
       const result = await prepareCluster(config, mockContext);
 
       expect(result.ok).toBe(true);
@@ -258,11 +304,14 @@ describe('prepareCluster', () => {
       mockK8sClient.namespaceExists.mockResolvedValue(true);
       mockK8sClient.checkPermissions.mockResolvedValue(true);
 
-      const mockContext = { logger: mockLogger } as any;
+      const mockContext = { 
+        logger: mockLogger,
+        sessionManager: mockSessionManager 
+      } as any;
       await prepareCluster(config, mockContext);
 
-      // Verify session was retrieved/created
-      expect(mockGetSession).toHaveBeenCalledWith('test-session-123', mockContext);
+      // Verify session was retrieved/created (using ensureSession now)
+      expect(mockEnsureSession).toHaveBeenCalledWith(mockContext, 'test-session-123');
     });
   });
 });

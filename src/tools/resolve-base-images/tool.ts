@@ -19,13 +19,15 @@
  * ```
  */
 
-import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import { extractErrorMessage } from '../../lib/error-utils';
 import type { ToolContext } from '../../mcp/context';
 import { createTimer, createLogger, type Logger } from '../../lib/logger';
 import { getRecommendedBaseImage } from '../../lib/base-images';
 import { scoreConfigCandidates } from '@lib/integrated-scoring';
 import { getKnowledgeForCategory } from '../../knowledge';
+import { resolveBaseImagesSchema, type ResolveBaseImagesParams } from './schema';
+import { z } from 'zod';
 
 // Helper functions for base image resolution
 function getSuggestedBaseImages(language: string): string[] {
@@ -163,7 +165,48 @@ async function getImageMetadata(
 import { Success, Failure, type Result } from '../../types';
 import { getSuccessProgression, type SessionContext } from '../../workflows/workflow-progression';
 import { TOOL_NAMES } from '../../exports/tool-names.js';
-import type { ResolveBaseImagesParams } from './schema';
+
+// Define the result schema for type safety
+const BaseImageRecommendationSchema = z.object({
+  sessionId: z.string(),
+  technology: z.string().optional(),
+  primaryImage: z.object({
+    name: z.string(),
+    tag: z.string(),
+    digest: z.string().optional(),
+    size: z.number().optional(),
+    lastUpdated: z.string().optional(),
+    score: z.number().optional(),
+    knowledgeBasedRecommendations: z.array(z.string()).optional(),
+  }),
+  alternativeImages: z
+    .array(
+      z.object({
+        name: z.string(),
+        tag: z.string(),
+        reason: z.string(),
+        score: z.number().optional(),
+        pros: z.array(z.string()).optional(),
+        cons: z.array(z.string()).optional(),
+      }),
+    )
+    .optional(),
+  rationale: z.string(),
+  securityConsiderations: z.array(z.string()).optional(),
+  performanceNotes: z.array(z.string()).optional(),
+  compatibilityWarnings: z.array(z.string()).optional(),
+  bestPractices: z.array(z.string()).optional(),
+});
+
+// Define tool IO for type-safe session operations
+const io = defineToolIO(resolveBaseImagesSchema, BaseImageRecommendationSchema);
+
+// Tool-specific state schema
+const StateSchema = z.object({
+  lastResolvedAt: z.date().optional(),
+  primaryTechnology: z.string().optional(),
+  recommendationScore: z.number().optional(),
+});
 
 export interface BaseImageRecommendation {
   sessionId: string;
@@ -215,15 +258,26 @@ async function resolveBaseImagesImpl(
 
     logger.info({ technology, targetEnvironment, securityLevel }, 'Resolving base images');
 
-    // Resolve session (now always optional)
-    const sessionResult = await getSession(params.sessionId, context);
-
+    // Ensure session exists and get typed slice operations
+    const sessionResult = await ensureSession(context, params.sessionId);
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
     }
 
     const { id: sessionId, state: session } = sessionResult.value;
-    logger.info({ sessionId, technology, targetEnvironment }, 'Starting base image resolution');
+    const slice = useSessionSlice('resolve-base-images', io, context, StateSchema);
+
+    if (!slice) {
+      return Failure('Session manager not available');
+    }
+
+    logger.info(
+      { sessionId, technology, targetEnvironment, securityLevel },
+      'Starting base image resolution',
+    );
+
+    // Record input in session slice
+    await slice.patch(sessionId, { input: params });
 
     // Get analysis result from session or use provided technology
     const sessionState = session as
@@ -371,21 +425,33 @@ async function resolveBaseImagesImpl(
       }),
     };
 
-    // Update session with recommendation using standardized helper
-    const updateResult = await updateSession(
-      sessionId,
-      {
-        base_image_recommendation: recommendation,
-        completed_steps: [...(session.completed_steps || []), 'resolve-base-images'],
+    // Update typed session slice with output and state
+    await slice.patch(sessionId, {
+      output: recommendation,
+      state: {
+        lastResolvedAt: new Date(),
+        primaryTechnology: language,
+        recommendationScore: primaryScore,
       },
-      context,
-    );
+    });
 
-    if (!updateResult.ok) {
-      logger.warn(
-        { error: updateResult.error },
-        'Failed to update session, but resolution succeeded',
-      );
+    // Update session metadata for backward compatibility
+    const sessionManager = context.sessionManager;
+    if (sessionManager) {
+      try {
+        await sessionManager.update(sessionId, {
+          metadata: {
+            ...session.metadata,
+            base_image_recommendation: recommendation,
+          },
+          completed_steps: [...(session.completed_steps || []), 'resolve-base-images'],
+        });
+      } catch (error) {
+        logger.warn(
+          { error: extractErrorMessage(error) },
+          'Failed to update session, but resolution succeeded',
+        );
+      }
     }
 
     timer.end({ primaryImage, sessionId, technology: language });

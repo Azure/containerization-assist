@@ -21,7 +21,7 @@
 
 import { joinPaths, getExtension, safeNormalizePath } from '@lib/path-utils';
 import { promises as fs } from 'node:fs';
-import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import { createStandardProgress } from '@mcp/progress-helper';
 import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
@@ -29,44 +29,67 @@ import { getRecommendedBaseImage } from '../../lib/base-images';
 import type { ToolContext } from '../../mcp/context';
 import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../types';
-import type { AnalyzeRepoParams } from './schema';
+import { analyzeRepoSchema, type AnalyzeRepoParams } from './schema';
+import { z } from 'zod';
 import { parsePackageJson, getAllDependencies } from '../../lib/parsing-package-json';
 import { DEFAULT_PORTS } from '../../config/defaults';
 import { getSuccessProgression } from '../../workflows/workflow-progression';
 import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { extractErrorMessage } from '../../lib/error-utils';
 
-export interface AnalyzeRepoResult {
-  ok: boolean;
-  sessionId: string;
-  language: string;
-  languageVersion?: string;
-  framework?: string;
-  frameworkVersion?: string;
-  buildSystem?: {
-    type: string;
-    file: string;
-    buildCommand: string;
-    testCommand?: string;
-  };
-  dependencies: Array<{ name: string; version?: string; type: string }>;
-  ports: number[];
-  hasDockerfile: boolean;
-  hasDockerCompose: boolean;
-  hasKubernetes: boolean;
-  recommendations: {
-    baseImage: string;
-    buildStrategy: 'multi-stage' | 'single-stage';
-    securityNotes: string[];
-  };
-  metadata: {
-    repoPath: string;
-    depth: number;
-    timestamp: number;
-    includeTests?: boolean;
-    aiInsights?: unknown;
-  };
-}
+// Define the result schema for type safety
+const AnalyzeRepoResultSchema = z.object({
+  ok: z.boolean(),
+  sessionId: z.string(),
+  language: z.string(),
+  languageVersion: z.string().optional(),
+  framework: z.string().optional(),
+  frameworkVersion: z.string().optional(),
+  buildSystem: z
+    .object({
+      type: z.string(),
+      file: z.string(),
+      buildCommand: z.string(),
+      testCommand: z.string().optional(),
+    })
+    .optional(),
+  dependencies: z.array(
+    z.object({
+      name: z.string(),
+      version: z.string().optional(),
+      type: z.string(),
+    }),
+  ),
+  ports: z.array(z.number()),
+  hasDockerfile: z.boolean(),
+  hasDockerCompose: z.boolean(),
+  hasKubernetes: z.boolean(),
+  recommendations: z.object({
+    baseImage: z.string(),
+    buildStrategy: z.enum(['multi-stage', 'single-stage']),
+    securityNotes: z.array(z.string()),
+  }),
+  metadata: z.object({
+    repoPath: z.string(),
+    depth: z.number(),
+    timestamp: z.number(),
+    includeTests: z.boolean().optional(),
+    aiInsights: z.unknown().optional(),
+  }),
+});
+
+// Define the result type from the schema
+export type AnalyzeRepoResult = z.infer<typeof AnalyzeRepoResultSchema>;
+
+// Define tool IO for type-safe session operations
+const io = defineToolIO(analyzeRepoSchema, AnalyzeRepoResultSchema);
+
+// Tool-specific state schema
+const StateSchema = z.object({
+  lastAnalyzedAt: z.date().optional(),
+  analysisDepth: z.number().optional(),
+  detectedLanguages: z.array(z.string()).default([]),
+});
 const LANGUAGE_SIGNATURES: Record<string, { extensions: string[]; files: string[] }> = {
   javascript: {
     extensions: ['', '.mjs', '.cjs'],
@@ -391,14 +414,23 @@ async function analyzeRepoImpl(
       return Failure(validation.error ?? 'Invalid repository path');
     }
 
-    // Get or create session
-    const sessionResult = await getSession(params.sessionId, context);
+    // Ensure session exists and get typed slice operations
+    const sessionResult = await ensureSession(context, params.sessionId);
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
     }
 
     const { id: sessionId, state: session } = sessionResult.value;
+    const slice = useSessionSlice('analyze-repo', io, context, StateSchema);
+
+    if (!slice) {
+      return Failure('Session manager not available');
+    }
+
     logger.info({ sessionId, repoPath }, 'Starting repository analysis with session');
+
+    // Record input in session slice
+    await slice.patch(sessionId, { input: params });
 
     // Repository analysis discovers language, framework, and configuration patterns
     if (progress) await progress('EXECUTING');
@@ -546,49 +578,66 @@ async function analyzeRepoImpl(
       },
     };
 
-    // Update session with analysis result using simplified helper
-    const updateResult = await updateSession(
-      sessionId,
-      {
-        repo_path: repoPath,
-        analysis_result: {
-          language: languageInfo.language,
-          ...(languageInfo.version && { language_version: languageInfo.version }),
-          ...(frameworkInfo?.framework && { framework: frameworkInfo.framework }),
-          ...(frameworkInfo?.version && { framework_version: frameworkInfo.version }),
-          ...(buildSystem && {
-            build_system: {
-              type: buildSystem.type,
-              build_file: buildSystem.file,
-              ...(buildSystem.buildCommand && { build_command: buildSystem.buildCommand }),
-            },
-          }),
-          dependencies: dependencies.map((d) => ({
-            name: d.name,
-            ...(d.version && { version: d.version }),
-            type:
-              d.type === 'production'
-                ? ('runtime' as const)
-                : d.type === 'development'
-                  ? ('dev' as const)
-                  : ('test' as const),
-          })),
-          has_tests: dependencies.some((dep) => dep.type === 'test'),
-          ports,
-          docker_compose_exists: dockerInfo.hasDockerCompose,
-          recommendations: {
-            baseImage,
-            buildStrategy: buildSystem ? 'multi-stage' : 'single-stage',
-            securityNotes,
-          },
-        },
-        completed_steps: [...(session?.completed_steps ?? []), 'analyze-repo'],
+    // Update typed session slice with output and state
+    await slice.patch(sessionId, {
+      output: result,
+      state: {
+        lastAnalyzedAt: new Date(),
+        analysisDepth: params.depth || 3,
+        detectedLanguages: frameworkInfo?.framework
+          ? [languageInfo.language, frameworkInfo.framework]
+          : [languageInfo.language],
       },
-      context,
-    );
+    });
 
-    if (!updateResult.ok) {
-      logger.warn({ error: updateResult.error }, 'Failed to update session with analysis result');
+    // Update session metadata for backward compatibility
+    const sessionManager = context.sessionManager;
+    if (sessionManager) {
+      try {
+        await sessionManager.update(sessionId, {
+          metadata: {
+            ...session.metadata,
+            analysis_result: {
+              language: languageInfo.language,
+              ...(languageInfo.version && { language_version: languageInfo.version }),
+              ...(frameworkInfo?.framework && { framework: frameworkInfo.framework }),
+              ...(frameworkInfo?.version && { framework_version: frameworkInfo.version }),
+              ...(buildSystem && {
+                build_system: {
+                  type: buildSystem.type,
+                  build_file: buildSystem.file,
+                  ...(buildSystem.buildCommand && { build_command: buildSystem.buildCommand }),
+                },
+              }),
+              dependencies: dependencies.map((d) => ({
+                name: d.name,
+                ...(d.version && { version: d.version }),
+                type:
+                  d.type === 'production'
+                    ? ('runtime' as const)
+                    : d.type === 'development'
+                      ? ('dev' as const)
+                      : ('test' as const),
+              })),
+              has_tests: dependencies.some((dep) => dep.type === 'test'),
+              ports,
+              docker_compose_exists: dockerInfo.hasDockerCompose,
+              recommendations: {
+                baseImage,
+                buildStrategy: buildSystem ? 'multi-stage' : 'single-stage',
+                securityNotes,
+              },
+            },
+          },
+          repo_path: repoPath,
+          completed_steps: [...(session?.completed_steps ?? []), 'analyze-repo'],
+        });
+      } catch (error) {
+        logger.warn(
+          { error: extractErrorMessage(error) },
+          'Failed to update session with analysis result',
+        );
+      }
     }
 
     // Progress: Finalizing results

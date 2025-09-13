@@ -15,7 +15,7 @@
 
 import { resolvePath, joinPaths, getRelativePath, safeNormalizePath } from '@lib/path-utils';
 import { promises as fs } from 'node:fs';
-import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import { createStandardProgress } from '@mcp/progress-helper';
 import type { ToolContext } from '../../mcp/context';
 import { createDockerClient, type DockerBuildOptions } from '../../lib/docker';
@@ -23,13 +23,15 @@ import { createTimer, createLogger } from '../../lib/logger';
 import { type Result, Success, Failure } from '../../types';
 import { extractErrorMessage } from '../../lib/error-utils';
 import { fileExists } from '@lib/file-utils';
-import type { BuildImageParams } from './schema';
+import { buildImageSchema, type BuildImageParams } from './schema';
 import {
   getFailureProgression,
   formatFailureChainHint,
   getSuccessProgression,
 } from '../../workflows/workflow-progression';
 import { TOOL_NAMES } from '../../exports/tool-names.js';
+import { z } from 'zod';
+import type { SessionData } from '../session-types';
 
 export interface BuildImageResult {
   /** Whether the build completed successfully */
@@ -52,21 +54,38 @@ export interface BuildImageResult {
   securityWarnings?: string[];
 }
 
+// Define the result schema for type safety
+const BuildImageResultSchema = z.object({
+  success: z.boolean(),
+  sessionId: z.string(),
+  imageId: z.string(),
+  tags: z.array(z.string()),
+  size: z.number(),
+  layers: z.number().optional(),
+  buildTime: z.number(),
+  logs: z.array(z.string()),
+  securityWarnings: z.array(z.string()).optional(),
+});
+
+// Define tool IO for type-safe session operations
+const io = defineToolIO(buildImageSchema, BuildImageResultSchema);
+
+// Tool-specific state schema
+const StateSchema = z.object({
+  lastBuiltAt: z.date().optional(),
+  lastBuiltImageId: z.string().optional(),
+  lastBuiltTags: z.array(z.string()).optional(),
+  totalBuilds: z.number().optional(),
+  lastBuildTime: z.number().optional(),
+  lastSecurityWarningCount: z.number().optional(),
+});
+
 /**
  * Prepare build arguments with defaults
  */
-interface SessionWithAnalysis {
-  workflow_state?: {
-    analysis_result?: {
-      language?: string;
-      framework?: string;
-    };
-  };
-}
-
 function prepareBuildArgs(
   buildArgs: Record<string, string> = {},
-  session: SessionWithAnalysis | null | undefined,
+  session: SessionData | null | undefined,
 ): Record<string, string> {
   const defaults: Record<string, string> = {
     NODE_ENV: process.env.NODE_ENV ?? 'production',
@@ -75,7 +94,7 @@ function prepareBuildArgs(
   };
 
   // Add session-specific args if available
-  const analysisResult = session?.workflow_state?.analysis_result;
+  const analysisResult = session?.analysis_result;
   if (analysisResult) {
     if (analysisResult.language) {
       defaults.LANGUAGE = analysisResult.language;
@@ -145,7 +164,7 @@ async function buildImageImpl(
       imageName,
       tags = [],
       buildArgs = {},
-      platform,
+      platform: _platform,
     } = params;
 
     // Normalize paths to handle Windows separators
@@ -159,29 +178,36 @@ async function buildImageImpl(
 
     const startTime = Date.now();
 
-    // Get or create session
-    const sessionResult = await getSession(params.sessionId, context);
+    // Ensure session exists and get typed slice operations
+    const sessionResult = await ensureSession(context, params.sessionId);
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
     }
 
     const { id: sessionId, state: session } = sessionResult.value;
-    logger.info({ sessionId }, 'Starting Docker image build');
+    const slice = useSessionSlice('build-image', io, context, StateSchema);
+
+    if (!slice) {
+      return Failure('Session manager not available');
+    }
+
+    logger.info({ sessionId }, 'Starting Docker image build with session');
+
+    // Record input in session slice
+    await slice.patch(sessionId, { input: params });
 
     const dockerClient = createDockerClient(logger);
 
     // Determine paths
-    const sessionState = session as SessionWithAnalysis & { repo_path?: string };
-    const repoPath = sessionState.repo_path ?? buildContext;
+    const sessionData = session as SessionData;
+    const repoPath = (sessionData?.repo_path ?? buildContext) as string;
     let finalDockerfilePath = dockerfilePath
       ? resolvePath(repoPath, dockerfilePath)
       : resolvePath(repoPath, dockerfile);
 
     // Check if we should use a generated Dockerfile
-    const dockerfileResult = (sessionState as Record<string, unknown>).dockerfile_result as
-      | Record<string, unknown>
-      | undefined;
-    const generatedPath = dockerfileResult?.path as string | undefined;
+    const dockerfileResult = sessionData?.dockerfile_result;
+    const generatedPath = dockerfileResult?.path;
 
     if (!(await fileExists(finalDockerfilePath))) {
       // If the specified Dockerfile doesn't exist, check for generated one
@@ -198,7 +224,7 @@ async function buildImageImpl(
            * Failure Mode: Generated path exists in session but file missing
            * Recovery: Write content from session if available
            */
-          const dockerfileContent = dockerfileResult?.content as string | undefined;
+          const dockerfileContent = dockerfileResult?.content;
           if (dockerfileContent) {
             // Use the user-specified dockerfile name (defaults to 'Dockerfile')
             finalDockerfilePath = joinPaths(repoPath, dockerfile);
@@ -214,7 +240,7 @@ async function buildImageImpl(
           }
         }
       } else {
-        const dockerfileContent = dockerfileResult?.content as string | undefined;
+        const dockerfileContent = dockerfileResult?.content;
         if (dockerfileContent) {
           // Use the user-specified dockerfile name (defaults to 'Dockerfile')
           finalDockerfilePath = joinPaths(repoPath, dockerfile);
@@ -245,7 +271,7 @@ async function buildImageImpl(
     }
 
     // Prepare build arguments
-    const finalBuildArgs = prepareBuildArgs(buildArgs, session as SessionWithAnalysis);
+    const finalBuildArgs = prepareBuildArgs(buildArgs, sessionData);
 
     // Analyze security
     const securityWarnings = analyzeBuildSecurity(dockerfileContent, finalBuildArgs);
@@ -258,7 +284,7 @@ async function buildImageImpl(
       context: repoPath, // Build context is the repository path
       dockerfile: getRelativePath(repoPath, finalDockerfilePath), // Dockerfile path relative to context
       buildargs: finalBuildArgs,
-      ...(platform !== undefined && { platform }),
+      ...(_platform !== undefined && { platform: _platform }),
     };
 
     // Add tags if provided
@@ -279,27 +305,18 @@ async function buildImageImpl(
     logger.info({ buildOptions, finalDockerfilePath }, 'About to call Docker buildImage');
     const buildResult = await dockerClient.buildImage(buildOptions);
 
-    // Prepare session context for chain hints
-    const sessionContext = {
-      completed_steps: session.completed_steps || [],
-      ...(((session as Record<string, unknown>).dockerfile_result as
-        | { content?: string }
-        | undefined) && {
-        dockerfile_result: (session as Record<string, unknown>).dockerfile_result as {
-          content?: string;
-        },
-      }),
-      ...(((session as Record<string, unknown>).analysis_result as
-        | { language?: string }
-        | undefined) && {
-        analysis_result: (session as Record<string, unknown>).analysis_result as {
-          language?: string;
-        },
-      }),
-    };
-
     if (!buildResult.ok) {
       const errorMessage = buildResult.error ?? 'Unknown error';
+      // Prepare session context for chain hints in failure case
+      const sessionContext = {
+        completed_steps: session.completed_steps || [],
+        ...(sessionData?.dockerfile_result && {
+          dockerfile_result: sessionData.dockerfile_result,
+        }),
+        ...(sessionData?.analysis_result && {
+          analysis_result: sessionData.analysis_result,
+        }),
+      };
       const progression = getFailureProgression(
         TOOL_NAMES.BUILD_IMAGE,
         errorMessage,
@@ -315,39 +332,9 @@ async function buildImageImpl(
     // Progress: Finalizing build results and updating session
     if (progress) await progress('FINALIZING');
 
-    // Update session with build result using simplified helper
+    // Prepare the result
     const finalTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
-    const updateResult = await updateSession(
-      sessionId,
-      {
-        build_result: {
-          success: true,
-          imageId: buildResult.value.imageId ?? '',
-          tags: finalTags,
-          size: (buildResult.value as unknown as { size?: number }).size ?? 0,
-          metadata: {
-            layers: (buildResult.value as unknown as { layers?: number }).layers,
-            buildTime,
-            logs: buildResult.value.logs,
-            securityWarnings,
-          },
-        },
-        completed_steps: [...(session.completed_steps || []), 'build-image'],
-      },
-      context,
-    );
-
-    if (!updateResult.ok) {
-      logger.warn({ error: updateResult.error }, 'Failed to update session, but build succeeded');
-    }
-
-    timer.end({ imageId: buildResult.value.imageId, buildTime });
-    logger.info({ imageId: buildResult.value.imageId, buildTime }, 'Docker image build completed');
-
-    // Progress: Complete
-    if (progress) await progress('COMPLETE');
-
-    return Success({
+    const result: BuildImageResult = {
       success: true,
       sessionId,
       imageId: buildResult.value.imageId,
@@ -359,6 +346,72 @@ async function buildImageImpl(
       buildTime,
       logs: buildResult.value.logs,
       ...(securityWarnings.length > 0 && { securityWarnings }),
+    };
+
+    // Update typed session slice with output and state
+    await slice.patch(sessionId, {
+      output: result,
+      state: {
+        lastBuiltAt: new Date(),
+        lastBuiltImageId: buildResult.value.imageId,
+        lastBuiltTags: finalTags,
+        totalBuilds:
+          (sessionData?.completed_steps || []).filter((s: string) => s === 'build-image').length +
+          1,
+        lastBuildTime: buildTime,
+        lastSecurityWarningCount: securityWarnings.length,
+      },
+    });
+
+    // Update session metadata for backward compatibility
+    const sessionManager = context.sessionManager;
+    if (sessionManager) {
+      try {
+        await sessionManager.update(sessionId, {
+          metadata: {
+            ...session.metadata,
+            build_result: {
+              success: true,
+              imageId: buildResult.value.imageId ?? '',
+              tags: finalTags,
+              size: (buildResult.value as unknown as { size?: number }).size ?? 0,
+              metadata: {
+                layers: (buildResult.value as unknown as { layers?: number }).layers,
+                buildTime,
+                logs: buildResult.value.logs,
+                securityWarnings,
+              },
+            },
+          },
+          completed_steps: [...(session.completed_steps || []), 'build-image'],
+        });
+      } catch (error) {
+        logger.warn(
+          { error: (error as Error).message },
+          'Failed to update session, but build succeeded',
+        );
+      }
+    }
+
+    timer.end({ imageId: buildResult.value.imageId, buildTime });
+    logger.info({ imageId: buildResult.value.imageId, buildTime }, 'Docker image build completed');
+
+    // Progress: Complete
+    if (progress) await progress('COMPLETE');
+
+    // Prepare session context for chain hints
+    const sessionContext = {
+      completed_steps: session.completed_steps || [],
+      ...(sessionData?.dockerfile_result && {
+        dockerfile_result: sessionData.dockerfile_result,
+      }),
+      ...(sessionData?.analysis_result && {
+        analysis_result: sessionData.analysis_result,
+      }),
+    };
+
+    return Success({
+      ...result,
       NextStep: getSuccessProgression(TOOL_NAMES.BUILD_IMAGE, sessionContext).summary,
     });
   } catch (error) {
