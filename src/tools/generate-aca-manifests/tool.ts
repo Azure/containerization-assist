@@ -507,7 +507,7 @@ async function generateAcaManifestsImpl(
       _fileWritten: true,
       _fileWrittenPath: outputPath,
       NextStep: getSuccessProgression(
-        TOOL_NAMES.GENERATE_ACA_MANIFESTS || 'generate-aca-manifests',
+        TOOL_NAMES.GENERATE_ACA_MANIFESTS,
         sessionContext,
       ).summary,
     };
