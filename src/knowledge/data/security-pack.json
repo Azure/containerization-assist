@@ -198,5 +198,145 @@
     "severity": "medium",
     "tags": ["security", "secrets", "rotation"],
     "description": "Regular secret rotation reduces impact of credential compromise"
+  },
+  {
+    "id": "sbom-generation",
+    "category": "security",
+    "pattern": "FROM.*:",
+    "recommendation": "Generate Software Bill of Materials (SBOM) for supply chain transparency",
+    "example": "# Generate SBOM during build\nRUN syft packages -o spdx-json > /sbom.json\n# Or use: docker sbom myimage:tag",
+    "severity": "medium",
+    "tags": ["security", "sbom", "supply-chain", "compliance"],
+    "description": "SBOM provides transparency into container contents and dependencies"
+  },
+  {
+    "id": "image-provenance",
+    "category": "security",
+    "pattern": "FROM.*:",
+    "recommendation": "Use image signing and provenance attestation for supply chain security",
+    "example": "# Sign with cosign\ncosign sign --key cosign.key myimage:tag\n# Verify: cosign verify --key cosign.pub myimage:tag",
+    "severity": "high",
+    "tags": ["security", "signing", "provenance", "supply-chain"],
+    "description": "Image signing ensures authenticity and prevents tampering"
+  },
+  {
+    "id": "base-image-verification",
+    "category": "security",
+    "pattern": "FROM",
+    "recommendation": "Verify base image signatures and use trusted registries",
+    "example": "# Use official images with digest\nFROM docker.io/library/node:20-alpine@sha256:abc123...\n# Enable Docker Content Trust: export DOCKER_CONTENT_TRUST=1",
+    "severity": "high",
+    "tags": ["security", "verification", "trust", "base-image"],
+    "description": "Verified base images prevent supply chain attacks"
+  },
+  {
+    "id": "dependency-pinning",
+    "category": "security",
+    "pattern": "(npm install|pip install|go get|cargo build)",
+    "recommendation": "Pin all dependency versions including transitive dependencies",
+    "example": "# Use lock files: package-lock.json, Pipfile.lock, go.sum, Cargo.lock\n# Verify checksums during installation",
+    "severity": "high",
+    "tags": ["security", "dependencies", "pinning", "reproducible"],
+    "description": "Pinned dependencies prevent unexpected malicious updates"
+  },
+  {
+    "id": "build-attestation",
+    "category": "security",
+    "pattern": "docker build",
+    "recommendation": "Generate build attestations for transparency and compliance",
+    "example": "docker build --provenance=true --sbom=true -t myimage:tag .\n# Generates attestations for build provenance and SBOM",
+    "severity": "medium",
+    "tags": ["security", "attestation", "provenance", "compliance"],
+    "description": "Build attestations provide verifiable build metadata"
+  },
+  {
+    "id": "registry-scanning",
+    "category": "security",
+    "pattern": "docker push",
+    "recommendation": "Enable automatic vulnerability scanning in container registries",
+    "example": "# Configure registry scanning\n# AWS ECR: automatic scanning on push\n# Harbor: integrated Trivy scanning\n# GCR: Container Analysis API",
+    "severity": "high",
+    "tags": ["security", "scanning", "registry", "vulnerabilities"],
+    "description": "Registry scanning identifies vulnerabilities before deployment"
+  },
+  {
+    "id": "admission-control",
+    "category": "security",
+    "pattern": "kind: Deployment",
+    "recommendation": "Use admission controllers to enforce security policies",
+    "example": "# Use OPA Gatekeeper or Kyverno for policy enforcement\n# Example: require image signatures, resource limits, non-root users",
+    "severity": "high",
+    "tags": ["security", "admission-control", "policy", "kubernetes"],
+    "description": "Admission controllers enforce security policies at deployment time"
+  },
+  {
+    "id": "runtime-protection",
+    "category": "security",
+    "pattern": "securityContext:",
+    "recommendation": "Implement runtime protection with security profiles",
+    "example": "securityContext:\n  seccompProfile:\n    type: RuntimeDefault\n  appArmorProfile:\n    type: runtime/default\n  seLinuxOptions:\n    level: s0:c123,c456",
+    "severity": "high",
+    "tags": ["security", "runtime", "seccomp", "apparmor"],
+    "description": "Runtime security profiles restrict container capabilities"
+  },
+  {
+    "id": "falco-rules",
+    "category": "security",
+    "pattern": "kind: Deployment",
+    "recommendation": "Deploy Falco for runtime threat detection",
+    "example": "# Deploy Falco DaemonSet for runtime security monitoring\n# Configure custom rules for application-specific threats",
+    "severity": "medium",
+    "tags": ["security", "falco", "runtime", "detection"],
+    "description": "Falco provides runtime security monitoring and alerting"
+  },
+  {
+    "id": "compliance-scanning",
+    "category": "security",
+    "pattern": "FROM.*:",
+    "recommendation": "Implement compliance scanning for regulatory requirements",
+    "example": "# CIS Benchmark scanning\ndocker run --rm -v /var/run/docker.sock:/var/run/docker.sock \\\n  aquasec/docker-bench-security\n# NIST, PCI-DSS, HIPAA compliance checks",
+    "severity": "high",
+    "tags": ["security", "compliance", "cis", "scanning"],
+    "description": "Compliance scanning ensures regulatory requirement adherence"
+  },
+  {
+    "id": "drift-detection",
+    "category": "security",
+    "pattern": "kind: Deployment",
+    "recommendation": "Implement configuration drift detection",
+    "example": "# Use tools like Kubescape or Datree\n# Monitor for unauthorized changes\n# Alert on configuration drift from baseline",
+    "severity": "medium",
+    "tags": ["security", "drift", "monitoring", "configuration"],
+    "description": "Drift detection identifies unauthorized configuration changes"
+  },
+  {
+    "id": "supply-chain-levels",
+    "category": "security",
+    "pattern": "FROM.*:",
+    "recommendation": "Implement SLSA (Supply chain Levels for Software Artifacts) framework",
+    "example": "# SLSA Level 3 requirements:\n# - Hardened build platform\n# - Non-falsifiable provenance\n# - Isolated builds",
+    "severity": "medium",
+    "tags": ["security", "slsa", "supply-chain", "framework"],
+    "description": "SLSA framework provides supply chain security maturity levels"
+  },
+  {
+    "id": "vulnerability-database",
+    "category": "security",
+    "pattern": "FROM.*:",
+    "recommendation": "Maintain internal vulnerability database and exemptions",
+    "example": "# Track accepted risks\n# Document false positives\n# Maintain vulnerability remediation SLAs",
+    "severity": "medium",
+    "tags": ["security", "vulnerabilities", "database", "tracking"],
+    "description": "Vulnerability tracking enables risk management and compliance"
+  },
+  {
+    "id": "zero-trust-networking",
+    "category": "security",
+    "pattern": "kind: NetworkPolicy",
+    "recommendation": "Implement zero-trust networking with service mesh",
+    "example": "# Istio/Linkerd for mTLS\n# Explicit allow policies only\n# Encrypt all pod-to-pod communication",
+    "severity": "high",
+    "tags": ["security", "zero-trust", "networking", "service-mesh"],
+    "description": "Zero-trust networking assumes no implicit trust between services"
   }
 ]

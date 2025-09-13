@@ -1,0 +1,129 @@
+{
+  "id": "generate-aca-manifests",
+  "category": "orchestration",
+  "description": "Generate Azure Container Apps manifests for containerized applications",
+  "version": "1.0",
+  "parameters": [
+    {
+      "name": "appName",
+      "type": "string",
+      "required": true,
+      "description": "Application name for the Container App"
+    },
+    {
+      "name": "imageId",
+      "type": "string",
+      "required": true,
+      "description": "Container image to deploy"
+    },
+    {
+      "name": "resourceGroup",
+      "type": "string",
+      "required": false,
+      "description": "Azure resource group name"
+    },
+    {
+      "name": "environmentName",
+      "type": "string",
+      "required": false,
+      "description": "Container Apps environment name"
+    },
+    {
+      "name": "location",
+      "type": "string",
+      "required": false,
+      "description": "Azure region (e.g., eastus, westeurope)"
+    },
+    {
+      "name": "cpu",
+      "type": "number",
+      "required": false,
+      "description": "CPU cores (0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0)"
+    },
+    {
+      "name": "memory",
+      "type": "string",
+      "required": false,
+      "description": "Memory allocation (0.5Gi, 1Gi, 1.5Gi, 2Gi, 2.5Gi, 3Gi, 3.5Gi, 4Gi)"
+    },
+    {
+      "name": "minReplicas",
+      "type": "number",
+      "required": false,
+      "description": "Minimum instances (0 for serverless)"
+    },
+    {
+      "name": "maxReplicas",
+      "type": "number",
+      "required": false,
+      "description": "Maximum instances"
+    },
+    {
+      "name": "targetPort",
+      "type": "number",
+      "required": false,
+      "description": "Container port to expose"
+    },
+    {
+      "name": "external",
+      "type": "boolean",
+      "required": false,
+      "description": "Enable external ingress"
+    },
+    {
+      "name": "environment",
+      "type": "string",
+      "required": false,
+      "description": "Target environment (development, staging, production)"
+    },
+    {
+      "name": "envVars",
+      "type": "array",
+      "required": false,
+      "description": "Environment variables configuration"
+    },
+    {
+      "name": "secrets",
+      "type": "array",
+      "required": false,
+      "description": "Secret configuration"
+    },
+    {
+      "name": "daprEnabled",
+      "type": "boolean",
+      "required": false,
+      "description": "Enable Dapr integration"
+    },
+    {
+      "name": "healthProbes",
+      "type": "object",
+      "required": false,
+      "description": "Health probe configuration"
+    },
+    {
+      "name": "bestPractices",
+      "type": "array",
+      "required": false,
+      "description": "Knowledge-base best practices recommendations"
+    },
+    {
+      "name": "examples",
+      "type": "array",
+      "required": false,
+      "description": "Relevant code examples from knowledge base"
+    },
+    {
+      "name": "securityRecommendations",
+      "type": "array",
+      "required": false,
+      "description": "Security-specific recommendations from knowledge base"
+    },
+    {
+      "name": "knowledgeSuggestions",
+      "type": "array",
+      "required": false,
+      "description": "Detailed suggestions with reasons from knowledge base"
+    }
+  ],
+  "template": "Generate production-ready Azure Container Apps deployment manifest.\n\nApplication Details:\n- Name: {{appName}}\n- Image: {{imageId}}\n{{#resourceGroup}}\n- Resource Group: {{resourceGroup}}\n{{/resourceGroup}}\n{{#environmentName}}\n- Environment: {{environmentName}}\n{{/environmentName}}\n{{#location}}\n- Location: {{location}}\n{{/location}}\n\n{{#cpu}}\nResource Configuration:\n- CPU: {{cpu}} vCPU\n{{/cpu}}\n{{#memory}}\n- Memory: {{memory}}\n{{/memory}}\n{{#minReplicas}}\n- Min Replicas: {{minReplicas}}\n{{/minReplicas}}\n{{#maxReplicas}}\n- Max Replicas: {{maxReplicas}}\n{{/maxReplicas}}\n\n{{#targetPort}}\nIngress Configuration:\n- Target Port: {{targetPort}}\n{{/targetPort}}\n{{#external}}\n- External Access: {{external}}\n{{/external}}\n\n{{#environment}}\nTarget Environment: {{environment}}\n{{/environment}}\n\n{{#daprEnabled}}\nDapr Integration: Enabled\n{{/daprEnabled}}\n\n{{#bestPractices}}Best Practices (from knowledge base):\n{{#.}}- {{.}}\n{{/.}}{{/bestPractices}}\n\n{{#examples}}Relevant Examples:\n{{#.}}- {{.}}\n{{/.}}{{/examples}}\n\n{{#securityRecommendations}}Security Recommendations:\n{{#.}}- {{.}}\n{{/.}}{{/securityRecommendations}}\n\n{{#knowledgeSuggestions}}Knowledge-Based Suggestions:\n{{#.}}- {{recommendation}} ({{reason}})\n{{/.}}{{/knowledgeSuggestions}}\n\nGenerate a complete Azure Container Apps manifest with the following requirements:\n\n1. **Container App Configuration:**\n   - Use appropriate CPU/memory combinations (0.25/0.5Gi, 0.5/1Gi, 0.75/1.5Gi, 1/2Gi, 1.25/2.5Gi, 1.5/3Gi, 1.75/3.5Gi, 2/4Gi)\n   - Configure managed identity for secure Azure resource access\n   - Set up proper container configuration with command and args if needed\n   - Include resource limits appropriate for the environment\n\n2. **Scaling Configuration:**\n   - Enable scale-to-zero for cost optimization (minReplicas: 0 for non-production)\n   - Configure appropriate scaling rules (HTTP, CPU, memory, or custom)\n   - Set reasonable max replicas based on expected load\n   - Include KEDA scalers if advanced scaling is needed\n\n3. **Ingress and Networking:**\n   - Configure ingress for HTTP/HTTPS or TCP traffic\n   - Set up custom domains if production environment\n   - Enable CORS if web application\n   - Configure session affinity if stateful application\n   - Set appropriate timeouts for long-running requests\n\n4. **Health and Monitoring:**\n   - Configure liveness probe for container health\n   - Set up readiness probe for traffic routing\n   - Include startup probe for slow-starting applications\n   - Set appropriate probe intervals and thresholds\n\n5. **Security Configuration:**\n   - Use secrets for sensitive configuration\n   - Configure registry credentials for private images\n   - Enable managed identity instead of credentials where possible\n   - Set up IP restrictions if needed\n   - Use least-privilege principles\n\n6. **Additional Features (if applicable):**\n   - Dapr configuration for microservices (app-id, app-port, protocol)\n   - Volume mounts for persistent storage (Azure Files or EmptyDir)\n   - Init containers for setup tasks\n   - Multiple container support for sidecar patterns\n   - Blue-green deployment with traffic splitting\n\nBest Practices:\n{{#bestPractices}}{{#.}}- {{.}}\n{{/.}}{{/bestPractices}}\n- Set minReplicas to 0 for serverless cost optimization\n- Use managed identity for Azure resource access\n- Configure health probes for production reliability\n- Use specific image tags (avoid :latest in production)\n- Set resource limits to prevent resource exhaustion\n- Use secrets for sensitive configuration\n- Enable Dapr for distributed application capabilities\n{{#securityRecommendations}}{{#.}}- {{.}}\n{{/.}}{{/securityRecommendations}}\n- Configure appropriate ingress settings for your security requirements\n\nReturn the complete Azure Container Apps manifest in JSON format without explanation or code fences. The manifest should follow the Azure Container Apps API schema and be ready for deployment using Azure CLI or ARM templates.\n"
+}
