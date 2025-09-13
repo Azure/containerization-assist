@@ -375,7 +375,7 @@ async function generateAcaManifestsImpl(
               'deployment',
               'manifests',
               analysisResult?.language,
-            ].filter(Boolean) as string[],
+            ].filter((x): x is string => typeof x === 'string'),
           });
 
           if (knowledgeResult.bestPractices && knowledgeResult.bestPractices.length > 0) {
