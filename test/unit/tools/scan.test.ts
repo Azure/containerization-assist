@@ -50,18 +50,26 @@ jest.mock('@lib/logger', () => ({
 }));
 
 jest.mock('@mcp/tool-session-helpers', () => ({
-  getSession: jest.fn().mockResolvedValue({
+  ensureSession: jest.fn().mockResolvedValue({
     ok: true,
     value: {
       id: 'test-session-123',
       state: {
-        build_result: {
-          imageId: 'sha256:mock-image-id',
+        metadata: {
+          build_result: {
+            imageId: 'sha256:mock-image-id',
+          },
         },
       },
     },
   }),
-  updateSession: jest.fn().mockResolvedValue({ ok: true, value: undefined }),
+  useSessionSlice: jest.fn().mockReturnValue({
+    get: jest.fn(),
+    set: jest.fn(),
+    patch: jest.fn().mockResolvedValue(undefined),
+    clear: jest.fn(),
+  }),
+  defineToolIO: jest.fn((input, output) => ({ input, output })),
 }));
 
 jest.mock('../../../src/knowledge', () => ({
@@ -79,13 +87,13 @@ import type { ScanImageParams } from '../../../src/tools/scan/schema';
 import { createSessionManager } from '@lib/session';
 import { createSecurityScanner } from '@lib/scanner';
 import { createLogger } from '@lib/logger';
-import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { ensureSession, useSessionSlice } from '@mcp/tool-session-helpers';
 
 // Get the mocked instances after imports
 const mockSessionManager = (createSessionManager as jest.Mock)();
 const mockLogger = (createLogger as jest.Mock)();
-const mockGetSession = getSession as jest.Mock;
-const mockUpdateSession = updateSession as jest.Mock;
+const mockEnsureSession = ensureSession as jest.Mock;
+const mockUseSessionSlice = useSessionSlice as jest.Mock;
 // mockSecurityScannerInstance is already defined above
 
 // Test helper functions

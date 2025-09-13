@@ -31,7 +31,7 @@ import {
 } from '../../workflows/workflow-progression';
 import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { z } from 'zod';
-import type { SessionData } from '../../lib/session-types';
+import type { SessionData } from '../session-types';
 
 export interface BuildImageResult {
   /** Whether the build completed successfully */
@@ -164,7 +164,7 @@ async function buildImageImpl(
       imageName,
       tags = [],
       buildArgs = {},
-      platform,
+      platform: _platform,
     } = params;
 
     // Normalize paths to handle Windows separators
@@ -201,8 +201,8 @@ async function buildImageImpl(
     // Determine paths
     const sessionData = session as SessionData;
     const repoPath = (sessionData?.repo_path ?? buildContext) as string;
-    let finalDockerfilePath = dockerfilePathStr
-      ? resolvePath(repoPath, dockerfilePathStr)
+    let finalDockerfilePath = dockerfilePath
+      ? resolvePath(repoPath, dockerfilePath)
       : resolvePath(repoPath, dockerfile);
 
     // Check if we should use a generated Dockerfile
@@ -284,12 +284,12 @@ async function buildImageImpl(
       context: repoPath, // Build context is the repository path
       dockerfile: getRelativePath(repoPath, finalDockerfilePath), // Dockerfile path relative to context
       buildargs: finalBuildArgs,
-      ...(platformStr !== undefined && { platform: platformStr }),
+      ...(_platform !== undefined && { platform: _platform }),
     };
 
     // Add tags if provided
-    if (tags.length > 0 || imageNameStr) {
-      const finalTags = tags.length > 0 ? tags : imageNameStr ? [imageNameStr] : [];
+    if (tags.length > 0 || imageName) {
+      const finalTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
       if (finalTags.length > 0) {
         const primaryTag = finalTags[0];
         if (primaryTag) {
@@ -356,7 +356,8 @@ async function buildImageImpl(
         lastBuiltImageId: buildResult.value.imageId,
         lastBuiltTags: finalTags,
         totalBuilds:
-          (sessionData?.completed_steps || []).filter((s) => s === 'build-image').length + 1,
+          (sessionData?.completed_steps || []).filter((s: string) => s === 'build-image').length +
+          1,
         lastBuildTime: buildTime,
         lastSecurityWarningCount: securityWarnings.length,
       },

@@ -13,7 +13,7 @@ import { aiGenerateWithSampling, aiGenerate } from '@mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 import type { SamplingOptions } from '@lib/sampling';
 import { createTimer, createLogger } from '@lib/logger';
-import type { SessionAnalysisResult } from '../../lib/session-types';
+import type { SessionAnalysisResult } from '../session-types';
 import type { ToolContext } from '../../mcp/context';
 import { Success, Failure, type Result, type WorkflowState } from '../../types';
 import { getDefaultPort } from '@config/defaults';

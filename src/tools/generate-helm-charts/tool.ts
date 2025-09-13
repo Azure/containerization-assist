@@ -8,7 +8,7 @@
 import { joinPaths } from '@lib/path-utils';
 import { extractErrorMessage } from '../../lib/error-utils';
 import { promises as fs } from 'node:fs';
-import { getSession, updateSession } from '@mcp/tool-session-helpers';
+import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 // AI imports commented out for now - can be added later for enhanced generation
 // import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
 // import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
@@ -23,7 +23,45 @@ import { getSuccessProgression, type SessionContext } from '../../workflows/work
 import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { execSync } from 'child_process';
 import * as yaml from 'js-yaml';
-import type { GenerateHelmChartsParams } from './schema';
+import { generateHelmChartsSchema, type GenerateHelmChartsParams } from './schema';
+import { z } from 'zod';
+
+// Define the result schema for type safety
+const GenerateHelmChartsResultSchema = z.object({
+  chartPath: z.string(),
+  chartName: z.string(),
+  files: z.array(z.string()),
+  validationResult: z
+    .object({
+      passed: z.boolean(),
+      output: z.string(),
+      warnings: z.array(z.string()).optional(),
+      errors: z.array(z.string()).optional(),
+    })
+    .optional(),
+  warnings: z.array(z.string()).optional(),
+  sessionId: z.string().optional(),
+  samplingMetadata: z
+    .object({
+      stoppedEarly: z.boolean().optional(),
+      candidatesGenerated: z.number(),
+      winnerScore: z.number(),
+      samplingDuration: z.number().optional(),
+    })
+    .optional(),
+});
+
+// Define tool IO for type-safe session operations
+const io = defineToolIO(generateHelmChartsSchema, GenerateHelmChartsResultSchema);
+
+// Tool-specific state schema
+const StateSchema = z.object({
+  lastGeneratedAt: z.date().optional(),
+  chartCount: z.number().optional(),
+  lastChartName: z.string().optional(),
+  lastChartVersion: z.string().optional(),
+  validationPassed: z.boolean().optional(),
+});
 
 /**
  * Result from Helm chart generation
@@ -561,13 +599,23 @@ async function generateHelmChartsImpl(
     // Progress: Starting validation
     if (progress) await progress('VALIDATING');
 
-    // Resolve session
-    const sessionResult = await getSession(params.sessionId, context);
+    // Ensure session exists and get typed slice operations
+    const sessionResult = await ensureSession(context, params.sessionId);
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
     }
-    const session = sessionResult.value;
-    const sessionData = session.state as unknown as SessionData;
+
+    const { id: sessionId, state: session } = sessionResult.value;
+    const slice = useSessionSlice('generate-helm-charts', io, context, StateSchema);
+
+    if (!slice) {
+      return Failure('Session manager not available');
+    }
+
+    // Record input in session slice
+    await slice.patch(sessionId, { input: params });
+
+    const sessionData = session as unknown as SessionData;
 
     // Get image from session or params
     const buildResult = sessionData?.build_result || sessionData?.workflow_state?.build_result;
@@ -666,28 +714,52 @@ async function generateHelmChartsImpl(
       warnings.push('Single replica in production - consider increasing for availability');
     }
 
-    // Update session
-    const updateResult = await updateSession(
-      session.id,
-      {
-        helm_result: {
-          chart_path: chartPath,
-          chart_name: chartName,
-          chart_version: chart.chartYaml.version,
-          files,
-        },
-        completed_steps: [...(sessionData?.completed_steps || []), 'helm'],
-        metadata: {
-          ...(sessionData?.metadata || {}),
-          helm_warnings: warnings,
-          helm_validation: validationResult,
-        },
-      },
-      context,
-    );
+    // Prepare result
+    const result: GenerateHelmChartsResult = {
+      chartPath,
+      chartName,
+      files,
+      ...(validationResult && { validationResult }),
+      ...(warnings.length > 0 && { warnings }),
+      sessionId,
+    };
 
-    if (!updateResult.ok) {
-      logger.warn({ error: updateResult.error }, 'Failed to update session');
+    // Update typed session slice with output and state
+    await slice.patch(sessionId, {
+      output: result,
+      state: {
+        lastGeneratedAt: new Date(),
+        chartCount: 1,
+        lastChartName: chartName,
+        lastChartVersion: chart.chartYaml.version,
+        validationPassed: validationResult?.passed,
+      },
+    });
+
+    // Update session metadata for backward compatibility
+    const sessionManager = context.sessionManager;
+    if (sessionManager) {
+      try {
+        await sessionManager.update(sessionId, {
+          metadata: {
+            ...session.metadata,
+            helm_result: {
+              chart_path: chartPath,
+              chart_name: chartName,
+              chart_version: chart.chartYaml.version,
+              files,
+            },
+            helm_warnings: warnings,
+            helm_validation: validationResult,
+          },
+          completed_steps: [...(session.completed_steps ?? []), 'generate-helm-charts'],
+        });
+      } catch (error) {
+        logger.warn(
+          { error: extractErrorMessage(error) },
+          'Failed to update session metadata, but Helm chart generation succeeded',
+        );
+      }
     }
 
     // Progress: Complete
@@ -696,24 +768,13 @@ async function generateHelmChartsImpl(
 
     // Prepare session context
     const sessionContext: SessionContext = {
-      completed_steps: (session.state as SessionContext).completed_steps || [],
-      ...((session.state as SessionContext).analysis_result && {
-        analysis_result: (session.state as SessionContext).analysis_result,
-      }),
+      completed_steps: session.completed_steps || [],
+      ...(session.analysis_result ? { analysis_result: session.analysis_result } : {}),
     };
 
-    // Return result
-    const finalResult: GenerateHelmChartsResult & {
-      _fileWritten?: boolean;
-      _fileWrittenPath?: string;
-      NextStep?: string;
-    } = {
-      chartPath,
-      chartName,
-      files,
-      ...(validationResult && { validationResult }),
-      ...(warnings.length > 0 && { warnings }),
-      sessionId: session.id,
+    // Return result with file indicator and chain hint
+    const enrichedResult = {
+      ...result,
       _fileWritten: true,
       _fileWrittenPath: chartPath,
       NextStep: getSuccessProgression(
@@ -722,7 +783,7 @@ async function generateHelmChartsImpl(
       ).summary,
     };
 
-    return Success(finalResult);
+    return Success(enrichedResult);
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Helm chart generation failed');

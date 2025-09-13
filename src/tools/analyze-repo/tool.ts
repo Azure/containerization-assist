@@ -28,7 +28,7 @@ import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 import { getRecommendedBaseImage } from '../../lib/base-images';
 import type { ToolContext } from '../../mcp/context';
 import { createTimer, createLogger } from '../../lib/logger';
-import { Success, Failure, type Result, type AnalyzeRepoResult } from '../../types';
+import { Success, Failure, type Result } from '../../types';
 import { analyzeRepoSchema, type AnalyzeRepoParams } from './schema';
 import { z } from 'zod';
 import { parsePackageJson, getAllDependencies } from '../../lib/parsing-package-json';
@@ -36,8 +36,6 @@ import { DEFAULT_PORTS } from '../../config/defaults';
 import { getSuccessProgression } from '../../workflows/workflow-progression';
 import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { extractErrorMessage } from '../../lib/error-utils';
-
-export type { AnalyzeRepoResult } from '../../types';
 
 // Define the result schema for type safety
 const AnalyzeRepoResultSchema = z.object({
@@ -79,6 +77,9 @@ const AnalyzeRepoResultSchema = z.object({
     aiInsights: z.unknown().optional(),
   }),
 });
+
+// Define the result type from the schema
+export type AnalyzeRepoResult = z.infer<typeof AnalyzeRepoResultSchema>;
 
 // Define tool IO for type-safe session operations
 const io = defineToolIO(analyzeRepoSchema, AnalyzeRepoResultSchema);
