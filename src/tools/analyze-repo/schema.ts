@@ -5,7 +5,9 @@
 import { z } from 'zod';
 
 const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
-export const repoPathSchema = z.string().describe('Path to the repository to analyze');
+export const repoPathSchema = z
+  .string()
+  .describe('Path to the repository to analyze (use forward slashes: /path/to/repo)');
 
 export const analyzeRepoSchema = z.object({
   sessionId: sessionIdSchema.optional(),
@@ -14,7 +16,10 @@ export const analyzeRepoSchema = z.object({
   includeTests: z.boolean().optional().describe('Include test files in analysis'),
   securityFocus: z.boolean().optional().describe('Focus on security aspects'),
   performanceFocus: z.boolean().optional().describe('Focus on performance aspects'),
-  moduleRoots: z.array(z.string()).optional().describe('Root directories of modules'),
+  moduleRoots: z
+    .array(z.string())
+    .optional()
+    .describe('Root directories of modules (use forward slashes: /path/to/module)'),
   language: z.enum(['java', 'dotnet', 'other']).optional().describe('Primary programming language'),
 });
 
