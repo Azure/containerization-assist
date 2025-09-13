@@ -121,49 +121,48 @@ async function convertAcaToK8sImpl(
             }),
           },
           spec: {
-            containers: containers.map((c: any) => ({
-              name: c.name || aca.name,
-              image: c.image,
-              ...(c.resources && {
-                resources: {
-                  requests: {
-                    cpu: String(c.resources.cpu || 0.5),
-                    memory: c.resources.memory || '1Gi',
+            containers: containers.map((c: any) => {
+              const livenessProbe = c.probes?.find((p: any) => p.type === 'liveness');
+              const readinessProbe = c.probes?.find((p: any) => p.type === 'readiness');
+              const startupProbe = c.probes?.find((p: any) => p.type === 'startup');
+              return {
+                name: c.name || aca.name,
+                image: c.image,
+                ...(c.resources && {
+                  resources: {
+                    requests: {
+                      cpu: String(c.resources.cpu || 0.5),
+                      memory: c.resources.memory || '1Gi',
+                    },
+                    limits: {
+                      cpu: String(c.resources.cpu || 0.5),
+                      memory: c.resources.memory || '1Gi',
+                    },
                   },
-                  limits: {
-                    cpu: String(c.resources.cpu || 0.5),
-                    memory: c.resources.memory || '1Gi',
+                }),
+                ...(c.env && { env: c.env }),
+                ...(c.ports && {
+                  ports: c.ports.map((port: number) => ({ containerPort: port })),
+                }),
+                ...(c.probes && {
+                  livenessProbe: livenessProbe?.httpGet && {
+                    httpGet: livenessProbe.httpGet,
+                    initialDelaySeconds: livenessProbe.initialDelaySeconds || 30,
+                    periodSeconds: livenessProbe.periodSeconds || 30,
                   },
-                },
-              }),
-              ...(c.env && { env: c.env }),
-              ...(c.ports && {
-                ports: c.ports.map((port: number) => ({ containerPort: port })),
-              }),
-              ...(c.probes && {
-                livenessProbe: c.probes.find((p: any) => p.type === 'liveness')?.httpGet && {
-                  httpGet: c.probes.find((p: any) => p.type === 'liveness').httpGet,
-                  initialDelaySeconds:
-                    c.probes.find((p: any) => p.type === 'liveness')?.initialDelaySeconds || 30,
-                  periodSeconds:
-                    c.probes.find((p: any) => p.type === 'liveness')?.periodSeconds || 30,
-                },
-                readinessProbe: c.probes.find((p: any) => p.type === 'readiness')?.httpGet && {
-                  httpGet: c.probes.find((p: any) => p.type === 'readiness').httpGet,
-                  initialDelaySeconds:
-                    c.probes.find((p: any) => p.type === 'readiness')?.initialDelaySeconds || 5,
-                  periodSeconds:
-                    c.probes.find((p: any) => p.type === 'readiness')?.periodSeconds || 10,
-                },
-                startupProbe: c.probes.find((p: any) => p.type === 'startup')?.httpGet && {
-                  httpGet: c.probes.find((p: any) => p.type === 'startup').httpGet,
-                  initialDelaySeconds:
-                    c.probes.find((p: any) => p.type === 'startup')?.initialDelaySeconds || 0,
-                  periodSeconds:
-                    c.probes.find((p: any) => p.type === 'startup')?.periodSeconds || 10,
-                },
-              }),
-            })),
+                  readinessProbe: readinessProbe?.httpGet && {
+                    httpGet: readinessProbe.httpGet,
+                    initialDelaySeconds: readinessProbe.initialDelaySeconds || 5,
+                    periodSeconds: readinessProbe.periodSeconds || 10,
+                  },
+                  startupProbe: startupProbe?.httpGet && {
+                    httpGet: startupProbe.httpGet,
+                    initialDelaySeconds: startupProbe.initialDelaySeconds || 0,
+                    periodSeconds: startupProbe.periodSeconds || 10,
+                  },
+                }),
+              };
+            }),
           },
         },
       },
