@@ -6,6 +6,7 @@
  */
 
 import { joinPaths } from '@lib/path-utils';
+import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
 import { extractErrorMessage } from '../../lib/error-utils';
 import { promises as fs } from 'node:fs';
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
@@ -14,13 +15,10 @@ import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-
 // import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 // import type { SamplingOptions } from '@lib/sampling';
 import { createStandardProgress } from '@mcp/progress-helper';
-import { createTimer } from '@lib/logger';
 import type { ToolContext } from '../../mcp/context';
 import type { SessionData } from '../session-types';
 import { Success, Failure, type Result } from '../../types';
 // import { stripFencesAndNoise } from '@lib/text-processing';
-import { getSuccessProgression, type SessionContext } from '../../workflows/workflow-progression';
-import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { execSync } from 'child_process';
 import * as yaml from 'js-yaml';
 import { generateHelmChartsSchema, type GenerateHelmChartsParams } from './schema';
@@ -590,8 +588,8 @@ async function generateHelmChartsImpl(
 
   // Progress reporting
   const progress = context.progress ? createStandardProgress(context.progress) : undefined;
-  const logger = context.logger;
-  const timer = createTimer(logger, 'generate-helm-charts');
+  const logger = getToolLogger(context, 'generate-helm-charts');
+  const timer = createToolTimer(logger, 'generate-helm-charts');
 
   try {
     const { chartName, appName } = params;
@@ -736,51 +734,15 @@ async function generateHelmChartsImpl(
       },
     });
 
-    // Update session metadata for backward compatibility
-    const sessionManager = context.sessionManager;
-    if (sessionManager) {
-      try {
-        await sessionManager.update(sessionId, {
-          metadata: {
-            ...session.metadata,
-            helm_result: {
-              chart_path: chartPath,
-              chart_name: chartName,
-              chart_version: chart.chartYaml.version,
-              files,
-            },
-            helm_warnings: warnings,
-            helm_validation: validationResult,
-          },
-          completed_steps: [...(session.completed_steps ?? []), 'generate-helm-charts'],
-        });
-      } catch (error) {
-        logger.warn(
-          { error: extractErrorMessage(error) },
-          'Failed to update session metadata, but Helm chart generation succeeded',
-        );
-      }
-    }
-
     // Progress: Complete
     if (progress) await progress('COMPLETE');
     timer.end({ chartPath });
 
-    // Prepare session context
-    const sessionContext: SessionContext = {
-      completed_steps: session.completed_steps || [],
-      ...(session.analysis_result ? { analysis_result: session.analysis_result } : {}),
-    };
-
-    // Return result with file indicator and chain hint
+    // Return result with file indicator
     const enrichedResult = {
       ...result,
       _fileWritten: true,
       _fileWrittenPath: chartPath,
-      NextStep: getSuccessProgression(
-        TOOL_NAMES.GENERATE_HELM_CHARTS || 'generate-helm-charts',
-        sessionContext,
-      ).summary,
     };
 
     return Success(enrichedResult);

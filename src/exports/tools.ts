@@ -29,8 +29,6 @@ import { resolveBaseImages } from '../tools/resolve-base-images/tool.js';
 import { resolveBaseImagesSchema } from '../tools/resolve-base-images/schema.js';
 import { opsTool } from '../tools/ops/tool.js';
 import { opsToolSchema } from '../tools/ops/schema.js';
-import { workflow } from '../tools/workflow/tool.js';
-import { workflowSchema } from '../tools/workflow/schema.js';
 import { generateAcaManifests } from '../tools/generate-aca-manifests/tool.js';
 import { generateAcaManifestsSchema } from '../tools/generate-aca-manifests/schema.js';
 import { convertAcaToK8s } from '../tools/convert-aca-to-k8s/tool.js';
@@ -61,7 +59,6 @@ export function getAllInternalTools(): Tool[] {
     fixDockerfileTool,
     resolveBaseImagesTool,
     opsToolWrapper,
-    workflowTool,
     generateAcaManifestsTool,
     convertAcaToK8sTool,
     generateHelmChartsTool,
@@ -95,7 +92,6 @@ export const TOOL_NAMES = {
   FIX_DOCKERFILE: 'fix_dockerfile',
   RESOLVE_BASE_IMAGES: 'resolve_base_images',
   OPS: 'ops',
-  WORKFLOW: 'workflow',
   GENERATE_ACA_MANIFESTS: 'generate_aca_manifests',
   CONVERT_ACA_TO_K8S: 'convert_aca_to_k8s',
   GENERATE_HELM_CHARTS: 'generate_helm_charts',
@@ -220,13 +216,6 @@ const opsToolWrapper = createToolWrapper(
   'Operational utilities',
   opsToolSchema,
   opsTool as (params: unknown, context: unknown) => Promise<Result<unknown>>,
-);
-
-const workflowTool = createToolWrapper(
-  TOOL_NAMES.WORKFLOW,
-  'Execute containerization workflows',
-  workflowSchema,
-  workflow as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const generateAcaManifestsTool = createToolWrapper(

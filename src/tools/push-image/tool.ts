@@ -4,11 +4,10 @@
  */
 
 import { createDockerClient, type DockerClient } from '../../services/docker-client';
+import { getToolLogger } from '@lib/tool-helpers';
 import type { MCPTool, MCPResponse } from '../../mcp/types';
 import type { ToolContext } from '../../mcp/context';
 import { Success, Failure, type Result } from '../../types';
-import { getSuccessProgression } from '../../workflows/workflow-progression';
-import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { pushImageSchema, type PushImageParams } from './schema';
 import type { z } from 'zod';
 
@@ -17,7 +16,6 @@ export interface PushImageResult {
   registry: string;
   digest: string;
   pushedTag: string;
-  NextStep?: string;
 }
 
 /**
@@ -100,10 +98,9 @@ export function makePushImage(
       // Return success response
       const result: PushImageResult = {
         success: true,
-        registry: params.registry || 'docker.io',
+        registry: params.registry ?? 'docker.io',
         digest: pushResult.value.digest,
         pushedTag: `${repository}:${tag}`,
-        NextStep: getSuccessProgression(TOOL_NAMES.PUSH_IMAGE, { completed_steps: [] }).summary,
       };
 
       return {
@@ -127,7 +124,7 @@ export async function pushImage(
   params: PushImageParams,
   context: ToolContext,
 ): Promise<Result<PushImageResult>> {
-  const logger = context.logger;
+  const logger = getToolLogger(context, 'push-image');
   const dockerClient = createDockerClient(logger);
   const tool = makePushImage(dockerClient);
 

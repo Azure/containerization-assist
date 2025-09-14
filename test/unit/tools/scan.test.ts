@@ -51,11 +51,24 @@ jest.mock('../../../src/lib/logger', () => ({
 
 jest.mock('../../../src/mcp/tool-session-helpers', () => ({
   ensureSession: jest.fn(),
-  useSessionSlice: jest.fn().mockReturnValue({
-    get: jest.fn(),
-    set: jest.fn(),
-    patch: jest.fn().mockResolvedValue(undefined),
-    clear: jest.fn(),
+  useSessionSlice: jest.fn((toolName, io, context) => {
+    // Simulate the actual behavior where patch calls sessionManager.update
+    return {
+      get: jest.fn(),
+      set: jest.fn(),
+      patch: jest.fn(async (sessionId, data) => {
+        if (context?.sessionManager?.update) {
+          await context.sessionManager.update(sessionId, {
+            metadata: {
+              toolSlices: {
+                [toolName]: data,
+              },
+            },
+          });
+        }
+      }),
+      clear: jest.fn(),
+    };
   }),
   defineToolIO: jest.fn((input, output) => ({ input, output })),
 }));
@@ -157,13 +170,15 @@ describe('scanImage', () => {
 
       // Verify scanner was called with correct image ID
       expect(mockSecurityScannerInstance.scanImage).toHaveBeenCalledWith('sha256:mock-image-id');
-      
-      // Verify session was updated via sessionManager
+
+      // Verify session was updated via sessionManager with the new toolSlices structure
       expect(mockSessionManager.update).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
           metadata: expect.objectContaining({
-            scan_result: expect.any(Object),
+            toolSlices: expect.objectContaining({
+              scan: expect.any(Object),
+            }),
           }),
         })
       );
@@ -335,9 +350,7 @@ describe('scanImage', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe(
-          'Scanner crashed\nError: Recover by calling tag_image tool. Next: tag_image',
-        );
+        expect(result.error).toBe('Scanner crashed');
       }
     });
   });

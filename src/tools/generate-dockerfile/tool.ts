@@ -5,6 +5,8 @@
 
 // import { extractErrorMessage } from '../../lib/error-utils'; // Not currently used
 import { promises as fs } from 'node:fs';
+import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
+import type { Logger } from '../../lib/logger';
 import path from 'node:path';
 import { safeNormalizePath } from '@lib/path-utils';
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
@@ -12,7 +14,7 @@ import { createStandardProgress } from '@mcp/progress-helper';
 import { aiGenerateWithSampling, aiGenerate } from '@mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 import type { SamplingOptions } from '@lib/sampling';
-import { createTimer, createLogger } from '@lib/logger';
+
 import type { SessionAnalysisResult } from '../session-types';
 import type { ToolContext } from '../../mcp/context';
 import { Success, Failure, type Result, type WorkflowState } from '../../types';
@@ -23,13 +25,6 @@ import {
   isValidDockerfileContent,
   extractBaseImage,
 } from '@lib/text-processing';
-import {
-  getSuccessProgression,
-  getFailureProgression,
-  formatFailureChainHint,
-  type SessionContext,
-} from '../../workflows/workflow-progression';
-import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { generateDockerfileSchema, type GenerateDockerfileParams } from './schema';
 import { z } from 'zod';
 import { AnalyzeRepoResult } from '../analyze-repo';
@@ -481,7 +476,7 @@ async function generateSingleDockerfile(
   params: GenerateDockerfileParams,
   moduleRoot: string,
   context: ToolContext,
-  logger: ReturnType<typeof createLogger>,
+  logger: Logger,
 ): Promise<Result<SingleDockerfileResult>> {
   const { multistage = true, securityHardening = true } = params;
   // Normalize optimization to boolean - any string value means optimization is enabled
@@ -518,7 +513,7 @@ async function generateSingleDockerfile(
       operation: 'generate_dockerfile',
       ...(analysisResult.language && { language: analysisResult.language }),
       ...(analysisResult.framework && { framework: analysisResult.framework }),
-      environment: params.environment || 'production',
+      environment: params.environment ?? 'production',
       tags: ['dockerfile', 'generation', analysisResult.language, analysisResult.framework].filter(
         Boolean,
       ) as string[],
@@ -709,8 +704,8 @@ async function generateDockerfileImpl(
 
   // Optional progress reporting for complex operations (AI generation)
   const progress = context.progress ? createStandardProgress(context.progress) : undefined;
-  const logger = context.logger || createLogger({ name: 'generate-dockerfile' });
-  const timer = createTimer(logger, 'generate-dockerfile');
+  const logger = getToolLogger(context, 'generate-dockerfile');
+  const timer = createToolTimer(logger, 'generate-dockerfile');
   try {
     const { multistage = true } = params;
     // Normalize optimization to boolean - any string value means optimization is enabled
@@ -785,12 +780,6 @@ async function generateDockerfileImpl(
 
     // Progress: Finalizing
     if (progress) await progress('FINALIZING');
-    const dockerfileResult = {
-      dockerfiles: dockerfileResults,
-      multistage,
-      fixed: false,
-      fixes: [],
-    };
     // Prepare the result for session update
     const generationResult: GenerateDockerfileResult = {
       dockerfiles: dockerfileResults,
@@ -813,29 +802,6 @@ async function generateDockerfileImpl(
         lastOptimization: optimization ? 'enabled' : 'disabled',
       },
     });
-
-    // Update session metadata for backward compatibility
-    const sessionManager = context.sessionManager;
-    if (sessionManager) {
-      try {
-        await sessionManager.update(sessionId, {
-          metadata: {
-            ...(typedSession.metadata || {}),
-            dockerfile_result: dockerfileResult,
-            dockerfile_count: dockerfileResults.length,
-            dockerfile_moduleRoots: moduleRoots,
-            dockerfile_optimization: optimization,
-            ai_enhancement_used: dockerfileResults.some((d) => d.samplingMetadata || d.winnerScore),
-          },
-          completed_steps: [...(typedSession.completed_steps || []), 'dockerfile'],
-        });
-      } catch (error) {
-        logger.warn(
-          { error: (error as Error).message },
-          'Failed to update session, but Dockerfile generation succeeded',
-        );
-      }
-    }
     // Progress: Complete
     if (progress) await progress('COMPLETE');
 
@@ -853,22 +819,10 @@ async function generateDockerfileImpl(
     if (errors.length > 0) {
       allWarnings.push(...errors);
     }
-    // Return result with file write indicator and chain hint
-    // Prepare session context for dynamic chain hints
-    const dockerfileContent =
-      dockerfileResults.length === 1 ? dockerfileResults[0]?.content : undefined;
-    const sessionContext: SessionContext = {
-      completed_steps: typedSession.completed_steps || [],
-      dockerfile_result: dockerfileContent ? { content: dockerfileContent } : {},
-      ...(typedSession.analysis_result && {
-        analysis_result: typedSession.analysis_result,
-      }),
-    };
-
+    // Return result with file write indicator
     const result: GenerateDockerfileResult & {
       _fileWritten?: boolean;
       _fileWrittenPath?: string;
-      NextStep?: string;
     } = {
       dockerfiles: dockerfileResults,
       count: dockerfileResults.length,
@@ -878,7 +832,6 @@ async function generateDockerfileImpl(
       sessionId,
       _fileWritten: true,
       _fileWrittenPath: dockerfileResults.map((d) => d.path).join(', '),
-      NextStep: getSuccessProgression(TOOL_NAMES.GENERATE_DOCKERFILE, sessionContext).summary,
     };
 
     // Set compatibility fields for single module (backwards compatibility)
@@ -917,19 +870,8 @@ async function generateDockerfileImpl(
     timer.error(error);
     logger.error({ error }, 'Dockerfile generation failed');
 
-    // Add failure chain hint
-    const sessionContext = {
-      completed_steps: [],
-    };
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const progression = getFailureProgression(
-      TOOL_NAMES.GENERATE_DOCKERFILE,
-      errorMessage,
-      sessionContext,
-    );
-    const chainHint = formatFailureChainHint(TOOL_NAMES.GENERATE_DOCKERFILE, progression);
-
-    return Failure(`${errorMessage}\n${chainHint}`);
+    return Failure(errorMessage);
   }
 }
 

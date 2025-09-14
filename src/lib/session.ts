@@ -182,7 +182,7 @@ export async function update(
   store: SessionStore,
   sessionId: string,
   state: Partial<WorkflowState>,
-): Promise<void> {
+): Promise<WorkflowState | null> {
   const session = store.sessions.get(sessionId);
   if (!session) {
     throw new SessionError(`Session ${sessionId} not found`, ErrorCodes.SESSION_NOT_FOUND, {
@@ -190,7 +190,7 @@ export async function update(
     });
   }
 
-  // Update workflow state
+  // Update workflow state - merge state into existing workflowState
   const updatedWorkflowState: WorkflowState = {
     ...session.workflowState,
     ...state,
@@ -198,7 +198,6 @@ export async function update(
       ...(session.workflowState.metadata || {}),
       ...(state.metadata || {}),
     },
-    completed_steps: state.completed_steps ?? session.workflowState.completed_steps ?? [],
     updatedAt: new Date(),
   };
 
@@ -219,6 +218,7 @@ export async function update(
     },
     'Session updated',
   );
+  return updatedWorkflowState;
 }
 
 /**
@@ -271,7 +271,7 @@ export function close(store: SessionStore): void {
 export interface SessionManager {
   create(sessionId?: string): Promise<WorkflowState>;
   get(sessionId: string): Promise<WorkflowState | null>;
-  update(sessionId: string, state: Partial<WorkflowState>): Promise<void>;
+  update(sessionId: string, state: Partial<WorkflowState>): Promise<WorkflowState | null>;
   delete(sessionId: string): Promise<void>;
   list(): Promise<string[]>;
   cleanup(olderThan: Date): Promise<void>;

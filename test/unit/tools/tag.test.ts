@@ -71,6 +71,11 @@ jest.mock('../../../src/lib/logger', () => ({
   createLogger: jest.fn(() => createMockLogger()),
 }));
 
+jest.mock('../../../src/lib/tool-helpers', () => ({
+  getToolLogger: jest.fn(() => createMockLogger()),
+  createToolTimer: jest.fn(() => mockTimer),
+}));
+
 // Mock session helpers
 jest.mock('../../../src/mcp/tool-session-helpers', () => ({
   ensureSession: jest.fn(),
@@ -208,8 +213,8 @@ describe('tagImage', () => {
 
       // Verify timer was used correctly
       expect(mockTimer.end).toHaveBeenCalledWith({
-        source: 'sha256:mock-image-id',
-        tag: 'myapp:v1.0',
+        tags: ['myapp:v1.0'],
+        sessionId: 'test-session-123',
       });
     });
 
@@ -579,12 +584,10 @@ describe('tagImage', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe(
-          'Docker daemon not responding\nError: Recover by calling build_image tool. Next: build_image',
-        );
+        expect(result.error).toBe('Docker daemon not responding');
       }
 
-      expect(mockTimer.end).toHaveBeenCalledWith({ error: expect.any(Error) });
+      expect(mockTimer.error).toHaveBeenCalledWith(expect.any(Error));
     });
 
     it('should handle session update failures gracefully', async () => {

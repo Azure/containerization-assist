@@ -18,24 +18,18 @@
  */
 
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
+import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
 import { extractErrorMessage } from '../../lib/error-utils';
 import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 import type { SamplingOptions } from '@lib/sampling';
 import { createStandardProgress } from '@mcp/progress-helper';
 import type { ToolContext } from '../../mcp/context';
-import { createTimer, createLogger, type Logger } from '../../lib/logger';
+import type { Logger } from '../../lib/logger';
 import { getRecommendedBaseImage } from '../../lib/base-images';
 import { Success, Failure, type Result } from '../../types';
 import { DEFAULT_PORTS } from '../../config/defaults';
 import { stripFencesAndNoise, isValidDockerfileContent } from '../../lib/text-processing';
-import {
-  getSuccessProgression,
-  getFailureProgression,
-  formatFailureChainHint,
-  type SessionContext,
-} from '../../workflows/workflow-progression';
-import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { scoreConfigCandidates } from '@lib/integrated-scoring';
 import { fixDockerfileSchema, type FixDockerfileParams } from './schema';
 import { z } from 'zod';
@@ -356,8 +350,8 @@ async function fixDockerfileImpl(
   }
   // Optional progress reporting for AI operations
   const progress = context?.progress ? createStandardProgress(context.progress) : undefined;
-  const logger = context?.logger || createLogger({ name: 'fix-dockerfile' });
-  const timer = createTimer(logger, 'fix-dockerfile');
+  const logger = getToolLogger(context || ({} as any), 'fix-dockerfile');
+  const timer = createToolTimer(logger, 'fix-dockerfile');
   try {
     const { error, dockerfile, issues } = params;
     logger.info({ hasError: !!error, hasDockerfile: !!dockerfile }, 'Starting Dockerfile fix');
@@ -532,35 +526,6 @@ async function fixDockerfileImpl(
         fixStrategy: aiUsed ? 'ai' : 'fallback',
       },
     });
-
-    // Update session metadata for backward compatibility
-    const sessionManager = context?.sessionManager;
-    if (sessionManager) {
-      try {
-        await sessionManager.update(sessionId, {
-          metadata: {
-            ...session.metadata,
-            dockerfile_result: {
-              content: fixedDockerfile,
-              path: './Dockerfile',
-              multistage: false,
-              fixed: true,
-              fixes,
-            },
-            dockerfile_fixed: true,
-            dockerfile_fixes: fixes,
-            ai_used: aiUsed,
-            generation_method: generationMethod,
-          },
-          completed_steps: [...(session.completed_steps || []), 'fix-dockerfile'],
-        });
-      } catch (error) {
-        logger.warn(
-          { error: extractErrorMessage(error) },
-          'Failed to update session, but fix succeeded',
-        );
-      }
-    }
     // Progress: Finalizing results
     if (progress) await progress('FINALIZING');
     timer.end({ fixCount: fixes.length, sessionId, aiUsed });
@@ -570,15 +535,6 @@ async function fixDockerfileImpl(
     );
     // Progress: Complete
     if (progress) await progress('COMPLETE');
-
-    // Prepare session context for chain hints
-    const sessionContext = {
-      completed_steps: session.completed_steps || [],
-      dockerfile_result: { content: fixedDockerfile },
-      ...((session as SessionContext).analysis_result && {
-        analysis_result: (session as SessionContext).analysis_result,
-      }),
-    };
 
     // Add sampling metadata if sampling was used
     if (!params.disableSampling) {
@@ -600,26 +556,13 @@ async function fixDockerfileImpl(
       ...fixResult,
       _fileWritten: true,
       _fileWrittenPath: './Dockerfile',
-      NextStep: getSuccessProgression(TOOL_NAMES.FIX_DOCKERFILE, sessionContext).summary,
     });
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Dockerfile fix failed');
 
-    // Add failure chain hint - use basic context since session may not be available
-    const sessionContext = {
-      completed_steps: [],
-    };
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const progression = getFailureProgression(
-      TOOL_NAMES.FIX_DOCKERFILE,
-      errorMessage,
-      sessionContext,
-    );
-    const chainHint = formatFailureChainHint(TOOL_NAMES.FIX_DOCKERFILE, progression);
-
     const logErrorMessage = extractErrorMessage(error);
-    return Failure(`${logErrorMessage}\n${chainHint}`);
+    return Failure(logErrorMessage);
   }
 }
 

@@ -12,11 +12,13 @@ import { randomUUID } from 'node:crypto';
 import { getSystemStatus, type Dependencies } from '../container';
 import { createMCPToolContext, type ToolContext } from './context';
 import { extractErrorMessage } from '../lib/error-utils';
+import { ToolRouter } from './tool-router';
 
 // Single unified tool definition structure
 interface ToolDefinition {
   name: string;
   description: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   schema: any; // Zod schema object (needs to be any for .shape property)
   handler: (params: Record<string, unknown>, context: ToolContext) => Promise<Result<unknown>>;
 }
@@ -37,8 +39,6 @@ import { pushImage } from '../tools/push-image';
 import { pushImageSchema } from '../tools/push-image/schema';
 import { tagImage } from '../tools/tag-image';
 import { tagImageSchema } from '../tools/tag-image/schema';
-import { workflow } from '../tools/workflow';
-import { workflowSchema } from '../tools/workflow/schema';
 import { fixDockerfile } from '../tools/fix-dockerfile';
 import { fixDockerfileSchema } from '../tools/fix-dockerfile/schema';
 import { resolveBaseImages } from '../tools/resolve-base-images';
@@ -51,6 +51,14 @@ import { generateK8sManifests } from '../tools/generate-k8s-manifests';
 import { generateK8sManifestsSchema } from '../tools/generate-k8s-manifests/schema';
 import { verifyDeployment } from '../tools/verify-deployment';
 import { verifyDeploymentSchema } from '../tools/verify-deployment/schema';
+import { generateHelmCharts } from '../tools/generate-helm-charts';
+import { generateHelmChartsSchema } from '../tools/generate-helm-charts/schema';
+import { generateAcaManifests } from '../tools/generate-aca-manifests';
+import { generateAcaManifestsSchema } from '../tools/generate-aca-manifests/schema';
+import { convertAcaToK8s } from '../tools/convert-aca-to-k8s';
+import { convertAcaToK8sSchema } from '../tools/convert-aca-to-k8s/schema';
+import { inspectSession } from '../tools/inspect-session';
+import { InspectSessionParamsSchema as inspectSessionSchema } from '../tools/inspect-session/schema';
 
 // Unified tool definitions
 const TOOLS: ToolDefinition[] = [
@@ -91,7 +99,7 @@ const TOOLS: ToolDefinition[] = [
     ) => Promise<Result<unknown>>,
   },
   {
-    name: 'deploy-application',
+    name: 'deploy',
     description: 'Deploy application',
     schema: deployApplicationSchema,
     handler: deployApplication as (
@@ -113,15 +121,6 @@ const TOOLS: ToolDefinition[] = [
     description: 'Tag Docker image',
     schema: tagImageSchema,
     handler: tagImage as (
-      params: Record<string, unknown>,
-      context: ToolContext,
-    ) => Promise<Result<unknown>>,
-  },
-  {
-    name: 'workflow',
-    description: 'Execute workflow',
-    schema: workflowSchema,
-    handler: workflow as (
       params: Record<string, unknown>,
       context: ToolContext,
     ) => Promise<Result<unknown>>,
@@ -180,6 +179,42 @@ const TOOLS: ToolDefinition[] = [
       context: ToolContext,
     ) => Promise<Result<unknown>>,
   },
+  {
+    name: 'generate-helm-charts',
+    description: 'Generate Helm charts for Kubernetes deployment',
+    schema: generateHelmChartsSchema,
+    handler: generateHelmCharts as (
+      params: Record<string, unknown>,
+      context: ToolContext,
+    ) => Promise<Result<unknown>>,
+  },
+  {
+    name: 'generate-aca-manifests',
+    description: 'Generate Azure Container Apps manifests',
+    schema: generateAcaManifestsSchema,
+    handler: generateAcaManifests as (
+      params: Record<string, unknown>,
+      context: ToolContext,
+    ) => Promise<Result<unknown>>,
+  },
+  {
+    name: 'convert-aca-to-k8s',
+    description: 'Convert Azure Container Apps to Kubernetes manifests',
+    schema: convertAcaToK8sSchema,
+    handler: convertAcaToK8s as (
+      params: Record<string, unknown>,
+      context: ToolContext,
+    ) => Promise<Result<unknown>>,
+  },
+  {
+    name: 'inspect-session',
+    description: 'Inspect current session state',
+    schema: inspectSessionSchema,
+    handler: inspectSession as (
+      params: Record<string, unknown>,
+      context: ToolContext,
+    ) => Promise<Result<unknown>>,
+  },
 ];
 
 /**
@@ -189,6 +224,8 @@ export class DirectMCPServer {
   private server: McpServer;
   private transport: StdioServerTransport;
   private isRunning = false;
+  private router?: ToolRouter;
+  private toolMap = new Map<string, ToolDefinition>();
 
   constructor(private deps: Dependencies) {
     // Create SDK server directly with capabilities
@@ -213,8 +250,12 @@ export class DirectMCPServer {
    * Register all tools and resources directly with SDK
    */
   private async registerHandlers(): Promise<void> {
+    // Initialize router with tools
+    this.initializeRouter();
+
     // Register tools using direct SDK pattern
     for (const tool of TOOLS) {
+      this.toolMap.set(tool.name, tool);
       this.server.tool(
         tool.name,
         tool.description,
@@ -249,6 +290,28 @@ export class DirectMCPServer {
   }
 
   /**
+   * Initialize the tool router
+   */
+  private initializeRouter(): void {
+    // Create tools map for router
+    const tools = new Map<string, import('./tool-router').RouterTool>();
+    for (const tool of TOOLS) {
+      tools.set(tool.name, {
+        name: tool.name,
+        handler: tool.handler,
+        schema: tool.schema,
+      });
+    }
+
+    // Initialize router with dependencies
+    this.router = new ToolRouter({
+      sessionManager: this.deps.sessionManager,
+      logger: this.deps.logger,
+      tools,
+    });
+  }
+
+  /**
    * Create a standardized tool handler
    */
   private createToolHandler(tool: ToolDefinition) {
@@ -257,8 +320,13 @@ export class DirectMCPServer {
 
       try {
         // Ensure sessionId
-        if (params && typeof params === 'object' && !params.sessionId) {
-          params.sessionId = randomUUID();
+        const sessionId =
+          params && typeof params === 'object' && params.sessionId
+            ? String(params.sessionId)
+            : randomUUID();
+
+        if (params && typeof params === 'object') {
+          params.sessionId = sessionId;
         }
 
         // Create context with all dependencies
@@ -272,7 +340,56 @@ export class DirectMCPServer {
           },
         );
 
-        // Execute tool
+        // Use router if available for intelligent routing
+        if (this.router) {
+          const forceFlag = params.force === true;
+          const routeResult = await this.router.route({
+            toolName: tool.name,
+            params,
+            sessionId,
+            context,
+            ...(forceFlag && { force: true }),
+          });
+
+          // Log executed tools for debugging
+          if (routeResult.executedTools.length > 0) {
+            this.deps.logger.info(
+              { executedTools: routeResult.executedTools },
+              'Router executed tools in sequence',
+            );
+          }
+
+          const result = routeResult.result;
+
+          // Handle Result pattern
+          if (result && typeof result === 'object' && 'ok' in result) {
+            const typedResult = result;
+            if (typedResult.ok) {
+              return {
+                content: [
+                  {
+                    type: 'text' as const,
+                    text: JSON.stringify(typedResult.value, null, 2),
+                  },
+                ],
+              };
+            } else {
+              throw new McpError(ErrorCode.InternalError, typedResult.error);
+            }
+          }
+
+          // Direct return
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: JSON.stringify(result, null, 2),
+              },
+            ],
+          };
+        }
+
+        // Fallback to direct execution if no router
         const result = await tool.handler(params, context);
 
         // Handle Result pattern
@@ -407,7 +524,7 @@ export class DirectMCPServer {
       tools: TOOLS.length,
       resources: 1,
       prompts: this.deps.promptRegistry.getPromptNames().length,
-      workflows: 2,
+      workflows: 0,
     };
   }
 
@@ -423,11 +540,9 @@ export class DirectMCPServer {
 
   /**
    * Get available workflows for CLI listing
+   * @deprecated Workflows are deprecated in favor of intelligent tool routing
    */
   getWorkflows(): Array<{ name: string; description: string }> {
-    return [
-      { name: 'containerization', description: 'Containerization workflow' },
-      { name: 'deployment', description: 'Deployment workflow' },
-    ];
+    return [];
   }
 }

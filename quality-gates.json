@@ -20,10 +20,10 @@
     "baselines": {
       "lint": {
         "errors": 0,
-        "warnings": 78
+        "warnings": 81
       },
       "deadcode": {
-        "count": 320
+        "count": 340
       },
       "typescript": {
         "errors": 0

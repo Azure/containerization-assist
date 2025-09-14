@@ -67,21 +67,21 @@ export interface Tool {
   ) => Promise<Result<unknown>>;
 }
 
-// ===== SESSION & WORKFLOW =====
+// ===== SESSION =====
 
 /**
- * Represents the state of a workflow execution session.
+ * Represents the state of a tool execution session.
  */
 export interface WorkflowState {
   /** Unique session identifier */
   sessionId: string;
-  /** Currently executing workflow step */
+  /** Currently executing tool */
   currentStep?: string;
-  /** Overall workflow progress (0-100) */
+  /** Overall progress (0-100) */
   progress?: number;
-  /** Results from completed workflow steps */
+  /** Results from completed tools */
   results?: Record<string, unknown>;
-  /** Additional workflow metadata */
+  /** Additional metadata */
   metadata?: Record<string, unknown>;
   /** List of completed step names */
   completed_steps?: string[];

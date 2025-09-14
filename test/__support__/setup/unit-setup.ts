@@ -40,10 +40,33 @@ jest.mock('@lib/kubernetes', () => ({
 jest.mock('@lib/session', () => ({
   SessionManager: jest.fn(),
   createSessionManager: jest.fn(() => ({
-    get: jest.fn(),
-    update: jest.fn(),
-    create: jest.fn(),
-    delete: jest.fn()
+    get: jest.fn(async (id) => ({
+      sessionId: id,
+      metadata: {},
+      completed_steps: [],
+      errors: {},
+      current_step: null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    })),
+    update: jest.fn(async (id, state) => ({
+      sessionId: id,
+      ...state,
+      updatedAt: new Date()
+    })),
+    create: jest.fn(async (id) => ({
+      sessionId: id || 'test-session-' + Math.random().toString(36).substr(2, 9),
+      metadata: {},
+      completed_steps: [],
+      errors: {},
+      current_step: null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    })),
+    delete: jest.fn(),
+    list: jest.fn(async () => []),
+    cleanup: jest.fn(),
+    close: jest.fn()
   }))
 }));
 

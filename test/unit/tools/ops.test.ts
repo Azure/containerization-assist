@@ -19,6 +19,16 @@ jest.mock('@lib/logger', () => ({
   createTimer: jest.fn(() => mockTimer),
 }));
 
+jest.mock('@lib/tool-helpers', () => ({
+  createToolTimer: jest.fn(() => mockTimer),
+  getToolLogger: jest.fn(() => ({
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+  })),
+}));
+
 describe('opsTool', () => {
   let mockLogger: ReturnType<typeof createMockLogger>;
 

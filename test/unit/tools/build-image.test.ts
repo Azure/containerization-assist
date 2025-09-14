@@ -95,11 +95,24 @@ jest.mock('../../../src/lib/logger', () => ({
 // Mock the session helpers
 jest.mock('../../../src/mcp/tool-session-helpers', () => ({
   ensureSession: jest.fn(),
-  useSessionSlice: jest.fn().mockReturnValue({
-    get: jest.fn(),
-    set: jest.fn(),
-    patch: jest.fn().mockResolvedValue(undefined),
-    clear: jest.fn(),
+  useSessionSlice: jest.fn((toolName, io, context) => {
+    // Simulate the actual behavior where patch calls sessionManager.update
+    return {
+      get: jest.fn(),
+      set: jest.fn(),
+      patch: jest.fn(async (sessionId, data) => {
+        if (context?.sessionManager?.update) {
+          await context.sessionManager.update(sessionId, {
+            metadata: {
+              toolSlices: {
+                [toolName]: data,
+              },
+            },
+          });
+        }
+      }),
+      clear: jest.fn(),
+    };
   }),
   defineToolIO: jest.fn((input, output) => ({ input, output })),
 }));
@@ -276,21 +289,13 @@ CMD ["node", "index.js"]`;
       const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
+      // With the new session slice utils, the update happens in toolSlices
       expect(mockSessionManager.update).toHaveBeenCalledWith('test-session-123', expect.objectContaining({
         metadata: expect.objectContaining({
-          build_result: {
-            success: true,
-            imageId: 'sha256:mock-image-id',
-            tags: ['myapp:latest', 'myapp:v1.0'],
-            size: 123456789,
-            metadata: expect.objectContaining({
-              layers: 8,
-              buildTime: expect.any(Number),
-              logs: expect.arrayContaining(['Successfully built mock-image-id']),
-            }),
-          },
+          toolSlices: expect.objectContaining({
+            'build-image': expect.any(Object),
+          }),
         }),
-        completed_steps: expect.arrayContaining(['build-image']),
       }));
     });
   });

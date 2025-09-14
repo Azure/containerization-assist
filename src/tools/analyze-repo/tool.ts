@@ -27,14 +27,12 @@ import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 import { getRecommendedBaseImage } from '../../lib/base-images';
 import type { ToolContext } from '../../mcp/context';
-import { createTimer, createLogger } from '../../lib/logger';
+import { getToolLogger, createToolTimer } from '../../lib/tool-helpers';
 import { Success, Failure, type Result } from '../../types';
 import { analyzeRepoSchema, type AnalyzeRepoParams } from './schema';
 import { z } from 'zod';
 import { parsePackageJson, getAllDependencies } from '../../lib/parsing-package-json';
 import { DEFAULT_PORTS } from '../../config/defaults';
-import { getSuccessProgression } from '../../workflows/workflow-progression';
-import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { extractErrorMessage } from '../../lib/error-utils';
 
 // Define the result schema for type safety
@@ -396,8 +394,8 @@ async function analyzeRepoImpl(
 
   // Optional progress reporting for complex operations
   const progress = context.progress ? createStandardProgress(context.progress) : undefined;
-  const logger = context.logger || createLogger({ name: 'analyze-repo' });
-  const timer = createTimer(logger, 'analyze-repo');
+  const logger = getToolLogger(context, 'analyze-repo');
+  const timer = createToolTimer(logger, 'analyze-repo');
 
   try {
     const { repoPath: rawRepoPath = process.cwd(), depth = 3, includeTests = false } = params;
@@ -420,7 +418,7 @@ async function analyzeRepoImpl(
       return Failure(sessionResult.error);
     }
 
-    const { id: sessionId, state: session } = sessionResult.value;
+    const { id: sessionId, state: _session } = sessionResult.value;
     const slice = useSessionSlice('analyze-repo', io, context, StateSchema);
 
     if (!slice) {
@@ -590,56 +588,6 @@ async function analyzeRepoImpl(
       },
     });
 
-    // Update session metadata for backward compatibility
-    const sessionManager = context.sessionManager;
-    if (sessionManager) {
-      try {
-        await sessionManager.update(sessionId, {
-          metadata: {
-            ...session.metadata,
-            analysis_result: {
-              language: languageInfo.language,
-              ...(languageInfo.version && { language_version: languageInfo.version }),
-              ...(frameworkInfo?.framework && { framework: frameworkInfo.framework }),
-              ...(frameworkInfo?.version && { framework_version: frameworkInfo.version }),
-              ...(buildSystem && {
-                build_system: {
-                  type: buildSystem.type,
-                  build_file: buildSystem.file,
-                  ...(buildSystem.buildCommand && { build_command: buildSystem.buildCommand }),
-                },
-              }),
-              dependencies: dependencies.map((d) => ({
-                name: d.name,
-                ...(d.version && { version: d.version }),
-                type:
-                  d.type === 'production'
-                    ? ('runtime' as const)
-                    : d.type === 'development'
-                      ? ('dev' as const)
-                      : ('test' as const),
-              })),
-              has_tests: dependencies.some((dep) => dep.type === 'test'),
-              ports,
-              docker_compose_exists: dockerInfo.hasDockerCompose,
-              recommendations: {
-                baseImage,
-                buildStrategy: buildSystem ? 'multi-stage' : 'single-stage',
-                securityNotes,
-              },
-            },
-          },
-          repo_path: repoPath,
-          completed_steps: [...(session?.completed_steps ?? []), 'analyze-repo'],
-        });
-      } catch (error) {
-        logger.warn(
-          { error: extractErrorMessage(error) },
-          'Failed to update session with analysis result',
-        );
-      }
-    }
-
     // Progress: Finalizing results
     if (progress) await progress('FINALIZING');
 
@@ -649,16 +597,7 @@ async function analyzeRepoImpl(
     // Progress: Complete
     if (progress) await progress('COMPLETE');
 
-    const sessionContext = {
-      completed_steps: session.completed_steps || [],
-      analysis_result: result,
-    };
-    const enrichedResult = {
-      ...result,
-      NextStep: getSuccessProgression(TOOL_NAMES.ANALYZE_REPO, sessionContext).summary,
-    };
-
-    return Success(enrichedResult);
+    return Success(result);
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Repository analysis failed');

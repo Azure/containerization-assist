@@ -14,22 +14,17 @@
  */
 
 import { resolvePath, joinPaths, getRelativePath, safeNormalizePath } from '@lib/path-utils';
+import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
 import { promises as fs } from 'node:fs';
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import { createStandardProgress } from '@mcp/progress-helper';
 import type { ToolContext } from '../../mcp/context';
 import { createDockerClient, type DockerBuildOptions } from '../../lib/docker';
-import { createTimer, createLogger } from '../../lib/logger';
+
 import { type Result, Success, Failure } from '../../types';
 import { extractErrorMessage } from '../../lib/error-utils';
 import { fileExists } from '@lib/file-utils';
 import { buildImageSchema, type BuildImageParams } from './schema';
-import {
-  getFailureProgression,
-  formatFailureChainHint,
-  getSuccessProgression,
-} from '../../workflows/workflow-progression';
-import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { z } from 'zod';
 import type { SessionData } from '../session-types';
 
@@ -153,8 +148,8 @@ async function buildImageImpl(
 
   // Optional progress reporting for complex operations (Docker build process)
   const progress = context.progress ? createStandardProgress(context.progress) : undefined;
-  const logger = context.logger || createLogger({ name: 'build-image' });
-  const timer = createTimer(logger, 'build-image');
+  const logger = getToolLogger(context, 'build-image');
+  const timer = createToolTimer(logger, 'build-image');
 
   try {
     const {
@@ -307,24 +302,7 @@ async function buildImageImpl(
 
     if (!buildResult.ok) {
       const errorMessage = buildResult.error ?? 'Unknown error';
-      // Prepare session context for chain hints in failure case
-      const sessionContext = {
-        completed_steps: session.completed_steps || [],
-        ...(sessionData?.dockerfile_result && {
-          dockerfile_result: sessionData.dockerfile_result,
-        }),
-        ...(sessionData?.analysis_result && {
-          analysis_result: sessionData.analysis_result,
-        }),
-      };
-      const progression = getFailureProgression(
-        TOOL_NAMES.BUILD_IMAGE,
-        errorMessage,
-        sessionContext,
-      );
-      const chainHint = formatFailureChainHint(TOOL_NAMES.BUILD_IMAGE, progression);
-
-      return Failure(`Failed to build image: ${errorMessage}\n${chainHint}`);
+      return Failure(`Failed to build image: ${errorMessage}`);
     }
 
     const buildTime = Date.now() - startTime;
@@ -363,57 +341,13 @@ async function buildImageImpl(
       },
     });
 
-    // Update session metadata for backward compatibility
-    const sessionManager = context.sessionManager;
-    if (sessionManager) {
-      try {
-        await sessionManager.update(sessionId, {
-          metadata: {
-            ...session.metadata,
-            build_result: {
-              success: true,
-              imageId: buildResult.value.imageId ?? '',
-              tags: finalTags,
-              size: (buildResult.value as unknown as { size?: number }).size ?? 0,
-              metadata: {
-                layers: (buildResult.value as unknown as { layers?: number }).layers,
-                buildTime,
-                logs: buildResult.value.logs,
-                securityWarnings,
-              },
-            },
-          },
-          completed_steps: [...(session.completed_steps || []), 'build-image'],
-        });
-      } catch (error) {
-        logger.warn(
-          { error: (error as Error).message },
-          'Failed to update session, but build succeeded',
-        );
-      }
-    }
-
     timer.end({ imageId: buildResult.value.imageId, buildTime });
     logger.info({ imageId: buildResult.value.imageId, buildTime }, 'Docker image build completed');
 
     // Progress: Complete
     if (progress) await progress('COMPLETE');
 
-    // Prepare session context for chain hints
-    const sessionContext = {
-      completed_steps: session.completed_steps || [],
-      ...(sessionData?.dockerfile_result && {
-        dockerfile_result: sessionData.dockerfile_result,
-      }),
-      ...(sessionData?.analysis_result && {
-        analysis_result: sessionData.analysis_result,
-      }),
-    };
-
-    return Success({
-      ...result,
-      NextStep: getSuccessProgression(TOOL_NAMES.BUILD_IMAGE, sessionContext).summary,
-    });
+    return Success(result);
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Docker image build failed');

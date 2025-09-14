@@ -6,10 +6,10 @@
  */
 
 import { joinPaths } from '@lib/path-utils';
+import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
 import { extractErrorMessage } from '../../lib/error-utils';
 import { promises as fs } from 'node:fs';
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
-import { createTimer } from '@lib/logger';
 import type { ToolContext } from '../../mcp/context';
 import type { SessionData } from '../session-types';
 import { Success, Failure, type Result } from '../../types';
@@ -87,8 +87,8 @@ async function convertAcaToK8sImpl(
   params: ConvertAcaToK8sParams,
   context: ToolContext,
 ): Promise<Result<ConvertAcaToK8sResult>> {
-  const logger = context.logger;
-  const timer = createTimer(logger, 'convert-aca-to-k8s');
+  const logger = getToolLogger(context, 'convert-aca-to-k8s');
+  const timer = createToolTimer(logger, 'convert-aca-to-k8s');
 
   try {
     // Parse ACA manifest
@@ -124,7 +124,7 @@ async function convertAcaToK8sImpl(
       kind: 'Deployment',
       metadata: {
         name: aca.name,
-        namespace: params.namespace || 'default',
+        namespace: params.namespace ?? 'default',
         labels: { app: aca.name },
         ...(params.includeComments && {
           annotations: {
@@ -200,7 +200,7 @@ async function convertAcaToK8sImpl(
     resourceList.push({
       kind: 'Deployment',
       name: aca.name,
-      namespace: params.namespace || 'default',
+      namespace: params.namespace ?? 'default',
     });
 
     // 2. Create Service if ingress exists
@@ -211,7 +211,7 @@ async function convertAcaToK8sImpl(
         kind: 'Service',
         metadata: {
           name: aca.name,
-          namespace: params.namespace || 'default',
+          namespace: params.namespace ?? 'default',
           labels: { app: aca.name },
           ...(params.includeComments && {
             annotations: {
@@ -237,7 +237,7 @@ async function convertAcaToK8sImpl(
       resourceList.push({
         kind: 'Service',
         name: aca.name,
-        namespace: params.namespace || 'default',
+        namespace: params.namespace ?? 'default',
       });
 
       // 3. Create Ingress for HTTP with external access
@@ -247,7 +247,7 @@ async function convertAcaToK8sImpl(
           kind: 'Ingress',
           metadata: {
             name: aca.name,
-            namespace: params.namespace || 'default',
+            namespace: params.namespace ?? 'default',
             labels: { app: aca.name },
             annotations: {
               'nginx.ingress.kubernetes.io/rewrite-target': '/',
@@ -284,7 +284,7 @@ async function convertAcaToK8sImpl(
         resourceList.push({
           kind: 'Ingress',
           name: aca.name,
-          namespace: params.namespace || 'default',
+          namespace: params.namespace ?? 'default',
         });
       }
     }
@@ -299,7 +299,7 @@ async function convertAcaToK8sImpl(
         kind: 'HorizontalPodAutoscaler',
         metadata: {
           name: `${aca.name}-hpa`,
-          namespace: params.namespace || 'default',
+          namespace: params.namespace ?? 'default',
           labels: { app: aca.name },
           ...(params.includeComments && {
             annotations: {
@@ -333,7 +333,7 @@ async function convertAcaToK8sImpl(
       resourceList.push({
         kind: 'HorizontalPodAutoscaler',
         name: `${aca.name}-hpa`,
-        namespace: params.namespace || 'default',
+        namespace: params.namespace ?? 'default',
       });
     }
 
@@ -344,7 +344,7 @@ async function convertAcaToK8sImpl(
         kind: 'Secret',
         metadata: {
           name: `${aca.name}-secrets`,
-          namespace: params.namespace || 'default',
+          namespace: params.namespace ?? 'default',
           labels: { app: aca.name },
           ...(params.includeComments && {
             annotations: {
@@ -362,7 +362,7 @@ async function convertAcaToK8sImpl(
       resourceList.push({
         kind: 'Secret',
         name: `${aca.name}-secrets`,
-        namespace: params.namespace || 'default',
+        namespace: params.namespace ?? 'default',
       });
     }
 
@@ -422,36 +422,10 @@ async function convertAcaToK8sImpl(
         lastConvertedAt: new Date(),
         conversionCount: 1,
         lastAppName: aca.name,
-        lastNamespace: params.namespace || 'default',
+        lastNamespace: params.namespace ?? 'default',
         resourceTypes: k8sResources.map((r) => r.kind),
       },
     });
-
-    // Update session metadata for backward compatibility
-    const sessionManager = context.sessionManager;
-    if (sessionManager) {
-      try {
-        await sessionManager.update(sessionId, {
-          metadata: {
-            ...session.metadata,
-            k8s_conversion_result: {
-              manifests: yamlContent,
-              file_path: joinPaths(outputPath, 'manifests.yaml'),
-              resource_count: k8sResources.length,
-              output_path: outputPath,
-            },
-            conversion_type: 'aca-to-k8s',
-            resources_created: resourceList,
-          },
-          completed_steps: [...(session.completed_steps ?? []), 'convert-aca-to-k8s'],
-        });
-      } catch (error) {
-        logger.warn(
-          { error: extractErrorMessage(error) },
-          'Failed to update session metadata, but conversion succeeded',
-        );
-      }
-    }
 
     timer.end({ resourceCount: k8sResources.length });
 

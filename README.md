@@ -7,7 +7,7 @@ An AI-powered containerization assistant that helps you build, scan, and deploy 
 - 🐳 **Docker Integration**: Build, scan, and deploy container images
 - ☸️ **Kubernetes Support**: Generate manifests and deploy applications  
 - 🤖 **AI-Powered**: Intelligent Dockerfile generation and optimization
-- 🔄 **Workflow Orchestration**: Complete containerization pipelines
+- 🔄 **Intelligent Tool Routing**: Automatic dependency resolution and execution
 - 📊 **Progress Tracking**: Real-time progress updates via MCP
 - 🔒 **Security Scanning**: Built-in vulnerability scanning with Trivy
 
@@ -69,7 +69,7 @@ Once installed and configured, you can use natural language commands with GitHub
 - **"Generate a Dockerfile for this Python project"**
 - **"Build and scan a Docker image"**
 - **"Create Kubernetes deployment manifests"**
-- **"Start a complete containerization workflow"**
+- **"Analyze and containerize my application"**
 
 ### Step-by-Step Containerization
 
@@ -114,7 +114,6 @@ Once installed and configured, you can use natural language commands with GitHub
 | `prepare-cluster` | Prepare Kubernetes cluster for deployment |
 | `deploy` | Deploy applications to Kubernetes |
 | `verify-deployment` | Verify deployment health and status |
-| `workflow` | Start complete containerization workflow |
 | `ops` | Operational tools (ping, health, registry) |
 
 ## Supported Technologies

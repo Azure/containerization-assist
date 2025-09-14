@@ -6,21 +6,15 @@
  */
 
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
+import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
 import type { ToolContext } from '../../mcp/context';
-import { createTimer, createLogger } from '../../lib/logger';
+
 import { createSecurityScanner } from '../../lib/scanner';
 import { Success, Failure, type Result } from '../../types';
 import { getKnowledgeForCategory } from '../../knowledge';
 import { scanImageSchema, type ScanImageParams } from './schema';
 import { z } from 'zod';
 import type { SessionData } from '../session-types';
-import {
-  getSuccessProgression,
-  getFailureProgression,
-  formatFailureChainHint,
-  type SessionContext,
-} from '../../workflows/workflow-progression';
-import { TOOL_NAMES } from '../../exports/tool-names.js';
 
 interface DockerScanResult {
   vulnerabilities?: Array<{
@@ -114,8 +108,8 @@ async function scanImageImpl(
   if (!params || typeof params !== 'object') {
     return Failure('Invalid parameters provided');
   }
-  const logger = context.logger || createLogger({ name: 'scan' });
-  const timer = createTimer(logger, 'scan-image');
+  const logger = getToolLogger(context, 'scan');
+  const timer = createToolTimer(logger, 'scan-image');
 
   try {
     const { scanner = 'trivy', severity } = params;
@@ -289,39 +283,6 @@ async function scanImageImpl(
       },
     });
 
-    // Update session metadata for backward compatibility
-    const sessionManager = context.sessionManager;
-    if (sessionManager) {
-      try {
-        await sessionManager.update(sessionId, {
-          metadata: {
-            ...session.metadata,
-            scan_result: {
-              success: passed,
-              vulnerabilities: dockerScanResult.vulnerabilities?.map((v) => ({
-                id: v.id ?? 'unknown',
-                severity: v.severity,
-                package: v.package ?? 'unknown',
-                version: v.version ?? 'unknown',
-                description: v.description ?? '',
-                ...(v.fixedVersion && { fixedVersion: v.fixedVersion }),
-              })),
-              summary: dockerScanResult.summary,
-            },
-            scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
-            scanner,
-            scanPassed: passed,
-          },
-          completed_steps: [...(session.completed_steps || []), 'scan'],
-        });
-      } catch (error) {
-        logger.warn(
-          { error: (error as Error).message },
-          'Failed to update session, but scan succeeded',
-        );
-      }
-    }
-
     timer.end({
       vulnerabilities: scanResult.totalVulnerabilities,
       critical: scanResult.criticalCount,
@@ -338,31 +299,13 @@ async function scanImageImpl(
       'Image scan completed',
     );
 
-    // Prepare session context for dynamic chain hints
-    const sessionContext: SessionContext = {
-      completed_steps: session.completed_steps || [],
-      ...((session as SessionContext).analysis_result && {
-        analysis_result: (session as SessionContext).analysis_result,
-      }),
-    };
-
-    return Success({
-      ...result,
-      NextStep: getSuccessProgression(TOOL_NAMES.SCAN_IMAGE, sessionContext).summary,
-    });
+    return Success(result);
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Image scan failed');
 
-    // Add failure chain hint - use basic context since session may not be available
-    const sessionContext = {
-      completed_steps: [],
-    };
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const progression = getFailureProgression(TOOL_NAMES.SCAN_IMAGE, errorMessage, sessionContext);
-    const chainHint = formatFailureChainHint(TOOL_NAMES.SCAN_IMAGE, progression);
-
-    return Failure(`${errorMessage}\n${chainHint}`);
+    return Failure(errorMessage);
   }
 }
 

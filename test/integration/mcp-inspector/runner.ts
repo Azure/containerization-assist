@@ -11,8 +11,7 @@ import { createErrorHandlingTests } from './suites/edge-cases/error-handling-tes
 import { createSamplingValidationTests } from './suites/sampling-validation/sampling-tests';
 import { createResourceManagementTests } from './suites/resource-management/resource-tests';
 import { createLoadTestingTests } from './suites/load-testing/concurrent-tests';
-import { createIntegrationFlowTests } from './suites/integration-flows/workflow-tests';
-import { createContainerizationWorkflowTests } from './suites/integration-flows/containerization-workflow';
+// Workflow tests removed - using intelligent tool routing instead
 // import { createDeploymentPipelineTests } from './suites/integration-flows/deployment-pipeline'; // Disabled - requires K8s cluster
 import { createOrchestratorEventTests } from './suites/orchestrator/event-flow-tests';
 import { createPhaseGateTests } from './suites/orchestrator/phase-gate-tests';
@@ -38,8 +37,7 @@ async function main() {
     const samplingTests = createSamplingValidationTests(testRunner);
     const resourceTests = createResourceManagementTests(testRunner);
     const loadTests = createLoadTestingTests(testRunner);
-    const integrationTests = createIntegrationFlowTests(testRunner);
-    const containerizationTests = createContainerizationWorkflowTests(testRunner);
+    // Workflow tests removed - using intelligent tool routing instead
     // const deploymentTests = createDeploymentPipelineTests(testRunner); // Disabled - requires K8s cluster
     const orchestratorEventTests = createOrchestratorEventTests(testRunner);
     const phaseGateTests = createPhaseGateTests(testRunner);
@@ -72,7 +70,7 @@ async function main() {
           testsToRegister = loadTests;
           break;
         case 'integration-flows':
-          testsToRegister = [...integrationTests, ...containerizationTests]; // deploymentTests disabled - requires K8s
+          testsToRegister = []; // Workflow tests removed - using intelligent tool routing instead
           break;
         case 'orchestrator':
           testsToRegister = [...orchestratorEventTests, ...phaseGateTests];
@@ -88,7 +86,7 @@ async function main() {
           process.exit(1);
       }
     } else {
-      testsToRegister = [...basicTests, ...comprehensiveTests, ...errorHandlingTests, ...samplingTests, ...resourceTests, ...loadTests, ...integrationTests, ...containerizationTests, /* ...deploymentTests, */ ...orchestratorEventTests, ...phaseGateTests, ...samplingDecisionTests, ...artifactTests, ...remediationTests];
+      testsToRegister = [...basicTests, ...comprehensiveTests, ...errorHandlingTests, ...samplingTests, ...resourceTests, ...loadTests, /* workflow tests removed */ ...orchestratorEventTests, ...phaseGateTests, ...samplingDecisionTests, ...artifactTests, ...remediationTests];
     }
 
     testsToRegister.forEach(test => testRunner.register(test));
@@ -151,7 +149,7 @@ Categories:
   - sampling-validation Sampling algorithm tests
   - resource-management Resource system tests
   - load-testing        Concurrent operation tests
-  - integration-flows   End-to-end workflow tests (includes real containerization)
+  - integration-flows   (Removed - using intelligent tool routing)
   - orchestrator        Orchestrator event and phase tests
   - gates               Phase gate validation tests
   - remediation         Remediation loop and healing tests
