@@ -78,19 +78,62 @@ export interface SessionMetadata {
  * Complete session data structure
  */
 export interface SessionData {
-  analysis_result?: SessionAnalysisResult;
-  build_result?: SessionBuildResult;
-  dockerfile_result?: SessionDockerfileResult;
-  k8s_result?: SessionK8sResult;
   workflow_state?: WorkflowState & {
-    analysis_result?: SessionAnalysisResult;
-    build_result?: SessionBuildResult;
-    dockerfile_result?: SessionDockerfileResult;
-    k8s_result?: SessionK8sResult;
     metadata?: SessionMetadata;
   };
   metadata?: SessionMetadata;
   completed_steps?: string[];
   currentStep?: string;
+  results?: Record<string, unknown>;
   [key: string]: unknown;
+}
+
+/**
+ * Helper functions for safe access to session results
+ * All data is stored in the results object indexed by tool name
+ */
+export function getAnalysisResult(
+  session: WorkflowState | SessionData | undefined | null,
+): SessionAnalysisResult | undefined {
+  if (!session) return undefined;
+
+  // Check results object (standard pattern)
+  if ('results' in session && session.results?.['analyze-repo']) {
+    return session.results['analyze-repo'] as SessionAnalysisResult;
+  }
+
+  // Check nested workflow_state
+  if ('workflow_state' in session && session.workflow_state) {
+    const ws = session.workflow_state;
+    if (typeof ws === 'object' && ws !== null && 'results' in ws) {
+      const results = (ws as WorkflowState).results;
+      if (results?.['analyze-repo']) {
+        return results['analyze-repo'] as SessionAnalysisResult;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+export function getBaseImages(session: WorkflowState | SessionData | undefined | null): unknown {
+  if (!session) return undefined;
+
+  // Check results object (standard pattern)
+  if ('results' in session && session.results?.['resolve-base-images']) {
+    return session.results['resolve-base-images'];
+  }
+
+  // Check nested workflow_state
+  if ('workflow_state' in session && session.workflow_state) {
+    const ws = session.workflow_state;
+    if (typeof ws === 'object' && ws !== null && 'results' in ws) {
+      const results = (ws as WorkflowState).results;
+      if (results?.['resolve-base-images']) {
+        return results['resolve-base-images'];
+      }
+    }
+  }
+
+  return undefined;
 }

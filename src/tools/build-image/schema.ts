@@ -8,7 +8,7 @@ const sessionIdSchema = z.string().describe('Session identifier for tracking ope
 
 export const buildImageSchema = z.object({
   sessionId: sessionIdSchema.optional(),
-  context: z.string().min(1).describe('Build context path (use forward slashes: /path/to/context)'),
+  path: z.string().min(1).describe('Build context path (use forward slashes: /path/to/context)'),
   dockerfile: z.string().optional().describe('Dockerfile name (relative to context)'),
   dockerfilePath: z
     .string()

@@ -14,7 +14,6 @@ import { Success, Failure, type Result } from '../../types';
 import { getKnowledgeForCategory } from '../../knowledge';
 import { scanImageSchema, type ScanImageParams } from './schema';
 import { z } from 'zod';
-import type { SessionData } from '../session-types';
 
 interface DockerScanResult {
   vulnerabilities?: Array<{
@@ -148,8 +147,7 @@ async function scanImageImpl(
     const securityScanner = createSecurityScanner(logger, scanner);
 
     // Check for built image in session or use provided imageId
-    const sessionData = session as SessionData;
-    const buildResult = sessionData?.build_result;
+    const buildResult = session?.results?.['build-image'] as { imageId?: string } | undefined;
     const imageId = params.imageId || buildResult?.imageId;
 
     if (!imageId) {

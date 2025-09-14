@@ -331,7 +331,9 @@ async function deployApplicationImpl(
     const k8sClient = createKubernetesClient(logger);
     // Get K8s manifests from session with type safety
     const sessionData = session as SessionData;
-    const k8sResult = sessionData?.k8s_result;
+    const k8sResult = sessionData?.results?.['generate-k8s-manifests'] as
+      | { manifests?: Array<{ content?: string }> }
+      | undefined;
 
     if (!k8sResult?.manifests) {
       return Failure(

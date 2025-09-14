@@ -540,4 +540,259 @@ describe('ToolRouter', () => {
       expect(result.executedTools).toContain('deploy');
     });
   });
+
+  describe('Session update consolidation', () => {
+    it('should handle successful session updates atomically', async () => {
+      const sessionId = 'atomic-update-test';
+      const context: ToolContext = {
+        sessionManager,
+        logger,
+      };
+
+      await sessionManager.create(sessionId);
+
+      const result = await router.route({
+        toolName: 'analyze-repo',
+        params: { path: './test' },
+        sessionId,
+        context,
+      });
+
+      expect(result.result.ok).toBe(true);
+
+      // Verify session was updated with all fields in one operation
+      const session = await sessionManager.get(sessionId);
+      expect(session).toBeDefined();
+      expect(session?.updatedAt).toBeDefined();
+      expect(session?.completed_steps).toContain('analyzed_repo');
+      expect(session?.results?.['analyze-repo']).toBeDefined();
+    });
+
+    it('should recover gracefully when session update returns null', async () => {
+      const sessionId = 'null-update-test';
+      const context: ToolContext = {
+        sessionManager,
+        logger,
+      };
+
+      await sessionManager.create(sessionId);
+
+      // Mock update to return null once
+      const originalUpdate = sessionManager.update;
+      let updateCallCount = 0;
+      sessionManager.update = jest.fn(async (id, state) => {
+        updateCallCount++;
+        if (updateCallCount === 1) {
+          // First call returns null to simulate failure
+          return null;
+        }
+        return originalUpdate.call(sessionManager, id, state);
+      });
+
+      const result = await router.route({
+        toolName: 'analyze-repo',
+        params: { path: './test' },
+        sessionId,
+        context,
+      });
+
+      // Should still succeed by falling back to get()
+      expect(result.result.ok).toBe(true);
+      expect(sessionManager.update).toHaveBeenCalled();
+
+      // Restore original update
+      sessionManager.update = originalUpdate;
+    });
+
+    it('should maintain session consistency across multiple tool executions', async () => {
+      const sessionId = 'consistency-test';
+      const context: ToolContext = {
+        sessionManager,
+        logger,
+      };
+
+      await sessionManager.create(sessionId);
+
+      // Execute multiple tools in sequence
+      const analyzeResult = await router.route({
+        toolName: 'analyze-repo',
+        params: { path: '.' },
+        sessionId,
+        context,
+      });
+
+      expect(analyzeResult.result.ok).toBe(true);
+
+      // Force re-execution with different params
+      const dockerfileResult = await router.route({
+        toolName: 'generate-dockerfile',
+        params: { path: './app' },
+        sessionId,
+        force: true,
+        context,
+      });
+
+      expect(dockerfileResult.result.ok).toBe(true);
+
+      // Verify session maintains all results
+      const finalSession = await sessionManager.get(sessionId);
+      expect(finalSession?.results?.['analyze-repo']).toBeDefined();
+      expect(finalSession?.results?.['generate-dockerfile']).toBeDefined();
+      expect(finalSession?.completed_steps).toContain('analyzed_repo');
+      expect(finalSession?.completed_steps).toContain('dockerfile_generated');
+    });
+
+    it('should not create race conditions with concurrent updates', async () => {
+      const sessionId = 'concurrent-test';
+      const context: ToolContext = {
+        sessionManager,
+        logger,
+      };
+
+      await sessionManager.create(sessionId);
+
+      // Create a single mock tool without dependencies for simpler testing
+      mockTools.set('tool-a', {
+        name: 'tool-a',
+        schema: z.object({ data: z.string(), sessionId: z.string().optional() }),
+        handler: jest.fn(async (params: any) => {
+          return Success({ result: 'tool-a-result', data: params.data });
+        }),
+      });
+
+      // Execute single tool first to verify basic functionality
+      const singleResult = await router.route({
+        toolName: 'tool-a',
+        params: { data: 'test-data' },
+        sessionId,
+        context,
+      });
+
+      expect(singleResult.result.ok).toBe(true);
+
+      // Check session was updated
+      const sessionAfterSingle = await sessionManager.get(sessionId);
+      expect(sessionAfterSingle).toBeDefined();
+      expect(sessionAfterSingle?.results).toBeDefined();
+      expect(sessionAfterSingle?.results?.['tool-a']).toBeDefined();
+
+      // Now test with multiple tools
+      const independentTools = ['tool-b', 'tool-c'];
+      independentTools.forEach(toolName => {
+        mockTools.set(toolName, {
+          name: toolName,
+          schema: z.object({ data: z.string(), sessionId: z.string().optional() }),
+          handler: jest.fn(async (params: any) => {
+            // Simulate some async work
+            await new Promise(resolve => setTimeout(resolve, 10));
+            return Success({ result: `${toolName}-result`, data: params.data });
+          }),
+        });
+      });
+
+      // Execute tools in parallel
+      const promises = independentTools.map(toolName =>
+        router.route({
+          toolName,
+          params: { data: `data-${toolName}` },
+          sessionId,
+          context,
+        })
+      );
+
+      const results = await Promise.all(promises);
+
+      // All should succeed
+      results.forEach((result) => {
+        expect(result.result.ok).toBe(true);
+      });
+
+      // Session should contain all results
+      const finalSession = await sessionManager.get(sessionId);
+      expect(finalSession).toBeDefined();
+      expect(finalSession?.results).toBeDefined();
+
+      // Check all tools are present
+      ['tool-a', 'tool-b', 'tool-c'].forEach(toolName => {
+        expect(finalSession?.results?.[toolName]).toBeDefined();
+        expect(finalSession?.results?.[toolName]).toHaveProperty('result', `${toolName}-result`);
+      });
+    });
+
+    it('should preserve session state on partial failure', async () => {
+      const sessionId = 'partial-failure-test';
+      const context: ToolContext = {
+        sessionManager,
+        logger,
+      };
+
+      await sessionManager.create(sessionId);
+
+      // First tool succeeds
+      const firstResult = await router.route({
+        toolName: 'analyze-repo',
+        params: { path: '.' },
+        sessionId,
+        context,
+      });
+
+      expect(firstResult.result.ok).toBe(true);
+
+      // Make resolve-base-images fail
+      const originalHandler = mockTools.get('resolve-base-images').handler;
+      mockTools.get('resolve-base-images').handler = jest.fn(async () => {
+        return Failure('Intentional failure for testing');
+      });
+
+      // Try to execute a tool that depends on resolve-base-images
+      const secondResult = await router.route({
+        toolName: 'generate-dockerfile',
+        params: { path: '.' },
+        sessionId,
+        context,
+      });
+
+      expect(secondResult.result.ok).toBe(false);
+
+      // Session should still contain the successful analyze-repo result
+      const session = await sessionManager.get(sessionId);
+      expect(session?.results?.['analyze-repo']).toBeDefined();
+      expect(session?.completed_steps).toContain('analyzed_repo');
+
+      // Restore original handler
+      mockTools.get('resolve-base-images').handler = originalHandler;
+    });
+
+    it('should update timestamps consistently', async () => {
+      const sessionId = 'timestamp-test';
+      const context: ToolContext = {
+        sessionManager,
+        logger,
+      };
+
+      await sessionManager.create(sessionId);
+
+      const initialSession = await sessionManager.get(sessionId);
+      const initialTimestamp = initialSession?.updatedAt;
+
+      // Wait a bit to ensure timestamp difference
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      await router.route({
+        toolName: 'analyze-repo',
+        params: { path: '.' },
+        sessionId,
+        context,
+      });
+
+      const updatedSession = await sessionManager.get(sessionId);
+      const updatedTimestamp = updatedSession?.updatedAt;
+
+      // Timestamp should be updated
+      expect(updatedTimestamp).toBeDefined();
+      expect(new Date(updatedTimestamp!).getTime()).toBeGreaterThan(
+        new Date(initialTimestamp!).getTime()
+      );
+    });
+  });
 });

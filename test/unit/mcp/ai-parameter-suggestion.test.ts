@@ -147,7 +147,7 @@ describe('AI Parameter Suggestion', () => {
       const result = await router.route({
         toolName: 'build-image',
         params: {
-          // Missing required 'path' and 'imageId'
+          // Missing required 'imageId' (path is auto-normalized to '.')
         },
         context: mockContext,
         force: true,
@@ -158,11 +158,11 @@ describe('AI Parameter Suggestion', () => {
         throw new Error(`Router failed: ${result.result.error}`);
       }
 
-      // Should call AI for suggestions
+      // Should call AI for suggestions (path is now normalized to '.' by default)
       expect(mockAIAssistant.suggestParameters).toHaveBeenCalledWith(
         expect.objectContaining({
           toolName: 'build-image',
-          missingParams: expect.arrayContaining(['path', 'imageId']),
+          missingParams: ['imageId'], // Only imageId is missing since path defaults to '.'
         }),
         mockContext,
       );

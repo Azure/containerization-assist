@@ -51,8 +51,8 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
           }
         }
 
-        const hasRecommendations = recommendations.recommended || recommendations.suggestions || 
-                                  recommendations.baseImages || recommendations.textContent;
+        const hasRecommendations = recommendations.recommended || recommendations.suggestions ||
+                                  recommendations.primaryImage || recommendations.textContent;
 
         return {
           success: !!hasRecommendations,

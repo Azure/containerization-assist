@@ -71,12 +71,11 @@ Quick Start:
   4. Test with: echo '{"method":"tools/ping","params":{},"id":1}' | containerization-assist-mcp
 
 MCP Tools Available:
-  • Analysis: analyze_repository, resolve_base_images
-  • Build: generate_dockerfile, build_image, scan_image
-  • Registry: tag_image, push_image
-  • Deploy: generate_k8s_manifests, deploy_application
-  • Orchestration: start_workflow, workflow_status
-  • Utilities: ping, server_status
+  • Analysis: analyze-repo, resolve-base-images
+  • Build: generate-dockerfile, build-image, scan-image
+  • Registry: tag-image, push-image
+  • Deploy: generate-k8s-manifests, deploy
+  • Additional: ops, inspect-session
 
 For detailed documentation, see: docs/README.md
 For examples and tutorials, see: docs/examples/
@@ -368,7 +367,6 @@ async function main(): Promise<void> {
       await server.start();
 
       const tools = server.getTools();
-      const workflows = server.getWorkflows();
 
       console.error('\n🛠️  Available MCP Tools:');
       console.error('═'.repeat(60));
@@ -378,14 +376,9 @@ async function main(): Promise<void> {
         console.error(`  • ${tool.name.padEnd(30)} - ${tool.description}`);
       });
 
-      console.error('\n🔄 Workflow Tools:');
-      workflows.forEach((workflow: { name: string; description: string }) => {
-        console.error(`  • ${workflow.name.padEnd(30)} - ${workflow.description}`);
-      });
-
       const status = getSystemStatus(deps, true); // Server is running
       console.error('\n📊 Summary:');
-      console.error(`  • Total workflows: ${status.stats.workflows}`);
+      console.error(`  • Total tools: ${tools.length}`);
       console.error(`  • Resources available: ${status.stats.resources}`);
       console.error(`  • Prompts available: ${status.stats.prompts}`);
 
@@ -404,7 +397,6 @@ async function main(): Promise<void> {
       console.error(`Status: ${status.healthy && status.running ? '✅ Healthy' : '❌ Unhealthy'}`);
       console.error('\nServices:');
       console.error(`  ✅ MCP Server: ${status.running ? 'running' : 'stopped'}`);
-      console.error(`  🔄 Workflows registered: ${status.stats.workflows}`);
       console.error(`  📁 Resources available: ${status.stats.resources}`);
       console.error(`  📝 Prompts available: ${status.stats.prompts}`);
 

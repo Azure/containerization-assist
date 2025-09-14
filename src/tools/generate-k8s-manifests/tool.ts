@@ -453,7 +453,10 @@ async function generateK8sManifestsImpl(
 
     const sessionData = session as SessionData;
     // Get build result from session for image tag
-    const buildResult = sessionData?.build_result || sessionData?.workflow_state?.build_result;
+    const buildResult = (sessionData?.results?.['build-image'] ||
+      sessionData?.workflow_state?.results?.['build-image']) as
+      | { tags?: string[]; imageId?: string }
+      | undefined;
     const image = params.imageId || buildResult?.tags?.[0] || `${appName}:latest`;
     // Kubernetes manifest generation from repository analysis and configuration
     if (progress) await progress('EXECUTING');
@@ -481,8 +484,10 @@ async function generateK8sManifestsImpl(
         let promptArgs = buildK8sManifestPromptArgs(params, image);
         try {
           // Get analysis from session for language/framework context
-          const analysisResult =
-            sessionData?.analysis_result || sessionData?.workflow_state?.analysis_result;
+          const analysisResult = (sessionData?.results?.['analyze-repo'] ||
+            sessionData?.workflow_state?.results?.['analyze-repo']) as
+            | { language?: string; framework?: string }
+            | undefined;
 
           const knowledgeResult = await enhancePromptWithKnowledge(promptArgs, {
             operation: 'generate_k8s_manifests',
@@ -581,10 +586,8 @@ async function generateK8sManifestsImpl(
       },
       'Kubernetes manifest validation complete',
     );
-    // Write manifests to disk
-    const repoPath =
-      sessionData?.metadata?.repo_path || sessionData?.workflow_state?.metadata?.repo_path || '.';
-    const outputPath = joinPaths(repoPath, 'k8s');
+    // Write manifests to disk - use current directory as base
+    const outputPath = joinPaths('.', 'k8s');
     await fs.mkdir(outputPath, { recursive: true });
     const manifestPath = joinPaths(outputPath, 'manifests.yaml');
     await fs.writeFile(manifestPath, yamlContent, 'utf-8');

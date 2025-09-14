@@ -380,7 +380,10 @@ async function generateAcaManifestsImpl(
     const sessionData = session as unknown as SessionData;
 
     // Get build result from session for image tag if not provided
-    const buildResult = sessionData?.build_result || sessionData?.workflow_state?.build_result;
+    const buildResult = (sessionData?.results?.['build-image'] ||
+      sessionData?.workflow_state?.results?.['build-image']) as
+      | { tags?: string[]; imageId?: string }
+      | undefined;
     const imageId = params.imageId || buildResult?.tags?.[0] || `${appName}:latest`;
 
     // Progress: Executing generation
@@ -413,8 +416,10 @@ async function generateAcaManifestsImpl(
 
         try {
           // Get analysis from session for language/framework context
-          const analysisResult =
-            sessionData?.analysis_result || sessionData?.workflow_state?.analysis_result;
+          const analysisResult = (sessionData?.results?.['analyze-repo'] ||
+            sessionData?.workflow_state?.results?.['analyze-repo']) as
+            | { language?: string; framework?: string }
+            | undefined;
 
           const knowledgeResult = await enhancePromptWithKnowledge(promptArgs, {
             operation: 'generate_aca_manifests',
@@ -484,10 +489,8 @@ async function generateAcaManifestsImpl(
     // Convert manifest to JSON string
     const manifestContent = JSON.stringify(manifest, null, 2);
 
-    // Write manifest to disk
-    const repoPath =
-      sessionData?.metadata?.repo_path || sessionData?.workflow_state?.metadata?.repo_path || '.';
-    const outputPath = joinPaths(repoPath, 'aca');
+    // Write manifest to disk - use current directory as base
+    const outputPath = joinPaths('.', 'aca');
     await fs.mkdir(outputPath, { recursive: true });
     const manifestPath = joinPaths(outputPath, 'app.json');
     await fs.writeFile(manifestPath, manifestContent, 'utf-8');

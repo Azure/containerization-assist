@@ -89,7 +89,7 @@ function prepareBuildArgs(
   };
 
   // Add session-specific args if available
-  const analysisResult = session?.analysis_result;
+  const analysisResult = session?.results?.['analyze-repo'] as any;
   if (analysisResult) {
     if (analysisResult.language) {
       defaults.LANGUAGE = analysisResult.language;
@@ -153,7 +153,7 @@ async function buildImageImpl(
 
   try {
     const {
-      context: rawBuildContext = '.',
+      path: rawBuildPath = '.',
       dockerfile = 'Dockerfile',
       dockerfilePath: rawDockerfilePath,
       imageName,
@@ -163,10 +163,10 @@ async function buildImageImpl(
     } = params;
 
     // Normalize paths to handle Windows separators
-    const buildContext = safeNormalizePath(rawBuildContext);
+    const buildContext = safeNormalizePath(rawBuildPath);
     const dockerfilePath = rawDockerfilePath ? safeNormalizePath(rawDockerfilePath) : undefined;
 
-    logger.info({ context: buildContext, dockerfile, tags }, 'Starting Docker image build');
+    logger.info({ path: buildContext, dockerfile, tags }, 'Starting Docker image build');
 
     // Progress: Validating build parameters and environment
     if (progress) await progress('VALIDATING');
@@ -194,14 +194,17 @@ async function buildImageImpl(
     const dockerClient = createDockerClient(logger);
 
     // Determine paths
+    // Use build context path directly - no legacy session fields
     const sessionData = session as SessionData;
-    const repoPath = (sessionData?.repo_path ?? buildContext) as string;
+    const repoPath = buildContext;
     let finalDockerfilePath = dockerfilePath
       ? resolvePath(repoPath, dockerfilePath)
       : resolvePath(repoPath, dockerfile);
 
     // Check if we should use a generated Dockerfile
-    const dockerfileResult = sessionData?.dockerfile_result;
+    const dockerfileResult = sessionData?.results?.['generate-dockerfile'] as
+      | { path?: string; content?: string }
+      | undefined;
     const generatedPath = dockerfileResult?.path;
 
     if (!(await fileExists(finalDockerfilePath))) {
@@ -276,7 +279,7 @@ async function buildImageImpl(
 
     // Prepare Docker build options
     const buildOptions: DockerBuildOptions = {
-      context: repoPath, // Build context is the repository path
+      context: repoPath, // Build context is the path parameter
       dockerfile: getRelativePath(repoPath, finalDockerfilePath), // Dockerfile path relative to context
       buildargs: finalBuildArgs,
       ...(_platform !== undefined && { platform: _platform }),
@@ -334,8 +337,7 @@ async function buildImageImpl(
         lastBuiltImageId: buildResult.value.imageId,
         lastBuiltTags: finalTags,
         totalBuilds:
-          (sessionData?.completed_steps || []).filter((s: string) => s === 'build-image').length +
-          1,
+          (session?.completed_steps || []).filter((s: string) => s === 'build-image').length + 1,
         lastBuildTime: buildTime,
         lastSecurityWarningCount: securityWarnings.length,
       },

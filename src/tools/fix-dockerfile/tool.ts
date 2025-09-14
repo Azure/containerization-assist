@@ -388,9 +388,9 @@ async function fixDockerfileImpl(
       ?.build_result;
     const buildError = error ?? buildResult?.error;
     // Get analysis context
-    const analysisResult = (
-      session as { analysis_result?: { language?: string; framework?: string } } | null | undefined
-    )?.analysis_result;
+    const analysisResult = session?.results?.['analyze-repo'] as
+      | { language?: string; framework?: string }
+      | undefined;
     const language = analysisResult?.language;
     const framework = analysisResult?.framework;
     logger.info({ hasError: !!buildError, language, framework }, 'Analyzing Dockerfile for issues');

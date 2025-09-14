@@ -278,11 +278,9 @@ async function resolveBaseImagesImpl(
     await slice.patch(sessionId, { input: params });
 
     // Get analysis result from session or use provided technology
-    const sessionState = session as
-      | { analysis_result?: { language?: string; framework?: string } }
-      | null
+    const analysisResult = session?.results?.['analyze-repo'] as
+      | { language?: string; framework?: string }
       | undefined;
-    const analysisResult = sessionState?.analysis_result;
 
     // Use provided technology or fall back to session analysis
     const language = technology || analysisResult?.language;

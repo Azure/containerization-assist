@@ -139,7 +139,6 @@ export interface SystemStatus {
   stats: {
     resources: number;
     prompts: number;
-    workflows: number;
   };
 }
 
@@ -166,7 +165,6 @@ export function getSystemStatus(deps: Dependencies, serverRunning = false): Syst
     stats: {
       resources: resourceStats.total,
       prompts: promptCount,
-      workflows: 2,
     },
   };
 }

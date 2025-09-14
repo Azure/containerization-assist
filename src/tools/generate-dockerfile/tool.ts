@@ -17,7 +17,7 @@ import type { SamplingOptions } from '@lib/sampling';
 
 import type { SessionAnalysisResult } from '../session-types';
 import type { ToolContext } from '../../mcp/context';
-import { Success, Failure, type Result, type WorkflowState } from '../../types';
+import { Success, Failure, type Result } from '../../types';
 import { getDefaultPort } from '@config/defaults';
 import { getRecommendedBaseImage } from '@lib/base-images';
 import {
@@ -408,7 +408,7 @@ function sessionToAnalyzeRepoResult(sessionResult: SessionAnalysisResult): Analy
       securityNotes: [],
     },
     metadata: {
-      repoPath: '',
+      path: '',
       depth: 0,
       timestamp: Date.now(),
     },
@@ -636,8 +636,8 @@ async function generateSingleDockerfile(
   }
 
   // Determine output path - write to each module root directory
-  const rawRepoPath = params.repoPath || '.';
-  const repoPath = safeNormalizePath(rawRepoPath);
+  const rawPath = params.path || '.';
+  const repoPath = safeNormalizePath(rawPath);
   const normalizedModuleRoot = safeNormalizePath(moduleRoot);
   const dockerfilePath = path.resolve(path.join(repoPath, normalizedModuleRoot, 'Dockerfile'));
 
@@ -729,15 +729,8 @@ async function generateDockerfileImpl(
 
     // Record input in session slice
     await slice.patch(sessionId, { input: params });
-    // Type the session properly with our extended properties
-    interface ExtendedWorkflowState extends WorkflowState {
-      repo_path?: string;
-      analysis_result?: SessionAnalysisResult;
-      dockerfile_result?: { content?: string };
-    }
-    const typedSession = session as ExtendedWorkflowState;
-    // Get analysis result from session - it should be directly on the session
-    const analysisResult = typedSession.analysis_result;
+    // Get analysis result from session results
+    const analysisResult = session.results?.['analyze-repo'] as SessionAnalysisResult | undefined;
     if (!analysisResult) {
       return Failure(
         `Repository must be analyzed first. Please run 'analyze-repo' before 'generate-dockerfile'.`,

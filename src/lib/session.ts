@@ -136,7 +136,6 @@ export async function create(store: SessionStore, sessionId?: string): Promise<W
     {
       sessionId: id,
       totalSessions: store.sessions.size,
-      sessionKeys: Object.keys(workflowState),
     },
     'Session created',
   );
@@ -150,13 +149,10 @@ export async function create(store: SessionStore, sessionId?: string): Promise<W
 export async function get(store: SessionStore, sessionId: string): Promise<WorkflowState | null> {
   const session = store.sessions.get(sessionId);
 
-  store.logger.info(
+  store.logger.debug(
     {
       sessionId,
       found: !!session,
-      totalSessions: store.sessions.size,
-      allSessionIds: Array.from(store.sessions.keys()),
-      sessionData: session ? Object.keys(session.workflowState) : null,
     },
     'Session lookup',
   );
@@ -208,13 +204,11 @@ export async function update(
   };
 
   store.sessions.set(sessionId, updatedSession);
-  store.logger.info(
+  store.logger.debug(
     {
       sessionId,
-      updatedKeys: Object.keys(updatedWorkflowState),
-      hasAnalysisResult: 'analysis_result' in updatedWorkflowState,
-      completedSteps: updatedWorkflowState.completed_steps,
-      totalSessions: store.sessions.size,
+      updatedFields: Object.keys(state).length,
+      hasAnalysis: 'analysis' in state,
     },
     'Session updated',
   );

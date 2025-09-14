@@ -8,7 +8,7 @@
  * ```typescript
  * const result = await analyzeRepo({
  *   sessionId: 'session-123',
- *   repoPath: '/path/to/project',
+ *   path: '/path/to/project',
  *   includeTests: true
  * }, logger);
  *
@@ -68,7 +68,7 @@ const AnalyzeRepoResultSchema = z.object({
     securityNotes: z.array(z.string()),
   }),
   metadata: z.object({
-    repoPath: z.string(),
+    path: z.string(),
     depth: z.number(),
     timestamp: z.number(),
     includeTests: z.boolean().optional(),
@@ -398,8 +398,8 @@ async function analyzeRepoImpl(
   const timer = createToolTimer(logger, 'analyze-repo');
 
   try {
-    const { repoPath: rawRepoPath = process.cwd(), depth = 3, includeTests = false } = params;
-    const repoPath = safeNormalizePath(rawRepoPath);
+    const { path: rawPath = process.cwd(), depth = 3, includeTests = false } = params;
+    const repoPath = safeNormalizePath(rawPath);
 
     logger.info({ repoPath, depth, includeTests }, 'Starting repository analysis');
 
@@ -568,7 +568,7 @@ async function analyzeRepoImpl(
         securityNotes,
       },
       metadata: {
-        repoPath,
+        path: repoPath,
         depth,
         includeTests,
         timestamp: Date.now(),

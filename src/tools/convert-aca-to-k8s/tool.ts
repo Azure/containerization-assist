@@ -11,7 +11,6 @@ import { extractErrorMessage } from '../../lib/error-utils';
 import { promises as fs } from 'node:fs';
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import type { ToolContext } from '../../mcp/context';
-import type { SessionData } from '../session-types';
 import { Success, Failure, type Result } from '../../types';
 import * as yaml from 'js-yaml';
 import { convertAcaToK8sSchema, type ConvertAcaToK8sParams } from './schema';
@@ -388,7 +387,7 @@ async function convertAcaToK8sImpl(
       return Failure(sessionResult.error);
     }
 
-    const { id: sessionId, state: session } = sessionResult.value;
+    const { id: sessionId } = sessionResult.value;
     const slice = useSessionSlice('convert-aca-to-k8s', io, context, StateSchema);
 
     if (!slice) {
@@ -398,11 +397,8 @@ async function convertAcaToK8sImpl(
     // Record input in session slice
     await slice.patch(sessionId, { input: params });
 
-    const sessionData = session as unknown as SessionData;
-
-    // Write to file
-    const repoPath = sessionData?.metadata?.repo_path || '.';
-    const outputPath = joinPaths(repoPath, 'k8s-converted');
+    // Write to file - use current directory as base
+    const outputPath = joinPaths('.', 'k8s-converted');
     await fs.mkdir(outputPath, { recursive: true });
     await fs.writeFile(joinPaths(outputPath, 'manifests.yaml'), yamlContent, 'utf-8');
 

@@ -1,9 +1,13 @@
 /**
- * Tool dependency graph for router-first architecture
+ * Tool dependency graph enabling automatic precondition satisfaction.
+ *
+ * Invariant: Graph must be acyclic to prevent infinite execution loops
+ * Trade-off: Static graph definition vs runtime discovery - chose static for predictability
  */
 
 /**
- * Execution steps that tools can require or provide
+ * Execution steps representing workflow state transitions.
+ * Each step marks a completed capability that downstream tools can depend on.
  */
 export type Step =
   | 'analyzed_repo'
@@ -19,7 +23,8 @@ export type Step =
   | 'deployed';
 
 /**
- * Tool dependency edge definition
+ * Dependency edge defining tool's preconditions and effects.
+ * Enables automatic workflow orchestration through declarative dependencies.
  */
 export interface ToolEdge {
   /** Preconditions that must be satisfied before tool execution */
@@ -38,10 +43,18 @@ export interface ToolEdge {
       }
     >
   >;
+
+  /** Suggested next tools after successful execution */
+  nextSteps?: {
+    tool: string;
+    description: string;
+    buildParams?: (params: any) => any;
+  }[];
 }
 
 /**
- * Complete tool dependency graph
+ * Static dependency graph mapping tools to their workflow requirements.
+ * Central source of truth for tool orchestration and auto-correction.
  */
 export const TOOL_GRAPH: Record<string, ToolEdge> = {
   'analyze-repo': {
@@ -54,7 +67,10 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     autofix: {
       analyzed_repo: {
         tool: 'analyze-repo',
-        buildParams: (p) => ({ path: p.path || '.' }),
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId,
+        }),
       },
     },
   },
@@ -65,13 +81,41 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     autofix: {
       analyzed_repo: {
         tool: 'analyze-repo',
-        buildParams: (p) => ({ path: p.path || '.' }),
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId,
+        }),
       },
       resolved_base_images: {
         tool: 'resolve-base-images',
-        buildParams: (p) => ({ path: p.path || '.' }),
+        buildParams: (p) => ({
+          path: p.path || '.',
+          technology: p.technology,
+          language: p.language,
+          framework: p.framework,
+          sessionId: p.sessionId,
+        }),
       },
     },
+    nextSteps: [
+      {
+        tool: 'build-image',
+        description: 'Build Docker image from the generated Dockerfile',
+        buildParams: (p) => ({
+          path: p.path || '.',
+          imageName: p.imageName || p.imageId || 'app:latest',
+          sessionId: p.sessionId,
+        }),
+      },
+      {
+        tool: 'fix-dockerfile',
+        description: 'Optimize or fix issues in the generated Dockerfile',
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   'fix-dockerfile': {
@@ -80,7 +124,10 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     autofix: {
       dockerfile_generated: {
         tool: 'generate-dockerfile',
-        buildParams: (p) => ({ path: p.path || '.' }),
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId,
+        }),
       },
     },
   },
@@ -91,13 +138,47 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     autofix: {
       analyzed_repo: {
         tool: 'analyze-repo',
-        buildParams: (p) => ({ path: p.path || '.' }),
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId,
+        }),
       },
       dockerfile_generated: {
         tool: 'generate-dockerfile',
-        buildParams: (p) => ({ path: p.path || '.' }),
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId,
+        }),
       },
     },
+    nextSteps: [
+      {
+        tool: 'scan-image',
+        description: 'Scan the built image for security vulnerabilities',
+        buildParams: (p) => ({
+          imageId: p.imageId || p.imageName || p.tag,
+          sessionId: p.sessionId,
+        }),
+      },
+      {
+        tool: 'push-image',
+        description: 'Push the built image to a container registry',
+        buildParams: (p) => ({
+          imageId: p.imageId || p.imageName || p.tag,
+          registry: p.registry,
+          sessionId: p.sessionId,
+        }),
+      },
+      {
+        tool: 'deploy',
+        description: 'Deploy the containerized application to Kubernetes',
+        buildParams: (p) => ({
+          imageId: p.imageId || p.imageName || p.tag,
+          namespace: p.namespace || 'default',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   'scan-image': {
@@ -108,7 +189,8 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
         tool: 'build-image',
         buildParams: (p) => ({
           path: p.path || '.',
-          imageId: p.imageId,
+          imageName: p.imageId || p.imageName || 'app:latest',
+          sessionId: p.sessionId,
         }),
       },
     },
@@ -126,7 +208,8 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
         tool: 'build-image',
         buildParams: (p) => ({
           path: p.path || '.',
-          imageId: p.imageId,
+          imageName: p.imageId || p.imageName || 'app:latest',
+          sessionId: p.sessionId,
         }),
       },
     },
@@ -177,7 +260,8 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
         tool: 'build-image',
         buildParams: (p) => ({
           path: p.path || '.',
-          imageId: p.imageId,
+          imageName: p.imageId || p.imageName || 'app:latest',
+          sessionId: p.sessionId,
         }),
       },
       k8s_prepared: {
@@ -198,29 +282,32 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     requires: ['deployed'],
   },
 
-  // Tools without dependencies
-  workflow: {},
   ops: {},
   'inspect-session': {},
   'convert-aca-to-k8s': {},
 };
 
 /**
- * Get tool edge configuration
+ * Retrieves dependency configuration for a tool.
+ * Returns undefined for tools without workflow dependencies.
  */
 export function getToolEdge(toolName: string): ToolEdge | undefined {
   return TOOL_GRAPH[toolName];
 }
 
 /**
- * Check if a step is satisfied in session
+ * Verifies if a workflow step has been completed.
+ *
+ * Precondition: completedSteps must be accurately maintained by session manager
  */
 export function isStepSatisfied(step: Step, completedSteps: Set<Step>): boolean {
   return completedSteps.has(step);
 }
 
 /**
- * Get missing preconditions for a tool
+ * Identifies unsatisfied preconditions blocking tool execution.
+ *
+ * Postcondition: Returns empty array if tool can execute immediately
  */
 export function getMissingPreconditions(toolName: string, completedSteps: Set<Step>): Step[] {
   const edge = getToolEdge(toolName);
@@ -230,7 +317,10 @@ export function getMissingPreconditions(toolName: string, completedSteps: Set<St
 }
 
 /**
- * Determine execution order for missing preconditions
+ * Computes topological ordering of tools to satisfy preconditions.
+ *
+ * Invariant: Throws if circular dependencies detected (max 10 expansion attempts)
+ * Failure Mode: Circular dependency results in explicit error, not infinite loop
  */
 export function getExecutionOrder(
   missingSteps: Step[],
@@ -246,7 +336,6 @@ export function getExecutionOrder(
     let madeProgress = false;
 
     for (const step of toProcess) {
-      // Find a tool that provides this step
       const provider = Object.entries(TOOL_GRAPH).find(([_, edge]) =>
         edge.provides?.includes(step),
       );
@@ -257,7 +346,6 @@ export function getExecutionOrder(
 
       const [toolName, edge] = provider;
 
-      // Check if all requirements are satisfied
       const toolRequirements = edge.requires || [];
       const allSatisfied = toolRequirements.every((req) => processed.has(req));
 
@@ -270,10 +358,9 @@ export function getExecutionOrder(
     }
 
     if (!madeProgress) {
-      // Track expansion attempts to detect circular dependencies
+      // Expansion tracking prevents infinite loops from circular dependencies
       let newDepsAdded = false;
 
-      // Find unsatisfied dependencies
       for (const step of toProcess) {
         const attempts = expansionAttempts.get(step) || 0;
         if (attempts >= maxExpansions) {
@@ -297,7 +384,7 @@ export function getExecutionOrder(
         }
       }
 
-      // If no new dependencies were added and we still can't make progress
+      // Deadlock detection: no progress and no new dependencies = circular reference
       if (!newDepsAdded && toProcess.size > 0) {
         throw new Error(
           `Circular dependency detected for steps: ${Array.from(toProcess).join(', ')}`,

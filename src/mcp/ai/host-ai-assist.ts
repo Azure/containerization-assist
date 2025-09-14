@@ -6,6 +6,12 @@ import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '../../types';
 import { z } from 'zod';
 import type { ToolContext, SamplingRequest } from '../context';
+import { AIPromptBuilder } from './prompt-builder';
+import {
+  SuggestionRegistry,
+  createSuggestionRegistry,
+  type SuggestionGenerator,
+} from './default-suggestions';
 
 /**
  * AI parameter suggestion request
@@ -70,9 +76,10 @@ export interface AIAssistantConfig {
   enabled?: boolean;
   defaultConfidence?: number;
   maxTokens?: number;
+  customSuggestions?: Record<string, SuggestionGenerator>;
 }
 
-const DEFAULT_CONFIG: Required<AIAssistantConfig> = {
+const DEFAULT_CONFIG: Required<Omit<AIAssistantConfig, 'customSuggestions'>> = {
   enabled: true,
   defaultConfidence: 0.8,
   maxTokens: 2048,
@@ -83,11 +90,15 @@ const DEFAULT_CONFIG: Required<AIAssistantConfig> = {
  */
 export class DefaultHostAIAssistant implements HostAIAssistant {
   private logger: Logger;
-  private config: Required<AIAssistantConfig>;
+  private config: Required<Omit<AIAssistantConfig, 'customSuggestions'>>;
+  private suggestionRegistry: SuggestionRegistry;
 
   constructor(logger: Logger, config: AIAssistantConfig = {}) {
     this.logger = logger.child({ component: 'host-ai-assist' });
     this.config = { ...DEFAULT_CONFIG, ...config };
+
+    // Initialize suggestion registry with custom generators if provided
+    this.suggestionRegistry = createSuggestionRegistry(config.customSuggestions, this.logger);
   }
 
   async suggestParameters(
@@ -249,59 +260,18 @@ export class DefaultHostAIAssistant implements HostAIAssistant {
    * Build prompt for AI parameter suggestion
    */
   private buildPrompt(request: AIParamRequest): string {
-    const lines = [
-      `Tool: ${request.toolName}`,
-      `Current parameters: ${JSON.stringify(request.currentParams, null, 2)}`,
-      `Missing parameters: ${request.missingParams.join(', ')}`,
-    ];
-
-    if (request.schema) {
-      lines.push(`Schema: ${JSON.stringify(request.schema, null, 2)}`);
-    }
-
-    if (request.sessionContext) {
-      lines.push(`Context: ${JSON.stringify(request.sessionContext, null, 2)}`);
-    }
-
-    lines.push(
-      '',
-      'Please suggest values for the missing parameters based on the context and common patterns.',
-      'Return ONLY a JSON object with the parameter names as keys and suggested values.',
-      'Example: {"path": ".", "imageId": "myapp:latest"}',
-    );
-
-    return lines.join('\n');
+    return AIPromptBuilder.forParameterSuggestion(request);
   }
 
   /**
    * Generate default suggestions based on context
    */
   private generateDefaultSuggestions(request: AIParamRequest): Record<string, unknown> {
-    const suggestions: Record<string, unknown> = {};
-
-    for (const param of request.missingParams) {
-      // Use existing params as hints
-      if (param === 'path' && !request.currentParams.path) {
-        suggestions.path = '.';
-      } else if (param === 'imageId' && !request.currentParams.imageId) {
-        // Try to derive from other params or use default
-        const appName = request.currentParams.appName || 'app';
-        suggestions.imageId = `${appName}:latest`;
-      } else if (param === 'registry' && !request.currentParams.registry) {
-        // Check if there's a registry in session context
-        const registry = request.sessionContext?.registry;
-        if (registry) {
-          suggestions.registry = registry;
-        }
-      } else if (param === 'namespace' && !request.currentParams.namespace) {
-        suggestions.namespace = 'default';
-      } else if (param === 'replicas' && !request.currentParams.replicas) {
-        suggestions.replicas = 1;
-      }
-      // Add more intelligent defaults based on parameter names
-    }
-
-    return suggestions;
+    return this.suggestionRegistry.generateAll(
+      request.missingParams,
+      request.currentParams,
+      request.sessionContext,
+    );
   }
 }
 

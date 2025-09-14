@@ -325,13 +325,6 @@ export const VALID_TOOL_INPUTS = {
   verify_deployment: {
     session_id: 'test-session-123',
   },
-  start_workflow: {
-    session_id: 'test-session-123',
-    repo_path: '/test/repo',
-  },
-  workflow_status: {
-    session_id: 'test-session-123',
-  },
 };
 
 export const INVALID_TOOL_INPUTS = {
@@ -361,9 +354,10 @@ export function createSessionWithCompletedStep(step: keyof typeof WorkflowStep, 
   workflowState.completed_steps = [...(workflowState.completed_steps || []), WorkflowStep[step]];
 
   // Add appropriate result data based on step
+  workflowState.results = workflowState.results || {};
   switch (step) {
     case 'ANALYZE':
-      workflowState.analysis_result = createMockAnalysisResult();
+      workflowState.results['analyze-repo'] = createMockAnalysisResult();
       break;
     case 'GENERATE_DOCKERFILE':
       workflowState.dockerfile_result = createMockDockerfileResult();
@@ -401,12 +395,14 @@ export function createCompletedWorkflowSession(overrides?: Partial<Session>): Se
     ...session,
     workflow_state: {
       completed_steps: Object.values(WorkflowStep),
-      analysis_result: createMockAnalysisResult(),
-      dockerfile_result: createMockDockerfileResult(),
-      build_result: createMockDockerBuildResult(),
-      scan_result: createMockScanResult(),
-      k8s_result: createMockK8sManifestResult(),
-      deployment_result: createMockDeploymentResult(),
+      results: {
+        'analyze-repo': createMockAnalysisResult(),
+        'generate-dockerfile': createMockDockerfileResult(),
+        'build-image': createMockDockerBuildResult(),
+        'scan': createMockScanResult(),
+        'generate-k8s-manifests': createMockK8sManifestResult(),
+        'deploy': createMockDeploymentResult(),
+      },
       errors: {},
       metadata: {},
     },

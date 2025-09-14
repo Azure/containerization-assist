@@ -215,15 +215,17 @@ spec:
         id: 'test-session-123',
         state: {
           sessionId: 'test-session-123',
-          k8s_result: {
-            manifests: [
-              {
-                kind: 'Multiple',
-                namespace: 'default',
-                content: sampleManifests,
-                file_path: '/test/manifests.yaml',
-              },
-            ],
+          results: {
+            'generate-k8s-manifests': {
+              manifests: [
+                {
+                  kind: 'Multiple',
+                  namespace: 'default',
+                  content: sampleManifests,
+                  file_path: '/test/manifests.yaml',
+                },
+              ],
+            },
           },
           metadata: {},
           completed_steps: [],
@@ -241,15 +243,17 @@ spec:
         state: {
           sessionId: 'test-session-123',
           metadata: {},
-          k8s_result: {
-            manifests: [
-              {
-                kind: 'Multiple',
-                namespace: 'default',
-                content: sampleManifests,
-                file_path: '/test/manifests.yaml',
-              },
-            ],
+          results: {
+            'generate-k8s-manifests': {
+              manifests: [
+                {
+                  kind: 'Multiple',
+                  namespace: 'default',
+                  content: sampleManifests,
+                  file_path: '/test/manifests.yaml',
+                },
+              ],
+            },
           },
           completed_steps: [],
           errors: {},
@@ -272,15 +276,17 @@ spec:
     beforeEach(() => {
       // Session with K8s manifests
       mockSessionManager.get.mockResolvedValue({
-        k8s_result: {
-          manifests: [
-            {
-              kind: 'Multiple',
-              namespace: 'default',
-              content: sampleManifests,
-              file_path: '/test/manifests.yaml',
-            },
-          ],
+        results: {
+          'generate-k8s-manifests': {
+            manifests: [
+              {
+                kind: 'Multiple',
+                namespace: 'default',
+                content: sampleManifests,
+                file_path: '/test/manifests.yaml',
+              },
+            ],
+          },
         },
         repo_path: '/test/repo',
       });
@@ -400,15 +406,17 @@ spec:
     beforeEach(() => {
       // Use the existing sampleManifests which are properly handled by the YAML mock
       mockSessionManager.get.mockResolvedValue({
-        k8s_result: {
-          manifests: [
-            {
-              kind: 'Multiple',
-              namespace: 'default',
-              content: sampleManifests,
-              file_path: '/test/manifests.yaml',
-            },
-          ],
+        results: {
+          'generate-k8s-manifests': {
+            manifests: [
+              {
+                kind: 'Multiple',
+                namespace: 'default',
+                content: sampleManifests,
+                file_path: '/test/manifests.yaml',
+              },
+            ],
+          },
         },
         repo_path: '/test/repo',
       });
@@ -452,15 +460,17 @@ spec:
 
     it('should handle Kubernetes client failures gracefully', async () => {
       mockSessionManager.get.mockResolvedValue({
-        k8s_result: {
-          manifests: [
-            {
-              kind: 'Multiple',
-              namespace: 'default',
-              content: sampleManifests,
-              file_path: '/test/manifests.yaml',
-            },
-          ],
+        results: {
+          'generate-k8s-manifests': {
+            manifests: [
+              {
+                kind: 'Multiple',
+                namespace: 'default',
+                content: sampleManifests,
+                file_path: '/test/manifests.yaml',
+              },
+            ],
+          },
         },
         repo_path: '/test/repo',
       });
@@ -503,15 +513,17 @@ spec:
   describe('Configuration Options', () => {
     beforeEach(() => {
       mockSessionManager.get.mockResolvedValue({
-        k8s_result: {
-          manifests: [
-            {
-              kind: 'Multiple',
-              namespace: 'default',
-              content: sampleManifests,
-              file_path: '/test/manifests.yaml',
-            },
-          ],
+        results: {
+          'generate-k8s-manifests': {
+            manifests: [
+              {
+                kind: 'Multiple',
+                namespace: 'default',
+                content: sampleManifests,
+                file_path: '/test/manifests.yaml',
+              },
+            ],
+          },
         },
         repo_path: '/test/repo',
       });

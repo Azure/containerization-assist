@@ -122,8 +122,10 @@ describe('scanImage', () => {
         value: {
           id: 'test-session-123',
           state: {
-            build_result: {
-              imageId: 'sha256:mock-image-id',
+            results: {
+              'build-image': {
+                imageId: 'sha256:mock-image-id',
+              },
             },
             repo_path: '/test/repo',
           },
@@ -191,8 +193,10 @@ describe('scanImage', () => {
         value: {
           id: 'test-session-123',
           state: {
-            build_result: {
-              imageId: 'sha256:mock-image-id',
+            results: {
+              'build-image': {
+                imageId: 'sha256:mock-image-id',
+              },
             },
             repo_path: '/test/repo',
           },
@@ -304,8 +308,10 @@ describe('scanImage', () => {
         value: {
           id: 'test-session-123',
           state: {
-            build_result: {
-              imageId: 'sha256:mock-image-id',
+            results: {
+              'build-image': {
+                imageId: 'sha256:mock-image-id',
+              },
             },
             repo_path: '/test/repo',
           },
@@ -333,8 +339,10 @@ describe('scanImage', () => {
         value: {
           id: 'test-session-123',
           state: {
-            build_result: {
-              imageId: 'sha256:mock-image-id',
+            results: {
+              'build-image': {
+                imageId: 'sha256:mock-image-id',
+              },
             },
             repo_path: '/test/repo',
           },
@@ -362,8 +370,10 @@ describe('scanImage', () => {
         value: {
           id: 'test-session-123',
           state: {
-            build_result: {
-              imageId: 'sha256:mock-image-id',
+            results: {
+              'build-image': {
+                imageId: 'sha256:mock-image-id',
+              },
             },
             repo_path: '/test/repo',
           },
@@ -413,8 +423,10 @@ describe('scanImage', () => {
         value: {
           id: 'test-session-123',
           state: {
-            build_result: {
-              imageId: 'sha256:mock-image-id',
+            results: {
+              'build-image': {
+                imageId: 'sha256:mock-image-id',
+              },
             },
             repo_path: '/test/repo',
           },

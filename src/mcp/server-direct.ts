@@ -359,20 +359,36 @@ export class DirectMCPServer {
             );
           }
 
+          // Log workflow hint if present
+          if (routeResult.workflowHint) {
+            this.deps.logger.info(
+              { hint: routeResult.workflowHint.message },
+              'Workflow continuation available',
+            );
+          }
+
           const result = routeResult.result;
 
           // Handle Result pattern
           if (result && typeof result === 'object' && 'ok' in result) {
             const typedResult = result;
             if (typedResult.ok) {
-              return {
-                content: [
-                  {
-                    type: 'text' as const,
-                    text: JSON.stringify(typedResult.value, null, 2),
-                  },
-                ],
-              };
+              const content = [
+                {
+                  type: 'text' as const,
+                  text: JSON.stringify(typedResult.value, null, 2),
+                },
+              ];
+
+              // Add workflow hint as separate content block if present
+              if (routeResult.workflowHint) {
+                content.push({
+                  type: 'text' as const,
+                  text: `\n---\n${routeResult.workflowHint.markdown}`,
+                });
+              }
+
+              return { content };
             } else {
               throw new McpError(ErrorCode.InternalError, typedResult.error);
             }
@@ -517,14 +533,12 @@ export class DirectMCPServer {
     tools: number;
     resources: number;
     prompts: number;
-    workflows: number;
   } {
     return {
       running: this.isRunning,
       tools: TOOLS.length,
       resources: 1,
       prompts: this.deps.promptRegistry.getPromptNames().length,
-      workflows: 0,
     };
   }
 
@@ -536,13 +550,5 @@ export class DirectMCPServer {
       name: tool.name,
       description: tool.description,
     }));
-  }
-
-  /**
-   * Get available workflows for CLI listing
-   * @deprecated Workflows are deprecated in favor of intelligent tool routing
-   */
-  getWorkflows(): Array<{ name: string; description: string }> {
-    return [];
   }
 }

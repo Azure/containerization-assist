@@ -616,7 +616,10 @@ async function generateHelmChartsImpl(
     const sessionData = session as unknown as SessionData;
 
     // Get image from session or params
-    const buildResult = sessionData?.build_result || sessionData?.workflow_state?.build_result;
+    const buildResult = (sessionData?.results?.['build-image'] ||
+      sessionData?.workflow_state?.results?.['build-image']) as
+      | { tags?: string[]; imageId?: string }
+      | undefined;
     const imageId = params.imageId || buildResult?.tags?.[0] || `${appName}:latest`;
 
     // Progress: Executing generation
@@ -628,10 +631,8 @@ async function generateHelmChartsImpl(
     // Progress: Writing files
     if (progress) await progress('FINALIZING');
 
-    // Write chart to disk
-    const repoPath =
-      sessionData?.metadata?.repo_path || sessionData?.workflow_state?.metadata?.repo_path || '.';
-    const chartPath = joinPaths(repoPath, 'helm', chartName);
+    // Write chart to disk - use current directory as base
+    const chartPath = joinPaths('.', 'helm', chartName);
     const templatesPath = joinPaths(chartPath, 'templates');
 
     // Create directories
