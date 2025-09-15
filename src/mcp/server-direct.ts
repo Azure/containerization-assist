@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto';
 import { getSystemStatus, type Dependencies } from '@/container';
 import { createMCPToolContext, type ToolContext } from './context';
 import { extractErrorMessage } from '@lib/error-utils';
-import { createToolRouter, type ToolRouter } from './tool-router';
+import { createToolRouter, RouterTool, type ToolRouter } from './tool-router';
 
 // Single unified tool definition structure
 interface ToolDefinition {
@@ -293,7 +293,7 @@ export const registerHandlers = async (state: MCPServerState): Promise<void> => 
  */
 export const initializeRouter = (state: MCPServerState): void => {
   // Create tools map for router
-  const tools = new Map<string, import('./tool-router').RouterTool>();
+  const tools = new Map<string, RouterTool>();
   for (const tool of TOOLS) {
     tools.set(tool.name, {
       name: tool.name,
