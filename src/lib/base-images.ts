@@ -175,6 +175,22 @@ function applyPreference(
 }
 
 /**
+ * Detects the appropriate platform for a given base image
+ *
+ * @param baseImage - The Docker base image name
+ * @returns Platform string (e.g., 'linux/amd64', 'windows/amd64')
+ */
+export function getPlatformForBaseImage(baseImage: string): string {
+  // .NET Framework requires Windows
+  if (baseImage.includes('dotnet/framework')) {
+    return 'windows/amd64';
+  }
+
+  // Everything else supports Linux
+  return 'linux/amd64';
+}
+
+/**
  * Get comprehensive base image recommendations with context-aware selection
  *
  * This function implements a multi-tiered selection strategy:

@@ -19,7 +19,7 @@ import type { SessionAnalysisResult } from '@tools/session-types';
 import type { ToolContext } from '@mcp/context';
 import { Success, Failure, type Result } from '@types';
 import { getDefaultPort, ANALYSIS_CONFIG } from '@config/defaults';
-import { getRecommendedBaseImage } from '@lib/base-images';
+import { getRecommendedBaseImage, getPlatformForBaseImage } from '@lib/base-images';
 import {
   stripFencesAndNoise,
   isValidDockerfileContent,
@@ -227,14 +227,18 @@ function generateTemplateDockerfile(
   moduleRoot?: string,
 ): Result<Pick<SingleDockerfileResult, 'content' | 'baseImage'>> {
   const { language, framework, dependencies = [], ports = [], buildSystem } = analysisResult;
-  const { baseImage, multistage = true, securityHardening = true } = params;
+  const { baseImage, multistage = true, securityHardening = true, platform } = params;
   const effectiveBase = baseImage || getRecommendedBaseImage(language || 'unknown');
+
+  // Use platform detection for base image if platform not explicitly provided
+  const effectivePlatform = platform || getPlatformForBaseImage(effectiveBase);
+
   const mainPort = ports[0] || getDefaultPort(language || framework || 'generic');
   let dockerfile = `# Generated Dockerfile for ${language} ${framework ? `(${framework})` : ''}\n`;
   if (moduleRoot) {
     dockerfile += `# Module root: ${moduleRoot}\n`;
   }
-  dockerfile += `FROM ${effectiveBase}\n\n`;
+  dockerfile += `FROM --platform=${effectivePlatform} ${effectiveBase}\n\n`;
   dockerfile += `# Metadata\n`;
   dockerfile += `LABEL maintainer="generated"\n`;
   dockerfile += `LABEL language="${language || 'unknown'}"\n`;
@@ -622,6 +626,7 @@ function sessionToAnalyzeRepoResult(sessionResult: SessionAnalysisResult): Analy
 function buildArgsFromAnalysis(
   analysisResult: SessionAnalysisResult,
   optimization?: boolean | string,
+  platform?: string,
 ): Record<string, unknown> {
   const {
     language = 'unknown',
@@ -662,6 +667,7 @@ function buildArgsFromAnalysis(
     buildCommand: recommendedBuildCommand,
     buildFile,
     hasWrapper,
+    ...(platform && { platform }),
     ...(optimization && {
       optimization: typeof optimization === 'string' ? optimization : 'performance',
     }),
@@ -940,7 +946,7 @@ async function generateSingleDockerfile(
   let allCandidates: SingleDockerfileResult['allCandidates'];
 
   // Build AI prompt args with module-specific context
-  let promptArgs = buildArgsFromAnalysis(analysisResult, optimization);
+  let promptArgs = buildArgsFromAnalysis(analysisResult, optimization, params.platform);
   promptArgs.moduleRoot = moduleRoot;
   promptArgs.moduleContext = `Generating Dockerfile for module at path: ${moduleRoot}`;
 
