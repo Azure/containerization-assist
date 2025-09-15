@@ -373,6 +373,105 @@ function generateTemplateDockerfile(
 }
 
 /**
+ * Automatically detects module roots by finding directories containing build files.
+ * Supports Java (pom.xml, build.gradle) and Node.js (package.json) projects.
+ */
+async function detectModuleRoots(
+  repoPath: string,
+  language?: string,
+  logger?: Logger,
+): Promise<string[]> {
+  try {
+    const buildFiles =
+      language === 'java'
+        ? ['pom.xml', 'build.gradle', 'build.gradle.kts']
+        : language === 'javascript' || language === 'typescript'
+          ? ['package.json']
+          : ['pom.xml', 'build.gradle', 'build.gradle.kts', 'package.json'];
+
+    logger?.info({ repoPath, language, buildFiles }, 'Detecting module roots');
+
+    const moduleRoots: string[] = [];
+
+    async function scanDirectory(dirPath: string, depth: number = 0): Promise<void> {
+      // Limit depth to avoid infinite recursion and performance issues
+      if (depth > 3) return;
+
+      try {
+        const entries = await fs.readdir(dirPath, { withFileTypes: true });
+
+        // Check if current directory contains build files
+        for (const buildFile of buildFiles) {
+          const buildFilePath = path.join(dirPath, buildFile);
+          try {
+            await fs.access(buildFilePath);
+
+            // For Java projects, ensure this is an actual module, not just a parent pom
+            if (buildFile === 'pom.xml') {
+              const pomContent = await fs.readFile(buildFilePath, 'utf-8');
+              // Check if this is a parent pom by looking for <modules> tag
+              const isParentPom =
+                pomContent.includes('<modules>') && pomContent.includes('<module>');
+              // Check if it has source code (src directory)
+              const srcDir = path.join(dirPath, 'src');
+              const hasSrc = await fs
+                .access(srcDir)
+                .then(() => true)
+                .catch(() => false);
+
+              if (!isParentPom || hasSrc) {
+                const relativePath = path.relative(repoPath, dirPath) || '.';
+                if (!moduleRoots.includes(relativePath)) {
+                  moduleRoots.push(relativePath);
+                  logger?.info({ moduleRoot: relativePath, buildFile }, 'Found module root');
+                }
+              }
+            } else {
+              // For non-Maven build files, add the module
+              const relativePath = path.relative(repoPath, dirPath) || '.';
+              if (!moduleRoots.includes(relativePath)) {
+                moduleRoots.push(relativePath);
+                logger?.info({ moduleRoot: relativePath, buildFile }, 'Found module root');
+              }
+            }
+            break; // Found a build file, no need to check others in this directory
+          } catch {
+            // Build file doesn't exist, continue
+          }
+        }
+
+        // Recursively scan subdirectories, but skip some common directories
+        for (const entry of entries) {
+          if (
+            entry.isDirectory() &&
+            !entry.name.startsWith('.') &&
+            !['node_modules', 'target', 'build', 'dist', 'out'].includes(entry.name)
+          ) {
+            await scanDirectory(path.join(dirPath, entry.name), depth + 1);
+          }
+        }
+      } catch (error) {
+        logger?.debug({ dirPath, error }, 'Error scanning directory');
+      }
+    }
+
+    await scanDirectory(repoPath);
+
+    // If no modules found, return root as default
+    if (moduleRoots.length === 0) {
+      moduleRoots.push('.');
+      logger?.info('No modules detected, using root directory');
+    }
+
+    logger?.info({ moduleRoots, count: moduleRoots.length }, 'Module detection complete');
+    return moduleRoots;
+  } catch (error) {
+    logger?.error({ error, repoPath }, 'Error detecting module roots');
+    return ['.'];
+  }
+}
+
+/**
  * Adapts session analysis format to tool requirements.
  * Provides backward compatibility during result format transition.
  */
@@ -920,11 +1019,6 @@ async function generateDockerfileImpl(
     return Failure('Invalid parameters provided');
   }
 
-  // Validate moduleRoots parameter - use default if not provided
-  const rawModuleRoots =
-    params.moduleRoots && params.moduleRoots.length > 0 ? params.moduleRoots : ['.'];
-  const moduleRoots = rawModuleRoots.map(safeNormalizePath);
-
   // Optional progress reporting for complex operations (AI generation)
   const progress = context.progress ? createStandardProgress(context.progress) : undefined;
   const logger = getToolLogger(context, 'generate-dockerfile');
@@ -979,6 +1073,20 @@ async function generateDockerfileImpl(
         `Repository must be analyzed first. Please run 'analyze-repo' before 'generate-dockerfile'.`,
       );
     }
+
+    // Auto-detect module roots if not provided
+    let rawModuleRoots: string[];
+    if (params.moduleRoots && params.moduleRoots.length > 0) {
+      rawModuleRoots = params.moduleRoots;
+      logger.info({ providedModuleRoots: params.moduleRoots }, 'Using provided module roots');
+    } else {
+      // Auto-detect modules based on repository analysis
+      const repoPath = safeNormalizePath(params.path || '.');
+      rawModuleRoots = await detectModuleRoots(repoPath, analysisResult.language, logger);
+      logger.info({ detectedModuleRoots: rawModuleRoots }, 'Auto-detected module roots');
+    }
+    const moduleRoots = rawModuleRoots.map(safeNormalizePath);
+
     if (progress) await progress('EXECUTING');
 
     // Generate dockerfile for each module root
