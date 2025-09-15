@@ -220,14 +220,7 @@ spec:
           sessionId: 'test-session-123',
           results: {
             'generate-k8s-manifests': {
-              manifests: [
-                {
-                  kind: 'Multiple',
-                  namespace: 'default',
-                  content: sampleManifests,
-                  file_path: '/test/manifests.yaml',
-                },
-              ],
+              manifests: sampleManifests,
             },
           },
           metadata: {},
@@ -248,14 +241,7 @@ spec:
           metadata: {},
           results: {
             'generate-k8s-manifests': {
-              manifests: [
-                {
-                  kind: 'Multiple',
-                  namespace: 'default',
-                  content: sampleManifests,
-                  file_path: '/test/manifests.yaml',
-                },
-              ],
+              manifests: sampleManifests,
             },
           },
           completed_steps: [],
@@ -281,14 +267,7 @@ spec:
       mockSessionManager.get.mockResolvedValue({
         results: {
           'generate-k8s-manifests': {
-            manifests: [
-              {
-                kind: 'Multiple',
-                namespace: 'default',
-                content: sampleManifests,
-                file_path: '/test/manifests.yaml',
-              },
-            ],
+            manifests: sampleManifests,
           },
         },
         repo_path: '/test/repo',
@@ -411,14 +390,7 @@ spec:
       mockSessionManager.get.mockResolvedValue({
         results: {
           'generate-k8s-manifests': {
-            manifests: [
-              {
-                kind: 'Multiple',
-                namespace: 'default',
-                content: sampleManifests,
-                file_path: '/test/manifests.yaml',
-              },
-            ],
+            manifests: sampleManifests,
           },
         },
         repo_path: '/test/repo',
@@ -465,14 +437,7 @@ spec:
       mockSessionManager.get.mockResolvedValue({
         results: {
           'generate-k8s-manifests': {
-            manifests: [
-              {
-                kind: 'Multiple',
-                namespace: 'default',
-                content: sampleManifests,
-                file_path: '/test/manifests.yaml',
-              },
-            ],
+            manifests: sampleManifests,
           },
         },
         repo_path: '/test/repo',
@@ -518,14 +483,7 @@ spec:
       mockSessionManager.get.mockResolvedValue({
         results: {
           'generate-k8s-manifests': {
-            manifests: [
-              {
-                kind: 'Multiple',
-                namespace: 'default',
-                content: sampleManifests,
-                file_path: '/test/manifests.yaml',
-              },
-            ],
+            manifests: sampleManifests,
           },
         },
         repo_path: '/test/repo',
