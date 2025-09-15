@@ -576,7 +576,7 @@ async function deployApplicationImpl(
         lastDeploymentName: deploymentName,
         lastServiceName: serviceName,
         totalDeployments:
-          (sessionData?.completed_steps || []).filter((s) => s === 'deploy').length + 1,
+          (sessionData?.completedSteps || []).filter((s: string) => s === 'deploy').length + 1,
         lastDeploymentReady: ready,
         lastEndpointCount: endpoints.length,
       },

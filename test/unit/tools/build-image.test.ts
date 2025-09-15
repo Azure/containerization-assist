@@ -138,6 +138,7 @@ CMD ["node", "index.js"]`;
       sessionId: 'test-session-123',
       path: '.',
       dockerfile: 'Dockerfile',
+      imageName: 'test-app:latest',
       tags: ['myapp:latest', 'myapp:v1.0'],
       buildArgs: {},
       noCache: false,

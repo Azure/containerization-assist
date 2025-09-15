@@ -454,7 +454,7 @@ async function generateK8sManifestsImpl(
     const sessionData = session as SessionData;
     // Get build result from session for image tag
     const buildResult = (sessionData?.results?.['build-image'] ||
-      sessionData?.workflow_state?.results?.['build-image']) as
+      sessionData?.workflowState?.results?.['build-image']) as
       | { tags?: string[]; imageId?: string }
       | undefined;
     const image = params.imageId || buildResult?.tags?.[0] || `${appName}:latest`;
@@ -485,7 +485,7 @@ async function generateK8sManifestsImpl(
         try {
           // Get analysis from session for language/framework context
           const analysisResult = (sessionData?.results?.['analyze-repo'] ||
-            sessionData?.workflow_state?.results?.['analyze-repo']) as
+            sessionData?.workflowState?.results?.['analyze-repo']) as
             | { language?: string; framework?: string }
             | undefined;
 
@@ -641,7 +641,7 @@ async function generateK8sManifestsImpl(
         lastAppName: appName,
         lastNamespace: namespace,
         totalManifestsGenerated:
-          (sessionData?.completed_steps || []).filter((s) => s === 'k8s').length + 1,
+          (sessionData?.completedSteps || []).filter((s: string) => s === 'k8s').length + 1,
         lastManifestCount: resourceList.length,
         lastValidationScore: validationReport.score,
         lastUsedAI: result.value.aiUsed || false,

@@ -381,7 +381,7 @@ async function generateAcaManifestsImpl(
 
     // Get build result from session for image tag if not provided
     const buildResult = (sessionData?.results?.['build-image'] ||
-      sessionData?.workflow_state?.results?.['build-image']) as
+      sessionData?.workflowState?.results?.['build-image']) as
       | { tags?: string[]; imageId?: string }
       | undefined;
     const imageId = params.imageId || buildResult?.tags?.[0] || `${appName}:latest`;
@@ -417,7 +417,7 @@ async function generateAcaManifestsImpl(
         try {
           // Get analysis from session for language/framework context
           const analysisResult = (sessionData?.results?.['analyze-repo'] ||
-            sessionData?.workflow_state?.results?.['analyze-repo']) as
+            sessionData?.workflowState?.results?.['analyze-repo']) as
             | { language?: string; framework?: string }
             | undefined;
 

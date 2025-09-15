@@ -617,7 +617,7 @@ async function generateHelmChartsImpl(
 
     // Get image from session or params
     const buildResult = (sessionData?.results?.['build-image'] ||
-      sessionData?.workflow_state?.results?.['build-image']) as
+      sessionData?.workflowState?.results?.['build-image']) as
       | { tags?: string[]; imageId?: string }
       | undefined;
     const imageId = params.imageId || buildResult?.tags?.[0] || `${appName}:latest`;

@@ -14,10 +14,10 @@ export interface SessionAnalysisResult {
   framework?: string;
   dependencies?: Array<{ name: string; version?: string }>;
   ports?: number[];
-  build_system?: {
+  buildSystem?: {
     type?: string;
-    build_file?: string;
-    build_command?: string;
+    buildFile?: string;
+    buildCommand?: string;
   };
   summary?: string;
 }
@@ -52,25 +52,25 @@ export interface SessionK8sResult {
     name: string;
     namespace: string;
     content?: string;
-    file_path?: string;
+    filePath?: string;
   }>;
   replicas?: number;
   resources?: unknown;
-  output_path?: string;
+  outputPath?: string;
 }
 
 /**
  * Session metadata
  */
 export interface SessionMetadata {
-  repo_path?: string;
-  dockerfile_baseImage?: string;
-  dockerfile_optimization?: boolean;
-  dockerfile_warnings?: string[];
-  ai_enhancement_used?: boolean;
-  ai_generation_type?: string;
+  repoPath?: string;
+  dockerfileBaseImage?: string;
+  dockerfileOptimization?: boolean;
+  dockerfileWarnings?: string[];
+  aiEnhancementUsed?: boolean;
+  aiGenerationType?: string;
   timestamp?: string;
-  k8s_warnings?: string[];
+  k8sWarnings?: string[];
   [key: string]: unknown;
 }
 
@@ -78,11 +78,11 @@ export interface SessionMetadata {
  * Complete session data structure
  */
 export interface SessionData {
-  workflow_state?: WorkflowState & {
+  workflowState?: WorkflowState & {
     metadata?: SessionMetadata;
   };
   metadata?: SessionMetadata;
-  completed_steps?: string[];
+  completedSteps?: string[];
   currentStep?: string;
   results?: Record<string, unknown>;
   [key: string]: unknown;
@@ -102,9 +102,9 @@ export function getAnalysisResult(
     return session.results['analyze-repo'] as SessionAnalysisResult;
   }
 
-  // Check nested workflow_state
-  if ('workflow_state' in session && session.workflow_state) {
-    const ws = session.workflow_state;
+  // Check nested workflowState
+  if ('workflowState' in session && session.workflowState) {
+    const ws = session.workflowState;
     if (typeof ws === 'object' && ws !== null && 'results' in ws) {
       const results = (ws as WorkflowState).results;
       if (results?.['analyze-repo']) {
@@ -124,9 +124,9 @@ export function getBaseImages(session: WorkflowState | SessionData | undefined |
     return session.results['resolve-base-images'];
   }
 
-  // Check nested workflow_state
-  if ('workflow_state' in session && session.workflow_state) {
-    const ws = session.workflow_state;
+  // Check nested workflowState
+  if ('workflowState' in session && session.workflowState) {
+    const ws = session.workflowState;
     if (typeof ws === 'object' && ws !== null && 'results' in ws) {
       const results = (ws as WorkflowState).results;
       if (results?.['resolve-base-images']) {

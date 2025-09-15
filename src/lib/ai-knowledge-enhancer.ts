@@ -73,6 +73,12 @@ export async function enhancePromptWithKnowledge(
       // Extract relevant text based on category
       if (category === 'dockerfile' && context.dockerfileContent) {
         text = context.dockerfileContent;
+      } else if (category === 'dockerfile' && context.operation === 'generate_dockerfile') {
+        // For generation, use language and framework as matching context for knowledge patterns
+        const contextParts = [];
+        if (context.language) contextParts.push(context.language);
+        if (context.framework) contextParts.push(context.framework);
+        text = contextParts.join(' ');
       } else if (category === 'kubernetes' && context.k8sContent) {
         text = context.k8sContent;
       } else if (context.baseImage) {

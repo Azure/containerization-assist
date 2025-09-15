@@ -178,9 +178,11 @@ export const loadKnowledgeBase = async (): Promise<void> => {
         const possiblePaths = [
           resolvePath(process.cwd(), 'src/knowledge/data', packFile),
           resolvePath(process.cwd(), 'dist/src/knowledge/data', packFile),
-          resolvePath(__dirname, 'data', packFile),
-          resolvePath(__dirname, '../../src/knowledge/data', packFile),
-          resolvePath(__dirname, '../../../src/knowledge/data', packFile),
+          resolvePath(
+            process.cwd(),
+            'node_modules/@thgamble/containerization-assist-mcp/dist/src/knowledge/data',
+            packFile,
+          ),
         ] as const;
 
         const dataPath = findExistingPath(possiblePaths);

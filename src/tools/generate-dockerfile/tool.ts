@@ -128,7 +128,7 @@ const StateSchema = z.object({
 interface SingleDockerfileResult {
   /** Generated Dockerfile content */
   content: string;
-  /** Path where Dockerfile was written */
+  /** Repository path (build context) */
   path: string;
   /** Module root path this dockerfile corresponds to */
   moduleRoot: string;
@@ -171,7 +171,7 @@ interface SingleDockerfileResult {
 export interface GenerateDockerfileResult {
   /** Generated Dockerfile content (for single module compatibility) */
   content?: string;
-  /** Path where Dockerfile was written (for single module compatibility) */
+  /** Repository path (build context) (for single module compatibility) */
   path?: string;
   /** Base image used (for single module compatibility) */
   baseImage?: string;
@@ -392,11 +392,11 @@ function sessionToAnalyzeRepoResult(sessionResult: SessionAnalysisResult): Analy
         return dep;
       }) || [],
     ports: sessionResult.ports || [],
-    ...(sessionResult.build_system && {
+    ...(sessionResult.buildSystem && {
       buildSystem: {
-        type: sessionResult.build_system.type || 'unknown',
-        file: sessionResult.build_system.build_file || '',
-        buildCommand: sessionResult.build_system.build_command || '',
+        type: sessionResult.buildSystem.type || 'unknown',
+        file: sessionResult.buildSystem.buildFile || '',
+        buildCommand: sessionResult.buildSystem.buildCommand || '',
       },
     }),
     hasDockerfile: false, // These won't be used in template generation
@@ -427,28 +427,28 @@ function buildArgsFromAnalysis(
     framework = '',
     dependencies = [],
     ports = [],
-    build_system,
+    buildSystem,
     summary = '',
   } = analysisResult;
   // Infer package manager from build system
   const packageManager =
-    build_system?.type === 'maven' || build_system?.type === 'gradle'
-      ? build_system.type
+    buildSystem?.type === 'maven' || buildSystem?.type === 'gradle'
+      ? buildSystem.type
       : language === 'javascript' || language === 'typescript'
         ? 'npm'
         : 'unknown';
   // Get build file information
-  const buildFile = build_system?.build_file || '';
+  const buildFile = buildSystem?.buildFile || '';
   const hasWrapper =
-    buildFile.includes('mvnw') || build_system?.build_command?.includes('mvnw') || false;
+    buildFile.includes('mvnw') || buildSystem?.buildCommand?.includes('mvnw') || false;
   // Determine appropriate build command
   let recommendedBuildCommand = '';
-  if (build_system?.type === 'maven') {
+  if (buildSystem?.type === 'maven') {
     recommendedBuildCommand = hasWrapper ? './mvnw' : 'mvn';
-  } else if (build_system?.type === 'gradle') {
+  } else if (buildSystem?.type === 'gradle') {
     recommendedBuildCommand = hasWrapper ? './gradlew' : 'gradle';
-  } else if (build_system?.build_command) {
-    recommendedBuildCommand = build_system.build_command;
+  } else if (buildSystem?.buildCommand) {
+    recommendedBuildCommand = buildSystem.buildCommand;
   }
   return {
     language,
@@ -457,7 +457,7 @@ function buildArgsFromAnalysis(
     ports: ports?.join(', ') || '',
     summary: summary || `${language} ${framework ? `${framework} ` : ''}application`,
     packageManager,
-    buildSystem: build_system?.type || 'none',
+    buildSystem: buildSystem?.type || 'none',
     buildCommand: recommendedBuildCommand,
     buildFile,
     hasWrapper,
@@ -506,6 +506,20 @@ async function generateSingleDockerfile(
   let promptArgs = buildArgsFromAnalysis(analysisResult, optimization);
   promptArgs.moduleRoot = moduleRoot;
   promptArgs.moduleContext = `Generating Dockerfile for module at path: ${moduleRoot}`;
+
+  // Log what we're sending to the AI
+  logger.info(
+    {
+      language: promptArgs.language,
+      framework: promptArgs.framework,
+      buildSystem: promptArgs.buildSystem,
+      buildFile: promptArgs.buildFile,
+      buildCommand: promptArgs.buildCommand,
+      packageManager: promptArgs.packageManager,
+      hasWrapper: promptArgs.hasWrapper,
+    },
+    'Prompt arguments being sent to AI',
+  );
 
   // Enhance prompt with knowledge context
   try {
@@ -658,7 +672,7 @@ async function generateSingleDockerfile(
 
   const result: SingleDockerfileResult = {
     content: dockerfileContent,
-    path: dockerfilePath,
+    path: path.resolve(repoPath), // Repository path (build context)
     moduleRoot,
     baseImage: baseImageUsed,
     optimization,
@@ -730,7 +744,25 @@ async function generateDockerfileImpl(
     // Record input in session slice
     await slice.patch(sessionId, { input: params });
     // Get analysis result from session results
-    const analysisResult = session.results?.['analyze-repo'] as SessionAnalysisResult | undefined;
+    const rawAnalysisResult = session.results?.['analyze-repo'] as any;
+
+    // Map the analyze-repo result to SessionAnalysisResult format
+    const analysisResult: SessionAnalysisResult | undefined = rawAnalysisResult
+      ? {
+          language: rawAnalysisResult.language,
+          framework: rawAnalysisResult.framework,
+          dependencies: rawAnalysisResult.dependencies,
+          ports: rawAnalysisResult.ports,
+          ...(rawAnalysisResult.buildSystem && {
+            buildSystem: {
+              type: rawAnalysisResult.buildSystem.type,
+              buildFile: rawAnalysisResult.buildSystem.file,
+              buildCommand: rawAnalysisResult.buildSystem.buildCommand,
+            },
+          }),
+          summary: rawAnalysisResult.summary,
+        }
+      : undefined;
     if (!analysisResult) {
       return Failure(
         `Repository must be analyzed first. Please run 'analyze-repo' before 'generate-dockerfile'.`,

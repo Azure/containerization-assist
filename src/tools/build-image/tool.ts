@@ -156,7 +156,7 @@ async function buildImageImpl(
       path: rawBuildPath = '.',
       dockerfile = 'Dockerfile',
       dockerfilePath: rawDockerfilePath,
-      imageName,
+      imageName = 'app:latest',
       tags = [],
       buildArgs = {},
       platform: _platform,

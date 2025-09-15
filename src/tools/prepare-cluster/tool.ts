@@ -571,8 +571,9 @@ async function prepareClusterImpl(
         lastClusterName: cluster,
         lastNamespace: namespace,
         totalPreparations:
-          (sessionData?.completed_steps || []).filter((s) => s === TOOL_NAMES.PREPARE_CLUSTER)
-            .length + 1,
+          (sessionData?.completedSteps || []).filter(
+            (s: string) => s === TOOL_NAMES.PREPARE_CLUSTER,
+          ).length + 1,
         lastClusterReady: clusterReady,
         lastChecksPassed: Object.values(checks).filter(Boolean).length,
         lastWarningCount: warnings.length,

@@ -119,7 +119,8 @@ export class ToolRouter {
   ): Record<string, unknown> {
     const normalized: Record<string, unknown> = {
       ...params,
-      path: params.path || '.', // Only check 'path', default to '.'
+      // Handle path parameter aliasing - repoPath and context should map to path
+      path: params.path || params.repoPath || params.context || '.',
     };
 
     // Merge session context if available
