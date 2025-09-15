@@ -633,9 +633,19 @@ async function generateWithDirectAnalysis(
       // Success - extract info from generated content
       const baseImageUsed = extractBaseImage(cleaned) || params.baseImage || 'node:18-alpine'; // fallback
 
-      const dockerfilePath = path.isAbsolute(normalizedModuleRoot)
-        ? path.join(normalizedModuleRoot, 'Dockerfile')
-        : path.resolve(path.join(repoPath, normalizedModuleRoot, 'Dockerfile'));
+      // Handle moduleRoot path resolution correctly
+      let targetPath: string;
+      if (path.isAbsolute(normalizedModuleRoot)) {
+        // Absolute path - use as-is
+        targetPath = normalizedModuleRoot;
+      } else if (normalizedModuleRoot.startsWith(repoPath)) {
+        // moduleRoot already includes repoPath - use as-is to avoid duplication
+        targetPath = normalizedModuleRoot;
+      } else {
+        // Relative path - join with repoPath
+        targetPath = path.resolve(path.join(repoPath, normalizedModuleRoot));
+      }
+      const dockerfilePath = path.join(targetPath, 'Dockerfile');
 
       await fs.writeFile(dockerfilePath, cleaned, 'utf-8');
 
@@ -701,9 +711,18 @@ async function generateWithDirectAnalysis(
   }
 
   // Handle template fallback similar to existing logic
-  const dockerfilePath = path.isAbsolute(normalizedModuleRoot)
-    ? path.join(normalizedModuleRoot, 'Dockerfile')
-    : path.resolve(path.join(repoPath, normalizedModuleRoot, 'Dockerfile'));
+  let targetPath: string;
+  if (path.isAbsolute(normalizedModuleRoot)) {
+    // Absolute path - use as-is
+    targetPath = normalizedModuleRoot;
+  } else if (normalizedModuleRoot.startsWith(repoPath)) {
+    // moduleRoot already includes repoPath - use as-is to avoid duplication
+    targetPath = normalizedModuleRoot;
+  } else {
+    // Relative path - join with repoPath
+    targetPath = path.resolve(path.join(repoPath, normalizedModuleRoot));
+  }
+  const dockerfilePath = path.join(targetPath, 'Dockerfile');
 
   await fs.writeFile(dockerfilePath, fallbackResult.value.content, 'utf-8');
 
@@ -957,10 +976,19 @@ async function generateSingleDockerfile(
   const repoPath = safeNormalizePath(rawPath);
   const normalizedModuleRoot = safeNormalizePath(moduleRoot);
 
-  // Check if moduleRoot is already an absolute path
-  const dockerfilePath = path.isAbsolute(normalizedModuleRoot)
-    ? path.join(normalizedModuleRoot, 'Dockerfile')
-    : path.resolve(path.join(repoPath, normalizedModuleRoot, 'Dockerfile'));
+  // Handle moduleRoot path resolution correctly
+  let targetPath: string;
+  if (path.isAbsolute(normalizedModuleRoot)) {
+    // Absolute path - use as-is
+    targetPath = normalizedModuleRoot;
+  } else if (normalizedModuleRoot.startsWith(repoPath)) {
+    // moduleRoot already includes repoPath - use as-is to avoid duplication
+    targetPath = normalizedModuleRoot;
+  } else {
+    // Relative path - join with repoPath
+    targetPath = path.resolve(path.join(repoPath, normalizedModuleRoot));
+  }
+  const dockerfilePath = path.join(targetPath, 'Dockerfile');
 
   // Write Dockerfile to disk
   await fs.writeFile(dockerfilePath, dockerfileContent, 'utf-8');
@@ -1047,7 +1075,7 @@ async function generateDockerfileImpl(
     // Record input in session slice
     await slice.patch(sessionId, { input: params });
     // Get analysis result from session results
-    const rawAnalysisResult = session.results?.['analyze-repo'] as any;
+    const rawAnalysisResult = session.results?.['analyze_repo'] as any;
 
     // Map the analyze-repo result to SessionAnalysisResult format
     const analysisResult: SessionAnalysisResult | undefined = rawAnalysisResult

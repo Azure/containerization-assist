@@ -89,7 +89,7 @@ function prepareBuildArgs(
   };
 
   // Add session-specific args if available
-  const analysisResult = session?.results?.['analyze-repo'] as any;
+  const analysisResult = session?.results?.['analyze_repo'] as any;
   if (analysisResult) {
     if (analysisResult.language) {
       defaults.LANGUAGE = analysisResult.language;

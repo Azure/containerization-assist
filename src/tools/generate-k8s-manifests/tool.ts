@@ -484,8 +484,8 @@ async function generateK8sManifestsImpl(
         let promptArgs = buildK8sManifestPromptArgs(params, image);
         try {
           // Get analysis from session for language/framework context
-          const analysisResult = (sessionData?.results?.['analyze-repo'] ||
-            sessionData?.workflowState?.results?.['analyze-repo']) as
+          const analysisResult = (sessionData?.results?.['analyze_repo'] ||
+            sessionData?.workflowState?.results?.['analyze_repo']) as
             | { language?: string; framework?: string }
             | undefined;
 

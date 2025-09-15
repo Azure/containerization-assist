@@ -88,7 +88,7 @@ export interface ToolRouterState {
 /**
  * Tool router interface for dependency injection compatibility
  */
-export interface IToolRouter {
+export interface ToolRouter {
   route(request: RouteRequest): Promise<RouteResult>;
   getToolDependencies(toolName: string): { requires: Step[]; provides: Step[] };
   canExecute(
@@ -104,7 +104,7 @@ export interface IToolRouter {
  * Invariant: Only uses session.results pattern - no legacy field fallbacks for clean architecture
  */
 export const extractSessionContext = (session: WorkflowState): Record<string, unknown> => {
-  const analysis = (session.results?.['analyze-repo'] as Record<string, unknown>) || {};
+  const analysis = (session.results?.['analyze_repo'] as Record<string, unknown>) || {};
   return {
     technology: analysis.technology,
     language: analysis.language,
@@ -752,7 +752,7 @@ export const getExecutionPlan = (
  *
  * Design pattern: Factory function enables testability and configuration flexibility
  */
-export const createToolRouter = (config: RouterConfig): IToolRouter => {
+export const createToolRouter = (config: RouterConfig): ToolRouter => {
   const state: ToolRouterState = {
     sessionManager: config.sessionManager,
     logger: config.logger.child({ component: 'tool-router' }),

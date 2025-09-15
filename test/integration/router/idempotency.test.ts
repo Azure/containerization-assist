@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import pino from 'pino';
-import { createToolRouter, type IToolRouter } from '@mcp/tool-router';
+import { createToolRouter, type ToolRouter } from '@mcp/tool-router';
 import type { Step } from '@mcp/tool-graph';
 import {
   createMockToolsMap,
@@ -15,7 +15,7 @@ import { MockSessionManager } from './fixtures/mock-session';
 import { createMockContext } from './fixtures/mock-context';
 
 describe('Idempotency Behavior', () => {
-  let router: IToolRouter;
+  let router: ToolRouter;
   let sessionManager: MockSessionManager;
   let logger: pino.Logger;
   let mockContext: any;

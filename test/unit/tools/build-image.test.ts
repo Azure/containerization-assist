@@ -137,7 +137,7 @@ CMD ["node", "index.js"]`;
         state: {
           workflow_state: {},
           results: {
-            'analyze-repo': {
+            'analyze_repo': {
               language: 'javascript',
               framework: 'express',
             },
@@ -180,7 +180,7 @@ CMD ["node", "index.js"]`;
           state: {
             workflow_state: {},
             results: {
-              'analyze-repo': {
+              'analyze_repo': {
                 language: 'javascript',
                 framework: 'express',
               },
@@ -289,7 +289,7 @@ CMD ["node", "index.js"]`;
       mockSessionManager.get.mockResolvedValue({
         workflow_state: {},
         results: {
-          'analyze-repo': { language: 'javascript' },
+          'analyze_repo': { language: 'javascript' },
           'generate-dockerfile': {
             path: '/test/repo/Dockerfile',
             content: mockDockerfile,
@@ -318,7 +318,7 @@ CMD ["node", "index.js"]`;
       mockSessionManager.get.mockResolvedValue({
         workflow_state: {},
         results: {
-          'analyze-repo': { language: 'javascript' },
+          'analyze_repo': { language: 'javascript' },
           'generate-dockerfile': {
             content: mockDockerfile,
           },
@@ -351,7 +351,7 @@ CMD ["node", "index.js"]`;
       mockSessionManager.get.mockResolvedValue({
         workflow_state: {},
         results: {
-          'analyze-repo': { language: 'javascript' },
+          'analyze_repo': { language: 'javascript' },
           'generate-dockerfile': {
             path: '/test/repo/Dockerfile',
             content: mockDockerfile,
@@ -386,7 +386,7 @@ USER appuser`;
       mockSessionManager.get.mockResolvedValue({
         workflow_state: {},
         results: {
-          'analyze-repo': { language: 'javascript' },
+          'analyze_repo': { language: 'javascript' },
           'generate-dockerfile': {
             path: '/test/repo/Dockerfile',
             content: dockerfileWithSudo,
@@ -415,7 +415,7 @@ USER appuser`;
       mockSessionManager.get.mockResolvedValue({
         workflow_state: {},
         results: {
-          'analyze-repo': { language: 'javascript' },
+          'analyze_repo': { language: 'javascript' },
           'generate-dockerfile': {
             path: '/test/repo/Dockerfile',
             content: dockerfileWithLatest,
@@ -445,7 +445,7 @@ CMD ["node", "index.js"]`;
       mockSessionManager.get.mockResolvedValue({
         workflow_state: {},
         results: {
-          'analyze-repo': { language: 'javascript' },
+          'analyze_repo': { language: 'javascript' },
           'generate-dockerfile': {
             path: '/test/repo/Dockerfile',
             content: dockerfileWithoutUser,
@@ -476,7 +476,7 @@ CMD ["node", "index.js"]`;
       mockSessionManager.get.mockResolvedValue({
         workflow_state: {},
         results: {
-          'analyze-repo': { language: 'javascript' },
+          'analyze_repo': { language: 'javascript' },
           'generate-dockerfile': {
             path: '/test/repo/Dockerfile',
             content: dockerfileWithRootUser,
@@ -579,7 +579,7 @@ CMD ["node", "index.js"]`;
       mockSessionManager.get.mockResolvedValue({
         workflow_state: {},
         results: {
-          'analyze-repo': { language: 'javascript' },
+          'analyze_repo': { language: 'javascript' },
           'generate-dockerfile': {
             path: '/test/repo/Dockerfile',
             content: mockDockerfile,
@@ -677,7 +677,7 @@ CMD ["node", "index.js"]`;
           state: {
             workflow_state: {},
             results: {
-              'analyze-repo': {
+              'analyze_repo': {
                 language: 'python',
                 framework: 'flask',
               },
@@ -803,7 +803,7 @@ CMD ["node", "index.js"]`;
       mockSessionManager.get.mockResolvedValue({
         workflow_state: {},
         results: {
-          'analyze-repo': { language: 'javascript' },
+          'analyze_repo': { language: 'javascript' },
           'generate-dockerfile': {
             path: '/test/repo/Dockerfile',
             content: mockDockerfile,
@@ -834,7 +834,7 @@ CMD ["node", "index.js"]`;
       mockSessionManager.get.mockResolvedValue({
         workflow_state: {},
         results: {
-          'analyze-repo': { language: 'javascript' },
+          'analyze_repo': { language: 'javascript' },
           'generate-dockerfile': {
             path: '/test/repo/Dockerfile',
             content: mockDockerfile,

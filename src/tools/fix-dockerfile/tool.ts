@@ -388,7 +388,7 @@ async function fixDockerfileImpl(
       ?.build_result;
     const buildError = error ?? buildResult?.error;
     // Get analysis context
-    const analysisResult = session?.results?.['analyze-repo'] as
+    const analysisResult = session?.results?.['analyze_repo'] as
       | { language?: string; framework?: string }
       | undefined;
     const language = analysisResult?.language;

@@ -9,7 +9,7 @@ import type { Logger } from 'pino';
 import { createSessionManager, type SessionManager } from '../lib/session.js';
 import { createLogger } from '../lib/logger.js';
 import { createToolContext, type ToolContext } from '../mcp/context.js';
-import { createToolRouter, type IToolRouter, type RouterTool } from '../mcp/tool-router.js';
+import { createToolRouter, type ToolRouter, type RouterTool } from '../mcp/tool-router.js';
 import { getAllInternalTools } from './tools.js';
 import { extractErrorMessage } from '../lib/error-utils.js';
 import type { Tool, Result } from '../types.js';
@@ -43,6 +43,28 @@ export interface ContainerAssist {
  * MCP Server union type for compatibility
  */
 type McpServerLike = McpServer;
+
+/**
+ * Generate a session ID based on tool parameters, using path-specific IDs when applicable
+ */
+function getSessionIdForParams(params: Record<string, unknown>, defaultSessionId: string): string {
+  // If user explicitly provided a sessionId, use it
+  if (typeof params.sessionId === 'string') {
+    return params.sessionId;
+  }
+
+  // For tools that work on specific paths, create path-based session IDs
+  if (typeof params.path === 'string') {
+    const pathHash = Buffer.from(params.path)
+      .toString('base64')
+      .replace(/[/+=]/g, '')
+      .substring(0, 8);
+    return `${defaultSessionId}-path-${pathHash}`;
+  }
+
+  // For other tools, use the default instance session ID
+  return defaultSessionId;
+}
 
 /**
  * Create a Container Assist instance with idiomatic TypeScript patterns
@@ -102,7 +124,7 @@ function createRouter(
   sessionManager: SessionManager,
   logger: Logger,
   tools: Map<string, Tool>,
-): IToolRouter {
+): ToolRouter {
   const routerTools = new Map<string, RouterTool>();
 
   for (const [name, tool] of tools.entries()) {
@@ -133,7 +155,7 @@ function createRouter(
 function bindAllTools(
   server: McpServerLike,
   tools: Map<string, Tool>,
-  router: IToolRouter,
+  router: ToolRouter,
   logger: Logger,
   sessionManager: SessionManager,
   defaultSessionId: string,
@@ -147,7 +169,7 @@ function bindAllTools(
 function registerSelectedTools(
   server: McpServerLike,
   tools: Map<string, Tool>,
-  router: IToolRouter,
+  router: ToolRouter,
   config: ToolConfig = {},
   logger: Logger,
   sessionManager: SessionManager,
@@ -171,7 +193,7 @@ function registerSingleTool(
   server: McpServerLike,
   tool: Tool,
   name: string,
-  router: IToolRouter,
+  router: ToolRouter,
   logger: Logger,
   sessionManager: SessionManager,
   defaultSessionId: string,
@@ -202,10 +224,9 @@ function registerSingleTool(
           },
         });
 
-        // Extract session info from params - use default session to maintain state
+        // Extract session info from params - use path-based session for path-specific tools
         const paramsObj = (args || {}) as Record<string, unknown>;
-        const sessionId =
-          typeof paramsObj.sessionId === 'string' ? paramsObj.sessionId : defaultSessionId;
+        const sessionId = getSessionIdForParams(paramsObj, defaultSessionId);
 
         // Use router for execution with dependency resolution
         const routeResult = await router.route({

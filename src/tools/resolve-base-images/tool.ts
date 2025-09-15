@@ -278,7 +278,7 @@ async function resolveBaseImagesImpl(
     await slice.patch(sessionId, { input: params });
 
     // Get analysis result from session or use provided technology
-    const analysisResult = session?.results?.['analyze-repo'] as
+    const analysisResult = session?.results?.['analyze_repo'] as
       | { language?: string; framework?: string }
       | undefined;
 

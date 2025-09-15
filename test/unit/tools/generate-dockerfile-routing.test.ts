@@ -114,7 +114,7 @@ describe('generate-dockerfile smart routing', () => {
         id: 'test-session',
         state: {
           results: {
-            'analyze-repo': {
+            'analyze_repo': {
               language: 'javascript',
               framework: 'express',
               confidence: 85, // High confidence
@@ -170,7 +170,7 @@ describe('generate-dockerfile smart routing', () => {
         id: 'test-session',
         state: {
           results: {
-            'analyze-repo': {
+            'analyze_repo': {
               language: 'python',
               confidence: 30, // Low confidence - below threshold
               detectionMethod: 'extension',
@@ -224,7 +224,7 @@ describe('generate-dockerfile smart routing', () => {
         id: 'test-session',
         state: {
           results: {
-            'analyze-repo': {
+            'analyze_repo': {
               language: 'unknown',
               confidence: 0,
               detectionMethod: 'fallback',
@@ -279,7 +279,7 @@ describe('generate-dockerfile smart routing', () => {
         id: 'test-session',
         state: {
           results: {
-            'analyze-repo': {
+            'analyze_repo': {
               language: 'go',
               confidence: ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD, // Exactly at threshold
               detectionMethod: 'signature',
@@ -333,7 +333,7 @@ describe('generate-dockerfile smart routing', () => {
         id: 'test-session',
         state: {
           results: {
-            'analyze-repo': {
+            'analyze_repo': {
               language: 'unknown',
               confidence: 0,
               detectionMethod: 'fallback',

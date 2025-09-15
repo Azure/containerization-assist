@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { createToolRouter, type IToolRouter } from '../../../src/mcp/tool-router';
+import { createToolRouter, type ToolRouter } from '../../../src/mcp/tool-router';
 import { createSessionManager } from '../../../src/lib/session';
 import { createLogger } from '../../../src/lib/logger';
 import { Success, Failure } from '../../../src/types';
@@ -12,7 +12,7 @@ import { createHostAIAssistant, type HostAIAssistant } from '../../../src/mcp/ai
 import { z } from 'zod';
 
 describe('AI Parameter Suggestion', () => {
-  let router: IToolRouter;
+  let router: ToolRouter;
   let mockTools: Map<string, any>;
   let sessionManager: ReturnType<typeof createSessionManager>;
   let logger: any;

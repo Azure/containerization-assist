@@ -106,8 +106,8 @@ export function getAnalysisResult(
   if (!session) return undefined;
 
   // Check results object (standard pattern)
-  if ('results' in session && session.results?.['analyze-repo']) {
-    return session.results['analyze-repo'] as SessionAnalysisResult;
+  if ('results' in session && session.results?.['analyze_repo']) {
+    return session.results['analyze_repo'] as SessionAnalysisResult;
   }
 
   // Check nested workflowState
@@ -115,8 +115,8 @@ export function getAnalysisResult(
     const ws = session.workflowState;
     if (typeof ws === 'object' && ws !== null && 'results' in ws) {
       const results = (ws as WorkflowState).results;
-      if (results?.['analyze-repo']) {
-        return results['analyze-repo'] as SessionAnalysisResult;
+      if (results?.['analyze_repo']) {
+        return results['analyze_repo'] as SessionAnalysisResult;
       }
     }
   }

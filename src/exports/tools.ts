@@ -82,12 +82,12 @@ export const TOOLS = {
   ANALYZE_REPO: 'analyze_repo',
   GENERATE_DOCKERFILE: 'generate_dockerfile',
   BUILD_IMAGE: 'build_image',
-  SCAN_IMAGE: 'scan_image',
+  SCAN: 'scan',
   TAG_IMAGE: 'tag_image',
   PUSH_IMAGE: 'push_image',
   GENERATE_K8S_MANIFESTS: 'generate_k8s_manifests',
   PREPARE_CLUSTER: 'prepare_cluster',
-  DEPLOY_APPLICATION: 'deploy_application',
+  DEPLOY: 'deploy',
   VERIFY_DEPLOYMENT: 'verify_deployment',
   FIX_DOCKERFILE: 'fix_dockerfile',
   RESOLVE_BASE_IMAGES: 'resolve_base_images',
@@ -149,7 +149,7 @@ const buildImageTool = createToolWrapper(
 );
 
 const scanImageTool = createToolWrapper(
-  TOOLS.SCAN_IMAGE,
+  TOOLS.SCAN,
   'Scan a Docker image for vulnerabilities',
   scanImageSchema,
   scanImage as (params: unknown, context: unknown) => Promise<Result<unknown>>,
@@ -184,7 +184,7 @@ const prepareClusterTool = createToolWrapper(
 );
 
 const deployApplicationTool = createToolWrapper(
-  TOOLS.DEPLOY_APPLICATION,
+  TOOLS.DEPLOY,
   'Deploy application to Kubernetes',
   deployApplicationSchema,
   deployApplication as (params: unknown, context: unknown) => Promise<Result<unknown>>,

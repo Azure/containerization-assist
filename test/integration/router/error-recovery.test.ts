@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import pino from 'pino';
-import { createToolRouter, type IToolRouter } from '@mcp/tool-router';
+import { createToolRouter, type ToolRouter } from '@mcp/tool-router';
 import type { Step } from '@mcp/tool-graph';
 import { Failure, Success, type Result } from '@types';
 import { MockSessionManager } from './fixtures/mock-session';
@@ -16,7 +16,7 @@ import {
 } from './fixtures/mock-tools';
 
 describe('Error Recovery and Rerouting', () => {
-  let router: IToolRouter;
+  let router: ToolRouter;
   let sessionManager: MockSessionManager;
   let logger: pino.Logger;
   let mockContext: any;

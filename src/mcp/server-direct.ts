@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto';
 import { getSystemStatus, type Dependencies } from '../container';
 import { createMCPToolContext, type ToolContext } from './context';
 import { extractErrorMessage } from '../lib/error-utils';
-import { createToolRouter, type IToolRouter } from './tool-router';
+import { createToolRouter, type ToolRouter } from './tool-router';
 
 // Single unified tool definition structure
 interface ToolDefinition {
@@ -63,7 +63,7 @@ import { InspectSessionParamsSchema as inspectSessionSchema } from '../tools/ins
 // Unified tool definitions
 const TOOLS: ToolDefinition[] = [
   {
-    name: 'analyze-repo',
+    name: 'analyze_repo',
     description: 'Analyze repository structure',
     schema: analyzeRepoSchema,
     handler: analyzeRepo as (
@@ -72,7 +72,7 @@ const TOOLS: ToolDefinition[] = [
     ) => Promise<Result<unknown>>,
   },
   {
-    name: 'generate-dockerfile',
+    name: 'generate_dockerfile',
     description: 'Generate optimized Dockerfile',
     schema: generateDockerfileSchema,
     handler: generateDockerfile as (
@@ -81,7 +81,7 @@ const TOOLS: ToolDefinition[] = [
     ) => Promise<Result<unknown>>,
   },
   {
-    name: 'build-image',
+    name: 'build_image',
     description: 'Build Docker image',
     schema: buildImageSchema,
     handler: buildImage as (
@@ -90,7 +90,7 @@ const TOOLS: ToolDefinition[] = [
     ) => Promise<Result<unknown>>,
   },
   {
-    name: 'scan-image',
+    name: 'scan',
     description: 'Scan image for vulnerabilities',
     schema: scanImageSchema,
     handler: scanImage as (
@@ -108,7 +108,7 @@ const TOOLS: ToolDefinition[] = [
     ) => Promise<Result<unknown>>,
   },
   {
-    name: 'push-image',
+    name: 'push_image',
     description: 'Push image to registry',
     schema: pushImageSchema,
     handler: pushImage as (
@@ -117,7 +117,7 @@ const TOOLS: ToolDefinition[] = [
     ) => Promise<Result<unknown>>,
   },
   {
-    name: 'tag-image',
+    name: 'tag_image',
     description: 'Tag Docker image',
     schema: tagImageSchema,
     handler: tagImage as (
@@ -126,7 +126,7 @@ const TOOLS: ToolDefinition[] = [
     ) => Promise<Result<unknown>>,
   },
   {
-    name: 'fix-dockerfile',
+    name: 'fix_dockerfile',
     description: 'Fix Dockerfile issues',
     schema: fixDockerfileSchema,
     handler: fixDockerfile as (
@@ -135,7 +135,7 @@ const TOOLS: ToolDefinition[] = [
     ) => Promise<Result<unknown>>,
   },
   {
-    name: 'resolve-base-images',
+    name: 'resolve_base_images',
     description: 'Resolve optimal base images',
     schema: resolveBaseImagesSchema,
     handler: resolveBaseImages as (
@@ -144,7 +144,7 @@ const TOOLS: ToolDefinition[] = [
     ) => Promise<Result<unknown>>,
   },
   {
-    name: 'prepare-cluster',
+    name: 'prepare_cluster',
     description: 'Prepare Kubernetes cluster',
     schema: prepareClusterSchema,
     handler: prepareCluster as (
@@ -162,7 +162,7 @@ const TOOLS: ToolDefinition[] = [
     ) => Promise<Result<unknown>>,
   },
   {
-    name: 'generate-k8s-manifests',
+    name: 'generate_k8s_manifests',
     description: 'Generate K8s manifests',
     schema: generateK8sManifestsSchema,
     handler: generateK8sManifests as (
@@ -171,7 +171,7 @@ const TOOLS: ToolDefinition[] = [
     ) => Promise<Result<unknown>>,
   },
   {
-    name: 'verify-deployment',
+    name: 'verify_deployment',
     description: 'Verify deployment status',
     schema: verifyDeploymentSchema,
     handler: verifyDeployment as (
@@ -180,7 +180,7 @@ const TOOLS: ToolDefinition[] = [
     ) => Promise<Result<unknown>>,
   },
   {
-    name: 'generate-helm-charts',
+    name: 'generate_helm_charts',
     description: 'Generate Helm charts for Kubernetes deployment',
     schema: generateHelmChartsSchema,
     handler: generateHelmCharts as (
@@ -189,7 +189,7 @@ const TOOLS: ToolDefinition[] = [
     ) => Promise<Result<unknown>>,
   },
   {
-    name: 'generate-aca-manifests',
+    name: 'generate_aca_manifests',
     description: 'Generate Azure Container Apps manifests',
     schema: generateAcaManifestsSchema,
     handler: generateAcaManifests as (
@@ -198,7 +198,7 @@ const TOOLS: ToolDefinition[] = [
     ) => Promise<Result<unknown>>,
   },
   {
-    name: 'convert-aca-to-k8s',
+    name: 'convert_aca_to_k8s',
     description: 'Convert Azure Container Apps to Kubernetes manifests',
     schema: convertAcaToK8sSchema,
     handler: convertAcaToK8s as (
@@ -207,7 +207,7 @@ const TOOLS: ToolDefinition[] = [
     ) => Promise<Result<unknown>>,
   },
   {
-    name: 'inspect-session',
+    name: 'inspect_session',
     description: 'Inspect current session state',
     schema: inspectSessionSchema,
     handler: inspectSession as (
@@ -224,7 +224,7 @@ export interface MCPServerState {
   server: McpServer;
   transport: StdioServerTransport;
   isRunning: boolean;
-  router?: IToolRouter;
+  router?: ToolRouter;
   toolMap: Map<string, ToolDefinition>;
   deps: Dependencies;
 }
@@ -339,86 +339,61 @@ export const createToolHandler = (state: MCPServerState, tool: ToolDefinition) =
         },
       );
 
-      // Use router if available for intelligent routing
-      if (state.router) {
-        const forceFlag = params.force === true;
-        const routeResult = await state.router.route({
-          toolName: tool.name,
-          params,
-          sessionId,
-          context,
-          ...(forceFlag && { force: true }),
-        });
-
-        // Log executed tools for debugging
-        if (routeResult.executedTools.length > 0) {
-          state.deps.logger.info(
-            { executedTools: routeResult.executedTools },
-            'Router executed tools in sequence',
-          );
-        }
-
-        // Log workflow hint if present
-        if (routeResult.workflowHint) {
-          state.deps.logger.info(
-            { hint: routeResult.workflowHint.message },
-            'Workflow continuation available',
-          );
-        }
-
-        const result = routeResult.result;
-
-        // Handle Result pattern
-        if (result && typeof result === 'object' && 'ok' in result) {
-          const typedResult = result;
-          if (typedResult.ok) {
-            const content = [
-              {
-                type: 'text' as const,
-                text: JSON.stringify(typedResult.value, null, 2),
-              },
-            ];
-
-            // Add workflow hint as separate content block if present
-            if (routeResult.workflowHint) {
-              content.push({
-                type: 'text' as const,
-                text: `\n---\n${routeResult.workflowHint.markdown}`,
-              });
-            }
-
-            return { content };
-          } else {
-            throw new McpError(ErrorCode.InternalError, typedResult.error);
-          }
-        }
-
-        // Direct return
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
-        };
+      // Always use router for intelligent routing and dependency resolution
+      if (!state.router) {
+        throw new McpError(
+          ErrorCode.InternalError,
+          'Router not initialized - this should never happen',
+        );
       }
 
-      // Fallback to direct execution if no router
-      const result = await tool.handler(params, context);
+      const forceFlag = params.force === true;
+      const routeResult = await state.router.route({
+        toolName: tool.name,
+        params,
+        sessionId,
+        context,
+        ...(forceFlag && { force: true }),
+      });
+
+      // Log executed tools for debugging
+      if (routeResult.executedTools.length > 0) {
+        state.deps.logger.info(
+          { executedTools: routeResult.executedTools },
+          'Router executed tools in sequence',
+        );
+      }
+
+      // Log workflow hint if present
+      if (routeResult.workflowHint) {
+        state.deps.logger.info(
+          { hint: routeResult.workflowHint.message },
+          'Workflow continuation available',
+        );
+      }
+
+      const result = routeResult.result;
 
       // Handle Result pattern
       if (result && typeof result === 'object' && 'ok' in result) {
         const typedResult = result;
         if (typedResult.ok) {
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: JSON.stringify(typedResult.value, null, 2),
-              },
-            ],
-          };
+          const content = [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(typedResult.value, null, 2),
+            },
+          ];
+
+          // Add workflow hint as separate content block if present
+          if (routeResult.workflowHint) {
+            content.push({
+              type: 'text' as const,
+              text: `\n---\n${routeResult.workflowHint.markdown}`,
+            });
+          }
+
+          return { content };
         } else {
           throw new McpError(ErrorCode.InternalError, typedResult.error);
         }

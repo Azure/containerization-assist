@@ -85,12 +85,12 @@ describe('resolveBaseImagesTool', () => {
   const mockSession = {
     id: 'test-session',
     results: {
-      'analyze-repo': {
+      'analyze_repo': {
         language: 'javascript',
         framework: 'react',
       },
     },
-    completed_steps: ['analyze-repo'],
+    completed_steps: ['analyze_repo'],
     metadata: {},
   };
 
@@ -134,7 +134,7 @@ describe('resolveBaseImagesTool', () => {
         state: {
           sessionId: 'test-session-123',
           results: {
-            'analyze-repo': {
+            'analyze_repo': {
               language: 'javascript',
               framework: 'react',
               packageManager: 'npm',
@@ -143,7 +143,7 @@ describe('resolveBaseImagesTool', () => {
           },
           workflow_state: {},
           metadata: {},
-          completed_steps: ['analyze-repo'],
+          completed_steps: ['analyze_repo'],
         },
       },
     });
@@ -166,7 +166,7 @@ describe('resolveBaseImagesTool', () => {
           state: {
             sessionId: 'test-session-123',
             results: {
-              'analyze-repo': {
+              'analyze_repo': {
                 language: 'javascript',
                 framework: 'react',
                 packageManager: 'npm',
@@ -175,7 +175,7 @@ describe('resolveBaseImagesTool', () => {
             },
             workflow_state: {},
             metadata: {},
-            completed_steps: ['analyze-repo'],
+            completed_steps: ['analyze_repo'],
           },
           isNew: false,
         },
@@ -251,14 +251,14 @@ describe('resolveBaseImagesTool', () => {
           state: {
             sessionId: 'test-session-123',
             results: {
-              'analyze-repo': {
+              'analyze_repo': {
                 language: 'python',
                 framework: 'flask',
               },
             },
             workflow_state: {},
             metadata: {},
-            completed_steps: ['analyze-repo'],
+            completed_steps: ['analyze_repo'],
           },
         },
       });
@@ -401,13 +401,13 @@ describe('resolveBaseImagesTool', () => {
           state: {
             sessionId: 'test-session-123',
             results: {
-              'analyze-repo': {
+              'analyze_repo': {
                 language: 'unknown',
               },
             },
             workflow_state: {},
             metadata: {},
-            completed_steps: ['analyze-repo'],
+            completed_steps: ['analyze_repo'],
           },
           isNew: false,
         },
