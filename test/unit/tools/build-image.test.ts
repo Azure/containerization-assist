@@ -92,7 +92,11 @@ jest.mock('../../../src/lib/logger', () => ({
 }));
 
 // Mock the session helpers
-jest.mock('../../../src/mcp/tool-session-helpers', () => createToolSessionHelpersMock());
+const mockGetSessionSlice = jest.fn();
+jest.mock('../../../src/mcp/tool-session-helpers', () => ({
+  ...createToolSessionHelpersMock(),
+  getSessionSlice: mockGetSessionSlice,
+}));
 
 // Import these after mocks are set up
 import { buildImage, type BuildImageConfig } from '../../../src/tools/build-image/tool';
@@ -193,7 +197,25 @@ CMD ["node", "index.js"]`;
           },
         },
       });
-      
+
+      // Setup getSessionSlice mock for analyze-repo
+      mockGetSessionSlice.mockImplementation((toolName: string) => {
+        if (toolName === 'analyze-repo') {
+          return {
+            ok: true,
+            value: {
+              output: {
+                ok: true,
+                sessionId: 'test-session-123',
+                language: 'javascript',
+                framework: 'express',
+              },
+            },
+          };
+        }
+        return { ok: true, value: null };
+      });
+
       mockSessionManager.get.mockResolvedValue({
         workflow_state: {
           analysis_result: {
@@ -690,11 +712,29 @@ CMD ["node", "index.js"]`;
           },
         },
       });
-      
+
+      // Setup getSessionSlice mock for analyze-repo with python/flask
+      mockGetSessionSlice.mockImplementation((toolName: string) => {
+        if (toolName === 'analyze-repo') {
+          return {
+            ok: true,
+            value: {
+              output: {
+                ok: true,
+                sessionId: 'test-session-123',
+                language: 'python',
+                framework: 'flask',
+              },
+            },
+          };
+        }
+        return { ok: true, value: null };
+      });
+
       // Setup filesystem mocks
       mockFs.access.mockResolvedValue(undefined);
       mockFs.readFile.mockResolvedValue(mockDockerfile);
-      
+
       // Setup docker build mock
       mockDockerClient.buildImage.mockResolvedValue(createSuccessResult({
         imageId: 'sha256:mock-image-id',
@@ -758,6 +798,13 @@ CMD ["node", "index.js"]`;
             },
           },
         },
+      });
+
+      // Reset getSessionSlice mock to return no analysis data
+      mockGetSessionSlice.mockReset();
+      mockGetSessionSlice.mockResolvedValue({
+        ok: true,
+        value: null  // No analysis data available
       });
 
       mockSessionManager.get.mockResolvedValue({

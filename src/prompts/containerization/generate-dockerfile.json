@@ -23,6 +23,12 @@
       "description": "Framework used by the application"
     },
     {
+      "name": "frameworkVersion",
+      "type": "string",
+      "required": false,
+      "description": "Framework version (e.g., 4.8 for .NET Framework)"
+    },
+    {
       "name": "ports",
       "type": "string",
       "required": false,
@@ -41,5 +47,5 @@
       "description": "Dependency information"
     }
   ],
-  "template": "Generate a production-ready Dockerfile for a {{language}} project.\n\nProject Details:\n- Language: {{language}}\n{{#framework}}\n- Framework: {{framework}}\n{{/framework}}\n{{#ports}}\n- Ports: {{ports}}\n{{/ports}}\n{{#baseImage}}\n- Suggested Base Image: {{baseImage}}\n{{/baseImage}}\n{{#requirements}}\n- Dependencies: {{requirements}}\n{{/requirements}}\n\nRepository Summary:\n{{repoSummary}}\n\nRequirements:\n1. Use multi-stage builds when appropriate\n2. Include security best practices\n3. Minimize image size\n4. Include proper health checks\n5. Set appropriate working directory and user\n6. Copy files efficiently\n7. Expose necessary ports\n\nReturn only the Dockerfile content without explanation or code fences.\n"
+  "template": "Generate a production-ready Dockerfile for a {{language}} project.\n\nProject Details:\n- Language: {{language}}\n{{#framework}}\n- Framework: {{framework}}\n{{/framework}}\n{{#frameworkVersion}}\n- Framework Version: {{frameworkVersion}}\n{{/frameworkVersion}}\n{{#ports}}\n- Ports: {{ports}}\n{{/ports}}\n{{#baseImage}}\n- IMPORTANT: Use this base image: {{baseImage}}\n{{/baseImage}}\n{{#requirements}}\n- Dependencies: {{requirements}}\n{{/requirements}}\n\nRepository Summary:\n{{repoSummary}}\n\nRequirements:\n1. Use the suggested base image if provided\n2. Use multi-stage builds when appropriate\n3. Include security best practices\n4. Minimize image size\n5. Include proper health checks\n6. Set appropriate working directory and user\n7. Copy files efficiently\n8. Expose necessary ports\n\nReturn only the Dockerfile content without explanation or code fences.\n"
 }

@@ -29,6 +29,12 @@ export interface SessionAnalysisResult {
     frameworkSignals: number;
     buildSystemSignals: number;
   };
+  recommendations?: {
+    baseImage?: string;
+    buildStrategy?: string;
+    securityNotes?: string[];
+  };
+  modules?: string[]; // Detected module paths for multi-module projects
 }
 
 /**
@@ -97,52 +103,5 @@ export interface SessionData {
   [key: string]: unknown;
 }
 
-/**
- * Helper functions for safe access to session results
- * All data is stored in the results object indexed by tool name
- */
-export function getAnalysisResult(
-  session: WorkflowState | SessionData | undefined | null,
-): SessionAnalysisResult | undefined {
-  if (!session) return undefined;
-
-  // Check results object (standard pattern)
-  if ('results' in session && session.results?.['analyze_repo']) {
-    return session.results['analyze_repo'] as SessionAnalysisResult;
-  }
-
-  // Check nested workflowState
-  if ('workflowState' in session && session.workflowState) {
-    const ws = session.workflowState;
-    if (typeof ws === 'object' && ws !== null && 'results' in ws) {
-      const results = (ws as WorkflowState).results;
-      if (results?.['analyze_repo']) {
-        return results['analyze_repo'] as SessionAnalysisResult;
-      }
-    }
-  }
-
-  return undefined;
-}
-
-export function getBaseImages(session: WorkflowState | SessionData | undefined | null): unknown {
-  if (!session) return undefined;
-
-  // Check results object (standard pattern)
-  if ('results' in session && session.results?.['resolve-base-images']) {
-    return session.results['resolve-base-images'];
-  }
-
-  // Check nested workflowState
-  if ('workflowState' in session && session.workflowState) {
-    const ws = session.workflowState;
-    if (typeof ws === 'object' && ws !== null && 'results' in ws) {
-      const results = (ws as WorkflowState).results;
-      if (results?.['resolve-base-images']) {
-        return results['resolve-base-images'];
-      }
-    }
-  }
-
-  return undefined;
-}
+// Note: Helper functions removed - use getSessionSlice from @mcp/tool-session-helpers instead
+// This provides proper type-safe access to session data across tools

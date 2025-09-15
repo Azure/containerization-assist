@@ -23,15 +23,20 @@ import * as yaml from 'js-yaml';
 import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
 import type { Logger } from '@lib/logger';
 import { extractErrorMessage } from '@lib/error-utils';
-import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
+import {
+  ensureSession,
+  defineToolIO,
+  useSessionSlice,
+  getSessionSlice,
+} from '@mcp/tool-session-helpers';
 import type { ToolContext } from '@mcp/context';
 import { createKubernetesClient } from '@lib/kubernetes';
 
 import { Success, Failure, type Result } from '@types';
+import { generateK8sManifestsSchema } from '@tools/generate-k8s-manifests/schema';
+import { z } from 'zod';
 import { DEFAULT_TIMEOUTS } from '@config/defaults';
 import { deployApplicationSchema, type DeployApplicationParams } from './schema';
-import { z } from 'zod';
-import type { SessionData } from '@tools/session-types';
 
 // Type definitions for Kubernetes manifests
 interface KubernetesManifest {
@@ -314,7 +319,7 @@ async function deployApplicationImpl(
       return Failure(sessionResult.error);
     }
 
-    const { id: sessionId, state: session } = sessionResult.value;
+    const { id: sessionId } = sessionResult.value;
     const slice = useSessionSlice('deploy', io, context, StateSchema);
 
     if (!slice) {
@@ -329,13 +334,41 @@ async function deployApplicationImpl(
     // Record input in session slice
     await slice.patch(sessionId, { input: params });
     const k8sClient = createKubernetesClient(logger);
-    // Get K8s manifests from session with type safety
-    const sessionData = session as SessionData;
-    const k8sResult = sessionData?.results?.['generate-k8s-manifests'] as
-      | { manifests?: string }
-      | undefined;
 
-    if (!k8sResult?.manifests) {
+    // Get K8s manifests from session slice
+    let manifestContents: string | undefined;
+    try {
+      const GenerateK8sManifestsResultSchema = z.object({
+        manifests: z.string(),
+        outputPath: z.string(),
+        resources: z.array(
+          z.object({
+            kind: z.string(),
+            name: z.string(),
+            namespace: z.string(),
+          }),
+        ),
+        sessionId: z.string().optional(),
+      });
+      const generateK8sIO = defineToolIO(
+        generateK8sManifestsSchema,
+        GenerateK8sManifestsResultSchema,
+      );
+      const k8sSliceResult = await getSessionSlice(
+        'generate-k8s-manifests',
+        sessionId,
+        generateK8sIO,
+        context,
+      );
+
+      if (k8sSliceResult.ok && k8sSliceResult.value?.output) {
+        manifestContents = k8sSliceResult.value.output.manifests;
+      }
+    } catch (error) {
+      logger.error({ error }, 'Failed to get K8s manifests from session');
+    }
+
+    if (!manifestContents) {
       return Failure(
         'No Kubernetes manifests found in session. Please run generate-k8s-manifests tool first.',
       );
@@ -345,7 +378,6 @@ async function deployApplicationImpl(
     let manifests: KubernetesManifest[];
     try {
       // The manifests are already a string containing all YAML documents
-      const manifestContents = k8sResult.manifests;
 
       if (!manifestContents) {
         return Failure('No valid manifest content found in session');
@@ -572,8 +604,7 @@ async function deployApplicationImpl(
         lastDeployedNamespace: namespace,
         lastDeploymentName: deploymentName,
         lastServiceName: serviceName,
-        totalDeployments:
-          (sessionData?.completedSteps || []).filter((s: string) => s === 'deploy').length + 1,
+        totalDeployments: 1, // Default deployment iteration
         lastDeploymentReady: ready,
         lastEndpointCount: endpoints.length,
       },
