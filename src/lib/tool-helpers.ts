@@ -34,19 +34,25 @@ export function createToolTimer(logger: Logger, toolName: string): Timer {
   let ended = false;
   const originalEnd = timer.end.bind(timer);
 
-  // Override end method to track state
-  timer.end = () => {
-    if (!ended) {
-      ended = true;
-      originalEnd();
-    }
-  };
-
   // Auto-cleanup on process exit
   const cleanup = (): void => {
     if (!ended) {
       ended = true;
       originalEnd();
+      // Remove listeners to prevent memory leaks
+      process.removeListener('beforeExit', cleanup);
+      process.removeListener('exit', cleanup);
+    }
+  };
+
+  // Override end method to track state and clean up listeners
+  timer.end = () => {
+    if (!ended) {
+      ended = true;
+      originalEnd();
+      // Remove listeners when timer ends normally
+      process.removeListener('beforeExit', cleanup);
+      process.removeListener('exit', cleanup);
     }
   };
 

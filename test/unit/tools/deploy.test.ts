@@ -232,7 +232,7 @@ spec:
     sessionHelpers.updateSession = jest.fn().mockResolvedValue({ ok: true });
     
     // Setup new session helper mocks
-    mockEnsureSession = sessionHelpers.ensureSession = jest.fn().mockResolvedValue({
+    mockEnsureSession = sessionHelpers.ensureSession = jest.fn().mockImplementation(async () => ({
       ok: true,
       value: {
         id: 'test-session-123',
@@ -251,7 +251,7 @@ spec:
           updatedAt: new Date(),
         },
       },
-    });
+    }));
     
     // Setup useSessionSlice mock
     mockUseSessionSlice = sessionHelpers.useSessionSlice = jest.fn().mockReturnValue({

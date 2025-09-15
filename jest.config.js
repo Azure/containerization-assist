@@ -292,7 +292,7 @@ export default {
     '^\\.\/cache\\.js$': '<rootDir>/src/mcp/resources/cache.ts',
   },
   roots: ['<rootDir>/src', '<rootDir>/test'],
-  testPathIgnorePatterns: ['/node_modules/', '/dist/', 'test/unit/lib/kubernetes.test.ts', 'test/unit/tools/deploy.test.ts'],
+  testPathIgnorePatterns: ['/node_modules/', '/dist/', 'test/unit/lib/kubernetes.test.ts'],
   
   // Timeout handling for different test types
   testTimeout: 30000,  // Default 30s
