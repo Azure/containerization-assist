@@ -332,7 +332,7 @@ async function deployApplicationImpl(
     // Get K8s manifests from session with type safety
     const sessionData = session as SessionData;
     const k8sResult = sessionData?.results?.['generate-k8s-manifests'] as
-      | { manifests?: Array<{ content?: string }> }
+      | { manifests?: string }
       | undefined;
 
     if (!k8sResult?.manifests) {
@@ -344,11 +344,8 @@ async function deployApplicationImpl(
     // Parse and validate manifests
     let manifests: KubernetesManifest[];
     try {
-      // Extract content from manifests and join them
-      const manifestContents = k8sResult.manifests
-        .map((m) => m.content)
-        .filter((content): content is string => Boolean(content))
-        .join('\n---\n');
+      // The manifests are already a string containing all YAML documents
+      const manifestContents = k8sResult.manifests;
 
       if (!manifestContents) {
         return Failure('No valid manifest content found in session');
