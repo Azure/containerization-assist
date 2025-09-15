@@ -497,8 +497,7 @@ async function detectModuleRoots(
       for (const buildFile of buildFiles) {
         const buildFilePath = joinPaths(dirPath, buildFile);
         try {
-          await fs.access(buildFilePath);
-
+          // Directly read the file to avoid TOCTOU race condition
           if (buildFile === 'pom.xml') {
             const pomContent = await fs.readFile(buildFilePath, 'utf-8');
             const isParentPom = pomContent.includes('<modules>') && pomContent.includes('<module>');
@@ -516,6 +515,8 @@ async function detectModuleRoots(
               }
             }
           } else {
+            // For non-pom.xml files, just check if we can stat the file
+            await fs.stat(buildFilePath);
             const relativePath = path.relative(repoPath, dirPath) || '.';
             if (!moduleRoots.includes(relativePath)) {
               moduleRoots.push(relativePath);
