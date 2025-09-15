@@ -16,10 +16,12 @@ export const analyzeRepoSchema = z.object({
   includeTests: z.boolean().optional().describe('Include test files in analysis'),
   securityFocus: z.boolean().optional().describe('Focus on security aspects'),
   performanceFocus: z.boolean().optional().describe('Focus on performance aspects'),
-  moduleRoots: z
+  dockerfilePaths: z
     .array(z.string())
-    .optional()
-    .describe('Root directories of modules (use forward slashes: /path/to/module)'),
+    .nonempty()
+    .describe(
+      'List of Dockerfile paths for generating separate Dockerfiles (use forward slashes: /path/to/Dockerfile)',
+    ),
   language: z.enum(['java', 'dotnet', 'other']).optional().describe('Primary programming language'),
 });
 
