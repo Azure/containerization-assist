@@ -203,7 +203,7 @@ describe('AI Parameter Suggestion', () => {
         progress: undefined,
       } as import('../../../src/mcp/context').ToolContext;
 
-      const result = await router.route({
+      await router.route({
         toolName: 'build-image',
         params: {
           path: '/custom/path',
