@@ -4,6 +4,7 @@
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import * as crypto from 'crypto';
 import type { Logger } from 'pino';
 
 import { createSessionManager, type SessionManager } from '@lib/session.js';
@@ -83,7 +84,7 @@ export function createContainerAssist(
   // Generate a consistent session ID for this instance to maintain state across tool calls
   const defaultSessionId =
     options.sessionId ||
-    `container-assist-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    `container-assist-${Date.now()}-${crypto.randomBytes(6).toString('base64').replace(/[/+=]/g, '').substring(0, 9)}`;
 
   return {
     bindToServer: (server: McpServer) =>
