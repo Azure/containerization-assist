@@ -19,7 +19,12 @@
  * ```
  */
 
-import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
+import {
+  ensureSession,
+  defineToolIO,
+  useSessionSlice,
+  getSessionSlice,
+} from '@mcp/tool-session-helpers';
 import { initializeToolInstrumentation } from '@lib/tool-helpers';
 import { extractErrorMessage } from '@lib/error-utils';
 import type { ToolContext } from '@mcp/context';
@@ -28,10 +33,38 @@ import { getRecommendedBaseImage } from '@lib/base-images';
 import { scoreConfigCandidates } from '@lib/integrated-scoring';
 import { getKnowledgeForCategory } from '@knowledge/index';
 import { resolveBaseImagesSchema, type ResolveBaseImagesParams } from './schema';
+import { analyzeRepoSchema } from '@tools/analyze-repo/schema';
 import { z } from 'zod';
 
 // Helper functions for base image resolution
-function getSuggestedBaseImages(language: string): string[] {
+function getSuggestedBaseImages(
+  language: string,
+  framework?: string,
+  frameworkVersion?: string,
+): string[] {
+  // Check for .NET Framework specifically
+  if (language === 'dotnet' || language === 'csharp') {
+    if (
+      framework === 'aspnet-webapi' ||
+      framework === 'aspnet' ||
+      framework === 'dotnet-framework'
+    ) {
+      if (frameworkVersion?.startsWith('4.')) {
+        return [
+          'mcr.microsoft.com/dotnet/framework/aspnet:4.8-windowsservercore-ltsc2022',
+          'mcr.microsoft.com/dotnet/framework/aspnet:4.8-windowsservercore-ltsc2019',
+          'mcr.microsoft.com/dotnet/framework/aspnet:4.8',
+        ];
+      }
+    }
+    // .NET Core/5+ images
+    return [
+      'mcr.microsoft.com/dotnet/aspnet:8.0-alpine',
+      'mcr.microsoft.com/dotnet/aspnet:8.0',
+      'mcr.microsoft.com/dotnet/sdk:8.0',
+    ];
+  }
+
   const suggestions: Record<string, string[]> = {
     javascript: ['node:18-alpine', 'node:18-slim', 'node:18'],
     typescript: ['node:18-alpine', 'node:18-slim', 'node:18'],
@@ -200,6 +233,57 @@ const BaseImageRecommendationSchema = z.object({
 // Define tool IO for type-safe session operations
 const io = defineToolIO(resolveBaseImagesSchema, BaseImageRecommendationSchema);
 
+// Define analyze-repo IO for accessing its session slice
+const AnalyzeRepoResultSchema = z.object({
+  ok: z.boolean(),
+  sessionId: z.string(),
+  language: z.string(),
+  languageVersion: z.string().optional(),
+  framework: z.string().optional(),
+  frameworkVersion: z.string().optional(),
+  buildSystem: z
+    .object({
+      type: z.string(),
+      file: z.string(),
+      buildCommand: z.string(),
+      testCommand: z.string().optional(),
+    })
+    .optional(),
+  dependencies: z.array(
+    z.object({
+      name: z.string(),
+      version: z.string().optional(),
+      type: z.string(),
+    }),
+  ),
+  ports: z.array(z.number()),
+  hasDockerfile: z.boolean(),
+  hasDockerCompose: z.boolean(),
+  hasKubernetes: z.boolean(),
+  recommendations: z.object({
+    baseImage: z.string(),
+    buildStrategy: z.enum(['multi-stage', 'single-stage']),
+    securityNotes: z.array(z.string()),
+  }),
+  confidence: z.number(),
+  detectionMethod: z.enum(['signature', 'extension', 'fallback', 'ai-enhanced']),
+  detectionDetails: z.object({
+    signatureMatches: z.number(),
+    extensionMatches: z.number(),
+    frameworkSignals: z.number(),
+    buildSystemSignals: z.number(),
+  }),
+  metadata: z.object({
+    path: z.string(),
+    depth: z.number(),
+    timestamp: z.number(),
+    includeTests: z.boolean().optional(),
+    aiInsights: z.unknown().optional(),
+  }),
+});
+
+const analyzeRepoIO = defineToolIO(analyzeRepoSchema, AnalyzeRepoResultSchema);
+
 // Tool-specific state schema
 const StateSchema = z.object({
   lastResolvedAt: z.date().optional(),
@@ -262,7 +346,7 @@ async function resolveBaseImagesImpl(
       return Failure(sessionResult.error);
     }
 
-    const { id: sessionId, state: session } = sessionResult.value;
+    const { id: sessionId } = sessionResult.value;
     const slice = useSessionSlice('resolve-base-images', io, context, StateSchema);
 
     if (!slice) {
@@ -277,10 +361,15 @@ async function resolveBaseImagesImpl(
     // Record input in session slice
     await slice.patch(sessionId, { input: params });
 
-    // Get analysis result from session or use provided technology
-    const analysisResult = session?.results?.['analyze_repo'] as
-      | { language?: string; framework?: string }
-      | undefined;
+    // Get analysis result from analyze-repo session slice
+    const analyzeRepoSliceResult = await getSessionSlice(
+      'analyze-repo',
+      sessionId,
+      analyzeRepoIO,
+      context,
+    );
+    const analyzeRepoSlice = analyzeRepoSliceResult.ok ? analyzeRepoSliceResult.value : null;
+    const analysisResult = analyzeRepoSlice?.output;
 
     // Use provided technology or fall back to session analysis
     const language = technology || analysisResult?.language;
@@ -291,7 +380,29 @@ async function resolveBaseImagesImpl(
     }
 
     const framework = analysisResult?.framework;
-    const suggestedImages = getSuggestedBaseImages(language);
+    const frameworkVersion = analysisResult?.frameworkVersion;
+
+    // Also check if recommendations already include a base image
+    const recommendedBaseImage = analysisResult?.recommendations?.baseImage;
+
+    logger.info(
+      {
+        sessionId,
+        language,
+        framework,
+        frameworkVersion,
+        recommendedBaseImage,
+        hasAnalysisData: !!analysisResult,
+      },
+      'Base image resolution using session data',
+    );
+
+    const suggestedImages = getSuggestedBaseImages(language, framework, frameworkVersion);
+
+    // If we have a recommended base image from analysis, add it to suggestions
+    if (recommendedBaseImage && !suggestedImages.includes(recommendedBaseImage)) {
+      suggestedImages.unshift(recommendedBaseImage);
+    }
 
     // Get knowledge-based recommendations for base images
     const knowledgeData = await getBaseImageKnowledge(

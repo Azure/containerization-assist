@@ -59,6 +59,16 @@ export interface ToolEdge {
 export const TOOL_GRAPH: Record<string, ToolEdge> = {
   analyze_repo: {
     provides: ['analyzed_repo'],
+    nextSteps: [
+      {
+        tool: 'generate_dockerfile',
+        description: 'Generate optimized Dockerfile based on the repository analysis',
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId, // Pass the same sessionId to share analysis data
+        }),
+      },
+    ],
   },
 
   resolve_base_images: {
@@ -73,6 +83,16 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
         }),
       },
     },
+    nextSteps: [
+      {
+        tool: 'generate_dockerfile',
+        description: 'Generate Dockerfile using the resolved base images',
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   generate_dockerfile: {
@@ -130,6 +150,17 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
         }),
       },
     },
+    nextSteps: [
+      {
+        tool: 'build_image',
+        description: 'Build Docker image from the fixed Dockerfile',
+        buildParams: (p) => ({
+          path: p.path || '.',
+          imageName: p.imageName || 'app:latest',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   build_image: {
@@ -194,10 +225,41 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
         }),
       },
     },
+    nextSteps: [
+      {
+        tool: 'push_image',
+        description: 'Push the scanned image to a container registry',
+        buildParams: (p) => ({
+          imageId: p.imageId || p.imageName,
+          registry: p.registry,
+          sessionId: p.sessionId,
+        }),
+      },
+      {
+        tool: 'deploy',
+        description: 'Deploy the scanned application to Kubernetes',
+        buildParams: (p) => ({
+          imageId: p.imageId || p.imageName,
+          namespace: p.namespace || 'default',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   tag_image: {
     requires: ['built_image'],
+    nextSteps: [
+      {
+        tool: 'push_image',
+        description: 'Push the tagged image to a container registry',
+        buildParams: (p) => ({
+          imageId: p.imageId || p.imageName,
+          registry: p.registry,
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   push_image: {
@@ -213,10 +275,31 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
         }),
       },
     },
+    nextSteps: [
+      {
+        tool: 'deploy',
+        description: 'Deploy the pushed image to Kubernetes',
+        buildParams: (p) => ({
+          imageId: p.imageId || p.imageName,
+          namespace: p.namespace || 'default',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   prepare_cluster: {
     provides: ['k8s_prepared'],
+    nextSteps: [
+      {
+        tool: 'generate_k8s_manifests',
+        description: 'Generate Kubernetes manifests for deployment',
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   generate_k8s_manifests: {
@@ -225,9 +308,23 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     autofix: {
       analyzed_repo: {
         tool: 'analyze_repo',
-        buildParams: (p) => ({ path: p.path || '.' }),
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId,
+        }),
       },
     },
+    nextSteps: [
+      {
+        tool: 'deploy',
+        description: 'Deploy the application using the generated manifests',
+        buildParams: (p) => ({
+          path: p.path || '.',
+          namespace: p.namespace || 'default',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   generate_helm_charts: {
@@ -236,9 +333,23 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     autofix: {
       analyzed_repo: {
         tool: 'analyze_repo',
-        buildParams: (p) => ({ path: p.path || '.' }),
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId,
+        }),
       },
     },
+    nextSteps: [
+      {
+        tool: 'deploy',
+        description: 'Deploy the application using the generated Helm charts',
+        buildParams: (p) => ({
+          path: p.path || '.',
+          namespace: p.namespace || 'default',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   generate_aca_manifests: {
@@ -247,9 +358,22 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     autofix: {
       analyzed_repo: {
         tool: 'analyze_repo',
-        buildParams: (p) => ({ path: p.path || '.' }),
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId,
+        }),
       },
     },
+    nextSteps: [
+      {
+        tool: 'deploy',
+        description: 'Deploy the application using the generated Azure Container Apps manifests',
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   deploy: {
@@ -273,9 +397,20 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
         buildParams: (p) => ({
           path: p.path || '.',
           imageId: p.imageId,
+          sessionId: p.sessionId,
         }),
       },
     },
+    nextSteps: [
+      {
+        tool: 'verify_deployment',
+        description: 'Verify that the deployment is running successfully',
+        buildParams: (p) => ({
+          namespace: p.namespace || 'default',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   verify_deployment: {

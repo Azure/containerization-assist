@@ -10,14 +10,18 @@ import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
 import { withDefaults, K8S_DEFAULTS } from '@lib/param-defaults';
 import { extractErrorMessage } from '@lib/error-utils';
 import { promises as fs } from 'node:fs';
-import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
+import {
+  ensureSession,
+  defineToolIO,
+  useSessionSlice,
+  getSessionSlice,
+} from '@mcp/tool-session-helpers';
 import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 import type { SamplingOptions } from '@lib/sampling';
 import { createStandardProgress } from '@mcp/progress-helper';
 // Moved to tool-helpers
 import type { ToolContext } from '@mcp/context';
-import type { SessionData } from '@tools/session-types';
 import { Success, Failure, type Result } from '@types';
 import { stripFencesAndNoise, isValidKubernetesContent } from '@lib/text-processing';
 import { createKubernetesValidator, getValidationSummary } from '@/validation';
@@ -25,6 +29,8 @@ import { scoreConfigCandidates } from '@lib/integrated-scoring';
 import * as yaml from 'js-yaml';
 import { generateK8sManifestsSchema, type GenerateK8sManifestsParams } from './schema';
 import { z } from 'zod';
+import { buildImageSchema } from '@tools/build-image/schema';
+import { analyzeRepoSchema } from '@tools/analyze-repo/schema';
 // Note: Tool now uses GenerateK8sManifestsParams from schema for type safety
 
 /**
@@ -439,7 +445,7 @@ async function generateK8sManifestsImpl(
       return Failure(sessionResult.error);
     }
 
-    const { id: sessionId, state: session } = sessionResult.value;
+    const { id: sessionId } = sessionResult.value;
     const slice = useSessionSlice('generate-k8s-manifests', io, context, StateSchema);
 
     if (!slice) {
@@ -451,13 +457,33 @@ async function generateK8sManifestsImpl(
     // Record input in session slice
     await slice.patch(sessionId, { input: params });
 
-    const sessionData = session as SessionData;
-    // Get build result from session for image tag
-    const buildResult = (sessionData?.results?.['build-image'] ||
-      sessionData?.workflowState?.results?.['build-image']) as
-      | { tags?: string[]; imageId?: string }
-      | undefined;
-    const image = params.imageId || buildResult?.tags?.[0] || `${appName}:latest`;
+    // Get build result from session slice for image tag
+    let image = params.imageId || `${appName}:latest`;
+    try {
+      const BuildImageResultSchema = z.object({
+        success: z.boolean(),
+        sessionId: z.string(),
+        imageId: z.string(),
+        tags: z.array(z.string()),
+      });
+      const buildImageIO = defineToolIO(buildImageSchema, BuildImageResultSchema);
+      const buildSliceResult = await getSessionSlice(
+        'build-image',
+        sessionId,
+        buildImageIO,
+        context,
+      );
+
+      if (buildSliceResult.ok && buildSliceResult.value?.output) {
+        const buildResult = buildSliceResult.value.output;
+        if (!params.imageId && buildResult.tags?.[0]) {
+          image = buildResult.tags[0];
+          logger.debug({ image }, 'Using image tag from build-image session');
+        }
+      }
+    } catch (error) {
+      logger.debug({ error }, 'Could not get build result from session, using default image');
+    }
     // Kubernetes manifest generation from repository analysis and configuration
     if (progress) await progress('EXECUTING');
     // Prepare sampling options
@@ -483,11 +509,37 @@ async function generateK8sManifestsImpl(
         // Enhance prompt with knowledge context
         let promptArgs = buildK8sManifestPromptArgs(params, image);
         try {
-          // Get analysis from session for language/framework context
-          const analysisResult = (sessionData?.results?.['analyze_repo'] ||
-            sessionData?.workflowState?.results?.['analyze_repo']) as
-            | { language?: string; framework?: string }
+          // Get analysis from session slice for language/framework context
+          let analysisResult:
+            | { language?: string; framework?: string; frameworkVersion?: string }
             | undefined;
+          try {
+            const AnalyzeRepoResultSchema = z.object({
+              ok: z.boolean(),
+              sessionId: z.string(),
+              language: z.string(),
+              framework: z.string().optional(),
+              frameworkVersion: z.string().optional(),
+            });
+            const analyzeRepoIO = defineToolIO(analyzeRepoSchema, AnalyzeRepoResultSchema);
+            const analysisSliceResult = await getSessionSlice(
+              'analyze-repo',
+              sessionId,
+              analyzeRepoIO,
+              context,
+            );
+
+            if (analysisSliceResult.ok && analysisSliceResult.value?.output) {
+              const output = analysisSliceResult.value.output;
+              analysisResult = {
+                language: output.language,
+                ...(output.framework && { framework: output.framework }),
+                ...(output.frameworkVersion && { frameworkVersion: output.frameworkVersion }),
+              };
+            }
+          } catch (error) {
+            logger.debug({ error }, 'Could not get analysis result from session');
+          }
 
           const knowledgeResult = await enhancePromptWithKnowledge(promptArgs, {
             operation: 'generate_k8s_manifests',
@@ -640,8 +692,7 @@ async function generateK8sManifestsImpl(
         lastGeneratedAt: new Date(),
         lastAppName: appName,
         lastNamespace: namespace,
-        totalManifestsGenerated:
-          (sessionData?.completedSteps || []).filter((s: string) => s === 'k8s').length + 1,
+        totalManifestsGenerated: 1, // Default generation iteration
         lastManifestCount: resourceList.length,
         lastValidationScore: validationReport.score,
         lastUsedAI: result.value.aiUsed || false,

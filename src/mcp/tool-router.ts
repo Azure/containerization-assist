@@ -500,6 +500,7 @@ export const buildWorkflowMetadata = (
 export const buildWorkflowHint = (toolName: string, metadata: WorkflowMetadata): WorkflowHint => {
   const message =
     `✅ ${toolName} completed successfully!\n\n` +
+    `🔗 IMPORTANT: Use sessionId "${metadata.sessionId}" for next tool call\n\n` +
     `📋 NEXT RECOMMENDED ACTION:\n` +
     `Tool: ${metadata.nextTool}\n` +
     `Purpose: ${metadata.description}\n` +
@@ -507,11 +508,13 @@ export const buildWorkflowHint = (toolName: string, metadata: WorkflowMetadata):
 
   const markdown =
     `### ✅ ${toolName} completed successfully!\n\n` +
+    `> **🔗 IMPORTANT:** Pass \`"sessionId": "${metadata.sessionId}"\` to the next tool call\n\n` +
     `#### 📋 Next Recommended Action\n` +
     `- **Tool**: \`${metadata.nextTool}\`\n` +
     `- **Purpose**: ${metadata.description}\n` +
     `- **Session**: \`${metadata.sessionId}\`\n\n` +
-    `To continue: \`${metadata.nextTool} --session ${metadata.sessionId}\``;
+    `**Example call:**\n` +
+    `\`\`\`json\n{\n  "sessionId": "${metadata.sessionId}",\n  "path": "your/project/path"\n}\n\`\`\``;
 
   return {
     message,

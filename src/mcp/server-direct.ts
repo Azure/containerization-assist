@@ -378,12 +378,24 @@ export const createToolHandler = (state: MCPServerState, tool: ToolDefinition) =
       if (result && typeof result === 'object' && 'ok' in result) {
         const typedResult = result;
         if (typedResult.ok) {
+          // Extract sessionId from the result for highlighting
+          const resultValue = typedResult.value as any;
+          const sessionId = resultValue?.sessionId;
+
           const content = [
             {
               type: 'text' as const,
               text: JSON.stringify(typedResult.value, null, 2),
             },
           ];
+
+          // Add session continuation reminder if sessionId exists
+          if (sessionId) {
+            content.push({
+              type: 'text' as const,
+              text: `\n🔗 **SESSION CONTINUATION:** Use sessionId "${sessionId}" in your next tool call to share analysis data`,
+            });
+          }
 
           // Add workflow hint as separate content block if present
           if (routeResult.workflowHint) {
