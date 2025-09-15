@@ -41,7 +41,6 @@ export const generateDockerfileSchema = z.object({
   path: z.string().optional().describe('Repository path (use forward slashes: /path/to/repo)'),
   dockerfileDirectoryPaths: z
     .array(z.string())
-    .min(1)
     .nonempty()
     .describe(
       'List of paths in the repository to generate separate Dockerfiles (use forward slashes: /path/to/directory/where/dockerfile/will/be/placed/)',
