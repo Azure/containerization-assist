@@ -57,16 +57,16 @@ export interface ToolEdge {
  * Central source of truth for tool orchestration and auto-correction.
  */
 export const TOOL_GRAPH: Record<string, ToolEdge> = {
-  'analyze-repo': {
+  analyze_repo: {
     provides: ['analyzed_repo'],
   },
 
-  'resolve-base-images': {
+  resolve_base_images: {
     requires: ['analyzed_repo'],
     provides: ['resolved_base_images'],
     autofix: {
       analyzed_repo: {
-        tool: 'analyze-repo',
+        tool: 'analyze_repo',
         buildParams: (p) => ({
           path: p.path || '.',
           sessionId: p.sessionId,
@@ -75,19 +75,19 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     },
   },
 
-  'generate-dockerfile': {
+  generate_dockerfile: {
     requires: ['analyzed_repo', 'resolved_base_images'],
     provides: ['dockerfile_generated'],
     autofix: {
       analyzed_repo: {
-        tool: 'analyze-repo',
+        tool: 'analyze_repo',
         buildParams: (p) => ({
           path: p.path || '.',
           sessionId: p.sessionId,
         }),
       },
       resolved_base_images: {
-        tool: 'resolve-base-images',
+        tool: 'resolve_base_images',
         buildParams: (p) => ({
           path: p.path || '.',
           technology: p.technology,
@@ -99,7 +99,7 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     },
     nextSteps: [
       {
-        tool: 'build-image',
+        tool: 'build_image',
         description: 'Build Docker image from the generated Dockerfile',
         buildParams: (p) => ({
           path: p.path || '.',
@@ -108,7 +108,7 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
         }),
       },
       {
-        tool: 'fix-dockerfile',
+        tool: 'fix_dockerfile',
         description: 'Optimize or fix issues in the generated Dockerfile',
         buildParams: (p) => ({
           path: p.path || '.',
@@ -118,12 +118,12 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     ],
   },
 
-  'fix-dockerfile': {
+  fix_dockerfile: {
     requires: ['dockerfile_generated'],
     provides: ['dockerfile_generated'],
     autofix: {
       dockerfile_generated: {
-        tool: 'generate-dockerfile',
+        tool: 'generate_dockerfile',
         buildParams: (p) => ({
           path: p.path || '.',
           sessionId: p.sessionId,
@@ -132,19 +132,19 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     },
   },
 
-  'build-image': {
+  build_image: {
     requires: ['analyzed_repo', 'dockerfile_generated'],
     provides: ['built_image'],
     autofix: {
       analyzed_repo: {
-        tool: 'analyze-repo',
+        tool: 'analyze_repo',
         buildParams: (p) => ({
           path: p.path || '.',
           sessionId: p.sessionId,
         }),
       },
       dockerfile_generated: {
-        tool: 'generate-dockerfile',
+        tool: 'generate_dockerfile',
         buildParams: (p) => ({
           path: p.path || '.',
           sessionId: p.sessionId,
@@ -153,7 +153,7 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     },
     nextSteps: [
       {
-        tool: 'scan-image',
+        tool: 'scan',
         description: 'Scan the built image for security vulnerabilities',
         buildParams: (p) => ({
           imageId: p.imageId || p.imageName || p.tag,
@@ -161,7 +161,7 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
         }),
       },
       {
-        tool: 'push-image',
+        tool: 'push_image',
         description: 'Push the built image to a container registry',
         buildParams: (p) => ({
           imageId: p.imageId || p.imageName || p.tag,
@@ -181,12 +181,12 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     ],
   },
 
-  'scan-image': {
+  scan: {
     requires: ['built_image'],
     provides: ['scanned_image'],
     autofix: {
       built_image: {
-        tool: 'build-image',
+        tool: 'build_image',
         buildParams: (p) => ({
           path: p.path || '.',
           imageName: p.imageId || p.imageName || 'app:latest',
@@ -196,16 +196,16 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     },
   },
 
-  'tag-image': {
+  tag_image: {
     requires: ['built_image'],
   },
 
-  'push-image': {
+  push_image: {
     requires: ['built_image'],
     provides: ['pushed_image'],
     autofix: {
       built_image: {
-        tool: 'build-image',
+        tool: 'build_image',
         buildParams: (p) => ({
           path: p.path || '.',
           imageName: p.imageId || p.imageName || 'app:latest',
@@ -215,38 +215,38 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     },
   },
 
-  'prepare-cluster': {
+  prepare_cluster: {
     provides: ['k8s_prepared'],
   },
 
-  'generate-k8s-manifests': {
+  generate_k8s_manifests: {
     requires: ['analyzed_repo'],
     provides: ['manifests_generated'],
     autofix: {
       analyzed_repo: {
-        tool: 'analyze-repo',
+        tool: 'analyze_repo',
         buildParams: (p) => ({ path: p.path || '.' }),
       },
     },
   },
 
-  'generate-helm-charts': {
+  generate_helm_charts: {
     requires: ['analyzed_repo'],
     provides: ['helm_charts_generated', 'manifests_generated'],
     autofix: {
       analyzed_repo: {
-        tool: 'analyze-repo',
+        tool: 'analyze_repo',
         buildParams: (p) => ({ path: p.path || '.' }),
       },
     },
   },
 
-  'generate-aca-manifests': {
+  generate_aca_manifests: {
     requires: ['analyzed_repo'],
     provides: ['aca_manifests_generated', 'manifests_generated'],
     autofix: {
       analyzed_repo: {
-        tool: 'analyze-repo',
+        tool: 'analyze_repo',
         buildParams: (p) => ({ path: p.path || '.' }),
       },
     },
@@ -257,7 +257,7 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     provides: ['deployed'],
     autofix: {
       built_image: {
-        tool: 'build-image',
+        tool: 'build_image',
         buildParams: (p) => ({
           path: p.path || '.',
           imageName: p.imageId || p.imageName || 'app:latest',
@@ -265,11 +265,11 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
         }),
       },
       k8s_prepared: {
-        tool: 'prepare-cluster',
+        tool: 'prepare_cluster',
         buildParams: () => ({}),
       },
       manifests_generated: {
-        tool: 'generate-k8s-manifests',
+        tool: 'generate_k8s_manifests',
         buildParams: (p) => ({
           path: p.path || '.',
           imageId: p.imageId,
@@ -278,12 +278,12 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     },
   },
 
-  'verify-deployment': {
+  verify_deployment: {
     requires: ['deployed'],
   },
 
   ops: {},
-  'inspect-session': {},
+  inspect_session: {},
   'convert-aca-to-k8s': {},
 };
 

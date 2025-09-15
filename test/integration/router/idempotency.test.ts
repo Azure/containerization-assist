@@ -42,18 +42,18 @@ describe('Idempotency Behavior', () => {
       // First execution
       const firstRun = await router.route({
         context: mockContext,
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './src' },
       });
 
       expect(firstRun.result.ok).toBe(true);
-      expect(firstRun.executedTools).toEqual(['analyze-repo']);
+      expect(firstRun.executedTools).toEqual(['analyze_repo']);
 
       // Second execution with same session
       resetExecutionLog();
       const secondRun = await router.route({
         context: mockContext,
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './src' },
         sessionId: firstRun.sessionState.sessionId,
       });
@@ -85,10 +85,10 @@ describe('Idempotency Behavior', () => {
 
       // Try to run various tools that should be skipped
       const toolsToTest = [
-        'analyze-repo',
-        'build-image',
-        'prepare-cluster',
-        'generate-k8s-manifests',
+        'analyze_repo',
+        'build_image',
+        'prepare_cluster',
+        'generate_k8s_manifests',
         'deploy',
       ];
 
@@ -125,7 +125,7 @@ describe('Idempotency Behavior', () => {
       // Run first tool
       await router.route({
         context: mockContext,
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './' },
         sessionId: session.sessionId,
       });
@@ -138,7 +138,7 @@ describe('Idempotency Behavior', () => {
       // Run second tool
       await router.route({
         context: mockContext,
-        toolName: 'prepare-cluster',
+        toolName: 'prepare_cluster',
         params: {},
         sessionId: session.sessionId,
       });
@@ -153,15 +153,15 @@ describe('Idempotency Behavior', () => {
       resetExecutionLog();
       await router.route({
         context: mockContext,
-        toolName: 'resolve-base-images',
+        toolName: 'resolve_base_images',
         params: {},
         sessionId: session.sessionId,
       });
 
       // Should not re-run analyze-repo
       const toolOrder = executionLog.map(e => e.tool);
-      expect(toolOrder).not.toContain('analyze-repo');
-      expect(toolOrder).toEqual(['resolve-base-images']);
+      expect(toolOrder).not.toContain('analyze_repo');
+      expect(toolOrder).toEqual(['resolve_base_images']);
 
       // All steps should be preserved
       currentSessionResult = await sessionManager.get(session.sessionId);
@@ -182,14 +182,14 @@ describe('Idempotency Behavior', () => {
       // Run multiple tools
       await router.route({
         context: mockContext,
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './' },
         sessionId: session.sessionId,
       });
 
       await router.route({
         context: mockContext,
-        toolName: 'build-image',
+        toolName: 'build_image',
         params: { imageName: 'test-app' },
         sessionId: session.sessionId,
       });
@@ -199,8 +199,8 @@ describe('Idempotency Behavior', () => {
       if (!finalSessionResult.ok) return;
       const finalSession = finalSessionResult.value;
       expect(finalSession?.results).toBeDefined();
-      expect(finalSession?.results?.['analyze-repo']).toBeDefined();
-      expect(finalSession?.results?.['build-image']).toBeDefined();
+      expect(finalSession?.results?.['analyze_repo']).toBeDefined();
+      expect(finalSession?.results?.['build_image']).toBeDefined();
     });
   });
 
@@ -212,7 +212,7 @@ describe('Idempotency Behavior', () => {
       const session = sessionResult.value;
       await router.route({
         context: mockContext,
-        toolName: 'prepare-cluster',
+        toolName: 'prepare_cluster',
         params: { context: 'test' },
         sessionId: session.sessionId,
       });
@@ -233,7 +233,7 @@ describe('Idempotency Behavior', () => {
 
       await router.route({
         context: mockContext,
-        toolName: 'generate-dockerfile',
+        toolName: 'generate_dockerfile',
         params: { path: './' },
         sessionId: session.sessionId,
       });
@@ -258,7 +258,7 @@ describe('Idempotency Behavior', () => {
       // Run analyze-repo directly
       await router.route({
         context: mockContext,
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './' },
         sessionId: session.sessionId,
       });
@@ -266,7 +266,7 @@ describe('Idempotency Behavior', () => {
       // Run another tool that would also provide analyzed_repo
       await router.route({
         context: mockContext,
-        toolName: 'resolve-base-images',
+        toolName: 'resolve_base_images',
         params: {},
         sessionId: session.sessionId,
       });
@@ -300,7 +300,7 @@ describe('Idempotency Behavior', () => {
       // but requires both analyzed_repo and resolved_base_images
       const result = await router.route({
         context: mockContext,
-        toolName: 'generate-dockerfile',
+        toolName: 'generate_dockerfile',
         params: { path: './' },
         sessionId: session.sessionId,
       });
@@ -309,9 +309,9 @@ describe('Idempotency Behavior', () => {
 
       // Should only run missing prerequisites
       const toolOrder = executionLog.map(e => e.tool);
-      expect(toolOrder).not.toContain('analyze-repo');
-      expect(toolOrder).toContain('resolve-base-images');
-      expect(toolOrder).toContain('generate-dockerfile');
+      expect(toolOrder).not.toContain('analyze_repo');
+      expect(toolOrder).toContain('resolve_base_images');
+      expect(toolOrder).toContain('generate_dockerfile');
     });
   });
 
@@ -320,7 +320,7 @@ describe('Idempotency Behavior', () => {
       // First run with one set of parameters
       const firstRun = await router.route({
         context: mockContext,
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './src' },
       });
 
@@ -330,7 +330,7 @@ describe('Idempotency Behavior', () => {
       resetExecutionLog();
       const secondRun = await router.route({
         context: mockContext,
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './different-path' },
         sessionId: firstRun.sessionState.sessionId,
       });
@@ -348,7 +348,7 @@ describe('Idempotency Behavior', () => {
       const session1 = await sessionManager.create();
       await router.route({
         context: mockContext,
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './' },
         sessionId: session1.sessionId,
       });
@@ -358,14 +358,14 @@ describe('Idempotency Behavior', () => {
       resetExecutionLog();
       const result = await router.route({
         context: mockContext,
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './' },
         sessionId: session2.sessionId,
       });
 
       // Should execute in new session despite being run in session1
       expect(result.result.ok).toBe(true);
-      expect(result.executedTools).toEqual(['analyze-repo']);
+      expect(result.executedTools).toEqual(['analyze_repo']);
       expect(executionLog.length).toBe(1);
     });
 
@@ -373,7 +373,7 @@ describe('Idempotency Behavior', () => {
       // First run without session
       const firstRun = await router.route({
         context: mockContext,
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './' },
       });
 
@@ -384,12 +384,12 @@ describe('Idempotency Behavior', () => {
       resetExecutionLog();
       const secondRun = await router.route({
         context: mockContext,
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './' },
       });
 
       expect(secondRun.result.ok).toBe(true);
-      expect(secondRun.executedTools).toEqual(['analyze-repo']);
+      expect(secondRun.executedTools).toEqual(['analyze_repo']);
       expect(secondRun.sessionState.sessionId).not.toBe(firstRun.sessionState.sessionId);
     });
   });
@@ -404,7 +404,7 @@ describe('Idempotency Behavior', () => {
       // Run tool A
       await router.route({
         context: mockContext,
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './' },
         sessionId: session.sessionId,
       });
@@ -412,7 +412,7 @@ describe('Idempotency Behavior', () => {
       // Run unrelated tool B
       await router.route({
         context: mockContext,
-        toolName: 'prepare-cluster',
+        toolName: 'prepare_cluster',
         params: {},
         sessionId: session.sessionId,
       });
@@ -421,21 +421,21 @@ describe('Idempotency Behavior', () => {
       resetExecutionLog();
       await router.route({
         context: mockContext,
-        toolName: 'resolve-base-images',
+        toolName: 'resolve_base_images',
         params: {},
         sessionId: session.sessionId,
       });
 
       // Should not re-run A
       const toolOrder = executionLog.map(e => e.tool);
-      expect(toolOrder).not.toContain('analyze-repo');
-      expect(toolOrder).toEqual(['resolve-base-images']);
+      expect(toolOrder).not.toContain('analyze_repo');
+      expect(toolOrder).toEqual(['resolve_base_images']);
 
       // Try to re-run B
       resetExecutionLog();
       const rerunB = await router.route({
         context: mockContext,
-        toolName: 'prepare-cluster',
+        toolName: 'prepare_cluster',
         params: {},
         sessionId: session.sessionId,
       });
@@ -461,22 +461,22 @@ describe('Idempotency Behavior', () => {
       // Try to build (should skip prerequisites)
       const result = await router.route({
         context: mockContext,
-        toolName: 'build-image',
+        toolName: 'build_image',
         params: { imageName: 'test' },
         sessionId: session.sessionId,
       });
 
       expect(result.result.ok).toBe(true);
 
-      // Should only run build-image
+      // Should only run build_image
       const toolOrder = executionLog.map(e => e.tool);
-      expect(toolOrder).toEqual(['build-image']);
+      expect(toolOrder).toEqual(['build_image']);
 
-      // Now try to re-run build-image
+      // Now try to re-run build_image
       resetExecutionLog();
       const rerun = await router.route({
         context: mockContext,
-        toolName: 'build-image',
+        toolName: 'build_image',
         params: { imageName: 'test' },
         sessionId: session.sessionId,
       });

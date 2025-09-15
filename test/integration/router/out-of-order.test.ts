@@ -38,7 +38,7 @@ describe('Out-of-Order Tool Execution', () => {
   });
 
   describe('deploy without prerequisites', () => {
-    it('should automatically run analyze-repo, build-image, prepare-cluster, and generate-k8s-manifests', async () => {
+    it('should automatically run analyze-repo, build_image, prepare_cluster, and generate_k8s_manifests', async () => {
       const result = await router.route({
         toolName: 'deploy',
         params: {
@@ -49,29 +49,29 @@ describe('Out-of-Order Tool Execution', () => {
       });
 
       expect(result.result.ok).toBe(true);
-      expect(result.executedTools).toContain('analyze-repo');
-      expect(result.executedTools).toContain('build-image');
-      expect(result.executedTools).toContain('prepare-cluster');
-      expect(result.executedTools).toContain('generate-k8s-manifests');
+      expect(result.executedTools).toContain('analyze_repo');
+      expect(result.executedTools).toContain('build_image');
+      expect(result.executedTools).toContain('prepare_cluster');
+      expect(result.executedTools).toContain('generate_k8s_manifests');
       expect(result.executedTools).toContain('deploy');
 
       // Verify execution order from log
       const toolOrder = executionLog.map(e => e.tool);
 
       // Check that all required tools were executed
-      expect(toolOrder).toContain('analyze-repo');
-      expect(toolOrder).toContain('resolve-base-images');
-      expect(toolOrder).toContain('generate-dockerfile');
-      expect(toolOrder).toContain('build-image');
-      expect(toolOrder).toContain('prepare-cluster');
-      expect(toolOrder).toContain('generate-k8s-manifests');
+      expect(toolOrder).toContain('analyze_repo');
+      expect(toolOrder).toContain('resolve_base_images');
+      expect(toolOrder).toContain('generate_dockerfile');
+      expect(toolOrder).toContain('build_image');
+      expect(toolOrder).toContain('prepare_cluster');
+      expect(toolOrder).toContain('generate_k8s_manifests');
       expect(toolOrder).toContain('deploy');
 
       // Verify order constraints (dependencies must be respected)
-      const analyzeIdx = toolOrder.indexOf('analyze-repo');
-      const resolveIdx = toolOrder.indexOf('resolve-base-images');
-      const generateDockerIdx = toolOrder.indexOf('generate-dockerfile');
-      const buildIdx = toolOrder.indexOf('build-image');
+      const analyzeIdx = toolOrder.indexOf('analyze_repo');
+      const resolveIdx = toolOrder.indexOf('resolve_base_images');
+      const generateDockerIdx = toolOrder.indexOf('generate_dockerfile');
+      const buildIdx = toolOrder.indexOf('build_image');
       const deployIdx = toolOrder.indexOf('deploy');
 
       // analyze-repo must come before its dependents
@@ -79,10 +79,10 @@ describe('Out-of-Order Tool Execution', () => {
       expect(analyzeIdx).toBeLessThan(generateDockerIdx);
       expect(analyzeIdx).toBeLessThan(buildIdx);
 
-      // resolve-base-images must come before generate-dockerfile
+      // resolve_base_images must come before generate_dockerfile
       expect(resolveIdx).toBeLessThan(generateDockerIdx);
 
-      // generate-dockerfile must come before build-image
+      // generate_dockerfile must come before build_image
       expect(generateDockerIdx).toBeLessThan(buildIdx);
 
       // All prerequisites must come before deploy
@@ -99,11 +99,11 @@ describe('Out-of-Order Tool Execution', () => {
     });
   });
 
-  describe('push-image without build', () => {
-    it('should automatically run analyze-repo, generate-dockerfile, and build-image first', async () => {
+  describe('push_image without build', () => {
+    it('should automatically run analyze-repo, generate_dockerfile, and build_image first', async () => {
       const result = await router.route({
         context: mockContext,
-        toolName: 'push-image',
+        toolName: 'push_image',
         params: {
           imageId: 'auto-generated',
           registry: 'myregistry.io',
@@ -111,74 +111,74 @@ describe('Out-of-Order Tool Execution', () => {
       });
 
       expect(result.result.ok).toBe(true);
-      expect(result.executedTools).toContain('analyze-repo');
-      expect(result.executedTools).toContain('generate-dockerfile');
-      expect(result.executedTools).toContain('build-image');
-      expect(result.executedTools).toContain('push-image');
+      expect(result.executedTools).toContain('analyze_repo');
+      expect(result.executedTools).toContain('generate_dockerfile');
+      expect(result.executedTools).toContain('build_image');
+      expect(result.executedTools).toContain('push_image');
 
       // Verify execution order
       const toolOrder = executionLog.map(e => e.tool);
       expect(toolOrder).toEqual([
-        'analyze-repo',
-        'resolve-base-images',
-        'generate-dockerfile',
-        'build-image',
-        'push-image',
+        'analyze_repo',
+        'resolve_base_images',
+        'generate_dockerfile',
+        'build_image',
+        'push_image',
       ]);
 
       // Verify the push used the built image ID
-      const pushExecution = executionLog.find(e => e.tool === 'push-image');
+      const pushExecution = executionLog.find(e => e.tool === 'push_image');
       expect(pushExecution?.params.imageId).toBeDefined();
     });
   });
 
-  describe('scan-image without build', () => {
+  describe('scan without build', () => {
     it('should automatically build the image first', async () => {
       const result = await router.route({
         context: mockContext,
-        toolName: 'scan-image',
+        toolName: 'scan',
         params: {
           imageId: 'will-be-built',
         },
       });
 
       expect(result.result.ok).toBe(true);
-      expect(result.executedTools).toContain('analyze-repo');
-      expect(result.executedTools).toContain('build-image');
-      expect(result.executedTools).toContain('scan-image');
+      expect(result.executedTools).toContain('analyze_repo');
+      expect(result.executedTools).toContain('build_image');
+      expect(result.executedTools).toContain('scan');
 
       // Verify proper order
       const toolOrder = executionLog.map(e => e.tool);
-      const analyzeIndex = toolOrder.indexOf('analyze-repo');
-      const buildIndex = toolOrder.indexOf('build-image');
-      const scanIndex = toolOrder.indexOf('scan-image');
+      const analyzeIndex = toolOrder.indexOf('analyze_repo');
+      const buildIndex = toolOrder.indexOf('build_image');
+      const scanIndex = toolOrder.indexOf('scan');
 
       expect(analyzeIndex).toBeLessThan(buildIndex);
       expect(buildIndex).toBeLessThan(scanIndex);
     });
   });
 
-  describe('generate-dockerfile without analysis', () => {
-    it('should automatically run analyze-repo and resolve-base-images first', async () => {
+  describe('generate_dockerfile without analysis', () => {
+    it('should automatically run analyze-repo and resolve_base_images first', async () => {
       const result = await router.route({
         context: mockContext,
-        toolName: 'generate-dockerfile',
+        toolName: 'generate_dockerfile',
         params: {
           path: './src',
         },
       });
 
       expect(result.result.ok).toBe(true);
-      expect(result.executedTools).toContain('analyze-repo');
-      expect(result.executedTools).toContain('resolve-base-images');
-      expect(result.executedTools).toContain('generate-dockerfile');
+      expect(result.executedTools).toContain('analyze_repo');
+      expect(result.executedTools).toContain('resolve_base_images');
+      expect(result.executedTools).toContain('generate_dockerfile');
 
       // Verify execution order
       const toolOrder = executionLog.map(e => e.tool);
       expect(toolOrder).toEqual([
-        'analyze-repo',
-        'resolve-base-images',
-        'generate-dockerfile',
+        'analyze_repo',
+        'resolve_base_images',
+        'generate_dockerfile',
       ]);
     });
   });
@@ -189,7 +189,7 @@ describe('Out-of-Order Tool Execution', () => {
       const sessionResult = await sessionManager.createWithState({
         completed_steps: ['analyzed_repo'] as Step[],
         results: {
-          'analyze-repo': {
+          'analyze_repo': {
             framework: 'node',
             packageManager: 'npm',
           },
@@ -201,7 +201,7 @@ describe('Out-of-Order Tool Execution', () => {
 
       const result = await router.route({
         context: mockContext,
-        toolName: 'build-image',
+        toolName: 'build_image',
         params: {
           imageName: 'test-app',
         },
@@ -212,13 +212,13 @@ describe('Out-of-Order Tool Execution', () => {
 
       // Should NOT re-run analyze-repo
       const toolOrder = executionLog.map(e => e.tool);
-      expect(toolOrder).not.toContain('analyze-repo');
+      expect(toolOrder).not.toContain('analyze_repo');
 
       // Should run missing prerequisites
       expect(toolOrder).toEqual([
-        'resolve-base-images',
-        'generate-dockerfile',
-        'build-image',
+        'resolve_base_images',
+        'generate_dockerfile',
+        'build_image',
       ]);
     });
   });
@@ -242,16 +242,16 @@ describe('Out-of-Order Tool Execution', () => {
 
       // Verify all required tools were run
       const executedTools = new Set(executionLog.map(e => e.tool));
-      expect(executedTools.has('analyze-repo')).toBe(true);
-      expect(executedTools.has('build-image')).toBe(true);
-      expect(executedTools.has('prepare-cluster')).toBe(true);
-      expect(executedTools.has('generate-k8s-manifests')).toBe(true);
+      expect(executedTools.has('analyze_repo')).toBe(true);
+      expect(executedTools.has('build_image')).toBe(true);
+      expect(executedTools.has('prepare_cluster')).toBe(true);
+      expect(executedTools.has('generate_k8s_manifests')).toBe(true);
       expect(executedTools.has('deploy')).toBe(true);
 
       // Verify order constraints
       const toolOrder = executionLog.map(e => e.tool);
-      const analyzeIndex = toolOrder.indexOf('analyze-repo');
-      const buildIndex = toolOrder.indexOf('build-image');
+      const analyzeIndex = toolOrder.indexOf('analyze_repo');
+      const buildIndex = toolOrder.indexOf('build_image');
       const deployIndex = toolOrder.indexOf('deploy');
 
       // analyze must come before build and deploy
@@ -264,19 +264,19 @@ describe('Out-of-Order Tool Execution', () => {
   });
 
   describe('tools with no dependencies', () => {
-    it('should execute prepare-cluster directly without prerequisites', async () => {
+    it('should execute prepare_cluster directly without prerequisites', async () => {
       const result = await router.route({
         context: mockContext,
-        toolName: 'prepare-cluster',
+        toolName: 'prepare_cluster',
         params: {
           context: 'minikube',
         },
       });
 
       expect(result.result.ok).toBe(true);
-      expect(result.executedTools).toEqual(['prepare-cluster']);
+      expect(result.executedTools).toEqual(['prepare_cluster']);
       expect(executionLog.length).toBe(1);
-      expect(executionLog[0].tool).toBe('prepare-cluster');
+      expect(executionLog[0].tool).toBe('prepare_cluster');
     });
   });
 
@@ -284,10 +284,10 @@ describe('Out-of-Order Tool Execution', () => {
     it('should provide correct execution plan for deploy', () => {
       const plan = router.getExecutionPlan('deploy');
 
-      expect(plan).toContain('analyze-repo');
-      expect(plan).toContain('build-image');
-      expect(plan).toContain('prepare-cluster');
-      expect(plan).toContain('generate-k8s-manifests');
+      expect(plan).toContain('analyze_repo');
+      expect(plan).toContain('build_image');
+      expect(plan).toContain('prepare_cluster');
+      expect(plan).toContain('generate_k8s_manifests');
       expect(plan[plan.length - 1]).toBe('deploy');
     });
 
@@ -295,13 +295,13 @@ describe('Out-of-Order Tool Execution', () => {
       const completedSteps = new Set<Step>(['analyzed_repo', 'k8s_prepared']);
       const plan = router.getExecutionPlan('deploy', completedSteps);
 
-      // Should not include analyze-repo or prepare-cluster
-      expect(plan).not.toContain('analyze-repo');
-      expect(plan).not.toContain('prepare-cluster');
+      // Should not include analyze-repo or prepare_cluster
+      expect(plan).not.toContain('analyze_repo');
+      expect(plan).not.toContain('prepare_cluster');
 
       // Should include missing steps
-      expect(plan).toContain('build-image');
-      expect(plan).toContain('generate-k8s-manifests');
+      expect(plan).toContain('build_image');
+      expect(plan).toContain('generate_k8s_manifests');
       expect(plan[plan.length - 1]).toBe('deploy');
     });
   });

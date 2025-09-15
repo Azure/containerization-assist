@@ -35,6 +35,8 @@ export interface ContainerAssist {
   registerTools: (server: McpServer, config?: ToolConfig) => void;
   /** Get list of available tool names */
   getAvailableTools: () => readonly string[];
+  /** Get the session ID used for maintaining state across tool calls */
+  getSessionId: () => string;
 }
 
 /**
@@ -48,6 +50,7 @@ type McpServerLike = McpServer;
 export function createContainerAssist(
   options: {
     logger?: Logger;
+    sessionId?: string;
   } = {},
 ): ContainerAssist {
   const logger = options.logger || createLogger({ name: 'containerization-assist' });
@@ -55,12 +58,26 @@ export function createContainerAssist(
   const tools = loadAllTools();
   const router = createRouter(sessionManager, logger, tools);
 
+  // Generate a consistent session ID for this instance to maintain state across tool calls
+  const defaultSessionId =
+    options.sessionId ||
+    `container-assist-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
   return {
     bindToServer: (server: McpServer) =>
-      bindAllTools(server, tools, router, logger, sessionManager),
+      bindAllTools(server, tools, router, logger, sessionManager, defaultSessionId),
     registerTools: (server: McpServer, config?: ToolConfig) =>
-      registerSelectedTools(server, tools, router, config, logger, sessionManager),
+      registerSelectedTools(
+        server,
+        tools,
+        router,
+        config,
+        logger,
+        sessionManager,
+        defaultSessionId,
+      ),
     getAvailableTools: () => Object.keys(tools) as readonly string[],
+    getSessionId: () => defaultSessionId,
   } as const;
 }
 
@@ -79,7 +96,7 @@ function loadAllTools(): Map<string, Tool> {
 }
 
 /**
- * Create tool router with proper configuration
+ * Create tool router with proper configuration matching standalone server
  */
 function createRouter(
   sessionManager: SessionManager,
@@ -89,20 +106,17 @@ function createRouter(
   const routerTools = new Map<string, RouterTool>();
 
   for (const [name, tool] of tools.entries()) {
-    // Get the raw execution function to avoid double wrapping
-    const rawExecuteFn =
-      (tool as { executeFn?: (...args: unknown[]) => unknown }).executeFn || tool.execute;
-
     routerTools.set(name, {
       name,
       handler: async (
         params: Record<string, unknown>,
         context: ToolContext,
       ): Promise<Result<unknown>> => {
-        // Tool.execute expects (params, logger, context?) but router expects (params, context)
+        // Use the tool's execute method directly - the router's executeToolImpl will handle session persistence
         const toolLogger = logger.child({ tool: name });
-        return (await rawExecuteFn(params, toolLogger, context)) as Result<unknown>;
+        return await tool.execute(params, toolLogger, context);
       },
+      schema: tool.zodSchema ? (tool.zodSchema as any) : undefined,
     });
   }
 
@@ -122,8 +136,9 @@ function bindAllTools(
   router: IToolRouter,
   logger: Logger,
   sessionManager: SessionManager,
+  defaultSessionId: string,
 ): void {
-  registerSelectedTools(server, tools, router, undefined, logger, sessionManager);
+  registerSelectedTools(server, tools, router, undefined, logger, sessionManager, defaultSessionId);
 }
 
 /**
@@ -136,6 +151,7 @@ function registerSelectedTools(
   config: ToolConfig = {},
   logger: Logger,
   sessionManager: SessionManager,
+  defaultSessionId: string,
 ): void {
   const toolsToRegister = config.tools
     ? Array.from(tools.entries()).filter(([name]) => config.tools?.includes(name as ToolName))
@@ -144,7 +160,7 @@ function registerSelectedTools(
   for (const [originalName, tool] of toolsToRegister) {
     const customName = config.nameMapping?.[originalName as ToolName] || originalName;
 
-    registerSingleTool(server, tool, customName, router, logger, sessionManager);
+    registerSingleTool(server, tool, customName, router, logger, sessionManager, defaultSessionId);
   }
 }
 
@@ -158,6 +174,7 @@ function registerSingleTool(
   router: IToolRouter,
   logger: Logger,
   sessionManager: SessionManager,
+  defaultSessionId: string,
 ): void {
   if (!tool.zodSchema) {
     logger.warn({ tool: name }, 'Tool missing Zod schema, skipping registration');
@@ -185,10 +202,10 @@ function registerSingleTool(
           },
         });
 
-        // Extract session info from params
+        // Extract session info from params - use default session to maintain state
         const paramsObj = (args || {}) as Record<string, unknown>;
         const sessionId =
-          typeof paramsObj.sessionId === 'string' ? paramsObj.sessionId : `session-${Date.now()}`;
+          typeof paramsObj.sessionId === 'string' ? paramsObj.sessionId : defaultSessionId;
 
         // Use router for execution with dependency resolution
         const routeResult = await router.route({

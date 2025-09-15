@@ -42,19 +42,19 @@ describe('Force Flag Functionality', () => {
       // First run: analyze-repo
       const firstRun = await router.route({
         context: mockContext,
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './src' },
       });
 
       expect(firstRun.result.ok).toBe(true);
-      expect(firstRun.executedTools).toEqual(['analyze-repo']);
+      expect(firstRun.executedTools).toEqual(['analyze_repo']);
       expect(executionLog.length).toBe(1);
 
       // Second run WITHOUT force: should skip
       resetExecutionLog();
       const secondRun = await router.route({
         context: mockContext,
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './src' },
         sessionId: firstRun.sessionState.sessionId,
       });
@@ -73,26 +73,26 @@ describe('Force Flag Functionality', () => {
       resetExecutionLog();
       const thirdRun = await router.route({
         context: mockContext,
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './src' },
         sessionId: firstRun.sessionState.sessionId,
         force: true,
       });
 
       expect(thirdRun.result.ok).toBe(true);
-      expect(thirdRun.executedTools).toEqual(['analyze-repo']);
+      expect(thirdRun.executedTools).toEqual(['analyze_repo']);
       expect(executionLog.length).toBe(1);
-      expect(executionLog[0].tool).toBe('analyze-repo');
+      expect(executionLog[0].tool).toBe('analyze_repo');
     });
   });
 
   describe('bypassing precondition checks', () => {
     it('should skip prerequisite execution when force=true', async () => {
-      // Try to run build-image with force flag
-      // Should NOT run analyze-repo, generate-dockerfile first
+      // Try to run build_image with force flag
+      // Should NOT run analyze-repo, generate_dockerfile first
       const result = await router.route({
         context: mockContext,
-        toolName: 'build-image',
+        toolName: 'build_image',
         params: {
           imageName: 'forced-build',
           dockerfilePath: './Dockerfile',
@@ -104,9 +104,9 @@ describe('Force Flag Functionality', () => {
         console.error('Force flag test failed:', result.result.error);
       }
       expect(result.result.ok).toBe(true);
-      expect(result.executedTools).toEqual(['build-image']);
+      expect(result.executedTools).toEqual(['build_image']);
       expect(executionLog.length).toBe(1);
-      expect(executionLog[0].tool).toBe('build-image');
+      expect(executionLog[0].tool).toBe('build_image');
 
       // Session should still record the effect
       const completedSteps = result.sessionState.completed_steps as Step[];
@@ -141,7 +141,7 @@ describe('Force Flag Functionality', () => {
       const sessionResult = await sessionManager.createWithState({
         completed_steps: ['analyzed_repo', 'dockerfile_generated', 'built_image'] as Step[],
         results: {
-          'build-image': {
+          'build_image': {
             imageId: 'old-image',
             tag: 'v1.0',
           },
@@ -152,10 +152,10 @@ describe('Force Flag Functionality', () => {
       if (!sessionResult.ok) return;
       const session = sessionResult.value;
 
-      // Force re-run build-image
+      // Force re-run build_image
       const result = await router.route({
         context: mockContext,
-        toolName: 'build-image',
+        toolName: 'build_image',
         params: {
           imageName: 'new-image',
           tag: 'v2.0',
@@ -165,14 +165,14 @@ describe('Force Flag Functionality', () => {
       });
 
       expect(result.result.ok).toBe(true);
-      expect(result.executedTools).toEqual(['build-image']);
+      expect(result.executedTools).toEqual(['build_image']);
 
       // Verify new results replaced old ones
       const updatedResult = await sessionManager.get(session.sessionId);
       expect(updatedResult.ok).toBe(true);
       if (!updatedResult.ok) return;
       const updatedSession = updatedResult.value;
-      expect(updatedSession?.results?.['build-image']).toMatchObject({
+      expect(updatedSession?.results?.['build_image']).toMatchObject({
         imageName: 'new-image',
         tag: 'v2.0',
       });
@@ -184,7 +184,7 @@ describe('Force Flag Functionality', () => {
       // First, complete the full chain normally
       const initialRun = await router.route({
         context: mockContext,
-        toolName: 'push-image',
+        toolName: 'push_image',
         params: { imageId: 'initial' },
       });
 
@@ -192,18 +192,18 @@ describe('Force Flag Functionality', () => {
       const initialCount = executionLog.length;
       expect(initialCount).toBeGreaterThan(1); // Multiple tools run
 
-      // Now force re-run only push-image
+      // Now force re-run only push_image
       resetExecutionLog();
       const forcedRun = await router.route({
         context: mockContext,
-        toolName: 'push-image',
+        toolName: 'push_image',
         params: { imageId: 'forced', registry: 'newregistry.io' },
         sessionId: initialRun.sessionState.sessionId,
         force: true,
       });
 
       expect(forcedRun.result.ok).toBe(true);
-      expect(forcedRun.executedTools).toEqual(['push-image']);
+      expect(forcedRun.executedTools).toEqual(['push_image']);
       expect(executionLog.length).toBe(1);
       expect(executionLog[0].params.registry).toBe('newregistry.io');
     });
@@ -214,13 +214,13 @@ describe('Force Flag Functionality', () => {
       // Force flag without session should create new session and execute
       const result = await router.route({
         context: mockContext,
-        toolName: 'scan-image',
+        toolName: 'scan',
         params: { imageId: 'test-image' },
         force: true,
       });
 
       expect(result.result.ok).toBe(true);
-      expect(result.executedTools).toEqual(['scan-image']);
+      expect(result.executedTools).toEqual(['scan']);
       expect(result.sessionState.sessionId).toBeDefined();
     });
 
@@ -228,7 +228,7 @@ describe('Force Flag Functionality', () => {
       // Complete a tool first
       const firstRun = await router.route({
         context: mockContext,
-        toolName: 'prepare-cluster',
+        toolName: 'prepare_cluster',
         params: { context: 'test' },
       });
 
@@ -238,7 +238,7 @@ describe('Force Flag Functionality', () => {
       resetExecutionLog();
       const secondRun = await router.route({
         context: mockContext,
-        toolName: 'prepare-cluster',
+        toolName: 'prepare_cluster',
         params: { context: 'test' },
         sessionId: firstRun.sessionState.sessionId,
         force: false,
@@ -303,7 +303,7 @@ describe('Force Flag Functionality', () => {
       // Run with force flag
       const result = await router.route({
         context: mockContext,
-        toolName: 'generate-dockerfile',
+        toolName: 'generate_dockerfile',
         params: { path: './' },
         sessionId: session.sessionId,
         force: true,
@@ -327,7 +327,7 @@ describe('Force Flag Functionality', () => {
       const session = sessionResult.value;
 
       // Force multiple tools in sequence
-      const tools = ['analyze-repo', 'build-image', 'scan-image'];
+      const tools = ['analyze_repo', 'build_image', 'scan'];
 
       for (const tool of tools) {
         resetExecutionLog();

@@ -22,14 +22,14 @@ export const resetExecutionLog = () => {
 
 // Mock tool handlers
 export const mockAnalyzeRepo = {
-  name: 'analyze-repo',
+  name: 'analyze_repo',
   schema: z.object({
     path: z.string().default('.'),
     sessionId: z.string().optional(),
   }),
   handler: async (params: Record<string, unknown>, _context?: any): Promise<Result<unknown>> => {
     executionLog.push({
-      tool: 'analyze-repo',
+      tool: 'analyze_repo',
       executed: true,
       params,
       timestamp: new Date(),
@@ -43,7 +43,7 @@ export const mockAnalyzeRepo = {
 };
 
 export const mockResolveBaseImages = {
-  name: 'resolve-base-images',
+  name: 'resolve_base_images',
   schema: z.object({
     framework: z.string().optional(),
     version: z.string().optional(),
@@ -51,7 +51,7 @@ export const mockResolveBaseImages = {
   }),
   handler: async (params: Record<string, unknown>, _context?: any): Promise<Result<unknown>> => {
     executionLog.push({
-      tool: 'resolve-base-images',
+      tool: 'resolve_base_images',
       executed: true,
       params,
       timestamp: new Date(),
@@ -64,7 +64,7 @@ export const mockResolveBaseImages = {
 };
 
 export const mockGenerateDockerfile = {
-  name: 'generate-dockerfile',
+  name: 'generate_dockerfile',
   schema: z.object({
     path: z.string().default('.'),
     framework: z.string().optional(),
@@ -73,7 +73,7 @@ export const mockGenerateDockerfile = {
   }),
   handler: async (params: Record<string, unknown>, _context?: any): Promise<Result<unknown>> => {
     executionLog.push({
-      tool: 'generate-dockerfile',
+      tool: 'generate_dockerfile',
       executed: true,
       params,
       timestamp: new Date(),
@@ -86,7 +86,7 @@ export const mockGenerateDockerfile = {
 };
 
 export const mockBuildImage = {
-  name: 'build-image',
+  name: 'build_image',
   schema: z.object({
     dockerfilePath: z.string().default('./Dockerfile'),
     imageName: z.string(),
@@ -95,7 +95,7 @@ export const mockBuildImage = {
   }),
   handler: async (params: Record<string, unknown>, _context?: any): Promise<Result<unknown>> => {
     executionLog.push({
-      tool: 'build-image',
+      tool: 'build_image',
       executed: true,
       params,
       timestamp: new Date(),
@@ -109,7 +109,7 @@ export const mockBuildImage = {
 };
 
 export const mockPushImage = {
-  name: 'push-image',
+  name: 'push_image',
   schema: z.object({
     imageId: z.string(),
     registry: z.string().optional(),
@@ -117,7 +117,7 @@ export const mockPushImage = {
   }),
   handler: async (params: Record<string, unknown>, _context?: any): Promise<Result<unknown>> => {
     executionLog.push({
-      tool: 'push-image',
+      tool: 'push_image',
       executed: true,
       params,
       timestamp: new Date(),
@@ -131,14 +131,14 @@ export const mockPushImage = {
 };
 
 export const mockScanImage = {
-  name: 'scan-image',
+  name: 'scan',
   schema: z.object({
     imageId: z.string(),
     sessionId: z.string().optional(),
   }),
   handler: async (params: Record<string, unknown>, _context?: any): Promise<Result<unknown>> => {
     executionLog.push({
-      tool: 'scan-image',
+      tool: 'scan',
       executed: true,
       params,
       timestamp: new Date(),
@@ -156,14 +156,14 @@ export const mockScanImage = {
 };
 
 export const mockPrepareCluster = {
-  name: 'prepare-cluster',
+  name: 'prepare_cluster',
   schema: z.object({
     context: z.string().optional(),
     sessionId: z.string().optional(),
   }),
   handler: async (params: Record<string, unknown>, _context?: any): Promise<Result<unknown>> => {
     executionLog.push({
-      tool: 'prepare-cluster',
+      tool: 'prepare_cluster',
       executed: true,
       params,
       timestamp: new Date(),
@@ -176,7 +176,7 @@ export const mockPrepareCluster = {
 };
 
 export const mockGenerateK8sManifests = {
-  name: 'generate-k8s-manifests',
+  name: 'generate_k8s_manifests',
   schema: z.object({
     appName: z.string(),
     imageName: z.string(),
@@ -184,7 +184,7 @@ export const mockGenerateK8sManifests = {
   }),
   handler: async (params: Record<string, unknown>, _context?: any): Promise<Result<unknown>> => {
     executionLog.push({
-      tool: 'generate-k8s-manifests',
+      tool: 'generate_k8s_manifests',
       executed: true,
       params,
       timestamp: new Date(),
@@ -244,14 +244,14 @@ export const mockFailingTool = {
 export const createMockToolsMap = () => {
   const tools = new Map();
 
-  tools.set('analyze-repo', mockAnalyzeRepo);
-  tools.set('resolve-base-images', mockResolveBaseImages);
-  tools.set('generate-dockerfile', mockGenerateDockerfile);
-  tools.set('build-image', mockBuildImage);
-  tools.set('push-image', mockPushImage);
-  tools.set('scan-image', mockScanImage);
-  tools.set('prepare-cluster', mockPrepareCluster);
-  tools.set('generate-k8s-manifests', mockGenerateK8sManifests);
+  tools.set('analyze_repo', mockAnalyzeRepo);
+  tools.set('resolve_base_images', mockResolveBaseImages);
+  tools.set('generate_dockerfile', mockGenerateDockerfile);
+  tools.set('build_image', mockBuildImage);
+  tools.set('push_image', mockPushImage);
+  tools.set('scan', mockScanImage);
+  tools.set('prepare_cluster', mockPrepareCluster);
+  tools.set('generate_k8s_manifests', mockGenerateK8sManifests);
   tools.set('deploy', mockDeploy);
   tools.set('failing-tool', mockFailingTool);
 

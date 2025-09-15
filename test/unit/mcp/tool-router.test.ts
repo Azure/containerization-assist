@@ -35,9 +35,9 @@ describe('ToolRouter', () => {
     // Create mock tools
     mockTools = new Map();
 
-    // Mock analyze-repo tool
-    mockTools.set('analyze-repo', {
-      name: 'analyze-repo',
+    // Mock analyze_repo tool
+    mockTools.set('analyze_repo', {
+      name: 'analyze_repo',
       schema: z.object({
         path: z.string(),
         sessionId: z.string().optional(),
@@ -52,8 +52,8 @@ describe('ToolRouter', () => {
     });
 
     // Mock resolve-base-images tool
-    mockTools.set('resolve-base-images', {
-      name: 'resolve-base-images',
+    mockTools.set('resolve_base_images', {
+      name: 'resolve_base_images',
       schema: z.object({
         framework: z.string(),
         sessionId: z.string().optional(),
@@ -67,8 +67,8 @@ describe('ToolRouter', () => {
     });
 
     // Mock generate-dockerfile tool
-    mockTools.set('generate-dockerfile', {
-      name: 'generate-dockerfile',
+    mockTools.set('generate_dockerfile', {
+      name: 'generate_dockerfile',
       schema: z.object({
         path: z.string(),
         framework: z.string().optional(),
@@ -84,8 +84,8 @@ describe('ToolRouter', () => {
     });
 
     // Mock build-image tool
-    mockTools.set('build-image', {
-      name: 'build-image',
+    mockTools.set('build_image', {
+      name: 'build_image',
       schema: z.object({
         path: z.string(),
         imageId: z.string(),
@@ -117,8 +117,8 @@ describe('ToolRouter', () => {
     });
 
     // Mock prepare-cluster tool
-    mockTools.set('prepare-cluster', {
-      name: 'prepare-cluster',
+    mockTools.set('prepare_cluster', {
+      name: 'prepare_cluster',
       schema: z.object({
         namespace: z.string().optional(),
         sessionId: z.string().optional(),
@@ -132,8 +132,8 @@ describe('ToolRouter', () => {
     });
 
     // Mock generate-k8s-manifests tool
-    mockTools.set('generate-k8s-manifests', {
-      name: 'generate-k8s-manifests',
+    mockTools.set('generate_k8s_manifests', {
+      name: 'generate_k8s_manifests',
       schema: z.object({
         imageId: z.string(),
         appName: z.string().optional(),
@@ -182,10 +182,10 @@ describe('ToolRouter', () => {
       expect(result.executedTools.length).toBeGreaterThan(1);
 
       // Verify the sequence included necessary preconditions
-      expect(result.executedTools).toContain('analyze-repo');
-      expect(result.executedTools).toContain('build-image');
-      expect(result.executedTools).toContain('prepare-cluster');
-      expect(result.executedTools).toContain('generate-k8s-manifests');
+      expect(result.executedTools).toContain('analyze_repo');
+      expect(result.executedTools).toContain('build_image');
+      expect(result.executedTools).toContain('prepare_cluster');
+      expect(result.executedTools).toContain('generate_k8s_manifests');
       expect(result.executedTools).toContain('deploy');
 
       // Verify final result is successful
@@ -195,10 +195,10 @@ describe('ToolRouter', () => {
       }
 
       // Verify tools were called
-      const analyzeHandler = mockTools.get('analyze-repo').handler;
+      const analyzeHandler = mockTools.get('analyze_repo').handler;
       expect(analyzeHandler).toHaveBeenCalled();
 
-      const buildHandler = mockTools.get('build-image').handler;
+      const buildHandler = mockTools.get('build_image').handler;
       expect(buildHandler).toHaveBeenCalled();
     });
 
@@ -209,7 +209,7 @@ describe('ToolRouter', () => {
       };
 
       const result = await router.route({
-        toolName: 'generate-dockerfile',
+        toolName: 'generate_dockerfile',
         params: {
           path: './app',
         },
@@ -217,9 +217,9 @@ describe('ToolRouter', () => {
       });
 
       // Should run analyze-repo and resolve-base-images first
-      expect(result.executedTools).toContain('analyze-repo');
-      expect(result.executedTools).toContain('resolve-base-images');
-      expect(result.executedTools).toContain('generate-dockerfile');
+      expect(result.executedTools).toContain('analyze_repo');
+      expect(result.executedTools).toContain('resolve_base_images');
+      expect(result.executedTools).toContain('generate_dockerfile');
 
       expect(result.result.ok).toBe(true);
     });
@@ -237,14 +237,14 @@ describe('ToolRouter', () => {
 
       // First execution
       const firstResult = await router.route({
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: '.' },
         sessionId,
         context,
       });
 
       expect(firstResult.result.ok).toBe(true);
-      expect(firstResult.executedTools).toContain('analyze-repo');
+      expect(firstResult.executedTools).toContain('analyze_repo');
 
       // Check that session was updated with completed steps
       const sessionResult = await sessionManager.get(sessionId);
@@ -256,7 +256,7 @@ describe('ToolRouter', () => {
 
       // Second execution with same session
       const secondResult = await router.route({
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: '.' },
         sessionId,
         context,
@@ -285,18 +285,18 @@ describe('ToolRouter', () => {
 
       // First execution
       const firstResult = await router.route({
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: '.' },
         sessionId,
         context,
       });
 
       expect(firstResult.result.ok).toBe(true);
-      expect(firstResult.executedTools).toContain('analyze-repo');
+      expect(firstResult.executedTools).toContain('analyze_repo');
 
       // Force re-execution
       const forcedResult = await router.route({
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: '.', force: true },
         sessionId,
         force: true,
@@ -304,11 +304,11 @@ describe('ToolRouter', () => {
       });
 
       // Should execute despite already completed
-      expect(forcedResult.executedTools).toContain('analyze-repo');
+      expect(forcedResult.executedTools).toContain('analyze_repo');
       expect(forcedResult.result.ok).toBe(true);
 
       // Verify handler was called twice
-      const handler = mockTools.get('analyze-repo').handler;
+      const handler = mockTools.get('analyze_repo').handler;
       expect(handler).toHaveBeenCalledTimes(2);
     });
 
@@ -325,7 +325,7 @@ describe('ToolRouter', () => {
 
       // Set up initial state
       await router.route({
-        toolName: 'build-image',
+        toolName: 'build_image',
         params: {
           path: '.',
           imageId: 'app:v1',
@@ -339,7 +339,7 @@ describe('ToolRouter', () => {
 
       // Force re-run
       const result = await router.route({
-        toolName: 'build-image',
+        toolName: 'build_image',
         params: {
           path: '.',
           imageId: 'app:v2',
@@ -350,8 +350,8 @@ describe('ToolRouter', () => {
         context,
       });
 
-      expect(result.executedTools).toContain('build-image');
-      const handler = mockTools.get('build-image').handler;
+      expect(result.executedTools).toContain('build_image');
+      const handler = mockTools.get('build_image').handler;
       expect(handler).toHaveBeenCalledWith(
         expect.objectContaining({ imageId: 'app:v2' }),
         expect.anything(),
@@ -373,7 +373,7 @@ describe('ToolRouter', () => {
 
       // Execute first tool
       await router.route({
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: '.' },
         sessionId,
         context,
@@ -387,7 +387,7 @@ describe('ToolRouter', () => {
 
       // Execute dependent tool
       await router.route({
-        toolName: 'resolve-base-images',
+        toolName: 'resolve_base_images',
         params: { framework: 'nodejs' },
         sessionId,
         context,
@@ -413,7 +413,7 @@ describe('ToolRouter', () => {
       expect(createResult.ok).toBe(true);
 
       const result = await router.route({
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './src' },
         sessionId,
         context,
@@ -425,8 +425,8 @@ describe('ToolRouter', () => {
       expect(sessionResult.ok).toBe(true);
       const session = sessionResult.ok ? sessionResult.value : null;
       expect(session.results).toBeDefined();
-      expect(session.results['analyze-repo']).toBeDefined();
-      expect(session.results['analyze-repo']).toHaveProperty('framework', 'nodejs');
+      expect(session.results['analyze_repo']).toBeDefined();
+      expect(session.results['analyze_repo']).toHaveProperty('framework', 'nodejs');
     });
   });
 
@@ -478,7 +478,7 @@ describe('ToolRouter', () => {
 
     it('should fail fast if precondition tool fails', async () => {
       // Make analyze-repo fail
-      mockTools.get('analyze-repo').handler = jest.fn(async () => {
+      mockTools.get('analyze_repo').handler = jest.fn(async () => {
         return Failure('Analysis failed');
       });
 
@@ -488,7 +488,7 @@ describe('ToolRouter', () => {
       };
 
       const result = await router.route({
-        toolName: 'generate-dockerfile',
+        toolName: 'generate_dockerfile',
         params: { path: '.' },
         context,
       });
@@ -499,7 +499,7 @@ describe('ToolRouter', () => {
       }
 
       // Should not have executed generate-dockerfile
-      expect(result.executedTools).not.toContain('generate-dockerfile');
+      expect(result.executedTools).not.toContain('generate_dockerfile');
     });
   });
 
@@ -521,8 +521,8 @@ describe('ToolRouter', () => {
       expect(result.result.ok).toBe(true);
 
       // Verify execution order
-      const analyzeIndex = result.executedTools.indexOf('analyze-repo');
-      const buildIndex = result.executedTools.indexOf('build-image');
+      const analyzeIndex = result.executedTools.indexOf('analyze_repo');
+      const buildIndex = result.executedTools.indexOf('build_image');
       const deployIndex = result.executedTools.indexOf('deploy');
 
       // analyze-repo should come before build-image
@@ -549,8 +549,8 @@ describe('ToolRouter', () => {
       expect(result.result.ok).toBe(true);
 
       // Both prepare-cluster and build-image are preconditions
-      expect(result.executedTools).toContain('prepare-cluster');
-      expect(result.executedTools).toContain('build-image');
+      expect(result.executedTools).toContain('prepare_cluster');
+      expect(result.executedTools).toContain('build_image');
       expect(result.executedTools).toContain('deploy');
     });
   });
@@ -567,7 +567,7 @@ describe('ToolRouter', () => {
       expect(createResult.ok).toBe(true);
 
       const result = await router.route({
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './test' },
         sessionId,
         context,
@@ -582,7 +582,7 @@ describe('ToolRouter', () => {
       expect(session).toBeDefined();
       expect(session?.updatedAt).toBeDefined();
       expect(session?.completed_steps).toContain('analyzed_repo');
-      expect(session?.results?.['analyze-repo']).toBeDefined();
+      expect(session?.results?.['analyze_repo']).toBeDefined();
     });
 
     it('should recover gracefully when session update returns null', async () => {
@@ -608,7 +608,7 @@ describe('ToolRouter', () => {
       });
 
       const result = await router.route({
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './test' },
         sessionId,
         context,
@@ -634,7 +634,7 @@ describe('ToolRouter', () => {
 
       // Execute multiple tools in sequence
       const analyzeResult = await router.route({
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: '.' },
         sessionId,
         context,
@@ -644,7 +644,7 @@ describe('ToolRouter', () => {
 
       // Force re-execution with different params
       const dockerfileResult = await router.route({
-        toolName: 'generate-dockerfile',
+        toolName: 'generate_dockerfile',
         params: { path: './app' },
         sessionId,
         force: true,
@@ -657,8 +657,8 @@ describe('ToolRouter', () => {
       const finalSessionResult = await sessionManager.get(sessionId);
       expect(finalSessionResult.ok).toBe(true);
       const finalSession = finalSessionResult.ok ? finalSessionResult.value : null;
-      expect(finalSession?.results?.['analyze-repo']).toBeDefined();
-      expect(finalSession?.results?.['generate-dockerfile']).toBeDefined();
+      expect(finalSession?.results?.['analyze_repo']).toBeDefined();
+      expect(finalSession?.results?.['generate_dockerfile']).toBeDefined();
       expect(finalSession?.completed_steps).toContain('analyzed_repo');
       expect(finalSession?.completed_steps).toContain('dockerfile_generated');
     });
@@ -757,7 +757,7 @@ describe('ToolRouter', () => {
 
       // First tool succeeds
       const firstResult = await router.route({
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: '.' },
         sessionId,
         context,
@@ -766,14 +766,14 @@ describe('ToolRouter', () => {
       expect(firstResult.result.ok).toBe(true);
 
       // Make resolve-base-images fail
-      const originalHandler = mockTools.get('resolve-base-images').handler;
-      mockTools.get('resolve-base-images').handler = jest.fn(async () => {
+      const originalHandler = mockTools.get('resolve_base_images').handler;
+      mockTools.get('resolve_base_images').handler = jest.fn(async () => {
         return Failure('Intentional failure for testing');
       });
 
       // Try to execute a tool that depends on resolve-base-images
       const secondResult = await router.route({
-        toolName: 'generate-dockerfile',
+        toolName: 'generate_dockerfile',
         params: { path: '.' },
         sessionId,
         context,
@@ -785,11 +785,11 @@ describe('ToolRouter', () => {
       const sessionResult = await sessionManager.get(sessionId);
       expect(sessionResult.ok).toBe(true);
       const session = sessionResult.ok ? sessionResult.value : null;
-      expect(session?.results?.['analyze-repo']).toBeDefined();
+      expect(session?.results?.['analyze_repo']).toBeDefined();
       expect(session?.completed_steps).toContain('analyzed_repo');
 
       // Restore original handler
-      mockTools.get('resolve-base-images').handler = originalHandler;
+      mockTools.get('resolve_base_images').handler = originalHandler;
     });
 
     it('should update timestamps consistently', async () => {
@@ -811,7 +811,7 @@ describe('ToolRouter', () => {
       await new Promise(resolve => setTimeout(resolve, 10));
 
       await router.route({
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: '.' },
         sessionId,
         context,

@@ -43,11 +43,11 @@ describe('Error Recovery and Rerouting', () => {
       const tools = createMockToolsMap();
 
       // Make analyze-repo fail
-      tools.set('analyze-repo', {
-        name: 'analyze-repo',
+      tools.set('analyze_repo', {
+        name: 'analyze_repo',
         handler: async (): Promise<Result<unknown>> => {
           executionLog.push({
-            tool: 'analyze-repo',
+            tool: 'analyze_repo',
             executed: true,
             params: {},
             timestamp: new Date(),
@@ -64,7 +64,7 @@ describe('Error Recovery and Rerouting', () => {
 
       const result = await failingRouter.route({
         context: mockContext,
-        toolName: 'build-image',
+        toolName: 'build_image',
         params: { imageName: 'test' },
       });
 
@@ -75,19 +75,19 @@ describe('Error Recovery and Rerouting', () => {
 
       // Should have stopped after analyze-repo failed
       const toolOrder = executionLog.map(e => e.tool);
-      expect(toolOrder).toEqual(['analyze-repo']);
-      expect(toolOrder).not.toContain('build-image');
+      expect(toolOrder).toEqual(['analyze_repo']);
+      expect(toolOrder).not.toContain('build_image');
     });
 
     it('should return detailed error when middle of chain fails', async () => {
       const tools = createMockToolsMap();
 
       // Make generate-dockerfile fail
-      tools.set('generate-dockerfile', {
-        name: 'generate-dockerfile',
+      tools.set('generate_dockerfile', {
+        name: 'generate_dockerfile',
         handler: async (): Promise<Result<unknown>> => {
           executionLog.push({
-            tool: 'generate-dockerfile',
+            tool: 'generate_dockerfile',
             executed: true,
             params: {},
             timestamp: new Date(),
@@ -104,22 +104,22 @@ describe('Error Recovery and Rerouting', () => {
 
       const result = await failingRouter.route({
         context: mockContext,
-        toolName: 'build-image',
+        toolName: 'build_image',
         params: { imageName: 'test' },
       });
 
       expect(result.result.ok).toBe(false);
       if (!result.result.ok) {
-        expect(result.result.error).toContain('generate-dockerfile');
+        expect(result.result.error).toContain('generate_dockerfile');
         expect(result.result.error).toContain('Dockerfile generation failed');
       }
 
       // Should have run up to the failure point
       const toolOrder = executionLog.map(e => e.tool);
-      expect(toolOrder).toContain('analyze-repo');
-      expect(toolOrder).toContain('resolve-base-images');
-      expect(toolOrder).toContain('generate-dockerfile');
-      expect(toolOrder).not.toContain('build-image');
+      expect(toolOrder).toContain('analyze_repo');
+      expect(toolOrder).toContain('resolve_base_images');
+      expect(toolOrder).toContain('generate_dockerfile');
+      expect(toolOrder).not.toContain('build_image');
     });
   });
 
@@ -128,12 +128,12 @@ describe('Error Recovery and Rerouting', () => {
       const tools = createMockToolsMap();
 
       let totalCalls = 0;
-      tools.set('build-image', {
-        name: 'build-image',
+      tools.set('build_image', {
+        name: 'build_image',
         handler: async (params: Record<string, unknown>, _context?: any): Promise<Result<unknown>> => {
           totalCalls++;
           executionLog.push({
-            tool: 'build-image',
+            tool: 'build_image',
             executed: true,
             params,
             timestamp: new Date(),
@@ -158,7 +158,7 @@ describe('Error Recovery and Rerouting', () => {
 
       const result = await recoveringRouter.route({
         context: mockContext,
-        toolName: 'build-image',
+        toolName: 'build_image',
         params: { imageName: 'test' },
       });
 
@@ -169,7 +169,7 @@ describe('Error Recovery and Rerouting', () => {
       resetExecutionLog();
       const retryResult = await recoveringRouter.route({
         context: mockContext,
-        toolName: 'build-image',
+        toolName: 'build_image',
         params: { imageName: 'test' },
         sessionId: result.sessionState.sessionId,
         force: true, // Force retry
@@ -192,11 +192,11 @@ describe('Error Recovery and Rerouting', () => {
     it('should include context in error messages', async () => {
       const tools = createMockToolsMap();
 
-      tools.set('push-image', {
-        name: 'push-image',
+      tools.set('push_image', {
+        name: 'push_image',
         handler: async (): Promise<Result<unknown>> => {
           executionLog.push({
-            tool: 'push-image',
+            tool: 'push_image',
             executed: true,
             params: {},
             timestamp: new Date(),
@@ -213,7 +213,7 @@ describe('Error Recovery and Rerouting', () => {
 
       const result = await failingRouter.route({
         context: mockContext,
-        toolName: 'push-image',
+        toolName: 'push_image',
         params: { imageId: 'test', registry: 'private.registry.io' },
       });
 
@@ -224,9 +224,9 @@ describe('Error Recovery and Rerouting', () => {
 
       // Verify prerequisites ran successfully before failure
       const toolOrder = executionLog.map(e => e.tool);
-      expect(toolOrder).toContain('analyze-repo');
-      expect(toolOrder).toContain('build-image');
-      expect(toolOrder[toolOrder.length - 1]).toBe('push-image');
+      expect(toolOrder).toContain('analyze_repo');
+      expect(toolOrder).toContain('build_image');
+      expect(toolOrder[toolOrder.length - 1]).toBe('push_image');
     });
   });
 
@@ -365,7 +365,7 @@ describe('Error Recovery and Rerouting', () => {
       const tools = createMockToolsMap();
 
       // Remove a critical prerequisite tool
-      tools.delete('analyze-repo');
+      tools.delete('analyze_repo');
 
       const incompleteRouter = createToolRouter({
         sessionManager,
@@ -375,14 +375,14 @@ describe('Error Recovery and Rerouting', () => {
 
       const result = await incompleteRouter.route({
         context: mockContext,
-        toolName: 'build-image',
+        toolName: 'build_image',
         params: { imageName: 'test' },
       });
 
       expect(result.result.ok).toBe(false);
       if (!result.result.ok) {
         expect(result.result.error).toContain('Tool not found');
-        expect(result.result.error).toContain('analyze-repo');
+        expect(result.result.error).toContain('analyze_repo');
       }
     });
   });
@@ -391,11 +391,11 @@ describe('Error Recovery and Rerouting', () => {
     it('should catch and wrap thrown exceptions', async () => {
       const tools = createMockToolsMap();
 
-      tools.set('scan-image', {
-        name: 'scan-image',
+      tools.set('scan', {
+        name: 'scan',
         handler: async (): Promise<Result<unknown>> => {
           executionLog.push({
-            tool: 'scan-image',
+            tool: 'scan',
             executed: true,
             params: {},
             timestamp: new Date(),
@@ -412,7 +412,7 @@ describe('Error Recovery and Rerouting', () => {
 
       const result = await crashingRouter.route({
         context: mockContext,
-        toolName: 'scan-image',
+        toolName: 'scan',
         params: { imageId: 'test' },
       });
 
@@ -426,11 +426,11 @@ describe('Error Recovery and Rerouting', () => {
     it('should handle async rejection', async () => {
       const tools = createMockToolsMap();
 
-      tools.set('prepare-cluster', {
-        name: 'prepare-cluster',
+      tools.set('prepare_cluster', {
+        name: 'prepare_cluster',
         handler: async (): Promise<Result<unknown>> => {
           executionLog.push({
-            tool: 'prepare-cluster',
+            tool: 'prepare_cluster',
             executed: true,
             params: {},
             timestamp: new Date(),
@@ -447,7 +447,7 @@ describe('Error Recovery and Rerouting', () => {
 
       const result = await rejectingRouter.route({
         context: mockContext,
-        toolName: 'prepare-cluster',
+        toolName: 'prepare_cluster',
         params: {},
       });
 
@@ -473,7 +473,7 @@ describe('Error Recovery and Rerouting', () => {
 
       const result = await routerWithBadSession.route({
         context: mockContext,
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './' },
       });
 
@@ -494,14 +494,14 @@ describe('Error Recovery and Rerouting', () => {
 
       const result = await router.route({
         context: mockContext,
-        toolName: 'analyze-repo',
+        toolName: 'analyze_repo',
         params: { path: './' },
         sessionId: session.sessionId,
       });
 
       // Tool should still execute successfully
       expect(result.result.ok).toBe(true);
-      expect(result.executedTools).toContain('analyze-repo');
+      expect(result.executedTools).toContain('analyze_repo');
     });
   });
 
@@ -510,11 +510,11 @@ describe('Error Recovery and Rerouting', () => {
       const tools = createMockToolsMap();
 
       // Make a mid-chain tool fail
-      tools.set('resolve-base-images', {
-        name: 'resolve-base-images',
+      tools.set('resolve_base_images', {
+        name: 'resolve_base_images',
         handler: async (): Promise<Result<unknown>> => {
           executionLog.push({
-            tool: 'resolve-base-images',
+            tool: 'resolve_base_images',
             executed: true,
             params: {},
             timestamp: new Date(),
@@ -537,18 +537,18 @@ describe('Error Recovery and Rerouting', () => {
 
       expect(result.result.ok).toBe(false);
       if (!result.result.ok) {
-        expect(result.result.error).toContain('resolve-base-images');
+        expect(result.result.error).toContain('resolve_base_images');
         expect(result.result.error).toContain('unsupported framework');
       }
 
       // Should have executed up to the failure point
       const toolOrder = executionLog.map(e => e.tool);
-      expect(toolOrder).toContain('analyze-repo');
-      expect(toolOrder).toContain('resolve-base-images');
+      expect(toolOrder).toContain('analyze_repo');
+      expect(toolOrder).toContain('resolve_base_images');
 
       // Should not have continued past the failure
-      expect(toolOrder).not.toContain('generate-dockerfile');
-      expect(toolOrder).not.toContain('build-image');
+      expect(toolOrder).not.toContain('generate_dockerfile');
+      expect(toolOrder).not.toContain('build_image');
       expect(toolOrder).not.toContain('deploy');
     });
   });
