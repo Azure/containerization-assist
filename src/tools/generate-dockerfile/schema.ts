@@ -27,6 +27,10 @@ export const generateDockerfileSchema = z.object({
   runtimeImage: z.string().optional().describe('Runtime image for multi-stage builds'),
   environment: environmentSchema,
   optimization: z.union([optimizationSchema, z.boolean()]).optional(),
+  preferAI: z
+    .boolean()
+    .optional()
+    .describe('Force AI analysis even with high-confidence hardcoded detection'),
   multistage: z.boolean().optional().describe('Use multi-stage build pattern'),
   securityHardening: z.boolean().optional().describe('Apply security hardening practices'),
   includeHealthcheck: z.boolean().optional().describe('Include health check configuration'),

@@ -7,7 +7,7 @@
 import { z } from 'zod';
 import type { ToolContext } from '@mcp/context';
 import type { SessionManager } from './session';
-import { Result, Success, Failure } from '../types';
+import { Result, Success, Failure } from '@types';
 import {
   SessionSlice,
   SessionSliceOperations,

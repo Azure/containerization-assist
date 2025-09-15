@@ -26,7 +26,7 @@ type Session = {
 const mockId = () => Math.random().toString(36).substring(7);
 import type { Logger } from '../../../src/lib/logger';
 import type { Result } from '../../../src/types';
-import type { ApplicationConfig } from '../../../src/config/app-config';
+import type { AppConfig } from '../../../src/config/app-config';
 import { jest } from '@jest/globals';
 
 export function createMockSession(overrides?: Partial<Session>): Session {
@@ -432,7 +432,7 @@ export function createMockLogger(): jest.Mocked<Logger> {
 /**
  * Mock Configuration Factory
  */
-export function createMockConfig(overrides?: Partial<ApplicationConfig>): ApplicationConfig {
+export function createMockConfig(overrides?: Partial<AppConfig>): AppConfig {
   return {
     server: {
       nodeEnv: 'test',
@@ -441,6 +441,8 @@ export function createMockConfig(overrides?: Partial<ApplicationConfig>): Applic
       host: 'localhost',
     },
     mcp: {
+      name: 'containerization-assist',
+      version: '1.0.0',
       storePath: ':memory:',
       sessionTTL: '1h',
       maxSessions: 10,
@@ -452,98 +454,42 @@ export function createMockConfig(overrides?: Partial<ApplicationConfig>): Applic
       ttl: 3600,
       maxSessions: 10,
       persistencePath: ':memory:',
+      persistenceInterval: 60000,
+      cleanupInterval: 3600000,
+    },
+    services: {
+      docker: {
+        socketPath: '/var/run/docker.sock',
+        host: 'localhost',
+        port: 2375,
+        registry: 'docker.io',
+        timeout: 30000,
+        buildArgs: {},
+      },
+      kubernetes: {
+        namespace: 'test',
+        kubeconfig: '',
+        timeout: 30000,
+      },
     },
     workspace: {
       workspaceDir: '/tmp/test',
       tempDir: '/tmp/test/tmp',
-      cleanupOnExit: true,
-    },
-    infrastructure: {
-      docker: {
-        socketPath: '/var/run/docker.sock',
-        registry: 'docker.io',
-        host: 'localhost',
-        port: 2376,
-        timeout: 30000,
-        apiVersion: '1.41',
-      },
-      kubernetes: {
-        kubeconfig: '',
-        namespace: 'test',
-        context: 'test-context',
-        timeout: 30000,
-        dryRun: true,
-      },
-      scanning: {
-        enabled: false,
-        scanner: 'trivy',
-        severityThreshold: 'high',
-        failOnVulnerabilities: false,
-        skipUpdate: true,
-        timeout: 30000,
-      },
-      build: {
-        enableCache: false,
-        parallel: false,
-        maxParallel: 1,
-        buildArgs: {},
-        labels: {},
-      },
-      java: {
-        defaultVersion: '17',
-        defaultJvmHeapPercentage: 75,
-        enableNativeImage: false,
-        enableJmx: false,
-        enableProfiling: false,
-      },
-    },
-    aiServices: {
-      ai: {
-        model: 'test-model',
-        baseUrl: 'http://localhost:8080',
-        timeout: 5000,
-        retryAttempts: 1,
-        retryDelayMs: 100,
-        temperature: 0.1,
-        maxTokens: 1000,
-      },
-      sampler: {
-        mode: 'mock',
-        templateDir: './test/fixtures',
-        cacheEnabled: false,
-        retryAttempts: 1,
-        retryDelayMs: 100,
-      },
-      mock: {
-        enabled: true,
-        responsesDir: './test/fixtures/mock-responses',
-        deterministicMode: true,
-        simulateLatency: false,
-        errorRate: 0,
-      },
+      maxFileSize: 1048576,
     },
     logging: {
       level: 'error',
-      format: 'json',
-      destination: 'console',
-      enableColors: false,
     },
     workflow: {
       mode: 'batch',
-      autoRetry: false,
-      maxRetries: 0,
-      retryDelayMs: 100,
-      parallelSteps: false,
-      skipOptionalSteps: true,
     },
-    features: {
-      mockMode: true,
-      enableMetrics: false,
-      enableEvents: false,
-      enablePerformanceMonitoring: false,
-      enableDebugLogs: false,
-      enableTracing: false,
-      nonInteractive: true,
+    cache: {
+      ttl: 3600,
+      maxSize: 100,
+    },
+    security: {
+      scanTimeout: 30000,
+      failOnCritical: false,
     },
     ...overrides,
   };

@@ -9,7 +9,7 @@ import {
   validateConfigurationPure,
   type SamplingConfiguration,
 } from './sampling-config';
-import { ValidationResult } from '../validation/core-types';
+import { ValidationResult } from '@/validation/core-types';
 
 export interface ConfigValidatorInterface {
   validate(config: SamplingConfiguration): Promise<ValidationResult>;

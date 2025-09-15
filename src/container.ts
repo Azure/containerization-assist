@@ -87,8 +87,8 @@ export async function initializeDependencies(deps: Dependencies): Promise<void> 
         logLevel: deps.config.server.logLevel,
         port: deps.config.server.port,
         maxSessions: deps.config.mcp.maxSessions,
-        dockerSocket: deps.config.docker.socketPath,
-        k8sNamespace: deps.config.kubernetes.namespace,
+        dockerSocket: deps.config.services.docker.socketPath,
+        k8sNamespace: deps.config.services.kubernetes.namespace,
       },
       services: {
         logger: true,

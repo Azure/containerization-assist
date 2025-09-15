@@ -35,7 +35,6 @@ const isWorkload = (manifest: KubernetesManifest): boolean => {
  * Get pod spec from different workload types
  */
 const getPodSpec = (manifest: KubernetesManifest): Record<string, unknown> | undefined => {
-  // Handle different workload types
   if (manifest.kind === 'Pod') {
     return manifest.spec;
   }
@@ -43,7 +42,6 @@ const getPodSpec = (manifest: KubernetesManifest): Record<string, unknown> | und
     const spec = manifest.spec as any;
     return spec?.jobTemplate?.spec?.template?.spec || spec?.template?.spec;
   }
-  // Deployment, StatefulSet, DaemonSet
   return (manifest.spec as any)?.template?.spec;
 };
 
@@ -122,7 +120,7 @@ const KUBERNETES_RULES: KubernetesValidationRule[] = [
       if (!isWorkload(manifest)) return true;
 
       const containers = getContainers(manifest);
-      // Liveness is optional but recommended for long-running services
+      // Liveness probes prevent zombie containers in production workloads
       return containers.some((container) => container.livenessProbe);
     },
     message: 'Consider adding liveness probe for auto-restart',
@@ -197,11 +195,11 @@ const KUBERNETES_RULES: KubernetesValidationRule[] = [
       const containers = getContainers(manifest);
       return containers.every((container) => {
         const c = container as any;
-        // If using :latest, should have Always
+        // :latest tags change content, requiring Always pull policy
         if (c.image?.includes(':latest')) {
           return c.imagePullPolicy === 'Always';
         }
-        // For specific tags, IfNotPresent is usually fine
+        // Immutable tags don't need Always, reducing network overhead
         return true;
       });
     },
@@ -280,7 +278,7 @@ const KUBERNETES_RULES: KubernetesValidationRule[] = [
  * Parse YAML documents from content
  */
 const parseDocuments = (yamlContent: string): KubernetesManifest[] => {
-  // Split by document separator and parse each part
+  // YAML allows multiple K8s resources separated by ---
   const parts = yamlContent.split(/^---\s*$/m);
   const documents: KubernetesManifest[] = [];
 
@@ -293,7 +291,7 @@ const parseDocuments = (yamlContent: string): KubernetesManifest[] => {
           documents.push(doc);
         }
       } catch {
-        // Skip invalid documents
+        // Ignore parsing errors for individual documents
       }
     }
   }
@@ -328,7 +326,7 @@ const createReport = (results: ValidationResult[]): ValidationReport => {
   const passed = results.filter((r) => r.passed).length;
   const total = results.length;
 
-  // Weighted scoring: errors = -15, warnings = -5, info = -2  (stricter on errors)
+  // Weighted scoring prioritizes security and correctness over style
   const score = Math.max(0, 100 - errors * 15 - warnings * 5 - info * 2);
   const grade = calculateGrade(score);
 
@@ -350,11 +348,9 @@ const createReport = (results: ValidationResult[]): ValidationReport => {
  */
 export const validateKubernetesContent = (yamlContent: string): ValidationReport => {
   try {
-    // First try to parse the entire content to catch syntax errors
     try {
       parseYaml(yamlContent);
     } catch (parseError) {
-      // If parsing fails, it's a syntax error
       return {
         results: [
           {
@@ -380,7 +376,7 @@ export const validateKubernetesContent = (yamlContent: string): ValidationReport
       };
     }
 
-    // Parse YAML (handles multi-document)
+    // Extract all K8s resources from potentially multi-document YAML
     const documents = parseDocuments(yamlContent);
 
     if (documents.length === 0) {
@@ -412,7 +408,6 @@ export const validateKubernetesContent = (yamlContent: string): ValidationReport
     const allResults: ValidationResult[] = [];
     let validDocumentCount = 0;
 
-    // Validate each document
     for (const doc of documents) {
       if (!doc.apiVersion || !doc.kind) continue;
 
@@ -440,7 +435,7 @@ export const validateKubernetesContent = (yamlContent: string): ValidationReport
       }
     }
 
-    // If we had documents but none were valid Kubernetes resources
+    // Fail-fast if content parses as YAML but contains no K8s resources
     if (validDocumentCount === 0) {
       return {
         results: [

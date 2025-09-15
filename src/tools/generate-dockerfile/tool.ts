@@ -6,7 +6,7 @@
 // import { extractErrorMessage } from '../../lib/error-utils'; // Not currently used
 import { promises as fs } from 'node:fs';
 import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import type { Logger } from '../../lib/logger';
+import type { Logger } from '@lib/logger';
 import path from 'node:path';
 import { safeNormalizePath } from '@lib/path-utils';
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
@@ -16,8 +16,8 @@ import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 import type { SamplingOptions } from '@lib/sampling';
 
 import type { SessionAnalysisResult } from '../session-types';
-import type { ToolContext } from '../../mcp/context';
-import { Success, Failure, type Result } from '../../types';
+import type { ToolContext } from '@mcp/context';
+import { Success, Failure, type Result } from '@types';
 import { getDefaultPort, ANALYSIS_CONFIG } from '@config/defaults';
 import { getRecommendedBaseImage } from '@lib/base-images';
 import {
@@ -404,8 +404,6 @@ async function detectModuleRoots(
         for (const buildFile of buildFiles) {
           const buildFilePath = path.join(dirPath, buildFile);
           try {
-            await fs.access(buildFilePath);
-
             // For Java projects, ensure this is an actual module, not just a parent pom
             if (buildFile === 'pom.xml') {
               const pomContent = await fs.readFile(buildFilePath, 'utf-8');
@@ -415,8 +413,8 @@ async function detectModuleRoots(
               // Check if it has source code (src directory)
               const srcDir = path.join(dirPath, 'src');
               const hasSrc = await fs
-                .access(srcDir)
-                .then(() => true)
+                .stat(srcDir)
+                .then((stats) => stats.isDirectory())
                 .catch(() => false);
 
               if (!isParentPom || hasSrc) {
@@ -775,20 +773,23 @@ async function generateSingleDockerfile(
     samplingOptions.returnAllCandidates = params.returnAllCandidates;
   if (params.useCache !== undefined) samplingOptions.useCache = params.useCache;
 
-  // Check if we should use direct analysis
-  const shouldUseDirectAnalysis =
-    (analysisResult.confidence !== undefined &&
-      analysisResult.confidence < ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD) ||
+  // Prefer AI analysis unless we have extremely high confidence in hardcoded detection
+  const shouldUseAIAnalysis =
+    !analysisResult.confidence ||
+    analysisResult.confidence < ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD ||
     analysisResult.language === 'unknown' ||
-    !analysisResult.language;
+    !analysisResult.language ||
+    params.preferAI === true; // Allow explicit AI preference
 
-  if (shouldUseDirectAnalysis) {
+  if (shouldUseAIAnalysis) {
     const reason =
-      analysisResult.language === 'unknown'
-        ? 'language detection failed (unknown)'
-        : !analysisResult.language
-          ? 'no language detected'
-          : `low confidence score (${analysisResult.confidence}/${ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD})`;
+      params.preferAI === true
+        ? 'AI analysis explicitly requested'
+        : analysisResult.language === 'unknown'
+          ? 'language detection failed (unknown)'
+          : !analysisResult.language
+            ? 'no language detected'
+            : `using AI for better accuracy (confidence: ${analysisResult.confidence}/${ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD})`;
 
     logger.info(
       {
@@ -799,7 +800,7 @@ async function generateSingleDockerfile(
         moduleRoot,
         reason,
       },
-      `🔍 DIRECT ANALYSIS MODE: ${reason} - letting AI examine repository files directly instead of using pre-analysis guidance`,
+      `🤖 AI-FIRST ANALYSIS: ${reason} - AI will examine repository files to generate optimal Dockerfile`,
     );
 
     return await generateWithDirectAnalysis(analysisResult, params, moduleRoot, context, logger);
@@ -814,7 +815,7 @@ async function generateSingleDockerfile(
       threshold: ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD,
       moduleRoot,
     },
-    `📋 GUIDED ANALYSIS MODE: High confidence detection (${analysisResult.confidence}/${ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD}) - using pre-analyzed ${analysisResult.language}${analysisResult.framework ? ` + ${analysisResult.framework}` : ''} information`,
+    `📋 FALLBACK TO TEMPLATE: Extremely high confidence detection (${analysisResult.confidence}/${ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD}) - using pre-analyzed ${analysisResult.language}${analysisResult.framework ? ` + ${analysisResult.framework}` : ''} templates`,
   );
 
   let dockerfileContent: string;

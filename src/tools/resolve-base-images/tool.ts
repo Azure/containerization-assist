@@ -21,10 +21,10 @@
 
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import { initializeToolInstrumentation } from '@lib/tool-helpers';
-import { extractErrorMessage } from '../../lib/error-utils';
-import type { ToolContext } from '../../mcp/context';
-import type { Logger } from '../../lib/logger';
-import { getRecommendedBaseImage } from '../../lib/base-images';
+import { extractErrorMessage } from '@lib/error-utils';
+import type { ToolContext } from '@mcp/context';
+import type { Logger } from '@lib/logger';
+import { getRecommendedBaseImage } from '@lib/base-images';
 import { scoreConfigCandidates } from '@lib/integrated-scoring';
 import { getKnowledgeForCategory } from '../../knowledge';
 import { resolveBaseImagesSchema, type ResolveBaseImagesParams } from './schema';
@@ -73,7 +73,7 @@ async function getBaseImageKnowledge(
     const compatibilityWarnings: string[] = [];
 
     // Process dockerfile knowledge
-    dockerfileKnowledge.forEach((match) => {
+    dockerfileKnowledge.forEach((match: any) => {
       if (match.entry.tags?.includes('base-image')) {
         recommendations.push(match.entry.recommendation);
       }
@@ -86,7 +86,7 @@ async function getBaseImageKnowledge(
     });
 
     // Process security knowledge
-    securityKnowledge.forEach((match) => {
+    securityKnowledge.forEach((match: any) => {
       if (match.entry.severity === 'high' || match.entry.tags?.includes('base-image')) {
         securityNotes.push(match.entry.recommendation);
       }
@@ -163,7 +163,7 @@ async function getImageMetadata(
     lastUpdated: new Date().toISOString(),
   };
 }
-import { Success, Failure, type Result } from '../../types';
+import { Success, Failure, type Result } from '@types';
 
 // Define the result schema for type safety
 const BaseImageRecommendationSchema = z.object({

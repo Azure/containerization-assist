@@ -7,8 +7,8 @@
 
 import type { Logger } from 'pino';
 import type { ToolContext, SamplingRequest, SamplingResponse } from '@mcp/context';
-import { Result, Success, Failure } from '../types';
-import { extractErrorMessage, formatErrorMessage } from '../lib/error-utils';
+import { Result, Success, Failure } from '@types';
+import { extractErrorMessage, formatErrorMessage } from '@lib/error-utils';
 
 /**
  * AI response with extracted content

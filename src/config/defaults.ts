@@ -52,7 +52,7 @@ export const DEFAULT_NETWORK = {
  * Analysis configuration defaults
  */
 export const ANALYSIS_CONFIG = {
-  CONFIDENCE_THRESHOLD: 70, // Threshold below which direct analysis is used
+  CONFIDENCE_THRESHOLD: 95, // Threshold above which we trust hardcoded detection over AI
   DIRECT_ANALYSIS_MAX_TOKENS: 4096, // Max tokens for direct analysis prompts
 } as const;
 

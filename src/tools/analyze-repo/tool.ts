@@ -25,15 +25,15 @@ import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-
 import { createStandardProgress } from '@mcp/progress-helper';
 import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
-import { getBaseImageRecommendations } from '../../lib/base-images';
-import type { ToolContext } from '../../mcp/context';
-import { getToolLogger, createToolTimer } from '../../lib/tool-helpers';
-import { Success, Failure, type Result } from '../../types';
+import { getBaseImageRecommendations } from '@lib/base-images';
+import type { ToolContext } from '@mcp/context';
+import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
+import { Success, Failure, type Result } from '@types';
 import { analyzeRepoSchema, type AnalyzeRepoParams } from './schema';
 import { z } from 'zod';
-import { parsePackageJson, getAllDependencies } from '../../lib/parsing-package-json';
-import { DEFAULT_PORTS } from '../../config/defaults';
-import { extractErrorMessage } from '../../lib/error-utils';
+import { parsePackageJson, getAllDependencies } from '@lib/parsing-package-json';
+import { DEFAULT_PORTS } from '@config/defaults';
+import { extractErrorMessage } from '@lib/error-utils';
 
 // Define the result schema for type safety
 const AnalyzeRepoResultSchema = z.object({
@@ -364,7 +364,7 @@ async function detectFramework(
           if (frameworkVersionMatch) {
             const version = frameworkVersionMatch[1];
 
-            // Determine specific framework type based on references
+            // Determine specific framework type based oni ences
             frameworkSignals = 1;
             if (csprojContent.includes('System.Web.Http')) {
               frameworkSignals = 2; // More specific detection

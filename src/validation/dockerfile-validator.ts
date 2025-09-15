@@ -30,7 +30,6 @@ import {
   TOKEN_PATTERN,
 } from '../lib/regex-patterns';
 
-// Use CommandEntry from docker-file-parser
 type DockerCommand = CommandEntry;
 
 /**
@@ -44,7 +43,7 @@ const getArgValue = (command: DockerCommand): string => {
     return command.args.join(' ');
   }
   if (typeof command.args === 'object' && command.args !== null) {
-    // Handle ENV key=value format
+    // ENV supports both space-separated and = formats
     return Object.entries(command.args)
       .map(([k, v]) => `${k}=${v}`)
       .join(' ');
@@ -100,7 +99,7 @@ const DOCKERFILE_RULES: DockerfileValidationRule[] = [
       const fromCommands = commands.filter((cmd: DockerCommand) => cmd.name === 'FROM');
       return fromCommands.every((cmd: DockerCommand) => {
         const image = getArgValue(cmd);
-        // Extract base image name before AS clause for validation
+        // Multi-stage builds use 'FROM image AS stage' syntax
         const cleanImage = image?.split(AS_CLAUSE)?.[0];
         return cleanImage && cleanImage.includes(':') && !LATEST_TAG.test(cleanImage);
       });
@@ -144,13 +143,11 @@ const DOCKERFILE_RULES: DockerfileValidationRule[] = [
         }
       });
 
-      // Pass if:
-      // - No source copy found (nothing to optimize)
-      // - Source copy found but package copy comes before it
-      // Fail if source copy found but no package copy or package copy comes after
-      if (sourceCopyIndex === -1) return true; // No source copy, nothing to optimize
-      if (packageCopyIndex === -1) return false; // Source copy but no package copy
-      return packageCopyIndex < sourceCopyIndex; // Package should come before source
+      // Optimal layer caching requires dependencies before source code
+      if (sourceCopyIndex === -1) return true;
+      // Layer invalidation occurs when source changes before dependency install
+      if (packageCopyIndex === -1) return false;
+      return packageCopyIndex < sourceCopyIndex;
     },
     message: 'Copy dependency files before source code for better caching',
     severity: ValidationSeverity.INFO,
@@ -187,10 +184,10 @@ const DOCKERFILE_RULES: DockerfileValidationRule[] = [
       const fromCount = commands.filter((cmd: DockerCommand) => cmd.name === 'FROM').length;
       const totalLines = commands.length;
 
-      // Skip check for simple Dockerfiles
+      // Multi-stage builds reduce final image size significantly
       if (totalLines < 10) return true;
 
-      // For complex Dockerfiles, recommend multi-stage
+      // Complex builds benefit from separate build and runtime stages
       return fromCount > 1;
     },
     message: 'Consider multi-stage builds for smaller images',

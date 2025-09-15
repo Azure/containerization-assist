@@ -1,6 +1,6 @@
 import { createLogger } from '@lib/logger';
-import { getKnowledgeForCategory, getKnowledgeRecommendations } from '../knowledge';
-import type { KnowledgeQuery } from '../knowledge/types';
+import { getKnowledgeForCategory, getKnowledgeRecommendations } from '@/knowledge';
+import type { KnowledgeQuery } from '@/knowledge/types';
 
 const logger = createLogger().child({ module: 'knowledge-enhancer' });
 

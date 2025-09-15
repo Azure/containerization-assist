@@ -4,7 +4,7 @@
  * These types represent the session data structures used across tools
  */
 
-import type { WorkflowState } from '../types';
+import type { WorkflowState } from '@types';
 
 /**
  * Analysis result stored in session

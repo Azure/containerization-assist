@@ -46,7 +46,6 @@ export const combine = <T>(validators: ValidationFunction<T>[]): ValidationFunct
       if (result.ok) {
         results.push(result.value);
       } else {
-        // If validator fails, create error result
         results.push({
           isValid: false,
           errors: [result.error],
@@ -54,8 +53,6 @@ export const combine = <T>(validators: ValidationFunction<T>[]): ValidationFunct
         });
       }
     }
-
-    // Aggregate all results
     const allErrors = results.flatMap((r) => r.errors);
     const allWarnings = results.flatMap((r) => r.warnings || []);
     const allSuggestions = results.flatMap((r) => r.suggestions || []);

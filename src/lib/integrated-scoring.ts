@@ -6,11 +6,11 @@
 
 import type { Logger } from 'pino';
 import type { ToolContext } from '@mcp/context';
-import { Result, Success, Failure } from '../types';
+import { Result, Success, Failure } from '@types';
 import { createConfigurationManager, type ConfigurationManagerInterface } from './sampling-config';
 import { createConfigScoringEngine } from './config-scoring-engine';
 import { createStrategyResolver, type StrategyContext } from './strategy-resolver';
-import type { AIGenerateOptions } from '../mcp/tool-ai-generation';
+import type { AIGenerateOptions } from '@mcp/tool-ai-generation';
 import type { SamplingCandidate } from '@lib/sampling';
 import { extractErrorMessage } from './error-utils';
 

@@ -1,12 +1,9 @@
 /**
- * Validation module exports - Functional API (Phase 3 Refactored)
+ * Validation module exports - Functional API with Result<T> pattern
  */
 
-// Core types and utilities
 export * from './core-types';
 export * from './pipeline';
-
-// Functional validators (preferred)
 export {
   validateDockerfileContent,
   getDockerfileRules,
@@ -20,13 +17,9 @@ export {
   type KubernetesValidatorInstance,
 } from './kubernetes-validator';
 
-// Import for convenience alias
 import { validateDockerfileContent } from './dockerfile-validator';
 
-// Convenience aliases
 export const validateDockerfile = validateDockerfileContent;
-
-// Re-export commonly used types
 export type {
   ValidationResult,
   ValidationReport,
@@ -37,10 +30,9 @@ export type {
   KubernetesValidationRule,
 } from './core-types';
 
-// Import types for use in this file
 import type { ValidationReport, ValidationResult } from './core-types';
 
-// Convenience function to format validation reports as markdown
+/** Formats validation reports as markdown for human consumption */
 export function formatValidationReport(report: ValidationReport): string {
   const lines: string[] = [
     '# Validation Report',
@@ -104,7 +96,7 @@ export function formatValidationReport(report: ValidationReport): string {
   return lines.join('\n');
 }
 
-// Convenience function for quick validation summary
+/** Returns human-readable validation status with score and issue counts */
 export function getValidationSummary(report: ValidationReport): string {
   if (report.score >= 90) {
     return `✅ Excellent! Score: ${report.score}/100 (${report.grade})`;

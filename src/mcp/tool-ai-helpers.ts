@@ -27,12 +27,12 @@ export {
 } from './tool-content-analysis';
 
 // Re-export scoring utilities
-export { normalizeScore, weightedAverage } from '../lib/string-validators';
+export { normalizeScore, weightedAverage } from '@lib/string-validators';
 
 // Sampling functionality
 import type { Logger } from 'pino';
 import type { ToolContext } from '@mcp/context';
-import { Result, Success, Failure } from '../types';
+import { Result, Success, Failure } from '@types';
 import { type AIResponse, type AIGenerateOptions, aiGenerate } from './tool-ai-generation';
 import type { SamplingOptions, SamplingResult, SamplingCandidate } from '@lib/sampling';
 import {
@@ -46,7 +46,7 @@ import {
   enhancePromptWithKnowledge,
   type PromptEnhancementContext,
 } from '@lib/ai-knowledge-enhancer';
-import { extractErrorMessage } from '../lib/error-utils';
+import { extractErrorMessage } from '@lib/error-utils';
 
 /**
  * Generate multiple content candidates with strategy variation

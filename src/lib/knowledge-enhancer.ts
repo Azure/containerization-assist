@@ -2,9 +2,9 @@
  * Simplified knowledge enhancer for AI prompts
  */
 import { createLogger } from '@lib/logger';
-import { getEntriesByCategoryEnhanced } from '../knowledge/enhanced-loader';
-import { scoreEntry, rankMatches } from '../knowledge/simple-scoring';
-import type { KnowledgeMatch } from '../knowledge/types';
+import { getEntriesByCategoryEnhanced } from '@/knowledge/enhanced-loader';
+import { scoreEntry, rankMatches } from '@/knowledge/simple-scoring';
+import type { KnowledgeMatch } from '@/knowledge/types';
 
 const logger = createLogger().child({ module: 'knowledge-enhancer' });
 
