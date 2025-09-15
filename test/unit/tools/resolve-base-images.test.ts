@@ -120,10 +120,8 @@ describe('resolveBaseImagesTool', () => {
     config = {
       sessionId: 'test-session-123',
       targetEnvironment: 'production',
-      requirements: {
-        security: 'medium',
-        performancePriority: 'balanced',
-      },
+      securityLevel: 'medium',
+      performancePriority: 'balanced',
     };
 
     // Get mocked functions
