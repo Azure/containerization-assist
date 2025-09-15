@@ -18,7 +18,6 @@ export const analyzeRepoSchema = z.object({
   performanceFocus: z.boolean().optional().describe('Focus on performance aspects'),
   dockerfilePaths: z
     .array(z.string())
-    .min(1)
     .nonempty()
     .describe(
       'List of Dockerfile paths for generating separate Dockerfiles (use forward slashes: /path/to/Dockerfile)',
