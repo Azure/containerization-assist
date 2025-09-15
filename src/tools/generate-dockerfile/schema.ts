@@ -48,10 +48,6 @@ export const generateDockerfileSchema = z.object({
     ),
 
   // Sampling options
-  disableSampling: z
-    .boolean()
-    .optional()
-    .describe('Disable multi-candidate sampling (sampling is enabled by default)'),
   maxCandidates: z
     .number()
     .min(1)

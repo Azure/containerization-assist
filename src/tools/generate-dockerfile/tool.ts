@@ -620,8 +620,7 @@ async function generateWithDirectAnalysis(
     maxRetries: 3,
     fallbackBehavior: 'default',
     maxTokens: ANALYSIS_CONFIG.DIRECT_ANALYSIS_MAX_TOKENS,
-    // Pass through sampling options if not disabled
-    ...(params.disableSampling ? { enableSampling: false } : {}),
+    // Sampling is always enabled for better quality
   });
 
   if (aiResult.ok) {
@@ -658,7 +657,7 @@ async function generateWithDirectAnalysis(
       };
 
       // Add sampling metadata if available
-      if (!params.disableSampling && aiResult.value.samplingMetadata) {
+      if (aiResult.value.samplingMetadata) {
         result.samplingMetadata = aiResult.value.samplingMetadata;
         result.winnerScore = aiResult.value.winner.score;
         if (params.includeScoreBreakdown && aiResult.value.winner.scoreBreakdown) {
@@ -762,8 +761,8 @@ async function generateSingleDockerfile(
 
   // Prepare sampling options (filter out undefined values)
   const samplingOptions: SamplingOptions = {};
-  // Sampling is enabled by default unless explicitly disabled
-  samplingOptions.enableSampling = !params.disableSampling;
+  // Sampling is always enabled for better quality
+  samplingOptions.enableSampling = true;
   if (params.maxCandidates !== undefined) samplingOptions.maxCandidates = params.maxCandidates;
   if (params.earlyStopThreshold !== undefined)
     samplingOptions.earlyStopThreshold = params.earlyStopThreshold;
@@ -874,8 +873,8 @@ async function generateSingleDockerfile(
     );
   }
 
-  // Use sampling-aware generation (default) unless explicitly disabled
-  if (!params.disableSampling) {
+  // Always use sampling for better quality
+  {
     const aiResult = await aiGenerateWithSampling(logger, context, {
       promptName: 'dockerfile-generation',
       promptArgs,
@@ -1016,8 +1015,8 @@ async function generateSingleDockerfile(
     ...(warnings.length > 0 && { warnings }),
   };
 
-  // Add sampling metadata if sampling was used
-  if (!params.disableSampling) {
+  // Add sampling metadata
+  {
     if (samplingMetadata) {
       result.samplingMetadata = samplingMetadata;
     }
