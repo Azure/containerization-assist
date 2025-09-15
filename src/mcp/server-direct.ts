@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto';
 import { getSystemStatus, type Dependencies } from '../container';
 import { createMCPToolContext, type ToolContext } from './context';
 import { extractErrorMessage } from '../lib/error-utils';
-import { ToolRouter } from './tool-router';
+import { createToolRouter, type IToolRouter } from './tool-router';
 
 // Single unified tool definition structure
 interface ToolDefinition {
@@ -218,208 +218,176 @@ const TOOLS: ToolDefinition[] = [
 ];
 
 /**
- * Direct MCP Server - uses SDK patterns without unnecessary wrappers
+ * MCP Server state interface
  */
-export class DirectMCPServer {
-  private server: McpServer;
-  private transport: StdioServerTransport;
-  private isRunning = false;
-  private router?: ToolRouter;
-  private toolMap = new Map<string, ToolDefinition>();
+export interface MCPServerState {
+  server: McpServer;
+  transport: StdioServerTransport;
+  isRunning: boolean;
+  router?: IToolRouter;
+  toolMap: Map<string, ToolDefinition>;
+  deps: Dependencies;
+}
 
-  constructor(private deps: Dependencies) {
-    // Create SDK server directly with capabilities
-    this.server = new McpServer(
-      {
-        name: deps.config.mcp.name,
-        version: deps.config.mcp.version,
-      },
-      {
-        capabilities: {
-          resources: { subscribe: false, listChanged: false },
-          prompts: { listChanged: false },
-          tools: { listChanged: false },
+/**
+ * MCP Server interface for dependency injection compatibility
+ */
+export interface IDirectMCPServer {
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  getServer(): unknown;
+  getStatus(): {
+    running: boolean;
+    tools: number;
+    resources: number;
+    prompts: number;
+  };
+  getTools(): Array<{ name: string; description: string }>;
+}
+
+/**
+ * Register all tools and resources directly with SDK
+ */
+export const registerHandlers = async (state: MCPServerState): Promise<void> => {
+  // Initialize router with tools
+  initializeRouter(state);
+
+  // Register tools using direct SDK pattern
+  for (const tool of TOOLS) {
+    state.toolMap.set(tool.name, tool);
+    state.server.tool(
+      tool.name,
+      tool.description,
+      tool.schema?.shape || {},
+      createToolHandler(state, tool),
+    );
+  }
+
+  // Register status resource directly
+  state.server.resource(
+    'status',
+    'containerization://status',
+    {
+      title: 'Container Status',
+      description: 'Current status of the containerization system',
+    },
+    async () => ({
+      contents: [
+        {
+          uri: 'containerization://status',
+          mimeType: 'application/json',
+          text: JSON.stringify(getSystemStatus(state.deps, state.isRunning), null, 2),
         },
-      },
-    );
+      ],
+    }),
+  );
 
-    this.transport = new StdioServerTransport();
-  }
+  // Register prompts from registry
+  await registerPrompts(state);
 
-  /**
-   * Register all tools and resources directly with SDK
-   */
-  private async registerHandlers(): Promise<void> {
-    // Initialize router with tools
-    this.initializeRouter();
+  state.deps.logger.info(`Registered ${TOOLS.length} tools via SDK`);
+};
 
-    // Register tools using direct SDK pattern
-    for (const tool of TOOLS) {
-      this.toolMap.set(tool.name, tool);
-      this.server.tool(
-        tool.name,
-        tool.description,
-        tool.schema?.shape || {},
-        this.createToolHandler(tool),
-      );
-    }
-
-    // Register status resource directly
-    this.server.resource(
-      'status',
-      'containerization://status',
-      {
-        title: 'Container Status',
-        description: 'Current status of the containerization system',
-      },
-      async () => ({
-        contents: [
-          {
-            uri: 'containerization://status',
-            mimeType: 'application/json',
-            text: JSON.stringify(getSystemStatus(this.deps, this.isRunning), null, 2),
-          },
-        ],
-      }),
-    );
-
-    // Register prompts from registry
-    await this.registerPrompts();
-
-    this.deps.logger.info(`Registered ${TOOLS.length} tools via SDK`);
-  }
-
-  /**
-   * Initialize the tool router
-   */
-  private initializeRouter(): void {
-    // Create tools map for router
-    const tools = new Map<string, import('./tool-router').RouterTool>();
-    for (const tool of TOOLS) {
-      tools.set(tool.name, {
-        name: tool.name,
-        handler: tool.handler,
-        schema: tool.schema,
-      });
-    }
-
-    // Initialize router with dependencies
-    this.router = new ToolRouter({
-      sessionManager: this.deps.sessionManager,
-      logger: this.deps.logger,
-      tools,
+/**
+ * Initialize the tool router
+ */
+export const initializeRouter = (state: MCPServerState): void => {
+  // Create tools map for router
+  const tools = new Map<string, import('./tool-router').RouterTool>();
+  for (const tool of TOOLS) {
+    tools.set(tool.name, {
+      name: tool.name,
+      handler: tool.handler,
+      schema: tool.schema,
     });
   }
 
-  /**
-   * Create a standardized tool handler
-   */
-  private createToolHandler(tool: ToolDefinition) {
-    return async (params: Record<string, unknown>) => {
-      this.deps.logger.info({ tool: tool.name }, 'Executing tool');
+  // Initialize router with dependencies
+  state.router = createToolRouter({
+    sessionManager: state.deps.sessionManager,
+    logger: state.deps.logger,
+    tools,
+  });
+};
 
-      try {
-        // Ensure sessionId
-        const sessionId =
-          params && typeof params === 'object' && params.sessionId
-            ? String(params.sessionId)
-            : randomUUID();
+/**
+ * Create a standardized tool handler
+ */
+export const createToolHandler = (state: MCPServerState, tool: ToolDefinition) => {
+  return async (params: Record<string, unknown>) => {
+    state.deps.logger.info({ tool: tool.name }, 'Executing tool');
 
-        if (params && typeof params === 'object') {
-          params.sessionId = sessionId;
+    try {
+      // Ensure sessionId
+      const sessionId =
+        params && typeof params === 'object' && params.sessionId
+          ? String(params.sessionId)
+          : randomUUID();
+
+      if (params && typeof params === 'object') {
+        params.sessionId = sessionId;
+      }
+
+      // Create context with all dependencies
+      const context = createMCPToolContext(
+        state.server.server,
+        {},
+        state.deps.logger.child({ tool: tool.name }),
+        {
+          promptRegistry: state.deps.promptRegistry,
+          sessionManager: state.deps.sessionManager,
+        },
+      );
+
+      // Use router if available for intelligent routing
+      if (state.router) {
+        const forceFlag = params.force === true;
+        const routeResult = await state.router.route({
+          toolName: tool.name,
+          params,
+          sessionId,
+          context,
+          ...(forceFlag && { force: true }),
+        });
+
+        // Log executed tools for debugging
+        if (routeResult.executedTools.length > 0) {
+          state.deps.logger.info(
+            { executedTools: routeResult.executedTools },
+            'Router executed tools in sequence',
+          );
         }
 
-        // Create context with all dependencies
-        const context = createMCPToolContext(
-          this.server.server,
-          {},
-          this.deps.logger.child({ tool: tool.name }),
-          {
-            promptRegistry: this.deps.promptRegistry,
-            sessionManager: this.deps.sessionManager,
-          },
-        );
-
-        // Use router if available for intelligent routing
-        if (this.router) {
-          const forceFlag = params.force === true;
-          const routeResult = await this.router.route({
-            toolName: tool.name,
-            params,
-            sessionId,
-            context,
-            ...(forceFlag && { force: true }),
-          });
-
-          // Log executed tools for debugging
-          if (routeResult.executedTools.length > 0) {
-            this.deps.logger.info(
-              { executedTools: routeResult.executedTools },
-              'Router executed tools in sequence',
-            );
-          }
-
-          // Log workflow hint if present
-          if (routeResult.workflowHint) {
-            this.deps.logger.info(
-              { hint: routeResult.workflowHint.message },
-              'Workflow continuation available',
-            );
-          }
-
-          const result = routeResult.result;
-
-          // Handle Result pattern
-          if (result && typeof result === 'object' && 'ok' in result) {
-            const typedResult = result;
-            if (typedResult.ok) {
-              const content = [
-                {
-                  type: 'text' as const,
-                  text: JSON.stringify(typedResult.value, null, 2),
-                },
-              ];
-
-              // Add workflow hint as separate content block if present
-              if (routeResult.workflowHint) {
-                content.push({
-                  type: 'text' as const,
-                  text: `\n---\n${routeResult.workflowHint.markdown}`,
-                });
-              }
-
-              return { content };
-            } else {
-              throw new McpError(ErrorCode.InternalError, typedResult.error);
-            }
-          }
-
-          // Direct return
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: JSON.stringify(result, null, 2),
-              },
-            ],
-          };
+        // Log workflow hint if present
+        if (routeResult.workflowHint) {
+          state.deps.logger.info(
+            { hint: routeResult.workflowHint.message },
+            'Workflow continuation available',
+          );
         }
 
-        // Fallback to direct execution if no router
-        const result = await tool.handler(params, context);
+        const result = routeResult.result;
 
         // Handle Result pattern
         if (result && typeof result === 'object' && 'ok' in result) {
           const typedResult = result;
           if (typedResult.ok) {
-            return {
-              content: [
-                {
-                  type: 'text' as const,
-                  text: JSON.stringify(typedResult.value, null, 2),
-                },
-              ],
-            };
+            const content = [
+              {
+                type: 'text' as const,
+                text: JSON.stringify(typedResult.value, null, 2),
+              },
+            ];
+
+            // Add workflow hint as separate content block if present
+            if (routeResult.workflowHint) {
+              content.push({
+                type: 'text' as const,
+                text: `\n---\n${routeResult.workflowHint.markdown}`,
+              });
+            }
+
+            return { content };
           } else {
             throw new McpError(ErrorCode.InternalError, typedResult.error);
           }
@@ -434,121 +402,188 @@ export class DirectMCPServer {
             },
           ],
         };
+      }
+
+      // Fallback to direct execution if no router
+      const result = await tool.handler(params, context);
+
+      // Handle Result pattern
+      if (result && typeof result === 'object' && 'ok' in result) {
+        const typedResult = result;
+        if (typedResult.ok) {
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: JSON.stringify(typedResult.value, null, 2),
+              },
+            ],
+          };
+        } else {
+          throw new McpError(ErrorCode.InternalError, typedResult.error);
+        }
+      }
+
+      // Direct return
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    } catch (error) {
+      state.deps.logger.error({ tool: tool.name, error }, 'Tool execution failed');
+
+      if (error instanceof McpError) {
+        throw error;
+      }
+
+      throw new McpError(ErrorCode.InternalError, extractErrorMessage(error));
+    }
+  };
+};
+
+/**
+ * Register prompts directly from registry
+ */
+export const registerPrompts = async (state: MCPServerState): Promise<void> => {
+  const promptNames = state.deps.promptRegistry.getPromptNames();
+
+  for (const name of promptNames) {
+    const info = state.deps.promptRegistry.getPromptInfo(name);
+    if (!info) continue;
+
+    // Build schema from arguments
+    const schemaShape: Record<string, any> = {};
+    const zod = await import('zod');
+    const { z } = zod;
+    for (const arg of info.arguments) {
+      schemaShape[arg.name] = arg.required
+        ? z.string().describe(arg.description || arg.name)
+        : z
+            .string()
+            .optional()
+            .describe(arg.description || arg.name);
+    }
+
+    // Register directly with SDK
+    state.server.prompt(name, info.description, schemaShape, async (params) => {
+      try {
+        return await state.deps.promptRegistry.getPrompt(name, params);
       } catch (error) {
-        this.deps.logger.error({ tool: tool.name, error }, 'Tool execution failed');
-
-        if (error instanceof McpError) {
-          throw error;
-        }
-
-        throw new McpError(ErrorCode.InternalError, extractErrorMessage(error));
+        throw new McpError(ErrorCode.MethodNotFound, extractErrorMessage(error));
       }
-    };
+    });
   }
 
-  /**
-   * Register prompts directly from registry
-   */
-  private async registerPrompts(): Promise<void> {
-    const promptNames = this.deps.promptRegistry.getPromptNames();
+  state.deps.logger.info(`Registered ${promptNames.length} prompts`);
+};
 
-    for (const name of promptNames) {
-      const info = this.deps.promptRegistry.getPromptInfo(name);
-      if (!info) continue;
-
-      // Build schema from arguments
-      const schemaShape: Record<string, any> = {};
-      const zod = await import('zod');
-      const { z } = zod;
-      for (const arg of info.arguments) {
-        schemaShape[arg.name] = arg.required
-          ? z.string().describe(arg.description || arg.name)
-          : z
-              .string()
-              .optional()
-              .describe(arg.description || arg.name);
-      }
-
-      // Register directly with SDK
-      this.server.prompt(name, info.description, schemaShape, async (params) => {
-        try {
-          return await this.deps.promptRegistry.getPrompt(name, params);
-        } catch (error) {
-          throw new McpError(ErrorCode.MethodNotFound, extractErrorMessage(error));
-        }
-      });
-    }
-
-    this.deps.logger.info(`Registered ${promptNames.length} prompts`);
+/**
+ * Start the server
+ */
+export const startServer = async (state: MCPServerState): Promise<void> => {
+  if (state.isRunning) {
+    state.deps.logger.warn('Server already running');
+    return;
   }
 
-  /**
-   * Start the server
-   */
-  async start(): Promise<void> {
-    if (this.isRunning) {
-      this.deps.logger.warn('Server already running');
-      return;
-    }
+  await registerHandlers(state);
+  await state.server.connect(state.transport);
+  state.isRunning = true;
 
-    await this.registerHandlers();
-    await this.server.connect(this.transport);
-    this.isRunning = true;
-
-    this.deps.logger.info(
-      {
-        tools: TOOLS.length,
-        prompts: this.deps.promptRegistry.getPromptNames().length,
-        healthy: true,
-      },
-      'MCP server started',
-    );
-  }
-
-  /**
-   * Stop the server
-   */
-  async stop(): Promise<void> {
-    if (!this.isRunning) {
-      return;
-    }
-
-    await this.server.close();
-    this.isRunning = false;
-    this.deps.logger.info('Server stopped');
-  }
-
-  /**
-   * Get SDK server instance for sampling
-   */
-  getServer(): unknown {
-    return this.server.server;
-  }
-
-  /**
-   * Get server status
-   */
-  getStatus(): {
-    running: boolean;
-    tools: number;
-    resources: number;
-    prompts: number;
-  } {
-    return {
-      running: this.isRunning,
+  state.deps.logger.info(
+    {
       tools: TOOLS.length,
-      resources: 1,
-      prompts: this.deps.promptRegistry.getPromptNames().length,
-    };
+      prompts: state.deps.promptRegistry.getPromptNames().length,
+      healthy: true,
+    },
+    'MCP server started',
+  );
+};
+
+/**
+ * Stop the server
+ */
+export const stopServer = async (state: MCPServerState): Promise<void> => {
+  if (!state.isRunning) {
+    return;
   }
 
-  /**
-   * Get available tools for CLI listing
-   */
-  getTools(): Array<{ name: string; description: string }> {
-    return TOOLS.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-    }));
-  }
-}
+  await state.server.close();
+  state.isRunning = false;
+  state.deps.logger.info('Server stopped');
+};
+
+/**
+ * Get SDK server instance for sampling
+ */
+export const getServer = (state: MCPServerState): unknown => {
+  return state.server.server;
+};
+
+/**
+ * Get server status
+ */
+export const getStatus = (
+  state: MCPServerState,
+): {
+  running: boolean;
+  tools: number;
+  resources: number;
+  prompts: number;
+} => {
+  return {
+    running: state.isRunning,
+    tools: TOOLS.length,
+    resources: 1,
+    prompts: state.deps.promptRegistry.getPromptNames().length,
+  };
+};
+
+/**
+ * Get available tools for CLI listing
+ */
+export const getTools = (): Array<{ name: string; description: string }> => {
+  return TOOLS.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+  }));
+};
+
+/**
+ * Factory function to create a DirectMCPServer implementation.
+ *
+ * Maintains all existing functionality while using functional patterns internally.
+ */
+export const createDirectMCPServer = (deps: Dependencies): IDirectMCPServer => {
+  const state: MCPServerState = {
+    server: new McpServer(
+      {
+        name: deps.config.mcp.name,
+        version: deps.config.mcp.version,
+      },
+      {
+        capabilities: {
+          resources: { subscribe: false, listChanged: false },
+          prompts: { listChanged: false },
+          tools: { listChanged: false },
+        },
+      },
+    ),
+    transport: new StdioServerTransport(),
+    isRunning: false,
+    toolMap: new Map<string, ToolDefinition>(),
+    deps,
+  };
+
+  return {
+    start: () => startServer(state),
+    stop: () => stopServer(state),
+    getServer: () => getServer(state),
+    getStatus: () => getStatus(state),
+    getTools,
+  };
+};

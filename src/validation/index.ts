@@ -20,9 +20,6 @@ export {
   type KubernetesValidatorInstance,
 } from './kubernetes-validator';
 
-// Legacy class-based validators (deprecated but maintained for compatibility)
-export { DockerfileValidator } from './dockerfile-validator';
-
 // Import for convenience alias
 import { validateDockerfileContent } from './dockerfile-validator';
 

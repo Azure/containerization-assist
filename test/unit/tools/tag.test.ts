@@ -893,7 +893,7 @@ describe('tagImage', () => {
 
   describe('Tool Instance', () => {
     it('should provide correctly configured tool instance', async () => {
-      const { tagImage: tagImageTool } = await import('../../../src/tools/tag-image');
+      const { tagImage: tagImageTool } = await import('../../../src/tools/tag-image/tool');
 
       // The wrapped tool is now a function directly
       expect(typeof tagImageTool).toBe('function');

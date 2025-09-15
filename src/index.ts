@@ -9,8 +9,9 @@ export * from './mcp/server.js';
 // Tool registration helpers
 export { registerTool, registerAllTools, toJsonSchema } from './exports/helpers.js';
 
-// Main server class for programmatic usage
-export { ContainerAssistServer } from './exports/containerization-assist-server.js';
+// Main server factory for programmatic usage
+export { createContainerAssistServer } from './exports/containerization-assist-server.js';
+export type { IContainerAssistServer } from './exports/containerization-assist-server.js';
 
 // Tool names for type-safe registration
 export { TOOL_NAMES } from './exports/tools.js';

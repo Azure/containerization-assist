@@ -76,629 +76,694 @@ export interface RouteResult {
 }
 
 /**
- * Central orchestrator managing tool dependencies and workflow state.
- *
- * Invariant: Session state must be consistent across tool executions
- * Trade-off: Stateful sessions vs stateless - chose stateful for workflow continuity
+ * Router state interface for managing tool execution context
  */
-export class ToolRouter {
-  private sessionManager: SessionManager;
-  private logger: Logger;
-  private tools: Map<string, RouterTool>;
-  private aiAssistant: HostAIAssistant;
+export interface ToolRouterState {
+  sessionManager: SessionManager;
+  logger: Logger;
+  tools: Map<string, RouterTool>;
+  aiAssistant: HostAIAssistant;
+}
 
-  constructor(config: RouterConfig) {
-    this.sessionManager = config.sessionManager;
-    this.logger = config.logger.child({ component: 'tool-router' });
-    this.tools = config.tools;
-    this.aiAssistant = config.aiAssistant || createHostAIAssistant(this.logger, { enabled: true });
-  }
-
-  /**
-   * Extracts session context from WorkflowState using ONLY session.results pattern
-   * No fallback to legacy fields - clean implementation
-   */
-  private extractSessionContext(session: WorkflowState): Record<string, unknown> {
-    const analysis = (session.results?.['analyze-repo'] as Record<string, unknown>) || {};
-    return {
-      technology: analysis.technology,
-      language: analysis.language,
-      framework: analysis.framework,
-      runtime: analysis.runtime,
-      packageManager: analysis.packageManager,
-    };
-  }
-
-  /**
-   * Single source of truth for tool parameters
-   * Only 'path' parameter is used - no repoPath, no context fallbacks
-   */
-  private normalizeToolParameters(
-    params: Record<string, unknown>,
-    session?: WorkflowState,
-  ): Record<string, unknown> {
-    const normalized: Record<string, unknown> = {
-      ...params,
-      // Handle path parameter aliasing - repoPath and context should map to path
-      path: params.path || params.repoPath || params.context || '.',
-    };
-
-    // Merge session context if available
-    if (session) {
-      Object.assign(normalized, this.extractSessionContext(session));
-    }
-
-    return normalized;
-  }
-
-  /**
-   * Consolidated session update helper that ensures atomic updates with automatic timestamp.
-   * Returns the updated session or fetches latest on null return.
-   * Handles concurrent updates by merging results properly.
-   */
-  private async updateSessionState(
+/**
+ * Tool router interface for dependency injection compatibility
+ */
+export interface IToolRouter {
+  route(request: RouteRequest): Promise<RouteResult>;
+  getToolDependencies(toolName: string): { requires: Step[]; provides: Step[] };
+  canExecute(
+    toolName: string,
     sessionId: string,
-    updates: Partial<WorkflowState>,
-  ): Promise<WorkflowState> {
-    // If we're updating results, fetch current session to merge properly
-    if (updates.results) {
-      const currentSessionResult = await this.sessionManager.get(sessionId);
-      if (currentSessionResult.ok && currentSessionResult.value?.results) {
-        // Merge the results objects to preserve concurrent updates
-        updates.results = {
-          ...currentSessionResult.value.results,
-          ...updates.results,
-        };
-      }
-    }
+  ): Promise<{ canExecute: boolean; missingSteps: Step[] }>;
+  getExecutionPlan(toolName: string, completedSteps?: Set<Step>): string[];
+}
 
-    const updateData = {
-      ...updates,
-      updatedAt: new Date(),
-    };
+/**
+ * Extracts session context from WorkflowState for tool parameter resolution.
+ *
+ * Invariant: Only uses session.results pattern - no legacy field fallbacks for clean architecture
+ */
+export const extractSessionContext = (session: WorkflowState): Record<string, unknown> => {
+  const analysis = (session.results?.['analyze-repo'] as Record<string, unknown>) || {};
+  return {
+    technology: analysis.technology,
+    language: analysis.language,
+    framework: analysis.framework,
+    runtime: analysis.runtime,
+    packageManager: analysis.packageManager,
+  };
+};
 
-    const updateResult = await this.sessionManager.update(sessionId, updateData);
+/**
+ * Normalizes tool parameters with path aliasing for backward compatibility.
+ *
+ * Trade-off: Supports legacy parameter names (repoPath, context) to maintain API compatibility
+ */
+export const normalizeToolParameters = (
+  params: Record<string, unknown>,
+  session?: WorkflowState,
+): Record<string, unknown> => {
+  const normalized: Record<string, unknown> = {
+    ...params,
+    path: params.path || params.repoPath || params.context || '.',
+  };
 
-    if (!updateResult.ok) {
-      this.logger.warn({ sessionId, error: updateResult.error }, 'Session update failed');
-      const fallbackResult = await this.sessionManager.get(sessionId);
-      if (fallbackResult.ok && fallbackResult.value) {
-        return fallbackResult.value;
-      }
-      // Return minimal session if all else fails to prevent crashes
-      return { sessionId, updatedAt: new Date() } as WorkflowState;
-    }
-
-    return updateResult.value;
+  // Merge session context if available
+  if (session) {
+    Object.assign(normalized, extractSessionContext(session));
   }
 
-  /**
-   * Executes tool with automatic dependency resolution.
-   *
-   * Postcondition: Session contains all completed steps and tool results
-   * Failure Mode: Returns partial execution list on failure for debugging
-   */
-  async route(request: RouteRequest): Promise<RouteResult> {
-    const { toolName, params, force = false, sessionId, context } = request;
+  return normalized;
+};
 
-    let session: WorkflowState | null = null;
+/**
+ * Performs atomic session updates with conflict resolution.
+ *
+ * Postcondition: Session contains merged results from concurrent updates
+ * Failure Mode: Returns latest session state if update fails to prevent crashes
+ */
+export const updateSessionState = async (
+  sessionManager: SessionManager,
+  logger: Logger,
+  sessionId: string,
+  updates: Partial<WorkflowState>,
+): Promise<WorkflowState> => {
+  // Merge results to handle concurrent updates
+  if (updates.results) {
+    const currentSessionResult = await sessionManager.get(sessionId);
+    if (currentSessionResult.ok && currentSessionResult.value?.results) {
+      // Merge the results objects to preserve concurrent updates
+      updates.results = {
+        ...currentSessionResult.value.results,
+        ...updates.results,
+      };
+    }
+  }
 
-    if (sessionId) {
-      const getResult = await this.sessionManager.get(sessionId);
-      if (getResult.ok) {
-        session = getResult.value;
-      }
+  const updateData = {
+    ...updates,
+    updatedAt: new Date(),
+  };
 
-      // Session creation with explicit ID ensures workflow continuity
-      if (!session) {
-        this.logger.debug({ sessionId }, 'Session not found, creating new session with ID');
-        const createResult = await this.sessionManager.create(sessionId);
-        if (createResult.ok) {
-          session = createResult.value;
-        }
-      }
-    } else {
-      const createResult = await this.sessionManager.create();
+  const updateResult = await sessionManager.update(sessionId, updateData);
+
+  if (!updateResult.ok) {
+    logger.warn({ sessionId, error: updateResult.error }, 'Session update failed');
+    const fallbackResult = await sessionManager.get(sessionId);
+    if (fallbackResult.ok && fallbackResult.value) {
+      return fallbackResult.value;
+    }
+    // Minimal session fallback to prevent crashes
+    return { sessionId, updatedAt: new Date() } as WorkflowState;
+  }
+
+  return updateResult.value;
+};
+
+/**
+ * Executes tool with automatic dependency resolution.
+ *
+ * Postcondition: Session contains all completed steps and tool results
+ * Failure Mode: Returns partial execution list on failure for debugging
+ */
+export const routeRequestImpl = async (
+  state: ToolRouterState,
+  request: RouteRequest,
+): Promise<RouteResult> => {
+  const { toolName, params, force = false, sessionId, context } = request;
+
+  let session: WorkflowState | null = null;
+
+  if (sessionId) {
+    const getResult = await state.sessionManager.get(sessionId);
+    if (getResult.ok) {
+      session = getResult.value;
+    }
+
+    // Create session with explicit ID for workflow continuity
+    if (!session) {
+      state.logger.debug({ sessionId }, 'Session not found, creating new session with ID');
+      const createResult = await state.sessionManager.create(sessionId);
       if (createResult.ok) {
         session = createResult.value;
       }
     }
-
-    if (!session) {
-      return {
-        result: Failure('Failed to get or create session'),
-        executedTools: [],
-        sessionState: {} as WorkflowState,
-      };
-    }
-
-    const executedTools: string[] = [];
-
-    try {
-      const completedSteps = new Set<Step>((session.completed_steps || []) as Step[]);
-
-      const edge = getToolEdge(toolName);
-
-      this.logger.debug(
-        {
-          toolName,
-          hasEdge: !!edge,
-        },
-        'Checking tool dependencies',
-      );
-
-      if (!edge) {
-        // Tools without dependencies bypass orchestration layer
-        this.logger.debug({ toolName }, 'Tool has no dependencies, executing directly');
-        const result = await this.executeTool(toolName, params, session, context);
-        if (result.ok) {
-          executedTools.push(toolName);
-          // Fetch updated session after tool execution
-          const updatedSessionResult = await this.sessionManager.get(session.sessionId);
-          if (updatedSessionResult.ok && updatedSessionResult.value) {
-            session = updatedSessionResult.value;
-          }
-        }
-        return { result, executedTools, sessionState: session };
-      }
-
-      // Force flag bypasses idempotency check for re-execution scenarios
-      if (!force) {
-        // Idempotency: Skip execution if all effects already present
-        // Prevents redundant work and maintains workflow efficiency
-        const alreadySatisfied = edge.provides?.every((step) => completedSteps.has(step)) ?? false;
-
-        if (alreadySatisfied) {
-          this.logger.debug({ toolName }, 'Tool effects already satisfied, skipping execution');
-          return {
-            result: Success({ skipped: true, reason: 'Effects already satisfied' }),
-            executedTools: [],
-            sessionState: session,
-          };
-        }
-
-        const missingSteps = getMissingPreconditions(toolName, completedSteps);
-
-        this.logger.debug(
-          {
-            toolName,
-            missingCount: missingSteps.length,
-          },
-          'Precondition check',
-        );
-
-        if (missingSteps.length > 0) {
-          this.logger.debug(
-            { toolName, missingCount: missingSteps.length },
-            'Tool has missing preconditions, auto-running corrective tools',
-          );
-
-          // Topological sort ensures dependencies execute in correct order
-          const executionOrder = getExecutionOrder(missingSteps, completedSteps);
-
-          for (const { tool: correctiveTool, step } of executionOrder) {
-            this.logger.debug({ correctiveTool, step }, 'Running corrective tool');
-
-            const correctiveParams = this.buildCorrectiveParams(
-              toolName,
-              correctiveTool,
-              step,
-              params,
-              session,
-            );
-
-            this.logger.debug(
-              {
-                correctiveTool,
-                step,
-              },
-              'Running corrective tool',
-            );
-
-            const result = await this.executeTool(
-              correctiveTool,
-              correctiveParams,
-              session,
-              context,
-            );
-
-            if (!result.ok) {
-              // Partial state update preserves progress on failure
-              const failedSession = await this.updateSessionState(session.sessionId, {
-                completed_steps: Array.from(completedSteps),
-              });
-
-              return {
-                result: Failure(
-                  `Failed to satisfy precondition '${step}' with tool '${correctiveTool}': ${result.error}`,
-                ),
-                executedTools,
-                sessionState: failedSession || session,
-              };
-            }
-
-            executedTools.push(correctiveTool);
-            completedSteps.add(step);
-
-            const correctiveEdge = getToolEdge(correctiveTool);
-            correctiveEdge?.provides?.forEach((s) => completedSteps.add(s));
-
-            // Result persistence enables downstream tools to access upstream outputs
-            if (result.ok) {
-              const updateData: Partial<WorkflowState> = {
-                results: {
-                  ...session.results,
-                  [correctiveTool]: result.value,
-                },
-              };
-
-              const updated = await this.updateSessionState(session.sessionId, updateData);
-              // Update local session reference with latest state
-              session = updated;
-            }
-          }
-
-          // Single consolidated update after all prerequisites complete
-          session = await this.updateSessionState(session.sessionId, {
-            completed_steps: Array.from(completedSteps),
-          });
-        }
-      }
-
-      this.logger.debug({ toolName }, 'Executing requested tool');
-      const result = await this.executeTool(toolName, params, session, context);
-
-      if (result.ok) {
-        executedTools.push(toolName);
-
-        edge.provides?.forEach((step) => completedSteps.add(step));
-
-        // Single atomic update with automatic timestamp
-        session = await this.updateSessionState(session.sessionId, {
-          completed_steps: Array.from(completedSteps),
-        });
-
-        // Clean separation: workflow metadata never pollutes results
-        if (edge.nextSteps && edge.nextSteps.length > 0) {
-          const workflowMetadata = this.buildWorkflowMetadata(
-            edge,
-            session.sessionId,
-            params,
-            result,
-          );
-
-          if (workflowMetadata) {
-            const workflowHint = this.buildWorkflowHint(toolName, workflowMetadata);
-
-            return {
-              result, // Result stays completely clean
-              executedTools,
-              sessionState: session,
-              workflowMetadata,
-              workflowHint,
-            };
-          }
-        }
-      }
-
-      return { result, executedTools, sessionState: session };
-    } catch (error) {
-      this.logger.error({ error, toolName }, 'Router execution failed');
-      return {
-        result: Failure(`Router execution failed: ${error}`),
-        executedTools,
-        sessionState: session,
-      };
+  } else {
+    const createResult = await state.sessionManager.create();
+    if (createResult.ok) {
+      session = createResult.value;
     }
   }
 
-  /**
-   * Constructs parameters for dependency tools using autofix configuration.
-   * Clean implementation with no backwards compatibility.
-   */
-  private buildCorrectiveParams(
-    originalTool: string,
-    correctiveTool: string,
-    step: Step,
-    originalParams: Record<string, unknown>,
-    session: WorkflowState,
-  ): Record<string, unknown> {
-    const edge = getToolEdge(originalTool);
-    const autofix = edge?.autofix?.[step];
-
-    const normalizedParams = this.normalizeToolParameters(originalParams, session);
-
-    if (autofix && autofix.tool === correctiveTool) {
-      return autofix.buildParams(normalizedParams);
-    }
-
-    return normalizedParams;
-  }
-
-  /**
-   * Builds workflow metadata from edge configuration.
-   * Separates workflow control data from tool results.
-   */
-  private buildWorkflowMetadata(
-    edge: ToolEdge,
-    sessionId: string,
-    params: Record<string, unknown>,
-    result: Result<unknown>,
-  ): WorkflowMetadata | undefined {
-    if (!edge.nextSteps?.length) return undefined;
-
-    const primary = edge.nextSteps[0];
-    if (!primary) return undefined;
-
-    const resultData =
-      result.ok && result.value && typeof result.value === 'object'
-        ? (result.value as Record<string, unknown>)
-        : {};
-
-    const nextParams = primary.buildParams
-      ? primary.buildParams({
-          ...params,
-          sessionId,
-          ...resultData,
-        })
-      : { sessionId };
-
+  if (!session) {
     return {
-      nextTool: primary.tool,
-      description: primary.description,
-      params: nextParams,
-      sessionId,
-      alternatives: edge.nextSteps
-        .slice(1)
-        .map((step) => ({
-          tool: step.tool,
-          description: step.description,
-          params: step.buildParams
-            ? step.buildParams({ ...params, sessionId, ...resultData })
-            : undefined,
-        }))
-        .filter((alt) => alt.params !== undefined),
+      result: Failure('Failed to get or create session'),
+      executedTools: [],
+      sessionState: {} as WorkflowState,
     };
   }
 
-  /**
-   * Generates human-readable workflow hint.
-   * Used for CLI/UI display without polluting result data.
-   */
-  private buildWorkflowHint(toolName: string, metadata: WorkflowMetadata): WorkflowHint {
-    const message =
-      `✅ ${toolName} completed successfully!\n\n` +
-      `📋 NEXT RECOMMENDED ACTION:\n` +
-      `Tool: ${metadata.nextTool}\n` +
-      `Purpose: ${metadata.description}\n` +
-      `Session: ${metadata.sessionId}`;
+  const executedTools: string[] = [];
 
-    const markdown =
-      `### ✅ ${toolName} completed successfully!\n\n` +
-      `#### 📋 Next Recommended Action\n` +
-      `- **Tool**: \`${metadata.nextTool}\`\n` +
-      `- **Purpose**: ${metadata.description}\n` +
-      `- **Session**: \`${metadata.sessionId}\`\n\n` +
-      `To continue: \`${metadata.nextTool} --session ${metadata.sessionId}\``;
-
-    return {
-      message,
-      markdown,
-      ready: true,
-    };
-  }
-
-  /**
-   * Core tool execution with session persistence.
-   *
-   * Precondition: Tool must exist in registry and context must be provided
-   * Postcondition: Session contains tool results on success
-   */
-  private async executeTool(
-    toolName: string,
-    params: Record<string, unknown>,
-    session: WorkflowState,
-    context?: ToolContext,
-  ): Promise<Result<unknown>> {
-    const tool = this.tools.get(toolName);
-
-    if (!tool) {
-      return Failure(`Tool not found: ${toolName}`);
-    }
-
-    // Normalize parameters before any processing
-    let enhancedParams = this.normalizeToolParameters(params, session);
-    enhancedParams.sessionId = session.sessionId;
-
-    // AI parameter inference reduces user burden for complex workflows
-    if (this.aiAssistant.isAvailable() && tool.schema) {
-      const filledParams = await this.fillMissingParameters(
-        toolName,
-        enhancedParams,
-        tool.schema,
-        session,
-        context,
-      );
-      if (filledParams.ok) {
-        enhancedParams = {
-          ...filledParams.value,
-          sessionId: session.sessionId,
-        };
-      } else {
-        this.logger.warn(
-          { error: filledParams.error, toolName },
-          'Failed to fill missing parameters with AI',
-        );
-      }
-    }
-
-    try {
-      // Context requirement enforced at runtime for MCP compliance
-      if (!context) {
-        return Failure(`Tool context is required for tool: ${toolName}`);
-      }
-      const result = await tool.handler(enhancedParams, context);
-
-      if (result.ok && session.sessionId) {
-        const updateData: Partial<WorkflowState> = {
-          results: {
-            ...session.results,
-            [toolName]: result.value,
-          },
-          currentStep: toolName,
-        };
-
-        await this.updateSessionState(session.sessionId, updateData);
-      }
-
-      return result;
-    } catch (error) {
-      this.logger.error({ error, toolName }, 'Tool execution failed');
-      return Failure(`Tool execution failed: ${error}`);
-    }
-  }
-
-  /**
-   * Exposes dependency metadata for external planning tools
-   */
-  getToolDependencies(toolName: string): {
-    requires: Step[];
-    provides: Step[];
-  } {
-    const edge = getToolEdge(toolName);
-    return {
-      requires: edge?.requires || [],
-      provides: edge?.provides || [],
-    };
-  }
-
-  /**
-   * Leverages AI to infer missing required parameters from context.
-   *
-   * Trade-off: Automatic inference vs explicit user input - validate all suggestions
-   * Postcondition: Returns original params if AI unavailable or fails
-   */
-  private async fillMissingParameters(
-    toolName: string,
-    params: Record<string, unknown>,
-    schema: z.ZodObject<z.ZodRawShape> | z.ZodType<unknown>,
-    session: WorkflowState,
-    context?: ToolContext,
-  ): Promise<Result<Record<string, unknown>>> {
-    try {
-      const schemaShape = (schema as z.ZodObject<z.ZodRawShape>).shape || {};
-      const requiredParams: string[] = [];
-      const missingParams: string[] = [];
-
-      for (const [key, fieldSchema] of Object.entries(schemaShape)) {
-        if (fieldSchema && typeof fieldSchema === 'object') {
-          const zodField = fieldSchema;
-          // Zod schema introspection to identify required fields
-          const isOptional =
-            zodField._def?.typeName === 'ZodOptional' ||
-            zodField._def?.typeName === 'ZodNullable' ||
-            zodField.isOptional?.();
-
-          if (!isOptional) {
-            requiredParams.push(key);
-            if (!(key in params) || params[key] === undefined || params[key] === null) {
-              missingParams.push(key);
-            }
-          }
-        }
-      }
-
-      if (missingParams.length === 0) {
-        return Success(params);
-      }
-
-      this.logger.debug(
-        { toolName, missingParams, requiredParams },
-        'Attempting to fill missing parameters with AI',
-      );
-
-      const aiRequest: import('./ai/host-ai-assist').AIParamRequest = {
-        toolName,
-        currentParams: params,
-        requiredParams,
-        missingParams,
-        schema: schemaShape,
-        ...(session.results && { sessionContext: session.results }),
-      };
-
-      const aiResult = await this.aiAssistant.suggestParameters(aiRequest, context);
-
-      if (!aiResult.ok) {
-        return Failure(aiResult.error);
-      }
-
-      const validationResult = this.aiAssistant.validateSuggestions(
-        aiResult.value.suggestions,
-        schema,
-      );
-
-      if (!validationResult.ok) {
-        return Failure(validationResult.error);
-      }
-
-      // User parameters always override AI suggestions for safety
-      const mergedParams = mergeWithSuggestions(params, validationResult.value);
-
-      this.logger.debug(
-        {
-          toolName,
-          filledCount: Object.keys(validationResult.value).length,
-        },
-        'Successfully filled missing parameters with AI',
-      );
-
-      return Success(mergedParams);
-    } catch (error) {
-      this.logger.error({ error, toolName }, 'Error filling missing parameters');
-      return Failure(`Failed to fill parameters: ${error}`);
-    }
-  }
-
-  /**
-   * Pre-execution check for tool readiness.
-   *
-   * Postcondition: Returns list of blocking steps if cannot execute
-   */
-  async canExecute(
-    toolName: string,
-    sessionId: string,
-  ): Promise<{ canExecute: boolean; missingSteps: Step[] }> {
-    const sessionResult = await this.sessionManager.get(sessionId);
-
-    if (!sessionResult.ok || !sessionResult.value) {
-      return { canExecute: false, missingSteps: [] };
-    }
-
-    const session = sessionResult.value;
+  try {
     const completedSteps = new Set<Step>((session.completed_steps || []) as Step[]);
 
-    const missingSteps = getMissingPreconditions(toolName, completedSteps);
+    const edge = getToolEdge(toolName);
 
-    return {
-      canExecute: missingSteps.length === 0,
-      missingSteps,
-    };
-  }
+    state.logger.debug(
+      {
+        toolName,
+        hasEdge: !!edge,
+      },
+      'Checking tool dependencies',
+    );
 
-  /**
-   * Generates complete execution sequence including dependencies
-   */
-  getExecutionPlan(toolName: string, completedSteps: Set<Step> = new Set()): string[] {
-    const missingSteps = getMissingPreconditions(toolName, completedSteps);
-
-    if (missingSteps.length === 0) {
-      return [toolName];
+    if (!edge) {
+      // Direct execution for tools without dependencies
+      state.logger.debug({ toolName }, 'Tool has no dependencies, executing directly');
+      const result = await executeToolImpl(state, toolName, params, session, context);
+      if (result.ok) {
+        executedTools.push(toolName);
+        // Fetch updated session after tool execution
+        const updatedSessionResult = await state.sessionManager.get(session.sessionId);
+        if (updatedSessionResult.ok && updatedSessionResult.value) {
+          session = updatedSessionResult.value;
+        }
+      }
+      return { result, executedTools, sessionState: session };
     }
 
-    const executionOrder = getExecutionOrder(missingSteps, completedSteps);
-    const plan = executionOrder.map(({ tool }) => tool);
-    plan.push(toolName);
+    if (!force) {
+      // Idempotency check prevents redundant work and maintains workflow efficiency
+      const alreadySatisfied = edge.provides?.every((step) => completedSteps.has(step)) ?? false;
 
-    return plan;
+      if (alreadySatisfied) {
+        state.logger.debug({ toolName }, 'Tool effects already satisfied, skipping execution');
+        return {
+          result: Success({ skipped: true, reason: 'Effects already satisfied' }),
+          executedTools: [],
+          sessionState: session,
+        };
+      }
+
+      const missingSteps = getMissingPreconditions(toolName, completedSteps);
+
+      state.logger.debug(
+        {
+          toolName,
+          missingCount: missingSteps.length,
+        },
+        'Precondition check',
+      );
+
+      if (missingSteps.length > 0) {
+        state.logger.debug(
+          { toolName, missingCount: missingSteps.length },
+          'Tool has missing preconditions, auto-running corrective tools',
+        );
+
+        // Execute dependencies in topological order
+        const executionOrder = getExecutionOrder(missingSteps, completedSteps);
+
+        for (const { tool: correctiveTool, step } of executionOrder) {
+          // Skip if this step is already completed
+          if (completedSteps.has(step)) {
+            state.logger.debug(
+              { correctiveTool, step, completedSteps: Array.from(completedSteps) },
+              'Step already completed, skipping',
+            );
+            continue;
+          }
+
+          state.logger.debug(
+            { correctiveTool, step, completedSteps: Array.from(completedSteps) },
+            'Step not completed, executing tool',
+          );
+
+          state.logger.debug({ correctiveTool, step }, 'Running corrective tool');
+
+          const correctiveParams = buildCorrectiveParams(
+            toolName,
+            correctiveTool,
+            step,
+            params,
+            session,
+          );
+
+          state.logger.debug(
+            {
+              correctiveTool,
+              step,
+            },
+            'Running corrective tool',
+          );
+
+          const result = await executeToolImpl(
+            state,
+            correctiveTool,
+            correctiveParams,
+            session,
+            context,
+          );
+
+          if (!result.ok) {
+            // Preserve progress on failure
+            const failedSession = await updateSessionState(
+              state.sessionManager,
+              state.logger,
+              session.sessionId,
+              {
+                completed_steps: Array.from(completedSteps),
+              },
+            );
+
+            return {
+              result: Failure(
+                `Failed to satisfy precondition '${step}' with tool '${correctiveTool}': ${result.error}`,
+              ),
+              executedTools,
+              sessionState: failedSession || session,
+            };
+          }
+
+          executedTools.push(correctiveTool);
+          completedSteps.add(step);
+
+          const correctiveEdge = getToolEdge(correctiveTool);
+          correctiveEdge?.provides?.forEach((s) => completedSteps.add(s));
+
+          // Persist results for downstream tool access
+          if (result.ok) {
+            const updateData: Partial<WorkflowState> = {
+              results: {
+                ...session.results,
+                [correctiveTool]: result.value,
+              },
+            };
+
+            const updated = await updateSessionState(
+              state.sessionManager,
+              state.logger,
+              session.sessionId,
+              updateData,
+            );
+            // Update session reference
+            session = updated;
+          }
+        }
+
+        // Single consolidated update after all prerequisites complete
+        session = await updateSessionState(state.sessionManager, state.logger, session.sessionId, {
+          completed_steps: Array.from(completedSteps),
+        });
+      }
+    }
+
+    state.logger.debug({ toolName }, 'Executing requested tool');
+    const result = await executeToolImpl(state, toolName, params, session, context);
+
+    if (result.ok) {
+      executedTools.push(toolName);
+
+      edge.provides?.forEach((step) => completedSteps.add(step));
+
+      // Atomic session update
+      session = await updateSessionState(state.sessionManager, state.logger, session.sessionId, {
+        completed_steps: Array.from(completedSteps),
+      });
+
+      // Separate workflow metadata from results
+      if (edge.nextSteps && edge.nextSteps.length > 0) {
+        const workflowMetadata = buildWorkflowMetadata(edge, session.sessionId, params, result);
+
+        if (workflowMetadata) {
+          const workflowHint = buildWorkflowHint(toolName, workflowMetadata);
+
+          return {
+            result,
+            executedTools,
+            sessionState: session,
+            workflowMetadata,
+            workflowHint,
+          };
+        }
+      }
+    }
+
+    return { result, executedTools, sessionState: session };
+  } catch (error) {
+    state.logger.error({ error, toolName }, 'Router execution failed');
+    return {
+      result: Failure(`Router execution failed: ${error}`),
+      executedTools,
+      sessionState: session,
+    };
   }
-}
+};
+
+/**
+ * Constructs parameters for corrective tools using autofix configuration.
+ *
+ * Invariant: autofix.buildParams always receives normalized parameters
+ */
+export const buildCorrectiveParams = (
+  originalTool: string,
+  correctiveTool: string,
+  step: Step,
+  originalParams: Record<string, unknown>,
+  session: WorkflowState,
+): Record<string, unknown> => {
+  const edge = getToolEdge(originalTool);
+  const autofix = edge?.autofix?.[step];
+
+  const normalizedParams = normalizeToolParameters(originalParams, session);
+
+  if (autofix && autofix.tool === correctiveTool) {
+    return autofix.buildParams(normalizedParams);
+  }
+
+  return normalizedParams;
+};
+
+/**
+ * Builds workflow metadata from tool edge configuration.
+ *
+ * Trade-off: Metadata separation prevents pollution of tool results while enabling workflow guidance
+ */
+export const buildWorkflowMetadata = (
+  edge: ToolEdge,
+  sessionId: string,
+  params: Record<string, unknown>,
+  result: Result<unknown>,
+): WorkflowMetadata | undefined => {
+  if (!edge.nextSteps?.length) return undefined;
+
+  const primary = edge.nextSteps[0];
+  if (!primary) return undefined;
+
+  const resultData =
+    result.ok && result.value && typeof result.value === 'object'
+      ? (result.value as Record<string, unknown>)
+      : {};
+
+  const nextParams = primary.buildParams
+    ? primary.buildParams({
+        ...params,
+        sessionId,
+        ...resultData,
+      })
+    : { sessionId };
+
+  return {
+    nextTool: primary.tool,
+    description: primary.description,
+    params: nextParams,
+    sessionId,
+    alternatives: edge.nextSteps
+      .slice(1)
+      .map((step) => ({
+        tool: step.tool,
+        description: step.description,
+        params: step.buildParams
+          ? step.buildParams({ ...params, sessionId, ...resultData })
+          : undefined,
+      }))
+      .filter((alt) => alt.params !== undefined),
+  };
+};
+
+/**
+ * Generates human-readable workflow hints for CLI/UI display.
+ *
+ * Design rationale: Separates presentation logic from business logic
+ */
+export const buildWorkflowHint = (toolName: string, metadata: WorkflowMetadata): WorkflowHint => {
+  const message =
+    `✅ ${toolName} completed successfully!\n\n` +
+    `📋 NEXT RECOMMENDED ACTION:\n` +
+    `Tool: ${metadata.nextTool}\n` +
+    `Purpose: ${metadata.description}\n` +
+    `Session: ${metadata.sessionId}`;
+
+  const markdown =
+    `### ✅ ${toolName} completed successfully!\n\n` +
+    `#### 📋 Next Recommended Action\n` +
+    `- **Tool**: \`${metadata.nextTool}\`\n` +
+    `- **Purpose**: ${metadata.description}\n` +
+    `- **Session**: \`${metadata.sessionId}\`\n\n` +
+    `To continue: \`${metadata.nextTool} --session ${metadata.sessionId}\``;
+
+  return {
+    message,
+    markdown,
+    ready: true,
+  };
+};
+
+/**
+ * Core tool execution with session persistence.
+ *
+ * Precondition: Tool must exist in registry and context must be provided
+ * Postcondition: Session contains tool results on success
+ */
+export const executeToolImpl = async (
+  state: ToolRouterState,
+  toolName: string,
+  params: Record<string, unknown>,
+  session: WorkflowState,
+  context?: ToolContext,
+): Promise<Result<unknown>> => {
+  const tool = state.tools.get(toolName);
+
+  if (!tool) {
+    return Failure(`Tool not found: ${toolName}`);
+  }
+
+  // Normalize parameters before any processing
+  let enhancedParams = normalizeToolParameters(params, session);
+  enhancedParams.sessionId = session.sessionId;
+
+  // Reduce user burden through AI parameter inference
+  if (state.aiAssistant.isAvailable() && tool.schema) {
+    const filledParams = await fillMissingParameters(
+      state,
+      toolName,
+      enhancedParams,
+      tool.schema,
+      session,
+      context,
+    );
+    if (filledParams.ok) {
+      enhancedParams = {
+        ...filledParams.value,
+        sessionId: session.sessionId,
+      };
+    } else {
+      state.logger.warn(
+        { error: filledParams.error, toolName },
+        'Failed to fill missing parameters with AI',
+      );
+    }
+  }
+
+  try {
+    // MCP compliance requires context
+    if (!context) {
+      return Failure(`Tool context is required for tool: ${toolName}`);
+    }
+    const result = await tool.handler(enhancedParams, context);
+
+    if (result.ok && session.sessionId) {
+      const updateData: Partial<WorkflowState> = {
+        results: {
+          ...session.results,
+          [toolName]: result.value,
+        },
+        currentStep: toolName,
+      };
+
+      await updateSessionState(state.sessionManager, state.logger, session.sessionId, updateData);
+    }
+
+    return result;
+  } catch (error) {
+    state.logger.error({ error, toolName }, 'Tool execution failed');
+    return Failure(`Tool execution failed: ${error}`);
+  }
+};
+
+/**
+ * Retrieves tool dependency metadata for external planning systems.
+ * Used by workflow orchestrators and dependency analyzers.
+ */
+export const getToolDependencies = (
+  toolName: string,
+): {
+  requires: Step[];
+  provides: Step[];
+} => {
+  const edge = getToolEdge(toolName);
+  return {
+    requires: edge?.requires || [],
+    provides: edge?.provides || [],
+  };
+};
+
+/**
+ * Infers missing tool parameters using AI assistance from session context.
+ *
+ * Trade-off: Automatic inference reduces user burden but requires validation for safety
+ * Invariant: User-provided parameters always override AI suggestions
+ * Postcondition: Returns original params if AI unavailable or fails
+ */
+export const fillMissingParameters = async (
+  state: ToolRouterState,
+  toolName: string,
+  params: Record<string, unknown>,
+  schema: z.ZodObject<z.ZodRawShape> | z.ZodType<unknown>,
+  session: WorkflowState,
+  context?: ToolContext,
+): Promise<Result<Record<string, unknown>>> => {
+  try {
+    const schemaShape = (schema as z.ZodObject<z.ZodRawShape>).shape || {};
+    const requiredParams: string[] = [];
+    const missingParams: string[] = [];
+
+    for (const [key, fieldSchema] of Object.entries(schemaShape)) {
+      if (fieldSchema && typeof fieldSchema === 'object') {
+        const zodField = fieldSchema;
+        // Check if field is optional using Zod schema
+        const isOptional =
+          zodField._def?.typeName === 'ZodOptional' ||
+          zodField._def?.typeName === 'ZodNullable' ||
+          zodField.isOptional?.();
+
+        if (!isOptional) {
+          requiredParams.push(key);
+          if (!(key in params) || params[key] === undefined || params[key] === null) {
+            missingParams.push(key);
+          }
+        }
+      }
+    }
+
+    if (missingParams.length === 0) {
+      return Success(params);
+    }
+
+    state.logger.debug(
+      { toolName, missingParams, requiredParams },
+      'Attempting to fill missing parameters with AI',
+    );
+
+    const aiRequest: import('./ai/host-ai-assist').AIParamRequest = {
+      toolName,
+      currentParams: params,
+      requiredParams,
+      missingParams,
+      schema: schemaShape,
+      ...(session.results && { sessionContext: session.results }),
+    };
+
+    const aiResult = await state.aiAssistant.suggestParameters(aiRequest, context);
+
+    if (!aiResult.ok) {
+      return Failure(aiResult.error);
+    }
+
+    const validationResult = state.aiAssistant.validateSuggestions(
+      aiResult.value.suggestions,
+      schema,
+    );
+
+    if (!validationResult.ok) {
+      return Failure(validationResult.error);
+    }
+
+    // User parameters override AI for safety
+    const mergedParams = mergeWithSuggestions(params, validationResult.value);
+
+    state.logger.debug(
+      {
+        toolName,
+        filledCount: Object.keys(validationResult.value).length,
+      },
+      'Successfully filled missing parameters with AI',
+    );
+
+    return Success(mergedParams);
+  } catch (error) {
+    state.logger.error({ error, toolName }, 'Error filling missing parameters');
+    return Failure(`Failed to fill parameters: ${error}`);
+  }
+};
+
+/**
+ * Validates tool execution prerequisites by checking session state.
+ *
+ * Precondition: sessionId must reference valid session
+ * Postcondition: Returns list of blocking steps if cannot execute
+ */
+export const canExecuteImpl = async (
+  state: ToolRouterState,
+  toolName: string,
+  sessionId: string,
+): Promise<{ canExecute: boolean; missingSteps: Step[] }> => {
+  const sessionResult = await state.sessionManager.get(sessionId);
+
+  if (!sessionResult.ok || !sessionResult.value) {
+    return { canExecute: false, missingSteps: [] };
+  }
+
+  const session = sessionResult.value;
+  const completedSteps = new Set<Step>((session.completed_steps || []) as Step[]);
+
+  const missingSteps = getMissingPreconditions(toolName, completedSteps);
+
+  return {
+    canExecute: missingSteps.length === 0,
+    missingSteps,
+  };
+};
+
+/**
+ * Calculates complete execution plan including all required dependencies.
+ * Used for workflow preview and dependency analysis.
+ */
+export const getExecutionPlan = (
+  toolName: string,
+  completedSteps: Set<Step> = new Set(),
+): string[] => {
+  const missingSteps = getMissingPreconditions(toolName, completedSteps);
+
+  if (missingSteps.length === 0) {
+    return [toolName];
+  }
+
+  const executionOrder = getExecutionOrder(missingSteps, completedSteps);
+  const plan = executionOrder.map(({ tool }) => tool);
+  plan.push(toolName);
+
+  return plan;
+};
+
+/**
+ * Creates configured ToolRouter instance with dependency injection.
+ *
+ * Design pattern: Factory function enables testability and configuration flexibility
+ */
+export const createToolRouter = (config: RouterConfig): IToolRouter => {
+  const state: ToolRouterState = {
+    sessionManager: config.sessionManager,
+    logger: config.logger.child({ component: 'tool-router' }),
+    tools: config.tools,
+    aiAssistant: config.aiAssistant || createHostAIAssistant(config.logger, { enabled: true }),
+  };
+
+  return {
+    route: (request: RouteRequest) => routeRequestImpl(state, request),
+    getToolDependencies,
+    canExecute: (toolName: string, sessionId: string) => canExecuteImpl(state, toolName, sessionId),
+    getExecutionPlan,
+  };
+};

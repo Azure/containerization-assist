@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import pino from 'pino';
-import { ToolRouter } from '@mcp/tool-router';
+import { createToolRouter, type IToolRouter } from '@mcp/tool-router';
 import type { Step } from '@mcp/tool-graph';
 import {
   createMockToolsMap,
@@ -15,7 +15,7 @@ import { MockSessionManager } from './fixtures/mock-session';
 import { createMockContext } from './fixtures/mock-context';
 
 describe('Out-of-Order Tool Execution', () => {
-  let router: ToolRouter;
+  let router: IToolRouter;
   let sessionManager: MockSessionManager;
   let logger: pino.Logger;
   let mockContext: any;
@@ -26,7 +26,7 @@ describe('Out-of-Order Tool Execution', () => {
     logger = pino({ level: 'silent' });
     mockContext = createMockContext();
 
-    router = new ToolRouter({
+    router = createToolRouter({
       sessionManager,
       logger,
       tools: createMockToolsMap(),

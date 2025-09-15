@@ -3,7 +3,7 @@
  * Uses direct SDK patterns with Zod schemas
  */
 
-import { MCPServer } from '../mcp/server';
+import { createMCPServer, type IMCPServer } from '../mcp/server';
 import {
   createDependencies,
   initializeDependencies,
@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   process.env.MCP_MODE = 'true';
 
   let deps: Dependencies | undefined;
-  let server: MCPServer | undefined;
+  let server: IMCPServer | undefined;
 
   try {
     // Create dependencies
@@ -27,7 +27,7 @@ async function main(): Promise<void> {
     deps.logger.info('Starting SDK-Native MCP Server with DI container');
 
     // Create and start the SDK-native server with injected dependencies
-    server = new MCPServer(deps);
+    server = createMCPServer(deps);
     await server.start();
 
     deps.logger.info('MCP Server started successfully');

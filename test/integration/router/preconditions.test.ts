@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import pino from 'pino';
-import { ToolRouter } from '@mcp/tool-router';
+import { createToolRouter, type IToolRouter } from '@mcp/tool-router';
 import type { Step } from '@mcp/tool-graph';
 import {
   createMockToolsMap,
@@ -15,7 +15,7 @@ import { MockSessionManager } from './fixtures/mock-session';
 import { createMockContext } from './fixtures/mock-context';
 
 describe('Automatic Precondition Satisfaction', () => {
-  let router: ToolRouter;
+  let router: IToolRouter;
   let sessionManager: MockSessionManager;
   let logger: pino.Logger;
   let mockContext: any;
@@ -26,7 +26,7 @@ describe('Automatic Precondition Satisfaction', () => {
     logger = pino({ level: 'silent' });
     mockContext = createMockContext();
 
-    router = new ToolRouter({
+    router = createToolRouter({
       sessionManager,
       logger,
       tools: createMockToolsMap(),
@@ -111,6 +111,10 @@ describe('Automatic Precondition Satisfaction', () => {
         completed_steps: ['analyzed_repo'] as Step[],
       });
 
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
+
       // deploy has three parallel branches from analyzed_repo
       const result = await router.route({
         context: mockContext,
@@ -165,6 +169,10 @@ describe('Automatic Precondition Satisfaction', () => {
       const sessionResult = await sessionManager.createWithState({
         completed_steps: ['analyzed_repo', 'k8s_prepared'] as Step[],
       });
+
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       const result = await router.route({
         context: mockContext,

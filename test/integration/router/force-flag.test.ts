@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import pino from 'pino';
-import { ToolRouter } from '@mcp/tool-router';
+import { createToolRouter, type IToolRouter } from '@mcp/tool-router';
 import type { Step } from '@mcp/tool-graph';
 import {
   createMockToolsMap,
@@ -15,7 +15,7 @@ import { MockSessionManager } from './fixtures/mock-session';
 import { createMockContext } from './fixtures/mock-context';
 
 describe('Force Flag Functionality', () => {
-  let router: ToolRouter;
+  let router: IToolRouter;
   let sessionManager: MockSessionManager;
   let logger: pino.Logger;
   let mockContext: any;
@@ -26,7 +26,7 @@ describe('Force Flag Functionality', () => {
     logger = pino({ level: 'silent' });
     mockContext = createMockContext();
 
-    router = new ToolRouter({
+    router = createToolRouter({
       sessionManager,
       logger,
       tools: createMockToolsMap(),
@@ -138,7 +138,7 @@ describe('Force Flag Functionality', () => {
   describe('force flag with session state', () => {
     it('should override existing session state when forced', async () => {
       // Create session with completed steps
-      const session = await sessionManager.createWithState({
+      const sessionResult = await sessionManager.createWithState({
         completed_steps: ['analyzed_repo', 'dockerfile_generated', 'built_image'] as Step[],
         results: {
           'build-image': {
@@ -147,6 +147,10 @@ describe('Force Flag Functionality', () => {
           },
         },
       });
+
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       // Force re-run build-image
       const result = await router.route({
@@ -254,7 +258,10 @@ describe('Force Flag Functionality', () => {
   describe('force flag with failed prerequisites', () => {
     it('should execute tool despite missing prerequisites when forced', async () => {
       // Create session with no completed steps
-      const session = await sessionManager.create();
+      const sessionResult = await sessionManager.create();
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       // Try to run a tool with many prerequisites using force
       const result = await router.route({
@@ -288,7 +295,10 @@ describe('Force Flag Functionality', () => {
 
   describe('force flag effect tracking', () => {
     it('should still update completed_steps when forced', async () => {
-      const session = await sessionManager.create();
+      const sessionResult = await sessionManager.create();
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       // Run with force flag
       const result = await router.route({
@@ -311,7 +321,10 @@ describe('Force Flag Functionality', () => {
     });
 
     it('should allow multiple forced executions in sequence', async () => {
-      const session = await sessionManager.create();
+      const sessionResult = await sessionManager.create();
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       // Force multiple tools in sequence
       const tools = ['analyze-repo', 'build-image', 'scan-image'];

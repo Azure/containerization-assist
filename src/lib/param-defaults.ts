@@ -89,44 +89,82 @@ export function getToolDefaults(
 }
 
 /**
- * Type-safe parameter builder for tools
- * Ensures all required fields are present after defaulting
+ * State for the parameter builder
  */
-export class ParameterBuilder<T extends Record<string, any>> {
-  private params: Partial<T>;
-  private defaultValues: Partial<T>;
-
-  constructor(params: Partial<T>) {
-    this.params = params;
-    this.defaultValues = {};
-  }
-
-  /**
-   * Set default value for a field
-   */
-  default<K extends keyof T>(key: K, value: T[K]): this {
-    this.defaultValues[key] = value;
-    return this;
-  }
-
-  /**
-   * Set multiple defaults at once
-   */
-  defaults(defaults: Partial<T>): this {
-    Object.assign(this.defaultValues, defaults);
-    return this;
-  }
-
-  /**
-   * Build the final parameters object
-   */
-  build(): T {
-    return withDefaults(this.params, this.defaultValues as T);
-  }
+export interface BuilderState<T> {
+  params: Partial<T>;
+  defaultValues: Partial<T>;
 }
 
 /**
+ * Add a default value to the builder state
+ */
+export const addDefault = <T extends Record<string, any>, K extends keyof T>(
+  state: BuilderState<T>,
+  key: K,
+  value: T[K],
+): BuilderState<T> => ({
+  ...state,
+  defaultValues: { ...state.defaultValues, [key]: value },
+});
+
+/**
+ * Add multiple defaults to the builder state
+ */
+export const addDefaults = <T extends Record<string, any>>(
+  state: BuilderState<T>,
+  defaults: Partial<T>,
+): BuilderState<T> => ({
+  ...state,
+  defaultValues: { ...state.defaultValues, ...defaults },
+});
+
+/**
+ * Build the final parameters from the builder state
+ */
+export const buildParameters = <T extends Record<string, any>>(state: BuilderState<T>): T => {
+  return withDefaults(state.params, state.defaultValues as T);
+};
+
+/**
+ * Interface for the parameter builder
+ */
+export interface ParameterBuilderInterface<T extends Record<string, any>> {
+  default<K extends keyof T>(key: K, value: T[K]): ParameterBuilderInterface<T>;
+  defaults(defaults: Partial<T>): ParameterBuilderInterface<T>;
+  build(): T;
+}
+
+/**
+ * Type-safe parameter builder factory for tools
+ * Ensures all required fields are present after defaulting
+ */
+export const createParameterBuilder = <T extends Record<string, any>>(
+  params: Partial<T>,
+): ParameterBuilderInterface<T> => {
+  let state: BuilderState<T> = {
+    params,
+    defaultValues: {},
+  };
+
+  const builder: ParameterBuilderInterface<T> = {
+    default: (key, value) => {
+      state = addDefault(state, key, value);
+      return builder;
+    },
+    defaults: (defaults) => {
+      state = addDefaults(state, defaults);
+      return builder;
+    },
+    build: () => buildParameters(state),
+  };
+
+  return builder;
+};
+
+/**
  * Create a parameter builder for fluent API usage
+ * Backward compatibility alias for createParameterBuilder
  *
  * Example:
  * const params = buildParams(inputParams)
@@ -135,8 +173,10 @@ export class ParameterBuilder<T extends Record<string, any>> {
  *   .defaults(K8S_DEFAULTS)
  *   .build();
  */
-export function buildParams<T extends Record<string, any>>(
-  params: Partial<T>,
-): ParameterBuilder<T> {
-  return new ParameterBuilder<T>(params);
-}
+export const buildParams = createParameterBuilder;
+
+/**
+ * Export ParameterBuilder type for backward compatibility
+ * (For type references only - not a class anymore)
+ */
+export type ParameterBuilder<T extends Record<string, any>> = ParameterBuilderInterface<T>;

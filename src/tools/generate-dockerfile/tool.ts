@@ -18,7 +18,7 @@ import type { SamplingOptions } from '@lib/sampling';
 import type { SessionAnalysisResult } from '../session-types';
 import type { ToolContext } from '../../mcp/context';
 import { Success, Failure, type Result } from '../../types';
-import { getDefaultPort } from '@config/defaults';
+import { getDefaultPort, ANALYSIS_CONFIG } from '@config/defaults';
 import { getRecommendedBaseImage } from '@lib/base-images';
 import {
   stripFencesAndNoise,
@@ -216,8 +216,10 @@ export interface GenerateDockerfileResult {
 }
 
 /**
- * Template-based Dockerfile generation fallback.
- * Invariant: Always produces valid Dockerfile syntax even without AI.
+ * Generates Dockerfile using templates when AI generation fails.
+ *
+ * Invariant: Always produces valid Dockerfile syntax for reliability
+ * Trade-off: Template consistency over AI creativity for fallback scenarios
  */
 function generateTemplateDockerfile(
   analysisResult: AnalyzeRepoResult,
@@ -239,7 +241,6 @@ function generateTemplateDockerfile(
   if (framework) dockerfile += `LABEL framework="${framework}"\n`;
   if (moduleRoot) dockerfile += `LABEL module.root="${moduleRoot}"\n`;
   dockerfile += '\n';
-  // Working directory follows container best practices
   dockerfile += `WORKDIR /app\n\n`;
   // Language-specific setup
   switch (language) {
@@ -372,13 +373,22 @@ function generateTemplateDockerfile(
 }
 
 /**
- * Convert SessionAnalysisResult to AnalyzeRepoResult for compatibility
+ * Adapts session analysis format to tool requirements.
+ * Provides backward compatibility during result format transition.
  */
 function sessionToAnalyzeRepoResult(sessionResult: SessionAnalysisResult): AnalyzeRepoResult {
   return {
     ok: true,
     sessionId: 'session-converted', // This won't be used in template generation
     language: sessionResult.language || 'unknown',
+    confidence: 0.8, // Default confidence for session-converted results
+    detectionMethod: 'signature' as const,
+    detectionDetails: {
+      signatureMatches: 0,
+      extensionMatches: 0,
+      frameworkSignals: 0,
+      buildSystemSignals: 0,
+    },
     ...(sessionResult.framework && { framework: sessionResult.framework }),
     dependencies:
       sessionResult.dependencies?.map((d) => {
@@ -416,7 +426,8 @@ function sessionToAnalyzeRepoResult(sessionResult: SessionAnalysisResult): Analy
 }
 
 /**
- * Build arguments for AI prompt from analysis result
+ * Constructs AI prompt arguments from repository analysis.
+ * Infers optimal build configuration from detected patterns.
  */
 function buildArgsFromAnalysis(
   analysisResult: SessionAnalysisResult,
@@ -468,8 +479,160 @@ function buildArgsFromAnalysis(
 }
 
 // computeHash function removed - was unused after tool wrapper elimination
+
 /**
- * Generate Dockerfile for a single module root
+ * Generates Dockerfile through direct AI analysis when initial detection fails.
+ * Fallback strategy when confidence thresholds aren't met for guided generation.
+ */
+async function generateWithDirectAnalysis(
+  analysisResult: SessionAnalysisResult,
+  params: GenerateDockerfileParams,
+  moduleRoot: string,
+  context: ToolContext,
+  logger: Logger,
+): Promise<Result<SingleDockerfileResult>> {
+  const rawPath = params.path || '.';
+  const repoPath = safeNormalizePath(rawPath);
+  const normalizedModuleRoot = safeNormalizePath(moduleRoot);
+
+  // Build minimal prompt args for direct analysis
+  const promptArgs = {
+    repoPath: path.isAbsolute(normalizedModuleRoot)
+      ? normalizedModuleRoot
+      : path.resolve(path.join(repoPath, normalizedModuleRoot)),
+    detectedLanguage: analysisResult.language !== 'unknown' ? analysisResult.language : undefined,
+    optimization: params.optimization === false ? undefined : params.optimization || 'balanced',
+    moduleRoot,
+  };
+
+  logger.info(
+    {
+      promptArgs,
+      detectedLanguage: analysisResult.language,
+      confidence: analysisResult.confidence,
+      threshold: ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD,
+    },
+    '🤖 AI Direct Analysis: Asking AI to examine repository files and generate Dockerfile without pre-analysis constraints',
+  );
+
+  // Use direct analysis prompt
+  const aiResult = await aiGenerateWithSampling(logger, context, {
+    promptName: 'dockerfile-direct-analysis',
+    promptArgs,
+    expectation: 'dockerfile',
+    maxRetries: 3,
+    fallbackBehavior: 'default',
+    maxTokens: ANALYSIS_CONFIG.DIRECT_ANALYSIS_MAX_TOKENS,
+    // Pass through sampling options if not disabled
+    ...(params.disableSampling ? { enableSampling: false } : {}),
+  });
+
+  if (aiResult.ok) {
+    const cleaned = stripFencesAndNoise(aiResult.value.winner.content, 'dockerfile');
+
+    if (isValidDockerfileContent(cleaned)) {
+      // Success - extract info from generated content
+      const baseImageUsed = extractBaseImage(cleaned) || params.baseImage || 'node:18-alpine'; // fallback
+
+      const dockerfilePath = path.isAbsolute(normalizedModuleRoot)
+        ? path.join(normalizedModuleRoot, 'Dockerfile')
+        : path.resolve(path.join(repoPath, normalizedModuleRoot, 'Dockerfile'));
+
+      await fs.writeFile(dockerfilePath, cleaned, 'utf-8');
+
+      const result: SingleDockerfileResult = {
+        content: cleaned,
+        path: path.resolve(repoPath),
+        moduleRoot,
+        baseImage: baseImageUsed,
+        optimization: params.optimization !== false,
+        multistage: cleaned.includes('FROM ') && cleaned.split('FROM ').length > 2,
+        warnings: [], // Could add analysis for warnings
+      };
+
+      // Add sampling metadata if available
+      if (!params.disableSampling && aiResult.value.samplingMetadata) {
+        result.samplingMetadata = aiResult.value.samplingMetadata;
+        result.winnerScore = aiResult.value.winner.score;
+        if (params.includeScoreBreakdown && aiResult.value.winner.scoreBreakdown) {
+          result.scoreBreakdown = aiResult.value.winner.scoreBreakdown;
+        }
+        if (params.returnAllCandidates && aiResult.value.allCandidates) {
+          result.allCandidates = aiResult.value.allCandidates;
+        }
+      }
+
+      logger.info(
+        {
+          baseImage: baseImageUsed,
+          multistage: result.multistage,
+          dockerfilePath,
+          originalDetection: {
+            language: analysisResult.language,
+            confidence: analysisResult.confidence,
+          },
+        },
+        '✅ DIRECT ANALYSIS SUCCESS: AI successfully analyzed repository and generated Dockerfile',
+      );
+
+      return Success(result);
+    }
+  }
+
+  // Fallback to template if direct analysis fails
+  logger.warn(
+    {
+      error: aiResult.ok ? 'Invalid content' : aiResult.error,
+      originalDetection: {
+        language: analysisResult.language,
+        confidence: analysisResult.confidence,
+      },
+    },
+    '⚠️ DIRECT ANALYSIS FAILED: AI could not generate valid Dockerfile, falling back to template generation',
+  );
+
+  const fallbackResult = generateTemplateDockerfile(
+    sessionToAnalyzeRepoResult(analysisResult),
+    params,
+    moduleRoot,
+  );
+
+  if (!fallbackResult.ok) {
+    return Failure(`Both direct analysis and template generation failed: ${fallbackResult.error}`);
+  }
+
+  // Handle template fallback similar to existing logic
+  const dockerfilePath = path.isAbsolute(normalizedModuleRoot)
+    ? path.join(normalizedModuleRoot, 'Dockerfile')
+    : path.resolve(path.join(repoPath, normalizedModuleRoot, 'Dockerfile'));
+
+  await fs.writeFile(dockerfilePath, fallbackResult.value.content, 'utf-8');
+
+  logger.info(
+    {
+      baseImage: fallbackResult.value.baseImage,
+      dockerfilePath,
+      originalDetection: {
+        language: analysisResult.language,
+        confidence: analysisResult.confidence,
+      },
+    },
+    '🔧 TEMPLATE FALLBACK SUCCESS: Generated basic Dockerfile using template after direct analysis failed',
+  );
+
+  return Success({
+    content: fallbackResult.value.content,
+    path: path.resolve(repoPath),
+    moduleRoot,
+    baseImage: fallbackResult.value.baseImage,
+    optimization: params.optimization !== false,
+    multistage: params.multistage !== false,
+  });
+}
+
+/**
+ * Generates Dockerfile for individual module within multi-module project.
+ * Supports both AI-guided and template-based generation with sampling optimization.
  */
 async function generateSingleDockerfile(
   analysisResult: SessionAnalysisResult,
@@ -479,7 +642,6 @@ async function generateSingleDockerfile(
   logger: Logger,
 ): Promise<Result<SingleDockerfileResult>> {
   const { multistage = true, securityHardening = true } = params;
-  // Normalize optimization to boolean - any string value means optimization is enabled
   const optimization = params.optimization === false ? false : true;
 
   // Prepare sampling options (filter out undefined values)
@@ -494,6 +656,48 @@ async function generateSingleDockerfile(
   if (params.returnAllCandidates !== undefined)
     samplingOptions.returnAllCandidates = params.returnAllCandidates;
   if (params.useCache !== undefined) samplingOptions.useCache = params.useCache;
+
+  // Check if we should use direct analysis
+  const shouldUseDirectAnalysis =
+    (analysisResult.confidence !== undefined &&
+      analysisResult.confidence < ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD) ||
+    analysisResult.language === 'unknown' ||
+    !analysisResult.language;
+
+  if (shouldUseDirectAnalysis) {
+    const reason =
+      analysisResult.language === 'unknown'
+        ? 'language detection failed (unknown)'
+        : !analysisResult.language
+          ? 'no language detected'
+          : `low confidence score (${analysisResult.confidence}/${ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD})`;
+
+    logger.info(
+      {
+        confidence: analysisResult.confidence,
+        language: analysisResult.language,
+        detectionMethod: analysisResult.detectionMethod,
+        threshold: ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD,
+        moduleRoot,
+        reason,
+      },
+      `🔍 DIRECT ANALYSIS MODE: ${reason} - letting AI examine repository files directly instead of using pre-analysis guidance`,
+    );
+
+    return await generateWithDirectAnalysis(analysisResult, params, moduleRoot, context, logger);
+  }
+
+  logger.info(
+    {
+      confidence: analysisResult.confidence,
+      language: analysisResult.language,
+      framework: analysisResult.framework,
+      detectionMethod: analysisResult.detectionMethod,
+      threshold: ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD,
+      moduleRoot,
+    },
+    `📋 GUIDED ANALYSIS MODE: High confidence detection (${analysisResult.confidence}/${ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD}) - using pre-analyzed ${analysisResult.language}${analysisResult.framework ? ` + ${analysisResult.framework}` : ''} information`,
+  );
 
   let dockerfileContent: string;
   let baseImageUsed: string;
@@ -653,7 +857,11 @@ async function generateSingleDockerfile(
   const rawPath = params.path || '.';
   const repoPath = safeNormalizePath(rawPath);
   const normalizedModuleRoot = safeNormalizePath(moduleRoot);
-  const dockerfilePath = path.resolve(path.join(repoPath, normalizedModuleRoot, 'Dockerfile'));
+
+  // Check if moduleRoot is already an absolute path
+  const dockerfilePath = path.isAbsolute(normalizedModuleRoot)
+    ? path.join(normalizedModuleRoot, 'Dockerfile')
+    : path.resolve(path.join(repoPath, normalizedModuleRoot, 'Dockerfile'));
 
   // Write Dockerfile to disk
   await fs.writeFile(dockerfilePath, dockerfileContent, 'utf-8');
@@ -700,7 +908,8 @@ async function generateSingleDockerfile(
 }
 
 /**
- * Generate Dockerfile implementation - direct execution with selective progress
+ * Main Dockerfile generation orchestrator supporting multi-module projects.
+ * Coordinates analysis, AI generation, and template fallbacks across project modules.
  */
 async function generateDockerfileImpl(
   params: GenerateDockerfileParams,
@@ -753,6 +962,8 @@ async function generateDockerfileImpl(
           framework: rawAnalysisResult.framework,
           dependencies: rawAnalysisResult.dependencies,
           ports: rawAnalysisResult.ports,
+          confidence: rawAnalysisResult.confidence,
+          detectionMethod: rawAnalysisResult.detectionMethod,
           ...(rawAnalysisResult.buildSystem && {
             buildSystem: {
               type: rawAnalysisResult.buildSystem.type,
@@ -901,6 +1112,7 @@ async function generateDockerfileImpl(
 }
 
 /**
- * Generate Dockerfile tool with selective progress reporting
+ * Main entry point for Dockerfile generation tool.
+ * Provides AI-powered containerization with intelligent fallbacks.
  */
 export const generateDockerfile = generateDockerfileImpl;

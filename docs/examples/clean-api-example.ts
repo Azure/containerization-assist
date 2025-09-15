@@ -4,7 +4,7 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ContainerAssistServer } from '@thgamble/containerization-assist-mcp';
+import { createContainerAssistServer } from '@thgamble/containerization-assist-mcp';
 
 /**
  * Example 1: Simple integration - register all tools
@@ -17,7 +17,7 @@ async function simpleIntegration() {
   });
 
   // Create Container Assist instance (no globals!)
-  const caServer = new ContainerAssistServer();
+  const caServer = createContainerAssistServer();
   
   // Bind everything at once (sampling + tools)
   caServer.bindAll({ server: mcpServer });
@@ -37,7 +37,7 @@ async function selectiveRegistration() {
     version: '1.0.0'
   });
 
-  const caServer = new ContainerAssistServer();
+  const caServer = createContainerAssistServer();
   
   // Configure sampling separately
   caServer.bindSampling({ server: mcpServer });
@@ -65,7 +65,7 @@ async function customToolNames() {
     version: '1.0.0'
   });
 
-  const caServer = new ContainerAssistServer();
+  const caServer = createContainerAssistServer();
   
   // Bind with custom names
   caServer.bindSampling({ server: mcpServer });
@@ -96,8 +96,8 @@ async function multipleInstances() {
     version: '1.0.0'
   });
   
-  const devCA = new ContainerAssistServer({ 
-    logger: createCustomLogger('dev') 
+  const devCA = createContainerAssistServer({
+    logger: createCustomLogger('dev')
   });
   devCA.bindAll({ server: devServer });
   
@@ -107,8 +107,8 @@ async function multipleInstances() {
     version: '1.0.0'
   });
   
-  const prodCA = new ContainerAssistServer({ 
-    logger: createCustomLogger('prod') 
+  const prodCA = createContainerAssistServer({
+    logger: createCustomLogger('prod')
   });
   prodCA.bindAll({ server: prodServer });
   
@@ -132,7 +132,7 @@ async function advancedUsage() {
     version: '1.0.0'
   });
 
-  const caServer = new ContainerAssistServer();
+  const caServer = createContainerAssistServer();
   caServer.bindAll({ server: mcpServer });
   
   // Access specific tools after registration

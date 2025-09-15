@@ -4,11 +4,11 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { 
-  ContainerAssistServer,
-  registerAllTools, 
+import {
+  createContainerAssistServer,
+  registerAllTools,
   registerTool,
-  tools 
+  tools
 } from '@thgamble/containerization-assist-mcp';
 
 /**
@@ -20,7 +20,7 @@ async function registerAllToolsExample() {
     version: '1.0.0'
   });
   
-  const caServer = new ContainerAssistServer();
+  const caServer = createContainerAssistServer();
   caServer.bindAll({ server });
   
   // Start the server
@@ -39,7 +39,7 @@ async function registerCustomToolsExample() {
   });
   
   // Create Container Assist instance and register specific tools
-  const caServer = new ContainerAssistServer();
+  const caServer = createContainerAssistServer();
   caServer.bindSampling({ server });
   caServer.registerTools(
     { server },
@@ -74,7 +74,7 @@ async function registerWithMappingExample() {
   });
   
   // Create Container Assist instance
-  const caServer = new ContainerAssistServer();
+  const caServer = createContainerAssistServer();
   
   // Define custom names for all tools
   const nameMapping = {

@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import pino from 'pino';
-import { ToolRouter } from '@mcp/tool-router';
+import { createToolRouter, type IToolRouter } from '@mcp/tool-router';
 import type { Step } from '@mcp/tool-graph';
 import {
   createMockToolsMap,
@@ -15,7 +15,7 @@ import { MockSessionManager } from './fixtures/mock-session';
 import { createMockContext } from './fixtures/mock-context';
 
 describe('Idempotency Behavior', () => {
-  let router: ToolRouter;
+  let router: IToolRouter;
   let sessionManager: MockSessionManager;
   let logger: pino.Logger;
   let mockContext: any;
@@ -26,7 +26,7 @@ describe('Idempotency Behavior', () => {
     logger = pino({ level: 'silent' });
     mockContext = createMockContext();
 
-    router = new ToolRouter({
+    router = createToolRouter({
       sessionManager,
       logger,
       tools: createMockToolsMap(),
@@ -117,7 +117,10 @@ describe('Idempotency Behavior', () => {
 
   describe('session state persistence', () => {
     it('should maintain completed_steps across multiple operations', async () => {
-      const session = await sessionManager.create();
+      const sessionResult = await sessionManager.create();
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       // Run first tool
       await router.route({
@@ -127,8 +130,10 @@ describe('Idempotency Behavior', () => {
         sessionId: session.sessionId,
       });
 
-      let currentSession = await sessionManager.get(session.sessionId);
-      expect(currentSession?.completed_steps).toContain('analyzed_repo');
+      let currentSessionResult = await sessionManager.get(session.sessionId);
+      expect(currentSessionResult.ok).toBe(true);
+      if (!currentSessionResult.ok) return;
+      expect(currentSessionResult.value?.completed_steps).toContain('analyzed_repo');
 
       // Run second tool
       await router.route({
@@ -138,9 +143,11 @@ describe('Idempotency Behavior', () => {
         sessionId: session.sessionId,
       });
 
-      currentSession = await sessionManager.get(session.sessionId);
-      expect(currentSession?.completed_steps).toContain('analyzed_repo');
-      expect(currentSession?.completed_steps).toContain('k8s_prepared');
+      currentSessionResult = await sessionManager.get(session.sessionId);
+      expect(currentSessionResult.ok).toBe(true);
+      if (!currentSessionResult.ok) return;
+      expect(currentSessionResult.value?.completed_steps).toContain('analyzed_repo');
+      expect(currentSessionResult.value?.completed_steps).toContain('k8s_prepared');
 
       // Run third tool that depends on first
       resetExecutionLog();
@@ -157,15 +164,20 @@ describe('Idempotency Behavior', () => {
       expect(toolOrder).toEqual(['resolve-base-images']);
 
       // All steps should be preserved
-      currentSession = await sessionManager.get(session.sessionId);
-      const steps = currentSession?.completed_steps as Step[];
+      currentSessionResult = await sessionManager.get(session.sessionId);
+      expect(currentSessionResult.ok).toBe(true);
+      if (!currentSessionResult.ok) return;
+      const steps = currentSessionResult.value?.completed_steps as Step[];
       expect(steps).toContain('analyzed_repo');
       expect(steps).toContain('k8s_prepared');
       expect(steps).toContain('resolved_base_images');
     });
 
     it('should accumulate results in session', async () => {
-      const session = await sessionManager.create();
+      const sessionResult = await sessionManager.create();
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       // Run multiple tools
       await router.route({
@@ -182,7 +194,10 @@ describe('Idempotency Behavior', () => {
         sessionId: session.sessionId,
       });
 
-      const finalSession = await sessionManager.get(session.sessionId);
+      const finalSessionResult = await sessionManager.get(session.sessionId);
+      expect(finalSessionResult.ok).toBe(true);
+      if (!finalSessionResult.ok) return;
+      const finalSession = finalSessionResult.value;
       expect(finalSession?.results).toBeDefined();
       expect(finalSession?.results?.['analyze-repo']).toBeDefined();
       expect(finalSession?.results?.['build-image']).toBeDefined();
@@ -191,8 +206,10 @@ describe('Idempotency Behavior', () => {
 
   describe('effect tracking accuracy', () => {
     it('should correctly track single tool effects', async () => {
-      const session = await sessionManager.create();
-
+      const sessionResult = await sessionManager.create();
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
       await router.route({
         context: mockContext,
         toolName: 'prepare-cluster',
@@ -209,7 +226,10 @@ describe('Idempotency Behavior', () => {
     });
 
     it('should track multiple effects from single tool', async () => {
-      const session = await sessionManager.create();
+      const sessionResult = await sessionManager.create();
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       await router.route({
         context: mockContext,
@@ -230,7 +250,10 @@ describe('Idempotency Behavior', () => {
     });
 
     it('should not duplicate effects when tools share them', async () => {
-      const session = await sessionManager.create();
+      const sessionResult = await sessionManager.create();
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       // Run analyze-repo directly
       await router.route({
@@ -265,9 +288,13 @@ describe('Idempotency Behavior', () => {
       // This test depends on the actual tool graph structure
       // For tools with multiple effects, we test partial satisfaction
 
-      const session = await sessionManager.createWithState({
+      const sessionResult = await sessionManager.createWithState({
         completed_steps: ['analyzed_repo'] as Step[],
       });
+
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       // generate-dockerfile provides dockerfile_generated
       // but requires both analyzed_repo and resolved_base_images
@@ -369,7 +396,10 @@ describe('Idempotency Behavior', () => {
 
   describe('complex idempotency scenarios', () => {
     it('should handle interleaved tool execution', async () => {
-      const session = await sessionManager.create();
+      const sessionResult = await sessionManager.create();
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       // Run tool A
       await router.route({
@@ -420,9 +450,13 @@ describe('Idempotency Behavior', () => {
     });
 
     it('should handle failed prerequisite chains gracefully', async () => {
-      const session = await sessionManager.createWithState({
+      const sessionResult = await sessionManager.createWithState({
         completed_steps: ['analyzed_repo', 'dockerfile_generated'] as Step[],
       });
+
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       // Try to build (should skip prerequisites)
       const result = await router.route({

@@ -41,22 +41,39 @@ export enum ValidationSeverity {
 
 export type ValidationGrade = 'A' | 'B' | 'C' | 'D' | 'F';
 
+// Import type from docker-file-parser
+import type { CommandEntry } from 'docker-file-parser';
+
 export interface DockerfileValidationRule {
   id: string;
   name: string;
   description: string;
-  check: (commands: any[]) => boolean; // Uses docker-file-parser Command[]
+  check: (commands: CommandEntry[]) => boolean;
   message: string;
   severity: ValidationSeverity;
   fix?: string;
   category: ValidationCategory;
 }
 
+// Kubernetes manifest can have various shapes, but we'll define a minimal type
+export interface KubernetesManifest {
+  apiVersion?: string;
+  kind?: string;
+  metadata?: {
+    name?: string;
+    namespace?: string;
+    labels?: Record<string, string>;
+    annotations?: Record<string, string>;
+  };
+  spec?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 export interface KubernetesValidationRule {
   id: string;
   name: string;
   description: string;
-  check: (manifest: any) => boolean; // Uses parsed YAML object
+  check: (manifest: KubernetesManifest) => boolean;
   message: string;
   severity: ValidationSeverity;
   fix?: string;

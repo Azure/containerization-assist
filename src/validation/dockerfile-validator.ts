@@ -6,6 +6,7 @@
  */
 
 import * as dockerParser from 'docker-file-parser';
+import type { CommandEntry } from 'docker-file-parser';
 import validateDockerfileSyntax from 'validate-dockerfile';
 import { Result, Success, Failure } from '../types';
 import { extractErrorMessage } from '../lib/error-utils';
@@ -29,17 +30,13 @@ import {
   TOKEN_PATTERN,
 } from '../lib/regex-patterns';
 
-// Type definitions for docker-file-parser commands
-interface DockerCommand {
-  name: string;
-  args: string | string[] | { [key: string]: string };
-  lineno: number;
-}
+// Use CommandEntry from docker-file-parser
+type DockerCommand = CommandEntry;
 
 /**
  * Get argument value from docker command
  */
-const getArgValue = (command: any): string => {
+const getArgValue = (command: DockerCommand): string => {
   if (typeof command.args === 'string') {
     return command.args;
   }
@@ -63,11 +60,12 @@ const DOCKERFILE_RULES: DockerfileValidationRule[] = [
     id: 'no-root-user',
     name: 'Non-root user required',
     description: 'Container should run as non-root user for security',
-    check: (commands: any) => {
+    check: (commands: CommandEntry[]) => {
       const userCommands = commands.filter((cmd: DockerCommand) => cmd.name === 'USER');
       if (userCommands.length === 0) return false;
 
       const lastUser = userCommands[userCommands.length - 1];
+      if (!lastUser) return false;
       const userArg = getArgValue(lastUser);
       return userArg !== 'root' && userArg !== '0';
     },
@@ -81,9 +79,9 @@ const DOCKERFILE_RULES: DockerfileValidationRule[] = [
     id: 'no-sudo-install',
     name: 'No sudo in containers',
     description: 'Avoid installing sudo in containers for security',
-    check: (commands: any) => {
+    check: (commands: CommandEntry[]) => {
       const runCommands = commands.filter((cmd: DockerCommand) => cmd.name === 'RUN');
-      return !runCommands.some((cmd: any) => {
+      return !runCommands.some((cmd: DockerCommand) => {
         const args = getArgValue(cmd);
         return SUDO_INSTALL.test(args);
       });
@@ -98,9 +96,9 @@ const DOCKERFILE_RULES: DockerfileValidationRule[] = [
     id: 'specific-base-image',
     name: 'Use specific version tags',
     description: 'Base images should use specific versions for reproducibility',
-    check: (commands: any) => {
+    check: (commands: CommandEntry[]) => {
       const fromCommands = commands.filter((cmd: DockerCommand) => cmd.name === 'FROM');
-      return fromCommands.every((cmd: any) => {
+      return fromCommands.every((cmd: DockerCommand) => {
         const image = getArgValue(cmd);
         // Extract base image name before AS clause for validation
         const cleanImage = image?.split(AS_CLAUSE)?.[0];
@@ -117,8 +115,8 @@ const DOCKERFILE_RULES: DockerfileValidationRule[] = [
     id: 'has-healthcheck',
     name: 'Health check defined',
     description: 'Containers should define health checks for monitoring',
-    check: (commands: any) => {
-      return commands.some((cmd: any) => cmd.name === 'HEALTHCHECK');
+    check: (commands: CommandEntry[]) => {
+      return commands.some((cmd: CommandEntry) => cmd.name === 'HEALTHCHECK');
     },
     message: 'Add HEALTHCHECK for container monitoring',
     severity: ValidationSeverity.INFO,
@@ -130,7 +128,7 @@ const DOCKERFILE_RULES: DockerfileValidationRule[] = [
     id: 'layer-caching-optimization',
     name: 'Optimize layer caching',
     description: 'Dependencies should be copied before application code',
-    check: (commands: any) => {
+    check: (commands: CommandEntry[]) => {
       const copyCommands = commands.filter((cmd: DockerCommand) => cmd.name === 'COPY');
 
       let packageCopyIndex = -1;
@@ -164,7 +162,7 @@ const DOCKERFILE_RULES: DockerfileValidationRule[] = [
     id: 'no-secrets',
     name: 'No hardcoded secrets',
     description: 'Secrets should not be hardcoded in Dockerfile',
-    check: (commands: any) => {
+    check: (commands: CommandEntry[]) => {
       const suspicious = [PASSWORD_PATTERN, API_KEY_PATTERN, SECRET_PATTERN, TOKEN_PATTERN];
 
       return !commands.some((cmd: DockerCommand) => {
@@ -185,7 +183,7 @@ const DOCKERFILE_RULES: DockerfileValidationRule[] = [
     id: 'multi-stage-optimization',
     name: 'Multi-stage builds for production',
     description: 'Complex applications should use multi-stage builds',
-    check: (commands: any) => {
+    check: (commands: CommandEntry[]) => {
       const fromCount = commands.filter((cmd: DockerCommand) => cmd.name === 'FROM').length;
       const totalLines = commands.length;
 
@@ -241,7 +239,7 @@ const DOCKERFILE_RULES: DockerfileValidationRule[] = [
  */
 const parseDockerfile = (content: string): Result<DockerCommand[]> => {
   try {
-    const commands = dockerParser.parse(content) as DockerCommand[];
+    const commands = dockerParser.parse(content);
     return Success(commands);
   } catch (error) {
     return Failure(`Failed to parse Dockerfile: ${extractErrorMessage(error)}`);
@@ -257,21 +255,21 @@ const validateSyntax = (content: string): Result<boolean> => {
     line?: number;
     message?: string;
     priority?: number;
-    errors?: any[];
+    errors?: Array<{ line: number; message: string; level?: string }>;
   };
 
   if (!basicValidation.valid) {
     // Check if there are true syntax/parse errors (priority 0)
     const syntaxErrors =
-      (basicValidation.errors as any[])?.filter(
-        (err: any) =>
-          err.priority === 0 &&
+      (basicValidation.errors as Array<{ line: number; message: string; level?: string }>)?.filter(
+        (err) =>
+          (err as any).priority === 0 &&
           (err.message.includes('Invalid instruction') ||
             err.message.includes('Missing or misplaced FROM')),
       ) || [];
 
     if (syntaxErrors.length > 0) {
-      return Failure(`Failed to parse Dockerfile: ${syntaxErrors[0].message}`);
+      return Failure(`Failed to parse Dockerfile: ${syntaxErrors[0]?.message || 'Unknown error'}`);
     }
   }
 
@@ -484,26 +482,12 @@ export const getDockerfileRulesByCategory = (
 /**
  * Create a Dockerfile validator factory for backward compatibility
  */
-export const createDockerfileValidator = () => ({
+export const createDockerfileValidator = (): {
+  validate: (dockerfileContent: string) => ValidationReport;
+  getRules: () => DockerfileValidationRule[];
+  getCategory: (category: ValidationCategory) => DockerfileValidationRule[];
+} => ({
   validate: validateDockerfileContent,
   getRules: getDockerfileRules,
   getCategory: getDockerfileRulesByCategory,
 });
-
-/**
- * Legacy class-based validator for backward compatibility
- * @deprecated Use validateDockerfileContent function instead
- */
-export class DockerfileValidator {
-  validate(dockerfileContent: string): ValidationReport {
-    return validateDockerfileContent(dockerfileContent);
-  }
-
-  getRules(): DockerfileValidationRule[] {
-    return getDockerfileRules();
-  }
-
-  getCategory(category: ValidationCategory): DockerfileValidationRule[] {
-    return getDockerfileRulesByCategory(category);
-  }
-}

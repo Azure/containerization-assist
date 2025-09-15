@@ -9,7 +9,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 // Import Container Assist tools
-import { ContainerAssistServer } from '@thgamble/containerization-assist-mcp';
+import { createContainerAssistServer } from '@thgamble/containerization-assist-mcp';
 
 async function main() {
   console.error('Starting MCP server with Container Assist tools...');
@@ -30,7 +30,7 @@ async function main() {
 
     // Create Container Assist instance and bind tools
     console.error('Setting up Container Assist tools...');
-    const caServer = new ContainerAssistServer();
+    const caServer = createContainerAssistServer();
     
     // Register specific tools (or use bindAll for all tools)
     caServer.bindSampling({ server });

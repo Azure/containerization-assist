@@ -164,6 +164,7 @@ export const loadKnowledgeBase = async (): Promise<void> => {
       'java-pack.json',
       'go-pack.json',
       'dotnet-pack.json',
+      'dotnet-framework-pack.json',
       'ruby-pack.json',
       'rust-pack.json',
       'php-pack.json',

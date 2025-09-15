@@ -7,11 +7,7 @@ import { Success, Failure, type Result } from '../../types';
 import { z } from 'zod';
 import type { ToolContext, SamplingRequest } from '../context';
 import { createParameterSuggestionPrompt } from './prompt-builder';
-import {
-  SuggestionRegistry,
-  createSuggestionRegistry,
-  type SuggestionGenerator,
-} from './default-suggestions';
+import { createSuggestionRegistry, type SuggestionGenerator } from './default-suggestions';
 
 /**
  * AI parameter suggestion request
@@ -59,7 +55,7 @@ export interface AIAssistantConfig {
 export interface AIAssistantDeps {
   logger: Logger;
   config: AIAssistantConfig;
-  suggestionRegistry: SuggestionRegistry;
+  suggestionRegistry: ReturnType<typeof createSuggestionRegistry>;
 }
 
 const DEFAULT_CONFIG: Required<Omit<AIAssistantConfig, 'customSuggestions'>> = {
@@ -325,34 +321,4 @@ export interface HostAIAssistant {
    * Check if AI assistance is available
    */
   isAvailable(): boolean;
-}
-
-/**
- * Legacy class-based implementation for backward compatibility
- * @deprecated Use functional API instead
- */
-export class DefaultHostAIAssistant implements HostAIAssistant {
-  private deps: AIAssistantDeps;
-
-  constructor(logger: Logger, config: AIAssistantConfig = {}) {
-    this.deps = createAIAssistantDeps(logger, config);
-  }
-
-  async suggestParameters(
-    request: AIParamRequest,
-    context?: ToolContext,
-  ): Promise<Result<AIParamResponse>> {
-    return suggestParameters(this.deps, request, context);
-  }
-
-  validateSuggestions(
-    suggestions: Record<string, unknown>,
-    schema: z.ZodType<unknown>,
-  ): Result<Record<string, unknown>> {
-    return validateSuggestions(suggestions, schema);
-  }
-
-  isAvailable(): boolean {
-    return isAIAssistanceAvailable(this.deps);
-  }
 }

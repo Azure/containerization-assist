@@ -1,0 +1,588 @@
+{
+  "name": "DotNet MediatR CQRS Pack",
+  "description": "Comprehensive containerization patterns for .NET applications using MediatR for CQRS, microservices, and clean architecture patterns",
+  "version": "1.0.0",
+  "triggers": {
+    "frameworks": ["aspnet-core", "dotnet-core"],
+    "packages": ["MediatR", "MediatR.Extensions.Microsoft.DependencyInjection"],
+    "files": ["Commands/", "Queries/", "Handlers/"],
+    "patterns": ["IRequest", "IRequestHandler", "INotification"]
+  },
+  "rules": [
+    {
+      "id": "mediatr-base-setup",
+      "description": "Basic MediatR CQRS application containerization",
+      "conditions": {
+        "packages": ["MediatR"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "base_image": "mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+          "build_stage": "mcr.microsoft.com/dotnet/sdk:8.0-alpine",
+          "layers": [
+            "# MediatR CQRS Application",
+            "WORKDIR /app",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o out --no-restore",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+            "WORKDIR /app",
+            "COPY --from=build /app/out .",
+            "",
+            "# Configure for CQRS patterns",
+            "ENV ASPNETCORE_ENVIRONMENT=Production",
+            "ENV ASPNETCORE_URLS=http://+:8080",
+            "EXPOSE 8080",
+            "",
+            "ENTRYPOINT [\"dotnet\", \"YourApp.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "mediatr-microservice-architecture",
+      "description": "Microservice with MediatR and service discovery",
+      "conditions": {
+        "packages": ["MediatR", "Microsoft.Extensions.ServiceDiscovery"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Multi-stage build for microservice",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "# Copy solution and project files for better layer caching",
+            "COPY *.sln ./",
+            "COPY */*.csproj ./",
+            "RUN for file in $(ls *.csproj); do mkdir -p ${file%.*}/ && mv $file ${file%.*}/; done",
+            "RUN dotnet restore",
+            "",
+            "# Copy source and build",
+            "COPY . ./",
+            "RUN dotnet build -c Release --no-restore",
+            "RUN dotnet publish -c Release -o /app/publish --no-build",
+            "",
+            "# Runtime stage",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "# Create non-root user for security",
+            "RUN addgroup -g 1001 -S appgroup && adduser -u 1001 -S appuser -G appgroup",
+            "",
+            "COPY --from=build /app/publish .",
+            "RUN chown -R appuser:appgroup /app",
+            "",
+            "USER appuser",
+            "",
+            "# Health check for microservice",
+            "HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \\",
+            "  CMD curl -f http://localhost:8080/health || exit 1",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"YourMicroservice.dll\"]"
+          ]
+        },
+        "kubernetes": {
+          "deployment": {
+            "replicas": 3,
+            "resources": {
+              "requests": {
+                "cpu": "100m",
+                "memory": "128Mi"
+              },
+              "limits": {
+                "cpu": "500m",
+                "memory": "512Mi"
+              }
+            },
+            "readinessProbe": {
+              "httpGet": {
+                "path": "/health/ready",
+                "port": 8080
+              },
+              "initialDelaySeconds": 10,
+              "periodSeconds": 5
+            },
+            "livenessProbe": {
+              "httpGet": {
+                "path": "/health/live",
+                "port": 8080
+              },
+              "initialDelaySeconds": 30,
+              "periodSeconds": 10
+            }
+          },
+          "service": {
+            "type": "ClusterIP",
+            "ports": [
+              {
+                "port": 80,
+                "targetPort": 8080
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "mediatr-event-sourcing",
+      "description": "Event sourcing with MediatR and message persistence",
+      "conditions": {
+        "packages": ["MediatR", "EventStore.Client"],
+        "patterns": ["DomainEvent", "EventStore"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Event Sourcing Application",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0",
+            "WORKDIR /app",
+            "",
+            "# Install EventStore client dependencies",
+            "RUN apt-get update && apt-get install -y \\",
+            "    curl \\",
+            "    && rm -rf /var/lib/apt/lists/*",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Event store configuration",
+            "ENV EventStore__ConnectionString=\"esdb://eventstore:2113?tls=false\"",
+            "ENV EventStore__DefaultCredentials__Username=\"admin\"",
+            "ENV EventStore__DefaultCredentials__Password=\"changeit\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"EventSourcingApp.dll\"]"
+          ]
+        },
+        "docker_compose": {
+          "services": {
+            "app": {
+              "depends_on": ["eventstore"]
+            },
+            "eventstore": {
+              "image": "eventstore/eventstore:23.10.0-bookworm-slim",
+              "environment": [
+                "EVENTSTORE_CLUSTER_SIZE=1",
+                "EVENTSTORE_RUN_PROJECTIONS=All",
+                "EVENTSTORE_START_STANDARD_PROJECTIONS=true",
+                "EVENTSTORE_EXT_TCP_PORT=1113",
+                "EVENTSTORE_HTTP_PORT=2113",
+                "EVENTSTORE_INSECURE=true",
+                "EVENTSTORE_ENABLE_EXTERNAL_TCP=true",
+                "EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP=true"
+              ],
+              "ports": ["1113:1113", "2113:2113"],
+              "volumes": ["eventstore-volume-data:/var/lib/eventstore"]
+            }
+          },
+          "volumes": {
+            "eventstore-volume-data": {}
+          }
+        }
+      }
+    },
+    {
+      "id": "mediatr-saga-orchestration",
+      "description": "Saga orchestration with MediatR and state management",
+      "conditions": {
+        "packages": ["MediatR", "MassTransit"],
+        "patterns": ["Saga", "StateMachine"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Saga Orchestration Service",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish --runtime linux-musl-x64 --self-contained false",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "# Install required packages for saga state persistence",
+            "RUN apk add --no-cache icu-libs",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Saga configuration",
+            "ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false",
+            "ENV LC_ALL=en_US.UTF-8",
+            "ENV LANG=en_US.UTF-8",
+            "",
+            "# Message broker configuration",
+            "ENV MessageBroker__Host=\"rabbitmq\"",
+            "ENV MessageBroker__Username=\"guest\"",
+            "ENV MessageBroker__Password=\"guest\"",
+            "",
+            "# State persistence configuration",
+            "ENV SagaState__Provider=\"Redis\"",
+            "ENV SagaState__ConnectionString=\"redis:6379\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"SagaOrchestrator.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "mediatr-cqrs-read-write-separation",
+      "description": "CQRS with read/write database separation",
+      "conditions": {
+        "packages": ["MediatR", "Entity Framework Core"],
+        "patterns": ["ICommand", "IQuery", "ReadModel", "WriteModel"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# CQRS Application with Read/Write Separation",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Database connection configuration",
+            "ENV ConnectionStrings__WriteDatabase=\"Server=write-db;Database=AppWrite;User Id=sa;Password=YourPassword123;TrustServerCertificate=true\"",
+            "ENV ConnectionStrings__ReadDatabase=\"Server=read-db;Database=AppRead;User Id=sa;Password=YourPassword123;TrustServerCertificate=true\"",
+            "",
+            "# CQRS specific configuration",
+            "ENV CQRS__CommandTimeout=\"30\"",
+            "ENV CQRS__QueryTimeout=\"10\"",
+            "ENV CQRS__EnableQueryCaching=\"true\"",
+            "ENV CQRS__CacheExpiration=\"300\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"CqrsApp.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "mediatr-performance-optimization",
+      "description": "Performance-optimized MediatR configuration",
+      "conditions": {
+        "packages": ["MediatR"],
+        "patterns": ["IPipelineBehavior", "RequestPerformanceBehaviour"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Performance Optimized MediatR Application",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "# Enable ReadyToRun for faster startup",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish \\",
+            "    --runtime linux-musl-x64 \\",
+            "    --self-contained false \\",
+            "    -p:PublishReadyToRun=true \\",
+            "    -p:PublishTrimmed=false",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "# Performance optimizations",
+            "ENV DOTNET_TieredPGO=1",
+            "ENV DOTNET_TC_QuickJitForLoops=1",
+            "ENV DOTNET_ReadyToRun=1",
+            "",
+            "# Memory optimizations",
+            "ENV DOTNET_gcServer=1",
+            "ENV DOTNET_gcConcurrent=1",
+            "",
+            "# MediatR performance configuration",
+            "ENV MediatR__ServiceLifetime=\"Singleton\"",
+            "ENV MediatR__RequestTimeout=\"30000\"",
+            "ENV MediatR__EnableRequestCaching=\"true\"",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"PerformantApp.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "mediatr-distributed-cache",
+      "description": "MediatR with distributed caching for query optimization",
+      "conditions": {
+        "packages": ["MediatR", "Microsoft.Extensions.Caching.StackExchangeRedis"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# MediatR with Distributed Caching",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Redis distributed cache configuration",
+            "ENV ConnectionStrings__Redis=\"redis:6379\"",
+            "ENV DistributedCache__DefaultExpiration=\"300\"",
+            "ENV DistributedCache__SlidingExpiration=\"60\"",
+            "",
+            "# Query caching configuration",
+            "ENV QueryCache__Enabled=\"true\"",
+            "ENV QueryCache__DefaultTTL=\"300\"",
+            "ENV QueryCache__MaxMemorySize=\"100MB\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"CachedApp.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "mediatr-validation-pipeline",
+      "description": "MediatR with FluentValidation pipeline behavior",
+      "conditions": {
+        "packages": ["MediatR", "FluentValidation"],
+        "patterns": ["ValidationBehaviour", "IValidator"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# MediatR with Validation Pipeline",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Validation configuration",
+            "ENV Validation__StopOnFirstFailure=\"false\"",
+            "ENV Validation__IncludeErrorDetails=\"true\"",
+            "ENV Validation__ValidateChildProperties=\"true\"",
+            "",
+            "# Logging configuration for validation",
+            "ENV Logging__LogLevel__Validation=\"Information\"",
+            "ENV Logging__LogLevel__MediatR=\"Information\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"ValidatedApp.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "mediatr-outbox-pattern",
+      "description": "MediatR with outbox pattern for reliable messaging",
+      "conditions": {
+        "packages": ["MediatR", "MassTransit"],
+        "patterns": ["OutboxPattern", "DomainEvent"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# MediatR Outbox Pattern Implementation",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Outbox configuration",
+            "ENV Outbox__ProcessingInterval=\"5000\"",
+            "ENV Outbox__BatchSize=\"100\"",
+            "ENV Outbox__RetryCount=\"3\"",
+            "ENV Outbox__RetryDelay=\"1000\"",
+            "",
+            "# Message broker configuration",
+            "ENV MessageBroker__Host=\"rabbitmq\"",
+            "ENV MessageBroker__VirtualHost=\"/\"",
+            "ENV MessageBroker__Username=\"guest\"",
+            "ENV MessageBroker__Password=\"guest\"",
+            "",
+            "# Database configuration for outbox",
+            "ENV ConnectionStrings__DefaultConnection=\"Server=db;Database=OutboxApp;User Id=sa;Password=YourPassword123;TrustServerCertificate=true\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"OutboxApp.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "mediatr-monitoring-observability",
+      "description": "MediatR with comprehensive monitoring and observability",
+      "conditions": {
+        "packages": ["MediatR", "OpenTelemetry"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# MediatR with Observability",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# OpenTelemetry configuration",
+            "ENV OTEL_EXPORTER_OTLP_ENDPOINT=\"http://jaeger:4317\"",
+            "ENV OTEL_SERVICE_NAME=\"mediatr-service\"",
+            "ENV OTEL_SERVICE_VERSION=\"1.0.0\"",
+            "",
+            "# Metrics configuration",
+            "ENV Metrics__Enabled=\"true\"",
+            "ENV Metrics__RequestDuration=\"true\"",
+            "ENV Metrics__CommandHandlerMetrics=\"true\"",
+            "ENV Metrics__QueryHandlerMetrics=\"true\"",
+            "",
+            "# Structured logging",
+            "ENV Logging__LogLevel__Default=\"Information\"",
+            "ENV Logging__LogLevel__MediatR=\"Debug\"",
+            "ENV Serilog__WriteTo__0__Name=\"Console\"",
+            "ENV Serilog__WriteTo__1__Name=\"Elasticsearch\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"ObservableApp.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "mediatr-multi-tenant",
+      "description": "Multi-tenant MediatR application with tenant isolation",
+      "conditions": {
+        "packages": ["MediatR"],
+        "patterns": ["ITenantContext", "TenantResolver"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# Multi-Tenant MediatR Application",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Multi-tenancy configuration",
+            "ENV MultiTenancy__Strategy=\"Subdomain\"",
+            "ENV MultiTenancy__DefaultTenant=\"default\"",
+            "ENV MultiTenancy__RequireTenant=\"true\"",
+            "",
+            "# Database per tenant configuration",
+            "ENV ConnectionStrings__Template=\"Server=db;Database=App_{tenant};User Id=sa;Password=YourPassword123;TrustServerCertificate=true\"",
+            "",
+            "# Tenant isolation settings",
+            "ENV TenantIsolation__DataIsolation=\"Database\"",
+            "ENV TenantIsolation__CacheIsolation=\"true\"",
+            "ENV TenantIsolation__LoggingIsolation=\"true\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"MultiTenantApp.dll\"]"
+          ]
+        }
+      }
+    },
+    {
+      "id": "mediatr-streaming-queries",
+      "description": "MediatR with streaming query support for large datasets",
+      "conditions": {
+        "packages": ["MediatR"],
+        "patterns": ["IStreamRequest", "IAsyncEnumerable"]
+      },
+      "containerization": {
+        "dockerfile": {
+          "layers": [
+            "# MediatR Streaming Queries",
+            "FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build",
+            "WORKDIR /src",
+            "",
+            "COPY *.csproj ./",
+            "RUN dotnet restore",
+            "COPY . ./",
+            "RUN dotnet publish -c Release -o /app/publish",
+            "",
+            "FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine",
+            "WORKDIR /app",
+            "",
+            "COPY --from=build /app/publish .",
+            "",
+            "# Streaming configuration",
+            "ENV Streaming__BufferSize=\"1000\"",
+            "ENV Streaming__MaxConcurrentStreams=\"10\"",
+            "ENV Streaming__StreamTimeout=\"300000\"",
+            "",
+            "# Memory optimization for streaming",
+            "ENV DOTNET_gcServer=1",
+            "ENV DOTNET_GCHighMemPercent=75",
+            "ENV DOTNET_GCLOHThreshold=100000",
+            "",
+            "# Kestrel limits for streaming",
+            "ENV Kestrel__Limits__MaxRequestBodySize=\"2147483648\"",
+            "ENV Kestrel__Limits__MaxConcurrentConnections=\"1000\"",
+            "",
+            "EXPOSE 8080",
+            "ENTRYPOINT [\"dotnet\", \"StreamingApp.dll\"]"
+          ]
+        }
+      }
+    }
+  ]
+}

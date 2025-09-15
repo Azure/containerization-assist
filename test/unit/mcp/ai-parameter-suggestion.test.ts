@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { ToolRouter } from '../../../src/mcp/tool-router';
+import { createToolRouter, type IToolRouter } from '../../../src/mcp/tool-router';
 import { createSessionManager } from '../../../src/lib/session';
 import { createLogger } from '../../../src/lib/logger';
 import { Success, Failure } from '../../../src/types';
@@ -12,7 +12,7 @@ import { createHostAIAssistant, type HostAIAssistant } from '../../../src/mcp/ai
 import { z } from 'zod';
 
 describe('AI Parameter Suggestion', () => {
-  let router: ToolRouter;
+  let router: IToolRouter;
   let mockTools: Map<string, any>;
   let sessionManager: ReturnType<typeof createSessionManager>;
   let logger: any;
@@ -101,7 +101,7 @@ describe('AI Parameter Suggestion', () => {
     });
 
     // Create router with mock AI
-    router = new ToolRouter({
+    router = createToolRouter({
       sessionManager,
       logger,
       tools: mockTools,
@@ -135,12 +135,12 @@ describe('AI Parameter Suggestion', () => {
       } as import('../../../src/mcp/context').ToolContext;
 
       // Test session creation directly first
-      console.log('About to create session, sessionManager:', sessionManager);
-      const testSession = await sessionManager.create();
-      console.log('Test session result:', testSession);
-      if (!testSession) {
-        throw new Error('Session creation returned null/undefined');
+      const testSessionResult = await sessionManager.create();
+      expect(testSessionResult.ok).toBe(true);
+      if (!testSessionResult.ok) {
+        throw new Error(`Session creation failed: ${testSessionResult.error}`);
       }
+      const testSession = testSessionResult.value;
       expect(testSession).toBeDefined();
       expect(testSession.sessionId).toBeDefined();
 
@@ -150,6 +150,7 @@ describe('AI Parameter Suggestion', () => {
           // Missing required 'imageId' (path is auto-normalized to '.')
         },
         context: mockContext,
+        sessionId: testSession.sessionId,
         force: true,
       });
 

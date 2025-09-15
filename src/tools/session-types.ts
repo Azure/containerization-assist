@@ -20,6 +20,14 @@ export interface SessionAnalysisResult {
     buildCommand?: string;
   };
   summary?: string;
+  confidence?: number;
+  detectionMethod?: 'signature' | 'extension' | 'fallback' | 'ai-enhanced';
+  detectionDetails?: {
+    signatureMatches: number;
+    extensionMatches: number;
+    frameworkSignals: number;
+    buildSystemSignals: number;
+  };
 }
 
 /**

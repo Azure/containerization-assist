@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 jest.unmock('@lib/session');
 jest.unmock('../../../src/lib/session');
 
-import { ToolRouter } from '../../../src/mcp/tool-router';
+import { createToolRouter, type IToolRouter } from '../../../src/mcp/tool-router';
 import { createSessionManager } from '../../../src/lib/session';
 import { createLogger } from '../../../src/lib/logger';
 import { Success, Failure } from '../../../src/types';
@@ -17,7 +17,7 @@ import { createHostAIAssistant } from '../../../src/mcp/ai/host-ai-assist';
 import { z } from 'zod';
 
 describe('ToolRouter', () => {
-  let router: ToolRouter;
+  let router: IToolRouter;
   let mockTools: Map<string, any>;
   let sessionManager: ReturnType<typeof createSessionManager>;
   let logger: any;
@@ -148,7 +148,7 @@ describe('ToolRouter', () => {
     });
 
     // Create router with mocks
-    router = new ToolRouter({
+    router = createToolRouter({
       sessionManager,
       logger,
       tools: mockTools,
@@ -232,7 +232,8 @@ describe('ToolRouter', () => {
 
       // Create the session first
       const sessionId = 'test-session';
-      await sessionManager.create(sessionId);
+      const createResult = await sessionManager.create(sessionId);
+      expect(createResult.ok).toBe(true);
 
       // First execution
       const firstResult = await router.route({
@@ -246,7 +247,10 @@ describe('ToolRouter', () => {
       expect(firstResult.executedTools).toContain('analyze-repo');
 
       // Check that session was updated with completed steps
-      const sessionAfterFirst = await sessionManager.get(sessionId);
+      const sessionResult = await sessionManager.get(sessionId);
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const sessionAfterFirst = sessionResult.value;
       expect(sessionAfterFirst).toBeDefined();
       expect(sessionAfterFirst?.completed_steps).toContain('analyzed_repo');
 
@@ -276,7 +280,8 @@ describe('ToolRouter', () => {
       };
 
       // Create the session first
-      await sessionManager.create(sessionId);
+      const createResult = await sessionManager.create(sessionId);
+      expect(createResult.ok).toBe(true);
 
       // First execution
       const firstResult = await router.route({
@@ -315,7 +320,8 @@ describe('ToolRouter', () => {
       };
 
       // Create the session first
-      await sessionManager.create(sessionId);
+      const createResult = await sessionManager.create(sessionId);
+      expect(createResult.ok).toBe(true);
 
       // Set up initial state
       await router.route({
@@ -362,7 +368,8 @@ describe('ToolRouter', () => {
       };
 
       // Create the session first
-      await sessionManager.create(sessionId);
+      const createResult = await sessionManager.create(sessionId);
+      expect(createResult.ok).toBe(true);
 
       // Execute first tool
       await router.route({
@@ -373,7 +380,9 @@ describe('ToolRouter', () => {
       });
 
       // Check session state
-      const session1 = await sessionManager.get(sessionId);
+      const session1Result = await sessionManager.get(sessionId);
+      expect(session1Result.ok).toBe(true);
+      const session1 = session1Result.ok ? session1Result.value : null;
       expect(session1.completed_steps).toContain('analyzed_repo');
 
       // Execute dependent tool
@@ -385,7 +394,9 @@ describe('ToolRouter', () => {
       });
 
       // Check updated state
-      const session2 = await sessionManager.get(sessionId);
+      const session2Result = await sessionManager.get(sessionId);
+      expect(session2Result.ok).toBe(true);
+      const session2 = session2Result.ok ? session2Result.value : null;
       expect(session2.completed_steps).toContain('analyzed_repo');
       expect(session2.completed_steps).toContain('resolved_base_images');
     });
@@ -398,7 +409,8 @@ describe('ToolRouter', () => {
       };
 
       // Create the session first
-      await sessionManager.create(sessionId);
+      const createResult = await sessionManager.create(sessionId);
+      expect(createResult.ok).toBe(true);
 
       const result = await router.route({
         toolName: 'analyze-repo',
@@ -409,7 +421,9 @@ describe('ToolRouter', () => {
 
       expect(result.result.ok).toBe(true);
 
-      const session = await sessionManager.get(sessionId);
+      const sessionResult = await sessionManager.get(sessionId);
+      expect(sessionResult.ok).toBe(true);
+      const session = sessionResult.ok ? sessionResult.value : null;
       expect(session.results).toBeDefined();
       expect(session.results['analyze-repo']).toBeDefined();
       expect(session.results['analyze-repo']).toHaveProperty('framework', 'nodejs');
@@ -549,7 +563,8 @@ describe('ToolRouter', () => {
         logger,
       };
 
-      await sessionManager.create(sessionId);
+      const createResult = await sessionManager.create(sessionId);
+      expect(createResult.ok).toBe(true);
 
       const result = await router.route({
         toolName: 'analyze-repo',
@@ -561,7 +576,9 @@ describe('ToolRouter', () => {
       expect(result.result.ok).toBe(true);
 
       // Verify session was updated with all fields in one operation
-      const session = await sessionManager.get(sessionId);
+      const sessionResult = await sessionManager.get(sessionId);
+      expect(sessionResult.ok).toBe(true);
+      const session = sessionResult.ok ? sessionResult.value : null;
       expect(session).toBeDefined();
       expect(session?.updatedAt).toBeDefined();
       expect(session?.completed_steps).toContain('analyzed_repo');
@@ -575,16 +592,17 @@ describe('ToolRouter', () => {
         logger,
       };
 
-      await sessionManager.create(sessionId);
+      const createResult = await sessionManager.create(sessionId);
+      expect(createResult.ok).toBe(true);
 
-      // Mock update to return null once
+      // Mock update to return failure once
       const originalUpdate = sessionManager.update;
       let updateCallCount = 0;
       sessionManager.update = jest.fn(async (id, state) => {
         updateCallCount++;
         if (updateCallCount === 1) {
-          // First call returns null to simulate failure
-          return null;
+          // First call returns failure to simulate error
+          return { ok: false, error: 'Session update failed' };
         }
         return originalUpdate.call(sessionManager, id, state);
       });
@@ -611,7 +629,8 @@ describe('ToolRouter', () => {
         logger,
       };
 
-      await sessionManager.create(sessionId);
+      const createResult = await sessionManager.create(sessionId);
+      expect(createResult.ok).toBe(true);
 
       // Execute multiple tools in sequence
       const analyzeResult = await router.route({
@@ -635,7 +654,9 @@ describe('ToolRouter', () => {
       expect(dockerfileResult.result.ok).toBe(true);
 
       // Verify session maintains all results
-      const finalSession = await sessionManager.get(sessionId);
+      const finalSessionResult = await sessionManager.get(sessionId);
+      expect(finalSessionResult.ok).toBe(true);
+      const finalSession = finalSessionResult.ok ? finalSessionResult.value : null;
       expect(finalSession?.results?.['analyze-repo']).toBeDefined();
       expect(finalSession?.results?.['generate-dockerfile']).toBeDefined();
       expect(finalSession?.completed_steps).toContain('analyzed_repo');
@@ -649,7 +670,8 @@ describe('ToolRouter', () => {
         logger,
       };
 
-      await sessionManager.create(sessionId);
+      const createResult = await sessionManager.create(sessionId);
+      expect(createResult.ok).toBe(true);
 
       // Create a single mock tool without dependencies for simpler testing
       mockTools.set('tool-a', {
@@ -671,7 +693,9 @@ describe('ToolRouter', () => {
       expect(singleResult.result.ok).toBe(true);
 
       // Check session was updated
-      const sessionAfterSingle = await sessionManager.get(sessionId);
+      const sessionAfterSingleResult = await sessionManager.get(sessionId);
+      expect(sessionAfterSingleResult.ok).toBe(true);
+      const sessionAfterSingle = sessionAfterSingleResult.ok ? sessionAfterSingleResult.value : null;
       expect(sessionAfterSingle).toBeDefined();
       expect(sessionAfterSingle?.results).toBeDefined();
       expect(sessionAfterSingle?.results?.['tool-a']).toBeDefined();
@@ -708,7 +732,9 @@ describe('ToolRouter', () => {
       });
 
       // Session should contain all results
-      const finalSession = await sessionManager.get(sessionId);
+      const finalSessionResult = await sessionManager.get(sessionId);
+      expect(finalSessionResult.ok).toBe(true);
+      const finalSession = finalSessionResult.ok ? finalSessionResult.value : null;
       expect(finalSession).toBeDefined();
       expect(finalSession?.results).toBeDefined();
 
@@ -726,7 +752,8 @@ describe('ToolRouter', () => {
         logger,
       };
 
-      await sessionManager.create(sessionId);
+      const createResult = await sessionManager.create(sessionId);
+      expect(createResult.ok).toBe(true);
 
       // First tool succeeds
       const firstResult = await router.route({
@@ -755,7 +782,9 @@ describe('ToolRouter', () => {
       expect(secondResult.result.ok).toBe(false);
 
       // Session should still contain the successful analyze-repo result
-      const session = await sessionManager.get(sessionId);
+      const sessionResult = await sessionManager.get(sessionId);
+      expect(sessionResult.ok).toBe(true);
+      const session = sessionResult.ok ? sessionResult.value : null;
       expect(session?.results?.['analyze-repo']).toBeDefined();
       expect(session?.completed_steps).toContain('analyzed_repo');
 
@@ -770,9 +799,12 @@ describe('ToolRouter', () => {
         logger,
       };
 
-      await sessionManager.create(sessionId);
+      const createResult = await sessionManager.create(sessionId);
+      expect(createResult.ok).toBe(true);
 
-      const initialSession = await sessionManager.get(sessionId);
+      const initialSessionResult = await sessionManager.get(sessionId);
+      expect(initialSessionResult.ok).toBe(true);
+      const initialSession = initialSessionResult.ok ? initialSessionResult.value : null;
       const initialTimestamp = initialSession?.updatedAt;
 
       // Wait a bit to ensure timestamp difference
@@ -785,7 +817,9 @@ describe('ToolRouter', () => {
         context,
       });
 
-      const updatedSession = await sessionManager.get(sessionId);
+      const updatedSessionResult = await sessionManager.get(sessionId);
+      expect(updatedSessionResult.ok).toBe(true);
+      const updatedSession = updatedSessionResult.ok ? updatedSessionResult.value : null;
       const updatedTimestamp = updatedSession?.updatedAt;
 
       // Timestamp should be updated

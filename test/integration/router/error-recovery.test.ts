@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import pino from 'pino';
-import { ToolRouter } from '@mcp/tool-router';
+import { createToolRouter, type IToolRouter } from '@mcp/tool-router';
 import type { Step } from '@mcp/tool-graph';
 import { Failure, Success, type Result } from '@types';
 import { MockSessionManager } from './fixtures/mock-session';
@@ -16,7 +16,7 @@ import {
 } from './fixtures/mock-tools';
 
 describe('Error Recovery and Rerouting', () => {
-  let router: ToolRouter;
+  let router: IToolRouter;
   let sessionManager: MockSessionManager;
   let logger: pino.Logger;
   let mockContext: any;
@@ -27,7 +27,7 @@ describe('Error Recovery and Rerouting', () => {
     logger = pino({ level: 'silent' });
     mockContext = createMockContext();
 
-    router = new ToolRouter({
+    router = createToolRouter({
       sessionManager,
       logger,
       tools: createMockToolsMap(),
@@ -56,7 +56,7 @@ describe('Error Recovery and Rerouting', () => {
         },
       });
 
-      const failingRouter = new ToolRouter({
+      const failingRouter = createToolRouter({
         sessionManager,
         logger,
         tools,
@@ -96,7 +96,7 @@ describe('Error Recovery and Rerouting', () => {
         },
       });
 
-      const failingRouter = new ToolRouter({
+      const failingRouter = createToolRouter({
         sessionManager,
         logger,
         tools,
@@ -150,7 +150,7 @@ describe('Error Recovery and Rerouting', () => {
         },
       });
 
-      const recoveringRouter = new ToolRouter({
+      const recoveringRouter = createToolRouter({
         sessionManager,
         logger,
         tools,
@@ -205,7 +205,7 @@ describe('Error Recovery and Rerouting', () => {
         },
       });
 
-      const failingRouter = new ToolRouter({
+      const failingRouter = createToolRouter({
         sessionManager,
         logger,
         tools,
@@ -252,7 +252,7 @@ describe('Error Recovery and Rerouting', () => {
         },
       });
 
-      const failingRouter = new ToolRouter({
+      const failingRouter = createToolRouter({
         sessionManager,
         logger,
         tools,
@@ -310,7 +310,7 @@ describe('Error Recovery and Rerouting', () => {
         },
       });
 
-      const router = new ToolRouter({
+      const router = createToolRouter({
         sessionManager,
         logger,
         tools,
@@ -367,7 +367,7 @@ describe('Error Recovery and Rerouting', () => {
       // Remove a critical prerequisite tool
       tools.delete('analyze-repo');
 
-      const incompleteRouter = new ToolRouter({
+      const incompleteRouter = createToolRouter({
         sessionManager,
         logger,
         tools,
@@ -404,7 +404,7 @@ describe('Error Recovery and Rerouting', () => {
         },
       });
 
-      const crashingRouter = new ToolRouter({
+      const crashingRouter = createToolRouter({
         sessionManager,
         logger,
         tools,
@@ -439,7 +439,7 @@ describe('Error Recovery and Rerouting', () => {
         },
       });
 
-      const rejectingRouter = new ToolRouter({
+      const rejectingRouter = createToolRouter({
         sessionManager,
         logger,
         tools,
@@ -462,10 +462,10 @@ describe('Error Recovery and Rerouting', () => {
     it('should handle session creation failure', async () => {
       const failingSessionManager = {
         ...sessionManager,
-        create: async () => null as any,
+        create: async () => Failure('Session creation failed'),
       };
 
-      const routerWithBadSession = new ToolRouter({
+      const routerWithBadSession = createToolRouter({
         sessionManager: failingSessionManager as any,
         logger,
         tools: createMockToolsMap(),
@@ -490,7 +490,7 @@ describe('Error Recovery and Rerouting', () => {
       const session = sessionResult.value;
 
       // Override update to fail
-      sessionManager.update = async () => null;
+      sessionManager.update = async () => Failure('Update failed');
 
       const result = await router.route({
         context: mockContext,
@@ -523,7 +523,7 @@ describe('Error Recovery and Rerouting', () => {
         },
       });
 
-      const failingRouter = new ToolRouter({
+      const failingRouter = createToolRouter({
         sessionManager,
         logger,
         tools,

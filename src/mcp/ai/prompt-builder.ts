@@ -133,38 +133,3 @@ export const createAIPromptBuilder = () => ({
   forParameterSuggestion: createParameterSuggestionPrompt,
   forContextAnalysis: createContextAnalysisPrompt,
 });
-
-/**
- * Legacy class-based builder for backward compatibility
- * @deprecated Use functional API instead
- */
-export class AIPromptBuilder {
-  private sections: PromptSection[] = [];
-
-  addSection(title: string, content: unknown): this {
-    this.sections = addSection(title, content)(this.sections);
-    return this;
-  }
-
-  addInstruction(instruction: string): this {
-    this.sections = addInstruction(instruction)(this.sections);
-    return this;
-  }
-
-  addSeparator(): this {
-    this.sections = addSeparator()(this.sections);
-    return this;
-  }
-
-  build(): string {
-    return buildPrompt(this.sections);
-  }
-
-  static forParameterSuggestion(request: AIParamRequest): string {
-    return createParameterSuggestionPrompt(request);
-  }
-
-  static forContextAnalysis(context: Record<string, unknown>, objective: string): string {
-    return createContextAnalysisPrompt(context, objective);
-  }
-}

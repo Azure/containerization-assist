@@ -43,6 +43,12 @@ const FRAMEWORK_KEYWORDS: Record<string, string[]> = {
   spring: ['spring', 'java'],
   rails: ['rails', 'ruby'],
   laravel: ['laravel', 'php'],
+  'aspnet-core': ['aspnet', 'dotnet', 'core'],
+  'aspnet-webapi': ['aspnet', 'dotnet', 'webapi', 'framework'],
+  'aspnet-mvc': ['aspnet', 'dotnet', 'mvc', 'framework'],
+  'aspnet-framework': ['aspnet', 'dotnet', 'framework'],
+  'dotnet-framework': ['dotnet', 'framework', 'windows'],
+  'dotnet-core': ['dotnet', 'core'],
 } as const;
 
 // Environment keyword mappings

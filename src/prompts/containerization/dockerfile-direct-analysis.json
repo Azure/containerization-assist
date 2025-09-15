@@ -1,0 +1,33 @@
+{
+  "id": "dockerfile-direct-analysis",
+  "category": "containerization",
+  "description": "Generate Dockerfile by directly analyzing repository files when automated detection fails",
+  "version": "1.0",
+  "parameters": [
+    {
+      "name": "repoPath",
+      "type": "string",
+      "required": true,
+      "description": "Path to repository for analysis"
+    },
+    {
+      "name": "detectedLanguage",
+      "type": "string",
+      "required": false,
+      "description": "Language detected by automated analysis (if any)"
+    },
+    {
+      "name": "moduleRoot",
+      "type": "string",
+      "required": false,
+      "description": "Module root path for multi-module projects"
+    },
+    {
+      "name": "optimization",
+      "type": "string",
+      "required": false,
+      "description": "Optimization focus (performance, security, size, balanced)"
+    }
+  ],
+  "template": "I need you to analyze the repository at {{repoPath}} and generate an optimized Dockerfile.\n\n{{#moduleRoot}}This is for module: {{moduleRoot}}\n{{/moduleRoot}}Since automated detection was inconclusive{{#detectedLanguage}} (detected: {{detectedLanguage}}){{/detectedLanguage}}, please:\n\n1. **Examine the repository structure and key files:**\n   - Use your file reading tools to explore the directory structure\n   - Read configuration files like:\n     * JavaScript/Node: package.json, tsconfig.json\n     * Python: requirements.txt, setup.py, pyproject.toml\n     * Java: pom.xml, build.gradle, build.gradle.kts\n     * .NET: *.csproj, *.sln, web.config, appsettings.json\n     * Go: go.mod, go.sum\n     * Rust: Cargo.toml\n     * PHP: composer.json\n   - Look for framework-specific files and configurations\n   - Examine source code structure and patterns\n\n2. **Identify the technology stack:**\n   - Programming language and version requirements\n   - Framework being used (if any)\n   - Build system and package manager\n   - Runtime dependencies and requirements\n   - Any specific configuration or deployment needs\n\n3. **Generate an appropriate Dockerfile that:**\n   - Uses the correct base image for the detected technology stack\n   - Follows best practices for the identified language/framework\n   - Implements multi-stage builds when beneficial for image size\n   - Includes proper security hardening (non-root user, minimal attack surface)\n   - Handles dependencies efficiently with proper layer caching\n   - Sets appropriate WORKDIR, EXPOSE ports, and ENTRYPOINT/CMD\n   {{#optimization}}- Optimizes specifically for {{optimization}}{{/optimization}}\n\n**Critical Instructions:**\n- Analyze the actual repository files yourself - don't rely on the detection hint\n- For Java projects: NEVER use javac directly - always use the appropriate build tool (Maven/Gradle)\n- For .NET projects: Use appropriate SDK images (mcr.microsoft.com/dotnet/sdk) for build, runtime images for final stage\n- For Node.js: Copy package*.json first, run npm install, then copy source\n- For build tools: Copy configuration files (pom.xml, build.gradle, *.csproj, package.json) before copying source code\n- Use wrapper scripts (mvnw, gradlew) if they exist in the repository\n- Ensure the final Dockerfile can successfully build the application\n\n**Output Format:**\nReturn ONLY the raw Dockerfile content. Do not include:\n- Explanatory text before or after the Dockerfile\n- Markdown code blocks or formatting\n- Comments about your analysis process\n- Installation instructions\n\nStart your response directly with the FROM instruction and end with the last Dockerfile instruction."
+}

@@ -3,25 +3,35 @@
  */
 
 import { describe, it, expect } from '@jest/globals';
-import { AIPromptBuilder } from '@mcp/ai/prompt-builder';
+import {
+  addSection,
+  addInstruction,
+  addSeparator,
+  buildPrompt,
+  createParameterSuggestionPrompt,
+  createContextAnalysisPrompt,
+  pipe
+} from '@mcp/ai/prompt-builder';
 import type { AIParamRequest } from '@mcp/ai/host-ai-assist';
 
 describe('AIPromptBuilder', () => {
   describe('basic building', () => {
     it('should build simple prompt', () => {
-      const prompt = new AIPromptBuilder()
-        .addSection('Tool', 'analyze-repo')
-        .addSection('Missing', 'path')
-        .build();
+      const builder = pipe(
+        addSection('Tool', 'analyze-repo'),
+        addSection('Missing', 'path')
+      );
+      const prompt = buildPrompt(builder([]));
 
       expect(prompt).toContain('Tool: analyze-repo');
       expect(prompt).toContain('Missing: path');
     });
 
     it('should format JSON objects', () => {
-      const prompt = new AIPromptBuilder()
-        .addSection('Params', { foo: 'bar', nested: { value: 123 } })
-        .build();
+      const builder = pipe(
+        addSection('Params', { foo: 'bar', nested: { value: 123 } })
+      );
+      const prompt = buildPrompt(builder([]));
 
       expect(prompt).toContain('"foo": "bar"');
       expect(prompt).toContain('"nested": {');
@@ -29,12 +39,13 @@ describe('AIPromptBuilder', () => {
     });
 
     it('should skip undefined sections', () => {
-      const prompt = new AIPromptBuilder()
-        .addSection('Valid', 'value')
-        .addSection('Invalid', undefined)
-        .addSection('Null', null)
-        .addSection('Another', 'included')
-        .build();
+      const builder = pipe(
+        addSection('Valid', 'value'),
+        addSection('Invalid', undefined),
+        addSection('Null', null),
+        addSection('Another', 'included')
+      );
+      const prompt = buildPrompt(builder([]));
 
       expect(prompt).toContain('Valid: value');
       expect(prompt).not.toContain('Invalid');
@@ -43,20 +54,22 @@ describe('AIPromptBuilder', () => {
     });
 
     it('should add instructions', () => {
-      const prompt = new AIPromptBuilder()
-        .addInstruction('First instruction')
-        .addInstruction('Second instruction')
-        .build();
+      const builder = pipe(
+        addInstruction('First instruction'),
+        addInstruction('Second instruction')
+      );
+      const prompt = buildPrompt(builder([]));
 
       expect(prompt).toBe('First instruction\nSecond instruction');
     });
 
     it('should add separators', () => {
-      const prompt = new AIPromptBuilder()
-        .addSection('Before', 'separator')
-        .addSeparator()
-        .addSection('After', 'separator')
-        .build();
+      const builder = pipe(
+        addSection('Before', 'separator'),
+        addSeparator(),
+        addSection('After', 'separator')
+      );
+      const prompt = buildPrompt(builder([]));
 
       const lines = prompt.split('\n');
       expect(lines).toEqual(['Before: separator', '', 'After: separator']);
@@ -140,40 +153,43 @@ describe('AIPromptBuilder', () => {
   });
 
   describe('chaining', () => {
-    it('should support method chaining', () => {
-      const builder = new AIPromptBuilder();
-      const result = builder
-        .addSection('First', 'value1')
-        .addSection('Second', 'value2')
-        .addSeparator()
-        .addInstruction('Do something')
-        .addInstruction('Do something else');
+    it('should support functional composition', () => {
+      const builder = pipe(
+        addSection('First', 'value1'),
+        addSection('Second', 'value2'),
+        addSeparator(),
+        addInstruction('Do something'),
+        addInstruction('Do something else')
+      );
 
-      expect(result).toBe(builder);
+      const sections = builder([]);
+      expect(sections).toHaveLength(5);
 
-      const prompt = result.build();
+      const prompt = buildPrompt(sections);
       expect(prompt.split('\n')).toHaveLength(5);
     });
   });
 
   describe('edge cases', () => {
     it('should handle empty builder', () => {
-      const prompt = new AIPromptBuilder().build();
+      const prompt = buildPrompt([]);
       expect(prompt).toBe('');
     });
 
     it('should handle special characters in content', () => {
-      const prompt = new AIPromptBuilder()
-        .addSection('Special', 'Line\nbreak\ttab"quote')
-        .build();
+      const builder = pipe(
+        addSection('Special', 'Line\nbreak\ttab"quote')
+      );
+      const prompt = buildPrompt(builder([]));
 
       expect(prompt).toContain('Special: Line\nbreak\ttab"quote');
     });
 
     it('should handle arrays as content', () => {
-      const prompt = new AIPromptBuilder()
-        .addSection('Array', ['item1', 'item2', 'item3'])
-        .build();
+      const builder = pipe(
+        addSection('Array', ['item1', 'item2', 'item3'])
+      );
+      const prompt = buildPrompt(builder([]));
 
       expect(prompt).toContain('Array: [');
       expect(prompt).toContain('"item1"');
@@ -192,7 +208,8 @@ describe('AIPromptBuilder', () => {
         },
       };
 
-      const prompt = new AIPromptBuilder().addSection('Deep', deepObject).build();
+      const builder = pipe(addSection('Deep', deepObject));
+      const prompt = buildPrompt(builder([]));
 
       expect(prompt).toContain('"level1": {');
       expect(prompt).toContain('"level2": {');

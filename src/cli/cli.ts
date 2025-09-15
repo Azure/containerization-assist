@@ -5,7 +5,7 @@
  */
 
 import { program } from 'commander';
-import { MCPServer } from '../mcp/server';
+import { createMCPServer } from '../mcp/server';
 import { createDependencies, initializeDependencies, getSystemStatus } from '../container';
 import { config, logConfigSummaryIfDev } from '../config';
 import { createLogger } from '../lib/logger';
@@ -360,7 +360,7 @@ async function main(): Promise<void> {
     const deps = createDependencies();
     await initializeDependencies(deps);
 
-    const server = new MCPServer(deps);
+    const server = createMCPServer(deps);
 
     if (options.listTools) {
       getLogger().info('Listing available tools');

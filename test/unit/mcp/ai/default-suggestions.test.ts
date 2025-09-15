@@ -4,21 +4,31 @@
 
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import {
-  SuggestionRegistry,
   createSuggestionRegistry,
   DEFAULT_SUGGESTION_GENERATORS,
+  registerSuggestion,
+  unregisterSuggestion,
+  hasSuggestion,
+  generateSuggestion,
+  generateAllSuggestions,
+  getRegisteredParams,
+  clearSuggestions,
+  resetSuggestions,
+  setRegistryLogger,
   type SuggestionGenerator,
 } from '@mcp/ai/default-suggestions';
 import { createMockLogger } from '../../../__support__/utilities/mock-factories';
 import type { Logger } from 'pino';
 
 describe('SuggestionRegistry', () => {
-  let registry: SuggestionRegistry;
+  let registry: ReturnType<typeof createSuggestionRegistry>;
   let mockLogger: Logger;
 
   beforeEach(() => {
     mockLogger = createMockLogger();
-    registry = new SuggestionRegistry(DEFAULT_SUGGESTION_GENERATORS, mockLogger);
+    resetSuggestions(); // Reset to defaults
+    setRegistryLogger(mockLogger);
+    registry = createSuggestionRegistry();
   });
 
   describe('basic functionality', () => {
@@ -239,19 +249,20 @@ describe('SuggestionRegistry', () => {
     });
 
     it('should extend registry with additional generators', () => {
-      const extended = registry.extend({
-        customParam: () => 'extended-value',
-        path: () => '/extended/path',
-      });
+      // Save current state
+      const originalParams = getRegisteredParams();
 
-      // Original registry unchanged
-      expect(registry.generate('customParam', {})).toBeUndefined();
-      expect(registry.generate('path', {})).toBe('.');
+      // Add new generators
+      registerSuggestion('customParam', () => 'extended-value');
+      registerSuggestion('path', () => '/extended/path');
 
-      // Extended registry has both
-      expect(extended.generate('customParam', {})).toBe('extended-value');
-      expect(extended.generate('path', {})).toBe('/extended/path');
-      expect(extended.generate('namespace', {})).toBe('default');
+      // Test new functionality
+      expect(generateSuggestion('customParam', {})).toBe('extended-value');
+      expect(generateSuggestion('path', {})).toBe('/extended/path');
+      expect(generateSuggestion('namespace', {})).toBe('default');
+
+      // Reset for next test
+      resetSuggestions();
     });
   });
 

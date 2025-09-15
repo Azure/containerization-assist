@@ -120,7 +120,7 @@ describe('Server Entry Point', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
       
-      expect(content).toContain('new MCPServer');
+      expect(content).toContain('createMCPServer');
       expect(content).toContain('await server.start()');
       expect(content).toContain('Starting SDK-Native MCP Server');
       expect(content).toContain('MCP Server started successfully');
@@ -131,7 +131,7 @@ describe('Server Entry Point', () => {
       const content = readFileSync(serverPath, 'utf-8');
       
       expect(content).toContain('let deps: Dependencies | undefined');
-      expect(content).toContain('let server: MCPServer | undefined');
+      expect(content).toContain('let server: IMCPServer | undefined');
     });
   });
 });

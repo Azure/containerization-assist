@@ -164,7 +164,7 @@ export const normalizeParameters = <T extends Record<string, unknown>>(
     for (const [field, normalizer] of Object.entries(normalizers)) {
       if (normalized[field] !== undefined) {
         try {
-          (normalized as any)[field] = normalizer(normalized[field]);
+          (normalized as Record<string, unknown>)[field] = normalizer(normalized[field]);
         } catch (error) {
           return Failure(`Failed to normalize field '${field}': ${error}`);
         }

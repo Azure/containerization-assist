@@ -49,6 +49,14 @@ export const DEFAULT_NETWORK = {
 } as const;
 
 /**
+ * Analysis configuration defaults
+ */
+export const ANALYSIS_CONFIG = {
+  CONFIDENCE_THRESHOLD: 70, // Threshold below which direct analysis is used
+  DIRECT_ANALYSIS_MAX_TOKENS: 4096, // Max tokens for direct analysis prompts
+} as const;
+
+/**
  * Get default port for a given language
  */
 export function getDefaultPort(language: string): number {
