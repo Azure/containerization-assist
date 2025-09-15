@@ -2,15 +2,9 @@
  * Tests for Dockerfile validation using docker-file-parser
  */
 
-import { DockerfileValidator, ValidationSeverity } from '../../../src/validation';
+import { validateDockerfile, ValidationSeverity } from '../../../src/validation';
 
 describe('DockerfileValidator', () => {
-  let validator: DockerfileValidator;
-
-  beforeEach(() => {
-    validator = new DockerfileValidator();
-  });
-
   describe('Security Rules', () => {
     test('should detect missing USER directive', () => {
       const dockerfile = `
@@ -20,7 +14,7 @@ COPY . .
 CMD ["node", "app.js"]
       `.trim();
 
-      const report = validator.validate(dockerfile);
+      const report = validateDockerfile(dockerfile);
 
       // Should have errors for no USER directive
       expect(report.errors).toBeGreaterThan(0);
@@ -46,7 +40,7 @@ USER node
 CMD ["node", "app.js"]
       `.trim();
 
-      const report = validator.validate(dockerfile);
+      const report = validateDockerfile(dockerfile);
       
       const userRule = report.results.find(r => r.ruleId === 'no-root-user');
       expect(userRule?.passed).toBe(true);
@@ -60,7 +54,7 @@ COPY . /app
 CMD ["./app"]
       `.trim();
 
-      const report = validator.validate(dockerfile);
+      const report = validateDockerfile(dockerfile);
 
       const sudoRule = report.results.find(r => r.ruleId === 'no-sudo-install');
       expect(sudoRule?.passed).toBe(false);
@@ -76,7 +70,7 @@ COPY . .
 CMD ["node", "app.js"]
       `.trim();
 
-      const report = validator.validate(dockerfile);
+      const report = validateDockerfile(dockerfile);
 
       const secretRule = report.results.find(r => r.ruleId === 'no-secrets');
       expect(secretRule?.passed).toBe(false);
@@ -92,7 +86,7 @@ COPY . .
 CMD ["node", "app.js"]
       `.trim();
 
-      const report = validator.validate(dockerfile);
+      const report = validateDockerfile(dockerfile);
 
       const latestRule = report.results.find(r => r.ruleId === 'specific-base-image');
       expect(latestRule?.passed).toBe(false);
@@ -106,7 +100,7 @@ COPY . .
 CMD ["node", "app.js"]
       `.trim();
 
-      const report = validator.validate(dockerfile);
+      const report = validateDockerfile(dockerfile);
 
       const versionRule = report.results.find(r => r.ruleId === 'specific-base-image');
       expect(versionRule?.passed).toBe(true);
@@ -119,7 +113,7 @@ COPY . .
 CMD ["node", "app.js"]
       `.trim();
 
-      const report = validator.validate(dockerfile);
+      const report = validateDockerfile(dockerfile);
 
       const healthRule = report.results.find(r => r.ruleId === 'has-healthcheck');
       expect(healthRule?.passed).toBe(false);
@@ -135,7 +129,7 @@ COPY . .
 CMD ["node", "app.js"]
       `.trim();
 
-      const report = validator.validate(dockerfile);
+      const report = validateDockerfile(dockerfile);
 
       const healthRule = report.results.find(r => r.ruleId === 'has-healthcheck');
       expect(healthRule?.passed).toBe(false); // No healthcheck present
@@ -152,7 +146,7 @@ RUN npm install
 CMD ["node", "app.js"]
       `.trim();
 
-      const report = validator.validate(dockerfile);
+      const report = validateDockerfile(dockerfile);
 
       const cachingRule = report.results.find(r => r.ruleId === 'layer-caching-optimization');
       expect(cachingRule?.passed).toBe(false);
@@ -168,7 +162,7 @@ COPY . .
 CMD ["node", "app.js"]
       `.trim();
 
-      const report = validator.validate(dockerfile);
+      const report = validateDockerfile(dockerfile);
 
       const cachingRule = report.results.find(r => r.ruleId === 'layer-caching-optimization');
       expect(cachingRule?.passed).toBe(true);
@@ -188,7 +182,7 @@ EXPOSE 3000
 CMD ["node", "app.js"]
       `.trim();
 
-      const report = validator.validate(dockerfile);
+      const report = validateDockerfile(dockerfile);
 
       expect(report.score).toBeGreaterThan(70);
       expect(report.grade).toMatch(/[ABC]/);
@@ -204,7 +198,7 @@ COPY . /app
 CMD ["./app"]
       `.trim();
 
-      const report = validator.validate(dockerfile);
+      const report = validateDockerfile(dockerfile);
 
       expect(report.score).toBeLessThan(60);
       expect(report.grade).toMatch(/[DF]/);
@@ -216,7 +210,7 @@ CMD ["./app"]
     test('should handle invalid Dockerfile syntax', () => {
       const dockerfile = 'INVALID DOCKERFILE SYNTAX';
 
-      const report = validator.validate(dockerfile);
+      const report = validateDockerfile(dockerfile);
 
       expect(report.score).toBe(0);
       expect(report.grade).toBe('F');
@@ -227,7 +221,7 @@ CMD ["./app"]
     test('should handle empty content', () => {
       const dockerfile = '';
 
-      const report = validator.validate(dockerfile);
+      const report = validateDockerfile(dockerfile);
 
       expect(report.score).toBe(0);
       expect(report.grade).toBe('F');

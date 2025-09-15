@@ -164,7 +164,10 @@ describe('Force Flag Functionality', () => {
       expect(result.executedTools).toEqual(['build-image']);
 
       // Verify new results replaced old ones
-      const updatedSession = await sessionManager.get(session.sessionId);
+      const updatedResult = await sessionManager.get(session.sessionId);
+      expect(updatedResult.ok).toBe(true);
+      if (!updatedResult.ok) return;
+      const updatedSession = updatedResult.value;
       expect(updatedSession?.results?.['build-image']).toMatchObject({
         imageName: 'new-image',
         tag: 'v2.0',
@@ -269,7 +272,10 @@ describe('Force Flag Functionality', () => {
       expect(result.executedTools).toEqual(['deploy']);
 
       // Verify session recorded the effect despite missing prerequisites
-      const updatedSession = await sessionManager.get(session.sessionId);
+      const updatedResult = await sessionManager.get(session.sessionId);
+      expect(updatedResult.ok).toBe(true);
+      if (!updatedResult.ok) return;
+      const updatedSession = updatedResult.value;
       const completedSteps = updatedSession?.completed_steps as Step[];
       expect(completedSteps).toContain('deployed');
 
@@ -296,7 +302,10 @@ describe('Force Flag Functionality', () => {
       expect(result.result.ok).toBe(true);
 
       // Check that effects were recorded
-      const updatedSession = await sessionManager.get(session.sessionId);
+      const updatedResult = await sessionManager.get(session.sessionId);
+      expect(updatedResult.ok).toBe(true);
+      if (!updatedResult.ok) return;
+      const updatedSession = updatedResult.value;
       const completedSteps = updatedSession?.completed_steps as Step[];
       expect(completedSteps).toContain('dockerfile_generated');
     });
@@ -323,7 +332,10 @@ describe('Force Flag Functionality', () => {
       }
 
       // Verify all effects were recorded
-      const finalSession = await sessionManager.get(session.sessionId);
+      const finalResult = await sessionManager.get(session.sessionId);
+      expect(finalResult.ok).toBe(true);
+      if (!finalResult.ok) return;
+      const finalSession = finalResult.value;
       const completedSteps = finalSession?.completed_steps as Step[];
       expect(completedSteps).toContain('analyzed_repo');
       expect(completedSteps).toContain('built_image');

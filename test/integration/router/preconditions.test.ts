@@ -40,7 +40,10 @@ describe('Automatic Precondition Satisfaction', () => {
   describe('single missing precondition', () => {
     it('should automatically satisfy missing analyzed_repo step', async () => {
       // Create session with no completed steps
-      const session = await sessionManager.create();
+      const sessionResult = await sessionManager.create();
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       // Try to generate dockerfile (requires analyzed_repo)
       const result = await router.route({
@@ -104,7 +107,7 @@ describe('Automatic Precondition Satisfaction', () => {
 
     it('should handle parallel preconditions efficiently', async () => {
       // Create session with analyzed_repo already complete
-      const session = await sessionManager.createWithState({
+      const sessionResult = await sessionManager.createWithState({
         completed_steps: ['analyzed_repo'] as Step[],
       });
 
@@ -159,7 +162,7 @@ describe('Automatic Precondition Satisfaction', () => {
   describe('partial satisfaction', () => {
     it('should only run missing prerequisites', async () => {
       // Pre-satisfy some but not all prerequisites
-      const session = await sessionManager.createWithState({
+      const sessionResult = await sessionManager.createWithState({
         completed_steps: ['analyzed_repo', 'k8s_prepared'] as Step[],
       });
 
@@ -187,7 +190,10 @@ describe('Automatic Precondition Satisfaction', () => {
       // When multiple tools require the same prerequisite,
       // it should only be run once
 
-      const session = await sessionManager.create();
+      const sessionResult = await sessionManager.create();
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       // generate-dockerfile and generate-k8s-manifests both require analyzed_repo
       const result = await router.route({
@@ -207,9 +213,12 @@ describe('Automatic Precondition Satisfaction', () => {
 
   describe('canExecute checks', () => {
     it('should correctly identify when tool can execute', async () => {
-      const session = await sessionManager.createWithState({
+      const sessionResult = await sessionManager.createWithState({
         completed_steps: ['analyzed_repo', 'resolved_base_images', 'dockerfile_generated'] as Step[],
       });
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       const canExecute = await router.canExecute('build-image', session.sessionId);
       expect(canExecute.canExecute).toBe(true);
@@ -217,9 +226,12 @@ describe('Automatic Precondition Satisfaction', () => {
     });
 
     it('should identify missing preconditions', async () => {
-      const session = await sessionManager.createWithState({
+      const sessionResult = await sessionManager.createWithState({
         completed_steps: ['analyzed_repo'] as Step[],
       });
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       const canExecute = await router.canExecute('build-image', session.sessionId);
       expect(canExecute.canExecute).toBe(false);
@@ -227,7 +239,10 @@ describe('Automatic Precondition Satisfaction', () => {
     });
 
     it('should handle tools with no preconditions', async () => {
-      const session = await sessionManager.create();
+      const sessionResult = await sessionManager.create();
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       const canExecute = await router.canExecute('prepare-cluster', session.sessionId);
       expect(canExecute.canExecute).toBe(true);
@@ -292,7 +307,10 @@ describe('Automatic Precondition Satisfaction', () => {
 
   describe('state accumulation', () => {
     it('should accumulate completed steps across execution', async () => {
-      const session = await sessionManager.create();
+      const sessionResult = await sessionManager.create();
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       // First execution
       await router.route({
@@ -302,7 +320,10 @@ describe('Automatic Precondition Satisfaction', () => {
         sessionId: session.sessionId,
       });
 
-      let updatedSession = await sessionManager.get(session.sessionId);
+      const getResult = await sessionManager.get(session.sessionId);
+      expect(getResult.ok).toBe(true);
+      if (!getResult.ok) return;
+      let updatedSession = getResult.value;
       expect(updatedSession?.completed_steps).toContain('analyzed_repo');
 
       // Second execution
@@ -313,7 +334,10 @@ describe('Automatic Precondition Satisfaction', () => {
         sessionId: session.sessionId,
       });
 
-      updatedSession = await sessionManager.get(session.sessionId);
+      const getResult2 = await sessionManager.get(session.sessionId);
+      expect(getResult2.ok).toBe(true);
+      if (!getResult2.ok) return;
+      updatedSession = getResult2.value;
       expect(updatedSession?.completed_steps).toContain('analyzed_repo');
       expect(updatedSession?.completed_steps).toContain('k8s_prepared');
 

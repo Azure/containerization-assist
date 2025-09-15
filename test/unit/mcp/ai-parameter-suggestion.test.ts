@@ -8,7 +8,7 @@ import { createSessionManager } from '../../../src/lib/session';
 import { createLogger } from '../../../src/lib/logger';
 import { Success, Failure } from '../../../src/types';
 import type { ToolContext } from '../../../src/mcp/context';
-import { DefaultHostAIAssistant, type HostAIAssistant } from '../../../src/mcp/ai/host-ai-assist';
+import { createHostAIAssistant, type HostAIAssistant } from '../../../src/mcp/ai/host-ai-assist';
 import { z } from 'zod';
 
 describe('AI Parameter Suggestion', () => {

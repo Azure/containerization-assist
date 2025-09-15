@@ -13,7 +13,7 @@ import { scanImage } from '../tools/scan/tool.js';
 import { scanImageSchema } from '../tools/scan/schema.js';
 import { tagImage } from '../tools/tag-image/tool.js';
 import { tagImageSchema } from '../tools/tag-image/schema.js';
-import { pushImage } from '../tools/push-image/index.js';
+import { pushImage } from '../tools/push-image/tool.js';
 import { pushImageSchema } from '../tools/push-image/schema.js';
 import { generateK8sManifests } from '../tools/generate-k8s-manifests/tool.js';
 import { generateK8sManifestsSchema } from '../tools/generate-k8s-manifests/schema.js';

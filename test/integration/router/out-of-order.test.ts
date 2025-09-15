@@ -186,7 +186,7 @@ describe('Out-of-Order Tool Execution', () => {
   describe('partial prerequisites satisfied', () => {
     it('should only run missing prerequisites', async () => {
       // Pre-populate session with some completed steps
-      const session = await sessionManager.createWithState({
+      const sessionResult = await sessionManager.createWithState({
         completed_steps: ['analyzed_repo'] as Step[],
         results: {
           'analyze-repo': {
@@ -195,6 +195,9 @@ describe('Out-of-Order Tool Execution', () => {
           },
         },
       });
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       const result = await router.route({
         context: mockContext,

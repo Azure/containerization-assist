@@ -233,7 +233,10 @@ describe('Error Recovery and Rerouting', () => {
   describe('partial completion on error', () => {
     it('should preserve completed steps even when later steps fail', async () => {
       const tools = createMockToolsMap();
-      const session = await sessionManager.create();
+      const sessionResult = await sessionManager.create();
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       // Make deploy fail
       tools.set('deploy', {
@@ -265,7 +268,10 @@ describe('Error Recovery and Rerouting', () => {
       expect(result.result.ok).toBe(false);
 
       // Check that completed steps were preserved
-      const updatedSession = await sessionManager.get(session.sessionId);
+      const getResult = await sessionManager.get(session.sessionId);
+      expect(getResult.ok).toBe(true);
+      if (!getResult.ok) return;
+      const updatedSession = getResult.value;
       const completedSteps = updatedSession?.completed_steps as Step[];
 
       // Prerequisites should be marked complete
@@ -280,7 +286,10 @@ describe('Error Recovery and Rerouting', () => {
 
     it('should allow resuming after partial failure', async () => {
       const tools = createMockToolsMap();
-      const session = await sessionManager.create();
+      const sessionResult = await sessionManager.create();
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       let deployAttempts = 0;
       tools.set('deploy', {
@@ -475,7 +484,10 @@ describe('Error Recovery and Rerouting', () => {
     });
 
     it('should handle session update failure gracefully', async () => {
-      const session = await sessionManager.create();
+      const sessionResult = await sessionManager.create();
+      expect(sessionResult.ok).toBe(true);
+      if (!sessionResult.ok) return;
+      const session = sessionResult.value;
 
       // Override update to fail
       sessionManager.update = async () => null;

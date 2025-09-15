@@ -27,7 +27,7 @@ import {
 } from '@lib/text-processing';
 import { generateDockerfileSchema, type GenerateDockerfileParams } from './schema';
 import { z } from 'zod';
-import { AnalyzeRepoResult } from '../analyze-repo';
+import { AnalyzeRepoResult } from '../analyze-repo/tool';
 
 // Define the result schema for type safety - complex nested structure
 const SingleDockerfileResultSchema = z.object({

@@ -11,7 +11,7 @@ import type { ToolContext } from '../../mcp/context';
 
 import { createSecurityScanner } from '../../lib/scanner';
 import { Success, Failure, type Result } from '../../types';
-import { getKnowledgeForCategory } from '../../knowledge';
+import { getKnowledgeForCategory } from '../../knowledge/index';
 import { scanImageSchema, type ScanImageParams } from './schema';
 import { z } from 'zod';
 

@@ -24,40 +24,40 @@ interface ToolDefinition {
 }
 
 // Import all tools with their schemas and handlers in one place
-import { analyzeRepo } from '../tools/analyze-repo';
+import { analyzeRepo } from '../tools/analyze-repo/tool';
 import { analyzeRepoSchema } from '../tools/analyze-repo/schema';
 import type { Result } from '../types';
-import { generateDockerfile } from '../tools/generate-dockerfile';
+import { generateDockerfile } from '../tools/generate-dockerfile/tool';
 import { generateDockerfileSchema } from '../tools/generate-dockerfile/schema';
-import { buildImage } from '../tools/build-image';
+import { buildImage } from '../tools/build-image/tool';
 import { buildImageSchema } from '../tools/build-image/schema';
-import { scanImage } from '../tools/scan';
+import { scanImage } from '../tools/scan/tool';
 import { scanImageSchema } from '../tools/scan/schema';
-import { deployApplication } from '../tools/deploy';
+import { deployApplication } from '../tools/deploy/tool';
 import { deployApplicationSchema } from '../tools/deploy/schema';
-import { pushImage } from '../tools/push-image';
+import { pushImage } from '../tools/push-image/tool';
 import { pushImageSchema } from '../tools/push-image/schema';
-import { tagImage } from '../tools/tag-image';
+import { tagImage } from '../tools/tag-image/tool';
 import { tagImageSchema } from '../tools/tag-image/schema';
-import { fixDockerfile } from '../tools/fix-dockerfile';
+import { fixDockerfile } from '../tools/fix-dockerfile/tool';
 import { fixDockerfileSchema } from '../tools/fix-dockerfile/schema';
-import { resolveBaseImages } from '../tools/resolve-base-images';
+import { resolveBaseImages } from '../tools/resolve-base-images/tool';
 import { resolveBaseImagesSchema } from '../tools/resolve-base-images/schema';
-import { prepareCluster } from '../tools/prepare-cluster';
+import { prepareCluster } from '../tools/prepare-cluster/tool';
 import { prepareClusterSchema } from '../tools/prepare-cluster/schema';
-import { opsTool } from '../tools/ops';
+import { opsTool } from '../tools/ops/tool';
 import { opsToolSchema } from '../tools/ops/schema';
-import { generateK8sManifests } from '../tools/generate-k8s-manifests';
+import { generateK8sManifests } from '../tools/generate-k8s-manifests/tool';
 import { generateK8sManifestsSchema } from '../tools/generate-k8s-manifests/schema';
-import { verifyDeployment } from '../tools/verify-deployment';
+import { verifyDeployment } from '../tools/verify-deployment/tool';
 import { verifyDeploymentSchema } from '../tools/verify-deployment/schema';
-import { generateHelmCharts } from '../tools/generate-helm-charts';
+import { generateHelmCharts } from '../tools/generate-helm-charts/tool';
 import { generateHelmChartsSchema } from '../tools/generate-helm-charts/schema';
-import { generateAcaManifests } from '../tools/generate-aca-manifests';
+import { generateAcaManifests } from '../tools/generate-aca-manifests/tool';
 import { generateAcaManifestsSchema } from '../tools/generate-aca-manifests/schema';
-import { convertAcaToK8s } from '../tools/convert-aca-to-k8s';
+import { convertAcaToK8s } from '../tools/convert-aca-to-k8s/tool';
 import { convertAcaToK8sSchema } from '../tools/convert-aca-to-k8s/schema';
-import { inspectSession } from '../tools/inspect-session';
+import { inspectSession } from '../tools/inspect-session/tool';
 import { InspectSessionParamsSchema as inspectSessionSchema } from '../tools/inspect-session/schema';
 
 // Unified tool definitions

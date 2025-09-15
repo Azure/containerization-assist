@@ -8,8 +8,8 @@
 
 import { randomUUID } from 'node:crypto';
 import type { Logger } from 'pino';
-import { WorkflowState } from '../types';
-import { SessionError, ErrorCodes } from './errors';
+import { WorkflowState, Result, Success, Failure } from '../types';
+import { createSessionError, ErrorCodes } from './errors';
 
 // Session configuration options inline type removed - use direct parameters
 
@@ -98,16 +98,20 @@ function cleanupExpiredSessions(store: SessionStore): void {
 /**
  * Create a new session
  */
-export async function create(store: SessionStore, sessionId?: string): Promise<WorkflowState> {
+export async function create(
+  store: SessionStore,
+  sessionId?: string,
+): Promise<Result<WorkflowState>> {
   // Check session limit
   if (store.sessions.size >= store.maxSessions) {
     cleanupExpiredSessions(store);
     if (store.sessions.size >= store.maxSessions) {
-      throw new SessionError(
+      const error = createSessionError(
         `Maximum sessions (${store.maxSessions}) reached`,
         ErrorCodes.SESSION_LIMIT_EXCEEDED,
         { maxSessions: store.maxSessions, currentCount: store.sessions.size },
       );
+      return Failure(`${error.code}: ${error.message}`);
     }
   }
 
@@ -140,13 +144,16 @@ export async function create(store: SessionStore, sessionId?: string): Promise<W
     'Session created',
   );
 
-  return workflowState;
+  return Success(workflowState);
 }
 
 /**
  * Get a session by ID
  */
-export async function get(store: SessionStore, sessionId: string): Promise<WorkflowState | null> {
+export async function get(
+  store: SessionStore,
+  sessionId: string,
+): Promise<Result<WorkflowState | null>> {
   const session = store.sessions.get(sessionId);
 
   store.logger.debug(
@@ -158,17 +165,17 @@ export async function get(store: SessionStore, sessionId: string): Promise<Workf
   );
 
   if (!session) {
-    return null;
+    return Success(null);
   }
 
   // Check if expired
   if (Date.now() - session.created_at.getTime() > store.ttl * 1000) {
     store.sessions.delete(sessionId);
     store.logger.debug({ sessionId }, 'Expired session removed');
-    return null;
+    return Success(null);
   }
 
-  return session.workflowState;
+  return Success(session.workflowState);
 }
 
 /**
@@ -178,12 +185,15 @@ export async function update(
   store: SessionStore,
   sessionId: string,
   state: Partial<WorkflowState>,
-): Promise<WorkflowState | null> {
+): Promise<Result<WorkflowState>> {
   const session = store.sessions.get(sessionId);
   if (!session) {
-    throw new SessionError(`Session ${sessionId} not found`, ErrorCodes.SESSION_NOT_FOUND, {
-      sessionId,
-    });
+    const error = createSessionError(
+      `Session ${sessionId} not found`,
+      ErrorCodes.SESSION_NOT_FOUND,
+      { sessionId },
+    );
+    return Failure(`${error.code}: ${error.message}`);
   }
 
   // Update workflow state - merge state into existing workflowState
@@ -212,30 +222,31 @@ export async function update(
     },
     'Session updated',
   );
-  return updatedWorkflowState;
+  return Success(updatedWorkflowState);
 }
 
 /**
  * Delete a session
  */
-export async function deleteSession(store: SessionStore, sessionId: string): Promise<void> {
+export async function deleteSession(store: SessionStore, sessionId: string): Promise<Result<void>> {
   const existed = store.sessions.delete(sessionId);
   if (existed) {
     store.logger.debug({ sessionId }, 'Session deleted');
   }
+  return Success(undefined);
 }
 
 /**
  * List all session IDs
  */
-export async function list(store: SessionStore): Promise<string[]> {
-  return Array.from(store.sessions.keys());
+export async function list(store: SessionStore): Promise<Result<string[]>> {
+  return Success(Array.from(store.sessions.keys()));
 }
 
 /**
  * Cleanup old sessions
  */
-export async function cleanup(store: SessionStore, olderThan: Date): Promise<void> {
+export async function cleanup(store: SessionStore, olderThan: Date): Promise<Result<void>> {
   let cleanedCount = 0;
   for (const [id, session] of store.sessions.entries()) {
     if (session.created_at < olderThan) {
@@ -244,6 +255,7 @@ export async function cleanup(store: SessionStore, olderThan: Date): Promise<voi
     }
   }
   store.logger.debug({ cleanedCount }, 'Session cleanup completed');
+  return Success(undefined);
 }
 
 // Removed duplicate Result-based methods - use main interface methods instead
@@ -260,15 +272,15 @@ export function close(store: SessionStore): void {
 }
 
 /**
- * SessionManager interface - unified Result-based API
+ * SessionManager interface - unified session management API
  */
 export interface SessionManager {
-  create(sessionId?: string): Promise<WorkflowState>;
-  get(sessionId: string): Promise<WorkflowState | null>;
-  update(sessionId: string, state: Partial<WorkflowState>): Promise<WorkflowState | null>;
-  delete(sessionId: string): Promise<void>;
-  list(): Promise<string[]>;
-  cleanup(olderThan: Date): Promise<void>;
+  create(sessionId?: string): Promise<Result<WorkflowState>>;
+  get(sessionId: string): Promise<Result<WorkflowState | null>>;
+  update(sessionId: string, state: Partial<WorkflowState>): Promise<Result<WorkflowState>>;
+  delete(sessionId: string): Promise<Result<void>>;
+  list(): Promise<Result<string[]>>;
+  cleanup(olderThan: Date): Promise<Result<void>>;
   close(): void;
 }
 

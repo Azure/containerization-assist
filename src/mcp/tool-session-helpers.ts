@@ -48,12 +48,17 @@ export async function getSession(
     const id = sessionId || randomUUID();
 
     // Try to get existing session
-    let session = await sessionManager.get(id);
+    const getResult = await sessionManager.get(id);
+    let session = getResult.ok ? getResult.value : null;
     let isNew = false;
 
     // Create if doesn't exist
     if (!session) {
-      session = await sessionManager.create(id);
+      const createResult = await sessionManager.create(id);
+      if (!createResult.ok) {
+        return Failure(`Failed to create session: ${createResult.error}`);
+      }
+      session = createResult.value;
       isNew = true;
     }
 
@@ -83,10 +88,11 @@ export async function completeStep(
     }
 
     // Get current session
-    const currentSession = await sessionManager.get(sessionId);
-    if (!currentSession) {
+    const getResult = await sessionManager.get(sessionId);
+    if (!getResult.ok || !getResult.value) {
       return Failure(`Session ${sessionId} not found`);
     }
+    const currentSession = getResult.value;
 
     // Add step to completed_steps array if not already there
     const updatedSteps = [...(currentSession.completed_steps || [])];
@@ -126,8 +132,11 @@ export async function createSession(
     }
 
     const id = sessionId || randomUUID();
-    const session = await sessionManager.create(id);
-    return Success({ id, state: session });
+    const createResult = await sessionManager.create(id);
+    if (!createResult.ok) {
+      return Failure(`Failed to create session: ${createResult.error}`);
+    }
+    return Success({ id, state: createResult.value });
   } catch (error) {
     return Failure(`Failed to create session: ${extractErrorMessage(error)}`);
   }
@@ -153,10 +162,11 @@ export async function updateSession(
     }
 
     // Get current session to merge metadata properly
-    const currentSession = await sessionManager.get(sessionId);
-    if (!currentSession) {
+    const getResult = await sessionManager.get(sessionId);
+    if (!getResult.ok || !getResult.value) {
       return Failure(`Session ${sessionId} not found`);
     }
+    const currentSession = getResult.value;
 
     // Apply updates with metadata merging
     const mergedUpdates: Partial<WorkflowState> = {
@@ -168,15 +178,12 @@ export async function updateSession(
       updatedAt: new Date(),
     };
 
-    await sessionManager.update(sessionId, mergedUpdates);
-
-    // Return updated session
-    const updatedSession = await sessionManager.get(sessionId);
-    if (!updatedSession) {
-      return Failure(`Session ${sessionId} lost after update`);
+    const updateResult = await sessionManager.update(sessionId, mergedUpdates);
+    if (!updateResult.ok) {
+      return Failure(`Failed to update session: ${updateResult.error}`);
     }
 
-    return Success(updatedSession);
+    return Success(updateResult.value);
   } catch (error) {
     return Failure(`Failed to update session: ${extractErrorMessage(error)}`);
   }
@@ -203,11 +210,16 @@ export async function ensureSession(
     const id = sessionId || randomUUID();
 
     // Try to get existing session first
-    let session = await sessionManager.get(id);
+    const getResult = await sessionManager.get(id);
+    let session = getResult.ok ? getResult.value : null;
 
     // Create if doesn't exist
     if (!session) {
-      session = await sessionManager.create(id);
+      const createResult = await sessionManager.create(id);
+      if (!createResult.ok) {
+        return Failure(`Failed to create session: ${createResult.error}`);
+      }
+      session = createResult.value;
     }
 
     return Success({ id, state: session });

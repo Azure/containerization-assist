@@ -6,17 +6,17 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { join } from 'path';
 import { mkdtempSync, writeFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
-import { ConfigurationManager } from '../../../../src/lib/sampling-config';
+import { createConfigurationManager, type ConfigurationManagerInterface } from '../../../../src/lib/sampling-config';
 import { createConfigValidator } from '../../../../src/lib/config-validator';
 import { createConfigScoringEngine } from '../../../../src/lib/config-scoring-engine';
 
 describe('ConfigurationManager', () => {
   let tempDir: string;
-  let configManager: ConfigurationManager;
+  let configManager: ConfigurationManagerInterface;
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'sampling-config-test-'));
-    configManager = new ConfigurationManager(tempDir);
+    configManager = createConfigurationManager(tempDir);
   });
 
   afterEach(() => {

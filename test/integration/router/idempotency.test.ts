@@ -200,7 +200,10 @@ describe('Idempotency Behavior', () => {
         sessionId: session.sessionId,
       });
 
-      const updatedSession = await sessionManager.get(session.sessionId);
+      const updatedResult = await sessionManager.get(session.sessionId);
+      expect(updatedResult.ok).toBe(true);
+      if (!updatedResult.ok) return;
+      const updatedSession = updatedResult.value;
       const steps = updatedSession?.completed_steps as Step[];
       expect(steps).toEqual(['k8s_prepared']);
     });
@@ -215,7 +218,10 @@ describe('Idempotency Behavior', () => {
         sessionId: session.sessionId,
       });
 
-      const updatedSession = await sessionManager.get(session.sessionId);
+      const updatedResult = await sessionManager.get(session.sessionId);
+      expect(updatedResult.ok).toBe(true);
+      if (!updatedResult.ok) return;
+      const updatedSession = updatedResult.value;
       const steps = updatedSession?.completed_steps as Step[];
       expect(steps).toContain('dockerfile_generated');
       // Also includes effects from prerequisites
@@ -242,7 +248,10 @@ describe('Idempotency Behavior', () => {
         sessionId: session.sessionId,
       });
 
-      const updatedSession = await sessionManager.get(session.sessionId);
+      const updatedResult = await sessionManager.get(session.sessionId);
+      expect(updatedResult.ok).toBe(true);
+      if (!updatedResult.ok) return;
+      const updatedSession = updatedResult.value;
       const steps = updatedSession?.completed_steps as Step[];
 
       // Should have exactly one instance of analyzed_repo

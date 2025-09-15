@@ -74,7 +74,7 @@ describe('AIPromptBuilder', () => {
         schema: { imageId: { type: 'string' } },
       };
 
-      const prompt = AIPromptBuilder.forParameterSuggestion(request);
+      const prompt = createParameterSuggestionPrompt(request);
 
       expect(prompt).toContain('Tool: build-image');
       expect(prompt).toContain('Current: {');
@@ -95,7 +95,7 @@ describe('AIPromptBuilder', () => {
         missingParams: ['param1'],
       };
 
-      const prompt = AIPromptBuilder.forParameterSuggestion(request);
+      const prompt = createParameterSuggestionPrompt(request);
 
       expect(prompt).toContain('Tool: simple-tool');
       expect(prompt).toContain('Current: {}');
@@ -113,7 +113,7 @@ describe('AIPromptBuilder', () => {
         missingParams: ['param1', 'param2', 'param3'],
       };
 
-      const prompt = AIPromptBuilder.forParameterSuggestion(request);
+      const prompt = createParameterSuggestionPrompt(request);
 
       expect(prompt).toContain('Missing: param1, param2, param3');
     });
@@ -128,7 +128,7 @@ describe('AIPromptBuilder', () => {
       };
       const objective = 'Determine containerization strategy';
 
-      const prompt = AIPromptBuilder.forContextAnalysis(context, objective);
+      const prompt = createContextAnalysisPrompt(context, objective);
 
       expect(prompt).toContain('Objective: Determine containerization strategy');
       expect(prompt).toContain('Context: {');

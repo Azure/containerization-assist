@@ -1,30 +1,33 @@
 /**
- * Validation module exports
+ * Validation module exports - Functional API (Phase 3 Refactored)
  */
 
+// Core types and utilities
 export * from './core-types';
-export { DockerfileValidator } from './dockerfile-validator';
+export * from './pipeline';
+
+// Functional validators (preferred)
+export {
+  validateDockerfileContent,
+  getDockerfileRules,
+  getDockerfileRulesByCategory,
+  createDockerfileValidator,
+} from './dockerfile-validator';
+
 export {
   createKubernetesValidator,
   validateKubernetes as validateKubernetesManifests,
   type KubernetesValidatorInstance,
 } from './kubernetes-validator';
 
-// Simple validation functions
-export const validateDockerfile = (dockerfile: string): ValidationReport => {
-  const validator = new DockerfileValidator();
-  return validator.validate(dockerfile);
-};
+// Legacy class-based validators (deprecated but maintained for compatibility)
+export { DockerfileValidator } from './dockerfile-validator';
 
-export const validateKubernetes = (manifests: string): ValidationReport => {
-  const validator = createKubernetesValidator();
-  return validator.validate(manifests);
-};
+// Import for convenience alias
+import { validateDockerfileContent } from './dockerfile-validator';
 
-// Import types and classes for use in functions
-import type { ValidationReport, ValidationResult } from './core-types';
-import { DockerfileValidator } from './dockerfile-validator';
-import { createKubernetesValidator } from './kubernetes-validator';
+// Convenience aliases
+export const validateDockerfile = validateDockerfileContent;
 
 // Re-export commonly used types
 export type {
@@ -36,6 +39,9 @@ export type {
   DockerfileValidationRule,
   KubernetesValidationRule,
 } from './core-types';
+
+// Import types for use in this file
+import type { ValidationReport, ValidationResult } from './core-types';
 
 // Convenience function to format validation reports as markdown
 export function formatValidationReport(report: ValidationReport): string {

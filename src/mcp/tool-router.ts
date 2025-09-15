@@ -142,11 +142,11 @@ export class ToolRouter {
   ): Promise<WorkflowState> {
     // If we're updating results, fetch current session to merge properly
     if (updates.results) {
-      const currentSession = await this.sessionManager.get(sessionId);
-      if (currentSession?.results) {
+      const currentSessionResult = await this.sessionManager.get(sessionId);
+      if (currentSessionResult.ok && currentSessionResult.value?.results) {
         // Merge the results objects to preserve concurrent updates
         updates.results = {
-          ...currentSession.results,
+          ...currentSessionResult.value.results,
           ...updates.results,
         };
       }
@@ -157,19 +157,19 @@ export class ToolRouter {
       updatedAt: new Date(),
     };
 
-    const updated = await this.sessionManager.update(sessionId, updateData);
+    const updateResult = await this.sessionManager.update(sessionId, updateData);
 
-    if (!updated) {
-      this.logger.warn({ sessionId }, 'Session update returned null, fetching latest');
-      const fallback = await this.sessionManager.get(sessionId);
-      if (fallback) {
-        return fallback;
+    if (!updateResult.ok) {
+      this.logger.warn({ sessionId, error: updateResult.error }, 'Session update failed');
+      const fallbackResult = await this.sessionManager.get(sessionId);
+      if (fallbackResult.ok && fallbackResult.value) {
+        return fallbackResult.value;
       }
       // Return minimal session if all else fails to prevent crashes
       return { sessionId, updatedAt: new Date() } as WorkflowState;
     }
 
-    return updated;
+    return updateResult.value;
   }
 
   /**
@@ -184,15 +184,24 @@ export class ToolRouter {
     let session: WorkflowState | null = null;
 
     if (sessionId) {
-      session = await this.sessionManager.get(sessionId);
+      const getResult = await this.sessionManager.get(sessionId);
+      if (getResult.ok) {
+        session = getResult.value;
+      }
 
       // Session creation with explicit ID ensures workflow continuity
       if (!session) {
         this.logger.debug({ sessionId }, 'Session not found, creating new session with ID');
-        session = await this.sessionManager.create(sessionId);
+        const createResult = await this.sessionManager.create(sessionId);
+        if (createResult.ok) {
+          session = createResult.value;
+        }
       }
     } else {
-      session = await this.sessionManager.create();
+      const createResult = await this.sessionManager.create();
+      if (createResult.ok) {
+        session = createResult.value;
+      }
     }
 
     if (!session) {
@@ -225,9 +234,9 @@ export class ToolRouter {
         if (result.ok) {
           executedTools.push(toolName);
           // Fetch updated session after tool execution
-          const updatedSession = await this.sessionManager.get(session.sessionId);
-          if (updatedSession) {
-            session = updatedSession;
+          const updatedSessionResult = await this.sessionManager.get(session.sessionId);
+          if (updatedSessionResult.ok && updatedSessionResult.value) {
+            session = updatedSessionResult.value;
           }
         }
         return { result, executedTools, sessionState: session };
@@ -659,12 +668,13 @@ export class ToolRouter {
     toolName: string,
     sessionId: string,
   ): Promise<{ canExecute: boolean; missingSteps: Step[] }> {
-    const session = await this.sessionManager.get(sessionId);
+    const sessionResult = await this.sessionManager.get(sessionId);
 
-    if (!session) {
+    if (!sessionResult.ok || !sessionResult.value) {
       return { canExecute: false, missingSteps: [] };
     }
 
+    const session = sessionResult.value;
     const completedSteps = new Set<Step>((session.completed_steps || []) as Step[]);
 
     const missingSteps = getMissingPreconditions(toolName, completedSteps);
