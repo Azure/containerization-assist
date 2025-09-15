@@ -1,22 +1,14 @@
 /**
- * Main export file for external tool consumption
- * Provides tools, helpers, and types for integration with MCP servers
+ * Clean, idiomatic TypeScript API for Container Assist MCP tools
  */
 
-// MCP Server functionality
-export * from './mcp/server.js';
+// Primary functional API
+export { createContainerAssist as default } from './exports/container-assist.js';
+export { createContainerAssist, type ContainerAssist } from './exports/container-assist.js';
 
-// Tool registration helpers
-export { registerTool, registerAllTools, toJsonSchema } from './exports/helpers.js';
+// Tool names and types for type-safe registration
+export { TOOLS, type ToolName } from './exports/tool-names.js';
 
-// Main server factory for programmatic usage
-export { createContainerAssistServer } from './exports/containerization-assist-server.js';
-export type { IContainerAssistServer } from './exports/containerization-assist-server.js';
-
-// Tool names for type-safe registration
-export { TOOL_NAMES } from './exports/tools.js';
-export type { ToolName } from './exports/tools.js';
-
-// Core types needed for external usage
-export type { MCPTool, MCPToolMetadata, MCPToolResult, MCPServer } from './exports/types';
-export type { Tool, Result, Success, Failure } from './types';
+// Core types for external usage
+export type { MCPTool, MCPToolResult } from './exports/types.js';
+export type { Tool, Result, Success, Failure } from './types.js';

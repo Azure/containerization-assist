@@ -29,7 +29,7 @@ import { createKubernetesClient } from '../../lib/kubernetes';
 
 import type * as pino from 'pino';
 import { Success, Failure, type Result } from '../../types';
-import { TOOL_NAMES } from '../../exports/tool-names.js';
+import { TOOLS } from '../../exports/tool-names.js';
 import { prepareClusterSchema, type PrepareClusterParams } from './schema';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -571,9 +571,8 @@ async function prepareClusterImpl(
         lastClusterName: cluster,
         lastNamespace: namespace,
         totalPreparations:
-          (sessionData?.completedSteps || []).filter(
-            (s: string) => s === TOOL_NAMES.PREPARE_CLUSTER,
-          ).length + 1,
+          (sessionData?.completedSteps || []).filter((s: string) => s === TOOLS.PREPARE_CLUSTER)
+            .length + 1,
         lastClusterReady: clusterReady,
         lastChecksPassed: Object.values(checks).filter(Boolean).length,
         lastWarningCount: warnings.length,

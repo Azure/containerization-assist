@@ -78,7 +78,7 @@ export function getAllToolNames(): string[] {
  * Tool names as constants for type-safe registration
  * Use these instead of raw strings when registering specific tools
  */
-export const TOOL_NAMES = {
+export const TOOLS = {
   ANALYZE_REPO: 'analyze_repo',
   GENERATE_DOCKERFILE: 'generate_dockerfile',
   BUILD_IMAGE: 'build_image',
@@ -101,7 +101,7 @@ export const TOOL_NAMES = {
 /**
  * Type for valid tool names
  */
-export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];
+export type ToolName = (typeof TOOLS)[keyof typeof TOOLS];
 
 // Helper to create tool wrapper
 const createToolWrapper = (
@@ -128,119 +128,119 @@ const createToolWrapper = (
 
 // Create Tool wrappers for all functions
 const analyzeRepoTool = createToolWrapper(
-  TOOL_NAMES.ANALYZE_REPO,
+  TOOLS.ANALYZE_REPO,
   'Analyze repository structure and detect technologies',
   analyzeRepoSchema,
   analyzeRepo as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const generateDockerfileTool = createToolWrapper(
-  TOOL_NAMES.GENERATE_DOCKERFILE,
+  TOOLS.GENERATE_DOCKERFILE,
   'Generate a Dockerfile for the analyzed repository',
   generateDockerfileSchema,
   generateDockerfile as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const buildImageTool = createToolWrapper(
-  TOOL_NAMES.BUILD_IMAGE,
+  TOOLS.BUILD_IMAGE,
   'Build a Docker image',
   buildImageSchema,
   buildImage as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const scanImageTool = createToolWrapper(
-  TOOL_NAMES.SCAN_IMAGE,
+  TOOLS.SCAN_IMAGE,
   'Scan a Docker image for vulnerabilities',
   scanImageSchema,
   scanImage as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const tagImageTool = createToolWrapper(
-  TOOL_NAMES.TAG_IMAGE,
+  TOOLS.TAG_IMAGE,
   'Tag a Docker image',
   tagImageSchema,
   tagImage as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const pushImageTool = createToolWrapper(
-  TOOL_NAMES.PUSH_IMAGE,
+  TOOLS.PUSH_IMAGE,
   'Push a Docker image to a registry',
   pushImageSchema,
   pushImage as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const generateK8sManifestsTool = createToolWrapper(
-  TOOL_NAMES.GENERATE_K8S_MANIFESTS,
+  TOOLS.GENERATE_K8S_MANIFESTS,
   'Generate Kubernetes manifests',
   generateK8sManifestsSchema,
   generateK8sManifests as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const prepareClusterTool = createToolWrapper(
-  TOOL_NAMES.PREPARE_CLUSTER,
+  TOOLS.PREPARE_CLUSTER,
   'Prepare Kubernetes cluster for deployment',
   prepareClusterSchema,
   prepareCluster as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const deployApplicationTool = createToolWrapper(
-  TOOL_NAMES.DEPLOY_APPLICATION,
+  TOOLS.DEPLOY_APPLICATION,
   'Deploy application to Kubernetes',
   deployApplicationSchema,
   deployApplication as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const verifyDeploymentTool = createToolWrapper(
-  TOOL_NAMES.VERIFY_DEPLOYMENT,
+  TOOLS.VERIFY_DEPLOYMENT,
   'Verify deployment status',
   verifyDeploymentSchema,
   verifyDeployment as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const fixDockerfileTool = createToolWrapper(
-  TOOL_NAMES.FIX_DOCKERFILE,
+  TOOLS.FIX_DOCKERFILE,
   'Fix issues in a Dockerfile',
   fixDockerfileSchema,
   fixDockerfile as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const resolveBaseImagesTool = createToolWrapper(
-  TOOL_NAMES.RESOLVE_BASE_IMAGES,
+  TOOLS.RESOLVE_BASE_IMAGES,
   'Resolve and recommend base images',
   resolveBaseImagesSchema,
   resolveBaseImages as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const opsToolWrapper = createToolWrapper(
-  TOOL_NAMES.OPS,
+  TOOLS.OPS,
   'Operational utilities',
   opsToolSchema,
   opsTool as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const generateAcaManifestsTool = createToolWrapper(
-  TOOL_NAMES.GENERATE_ACA_MANIFESTS,
+  TOOLS.GENERATE_ACA_MANIFESTS,
   'Generate Azure Container Apps manifests',
   generateAcaManifestsSchema,
   generateAcaManifests as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const convertAcaToK8sTool = createToolWrapper(
-  TOOL_NAMES.CONVERT_ACA_TO_K8S,
+  TOOLS.CONVERT_ACA_TO_K8S,
   'Convert Azure Container Apps manifests to Kubernetes',
   convertAcaToK8sSchema,
   convertAcaToK8s as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const generateHelmChartsTool = createToolWrapper(
-  TOOL_NAMES.GENERATE_HELM_CHARTS,
+  TOOLS.GENERATE_HELM_CHARTS,
   'Generate Helm charts for Kubernetes deployments',
   generateHelmChartsSchema,
   generateHelmCharts as (params: unknown, context: unknown) => Promise<Result<unknown>>,
 );
 
 const inspectSessionTool = createToolWrapper(
-  TOOL_NAMES.INSPECT_SESSION,
+  TOOLS.INSPECT_SESSION,
   'Inspect session data for debugging',
   inspectSessionSchema,
   inspectSession as (params: unknown, context: unknown) => Promise<Result<unknown>>,

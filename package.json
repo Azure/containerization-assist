@@ -1,6 +1,6 @@
 {
   "name": "@thgamble/containerization-assist-mcp",
-  "version": "1.2.2",
+  "version": "1.3.0",
   "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
   "type": "module",
   "engines": {
@@ -24,11 +24,6 @@
       "types": "./dist/src/exports/tools.d.ts",
       "import": "./dist/src/exports/tools.js",
       "require": "./dist-cjs/src/exports/tools.js"
-    },
-    "./helpers": {
-      "types": "./dist/src/exports/helpers.d.ts",
-      "import": "./dist/src/exports/helpers.js",
-      "require": "./dist-cjs/src/exports/helpers.js"
     },
     "./types": {
       "types": "./dist/src/domain/types.d.ts",

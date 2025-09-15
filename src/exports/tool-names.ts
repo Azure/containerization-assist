@@ -2,7 +2,7 @@
  * Tool names as constants for type-safe registration
  * Use these instead of raw strings when registering specific tools
  */
-export const TOOL_NAMES = {
+export const TOOLS = {
   ANALYZE_REPO: 'analyze_repo',
   GENERATE_DOCKERFILE: 'generate_dockerfile',
   BUILD_IMAGE: 'build_image',
@@ -26,4 +26,4 @@ export const TOOL_NAMES = {
 /**
  * Type for valid tool names
  */
-export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];
+export type ToolName = (typeof TOOLS)[keyof typeof TOOLS];
