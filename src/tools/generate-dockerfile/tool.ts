@@ -1171,9 +1171,12 @@ async function generateDockerfileImpl(
 
     // Auto-detect module roots if not provided
     let rawModuleRoots: string[];
-    if (params.moduleRoots && params.moduleRoots.length > 0) {
-      rawModuleRoots = params.moduleRoots;
-      logger.info({ providedModuleRoots: params.moduleRoots }, 'Using provided module roots');
+    if (params.dockerfileDirectoryPaths && params.dockerfileDirectoryPaths.length > 0) {
+      rawModuleRoots = params.dockerfileDirectoryPaths;
+      logger.info(
+        { providedModuleRoots: params.dockerfileDirectoryPaths },
+        'Using provided module roots',
+      );
     } else {
       // Auto-detect modules based on repository analysis
       const repoPath = safeNormalizePath(params.path || '.');
