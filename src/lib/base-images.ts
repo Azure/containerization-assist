@@ -107,7 +107,8 @@ const FALLBACK_IMAGES = {
 };
 
 /**
- * Get recommended base image (single image - backward compatible)
+ * Returns single recommended base image for language.
+ * Maintains backward compatibility with legacy single-image API.
  */
 export function getRecommendedBaseImage(language: string): string {
   const langKey = language.toLowerCase();
@@ -121,7 +122,8 @@ export function getRecommendedBaseImage(language: string): string {
 }
 
 /**
- * Get multiple suggested base images (array - for choice/alternatives)
+ * Returns array of base image alternatives for user selection.
+ * Provides flexibility when primary recommendation isn't suitable.
  */
 export function getSuggestedBaseImages(language: string): string[] {
   const langKey = language.toLowerCase();
@@ -132,6 +134,44 @@ export function getSuggestedBaseImages(language: string): string[] {
   }
 
   return [imageConfig.primary, ...imageConfig.alternatives];
+}
+
+/**
+ * Applies optimization preference to base image selection.
+ *
+ * Trade-off: Security vs performance vs size optimization strategies
+ */
+function applyPreference(
+  config: { primary: string; alternatives: string[]; security?: string[]; performance?: string[] },
+  preference?: 'security' | 'performance' | 'size' | 'compatibility' | 'balanced',
+): BaseImageRecommendations {
+  let primaryImages: string[];
+
+  switch (preference) {
+    case 'security':
+      primaryImages = config.security || [config.primary];
+      break;
+    case 'performance':
+      primaryImages = config.performance || [config.primary];
+      break;
+    default:
+      primaryImages = [config.primary];
+  }
+
+  const result: BaseImageRecommendations = {
+    primary: primaryImages[0] || config.primary,
+    alternatives: config.alternatives,
+  };
+
+  if (config.security) {
+    result.security = config.security;
+  }
+
+  if (config.performance) {
+    result.performance = config.performance;
+  }
+
+  return result;
 }
 
 /**
@@ -154,6 +194,110 @@ export function getSuggestedBaseImages(language: string): string[] {
  */
 export function getBaseImageRecommendations(options: BaseImageOptions): BaseImageRecommendations {
   const langKey = options.language.toLowerCase();
+
+  // Handle .NET Framework specific recommendations
+  if (langKey === 'dotnet' && options.framework) {
+    const framework = options.framework.toLowerCase();
+
+    if (
+      framework.includes('framework') ||
+      framework.includes('aspnet-webapi') ||
+      framework.includes('aspnet-mvc') ||
+      framework.includes('wcf') ||
+      framework.includes('webforms')
+    ) {
+      const frameworkConfig = {
+        primary: 'mcr.microsoft.com/dotnet/framework/aspnet:4.8-windowsservercore-ltsc2022',
+        alternatives: [
+          'mcr.microsoft.com/dotnet/framework/aspnet:4.8-nanoserver-ltsc2022',
+          'mcr.microsoft.com/dotnet/framework/runtime:4.8-windowsservercore-ltsc2022',
+          'mcr.microsoft.com/dotnet/framework/aspnet:4.7.2-windowsservercore-ltsc2022',
+        ],
+        security: [
+          'mcr.microsoft.com/dotnet/framework/aspnet:4.8-nanoserver-ltsc2022',
+          'mcr.microsoft.com/dotnet/framework/runtime:4.8-nanoserver-ltsc2022',
+        ],
+        performance: [
+          'mcr.microsoft.com/dotnet/framework/aspnet:4.8-windowsservercore-ltsc2022',
+          'mcr.microsoft.com/dotnet/framework/runtime:4.8-windowsservercore-ltsc2022',
+        ],
+      };
+      return applyPreference(frameworkConfig, options.preference);
+    }
+
+    if (framework.includes('blazor-webassembly')) {
+      const blazorWasmConfig = {
+        primary: 'nginx:alpine',
+        alternatives: [
+          'mcr.microsoft.com/dotnet/aspnet:8.0-alpine',
+          'httpd:alpine',
+          'caddy:alpine',
+        ],
+        security: ['nginx:alpine', 'caddy:alpine'],
+        performance: ['nginx:alpine', 'httpd:alpine'],
+      };
+      return applyPreference(blazorWasmConfig, options.preference);
+    }
+
+    if (framework.includes('worker-service') || framework.includes('windows-service')) {
+      const workerConfig = {
+        primary: 'mcr.microsoft.com/dotnet/runtime:8.0-alpine',
+        alternatives: [
+          'mcr.microsoft.com/dotnet/runtime:8.0',
+          'mcr.microsoft.com/dotnet/runtime:7.0-alpine',
+          'mcr.microsoft.com/dotnet/aspnet:8.0-alpine', // If adding HTTP later
+        ],
+        security: [
+          'mcr.microsoft.com/dotnet/runtime:8.0-alpine',
+          'gcr.io/distroless/dotnet/runtime:8.0',
+        ],
+        performance: [
+          'mcr.microsoft.com/dotnet/runtime:8.0',
+          'mcr.microsoft.com/dotnet/runtime:8.0-alpine',
+        ],
+      };
+      return applyPreference(workerConfig, options.preference);
+    }
+
+    if (framework.includes('grpc')) {
+      const grpcConfig = {
+        primary: 'mcr.microsoft.com/dotnet/aspnet:8.0-alpine',
+        alternatives: [
+          'mcr.microsoft.com/dotnet/aspnet:8.0',
+          'mcr.microsoft.com/dotnet/aspnet:7.0-alpine',
+        ],
+        security: [
+          'mcr.microsoft.com/dotnet/aspnet:8.0-alpine',
+          'gcr.io/distroless/dotnet/aspnet:8.0',
+        ],
+        performance: [
+          'mcr.microsoft.com/dotnet/aspnet:8.0',
+          'mcr.microsoft.com/dotnet/aspnet:8.0-alpine',
+        ],
+      };
+      return applyPreference(grpcConfig, options.preference);
+    }
+
+    if (framework.includes('blazor')) {
+      const blazorConfig = {
+        primary: 'mcr.microsoft.com/dotnet/aspnet:8.0-alpine',
+        alternatives: [
+          'mcr.microsoft.com/dotnet/aspnet:8.0',
+          'mcr.microsoft.com/dotnet/aspnet:7.0-alpine',
+        ],
+        security: [
+          'mcr.microsoft.com/dotnet/aspnet:8.0-alpine',
+          'gcr.io/distroless/dotnet/aspnet:8.0',
+        ],
+        performance: [
+          'mcr.microsoft.com/dotnet/aspnet:8.0',
+          'mcr.microsoft.com/dotnet/aspnet:8.0-alpine',
+        ],
+      };
+      return applyPreference(blazorConfig, options.preference);
+    }
+  }
+
   const imageConfig = BASE_IMAGE_MAP[langKey] || FALLBACK_IMAGES;
 
   let primaryImages: string[];
@@ -166,13 +310,11 @@ export function getBaseImageRecommendations(options: BaseImageOptions): BaseImag
       primaryImages = imageConfig.performance || imageConfig.alternatives.slice(0, 2);
       break;
     case 'size':
-      // Prefer alpine variants
       primaryImages = imageConfig.alternatives.filter((img) => img.includes('alpine')) || [
         imageConfig.primary,
       ];
       break;
     case 'compatibility':
-      // Prefer non-alpine variants for compatibility
       primaryImages = imageConfig.alternatives.filter((img) => !img.includes('alpine')) || [
         imageConfig.primary,
       ];

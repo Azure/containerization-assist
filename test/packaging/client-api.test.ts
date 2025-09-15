@@ -73,10 +73,10 @@ describe('Client API Compatibility', () => {
   });
 
   describe('Package Exports', () => {
-    it('should export ContainerAssistServer', () => {
+    it('should export createContainerAssistServer', () => {
       const testScript = `
-        const { ContainerAssistServer } = require('@thgamble/containerization-assist-mcp');
-        console.log(typeof ContainerAssistServer);
+        const { createContainerAssistServer } = require('@thgamble/containerization-assist-mcp');
+        console.log(typeof createContainerAssistServer);
       `;
       
       writeFileSync(join(clientTestDir, 'test-exports.js'), testScript);
@@ -139,45 +139,45 @@ describe('Client API Compatibility', () => {
     });
   });
 
-  describe('ContainerAssistServer Class', () => {
-    it('should instantiate without errors', () => {
+  describe('createContainerAssistServer Factory', () => {
+    it('should create server instance without errors', () => {
       const testScript = `
-        const { ContainerAssistServer } = require('@thgamble/containerization-assist-mcp');
-        
+        const { createContainerAssistServer } = require('@thgamble/containerization-assist-mcp');
+
         try {
-          const server = new ContainerAssistServer();
+          const server = createContainerAssistServer();
           console.log('instantiated');
         } catch (error) {
           console.error('Error:', error.message);
           process.exit(1);
         }
       `;
-      
+
       writeFileSync(join(clientTestDir, 'test-instantiation.js'), testScript);
-      
-      const result = execSync('node test-instantiation.js', { 
-        cwd: clientTestDir, 
-        encoding: 'utf8' 
+
+      const result = execSync('node test-instantiation.js', {
+        cwd: clientTestDir,
+        encoding: 'utf8'
       });
-      
+
       expect(result.trim()).toBe('instantiated');
     });
 
     it('should have registerTools method', () => {
       const testScript = `
-        const { ContainerAssistServer } = require('@thgamble/containerization-assist-mcp');
-        
-        const server = new ContainerAssistServer();
+        const { createContainerAssistServer } = require('@thgamble/containerization-assist-mcp');
+
+        const server = createContainerAssistServer();
         console.log(typeof server.registerTools);
       `;
-      
+
       writeFileSync(join(clientTestDir, 'test-register-tools.js'), testScript);
-      
-      const result = execSync('node test-register-tools.js', { 
-        cwd: clientTestDir, 
-        encoding: 'utf8' 
+
+      const result = execSync('node test-register-tools.js', {
+        cwd: clientTestDir,
+        encoding: 'utf8'
       });
-      
+
       expect(result.trim()).toBe('function');
     });
   });
@@ -187,7 +187,7 @@ describe('Client API Compatibility', () => {
       // Create a simplified version of the client example
       const clientExample = `
         const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
-        const { ContainerAssistServer, TOOL_NAMES } = require('@thgamble/containerization-assist-mcp');
+        const { createContainerAssistServer, TOOL_NAMES } = require('@thgamble/containerization-assist-mcp');
 
         function testClientPattern() {
           const server = new McpServer(
@@ -202,7 +202,7 @@ describe('Client API Compatibility', () => {
             }
           );
 
-          const caServer = new ContainerAssistServer();
+          const caServer = createContainerAssistServer();
 
           // Test the registerTools method with the expected signature
           try {
@@ -276,7 +276,7 @@ describe('Client API Compatibility', () => {
         
         // Check for key exports that clients depend on
         const expectedExports = [
-          'ContainerAssistServer',
+          'createContainerAssistServer',
           'TOOL_NAMES'
         ];
         
@@ -304,7 +304,7 @@ describe('Client API Compatibility', () => {
       const testScript = `
         // Test different require patterns
         const pkg1 = require('@thgamble/containerization-assist-mcp');
-        const { ContainerAssistServer } = require('@thgamble/containerization-assist-mcp');
+        const { createContainerAssistServer } = require('@thgamble/containerization-assist-mcp');
         const { TOOL_NAMES } = require('@thgamble/containerization-assist-mcp');
         
         console.log('All require patterns work');

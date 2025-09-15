@@ -20,18 +20,18 @@
  */
 
 import * as yaml from 'js-yaml';
-import { extractErrorMessage } from '../../lib/error-utils';
+import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
+import type { Logger } from '@lib/logger';
+import { extractErrorMessage } from '@lib/error-utils';
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
-import type { ToolContext } from '../../mcp/context';
-import { createKubernetesClient } from '../../lib/kubernetes';
-import { createTimer, createLogger } from '../../lib/logger';
-import { Success, Failure, type Result } from '../../types';
-import { DEFAULT_TIMEOUTS } from '../../config/defaults';
-import { getSuccessProgression } from '../../workflows/workflow-progression';
-import { TOOL_NAMES } from '../../exports/tool-names.js';
+import type { ToolContext } from '@mcp/context';
+import { createKubernetesClient } from '@lib/kubernetes';
+
+import { Success, Failure, type Result } from '@types';
+import { DEFAULT_TIMEOUTS } from '@config/defaults';
 import { deployApplicationSchema, type DeployApplicationParams } from './schema';
 import { z } from 'zod';
-import type { SessionData } from '../session-types';
+import type { SessionData } from '@tools/session-types';
 
 // Type definitions for Kubernetes manifests
 interface KubernetesManifest {
@@ -176,10 +176,7 @@ const StateSchema = z.object({
 /**
  * Parse YAML/JSON manifest content with validation
  */
-function parseManifest(
-  content: string,
-  logger: ReturnType<typeof createLogger>,
-): KubernetesManifest[] {
+function parseManifest(content: string, logger: Logger): KubernetesManifest[] {
   try {
     // Try parsing as JSON first
     const parsed = JSON.parse(content);
@@ -201,10 +198,7 @@ function parseManifest(
 /**
  * Validate manifests have required structure
  */
-function validateManifests(
-  manifests: unknown[],
-  logger: ReturnType<typeof createLogger>,
-): KubernetesManifest[] {
+function validateManifests(manifests: unknown[], logger: Logger): KubernetesManifest[] {
   const validated: KubernetesManifest[] = [];
 
   for (const manifest of manifests) {
@@ -263,7 +257,7 @@ async function deployManifest(
   manifest: KubernetesManifest,
   namespace: string,
   k8sClient: ReturnType<typeof createKubernetesClient>,
-  logger: ReturnType<typeof createLogger>,
+  logger: Logger,
 ): Promise<{ success: boolean; resource?: { kind: string; name: string; namespace: string } }> {
   const { kind = 'unknown', metadata } = manifest;
   const name = metadata?.name ?? 'unknown';
@@ -299,8 +293,8 @@ async function deployApplicationImpl(
   params: DeployApplicationParams,
   context: ToolContext,
 ): Promise<Result<DeployApplicationResult>> {
-  const logger = context.logger || createLogger({ name: 'deploy-application' });
-  const timer = createTimer(logger, 'deploy-application');
+  const logger = getToolLogger(context, 'deploy');
+  const timer = createToolTimer(logger, 'deploy');
   try {
     const {
       namespace = DEPLOYMENT_CONFIG.DEFAULT_NAMESPACE,
@@ -337,7 +331,9 @@ async function deployApplicationImpl(
     const k8sClient = createKubernetesClient(logger);
     // Get K8s manifests from session with type safety
     const sessionData = session as SessionData;
-    const k8sResult = sessionData?.k8s_result;
+    const k8sResult = sessionData?.results?.['generate-k8s-manifests'] as
+      | { manifests?: string }
+      | undefined;
 
     if (!k8sResult?.manifests) {
       return Failure(
@@ -348,11 +344,8 @@ async function deployApplicationImpl(
     // Parse and validate manifests
     let manifests: KubernetesManifest[];
     try {
-      // Extract content from manifests and join them
-      const manifestContents = k8sResult.manifests
-        .map((m) => m.content)
-        .filter((content): content is string => Boolean(content))
-        .join('\n---\n');
+      // The manifests are already a string containing all YAML documents
+      const manifestContents = k8sResult.manifests;
 
       if (!manifestContents) {
         return Failure('No valid manifest content found in session');
@@ -580,64 +573,18 @@ async function deployApplicationImpl(
         lastDeploymentName: deploymentName,
         lastServiceName: serviceName,
         totalDeployments:
-          (sessionData?.completed_steps || []).filter((s) => s === 'deploy').length + 1,
+          (sessionData?.completedSteps || []).filter((s: string) => s === 'deploy').length + 1,
         lastDeploymentReady: ready,
         lastEndpointCount: endpoints.length,
       },
     });
-
-    // Update session metadata for backward compatibility
-    const sessionManager = context.sessionManager;
-    if (sessionManager) {
-      try {
-        await sessionManager.update(sessionId, {
-          metadata: {
-            ...session.metadata,
-            deployment_result: {
-              success: true,
-              namespace,
-              deploymentName,
-              serviceName,
-              endpoints,
-              ready,
-              replicas: totalReplicas,
-              status: {
-                readyReplicas,
-                totalReplicas,
-                conditions: [
-                  {
-                    type: 'Available',
-                    status: ready ? 'True' : 'False',
-                    message: ready ? 'Deployment is available' : 'Deployment is pending',
-                  },
-                ],
-              },
-            },
-          },
-          completed_steps: [...(sessionData?.completed_steps || []), 'deploy'],
-        });
-      } catch (error) {
-        logger.warn(
-          { error: (error as Error).message },
-          'Failed to update session, but deployment succeeded',
-        );
-      }
-    }
     timer.end({ deploymentName, ready, sessionId });
     logger.info(
       { sessionId, deploymentName, serviceName, ready, namespace },
       'Kubernetes deployment completed',
     );
 
-    return Success({
-      ...result,
-      NextStep: getSuccessProgression(TOOL_NAMES.DEPLOY_APPLICATION, {
-        completed_steps: session.completed_steps || [],
-        ...(sessionData?.analysis_result && {
-          analysis_result: sessionData.analysis_result,
-        }),
-      }),
-    });
+    return Success(result);
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Application deployment failed');

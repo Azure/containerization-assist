@@ -8,9 +8,9 @@
 
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Logger } from 'pino';
-import type { SessionManager } from '../lib/session';
-import type * as promptRegistry from '../prompts/registry';
-import { extractErrorMessage } from '../lib/error-utils';
+import type { SessionManager } from '@lib/session';
+import type * as promptRegistry from '@prompts/registry';
+import { extractErrorMessage } from '@lib/error-utils';
 import { extractProgressReporter } from './context-helpers.js';
 
 // ===== TYPES =====

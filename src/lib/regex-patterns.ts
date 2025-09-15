@@ -27,7 +27,7 @@ export const MULTI_STAGE_FROM = /FROM\s+[\w\-./:]+\s+AS\s+\w+/im;
 export const AS_CLAUSE = /\s+AS\s+/i;
 
 // Version and tag patterns
-export const LATEST_TAG = /:latest(?:\s|$)/g;
+export const LATEST_TAG = /:latest(?:\s|$)/;
 export const PINNED_VERSION = /:\d+\.\d+/;
 export const SEMVER_VERSION = /:\d+\.\d+\.\d+/;
 

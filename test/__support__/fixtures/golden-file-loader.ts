@@ -12,18 +12,11 @@ export interface GoldenFileMetadata {
   description: string;
   lastUpdated: string;
   tools: Record<string, ToolGoldenFileInfo>;
-  workflows: Record<string, WorkflowGoldenFileInfo>;
 }
 
 export interface ToolGoldenFileInfo {
   description: string;
   variants: string[];
-  fixtures: string[];
-}
-
-export interface WorkflowGoldenFileInfo {
-  description: string;
-  steps: string[];
   fixtures: string[];
 }
 
@@ -90,33 +83,6 @@ export class GoldenFileLoader {
     }
   }
 
-  /**
-   * Load golden file for a workflow
-   */
-  async loadWorkflowGoldenFile<T = unknown>(
-    workflowName: string,
-    fixture: string,
-    options: GoldenFileLoadOptions = {}
-  ): Promise<Result<T | null>> {
-    const { strict = true } = options;
-    
-    try {
-      const filePath = path.join(this.basePath, 'workflows', `${workflowName}-${fixture}.json`);
-      
-      try {
-        const content = await fs.readFile(filePath, 'utf-8');
-        const parsed = JSON.parse(content) as T;
-        return Success(parsed);
-      } catch (error) {
-        if (!strict && (error as NodeJS.ErrnoException).code === 'ENOENT') {
-          return Success(null);
-        }
-        throw error;
-      }
-    } catch (error) {
-      return Failure(`Failed to load workflow golden file ${workflowName}/${fixture}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
 
   /**
    * Save golden file (for updating/creating new golden files)
@@ -205,20 +171,6 @@ export class GoldenFileLoader {
     return Success(toolInfo || null);
   }
 
-  /**
-   * Get workflow information from metadata
-   */
-  async getWorkflowInfo(workflowName: string): Promise<Result<WorkflowGoldenFileInfo | null>> {
-    if (!this.metadata) {
-      const metadataResult = await this.loadMetadata();
-      if (!metadataResult.success) {
-        return metadataResult;
-      }
-    }
-
-    const workflowInfo = this.metadata!.workflows[workflowName];
-    return Success(workflowInfo || null);
-  }
 }
 
 /**
@@ -238,13 +190,6 @@ export async function loadGoldenFile<T>(
   return result.success ? result.data : null;
 }
 
-export async function loadWorkflowGoldenFile<T>(
-  workflowName: string,
-  fixture: string
-): Promise<T | null> {
-  const result = await goldenFileLoader.loadWorkflowGoldenFile<T>(workflowName, fixture, { strict: false });
-  return result.success ? result.data : null;
-}
 
 export async function saveGoldenFile<T>(
   toolName: string,

@@ -6,7 +6,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../types';
+import { Success, Failure, type Result } from '@types';
 import { formatErrorMessage } from './error-utils';
 
 /**

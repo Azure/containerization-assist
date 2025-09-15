@@ -20,140 +20,148 @@ export interface ContextData {
 }
 
 /**
- * Correlation context using AsyncLocalStorage for automatic propagation
+ * Module-level storage for correlation context
  */
-export class CorrelationContext {
-  private static storage = new AsyncLocalStorage<ContextData>();
+const storage = new AsyncLocalStorage<ContextData>();
 
-  /**
-   * Run a function with correlation context
-   */
-  static run<T>(data: Partial<ContextData>, fn: () => T): T {
-    const current = this.getCurrent();
+/**
+ * Merge context data with current context
+ */
+const mergeContextData = (
+  current: ContextData | undefined,
+  data: Partial<ContextData>,
+): ContextData => {
+  const merged: ContextData = {
+    correlationId: data.correlationId || generateId(),
+    workflowId: data.workflowId || current?.workflowId || generateId(),
+    spanId: data.spanId || generateId(),
+    startTime: data.startTime || Date.now(),
+    metadata: { ...current?.metadata, ...data.metadata },
+  };
 
-    const merged: ContextData = {
-      correlationId: data.correlationId || generateId(),
-      workflowId: data.workflowId || current?.workflowId || generateId(),
-      spanId: data.spanId || generateId(),
-      startTime: data.startTime || Date.now(),
-      metadata: { ...current?.metadata, ...data.metadata },
-    };
+  // Only set optional properties if they have values
+  const parentSpanId = data.parentSpanId ?? current?.spanId;
+  if (parentSpanId) merged.parentSpanId = parentSpanId;
 
-    // Only set optional properties if they have values
-    const parentSpanId = data.parentSpanId ?? current?.spanId;
-    if (parentSpanId) merged.parentSpanId = parentSpanId;
+  const toolName = data.toolName || current?.toolName;
+  if (toolName) merged.toolName = toolName;
 
-    const toolName = data.toolName || current?.toolName;
-    if (toolName) merged.toolName = toolName;
+  const sessionId = data.sessionId || current?.sessionId;
+  if (sessionId) merged.sessionId = sessionId;
 
-    const sessionId = data.sessionId || current?.sessionId;
-    if (sessionId) merged.sessionId = sessionId;
+  return merged;
+};
 
-    return this.storage.run(merged, fn);
-  }
+/**
+ * Run a function with correlation context
+ */
+export const runWithContext = <T>(data: Partial<ContextData>, fn: () => T): T => {
+  const current = getCurrentContext();
+  const merged = mergeContextData(current, data);
+  return storage.run(merged, fn);
+};
 
-  /**
-   * Run async function with correlation context
-   */
-  static async runAsync<T>(data: Partial<ContextData>, fn: () => Promise<T>): Promise<T> {
-    const current = this.getCurrent();
+/**
+ * Run async function with correlation context
+ */
+export const runAsyncWithContext = async <T>(
+  data: Partial<ContextData>,
+  fn: () => Promise<T>,
+): Promise<T> => {
+  const current = getCurrentContext();
+  const merged = mergeContextData(current, data);
+  return storage.run(merged, fn);
+};
 
-    const merged: ContextData = {
-      correlationId: data.correlationId || generateId(),
-      workflowId: data.workflowId || current?.workflowId || generateId(),
-      spanId: data.spanId || generateId(),
-      startTime: data.startTime || Date.now(),
-      metadata: { ...current?.metadata, ...data.metadata },
-    };
+/**
+ * Get current context
+ */
+export const getCurrentContext = (): ContextData | undefined => {
+  return storage.getStore();
+};
 
-    // Only set optional properties if they have values
-    const parentSpanId = data.parentSpanId ?? current?.spanId;
-    if (parentSpanId) merged.parentSpanId = parentSpanId;
+/**
+ * Create a child context (new span)
+ */
+export const createChildContext = (metadata?: Record<string, unknown>): ContextData => {
+  const current = getCurrentContext();
 
-    const toolName = data.toolName || current?.toolName;
-    if (toolName) merged.toolName = toolName;
-
-    const sessionId = data.sessionId || current?.sessionId;
-    if (sessionId) merged.sessionId = sessionId;
-
-    return this.storage.run(merged, fn);
-  }
-
-  /**
-   * Get current context
-   */
-  static getCurrent(): ContextData | undefined {
-    return this.storage.getStore();
-  }
-
-  /**
-   * Create a child context (new span)
-   */
-  static createChild(metadata?: Record<string, unknown>): ContextData {
-    const current = this.getCurrent();
-
-    if (!current) {
-      // No parent context, create new root
-      return {
-        correlationId: generateId(),
-        workflowId: generateId(),
-        spanId: generateId(),
-        startTime: Date.now(),
-        metadata: metadata || {},
-      };
-    }
-
+  if (!current) {
+    // No parent context, create new root
     return {
-      ...current,
+      correlationId: generateId(),
+      workflowId: generateId(),
       spanId: generateId(),
-      parentSpanId: current.spanId,
       startTime: Date.now(),
-      metadata: { ...current.metadata, ...metadata },
+      metadata: metadata || {},
     };
   }
 
-  /**
-   * Extract context for external propagation (e.g., HTTP headers)
-   */
-  static extract(): Record<string, string> {
-    const current = this.getCurrent();
+  return {
+    ...current,
+    spanId: generateId(),
+    parentSpanId: current.spanId,
+    startTime: Date.now(),
+    metadata: { ...current.metadata, ...metadata },
+  };
+};
 
-    if (!current) {
-      return {};
-    }
+/**
+ * Extract context for external propagation (e.g., HTTP headers)
+ */
+export const extractContextHeaders = (): Record<string, string> => {
+  const current = getCurrentContext();
 
-    return {
-      'x-correlation-id': current.correlationId,
-      'x-workflow-id': current.workflowId,
-      'x-span-id': current.spanId,
-      'x-parent-span-id': current.parentSpanId || '',
-      'x-session-id': current.sessionId || '',
-    };
+  if (!current) {
+    return {};
   }
 
-  /**
-   * Inject context from external source (e.g., HTTP headers)
-   */
-  static inject(headers: Record<string, string | undefined>): Partial<ContextData> {
-    const result: Partial<ContextData> = {};
+  return {
+    'x-correlation-id': current.correlationId,
+    'x-workflow-id': current.workflowId,
+    'x-span-id': current.spanId,
+    'x-parent-span-id': current.parentSpanId || '',
+    'x-session-id': current.sessionId || '',
+  };
+};
 
-    if (headers['x-correlation-id']) result.correlationId = headers['x-correlation-id'];
-    if (headers['x-workflow-id']) result.workflowId = headers['x-workflow-id'];
-    if (headers['x-span-id']) result.spanId = headers['x-span-id'];
-    if (headers['x-parent-span-id']) result.parentSpanId = headers['x-parent-span-id'];
-    if (headers['x-session-id']) result.sessionId = headers['x-session-id'];
+/**
+ * Inject context from external source (e.g., HTTP headers)
+ */
+export const injectContextFromHeaders = (
+  headers: Record<string, string | undefined>,
+): Partial<ContextData> => {
+  const result: Partial<ContextData> = {};
 
-    return result;
-  }
+  if (headers['x-correlation-id']) result.correlationId = headers['x-correlation-id'];
+  if (headers['x-workflow-id']) result.workflowId = headers['x-workflow-id'];
+  if (headers['x-span-id']) result.spanId = headers['x-span-id'];
+  if (headers['x-parent-span-id']) result.parentSpanId = headers['x-parent-span-id'];
+  if (headers['x-session-id']) result.sessionId = headers['x-session-id'];
 
-  /**
-   * Calculate duration from span start
-   */
-  static getDuration(): number {
-    const current = this.getCurrent();
-    return current ? Date.now() - current.startTime : 0;
-  }
-}
+  return result;
+};
+
+/**
+ * Calculate duration from span start
+ */
+export const getContextDuration = (): number => {
+  const current = getCurrentContext();
+  return current ? Date.now() - current.startTime : 0;
+};
+
+/**
+ * Backward compatibility layer - mimics the static class interface
+ */
+export const CorrelationContext = {
+  run: runWithContext,
+  runAsync: runAsyncWithContext,
+  getCurrent: getCurrentContext,
+  createChild: createChildContext,
+  extract: extractContextHeaders,
+  inject: injectContextFromHeaders,
+  getDuration: getContextDuration,
+};
 
 /**
  * Generate unique ID
@@ -166,7 +174,7 @@ export function generateId(): string {
  * Create a logger with correlation context
  */
 export function createContextLogger(baseLogger: Logger): Logger {
-  const context = CorrelationContext.getCurrent();
+  const context = getCurrentContext();
 
   if (!context) {
     return baseLogger;
@@ -204,7 +212,7 @@ export function correlationMiddleware<T extends (...args: any[]) => any>(
       },
     };
 
-    return CorrelationContext.runAsync(correlationData, async () => {
+    return runAsyncWithContext(correlationData, async () => {
       return handler(...args);
     });
   }) as T;
@@ -226,7 +234,7 @@ export function withCorrelation(toolName?: string) {
         },
       };
 
-      return CorrelationContext.runAsync(correlationData, async () => {
+      return runAsyncWithContext(correlationData, async () => {
         return originalMethod.apply(this, args);
       });
     };
@@ -240,7 +248,7 @@ export function withCorrelation(toolName?: string) {
  */
 export function formatCorrelation(context?: ContextData): Record<string, unknown> {
   if (!context) {
-    context = CorrelationContext.getCurrent();
+    context = getCurrentContext();
   }
 
   if (!context) {

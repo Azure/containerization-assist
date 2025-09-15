@@ -6,20 +6,18 @@
  */
 
 import { joinPaths } from '@lib/path-utils';
-import { extractErrorMessage } from '../../lib/error-utils';
+import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
+import { extractErrorMessage } from '@lib/error-utils';
 import { promises as fs } from 'node:fs';
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 import type { SamplingOptions } from '@lib/sampling';
 import { createStandardProgress } from '@mcp/progress-helper';
-import { createTimer } from '@lib/logger';
-import type { ToolContext } from '../../mcp/context';
-import type { SessionData } from '../session-types';
-import { Success, Failure, type Result } from '../../types';
+import type { ToolContext } from '@mcp/context';
+import type { SessionData } from '@tools/session-types';
+import { Success, Failure, type Result } from '@types';
 import { stripFencesAndNoise } from '@lib/text-processing';
-import { getSuccessProgression, type SessionContext } from '../../workflows/workflow-progression';
-import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { generateAcaManifestsSchema, type GenerateAcaManifestsParams } from './schema';
 import { z } from 'zod';
 
@@ -326,15 +324,15 @@ function buildAcaManifestPromptArgs(params: GenerateAcaManifestsParams): Record<
     appName: params.appName,
     imageId: params.imageId,
     cpu: params.cpu || 0.5,
-    memory: params.memory || '1Gi',
+    memory: params.memory ?? '1Gi',
     minReplicas: params.minReplicas || 0,
     maxReplicas: params.maxReplicas || 10,
     targetPort: params.targetPort || 8080,
     external: params.external !== false,
     ingressEnabled: params.ingressEnabled || false,
     envVars: params.envVars,
-    environment: params.environment || 'production',
-    location: params.location || 'eastus',
+    environment: params.environment ?? 'production',
+    location: params.location ?? 'eastus',
     resourceGroup: params.resourceGroup,
     environmentName: params.environmentName,
   };
@@ -354,8 +352,8 @@ async function generateAcaManifestsImpl(
 
   // Progress reporting
   const progress = context.progress ? createStandardProgress(context.progress) : undefined;
-  const logger = context.logger;
-  const timer = createTimer(logger, 'generate-aca-manifests');
+  const logger = getToolLogger(context, 'generate-aca-manifests');
+  const timer = createToolTimer(logger, 'generate-aca-manifests');
 
   try {
     const { appName } = params;
@@ -382,7 +380,10 @@ async function generateAcaManifestsImpl(
     const sessionData = session as unknown as SessionData;
 
     // Get build result from session for image tag if not provided
-    const buildResult = sessionData?.build_result || sessionData?.workflow_state?.build_result;
+    const buildResult = (sessionData?.results?.['build-image'] ||
+      sessionData?.workflowState?.results?.['build-image']) as
+      | { tags?: string[]; imageId?: string }
+      | undefined;
     const imageId = params.imageId || buildResult?.tags?.[0] || `${appName}:latest`;
 
     // Progress: Executing generation
@@ -415,14 +416,16 @@ async function generateAcaManifestsImpl(
 
         try {
           // Get analysis from session for language/framework context
-          const analysisResult =
-            sessionData?.analysis_result || sessionData?.workflow_state?.analysis_result;
+          const analysisResult = (sessionData?.results?.['analyze_repo'] ||
+            sessionData?.workflowState?.results?.['analyze_repo']) as
+            | { language?: string; framework?: string }
+            | undefined;
 
           const knowledgeResult = await enhancePromptWithKnowledge(promptArgs, {
             operation: 'generate_aca_manifests',
             ...(analysisResult?.language && { language: analysisResult.language }),
             ...(analysisResult?.framework && { framework: analysisResult.framework }),
-            environment: params.environment || 'production',
+            environment: params.environment ?? 'production',
             tags: [
               'azure-container-apps',
               'deployment',
@@ -486,10 +489,8 @@ async function generateAcaManifestsImpl(
     // Convert manifest to JSON string
     const manifestContent = JSON.stringify(manifest, null, 2);
 
-    // Write manifest to disk
-    const repoPath =
-      sessionData?.metadata?.repo_path || sessionData?.workflow_state?.metadata?.repo_path || '.';
-    const outputPath = joinPaths(repoPath, 'aca');
+    // Write manifest to disk - use current directory as base
+    const outputPath = joinPaths('.', 'aca');
     await fs.mkdir(outputPath, { recursive: true });
     const manifestPath = joinPaths(outputPath, 'app.json');
     await fs.writeFile(manifestPath, manifestContent, 'utf-8');
@@ -530,54 +531,20 @@ async function generateAcaManifestsImpl(
         lastGeneratedAt: new Date(),
         manifestCount: 1,
         lastAppName: appName,
-        lastLocation: params.location || 'eastus',
+        lastLocation: params.location ?? 'eastus',
         aiStrategy: aiUsed ? 'ai' : 'template',
       },
     });
-
-    // Update session metadata for backward compatibility
-    const sessionManager = context.sessionManager;
-    if (sessionManager) {
-      try {
-        await sessionManager.update(sessionId, {
-          metadata: {
-            ...session.metadata,
-            aca_result: {
-              manifest: manifestContent,
-              file_path: manifestPath,
-              app_name: appName,
-              output_path: outputPath,
-            },
-            ai_enhancement_used: aiUsed,
-            ai_generation_type: 'aca-manifests',
-            aca_warnings: warnings,
-          },
-          completed_steps: [...(session.completed_steps ?? []), 'generate-aca-manifests'],
-        });
-      } catch (error) {
-        logger.warn(
-          { error: extractErrorMessage(error) },
-          'Failed to update session metadata, but ACA generation succeeded',
-        );
-      }
-    }
 
     // Progress: Complete
     if (progress) await progress('COMPLETE');
     timer.end({ outputPath });
 
-    // Prepare session context for dynamic chain hints
-    const sessionContext: SessionContext = {
-      completed_steps: session.completed_steps || [],
-      ...(session.analysis_result ? { analysis_result: session.analysis_result } : {}),
-    };
-
-    // Return result with file indicator and chain hint
+    // Return result with file indicator
     const enrichedResult = {
       ...result,
       _fileWritten: true,
       _fileWrittenPath: outputPath,
-      NextStep: getSuccessProgression(TOOL_NAMES.GENERATE_ACA_MANIFESTS, sessionContext).summary,
     };
 
     return Success(enrichedResult);

@@ -4,7 +4,7 @@
  * These types represent the session data structures used across tools
  */
 
-import type { WorkflowState } from '../types';
+import type { WorkflowState } from '@types';
 
 /**
  * Analysis result stored in session
@@ -12,14 +12,23 @@ import type { WorkflowState } from '../types';
 export interface SessionAnalysisResult {
   language?: string;
   framework?: string;
+  frameworkVersion?: string;
   dependencies?: Array<{ name: string; version?: string }>;
   ports?: number[];
-  build_system?: {
+  buildSystem?: {
     type?: string;
-    build_file?: string;
-    build_command?: string;
+    buildFile?: string;
+    buildCommand?: string;
   };
   summary?: string;
+  confidence?: number;
+  detectionMethod?: 'signature' | 'extension' | 'fallback' | 'ai-enhanced';
+  detectionDetails?: {
+    signatureMatches: number;
+    extensionMatches: number;
+    frameworkSignals: number;
+    buildSystemSignals: number;
+  };
 }
 
 /**
@@ -52,25 +61,25 @@ export interface SessionK8sResult {
     name: string;
     namespace: string;
     content?: string;
-    file_path?: string;
+    filePath?: string;
   }>;
   replicas?: number;
   resources?: unknown;
-  output_path?: string;
+  outputPath?: string;
 }
 
 /**
  * Session metadata
  */
 export interface SessionMetadata {
-  repo_path?: string;
-  dockerfile_baseImage?: string;
-  dockerfile_optimization?: boolean;
-  dockerfile_warnings?: string[];
-  ai_enhancement_used?: boolean;
-  ai_generation_type?: string;
+  repoPath?: string;
+  dockerfileBaseImage?: string;
+  dockerfileOptimization?: boolean;
+  dockerfileWarnings?: string[];
+  aiEnhancementUsed?: boolean;
+  aiGenerationType?: string;
   timestamp?: string;
-  k8s_warnings?: string[];
+  k8sWarnings?: string[];
   [key: string]: unknown;
 }
 
@@ -78,19 +87,62 @@ export interface SessionMetadata {
  * Complete session data structure
  */
 export interface SessionData {
-  analysis_result?: SessionAnalysisResult;
-  build_result?: SessionBuildResult;
-  dockerfile_result?: SessionDockerfileResult;
-  k8s_result?: SessionK8sResult;
-  workflow_state?: WorkflowState & {
-    analysis_result?: SessionAnalysisResult;
-    build_result?: SessionBuildResult;
-    dockerfile_result?: SessionDockerfileResult;
-    k8s_result?: SessionK8sResult;
+  workflowState?: WorkflowState & {
     metadata?: SessionMetadata;
   };
   metadata?: SessionMetadata;
-  completed_steps?: string[];
+  completedSteps?: string[];
   currentStep?: string;
+  results?: Record<string, unknown>;
   [key: string]: unknown;
+}
+
+/**
+ * Helper functions for safe access to session results
+ * All data is stored in the results object indexed by tool name
+ */
+export function getAnalysisResult(
+  session: WorkflowState | SessionData | undefined | null,
+): SessionAnalysisResult | undefined {
+  if (!session) return undefined;
+
+  // Check results object (standard pattern)
+  if ('results' in session && session.results?.['analyze_repo']) {
+    return session.results['analyze_repo'] as SessionAnalysisResult;
+  }
+
+  // Check nested workflowState
+  if ('workflowState' in session && session.workflowState) {
+    const ws = session.workflowState;
+    if (typeof ws === 'object' && ws !== null && 'results' in ws) {
+      const results = (ws as WorkflowState).results;
+      if (results?.['analyze_repo']) {
+        return results['analyze_repo'] as SessionAnalysisResult;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+export function getBaseImages(session: WorkflowState | SessionData | undefined | null): unknown {
+  if (!session) return undefined;
+
+  // Check results object (standard pattern)
+  if ('results' in session && session.results?.['resolve-base-images']) {
+    return session.results['resolve-base-images'];
+  }
+
+  // Check nested workflowState
+  if ('workflowState' in session && session.workflowState) {
+    const ws = session.workflowState;
+    if (typeof ws === 'object' && ws !== null && 'results' in ws) {
+      const results = (ws as WorkflowState).results;
+      if (results?.['resolve-base-images']) {
+        return results['resolve-base-images'];
+      }
+    }
+  }
+
+  return undefined;
 }

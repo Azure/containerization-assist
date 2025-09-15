@@ -10,64 +10,25 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 /**
- * Invariant: These constants define system-wide limits and defaults
- * Rationale: Centralized constants prevent magic numbers across codebase
+ * Flattened configuration defaults
+ * Simplified from nested CONSTANTS object for better maintainability
  */
-const CONSTANTS = {
-  MCP: {
-    NAME: 'containerization-assist',
-    DEFAULT_SESSION_TTL: '24h',
-  },
-  TIMEOUTS: {
-    DOCKER: 60000, // 60s
-    KUBERNETES: 30000, // 30s - match test expectation
-    SCAN: 300000, // 5min
-    SAMPLING: 30000, // 30s
-  },
-  LIMITS: {
-    MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
-    CACHE_TTL: 3600, // 1 hour
-    CACHE_MAX_SIZE: 100,
-    MAX_SESSIONS_DEFAULT: 100,
-    SESSION_TTL: 86400, // 24h in seconds
-  },
-  DEFAULTS: {
-    HOST: '0.0.0.0',
-    PORT: 3000,
-    DOCKER_SOCKET: '/var/run/docker.sock',
-    DOCKER_REGISTRY: 'docker.io',
-    K8S_NAMESPACE: 'default',
-    KUBECONFIG: '~/.kube/config',
-  },
-  ORCHESTRATOR: {
-    DEFAULT_CANDIDATES: 3,
-    MAX_CANDIDATES: 5,
-    EARLY_STOP_THRESHOLD: 90,
-    TIEBREAK_MARGIN: 5,
-    SCAN_THRESHOLDS: {
-      CRITICAL: 0,
-      HIGH: 2,
-      MEDIUM: 10,
-    },
-    BUILD_SIZE_LIMITS: {
-      SANITY_FACTOR: 1.25,
-      REJECT_FACTOR: 2.5,
-    },
-    SAMPLING_WEIGHTS: {
-      DOCKERFILE: {
-        BUILD: 30,
-        SIZE: 30,
-        SECURITY: 25,
-        SPEED: 15,
-      },
-      K8S: {
-        VALIDATION: 20,
-        SECURITY: 20,
-        RESOURCES: 20,
-        BEST_PRACTICES: 20,
-      },
-    },
-  },
+const DEFAULT_CONFIG = {
+  MCP_NAME: 'containerization-assist',
+  SESSION_TTL: 86400, // 24h in seconds
+  DOCKER_TIMEOUT: 60000, // 60s
+  K8S_TIMEOUT: 30000, // 30s
+  SCAN_TIMEOUT: 300000, // 5min
+  MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
+  CACHE_TTL: 3600, // 1 hour
+  CACHE_MAX_SIZE: 100,
+  MAX_SESSIONS: 100,
+  HOST: '0.0.0.0',
+  PORT: 3000,
+  DOCKER_SOCKET: '/var/run/docker.sock',
+  DOCKER_REGISTRY: 'docker.io',
+  K8S_NAMESPACE: 'default',
+  KUBECONFIG: '~/.kube/config',
 } as const;
 
 const NodeEnvSchema = z.enum(['development', 'production', 'test']).default('development');
@@ -78,62 +39,61 @@ const AppConfigSchema = z.object({
   server: z.object({
     nodeEnv: NodeEnvSchema,
     logLevel: LogLevelSchema,
-    port: z.coerce.number().int().min(1024).max(65535).default(CONSTANTS.DEFAULTS.PORT),
-    host: z.string().min(1).default(CONSTANTS.DEFAULTS.HOST),
+    port: z.coerce.number().int().min(1024).max(65535).default(DEFAULT_CONFIG.PORT),
+    host: z.string().min(1).default(DEFAULT_CONFIG.HOST),
   }),
   mcp: z.object({
-    name: z.string().default(CONSTANTS.MCP.NAME),
+    name: z.string().default(DEFAULT_CONFIG.MCP_NAME),
     version: z.string(),
     storePath: z.string().default('./data/sessions.db'),
-    sessionTTL: z.string().default(CONSTANTS.MCP.DEFAULT_SESSION_TTL),
-    maxSessions: z.coerce.number().int().positive().default(CONSTANTS.LIMITS.MAX_SESSIONS_DEFAULT),
+    maxSessions: z.coerce.number().int().positive().default(DEFAULT_CONFIG.MAX_SESSIONS),
     enableMetrics: z.boolean().default(true),
     enableEvents: z.boolean().default(true),
   }),
   session: z.object({
     store: StoreTypeSchema,
-    ttl: z.coerce.number().int().positive().default(CONSTANTS.LIMITS.SESSION_TTL),
-    maxSessions: z.coerce.number().int().positive().default(1000),
+    ttl: z.coerce.number().int().positive().default(DEFAULT_CONFIG.SESSION_TTL),
+    maxSessions: z.coerce.number().int().positive().default(DEFAULT_CONFIG.MAX_SESSIONS),
     persistencePath: z.string().default('./data/sessions.db'),
     persistenceInterval: z.coerce.number().int().positive().default(60000),
     cleanupInterval: z.coerce
       .number()
       .int()
       .positive()
-      .default(CONSTANTS.LIMITS.CACHE_TTL * 1000),
+      .default(DEFAULT_CONFIG.CACHE_TTL * 1000),
   }),
-  docker: z.object({
-    socketPath: z.string().default(CONSTANTS.DEFAULTS.DOCKER_SOCKET),
-    host: z.string().default('localhost'),
-    port: z.coerce.number().int().min(1).max(65535).default(2375),
-    registry: z.string().default(CONSTANTS.DEFAULTS.DOCKER_REGISTRY),
-    timeout: z.coerce.number().int().positive().default(CONSTANTS.TIMEOUTS.DOCKER),
-    buildArgs: z.record(z.string()).default({}),
-  }),
-  kubernetes: z.object({
-    namespace: z.string().default(CONSTANTS.DEFAULTS.K8S_NAMESPACE),
-    kubeconfig: z.string().default(CONSTANTS.DEFAULTS.KUBECONFIG),
-    timeout: z.coerce.number().int().positive().default(CONSTANTS.TIMEOUTS.KUBERNETES),
+  services: z.object({
+    docker: z.object({
+      socketPath: z.string().default(DEFAULT_CONFIG.DOCKER_SOCKET),
+      host: z.string().default('localhost'),
+      port: z.coerce.number().int().min(1).max(65535).default(2375),
+      registry: z.string().default(DEFAULT_CONFIG.DOCKER_REGISTRY),
+      timeout: z.coerce.number().int().positive().default(DEFAULT_CONFIG.DOCKER_TIMEOUT),
+      buildArgs: z.record(z.string()).default({}),
+    }),
+    kubernetes: z.object({
+      namespace: z.string().default(DEFAULT_CONFIG.K8S_NAMESPACE),
+      kubeconfig: z.string().default(DEFAULT_CONFIG.KUBECONFIG),
+      timeout: z.coerce.number().int().positive().default(DEFAULT_CONFIG.K8S_TIMEOUT),
+    }),
   }),
   workspace: z.object({
     workspaceDir: z.string().default(() => process.cwd()),
     tempDir: z.string().default('/tmp'),
-    cleanupOnExit: z.boolean().default(true),
-    maxFileSize: z.coerce.number().int().positive().default(CONSTANTS.LIMITS.MAX_FILE_SIZE),
+    maxFileSize: z.coerce.number().int().positive().default(DEFAULT_CONFIG.MAX_FILE_SIZE),
   }),
   logging: z.object({
     level: LogLevelSchema,
-    format: z.enum(['json', 'text']).default('json'),
   }),
   workflow: z.object({
     mode: WorkflowModeSchema,
   }),
   cache: z.object({
-    ttl: z.coerce.number().int().positive().default(CONSTANTS.LIMITS.CACHE_TTL),
-    maxSize: z.coerce.number().int().positive().default(CONSTANTS.LIMITS.CACHE_MAX_SIZE),
+    ttl: z.coerce.number().int().positive().default(DEFAULT_CONFIG.CACHE_TTL),
+    maxSize: z.coerce.number().int().positive().default(DEFAULT_CONFIG.CACHE_MAX_SIZE),
   }),
   security: z.object({
-    scanTimeout: z.coerce.number().int().positive().default(CONSTANTS.TIMEOUTS.SCAN),
+    scanTimeout: z.coerce.number().int().positive().default(DEFAULT_CONFIG.SCAN_TIMEOUT),
     failOnCritical: z.boolean().default(false),
   }),
 });
@@ -198,10 +158,9 @@ export function createAppConfig(): AppConfig {
       name: getEnvValue('MCP_SERVER_NAME'),
       version: getPackageVersion(),
       storePath: getEnvValue('MCP_STORE_PATH'),
-      sessionTTL: getEnvValue('SESSION_TTL'),
       maxSessions: parseNumberWithFallback(
         getEnvValue('MAX_SESSIONS'),
-        CONSTANTS.LIMITS.MAX_SESSIONS_DEFAULT,
+        DEFAULT_CONFIG.MAX_SESSIONS,
         'MAX_SESSIONS',
       ),
       enableMetrics: true,
@@ -210,43 +169,47 @@ export function createAppConfig(): AppConfig {
     session: {
       store: 'memory' as const,
       ttl: getEnvValue('SESSION_TTL'),
-      maxSessions: parseNumberWithFallback(getEnvValue('MAX_SESSIONS'), 1000, 'MAX_SESSIONS'),
+      maxSessions: parseNumberWithFallback(
+        getEnvValue('MAX_SESSIONS'),
+        DEFAULT_CONFIG.MAX_SESSIONS,
+        'MAX_SESSIONS',
+      ),
       persistencePath: getEnvValue('MCP_STORE_PATH') || './data/sessions.db',
       persistenceInterval: 60000,
-      cleanupInterval: CONSTANTS.LIMITS.CACHE_TTL * 1000,
+      cleanupInterval: DEFAULT_CONFIG.CACHE_TTL * 1000,
     },
-    docker: {
-      socketPath: getEnvValue('DOCKER_HOST') || getEnvValue('DOCKER_SOCKET'),
-      host: 'localhost',
-      port: getEnvValue('DOCKER_PORT'),
-      registry: getEnvValue('DOCKER_REGISTRY'),
-      timeout: getEnvValue('DOCKER_TIMEOUT'),
-      buildArgs: {},
-    },
-    kubernetes: {
-      namespace: getEnvValue('KUBE_NAMESPACE') || getEnvValue('K8S_NAMESPACE'),
-      kubeconfig: getEnvValue('KUBECONFIG'),
-      timeout: getEnvValue('K8S_TIMEOUT'),
+    services: {
+      docker: {
+        socketPath: getEnvValue('DOCKER_HOST') || getEnvValue('DOCKER_SOCKET'),
+        host: 'localhost',
+        port: getEnvValue('DOCKER_PORT'),
+        registry: getEnvValue('DOCKER_REGISTRY'),
+        timeout: getEnvValue('DOCKER_TIMEOUT'),
+        buildArgs: {},
+      },
+      kubernetes: {
+        namespace: getEnvValue('KUBE_NAMESPACE') || getEnvValue('K8S_NAMESPACE'),
+        kubeconfig: getEnvValue('KUBECONFIG'),
+        timeout: getEnvValue('K8S_TIMEOUT'),
+      },
     },
     workspace: {
       workspaceDir: getEnvValue('WORKSPACE_DIR') || process.cwd(),
       tempDir: '/tmp',
-      cleanupOnExit: true,
-      maxFileSize: CONSTANTS.LIMITS.MAX_FILE_SIZE,
+      maxFileSize: DEFAULT_CONFIG.MAX_FILE_SIZE,
     },
     logging: {
       level: getEnvValue('LOG_LEVEL'),
-      format: getEnvValue('LOG_FORMAT'),
     },
     workflow: {
       mode: 'interactive' as const,
     },
     cache: {
-      ttl: CONSTANTS.LIMITS.CACHE_TTL,
-      maxSize: CONSTANTS.LIMITS.CACHE_MAX_SIZE,
+      ttl: DEFAULT_CONFIG.CACHE_TTL,
+      maxSize: DEFAULT_CONFIG.CACHE_MAX_SIZE,
     },
     security: {
-      scanTimeout: CONSTANTS.TIMEOUTS.SCAN,
+      scanTimeout: DEFAULT_CONFIG.SCAN_TIMEOUT,
       failOnCritical: getEnvValue('FAIL_ON_CRITICAL') === 'true',
     },
   };

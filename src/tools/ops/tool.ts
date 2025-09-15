@@ -6,10 +6,10 @@
  */
 
 import * as os from 'os';
-import { extractErrorMessage } from '../../lib/error-utils';
-import { createTimer } from '../../lib/logger';
-import { Success, Failure, type Result } from '../../types';
-import type { ToolContext } from '../../mcp/context';
+import { extractErrorMessage } from '@lib/error-utils';
+import { createToolTimer } from '@lib/tool-helpers';
+import { Success, Failure, type Result } from '@types';
+import type { ToolContext } from '@mcp/context';
 import type { OpsToolParams } from './schema';
 
 interface PingConfig {
@@ -37,7 +37,7 @@ interface PingResult {
  * Ping operation - test server connectivity
  */
 export async function ping(config: PingConfig, context: ToolContext): Promise<Result<PingResult>> {
-  const timer = createTimer(context.logger, 'ops-ping');
+  const timer = createToolTimer(context.logger, 'ops-ping');
 
   try {
     const { message = 'ping' } = config;
@@ -108,7 +108,7 @@ export async function serverStatus(
   config: ServerStatusConfig,
   context: ToolContext,
 ): Promise<Result<ServerStatusResult>> {
-  const timer = createTimer(context.logger, 'ops-server-status');
+  const timer = createToolTimer(context.logger, 'ops-server-status');
 
   try {
     const { details = false } = config;

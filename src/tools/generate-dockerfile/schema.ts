@@ -27,6 +27,10 @@ export const generateDockerfileSchema = z.object({
   runtimeImage: z.string().optional().describe('Runtime image for multi-stage builds'),
   environment: environmentSchema,
   optimization: z.union([optimizationSchema, z.boolean()]).optional(),
+  preferAI: z
+    .boolean()
+    .optional()
+    .describe('Force AI analysis even with high-confidence hardcoded detection'),
   multistage: z.boolean().optional().describe('Use multi-stage build pattern'),
   securityHardening: z.boolean().optional().describe('Apply security hardening practices'),
   includeHealthcheck: z.boolean().optional().describe('Include health check configuration'),
@@ -34,7 +38,7 @@ export const generateDockerfileSchema = z.object({
   optimizeSize: z.boolean().optional().describe('Optimize for smaller image size'),
   securityLevel: securityLevelSchema,
   customCommands: z.array(z.string()).optional().describe('Custom Dockerfile commands'),
-  repoPath: z.string().optional().describe('Repository path (use forward slashes: /path/to/repo)'),
+  path: z.string().optional().describe('Repository path (use forward slashes: /path/to/repo)'),
   moduleRoots: z
     .array(z.string())
     .min(1)
@@ -44,10 +48,6 @@ export const generateDockerfileSchema = z.object({
     ),
 
   // Sampling options
-  disableSampling: z
-    .boolean()
-    .optional()
-    .describe('Disable multi-candidate sampling (sampling is enabled by default)'),
   maxCandidates: z
     .number()
     .min(1)

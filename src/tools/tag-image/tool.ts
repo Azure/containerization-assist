@@ -6,19 +6,14 @@
  */
 
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
-import type { ToolContext } from '../../mcp/context';
-import { createDockerClient } from '../../lib/docker';
-import { createTimer, createLogger } from '../../lib/logger';
-import { Success, Failure, type Result } from '../../types';
+import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
+import { extractErrorMessage } from '@lib/error-utils';
+import type { ToolContext } from '@mcp/context';
+import { createDockerClient } from '@lib/docker';
+
+import { Success, Failure, type Result } from '@types';
 import { tagImageSchema, type TagImageParams } from './schema';
 import { z } from 'zod';
-import {
-  getSuccessProgression,
-  getFailureProgression,
-  formatFailureChainHint,
-  type SessionContext,
-} from '../../workflows/workflow-progression';
-import { TOOL_NAMES } from '../../exports/tool-names.js';
 
 // Define the result schema for type safety
 const TagImageResultSchema = z.object({
@@ -55,8 +50,8 @@ async function tagImageImpl(
   if (!params || typeof params !== 'object') {
     return Failure('Invalid parameters provided');
   }
-  const logger = context.logger || createLogger({ name: 'tag-image' });
-  const timer = createTimer(logger, 'tag-image');
+  const logger = getToolLogger(context, 'tag-image');
+  const timer = createToolTimer(logger, 'tag-image');
 
   try {
     const { tag } = params;
@@ -129,50 +124,14 @@ async function tagImageImpl(
       },
     });
 
-    // Update session metadata for backward compatibility
-    const sessionManager = context.sessionManager;
-    if (sessionManager) {
-      await sessionManager.update(sessionId, {
-        metadata: {
-          ...session.metadata,
-          build_result: {
-            ...(buildResult || {}),
-            imageId: source,
-            tags,
-          },
-        },
-        completed_steps: [...(session.completed_steps || []), 'tag'],
-      });
-    }
+    timer.end({ tags, sessionId });
+    logger.info({ sessionId, tags }, 'Image tagging completed');
 
-    timer.end({ source, tag });
-    logger.info({ source, tag }, 'Image tagging completed');
-
-    // Prepare session context for dynamic chain hints
-    const sessionContext: SessionContext = {
-      completed_steps: session.completed_steps || [],
-      ...((session as SessionContext).analysis_result && {
-        analysis_result: (session as SessionContext).analysis_result,
-      }),
-    };
-
-    return Success({
-      ...result,
-      NextStep: getSuccessProgression(TOOL_NAMES.TAG_IMAGE, sessionContext).summary,
-    });
+    return Success(result);
   } catch (error) {
-    timer.end({ error });
+    timer.error(error);
     logger.error({ error }, 'Image tagging failed');
-
-    // Add failure chain hint - use basic context since session may not be available
-    const sessionContext = {
-      completed_steps: [],
-    };
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const progression = getFailureProgression(TOOL_NAMES.TAG_IMAGE, errorMessage, sessionContext);
-    const chainHint = formatFailureChainHint(TOOL_NAMES.TAG_IMAGE, progression);
-
-    return Failure(`${errorMessage}\n${chainHint}`);
+    return Failure(extractErrorMessage(error));
   }
 }
 

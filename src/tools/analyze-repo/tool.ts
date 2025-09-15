@@ -8,7 +8,7 @@
  * ```typescript
  * const result = await analyzeRepo({
  *   sessionId: 'session-123',
- *   repoPath: '/path/to/project',
+ *   path: '/path/to/project',
  *   includeTests: true
  * }, logger);
  *
@@ -20,22 +20,20 @@
  */
 
 import { joinPaths, getExtension, safeNormalizePath } from '@lib/path-utils';
-import { promises as fs } from 'node:fs';
+import { promises as fs, constants } from 'node:fs';
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import { createStandardProgress } from '@mcp/progress-helper';
 import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
-import { getRecommendedBaseImage } from '../../lib/base-images';
-import type { ToolContext } from '../../mcp/context';
-import { createTimer, createLogger } from '../../lib/logger';
-import { Success, Failure, type Result } from '../../types';
+import { getBaseImageRecommendations } from '@lib/base-images';
+import type { ToolContext } from '@mcp/context';
+import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
+import { Success, Failure, type Result } from '@types';
 import { analyzeRepoSchema, type AnalyzeRepoParams } from './schema';
 import { z } from 'zod';
-import { parsePackageJson, getAllDependencies } from '../../lib/parsing-package-json';
-import { DEFAULT_PORTS } from '../../config/defaults';
-import { getSuccessProgression } from '../../workflows/workflow-progression';
-import { TOOL_NAMES } from '../../exports/tool-names.js';
-import { extractErrorMessage } from '../../lib/error-utils';
+import { parsePackageJson, getAllDependencies } from '@lib/parsing-package-json';
+import { DEFAULT_PORTS } from '@config/defaults';
+import { extractErrorMessage } from '@lib/error-utils';
 
 // Define the result schema for type safety
 const AnalyzeRepoResultSchema = z.object({
@@ -69,8 +67,16 @@ const AnalyzeRepoResultSchema = z.object({
     buildStrategy: z.enum(['multi-stage', 'single-stage']),
     securityNotes: z.array(z.string()),
   }),
+  confidence: z.number(),
+  detectionMethod: z.enum(['signature', 'extension', 'fallback', 'ai-enhanced']),
+  detectionDetails: z.object({
+    signatureMatches: z.number(),
+    extensionMatches: z.number(),
+    frameworkSignals: z.number(),
+    buildSystemSignals: z.number(),
+  }),
   metadata: z.object({
-    repoPath: z.string(),
+    path: z.string(),
     depth: z.number(),
     timestamp: z.number(),
     includeTests: z.boolean().optional(),
@@ -124,8 +130,8 @@ const LANGUAGE_SIGNATURES: Record<string, { extensions: string[]; files: string[
     files: ['composer.json', 'composer.lock'],
   },
   dotnet: {
-    extensions: ['.cs', '.fs', '.vb'],
-    files: ['.csproj', '.fsproj', '.vbproj', '.sln', 'global.json', 'Directory.Build.props'],
+    extensions: ['.cs', '.fs', '.vb', '.csproj', '.fsproj', '.vbproj', '.sln'],
+    files: ['global.json', 'Directory.Build.props'],
   },
 };
 
@@ -144,8 +150,25 @@ const FRAMEWORK_SIGNATURES: Record<string, { files: string[]; dependencies?: str
   rails: { files: ['Gemfile'], dependencies: ['rails'] },
   laravel: { files: ['artisan'], dependencies: [] },
   'aspnet-core': { files: [], dependencies: ['Microsoft.AspNetCore'] },
-  blazor: { files: [], dependencies: ['Microsoft.AspNetCore.Components'] },
+  'blazor-server': { files: [], dependencies: ['Microsoft.AspNetCore.Components.Server'] },
+  'blazor-webassembly': {
+    files: [],
+    dependencies: ['Microsoft.AspNetCore.Components.WebAssembly'],
+  },
+  'blazor-hybrid': { files: [], dependencies: ['Microsoft.AspNetCore.Components.WebView'] },
+  'grpc-service': { files: [], dependencies: ['Grpc.AspNetCore'] },
+  'worker-service': { files: [], dependencies: ['Microsoft.Extensions.Hosting'] },
   'minimal-api': { files: [], dependencies: ['Microsoft.AspNetCore.OpenApi'] },
+  'aspnet-webforms': { files: ['Default.aspx', 'Site.Master'], dependencies: ['System.Web.UI'] },
+  'wcf-service': { files: ['service.svc', 'App.config'], dependencies: ['System.ServiceModel'] },
+  'windows-service': {
+    files: ['Program.cs', 'app.config'],
+    dependencies: ['System.ServiceProcess'],
+  },
+  'entity-framework-6': { files: ['App.config'], dependencies: ['EntityFramework'] },
+  'aspnet-webapi': { files: ['Global.asax', 'Web.config'], dependencies: ['System.Web.Http'] },
+  'aspnet-mvc': { files: ['Global.asax', 'Web.config'], dependencies: ['System.Web.Mvc'] },
+  'aspnet-framework': { files: ['Global.asax', 'Web.config'], dependencies: [] },
 };
 
 // Build system detection
@@ -166,6 +189,62 @@ const BUILD_SYSTEMS = {
 };
 
 /**
+ * Detection details for confidence calculation
+ */
+interface DetectionDetails {
+  signatureMatches: number;
+  extensionMatches: number;
+  frameworkSignals: number;
+  buildSystemSignals: number;
+}
+
+/**
+ * Calculates detection confidence score using weighted signal analysis.
+ *
+ * Invariant: Signature files carry more weight than extensions for accuracy
+ * Postcondition: Returns score 0-100 with detection method classification
+ */
+function calculateConfidence(
+  language: string,
+  framework: string | undefined,
+  buildSystem: any,
+  detectionDetails: DetectionDetails,
+): { confidence: number; method: 'signature' | 'extension' | 'fallback' | 'ai-enhanced' } {
+  if (language === 'unknown') {
+    return { confidence: 0, method: 'fallback' };
+  }
+
+  let score = 0;
+  let method: 'signature' | 'extension' | 'fallback' | 'ai-enhanced' = 'fallback';
+
+  // Language confidence - signature files are stronger indicators
+  if (detectionDetails.signatureMatches > 0) {
+    score += 40;
+    method = 'signature';
+  } else if (detectionDetails.extensionMatches > 0) {
+    score += 25;
+    method = 'extension';
+  }
+
+  // Framework detection adds confidence
+  if (framework && detectionDetails.frameworkSignals > 0) {
+    score += 25;
+  }
+
+  // Build system detection adds confidence
+  if (buildSystem && detectionDetails.buildSystemSignals > 0) {
+    score += 20;
+  }
+
+  // Multiple signals boost confidence
+  if (detectionDetails.signatureMatches > 1) {
+    score += 10;
+  }
+
+  return { confidence: Math.min(score, 100), method };
+}
+
+/**
  * Validate repository path exists and is accessible
  */
 async function validateRepositoryPath(
@@ -176,7 +255,7 @@ async function validateRepositoryPath(
     if (!stats.isDirectory()) {
       return { valid: false, error: 'Path is not a directory' };
     }
-    await fs.access(repoPath, fs.constants.R_OK);
+    await fs.access(repoPath, constants.R_OK);
     return { valid: true };
   } catch (error) {
     const errorMsg = extractErrorMessage(error);
@@ -185,17 +264,51 @@ async function validateRepositoryPath(
 }
 
 /**
- * Detect primary programming language
+ * Detects primary programming language using signature files and extensions.
+ *
+ * Trade-off: Prioritizes signature files over extensions for higher accuracy
  */
-async function detectLanguage(repoPath: string): Promise<{ language: string; version?: string }> {
-  const files = await fs.readdir(repoPath);
+async function detectLanguage(repoPath: string): Promise<{
+  language: string;
+  version?: string;
+  detectionDetails: DetectionDetails;
+  allFiles?: string[];
+}> {
+  // Get all files recursively (up to 2 levels deep)
+  const allFiles: string[] = [];
+  const getAllFiles = async (dir: string, depth = 0): Promise<void> => {
+    if (depth > 2) return; // Limit depth
+    const files = await fs.readdir(dir);
+
+    for (const file of files) {
+      const filePath = joinPaths(dir, file);
+      const stats = await fs.stat(filePath);
+      const relativePath = filePath.replace(`${repoPath}/`, '');
+
+      if (stats.isFile()) {
+        allFiles.push(relativePath);
+      } else if (stats.isDirectory() && !file.startsWith('.') && file !== 'node_modules') {
+        await getAllFiles(filePath, depth + 1);
+      }
+    }
+  };
+
+  await getAllFiles(repoPath);
+
   const fileStats = await Promise.all(
-    files.map(async (file) => {
+    allFiles.map(async (file) => {
       const filePath = joinPaths(repoPath, file);
       const stats = await fs.stat(filePath);
       return { name: file, path: filePath, isFile: stats.isFile() };
     }),
   );
+
+  const detectionDetails: DetectionDetails = {
+    signatureMatches: 0,
+    extensionMatches: 0,
+    frameworkSignals: 0,
+    buildSystemSignals: 0,
+  };
 
   // Count file extensions
   const extensionCounts: Record<string, number> = {};
@@ -208,31 +321,40 @@ async function detectLanguage(repoPath: string): Promise<{ language: string; ver
 
   // Check for language signatures
   for (const [lang, signature] of Object.entries(LANGUAGE_SIGNATURES)) {
-    // Check for specific files
-    const hasFiles = signature.files?.some((f) => files.includes(f)) ?? false;
-    if (hasFiles) {
-      return { language: lang };
+    const matchedFiles =
+      signature.files?.filter((f) =>
+        allFiles.some((file) => file === f || file.endsWith(`/${f}`)),
+      ) ?? [];
+    if (matchedFiles.length > 0) {
+      detectionDetails.signatureMatches = matchedFiles.length;
+      return { language: lang, detectionDetails, allFiles };
     }
 
     // Check for extensions
-    const hasExtensions =
-      signature.extensions?.some((ext) => (extensionCounts[ext] ?? 0) > 0) ?? false;
-    if (hasExtensions) {
-      return { language: lang };
+    const matchedExtensions =
+      signature.extensions?.filter((ext) => (extensionCounts[ext] ?? 0) > 0) ?? [];
+    if (matchedExtensions.length > 0) {
+      detectionDetails.extensionMatches = matchedExtensions.length;
+      return { language: lang, detectionDetails, allFiles };
     }
   }
 
-  return { language: 'unknown' };
+  return { language: 'unknown', detectionDetails, allFiles };
 }
 
 /**
- * Detect framework
+ * Detects framework using dependency analysis and configuration files.
+ *
+ * Design rationale: .NET requires special handling due to complex framework ecosystem
  */
 async function detectFramework(
   repoPath: string,
   language: string,
-): Promise<{ framework?: string; version?: string } | undefined> {
-  const files = await fs.readdir(repoPath);
+  allFiles?: string[],
+): Promise<{ framework?: string; version?: string; frameworkSignals: number } | undefined> {
+  // Use provided files or scan directory
+  const files = allFiles || (await fs.readdir(repoPath));
+  let frameworkSignals = 0;
 
   // Check package.json for JS/TS frameworks
   if (language === 'javascript' || language === 'typescript') {
@@ -241,8 +363,10 @@ async function detectFramework(
       const allDeps = getAllDependencies(packageJson);
 
       for (const [framework, signature] of Object.entries(FRAMEWORK_SIGNATURES)) {
-        if (signature.dependencies?.some((dep) => dep in allDeps)) {
-          return { framework };
+        const matchingDeps = signature.dependencies?.filter((dep) => dep in allDeps) ?? [];
+        if (matchingDeps.length > 0) {
+          frameworkSignals = matchingDeps.length;
+          return { framework, frameworkSignals };
         }
       }
     } catch {
@@ -250,18 +374,90 @@ async function detectFramework(
     }
   }
 
-  // Check for framework-specific files
-  for (const [framework, signature] of Object.entries(FRAMEWORK_SIGNATURES)) {
-    if (signature.files?.some((f) => files.includes(f))) {
-      return { framework };
+  // .NET specific framework detection
+  if (language === 'dotnet') {
+    try {
+      // Find all .csproj files (they should already be in allFiles from detectLanguage)
+      const csprojFiles = files.filter((f) => f.endsWith('.csproj'));
+      for (const csprojFile of csprojFiles) {
+        try {
+          const csprojPath = joinPaths(repoPath, csprojFile);
+          const csprojContent = await fs.readFile(csprojPath, 'utf-8');
+
+          // Check for .NET Framework version
+          const frameworkVersionMatch = csprojContent.match(
+            /<TargetFrameworkVersion>v(\d+\.\d+)<\/TargetFrameworkVersion>/,
+          );
+          if (frameworkVersionMatch) {
+            const version = frameworkVersionMatch[1];
+
+            // Determine specific framework type based oni iences
+            frameworkSignals = 1;
+            if (csprojContent.includes('System.Web.Http')) {
+              frameworkSignals = 2; // More specific detection
+              return version
+                ? { framework: 'aspnet-webapi', version, frameworkSignals }
+                : { framework: 'aspnet-webapi', frameworkSignals };
+            } else if (csprojContent.includes('System.Web.Mvc')) {
+              frameworkSignals = 2; // More specific detection
+              return version
+                ? { framework: 'aspnet-mvc', version, frameworkSignals }
+                : { framework: 'aspnet-mvc', frameworkSignals };
+            } else if (csprojContent.includes('System.Web')) {
+              frameworkSignals = 2; // More specific detection
+              return version
+                ? { framework: 'aspnet-framework', version, frameworkSignals }
+                : { framework: 'aspnet-framework', frameworkSignals };
+            }
+
+            return version
+              ? { framework: 'dotnet-framework', version, frameworkSignals }
+              : { framework: 'dotnet-framework', frameworkSignals };
+          }
+
+          // Check for .NET Core/5+ (uses TargetFramework without 'v' prefix)
+          const coreVersionMatch = csprojContent.match(
+            /<TargetFramework>(net\d+\.\d+|netcoreapp\d+\.\d+)<\/TargetFramework>/,
+          );
+          if (coreVersionMatch) {
+            const version = coreVersionMatch[1];
+            frameworkSignals = 1;
+
+            if (csprojContent.includes('Microsoft.AspNetCore')) {
+              frameworkSignals = 2; // More specific detection
+              return version
+                ? { framework: 'aspnet-core', version, frameworkSignals }
+                : { framework: 'aspnet-core', frameworkSignals };
+            }
+
+            return version
+              ? { framework: 'dotnet-core', version, frameworkSignals }
+              : { framework: 'dotnet-core', frameworkSignals };
+          }
+        } catch {
+          // Continue to next file if reading fails
+        }
+      }
+    } catch {
+      // Fall through to generic detection
     }
   }
 
-  return undefined;
+  // Check for framework-specific files
+  for (const [framework, signature] of Object.entries(FRAMEWORK_SIGNATURES)) {
+    const matchingFiles = signature.files?.filter((f) => files.includes(f)) ?? [];
+    if (matchingFiles.length > 0) {
+      frameworkSignals = matchingFiles.length;
+      return { framework, frameworkSignals };
+    }
+  }
+
+  return { frameworkSignals: 0 };
 }
 
 /**
- * Detect build system
+ * Detects build system by scanning for configuration files.
+ * Provides build and test commands for downstream tools.
  */
 async function detectBuildSystem(repoPath: string): Promise<
   | {
@@ -269,6 +465,7 @@ async function detectBuildSystem(repoPath: string): Promise<
       file: string;
       buildCmd: string;
       testCmd?: string;
+      buildSystemSignals: number;
     }
   | undefined
 > {
@@ -281,6 +478,7 @@ async function detectBuildSystem(repoPath: string): Promise<
         file: config.file,
         buildCmd: config.buildCmd,
         testCmd: config.testCmd,
+        buildSystemSignals: 1,
       };
     }
   }
@@ -289,7 +487,8 @@ async function detectBuildSystem(repoPath: string): Promise<
 }
 
 /**
- * Analyze dependencies
+ * Analyzes project dependencies by parsing package managers.
+ * Currently supports Node.js ecosystem; extensible for other languages.
  */
 async function analyzeDependencies(
   repoPath: string,
@@ -319,7 +518,8 @@ async function analyzeDependencies(
 }
 
 /**
- * Detect exposed ports
+ * Detects application ports using language/framework defaults.
+ * Trade-off: Static mapping over dynamic analysis for reliability.
  */
 async function detectPorts(language: string): Promise<number[]> {
   const ports: Set<number> = new Set();
@@ -336,7 +536,8 @@ async function detectPorts(language: string): Promise<number[]> {
 }
 
 /**
- * Check for Docker files
+ * Scans for existing containerization files.
+ * Used to inform recommendation strategy and avoid conflicts.
  */
 async function checkDockerFiles(repoPath: string): Promise<{
   hasDockerfile: boolean;
@@ -354,7 +555,9 @@ async function checkDockerFiles(repoPath: string): Promise<{
 }
 
 /**
- * Get security recommendations
+ * Generates security recommendations based on dependency analysis.
+ *
+ * Trade-off: Static analysis over runtime scanning for faster execution
  */
 function getSecurityRecommendations(
   dependencies: Array<{ name: string; version?: string; type: string }>,
@@ -383,7 +586,8 @@ function getSecurityRecommendations(
 }
 
 /**
- * Repository analysis implementation - direct execution with selective progress
+ * Analyzes repository structure and generates containerization recommendations.
+ * Combines static analysis with optional AI enhancement for comprehensive insights.
  */
 async function analyzeRepoImpl(
   params: AnalyzeRepoParams,
@@ -396,12 +600,12 @@ async function analyzeRepoImpl(
 
   // Optional progress reporting for complex operations
   const progress = context.progress ? createStandardProgress(context.progress) : undefined;
-  const logger = context.logger || createLogger({ name: 'analyze-repo' });
-  const timer = createTimer(logger, 'analyze-repo');
+  const logger = getToolLogger(context, 'analyze-repo');
+  const timer = createToolTimer(logger, 'analyze-repo');
 
   try {
-    const { repoPath: rawRepoPath = process.cwd(), depth = 3, includeTests = false } = params;
-    const repoPath = safeNormalizePath(rawRepoPath);
+    const { path: rawPath = process.cwd(), depth = 3, includeTests = false } = params;
+    const repoPath = safeNormalizePath(rawPath);
 
     logger.info({ repoPath, depth, includeTests }, 'Starting repository analysis');
 
@@ -420,7 +624,7 @@ async function analyzeRepoImpl(
       return Failure(sessionResult.error);
     }
 
-    const { id: sessionId, state: session } = sessionResult.value;
+    const { id: sessionId, state: _session } = sessionResult.value;
     const slice = useSessionSlice('analyze-repo', io, context, StateSchema);
 
     if (!slice) {
@@ -432,7 +636,6 @@ async function analyzeRepoImpl(
     // Record input in session slice
     await slice.patch(sessionId, { input: params });
 
-    // Repository analysis discovers language, framework, and configuration patterns
     if (progress) await progress('EXECUTING');
 
     // AI enhancement available through context
@@ -444,7 +647,11 @@ async function analyzeRepoImpl(
 
     // Perform analysis
     const languageInfo = await detectLanguage(repoPath);
-    const frameworkInfo = await detectFramework(repoPath, languageInfo.language);
+    const frameworkInfo = await detectFramework(
+      repoPath,
+      languageInfo.language,
+      languageInfo.allFiles,
+    );
     const buildSystemRaw = await detectBuildSystem(repoPath);
     const dependencies = await analyzeDependencies(repoPath, languageInfo.language);
     const ports = await detectPorts(languageInfo.language);
@@ -537,8 +744,14 @@ async function analyzeRepoImpl(
       logger.debug('No AI context available, using basic analysis');
     }
 
-    // Build recommendations
-    const baseImage = getRecommendedBaseImage(languageInfo.language);
+    // Build recommendations with framework context
+    const baseImageOptions = {
+      language: languageInfo.language,
+      preference: 'balanced' as const,
+      ...(frameworkInfo?.framework && { framework: frameworkInfo.framework }),
+    };
+    const baseImageRecommendations = getBaseImageRecommendations(baseImageOptions);
+    const baseImage = baseImageRecommendations.primary;
     const securityNotes = getSecurityRecommendations(dependencies);
 
     // Transform build system
@@ -551,10 +764,28 @@ async function analyzeRepoImpl(
         }
       : undefined;
 
+    // Calculate confidence score and detection method
+    const detectionDetails: DetectionDetails = {
+      signatureMatches: languageInfo.detectionDetails.signatureMatches,
+      extensionMatches: languageInfo.detectionDetails.extensionMatches,
+      frameworkSignals: frameworkInfo?.frameworkSignals ?? 0,
+      buildSystemSignals: buildSystemRaw?.buildSystemSignals ?? 0,
+    };
+
+    const { confidence, method } = calculateConfidence(
+      languageInfo.language,
+      frameworkInfo?.framework,
+      buildSystem,
+      detectionDetails,
+    );
+
     const result: AnalyzeRepoResult = {
       ok: true,
       sessionId,
       language: languageInfo.language,
+      confidence,
+      detectionMethod: method,
+      detectionDetails,
       ...(languageInfo.version !== undefined && { languageVersion: languageInfo.version }),
       ...(frameworkInfo?.framework !== undefined && { framework: frameworkInfo.framework }),
       ...(frameworkInfo?.version !== undefined && { frameworkVersion: frameworkInfo.version }),
@@ -570,11 +801,24 @@ async function analyzeRepoImpl(
         securityNotes,
       },
       metadata: {
-        repoPath,
+        path: repoPath,
         depth,
         includeTests,
         timestamp: Date.now(),
         ...(aiInsights !== undefined && { aiInsights }),
+        ...(languageInfo.allFiles && {
+          projectFiles: languageInfo.allFiles.filter(
+            (f) =>
+              f.endsWith('.csproj') ||
+              f.endsWith('.sln') ||
+              f === 'package.json' ||
+              f === 'pom.xml' ||
+              f === 'build.gradle' ||
+              f === 'go.mod' ||
+              f === 'Cargo.toml' ||
+              f === 'requirements.txt',
+          ),
+        }),
       },
     };
 
@@ -590,56 +834,6 @@ async function analyzeRepoImpl(
       },
     });
 
-    // Update session metadata for backward compatibility
-    const sessionManager = context.sessionManager;
-    if (sessionManager) {
-      try {
-        await sessionManager.update(sessionId, {
-          metadata: {
-            ...session.metadata,
-            analysis_result: {
-              language: languageInfo.language,
-              ...(languageInfo.version && { language_version: languageInfo.version }),
-              ...(frameworkInfo?.framework && { framework: frameworkInfo.framework }),
-              ...(frameworkInfo?.version && { framework_version: frameworkInfo.version }),
-              ...(buildSystem && {
-                build_system: {
-                  type: buildSystem.type,
-                  build_file: buildSystem.file,
-                  ...(buildSystem.buildCommand && { build_command: buildSystem.buildCommand }),
-                },
-              }),
-              dependencies: dependencies.map((d) => ({
-                name: d.name,
-                ...(d.version && { version: d.version }),
-                type:
-                  d.type === 'production'
-                    ? ('runtime' as const)
-                    : d.type === 'development'
-                      ? ('dev' as const)
-                      : ('test' as const),
-              })),
-              has_tests: dependencies.some((dep) => dep.type === 'test'),
-              ports,
-              docker_compose_exists: dockerInfo.hasDockerCompose,
-              recommendations: {
-                baseImage,
-                buildStrategy: buildSystem ? 'multi-stage' : 'single-stage',
-                securityNotes,
-              },
-            },
-          },
-          repo_path: repoPath,
-          completed_steps: [...(session?.completed_steps ?? []), 'analyze-repo'],
-        });
-      } catch (error) {
-        logger.warn(
-          { error: extractErrorMessage(error) },
-          'Failed to update session with analysis result',
-        );
-      }
-    }
-
     // Progress: Finalizing results
     if (progress) await progress('FINALIZING');
 
@@ -649,16 +843,7 @@ async function analyzeRepoImpl(
     // Progress: Complete
     if (progress) await progress('COMPLETE');
 
-    const sessionContext = {
-      completed_steps: session.completed_steps || [],
-      analysis_result: result,
-    };
-    const enrichedResult = {
-      ...result,
-      NextStep: getSuccessProgression(TOOL_NAMES.ANALYZE_REPO, sessionContext).summary,
-    };
-
-    return Success(enrichedResult);
+    return Success(result);
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Repository analysis failed');
@@ -668,6 +853,7 @@ async function analyzeRepoImpl(
 }
 
 /**
- * Analyze repository tool with selective progress reporting
+ * Main entry point for repository analysis tool.
+ * Provides comprehensive project analysis for containerization planning.
  */
 export const analyzeRepo = analyzeRepoImpl;

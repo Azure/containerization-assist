@@ -109,7 +109,7 @@ export interface TestServerHelper {
   getContainer(): TestContainer;
   startServer(): Promise<any>;
   stopServer(): Promise<void>;
-  getStatus(): { running: boolean; tools?: number; resources?: number; prompts?: number; workflows?: number;[key: string]: any };
+  getStatus(): { running: boolean; tools?: number; resources?: number; prompts?: number;[key: string]: any };
   registerTestTool(name: string, description: string): void;
   registerTestPrompt(name: string, content: string): void;
   getTools(): Array<{ name: string; description: string }>;
@@ -164,17 +164,7 @@ export function createTestServer(overrides?: TestServiceBindings): TestServerHel
             tools: {},
             prompts: {},
             resources: {}
-          },
-          getWorkflows: () => [
-            {
-              name: 'start_workflow',
-              description: 'Start a complete containerization workflow',
-            },
-            {
-              name: 'workflow_status',
-              description: 'Get the status of a running workflow',
-            },
-          ]
+          }
         };
         running = true;
       }
@@ -200,7 +190,6 @@ export function createTestServer(overrides?: TestServiceBindings): TestServerHel
         tools: tools.length,
         resources: resources.size,
         prompts: prompts.size,
-        workflows: 2,
         server,
         capabilities: server?.capabilities || {}
       };

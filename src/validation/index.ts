@@ -1,32 +1,25 @@
 /**
- * Validation module exports
+ * Validation module exports - Functional API with Result<T> pattern
  */
 
 export * from './core-types';
-export { DockerfileValidator } from './dockerfile-validator';
+export * from './pipeline';
+export {
+  validateDockerfileContent,
+  getDockerfileRules,
+  getDockerfileRulesByCategory,
+  createDockerfileValidator,
+} from './dockerfile-validator';
+
 export {
   createKubernetesValidator,
   validateKubernetes as validateKubernetesManifests,
   type KubernetesValidatorInstance,
 } from './kubernetes-validator';
 
-// Simple validation functions
-export const validateDockerfile = (dockerfile: string): ValidationReport => {
-  const validator = new DockerfileValidator();
-  return validator.validate(dockerfile);
-};
+import { validateDockerfileContent } from './dockerfile-validator';
 
-export const validateKubernetes = (manifests: string): ValidationReport => {
-  const validator = createKubernetesValidator();
-  return validator.validate(manifests);
-};
-
-// Import types and classes for use in functions
-import type { ValidationReport, ValidationResult } from './core-types';
-import { DockerfileValidator } from './dockerfile-validator';
-import { createKubernetesValidator } from './kubernetes-validator';
-
-// Re-export commonly used types
+export const validateDockerfile = validateDockerfileContent;
 export type {
   ValidationResult,
   ValidationReport,
@@ -37,7 +30,9 @@ export type {
   KubernetesValidationRule,
 } from './core-types';
 
-// Convenience function to format validation reports as markdown
+import type { ValidationReport, ValidationResult } from './core-types';
+
+/** Formats validation reports as markdown for human consumption */
 export function formatValidationReport(report: ValidationReport): string {
   const lines: string[] = [
     '# Validation Report',
@@ -101,7 +96,7 @@ export function formatValidationReport(report: ValidationReport): string {
   return lines.join('\n');
 }
 
-// Convenience function for quick validation summary
+/** Returns human-readable validation status with score and issue counts */
 export function getValidationSummary(report: ValidationReport): string {
   if (report.score >= 90) {
     return `✅ Excellent! Score: ${report.score}/100 (${report.grade})`;

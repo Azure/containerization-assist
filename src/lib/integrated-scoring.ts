@@ -6,16 +6,16 @@
 
 import type { Logger } from 'pino';
 import type { ToolContext } from '@mcp/context';
-import { Result, Success, Failure } from '../types';
-import { ConfigurationManager } from './sampling-config';
+import { Result, Success, Failure } from '@types';
+import { createConfigurationManager, type ConfigurationManagerInterface } from './sampling-config';
 import { createConfigScoringEngine } from './config-scoring-engine';
 import { createStrategyResolver, type StrategyContext } from './strategy-resolver';
-import type { AIGenerateOptions } from '../mcp/tool-ai-generation';
+import type { AIGenerateOptions } from '@mcp/tool-ai-generation';
 import type { SamplingCandidate } from '@lib/sampling';
 import { extractErrorMessage } from './error-utils';
 
 // Global instances (initialized lazily)
-let configManager: ConfigurationManager | null = null;
+let configManager: ConfigurationManagerInterface | null = null;
 let scoringEngine: ReturnType<typeof createConfigScoringEngine> | null = null;
 let strategyResolver: ReturnType<typeof createStrategyResolver> | null = null;
 let isConfigLoaded = false;
@@ -26,7 +26,7 @@ let isConfigLoaded = false;
 export async function initializeConfigSystem(configPath?: string): Promise<Result<void>> {
   try {
     // Initialize configuration manager
-    configManager = new ConfigurationManager(configPath);
+    configManager = createConfigurationManager(configPath);
 
     // Load configuration
     const loadResult = await configManager.loadConfiguration();

@@ -1,6 +1,6 @@
 import { createLogger } from '@lib/logger';
-import { getKnowledgeForCategory, getKnowledgeRecommendations } from '../knowledge';
-import type { KnowledgeQuery } from '../knowledge/types';
+import { getKnowledgeForCategory, getKnowledgeRecommendations } from '@knowledge/index';
+import type { KnowledgeQuery, KnowledgeMatch } from '@knowledge/types';
 
 const logger = createLogger().child({ module: 'knowledge-enhancer' });
 
@@ -73,6 +73,12 @@ export async function enhancePromptWithKnowledge(
       // Extract relevant text based on category
       if (category === 'dockerfile' && context.dockerfileContent) {
         text = context.dockerfileContent;
+      } else if (category === 'dockerfile' && context.operation === 'generate_dockerfile') {
+        // For generation, use language and framework as matching context for knowledge patterns
+        const contextParts = [];
+        if (context.language) contextParts.push(context.language);
+        if (context.framework) contextParts.push(context.framework);
+        text = contextParts.join(' ');
       } else if (category === 'kubernetes' && context.k8sContent) {
         text = context.k8sContent;
       } else if (context.baseImage) {
@@ -173,7 +179,7 @@ export async function getBaseImageKnowledge(
     };
 
     const matches = await getKnowledgeRecommendations(query);
-    return matches.map((m) => m.entry.recommendation);
+    return matches.map((m: KnowledgeMatch) => m.entry.recommendation);
   } catch (error) {
     logger.warn({ error }, 'Failed to get base image knowledge');
     return [];
@@ -194,7 +200,7 @@ export async function getSecurityKnowledge(
     };
 
     const matches = await getKnowledgeRecommendations(query);
-    return matches.map((m) => ({
+    return matches.map((m: KnowledgeMatch) => ({
       recommendation: m.entry.recommendation,
       severity: m.entry.severity || 'medium',
     }));

@@ -146,3 +146,41 @@ export function weightedAverage(
 
   return weightedSum / totalWeight;
 }
+
+/**
+ * Checks if an array is null, undefined, or empty.
+ * Consolidates the pattern: !arr || arr.length === 0
+ */
+export function isEmptyArray<T>(arr: T[] | null | undefined): boolean {
+  return !arr || arr.length === 0;
+}
+
+/**
+ * Checks if a value is null or undefined.
+ * Type guard for narrowing types.
+ */
+export function isNullOrUndefined(value: unknown): value is null | undefined {
+  return value === null || value === undefined;
+}
+
+/**
+ * Ensures a string value is not empty, throwing if it is.
+ * Consolidates validation + throw pattern.
+ */
+export function requireNonEmptyString(value: string | null | undefined, fieldName: string): string {
+  if (isEmptyString(value)) {
+    throw new Error(`${fieldName} cannot be empty`);
+  }
+  return value as string;
+}
+
+/**
+ * Ensures an array is not empty, throwing if it is.
+ * Consolidates array validation + throw pattern.
+ */
+export function requireNonEmptyArray<T>(arr: T[] | null | undefined, fieldName: string): T[] {
+  if (isEmptyArray(arr)) {
+    throw new Error(`${fieldName} cannot be empty`);
+  }
+  return arr as T[];
+}

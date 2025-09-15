@@ -5,8 +5,7 @@
 
 import { jest } from '@jest/globals';
 import { promises as fs } from 'node:fs';
-import { buildImage, type BuildImageConfig } from '../../../src/tools/build-image/tool';
-import { ensureSession } from '../../../src/mcp/tool-session-helpers';
+import { createToolSessionHelpersMock } from '../../__support__/mocks/tool-session-helpers.mock';
 
 // Result Type Helpers for Testing
 function createSuccessResult<T>(value: T) {
@@ -93,16 +92,11 @@ jest.mock('../../../src/lib/logger', () => ({
 }));
 
 // Mock the session helpers
-jest.mock('../../../src/mcp/tool-session-helpers', () => ({
-  ensureSession: jest.fn(),
-  useSessionSlice: jest.fn().mockReturnValue({
-    get: jest.fn(),
-    set: jest.fn(),
-    patch: jest.fn().mockResolvedValue(undefined),
-    clear: jest.fn(),
-  }),
-  defineToolIO: jest.fn((input, output) => ({ input, output })),
-}));
+jest.mock('../../../src/mcp/tool-session-helpers', () => createToolSessionHelpersMock());
+
+// Import these after mocks are set up
+import { buildImage, type BuildImageConfig } from '../../../src/tools/build-image/tool';
+import { ensureSession } from '../../../src/mcp/tool-session-helpers';
 
 const mockFs = fs as jest.Mocked<typeof fs>;
 
@@ -123,8 +117,9 @@ CMD ["node", "index.js"]`;
     mockLogger = createMockLogger();
     config = {
       sessionId: 'test-session-123',
-      context: '.',
+      path: '.',
       dockerfile: 'Dockerfile',
+      imageName: 'test-app:latest',
       tags: ['myapp:latest', 'myapp:v1.0'],
       buildArgs: {},
       noCache: false,
@@ -140,16 +135,19 @@ CMD ["node", "index.js"]`;
       value: {
         id: 'test-session-123',
         state: {
-          workflow_state: {
-            analysis_result: {
+          workflow_state: {},
+          results: {
+            'analyze_repo': {
               language: 'javascript',
               framework: 'express',
             },
           },
           repo_path: '/test/repo',
-          dockerfile_result: {
-            path: '/test/repo/Dockerfile',
-            content: mockDockerfile,
+          results: {
+            'generate-dockerfile': {
+              path: '/test/repo/Dockerfile',
+              content: mockDockerfile,
+            },
           },
         },
       },
@@ -180,21 +178,18 @@ CMD ["node", "index.js"]`;
         value: {
           id: 'test-session-123',
           state: {
-            workflow_state: {
-              analysis_result: {
+            workflow_state: {},
+            results: {
+              'analyze_repo': {
                 language: 'javascript',
                 framework: 'express',
               },
-            },
-            analysis_result: {
-              language: 'javascript',
-              framework: 'express',
+              'generate-dockerfile': {
+                path: '/test/repo/Dockerfile',
+                content: mockDockerfile,
+              },
             },
             repo_path: '/test/repo',
-            dockerfile_result: {
-              path: '/test/repo/Dockerfile',
-              content: mockDockerfile,
-            },
           },
         },
       });
@@ -207,9 +202,11 @@ CMD ["node", "index.js"]`;
           },
         },
         repo_path: '/test/repo',
-        dockerfile_result: {
-          path: '/test/repo/Dockerfile',
-          content: mockDockerfile,
+        results: {
+          'generate-dockerfile': {
+            path: '/test/repo/Dockerfile',
+            content: mockDockerfile,
+          },
         },
       });
     });
@@ -276,21 +273,13 @@ CMD ["node", "index.js"]`;
       const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
+      // With the new session slice utils, the update happens in toolSlices
       expect(mockSessionManager.update).toHaveBeenCalledWith('test-session-123', expect.objectContaining({
         metadata: expect.objectContaining({
-          build_result: {
-            success: true,
-            imageId: 'sha256:mock-image-id',
-            tags: ['myapp:latest', 'myapp:v1.0'],
-            size: 123456789,
-            metadata: expect.objectContaining({
-              layers: 8,
-              buildTime: expect.any(Number),
-              logs: expect.arrayContaining(['Successfully built mock-image-id']),
-            }),
-          },
+          toolSlices: expect.objectContaining({
+            'build-image': expect.any(Object),
+          }),
         }),
-        completed_steps: expect.arrayContaining(['build-image']),
       }));
     });
   });
@@ -298,14 +287,15 @@ CMD ["node", "index.js"]`;
   describe('Dockerfile Resolution', () => {
     it('should use generated Dockerfile when original not found', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: { language: 'javascript' },
+        workflow_state: {},
+        results: {
+          'analyze_repo': { language: 'javascript' },
+          'generate-dockerfile': {
+            path: '/test/repo/Dockerfile',
+            content: mockDockerfile,
+          },
         },
         repo_path: '/test/repo',
-        dockerfile_result: {
-          path: '/test/repo/Dockerfile',
-          content: mockDockerfile,
-        },
       });
 
       // Mock original Dockerfile not found, but generated one exists
@@ -318,7 +308,7 @@ CMD ["node", "index.js"]`;
       expect(result.ok).toBe(true);
       expect(mockDockerClient.buildImage).toHaveBeenCalledWith(
         expect.objectContaining({
-          context: '/test/repo',
+          context: '.',
           dockerfile: 'Dockerfile',
         })
       );
@@ -326,13 +316,14 @@ CMD ["node", "index.js"]`;
 
     it('should create Dockerfile from session content when none exists', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: { language: 'javascript' },
+        workflow_state: {},
+        results: {
+          'analyze_repo': { language: 'javascript' },
+          'generate-dockerfile': {
+            content: mockDockerfile,
+          },
         },
         repo_path: '/test/repo',
-        dockerfile_result: {
-          content: mockDockerfile,
-        },
       });
 
       // Mock both original and generated Dockerfiles not found
@@ -342,13 +333,13 @@ CMD ["node", "index.js"]`;
 
       expect(result.ok).toBe(true);
       expect(mockFs.writeFile).toHaveBeenCalledWith(
-        '/test/repo/Dockerfile',
+        'Dockerfile',
         mockDockerfile,
         'utf-8'
       );
       expect(mockDockerClient.buildImage).toHaveBeenCalledWith(
         expect.objectContaining({
-          context: '/test/repo',
+          context: '.',
           dockerfile: 'Dockerfile',
         })
       );
@@ -358,14 +349,15 @@ CMD ["node", "index.js"]`;
   describe('Security Analysis', () => {
     it('should detect security warnings in build args', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: { language: 'javascript' },
+        workflow_state: {},
+        results: {
+          'analyze_repo': { language: 'javascript' },
+          'generate-dockerfile': {
+            path: '/test/repo/Dockerfile',
+            content: mockDockerfile,
+          },
         },
         repo_path: '/test/repo',
-        dockerfile_result: {
-          path: '/test/repo/Dockerfile',
-          content: mockDockerfile,
-        },
       });
 
       config.buildArgs = {
@@ -392,14 +384,15 @@ RUN sudo apt-get update
 USER appuser`;
 
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: { language: 'javascript' },
+        workflow_state: {},
+        results: {
+          'analyze_repo': { language: 'javascript' },
+          'generate-dockerfile': {
+            path: '/test/repo/Dockerfile',
+            content: dockerfileWithSudo,
+          },
         },
         repo_path: '/test/repo',
-        dockerfile_result: {
-          path: '/test/repo/Dockerfile',
-          content: dockerfileWithSudo,
-        },
       });
 
       mockFs.readFile.mockResolvedValue(dockerfileWithSudo);
@@ -420,14 +413,15 @@ WORKDIR /app
 USER appuser`;
 
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: { language: 'javascript' },
+        workflow_state: {},
+        results: {
+          'analyze_repo': { language: 'javascript' },
+          'generate-dockerfile': {
+            path: '/test/repo/Dockerfile',
+            content: dockerfileWithLatest,
+          },
         },
         repo_path: '/test/repo',
-        dockerfile_result: {
-          path: '/test/repo/Dockerfile',
-          content: dockerfileWithLatest,
-        },
       });
 
       mockFs.readFile.mockResolvedValue(dockerfileWithLatest);
@@ -449,14 +443,15 @@ COPY . .
 CMD ["node", "index.js"]`;
 
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: { language: 'javascript' },
+        workflow_state: {},
+        results: {
+          'analyze_repo': { language: 'javascript' },
+          'generate-dockerfile': {
+            path: '/test/repo/Dockerfile',
+            content: dockerfileWithoutUser,
+          },
         },
         repo_path: '/test/repo',
-        dockerfile_result: {
-          path: '/test/repo/Dockerfile',
-          content: dockerfileWithoutUser,
-        },
       });
 
       mockFs.readFile.mockResolvedValue(dockerfileWithoutUser);
@@ -479,14 +474,15 @@ USER root
 CMD ["node", "index.js"]`;
 
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: { language: 'javascript' },
+        workflow_state: {},
+        results: {
+          'analyze_repo': { language: 'javascript' },
+          'generate-dockerfile': {
+            path: '/test/repo/Dockerfile',
+            content: dockerfileWithRootUser,
+          },
         },
         repo_path: '/test/repo',
-        dockerfile_result: {
-          path: '/test/repo/Dockerfile',
-          content: dockerfileWithRootUser,
-        },
       });
 
       mockFs.readFile.mockResolvedValue(dockerfileWithRootUser);
@@ -517,9 +513,11 @@ CMD ["node", "index.js"]`;
             errors: {},
             current_step: null,
             repo_path: '/test/repo',
-            dockerfile_result: {
-              path: '/test/repo/Dockerfile',
-              content: mockDockerfile,
+            results: {
+              'generate-dockerfile': {
+                path: '/test/repo/Dockerfile',
+                content: mockDockerfile,
+              },
             },
           },
           isNew: true, // Indicates session was newly created
@@ -560,7 +558,9 @@ CMD ["node", "index.js"]`;
               analysis_result: { language: 'javascript' },
             },
             repo_path: '/test/repo',
-            dockerfile_result: {},
+            results: {
+              'generate-dockerfile': {},
+            },
           },
         },
       });
@@ -577,14 +577,15 @@ CMD ["node", "index.js"]`;
 
     it('should return error when Docker build fails', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: { language: 'javascript' },
+        workflow_state: {},
+        results: {
+          'analyze_repo': { language: 'javascript' },
+          'generate-dockerfile': {
+            path: '/test/repo/Dockerfile',
+            content: mockDockerfile,
+          },
         },
         repo_path: '/test/repo',
-        dockerfile_result: {
-          path: '/test/repo/Dockerfile',
-          content: mockDockerfile,
-        },
       });
 
       mockDockerClient.buildImage.mockResolvedValue(
@@ -610,9 +611,11 @@ CMD ["node", "index.js"]`;
               analysis_result: { language: 'javascript' },
             },
             repo_path: '/test/repo',
-            dockerfile_result: {
-              path: '/test/repo/Dockerfile',
-              content: mockDockerfile,
+            results: {
+              'generate-dockerfile': {
+                path: '/test/repo/Dockerfile',
+                content: mockDockerfile,
+              },
             },
           },
         },
@@ -640,9 +643,11 @@ CMD ["node", "index.js"]`;
               analysis_result: { language: 'javascript' },
             },
             repo_path: '/test/repo',
-            dockerfile_result: {
-              path: '/test/repo/Dockerfile',
-              content: mockDockerfile,
+            results: {
+              'generate-dockerfile': {
+                path: '/test/repo/Dockerfile',
+                content: mockDockerfile,
+              },
             },
           },
         },
@@ -670,21 +675,18 @@ CMD ["node", "index.js"]`;
         value: {
           id: 'test-session-123',
           state: {
-            analysis_result: {
-              language: 'python',
-              framework: 'flask',
-            },
-            workflow_state: {
-              analysis_result: {
+            workflow_state: {},
+            results: {
+              'analyze_repo': {
                 language: 'python',
                 framework: 'flask',
               },
+              'generate-dockerfile': {
+                path: '/test/repo/Dockerfile',
+                content: mockDockerfile,
+              },
             },
             repo_path: '/test/repo',
-            dockerfile_result: {
-              path: '/test/repo/Dockerfile',
-              content: mockDockerfile,
-            },
           },
         },
       });
@@ -748,9 +750,11 @@ CMD ["node", "index.js"]`;
           state: {
             workflow_state: {},
             repo_path: '/test/repo',
-            dockerfile_result: {
-              path: '/test/repo/Dockerfile',
-              content: mockDockerfile,
+            results: {
+              'generate-dockerfile': {
+                path: '/test/repo/Dockerfile',
+                content: mockDockerfile,
+              },
             },
           },
         },
@@ -758,11 +762,13 @@ CMD ["node", "index.js"]`;
 
       mockSessionManager.get.mockResolvedValue({
         workflow_state: {},
-        repo_path: '/test/repo',
-        dockerfile_result: {
-          path: '/test/repo/Dockerfile',
-          content: mockDockerfile,
+        results: {
+          'generate-dockerfile': {
+            path: '/test/repo/Dockerfile',
+            content: mockDockerfile,
+          },
         },
+        repo_path: '/test/repo',
       });
 
       const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
@@ -795,14 +801,15 @@ CMD ["node", "index.js"]`;
       process.env.NODE_ENV = 'staging';
 
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: { language: 'javascript' },
+        workflow_state: {},
+        results: {
+          'analyze_repo': { language: 'javascript' },
+          'generate-dockerfile': {
+            path: '/test/repo/Dockerfile',
+            content: mockDockerfile,
+          },
         },
         repo_path: '/test/repo',
-        dockerfile_result: {
-          path: '/test/repo/Dockerfile',
-          content: mockDockerfile,
-        },
       });
 
       const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
@@ -825,14 +832,15 @@ CMD ["node", "index.js"]`;
       process.env.GIT_COMMIT = 'abc123def456';
 
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: { language: 'javascript' },
+        workflow_state: {},
+        results: {
+          'analyze_repo': { language: 'javascript' },
+          'generate-dockerfile': {
+            path: '/test/repo/Dockerfile',
+            content: mockDockerfile,
+          },
         },
         repo_path: '/test/repo',
-        dockerfile_result: {
-          path: '/test/repo/Dockerfile',
-          content: mockDockerfile,
-        },
       });
 
       const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });

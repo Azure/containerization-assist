@@ -20,12 +20,13 @@
  */
 
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
-import { extractErrorMessage } from '../../lib/error-utils';
-import type { ToolContext } from '../../mcp/context';
-import { createTimer, createLogger, type Logger } from '../../lib/logger';
-import { getRecommendedBaseImage } from '../../lib/base-images';
+import { initializeToolInstrumentation } from '@lib/tool-helpers';
+import { extractErrorMessage } from '@lib/error-utils';
+import type { ToolContext } from '@mcp/context';
+import type { Logger } from '@lib/logger';
+import { getRecommendedBaseImage } from '@lib/base-images';
 import { scoreConfigCandidates } from '@lib/integrated-scoring';
-import { getKnowledgeForCategory } from '../../knowledge';
+import { getKnowledgeForCategory } from '@knowledge/index';
 import { resolveBaseImagesSchema, type ResolveBaseImagesParams } from './schema';
 import { z } from 'zod';
 
@@ -72,7 +73,7 @@ async function getBaseImageKnowledge(
     const compatibilityWarnings: string[] = [];
 
     // Process dockerfile knowledge
-    dockerfileKnowledge.forEach((match) => {
+    dockerfileKnowledge.forEach((match: any) => {
       if (match.entry.tags?.includes('base-image')) {
         recommendations.push(match.entry.recommendation);
       }
@@ -85,7 +86,7 @@ async function getBaseImageKnowledge(
     });
 
     // Process security knowledge
-    securityKnowledge.forEach((match) => {
+    securityKnowledge.forEach((match: any) => {
       if (match.entry.severity === 'high' || match.entry.tags?.includes('base-image')) {
         securityNotes.push(match.entry.recommendation);
       }
@@ -162,9 +163,7 @@ async function getImageMetadata(
     lastUpdated: new Date().toISOString(),
   };
 }
-import { Success, Failure, type Result } from '../../types';
-import { getSuccessProgression, type SessionContext } from '../../workflows/workflow-progression';
-import { TOOL_NAMES } from '../../exports/tool-names.js';
+import { Success, Failure, type Result } from '@types';
 
 // Define the result schema for type safety
 const BaseImageRecommendationSchema = z.object({
@@ -246,8 +245,7 @@ async function resolveBaseImagesImpl(
   if (!params || typeof params !== 'object') {
     return Failure('Invalid parameters provided');
   }
-  const logger = context.logger || createLogger({ name: 'resolve-base-images' });
-  const timer = createTimer(logger, 'resolve-base-images');
+  const { logger, timer } = initializeToolInstrumentation(context, 'resolve-base-images');
 
   try {
     const { technology, requirements = {} } = params;
@@ -280,11 +278,9 @@ async function resolveBaseImagesImpl(
     await slice.patch(sessionId, { input: params });
 
     // Get analysis result from session or use provided technology
-    const sessionState = session as
-      | { analysis_result?: { language?: string; framework?: string } }
-      | null
+    const analysisResult = session?.results?.['analyze_repo'] as
+      | { language?: string; framework?: string }
       | undefined;
-    const analysisResult = sessionState?.analysis_result;
 
     // Use provided technology or fall back to session analysis
     const language = technology || analysisResult?.language;
@@ -435,41 +431,16 @@ async function resolveBaseImagesImpl(
       },
     });
 
-    // Update session metadata for backward compatibility
-    const sessionManager = context.sessionManager;
-    if (sessionManager) {
-      try {
-        await sessionManager.update(sessionId, {
-          metadata: {
-            ...session.metadata,
-            base_image_recommendation: recommendation,
-          },
-          completed_steps: [...(session.completed_steps || []), 'resolve-base-images'],
-        });
-      } catch (error) {
-        logger.warn(
-          { error: extractErrorMessage(error) },
-          'Failed to update session, but resolution succeeded',
-        );
-      }
-    }
-
     timer.end({ primaryImage, sessionId, technology: language });
     logger.info(
       { sessionId, primaryImage, technology: language },
       'Base image resolution completed',
     );
 
-    // Add chain hint to the recommendation
+    // Add sessionId to the recommendation
     const enrichedRecommendation = {
       ...recommendation,
       sessionId,
-      NextStep: getSuccessProgression(TOOL_NAMES.RESOLVE_BASE_IMAGES, {
-        completed_steps: session.completed_steps || [],
-        ...((session as SessionContext).analysis_result && {
-          analysis_result: (session as SessionContext).analysis_result,
-        }),
-      }),
     };
 
     return Success(enrichedRecommendation);

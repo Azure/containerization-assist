@@ -2,9 +2,9 @@
  * Simplified knowledge enhancer for AI prompts
  */
 import { createLogger } from '@lib/logger';
-import { getEntriesByCategoryEnhanced } from '../knowledge/enhanced-loader';
-import { scoreEntry, rankMatches } from '../knowledge/simple-scoring';
-import type { KnowledgeMatch } from '../knowledge/types';
+import { getEntriesByCategoryEnhanced } from '@/knowledge/enhanced-loader';
+import { scoreEntry, rankMatches } from '@/knowledge/simple-scoring';
+import type { KnowledgeMatch } from '@/knowledge/types';
 
 const logger = createLogger().child({ module: 'knowledge-enhancer' });
 
@@ -66,12 +66,14 @@ export async function enhanceWithKnowledge(
     // Add knowledge to prompt args
     return {
       ...promptArgs,
-      knowledgeRecommendations: topMatches.map((m) => ({
+      knowledgeRecommendations: topMatches.map((m: KnowledgeMatch) => ({
         recommendation: m.entry.recommendation,
         example: m.entry.example,
         severity: m.entry.severity,
       })),
-      bestPractices: topMatches.filter((m) => m.score > 50).map((m) => m.entry.recommendation),
+      bestPractices: topMatches
+        .filter((m: KnowledgeMatch) => m.score > 50)
+        .map((m: KnowledgeMatch) => m.entry.recommendation),
     };
   } catch (error) {
     logger.warn({ error }, 'Failed to enhance with knowledge');

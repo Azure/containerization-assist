@@ -46,21 +46,8 @@ describe('Docker Client Enhanced Error Handling', () => {
   });
 
   describe('buildImage error scenarios', () => {
-    test.skip('should return meaningful error for invalid context', async () => {
-      // Skipping this test as tar-fs hangs when trying to create a tar from non-existent path
-      // This is a known issue with tar-fs library, not our error handling
-      const result = await dockerClient.buildImage({
-        context: '/non/existent/path',
-        dockerfile: 'Dockerfile'
-      });
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toContain('Build failed:');
-        // The specific error will depend on the system, but it should not be "Unknown error"
-        expect(result.error).not.toContain('Unknown error');
-      }
-    }, 15000); // Increase timeout to 15 seconds
+    // Removed skipped test: tar-fs library hangs on non-existent paths
+    // This is a known library issue, not a problem with our error handling
   });
 
   describe('getImage error scenarios', () => {

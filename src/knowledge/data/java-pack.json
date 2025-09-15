@@ -158,5 +158,35 @@
     "severity": "medium",
     "tags": ["micronaut", "aot", "optimization"],
     "description": "Micronaut's AOT compilation reduces startup time and memory usage"
+  },
+  {
+    "id": "maven-avoid-javac",
+    "category": "dockerfile",
+    "pattern": "java",
+    "recommendation": "NEVER use 'javac' or 'find . -name *.java' commands. For Java projects with pom.xml, always use Maven commands (mvn package)",
+    "example": "FROM maven:3.9-openjdk-17 AS build\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests",
+    "severity": "high",
+    "tags": ["java", "maven", "build", "compilation"],
+    "description": "Raw javac compilation cannot handle Maven dependencies, classpath, or framework packaging"
+  },
+  {
+    "id": "spring-boot-maven-build",
+    "category": "dockerfile",
+    "pattern": "spring.*maven|maven.*spring",
+    "recommendation": "Use proper Maven commands for Spring Boot projects with fat JAR packaging",
+    "example": "FROM maven:3.9-openjdk-17 AS build\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests\n\nFROM openjdk:17-jre-alpine\nCOPY --from=build /app/target/*.jar app.jar\nCMD [\"java\", \"-jar\", \"/app/app.jar\"]",
+    "severity": "high",
+    "tags": ["spring-boot", "maven", "build", "fat-jar"],
+    "description": "Spring Boot requires Maven packaging to create executable JAR with embedded dependencies"
+  },
+  {
+    "id": "java-build-system-detection",
+    "category": "dockerfile",
+    "pattern": "java",
+    "recommendation": "CRITICAL: Never use javac directly! Always use Maven (mvn) or Gradle commands for Java projects",
+    "example": "# Maven example\nFROM maven:3.9-openjdk-17 AS build\nCOPY pom.xml .\nCOPY src ./src\nRUN mvn clean package -DskipTests\n\n# Gradle example\nFROM gradle:7-jdk17 AS build\nCOPY build.gradle settings.gradle ./\nCOPY src ./src\nRUN gradle build --no-daemon",
+    "severity": "high",
+    "tags": ["java", "maven", "gradle", "build-system"],
+    "description": "Java projects require build tools to handle dependencies and packaging correctly"
   }
 ]

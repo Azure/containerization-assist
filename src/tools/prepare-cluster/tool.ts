@@ -22,23 +22,19 @@
  */
 
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
-import { extractErrorMessage } from '../../lib/error-utils';
-import type { ToolContext } from '../../mcp/context';
-import { createKubernetesClient } from '../../lib/kubernetes';
-import { createTimer, createLogger } from '../../lib/logger';
+import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
+import { extractErrorMessage } from '@lib/error-utils';
+import type { ToolContext } from '@mcp/context';
+import { createKubernetesClient } from '@lib/kubernetes';
+
 import type * as pino from 'pino';
-import { Success, Failure, type Result } from '../../types';
-import {
-  getSuccessProgression,
-  getFailureProgression,
-  formatFailureChainHint,
-} from '../../workflows/workflow-progression';
-import { TOOL_NAMES } from '../../exports/tool-names.js';
+import { Success, Failure, type Result } from '@types';
+import { TOOLS } from '@exports/tool-names';
 import { prepareClusterSchema, type PrepareClusterParams } from './schema';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { z } from 'zod';
-import type { SessionData } from '../session-types';
+import type { SessionData } from '@tools/session-types';
 
 const execAsync = promisify(exec);
 
@@ -405,8 +401,8 @@ async function prepareClusterImpl(
   params: PrepareClusterParams,
   context: ToolContext,
 ): Promise<Result<PrepareClusterResult>> {
-  const logger = context.logger || createLogger({ name: 'prepare-cluster' });
-  const timer = createTimer(logger, 'prepare-cluster');
+  const logger = getToolLogger(context, 'prepare-cluster');
+  const timer = createToolTimer(logger, 'prepare-cluster');
 
   try {
     const { environment = 'development', namespace = 'default' } = params;
@@ -575,7 +571,7 @@ async function prepareClusterImpl(
         lastClusterName: cluster,
         lastNamespace: namespace,
         totalPreparations:
-          (sessionData?.completed_steps || []).filter((s) => s === TOOL_NAMES.PREPARE_CLUSTER)
+          (sessionData?.completedSteps || []).filter((s: string) => s === TOOLS.PREPARE_CLUSTER)
             .length + 1,
         lastClusterReady: clusterReady,
         lastChecksPassed: Object.values(checks).filter(Boolean).length,
@@ -583,70 +579,19 @@ async function prepareClusterImpl(
       },
     });
 
-    // Update session metadata for backward compatibility
-    const sessionManager = context.sessionManager;
-    if (sessionManager) {
-      try {
-        await sessionManager.update(sessionId, {
-          metadata: {
-            ...session.metadata,
-            cluster_preparation: {
-              success: true,
-              cluster,
-              namespace,
-              clusterReady,
-              checks,
-              warnings,
-              environment,
-              ...(localRegistryUrl && { localRegistryUrl }),
-            },
-            cluster_result: {
-              cluster_name: cluster,
-              context: cluster,
-              kubernetes_version: '1.28',
-              namespaces_created: checks.namespaceExists ? [] : [namespace],
-            },
-          },
-          completed_steps: [...(session.completed_steps || []), TOOL_NAMES.PREPARE_CLUSTER],
-        });
-      } catch (error) {
-        logger.warn(
-          { error: (error as Error).message },
-          'Failed to update session, but preparation succeeded',
-        );
-      }
-    }
-
     timer.end({ clusterReady, sessionId, environment });
     logger.info(
       { sessionId, clusterReady, checks, namespace, environment },
       'Kubernetes cluster preparation completed',
     );
 
-    return Success({
-      ...result,
-      NextStep: getSuccessProgression(TOOL_NAMES.PREPARE_CLUSTER, {
-        completed_steps: session.completed_steps || [],
-        ...(sessionData?.analysis_result && {
-          analysis_result: sessionData.analysis_result,
-        }),
-      }),
-    });
+    return Success(result);
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Cluster preparation failed');
 
-    // Add failure chain hint
-    const sessionContext = { completed_steps: [] };
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const progression = getFailureProgression(
-      TOOL_NAMES.PREPARE_CLUSTER,
-      errorMessage,
-      sessionContext,
-    );
-    const chainHint = formatFailureChainHint(TOOL_NAMES.PREPARE_CLUSTER, progression);
-
-    return Failure(`${errorMessage}\n${chainHint}`);
+    return Failure(errorMessage);
   }
 }
 

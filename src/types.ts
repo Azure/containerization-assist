@@ -6,38 +6,13 @@
 import type { Logger } from 'pino';
 import type { ToolContext } from './mcp/context';
 import type { ZodRawShape } from 'zod';
+import type { Result } from './types/core';
 
 // Export enhanced category types
 export * from './types/categories';
 
-/**
- * Result type for functional error handling
- *
- * Provides explicit error handling without exceptions to ensure:
- * - Type-safe error propagation
- * - MCP protocol compatibility (no exception bubbling)
- * - Clean async chain composition
- *
- * @example
- * ```typescript
- * const result = await riskyOperation();
- * if (result.ok) {
- *   console.log(result.value);
- * } else {
- *   console.error(result.error);
- * }
- * ```
- */
-export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
-
-/** Create a success result */
-export const Success = <T>(value: T): Result<T> => ({ ok: true, value });
-
-/** Create a failure result */
-export const Failure = <T>(error: string): Result<T> => ({ ok: false, error });
-
-/** Type guard to check if result is a failure */
-export const isFail = <T>(result: Result<T>): result is { ok: false; error: string } => !result.ok;
+// Export consolidated core types
+export * from './types/core';
 
 export type { ToolContext } from './mcp/context';
 
@@ -67,21 +42,21 @@ export interface Tool {
   ) => Promise<Result<unknown>>;
 }
 
-// ===== SESSION & WORKFLOW =====
+// ===== SESSION =====
 
 /**
- * Represents the state of a workflow execution session.
+ * Represents the state of a tool execution session.
  */
 export interface WorkflowState {
   /** Unique session identifier */
   sessionId: string;
-  /** Currently executing workflow step */
+  /** Currently executing tool */
   currentStep?: string;
-  /** Overall workflow progress (0-100) */
+  /** Overall progress (0-100) */
   progress?: number;
-  /** Results from completed workflow steps */
+  /** Results from completed tools */
   results?: Record<string, unknown>;
-  /** Additional workflow metadata */
+  /** Additional metadata */
   metadata?: Record<string, unknown>;
   /** List of completed step names */
   completed_steps?: string[];

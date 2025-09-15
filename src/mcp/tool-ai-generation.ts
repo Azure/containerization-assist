@@ -7,8 +7,8 @@
 
 import type { Logger } from 'pino';
 import type { ToolContext, SamplingRequest, SamplingResponse } from '@mcp/context';
-import { Result, Success, Failure } from '../types';
-import { extractErrorMessage, formatErrorMessage } from '../lib/error-utils';
+import { Result, Success, Failure } from '@types';
+import { extractErrorMessage, formatErrorMessage } from '@lib/error-utils';
 
 /**
  * AI response with extracted content
@@ -160,7 +160,7 @@ export async function aiGenerate(
 
       const request: SamplingRequest = {
         messages: prompt.messages,
-        includeContext: 'thisServer',
+        includeContext: 'allServers', // Allow AI to use all available tools, not just this MCP server
         maxTokens,
       };
 

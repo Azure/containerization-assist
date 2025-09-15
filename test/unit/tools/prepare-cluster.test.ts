@@ -4,8 +4,7 @@
  */
 
 import { jest } from '@jest/globals';
-import { prepareCluster } from '../../../src/tools/prepare-cluster/tool';
-import type { PrepareClusterParams } from '../../../src/tools/prepare-cluster/schema';
+import { createToolSessionHelpersMock } from '../../__support__/mocks/tool-session-helpers.mock';
 
 // Result Type Helpers for Testing
 function createSuccessResult<T>(value: T) {
@@ -65,7 +64,11 @@ jest.mock('@lib/kubernetes', () => ({
 }));
 
 // Mock MCP helper modules
-jest.mock('@mcp/tool-session-helpers');
+jest.mock('../../../src/mcp/tool-session-helpers', () => createToolSessionHelpersMock());
+
+// Import these after mocks are set up
+import { prepareCluster } from '../../../src/tools/prepare-cluster/tool';
+import type { PrepareClusterParams } from '../../../src/tools/prepare-cluster/schema';
 
 // wrapTool mock removed - tool now uses direct implementation
 

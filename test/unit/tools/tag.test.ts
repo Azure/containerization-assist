@@ -5,7 +5,7 @@
  */
 
 import { jest } from '@jest/globals';
-import { tagImage, type TagImageParams } from '../../../src/tools/tag-image/tool';
+import { createToolSessionHelpersMock } from '../../__support__/mocks/tool-session-helpers.mock';
 // Result Type Helpers for Testing
 function createSuccessResult<T>(value: T) {
   return {
@@ -71,12 +71,16 @@ jest.mock('../../../src/lib/logger', () => ({
   createLogger: jest.fn(() => createMockLogger()),
 }));
 
-// Mock session helpers
-jest.mock('../../../src/mcp/tool-session-helpers', () => ({
-  ensureSession: jest.fn(),
-  useSessionSlice: jest.fn(),
-  defineToolIO: jest.fn((input, output) => ({ input, output })),
+jest.mock('../../../src/lib/tool-helpers', () => ({
+  getToolLogger: jest.fn(() => createMockLogger()),
+  createToolTimer: jest.fn(() => mockTimer),
 }));
+
+// Mock session helpers
+jest.mock('../../../src/mcp/tool-session-helpers', () => createToolSessionHelpersMock());
+
+// Import these after mocks are set up
+import { tagImage, type TagImageParams } from '../../../src/tools/tag-image/tool';
 
 // Mock the session slice operations
 const mockSlicePatch = jest.fn().mockResolvedValue(undefined);
@@ -208,8 +212,8 @@ describe('tagImage', () => {
 
       // Verify timer was used correctly
       expect(mockTimer.end).toHaveBeenCalledWith({
-        source: 'sha256:mock-image-id',
-        tag: 'myapp:v1.0',
+        tags: ['myapp:v1.0'],
+        sessionId: 'test-session-123',
       });
     });
 
@@ -579,12 +583,10 @@ describe('tagImage', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe(
-          'Docker daemon not responding\nError: Recover by calling build_image tool. Next: build_image',
-        );
+        expect(result.error).toBe('Docker daemon not responding');
       }
 
-      expect(mockTimer.end).toHaveBeenCalledWith({ error: expect.any(Error) });
+      expect(mockTimer.error).toHaveBeenCalledWith(expect.any(Error));
     });
 
     it('should handle session update failures gracefully', async () => {
@@ -891,7 +893,7 @@ describe('tagImage', () => {
 
   describe('Tool Instance', () => {
     it('should provide correctly configured tool instance', async () => {
-      const { tagImage: tagImageTool } = await import('../../../src/tools/tag-image');
+      const { tagImage: tagImageTool } = await import('../../../src/tools/tag-image/tool');
 
       // The wrapped tool is now a function directly
       expect(typeof tagImageTool).toBe('function');

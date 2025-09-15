@@ -6,21 +6,21 @@
  */
 
 import { joinPaths } from '@lib/path-utils';
-import { extractErrorMessage } from '../../lib/error-utils';
+import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
+import { withDefaults, K8S_DEFAULTS } from '@lib/param-defaults';
+import { extractErrorMessage } from '@lib/error-utils';
 import { promises as fs } from 'node:fs';
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 import type { SamplingOptions } from '@lib/sampling';
 import { createStandardProgress } from '@mcp/progress-helper';
-import { createTimer } from '@lib/logger';
-import type { ToolContext } from '../../mcp/context';
-import type { SessionData } from '../session-types';
-import { Success, Failure, type Result } from '../../types';
+// Moved to tool-helpers
+import type { ToolContext } from '@mcp/context';
+import type { SessionData } from '@tools/session-types';
+import { Success, Failure, type Result } from '@types';
 import { stripFencesAndNoise, isValidKubernetesContent } from '@lib/text-processing';
-import { getSuccessProgression, type SessionContext } from '../../workflows/workflow-progression';
-import { TOOL_NAMES } from '../../exports/tool-names.js';
-import { createKubernetesValidator, getValidationSummary } from '../../validation';
+import { createKubernetesValidator, getValidationSummary } from '@/validation';
 import { scoreConfigCandidates } from '@lib/integrated-scoring';
 import * as yaml from 'js-yaml';
 import { generateK8sManifestsSchema, type GenerateK8sManifestsParams } from './schema';
@@ -387,14 +387,22 @@ function buildK8sManifestPromptArgs(
   params: GenerateK8sManifestsParams,
   image: string,
 ): Record<string, unknown> {
+  const defaults = {
+    appName: 'app',
+    namespace: K8S_DEFAULTS.namespace,
+    replicas: K8S_DEFAULTS.replicas,
+    port: K8S_DEFAULTS.port,
+    serviceType: K8S_DEFAULTS.serviceType,
+    ingressEnabled: false,
+    healthCheckEnabled: false,
+    autoscalingEnabled: false,
+  };
+
+  const merged = withDefaults(params, defaults as any);
+
   return {
-    appName: params.appName || 'app',
-    namespace: params.namespace || 'default',
+    ...merged,
     image,
-    replicas: params.replicas || 1,
-    port: params.port || 8080,
-    serviceType: params.serviceType || 'ClusterIP',
-    ingressEnabled: params.ingressEnabled || false,
     ingressHost: params.ingressHost,
     resources: params.resources,
     envVars: params.envVars,
@@ -417,8 +425,8 @@ async function generateK8sManifestsImpl(
   }
   // Progress reporting for complex manifest generation
   const progress = context.progress ? createStandardProgress(context.progress) : undefined;
-  const logger = context.logger;
-  const timer = createTimer(logger, 'generate-k8s-manifests');
+  const logger = getToolLogger(context, 'generate-k8s-manifests');
+  const timer = createToolTimer(logger, 'generate-k8s-manifests');
 
   try {
     const { appName = 'app', namespace = 'default' } = params;
@@ -445,7 +453,10 @@ async function generateK8sManifestsImpl(
 
     const sessionData = session as SessionData;
     // Get build result from session for image tag
-    const buildResult = sessionData?.build_result || sessionData?.workflow_state?.build_result;
+    const buildResult = (sessionData?.results?.['build-image'] ||
+      sessionData?.workflowState?.results?.['build-image']) as
+      | { tags?: string[]; imageId?: string }
+      | undefined;
     const image = params.imageId || buildResult?.tags?.[0] || `${appName}:latest`;
     // Kubernetes manifest generation from repository analysis and configuration
     if (progress) await progress('EXECUTING');
@@ -473,14 +484,16 @@ async function generateK8sManifestsImpl(
         let promptArgs = buildK8sManifestPromptArgs(params, image);
         try {
           // Get analysis from session for language/framework context
-          const analysisResult =
-            sessionData?.analysis_result || sessionData?.workflow_state?.analysis_result;
+          const analysisResult = (sessionData?.results?.['analyze_repo'] ||
+            sessionData?.workflowState?.results?.['analyze_repo']) as
+            | { language?: string; framework?: string }
+            | undefined;
 
           const knowledgeResult = await enhancePromptWithKnowledge(promptArgs, {
             operation: 'generate_k8s_manifests',
             ...(analysisResult?.language && { language: analysisResult.language }),
             ...(analysisResult?.framework && { framework: analysisResult.framework }),
-            environment: params.environment || 'production',
+            environment: params.environment ?? 'production',
             tags: ['kubernetes', 'deployment', 'manifests', analysisResult?.language].filter(
               Boolean,
             ) as string[],
@@ -573,10 +586,8 @@ async function generateK8sManifestsImpl(
       },
       'Kubernetes manifest validation complete',
     );
-    // Write manifests to disk
-    const repoPath =
-      sessionData?.metadata?.repo_path || sessionData?.workflow_state?.metadata?.repo_path || '.';
-    const outputPath = joinPaths(repoPath, 'k8s');
+    // Write manifests to disk - use current directory as base
+    const outputPath = joinPaths('.', 'k8s');
     await fs.mkdir(outputPath, { recursive: true });
     const manifestPath = joinPaths(outputPath, 'manifests.yaml');
     await fs.writeFile(manifestPath, yamlContent, 'utf-8');
@@ -587,7 +598,7 @@ async function generateK8sManifestsImpl(
       const scoring = await scoreConfigCandidates(
         [yamlContent],
         'yaml',
-        params.environment || 'production',
+        params.environment ?? 'production',
         logger,
       );
       if (scoring.ok && scoring.value[0]) {
@@ -630,69 +641,25 @@ async function generateK8sManifestsImpl(
         lastAppName: appName,
         lastNamespace: namespace,
         totalManifestsGenerated:
-          (sessionData?.completed_steps || []).filter((s) => s === 'k8s').length + 1,
+          (sessionData?.completedSteps || []).filter((s: string) => s === 'k8s').length + 1,
         lastManifestCount: resourceList.length,
         lastValidationScore: validationReport.score,
         lastUsedAI: result.value.aiUsed || false,
       },
     });
 
-    // Update session metadata for backward compatibility
-    const sessionManager = context.sessionManager;
-    if (sessionManager) {
-      try {
-        await sessionManager.update(sessionId, {
-          metadata: {
-            ...session.metadata,
-            k8s_result: {
-              manifests: [
-                {
-                  kind: 'Multiple',
-                  namespace,
-                  content: yamlContent,
-                  file_path: manifestPath,
-                },
-              ],
-              replicas: params.replicas,
-              resources: params.resources,
-              output_path: outputPath,
-            },
-            ai_enhancement_used: result.value.aiUsed || false,
-            ai_generation_type: 'k8s-manifests',
-            k8s_warnings: warnings,
-          },
-          completed_steps: [...(sessionData?.completed_steps || []), 'k8s'],
-        });
-      } catch (error) {
-        logger.warn(
-          { error: (error as Error).message },
-          'Failed to update session, but K8s generation succeeded',
-        );
-      }
-    }
-
     // Progress: Complete
     if (progress) await progress('COMPLETE');
     timer.end({ outputPath });
 
-    // Prepare session context for dynamic chain hints
-    const sessionContext: SessionContext = {
-      completed_steps: session.completed_steps || [],
-      ...(sessionData?.analysis_result && {
-        analysis_result: sessionData.analysis_result,
-      }),
-    };
-
-    // Return result with file indicator and chain hint
+    // Return result with file indicator
     const finalResult: GenerateK8sManifestsResult & {
       _fileWritten?: boolean;
       _fileWrittenPath?: string;
-      NextStep?: string;
     } = {
       ...k8sResult,
       _fileWritten: true,
       _fileWrittenPath: outputPath,
-      NextStep: getSuccessProgression(TOOL_NAMES.GENERATE_K8S_MANIFESTS, sessionContext).summary,
     };
 
     // Add sampling metadata if sampling was used

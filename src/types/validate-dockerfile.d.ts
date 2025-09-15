@@ -4,7 +4,7 @@
  */
 declare module 'validate-dockerfile' {
   // Use consolidated ValidationResult type instead
-  // import type { CoreValidationResult } from '../types/consolidated-types.js';
+  // import type { CoreValidationResult } from '@/types/consolidated-types.js';
 
   function validateDockerfile(dockerfile: string): {
     valid: boolean;

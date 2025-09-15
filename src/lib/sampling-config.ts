@@ -7,10 +7,10 @@
 
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { ValidationResult } from '../validation/core-types';
+import { ValidationResult } from '@/validation/core-types';
 import { load as yamlLoad } from 'js-yaml';
 import { z } from 'zod';
-import { Result, Success, Failure } from '../types';
+import { Result, Success, Failure } from '@types';
 import { extractErrorMessage } from './error-utils';
 
 // Configuration Schema Definitions
@@ -144,262 +144,298 @@ export interface SamplingConfiguration {
 
 // ValidationResult now imported from canonical source
 
+// ============================================================================
+// FUNCTIONAL APPROACH - State and Pure Functions
+// ============================================================================
+
 /**
- * Configuration Manager for sampling system
+ * Configuration state interface
  */
-export class ConfigurationManager {
-  private config: SamplingConfiguration | null = null;
-  private configPath: string;
+export interface ConfigurationState {
+  config: SamplingConfiguration | null;
+  configPath: string;
+}
 
-  constructor(configPath?: string) {
-    this.configPath = configPath || join(process.cwd(), 'config', 'sampling');
-  }
+/**
+ * Load configuration from YAML files (pure function)
+ */
+export async function loadConfigurationPure(
+  state: ConfigurationState,
+): Promise<Result<SamplingConfiguration>> {
+  try {
+    // Load scoring profiles
+    const scoring: Record<string, ScoringProfile> = {};
 
-  /**
-   * Load configuration from YAML files
-   */
-  async loadConfiguration(): Promise<Result<void>> {
     try {
-      // Load scoring profiles
-      const scoring: Record<string, ScoringProfile> = {};
-
-      try {
-        const dockerfileYaml = readFileSync(
-          join(this.configPath, 'scoring', 'dockerfile.yml'),
-          'utf8',
-        );
-        const dockerfileConfig = yamlLoad(dockerfileYaml);
-        const parsed = ScoringProfileSchema.safeParse(dockerfileConfig);
-        if (!parsed.success) {
-          return Failure(`Invalid dockerfile scoring config: ${parsed.error.message}`);
-        }
-        scoring.dockerfile = parsed.data;
-      } catch (error) {
-        return Failure(`Failed to load dockerfile scoring config: ${extractErrorMessage(error)}`);
+      const dockerfileYaml = readFileSync(
+        join(state.configPath, 'scoring', 'dockerfile.yml'),
+        'utf8',
+      );
+      const dockerfileConfig = yamlLoad(dockerfileYaml);
+      const parsed = ScoringProfileSchema.safeParse(dockerfileConfig);
+      if (!parsed.success) {
+        return Failure(`Invalid dockerfile scoring config: ${parsed.error.message}`);
       }
-
-      // Load strategies
-      let strategies: StrategiesConfig;
-      try {
-        const strategiesYaml = readFileSync(join(this.configPath, 'strategies.yml'), 'utf8');
-        const strategiesConfig = yamlLoad(strategiesYaml);
-        const parsed = StrategiesConfigSchema.safeParse(strategiesConfig);
-        if (!parsed.success) {
-          return Failure(`Invalid strategies config: ${parsed.error.message}`);
-        }
-        strategies = parsed.data;
-      } catch (error) {
-        return Failure(`Failed to load strategies config: ${extractErrorMessage(error)}`);
-      }
-
-      // Load environment overrides
-      const environments: Record<string, EnvironmentOverride> = {};
-
-      // Load production environment
-      try {
-        const prodYaml = readFileSync(
-          join(this.configPath, 'environments', 'production.yml'),
-          'utf8',
-        );
-        const prodConfig = yamlLoad(prodYaml);
-        const parsed = EnvironmentOverrideSchema.safeParse(prodConfig);
-        if (!parsed.success) {
-          return Failure(`Invalid production environment config: ${parsed.error.message}`);
-        }
-        environments.production = parsed.data;
-      } catch (error) {
-        return Failure(
-          `Failed to load production environment config: ${extractErrorMessage(error)}`,
-        );
-      }
-
-      // Load development environment
-      try {
-        const devYaml = readFileSync(
-          join(this.configPath, 'environments', 'development.yml'),
-          'utf8',
-        );
-        const devConfig = yamlLoad(devYaml);
-        const parsed = EnvironmentOverrideSchema.safeParse(devConfig);
-        if (!parsed.success) {
-          return Failure(`Invalid development environment config: ${parsed.error.message}`);
-        }
-        environments.development = parsed.data;
-      } catch (error) {
-        return Failure(
-          `Failed to load development environment config: ${extractErrorMessage(error)}`,
-        );
-      }
-
-      // Assemble final configuration
-      this.config = {
-        version: '1.0.0',
-        scoring,
-        strategies,
-        environments,
-      };
-
-      return Success(undefined);
+      scoring.dockerfile = parsed.data;
     } catch (error) {
-      return Failure(`Failed to load configuration: ${extractErrorMessage(error)}`);
+      return Failure(`Failed to load dockerfile scoring config: ${extractErrorMessage(error)}`);
+    }
+
+    // Load strategies
+    let strategies: StrategiesConfig;
+    try {
+      const strategiesYaml = readFileSync(join(state.configPath, 'strategies.yml'), 'utf8');
+      const strategiesConfig = yamlLoad(strategiesYaml);
+      const parsed = StrategiesConfigSchema.safeParse(strategiesConfig);
+      if (!parsed.success) {
+        return Failure(`Invalid strategies config: ${parsed.error.message}`);
+      }
+      strategies = parsed.data;
+    } catch (error) {
+      return Failure(`Failed to load strategies config: ${extractErrorMessage(error)}`);
+    }
+
+    // Load environment overrides
+    const environments: Record<string, EnvironmentOverride> = {};
+
+    // Load production environment
+    try {
+      const prodYaml = readFileSync(
+        join(state.configPath, 'environments', 'production.yml'),
+        'utf8',
+      );
+      const prodConfig = yamlLoad(prodYaml);
+      const parsed = EnvironmentOverrideSchema.safeParse(prodConfig);
+      if (!parsed.success) {
+        return Failure(`Invalid production environment config: ${parsed.error.message}`);
+      }
+      environments.production = parsed.data;
+    } catch (error) {
+      return Failure(`Failed to load production environment config: ${extractErrorMessage(error)}`);
+    }
+
+    // Load development environment
+    try {
+      const devYaml = readFileSync(
+        join(state.configPath, 'environments', 'development.yml'),
+        'utf8',
+      );
+      const devConfig = yamlLoad(devYaml);
+      const parsed = EnvironmentOverrideSchema.safeParse(devConfig);
+      if (!parsed.success) {
+        return Failure(`Invalid development environment config: ${parsed.error.message}`);
+      }
+      environments.development = parsed.data;
+    } catch (error) {
+      return Failure(
+        `Failed to load development environment config: ${extractErrorMessage(error)}`,
+      );
+    }
+
+    // Assemble final configuration
+    const config: SamplingConfiguration = {
+      version: '1.0.0',
+      scoring,
+      strategies,
+      environments,
+    };
+
+    return Success(config);
+  } catch (error) {
+    return Failure(`Failed to load configuration: ${extractErrorMessage(error)}`);
+  }
+}
+
+/**
+ * Validate configuration structure (pure function)
+ */
+export async function validateConfigurationPure(
+  config: SamplingConfiguration,
+): Promise<ValidationResult> {
+  const errors: string[] = [];
+
+  // Basic structure validation
+  if (!config.scoring || Object.keys(config.scoring).length === 0) {
+    errors.push('Configuration must include at least one scoring profile');
+  }
+
+  if (!config.strategies) {
+    errors.push('Configuration must include strategies');
+  }
+
+  // Validate scoring profiles
+  for (const [profileName, profile] of Object.entries(config.scoring || {})) {
+    const result = ScoringProfileSchema.safeParse(profile);
+    if (!result.success) {
+      errors.push(`Invalid scoring profile '${profileName}': ${result.error.message}`);
     }
   }
 
-  /**
-   * Validate configuration structure
-   */
-  async validateConfiguration(config: SamplingConfiguration): Promise<ValidationResult> {
-    const errors: string[] = [];
-
-    // Basic structure validation
-    if (!config.scoring || Object.keys(config.scoring).length === 0) {
-      errors.push('Configuration must include at least one scoring profile');
+  // Validate strategies
+  if (config.strategies) {
+    const result = StrategiesConfigSchema.safeParse(config.strategies);
+    if (!result.success) {
+      errors.push(`Invalid strategies config: ${result.error.message}`);
     }
-
-    if (!config.strategies) {
-      errors.push('Configuration must include strategies');
-    }
-
-    // Validate scoring profiles
-    for (const [profileName, profile] of Object.entries(config.scoring || {})) {
-      const result = ScoringProfileSchema.safeParse(profile);
-      if (!result.success) {
-        errors.push(`Invalid scoring profile '${profileName}': ${result.error.message}`);
-      }
-    }
-
-    // Validate strategies
-    if (config.strategies) {
-      const result = StrategiesConfigSchema.safeParse(config.strategies);
-      if (!result.success) {
-        errors.push(`Invalid strategies config: ${result.error.message}`);
-      }
-    }
-
-    // Validate environment overrides
-    for (const [envName, envConfig] of Object.entries(config.environments || {})) {
-      const result = EnvironmentOverrideSchema.safeParse(envConfig);
-      if (!result.success) {
-        errors.push(`Invalid environment override '${envName}': ${result.error.message}`);
-      }
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-    };
   }
 
-  /**
-   * Resolve configuration for specific environment
-   */
-  resolveForEnvironment(environment: string = 'development'): SamplingConfiguration {
-    if (!this.config) {
-      throw new Error('Configuration not loaded. Call loadConfiguration() first.');
+  // Validate environment overrides
+  for (const [envName, envConfig] of Object.entries(config.environments || {})) {
+    const result = EnvironmentOverrideSchema.safeParse(envConfig);
+    if (!result.success) {
+      errors.push(`Invalid environment override '${envName}': ${result.error.message}`);
     }
+  }
 
-    // Deep clone the base config to avoid mutating the original
-    const baseConfig = {
-      ...this.config,
-      scoring: { ...this.config.scoring },
-    };
-    const envOverride = this.config.environments[environment];
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+}
 
-    if (!envOverride) {
-      return baseConfig;
-    }
+/**
+ * Resolve configuration for specific environment (pure function)
+ */
+export function resolveForEnvironmentPure(
+  config: SamplingConfiguration,
+  environment: string = 'development',
+): SamplingConfiguration {
+  // Deep clone the base config to avoid mutating the original
+  const baseConfig = {
+    ...config,
+    scoring: { ...config.scoring },
+  };
+  const envOverride = config.environments[environment];
 
-    // Apply environment overrides
-    const resolvedConfig = {
-      ...baseConfig,
-      scoring: { ...baseConfig.scoring },
-    };
+  if (!envOverride) {
+    return baseConfig;
+  }
 
-    // Apply scoring overrides
-    if (envOverride.overrides.scoring) {
-      for (const [profileName, overrides] of Object.entries(envOverride.overrides.scoring)) {
-        if (resolvedConfig.scoring[profileName]) {
-          const profile = { ...resolvedConfig.scoring[profileName] };
+  // Apply environment overrides
+  const resolvedConfig = {
+    ...baseConfig,
+    scoring: { ...baseConfig.scoring },
+  };
 
-          // Apply category weight overrides
-          if (overrides.category_weights) {
-            profile.category_weights = {
-              ...profile.category_weights,
-              ...overrides.category_weights,
-            };
-          }
+  // Apply scoring overrides
+  if (envOverride.overrides.scoring) {
+    for (const [profileName, overrides] of Object.entries(envOverride.overrides.scoring)) {
+      if (resolvedConfig.scoring[profileName]) {
+        const profile = { ...resolvedConfig.scoring[profileName] };
 
-          // Apply rule overrides
-          if (overrides.rules) {
-            for (const [categoryName, ruleOverrides] of Object.entries(overrides.rules)) {
-              if (profile.rules?.[categoryName] && ruleOverrides) {
-                const existingRules = profile.rules[categoryName];
-                if (existingRules) {
-                  profile.rules[categoryName] = existingRules.map((rule) => {
-                    const override = ruleOverrides?.find((ro) => ro.name === rule.name);
-                    if (override) {
-                      return {
-                        ...rule,
-                        ...(override.points !== undefined && { points: override.points }),
-                        ...(override.weight !== undefined && { weight: override.weight }),
-                      };
-                    }
-                    return rule;
-                  });
-                }
+        // Apply category weight overrides
+        if (overrides.category_weights) {
+          profile.category_weights = {
+            ...profile.category_weights,
+            ...overrides.category_weights,
+          };
+        }
+
+        // Apply rule overrides
+        if (overrides.rules) {
+          for (const [categoryName, ruleOverrides] of Object.entries(overrides.rules)) {
+            if (profile.rules?.[categoryName] && ruleOverrides) {
+              const existingRules = profile.rules[categoryName];
+              if (existingRules) {
+                profile.rules[categoryName] = existingRules.map((rule) => {
+                  const override = ruleOverrides?.find((ro) => ro.name === rule.name);
+                  if (override) {
+                    return {
+                      ...rule,
+                      ...(override.points !== undefined && { points: override.points }),
+                      ...(override.weight !== undefined && { weight: override.weight }),
+                    };
+                  }
+                  return rule;
+                });
               }
             }
           }
-
-          resolvedConfig.scoring[profileName] = profile as ScoringProfile;
         }
+
+        resolvedConfig.scoring[profileName] = profile as ScoringProfile;
+      }
+    }
+  }
+
+  // Apply strategy overrides
+  if (envOverride.overrides.strategies) {
+    const strategies = { ...resolvedConfig.strategies };
+    strategies.selection_rules = { ...strategies.selection_rules };
+
+    for (const [strategyType, overrides] of Object.entries(envOverride.overrides.strategies)) {
+      if (strategies.selection_rules[strategyType]) {
+        const selection = { ...strategies.selection_rules[strategyType] };
+
+        if (overrides.default_strategy_index !== undefined) {
+          selection.default_strategy_index = overrides.default_strategy_index;
+        }
+
+        if (overrides.conditions) {
+          selection.conditions = [...(selection.conditions || []), ...overrides.conditions];
+        }
+
+        strategies.selection_rules[strategyType] = {
+          conditions: selection.conditions || [],
+          default_strategy_index: selection.default_strategy_index || 0,
+        };
       }
     }
 
-    // Apply strategy overrides
-    if (envOverride.overrides.strategies) {
-      const strategies = { ...resolvedConfig.strategies };
-      strategies.selection_rules = { ...strategies.selection_rules };
+    resolvedConfig.strategies = strategies;
+  }
 
-      for (const [strategyType, overrides] of Object.entries(envOverride.overrides.strategies)) {
-        if (strategies.selection_rules[strategyType]) {
-          const selection = { ...strategies.selection_rules[strategyType] };
+  return resolvedConfig;
+}
 
-          if (overrides.default_strategy_index !== undefined) {
-            selection.default_strategy_index = overrides.default_strategy_index;
-          }
+/**
+ * Factory function to create a configuration manager with closure-based state
+ * This is the preferred approach for new code
+ */
+export interface ConfigurationManagerInterface {
+  loadConfiguration: () => Promise<Result<void>>;
+  validateConfiguration: (config: SamplingConfiguration) => Promise<ValidationResult>;
+  resolveForEnvironment: (environment?: string) => SamplingConfiguration;
+  getConfiguration: () => SamplingConfiguration;
+  getScoringProfile: (profileName: string) => ScoringProfile | undefined;
+}
 
-          if (overrides.conditions) {
-            selection.conditions = [...(selection.conditions || []), ...overrides.conditions];
-          }
+export function createConfigurationManager(configPath?: string): ConfigurationManagerInterface {
+  const state: ConfigurationState = {
+    config: null,
+    configPath: configPath || join(process.cwd(), 'config', 'sampling'),
+  };
 
-          strategies.selection_rules[strategyType] = {
-            conditions: selection.conditions || [],
-            default_strategy_index: selection.default_strategy_index || 0,
-          };
-        }
+  return {
+    async loadConfiguration(): Promise<Result<void>> {
+      const result = await loadConfigurationPure(state);
+      if (result.ok) {
+        state.config = result.value;
+        return Success(undefined);
       }
+      return result;
+    },
 
-      resolvedConfig.strategies = strategies;
-    }
+    async validateConfiguration(config: SamplingConfiguration): Promise<ValidationResult> {
+      return validateConfigurationPure(config);
+    },
 
-    return resolvedConfig;
-  }
+    resolveForEnvironment(environment?: string): SamplingConfiguration {
+      if (!state.config) {
+        throw new Error('Configuration not loaded. Call loadConfiguration() first.');
+      }
+      return resolveForEnvironmentPure(state.config, environment);
+    },
 
-  /**
-   * Get current configuration (must be loaded first)
-   */
-  getConfiguration(): SamplingConfiguration {
-    if (!this.config) {
-      throw new Error('Configuration not loaded. Call loadConfiguration() first.');
-    }
-    return this.config;
-  }
+    getConfiguration(): SamplingConfiguration {
+      if (!state.config) {
+        throw new Error('Configuration not loaded. Call loadConfiguration() first.');
+      }
+      return state.config;
+    },
 
-  /**
-   * Get specific scoring profile
-   */
-  getScoringProfile(profileName: string): ScoringProfile | undefined {
-    return this.config?.scoring[profileName];
-  }
+    getScoringProfile(profileName: string): ScoringProfile | undefined {
+      return state.config?.scoring[profileName];
+    },
+  };
 }

@@ -23,17 +23,16 @@
  */
 
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
-import { extractErrorMessage } from '../../lib/error-utils';
-import type { ToolContext } from '../../mcp/context';
-import { createKubernetesClient, KubernetesClient } from '../../lib/kubernetes';
-import { createTimer, createLogger } from '../../lib/logger';
-import { DEFAULT_TIMEOUTS } from '../../config/defaults';
-import { Success, Failure, type Result } from '../../types';
+import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
+import { extractErrorMessage } from '@lib/error-utils';
+import type { ToolContext } from '@mcp/context';
+import { createKubernetesClient, KubernetesClient } from '@lib/kubernetes';
+
+import { DEFAULT_TIMEOUTS } from '@config/defaults';
+import { Success, Failure, type Result } from '@types';
 import { verifyDeploymentSchema, type VerifyDeploymentParams } from './schema';
-import { getSuccessProgression, type SessionContext } from '../../workflows/workflow-progression';
-import { TOOL_NAMES } from '../../exports/tool-names.js';
 import { z } from 'zod';
-import type { SessionData } from '../session-types';
+import type { SessionData } from '@tools/session-types';
 
 export interface VerifyDeploymentResult {
   success: boolean;
@@ -219,8 +218,8 @@ async function verifyDeploymentImpl(
   if (!params || typeof params !== 'object') {
     return Failure('Invalid parameters provided');
   }
-  const logger = context.logger || createLogger({ name: 'verify-deployment' });
-  const timer = createTimer(logger, 'verify-deployment');
+  const logger = getToolLogger(context, 'verify-deployment');
+  const timer = createToolTimer(logger, 'verify-deployment');
 
   try {
     const {
@@ -355,49 +354,6 @@ async function verifyDeploymentImpl(
       },
     });
 
-    // Update session metadata for backward compatibility
-    const sessionManager = context.sessionManager;
-    if (sessionManager) {
-      try {
-        await sessionManager.update(sessionId, {
-          metadata: {
-            ...session.metadata,
-            verification_result: {
-              success: true,
-              namespace,
-              deploymentName,
-              serviceName,
-              endpoints,
-              ready: health.ready,
-              replicas: health.totalReplicas,
-              status: {
-                readyReplicas: health.readyReplicas,
-                totalReplicas: health.totalReplicas,
-                conditions: [
-                  {
-                    type: 'Available',
-                    status: health.ready ? 'True' : 'False',
-                    message: health.message,
-                  },
-                ],
-              },
-              healthCheck: {
-                status: overallStatus,
-                message: health.message,
-                checks: healthChecks,
-              },
-            },
-          },
-          completed_steps: [...(session.completed_steps || []), 'verify-deployment'],
-        });
-      } catch (error) {
-        logger.warn(
-          { error: (error as Error).message },
-          'Failed to update session, but verification succeeded',
-        );
-      }
-    }
-
     timer.end({ deploymentName, ready: health.ready, sessionId });
     logger.info(
       {
@@ -410,15 +366,8 @@ async function verifyDeploymentImpl(
       'Kubernetes deployment verification completed',
     );
 
-    // Add chain hint based on verification status
     const enrichedResult = {
       ...result,
-      NextStep: getSuccessProgression(TOOL_NAMES.VERIFY_DEPLOYMENT, {
-        completed_steps: session.completed_steps || [],
-        ...((session as SessionContext).analysis_result && {
-          analysis_result: (session as SessionContext).analysis_result,
-        }),
-      }),
     };
 
     return Success(enrichedResult);

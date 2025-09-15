@@ -7,7 +7,7 @@
 import { z } from 'zod';
 import type { ToolContext } from '@mcp/context';
 import type { SessionManager } from './session';
-import { Result, Success, Failure } from '../types';
+import { Result, Success, Failure } from '@types';
 import {
   SessionSlice,
   SessionSliceOperations,
@@ -54,10 +54,11 @@ export function useSessionSlice<In, Out, State = Record<string, unknown>>(
   return {
     async get(sessionId: string): Promise<SessionSlice<In, Out, State> | null> {
       try {
-        const session = await sessionManager.get(sessionId);
-        if (!session) {
+        const sessionResult = await sessionManager.get(sessionId);
+        if (!sessionResult.ok || !sessionResult.value) {
           return null;
         }
+        const session = sessionResult.value;
 
         const metadata = session.metadata || {};
         if (!hasToolSlices(metadata)) {
@@ -84,8 +85,8 @@ export function useSessionSlice<In, Out, State = Record<string, unknown>>(
     },
 
     async set(sessionId: string, slice: SessionSlice<In, Out, State>): Promise<void> {
-      const session = await sessionManager.get(sessionId);
-      if (!session) {
+      const sessionResult = await sessionManager.get(sessionId);
+      if (!sessionResult.ok || !sessionResult.value) {
         // Create new session if it doesn't exist
         await sessionManager.create(sessionId);
         // Now update with the slice data
@@ -99,6 +100,7 @@ export function useSessionSlice<In, Out, State = Record<string, unknown>>(
         });
         return;
       }
+      const session = sessionResult.value;
 
       // Update existing session
       const metadata = session.metadata || {};
@@ -154,10 +156,11 @@ export function useSessionSlice<In, Out, State = Record<string, unknown>>(
     },
 
     async clear(sessionId: string): Promise<void> {
-      const session = await sessionManager.get(sessionId);
-      if (!session) {
+      const sessionResult = await sessionManager.get(sessionId);
+      if (!sessionResult.ok || !sessionResult.value) {
         return;
       }
+      const session = sessionResult.value;
 
       const metadata = session.metadata || {};
       if (!hasToolSlices(metadata)) {

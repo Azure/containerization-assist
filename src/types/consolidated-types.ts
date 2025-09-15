@@ -10,10 +10,10 @@ export type {
   ValidationSeverity,
   ValidationGrade,
   ValidationCategory,
-} from '../validation/core-types.js';
+} from '@/validation/core-types.js';
 
 // Import for local use
-import type { ValidationResult } from '../validation/core-types.js';
+import type { ValidationResult } from '@/validation/core-types.js';
 
 // Test-specific result types
 export interface TestResult {
@@ -74,10 +74,10 @@ export interface KubernetesValidationResult extends ValidationResult {
 export type {
   TestInfrastructureResult,
   TestInfrastructurePerformanceMetrics,
-} from '../../test/integration/mcp-inspector/infrastructure/test-runner.js';
+} from '@/../../test/integration/mcp-inspector/infrastructure/test-runner.js';
 
 // Re-export extended Docker types
-export type { DockerBuildResult } from '../../test/integration/mcp-inspector/lib/docker-utils.js';
+export type { DockerBuildResult } from '@/../../test/integration/mcp-inspector/lib/docker-utils.js';
 
 // Re-export extended Kubernetes types
-export type { KubernetesDeployResult } from '../../test/integration/mcp-inspector/lib/kubernetes-utils.js';
+export type { KubernetesDeployResult } from '@/../../test/integration/mcp-inspector/lib/kubernetes-utils.js';

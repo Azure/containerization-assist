@@ -1,9 +1,17 @@
 /**
- * Structured Error Classes for Containerization Assist
+ * Functional Error System for Containerization Assist
  *
- * Provides a hierarchy of error classes with rich metadata for better
- * error handling, debugging, and recovery throughout the application.
+ * Provides structured error handling using data interfaces and factory functions
+ * for better error handling, debugging, and recovery throughout the application.
+ *
+ * Uses a functional approach with:
+ * - Error data interfaces (ContainerizationErrorData, SessionErrorData)
+ * - Factory functions for error creation
+ * - Structural type guards for error checking
+ * - Result<T> pattern support
  */
+
+import { Result, Failure } from '@types';
 
 /**
  * Error codes for standardized error handling
@@ -56,86 +64,186 @@ export const ErrorCodes = {
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
 
+// ============================================================================
+// FUNCTIONAL APPROACH - Data Interfaces and Factory Functions
+// ============================================================================
+
 /**
- * Base error class for all containerization errors
+ * Data interface for containerization errors
+ * This is the preferred approach for new code
  */
-export class ContainerizationError extends Error {
-  public readonly code: ErrorCode;
-  public readonly details: Record<string, unknown> | undefined;
-  public override readonly cause: Error | undefined;
-  public readonly timestamp: Date;
-
-  constructor(
-    message: string,
-    code: ErrorCode = ErrorCodes.INTERNAL_ERROR,
-    details?: Record<string, unknown>,
-    cause?: Error,
-  ) {
-    super(message);
-    this.name = 'ContainerizationError';
-    this.code = code;
-    this.details = details || {};
-    this.cause = cause || undefined;
-    this.timestamp = new Date();
-
-    // Maintains proper stack trace for where error was thrown
-    Error.captureStackTrace(this, this.constructor);
-  }
-
-  /**
-   * Convert to plain object for serialization
-   */
-  toJSON(): Record<string, unknown> {
-    return {
-      name: this.name,
-      message: this.message,
-      code: this.code,
-      details: this.details,
-      timestamp: this.timestamp,
-      stack: this.stack,
-      cause: this.cause
-        ? {
-            message: this.cause.message,
-            stack: this.cause.stack,
-          }
-        : undefined,
-    };
-  }
-
-  /**
-   * Get a user-friendly error message
-   */
-  getUserMessage(): string {
-    return `${this.message} (${this.code})`;
-  }
+export interface ContainerizationErrorData {
+  readonly message: string;
+  readonly code: ErrorCode;
+  readonly details: Record<string, unknown>;
+  readonly cause?: Error;
+  readonly timestamp: Date;
+  readonly name: string;
+  readonly stack?: string;
 }
 
 /**
- * Session management errors
+ * Data interface for session errors
  */
-export class SessionError extends ContainerizationError {
-  constructor(
-    message: string,
-    code: ErrorCode = ErrorCodes.SESSION_NOT_FOUND,
-    details?: Record<string, unknown>,
-    cause?: Error,
-  ) {
-    super(message, code, details, cause);
-    this.name = 'SessionError';
-  }
+export interface SessionErrorData extends ContainerizationErrorData {
+  readonly sessionId?: string;
 }
 
 /**
- * Type guard to check if an error is a ContainerizationError
+ * Factory function to create a containerization error data object
+ * @param message - Error message
+ * @param code - Error code
+ * @param details - Additional error details
+ * @param cause - Original error that caused this error
+ * @returns ContainerizationErrorData object
  */
-export function isContainerizationError(error: unknown): error is ContainerizationError {
-  return error instanceof ContainerizationError;
+export const createContainerizationError = (
+  message: string,
+  code: ErrorCode = ErrorCodes.INTERNAL_ERROR,
+  details: Record<string, unknown> = {},
+  cause?: Error,
+): ContainerizationErrorData => {
+  const error = new Error(message);
+  return {
+    message,
+    code,
+    details,
+    timestamp: new Date(),
+    name: 'ContainerizationError',
+    ...(cause && { cause }),
+    ...(error.stack && { stack: error.stack }),
+  };
+};
+
+/**
+ * Factory function to create a session error data object
+ * @param message - Error message
+ * @param code - Error code
+ * @param details - Additional error details
+ * @param cause - Original error that caused this error
+ * @param sessionId - Optional session ID
+ * @returns SessionErrorData object
+ */
+export const createSessionError = (
+  message: string,
+  code: ErrorCode = ErrorCodes.SESSION_NOT_FOUND,
+  details: Record<string, unknown> = {},
+  cause?: Error,
+  sessionId?: string,
+): SessionErrorData => {
+  const baseError = createContainerizationError(message, code, details, cause);
+  return {
+    ...baseError,
+    name: 'SessionError',
+    ...(sessionId && { sessionId }),
+  };
+};
+
+/**
+ * Factory function to create a validation error
+ */
+export const createValidationError = (
+  message: string,
+  details: Record<string, unknown> = {},
+  cause?: Error,
+): ContainerizationErrorData =>
+  createContainerizationError(message, ErrorCodes.VALIDATION_FAILED, details, cause);
+
+/**
+ * Factory function to create a Docker error
+ */
+export const createDockerError = (
+  message: string,
+  code: ErrorCode = ErrorCodes.DOCKER_BUILD_FAILED,
+  details: Record<string, unknown> = {},
+  cause?: Error,
+): ContainerizationErrorData => createContainerizationError(message, code, details, cause);
+
+/**
+ * Factory function to create a Kubernetes error
+ */
+export const createKubernetesError = (
+  message: string,
+  code: ErrorCode = ErrorCodes.KUBERNETES_DEPLOY_FAILED,
+  details: Record<string, unknown> = {},
+  cause?: Error,
+): ContainerizationErrorData => createContainerizationError(message, code, details, cause);
+
+/**
+ * Factory function to create an AI service error
+ */
+export const createAIServiceError = (
+  message: string,
+  code: ErrorCode = ErrorCodes.AI_SERVICE_UNAVAILABLE,
+  details: Record<string, unknown> = {},
+  cause?: Error,
+): ContainerizationErrorData => createContainerizationError(message, code, details, cause);
+
+/**
+ * Convert error data to a user-friendly message
+ */
+export const getUserMessage = (error: ContainerizationErrorData): string =>
+  `${error.message} (${error.code})`;
+
+/**
+ * Serialize error data for logging or transmission
+ */
+export const serializeError = (error: ContainerizationErrorData): Record<string, unknown> => ({
+  name: error.name,
+  message: error.message,
+  code: error.code,
+  details: error.details,
+  timestamp: error.timestamp,
+  stack: error.stack,
+  cause: error.cause
+    ? {
+        message: error.cause.message,
+        stack: error.cause.stack,
+      }
+    : undefined,
+});
+
+/**
+ * Convert error data to Result type for function returns
+ */
+export const errorDataToResult = <T>(error: ContainerizationErrorData): Result<T> =>
+  Failure(`${error.code}: ${error.message}`);
+
+// ============================================================================
+// TYPE GUARDS
+// ============================================================================
+
+/**
+ * Type guard to check if an object is ContainerizationErrorData
+ * This is the preferred approach for new code
+ */
+export function isContainerizationErrorData(error: unknown): error is ContainerizationErrorData {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    'message' in error &&
+    'name' in error &&
+    'timestamp' in error &&
+    'details' in error
+  );
 }
 
 /**
- * Convert ContainerizationError to Result type (for MCP boundaries)
+ * Type guard to check if an object is SessionErrorData
  */
-export function errorToResult(error: ContainerizationError): { ok: false; error: string } {
+export function isSessionErrorData(error: unknown): error is SessionErrorData {
+  return isContainerizationErrorData(error) && error.name === 'SessionError';
+}
+
+// ============================================================================
+// CONVERSION UTILITIES
+// ============================================================================
+
+/**
+ * Convert error data to Result type (for MCP boundaries)
+ */
+export function errorToResult(error: ContainerizationErrorData): { ok: false; error: string } {
   return {
     ok: false,
     error: `${error.code}: ${error.message}`,

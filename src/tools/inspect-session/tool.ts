@@ -6,10 +6,10 @@
  */
 
 import type { ToolContext } from '@mcp/context';
-import { Result, Success, Failure } from '../../types';
+import { Result, Success, Failure } from '@types';
 import { InspectSessionParams, InspectSessionResult } from './schema';
-import type { SessionManager } from '../../lib/session';
-import { extractErrorMessage } from '../../lib/error-utils';
+import type { SessionManager } from '@lib/session';
+import { extractErrorMessage } from '@lib/error-utils';
 
 const DEFAULT_TTL = 86400; // 24 hours in seconds
 
@@ -25,11 +25,20 @@ export async function inspectSession(
     }
 
     // Get all session IDs
-    const allSessionIds = await sessionManager.list();
+    const listResult = await sessionManager.list();
+    if (!listResult.ok) {
+      return Failure(`Failed to list sessions: ${listResult.error}`);
+    }
+    const allSessionIds = listResult.value;
 
     // If specific session requested
     if (params.sessionId) {
-      const session = await sessionManager.get(params.sessionId);
+      const sessionResult = await sessionManager.get(params.sessionId);
+      if (!sessionResult.ok) {
+        return Failure(`Failed to get session: ${sessionResult.error}`);
+      }
+      const session = sessionResult.value;
+
       if (!session) {
         return Success({
           sessions: [],
@@ -65,8 +74,9 @@ export async function inspectSession(
     // List all sessions
     const sessions = [];
     for (const id of allSessionIds) {
-      const session = await sessionManager.get(id);
-      if (session) {
+      const sessionResult = await sessionManager.get(id);
+      if (sessionResult.ok && sessionResult.value) {
+        const session = sessionResult.value;
         sessions.push({
           id,
           createdAt: session.createdAt || new Date(),
