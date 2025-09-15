@@ -7,11 +7,11 @@
 
 import { joinPaths } from '@lib/path-utils';
 import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import { extractErrorMessage } from '../../lib/error-utils';
+import { extractErrorMessage } from '@lib/error-utils';
 import { promises as fs } from 'node:fs';
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
-import type { ToolContext } from '../../mcp/context';
-import { Success, Failure, type Result } from '../../types';
+import type { ToolContext } from '@mcp/context';
+import { Success, Failure, type Result } from '@types';
 import * as yaml from 'js-yaml';
 import { convertAcaToK8sSchema, type ConvertAcaToK8sParams } from './schema';
 import { z } from 'zod';

@@ -3,11 +3,11 @@
  * Lightweight, testable tool for pushing Docker images
  */
 
-import { createDockerClient, type DockerClient } from '../../services/docker-client';
+import { createDockerClient, type DockerClient } from '@services/docker-client';
 import { getToolLogger } from '@lib/tool-helpers';
-import type { MCPTool, MCPResponse } from '../../mcp/types';
-import type { ToolContext } from '../../mcp/context';
-import { Success, Failure, type Result } from '../../types';
+import type { MCPTool, MCPResponse } from '@mcp/types';
+import type { ToolContext } from '@mcp/context';
+import { Success, Failure, type Result } from '@types';
 import { pushImageSchema, type PushImageParams } from './schema';
 import type { z } from 'zod';
 

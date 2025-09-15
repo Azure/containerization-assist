@@ -15,7 +15,7 @@ import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 import type { SamplingOptions } from '@lib/sampling';
 import { createStandardProgress } from '@mcp/progress-helper';
 import type { ToolContext } from '@mcp/context';
-import type { SessionData } from '../session-types';
+import type { SessionData } from '@tools/session-types';
 import { Success, Failure, type Result } from '@types';
 import { stripFencesAndNoise } from '@lib/text-processing';
 import { generateAcaManifestsSchema, type GenerateAcaManifestsParams } from './schema';

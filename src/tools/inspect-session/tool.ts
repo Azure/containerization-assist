@@ -6,10 +6,10 @@
  */
 
 import type { ToolContext } from '@mcp/context';
-import { Result, Success, Failure } from '../../types';
+import { Result, Success, Failure } from '@types';
 import { InspectSessionParams, InspectSessionResult } from './schema';
-import type { SessionManager } from '../../lib/session';
-import { extractErrorMessage } from '../../lib/error-utils';
+import type { SessionManager } from '@lib/session';
+import { extractErrorMessage } from '@lib/error-utils';
 
 const DEFAULT_TTL = 86400; // 24 hours in seconds
 

@@ -14,7 +14,7 @@
  * @module resources/manager
  */
 
-import { Result, Success, Failure } from '../types';
+import { Result, Success, Failure } from '@types';
 import type { ResourceCategory } from './types';
 
 /**

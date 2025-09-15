@@ -1,7 +1,7 @@
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '../types';
+import { Result, Success, Failure } from '@types';
 import type { ResourceCache } from './types';
-import { extractErrorMessage } from '../lib/error-utils';
+import { extractErrorMessage } from '@lib/error-utils';
 
 interface CacheEntry {
   value: unknown;

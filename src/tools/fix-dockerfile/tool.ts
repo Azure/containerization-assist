@@ -19,17 +19,17 @@
 
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import { extractErrorMessage } from '../../lib/error-utils';
+import { extractErrorMessage } from '@lib/error-utils';
 import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 import type { SamplingOptions } from '@lib/sampling';
 import { createStandardProgress } from '@mcp/progress-helper';
-import type { ToolContext } from '../../mcp/context';
-import type { Logger } from '../../lib/logger';
-import { getRecommendedBaseImage } from '../../lib/base-images';
-import { Success, Failure, type Result } from '../../types';
-import { DEFAULT_PORTS } from '../../config/defaults';
-import { stripFencesAndNoise, isValidDockerfileContent } from '../../lib/text-processing';
+import type { ToolContext } from '@mcp/context';
+import type { Logger } from '@lib/logger';
+import { getRecommendedBaseImage } from '@lib/base-images';
+import { Success, Failure, type Result } from '@types';
+import { DEFAULT_PORTS } from '@config/defaults';
+import { stripFencesAndNoise, isValidDockerfileContent } from '@lib/text-processing';
 import { scoreConfigCandidates } from '@lib/integrated-scoring';
 import { fixDockerfileSchema, type FixDockerfileParams } from './schema';
 import { z } from 'zod';

@@ -8,8 +8,8 @@
 import * as dockerParser from 'docker-file-parser';
 import type { CommandEntry } from 'docker-file-parser';
 import validateDockerfileSyntax from 'validate-dockerfile';
-import { Result, Success, Failure } from '../types';
-import { extractErrorMessage } from '../lib/error-utils';
+import { Result, Success, Failure } from '@types';
+import { extractErrorMessage } from '@lib/error-utils';
 import {
   DockerfileValidationRule,
   ValidationResult,
@@ -28,7 +28,7 @@ import {
   API_KEY_PATTERN,
   SECRET_PATTERN,
   TOKEN_PATTERN,
-} from '../lib/regex-patterns';
+} from '@lib/regex-patterns';
 
 type DockerCommand = CommandEntry;
 

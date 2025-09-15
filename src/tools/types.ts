@@ -3,4 +3,4 @@
  * Re-exports consolidated tool types
  */
 
-export * from '../types/tools';
+export * from '@/types/tools';

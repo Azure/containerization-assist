@@ -5,10 +5,10 @@
 import * as k8s from '@kubernetes/client-node';
 import * as yaml from 'js-yaml';
 import type { Logger } from 'pino';
-import { createKeyedMutex } from '../lib/mutex';
-import { Success, Failure, type Result } from '../types';
-import { config } from '../config';
-import { extractErrorMessage } from '../lib/error-utils';
+import { createKeyedMutex } from '@lib/mutex';
+import { Success, Failure, type Result } from '@types';
+import { config } from '@config/index';
+import { extractErrorMessage } from '@lib/error-utils';
 
 export interface ApplyOptions {
   dryRun?: boolean;

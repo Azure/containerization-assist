@@ -3,13 +3,13 @@
  * Uses direct SDK patterns with Zod schemas
  */
 
-import { createMCPServer, type IMCPServer } from '../mcp/server';
+import { createMCPServer, type IMCPServer } from '@mcp/server';
 import {
   createDependencies,
   initializeDependencies,
   shutdownDependencies,
   type Dependencies,
-} from '../container';
+} from '@/container';
 import process from 'node:process';
 
 async function main(): Promise<void> {

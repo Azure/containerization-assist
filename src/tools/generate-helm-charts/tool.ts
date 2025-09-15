@@ -7,7 +7,7 @@
 
 import { joinPaths } from '@lib/path-utils';
 import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import { extractErrorMessage } from '../../lib/error-utils';
+import { extractErrorMessage } from '@lib/error-utils';
 import { promises as fs } from 'node:fs';
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 // AI imports commented out for now - can be added later for enhanced generation
@@ -15,9 +15,9 @@ import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-
 // import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 // import type { SamplingOptions } from '@lib/sampling';
 import { createStandardProgress } from '@mcp/progress-helper';
-import type { ToolContext } from '../../mcp/context';
-import type { SessionData } from '../session-types';
-import { Success, Failure, type Result } from '../../types';
+import type { ToolContext } from '@mcp/context';
+import type { SessionData } from '@tools/session-types';
+import { Success, Failure, type Result } from '@types';
 // import { stripFencesAndNoise } from '@lib/text-processing';
 import { execSync } from 'child_process';
 import * as yaml from 'js-yaml';

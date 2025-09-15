@@ -6,10 +6,10 @@
  */
 
 import * as os from 'os';
-import { extractErrorMessage } from '../../lib/error-utils';
+import { extractErrorMessage } from '@lib/error-utils';
 import { createToolTimer } from '@lib/tool-helpers';
-import { Success, Failure, type Result } from '../../types';
-import type { ToolContext } from '../../mcp/context';
+import { Success, Failure, type Result } from '@types';
+import type { ToolContext } from '@mcp/context';
 import type { OpsToolParams } from './schema';
 
 interface PingConfig {

@@ -7,11 +7,11 @@
 
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import { extractErrorMessage } from '../../lib/error-utils';
-import type { ToolContext } from '../../mcp/context';
-import { createDockerClient } from '../../lib/docker';
+import { extractErrorMessage } from '@lib/error-utils';
+import type { ToolContext } from '@mcp/context';
+import { createDockerClient } from '@lib/docker';
 
-import { Success, Failure, type Result } from '../../types';
+import { Success, Failure, type Result } from '@types';
 import { tagImageSchema, type TagImageParams } from './schema';
 import { z } from 'zod';
 

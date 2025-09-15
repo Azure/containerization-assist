@@ -21,17 +21,17 @@
 
 import * as yaml from 'js-yaml';
 import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import type { Logger } from '../../lib/logger';
-import { extractErrorMessage } from '../../lib/error-utils';
+import type { Logger } from '@lib/logger';
+import { extractErrorMessage } from '@lib/error-utils';
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
-import type { ToolContext } from '../../mcp/context';
-import { createKubernetesClient } from '../../lib/kubernetes';
+import type { ToolContext } from '@mcp/context';
+import { createKubernetesClient } from '@lib/kubernetes';
 
-import { Success, Failure, type Result } from '../../types';
-import { DEFAULT_TIMEOUTS } from '../../config/defaults';
+import { Success, Failure, type Result } from '@types';
+import { DEFAULT_TIMEOUTS } from '@config/defaults';
 import { deployApplicationSchema, type DeployApplicationParams } from './schema';
 import { z } from 'zod';
-import type { SessionData } from '../session-types';
+import type { SessionData } from '@tools/session-types';
 
 // Type definitions for Kubernetes manifests
 interface KubernetesManifest {

@@ -6,7 +6,7 @@
  */
 import type { Logger } from 'pino';
 import { renderPromptTemplate, type PromptEntry } from './loader';
-import { Result, Success, Failure } from '../types';
+import { Result, Success, Failure } from '@types';
 
 /**
  * Enhancement options for prompt rendering

@@ -1,6 +1,6 @@
-import { Result, Success, Failure } from '../types';
+import { Result, Success, Failure } from '@types';
 import { URI_SCHEMES, type ParsedUri, type UriScheme } from './types';
-import { extractErrorMessage } from '../lib/error-utils';
+import { extractErrorMessage } from '@lib/error-utils';
 
 /**
  * URI parser and builder for MCP resource schemes

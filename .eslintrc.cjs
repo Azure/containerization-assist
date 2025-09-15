@@ -40,20 +40,28 @@ module.exports = {
     '@typescript-eslint/no-unsafe-member-access': 'error',
     '@typescript-eslint/no-unsafe-return': 'off',
     
-    // Import rules (strict ESM patterns)
+    // Import rules (path alias enforcement)
     'no-duplicate-imports': 'error',
     'no-restricted-imports': [
       'error',
       {
         patterns: [
-          { 
-            group: ['@domain/*','@service/*','@infrastructure/*', '@application/*'], 
-            message: 'Use relative ESM imports instead of path aliases.' 
+          {
+            group: ['../../../*', '../../*'],
+            message: 'Use path aliases instead of relative imports that go up more than one level. Use @lib/, @mcp/, @tools/, @types, etc.'
           }
         ]
       }
     ],
     '@typescript-eslint/no-floating-promises': 'error',
+
+    // Import organization (manual rules until import plugin is added)
+    'sort-imports': ['error', {
+      'ignoreCase': false,
+      'ignoreDeclarationSort': true, // We'll handle declaration sorting separately
+      'ignoreMemberSort': false,
+      'memberSyntaxSortOrder': ['none', 'all', 'multiple', 'single']
+    }],
     
     // General rules
     'no-console': ['warn', { 

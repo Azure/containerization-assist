@@ -3,7 +3,7 @@
  * Trade-off: AI quality over speed; fallback templates ensure availability.
  */
 
-// import { extractErrorMessage } from '../../lib/error-utils'; // Not currently used
+// import { extractErrorMessage } from '@lib/error-utils'; // Not currently used
 import { promises as fs } from 'node:fs';
 import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
 import type { Logger } from '@lib/logger';
@@ -15,7 +15,7 @@ import { aiGenerateWithSampling, aiGenerate } from '@mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 import type { SamplingOptions } from '@lib/sampling';
 
-import type { SessionAnalysisResult } from '../session-types';
+import type { SessionAnalysisResult } from '@tools/session-types';
 import type { ToolContext } from '@mcp/context';
 import { Success, Failure, type Result } from '@types';
 import { getDefaultPort, ANALYSIS_CONFIG } from '@config/defaults';
@@ -27,7 +27,7 @@ import {
 } from '@lib/text-processing';
 import { generateDockerfileSchema, type GenerateDockerfileParams } from './schema';
 import { z } from 'zod';
-import { AnalyzeRepoResult } from '../analyze-repo/tool';
+import { AnalyzeRepoResult } from '@tools/analyze-repo/tool';
 
 // Define the result schema for type safety - complex nested structure
 const SingleDockerfileResultSchema = z.object({
