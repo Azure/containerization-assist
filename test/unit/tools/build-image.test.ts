@@ -5,8 +5,7 @@
 
 import { jest } from '@jest/globals';
 import { promises as fs } from 'node:fs';
-import { buildImage, type BuildImageConfig } from '../../../src/tools/build-image/tool';
-import { ensureSession } from '../../../src/mcp/tool-session-helpers';
+import { createToolSessionHelpersMock } from '../../__support__/mocks/tool-session-helpers.mock';
 
 // Result Type Helpers for Testing
 function createSuccessResult<T>(value: T) {
@@ -93,29 +92,11 @@ jest.mock('../../../src/lib/logger', () => ({
 }));
 
 // Mock the session helpers
-jest.mock('../../../src/mcp/tool-session-helpers', () => ({
-  ensureSession: jest.fn(),
-  useSessionSlice: jest.fn((toolName, io, context) => {
-    // Simulate the actual behavior where patch calls sessionManager.update
-    return {
-      get: jest.fn(),
-      set: jest.fn(),
-      patch: jest.fn(async (sessionId, data) => {
-        if (context?.sessionManager?.update) {
-          await context.sessionManager.update(sessionId, {
-            metadata: {
-              toolSlices: {
-                [toolName]: data,
-              },
-            },
-          });
-        }
-      }),
-      clear: jest.fn(),
-    };
-  }),
-  defineToolIO: jest.fn((input, output) => ({ input, output })),
-}));
+jest.mock('../../../src/mcp/tool-session-helpers', () => createToolSessionHelpersMock());
+
+// Import these after mocks are set up
+import { buildImage, type BuildImageConfig } from '../../../src/tools/build-image/tool';
+import { ensureSession } from '../../../src/mcp/tool-session-helpers';
 
 const mockFs = fs as jest.Mocked<typeof fs>;
 

@@ -5,7 +5,7 @@
  */
 
 import { jest } from '@jest/globals';
-import { tagImage, type TagImageParams } from '../../../src/tools/tag-image/tool';
+import { createToolSessionHelpersMock } from '../../__support__/mocks/tool-session-helpers.mock';
 // Result Type Helpers for Testing
 function createSuccessResult<T>(value: T) {
   return {
@@ -77,11 +77,10 @@ jest.mock('../../../src/lib/tool-helpers', () => ({
 }));
 
 // Mock session helpers
-jest.mock('../../../src/mcp/tool-session-helpers', () => ({
-  ensureSession: jest.fn(),
-  useSessionSlice: jest.fn(),
-  defineToolIO: jest.fn((input, output) => ({ input, output })),
-}));
+jest.mock('../../../src/mcp/tool-session-helpers', () => createToolSessionHelpersMock());
+
+// Import these after mocks are set up
+import { tagImage, type TagImageParams } from '../../../src/tools/tag-image/tool';
 
 // Mock the session slice operations
 const mockSlicePatch = jest.fn().mockResolvedValue(undefined);

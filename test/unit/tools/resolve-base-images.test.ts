@@ -4,6 +4,7 @@
  */
 
 import { jest } from '@jest/globals';
+import { createToolSessionHelpersMock } from '../../__support__/mocks/tool-session-helpers.mock';
 
 // Jest mocks must be at the top to ensure proper hoisting
 jest.mock('../../../src/lib/session', () => ({
@@ -71,20 +72,7 @@ jest.mock('../../../src/lib/base-images', () => ({
 }));
 
 // Mock MCP helper modules
-jest.mock('../../../src/mcp/tool-session-helpers', () => ({
-  ensureSession: jest.fn(),
-  useSessionSlice: jest.fn().mockReturnValue({
-    get: jest.fn(),
-    set: jest.fn(),
-    patch: jest.fn().mockResolvedValue(undefined),
-    clear: jest.fn(),
-  }),
-  defineToolIO: jest.fn((input, output) => ({ input, output })),
-  getSession: jest.fn(),
-  updateSession: jest.fn(),
-  updateSessionData: jest.fn(),
-  resolveSession: jest.fn(),
-}));
+jest.mock('../../../src/mcp/tool-session-helpers', () => createToolSessionHelpersMock());
 
 // wrapTool mock removed - tool now uses direct implementation
 

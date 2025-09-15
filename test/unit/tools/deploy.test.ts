@@ -5,9 +5,7 @@
  */
 
 import { jest } from '@jest/globals';
-import { deployApplication as deployApplicationTool } from '../../../src/tools/deploy/tool';
-import type { DeployApplicationParams } from '../../../src/tools/deploy/schema';
-import type { ToolContext } from '@mcp/context';
+import { createToolSessionHelpersMock } from '../../__support__/mocks/tool-session-helpers.mock';
 
 // Result Type Helpers for Testing
 function createSuccessResult<T>(value: T) {
@@ -121,7 +119,12 @@ jest.mock('../../../src/lib/session', () => ({
 }));
 
 // Mock MCP helper modules
-jest.mock('@mcp/tool-session-helpers');
+jest.mock('../../../src/mcp/tool-session-helpers', () => createToolSessionHelpersMock());
+
+// Import these after mocks are set up
+import { deployApplication as deployApplicationTool } from '../../../src/tools/deploy/tool';
+import type { DeployApplicationParams } from '../../../src/tools/deploy/schema';
+import type { ToolContext } from '@mcp/context';
 
 jest.mock('../../../src/lib/kubernetes', () => ({
   createKubernetesClient: jest.fn(() => mockKubernetesClient),

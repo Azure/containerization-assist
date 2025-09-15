@@ -49,29 +49,9 @@ jest.mock('../../../src/lib/logger', () => ({
   })),
 }));
 
-jest.mock('../../../src/mcp/tool-session-helpers', () => ({
-  ensureSession: jest.fn(),
-  useSessionSlice: jest.fn((toolName, io, context) => {
-    // Simulate the actual behavior where patch calls sessionManager.update
-    return {
-      get: jest.fn(),
-      set: jest.fn(),
-      patch: jest.fn(async (sessionId, data) => {
-        if (context?.sessionManager?.update) {
-          await context.sessionManager.update(sessionId, {
-            metadata: {
-              toolSlices: {
-                [toolName]: data,
-              },
-            },
-          });
-        }
-      }),
-      clear: jest.fn(),
-    };
-  }),
-  defineToolIO: jest.fn((input, output) => ({ input, output })),
-}));
+import { createToolSessionHelpersMock } from '../../__support__/mocks/tool-session-helpers.mock';
+
+jest.mock('../../../src/mcp/tool-session-helpers', () => createToolSessionHelpersMock());
 
 jest.mock('../../../src/knowledge', () => ({
   getKnowledgeForCategory: jest.fn().mockReturnValue([
