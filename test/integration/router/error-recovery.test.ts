@@ -316,7 +316,7 @@ describe('Error Recovery and Rerouting', () => {
       });
 
       expect(firstAttempt.result.ok).toBe(false);
-      const firstExecutionCount = executionLog.length;
+
 
       // Second attempt - should skip completed prerequisites
       resetExecutionLog();
