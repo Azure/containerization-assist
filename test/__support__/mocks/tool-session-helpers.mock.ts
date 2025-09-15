@@ -26,6 +26,8 @@ export function createToolSessionHelpersMock() {
       };
     }),
     defineToolIO: jest.fn((input: any, output: any) => ({ input, output })),
+    getSessionSlice: jest.fn(),
+    updateSessionSlice: jest.fn(),
   };
 }
 

@@ -209,7 +209,7 @@ spec:
     jest.clearAllMocks();
     mockSessionManager.update.mockResolvedValue(true);
     mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
-    
+
     // Setup session helper mocks
     const sessionHelpers = require('@mcp/tool-session-helpers');
     sessionHelpers.getSession = jest.fn().mockResolvedValue({
@@ -230,7 +230,7 @@ spec:
       },
     });
     sessionHelpers.updateSession = jest.fn().mockResolvedValue({ ok: true });
-    
+
     // Setup new session helper mocks
     mockEnsureSession = sessionHelpers.ensureSession = jest.fn().mockImplementation(async () => ({
       ok: true,
@@ -252,12 +252,28 @@ spec:
         },
       },
     }));
-    
+
     // Setup useSessionSlice mock
     mockUseSessionSlice = sessionHelpers.useSessionSlice = jest.fn().mockReturnValue({
       get: jest.fn().mockResolvedValue({ ok: true, value: null }),
       set: jest.fn().mockResolvedValue({ ok: true }),
       patch: jest.fn().mockResolvedValue({ ok: true }),
+    });
+
+    // Setup getSessionSlice mock - this is what the deploy tool actually uses
+    sessionHelpers.getSessionSlice = jest.fn().mockResolvedValue({
+      ok: true,
+      value: {
+        output: {
+          manifests: sampleManifests,
+          outputPath: '/test/manifests.yaml',
+          resources: [
+            { kind: 'Deployment', name: 'test-app', namespace: 'default' },
+            { kind: 'Service', name: 'test-app', namespace: 'default' }
+          ],
+          sessionId: 'test-session-123'
+        }
+      }
     });
   });
 
@@ -345,7 +361,7 @@ spec:
 
 
     it('should use default values when config options not specified', async () => {
-      const minimalConfig: DeployApplicationConfig = {
+      const minimalConfig: DeployApplicationParams = {
         sessionId: 'test-session-123',
       };
 
