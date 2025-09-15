@@ -40,8 +40,6 @@ import {
   getConfigStrategies,
   quickConfigScore,
 } from '@lib/integrated-scoring';
-import { cacheInstances } from '@lib/cache';
-import { createHash } from 'crypto';
 import {
   enhancePromptWithKnowledge,
   type PromptEnhancementContext,
@@ -208,26 +206,6 @@ function assembleResult<T = AIResponse>(
 }
 
 /**
- * Generate cache key for AI requests
- */
-function generateCacheKey(
-  promptName: string,
-  promptArgs: Record<string, unknown>,
-  expectation?: string,
-): string {
-  const keyData = {
-    promptName,
-    promptArgs,
-    expectation: expectation || 'text',
-  };
-
-  return createHash('sha256')
-    .update(JSON.stringify(keyData, Object.keys(keyData).sort()))
-    .digest('hex')
-    .substring(0, 16);
-}
-
-/**
  * Extract knowledge enhancement context from prompt arguments
  */
 function extractKnowledgeContext(
@@ -290,31 +268,6 @@ export async function aiGenerateWithSampling<T = AIResponse>(
   context: ToolContext,
   options: AIGenerateOptions & SamplingOptions,
 ): Promise<Result<SamplingResult<T>>> {
-  // Generate cache key
-  const cacheKey = generateCacheKey(options.promptName, options.promptArgs, options.expectation);
-
-  // Check cache first
-  const cached = cacheInstances.aiResponses.get(cacheKey);
-  if (cached) {
-    logger.debug({ cacheKey }, 'AI response cache hit');
-
-    const winner = {
-      content: cached,
-      score: 100,
-      rank: 1,
-    } as unknown as T & { score: number; rank?: number };
-
-    return Success({
-      winner,
-      samplingMetadata: {
-        candidatesGenerated: 1,
-        winnerScore: 100,
-        stoppedEarly: false,
-        fromCache: true,
-      },
-    });
-  }
-
   // Enhance prompt with knowledge base recommendations
   let enhancedPromptArgs = options.promptArgs;
   try {
@@ -340,11 +293,6 @@ export async function aiGenerateWithSampling<T = AIResponse>(
     const enhancedOptions = { ...options, promptArgs: enhancedPromptArgs };
     const result = await aiGenerate(logger, context, enhancedOptions);
     if (!result.ok) return Failure(result.error);
-
-    // Cache successful single results
-    // Note: TTL is configured at cache creation time, not per-item
-    cacheInstances.aiResponses.set(cacheKey, result.value.content);
-    logger.debug({ cacheKey }, 'Cached AI response');
 
     const winner = {
       ...result.value,
@@ -378,13 +326,6 @@ export async function aiGenerateWithSampling<T = AIResponse>(
 
   const scoredCandidates = scoringResult.value;
   const samplingDuration = Date.now() - startTime;
-
-  // Cache the winner for multi-candidate results
-  if (scoredCandidates.length > 0 && scoredCandidates[0]) {
-    // Note: TTL is configured at cache creation time, not per-item
-    cacheInstances.aiResponses.set(cacheKey, scoredCandidates[0].content);
-    logger.debug({ cacheKey }, 'Cached multi-candidate winner');
-  }
 
   logger.info(
     {

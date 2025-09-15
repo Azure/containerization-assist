@@ -12,6 +12,7 @@ import type { WorkflowState } from '@types';
 export interface SessionAnalysisResult {
   language?: string;
   framework?: string;
+  frameworkVersion?: string;
   dependencies?: Array<{ name: string; version?: string }>;
   ports?: number[];
   buildSystem?: {

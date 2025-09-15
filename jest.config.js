@@ -27,6 +27,8 @@ export default {
         '^@resources/(.*)$': '<rootDir>/src/resources/$1',
         '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
         '^@knowledge/(.*)$': '<rootDir>/src/knowledge/$1',
+        '^@services/(.*)$': '<rootDir>/src/services/$1',
+        '^@exports/(.*)$': '<rootDir>/src/exports/$1',
         '^@types$': '<rootDir>/src/types',
         '^(\\.{1,2}/.*)\\.js$': '$1',
         // Test support mappings
@@ -67,6 +69,9 @@ export default {
         '^@workflows/(.*)$': '<rootDir>/src/workflows/$1',
         '^@resources/(.*)$': '<rootDir>/src/resources/$1',
         '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
+        '^@knowledge/(.*)$': '<rootDir>/src/knowledge/$1',
+        '^@services/(.*)$': '<rootDir>/src/services/$1',
+        '^@exports/(.*)$': '<rootDir>/src/exports/$1',
         '^@types$': '<rootDir>/src/types',
         '^(\\.{1,2}/.*)\\.js$': '$1',
         '^@test/fixtures/(.*)$': '<rootDir>/test/__support__/fixtures/$1',
@@ -107,6 +112,9 @@ export default {
         '^@workflows/(.*)$': '<rootDir>/src/workflows/$1',
         '^@resources/(.*)$': '<rootDir>/src/resources/$1',
         '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
+        '^@knowledge/(.*)$': '<rootDir>/src/knowledge/$1',
+        '^@services/(.*)$': '<rootDir>/src/services/$1',
+        '^@exports/(.*)$': '<rootDir>/src/exports/$1',
         '^@types$': '<rootDir>/src/types',
         '^(\\.{1,2}/.*)\\.js$': '$1',
         '^@test/fixtures/(.*)$': '<rootDir>/test/__support__/fixtures/$1',
@@ -211,6 +219,9 @@ export default {
     '^@workflows/(.*)$': '<rootDir>/src/workflows/$1',
     '^@resources/(.*)$': '<rootDir>/src/resources/$1',
     '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
+    '^@knowledge/(.*)$': '<rootDir>/src/knowledge/$1',
+    '^@services/(.*)$': '<rootDir>/src/services/$1',
+    '^@exports/(.*)$': '<rootDir>/src/exports/$1',
     '^@types$': '<rootDir>/src/types',
     
     // Handle .js imports and map them to .ts

@@ -26,7 +26,7 @@ import type { ToolContext } from '@mcp/context';
 import type { Logger } from '@lib/logger';
 import { getRecommendedBaseImage } from '@lib/base-images';
 import { scoreConfigCandidates } from '@lib/integrated-scoring';
-import { getKnowledgeForCategory } from '@/knowledge';
+import { getKnowledgeForCategory } from '@knowledge/index';
 import { resolveBaseImagesSchema, type ResolveBaseImagesParams } from './schema';
 import { z } from 'zod';
 

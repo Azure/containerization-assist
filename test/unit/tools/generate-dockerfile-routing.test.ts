@@ -106,7 +106,7 @@ describe('generate-dockerfile smart routing', () => {
     });
   });
 
-  it('should use guided analysis for high confidence detection', async () => {
+  it('should use template generation for very high confidence detection', async () => {
     // Override session state for this test
     ensureSession.mockResolvedValueOnce({
       ok: true,
@@ -117,7 +117,7 @@ describe('generate-dockerfile smart routing', () => {
             'analyze_repo': {
               language: 'javascript',
               framework: 'express',
-              confidence: 85, // High confidence
+              confidence: 96, // Very high confidence (above threshold of 95)
               detectionMethod: 'signature',
               dependencies: [{ name: 'express', version: '4.18.0' }],
               ports: [3000],

@@ -11,7 +11,7 @@ import path from 'node:path';
 import { safeNormalizePath } from '@lib/path-utils';
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import { createStandardProgress } from '@mcp/progress-helper';
-import { aiGenerateWithSampling, aiGenerate } from '@mcp/tool-ai-helpers';
+import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
 import type { SamplingOptions } from '@lib/sampling';
 
@@ -335,6 +335,57 @@ function generateTemplateDockerfile(
       dockerfile += `# Copy binary\n`;
       dockerfile += `COPY app /app/\n\n`;
       break;
+    case 'dotnet': {
+      // Handle .NET projects - check framework type
+      const isFramework =
+        framework?.includes('framework') ||
+        framework?.includes('aspnet-webapi') ||
+        framework?.includes('aspnet-mvc');
+
+      if (isFramework) {
+        // .NET Framework - Windows containers only
+        dockerfile = `# .NET Framework application - requires Windows containers\n`;
+        dockerfile += `FROM mcr.microsoft.com/dotnet/framework/sdk:4.8-windowsservercore-ltsc2022 AS builder\n`;
+        dockerfile += `WORKDIR /app\n\n`;
+        dockerfile += `# Copy project files\n`;
+        dockerfile += `COPY *.sln .\n`;
+        dockerfile += `COPY **/*.csproj ./\n`;
+        dockerfile += `RUN for /f %i in ('dir /b /s *.csproj') do mkdir %~dpi && move %i %~dpi\n\n`;
+
+        dockerfile += `# Restore packages\n`;
+        dockerfile += `RUN nuget restore\n\n`;
+
+        dockerfile += `# Copy source code\n`;
+        dockerfile += `COPY . .\n\n`;
+
+        dockerfile += `# Build application\n`;
+        dockerfile += `RUN msbuild /p:Configuration=Release\n\n`;
+
+        dockerfile += `# Runtime stage\n`;
+        dockerfile += `FROM mcr.microsoft.com/dotnet/framework/aspnet:4.8-windowsservercore-ltsc2022\n`;
+        dockerfile += `WORKDIR /inetpub/wwwroot\n`;
+        dockerfile += `COPY --from=builder /app/bin/Release/net48/publish .\n`;
+      } else {
+        // .NET Core/5+ - Linux containers
+        dockerfile = `# Multi-stage build for .NET\n`;
+        dockerfile += `FROM mcr.microsoft.com/dotnet/sdk:8.0 AS builder\n`;
+        dockerfile += `WORKDIR /src\n\n`;
+
+        dockerfile += `# Copy project files\n`;
+        dockerfile += `COPY *.csproj ./\n`;
+        dockerfile += `RUN dotnet restore\n\n`;
+
+        dockerfile += `# Copy source code\n`;
+        dockerfile += `COPY . .\n`;
+        dockerfile += `RUN dotnet publish -c Release -o /app/publish\n\n`;
+
+        dockerfile += `# Runtime stage\n`;
+        dockerfile += `FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine\n`;
+        dockerfile += `WORKDIR /app\n`;
+        dockerfile += `COPY --from=builder /app/publish .\n`;
+      }
+      break;
+    }
     default:
     // Generic Dockerfile
   }
@@ -365,6 +416,22 @@ function generateTemplateDockerfile(
     case 'go':
       dockerfile += `CMD ["./app"]\n`;
       break;
+    case 'dotnet': {
+      // Check if it's .NET Framework or Core
+      const isFramework =
+        framework?.includes('framework') ||
+        framework?.includes('aspnet-webapi') ||
+        framework?.includes('aspnet-mvc');
+      if (isFramework) {
+        // .NET Framework uses IIS
+        dockerfile += `# Application runs under IIS\n`;
+      } else {
+        // .NET Core/5+ uses Kestrel
+        const appName = buildSystem?.file?.replace('.csproj', '') || 'app';
+        dockerfile += `CMD ["dotnet", "${appName}.dll"]\n`;
+      }
+      break;
+    }
     default:
       dockerfile += `CMD ["sh", "-c", "echo 'Please configure your application startup command'"]\n`;
       break;
@@ -382,14 +449,40 @@ async function detectModuleRoots(
   logger?: Logger,
 ): Promise<string[]> {
   try {
+    // For .NET projects, ALWAYS use the root directory
+    // .NET solutions should have one Dockerfile at the solution root
+    if (language === 'dotnet') {
+      logger?.info({ repoPath, language }, 'Detected .NET project - using single root Dockerfile');
+      return ['.'];
+    }
+
+    // For other single-module projects, also use root
+    if (
+      language === 'python' ||
+      language === 'go' ||
+      language === 'rust' ||
+      language === 'php' ||
+      language === 'ruby'
+    ) {
+      logger?.info(
+        { repoPath, language },
+        `Detected ${language} project - using single root Dockerfile`,
+      );
+      return ['.'];
+    }
+
+    // Only scan for multi-module in Java/Node monorepos
     const buildFiles =
       language === 'java'
         ? ['pom.xml', 'build.gradle', 'build.gradle.kts']
         : language === 'javascript' || language === 'typescript'
           ? ['package.json']
-          : ['pom.xml', 'build.gradle', 'build.gradle.kts', 'package.json'];
+          : ['pom.xml', 'build.gradle', 'package.json'];
 
-    logger?.info({ repoPath, language, buildFiles }, 'Detecting module roots');
+    logger?.info(
+      { repoPath, language, buildFiles },
+      'Detecting module roots for potential monorepo',
+    );
 
     const moduleRoots: string[] = [];
 
@@ -592,7 +685,7 @@ async function generateWithDirectAnalysis(
   const repoPath = safeNormalizePath(rawPath);
   const normalizedModuleRoot = safeNormalizePath(moduleRoot);
 
-  // Build minimal prompt args for direct analysis
+  // Build comprehensive prompt args for direct analysis
   const promptArgs = {
     repoPath: path.isAbsolute(normalizedModuleRoot)
       ? normalizedModuleRoot
@@ -600,6 +693,28 @@ async function generateWithDirectAnalysis(
     detectedLanguage: analysisResult.language !== 'unknown' ? analysisResult.language : undefined,
     optimization: params.optimization === false ? undefined : params.optimization || 'balanced',
     moduleRoot,
+    // Pass discovered framework info to help AI understand structure
+    ...(analysisResult.framework && { framework: analysisResult.framework }),
+    ...(analysisResult.frameworkVersion && { frameworkVersion: analysisResult.frameworkVersion }),
+    // Add build system info for better context
+    ...(analysisResult.buildSystem && {
+      buildSystem: analysisResult.buildSystem.type,
+      buildFile: analysisResult.buildSystem.buildFile,
+      buildCommand: analysisResult.buildSystem.buildCommand,
+    }),
+    // Add detected dependencies for context
+    ...(analysisResult.dependencies &&
+      analysisResult.dependencies.length > 0 && {
+        dependencies: analysisResult.dependencies
+          .map((d) => d.name || d)
+          .slice(0, 10)
+          .join(', '),
+      }),
+    // Add ports if detected
+    ...(analysisResult.ports &&
+      analysisResult.ports.length > 0 && {
+        ports: analysisResult.ports.join(', '),
+      }),
   };
 
   logger.info(
@@ -874,45 +989,19 @@ async function generateSingleDockerfile(
   }
 
   // Always use sampling for better quality
-  {
-    const aiResult = await aiGenerateWithSampling(logger, context, {
-      promptName: 'dockerfile-generation',
-      promptArgs,
-      expectation: 'dockerfile',
-      maxRetries: 3,
-      fallbackBehavior: 'default',
-      ...samplingOptions,
-    });
+  const aiResult = await aiGenerateWithSampling(logger, context, {
+    promptName: 'dockerfile-generation',
+    promptArgs,
+    expectation: 'dockerfile',
+    maxRetries: 3,
+    fallbackBehavior: 'default',
+    ...samplingOptions,
+  });
 
-    if (aiResult.ok) {
-      const cleaned = stripFencesAndNoise(aiResult.value.winner.content, 'dockerfile');
-      if (!isValidDockerfileContent(cleaned)) {
-        // Fall back to template if AI output is invalid
-        const fallbackResult = generateTemplateDockerfile(
-          sessionToAnalyzeRepoResult(analysisResult),
-          params,
-          moduleRoot,
-        );
-        if (!fallbackResult.ok) {
-          return Failure(fallbackResult.error);
-        }
-        dockerfileContent = fallbackResult.value.content;
-        baseImageUsed = fallbackResult.value.baseImage;
-      } else {
-        dockerfileContent = cleaned;
-        baseImageUsed =
-          extractBaseImage(cleaned) ||
-          params.baseImage ||
-          getRecommendedBaseImage(analysisResult.language ?? 'unknown');
-
-        // Capture sampling metadata
-        samplingMetadata = aiResult.value.samplingMetadata;
-        winnerScore = aiResult.value.winner.score;
-        scoreBreakdown = aiResult.value.winner.scoreBreakdown;
-        allCandidates = aiResult.value.allCandidates;
-      }
-    } else {
-      // Use template fallback
+  if (aiResult.ok) {
+    const cleaned = stripFencesAndNoise(aiResult.value.winner.content, 'dockerfile');
+    if (!isValidDockerfileContent(cleaned)) {
+      // Fall back to template if AI output is invalid
       const fallbackResult = generateTemplateDockerfile(
         sessionToAnalyzeRepoResult(analysisResult),
         params,
@@ -923,52 +1012,31 @@ async function generateSingleDockerfile(
       }
       dockerfileContent = fallbackResult.value.content;
       baseImageUsed = fallbackResult.value.baseImage;
+    } else {
+      dockerfileContent = cleaned;
+      baseImageUsed =
+        extractBaseImage(cleaned) ||
+        params.baseImage ||
+        getRecommendedBaseImage(analysisResult.language ?? 'unknown');
+
+      // Capture sampling metadata
+      samplingMetadata = aiResult.value.samplingMetadata;
+      winnerScore = aiResult.value.winner.score;
+      scoreBreakdown = aiResult.value.winner.scoreBreakdown;
+      allCandidates = aiResult.value.allCandidates;
     }
   } else {
-    // Standard generation without sampling
-    const aiResult = await aiGenerate(logger, context, {
-      promptName: 'dockerfile-generation',
-      promptArgs,
-      expectation: 'dockerfile',
-      maxRetries: 3,
-      fallbackBehavior: 'default',
-    });
-
-    if (aiResult.ok) {
-      // Use AI-generated content
-      const cleaned = stripFencesAndNoise(aiResult.value.content, 'dockerfile');
-      if (!isValidDockerfileContent(cleaned)) {
-        // Fall back to template if AI output is invalid
-        const fallbackResult = generateTemplateDockerfile(
-          sessionToAnalyzeRepoResult(analysisResult),
-          params,
-          moduleRoot,
-        );
-        if (!fallbackResult.ok) {
-          return Failure(fallbackResult.error);
-        }
-        dockerfileContent = fallbackResult.value.content;
-        baseImageUsed = fallbackResult.value.baseImage;
-      } else {
-        dockerfileContent = cleaned;
-        baseImageUsed =
-          extractBaseImage(cleaned) ||
-          params.baseImage ||
-          getRecommendedBaseImage(analysisResult.language ?? 'unknown');
-      }
-    } else {
-      // Use template fallback
-      const fallbackResult = generateTemplateDockerfile(
-        sessionToAnalyzeRepoResult(analysisResult),
-        params,
-        moduleRoot,
-      );
-      if (!fallbackResult.ok) {
-        return Failure(fallbackResult.error);
-      }
-      dockerfileContent = fallbackResult.value.content;
-      baseImageUsed = fallbackResult.value.baseImage;
+    // Use template fallback
+    const fallbackResult = generateTemplateDockerfile(
+      sessionToAnalyzeRepoResult(analysisResult),
+      params,
+      moduleRoot,
+    );
+    if (!fallbackResult.ok) {
+      return Failure(fallbackResult.error);
     }
+    dockerfileContent = fallbackResult.value.content;
+    baseImageUsed = fallbackResult.value.baseImage;
   }
 
   // Determine output path - write to each module root directory
@@ -1016,19 +1084,17 @@ async function generateSingleDockerfile(
   };
 
   // Add sampling metadata
-  {
-    if (samplingMetadata) {
-      result.samplingMetadata = samplingMetadata;
-    }
-    if (winnerScore !== undefined) {
-      result.winnerScore = winnerScore;
-    }
-    if (scoreBreakdown && params.includeScoreBreakdown) {
-      result.scoreBreakdown = scoreBreakdown;
-    }
-    if (allCandidates && params.returnAllCandidates) {
-      result.allCandidates = allCandidates;
-    }
+  if (samplingMetadata) {
+    result.samplingMetadata = samplingMetadata;
+  }
+  if (winnerScore !== undefined) {
+    result.winnerScore = winnerScore;
+  }
+  if (scoreBreakdown && params.includeScoreBreakdown) {
+    result.scoreBreakdown = scoreBreakdown;
+  }
+  if (allCandidates && params.returnAllCandidates) {
+    result.allCandidates = allCandidates;
   }
 
   return Success(result);
@@ -1082,6 +1148,7 @@ async function generateDockerfileImpl(
       ? {
           language: rawAnalysisResult.language,
           framework: rawAnalysisResult.framework,
+          frameworkVersion: rawAnalysisResult.frameworkVersion,
           dependencies: rawAnalysisResult.dependencies,
           ports: rawAnalysisResult.ports,
           confidence: rawAnalysisResult.confidence,

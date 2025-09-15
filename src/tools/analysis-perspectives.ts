@@ -5,7 +5,7 @@
  * that integrate seamlessly with the existing analyze-repo tool without complex types.
  */
 
-import type { AnalysisPerspective, PerspectiveConfig } from './types';
+import type { AnalysisPerspective, PerspectiveConfig } from '@/types/tools';
 
 /**
  * Analysis perspective configurations

@@ -1,6 +1,6 @@
 import { DockerTestCleaner } from '../utilities/docker-test-cleaner';
-import { createDockerClient } from '../../../src/services/docker-client';
-import { createLogger } from '../../../src/lib/logger';
+import { createDockerClient } from '../../../dist/src/services/docker-client.js';
+import { createLogger } from '../../../dist/src/lib/logger.js';
 
 export default async function globalTeardown() {
   console.log('\n🧹 Cleaning up global test environment...');

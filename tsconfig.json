@@ -20,7 +20,10 @@
       "@exports/*": ["src/exports/*"],
       "@knowledge/*": ["src/knowledge/*"],
       "@types": ["src/types"],
-      "@/container": ["src/container"]
+      "@/container": ["src/container"],
+      "@/validation/*": ["src/validation/*"],
+      "@/types/*": ["src/types/*"],
+      "@/knowledge/*": ["src/knowledge/*"]
     },
     "declaration": true,
     "declarationMap": true,

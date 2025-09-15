@@ -100,10 +100,18 @@ describe('analyze-repo confidence scoring', () => {
 
   it('should return high confidence for JavaScript project with package.json', async () => {
     // Mock directory structure with clear JavaScript indicators
-    mockFs.stat.mockResolvedValue({
-      isDirectory: () => true,
-      isFile: () => false
-    } as any);
+    mockFs.stat.mockImplementation((path: string) => {
+      if (path.includes('package.json') || path.includes('index.js')) {
+        return Promise.resolve({
+          isDirectory: () => false,
+          isFile: () => true
+        } as any);
+      }
+      return Promise.resolve({
+        isDirectory: () => true,
+        isFile: () => false
+      } as any);
+    });
     mockFs.access.mockResolvedValue(undefined);
     mockFs.readdir.mockResolvedValue(['package.json', 'index.js', 'src']);
 

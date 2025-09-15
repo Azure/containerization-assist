@@ -160,7 +160,7 @@ export async function aiGenerate(
 
       const request: SamplingRequest = {
         messages: prompt.messages,
-        includeContext: 'thisServer',
+        includeContext: 'allServers', // Allow AI to use all available tools, not just this MCP server
         maxTokens,
       };
 

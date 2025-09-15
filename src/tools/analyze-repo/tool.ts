@@ -272,10 +272,31 @@ async function detectLanguage(repoPath: string): Promise<{
   language: string;
   version?: string;
   detectionDetails: DetectionDetails;
+  allFiles?: string[];
 }> {
-  const files = await fs.readdir(repoPath);
+  // Get all files recursively (up to 2 levels deep)
+  const allFiles: string[] = [];
+  const getAllFiles = async (dir: string, depth = 0): Promise<void> => {
+    if (depth > 2) return; // Limit depth
+    const files = await fs.readdir(dir);
+
+    for (const file of files) {
+      const filePath = joinPaths(dir, file);
+      const stats = await fs.stat(filePath);
+      const relativePath = filePath.replace(`${repoPath}/`, '');
+
+      if (stats.isFile()) {
+        allFiles.push(relativePath);
+      } else if (stats.isDirectory() && !file.startsWith('.') && file !== 'node_modules') {
+        await getAllFiles(filePath, depth + 1);
+      }
+    }
+  };
+
+  await getAllFiles(repoPath);
+
   const fileStats = await Promise.all(
-    files.map(async (file) => {
+    allFiles.map(async (file) => {
       const filePath = joinPaths(repoPath, file);
       const stats = await fs.stat(filePath);
       return { name: file, path: filePath, isFile: stats.isFile() };
@@ -300,10 +321,13 @@ async function detectLanguage(repoPath: string): Promise<{
 
   // Check for language signatures
   for (const [lang, signature] of Object.entries(LANGUAGE_SIGNATURES)) {
-    const matchedFiles = signature.files?.filter((f) => files.includes(f)) ?? [];
+    const matchedFiles =
+      signature.files?.filter((f) =>
+        allFiles.some((file) => file === f || file.endsWith(`/${f}`)),
+      ) ?? [];
     if (matchedFiles.length > 0) {
       detectionDetails.signatureMatches = matchedFiles.length;
-      return { language: lang, detectionDetails };
+      return { language: lang, detectionDetails, allFiles };
     }
 
     // Check for extensions
@@ -311,11 +335,11 @@ async function detectLanguage(repoPath: string): Promise<{
       signature.extensions?.filter((ext) => (extensionCounts[ext] ?? 0) > 0) ?? [];
     if (matchedExtensions.length > 0) {
       detectionDetails.extensionMatches = matchedExtensions.length;
-      return { language: lang, detectionDetails };
+      return { language: lang, detectionDetails, allFiles };
     }
   }
 
-  return { language: 'unknown', detectionDetails };
+  return { language: 'unknown', detectionDetails, allFiles };
 }
 
 /**
@@ -326,8 +350,10 @@ async function detectLanguage(repoPath: string): Promise<{
 async function detectFramework(
   repoPath: string,
   language: string,
+  allFiles?: string[],
 ): Promise<{ framework?: string; version?: string; frameworkSignals: number } | undefined> {
-  const files = await fs.readdir(repoPath);
+  // Use provided files or scan directory
+  const files = allFiles || (await fs.readdir(repoPath));
   let frameworkSignals = 0;
 
   // Check package.json for JS/TS frameworks
@@ -351,6 +377,7 @@ async function detectFramework(
   // .NET specific framework detection
   if (language === 'dotnet') {
     try {
+      // Find all .csproj files (they should already be in allFiles from detectLanguage)
       const csprojFiles = files.filter((f) => f.endsWith('.csproj'));
       for (const csprojFile of csprojFiles) {
         try {
@@ -364,7 +391,7 @@ async function detectFramework(
           if (frameworkVersionMatch) {
             const version = frameworkVersionMatch[1];
 
-            // Determine specific framework type based oni ences
+            // Determine specific framework type based oni iences
             frameworkSignals = 1;
             if (csprojContent.includes('System.Web.Http')) {
               frameworkSignals = 2; // More specific detection
@@ -620,7 +647,11 @@ async function analyzeRepoImpl(
 
     // Perform analysis
     const languageInfo = await detectLanguage(repoPath);
-    const frameworkInfo = await detectFramework(repoPath, languageInfo.language);
+    const frameworkInfo = await detectFramework(
+      repoPath,
+      languageInfo.language,
+      languageInfo.allFiles,
+    );
     const buildSystemRaw = await detectBuildSystem(repoPath);
     const dependencies = await analyzeDependencies(repoPath, languageInfo.language);
     const ports = await detectPorts(languageInfo.language);
@@ -775,6 +806,19 @@ async function analyzeRepoImpl(
         includeTests,
         timestamp: Date.now(),
         ...(aiInsights !== undefined && { aiInsights }),
+        ...(languageInfo.allFiles && {
+          projectFiles: languageInfo.allFiles.filter(
+            (f) =>
+              f.endsWith('.csproj') ||
+              f.endsWith('.sln') ||
+              f === 'package.json' ||
+              f === 'pom.xml' ||
+              f === 'build.gradle' ||
+              f === 'go.mod' ||
+              f === 'Cargo.toml' ||
+              f === 'requirements.txt',
+          ),
+        }),
       },
     };
 

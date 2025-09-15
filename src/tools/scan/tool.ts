@@ -11,7 +11,8 @@ import type { ToolContext } from '@mcp/context';
 
 import { createSecurityScanner } from '@lib/scanner';
 import { Success, Failure, type Result } from '@types';
-import { getKnowledgeForCategory } from '@/knowledge/index';
+import { getKnowledgeForCategory } from '@knowledge/index';
+import type { KnowledgeMatch } from '@knowledge/types';
 import { scanImageSchema, type ScanImageParams } from './schema';
 import { z } from 'zod';
 
@@ -230,13 +231,13 @@ async function scanImageImpl(
         const generalKnowledge = await getKnowledgeForCategory('security', undefined);
 
         remediationGuidance = [
-          ...securityKnowledge.map((match) => ({
+          ...securityKnowledge.map((match: KnowledgeMatch) => ({
             vulnerability: 'General',
             recommendation: match.entry.recommendation,
             ...(match.entry.severity && { severity: match.entry.severity }),
             ...(match.entry.example && { example: match.entry.example }),
           })),
-          ...generalKnowledge.map((match) => ({
+          ...generalKnowledge.map((match: KnowledgeMatch) => ({
             vulnerability: 'Best Practice',
             recommendation: match.entry.recommendation,
             ...(match.entry.severity && { severity: match.entry.severity }),
