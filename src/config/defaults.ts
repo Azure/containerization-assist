@@ -17,8 +17,8 @@ export const DEFAULT_PORTS = {
   rust: [8080, 3000],
   ruby: [3000, 9292],
   php: [8080, 80],
-  csharp: [5000, 5001],
-  dotnet: [5000, 5001],
+  csharp: [8080, 5000],
+  dotnet: [8080, 5000],
   default: [3000, 8080],
 } as const;
 
