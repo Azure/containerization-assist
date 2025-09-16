@@ -39,6 +39,27 @@ export function safeNormalizePath(filePath: string): string {
     return match;
   });
 
+  // Pattern 4: Handle full path duplication like C:/Users/.../path/C:/Users/.../path
+  // This can happen when path.resolve is called on an already absolute path
+  const pathPattern = /^([a-zA-Z]:\/[^:]+)\/\1/;
+  const match = normalized.match(pathPattern);
+  if (match?.[1]) {
+    // Remove the duplicate path
+    normalized = match[1];
+  }
+
+  // Also check for pattern where the path appears twice with the second occurrence starting with drive letter
+  // e.g., "C:/Users/path/to/project/C:/Users/path/to/project"
+  const driveLetterPattern = /^([a-zA-Z]):\/(.+)\/[a-zA-Z]:\//;
+  const driveMatch = normalized.match(driveLetterPattern);
+  if (driveMatch) {
+    const firstPart = `${driveMatch[1]}:/${driveMatch[2]}`;
+    // Check if the path after the second drive letter matches the beginning
+    if (normalized.includes(`${firstPart}/${firstPart}`)) {
+      normalized = firstPart;
+    }
+  }
+
   // Handle potential double slashes that might occur
   // Check if it's a UNC path (//server/share) - these start with exactly two slashes followed by non-slash
   const isUncPath = normalized.match(/^\/\/[^/]/);

@@ -55,4 +55,14 @@ describe('safeNormalizePath', () => {
     expect(safeNormalizePath('C:/Users/test')).toBe('C:/Users/test');
     expect(safeNormalizePath('/d/projects/app')).toBe('/d/projects/app');
   });
+
+  it('should handle full path duplication', () => {
+    // Case from second screenshot - full path appears twice
+    const dupPath = 'C:/Users/chentomy/Git/BugBashRepos/java-migration-copilot-samples/asset-manager/C:/Users/chentomy/Git/BugBashRepos/java-migration-copilot-samples/asset-manager';
+    expect(safeNormalizePath(dupPath)).toBe('C:/Users/chentomy/Git/BugBashRepos/java-migration-copilot-samples/asset-manager');
+
+    // With backslashes
+    const dupPathBackslash = 'C:\\Users\\test\\project\\C:\\Users\\test\\project';
+    expect(safeNormalizePath(dupPathBackslash)).toBe('C:/Users/test/project');
+  });
 });
