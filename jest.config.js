@@ -260,11 +260,6 @@ export default {
     '^\\.\\.\/\\.\\.\/infrastructure\/core\/logger\\.js$': '<rootDir>/src/infrastructure/logger.ts',
     '^\\.\\.\/\\.\\.\/\\.\\.\/infrastructure\/core\/logger\\.js$': '<rootDir>/src/infrastructure/logger.ts',
 
-    // Relative imports from domain/types/errors
-    '^\\.\\.\/errors\/index\\.js$': '<rootDir>/src/domain/types/errors/index.ts',
-    '^\\.\\.\/\\.\\.\/errors\/index\\.js$': '<rootDir>/src/domain/types/errors/index.ts',
-    '^\\.\\.\/\\.\\.\/\\.\\.\/errors\/index\\.js$': '<rootDir>/src/domain/types/errors/index.ts',
-
     // Relative imports from src/errors - as seen from infrastructure directory
     '^\\.\\./errors/index\\.js$': '<rootDir>/src/errors/index.ts',
     '^\\.\\.\/\\.\\./errors/index\\.js$': '<rootDir>/src/errors/index.ts',

@@ -99,7 +99,7 @@
         "errors": 0
       },
       "build": {
-        "timeMs": 6000,
+        "timeMs": 4000,
         "mode": "clean",
         "environment": {
           "nodeVersion": "v24.7.0",
