@@ -22,7 +22,7 @@ export interface SessionAnalysisResult {
   };
   summary?: string;
   confidence?: number;
-  detectionMethod?: 'signature' | 'extension' | 'fallback' | 'ai-enhanced';
+  detectionMethod?: 'signature' | 'extension' | 'provided' | 'fallback' | 'ai-enhanced';
   detectionDetails?: {
     signatureMatches: number;
     extensionMatches: number;

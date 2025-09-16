@@ -36,14 +36,14 @@ jest.mock('../../../src/lib/tool-helpers', () => ({
     info: jest.fn(),
     error: jest.fn(),
     debug: jest.fn(),
-    warn: jest.fn()
+    warn: jest.fn(),
   })),
   createToolTimer: jest.fn(() => ({
     start: jest.fn(),
     stop: jest.fn(),
     error: jest.fn(),
     end: jest.fn(),
-    info: jest.fn()
+    info: jest.fn(),
   })),
 }));
 
@@ -74,7 +74,12 @@ describe('analyze-repo confidence scoring', () => {
     signal: undefined,
     progress: undefined,
     sampling: {
-      createMessage: jest.fn().mockResolvedValue({ role: 'assistant', content: [{ type: 'text', text: 'mock response' }] }),
+      createMessage: jest
+        .fn()
+        .mockResolvedValue({
+          role: 'assistant',
+          content: [{ type: 'text', text: 'mock response' }],
+        }),
     },
     getPrompt: jest.fn().mockResolvedValue({ messages: [] }),
     sessionManager: undefined,
@@ -89,8 +94,8 @@ describe('analyze-repo confidence scoring', () => {
       ok: true,
       value: {
         id: 'test-session',
-        state: { results: {} }
-      }
+        state: { results: {} },
+      },
     });
 
     useSessionSlice.mockReturnValue({
@@ -104,12 +109,12 @@ describe('analyze-repo confidence scoring', () => {
       if (path.includes('package.json') || path.includes('index.js')) {
         return Promise.resolve({
           isDirectory: () => false,
-          isFile: () => true
+          isFile: () => true,
         } as any);
       }
       return Promise.resolve({
         isDirectory: () => true,
-        isFile: () => false
+        isFile: () => false,
       } as any);
     });
     mockFs.access.mockResolvedValue(undefined);
@@ -121,6 +126,7 @@ describe('analyze-repo confidence scoring', () => {
       {
         sessionId: 'test-session',
         path: '/test/project',
+        dockerfilePaths: ['/test/project/Dockerfile'],
       },
       context,
     );
@@ -141,7 +147,7 @@ describe('analyze-repo confidence scoring', () => {
     // Mock directory with no clear language indicators
     mockFs.stat.mockResolvedValue({
       isDirectory: () => true,
-      isFile: () => false
+      isFile: () => false,
     } as any);
     mockFs.access.mockResolvedValue(undefined);
     mockFs.readdir.mockResolvedValue(['data.txt', 'config.ini', 'readme.md']);
@@ -152,6 +158,7 @@ describe('analyze-repo confidence scoring', () => {
       {
         sessionId: 'test-session',
         path: '/test/unknown',
+        dockerfilePaths: ['/test/unknown/Dockerfile'],
       },
       context,
     );
@@ -171,7 +178,7 @@ describe('analyze-repo confidence scoring', () => {
     // Mock directory with only file extensions as indicators
     mockFs.stat.mockResolvedValue({
       isDirectory: () => true,
-      isFile: () => false
+      isFile: () => false,
     } as any);
     mockFs.access.mockResolvedValue(undefined);
     // Add more Python files to increase the chance of detection
@@ -202,7 +209,7 @@ describe('analyze-repo confidence scoring', () => {
   it('should include confidence scoring fields in result', async () => {
     mockFs.stat.mockResolvedValue({
       isDirectory: () => true,
-      isFile: () => false
+      isFile: () => false,
     } as any);
     mockFs.access.mockResolvedValue(undefined);
     mockFs.readdir.mockResolvedValue(['package.json']);
@@ -213,6 +220,7 @@ describe('analyze-repo confidence scoring', () => {
       {
         sessionId: 'test-session',
         path: '/test/project',
+        dockerfilePaths: ['/test/project/Dockerfile'],
       },
       context,
     );
@@ -230,6 +238,37 @@ describe('analyze-repo confidence scoring', () => {
       expect(typeof result.value.detectionDetails.extensionMatches).toBe('number');
       expect(typeof result.value.detectionDetails.frameworkSignals).toBe('number');
       expect(typeof result.value.detectionDetails.buildSystemSignals).toBe('number');
+    }
+  });
+
+  it('should use provided language parameter', async () => {
+    mockFs.stat.mockResolvedValue({
+      isDirectory: () => true,
+      isFile: () => false,
+    } as any);
+    mockFs.access.mockResolvedValue(undefined);
+    mockFs.readdir.mockResolvedValue(['main.py']);
+
+    const context = mockContext;
+
+    // Test with explicitly provided language
+    const result = await analyzeRepo(
+      {
+        sessionId: 'test-session',
+        path: '/test/project',
+        language: 'java',
+        dockerfilePaths: ['/test/project/Dockerfile'],
+      },
+      context,
+    );
+
+    if (!result.ok) {
+      throw new Error(`Expected result.ok to be true, but got error: ${result.error}`);
+    }
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.language).toBe('java');
     }
   });
 });
