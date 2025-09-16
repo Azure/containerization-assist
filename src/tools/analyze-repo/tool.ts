@@ -21,7 +21,9 @@
 
 import { joinPaths, getExtension, safeNormalizePath } from '@lib/path-utils';
 import { promises as fs, constants } from 'node:fs';
+import * as path from 'node:path';
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
+import type { Logger } from '@lib/logger';
 import { createStandardProgress } from '@mcp/progress-helper';
 import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
@@ -82,6 +84,7 @@ const AnalyzeRepoResultSchema = z.object({
     includeTests: z.boolean().optional(),
     aiInsights: z.unknown().optional(),
   }),
+  modules: z.array(z.string()).optional(), // Detected module paths for multi-module projects
 });
 
 // Define the result type from the schema
@@ -473,6 +476,97 @@ async function detectFramework(
 }
 
 /**
+ * Detects module roots in multi-module projects (Maven, Gradle, Node monorepos)
+ */
+async function detectModuleRoots(
+  repoPath: string,
+  language: string,
+  logger: Logger,
+): Promise<string[]> {
+  // Skip module detection for languages that typically don't have multi-module structures
+  if (
+    language === 'dotnet' ||
+    language === 'python' ||
+    language === 'go' ||
+    language === 'rust' ||
+    language === 'php' ||
+    language === 'ruby'
+  ) {
+    return [];
+  }
+
+  const moduleRoots: string[] = [];
+  const buildFiles =
+    language === 'java'
+      ? ['pom.xml', 'build.gradle', 'build.gradle.kts']
+      : language === 'javascript' || language === 'typescript'
+        ? ['package.json']
+        : [];
+
+  if (buildFiles.length === 0) return [];
+
+  async function scanDirectory(dirPath: string, depth: number = 0): Promise<void> {
+    if (depth > 3) return;
+
+    try {
+      const entries = await fs.readdir(dirPath, { withFileTypes: true });
+
+      for (const buildFile of buildFiles) {
+        const buildFilePath = joinPaths(dirPath, buildFile);
+        try {
+          // Directly read the file to avoid TOCTOU race condition
+          if (buildFile === 'pom.xml') {
+            const pomContent = await fs.readFile(buildFilePath, 'utf-8');
+            const isParentPom = pomContent.includes('<modules>') && pomContent.includes('<module>');
+            const srcDir = joinPaths(dirPath, 'src');
+            const hasSrc = await fs
+              .stat(srcDir)
+              .then((stats) => stats.isDirectory())
+              .catch(() => false);
+
+            if (!isParentPom || hasSrc) {
+              const relativePath = path.relative(repoPath, dirPath) || '.';
+              if (!moduleRoots.includes(relativePath)) {
+                moduleRoots.push(relativePath);
+                logger.debug({ moduleRoot: relativePath, buildFile }, 'Found module root');
+              }
+            }
+          } else {
+            // For non-pom.xml files, just check if we can stat the file
+            await fs.stat(buildFilePath);
+            const relativePath = path.relative(repoPath, dirPath) || '.';
+            if (!moduleRoots.includes(relativePath)) {
+              moduleRoots.push(relativePath);
+              logger.debug({ moduleRoot: relativePath, buildFile }, 'Found module root');
+            }
+          }
+          break;
+        } catch {
+          // Build file doesn't exist, continue
+        }
+      }
+
+      for (const entry of entries) {
+        if (
+          entry.isDirectory() &&
+          !entry.name.startsWith('.') &&
+          !['node_modules', 'target', 'build', 'dist', 'out'].includes(entry.name)
+        ) {
+          await scanDirectory(joinPaths(dirPath, entry.name), depth + 1);
+        }
+      }
+    } catch (error) {
+      logger.debug({ dirPath, error }, 'Error scanning directory for modules');
+    }
+  }
+
+  await scanDirectory(repoPath);
+
+  // Only return if we found multiple modules
+  return moduleRoots.length > 1 ? moduleRoots : [];
+}
+
+/**
  * Detects build system by scanning for configuration files.
  * Provides build and test commands for downstream tools.
  */
@@ -488,6 +582,30 @@ async function detectBuildSystem(repoPath: string): Promise<
 > {
   const files = await fs.readdir(repoPath);
 
+  // Simple check for .NET projects - let AI figure out the details
+  const csprojFile = files.find((f) => f.endsWith('.csproj'));
+  if (csprojFile) {
+    return {
+      type: 'dotnet',
+      file: csprojFile,
+      buildCmd: 'dotnet build',
+      testCmd: 'dotnet test',
+      buildSystemSignals: 1,
+    };
+  }
+
+  const slnFile = files.find((f) => f.endsWith('.sln'));
+  if (slnFile) {
+    return {
+      type: 'dotnet',
+      file: slnFile,
+      buildCmd: 'dotnet build',
+      testCmd: 'dotnet test',
+      buildSystemSignals: 1,
+    };
+  }
+
+  // Check other build systems
   for (const [system, config] of Object.entries(BUILD_SYSTEMS)) {
     if (files.includes(config.file)) {
       return {
@@ -694,6 +812,15 @@ async function analyzeRepoImpl(
     const ports = await detectPorts(languageInfo.language);
     const dockerInfo = await checkDockerFiles(repoPath);
 
+    // Detect multi-module structure
+    const modules = await detectModuleRoots(repoPath, languageInfo.language, logger);
+    if (modules.length > 0) {
+      logger.info(
+        { modules, language: languageInfo.language },
+        'Detected multi-module project structure',
+      );
+    }
+
     // Get AI insights using standardized helper if available
     let aiInsights: string | undefined;
     if (hasAI) {
@@ -860,6 +987,7 @@ async function analyzeRepoImpl(
           ),
         }),
       },
+      ...(modules.length > 0 && { modules }), // Include detected modules if multi-module project
     };
 
     // Update typed session slice with output and state

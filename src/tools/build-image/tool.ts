@@ -16,7 +16,12 @@
 import { resolvePath, joinPaths, getRelativePath, safeNormalizePath } from '@lib/path-utils';
 import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
 import { promises as fs } from 'node:fs';
-import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
+import {
+  ensureSession,
+  defineToolIO,
+  useSessionSlice,
+  getSessionSlice,
+} from '@mcp/tool-session-helpers';
 import { createStandardProgress } from '@mcp/progress-helper';
 import type { ToolContext } from '@mcp/context';
 import { createDockerClient, type DockerBuildOptions } from '@lib/docker';
@@ -27,6 +32,7 @@ import { fileExists } from '@lib/file-utils';
 import { buildImageSchema, type BuildImageParams } from './schema';
 import { z } from 'zod';
 import type { SessionData } from '@tools/session-types';
+import { analyzeRepoSchema } from '@tools/analyze-repo/schema';
 
 export interface BuildImageResult {
   /** Whether the build completed successfully */
@@ -78,25 +84,52 @@ const StateSchema = z.object({
 /**
  * Prepare build arguments with defaults
  */
-function prepareBuildArgs(
+async function prepareBuildArgs(
   buildArgs: Record<string, string> = {},
-  session: SessionData | null | undefined,
-): Record<string, string> {
+  sessionId: string,
+  context: ToolContext,
+  logger: any,
+): Promise<Record<string, string>> {
   const defaults: Record<string, string> = {
     NODE_ENV: process.env.NODE_ENV ?? 'production',
     BUILD_DATE: new Date().toISOString(),
     VCS_REF: process.env.GIT_COMMIT ?? 'unknown',
   };
 
-  // Add session-specific args if available
-  const analysisResult = session?.results?.['analyze_repo'] as any;
-  if (analysisResult) {
-    if (analysisResult.language) {
-      defaults.LANGUAGE = analysisResult.language;
+  // Get analysis result from session slice
+  try {
+    // Define the IO for analyze-repo to access its slice
+    const AnalyzeRepoResultSchema = z.object({
+      ok: z.boolean(),
+      sessionId: z.string(),
+      language: z.string(),
+      languageVersion: z.string().optional(),
+      framework: z.string().optional(),
+      frameworkVersion: z.string().optional(),
+    });
+
+    const analyzeRepoIO = defineToolIO(analyzeRepoSchema, AnalyzeRepoResultSchema);
+    const analysisSliceResult = await getSessionSlice(
+      'analyze-repo',
+      sessionId,
+      analyzeRepoIO,
+      context,
+    );
+
+    if (analysisSliceResult.ok && analysisSliceResult.value?.output) {
+      const analysisResult = analysisSliceResult.value.output;
+      if (analysisResult.language) {
+        defaults.LANGUAGE = analysisResult.language;
+      }
+      if (analysisResult.framework) {
+        defaults.FRAMEWORK = analysisResult.framework;
+      }
+      if (analysisResult.frameworkVersion) {
+        defaults.FRAMEWORK_VERSION = analysisResult.frameworkVersion;
+      }
     }
-    if (analysisResult.framework) {
-      defaults.FRAMEWORK = analysisResult.framework;
-    }
+  } catch (error) {
+    logger.debug({ error }, 'Could not get analysis result from session, using defaults');
   }
 
   return { ...defaults, ...buildArgs };
@@ -269,7 +302,7 @@ async function buildImageImpl(
     }
 
     // Prepare build arguments
-    const finalBuildArgs = prepareBuildArgs(buildArgs, sessionData);
+    const finalBuildArgs = await prepareBuildArgs(buildArgs, sessionId, context, logger);
 
     // Analyze security
     const securityWarnings = analyzeBuildSecurity(dockerfileContent, finalBuildArgs);

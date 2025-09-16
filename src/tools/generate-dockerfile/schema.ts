@@ -4,7 +4,11 @@
 
 import { z } from 'zod';
 
-const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
+const sessionIdSchema = z
+  .string()
+  .describe(
+    'Session identifier for sharing data between tools. Use the sessionId from analyze-repo to leverage detailed analysis results.',
+  );
 
 export const environmentSchema = z
   .enum(['development', 'staging', 'production', 'testing'])
