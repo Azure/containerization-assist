@@ -45,7 +45,7 @@ import { resolveBaseImages } from '@tools/resolve-base-images/tool';
 import { resolveBaseImagesSchema } from '@tools/resolve-base-images/schema';
 import { prepareCluster } from '@tools/prepare-cluster/tool';
 import { prepareClusterSchema } from '@tools/prepare-cluster/schema';
-import { opsTool } from '@tools/ops/tool';
+import { ops } from '@tools/ops/tool';
 import { opsToolSchema } from '@tools/ops/schema';
 import { generateK8sManifests } from '@tools/generate-k8s-manifests/tool';
 import { generateK8sManifestsSchema } from '@tools/generate-k8s-manifests/schema';
@@ -157,7 +157,7 @@ const TOOLS: ToolDefinition[] = [
     name: 'ops',
     description: 'Operational tools',
     schema: opsToolSchema,
-    handler: opsTool as (
+    handler: ops as (
       params: Record<string, unknown>,
       context: ToolContext,
     ) => Promise<Result<unknown>>,

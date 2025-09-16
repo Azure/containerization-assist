@@ -203,4 +203,4 @@ async function opsImpl(params: OpsToolParams, context: ToolContext): Promise<Res
 /**
  * Export the ops tool directly
  */
-export const opsTool = opsImpl;
+export const ops = opsImpl;
