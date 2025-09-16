@@ -22,12 +22,12 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
         with:
           fetch-depth: 1  # Shallow clone for faster checkout
       
       - name: Run SHA Sentry Security Scan
-        uses: Tatsinnit/sha-sentry@v5.0.0
+        uses: Tatsinnit/sha-sentry@791b8608fd295028f2aad4e579cd68edabd62d85 # v5.0.0
         id: sha_audit
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
