@@ -245,6 +245,7 @@ function generateBasicManifests(
             {
               name: appName,
               image,
+              imagePullPolicy: 'Never', // Always use local images, never pull from registry
               ports: [{ containerPort: port }],
               ...(envVars.length > 0 && { env: envVars }),
               ...(resources && { resources }),
@@ -409,6 +410,7 @@ function buildK8sManifestPromptArgs(
   return {
     ...merged,
     image,
+    imagePullPolicy: 'Never', // Always use local images, never pull from registry
     ingressHost: params.ingressHost,
     resources: params.resources,
     envVars: params.envVars,
@@ -638,8 +640,8 @@ async function generateK8sManifestsImpl(
       },
       'Kubernetes manifest validation complete',
     );
-    // Write manifests to disk - use current directory as base
-    const outputPath = joinPaths('.', 'k8s');
+    // Write manifests to disk - use provided path as base
+    const outputPath = joinPaths(params.path, 'k8s');
     await fs.mkdir(outputPath, { recursive: true });
     const manifestPath = joinPaths(outputPath, 'manifests.yaml');
     await fs.writeFile(manifestPath, yamlContent, 'utf-8');
