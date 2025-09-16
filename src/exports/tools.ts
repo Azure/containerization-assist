@@ -16,7 +16,7 @@ import {
   convertAcaToK8s,
   generateHelmCharts,
   inspectSession,
-} from '@/tools/all';
+} from '@tools/all';
 import { analyzeRepoSchema } from '@tools/analyze-repo/schema';
 import { generateDockerfileSchema } from '@tools/generate-dockerfile/schema';
 import { buildImageSchema } from '@tools/build-image/schema';

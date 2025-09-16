@@ -4,8 +4,9 @@
  */
 
 import { jest } from '@jest/globals';
-import { opsTool } from '@tools/ops/tool';
-import type { OpsToolParams } from '@tools/ops/schema';
+import { ops } from '../../../src/tools/all';
+import { OpsToolParams } from '../../../src/tools/ops/schema';
+
 import { createMockLogger } from '../../__support__/utilities/mock-factories';
 
 
@@ -44,7 +45,7 @@ describe('opsTool', () => {
         message: 'test-ping',
       };
 
-      const result = await opsTool(config, { logger: mockLogger });
+      const result = await ops(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -71,7 +72,7 @@ describe('opsTool', () => {
         operation: 'ping',
       };
 
-      const result = await opsTool(config, { logger: mockLogger });
+      const result = await ops(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -86,7 +87,7 @@ describe('opsTool', () => {
         message: 'test-message',
       };
 
-      await opsTool(config, { logger: mockLogger });
+      await ops(config, { logger: mockLogger });
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         { message: 'test-message' },
@@ -102,7 +103,7 @@ describe('opsTool', () => {
         details: true,
       };
 
-      const result = await opsTool(config, { logger: mockLogger });
+      const result = await ops(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -139,7 +140,7 @@ describe('opsTool', () => {
         details: false,
       };
 
-      const result = await opsTool(config, { logger: mockLogger });
+      const result = await ops(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       expect(mockLogger.info).toHaveBeenCalledWith(
@@ -153,7 +154,7 @@ describe('opsTool', () => {
         operation: 'status',
       };
 
-      await opsTool(config, { logger: mockLogger });
+      await ops(config, { logger: mockLogger });
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -173,7 +174,7 @@ describe('opsTool', () => {
         operation: 'invalid',
       } as any;
 
-      const result = await opsTool(config, { logger: mockLogger });
+      const result = await ops(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -188,7 +189,7 @@ describe('opsTool', () => {
         operation: 'ping',
       };
 
-      await opsTool(config, { logger: mockLogger });
+      await ops(config, { logger: mockLogger });
 
       expect(mockTimer.end).toHaveBeenCalled();
     });
@@ -198,7 +199,7 @@ describe('opsTool', () => {
         operation: 'status',
       };
 
-      await opsTool(config, { logger: mockLogger });
+      await ops(config, { logger: mockLogger });
 
       expect(mockTimer.end).toHaveBeenCalled();
     });

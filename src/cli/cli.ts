@@ -15,6 +15,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extractErrorMessage } from '@lib/error-utils';
+import { homedir } from 'node:os';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -93,7 +94,16 @@ program.parse(argv);
 
 const options = program.opts();
 const command = program.args[0] ?? 'start';
-const defaultDockerSockets = ['/var/run/docker.sock', '~/.colima/default/docker.sock'];
+
+export function getColimaSockets(): string[] {
+  const homeDir = homedir();
+  return [
+    join(homeDir, '.colima/default/docker.sock'),
+    join(homeDir, '.colima/docker/docker.sock'),
+    join(homeDir, '.lima/colima/sock/docker.sock'), // Lima-based colima
+  ];
+}
+const defaultDockerSockets = ['/var/run/docker.sock', ...getColimaSockets()];
 
 // Enhanced transport detection and logging
 function getTransportInfo(options: any): { type: 'stdio' | 'http'; details: string } {
