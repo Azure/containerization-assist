@@ -722,7 +722,10 @@ async function analyzeRepoImpl(
   const timer = createToolTimer(logger, 'analyze-repo');
 
   try {
-    const { path: rawPath = process.cwd(), depth = 3, includeTests = false } = params;
+    // When no path is specified, use process.cwd() and ensure it's properly normalized
+    const defaultPath = process.cwd();
+    const { path: rawPath = defaultPath, depth = 3, includeTests = false } = params;
+    // Apply safeNormalizePath to handle Windows path variations
     const repoPath = safeNormalizePath(rawPath);
 
     logger.info({ repoPath, depth, includeTests }, 'Starting repository analysis');
