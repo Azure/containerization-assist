@@ -1,0 +1,80 @@
+name: SHA Sentry Security Audit
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC for weekly security audits
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+    inputs:
+      exclude_patterns:
+        description: 'Comma-separated patterns to exclude from scan'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read  # Only read access needed for scanning
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    name: Scan for Unpinned Actions
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1  # Shallow clone for faster checkout
+      
+      - name: Run SHA Sentry Security Scan
+        uses: Tatsinnit/sha-sentry@v5.0.0
+        id: sha_audit
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Display Audit Summary
+        if: always()
+        run: |
+          echo "## 🛡️ SHA Sentry Security Audit Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 📁 Files Scanned | ${{ steps.sha_audit.outputs.files_scanned }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🎯 Total Actions Found | ${{ steps.sha_audit.outputs.total_actions }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ⚠️ Unpinned Actions | ${{ steps.sha_audit.outputs.unpinned_actions_found }} |" >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.sha_audit.outputs.unpinned_actions_found }}" -eq "0" ]; then
+            echo "🎉 **Excellent!** All actions are properly SHA-pinned!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Your repository follows security best practices by pinning all GitHub Actions to specific SHA commits." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Action Required:** Found ${{ steps.sha_audit.outputs.unpinned_actions_found }} unpinned actions that need attention." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### � Next Steps:" >> $GITHUB_STEP_SUMMARY
+            echo "1. Review the detailed findings in the full report above" >> $GITHUB_STEP_SUMMARY
+            echo "2. Update workflow files with the recommended SHA-pinned versions" >> $GITHUB_STEP_SUMMARY
+            echo "3. Add comments to preserve version references (e.g., \`# v4\`)" >> $GITHUB_STEP_SUMMARY
+            echo "4. Test your workflows after making changes" >> $GITHUB_STEP_SUMMARY
+          fi
+      
+      - name: Security Compliance Check
+        if: steps.sha_audit.outputs.unpinned_actions_found != '0'
+        run: |
+          echo "❌ Security compliance check failed!"
+          echo "Found ${{ steps.sha_audit.outputs.unpinned_actions_found }} unpinned actions that pose security risks."
+          echo ""
+          echo "🔍 Review the detailed report in the Actions summary for specific recommendations."
+          echo ""
+          echo "💡 Pro tip: SHA-pinning prevents supply chain attacks by ensuring"
+          echo "   actions cannot be modified by malicious actors after publication."
+          exit 1
+      
+      - name: Success Notification
+        if: steps.sha_audit.outputs.unpinned_actions_found == '0'
+        run: |
+          echo "✅ Security audit passed!"
+          echo "All ${{ steps.sha_audit.outputs.total_actions }} actions across ${{ steps.sha_audit.outputs.files_scanned }} files are properly SHA-pinned."
+          echo ""
+          echo "🛡️ Your repository follows GitHub security best practices!"
