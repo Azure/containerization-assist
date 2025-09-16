@@ -2,8 +2,9 @@
  * Mock tools for router integration testing
  */
 
-import { Success, Failure, type Result } from '@types';
+import { Success, Failure, type Result } from '../../../../src/types/core';
 import { z } from 'zod';
+import { ToolName, TOOLS } from '../../../../src/exports/tools';
 
 export interface MockToolResult {
   tool: string;
@@ -131,14 +132,14 @@ export const mockPushImage = {
 };
 
 export const mockScanImage = {
-  name: 'scan',
+  name: 'scan_image',
   schema: z.object({
     imageId: z.string(),
     sessionId: z.string().optional(),
   }),
   handler: async (params: Record<string, unknown>, _context?: any): Promise<Result<unknown>> => {
     executionLog.push({
-      tool: 'scan',
+      tool: 'scan_image',
       executed: true,
       params,
       timestamp: new Date(),
@@ -233,7 +234,7 @@ export const mockFailingTool = {
     });
 
     if (params.shouldFail !== false) {
-      return Failure('Tool failed as expected', { recoverable: true });
+      return Failure('Tool failed as expected');
     }
 
     return Success({ failed: false });
@@ -242,17 +243,17 @@ export const mockFailingTool = {
 
 // Create tools map for router
 export const createMockToolsMap = () => {
-  const tools = new Map();
+  const tools = new Map<ToolName | 'failing-tool', any>();
 
-  tools.set('analyze_repo', mockAnalyzeRepo);
-  tools.set('resolve_base_images', mockResolveBaseImages);
-  tools.set('generate_dockerfile', mockGenerateDockerfile);
-  tools.set('build_image', mockBuildImage);
-  tools.set('push_image', mockPushImage);
-  tools.set('scan', mockScanImage);
-  tools.set('prepare_cluster', mockPrepareCluster);
-  tools.set('generate_k8s_manifests', mockGenerateK8sManifests);
-  tools.set('deploy', mockDeploy);
+  tools.set(TOOLS.ANALYZE_REPO, mockAnalyzeRepo);
+  tools.set(TOOLS.RESOLVE_BASE_IMAGES, mockResolveBaseImages);
+  tools.set(TOOLS.GENERATE_DOCKERFILE, mockGenerateDockerfile);
+  tools.set(TOOLS.BUILD_IMAGE, mockBuildImage);
+  tools.set(TOOLS.PUSH_IMAGE, mockPushImage);
+  tools.set(TOOLS.SCAN, mockScanImage);
+  tools.set(TOOLS.PREPARE_CLUSTER, mockPrepareCluster);
+  tools.set(TOOLS.GENERATE_K8S_MANIFESTS, mockGenerateK8sManifests);
+  tools.set(TOOLS.DEPLOY, mockDeploy);
   tools.set('failing-tool', mockFailingTool);
 
   return tools;

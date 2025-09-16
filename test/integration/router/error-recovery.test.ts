@@ -412,7 +412,7 @@ describe('Error Recovery and Rerouting', () => {
 
       const result = await crashingRouter.route({
         context: mockContext,
-        toolName: 'scan',
+        toolName: 'scan_image',
         params: { imageId: 'test' },
       });
 

@@ -4,8 +4,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import pino from 'pino';
-import { createToolRouter, type ToolRouter } from '@mcp/tool-router';
-import type { Step } from '@mcp/tool-graph';
+import { createToolRouter, type ToolRouter } from '../../../src/mcp/tool-router';
+import type { Step } from '@../../../src/mcp/tool-graph';
 import {
   createMockToolsMap,
   resetExecutionLog,
@@ -214,7 +214,7 @@ describe('Force Flag Functionality', () => {
       // Force flag without session should create new session and execute
       const result = await router.route({
         context: mockContext,
-        toolName: 'scan',
+        toolName: 'scan_image',
         params: { imageId: 'test-image' },
         force: true,
       });
@@ -332,7 +332,7 @@ describe('Force Flag Functionality', () => {
       for (const tool of tools) {
         resetExecutionLog();
         const result = await router.route({
-        context: mockContext,
+          context: mockContext,
           toolName: tool,
           params: { imageId: 'test', path: './' },
           sessionId: session.sessionId,

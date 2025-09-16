@@ -13,7 +13,7 @@
 
 import { createDockerClient } from '../../../../src/services/docker-client';
 import { createLogger } from '../../../../src/lib/logger';
-import type { DockerBuildOptions, DockerClient } from '../../../../src/services/docker-client';
+import type { DockerBuildOptions, DockerClient, DockerClientConfig } from '../../../../src/services/docker-client';
 import { DockerTestCleaner, TEST_IMAGE_NAME } from '../../../__support__/utilities/docker-test-cleaner';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -28,7 +28,12 @@ describe('Docker Client Error Handling Integration Tests', () => {
 
   beforeAll(async () => {
     // Initialize the test cleaner with verification enabled
-    dockerClient = createDockerClient(logger);
+    // Create Docker client with auto-detection that includes Colima support
+    const dockerConfig: DockerClientConfig = {
+      // No socketPath specified to trigger auto-detection
+      timeout: 60000,
+    };
+    dockerClient = createDockerClient(logger, dockerConfig);
     testCleaner = new DockerTestCleaner(logger, dockerClient, { verifyCleanup: true });
 
     // Create a temporary directory for test Dockerfiles

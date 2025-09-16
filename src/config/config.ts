@@ -4,6 +4,53 @@
 
 import type { ApplicationConfig } from './types';
 import { DEFAULT_NETWORK, DEFAULT_TIMEOUTS, getDefaultPort } from './defaults';
+import { homedir } from 'os';
+import { join } from 'path';
+import { existsSync, statSync } from 'fs';
+
+/**
+ * Get Colima socket paths in order of preference.
+ */
+function getColimaSockets(): string[] {
+  const homeDir = homedir();
+  return [
+    join(homeDir, '.colima/default/docker.sock'),
+    join(homeDir, '.colima/docker/docker.sock'),
+    join(homeDir, '.lima/colima/sock/docker.sock'), // Lima-based colima
+  ];
+}
+
+/**
+ * Find the first available Docker socket from the given paths.
+ */
+function findAvailableDockerSocket(socketPaths: string[]): string | null {
+  for (const socketPath of socketPaths) {
+    try {
+      if (existsSync(socketPath)) {
+        const stat = statSync(socketPath);
+        if (stat.isSocket()) {
+          return socketPath;
+        }
+      }
+    } catch {
+      // Continue to next socket path
+    }
+  }
+  return null;
+}
+
+/**
+ * Auto-detect Docker socket path with Colima support.
+ */
+function autoDetectDockerSocket(): string {
+  const defaultPaths = [
+    '/var/run/docker.sock', // Standard Docker socket
+    ...getColimaSockets(), // Colima sockets
+  ];
+
+  const availableSocket = findAvailableDockerSocket(defaultPaths);
+  return availableSocket || '/var/run/docker.sock'; // Fallback to default
+}
 
 /**
  * Create default configuration with sensible defaults
@@ -120,8 +167,7 @@ function createConfiguration(): ApplicationConfig {
     },
     docker: {
       ...defaultConfig.docker,
-      socketPath:
-        process.env.DOCKER_HOST || process.env.DOCKER_SOCKET || defaultConfig.docker.socketPath,
+      socketPath: process.env.DOCKER_HOST || process.env.DOCKER_SOCKET || autoDetectDockerSocket(),
       registry: process.env.DOCKER_REGISTRY || defaultConfig.docker.registry,
       timeout: parseIntWithFallback(process.env.DOCKER_TIMEOUT, defaultConfig.docker.timeout),
       port: parseIntWithFallback(process.env.DOCKER_PORT, defaultConfig.docker.port),

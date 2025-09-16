@@ -136,7 +136,7 @@ describe('Out-of-Order Tool Execution', () => {
     it('should automatically build the image first', async () => {
       const result = await router.route({
         context: mockContext,
-        toolName: 'scan',
+        toolName: 'scan_image',
         params: {
           imageId: 'will-be-built',
         },
@@ -145,13 +145,13 @@ describe('Out-of-Order Tool Execution', () => {
       expect(result.result.ok).toBe(true);
       expect(result.executedTools).toContain('analyze_repo');
       expect(result.executedTools).toContain('build_image');
-      expect(result.executedTools).toContain('scan');
+      expect(result.executedTools).toContain('scan_image');
 
       // Verify proper order
       const toolOrder = executionLog.map(e => e.tool);
       const analyzeIndex = toolOrder.indexOf('analyze_repo');
       const buildIndex = toolOrder.indexOf('build_image');
-      const scanIndex = toolOrder.indexOf('scan');
+      const scanIndex = toolOrder.indexOf('scan_image');
 
       expect(analyzeIndex).toBeLessThan(buildIndex);
       expect(buildIndex).toBeLessThan(scanIndex);

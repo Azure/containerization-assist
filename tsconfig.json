@@ -3,27 +3,61 @@
     "target": "ES2022",
     "module": "ES2022",
     "moduleResolution": "bundler",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "rootDir": "./",
     "outDir": "./dist",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@mcp/*": ["src/mcp/*"],
-      "@tools/*": ["src/tools/*"],
-      "@lib/*": ["src/lib/*"],
-      "@services/*": ["src/services/*"],
-      "@config/*": ["src/config/*"],
-      "@prompts/*": ["src/prompts/*"],
-      "@resources/*": ["src/resources/*"],
-      "@workflows/*": ["src/workflows/*"],
-      "@exports/*": ["src/exports/*"],
-      "@knowledge/*": ["src/knowledge/*"],
-      "@types": ["src/types"],
-      "@/container": ["src/container"],
-      "@/validation/*": ["src/validation/*"],
-      "@/types/*": ["src/types/*"],
-      "@/knowledge/*": ["src/knowledge/*"]
+      "@/*": [
+        "src/*"
+      ],
+      "@mcp/*": [
+        "src/mcp/*"
+      ],
+      "@tools/*": [
+        "src/tools/*"
+      ],
+      "@lib/*": [
+        "src/lib/*"
+      ],
+      "@services/*": [
+        "src/services/*"
+      ],
+      "@config/*": [
+        "src/config/*"
+      ],
+      "@prompts/*": [
+        "src/prompts/*"
+      ],
+      "@resources/*": [
+        "src/resources/*"
+      ],
+      "@workflows/*": [
+        "src/workflows/*"
+      ],
+      "@exports/*": [
+        "src/exports/*"
+      ],
+      "@knowledge/*": [
+        "src/knowledge/*"
+      ],
+      "@types": [
+        "src/types"
+      ],
+      "@/container": [
+        "src/container"
+      ],
+      "@/validation/*": [
+        "src/validation/*"
+      ],
+      "@/types/*": [
+        "src/types/*"
+      ],
+      "@/knowledge/*": [
+        "src/knowledge/*"
+      ]
     },
     "declaration": true,
     "declarationMap": true,
@@ -46,6 +80,14 @@
     "resolveJsonModule": true,
     "isolatedModules": true
   },
-  "include": ["src/**/*", "apps/**/*"],
-  "exclude": ["node_modules", "dist", "test", "**/*.test.ts"]
+  "include": [
+    "src/**/*",
+    "apps/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "test",
+    "**/*.test.ts"
+  ]
 }

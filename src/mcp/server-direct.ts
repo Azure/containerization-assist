@@ -15,7 +15,7 @@ import { extractErrorMessage } from '@lib/error-utils';
 import { createToolRouter, type ToolRouter } from './tool-router';
 
 // Single unified tool definition structure
-interface ToolDefinition {
+export interface ToolDefinition {
   name: ToolName;
   description: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

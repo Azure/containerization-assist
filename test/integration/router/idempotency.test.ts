@@ -4,8 +4,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import pino from 'pino';
-import { createToolRouter, type ToolRouter } from '@mcp/tool-router';
-import type { Step } from '@mcp/tool-graph';
+import { createToolRouter, type ToolRouter } from '../../../src/mcp/tool-router';
+import type { Step } from '../../../src/mcp/tool-graph';
 import {
   createMockToolsMap,
   resetExecutionLog,
@@ -95,7 +95,7 @@ describe('Idempotency Behavior', () => {
       for (const tool of toolsToTest) {
         resetExecutionLog();
         const result = await router.route({
-        context: mockContext,
+          context: mockContext,
           toolName: tool,
           params: { manifestPath: './k8s', imageName: 'test' },
           sessionId: initialRun.sessionState.sessionId,

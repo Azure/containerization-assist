@@ -50,7 +50,12 @@ export function createDependencies(config?: AppConfig): Dependencies {
     config: appConfig,
     logger,
     sessionManager,
-    dockerClient: createDockerClient(logger),
+    dockerClient: createDockerClient(logger, {
+      socketPath: appConfig.services.docker.socketPath,
+      host: appConfig.services.docker.host,
+      port: appConfig.services.docker.port,
+      timeout: appConfig.services.docker.timeout,
+    }),
     kubernetesClient: createKubernetesClient(logger),
     promptRegistry,
     resourceManager,

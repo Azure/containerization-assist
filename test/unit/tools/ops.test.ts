@@ -4,11 +4,7 @@
  */
 
 import { jest } from '@jest/globals';
-import { ops } from '../../../src/tools/all';
-import { OpsToolParams } from '../../../src/tools/ops/schema';
-
 import { createMockLogger } from '../../__support__/utilities/mock-factories';
-
 
 // Mock timer functionality
 const mockTimer = {
@@ -17,6 +13,7 @@ const mockTimer = {
 };
 
 jest.mock('@lib/logger', () => ({
+  createLogger: jest.fn(() => createMockLogger()),
   createTimer: jest.fn(() => mockTimer),
 }));
 
@@ -29,6 +26,9 @@ jest.mock('@lib/tool-helpers', () => ({
     debug: jest.fn(),
   })),
 }));
+
+import { ops } from '../../../src/tools/all';
+import { OpsToolParams } from '../../../src/tools/ops/schema';
 
 describe('opsTool', () => {
   let mockLogger: ReturnType<typeof createMockLogger>;
