@@ -82,7 +82,7 @@ export const TOOLS = {
   ANALYZE_REPO: 'analyze_repo',
   GENERATE_DOCKERFILE: 'generate_dockerfile',
   BUILD_IMAGE: 'build_image',
-  SCAN: 'scan',
+  SCAN: 'scan_image',
   TAG_IMAGE: 'tag_image',
   PUSH_IMAGE: 'push_image',
   GENERATE_K8S_MANIFESTS: 'generate_k8s_manifests',
@@ -95,7 +95,7 @@ export const TOOLS = {
   GENERATE_ACA_MANIFESTS: 'generate_aca_manifests',
   CONVERT_ACA_TO_K8S: 'convert_aca_to_k8s',
   GENERATE_HELM_CHARTS: 'generate_helm_charts',
-  INSPECT_SESSION: 'inspect-session',
+  INSPECT_SESSION: 'inspect_session',
 } as const;
 
 /**
@@ -105,7 +105,7 @@ export type ToolName = (typeof TOOLS)[keyof typeof TOOLS];
 
 // Helper to create tool wrapper
 const createToolWrapper = (
-  name: string,
+  name: ToolName,
   description: string,
   zodSchema: ZodObject<ZodRawShape>, // Pass the Zod object schema
   executeFn: (params: unknown, context: unknown) => Promise<Result<unknown>>,

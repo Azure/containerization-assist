@@ -22,6 +22,7 @@ import {
   type HostAIAssistant,
 } from './ai/host-ai-assist';
 import type { z } from 'zod';
+import { ToolName } from '@/exports/tools';
 
 /**
  * Minimal tool interface required for routing and execution
@@ -35,13 +36,13 @@ export interface RouterTool {
 export interface RouterConfig {
   sessionManager: SessionManager;
   logger: Logger;
-  tools: Map<string, RouterTool>;
+  tools: Map<ToolName, RouterTool>;
   /** Optional AI assistance for missing parameter inference */
   aiAssistant?: HostAIAssistant;
 }
 
 export interface RouteRequest {
-  toolName: string;
+  toolName: ToolName;
   params: Record<string, unknown>;
   /** Force execution even if effects already satisfied (idempotency override) */
   force?: boolean;
@@ -427,8 +428,8 @@ export const routeRequestImpl = async (
  * Invariant: autofix.buildParams always receives normalized parameters
  */
 export const buildCorrectiveParams = (
-  originalTool: string,
-  correctiveTool: string,
+  originalTool: ToolName,
+  correctiveTool: ToolName,
   step: Step,
   originalParams: Record<string, unknown>,
   session: WorkflowState,
@@ -600,7 +601,7 @@ export const executeToolImpl = async (
  * Used by workflow orchestrators and dependency analyzers.
  */
 export const getToolDependencies = (
-  toolName: string,
+  toolName: ToolName,
 ): {
   requires: Step[];
   provides: Step[];
@@ -709,7 +710,7 @@ export const fillMissingParameters = async (
  */
 export const canExecuteImpl = async (
   state: ToolRouterState,
-  toolName: string,
+  toolName: ToolName,
   sessionId: string,
 ): Promise<{ canExecute: boolean; missingSteps: Step[] }> => {
   const sessionResult = await state.sessionManager.get(sessionId);
@@ -734,7 +735,7 @@ export const canExecuteImpl = async (
  * Used for workflow preview and dependency analysis.
  */
 export const getExecutionPlan = (
-  toolName: string,
+  toolName: ToolName,
   completedSteps: Set<Step> = new Set(),
 ): string[] => {
   const missingSteps = getMissingPreconditions(toolName, completedSteps);
@@ -766,7 +767,8 @@ export const createToolRouter = (config: RouterConfig): ToolRouter => {
   return {
     route: (request: RouteRequest) => routeRequestImpl(state, request),
     getToolDependencies,
-    canExecute: (toolName: string, sessionId: string) => canExecuteImpl(state, toolName, sessionId),
+    canExecute: (toolName: ToolName, sessionId: string) =>
+      canExecuteImpl(state, toolName, sessionId),
     getExecutionPlan,
   };
 };
