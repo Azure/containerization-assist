@@ -1,11 +1,7 @@
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 
-/** @type {import('jest').Conf        '^@types$': '<rootDir>/src/types',
-        '^(\.{1,2}/.*)\.js$': '$1',
-        '^@validation$': '<rootDir>/src/validation',
-        '^@validation/(.*)$': '<rootDir>/src/validation/$1',
-        '^@test/fixtures/(.*)$': '<rootDir>/test/__support__/fixtures/$1', */
+/** @type {import('jest').Config} */
 export default {
   preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
