@@ -1,4 +1,4 @@
-import { safeNormalizePath } from '../../../src/lib/path-utils';
+import { safeNormalizePath, toNativePath } from '../../../src/lib/path-utils';
 
 describe('safeNormalizePath', () => {
   it('should convert Windows backslashes to forward slashes', () => {
@@ -64,5 +64,48 @@ describe('safeNormalizePath', () => {
     // With backslashes
     const dupPathBackslash = 'C:\\Users\\test\\project\\C:\\Users\\test\\project';
     expect(safeNormalizePath(dupPathBackslash)).toBe('C:/Users/test/project');
+  });
+});
+
+describe('toNativePath', () => {
+  const originalPlatform = process.platform;
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', {
+      value: originalPlatform,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  });
+
+  it('should convert forward slashes to backslashes on Windows', () => {
+    Object.defineProperty(process, 'platform', {
+      value: 'win32',
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+
+    expect(toNativePath('C:/Users/test/project')).toBe('C:\\Users\\test\\project');
+    expect(toNativePath('/c/Users/test')).toBe('\\c\\Users\\test');
+  });
+
+  it('should leave paths unchanged on non-Windows platforms', () => {
+    Object.defineProperty(process, 'platform', {
+      value: 'linux',
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+
+    expect(toNativePath('/usr/local/bin')).toBe('/usr/local/bin');
+    expect(toNativePath('./relative/path')).toBe('./relative/path');
+  });
+
+  it('should handle empty and null inputs', () => {
+    expect(toNativePath('')).toBe('');
+    expect(toNativePath(null as any)).toBe(null);
+    expect(toNativePath(undefined as any)).toBe(undefined);
   });
 });

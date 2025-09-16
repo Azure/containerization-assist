@@ -19,7 +19,7 @@
  * ```
  */
 
-import { joinPaths, getExtension, safeNormalizePath } from '@lib/path-utils';
+import { joinPaths, getExtension, safeNormalizePath, toNativePath } from '@lib/path-utils';
 import { promises as fs, constants } from 'node:fs';
 import * as path from 'node:path';
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
@@ -254,11 +254,13 @@ async function validateRepositoryPath(
   repoPath: string,
 ): Promise<{ valid: boolean; error?: string }> {
   try {
-    const stats = await fs.stat(repoPath);
+    // Convert to native path format for file system operations
+    const nativePath = toNativePath(repoPath);
+    const stats = await fs.stat(nativePath);
     if (!stats.isDirectory()) {
       return { valid: false, error: 'Path is not a directory' };
     }
-    await fs.access(repoPath, constants.R_OK);
+    await fs.access(nativePath, constants.R_OK);
     return { valid: true };
   } catch (error) {
     const errorMsg = extractErrorMessage(error);
@@ -281,11 +283,11 @@ async function detectLanguage(repoPath: string): Promise<{
   const allFiles: string[] = [];
   const getAllFiles = async (dir: string, depth = 0): Promise<void> => {
     if (depth > 2) return; // Limit depth
-    const files = await fs.readdir(dir);
+    const files = await fs.readdir(toNativePath(dir));
 
     for (const file of files) {
       const filePath = joinPaths(dir, file);
-      const stats = await fs.stat(filePath);
+      const stats = await fs.stat(toNativePath(filePath));
       const relativePath = filePath.replace(`${repoPath}/`, '');
 
       if (stats.isFile()) {
@@ -301,7 +303,7 @@ async function detectLanguage(repoPath: string): Promise<{
   const fileStats = await Promise.all(
     allFiles.map(async (file) => {
       const filePath = joinPaths(repoPath, file);
-      const stats = await fs.stat(filePath);
+      const stats = await fs.stat(toNativePath(filePath));
       return { name: file, path: filePath, isFile: stats.isFile() };
     }),
   );
@@ -356,7 +358,7 @@ async function detectFramework(
   allFiles?: string[],
 ): Promise<{ framework?: string; version?: string; frameworkSignals: number } | undefined> {
   // Use provided files or scan directory
-  const files = allFiles || (await fs.readdir(repoPath));
+  const files = allFiles || (await fs.readdir(toNativePath(repoPath)));
   let frameworkSignals = 0;
 
   // Check package.json for JS/TS frameworks
@@ -385,7 +387,7 @@ async function detectFramework(
       for (const csprojFile of csprojFiles) {
         try {
           const csprojPath = joinPaths(repoPath, csprojFile);
-          const csprojContent = await fs.readFile(csprojPath, 'utf-8');
+          const csprojContent = await fs.readFile(toNativePath(csprojPath), 'utf-8');
 
           // Check for .NET Framework version
           const frameworkVersionMatch = csprojContent.match(
@@ -492,14 +494,14 @@ async function detectModuleRoots(
     if (depth > 3) return;
 
     try {
-      const entries = await fs.readdir(dirPath, { withFileTypes: true });
+      const entries = await fs.readdir(toNativePath(dirPath), { withFileTypes: true });
 
       for (const buildFile of buildFiles) {
         const buildFilePath = joinPaths(dirPath, buildFile);
         try {
           // Directly read the file to avoid TOCTOU race condition
           if (buildFile === 'pom.xml') {
-            const pomContent = await fs.readFile(buildFilePath, 'utf-8');
+            const pomContent = await fs.readFile(toNativePath(buildFilePath), 'utf-8');
             const isParentPom = pomContent.includes('<modules>') && pomContent.includes('<module>');
             const srcDir = joinPaths(dirPath, 'src');
             const hasSrc = await fs
@@ -563,7 +565,7 @@ async function detectBuildSystem(repoPath: string): Promise<
     }
   | undefined
 > {
-  const files = await fs.readdir(repoPath);
+  const files = await fs.readdir(toNativePath(repoPath));
 
   // Simple check for .NET projects - let AI figure out the details
   const csprojFile = files.find((f) => f.endsWith('.csproj'));
@@ -662,7 +664,7 @@ async function checkDockerFiles(repoPath: string): Promise<{
   hasDockerCompose: boolean;
   hasKubernetes: boolean;
 }> {
-  const files = await fs.readdir(repoPath);
+  const files = await fs.readdir(toNativePath(repoPath));
 
   return {
     hasDockerfile: files.includes('Dockerfile') || files.includes('dockerfile'),
@@ -726,7 +728,14 @@ async function analyzeRepoImpl(
     const defaultPath = process.cwd();
     const { path: rawPath = defaultPath, depth = 3, includeTests = false } = params;
     // Apply safeNormalizePath to handle Windows path variations
-    const repoPath = safeNormalizePath(rawPath);
+    let repoPath = safeNormalizePath(rawPath);
+
+    // Use path.resolve to get the absolute path, but then normalize it again
+    // to handle any duplication that might occur
+    if (!path.isAbsolute(repoPath)) {
+      repoPath = path.resolve(repoPath);
+      repoPath = safeNormalizePath(repoPath);
+    }
 
     logger.info({ repoPath, depth, includeTests }, 'Starting repository analysis');
 

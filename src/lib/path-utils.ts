@@ -9,6 +9,16 @@ export const getDirectory = path.dirname;
 export const getExtension = path.extname;
 export const parsePath = path.parse;
 
+// Convert path to native format for file system operations
+export function toNativePath(filePath: string): string {
+  if (!filePath) return filePath;
+  // On Windows, convert forward slashes to backslashes for file system operations
+  if (process.platform === 'win32') {
+    return filePath.replace(/\//g, '\\');
+  }
+  return filePath;
+}
+
 // Only add custom logic where actually needed
 export function normalizePathSeparators(filePath: string): string {
   return filePath.replace(/\\/g, '/');

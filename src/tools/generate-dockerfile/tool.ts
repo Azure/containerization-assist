@@ -837,7 +837,7 @@ async function generateWithDirectAnalysis(
 
       const result: SingleDockerfileResult = {
         content: cleaned,
-        path: path.resolve(repoPath),
+        path: safeNormalizePath(path.resolve(repoPath)),
         moduleRoot,
         baseImage: baseImageUsed,
         optimization: params.optimization !== false,
@@ -926,7 +926,7 @@ async function generateWithDirectAnalysis(
 
   return Success({
     content: fallbackResult.value.content,
-    path: path.resolve(repoPath),
+    path: safeNormalizePath(path.resolve(repoPath)),
     moduleRoot,
     baseImage: fallbackResult.value.baseImage,
     optimization: params.optimization !== false,
@@ -1147,7 +1147,7 @@ async function generateSingleDockerfile(
 
   const result: SingleDockerfileResult = {
     content: dockerfileContent,
-    path: path.resolve(repoPath), // Repository path (build context)
+    path: safeNormalizePath(path.resolve(repoPath)), // Repository path (build context)
     moduleRoot,
     baseImage: baseImageUsed,
     optimization,
