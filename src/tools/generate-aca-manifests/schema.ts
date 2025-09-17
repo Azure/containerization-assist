@@ -7,6 +7,7 @@ export const generateAcaManifestsSchema = z.object({
 
   // Session tracking (standard pattern)
   sessionId: z.string().optional().describe('Session identifier for tracking operations'),
+  path: z.string().describe('Path where the aca folder should be created'),
 
   // Basic ACA configuration
   cpu: z

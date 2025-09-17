@@ -518,9 +518,9 @@ async function deployApplicationImpl(
       }
 
       if (!ready) {
-        logger.warn(
-          { deploymentName, timeoutSeconds: timeout },
-          'Deployment did not become ready within timeout',
+        logger.error(
+          { deploymentName, timeoutSeconds: timeout, attempts },
+          'Deployment did not become ready within timeout - check pod status and logs',
         );
       }
     } else if (dryRun) {
@@ -575,7 +575,7 @@ async function deployApplicationImpl(
 
     // Prepare the result
     const result: DeployApplicationResult = {
-      success: true,
+      success: ready, // Success depends on deployment readiness
       sessionId,
       namespace,
       deploymentName,
@@ -610,10 +610,18 @@ async function deployApplicationImpl(
       },
     });
     timer.end({ deploymentName, ready, sessionId });
-    logger.info(
-      { sessionId, deploymentName, serviceName, ready, namespace },
-      'Kubernetes deployment completed',
-    );
+
+    if (ready) {
+      logger.info(
+        { sessionId, deploymentName, serviceName, ready, namespace },
+        'Kubernetes deployment completed successfully',
+      );
+    } else {
+      logger.warn(
+        { sessionId, deploymentName, serviceName, ready, namespace },
+        'Kubernetes deployment completed but pods are not ready',
+      );
+    }
 
     return Success(result);
   } catch (error) {
