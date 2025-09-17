@@ -15,6 +15,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extractErrorMessage } from '@/lib/error-utils';
+import { autoDetectDockerSocket } from '@/services/docker-client';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -93,10 +94,7 @@ program.parse(argv);
 
 const options = program.opts();
 const command = program.args[0] ?? 'start';
-const defaultDockerSockets =
-  process.platform === 'win32'
-    ? ['//./pipe/docker_engine']
-    : ['/var/run/docker.sock', '~/.colima/default/docker.sock'];
+const defaultDockerSockets = autoDetectDockerSocket();
 
 // Enhanced transport detection and logging
 function getTransportInfo(options: any): { type: 'stdio' | 'http'; details: string } {

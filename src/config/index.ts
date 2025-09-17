@@ -4,6 +4,7 @@
  * Single source of configuration replacing 9 separate config files
  * Simple, focused configuration without complex validation overhead
  */
+import { autoDetectDockerSocket } from '../services/docker-client';
 
 export const config = {
   mcp: {
@@ -46,9 +47,7 @@ export const config = {
   },
 
   docker: {
-    socketPath:
-      process.env.DOCKER_SOCKET ||
-      (process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock'),
+    socketPath: process.env.DOCKER_SOCKET || autoDetectDockerSocket(),
     timeout: parseInt(process.env.DOCKER_TIMEOUT || '60000'),
   },
 
