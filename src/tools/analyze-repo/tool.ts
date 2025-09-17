@@ -33,9 +33,9 @@ import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
 import { Success, Failure, type Result } from '@types';
 import { analyzeRepoSchema, type AnalyzeRepoParams } from './schema';
 import { z } from 'zod';
-import { parsePackageJson, getAllDependencies } from '@lib/parsing-package-json';
-import { DEFAULT_PORTS } from '@config/defaults';
-import { extractErrorMessage } from '@lib/error-utils';
+import { parsePackageJson, getAllDependencies } from '@/lib/parsing-package-json';
+import { DEFAULT_PORTS } from '@/config/defaults';
+import { extractErrorMessage } from '@/lib/error-utils';
 
 // Define the result schema for type safety
 const AnalyzeRepoResultSchema = z.object({
@@ -70,7 +70,7 @@ const AnalyzeRepoResultSchema = z.object({
     securityNotes: z.array(z.string()),
   }),
   confidence: z.number(),
-  detectionMethod: z.enum(['signature', 'extension', 'fallback', 'ai-enhanced']),
+  detectionMethod: z.enum(['signature', 'extension', 'provided', 'fallback', 'ai-enhanced']),
   detectionDetails: z.object({
     signatureMatches: z.number(),
     extensionMatches: z.number(),
@@ -101,7 +101,7 @@ const StateSchema = z.object({
 });
 const LANGUAGE_SIGNATURES: Record<string, { extensions: string[]; files: string[] }> = {
   javascript: {
-    extensions: ['', '.mjs', '.cjs'],
+    extensions: ['.js', '.mjs', '.cjs'],
     files: ['package.json', 'node_modules'],
   },
   typescript: {
@@ -199,6 +199,7 @@ interface DetectionDetails {
   extensionMatches: number;
   frameworkSignals: number;
   buildSystemSignals: number;
+  provided?: number;
 }
 
 /**
@@ -212,16 +213,24 @@ function calculateConfidence(
   framework: string | undefined,
   buildSystem: any,
   detectionDetails: DetectionDetails,
-): { confidence: number; method: 'signature' | 'extension' | 'fallback' | 'ai-enhanced' } {
+): {
+  confidence: number;
+  method: 'signature' | 'extension' | 'provided' | 'fallback' | 'ai-enhanced';
+} {
   if (language === 'unknown') {
     return { confidence: 0, method: 'fallback' };
   }
 
   let score = 0;
-  let method: 'signature' | 'extension' | 'fallback' | 'ai-enhanced' = 'fallback';
+  let method: 'signature' | 'extension' | 'provided' | 'fallback' | 'ai-enhanced' = 'fallback';
 
+  // If language was provided by agent give high confidence
+  if (detectionDetails.provided && detectionDetails.provided > 0) {
+    score += 50;
+    method = 'provided';
+  }
   // Language confidence - signature files are stronger indicators
-  if (detectionDetails.signatureMatches > 0) {
+  else if (detectionDetails.signatureMatches > 0) {
     score += 40;
     method = 'signature';
   } else if (detectionDetails.extensionMatches > 0) {
@@ -271,7 +280,10 @@ async function validateRepositoryPath(
  *
  * Trade-off: Prioritizes signature files over extensions for higher accuracy
  */
-async function detectLanguage(repoPath: string): Promise<{
+async function detectLanguage(
+  repoPath: string,
+  providedLanguage: string | undefined,
+): Promise<{
   language: string;
   version?: string;
   detectionDetails: DetectionDetails;
@@ -312,6 +324,11 @@ async function detectLanguage(repoPath: string): Promise<{
     frameworkSignals: 0,
     buildSystemSignals: 0,
   };
+
+  if (providedLanguage) {
+    detectionDetails.provided = 1;
+    return { language: providedLanguage, detectionDetails, allFiles };
+  }
 
   // Count file extensions
   const extensionCounts: Record<string, number> = {};
@@ -721,11 +738,31 @@ async function analyzeRepoImpl(
   const logger = getToolLogger(context, 'analyze-repo');
   const timer = createToolTimer(logger, 'analyze-repo');
 
+  logger.info(
+    {
+      sessionId: params.sessionId,
+      path: params.path,
+      includeTests: params.includeTests,
+      depth: params.depth,
+      language: params.language,
+    },
+    'Analyze repository input parameters',
+  );
+
   try {
-    const { path: rawPath = process.cwd(), depth = 3, includeTests = false } = params;
+    const { path: rawPath = params.path, depth = 3, includeTests = false, language } = params;
     const repoPath = normalizePath(rawPath);
 
-    logger.info({ repoPath, depth, includeTests }, 'Starting repository analysis');
+    // Validate language parameter if provided
+    if (language && !['java', 'dotnet'].includes(language)) {
+      logger.warn(
+        {
+          providedLanguage: language,
+          supportedLanguages: ['java', 'dotnet'],
+        },
+        'Unsupported language provided',
+      );
+    }
 
     // Progress: Starting analysis
     if (progress) await progress('VALIDATING');
@@ -764,7 +801,7 @@ async function analyzeRepoImpl(
       context.getPrompt !== null;
 
     // Perform analysis
-    const languageInfo = await detectLanguage(repoPath);
+    const languageInfo = await detectLanguage(repoPath, language);
     const frameworkInfo = await detectFramework(
       repoPath,
       languageInfo.language,
@@ -897,6 +934,9 @@ async function analyzeRepoImpl(
       extensionMatches: languageInfo.detectionDetails.extensionMatches,
       frameworkSignals: frameworkInfo?.frameworkSignals ?? 0,
       buildSystemSignals: buildSystemRaw?.buildSystemSignals ?? 0,
+      ...(languageInfo.detectionDetails.provided && {
+        provided: languageInfo.detectionDetails.provided,
+      }),
     };
 
     const { confidence, method } = calculateConfidence(

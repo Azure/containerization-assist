@@ -93,7 +93,7 @@ npm run mcp:inspect    # Start MCP inspector for testing
 
 - **Build System**: Ultra-fast tsdown (esbuild-based) - 10-100x faster than tsc
 - **TypeScript**: Strict mode with ES2022 modules and native ESM support
-- **Imports**: Path aliases supported (@app, @mcp, @tools, etc.) for clean imports
+- **Imports**: Path aliases supported (@/app, @/mcp, @/tools, etc.) for clean imports
 - **Architecture**: Clean layered separation with strict boundaries
 - **Error Handling**: Result<T> monad pattern throughout
 - **Quality Gates**: Automated lint ratcheting prevents regression
@@ -104,9 +104,9 @@ When writing or modifying code, you can use either approach:
 
 ```typescript
 // ✅ OPTION 1 - Path aliases (Clean and preferred)
-import { Config } from '@config/types'
-import { Logger } from '@lib/logger'
-import type { Result } from '@types'
+import { Config } from '@/config/types'
+import { Logger } from '@/lib/logger'
+import type { Result } from '@/types'
 
 // ✅ OPTION 2 - Relative imports (Also acceptable)
 import { Config } from '../config/types'
@@ -114,17 +114,15 @@ import { Logger } from '../../lib/logger'
 ```
 
 **Path Alias Mappings:**
-- `@app/*` → `src/app/*`
-- `@mcp/*` → `src/mcp/*`
-- `@tools/*` → `src/tools/*`
-- `@lib/*` → `src/lib/*`
+- `@/app/*` → `src/app/*`
+- `@/mcp/*` → `src/mcp/*`
+- `@/tools/*` → `src/tools/*`
+- `@/lib/*` → `src/lib/*`
 - `@domain/*` → `src/domain/*`
-- `@infrastructure/*` → `src/infrastructure/*`
-- `@config/*` → `src/config/*`
-- `@prompts/*` → `src/prompts/*`
-- `@resources/*` → `src/resources/*`
-- `@workflows/*` → `src/workflows/*`
-- `@types` → `src/domain/types`
+- `@/config/*` → `src/config/*`
+- `@/prompts/*` → `src/prompts/*`
+- `@/resources/*` → `src/resources/*`
+- `@/types` → `src/domain/types`
 
 ### Error Handling Pattern
 All functions that can fail MUST return Result<T>:

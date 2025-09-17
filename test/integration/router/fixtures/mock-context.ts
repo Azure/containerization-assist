@@ -2,7 +2,7 @@
  * Mock MCP context for router integration testing
  */
 
-import type { ToolContext } from '@mcp/context';
+import type { ToolContext } from '@/mcp/context';
 
 export const createMockContext = (): ToolContext => {
   return {
@@ -21,10 +21,11 @@ export const createMockContext = (): ToolContext => {
     // Add a mock sampling method to satisfy the interface
     _internal: {
       sampling: {
-        requestSample: () => Promise.resolve({
-          prompt: 'test prompt',
-          content: [],
-        }),
+        requestSample: () =>
+          Promise.resolve({
+            prompt: 'test prompt',
+            content: [],
+          }),
       },
     },
   } as unknown as ToolContext;

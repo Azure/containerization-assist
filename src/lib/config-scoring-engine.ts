@@ -5,7 +5,7 @@
 
 import type { ScoringProfile, ScoringRule, ScoringMatcher, PenaltyRule } from './sampling-config';
 import { SCORING_FUNCTIONS, type ScoringFunctionName } from './scoring-functions';
-import { Result, Success, Failure } from '@types';
+import { Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from './error-utils';
 import { createLogger } from './logger';
 import type { Logger } from 'pino';

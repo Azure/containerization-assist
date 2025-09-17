@@ -6,9 +6,9 @@
  */
 
 import type { Logger } from 'pino';
-import type { ToolContext } from '@mcp/context';
-import { Success, Failure, type Result, type WorkflowState } from '@types';
-import type { SessionManager } from '@lib/session';
+import type { ToolContext } from '@/mcp/context';
+import { Success, Failure, type Result, type WorkflowState } from '@/types';
+import type { SessionManager } from '@/lib/session';
 import {
   type Step,
   type ToolEdge,
@@ -124,7 +124,6 @@ export const normalizeToolParameters = (
   session?: WorkflowState,
 ): Record<string, unknown> => {
   const normalized: Record<string, unknown> = {
-    ...params,
     path: params.path || params.repoPath || params.context || '.',
   };
 
@@ -132,6 +131,9 @@ export const normalizeToolParameters = (
   if (session) {
     Object.assign(normalized, extractSessionContext(session));
   }
+
+  // Explicit params take precedence over session context
+  Object.assign(normalized, params);
 
   return normalized;
 };

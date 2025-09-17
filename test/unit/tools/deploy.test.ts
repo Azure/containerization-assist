@@ -37,14 +37,14 @@ function createMockLogger() {
 // Mock lib modules following analyze-repo pattern
 const mockSessionManager = {
   create: jest.fn().mockResolvedValue({
-    "sessionId": "test-session-123",
-    "workflow_state": {},
-    "metadata": {},
-    "completed_steps": [],
-    "errors": {},
-    "current_step": null,
-    "createdAt": "2025-09-08T11:12:40.362Z",
-    "updatedAt": "2025-09-08T11:12:40.362Z"
+    sessionId: 'test-session-123',
+    workflow_state: {},
+    metadata: {},
+    completed_steps: [],
+    errors: {},
+    current_step: null,
+    createdAt: '2025-09-08T11:12:40.362Z',
+    updatedAt: '2025-09-08T11:12:40.362Z',
   }),
   get: jest.fn(),
   update: jest.fn(),
@@ -124,7 +124,7 @@ jest.mock('../../../src/mcp/tool-session-helpers', () => createToolSessionHelper
 // Import these after mocks are set up
 import { deployApplication as deployApplicationTool } from '../../../src/tools/deploy/tool';
 import type { DeployApplicationParams } from '../../../src/tools/deploy/schema';
-import type { ToolContext } from '@mcp/context';
+import type { ToolContext } from '@/mcp/context';
 
 jest.mock('../../../src/lib/kubernetes', () => ({
   createKubernetesClient: jest.fn(() => mockKubernetesClient),
@@ -211,7 +211,7 @@ spec:
     mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
 
     // Setup session helper mocks
-    const sessionHelpers = require('@mcp/tool-session-helpers');
+    const sessionHelpers = require('@/mcp/tool-session-helpers');
     sessionHelpers.getSession = jest.fn().mockResolvedValue({
       ok: true,
       value: {
@@ -269,11 +269,11 @@ spec:
           outputPath: '/test/manifests.yaml',
           resources: [
             { kind: 'Deployment', name: 'test-app', namespace: 'default' },
-            { kind: 'Service', name: 'test-app', namespace: 'default' }
+            { kind: 'Service', name: 'test-app', namespace: 'default' },
           ],
-          sessionId: 'test-session-123'
-        }
-      }
+          sessionId: 'test-session-123',
+        },
+      },
     });
   });
 
@@ -293,26 +293,28 @@ spec:
       mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({ applied: true }));
 
       // Default deployment status - ready
-      mockKubernetesClient.getDeploymentStatus.mockResolvedValue(createSuccessResult({
-        ready: true,
-        readyReplicas: 2,
-        totalReplicas: 2,
-        conditions: [{ type: 'Available', status: 'True', message: 'Deployment is available' }]
-      }));
+      mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
+        createSuccessResult({
+          ready: true,
+          readyReplicas: 2,
+          totalReplicas: 2,
+          conditions: [{ type: 'Available', status: 'True', message: 'Deployment is available' }],
+        }),
+      );
     });
 
     it('should successfully deploy application with valid manifests', async () => {
       const mockContext = createMockToolContext();
-      
+
       const result = await deployApplicationTool(config, mockContext);
-      
+
       if (!result.ok) {
         console.log('DEPLOY ERROR:', result.error);
         console.log('FULL RESULT:', JSON.stringify(result, null, 2));
         // Show the error in the test output
         throw new Error(`Deploy failed: ${result.error}`);
       }
-      
+
       expect(result.ok).toBe(true);
       expect(result.value.success).toBe(true);
       expect(result.value.sessionId).toBe('test-session-123');
@@ -340,10 +342,10 @@ spec:
 
       // Verify Kubernetes client was called to apply manifests
       expect(mockKubernetesClient.applyManifest).toHaveBeenCalledTimes(2);
-      
+
       // Verify deployment status was checked
       expect(mockKubernetesClient.getDeploymentStatus).toHaveBeenCalledWith('default', 'test-app');
-      
+
       // Verify session slice was updated with new pattern
       const sliceMock = mockUseSessionSlice.mock.results[0].value;
       expect(sliceMock.patch).toHaveBeenCalledWith(
@@ -358,7 +360,6 @@ spec:
         }),
       );
     });
-
 
     it('should use default values when config options not specified', async () => {
       const minimalConfig: DeployApplicationParams = {
@@ -376,7 +377,7 @@ spec:
       // Verify deployment was applied to default namespace
       expect(mockKubernetesClient.applyManifest).toHaveBeenCalledWith(
         expect.objectContaining({ kind: 'Deployment' }),
-        'default'
+        'default',
       );
     });
 
@@ -394,10 +395,9 @@ spec:
 
       expect(mockKubernetesClient.applyManifest).toHaveBeenCalledWith(
         expect.anything(),
-        'production'
+        'production',
       );
     });
-
   });
 
   describe('Manifest Parsing and Ordering', () => {
@@ -412,10 +412,12 @@ spec:
         repo_path: '/test/repo',
       });
 
-      mockKubernetesClient.getDeploymentStatus.mockResolvedValue(createSuccessResult({
-        ready: true,
-        readyReplicas: 2,
-      }));
+      mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
+        createSuccessResult({
+          ready: true,
+          readyReplicas: 2,
+        }),
+      );
     });
 
     it('should parse YAML manifests correctly', async () => {
@@ -434,21 +436,16 @@ spec:
       // Verify manifests were applied - the actual ordering is based on the implementation's sort logic
       const calls = mockKubernetesClient.applyManifest.mock.calls;
       expect(calls.length).toBe(2);
-      
+
       // The implementation orders: Service before Deployment based on the ordering array
       expect(calls[0][0]).toEqual(expect.objectContaining({ kind: 'Service' }));
       expect(calls[1][0]).toEqual(expect.objectContaining({ kind: 'Deployment' }));
     });
   });
 
-  describe('Service and Ingress Endpoint Detection', () => {
-
-  });
+  describe('Service and Ingress Endpoint Detection', () => {});
 
   describe('Error Handling', () => {
-
-
-
     it('should handle Kubernetes client failures gracefully', async () => {
       mockSessionManager.get.mockResolvedValue({
         results: {
@@ -460,7 +457,7 @@ spec:
       });
 
       mockKubernetesClient.applyManifest.mockResolvedValue(
-        createFailureResult('Failed to connect to Kubernetes cluster')
+        createFailureResult('Failed to connect to Kubernetes cluster'),
       );
 
       const mockContext = createMockToolContext();
@@ -470,18 +467,20 @@ spec:
       // Individual manifest failures are logged but don't stop the deployment
     });
 
-
-
-
     it('should handle session update failures', async () => {
       // Mock updateSessionData to fail
-      const sessionHelpers = require('@mcp/tool-session-helpers');
-      sessionHelpers.updateSession.mockResolvedValueOnce({ ok: false, error: 'Failed to update session' });
+      const sessionHelpers = require('@/mcp/tool-session-helpers');
+      sessionHelpers.updateSession.mockResolvedValueOnce({
+        ok: false,
+        error: 'Failed to update session',
+      });
 
-      mockKubernetesClient.getDeploymentStatus.mockResolvedValue(createSuccessResult({
-        ready: true,
-        readyReplicas: 2,
-      }));
+      mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
+        createSuccessResult({
+          ready: true,
+          readyReplicas: 2,
+        }),
+      );
 
       const mockContext = createMockToolContext();
       const result = await deployApplicationTool(config, mockContext);
@@ -505,10 +504,12 @@ spec:
         repo_path: '/test/repo',
       });
 
-      mockKubernetesClient.getDeploymentStatus.mockResolvedValue(createSuccessResult({
-        ready: true,
-        readyReplicas: 2,
-      }));
+      mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
+        createSuccessResult({
+          ready: true,
+          readyReplicas: 2,
+        }),
+      );
     });
 
     it('should handle different cluster configurations', async () => {
@@ -544,7 +545,7 @@ spec:
         const configWithOptions = { ...config, ...testConfig };
         const mockContext = createMockToolContext();
         const result = await deployApplicationTool(configWithOptions, mockContext);
-        
+
         expect(result.ok).toBe(true);
         if (result.ok) {
           // Different combinations should all succeed
@@ -555,10 +556,12 @@ spec:
         jest.clearAllMocks();
         mockSessionManager.update.mockResolvedValue(true);
         mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
-        mockKubernetesClient.getDeploymentStatus.mockResolvedValue(createSuccessResult({
-          ready: true,
-          readyReplicas: 2,
-        }));
+        mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
+          createSuccessResult({
+            ready: true,
+            readyReplicas: 2,
+          }),
+        );
       }
     });
   });

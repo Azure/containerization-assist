@@ -1,4 +1,4 @@
-import { createLogger } from '@lib/logger';
+import { createLogger } from '@/lib/logger';
 import type { KnowledgeEntry, KnowledgeStats, LoadedEntry, CompilationStats } from './types';
 import { KnowledgeEntrySchema } from './schemas';
 import { z } from 'zod';

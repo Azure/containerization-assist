@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 
 // IMPORTANT: Unmock the session module for these tests - we need a real session manager
-jest.unmock('@lib/session');
+jest.unmock('@/lib/session');
 jest.unmock('../../../src/lib/session');
 
 import { createToolRouter, type ToolRouter } from '../../../src/mcp/tool-router';
@@ -695,33 +695,35 @@ describe('ToolRouter', () => {
       // Check session was updated
       const sessionAfterSingleResult = await sessionManager.get(sessionId);
       expect(sessionAfterSingleResult.ok).toBe(true);
-      const sessionAfterSingle = sessionAfterSingleResult.ok ? sessionAfterSingleResult.value : null;
+      const sessionAfterSingle = sessionAfterSingleResult.ok
+        ? sessionAfterSingleResult.value
+        : null;
       expect(sessionAfterSingle).toBeDefined();
       expect(sessionAfterSingle?.results).toBeDefined();
       expect(sessionAfterSingle?.results?.['tool-a']).toBeDefined();
 
       // Now test with multiple tools
       const independentTools = ['tool-b', 'tool-c'];
-      independentTools.forEach(toolName => {
+      independentTools.forEach((toolName) => {
         mockTools.set(toolName, {
           name: toolName,
           schema: z.object({ data: z.string(), sessionId: z.string().optional() }),
           handler: jest.fn(async (params: any) => {
             // Simulate some async work
-            await new Promise(resolve => setTimeout(resolve, 10));
+            await new Promise((resolve) => setTimeout(resolve, 10));
             return Success({ result: `${toolName}-result`, data: params.data });
           }),
         });
       });
 
       // Execute tools in parallel
-      const promises = independentTools.map(toolName =>
+      const promises = independentTools.map((toolName) =>
         router.route({
           toolName,
           params: { data: `data-${toolName}` },
           sessionId,
           context,
-        })
+        }),
       );
 
       const results = await Promise.all(promises);
@@ -739,7 +741,7 @@ describe('ToolRouter', () => {
       expect(finalSession?.results).toBeDefined();
 
       // Check all tools are present
-      ['tool-a', 'tool-b', 'tool-c'].forEach(toolName => {
+      ['tool-a', 'tool-b', 'tool-c'].forEach((toolName) => {
         expect(finalSession?.results?.[toolName]).toBeDefined();
         expect(finalSession?.results?.[toolName]).toHaveProperty('result', `${toolName}-result`);
       });
@@ -808,7 +810,7 @@ describe('ToolRouter', () => {
       const initialTimestamp = initialSession?.updatedAt;
 
       // Wait a bit to ensure timestamp difference
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       await router.route({
         toolName: 'analyze_repo',
@@ -825,7 +827,7 @@ describe('ToolRouter', () => {
       // Timestamp should be updated
       expect(updatedTimestamp).toBeDefined();
       expect(new Date(updatedTimestamp!).getTime()).toBeGreaterThan(
-        new Date(initialTimestamp!).getTime()
+        new Date(initialTimestamp!).getTime(),
       );
     });
   });

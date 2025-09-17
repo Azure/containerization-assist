@@ -4,16 +4,12 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import pino from 'pino';
-import { createToolRouter, type ToolRouter } from '@mcp/tool-router';
-import type { Step } from '@mcp/tool-graph';
-import { Failure, Success, type Result } from '@types';
+import { createToolRouter, type ToolRouter } from '@/mcp/tool-router';
+import type { Step } from '@/mcp/tool-graph';
+import { Failure, Success, type Result } from '@/types';
 import { MockSessionManager } from './fixtures/mock-session';
 import { createMockContext } from './fixtures/mock-context';
-import {
-  createMockToolsMap,
-  resetExecutionLog,
-  executionLog,
-} from './fixtures/mock-tools';
+import { createMockToolsMap, resetExecutionLog, executionLog } from './fixtures/mock-tools';
 
 describe('Error Recovery and Rerouting', () => {
   let router: ToolRouter;
@@ -74,7 +70,7 @@ describe('Error Recovery and Rerouting', () => {
       }
 
       // Should have stopped after analyze-repo failed
-      const toolOrder = executionLog.map(e => e.tool);
+      const toolOrder = executionLog.map((e) => e.tool);
       expect(toolOrder).toEqual(['analyze_repo']);
       expect(toolOrder).not.toContain('build_image');
     });
@@ -115,7 +111,7 @@ describe('Error Recovery and Rerouting', () => {
       }
 
       // Should have run up to the failure point
-      const toolOrder = executionLog.map(e => e.tool);
+      const toolOrder = executionLog.map((e) => e.tool);
       expect(toolOrder).toContain('analyze_repo');
       expect(toolOrder).toContain('resolve_base_images');
       expect(toolOrder).toContain('generate_dockerfile');
@@ -130,7 +126,10 @@ describe('Error Recovery and Rerouting', () => {
       let totalCalls = 0;
       tools.set('build_image', {
         name: 'build_image',
-        handler: async (params: Record<string, unknown>, _context?: any): Promise<Result<unknown>> => {
+        handler: async (
+          params: Record<string, unknown>,
+          _context?: any,
+        ): Promise<Result<unknown>> => {
           totalCalls++;
           executionLog.push({
             tool: 'build_image',
@@ -223,7 +222,7 @@ describe('Error Recovery and Rerouting', () => {
       }
 
       // Verify prerequisites ran successfully before failure
-      const toolOrder = executionLog.map(e => e.tool);
+      const toolOrder = executionLog.map((e) => e.tool);
       expect(toolOrder).toContain('analyze_repo');
       expect(toolOrder).toContain('build_image');
       expect(toolOrder[toolOrder.length - 1]).toBe('push_image');
@@ -325,7 +324,6 @@ describe('Error Recovery and Rerouting', () => {
       });
 
       expect(firstAttempt.result.ok).toBe(false);
-
 
       // Second attempt - should skip completed prerequisites
       resetExecutionLog();
@@ -542,7 +540,7 @@ describe('Error Recovery and Rerouting', () => {
       }
 
       // Should have executed up to the failure point
-      const toolOrder = executionLog.map(e => e.tool);
+      const toolOrder = executionLog.map((e) => e.tool);
       expect(toolOrder).toContain('analyze_repo');
       expect(toolOrder).toContain('resolve_base_images');
 

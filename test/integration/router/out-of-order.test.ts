@@ -4,13 +4,9 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import pino from 'pino';
-import { createToolRouter, type ToolRouter } from '@mcp/tool-router';
-import type { Step } from '@mcp/tool-graph';
-import {
-  createMockToolsMap,
-  resetExecutionLog,
-  executionLog,
-} from './fixtures/mock-tools';
+import { createToolRouter, type ToolRouter } from '@/mcp/tool-router';
+import type { Step } from '@/mcp/tool-graph';
+import { createMockToolsMap, resetExecutionLog, executionLog } from './fixtures/mock-tools';
 import { MockSessionManager } from './fixtures/mock-session';
 import { createMockContext } from './fixtures/mock-context';
 
@@ -56,7 +52,7 @@ describe('Out-of-Order Tool Execution', () => {
       expect(result.executedTools).toContain('deploy');
 
       // Verify execution order from log
-      const toolOrder = executionLog.map(e => e.tool);
+      const toolOrder = executionLog.map((e) => e.tool);
 
       // Check that all required tools were executed
       expect(toolOrder).toContain('analyze_repo');
@@ -117,7 +113,7 @@ describe('Out-of-Order Tool Execution', () => {
       expect(result.executedTools).toContain('push_image');
 
       // Verify execution order
-      const toolOrder = executionLog.map(e => e.tool);
+      const toolOrder = executionLog.map((e) => e.tool);
       expect(toolOrder).toEqual([
         'analyze_repo',
         'resolve_base_images',
@@ -127,7 +123,7 @@ describe('Out-of-Order Tool Execution', () => {
       ]);
 
       // Verify the push used the built image ID
-      const pushExecution = executionLog.find(e => e.tool === 'push_image');
+      const pushExecution = executionLog.find((e) => e.tool === 'push_image');
       expect(pushExecution?.params.imageId).toBeDefined();
     });
   });
@@ -148,7 +144,7 @@ describe('Out-of-Order Tool Execution', () => {
       expect(result.executedTools).toContain('scan');
 
       // Verify proper order
-      const toolOrder = executionLog.map(e => e.tool);
+      const toolOrder = executionLog.map((e) => e.tool);
       const analyzeIndex = toolOrder.indexOf('analyze_repo');
       const buildIndex = toolOrder.indexOf('build_image');
       const scanIndex = toolOrder.indexOf('scan');
@@ -174,12 +170,8 @@ describe('Out-of-Order Tool Execution', () => {
       expect(result.executedTools).toContain('generate_dockerfile');
 
       // Verify execution order
-      const toolOrder = executionLog.map(e => e.tool);
-      expect(toolOrder).toEqual([
-        'analyze_repo',
-        'resolve_base_images',
-        'generate_dockerfile',
-      ]);
+      const toolOrder = executionLog.map((e) => e.tool);
+      expect(toolOrder).toEqual(['analyze_repo', 'resolve_base_images', 'generate_dockerfile']);
     });
   });
 
@@ -189,7 +181,7 @@ describe('Out-of-Order Tool Execution', () => {
       const sessionResult = await sessionManager.createWithState({
         completed_steps: ['analyzed_repo'] as Step[],
         results: {
-          'analyze_repo': {
+          analyze_repo: {
             framework: 'node',
             packageManager: 'npm',
           },
@@ -211,15 +203,11 @@ describe('Out-of-Order Tool Execution', () => {
       expect(result.result.ok).toBe(true);
 
       // Should NOT re-run analyze-repo
-      const toolOrder = executionLog.map(e => e.tool);
+      const toolOrder = executionLog.map((e) => e.tool);
       expect(toolOrder).not.toContain('analyze_repo');
 
       // Should run missing prerequisites
-      expect(toolOrder).toEqual([
-        'resolve_base_images',
-        'generate_dockerfile',
-        'build_image',
-      ]);
+      expect(toolOrder).toEqual(['resolve_base_images', 'generate_dockerfile', 'build_image']);
     });
   });
 
@@ -241,7 +229,7 @@ describe('Out-of-Order Tool Execution', () => {
       expect(result.result.ok).toBe(true);
 
       // Verify all required tools were run
-      const executedTools = new Set(executionLog.map(e => e.tool));
+      const executedTools = new Set(executionLog.map((e) => e.tool));
       expect(executedTools.has('analyze_repo')).toBe(true);
       expect(executedTools.has('build_image')).toBe(true);
       expect(executedTools.has('prepare_cluster')).toBe(true);
@@ -249,7 +237,7 @@ describe('Out-of-Order Tool Execution', () => {
       expect(executedTools.has('deploy')).toBe(true);
 
       // Verify order constraints
-      const toolOrder = executionLog.map(e => e.tool);
+      const toolOrder = executionLog.map((e) => e.tool);
       const analyzeIndex = toolOrder.indexOf('analyze_repo');
       const buildIndex = toolOrder.indexOf('build_image');
       const deployIndex = toolOrder.indexOf('deploy');

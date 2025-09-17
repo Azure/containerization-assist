@@ -3,7 +3,7 @@
  * Trade-off: AI quality over speed; fallback templates ensure availability.
  */
 
-// import { extractErrorMessage } from '@lib/error-utils'; // Not currently used
+// import { extractErrorMessage } from '@/lib/error-utils'; // Not currently used
 import { promises as fs } from 'node:fs';
 import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
 import type { Logger } from '@lib/logger';
@@ -14,26 +14,26 @@ import {
   defineToolIO,
   useSessionSlice,
   getSessionSlice,
-} from '@mcp/tool-session-helpers';
-import { createStandardProgress } from '@mcp/progress-helper';
-import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
-import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
-import type { SamplingOptions } from '@lib/sampling';
-import { analyzeRepoSchema } from '@tools/analyze-repo/schema';
+} from '@/mcp/tool-session-helpers';
+import { createStandardProgress } from '@/mcp/progress-helper';
+import { aiGenerateWithSampling } from '@/mcp/tool-ai-helpers';
+import { enhancePromptWithKnowledge } from '@/lib/ai-knowledge-enhancer';
+import type { SamplingOptions } from '@/lib/sampling';
+import { analyzeRepoSchema } from '@/tools/analyze-repo/schema';
 
-import type { SessionAnalysisResult } from '@tools/session-types';
-import type { ToolContext } from '@mcp/context';
-import { Success, Failure, type Result } from '@types';
-import { getDefaultPort, ANALYSIS_CONFIG } from '@config/defaults';
-import { getRecommendedBaseImage } from '@lib/base-images';
+import type { SessionAnalysisResult } from '@/tools/session-types';
+import type { ToolContext } from '@/mcp/context';
+import { Success, Failure, type Result } from '@/types';
+import { getDefaultPort, ANALYSIS_CONFIG } from '@/config/defaults';
+import { getRecommendedBaseImage } from '@/lib/base-images';
 import {
   stripFencesAndNoise,
   isValidDockerfileContent,
   extractBaseImage,
-} from '@lib/text-processing';
+} from '@/lib/text-processing';
 import { generateDockerfileSchema, type GenerateDockerfileParams } from './schema';
 import { z } from 'zod';
-import { AnalyzeRepoResult } from '@tools/analyze-repo/tool';
+import { AnalyzeRepoResult } from '@/tools/analyze-repo/tool';
 
 // Define the result schema for type safety - complex nested structure
 const SingleDockerfileResultSchema = z.object({
@@ -427,21 +427,38 @@ function generateTemplateDockerfile(
       } else {
         // .NET Core/5+ - Linux containers
         dockerfile = `# Multi-stage build for .NET\n`;
-        dockerfile += `FROM mcr.microsoft.com/dotnet/sdk:8.0 AS builder\n`;
+        dockerfile += `FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build\n`;
         dockerfile += `WORKDIR /src\n\n`;
 
         dockerfile += `# Copy project files\n`;
         dockerfile += `COPY *.csproj ./\n`;
-        dockerfile += `RUN dotnet restore\n\n`;
+        dockerfile += `COPY *.sln ./\n`;
+        dockerfile += `COPY Directory.Build.props* ./\n`;
+        dockerfile += `COPY Directory.Packages.props* ./\n`;
+        dockerfile += `COPY global.json* ./\n`;
+        dockerfile += `RUN dotnet restore --no-cache\n\n`;
 
-        dockerfile += `# Copy source code\n`;
+        dockerfile += `# Copy source code and build\n`;
         dockerfile += `COPY . .\n`;
-        dockerfile += `RUN dotnet publish -c Release -o /app/publish\n\n`;
+        dockerfile += `RUN dotnet publish -c Release -o /app/publish --no-restore --no-self-contained\n\n`;
 
-        dockerfile += `# Runtime stage\n`;
-        dockerfile += `FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine\n`;
-        dockerfile += `WORKDIR /app\n`;
-        dockerfile += `COPY --from=builder /app/publish .\n`;
+        dockerfile += `# Runtime stage with optimized security and performance\n`;
+        dockerfile += `FROM mcr.microsoft.com/dotnet/aspnet:8.0-jammy-chiseled\n`;
+        dockerfile += `WORKDIR /app\n\n`;
+
+        dockerfile += `# Set .NET 8+ environment variables for optimal performance\n`;
+        dockerfile += `ENV ASPNETCORE_ENVIRONMENT=Production \\\n`;
+        dockerfile += `    ASPNETCORE_HTTP_PORTS=8080 \\\n`;
+        dockerfile += `    ASPNETCORE_URLS=http://+:8080 \\\n`;
+        dockerfile += `    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 \\\n`;
+        dockerfile += `    DOTNET_RUNNING_IN_CONTAINER=1 \\\n`;
+        dockerfile += `    DOTNET_EnableDiagnostics=0\n\n`;
+
+        dockerfile += `# Copy published app\n`;
+        dockerfile += `COPY --from=build /app/publish .\n\n`;
+
+        dockerfile += `# Use built-in non-root user (UID 1654)\n`;
+        dockerfile += `USER $APP_UID\n\n`;
       }
       break;
     }
@@ -454,10 +471,16 @@ function generateTemplateDockerfile(
     dockerfile += `RUN addgroup -g 1001 -S appgroup && adduser -u 1001 -S appuser -G appgroup\n`;
     dockerfile += `USER appuser\n\n`;
   }
-  // Expose port
+  // Expose port (use 8080 for .NET 8+ projects)
   if (mainPort) {
+    const isDotNetFramework =
+      language === 'dotnet' &&
+      (framework?.includes('framework') ||
+        framework?.includes('aspnet-webapi') ||
+        framework?.includes('aspnet-mvc'));
+    const exposedPort = language === 'dotnet' && !isDotNetFramework ? 8080 : mainPort;
     dockerfile += `# Expose application port\n`;
-    dockerfile += `EXPOSE ${mainPort}\n\n`;
+    dockerfile += `EXPOSE ${exposedPort}\n\n`;
   }
   // Set entrypoint based on language
   dockerfile += `# Start application\n`;
@@ -734,8 +757,6 @@ function buildArgsFromAnalysis(
   };
 }
 
-// computeHash function removed - was unused after tool wrapper elimination
-
 /**
  * Generates Dockerfile through direct AI analysis when initial detection fails.
  * Fallback strategy when confidence thresholds aren't met for guided generation.
@@ -747,8 +768,12 @@ async function generateWithDirectAnalysis(
   context: ToolContext,
   logger: Logger,
 ): Promise<Result<SingleDockerfileResult>> {
-  const rawPath = params.path || '.';
-  const repoPath = normalizePath(rawPath);
+  if (!params.path) {
+    return Failure(
+      'Repository path is required. Please provide the absolute path to your repository.',
+    );
+  }
+  const repoPath = normalizePath(params.path);
   const normalizedModuleRoot = normalizePath(moduleRoot);
 
   // Build comprehensive prompt args using the same rich analysis as high-confidence path
@@ -820,18 +845,18 @@ async function generateWithDirectAnalysis(
       const baseImageUsed = extractBaseImage(cleaned) || params.baseImage || 'node:18-alpine'; // fallback
 
       // Handle moduleRoot path resolution correctly
-      let targetPath: string;
+      let dockerfileTargetPath: string;
       if (path.isAbsolute(normalizedModuleRoot)) {
         // Absolute path - use as-is
-        targetPath = normalizedModuleRoot;
+        dockerfileTargetPath = normalizedModuleRoot;
       } else if (normalizedModuleRoot.startsWith(repoPath)) {
         // moduleRoot already includes repoPath - use as-is to avoid duplication
-        targetPath = normalizedModuleRoot;
+        dockerfileTargetPath = normalizedModuleRoot;
       } else {
         // Relative path - join with repoPath
-        targetPath = path.resolve(path.join(repoPath, normalizedModuleRoot));
+        dockerfileTargetPath = path.resolve(path.join(repoPath, normalizedModuleRoot));
       }
-      const dockerfilePath = path.join(targetPath, 'Dockerfile');
+      const dockerfilePath = path.join(dockerfileTargetPath, 'Dockerfile');
 
       await fs.writeFile(dockerfilePath, cleaned, 'utf-8');
 
@@ -897,18 +922,18 @@ async function generateWithDirectAnalysis(
   }
 
   // Handle template fallback similar to existing logic
-  let targetPath: string;
+  let fallbackTargetPath: string;
   if (path.isAbsolute(normalizedModuleRoot)) {
     // Absolute path - use as-is
-    targetPath = normalizedModuleRoot;
+    fallbackTargetPath = normalizedModuleRoot;
   } else if (normalizedModuleRoot.startsWith(repoPath)) {
     // moduleRoot already includes repoPath - use as-is to avoid duplication
-    targetPath = normalizedModuleRoot;
+    fallbackTargetPath = normalizedModuleRoot;
   } else {
     // Relative path - join with repoPath
-    targetPath = path.resolve(path.join(repoPath, normalizedModuleRoot));
+    fallbackTargetPath = path.resolve(path.join(repoPath, normalizedModuleRoot));
   }
-  const dockerfilePath = path.join(targetPath, 'Dockerfile');
+  const dockerfilePath = path.join(fallbackTargetPath, 'Dockerfile');
 
   await fs.writeFile(dockerfilePath, fallbackResult.value.content, 'utf-8');
 
@@ -1112,23 +1137,27 @@ async function generateSingleDockerfile(
   }
 
   // Determine output path - write to each module root directory
-  const rawPath = params.path || '.';
-  const repoPath = normalizePath(rawPath);
+  if (!params.path) {
+    return Failure(
+      'Repository path is required. Please provide the absolute path to your repository.',
+    );
+  }
+  const repoPath = normalizePath(params.path);
   const normalizedModuleRoot = normalizePath(moduleRoot);
 
   // Handle moduleRoot path resolution correctly
-  let targetPath: string;
+  let outputTargetPath: string;
   if (path.isAbsolute(normalizedModuleRoot)) {
     // Absolute path - use as-is
-    targetPath = normalizedModuleRoot;
+    outputTargetPath = normalizedModuleRoot;
   } else if (normalizedModuleRoot.startsWith(repoPath)) {
     // moduleRoot already includes repoPath - use as-is to avoid duplication
-    targetPath = normalizedModuleRoot;
+    outputTargetPath = normalizedModuleRoot;
   } else {
     // Relative path - join with repoPath
-    targetPath = path.resolve(path.join(repoPath, normalizedModuleRoot));
+    outputTargetPath = path.resolve(path.join(repoPath, normalizedModuleRoot));
   }
-  const dockerfilePath = path.join(targetPath, 'Dockerfile');
+  const dockerfilePath = path.join(outputTargetPath, 'Dockerfile');
 
   // Write Dockerfile to disk
   await fs.writeFile(dockerfilePath, dockerfileContent, 'utf-8');
@@ -1306,7 +1335,12 @@ async function generateDockerfileImpl(
       );
     } else {
       // Fallback: Auto-detect modules based on repository analysis
-      const repoPath = normalizePath(params.path || '.');
+      if (!params.path) {
+        return Failure(
+          'Repository path is required. Please provide the absolute path to your repository.',
+        );
+      }
+      const repoPath = normalizePath(params.path);
       rawModuleRoots = await detectModuleRoots(repoPath, analysisResult.language, logger);
       logger.info({ detectedModuleRoots: rawModuleRoots }, 'Auto-detected module roots (fallback)');
     }

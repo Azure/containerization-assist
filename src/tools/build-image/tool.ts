@@ -22,18 +22,18 @@ import {
   defineToolIO,
   useSessionSlice,
   getSessionSlice,
-} from '@mcp/tool-session-helpers';
-import { createStandardProgress } from '@mcp/progress-helper';
-import type { ToolContext } from '@mcp/context';
-import { createDockerClient, type DockerBuildOptions } from '@lib/docker';
+} from '@/mcp/tool-session-helpers';
+import { createStandardProgress } from '@/mcp/progress-helper';
+import type { ToolContext } from '@/mcp/context';
+import { createDockerClient, type DockerBuildOptions } from '@/lib/docker';
 
-import { type Result, Success, Failure } from '@types';
-import { extractErrorMessage } from '@lib/error-utils';
-import { fileExists } from '@lib/file-utils';
+import { type Result, Success, Failure } from '@/types';
+import { extractErrorMessage } from '@/lib/error-utils';
+import { fileExists } from '@/lib/file-utils';
 import { buildImageSchema, type BuildImageParams } from './schema';
 import { z } from 'zod';
-import type { SessionData } from '@tools/session-types';
-import { analyzeRepoSchema } from '@tools/analyze-repo/schema';
+import type { SessionData } from '@/tools/session-types';
+import { analyzeRepoSchema } from '@/tools/analyze-repo/schema';
 
 export interface BuildImageResult {
   /** Whether the build completed successfully */

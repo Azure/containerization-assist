@@ -15,22 +15,22 @@ import {
   defineToolIO,
   useSessionSlice,
   getSessionSlice,
-} from '@mcp/tool-session-helpers';
-import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
-import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
-import type { SamplingOptions } from '@lib/sampling';
-import { createStandardProgress } from '@mcp/progress-helper';
+} from '@/mcp/tool-session-helpers';
+import { aiGenerateWithSampling } from '@/mcp/tool-ai-helpers';
+import { enhancePromptWithKnowledge } from '@/lib/ai-knowledge-enhancer';
+import type { SamplingOptions } from '@/lib/sampling';
+import { createStandardProgress } from '@/mcp/progress-helper';
 // Moved to tool-helpers
-import type { ToolContext } from '@mcp/context';
-import { Success, Failure, type Result } from '@types';
-import { stripFencesAndNoise, isValidKubernetesContent } from '@lib/text-processing';
+import type { ToolContext } from '@/mcp/context';
+import { Success, Failure, type Result } from '@/types';
+import { stripFencesAndNoise, isValidKubernetesContent } from '@/lib/text-processing';
 import { createKubernetesValidator, getValidationSummary } from '@/validation';
-import { scoreConfigCandidates } from '@lib/integrated-scoring';
+import { scoreConfigCandidates } from '@/lib/integrated-scoring';
 import * as yaml from 'js-yaml';
 import { generateK8sManifestsSchema, type GenerateK8sManifestsParams } from './schema';
 import { z } from 'zod';
-import { buildImageSchema } from '@tools/build-image/schema';
-import { analyzeRepoSchema } from '@tools/analyze-repo/schema';
+import { buildImageSchema } from '@/tools/build-image/schema';
+import { analyzeRepoSchema } from '@/tools/analyze-repo/schema';
 // Note: Tool now uses GenerateK8sManifestsParams from schema for type safety
 
 /**

@@ -4,27 +4,23 @@
 
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
 import type { Logger } from 'pino';
-import {
-  createToolContext,
-  createMCPToolContext,
-} from '@mcp/context';
-import {
-  extractProgressToken,
-  createProgressReporter,
-} from '@mcp/context';
+import { createToolContext, createMCPToolContext } from '@/mcp/context';
+import { extractProgressToken, createProgressReporter } from '@/mcp/context';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
 // Mock server and logger
-const createMockServer = (): Server => ({
-  createMessage: jest.fn(),
-} as any);
+const createMockServer = (): Server =>
+  ({
+    createMessage: jest.fn(),
+  }) as any;
 
-const createMockLogger = (): Logger => ({
-  debug: jest.fn(),
-  error: jest.fn(),
-  warn: jest.fn(),
-  child: jest.fn(() => createMockLogger()),
-} as any);
+const createMockLogger = (): Logger =>
+  ({
+    debug: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    child: jest.fn(() => createMockLogger()),
+  }) as any;
 
 describe('ToolContext Bridge', () => {
   let mockServer: Server;
@@ -90,7 +86,7 @@ describe('ToolContext Bridge', () => {
           maxTokens: 2048,
           stopSequences: ['```', '\n\n```', '\n\n# ', '\n\n---'],
           includeContext: 'thisServer',
-        })
+        }),
       );
     });
 
@@ -110,7 +106,7 @@ describe('ToolContext Bridge', () => {
               content: [{ type: 'text', text: 'Test prompt' }],
             },
           ],
-        })
+        }),
       ).rejects.toThrow('Empty response from sampling after processing');
     });
 
@@ -130,7 +126,7 @@ describe('ToolContext Bridge', () => {
               content: [{ type: 'text', text: 'Test prompt' }],
             },
           ],
-        })
+        }),
       ).rejects.toThrow('Empty or invalid response from sampling - no text content found');
     });
 
@@ -138,7 +134,7 @@ describe('ToolContext Bridge', () => {
       const context = createToolContext(mockServer, mockLogger);
 
       const result = await context.getPrompt('test-prompt');
-      
+
       expect(result).toEqual({
         description: 'Prompt not available - no registry',
         messages: [
@@ -168,11 +164,9 @@ describe('ToolContext Bridge', () => {
         }),
       };
 
-      const context = createToolContext(
-        mockServer,
-        mockLogger,
-        { promptRegistry: mockPromptRegistry as any }
-      );
+      const context = createToolContext(mockServer, mockLogger, {
+        promptRegistry: mockPromptRegistry as any,
+      });
 
       const result = await context.getPrompt('test-prompt', { arg1: 'value1' });
 
@@ -192,22 +186,14 @@ describe('ToolContext Bridge', () => {
 
     test('forwards abort signal', () => {
       const abortController = new AbortController();
-      const context = createToolContext(
-        mockServer,
-        mockLogger,
-        { signal: abortController.signal }
-      );
+      const context = createToolContext(mockServer, mockLogger, { signal: abortController.signal });
 
       expect(context.signal).toBe(abortController.signal);
     });
 
     test('includes progress reporter if provided', () => {
       const mockProgressReporter = jest.fn();
-      const context = createToolContext(
-        mockServer,
-        mockLogger,
-        { progress: mockProgressReporter }
-      );
+      const context = createToolContext(mockServer, mockLogger, { progress: mockProgressReporter });
 
       expect(context.progress).toBe(mockProgressReporter);
     });
@@ -265,7 +251,7 @@ describe('ToolContext Bridge', () => {
 
     test('progress reporter logs progress (placeholder implementation)', () => {
       const reporter = createProgressReporter(mockServer, 'test-token', mockLogger);
-      
+
       if (reporter) {
         reporter('Processing...', 50, 100);
         expect(mockLogger.debug).toHaveBeenCalledWith(
@@ -276,7 +262,7 @@ describe('ToolContext Bridge', () => {
             total: 100,
             type: 'progress_notification',
           }),
-          'Progress notification logged - MCP transport implementation pending'
+          'Progress notification logged - MCP transport implementation pending',
         );
       }
     });
@@ -331,7 +317,7 @@ describe('ToolContext Bridge', () => {
           maxTokens: 2048,
           includeContext: 'thisServer',
         }),
-        'Making sampling request'
+        'Making sampling request',
       );
 
       expect(mockLogger.debug).toHaveBeenCalledWith(
@@ -339,7 +325,7 @@ describe('ToolContext Bridge', () => {
           duration: expect.any(Number),
           responseLength: 8, // 'Response' length
         }),
-        'Sampling request completed'
+        'Sampling request completed',
       );
     });
 
@@ -357,7 +343,7 @@ describe('ToolContext Bridge', () => {
               content: [{ type: 'text', text: 'Test' }],
             },
           ],
-        })
+        }),
       ).rejects.toThrow('Sampling failed: Sampling failed');
 
       expect(mockLogger.error).toHaveBeenCalledWith(
@@ -366,13 +352,13 @@ describe('ToolContext Bridge', () => {
           error: 'Sampling failed',
           messageCount: 1,
         }),
-        'Sampling request failed'
+        'Sampling request failed',
       );
     });
 
     test('handles progress reporting errors gracefully', () => {
       const reporter = createProgressReporter(mockServer, 'test-token', mockLogger);
-      
+
       // Mock logger methods to throw
       (mockLogger.debug as jest.Mock).mockImplementation(() => {
         throw new Error('Logger error');

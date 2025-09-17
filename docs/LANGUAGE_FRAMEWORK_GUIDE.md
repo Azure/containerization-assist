@@ -609,7 +609,7 @@ grep -r "python" src/knowledge/data/ | wc -l
   "triggers": {
     "frameworks": ["fastapi"],
     "packages": ["fastapi", "uvicorn"],
-    "patterns": ["from fastapi import", "@app\\."]
+    "patterns": ["from fastapi import", "@/app\\."]
   },
   "rules": [
     {
