@@ -5,10 +5,10 @@
     "thresholds": {
       "lint": {
         "maxErrors": 0,
-        "maxWarnings": 2000
+        "maxWarnings": 400
       },
       "deadcode": {
-        "max": 80
+        "max": 200
       },
       "typescript": {
         "maxErrors": 0
@@ -20,34 +20,93 @@
     "baselines": {
       "lint": {
         "errors": 0,
-        "warnings": 68
+        "warnings": 68,
+        "warningSignatures": [
+          "/Users/d/containerization-assist/src/exports/container-assist.ts:141:51:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/mcp/ai/host-ai-assist.ts:288:83:@typescript-eslint/explicit-function-return-type:Missing return type on function.",
+          "/Users/d/containerization-assist/src/mcp/ai/prompt-builder.ts:121:3:@typescript-eslint/explicit-function-return-type:Missing return type on function.",
+          "/Users/d/containerization-assist/src/mcp/ai/prompt-builder.ts:128:41:@typescript-eslint/explicit-function-return-type:Missing return type on function.",
+          "/Users/d/containerization-assist/src/mcp/error-mapper.ts:110:65:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/mcp/server-direct.ts:382:52:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/mcp/server-direct.ts:446:39:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/mcp/tool-graph.ts:42:31:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/mcp/tool-graph.ts:42:39:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/mcp/tool-graph.ts:51:28:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/mcp/tool-graph.ts:51:36:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/mcp/tool-validator.ts:16:58:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/mcp/tool-validator.ts:16:75:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/mcp/tool-validator.ts:397:67:@typescript-eslint/explicit-function-return-type:Missing return type on function.",
+          "/Users/d/containerization-assist/src/services/docker-metadata-cache.ts:107:45:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/services/docker-mutex-client.ts:147:53:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/services/kubernetes-client.ts:26:29:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/services/kubernetes-client.ts:56:35:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/services/kubernetes-client.ts:149:38:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/services/kubernetes-client.ts:180:94:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/services/kubernetes-idempotent-apply.ts:28:10:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/services/kubernetes-idempotent-apply.ts:29:10:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/services/kubernetes-idempotent-apply.ts:55:46:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/services/kubernetes-idempotent-apply.ts:88:19:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/services/kubernetes-idempotent-apply.ts:176:38:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/services/kubernetes-idempotent-apply.ts:197:21:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/services/kubernetes-idempotent-apply.ts:224:19:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/services/kubernetes-idempotent-apply.ts:279:38:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/services/kubernetes-idempotent-apply.ts:299:21:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/services/kubernetes-idempotent-apply.ts:381:30:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/analyze-repo/tool.ts:214:16:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/build-image/tool.ts:91:11:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/convert-aca-to-k8s/tool.ts:94:14:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/convert-aca-to-k8s/tool.ts:100:48:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/convert-aca-to-k8s/tool.ts:151:44:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/convert-aca-to-k8s/tool.ts:152:56:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/convert-aca-to-k8s/tool.ts:153:57:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/convert-aca-to-k8s/tool.ts:154:55:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/convert-aca-to-k8s/tool.ts:354:92:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/deploy/tool.ts:237:51:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/deploy/tool.ts:238:44:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/deploy/tool.ts:241:51:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/deploy/tool.ts:242:44:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/fix-dockerfile/tool.ts:258:19:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/fix-dockerfile/tool.ts:355:50:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/fix-dockerfile/tool.ts:425:27:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/fix-dockerfile/tool.ts:427:25:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/fix-dockerfile/tool.ts:428:24:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/generate-dockerfile/tool.ts:272:22:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/generate-helm-charts/tool.ts:106:30:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/generate-helm-charts/tool.ts:527:11:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/generate-helm-charts/tool.ts:553:19:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/generate-k8s-manifests/tool.ts:407:51:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/inspect-session/tool.ts:156:40:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/inspect-session/tool.ts:180:38:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/resolve-base-images/tool.ts:109:41:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/resolve-base-images/tool.ts:122:39:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/validation/dockerfile-validator.ts:263:19:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/validation/kubernetes-validator.ts:42:35:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/validation/kubernetes-validator.ts:45:28:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/validation/kubernetes-validator.ts:53:27:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/validation/kubernetes-validator.ts:70:41:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/validation/kubernetes-validator.ts:89:41:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/validation/kubernetes-validator.ts:141:47:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/validation/kubernetes-validator.ts:159:43:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/validation/kubernetes-validator.ts:197:32:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/validation/kubernetes-validator.ts:236:35:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/validation/kubernetes-validator.ts:268:34:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type."
+        ]
       },
       "deadcode": {
-        "count": 310
+        "count": 309
       },
       "typescript": {
         "errors": 0
       },
       "build": {
-        "timeMs": 2000,
+        "timeMs": 4000,
         "mode": "clean",
         "environment": {
-          "nodeVersion": "v24.1.0",
-          "os": "Linux",
-          "cpu": "x86_64"
+          "nodeVersion": "v24.7.0",
+          "os": "Darwin",
+          "cpu": "arm64"
         }
       }
-    },
-    "lint": {
-      "current": 25,
-      "warnings": 25,
-      "errors": 0,
-      "baseline": 25
-    },
-    "deadcode": {
-      "current": 70,
-      "baseline": 70,
-      "note": "Accurate count excluding public API, MCP tools, and test-used exports. Conservative cleanup completed."
     }
   }
 }

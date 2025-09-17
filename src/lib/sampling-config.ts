@@ -7,7 +7,7 @@
 
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { ValidationResult } from '@/validation/core-types';
+import { ValidationResult } from '@validation/core-types';
 import { load as yamlLoad } from 'js-yaml';
 import { z } from 'zod';
 import { Result, Success, Failure } from '@types';

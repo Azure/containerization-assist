@@ -7,6 +7,7 @@ import type { Logger } from 'pino';
 import type { ToolContext } from './mcp/context';
 import type { ZodRawShape } from 'zod';
 import type { Result } from './types/core';
+import { ToolName } from './exports/tools';
 
 // Export enhanced category types
 export * from './types/categories';
@@ -21,7 +22,7 @@ export type { ToolContext } from './mcp/context';
  */
 export interface Tool {
   /** Unique tool identifier */
-  name: string;
+  name: ToolName;
   /** Human-readable tool description */
   description?: string;
   /** JSON schema for parameter validation */

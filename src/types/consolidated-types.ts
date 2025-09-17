@@ -10,10 +10,10 @@ export type {
   ValidationSeverity,
   ValidationGrade,
   ValidationCategory,
-} from '@/validation/core-types.js';
+} from '@validation/core-types.js';
 
 // Import for local use
-import type { ValidationResult } from '@/validation/core-types.js';
+import type { ValidationResult } from '@validation/core-types.js';
 
 // Test-specific result types
 export interface TestResult {
