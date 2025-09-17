@@ -10,17 +10,14 @@ import {
   buildPrompt,
   createParameterSuggestionPrompt,
   createContextAnalysisPrompt,
-  pipe
-} from '@mcp/ai/prompt-builder';
-import type { AIParamRequest } from '@mcp/ai/host-ai-assist';
+  pipe,
+} from '@/mcp/ai/prompt-builder';
+import type { AIParamRequest } from '@/mcp/ai/host-ai-assist';
 
 describe('AIPromptBuilder', () => {
   describe('basic building', () => {
     it('should build simple prompt', () => {
-      const builder = pipe(
-        addSection('Tool', 'analyze-repo'),
-        addSection('Missing', 'path')
-      );
+      const builder = pipe(addSection('Tool', 'analyze-repo'), addSection('Missing', 'path'));
       const prompt = buildPrompt(builder([]));
 
       expect(prompt).toContain('Tool: analyze-repo');
@@ -28,9 +25,7 @@ describe('AIPromptBuilder', () => {
     });
 
     it('should format JSON objects', () => {
-      const builder = pipe(
-        addSection('Params', { foo: 'bar', nested: { value: 123 } })
-      );
+      const builder = pipe(addSection('Params', { foo: 'bar', nested: { value: 123 } }));
       const prompt = buildPrompt(builder([]));
 
       expect(prompt).toContain('"foo": "bar"');
@@ -43,7 +38,7 @@ describe('AIPromptBuilder', () => {
         addSection('Valid', 'value'),
         addSection('Invalid', undefined),
         addSection('Null', null),
-        addSection('Another', 'included')
+        addSection('Another', 'included'),
       );
       const prompt = buildPrompt(builder([]));
 
@@ -56,7 +51,7 @@ describe('AIPromptBuilder', () => {
     it('should add instructions', () => {
       const builder = pipe(
         addInstruction('First instruction'),
-        addInstruction('Second instruction')
+        addInstruction('Second instruction'),
       );
       const prompt = buildPrompt(builder([]));
 
@@ -67,7 +62,7 @@ describe('AIPromptBuilder', () => {
       const builder = pipe(
         addSection('Before', 'separator'),
         addSeparator(),
-        addSection('After', 'separator')
+        addSection('After', 'separator'),
       );
       const prompt = buildPrompt(builder([]));
 
@@ -159,7 +154,7 @@ describe('AIPromptBuilder', () => {
         addSection('Second', 'value2'),
         addSeparator(),
         addInstruction('Do something'),
-        addInstruction('Do something else')
+        addInstruction('Do something else'),
       );
 
       const sections = builder([]);
@@ -177,18 +172,14 @@ describe('AIPromptBuilder', () => {
     });
 
     it('should handle special characters in content', () => {
-      const builder = pipe(
-        addSection('Special', 'Line\nbreak\ttab"quote')
-      );
+      const builder = pipe(addSection('Special', 'Line\nbreak\ttab"quote'));
       const prompt = buildPrompt(builder([]));
 
       expect(prompt).toContain('Special: Line\nbreak\ttab"quote');
     });
 
     it('should handle arrays as content', () => {
-      const builder = pipe(
-        addSection('Array', ['item1', 'item2', 'item3'])
-      );
+      const builder = pipe(addSection('Array', ['item1', 'item2', 'item3']));
       const prompt = buildPrompt(builder([]));
 
       expect(prompt).toContain('Array: [');

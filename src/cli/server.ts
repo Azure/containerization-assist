@@ -3,7 +3,7 @@
  * Uses direct SDK patterns with Zod schemas
  */
 
-import { createMCPServer, type IMCPServer } from '@mcp/server';
+import { createMCPServer, type IMCPServer } from '@/mcp/server';
 import {
   createDependencies,
   initializeDependencies,

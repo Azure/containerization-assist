@@ -1,11 +1,11 @@
 /**
  * Enhanced knowledge loader with simple caching
  */
-import { createLogger } from '@lib/logger';
+import { createLogger } from '@/lib/logger';
 import type { KnowledgeEntry, LoadedEntry } from './types';
 import { KnowledgeEntrySchema } from './schemas';
 import { readFileSync, existsSync } from 'fs';
-import { resolvePath } from '@lib/path-utils';
+import { resolvePath } from '@/lib/path-utils';
 
 const logger = createLogger().child({ module: 'enhanced-loader' });
 

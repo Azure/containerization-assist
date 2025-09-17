@@ -55,7 +55,7 @@ export default tseslint.config(
         {
           patterns: [
             { 
-              group: ['@domain/*','@service/*','@infrastructure/*', '@application/*'], 
+              group: ['@domain/*','@service/*', '@application/*'], 
               message: 'Use relative ESM imports instead of path aliases.' 
             }
           ]

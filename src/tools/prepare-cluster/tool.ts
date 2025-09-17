@@ -21,19 +21,19 @@
  * ```
  */
 
-import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
-import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import { extractErrorMessage } from '@lib/error-utils';
-import type { ToolContext } from '@mcp/context';
-import { createKubernetesClient } from '@lib/kubernetes';
+import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { extractErrorMessage } from '@/lib/error-utils';
+import type { ToolContext } from '@/mcp/context';
+import { createKubernetesClient } from '@/lib/kubernetes';
 
 import type * as pino from 'pino';
-import { Success, Failure, type Result } from '@types';
+import { Success, Failure, type Result } from '@/types';
 import { prepareClusterSchema, type PrepareClusterParams } from './schema';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { z } from 'zod';
-import type { SessionData } from '@tools/session-types';
+import type { SessionData } from '@/tools/session-types';
 
 const execAsync = promisify(exec);
 

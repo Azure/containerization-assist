@@ -1,4 +1,4 @@
-import { createKeyedMutex, type KeyedMutexInstance } from '@lib/mutex';
+import { createKeyedMutex, type KeyedMutexInstance } from '@/lib/mutex';
 
 describe('KeyedMutex', () => {
   let mutex: KeyedMutexInstance;
@@ -15,7 +15,7 @@ describe('KeyedMutex', () => {
     test('should acquire and release lock', async () => {
       const release = await mutex.acquire('test-key');
       expect(mutex.isLocked('test-key')).toBe(true);
-      
+
       release();
       expect(mutex.isLocked('test-key')).toBe(false);
     });
@@ -44,12 +44,12 @@ describe('KeyedMutex', () => {
       const results: string[] = [];
 
       const promise1 = mutex.withLock('key1', async () => {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         results.push('key1');
       });
 
       const promise2 = mutex.withLock('key2', async () => {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         results.push('key2');
       });
 
@@ -67,9 +67,9 @@ describe('KeyedMutex', () => {
       const release1 = await mutex.acquire('timeout-key');
 
       // Try to acquire with short timeout
-      await expect(
-        mutex.acquire('timeout-key', 100)
-      ).rejects.toThrow('Mutex timeout for key: timeout-key');
+      await expect(mutex.acquire('timeout-key', 100)).rejects.toThrow(
+        'Mutex timeout for key: timeout-key',
+      );
 
       release1();
     });
@@ -78,7 +78,7 @@ describe('KeyedMutex', () => {
       // First acquisition
       const release1 = await mutex.acquire('sequential-test');
       expect(mutex.isLocked('sequential-test')).toBe(true);
-      
+
       // Release first
       release1();
       expect(mutex.isLocked('sequential-test')).toBe(false);
@@ -86,7 +86,7 @@ describe('KeyedMutex', () => {
       // Second acquisition should work immediately
       const release2 = await mutex.acquire('sequential-test');
       expect(mutex.isLocked('sequential-test')).toBe(true);
-      
+
       release2();
       expect(mutex.isLocked('sequential-test')).toBe(false);
     });
@@ -110,7 +110,7 @@ describe('KeyedMutex', () => {
         mutex.withLock('error-key', async () => {
           expect(mutex.isLocked('error-key')).toBe(true);
           throw new Error('Test error');
-        })
+        }),
       ).rejects.toThrow('Test error');
 
       expect(mutex.isLocked('error-key')).toBe(false);
@@ -131,11 +131,11 @@ describe('KeyedMutex', () => {
       const release1 = await mutex.acquire('queue-key');
 
       // Queue up multiple waiters
-      const promises = [2, 3, 4].map(n =>
-        mutex.acquire('queue-key').then(release => {
+      const promises = [2, 3, 4].map((n) =>
+        mutex.acquire('queue-key').then((release) => {
           order.push(n);
           release();
-        })
+        }),
       );
 
       // Check waiters count
@@ -207,9 +207,9 @@ describe('KeyedMutex', () => {
     test('should handle concurrent acquire attempts', async () => {
       const promises = Array.from({ length: 10 }, (_, i) =>
         mutex.withLock('concurrent-key', async () => {
-          await new Promise(resolve => setTimeout(resolve, 10));
+          await new Promise((resolve) => setTimeout(resolve, 10));
           return i;
-        })
+        }),
       );
 
       const results = await Promise.all(promises);
@@ -226,9 +226,9 @@ describe('KeyedMutex', () => {
 
       const promises = Array.from({ length: operations }, (_, i) =>
         mutex.withLock(keys[i % keys.length], async () => {
-          await new Promise(resolve => setTimeout(resolve, Math.random() * 10));
+          await new Promise((resolve) => setTimeout(resolve, Math.random() * 10));
           completed.add(i);
-        })
+        }),
       );
 
       await Promise.all(promises);

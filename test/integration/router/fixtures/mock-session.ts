@@ -2,8 +2,8 @@
  * Mock session manager for router integration testing
  */
 
-import type { SessionManager } from '@lib/session';
-import type { WorkflowState, Result } from '@types';
+import type { SessionManager } from '@/lib/session';
+import type { WorkflowState, Result } from '@/types';
 import { Success, Failure } from '../../../../src/types';
 
 export class MockSessionManager implements SessionManager {
@@ -27,10 +27,7 @@ export class MockSessionManager implements SessionManager {
     return Success(this.sessions.get(sessionId) || null);
   }
 
-  async update(
-    sessionId: string,
-    updates: Partial<WorkflowState>,
-  ): Promise<Result<WorkflowState>> {
+  async update(sessionId: string, updates: Partial<WorkflowState>): Promise<Result<WorkflowState>> {
     const session = this.sessions.get(sessionId);
     if (!session) {
       return Failure(`Session ${sessionId} not found`);

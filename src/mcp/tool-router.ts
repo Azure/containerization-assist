@@ -6,9 +6,9 @@
  */
 
 import type { Logger } from 'pino';
-import type { ToolContext } from '@mcp/context';
-import { Success, Failure, type Result, type WorkflowState } from '@types';
-import type { SessionManager } from '@lib/session';
+import type { ToolContext } from '@/mcp/context';
+import { Success, Failure, type Result, type WorkflowState } from '@/types';
+import type { SessionManager } from '@/lib/session';
 import {
   type Step,
   type ToolEdge,

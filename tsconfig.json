@@ -13,53 +13,41 @@
       "@/*": [
         "src/*"
       ],
-      "@mcp/*": [
+      "@/mcp/*": [
         "src/mcp/*"
       ],
-      "@tools/*": [
+      "@/tools/*": [
         "src/tools/*"
       ],
-      "@lib/*": [
+      "@/lib/*": [
         "src/lib/*"
       ],
-      "@services/*": [
+      "@/services/*": [
         "src/services/*"
       ],
-      "@config/*": [
+      "@/config/*": [
         "src/config/*"
       ],
-      "@prompts/*": [
+      "@/prompts/*": [
         "src/prompts/*"
       ],
-      "@resources/*": [
+      "@/resources/*": [
         "src/resources/*"
       ],
-      "@workflows/*": [
-        "src/workflows/*"
-      ],
-      "@exports/*": [
+      "@/exports/*": [
         "src/exports/*"
       ],
-      "@knowledge/*": [
+      "@/knowledge/*": [
         "src/knowledge/*"
-      ],
-      "@types": [
-        "src/types"
-      ],
-      "@/container": [
-        "src/container"
-      ],
-      "@validation": [
-        "src/validation"
-      ],
-      "@validation/*": [
-        "src/validation/*"
       ],
       "@/types/*": [
         "src/types/*"
       ],
-      "@/knowledge/*": [
-        "src/knowledge/*"
+      "@/container": [
+        "src/container"
+      ],
+      "@validation/*": [
+        "src/validation"
       ]
     },
     "declaration": true,

@@ -4,13 +4,9 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import pino from 'pino';
-import { createToolRouter, type ToolRouter } from '@mcp/tool-router';
-import type { Step } from '@mcp/tool-graph';
-import {
-  createMockToolsMap,
-  resetExecutionLog,
-  executionLog,
-} from './fixtures/mock-tools';
+import { createToolRouter, type ToolRouter } from '@/mcp/tool-router';
+import type { Step } from '@/mcp/tool-graph';
+import { createMockToolsMap, resetExecutionLog, executionLog } from './fixtures/mock-tools';
 import { MockSessionManager } from './fixtures/mock-session';
 import { createMockContext } from './fixtures/mock-context';
 
@@ -141,7 +137,7 @@ describe('Force Flag Functionality', () => {
       const sessionResult = await sessionManager.createWithState({
         completed_steps: ['analyzed_repo', 'dockerfile_generated', 'built_image'] as Step[],
         results: {
-          'build_image': {
+          build_image: {
             imageId: 'old-image',
             tag: 'v1.0',
           },
@@ -332,7 +328,7 @@ describe('Force Flag Functionality', () => {
       for (const tool of tools) {
         resetExecutionLog();
         const result = await router.route({
-        context: mockContext,
+          context: mockContext,
           toolName: tool,
           params: { imageId: 'test', path: './' },
           sessionId: session.sessionId,

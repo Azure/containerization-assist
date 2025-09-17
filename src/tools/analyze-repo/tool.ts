@@ -19,23 +19,23 @@
  * ```
  */
 
-import { joinPaths, getExtension, safeNormalizePath } from '@lib/path-utils';
+import { joinPaths, getExtension, safeNormalizePath } from '@/lib/path-utils';
 import { promises as fs, constants } from 'node:fs';
 import * as path from 'node:path';
-import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
-import type { Logger } from '@lib/logger';
-import { createStandardProgress } from '@mcp/progress-helper';
-import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
-import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
-import { getBaseImageRecommendations } from '@lib/base-images';
-import type { ToolContext } from '@mcp/context';
-import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import { Success, Failure, type Result } from '@types';
+import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
+import type { Logger } from '@/lib/logger';
+import { createStandardProgress } from '@/mcp/progress-helper';
+import { aiGenerateWithSampling } from '@/mcp/tool-ai-helpers';
+import { enhancePromptWithKnowledge } from '@/lib/ai-knowledge-enhancer';
+import { getBaseImageRecommendations } from '@/lib/base-images';
+import type { ToolContext } from '@/mcp/context';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { Success, Failure, type Result } from '@/types';
 import { analyzeRepoSchema, type AnalyzeRepoParams } from './schema';
 import { z } from 'zod';
-import { parsePackageJson, getAllDependencies } from '@lib/parsing-package-json';
-import { DEFAULT_PORTS } from '@config/defaults';
-import { extractErrorMessage } from '@lib/error-utils';
+import { parsePackageJson, getAllDependencies } from '@/lib/parsing-package-json';
+import { DEFAULT_PORTS } from '@/config/defaults';
+import { extractErrorMessage } from '@/lib/error-utils';
 
 // Define the result schema for type safety
 const AnalyzeRepoResultSchema = z.object({

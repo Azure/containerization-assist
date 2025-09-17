@@ -5,14 +5,14 @@
  * Uses standardized helpers for consistency
  */
 
-import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
-import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import type { ToolContext } from '@mcp/context';
+import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import type { ToolContext } from '@/mcp/context';
 
-import { createSecurityScanner } from '@lib/scanner';
-import { Success, Failure, type Result } from '@types';
-import { getKnowledgeForCategory } from '@knowledge/index';
-import type { KnowledgeMatch } from '@knowledge/types';
+import { createSecurityScanner } from '@/lib/scanner';
+import { Success, Failure, type Result } from '@/types';
+import { getKnowledgeForCategory } from '@/knowledge/index';
+import type { KnowledgeMatch } from '@/knowledge/types';
 import { scanImageSchema, type ScanImageParams } from './schema';
 import { z } from 'zod';
 

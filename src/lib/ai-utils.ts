@@ -10,8 +10,8 @@
 
 import type { Logger } from 'pino';
 import { z } from 'zod';
-import { Success, Failure, type Result } from '@types';
-import type { ToolContext, SamplingRequest, SamplingResponse } from '@mcp/context';
+import { Success, Failure, type Result } from '@/types';
+import type { ToolContext, SamplingRequest, SamplingResponse } from '@/mcp/context';
 import { extractErrorMessage, formatErrorMessage } from './error-utils';
 
 // ============================================================================

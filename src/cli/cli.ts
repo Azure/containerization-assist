@@ -5,16 +5,16 @@
  */
 
 import { program } from 'commander';
-import { createMCPServer } from '@mcp/server';
+import { createMCPServer } from '@/mcp/server';
 import { createDependencies, initializeDependencies, getSystemStatus } from '@/container';
-import { config, logConfigSummaryIfDev } from '@config/index';
-import { createLogger } from '@lib/logger';
+import { config, logConfigSummaryIfDev } from '@/config/index';
+import { createLogger } from '@/lib/logger';
 import { exit, argv, env, cwd } from 'node:process';
 import { execSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { extractErrorMessage } from '@lib/error-utils';
+import { extractErrorMessage } from '@/lib/error-utils';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

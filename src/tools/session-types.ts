@@ -4,7 +4,7 @@
  * These types represent the session data structures used across tools
  */
 
-import type { WorkflowState } from '@types';
+import type { WorkflowState } from '@/types';
 
 /**
  * Analysis result stored in session
@@ -103,5 +103,5 @@ export interface SessionData {
   [key: string]: unknown;
 }
 
-// Note: Helper functions removed - use getSessionSlice from @mcp/tool-session-helpers instead
+// Note: Helper functions removed - use getSessionSlice from @/mcp/tool-session-helpers instead
 // This provides proper type-safe access to session data across tools

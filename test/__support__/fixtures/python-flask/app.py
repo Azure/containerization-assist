@@ -12,7 +12,7 @@ CORS(app)
 app.config['DEBUG'] = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
 
-@app.route('/')
+@/app.route('/')
 def index():
     return jsonify({
         'message': 'Flask Test Application',
@@ -21,14 +21,14 @@ def index():
         'python_version': os.sys.version
     })
 
-@app.route('/health')
+@/app.route('/health')
 def health():
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.utcnow().isoformat()
     })
 
-@app.route('/api/users', methods=['GET'])
+@/app.route('/api/users', methods=['GET'])
 def get_users():
     users = [
         {'id': 1, 'name': 'Alice Johnson', 'email': 'alice@example.com'},
@@ -36,7 +36,7 @@ def get_users():
     ]
     return jsonify(users)
 
-@app.route('/api/users', methods=['POST'])
+@/app.route('/api/users', methods=['POST'])
 def create_user():
     data = request.get_json()
     if not data or 'name' not in data or 'email' not in data:
@@ -50,11 +50,11 @@ def create_user():
     }
     return jsonify(user), 201
 
-@app.errorhandler(404)
+@/app.errorhandler(404)
 def not_found(error):
     return jsonify({'error': 'Not found'}), 404
 
-@app.errorhandler(500)
+@/app.errorhandler(500)
 def internal_error(error):
     return jsonify({'error': 'Internal server error'}), 500
 

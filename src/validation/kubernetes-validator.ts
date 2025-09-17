@@ -6,7 +6,7 @@
  */
 
 import { parse as parseYaml } from 'yaml';
-import { extractErrorMessage } from '@lib/error-utils';
+import { extractErrorMessage } from '@/lib/error-utils';
 import {
   KubernetesValidationRule,
   KubernetesManifest,
