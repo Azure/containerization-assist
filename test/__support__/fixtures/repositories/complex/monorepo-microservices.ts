@@ -13,13 +13,13 @@ export const monorepoMicroservicesConfig: TestRepositoryConfig = {
     expectedFeatures: [
       'api-gateway',
       'user-service',
-      'order-service', 
+      'order-service',
       'notification-service',
       'database-migrations',
       'docker-compose',
       'kubernetes-manifests',
-      'ci-cd-pipeline'
-    ]
+      'ci-cd-pipeline',
+    ],
   },
   expectation: {
     analysis: {
@@ -30,7 +30,7 @@ export const monorepoMicroservicesConfig: TestRepositoryConfig = {
         'services/api-gateway/server.js',
         'services/user-service/main.py',
         'services/order-service/src/main/java/OrderServiceApplication.java',
-        'services/notification-service/main.go'
+        'services/notification-service/main.go',
       ],
       dependencies: [
         'express',
@@ -39,7 +39,7 @@ export const monorepoMicroservicesConfig: TestRepositoryConfig = {
         'gin-gonic/gin',
         'redis',
         'postgresql',
-        'kafka'
+        'kafka',
       ],
       ports: [8080, 8081, 8082, 8083, 5432, 6379, 9092],
       environment: {
@@ -49,8 +49,8 @@ export const monorepoMicroservicesConfig: TestRepositoryConfig = {
         GO_ENV: 'production',
         DATABASE_URL: 'postgresql://postgres:password@postgres:5432/monorepo_db',
         REDIS_URL: 'redis://redis:6379',
-        KAFKA_BROKERS: 'kafka:9092'
-      }
+        KAFKA_BROKERS: 'kafka:9092',
+      },
     },
     dockerfile: {
       baseImage: 'multi-stage',
@@ -58,7 +58,7 @@ export const monorepoMicroservicesConfig: TestRepositoryConfig = {
       exposedPorts: [8080, 8081, 8082, 8083],
       hasMultiStage: true,
       hasHealthCheck: true,
-      hasNonRootUser: true
+      hasNonRootUser: true,
     },
     k8sManifests: {
       hasDeployment: true,
@@ -66,39 +66,39 @@ export const monorepoMicroservicesConfig: TestRepositoryConfig = {
       hasConfigMap: true,
       hasSecret: true,
       hasIngress: true,
-      replicas: 3
+      replicas: 3,
     },
     buildShouldSucceed: true,
-    estimatedBuildTimeMs: 180000 // 3 minutes
-  }
+    estimatedBuildTimeMs: 180000, // 3 minutes
+  },
 };
 
 export const monorepoMicroservicesStructure = {
-  'package.json': JSON.stringify({
-    name: 'monorepo-microservices',
-    private: true,
-    workspaces: [
-      'services/api-gateway',
-      'services/user-service',
-      'shared/common'
-    ],
-    scripts: {
-      'build:all': 'npm run build --workspaces',
-      'test:all': 'npm run test --workspaces',
-      'docker:build': 'docker-compose build',
-      'docker:up': 'docker-compose up',
-      'k8s:deploy': 'kubectl apply -f k8s/',
-      'migrate': 'npm run migrate -w services/user-service'
+  'package.json': JSON.stringify(
+    {
+      name: 'monorepo-microservices',
+      private: true,
+      workspaces: ['services/api-gateway', 'services/user-service', 'shared/common'],
+      scripts: {
+        'build:all': 'npm run build --workspaces',
+        'test:all': 'npm run test --workspaces',
+        'docker:build': 'docker-compose build',
+        'docker:up': 'docker-compose up',
+        'k8s:deploy': 'kubectl apply -f k8s/',
+        migrate: 'npm run migrate -w services/user-service',
+      },
+      devDependencies: {
+        '@/types/node': '^18.0.0',
+        typescript: '^4.9.0',
+        jest: '^29.0.0',
+        eslint: '^8.0.0',
+        prettier: '^2.8.0',
+      },
     },
-    devDependencies: {
-      '@types/node': '^18.0.0',
-      'typescript': '^4.9.0',
-      'jest': '^29.0.0',
-      'eslint': '^8.0.0',
-      'prettier': '^2.8.0'
-    }
-  }, null, 2),
-  
+    null,
+    2,
+  ),
+
   'docker-compose.yml': `version: '3.8'
 services:
   postgres:
@@ -194,36 +194,40 @@ volumes:
   redis_data:
 `,
 
-  'services/api-gateway/package.json': JSON.stringify({
-    name: 'api-gateway',
-    version: '1.0.0',
-    main: 'server.js',
-    scripts: {
-      start: 'node server.js',
-      dev: 'nodemon server.js',
-      test: 'jest',
-      build: 'tsc'
+  'services/api-gateway/package.json': JSON.stringify(
+    {
+      name: 'api-gateway',
+      version: '1.0.0',
+      main: 'server.js',
+      scripts: {
+        start: 'node server.js',
+        dev: 'nodemon server.js',
+        test: 'jest',
+        build: 'tsc',
+      },
+      dependencies: {
+        express: '^4.18.0',
+        'http-proxy-middleware': '^2.0.0',
+        'express-rate-limit': '^6.0.0',
+        helmet: '^6.0.0',
+        cors: '^2.8.5',
+        'express-validator': '^6.14.0',
+        redis: '^4.0.0',
+        pg: '^8.8.0',
+        winston: '^3.8.0',
+        'node-fetch': '^3.3.0',
+      },
+      devDependencies: {
+        '@/types/node': '^18.0.0',
+        typescript: '^4.9.0',
+        nodemon: '^2.0.20',
+        jest: '^29.0.0',
+        supertest: '^6.3.0',
+      },
     },
-    dependencies: {
-      express: '^4.18.0',
-      'http-proxy-middleware': '^2.0.0',
-      'express-rate-limit': '^6.0.0',
-      helmet: '^6.0.0',
-      cors: '^2.8.5',
-      'express-validator': '^6.14.0',
-      redis: '^4.0.0',
-      pg: '^8.8.0',
-      winston: '^3.8.0',
-      'node-fetch': '^3.3.0'
-    },
-    devDependencies: {
-      '@types/node': '^18.0.0',
-      'typescript': '^4.9.0',
-      'nodemon': '^2.0.20',
-      'jest': '^29.0.0',
-      'supertest': '^6.3.0'
-    }
-  }, null, 2),
+    null,
+    2,
+  ),
 
   'services/api-gateway/server.js': `const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
@@ -417,7 +421,7 @@ app = FastAPI(
 
 security = HTTPBearer()
 
-@app.get("/health")
+@/app.get("/health")
 async def health_check():
     return {
         "status": "healthy",
@@ -425,7 +429,7 @@ async def health_check():
         "timestamp": datetime.utcnow().isoformat()
     }
 
-@app.post("/users", response_model=UserResponse)
+@/app.post("/users", response_model=UserResponse)
 async def create_user(user: UserCreate, db: Session = Depends(get_db)):
     try:
         # Check if user already exists
@@ -455,7 +459,7 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@app.get("/users/{user_id}", response_model=UserResponse)
+@/app.get("/users/{user_id}", response_model=UserResponse)
 async def get_user(user_id: int, db: Session = Depends(get_db)):
     # Try cache first
     cached_user = redis_client.get(f"user:{user_id}")
@@ -472,7 +476,7 @@ async def get_user(user_id: int, db: Session = Depends(get_db)):
     
     return UserResponse.from_orm(user)
 
-@app.get("/users", response_model=List[UserResponse])
+@/app.get("/users", response_model=List[UserResponse])
 async def list_users(
     skip: int = 0, 
     limit: int = 100, 
@@ -481,7 +485,7 @@ async def list_users(
     users = db.query(User).offset(skip).limit(limit).all()
     return [UserResponse.from_orm(user) for user in users]
 
-@app.put("/users/{user_id}", response_model=UserResponse)
+@/app.put("/users/{user_id}", response_model=UserResponse)
 async def update_user(
     user_id: int, 
     user_update: UserCreate, 
@@ -510,7 +514,7 @@ async def update_user(
     
     return UserResponse.from_orm(user)
 
-@app.delete("/users/{user_id}")
+@/app.delete("/users/{user_id}")
 async def delete_user(
     user_id: int, 
     db: Session = Depends(get_db),
@@ -571,5 +575,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
   CMD python healthcheck.py
 
 CMD ["python", "main.py"]
-`
+`,
 };

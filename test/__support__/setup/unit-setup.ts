@@ -27,17 +27,17 @@ function createMockKubernetesClient() {
 }
 
 // Mock external dependencies by default for unit tests
-jest.mock('@lib/docker', () => ({
+jest.mock('../../../src/lib/docker', () => ({
   DockerClient: jest.fn(),
-  createDockerClient: jest.fn(() => createMockDockerClient())
+  createDockerClient: jest.fn(() => createMockDockerClient()),
 }));
 
-jest.mock('@lib/kubernetes', () => ({
+jest.mock('../../../src/lib/kubernetes', () => ({
   KubernetesClient: jest.fn(),
-  createKubernetesClient: jest.fn(() => createMockKubernetesClient())
+  createKubernetesClient: jest.fn(() => createMockKubernetesClient()),
 }));
 
-jest.mock('@lib/session', () => ({
+jest.mock('../../../src/lib/session', () => ({
   SessionManager: jest.fn(),
   createSessionManager: jest.fn(() => ({
     get: jest.fn(async (id) => ({
@@ -49,16 +49,16 @@ jest.mock('@lib/session', () => ({
         errors: {},
         current_step: null,
         createdAt: new Date(),
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     })),
     update: jest.fn(async (id, state) => ({
       ok: true,
       value: {
         sessionId: id,
         ...state,
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     })),
     create: jest.fn(async (id) => ({
       ok: true,
@@ -69,17 +69,17 @@ jest.mock('@lib/session', () => ({
         errors: {},
         current_step: null,
         createdAt: new Date(),
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     })),
     delete: jest.fn(async () => ({ ok: true, value: undefined })),
     list: jest.fn(async () => ({ ok: true, value: [] })),
     cleanup: jest.fn(async () => ({ ok: true, value: undefined })),
-    close: jest.fn()
-  }))
+    close: jest.fn(),
+  })),
 }));
 
-jest.mock('@lib/logger', () => ({
+jest.mock('../../../src/lib/logger', () => ({
   createLogger: jest.fn(() => ({
     info: jest.fn(),
     error: jest.fn(),
@@ -90,13 +90,13 @@ jest.mock('@lib/logger', () => ({
       error: jest.fn(),
       warn: jest.fn(),
       debug: jest.fn(),
-    }))
+    })),
   })),
   createTimer: jest.fn(() => ({
     end: jest.fn(),
     error: jest.fn(),
-    checkpoint: jest.fn()
-  }))
+    checkpoint: jest.fn(),
+  })),
 }));
 
 // Global test utilities

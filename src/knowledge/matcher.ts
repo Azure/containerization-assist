@@ -1,4 +1,4 @@
-import { createLogger } from '@lib/logger';
+import { createLogger } from '@/lib/logger';
 import type { KnowledgeQuery, KnowledgeMatch, LoadedEntry } from './types';
 
 const logger = createLogger().child({ module: 'knowledge-matcher' });

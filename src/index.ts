@@ -11,4 +11,4 @@ export { TOOLS, type ToolName } from './exports/tools.js';
 
 // Core types for external usage
 export type { MCPTool, MCPToolResult } from './exports/types.js';
-export type { Tool, Result, Success, Failure } from './types.js';
+export type { Tool, Result, Success, Failure } from './types/index.js';

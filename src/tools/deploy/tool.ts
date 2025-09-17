@@ -20,22 +20,22 @@
  */
 
 import * as yaml from 'js-yaml';
-import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import type { Logger } from '@lib/logger';
-import { extractErrorMessage } from '@lib/error-utils';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import type { Logger } from '@/lib/logger';
+import { extractErrorMessage } from '@/lib/error-utils';
 import {
   ensureSession,
   defineToolIO,
   useSessionSlice,
   getSessionSlice,
-} from '@mcp/tool-session-helpers';
-import type { ToolContext } from '@mcp/context';
-import { createKubernetesClient } from '@lib/kubernetes';
+} from '@/mcp/tool-session-helpers';
+import type { ToolContext } from '@/mcp/context';
+import { createKubernetesClient } from '@/lib/kubernetes';
 
-import { Success, Failure, type Result } from '@types';
-import { generateK8sManifestsSchema } from '@tools/generate-k8s-manifests/schema';
+import { Success, Failure, type Result } from '@/types';
+import { generateK8sManifestsSchema } from '@/tools/generate-k8s-manifests/schema';
 import { z } from 'zod';
-import { DEFAULT_TIMEOUTS } from '@config/defaults';
+import { DEFAULT_TIMEOUTS } from '@/config/defaults';
 import { deployApplicationSchema, type DeployApplicationParams } from './schema';
 
 // Type definitions for Kubernetes manifests

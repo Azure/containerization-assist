@@ -2,7 +2,7 @@
  * Validation Pipeline Utilities - Functional validation composition
  */
 
-import { Result, Success, Failure } from '@types';
+import { Result, Success, Failure } from '@/types';
 import { ValidationResult } from './core-types';
 
 /**

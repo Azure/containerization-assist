@@ -4,10 +4,9 @@
  */
 
 import { jest } from '@jest/globals';
-import { opsTool } from '@tools/ops/tool';
-import type { OpsToolParams } from '@tools/ops/schema';
+import { opsTool } from '@/tools/ops/tool';
+import type { OpsToolParams } from '@/tools/ops/schema';
 import { createMockLogger } from '../../__support__/utilities/mock-factories';
-
 
 // Mock timer functionality
 const mockTimer = {
@@ -15,11 +14,11 @@ const mockTimer = {
   error: jest.fn(),
 };
 
-jest.mock('@lib/logger', () => ({
+jest.mock('@/lib/logger', () => ({
   createTimer: jest.fn(() => mockTimer),
 }));
 
-jest.mock('@lib/tool-helpers', () => ({
+jest.mock('@/lib/tool-helpers', () => ({
   createToolTimer: jest.fn(() => mockTimer),
   getToolLogger: jest.fn(() => ({
     info: jest.fn(),
@@ -90,7 +89,7 @@ describe('opsTool', () => {
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         { message: 'test-message' },
-        'Processing ping request'
+        'Processing ping request',
       );
     });
   });
@@ -142,10 +141,7 @@ describe('opsTool', () => {
       const result = await opsTool(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        { details: false },
-        'Server status requested'
-      );
+      expect(mockLogger.info).toHaveBeenCalledWith({ details: false }, 'Server status requested');
     });
 
     it('should log server status compilation', async () => {
@@ -162,7 +158,7 @@ describe('opsTool', () => {
           memoryPercentage: expect.any(Number),
           toolsMigrated: 12,
         }),
-        'Server status compiled'
+        'Server status compiled',
       );
     });
   });
@@ -203,5 +199,4 @@ describe('opsTool', () => {
       expect(mockTimer.end).toHaveBeenCalled();
     });
   });
-
 });

@@ -1,9 +1,9 @@
-import { createLogger } from '@lib/logger';
+import { createLogger } from '@/lib/logger';
 import type { KnowledgeEntry, KnowledgeStats, LoadedEntry, CompilationStats } from './types';
 import { KnowledgeEntrySchema } from './schemas';
 import { z } from 'zod';
 import { readFileSync, existsSync } from 'fs';
-import { resolvePath } from '@lib/path-utils';
+import { resolvePath } from '@/lib/path-utils';
 
 const logger = createLogger().child({ module: 'knowledge-loader' });
 

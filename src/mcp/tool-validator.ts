@@ -5,8 +5,8 @@
  */
 
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '@types';
-import { extractErrorMessage } from '@lib/error-utils';
+import { Result, Success, Failure } from '@/types';
+import { extractErrorMessage } from '@/lib/error-utils';
 import { ValidationResult } from '@validation/core-types';
 
 /**

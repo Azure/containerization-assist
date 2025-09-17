@@ -24,16 +24,16 @@ import {
   defineToolIO,
   useSessionSlice,
   getSessionSlice,
-} from '@mcp/tool-session-helpers';
-import { initializeToolInstrumentation } from '@lib/tool-helpers';
-import { extractErrorMessage } from '@lib/error-utils';
-import type { ToolContext } from '@mcp/context';
-import type { Logger } from '@lib/logger';
-import { getRecommendedBaseImage } from '@lib/base-images';
-import { scoreConfigCandidates } from '@lib/integrated-scoring';
-import { getKnowledgeForCategory } from '@knowledge/index';
+} from '@/mcp/tool-session-helpers';
+import { initializeToolInstrumentation } from '@/lib/tool-helpers';
+import { extractErrorMessage } from '@/lib/error-utils';
+import type { ToolContext } from '@/mcp/context';
+import type { Logger } from '@/lib/logger';
+import { getRecommendedBaseImage } from '@/lib/base-images';
+import { scoreConfigCandidates } from '@/lib/integrated-scoring';
+import { getKnowledgeForCategory } from '@/knowledge/index';
 import { resolveBaseImagesSchema, type ResolveBaseImagesParams } from './schema';
-import { analyzeRepoSchema } from '@tools/analyze-repo/schema';
+import { analyzeRepoSchema } from '@/tools/analyze-repo/schema';
 import { z } from 'zod';
 
 // Helper functions for base image resolution
@@ -196,7 +196,7 @@ async function getImageMetadata(
     lastUpdated: new Date().toISOString(),
   };
 }
-import { Success, Failure, type Result } from '@types';
+import { Success, Failure, type Result } from '@/types';
 
 // Define the result schema for type safety
 const BaseImageRecommendationSchema = z.object({

@@ -35,7 +35,7 @@ interface SessionSlice<In, Out, State> {
 
 ```typescript
 import { z } from 'zod';
-import { defineToolIO } from '@mcp/tool-session-helpers';
+import { defineToolIO } from '@/mcp/tool-session-helpers';
 
 // Define your result schema
 const MyToolResultSchema = z.object({
@@ -61,7 +61,7 @@ const StateSchema = z.object({
 import { 
   ensureSession, 
   useSessionSlice 
-} from '@mcp/tool-session-helpers';
+} from '@/mcp/tool-session-helpers';
 
 async function myTool(params: MyToolParams, context: ToolContext) {
   // Ensure session exists

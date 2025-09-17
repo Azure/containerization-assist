@@ -7,13 +7,13 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as crypto from 'crypto';
 import type { Logger } from 'pino';
 
-import { createSessionManager, type SessionManager } from '@lib/session.js';
-import { createLogger } from '@lib/logger.js';
-import { createToolContext, type ToolContext } from '@mcp/context.js';
-import { createToolRouter, type ToolRouter, type RouterTool } from '@mcp/tool-router.js';
+import { createSessionManager, type SessionManager } from '@/lib/session.js';
+import { createLogger } from '@/lib/logger.js';
+import { createToolContext, type ToolContext } from '@/mcp/context.js';
+import { createToolRouter, type ToolRouter, type RouterTool } from '@/mcp/tool-router.js';
 import { ToolName, getAllInternalTools } from './tools.js';
-import { extractErrorMessage } from '@lib/error-utils.js';
-import type { Tool, Result } from '@types';
+import { extractErrorMessage } from '@/lib/error-utils.js';
+import type { Tool, Result } from '@/types';
 
 /**
  * Tool registration configuration

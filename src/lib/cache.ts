@@ -5,7 +5,7 @@
  */
 
 import { createHash } from 'crypto';
-import { createLogger, type Logger } from '@lib/logger';
+import { createLogger, type Logger } from '@/lib/logger';
 
 interface CacheEntry<T> {
   value: T;

@@ -1,9 +1,5 @@
-import type { ProgressReporter } from '@mcp/context';
-import {
-  STANDARD_STAGES,
-  createStandardProgress,
-  reportProgress,
-} from '@mcp/progress-helper';
+import type { ProgressReporter } from '@/mcp/context';
+import { STANDARD_STAGES, createStandardProgress, reportProgress } from '@/mcp/progress-helper';
 
 describe('progress-helper', () => {
   describe('STANDARD_STAGES', () => {
@@ -28,12 +24,14 @@ describe('progress-helper', () => {
 
     it('should be immutable', () => {
       // The object is frozen with `as const`, so properties can't be reassigned
-      expect(STANDARD_STAGES).toEqual(expect.objectContaining({
-        VALIDATING: { message: 'Validating', percentage: 10 },
-        EXECUTING: { message: 'Executing', percentage: 50 },
-        FINALIZING: { message: 'Finalizing', percentage: 90 },
-        COMPLETE: { message: 'Complete', percentage: 100 },
-      }));
+      expect(STANDARD_STAGES).toEqual(
+        expect.objectContaining({
+          VALIDATING: { message: 'Validating', percentage: 10 },
+          EXECUTING: { message: 'Executing', percentage: 50 },
+          FINALIZING: { message: 'Finalizing', percentage: 90 },
+          COMPLETE: { message: 'Complete', percentage: 100 },
+        }),
+      );
     });
   });
 
@@ -41,23 +39,19 @@ describe('progress-helper', () => {
     it('should call reporter when provided', async () => {
       const mockReporter = jest.fn();
       await reportProgress(mockReporter, 'Test message', 50);
-      
+
       expect(mockReporter).toHaveBeenCalledWith('Test message', 50);
       expect(mockReporter).toHaveBeenCalledTimes(1);
     });
 
     it('should handle undefined reporter safely', async () => {
       // Should not throw when reporter is undefined
-      await expect(
-        reportProgress(undefined, 'Test message', 50)
-      ).resolves.toBeUndefined();
+      await expect(reportProgress(undefined, 'Test message', 50)).resolves.toBeUndefined();
     });
 
     it('should handle null reporter safely', async () => {
       // Should not throw when reporter is null
-      await expect(
-        reportProgress(null as any, 'Test message', 50)
-      ).resolves.toBeUndefined();
+      await expect(reportProgress(null as any, 'Test message', 50)).resolves.toBeUndefined();
     });
   });
 
@@ -112,5 +106,4 @@ describe('progress-helper', () => {
       expect(() => progress('INVALID_STAGE')).rejects.toThrow();
     });
   });
-
 });
