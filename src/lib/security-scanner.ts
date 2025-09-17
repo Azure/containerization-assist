@@ -6,7 +6,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Result, Success, Failure, isFail } from '@types';
+import { Result, Success, Failure, isFail } from '@/types';
 import { extractErrorMessage } from './error-utils';
 
 // Type definitions expected by tests and other components

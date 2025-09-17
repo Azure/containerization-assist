@@ -5,7 +5,7 @@
 import Docker, { DockerOptions } from 'dockerode';
 import tar from 'tar-fs';
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '@types';
+import { Success, Failure, type Result } from '@/types';
 import { extractDockerErrorMessage } from './errors';
 import { homedir } from 'os';
 import { join } from 'path';

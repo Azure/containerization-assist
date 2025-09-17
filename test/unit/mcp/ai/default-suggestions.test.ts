@@ -16,7 +16,7 @@ import {
   resetSuggestions,
   setRegistryLogger,
   type SuggestionGenerator,
-} from '@mcp/ai/default-suggestions';
+} from '@/mcp/ai/default-suggestions';
 import { createMockLogger } from '../../../__support__/utilities/mock-factories';
 import type { Logger } from 'pino';
 
@@ -135,11 +135,7 @@ describe('SuggestionRegistry', () => {
 
   describe('generateAll', () => {
     it('should generate multiple suggestions', () => {
-      const suggestions = registry.generateAll(
-        ['path', 'namespace', 'replicas'],
-        {},
-        {},
-      );
+      const suggestions = registry.generateAll(['path', 'namespace', 'replicas'], {}, {});
 
       expect(suggestions).toEqual({
         path: '.',
@@ -161,11 +157,7 @@ describe('SuggestionRegistry', () => {
     });
 
     it('should handle missing generators gracefully', () => {
-      const suggestions = registry.generateAll(
-        ['path', 'unknownParam', 'namespace'],
-        {},
-        {},
-      );
+      const suggestions = registry.generateAll(['path', 'unknownParam', 'namespace'], {}, {});
 
       expect(suggestions).toEqual({
         path: '.',
@@ -204,11 +196,7 @@ describe('SuggestionRegistry', () => {
       };
       registry.register('errorParam', errorGenerator);
 
-      const suggestions = registry.generateAll(
-        ['path', 'errorParam', 'namespace'],
-        {},
-        {},
-      );
+      const suggestions = registry.generateAll(['path', 'errorParam', 'namespace'], {}, {});
 
       expect(suggestions).toEqual({
         path: '.',

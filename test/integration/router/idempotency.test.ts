@@ -4,13 +4,9 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import pino from 'pino';
-import { createToolRouter, type ToolRouter } from '@mcp/tool-router';
-import type { Step } from '@mcp/tool-graph';
-import {
-  createMockToolsMap,
-  resetExecutionLog,
-  executionLog,
-} from './fixtures/mock-tools';
+import { createToolRouter, type ToolRouter } from '@/mcp/tool-router';
+import type { Step } from '@/mcp/tool-graph';
+import { createMockToolsMap, resetExecutionLog, executionLog } from './fixtures/mock-tools';
 import { MockSessionManager } from './fixtures/mock-session';
 import { createMockContext } from './fixtures/mock-context';
 
@@ -95,7 +91,7 @@ describe('Idempotency Behavior', () => {
       for (const tool of toolsToTest) {
         resetExecutionLog();
         const result = await router.route({
-        context: mockContext,
+          context: mockContext,
           toolName: tool,
           params: { manifestPath: './k8s', imageName: 'test' },
           sessionId: initialRun.sessionState.sessionId,
@@ -159,7 +155,7 @@ describe('Idempotency Behavior', () => {
       });
 
       // Should not re-run analyze-repo
-      const toolOrder = executionLog.map(e => e.tool);
+      const toolOrder = executionLog.map((e) => e.tool);
       expect(toolOrder).not.toContain('analyze_repo');
       expect(toolOrder).toEqual(['resolve_base_images']);
 
@@ -278,7 +274,7 @@ describe('Idempotency Behavior', () => {
       const steps = updatedSession?.completed_steps as Step[];
 
       // Should have exactly one instance of analyzed_repo
-      const analyzeCount = steps.filter(s => s === 'analyzed_repo').length;
+      const analyzeCount = steps.filter((s) => s === 'analyzed_repo').length;
       expect(analyzeCount).toBe(1);
     });
   });
@@ -308,7 +304,7 @@ describe('Idempotency Behavior', () => {
       expect(result.result.ok).toBe(true);
 
       // Should only run missing prerequisites
-      const toolOrder = executionLog.map(e => e.tool);
+      const toolOrder = executionLog.map((e) => e.tool);
       expect(toolOrder).not.toContain('analyze_repo');
       expect(toolOrder).toContain('resolve_base_images');
       expect(toolOrder).toContain('generate_dockerfile');
@@ -427,7 +423,7 @@ describe('Idempotency Behavior', () => {
       });
 
       // Should not re-run A
-      const toolOrder = executionLog.map(e => e.tool);
+      const toolOrder = executionLog.map((e) => e.tool);
       expect(toolOrder).not.toContain('analyze_repo');
       expect(toolOrder).toEqual(['resolve_base_images']);
 
@@ -469,7 +465,7 @@ describe('Idempotency Behavior', () => {
       expect(result.result.ok).toBe(true);
 
       // Should only run build_image
-      const toolOrder = executionLog.map(e => e.tool);
+      const toolOrder = executionLog.map((e) => e.tool);
       expect(toolOrder).toEqual(['build_image']);
 
       // Now try to re-run build_image

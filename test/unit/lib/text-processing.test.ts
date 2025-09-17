@@ -8,7 +8,7 @@ import {
   isValidDockerfileContent,
   isValidKubernetesContent,
   extractBaseImage,
-} from '@lib/text-processing';
+} from '@/lib/text-processing';
 
 describe('Text Processing Utilities', () => {
   describe('stripFencesAndNoise', () => {
@@ -104,8 +104,4 @@ COPY --from=builder /app/dist /usr/share/nginx/html
       expect(await extractBaseImage('')).toBeNull();
     });
   });
-
-
-
-
 });

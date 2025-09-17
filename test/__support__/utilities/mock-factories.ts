@@ -70,7 +70,7 @@ export function createMockAnalysisResult(overrides?: Partial<AnalysisResult>): A
       { name: 'express', version: '4.18.0', type: 'runtime' },
       { name: 'pino', version: '8.0.0', type: 'runtime' },
       { name: 'zod', version: '3.21.0', type: 'runtime' },
-      { name: '@types/node', version: '18.0.0', type: 'dev' },
+      { name: '@/types/node', version: '18.0.0', type: 'dev' },
     ],
     has_tests: true,
     test_framework: 'jest',
@@ -84,7 +84,9 @@ export function createMockAnalysisResult(overrides?: Partial<AnalysisResult>): A
   };
 }
 
-export function createMockDockerfileResult(overrides?: Partial<DockerfileResult>): DockerfileResult {
+export function createMockDockerfileResult(
+  overrides?: Partial<DockerfileResult>,
+): DockerfileResult {
   return {
     content: `FROM node:18-alpine
 WORKDIR /app
@@ -102,7 +104,9 @@ CMD ["node", "index"]`,
   };
 }
 
-export function createMockDockerBuildResult(overrides?: Partial<DockerBuildResult>): DockerBuildResult {
+export function createMockDockerBuildResult(
+  overrides?: Partial<DockerBuildResult>,
+): DockerBuildResult {
   return {
     image_id: `sha256:${'a'.repeat(64)}`,
     image_tag: 'test-app:latest',
@@ -153,7 +157,9 @@ export function createMockScanResult(overrides?: Partial<ScanResult>): ScanResul
   };
 }
 
-export function createMockK8sManifestResult(overrides?: Partial<K8sManifestResult>): K8sManifestResult {
+export function createMockK8sManifestResult(
+  overrides?: Partial<K8sManifestResult>,
+): K8sManifestResult {
   return {
     manifests: [
       {
@@ -217,7 +223,9 @@ spec:
   };
 }
 
-export function createMockDeploymentResult(overrides?: Partial<DeploymentResult>): DeploymentResult {
+export function createMockDeploymentResult(
+  overrides?: Partial<DeploymentResult>,
+): DeploymentResult {
   return {
     namespace: 'default',
     deployment_name: 'test-app',
@@ -346,7 +354,10 @@ export const INVALID_TOOL_INPUTS = {
 /**
  * Create a session with completed workflow state for a specific step
  */
-export function createSessionWithCompletedStep(step: keyof typeof WorkflowStep, overrides?: Partial<Session>): Session {
+export function createSessionWithCompletedStep(
+  step: keyof typeof WorkflowStep,
+  overrides?: Partial<Session>,
+): Session {
   const session = createMockSession(overrides);
   const workflowState = { ...session.workflow_state };
 
@@ -399,9 +410,9 @@ export function createCompletedWorkflowSession(overrides?: Partial<Session>): Se
         'analyze-repo': createMockAnalysisResult(),
         'generate-dockerfile': createMockDockerfileResult(),
         'build-image': createMockDockerBuildResult(),
-        'scan': createMockScanResult(),
+        scan: createMockScanResult(),
         'generate-k8s-manifests': createMockK8sManifestResult(),
-        'deploy': createMockDeploymentResult(),
+        deploy: createMockDeploymentResult(),
       },
       errors: {},
       metadata: {},
@@ -422,10 +433,10 @@ export function createMockLogger(): jest.Mocked<Logger> {
     fatal: jest.fn(),
     child: jest.fn(),
   } as jest.Mocked<Logger>;
-  
+
   // Make child return a new mock logger with the same interface
   mockLogger.child.mockImplementation(() => mockLogger);
-  
+
   return mockLogger;
 }
 
@@ -547,10 +558,14 @@ export function createMockCoreServices(): {
       initialize: jest.fn().mockResolvedValue(undefined),
     },
     ai: {
-      generateDockerfile: jest.fn().mockResolvedValue('FROM node:18-alpine\nWORKDIR /app\nCMD ["node", "index"]'),
+      generateDockerfile: jest
+        .fn()
+        .mockResolvedValue('FROM node:18-alpine\nWORKDIR /app\nCMD ["node", "index"]'),
       enhanceManifests: jest.fn().mockImplementation((manifests) => Promise.resolve(manifests)),
       analyzeRepository: jest.fn().mockResolvedValue(createMockAnalysisResult()),
-      fixDockerfile: jest.fn().mockResolvedValue('FROM node:18-alpine\nWORKDIR /app\nCMD ["node", "index"]'),
+      fixDockerfile: jest
+        .fn()
+        .mockResolvedValue('FROM node:18-alpine\nWORKDIR /app\nCMD ["node", "index"]'),
       isAvailable: jest.fn().mockReturnValue(true),
       initialize: jest.fn().mockResolvedValue(undefined),
     },
@@ -604,7 +619,11 @@ export function createMockDockerode() {
           if (event === 'data') {
             // Simulate push progress events
             setTimeout(() => {
-              handler(Buffer.from(JSON.stringify({ status: 'Pushing', id: 'layer1', progress: '[=>    ]' })));
+              handler(
+                Buffer.from(
+                  JSON.stringify({ status: 'Pushing', id: 'layer1', progress: '[=>    ]' }),
+                ),
+              );
               handler(Buffer.from(JSON.stringify({ status: 'Pushed', id: 'layer1' })));
             }, 5);
           }
@@ -648,9 +667,16 @@ export function createMockDockerode() {
       },
     }),
     remove: jest.fn().mockResolvedValue([{ Deleted: imageId }]),
-    history: jest.fn().mockResolvedValue([
-      { Id: 'layer1', Created: Date.now() / 1000, CreatedBy: '/bin/sh -c #(nop) FROM node:18', Size: 0 },
-    ]),
+    history: jest
+      .fn()
+      .mockResolvedValue([
+        {
+          Id: 'layer1',
+          Created: Date.now() / 1000,
+          CreatedBy: '/bin/sh -c #(nop) FROM node:18',
+          Size: 0,
+        },
+      ]),
     get: jest.fn().mockImplementation((imageId: string) => mockImage(imageId)),
   });
 
@@ -736,14 +762,18 @@ export function createMockDockerode() {
     createContainer: jest.fn().mockResolvedValue(mockContainer()),
 
     // Network operations
-    listNetworks: jest.fn().mockResolvedValue([
-      { Id: 'mock-network-1', Name: 'bridge', Driver: 'bridge' },
-    ]),
+    listNetworks: jest
+      .fn()
+      .mockResolvedValue([{ Id: 'mock-network-1', Name: 'bridge', Driver: 'bridge' }]),
 
     // Volume operations
     listVolumes: jest.fn().mockResolvedValue({
       Volumes: [
-        { Name: 'mock-volume-1', Driver: 'local', Mountpoint: '/var/lib/docker/volumes/mock-volume-1' },
+        {
+          Name: 'mock-volume-1',
+          Driver: 'local',
+          Mountpoint: '/var/lib/docker/volumes/mock-volume-1',
+        },
       ],
     }),
 
@@ -757,21 +787,23 @@ export function createMockDockerode() {
 
     // Enhanced modem with comprehensive progress handling
     modem: {
-      followProgress: jest.fn().mockImplementation((stream: any, onFinish: any, onProgress?: any) => {
-        const events = [
-          { status: 'Pulling from library/node', id: '18-alpine' },
-          { status: 'Pull complete', id: '18-alpine' },
-          { aux: { ID: 'sha256:mock-final-id' } },
-        ];
+      followProgress: jest
+        .fn()
+        .mockImplementation((stream: any, onFinish: any, onProgress?: any) => {
+          const events = [
+            { status: 'Pulling from library/node', id: '18-alpine' },
+            { status: 'Pull complete', id: '18-alpine' },
+            { aux: { ID: 'sha256:mock-final-id' } },
+          ];
 
-        if (onProgress) {
-          events.forEach((event, index) => {
-            setTimeout(() => onProgress(event), index * 5);
-          });
-        }
+          if (onProgress) {
+            events.forEach((event, index) => {
+              setTimeout(() => onProgress(event), index * 5);
+            });
+          }
 
-        setTimeout(() => onFinish(null, events), events.length * 5 + 10);
-      }),
+          setTimeout(() => onFinish(null, events), events.length * 5 + 10);
+        }),
 
       demuxStream: jest.fn().mockImplementation((stream: any, stdout: any, stderr: any) => {
         // Mock demux implementation for exec streams
@@ -793,7 +825,6 @@ export function createMockDockerode() {
     listConfigs: jest.fn().mockResolvedValue([]),
   };
 }
-
 
 export function createMockKubernetesClient() {
   return {
@@ -1048,7 +1079,11 @@ export function createComprehensiveK8sMock() {
                   host: 'test.example.com',
                   http: {
                     paths: [
-                      { path: '/', pathType: 'Prefix', backend: { service: { name: 'service-1', port: { number: 80 } } } },
+                      {
+                        path: '/',
+                        pathType: 'Prefix',
+                        backend: { service: { name: 'service-1', port: { number: 80 } } },
+                      },
                     ],
                   },
                 },
@@ -1115,7 +1150,9 @@ export function createComprehensiveK8sMock() {
     }),
     getCurrentContext: jest.fn().mockReturnValue('default'),
     setCurrentContext: jest.fn(),
-    getCurrentCluster: jest.fn().mockReturnValue({ name: 'local', server: 'https://localhost:6443' }),
+    getCurrentCluster: jest
+      .fn()
+      .mockReturnValue({ name: 'local', server: 'https://localhost:6443' }),
     getCurrentUser: jest.fn().mockReturnValue({ name: 'admin' }),
     getContexts: jest.fn().mockReturnValue([{ name: 'default' }]),
     getClusters: jest.fn().mockReturnValue([{ name: 'local', server: 'https://localhost:6443' }]),
@@ -1152,7 +1189,12 @@ export function createComprehensiveK8sMock() {
     // Metrics API mock
     Metrics: jest.fn().mockImplementation(() => ({
       getPodMetrics: jest.fn().mockResolvedValue({
-        items: [{ metadata: { name: 'pod-1' }, containers: [{ name: 'main', usage: { cpu: '10m', memory: '64Mi' } }] }],
+        items: [
+          {
+            metadata: { name: 'pod-1' },
+            containers: [{ name: 'main', usage: { cpu: '10m', memory: '64Mi' } }],
+          },
+        ],
       }),
     })),
   };
@@ -1160,10 +1202,14 @@ export function createComprehensiveK8sMock() {
 
 export function createMockAIService() {
   return {
-    generateDockerfile: jest.fn().mockResolvedValue('FROM node:18-alpine\nWORKDIR /app\nCMD ["node", "index"]'),
+    generateDockerfile: jest
+      .fn()
+      .mockResolvedValue('FROM node:18-alpine\nWORKDIR /app\nCMD ["node", "index"]'),
     enhanceManifests: jest.fn().mockImplementation((manifests) => Promise.resolve(manifests)),
     analyzeRepository: jest.fn().mockResolvedValue(createMockAnalysisResult()),
-    fixDockerfile: jest.fn().mockResolvedValue('FROM node:18-alpine\nWORKDIR /app\nCMD ["node", "index"]'),
+    fixDockerfile: jest
+      .fn()
+      .mockResolvedValue('FROM node:18-alpine\nWORKDIR /app\nCMD ["node", "index"]'),
     isAvailable: jest.fn().mockReturnValue(true),
     initialize: jest.fn().mockResolvedValue(undefined),
   };
@@ -1206,14 +1252,29 @@ export function createMockDockerClientForService() {
     }),
 
     // Additional methods needed by DockerService
-    listImages: jest.fn().mockResolvedValue([
-      { Id: 'sha256:mock-image', RepoTags: ['test:latest'], Size: 100000, Created: Date.now() / 1000 },
-    ]),
+    listImages: jest
+      .fn()
+      .mockResolvedValue([
+        {
+          Id: 'sha256:mock-image',
+          RepoTags: ['test:latest'],
+          Size: 100000,
+          Created: Date.now() / 1000,
+        },
+      ]),
     removeImage: jest.fn().mockResolvedValue(undefined),
     imageExists: jest.fn().mockResolvedValue(true),
-    listContainers: jest.fn().mockResolvedValue([
-      { Id: 'mock-container', Names: ['/test'], Image: 'test:latest', State: 'running', Status: 'Up 5 minutes' },
-    ]),
+    listContainers: jest
+      .fn()
+      .mockResolvedValue([
+        {
+          Id: 'mock-container',
+          Names: ['/test'],
+          Image: 'test:latest',
+          State: 'running',
+          Status: 'Up 5 minutes',
+        },
+      ]),
     health: jest.fn().mockResolvedValue({
       available: true,
       version: '20.10.17',
@@ -1284,9 +1345,11 @@ export function createMockAIServiceEnhanced() {
 
     analyzeRepository: jest.fn().mockResolvedValue(createMockAnalysisResult()),
 
-    enhanceManifests: jest.fn().mockImplementation((manifests) =>
-      Promise.resolve(manifests.map((m: any) => ({ ...m, enhanced: true }))),
-    ),
+    enhanceManifests: jest
+      .fn()
+      .mockImplementation((manifests) =>
+        Promise.resolve(manifests.map((m: any) => ({ ...m, enhanced: true }))),
+      ),
 
     fixDockerfile: jest.fn().mockResolvedValue({
       content: 'FROM node:18-alpine\nWORKDIR /app\nCMD ["node", "index"]',
@@ -1421,4 +1484,3 @@ export const TestData = {
     spec: {},
   }),
 };
-

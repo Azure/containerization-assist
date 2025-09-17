@@ -7,8 +7,8 @@
 import { readFile, readdir, stat } from 'fs/promises';
 import { join, extname } from 'path';
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '@types';
-import { extractErrorMessage } from '@lib/error-utils';
+import { Result, Success, Failure } from '@/types';
+import { extractErrorMessage } from '@/lib/error-utils';
 
 /**
  * Parameter specification for prompt templates

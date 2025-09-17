@@ -8,7 +8,7 @@ import type { Logger } from 'pino';
 import { createLogger } from './lib/logger';
 import { createSessionManager, SessionManager } from './lib/session';
 import * as promptRegistry from './prompts/registry';
-import { findPromptsDirectory } from '@lib/find-prompts-dir';
+import { findPromptsDirectory } from '@/lib/find-prompts-dir';
 import * as resourceManager from './resources/manager';
 import type { AIService } from './types';
 import { createAppConfig, type AppConfig } from './config/app-config';

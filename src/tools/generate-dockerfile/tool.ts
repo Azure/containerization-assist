@@ -3,37 +3,37 @@
  * Trade-off: AI quality over speed; fallback templates ensure availability.
  */
 
-// import { extractErrorMessage } from '@lib/error-utils'; // Not currently used
+// import { extractErrorMessage } from '@/lib/error-utils'; // Not currently used
 import { promises as fs } from 'node:fs';
-import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import type { Logger } from '@lib/logger';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import type { Logger } from '@/lib/logger';
 import path from 'node:path';
-import { safeNormalizePath } from '@lib/path-utils';
+import { safeNormalizePath } from '@/lib/path-utils';
 import {
   ensureSession,
   defineToolIO,
   useSessionSlice,
   getSessionSlice,
-} from '@mcp/tool-session-helpers';
-import { createStandardProgress } from '@mcp/progress-helper';
-import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
-import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
-import type { SamplingOptions } from '@lib/sampling';
-import { analyzeRepoSchema } from '@tools/analyze-repo/schema';
+} from '@/mcp/tool-session-helpers';
+import { createStandardProgress } from '@/mcp/progress-helper';
+import { aiGenerateWithSampling } from '@/mcp/tool-ai-helpers';
+import { enhancePromptWithKnowledge } from '@/lib/ai-knowledge-enhancer';
+import type { SamplingOptions } from '@/lib/sampling';
+import { analyzeRepoSchema } from '@/tools/analyze-repo/schema';
 
-import type { SessionAnalysisResult } from '@tools/session-types';
-import type { ToolContext } from '@mcp/context';
-import { Success, Failure, type Result } from '@types';
-import { getDefaultPort, ANALYSIS_CONFIG } from '@config/defaults';
-import { getRecommendedBaseImage } from '@lib/base-images';
+import type { SessionAnalysisResult } from '@/tools/session-types';
+import type { ToolContext } from '@/mcp/context';
+import { Success, Failure, type Result } from '@/types';
+import { getDefaultPort, ANALYSIS_CONFIG } from '@/config/defaults';
+import { getRecommendedBaseImage } from '@/lib/base-images';
 import {
   stripFencesAndNoise,
   isValidDockerfileContent,
   extractBaseImage,
-} from '@lib/text-processing';
+} from '@/lib/text-processing';
 import { generateDockerfileSchema, type GenerateDockerfileParams } from './schema';
 import { z } from 'zod';
-import { AnalyzeRepoResult } from '@tools/analyze-repo/tool';
+import { AnalyzeRepoResult } from '@/tools/analyze-repo/tool';
 
 // Define the result schema for type safety - complex nested structure
 const SingleDockerfileResultSchema = z.object({

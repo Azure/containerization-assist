@@ -3,7 +3,7 @@
  */
 
 import { createLogger, createTimer, type Logger, type Timer } from './logger.js';
-import type { ToolContext } from '@mcp/context.js';
+import type { ToolContext } from '@/mcp/context.js';
 
 /**
  * Gets or creates a logger for a tool.

@@ -22,17 +22,17 @@
  * ```
  */
 
-import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
-import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import { extractErrorMessage } from '@lib/error-utils';
-import type { ToolContext } from '@mcp/context';
-import { createKubernetesClient, KubernetesClient } from '@lib/kubernetes';
+import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { extractErrorMessage } from '@/lib/error-utils';
+import type { ToolContext } from '@/mcp/context';
+import { createKubernetesClient, KubernetesClient } from '@/lib/kubernetes';
 
-import { DEFAULT_TIMEOUTS } from '@config/defaults';
-import { Success, Failure, type Result } from '@types';
+import { DEFAULT_TIMEOUTS } from '@/config/defaults';
+import { Success, Failure, type Result } from '@/types';
 import { verifyDeploymentSchema, type VerifyDeploymentParams } from './schema';
 import { z } from 'zod';
-import type { SessionData } from '@tools/session-types';
+import type { SessionData } from '@/tools/session-types';
 
 export interface VerifyDeploymentResult {
   success: boolean;

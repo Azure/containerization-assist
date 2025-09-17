@@ -3,7 +3,7 @@
  */
 
 import { promises as fs, readFileSync } from 'fs';
-import { joinPaths } from '@lib/path-utils';
+import { joinPaths } from '@/lib/path-utils';
 
 /**
  * Parsed package.json structure

@@ -27,7 +27,7 @@ import {
   type PromptEntry,
   type ParameterSpec,
 } from './loader';
-import { Result, Success, Failure } from '@types';
+import { Result, Success, Failure } from '@/types';
 
 // Module-level state
 let promptMap: Map<string, PromptEntry> | null = null;

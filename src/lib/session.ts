@@ -8,7 +8,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { Logger } from 'pino';
-import { WorkflowState, Result, Success, Failure } from '@types';
+import { WorkflowState, Result, Success, Failure } from '@/types';
 
 const DEFAULT_TTL = 86400; // 24 hours in seconds
 const DEFAULT_MAX_SESSIONS = 1000;

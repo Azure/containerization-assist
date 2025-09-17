@@ -18,14 +18,14 @@ export const securityHardenedAppConfig: TestRepositoryConfig = {
       'authorization',
       'audit-logging',
       'secrets-management',
-      'vulnerability-scanning'
+      'vulnerability-scanning',
     ],
     securityIssues: [
       'exposed-secrets',
       'insecure-dependencies',
       'weak-authentication',
-      'missing-security-headers'
-    ]
+      'missing-security-headers',
+    ],
   },
   expectation: {
     analysis: {
@@ -42,15 +42,15 @@ export const securityHardenedAppConfig: TestRepositoryConfig = {
         '@fastify/sensible',
         'bcrypt',
         'joi',
-        'pino'
+        'pino',
       ],
       ports: [3000, 3443],
       environment: {
         NODE_ENV: 'production',
         JWT_SECRET: 'CHANGE_ME',
         DATABASE_URL: 'postgresql://localhost:5432/secure_app',
-        LOG_LEVEL: 'info'
-      }
+        LOG_LEVEL: 'info',
+      },
     },
     dockerfile: {
       baseImage: 'node:18-alpine',
@@ -58,7 +58,7 @@ export const securityHardenedAppConfig: TestRepositoryConfig = {
       exposedPorts: [3000, 3443],
       hasMultiStage: true,
       hasHealthCheck: true,
-      hasNonRootUser: true
+      hasNonRootUser: true,
     },
     k8sManifests: {
       hasDeployment: true,
@@ -66,56 +66,60 @@ export const securityHardenedAppConfig: TestRepositoryConfig = {
       hasConfigMap: true,
       hasSecret: true,
       hasIngress: false, // Security-focused apps might not expose ingress
-      replicas: 2
+      replicas: 2,
     },
     buildShouldSucceed: false, // Should fail due to security issues
-    estimatedBuildTimeMs: 45000
-  }
+    estimatedBuildTimeMs: 45000,
+  },
 };
 
 export const securityHardenedAppStructure = {
-  'package.json': JSON.stringify({
-    name: 'security-hardened-app',
-    version: '1.0.0',
-    description: 'Security-hardened Node.js application',
-    main: 'src/server.js',
-    scripts: {
-      start: 'node src/server.js',
-      dev: 'nodemon src/server.js',
-      test: 'jest',
-      'test:security': 'npm audit && snyk test',
-      'security:scan': 'snyk test',
-      'security:fix': 'snyk wizard',
-      lint: 'eslint src/',
-      'lint:security': 'eslint src/ --config .eslintrc.security.js'
+  'package.json': JSON.stringify(
+    {
+      name: 'security-hardened-app',
+      version: '1.0.0',
+      description: 'Security-hardened Node.js application',
+      main: 'src/server.js',
+      scripts: {
+        start: 'node src/server.js',
+        dev: 'nodemon src/server.js',
+        test: 'jest',
+        'test:security': 'npm audit && snyk test',
+        'security:scan': 'snyk test',
+        'security:fix': 'snyk wizard',
+        lint: 'eslint src/',
+        'lint:security': 'eslint src/ --config .eslintrc.security.js',
+      },
+      dependencies: {
+        fastify: '^4.24.0',
+        '@fastify/helmet': '^11.1.1',
+        '@fastify/rate-limit': '^8.0.3',
+        '@fastify/jwt': '^7.2.4',
+        '@fastify/sensible': '^5.5.0',
+        '@fastify/cookie': '^9.2.0',
+        '@fastify/session': '^10.7.0',
+        bcrypt: '^5.1.0',
+        joi: '^17.11.0',
+        pino: '^8.16.0',
+        'pino-pretty': '^10.2.3',
+        helmet: '^7.1.0',
+        'express-rate-limit': '^7.1.0', // Vulnerable package (intentional)
+        lodash: '^4.17.20', // Vulnerable version (intentional)
+        'node-forge': '^1.0.0', // Potentially vulnerable (intentional)
+      },
+      devDependencies: {
+        '@/types/node': '^18.0.0',
+        nodemon: '^3.0.1',
+        jest: '^29.7.0',
+        eslint: '^8.50.0',
+        'eslint-plugin-security': '^1.7.1',
+        snyk: '^1.1233.0',
+        supertest: '^6.3.3',
+      },
     },
-    dependencies: {
-      fastify: '^4.24.0',
-      '@fastify/helmet': '^11.1.1',
-      '@fastify/rate-limit': '^8.0.3',
-      '@fastify/jwt': '^7.2.4',
-      '@fastify/sensible': '^5.5.0',
-      '@fastify/cookie': '^9.2.0',
-      '@fastify/session': '^10.7.0',
-      bcrypt: '^5.1.0',
-      joi: '^17.11.0',
-      pino: '^8.16.0',
-      'pino-pretty': '^10.2.3',
-      helmet: '^7.1.0',
-      'express-rate-limit': '^7.1.0', // Vulnerable package (intentional)
-      lodash: '^4.17.20', // Vulnerable version (intentional)
-      'node-forge': '^1.0.0' // Potentially vulnerable (intentional)
-    },
-    devDependencies: {
-      '@types/node': '^18.0.0',
-      'nodemon': '^3.0.1',
-      'jest': '^29.7.0',
-      'eslint': '^8.50.0',
-      'eslint-plugin-security': '^1.7.1',
-      'snyk': '^1.1233.0',
-      'supertest': '^6.3.3'
-    }
-  }, null, 2),
+    null,
+    2,
+  ),
 
   'src/server.js': `const fastify = require('fastify')({
   logger: {
@@ -318,7 +322,7 @@ AWS_ACCESS_KEY_ID=AKIAI1234567890
 AWS_SECRET_ACCESS_KEY=abcdefghijklmnopqrstuvwxyz1234567890
 `,
 
-  'Dockerfile': `FROM node:18-alpine
+  Dockerfile: `FROM node:18-alpine
 
 # Security vulnerability: Running as root user
 WORKDIR /app
@@ -521,5 +525,5 @@ spec:
     "low": 1
   }
 }
-`
+`,
 };

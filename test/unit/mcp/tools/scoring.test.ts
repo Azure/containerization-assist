@@ -11,7 +11,7 @@ import {
   extractK8sResources,
   normalizeScore,
   weightedAverage,
-} from '@mcp/tool-ai-helpers';
+} from '@/mcp/tool-ai-helpers';
 
 describe('Scoring Helper Utilities', () => {
   describe('detectMultistageDocker', () => {
@@ -286,7 +286,7 @@ describe('Dockerfile Scoring Functions', () => {
   // Note: These would typically be tested via integration tests
   // since the scoring functions are not exported individually.
   // Here we can test them indirectly through the sampling flow.
-  
+
   describe('Integration with sampling', () => {
     it('should score valid Dockerfile higher than invalid', () => {
       const goodDockerfile = `
@@ -331,7 +331,7 @@ CMD node /app/index.js
       // - Health check
       // - Layer optimization
       // - No hardcoded secrets
-      
+
       // Bad dockerfile issues:
       // - Using :latest tag
       // - Multiple RUN commands (not chained)
@@ -432,7 +432,7 @@ spec:
       // - Proper labels and annotations
       // - No hardcoded secrets
       // - Versioned image tag
-      
+
       // Insecure manifest issues:
       // - No security context
       // - Runs as root (default)
