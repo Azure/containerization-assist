@@ -8,10 +8,12 @@
 import { z } from 'zod';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import os from 'os';
 
 /**
  * Flattened configuration defaults
  * Simplified from nested CONSTANTS object for better maintainability
+ * Uses cross-platform utilities for paths
  */
 const DEFAULT_CONFIG = {
   MCP_NAME: 'containerization-assist',
@@ -25,10 +27,11 @@ const DEFAULT_CONFIG = {
   MAX_SESSIONS: 100,
   HOST: '0.0.0.0',
   PORT: 3000,
-  DOCKER_SOCKET: '/var/run/docker.sock',
+  DOCKER_SOCKET: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock',
   DOCKER_REGISTRY: 'docker.io',
   K8S_NAMESPACE: 'default',
-  KUBECONFIG: '~/.kube/config',
+  KUBECONFIG: join(os.homedir(), '.kube', 'config'),
+  TEMP_DIR: os.tmpdir(),
 } as const;
 
 const NodeEnvSchema = z.enum(['development', 'production', 'test']).default('development');
@@ -79,7 +82,7 @@ const AppConfigSchema = z.object({
   }),
   workspace: z.object({
     workspaceDir: z.string().default(() => process.cwd()),
-    tempDir: z.string().default('/tmp'),
+    tempDir: z.string().default(() => os.tmpdir()),
     maxFileSize: z.coerce.number().int().positive().default(DEFAULT_CONFIG.MAX_FILE_SIZE),
   }),
   logging: z.object({
@@ -195,7 +198,7 @@ export function createAppConfig(): AppConfig {
     },
     workspace: {
       workspaceDir: getEnvValue('WORKSPACE_DIR') || process.cwd(),
-      tempDir: '/tmp',
+      tempDir: getEnvValue('TEMP_DIR') || os.tmpdir(),
       maxFileSize: DEFAULT_CONFIG.MAX_FILE_SIZE,
     },
     logging: {

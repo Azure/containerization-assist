@@ -46,7 +46,9 @@ export const config = {
   },
 
   docker: {
-    socketPath: process.env.DOCKER_SOCKET || '/var/run/docker.sock',
+    socketPath:
+      process.env.DOCKER_SOCKET ||
+      (process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock'),
     timeout: parseInt(process.env.DOCKER_TIMEOUT || '60000'),
   },
 

@@ -5,7 +5,7 @@
  * Simple, direct conversion without over-abstraction
  */
 
-import { joinPaths } from '@lib/path-utils';
+import path from 'path';
 import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
 import { extractErrorMessage } from '@lib/error-utils';
 import { promises as fs } from 'node:fs';
@@ -398,9 +398,9 @@ async function convertAcaToK8sImpl(
     await slice.patch(sessionId, { input: params });
 
     // Write to file - use current directory as base
-    const outputPath = joinPaths('.', 'k8s-converted');
+    const outputPath = path.join('.', 'k8s-converted');
     await fs.mkdir(outputPath, { recursive: true });
-    await fs.writeFile(joinPaths(outputPath, 'manifests.yaml'), yamlContent, 'utf-8');
+    await fs.writeFile(path.join(outputPath, 'manifests.yaml'), yamlContent, 'utf-8');
 
     // Prepare result
     const result: ConvertAcaToK8sResult = {

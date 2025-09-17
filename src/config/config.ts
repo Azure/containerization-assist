@@ -4,6 +4,8 @@
 
 import type { ApplicationConfig } from './types';
 import { DEFAULT_NETWORK, DEFAULT_TIMEOUTS, getDefaultPort } from './defaults';
+import os from 'os';
+import path from 'path';
 
 /**
  * Create default configuration with sensible defaults
@@ -37,7 +39,7 @@ function createDefaultConfig(): ApplicationConfig {
       enableEvents: true,
     },
     docker: {
-      socketPath: '/var/run/docker.sock',
+      socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock',
       host: 'localhost',
       port: 2375,
       registry: 'docker.io',
@@ -46,12 +48,12 @@ function createDefaultConfig(): ApplicationConfig {
     },
     kubernetes: {
       namespace: 'default',
-      kubeconfig: '~/.kube/config',
+      kubeconfig: path.join(os.homedir(), '.kube', 'config'),
       timeout: 30000,
     },
     workspace: {
       workspaceDir: process.cwd(),
-      tempDir: '/tmp',
+      tempDir: os.tmpdir(),
       cleanupOnExit: true,
     },
     logging: {

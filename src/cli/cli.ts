@@ -46,7 +46,7 @@ program
   .option('--validate', 'validate configuration and exit')
   .option('--list-tools', 'list all registered MCP tools and exit')
   .option('--health-check', 'perform system health check and exit')
-  .option('--docker-socket <path>', 'Docker socket path (default: /var/run/docker.sock)', '')
+  .option('--docker-socket <path>', 'Docker socket path (default: platform-specific)', '')
   .option(
     '--k8s-namespace <namespace>',
     'default Kubernetes namespace (default: default)',
@@ -93,7 +93,10 @@ program.parse(argv);
 
 const options = program.opts();
 const command = program.args[0] ?? 'start';
-const defaultDockerSockets = ['/var/run/docker.sock', '~/.colima/default/docker.sock'];
+const defaultDockerSockets =
+  process.platform === 'win32'
+    ? ['//./pipe/docker_engine']
+    : ['/var/run/docker.sock', '~/.colima/default/docker.sock'];
 
 // Enhanced transport detection and logging
 function getTransportInfo(options: any): { type: 'stdio' | 'http'; details: string } {
