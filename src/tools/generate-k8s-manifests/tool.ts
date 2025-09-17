@@ -24,7 +24,7 @@ import { createStandardProgress } from '@mcp/progress-helper';
 import type { ToolContext } from '@mcp/context';
 import { Success, Failure, type Result } from '@types';
 import { stripFencesAndNoise, isValidKubernetesContent } from '@lib/text-processing';
-import { createKubernetesValidator, getValidationSummary } from '@/validation';
+import { createKubernetesValidator, getValidationSummary } from '@validation';
 import { scoreConfigCandidates } from '@lib/integrated-scoring';
 import * as yaml from 'js-yaml';
 import { generateK8sManifestsSchema, type GenerateK8sManifestsParams } from './schema';

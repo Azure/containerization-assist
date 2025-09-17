@@ -2,11 +2,72 @@
  * Docker client for containerization operations
  */
 
-import Docker from 'dockerode';
+import Docker, { DockerOptions } from 'dockerode';
 import tar from 'tar-fs';
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '@types';
 import { extractDockerErrorMessage } from './errors';
+import { homedir } from 'os';
+import { join } from 'path';
+import { existsSync, statSync } from 'fs';
+
+/**
+ * Docker client configuration options.
+ */
+export interface DockerClientConfig {
+  /** Docker socket path (defaults to auto-detection with Colima support) */
+  socketPath?: string;
+  /** Docker daemon host (for TCP connections) */
+  host?: string;
+  /** Docker daemon port (for TCP connections) */
+  port?: number;
+  /** Connection timeout in milliseconds */
+  timeout?: number;
+}
+
+/**
+ * Get Colima socket paths in order of preference.
+ */
+function getColimaSockets(): string[] {
+  const homeDir = homedir();
+  return [
+    join(homeDir, '.colima/default/docker.sock'),
+    join(homeDir, '.colima/docker/docker.sock'),
+    join(homeDir, '.lima/colima/sock/docker.sock'), // Lima-based colima
+  ];
+}
+
+/**
+ * Find the first available Docker socket from the given paths.
+ */
+function findAvailableDockerSocket(socketPaths: string[]): string | null {
+  for (const socketPath of socketPaths) {
+    try {
+      if (existsSync(socketPath)) {
+        const stat = statSync(socketPath);
+        if (stat.isSocket()) {
+          return socketPath;
+        }
+      }
+    } catch {
+      // Continue to next socket path
+    }
+  }
+  return null;
+}
+
+/**
+ * Auto-detect Docker socket path with Colima support.
+ */
+function autoDetectDockerSocket(): string {
+  const defaultPaths = [
+    '/var/run/docker.sock', // Standard Docker socket
+    ...getColimaSockets(), // Colima sockets
+  ];
+
+  const availableSocket = findAvailableDockerSocket(defaultPaths);
+  return availableSocket || '/var/run/docker.sock'; // Fallback to default
+}
 
 /**
  * Options for building a Docker image.
@@ -145,10 +206,39 @@ export interface DockerClient {
 /**
  * Create a Docker client with core operations
  * @param logger - Logger instance for debug output
+ * @param config - Optional Docker client configuration
  * @returns DockerClient with build, get, tag, and push operations
  */
-export const createDockerClient = (logger: Logger): DockerClient => {
-  const docker = new Docker();
+export const createDockerClient = (logger: Logger, config?: DockerClientConfig): DockerClient => {
+  // Determine the socket path to use
+  let socketPath: string;
+
+  if (config?.socketPath) {
+    socketPath = config.socketPath;
+  } else {
+    socketPath = autoDetectDockerSocket();
+    logger.debug({ socketPath }, 'Auto-detected Docker socket');
+  }
+
+  // Create Docker client with detected socket path
+  const dockerOptions: DockerOptions = {};
+
+  if (socketPath.startsWith('tcp://') || socketPath.startsWith('http://')) {
+    // TCP connection
+    dockerOptions.host = config?.host || 'localhost';
+    dockerOptions.port = config?.port || 2375;
+  } else {
+    // Unix socket connection
+    dockerOptions.socketPath = socketPath;
+  }
+
+  if (config?.timeout) {
+    dockerOptions.timeout = config.timeout;
+  }
+
+  const docker = new Docker(dockerOptions);
+
+  logger.debug({ dockerOptions }, 'Created Docker client');
 
   return {
     async buildImage(options: DockerBuildOptions): Promise<Result<DockerBuildResult>> {

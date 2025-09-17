@@ -3,40 +3,40 @@
  */
 
 // Import all tool implementations
-import { analyzeRepo } from '@tools/analyze-repo/tool.js';
-import { analyzeRepoSchema } from '@tools/analyze-repo/schema.js';
-import { generateDockerfile } from '@tools/generate-dockerfile/tool.js';
-import { generateDockerfileSchema } from '@tools/generate-dockerfile/schema.js';
-import { buildImage } from '@tools/build-image/tool.js';
-import { buildImageSchema } from '@tools/build-image/schema.js';
-import { scanImage } from '@tools/scan/tool.js';
-import { scanImageSchema } from '@tools/scan/schema.js';
-import { tagImage } from '@tools/tag-image/tool.js';
-import { tagImageSchema } from '@tools/tag-image/schema.js';
-import { pushImage } from '@tools/push-image/tool.js';
-import { pushImageSchema } from '@tools/push-image/schema.js';
-import { generateK8sManifests } from '@tools/generate-k8s-manifests/tool.js';
-import { generateK8sManifestsSchema } from '@tools/generate-k8s-manifests/schema.js';
-import { prepareCluster } from '@tools/prepare-cluster/tool.js';
-import { prepareClusterSchema } from '@tools/prepare-cluster/schema.js';
-import { deployApplication } from '@tools/deploy/tool.js';
-import { deployApplicationSchema } from '@tools/deploy/schema.js';
-import { verifyDeployment } from '@tools/verify-deployment/tool.js';
-import { verifyDeploymentSchema } from '@tools/verify-deployment/schema.js';
-import { fixDockerfile } from '@tools/fix-dockerfile/tool.js';
-import { fixDockerfileSchema } from '@tools/fix-dockerfile/schema.js';
-import { resolveBaseImages } from '@tools/resolve-base-images/tool.js';
-import { resolveBaseImagesSchema } from '@tools/resolve-base-images/schema.js';
-import { opsTool } from '@tools/ops/tool.js';
-import { opsToolSchema } from '@tools/ops/schema.js';
-import { generateAcaManifests } from '@tools/generate-aca-manifests/tool.js';
-import { generateAcaManifestsSchema } from '@tools/generate-aca-manifests/schema.js';
-import { convertAcaToK8s } from '@tools/convert-aca-to-k8s/tool.js';
-import { convertAcaToK8sSchema } from '@tools/convert-aca-to-k8s/schema.js';
-import { generateHelmCharts } from '@tools/generate-helm-charts/tool.js';
-import { generateHelmChartsSchema } from '@tools/generate-helm-charts/schema.js';
-import { inspectSession } from '@tools/inspect-session/tool.js';
-import { InspectSessionParamsSchema as inspectSessionSchema } from '@tools/inspect-session/schema.js';
+import { analyzeRepo } from '@tools/analyze-repo/tool';
+import { analyzeRepoSchema } from '@tools/analyze-repo/schema';
+import { generateDockerfile } from '@tools/generate-dockerfile/tool';
+import { generateDockerfileSchema } from '@tools/generate-dockerfile/schema';
+import { buildImage } from '@tools/build-image/tool';
+import { buildImageSchema } from '@tools/build-image/schema';
+import { scanImage } from '@tools/scan/tool';
+import { scanImageSchema } from '@tools/scan/schema';
+import { tagImage } from '@tools/tag-image/tool';
+import { tagImageSchema } from '@tools/tag-image/schema';
+import { pushImage } from '@tools/push-image/tool';
+import { pushImageSchema } from '@tools/push-image/schema';
+import { generateK8sManifests } from '@tools/generate-k8s-manifests/tool';
+import { generateK8sManifestsSchema } from '@tools/generate-k8s-manifests/schema';
+import { prepareCluster } from '@tools/prepare-cluster/tool';
+import { prepareClusterSchema } from '@tools/prepare-cluster/schema';
+import { deployApplication } from '@tools/deploy/tool';
+import { deployApplicationSchema } from '@tools/deploy/schema';
+import { verifyDeployment } from '@tools/verify-deployment/tool';
+import { verifyDeploymentSchema } from '@tools/verify-deployment/schema';
+import { fixDockerfile } from '@tools/fix-dockerfile/tool';
+import { fixDockerfileSchema } from '@tools/fix-dockerfile/schema';
+import { resolveBaseImages } from '@tools/resolve-base-images/tool';
+import { resolveBaseImagesSchema } from '@tools/resolve-base-images/schema';
+import { opsTool } from '@tools/ops/tool';
+import { opsToolSchema } from '@tools/ops/schema';
+import { generateAcaManifests } from '@tools/generate-aca-manifests/tool';
+import { generateAcaManifestsSchema } from '@tools/generate-aca-manifests/schema';
+import { convertAcaToK8s } from '@tools/convert-aca-to-k8s/tool';
+import { convertAcaToK8sSchema } from '@tools/convert-aca-to-k8s/schema';
+import { generateHelmCharts } from '@tools/generate-helm-charts/tool';
+import { generateHelmChartsSchema } from '@tools/generate-helm-charts/schema';
+import { inspectSession } from '@tools/inspect-session/tool';
+import { InspectSessionParamsSchema as inspectSessionSchema } from '@tools/inspect-session/schema';
 import type { Tool, Result } from '@types';
 import type { ZodObject, ZodRawShape } from 'zod';
 
@@ -82,7 +82,7 @@ export const TOOLS = {
   ANALYZE_REPO: 'analyze_repo',
   GENERATE_DOCKERFILE: 'generate_dockerfile',
   BUILD_IMAGE: 'build_image',
-  SCAN: 'scan',
+  SCAN_IMAGE: 'scan_image',
   TAG_IMAGE: 'tag_image',
   PUSH_IMAGE: 'push_image',
   GENERATE_K8S_MANIFESTS: 'generate_k8s_manifests',
@@ -95,7 +95,7 @@ export const TOOLS = {
   GENERATE_ACA_MANIFESTS: 'generate_aca_manifests',
   CONVERT_ACA_TO_K8S: 'convert_aca_to_k8s',
   GENERATE_HELM_CHARTS: 'generate_helm_charts',
-  INSPECT_SESSION: 'inspect-session',
+  INSPECT_SESSION: 'inspect_session',
 } as const;
 
 /**
@@ -105,7 +105,7 @@ export type ToolName = (typeof TOOLS)[keyof typeof TOOLS];
 
 // Helper to create tool wrapper
 const createToolWrapper = (
-  name: string,
+  name: ToolName,
   description: string,
   zodSchema: ZodObject<ZodRawShape>, // Pass the Zod object schema
   executeFn: (params: unknown, context: unknown) => Promise<Result<unknown>>,
@@ -149,7 +149,7 @@ const buildImageTool = createToolWrapper(
 );
 
 const scanImageTool = createToolWrapper(
-  TOOLS.SCAN,
+  TOOLS.SCAN_IMAGE,
   'Scan a Docker image for vulnerabilities',
   scanImageSchema,
   scanImage as (params: unknown, context: unknown) => Promise<Result<unknown>>,
