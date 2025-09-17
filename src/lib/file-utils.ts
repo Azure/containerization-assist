@@ -4,6 +4,7 @@ import path from 'node:path';
 import https from 'node:https';
 import http from 'node:http';
 import { URL } from 'node:url';
+import crypto from 'node:crypto';
 
 export async function fileExists(filePath: string): Promise<boolean> {
   try {
@@ -49,7 +50,7 @@ export async function makeExecutable(filePath: string): Promise<void> {
  * Create a temporary file with content
  */
 export async function createTempFile(content: string, extension: string = ''): Promise<string> {
-  const tempPath = path.join(tmpdir(), `temp-${Date.now()}${extension}`);
+  const tempPath = path.join(tmpdir(), `temp-${crypto.randomUUID()}${extension}`);
   await fs.writeFile(tempPath, content, 'utf8');
   return tempPath;
 }
