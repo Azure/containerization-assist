@@ -6,7 +6,7 @@ import type { ApplicationConfig } from './types';
 import { DEFAULT_NETWORK, DEFAULT_TIMEOUTS, getDefaultPort } from './defaults';
 import os from 'os';
 import path from 'path';
-import { autoDetectDockerSocket } from '../services/docker-client';
+import { autoDetectDockerSocket } from '@/services/docker-client';
 
 /**
  * Create default configuration with sensible defaults

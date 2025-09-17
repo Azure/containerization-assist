@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
+import { autoDetectDockerSocket } from '@/services/docker-client';
 
 /**
  * Flattened configuration defaults
@@ -27,7 +28,7 @@ const DEFAULT_CONFIG = {
   MAX_SESSIONS: 100,
   HOST: '0.0.0.0',
   PORT: 3000,
-  DOCKER_SOCKET: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock',
+  DOCKER_SOCKET: autoDetectDockerSocket(),
   DOCKER_REGISTRY: 'docker.io',
   K8S_NAMESPACE: 'default',
   KUBECONFIG: join(os.homedir(), '.kube', 'config'),

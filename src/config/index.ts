@@ -4,7 +4,7 @@
  * Single source of configuration replacing 9 separate config files
  * Simple, focused configuration without complex validation overhead
  */
-import { autoDetectDockerSocket } from '../services/docker-client';
+import { autoDetectDockerSocket } from '@/services/docker-client';
 
 export const config = {
   mcp: {
