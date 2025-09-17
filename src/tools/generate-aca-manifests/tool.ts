@@ -490,7 +490,8 @@ async function generateAcaManifestsImpl(
     const manifestContent = JSON.stringify(manifest, null, 2);
 
     // Write manifest to disk - use current directory as base
-    const outputPath = path.join('.', 'aca');
+    const outputPath = path.join(params.path, 'aca');
+
     await fs.mkdir(outputPath, { recursive: true });
     const manifestPath = path.join(outputPath, 'app.json');
     await fs.writeFile(manifestPath, manifestContent, 'utf-8');
