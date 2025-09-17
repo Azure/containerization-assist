@@ -12,7 +12,7 @@ CORS(app)
 app.config['DEBUG'] = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
 
-@/app.route('/')
+@app.route('/')
 def index():
     return jsonify({
         'message': 'Flask Test Application',
