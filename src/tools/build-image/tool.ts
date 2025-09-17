@@ -14,6 +14,7 @@
  */
 
 import path from 'path';
+import { normalizePath } from '@lib/path-utils';
 import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
 import { promises as fs } from 'node:fs';
 import {
@@ -196,8 +197,8 @@ async function buildImageImpl(
     } = params;
 
     // Normalize paths to handle Windows separators
-    const buildContext = path.normalize(rawBuildPath);
-    const dockerfilePath = rawDockerfilePath ? path.normalize(rawDockerfilePath) : undefined;
+    const buildContext = normalizePath(rawBuildPath);
+    const dockerfilePath = rawDockerfilePath ? normalizePath(rawDockerfilePath) : undefined;
 
     logger.info({ path: buildContext, dockerfile, tags }, 'Starting Docker image build');
 

@@ -26,6 +26,8 @@ import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
 import { extractErrorMessage } from '@lib/error-utils';
 import type { ToolContext } from '@mcp/context';
 import { createKubernetesClient } from '@lib/kubernetes';
+import { getSystemInfo, getDownloadOS, getDownloadArch } from '@lib/platform-utils';
+import { downloadFile, makeExecutable, createTempFile, deleteTempFile } from '@lib/file-utils';
 
 import type * as pino from 'pino';
 import { Success, Failure, type Result } from '@types';
@@ -33,100 +35,14 @@ import { TOOLS } from '@exports/tool-names';
 import { prepareClusterSchema, type PrepareClusterParams } from './schema';
 import { z } from 'zod';
 import type { SessionData } from '@tools/session-types';
-import { promises as fs, createWriteStream } from 'node:fs';
-import { execSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import https from 'node:https';
-import http from 'node:http';
-import { URL } from 'node:url';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 
-// Simple utility functions to replace the over-engineered ones
-function executeCommand(
-  command: string,
-): Promise<{ success: boolean; stdout: string; stderr: string }> {
-  return new Promise((resolve) => {
-    try {
-      const stdout = execSync(command, { encoding: 'utf8', stdio: 'pipe' });
-      resolve({ success: true, stdout, stderr: '' });
-    } catch (error) {
-      resolve({
-        success: false,
-        stdout: '',
-        stderr: String(error),
-      });
-    }
-  });
-}
+// Use proper async command execution
+const execAsync = promisify(exec);
 
-function getSystemInfo(): { isWindows: boolean; isMac: boolean; isLinux: boolean } {
-  return {
-    isWindows: process.platform === 'win32',
-    isMac: process.platform === 'darwin',
-    isLinux: process.platform === 'linux',
-  };
-}
-
-function getDownloadOS(): string {
-  switch (process.platform) {
-    case 'win32':
-      return 'windows';
-    case 'darwin':
-      return 'darwin';
-    default:
-      return 'linux';
-  }
-}
-
-function getDownloadArch(): string {
-  switch (process.arch) {
-    case 'x64':
-      return 'amd64';
-    case 'arm64':
-      return 'arm64';
-    default:
-      return 'amd64';
-  }
-}
-
-async function downloadFile(url: string, dest: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const parsedUrl = new URL(url);
-    const client = parsedUrl.protocol === 'https:' ? https : http;
-
-    const file = createWriteStream(dest);
-    const request = client.get(url, (response) => {
-      response.pipe(file);
-      file.on('finish', () => {
-        file.close();
-        resolve();
-      });
-    });
-
-    request.on('error', (err) => {
-      fs.unlink(dest).catch(() => {}); // Delete the file on error
-      reject(err);
-    });
-  });
-}
-
-async function makeExecutable(filePath: string): Promise<void> {
-  await fs.chmod(filePath, 0o755);
-}
-
-async function createTempFile(content: string, extension: string = ''): Promise<string> {
-  const tempPath = path.join(tmpdir(), `temp-${Date.now()}${extension}`);
-  await fs.writeFile(tempPath, content, 'utf8');
-  return tempPath;
-}
-
-async function deleteTempFile(filePath: string): Promise<void> {
-  try {
-    await fs.unlink(filePath);
-  } catch {
-    // Ignore errors when deleting temp files
-  }
-}
+// Configuration constants
+const KIND_VERSION = 'v0.20.0'; // Use latest stable version - easily configurable
 
 export interface PrepareClusterResult {
   success: boolean;
@@ -329,14 +245,9 @@ async function checkIngressController(
  */
 async function checkKindInstalled(logger: pino.Logger): Promise<boolean> {
   try {
-    const result = await executeCommand('kind version');
-    if (result.success) {
-      logger.debug('Kind is already installed');
-      return true;
-    } else {
-      logger.debug('Kind is not installed');
-      return false;
-    }
+    await execAsync('kind version');
+    logger.debug('Kind is already installed');
+    return true;
   } catch {
     logger.debug('Kind is not installed');
     return false;
@@ -354,15 +265,14 @@ async function installKind(logger: pino.Logger): Promise<void> {
     const downloadOS = getDownloadOS();
     const downloadArch = getDownloadArch();
 
-    const kindVersion = 'v0.20.0'; // Use latest stable version
     let kindUrl: string;
     let kindExecutable: string;
 
     if (systemInfo.isWindows) {
-      kindUrl = `https://kind.sigs.k8s.io/dl/${kindVersion}/kind-windows-${downloadArch}.exe`;
+      kindUrl = `https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-windows-${downloadArch}.exe`;
       kindExecutable = 'kind.exe';
     } else {
-      kindUrl = `https://kind.sigs.k8s.io/dl/${kindVersion}/kind-${downloadOS}-${downloadArch}`;
+      kindUrl = `https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-${downloadOS}-${downloadArch}`;
       kindExecutable = 'kind';
     }
 
@@ -378,25 +288,31 @@ async function installKind(logger: pino.Logger): Promise<void> {
     // Move to appropriate location
     if (systemInfo.isWindows) {
       // On Windows, move to a directory in PATH or create one
-      const result = await executeCommand(
-        `move ${kindExecutable} "%ProgramFiles%\\kind\\${kindExecutable}"`,
-      );
-      if (!result.success) {
+      try {
+        await execAsync(`move ${kindExecutable} "%ProgramFiles%\\kind\\${kindExecutable}"`);
+      } catch {
         // Fallback: try to add to user's local bin
-        await executeCommand(
-          `mkdir "%USERPROFILE%\\bin" 2>nul & move ${kindExecutable} "%USERPROFILE%\\bin\\${kindExecutable}"`,
-        );
+        try {
+          await execAsync(
+            `mkdir "%USERPROFILE%\\bin" 2>nul & move ${kindExecutable} "%USERPROFILE%\\bin\\${kindExecutable}"`,
+          );
+        } catch {
+          logger.warn('Failed to move kind executable to PATH, it may need manual installation');
+        }
       }
     } else {
       // Unix-like systems
-      const moveResult = await executeCommand(
-        `sudo mv ./${kindExecutable} /usr/local/bin/${kindExecutable}`,
-      );
-      if (!moveResult.success) {
+      try {
+        await execAsync(`sudo mv ./${kindExecutable} /usr/local/bin/${kindExecutable}`);
+      } catch {
         // Fallback: try without sudo to user's local bin
-        await executeCommand(
-          `mkdir -p ~/.local/bin && mv ./${kindExecutable} ~/.local/bin/${kindExecutable}`,
-        );
+        try {
+          await execAsync(
+            `mkdir -p ~/.local/bin && mv ./${kindExecutable} ~/.local/bin/${kindExecutable}`,
+          );
+        } catch {
+          logger.warn('Failed to move kind executable to PATH, it may need manual installation');
+        }
       }
     }
 
@@ -412,17 +328,14 @@ async function installKind(logger: pino.Logger): Promise<void> {
  */
 async function checkKindClusterExists(clusterName: string, logger: pino.Logger): Promise<boolean> {
   try {
-    const result = await executeCommand('kind get clusters');
-    if (result.success) {
-      const clusters = result.stdout
-        .trim()
-        .split('\n')
-        .filter((line: string) => line.trim());
-      const exists = clusters.includes(clusterName);
-      logger.debug({ clusterName, exists, clusters }, 'Checking kind cluster existence');
-      return exists;
-    }
-    return false;
+    const { stdout } = await execAsync('kind get clusters');
+    const clusters = stdout
+      .trim()
+      .split('\n')
+      .filter((line: string) => line.trim());
+    const exists = clusters.includes(clusterName);
+    logger.debug({ clusterName, exists, clusters }, 'Checking kind cluster existence');
+    return exists;
   } catch (error) {
     logger.debug({ error }, 'Error checking kind clusters');
     return false;
@@ -466,14 +379,7 @@ nodes:
 
     try {
       // Create cluster
-      const createResult = await executeCommand(
-        `kind create cluster --name ${clusterName} --config "${configPath}"`,
-      );
-
-      if (!createResult.success) {
-        throw new Error(`Kind cluster creation failed: ${createResult.stderr}`);
-      }
-
+      await execAsync(`kind create cluster --name ${clusterName} --config "${configPath}"`);
       logger.info({ clusterName }, 'Kind cluster created successfully');
     } finally {
       // Clean up config file
@@ -490,15 +396,12 @@ nodes:
  */
 async function checkLocalRegistryExists(logger: pino.Logger): Promise<boolean> {
   try {
-    const result = await executeCommand(
+    const { stdout } = await execAsync(
       'docker ps -a --filter "name=kind-registry" --format "{{.Names}}"',
     );
-    if (result.success) {
-      const exists = result.stdout.trim() === 'kind-registry';
-      logger.debug({ exists }, 'Checking local registry existence');
-      return exists;
-    }
-    return false;
+    const exists = stdout.trim() === 'kind-registry';
+    logger.debug({ exists }, 'Checking local registry existence');
+    return exists;
   } catch (error) {
     logger.debug({ error }, 'Error checking local registry');
     return false;
@@ -513,20 +416,11 @@ async function createLocalRegistry(logger: pino.Logger): Promise<string> {
     logger.info('Creating local Docker registry...');
 
     // Create registry container
-    const createResult = await executeCommand(
-      'docker run -d --restart=always -p 5001:5000 --name kind-registry registry:2',
-    );
-
-    if (!createResult.success) {
-      throw new Error(`Registry container creation failed: ${createResult.stderr}`);
-    }
+    await execAsync('docker run -d --restart=always -p 5001:5000 --name kind-registry registry:2');
 
     // Connect registry to kind network
     try {
-      const connectResult = await executeCommand('docker network connect kind kind-registry');
-      if (!connectResult.success) {
-        logger.debug('Registry might already be connected to kind network');
-      }
+      await execAsync('docker network connect kind kind-registry');
     } catch {
       // Network might already be connected, ignore error
       logger.debug('Registry might already be connected to kind network');
@@ -627,14 +521,10 @@ async function prepareClusterImpl(
       }
 
       // Setup kubectl context for kind
-      const kubeconfigResult = await executeCommand(
-        `kind export kubeconfig --name ${kindClusterName}`,
-      );
-      if (!kubeconfigResult.success) {
-        logger.warn(
-          { error: kubeconfigResult.stderr },
-          'Failed to export kubeconfig, continuing anyway',
-        );
+      try {
+        await execAsync(`kind export kubeconfig --name ${kindClusterName}`);
+      } catch (error) {
+        logger.warn({ error: String(error) }, 'Failed to export kubeconfig, continuing anyway');
       }
     }
 

@@ -8,6 +8,7 @@ import { promises as fs } from 'node:fs';
 import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
 import type { Logger } from '@lib/logger';
 import path from 'path';
+import { normalizePath } from '@lib/path-utils';
 import {
   ensureSession,
   defineToolIO,
@@ -747,8 +748,8 @@ async function generateWithDirectAnalysis(
   logger: Logger,
 ): Promise<Result<SingleDockerfileResult>> {
   const rawPath = params.path || '.';
-  const repoPath = path.normalize(rawPath);
-  const normalizedModuleRoot = path.normalize(moduleRoot);
+  const repoPath = normalizePath(rawPath);
+  const normalizedModuleRoot = normalizePath(moduleRoot);
 
   // Build comprehensive prompt args using the same rich analysis as high-confidence path
   const promptArgs = {
@@ -1112,8 +1113,8 @@ async function generateSingleDockerfile(
 
   // Determine output path - write to each module root directory
   const rawPath = params.path || '.';
-  const repoPath = path.normalize(rawPath);
-  const normalizedModuleRoot = path.normalize(moduleRoot);
+  const repoPath = normalizePath(rawPath);
+  const normalizedModuleRoot = normalizePath(moduleRoot);
 
   // Handle moduleRoot path resolution correctly
   let targetPath: string;
@@ -1305,11 +1306,11 @@ async function generateDockerfileImpl(
       );
     } else {
       // Fallback: Auto-detect modules based on repository analysis
-      const repoPath = path.normalize(params.path || '.');
+      const repoPath = normalizePath(params.path || '.');
       rawModuleRoots = await detectModuleRoots(repoPath, analysisResult.language, logger);
       logger.info({ detectedModuleRoots: rawModuleRoots }, 'Auto-detected module roots (fallback)');
     }
-    const moduleRoots = rawModuleRoots.map((r) => path.normalize(r));
+    const moduleRoots = rawModuleRoots.map((r) => normalizePath(r));
 
     if (progress) await progress('EXECUTING');
 

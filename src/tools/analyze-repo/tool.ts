@@ -21,6 +21,7 @@
 
 import { promises as fs, constants } from 'node:fs';
 import * as path from 'node:path';
+import { normalizePath } from '@lib/path-utils';
 import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
 import type { Logger } from '@lib/logger';
 import { createStandardProgress } from '@mcp/progress-helper';
@@ -722,7 +723,7 @@ async function analyzeRepoImpl(
 
   try {
     const { path: rawPath = process.cwd(), depth = 3, includeTests = false } = params;
-    const repoPath = path.normalize(rawPath);
+    const repoPath = normalizePath(rawPath);
 
     logger.info({ repoPath, depth, includeTests }, 'Starting repository analysis');
 
