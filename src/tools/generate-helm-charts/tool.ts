@@ -6,8 +6,8 @@
  */
 
 import path from 'path';
-import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import { extractErrorMessage } from '@lib/error-utils';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { extractErrorMessage } from '@/lib/error-utils';
 import { promises as fs } from 'node:fs';
 import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
 // AI imports commented out for now - can be added later for enhanced generation

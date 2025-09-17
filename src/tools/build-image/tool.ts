@@ -14,8 +14,8 @@
  */
 
 import path from 'path';
-import { normalizePath } from '@lib/path-utils';
-import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
+import { normalizePath } from '@/lib/path-utils';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { promises as fs } from 'node:fs';
 import {
   ensureSession,

@@ -5,10 +5,10 @@
 
 // import { extractErrorMessage } from '@/lib/error-utils'; // Not currently used
 import { promises as fs } from 'node:fs';
-import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import type { Logger } from '@lib/logger';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import type { Logger } from '@/lib/logger';
 import path from 'path';
-import { normalizePath } from '@lib/path-utils';
+import { normalizePath } from '@/lib/path-utils';
 import {
   ensureSession,
   defineToolIO,
