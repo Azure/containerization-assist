@@ -94,7 +94,7 @@ program.parse(argv);
 
 const options = program.opts();
 const command = program.args[0] ?? 'start';
-const defaultDockerSockets = autoDetectDockerSocket();
+const defaultDockerSocket = autoDetectDockerSocket();
 
 // Enhanced transport detection and logging
 function getTransportInfo(options: any): { type: 'stdio' | 'http'; details: string } {
@@ -118,7 +118,7 @@ function validateDockerSocket(options: any): { dockerSocket: string; warnings: s
   const allSocketOptions = [
     options.dockerSocket,
     process.env.DOCKER_SOCKET,
-    ...defaultDockerSockets,
+    defaultDockerSocket,
   ].filter(Boolean);
 
   for (const thisSocket of allSocketOptions) {

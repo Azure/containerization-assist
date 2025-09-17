@@ -51,7 +51,8 @@ export async function makeExecutable(filePath: string): Promise<void> {
  */
 export async function createTempFile(content: string, extension: string = ''): Promise<string> {
   const tempPath = path.join(tmpdir(), `temp-${crypto.randomUUID()}${extension}`);
-  await fs.writeFile(tempPath, content, 'utf8');
+  // Create file with permissions (readable/writable only by owner)
+  await fs.writeFile(tempPath, content, { encoding: 'utf8', mode: 0o600 });
   return tempPath;
 }
 
