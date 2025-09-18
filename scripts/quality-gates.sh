@@ -343,16 +343,18 @@ echo "-----------------------"
 
 # More robust dead code detection with error handling
 if command -v npx >/dev/null 2>&1 && [ -f "tsconfig.json" ]; then
-    DEADCODE_OUTPUT=$(npx ts-prune --project tsconfig.json 2>/dev/null || echo "")
+    DEADCODE_OUTPUT=$(npx knip 2>/dev/null || echo "")
     if [ -n "$DEADCODE_OUTPUT" ]; then
-        DEADCODE_COUNT=$(echo "$DEADCODE_OUTPUT" | grep -v 'used in module' | wc -l | tr -d ' ' || echo "0")
+        DEADCODE_COUNT=$(echo "$DEADCODE_OUTPUT" | wc -l | tr -d ' ' || echo "0")
+        # write deadcode output to file for inspection
+        echo "$DEADCODE_OUTPUT" > knip-deadcode-output.txt
     else
         DEADCODE_COUNT=0
-        print_status "WARN" "ts-prune failed to run, assuming 0 dead code exports"
+        print_status "WARN" "knip failed to run, assuming 0 dead code exports"
     fi
 else
     DEADCODE_COUNT=0
-    print_status "WARN" "ts-prune or tsconfig.json not available, skipping dead code check"
+    print_status "WARN" "knip not found, skipping dead code check"
 fi
 
 # Ensure numeric value
@@ -394,9 +396,9 @@ if [ "$DEADCODE_COUNT" -le "$DEADCODE_BASELINE" ]; then
 else
     DEADCODE_INCREASE=$((DEADCODE_COUNT - DEADCODE_BASELINE))
     if [ "$ALLOW_REGRESSION" = "true" ]; then
-        print_status "WARN" "Unused exports increased by $DEADCODE_INCREASE ($DEADCODE_COUNT > $DEADCODE_BASELINE) - ALLOWED by config"
+        print_status "WARN" "Unused exports increased by $DEADCODE_INCREASE ($DEADCODE_COUNT > $DEADCODE_BASELINE) - ALLOWED by config - Check knip-deadcode-output.txt changes for details"
     else
-        print_status "FAIL" "Unused exports increased by $DEADCODE_INCREASE ($DEADCODE_COUNT > $DEADCODE_BASELINE) - REGRESSION NOT ALLOWED"
+        print_status "FAIL" "Unused exports increased by $DEADCODE_INCREASE ($DEADCODE_COUNT > $DEADCODE_BASELINE) - REGRESSION NOT ALLOWED - Check knip-deadcode-output.txt changes for details"
         exit 1
     fi
 fi

@@ -58,21 +58,6 @@ export function createDependencies(config?: AppConfig): Dependencies {
 }
 
 /**
- * Create test dependencies with appropriate defaults
- */
-export function createTestDependencies(overrides?: Partial<Dependencies>): Dependencies {
-  const testConfig = createAppConfig();
-  // Apply test-specific settings
-  testConfig.server.logLevel = 'error';
-  testConfig.session.ttl = 60;
-  testConfig.session.maxSessions = 10;
-  testConfig.workspace.maxFileSize = 1024 * 1024; // 1MB
-
-  const base = createDependencies(testConfig);
-  return { ...base, ...overrides };
-}
-
-/**
  * Initialize asynchronous dependencies
  */
 export async function initializeDependencies(deps: Dependencies): Promise<void> {
