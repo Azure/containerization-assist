@@ -5,7 +5,7 @@ import { createLogger } from '@/lib/logger';
 import type { KnowledgeEntry, LoadedEntry } from './types';
 import { KnowledgeEntrySchema } from './schemas';
 import { readFileSync, existsSync } from 'fs';
-import { resolvePath } from '@/lib/path-utils';
+import path from 'path';
 
 const logger = createLogger().child({ module: 'enhanced-loader' });
 
@@ -42,9 +42,9 @@ export async function loadKnowledgePack(packName: string): Promise<LoadedEntry[]
 
   try {
     const possiblePaths = [
-      resolvePath(process.cwd(), 'src/knowledge/data', packName),
-      resolvePath(process.cwd(), 'dist/src/knowledge/data', packName),
-      resolvePath(__dirname, 'data', packName),
+      path.resolve(process.cwd(), 'src/knowledge/data', packName),
+      path.resolve(process.cwd(), 'dist/src/knowledge/data', packName),
+      path.resolve(__dirname, 'data', packName),
     ];
 
     const dataPath = possiblePaths.find(existsSync);

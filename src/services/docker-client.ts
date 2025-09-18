@@ -59,8 +59,9 @@ function findAvailableDockerSocket(socketPaths: string[]): string | null {
 /**
  * Auto-detect Docker socket path with Colima support.
  */
-function autoDetectDockerSocket(): string {
+export function autoDetectDockerSocket(): string {
   const defaultPaths = [
+    '//./pipe/docker_engine', //windows default pipe
     '/var/run/docker.sock', // Standard Docker socket
     ...getColimaSockets(), // Colima sockets
   ];

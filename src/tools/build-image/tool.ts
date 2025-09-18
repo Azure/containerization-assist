@@ -13,7 +13,8 @@
  * ```
  */
 
-import { resolvePath, joinPaths, getRelativePath, safeNormalizePath } from '@/lib/path-utils';
+import path from 'path';
+import { normalizePath } from '@/lib/path-utils';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { promises as fs } from 'node:fs';
 import {
@@ -196,8 +197,8 @@ async function buildImageImpl(
     } = params;
 
     // Normalize paths to handle Windows separators
-    const buildContext = safeNormalizePath(rawBuildPath);
-    const dockerfilePath = rawDockerfilePath ? safeNormalizePath(rawDockerfilePath) : undefined;
+    const buildContext = normalizePath(rawBuildPath);
+    const dockerfilePath = rawDockerfilePath ? normalizePath(rawDockerfilePath) : undefined;
 
     logger.info({ path: buildContext, dockerfile, tags }, 'Starting Docker image build');
 
@@ -231,8 +232,8 @@ async function buildImageImpl(
     const sessionData = session as SessionData;
     const repoPath = buildContext;
     let finalDockerfilePath = dockerfilePath
-      ? resolvePath(repoPath, dockerfilePath)
-      : resolvePath(repoPath, dockerfile);
+      ? path.resolve(repoPath, dockerfilePath)
+      : path.resolve(repoPath, dockerfile);
 
     // Check if we should use a generated Dockerfile
     const dockerfileResult = sessionData?.results?.['generate-dockerfile'] as
@@ -243,7 +244,7 @@ async function buildImageImpl(
     if (!(await fileExists(finalDockerfilePath))) {
       // If the specified Dockerfile doesn't exist, check for generated one
       if (generatedPath) {
-        const resolvedGeneratedPath = resolvePath(repoPath, generatedPath);
+        const resolvedGeneratedPath = path.resolve(repoPath, generatedPath);
         if (await fileExists(resolvedGeneratedPath)) {
           finalDockerfilePath = resolvedGeneratedPath;
           logger.info(
@@ -258,7 +259,7 @@ async function buildImageImpl(
           const dockerfileContent = dockerfileResult?.content;
           if (dockerfileContent) {
             // Use the user-specified dockerfile name (defaults to 'Dockerfile')
-            finalDockerfilePath = joinPaths(repoPath, dockerfile);
+            finalDockerfilePath = path.join(repoPath, dockerfile);
             await fs.writeFile(finalDockerfilePath, dockerfileContent, 'utf-8');
             logger.info(
               { dockerfilePath: finalDockerfilePath },
@@ -274,7 +275,7 @@ async function buildImageImpl(
         const dockerfileContent = dockerfileResult?.content;
         if (dockerfileContent) {
           // Use the user-specified dockerfile name (defaults to 'Dockerfile')
-          finalDockerfilePath = joinPaths(repoPath, dockerfile);
+          finalDockerfilePath = path.join(repoPath, dockerfile);
           await fs.writeFile(finalDockerfilePath, dockerfileContent, 'utf-8');
           logger.info(
             { dockerfilePath: finalDockerfilePath },
@@ -313,7 +314,7 @@ async function buildImageImpl(
     // Prepare Docker build options
     const buildOptions: DockerBuildOptions = {
       context: repoPath, // Build context is the path parameter
-      dockerfile: getRelativePath(repoPath, finalDockerfilePath), // Dockerfile path relative to context
+      dockerfile: path.relative(repoPath, finalDockerfilePath), // Dockerfile path relative to context
       buildargs: finalBuildArgs,
       ...(_platform !== undefined && { platform: _platform }),
     };

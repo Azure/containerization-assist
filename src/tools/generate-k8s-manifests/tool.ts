@@ -5,7 +5,7 @@
  * Uses standardized helpers for consistent behavior
  */
 
-import { joinPaths } from '@/lib/path-utils';
+import path from 'path';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { withDefaults, K8S_DEFAULTS } from '@/lib/param-defaults';
 import { extractErrorMessage } from '@/lib/error-utils';
@@ -640,10 +640,11 @@ async function generateK8sManifestsImpl(
       },
       'Kubernetes manifest validation complete',
     );
-    // Write manifests to disk - use provided path as base
-    const outputPath = joinPaths(params.path, 'k8s');
+    // Write manifests to disk - use current directory as base
+    const outputPath = path.join(params.path, 'k8s');
+
     await fs.mkdir(outputPath, { recursive: true });
-    const manifestPath = joinPaths(outputPath, 'manifests.yaml');
+    const manifestPath = path.join(outputPath, 'manifests.yaml');
     await fs.writeFile(manifestPath, yamlContent, 'utf-8');
 
     // Score the generated manifests

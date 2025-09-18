@@ -7,8 +7,8 @@
 import { promises as fs } from 'node:fs';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import type { Logger } from '@/lib/logger';
-import path from 'node:path';
-import { safeNormalizePath } from '@/lib/path-utils';
+import path from 'path';
+import { normalizePath } from '@/lib/path-utils';
 import {
   ensureSession,
   defineToolIO,
@@ -773,8 +773,8 @@ async function generateWithDirectAnalysis(
       'Repository path is required. Please provide the absolute path to your repository.',
     );
   }
-  const repoPath = safeNormalizePath(params.path);
-  const normalizedModuleRoot = safeNormalizePath(moduleRoot);
+  const repoPath = normalizePath(params.path);
+  const normalizedModuleRoot = normalizePath(moduleRoot);
 
   // Build comprehensive prompt args using the same rich analysis as high-confidence path
   const promptArgs = {
@@ -1142,8 +1142,8 @@ async function generateSingleDockerfile(
       'Repository path is required. Please provide the absolute path to your repository.',
     );
   }
-  const repoPath = safeNormalizePath(params.path);
-  const normalizedModuleRoot = safeNormalizePath(moduleRoot);
+  const repoPath = normalizePath(params.path);
+  const normalizedModuleRoot = normalizePath(moduleRoot);
 
   // Handle moduleRoot path resolution correctly
   let outputTargetPath: string;
@@ -1340,11 +1340,11 @@ async function generateDockerfileImpl(
           'Repository path is required. Please provide the absolute path to your repository.',
         );
       }
-      const repoPath = safeNormalizePath(params.path);
+      const repoPath = normalizePath(params.path);
       rawModuleRoots = await detectModuleRoots(repoPath, analysisResult.language, logger);
       logger.info({ detectedModuleRoots: rawModuleRoots }, 'Auto-detected module roots (fallback)');
     }
-    const moduleRoots = rawModuleRoots.map(safeNormalizePath);
+    const moduleRoots = rawModuleRoots.map((r) => normalizePath(r));
 
     if (progress) await progress('EXECUTING');
 
