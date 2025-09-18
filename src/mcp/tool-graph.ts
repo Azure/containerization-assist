@@ -5,6 +5,8 @@
  * Trade-off: Static graph definition vs runtime discovery - chose static for predictability
  */
 
+import { ToolName } from '@/exports/tools';
+
 /**
  * Execution steps representing workflow state transitions.
  * Each step marks a completed capability that downstream tools can depend on.
@@ -56,7 +58,7 @@ export interface ToolEdge {
  * Static dependency graph mapping tools to their workflow requirements.
  * Central source of truth for tool orchestration and auto-correction.
  */
-export const TOOL_GRAPH: Record<string, ToolEdge> = {
+export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
   analyze_repo: {
     provides: ['analyzed_repo'],
     nextSteps: [
@@ -212,7 +214,7 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     ],
   },
 
-  scan: {
+  scan_image: {
     requires: ['built_image'],
     provides: ['scanned_image'],
     autofix: {
@@ -419,14 +421,14 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
 
   ops: {},
   inspect_session: {},
-  'convert-aca-to-k8s': {},
+  convert_aca_to_k8s: {},
 };
 
 /**
  * Retrieves dependency configuration for a tool.
  * Returns undefined for tools without workflow dependencies.
  */
-export function getToolEdge(toolName: string): ToolEdge | undefined {
+export function getToolEdge(toolName: ToolName): ToolEdge | undefined {
   return TOOL_GRAPH[toolName];
 }
 
@@ -444,7 +446,7 @@ export function isStepSatisfied(step: Step, completedSteps: Set<Step>): boolean 
  *
  * Postcondition: Returns empty array if tool can execute immediately
  */
-export function getMissingPreconditions(toolName: string, completedSteps: Set<Step>): Step[] {
+export function getMissingPreconditions(toolName: ToolName, completedSteps: Set<Step>): Step[] {
   const edge = getToolEdge(toolName);
   if (!edge?.requires) return [];
 
@@ -460,8 +462,8 @@ export function getMissingPreconditions(toolName: string, completedSteps: Set<St
 export function getExecutionOrder(
   missingSteps: Step[],
   completedSteps: Set<Step>,
-): { tool: string; step: Step }[] {
-  const order: { tool: string; step: Step }[] = [];
+): { tool: ToolName; step: Step }[] {
+  const order: { tool: ToolName; step: Step }[] = [];
   const toProcess = new Set(missingSteps);
   const processed = new Set<Step>(completedSteps);
   const expansionAttempts = new Map<Step, number>();
@@ -473,7 +475,7 @@ export function getExecutionOrder(
     for (const step of toProcess) {
       const provider = Object.entries(TOOL_GRAPH).find(([_, edge]) =>
         edge.provides?.includes(step),
-      );
+      ) as [ToolName, ToolEdge] | undefined;
 
       if (!provider) {
         throw new Error(`No tool provides step: ${step}`);
