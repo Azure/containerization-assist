@@ -3,7 +3,7 @@ import type { KnowledgeEntry, KnowledgeStats, LoadedEntry, CompilationStats } fr
 import { KnowledgeEntrySchema } from './schemas';
 import { z } from 'zod';
 import { readFileSync, existsSync } from 'fs';
-import { resolvePath } from '@/lib/path-utils';
+import path from 'path';
 
 const logger = createLogger().child({ module: 'knowledge-loader' });
 
@@ -177,9 +177,9 @@ export const loadKnowledgeBase = async (): Promise<void> => {
     for (const packFile of knowledgePacks) {
       try {
         const possiblePaths = [
-          resolvePath(process.cwd(), 'src/knowledge/data', packFile),
-          resolvePath(process.cwd(), 'dist/src/knowledge/data', packFile),
-          resolvePath(
+          path.resolve(process.cwd(), 'src/knowledge/data', packFile),
+          path.resolve(process.cwd(), 'dist/src/knowledge/data', packFile),
+          path.resolve(
             process.cwd(),
             'node_modules/@thgamble/containerization-assist-mcp/dist/src/knowledge/data',
             packFile,

@@ -53,7 +53,7 @@
           "/Users/d/containerization-assist/src/services/kubernetes-idempotent-apply.ts:299:21:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/Users/d/containerization-assist/src/services/kubernetes-idempotent-apply.ts:381:30:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/Users/d/containerization-assist/src/tools/analyze-repo/tool.ts:214:16:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/Users/d/containerization-assist/src/tools/build-image/tool.ts:91:11:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/Users/d/containerization-assist/src/tools/build-image/tool.ts:92:11:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/Users/d/containerization-assist/src/tools/convert-aca-to-k8s/tool.ts:94:14:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/Users/d/containerization-assist/src/tools/convert-aca-to-k8s/tool.ts:100:48:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/Users/d/containerization-assist/src/tools/convert-aca-to-k8s/tool.ts:151:44:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
@@ -93,13 +93,13 @@
         ]
       },
       "deadcode": {
-        "count": 350
+        "count": 347
       },
       "typescript": {
         "errors": 0
       },
       "build": {
-        "timeMs": 5000,
+        "timeMs": 6000,
         "mode": "clean",
         "environment": {
           "nodeVersion": "v24.7.0",

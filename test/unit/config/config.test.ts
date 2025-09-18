@@ -3,6 +3,8 @@ import {
   createDefaultConfig,
   createConfiguration,
 } from '../../../src/config/config';
+import os from 'os';
+import path from 'path';
 
 describe('Configuration Module', () => {
   let originalEnv: Record<string, string | undefined>;
@@ -77,7 +79,7 @@ describe('Configuration Module', () => {
       const config = createDefaultConfig();
 
       expect(config.kubernetes.namespace).toBe('default');
-      expect(config.kubernetes.kubeconfig).toBe('~/.kube/config');
+      expect(config.kubernetes.kubeconfig).toBe(path.join(os.homedir(), '.kube', 'config'));
       expect(config.kubernetes.timeout).toBe(30000);
     });
 
@@ -85,7 +87,7 @@ describe('Configuration Module', () => {
       const config = createDefaultConfig();
 
       expect(config.workspace.workspaceDir).toBe(process.cwd());
-      expect(config.workspace.tempDir).toBe('/tmp');
+      expect(config.workspace.tempDir).toBe(os.tmpdir());
       expect(config.workspace.cleanupOnExit).toBe(true);
     });
 

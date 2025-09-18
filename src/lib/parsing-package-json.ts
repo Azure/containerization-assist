@@ -3,7 +3,7 @@
  */
 
 import { promises as fs, readFileSync } from 'fs';
-import { joinPaths } from '@/lib/path-utils';
+import path from 'path';
 
 /**
  * Parsed package.json structure
@@ -38,7 +38,7 @@ export interface PackageJson {
  * @throws Error if file not found or invalid JSON
  */
 export async function parsePackageJson(dirPath: string): Promise<PackageJson> {
-  const packageJsonPath = joinPaths(dirPath, 'package.json');
+  const packageJsonPath = path.join(dirPath, 'package.json');
 
   try {
     const content = await fs.readFile(packageJsonPath, 'utf-8');
@@ -60,7 +60,7 @@ export async function parsePackageJson(dirPath: string): Promise<PackageJson> {
  * Synchronously parses package.json file from a directory
  */
 export function parsePackageJsonSync(dirPath: string): PackageJson {
-  const packageJsonPath = joinPaths(dirPath, 'package.json');
+  const packageJsonPath = path.join(dirPath, 'package.json');
 
   try {
     const content = readFileSync(packageJsonPath, 'utf-8');
@@ -82,7 +82,7 @@ export function parsePackageJsonSync(dirPath: string): PackageJson {
  * Checks if a package.json exists in a directory
  */
 export async function hasPackageJson(dirPath: string): Promise<boolean> {
-  const packageJsonPath = joinPaths(dirPath, 'package.json');
+  const packageJsonPath = path.join(dirPath, 'package.json');
 
   try {
     await fs.access(packageJsonPath);

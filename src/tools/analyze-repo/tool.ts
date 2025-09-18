@@ -19,9 +19,9 @@
  * ```
  */
 
-import { joinPaths, getExtension, safeNormalizePath } from '@/lib/path-utils';
 import { promises as fs, constants } from 'node:fs';
 import * as path from 'node:path';
+import { normalizePath } from '@/lib/path-utils';
 import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
 import type { Logger } from '@/lib/logger';
 import { createStandardProgress } from '@/mcp/progress-helper';
@@ -296,7 +296,7 @@ async function detectLanguage(
     const files = await fs.readdir(dir);
 
     for (const file of files) {
-      const filePath = joinPaths(dir, file);
+      const filePath = path.join(dir, file);
       const stats = await fs.stat(filePath);
       const relativePath = filePath.replace(`${repoPath}/`, '');
 
@@ -312,7 +312,7 @@ async function detectLanguage(
 
   const fileStats = await Promise.all(
     allFiles.map(async (file) => {
-      const filePath = joinPaths(repoPath, file);
+      const filePath = path.join(repoPath, file);
       const stats = await fs.stat(filePath);
       return { name: file, path: filePath, isFile: stats.isFile() };
     }),
@@ -333,7 +333,7 @@ async function detectLanguage(
   // Count file extensions
   const extensionCounts: Record<string, number> = {};
   for (const file of fileStats.filter((f) => f.isFile)) {
-    const ext = getExtension(file.name);
+    const ext = path.extname(file.name);
     if (ext) {
       extensionCounts[ext] = (extensionCounts[ext] ?? 0) + 1;
     }
@@ -401,7 +401,7 @@ async function detectFramework(
       const csprojFiles = files.filter((f) => f.endsWith('.csproj'));
       for (const csprojFile of csprojFiles) {
         try {
-          const csprojPath = joinPaths(repoPath, csprojFile);
+          const csprojPath = path.join(repoPath, csprojFile);
           const csprojContent = await fs.readFile(csprojPath, 'utf-8');
 
           // Check for .NET Framework version
@@ -512,13 +512,13 @@ async function detectModuleRoots(
       const entries = await fs.readdir(dirPath, { withFileTypes: true });
 
       for (const buildFile of buildFiles) {
-        const buildFilePath = joinPaths(dirPath, buildFile);
+        const buildFilePath = path.join(dirPath, buildFile);
         try {
           // Directly read the file to avoid TOCTOU race condition
           if (buildFile === 'pom.xml') {
             const pomContent = await fs.readFile(buildFilePath, 'utf-8');
             const isParentPom = pomContent.includes('<modules>') && pomContent.includes('<module>');
-            const srcDir = joinPaths(dirPath, 'src');
+            const srcDir = path.join(dirPath, 'src');
             const hasSrc = await fs
               .stat(srcDir)
               .then((stats) => stats.isDirectory())
@@ -552,7 +552,7 @@ async function detectModuleRoots(
           !entry.name.startsWith('.') &&
           !['node_modules', 'target', 'build', 'dist', 'out'].includes(entry.name)
         ) {
-          await scanDirectory(joinPaths(dirPath, entry.name), depth + 1);
+          await scanDirectory(path.join(dirPath, entry.name), depth + 1);
         }
       }
     } catch (error) {
@@ -751,7 +751,7 @@ async function analyzeRepoImpl(
 
   try {
     const { path: rawPath = params.path, depth = 3, includeTests = false, language } = params;
-    const repoPath = safeNormalizePath(rawPath);
+    const repoPath = normalizePath(rawPath);
 
     // Validate language parameter if provided
     if (language && !['java', 'dotnet'].includes(language)) {
