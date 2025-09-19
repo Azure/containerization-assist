@@ -175,6 +175,31 @@ function applyPreference(
 }
 
 /**
+ * Platform selection:
+ * 1) Images under mcr.microsoft.com/dotnet/framework/* are .NET Framework and Windows-only → use "windows/amd64".
+ * 2) All other modern .NET images live under mcr.microsoft.com/dotnet/* (no "framework"; e.g., aspnet/sdk/runtime)
+ *    and are Linux container images → use "linux/amd64".
+ *
+ * Windows container images require the Windows kernel.
+ * Modern .NET (5+) images are Linux container images.
+ *
+ * Does not account for retagged private registry images which may have a different name
+ */
+export function getPlatformForBaseImage(baseImage: string): string {
+  const img = baseImage.toLowerCase();
+
+  // Simple Heuristics for Windows-only .NET images
+  const isWindows =
+    /(^|\/)dotnet\/framework/.test(img) || // .NET Framework (Windows-only)
+    /(^|\/)windowsservercore(\/|:|$)/.test(img) || // microsoft/windowsservercore legacy
+    /(^|\/)windows(\/|:)/.test(img) || // mcr.microsoft.com/windows/*
+    /(^|[-_.:])nanoserver($|[-_.:])/.test(img) || // *-nanoserver-*
+    /(^|[-_.:])servercore($|[-_.:])/.test(img); // *-servercore-*
+
+  return isWindows ? 'windows/amd64' : 'linux/amd64';
+}
+
+/**
  * Get comprehensive base image recommendations with context-aware selection
  *
  * This function implements a multi-tiered selection strategy:

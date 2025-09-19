@@ -42,6 +42,10 @@ export const generateDockerfileSchema = z.object({
   optimizeSize: z.boolean().optional().describe('Optimize for smaller image size'),
   securityLevel: securityLevelSchema,
   customCommands: z.array(z.string()).optional().describe('Custom Dockerfile commands'),
+  platform: z
+    .string()
+    .optional()
+    .describe('Target platform (e.g., linux/amd64, linux/arm64, windows/amd64)'),
   path: z.string().describe('Repository path (use forward slashes: /path/to/repo)'),
   dockerfileDirectoryPaths: z
     .array(z.string())
