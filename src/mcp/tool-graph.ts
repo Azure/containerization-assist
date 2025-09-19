@@ -5,6 +5,8 @@
  * Trade-off: Static graph definition vs runtime discovery - chose static for predictability
  */
 
+import { ToolName } from '@/exports/tools';
+
 /**
  * Execution steps representing workflow state transitions.
  * Each step marks a completed capability that downstream tools can depend on.
@@ -56,9 +58,19 @@ export interface ToolEdge {
  * Static dependency graph mapping tools to their workflow requirements.
  * Central source of truth for tool orchestration and auto-correction.
  */
-export const TOOL_GRAPH: Record<string, ToolEdge> = {
+export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
   analyze_repo: {
     provides: ['analyzed_repo'],
+    nextSteps: [
+      {
+        tool: 'generate_dockerfile',
+        description: 'Generate optimized Dockerfile based on the repository analysis',
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId, // Pass the same sessionId to share analysis data
+        }),
+      },
+    ],
   },
 
   resolve_base_images: {
@@ -73,6 +85,16 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
         }),
       },
     },
+    nextSteps: [
+      {
+        tool: 'generate_dockerfile',
+        description: 'Generate Dockerfile using the resolved base images',
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   generate_dockerfile: {
@@ -130,6 +152,17 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
         }),
       },
     },
+    nextSteps: [
+      {
+        tool: 'build_image',
+        description: 'Build Docker image from the fixed Dockerfile',
+        buildParams: (p) => ({
+          path: p.path || '.',
+          imageName: p.imageName || 'app:latest',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   build_image: {
@@ -181,7 +214,7 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     ],
   },
 
-  scan: {
+  scan_image: {
     requires: ['built_image'],
     provides: ['scanned_image'],
     autofix: {
@@ -194,10 +227,41 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
         }),
       },
     },
+    nextSteps: [
+      {
+        tool: 'push_image',
+        description: 'Push the scanned image to a container registry',
+        buildParams: (p) => ({
+          imageId: p.imageId || p.imageName,
+          registry: p.registry,
+          sessionId: p.sessionId,
+        }),
+      },
+      {
+        tool: 'deploy',
+        description: 'Deploy the scanned application to Kubernetes',
+        buildParams: (p) => ({
+          imageId: p.imageId || p.imageName,
+          namespace: p.namespace || 'default',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   tag_image: {
     requires: ['built_image'],
+    nextSteps: [
+      {
+        tool: 'push_image',
+        description: 'Push the tagged image to a container registry',
+        buildParams: (p) => ({
+          imageId: p.imageId || p.imageName,
+          registry: p.registry,
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   push_image: {
@@ -213,10 +277,31 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
         }),
       },
     },
+    nextSteps: [
+      {
+        tool: 'deploy',
+        description: 'Deploy the pushed image to Kubernetes',
+        buildParams: (p) => ({
+          imageId: p.imageId || p.imageName,
+          namespace: p.namespace || 'default',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   prepare_cluster: {
     provides: ['k8s_prepared'],
+    nextSteps: [
+      {
+        tool: 'generate_k8s_manifests',
+        description: 'Generate Kubernetes manifests for deployment',
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   generate_k8s_manifests: {
@@ -225,9 +310,23 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     autofix: {
       analyzed_repo: {
         tool: 'analyze_repo',
-        buildParams: (p) => ({ path: p.path || '.' }),
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId,
+        }),
       },
     },
+    nextSteps: [
+      {
+        tool: 'deploy',
+        description: 'Deploy the application using the generated manifests',
+        buildParams: (p) => ({
+          path: p.path || '.',
+          namespace: p.namespace || 'default',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   generate_helm_charts: {
@@ -236,9 +335,23 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     autofix: {
       analyzed_repo: {
         tool: 'analyze_repo',
-        buildParams: (p) => ({ path: p.path || '.' }),
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId,
+        }),
       },
     },
+    nextSteps: [
+      {
+        tool: 'deploy',
+        description: 'Deploy the application using the generated Helm charts',
+        buildParams: (p) => ({
+          path: p.path || '.',
+          namespace: p.namespace || 'default',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   generate_aca_manifests: {
@@ -247,9 +360,22 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
     autofix: {
       analyzed_repo: {
         tool: 'analyze_repo',
-        buildParams: (p) => ({ path: p.path || '.' }),
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId,
+        }),
       },
     },
+    nextSteps: [
+      {
+        tool: 'deploy',
+        description: 'Deploy the application using the generated Azure Container Apps manifests',
+        buildParams: (p) => ({
+          path: p.path || '.',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   deploy: {
@@ -273,9 +399,20 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
         buildParams: (p) => ({
           path: p.path || '.',
           imageId: p.imageId,
+          sessionId: p.sessionId,
         }),
       },
     },
+    nextSteps: [
+      {
+        tool: 'verify_deployment',
+        description: 'Verify that the deployment is running successfully',
+        buildParams: (p) => ({
+          namespace: p.namespace || 'default',
+          sessionId: p.sessionId,
+        }),
+      },
+    ],
   },
 
   verify_deployment: {
@@ -284,14 +421,14 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
 
   ops: {},
   inspect_session: {},
-  'convert-aca-to-k8s': {},
+  convert_aca_to_k8s: {},
 };
 
 /**
  * Retrieves dependency configuration for a tool.
  * Returns undefined for tools without workflow dependencies.
  */
-export function getToolEdge(toolName: string): ToolEdge | undefined {
+export function getToolEdge(toolName: ToolName): ToolEdge | undefined {
   return TOOL_GRAPH[toolName];
 }
 
@@ -309,7 +446,7 @@ export function isStepSatisfied(step: Step, completedSteps: Set<Step>): boolean 
  *
  * Postcondition: Returns empty array if tool can execute immediately
  */
-export function getMissingPreconditions(toolName: string, completedSteps: Set<Step>): Step[] {
+export function getMissingPreconditions(toolName: ToolName, completedSteps: Set<Step>): Step[] {
   const edge = getToolEdge(toolName);
   if (!edge?.requires) return [];
 
@@ -325,8 +462,8 @@ export function getMissingPreconditions(toolName: string, completedSteps: Set<St
 export function getExecutionOrder(
   missingSteps: Step[],
   completedSteps: Set<Step>,
-): { tool: string; step: Step }[] {
-  const order: { tool: string; step: Step }[] = [];
+): { tool: ToolName; step: Step }[] {
+  const order: { tool: ToolName; step: Step }[] = [];
   const toProcess = new Set(missingSteps);
   const processed = new Set<Step>(completedSteps);
   const expansionAttempts = new Map<Step, number>();
@@ -338,7 +475,7 @@ export function getExecutionOrder(
     for (const step of toProcess) {
       const provider = Object.entries(TOOL_GRAPH).find(([_, edge]) =>
         edge.provides?.includes(step),
-      );
+      ) as [ToolName, ToolEdge] | undefined;
 
       if (!provider) {
         throw new Error(`No tool provides step: ${step}`);

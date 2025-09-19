@@ -7,8 +7,8 @@
 
 import * as k8s from '@kubernetes/client-node';
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '@types';
-import { formatErrorMessage } from '@lib/error-utils';
+import { Success, Failure, type Result } from '@/types';
+import { formatErrorMessage } from '@/lib/error-utils';
 
 export interface DeploymentResult {
   ready: boolean;

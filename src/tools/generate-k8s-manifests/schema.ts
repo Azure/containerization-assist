@@ -4,6 +4,7 @@ export const generateK8sManifestsSchema = z.object({
   sessionId: z.string().optional().describe('Session identifier for tracking operations'),
   imageId: z.string().min(1).describe('Docker image to deploy (required)'),
   appName: z.string().min(1).describe('Application name (required)'),
+  path: z.string().describe('Path where the k8s folder should be created'),
   namespace: z.string().default('default').describe('Kubernetes namespace'),
   replicas: z.number().optional().describe('Number of replicas'),
   port: z.number().optional().describe('Application port'),

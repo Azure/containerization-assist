@@ -161,7 +161,8 @@ if [ ! -f "$QUALITY_CONFIG" ]; then
     "baselines": {
       "lint": {
         "errors": 0,
-        "warnings": null
+        "warnings": null,
+        "warningSignatures": []
       },
       "deadcode": {
         "count": null
@@ -189,6 +190,7 @@ fi
 if jq -e '.metrics.baselines' "$QUALITY_CONFIG" &>/dev/null; then
     # New structure
     BASELINE_WARNINGS=$(jq -r '.metrics.baselines.lint.warnings // null' "$QUALITY_CONFIG")
+    BASELINE_WARNING_SIGNATURES_JSON=$(jq -r '.metrics.baselines.lint.warningSignatures // null' "$QUALITY_CONFIG")
     DEADCODE_BASELINE=$(jq -r '.metrics.baselines.deadcode.count // null' "$QUALITY_CONFIG")
 else
     # Old structure fallback
@@ -212,6 +214,9 @@ CURRENT_WARNINGS=$(echo "$LINT_RESULTS" | cut -d' ' -f2)
 CURRENT_ERRORS=$(validate_json_numeric "$CURRENT_ERRORS" "errors")
 CURRENT_WARNINGS=$(validate_json_numeric "$CURRENT_WARNINGS" "warnings")
 
+# Capture current warning signatures (file:line:column:rule:message) for diffing
+CURRENT_WARNING_SIGNATURES=$(echo "$LINT_JSON_OUTPUT" | jq -r '.[] | .filePath as $f | .messages[]? | select(.severity == 1) | "\($f):\(.line // 0):\(.column // 0):\(.ruleId // "unknown"):\(.message | gsub("[\n\r]"; " "))"' 2>/dev/null || echo "")
+
 # Note: We don't store current values in git anymore, only baselines
 # Current values are computed during CI/CD runs
 
@@ -230,11 +235,25 @@ if [ "$BASELINE_WARNINGS" = "null" ] || [ -z "$BASELINE_WARNINGS" ]; then
     BASELINE_WARNINGS="$CURRENT_WARNINGS"
     # Update the baseline in the config file (new structure)
     if jq -e '.metrics.baselines' "$QUALITY_CONFIG" &>/dev/null; then
-        update_json_safely '.metrics.baselines.lint.warnings = ($warnings | tonumber)' \
-           --arg warnings "$CURRENT_WARNINGS"
+        update_json_safely '.metrics.baselines.lint.warnings = ($warnings | tonumber) | .metrics.baselines.lint.warningSignatures = ($sigs | split("\n") | map(select(length>0)))' \
+           --arg warnings "$CURRENT_WARNINGS" \
+           --arg sigs "$CURRENT_WARNING_SIGNATURES"
     else
         update_json_safely '.metrics.lint.baseline = ($warnings | tonumber)' \
            --arg warnings "$CURRENT_WARNINGS"
+    fi
+    BASELINE_WARNING_SIGNATURES_JSON=$(jq -r '.metrics.baselines.lint.warningSignatures // null' "$QUALITY_CONFIG")
+fi
+
+# Backfill legacy baseline warning signatures if absent
+if [ "${BASELINE_WARNING_SIGNATURES_JSON:-null}" = "null" ] && [ "$BASELINE_WARNINGS" != "null" ] && [ -n "$BASELINE_WARNINGS" ]; then
+    if [ "$CURRENT_WARNINGS" -eq "$BASELINE_WARNINGS" ] && [ -n "$CURRENT_WARNING_SIGNATURES" ]; then
+        print_status "INFO" "Backfilling baseline warning signatures (legacy config upgrade)"
+        update_json_safely '.metrics.baselines.lint.warningSignatures = ($sigs | split("\n") | map(select(length>0)))' \
+            --arg sigs "$CURRENT_WARNING_SIGNATURES"
+        BASELINE_WARNING_SIGNATURES_JSON=$(jq -r '.metrics.baselines.lint.warningSignatures // null' "$QUALITY_CONFIG")
+    else
+        print_status "INFO" "Skipping backfill of warning signatures (baseline=$BASELINE_WARNINGS current=$CURRENT_WARNINGS)"
     fi
 fi
 
@@ -250,8 +269,9 @@ if [ "$CURRENT_WARNINGS" -le "$BASELINE_WARNINGS" ] && [ "$CURRENT_WARNINGS" -le
         print_status "PASS" "Warnings reduced by $REDUCTION (${PERCENTAGE}%) - $CURRENT_WARNINGS ≤ $BASELINE_WARNINGS"
         # Auto-update baseline when improved (new structure)
         if jq -e '.metrics.baselines' "$QUALITY_CONFIG" &>/dev/null; then
-            update_json_safely '.metrics.baselines.lint.warnings = ($warnings | tonumber)' \
-               --arg warnings "$CURRENT_WARNINGS"
+            update_json_safely '.metrics.baselines.lint.warnings = ($warnings | tonumber) | .metrics.baselines.lint.warningSignatures = ($sigs | split("\n") | map(select(length>0)))' \
+               --arg warnings "$CURRENT_WARNINGS" \
+               --arg sigs "$CURRENT_WARNING_SIGNATURES"
         else
             update_json_safely '.metrics.lint.baseline = ($warnings | tonumber)' \
                --arg warnings "$CURRENT_WARNINGS"
@@ -266,6 +286,30 @@ else
         print_status "WARN" "Warning count increased by $INCREASE ($CURRENT_WARNINGS > $BASELINE_WARNINGS) - ALLOWED by config"
     else
         print_status "FAIL" "Warning count increased by $INCREASE ($CURRENT_WARNINGS > $BASELINE_WARNINGS) - REGRESSION NOT ALLOWED"
+        # Attempt to diff new warnings vs baseline signatures (if available)
+        if [ "${BASELINE_WARNING_SIGNATURES_JSON:-null}" != "null" ] && [ -n "$CURRENT_WARNING_SIGNATURES" ]; then
+            BASELINE_WARNING_SIGNATURES=$(echo "$BASELINE_WARNING_SIGNATURES_JSON" | jq -r '.[]')
+            # Prepare temp files
+            _tmp_base=$(mktemp)
+            _tmp_curr=$(mktemp)
+            echo "$BASELINE_WARNING_SIGNATURES" | sort > "$_tmp_base"
+            echo "$CURRENT_WARNING_SIGNATURES" | sort > "$_tmp_curr"
+            NEW_WARNING_SIGNATURES=$(comm -13 "$_tmp_base" "$_tmp_curr" || true)
+            if [ -n "$NEW_WARNING_SIGNATURES" ]; then
+                NEW_COUNT=$(echo "$NEW_WARNING_SIGNATURES" | grep -c '.' || echo "0")
+                print_status "INFO" "New ESLint warnings introduced since baseline ($NEW_COUNT):"
+                echo "$NEW_WARNING_SIGNATURES" | head -n 50 | sed 's/^/  • /'
+                if [ "$NEW_COUNT" -gt 50 ]; then
+                    REMAINING=$((NEW_COUNT - 50))
+                    print_status "INFO" "... and $REMAINING more new warnings (showing first 50)"
+                fi
+            else
+                print_status "INFO" "Could not determine specific new warnings (no diff found)"
+            fi
+            rm -f "$_tmp_base" "$_tmp_curr" 2>/dev/null || true
+        else
+            print_status "INFO" "Baseline warning signatures unavailable; cannot list new warnings"
+        fi
         exit 1
     fi
 fi
@@ -299,16 +343,18 @@ echo "-----------------------"
 
 # More robust dead code detection with error handling
 if command -v npx >/dev/null 2>&1 && [ -f "tsconfig.json" ]; then
-    DEADCODE_OUTPUT=$(npx ts-prune --project tsconfig.json 2>/dev/null || echo "")
+    DEADCODE_OUTPUT=$(npx knip 2>/dev/null || echo "")
     if [ -n "$DEADCODE_OUTPUT" ]; then
-        DEADCODE_COUNT=$(echo "$DEADCODE_OUTPUT" | grep -v 'used in module' | wc -l | tr -d ' ' || echo "0")
+        DEADCODE_COUNT=$(echo "$DEADCODE_OUTPUT" | wc -l | tr -d ' ' || echo "0")
+        # write deadcode output to file for inspection
+        echo "$DEADCODE_OUTPUT" > knip-deadcode-output.txt
     else
         DEADCODE_COUNT=0
-        print_status "WARN" "ts-prune failed to run, assuming 0 dead code exports"
+        print_status "WARN" "knip failed to run, assuming 0 dead code exports"
     fi
 else
     DEADCODE_COUNT=0
-    print_status "WARN" "ts-prune or tsconfig.json not available, skipping dead code check"
+    print_status "WARN" "knip not found, skipping dead code check"
 fi
 
 # Ensure numeric value
@@ -350,9 +396,9 @@ if [ "$DEADCODE_COUNT" -le "$DEADCODE_BASELINE" ]; then
 else
     DEADCODE_INCREASE=$((DEADCODE_COUNT - DEADCODE_BASELINE))
     if [ "$ALLOW_REGRESSION" = "true" ]; then
-        print_status "WARN" "Unused exports increased by $DEADCODE_INCREASE ($DEADCODE_COUNT > $DEADCODE_BASELINE) - ALLOWED by config"
+        print_status "WARN" "Unused exports increased by $DEADCODE_INCREASE ($DEADCODE_COUNT > $DEADCODE_BASELINE) - ALLOWED by config - Check knip-deadcode-output.txt changes for details"
     else
-        print_status "FAIL" "Unused exports increased by $DEADCODE_INCREASE ($DEADCODE_COUNT > $DEADCODE_BASELINE) - REGRESSION NOT ALLOWED"
+        print_status "FAIL" "Unused exports increased by $DEADCODE_INCREASE ($DEADCODE_COUNT > $DEADCODE_BASELINE) - REGRESSION NOT ALLOWED - Check knip-deadcode-output.txt changes for details"
         exit 1
     fi
 fi

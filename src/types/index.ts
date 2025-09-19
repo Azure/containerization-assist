@@ -4,24 +4,25 @@
  */
 
 import type { Logger } from 'pino';
-import type { ToolContext } from './mcp/context';
+import type { ToolContext } from '../mcp/context';
 import type { ZodRawShape } from 'zod';
-import type { Result } from './types/core';
+import type { Result } from './core';
+import { ToolName } from '@/exports/tools';
 
 // Export enhanced category types
-export * from './types/categories';
+export * from './categories';
 
 // Export consolidated core types
-export * from './types/core';
+export * from './core';
 
-export type { ToolContext } from './mcp/context';
+export type { ToolContext } from '../mcp/context';
 
 /**
  * Tool definition for MCP server operations.
  */
 export interface Tool {
   /** Unique tool identifier */
-  name: string;
+  name: ToolName;
   /** Human-readable tool description */
   description?: string;
   /** JSON schema for parameter validation */

@@ -4,7 +4,11 @@
 
 import { z } from 'zod';
 
-const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
+const sessionIdSchema = z
+  .string()
+  .describe(
+    'Session identifier for sharing data between tools. Use the sessionId from analyze-repo to leverage detailed analysis results.',
+  );
 
 export const environmentSchema = z
   .enum(['development', 'staging', 'production', 'testing'])
@@ -44,11 +48,12 @@ export const generateDockerfileSchema = z.object({
     .describe('Target platform (e.g., linux/amd64, linux/arm64, windows/amd64)'),
   path: z.string().optional().describe('Repository path (use forward slashes: /path/to/repo)'),
   moduleRoots: z
+  path: z.string().describe('Repository path (use forward slashes: /path/to/repo)'),
+  dockerfileDirectoryPaths: z
     .array(z.string())
-    .min(1)
-    .optional()
+    .nonempty()
     .describe(
-      'List of module root paths for generating separate Dockerfiles (use forward slashes: /path/to/module)',
+      'List of paths in the repository to generate separate Dockerfiles (use forward slashes: /path/to/directory/where/dockerfile/will/be/placed/)',
     ),
 
   // Sampling options

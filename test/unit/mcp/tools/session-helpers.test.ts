@@ -4,19 +4,14 @@
 
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
 import type { Logger } from 'pino';
-import {
-  getSession,
-  completeStep,
-  createSession,
-  updateSession
-} from '@mcp/tool-session-helpers';
-import type { SessionManager } from '@lib/session';
+import { getSession, completeStep, createSession, updateSession } from '@/mcp/tool-session-helpers';
+import type { SessionManager } from '@/lib/session';
 import type { WorkflowState, Result } from '../../../../src/types';
 import { Success, Failure } from '../../../../src/types';
-import type { ToolContext } from '@mcp/context';
+import type { ToolContext } from '@/mcp/context';
 
 // Mock the session module
-jest.mock('@lib/session');
+jest.mock('@/lib/session');
 
 // Mock logger
 const mockLogger: Logger = {
@@ -34,7 +29,7 @@ let sessionManager: jest.Mocked<SessionManager<WorkflowState>>;
 
 beforeEach(() => {
   jest.clearAllMocks();
-  
+
   // Create a fresh mock session manager for each test
   sessionManager = {
     get: jest.fn(),
@@ -43,9 +38,9 @@ beforeEach(() => {
     list: jest.fn(),
     delete: jest.fn(),
   } as any;
-  
+
   // Mock the session module to return our mocked session manager
-  const sessionModule = require('@lib/session');
+  const sessionModule = require('@/lib/session');
   sessionModule.createSessionManager = jest.fn().mockReturnValue(sessionManager);
 });
 
@@ -79,10 +74,12 @@ describe('Session Helpers', () => {
   describe('getSession', () => {
     it('should resolve existing session', async () => {
       // Mock existing session
-      sessionManager.get.mockResolvedValue(Success({
-        ...defaultState,
-        sessionId: 'existing-session'
-      }));
+      sessionManager.get.mockResolvedValue(
+        Success({
+          ...defaultState,
+          sessionId: 'existing-session',
+        }),
+      );
 
       const result = await getSession('existing-session', createContext());
 
@@ -97,11 +94,13 @@ describe('Session Helpers', () => {
     it('should create new session when not found', async () => {
       // Mock session not found
       sessionManager.get.mockResolvedValue(Success(null));
-      sessionManager.create.mockResolvedValue(Success({
-        ...defaultState,
-        sessionId: 'new-session'
-      }));
-      
+      sessionManager.create.mockResolvedValue(
+        Success({
+          ...defaultState,
+          sessionId: 'new-session',
+        }),
+      );
+
       const result = await getSession('new-session', createContext());
 
       expect(result.ok).toBe(true);
@@ -114,11 +113,13 @@ describe('Session Helpers', () => {
 
     it('should generate random session ID when not provided', async () => {
       sessionManager.get.mockResolvedValue(Success(null));
-      sessionManager.create.mockImplementation(async (id) => Success({
-        ...defaultState,
-        sessionId: id
-      }));
-      
+      sessionManager.create.mockImplementation(async (id) =>
+        Success({
+          ...defaultState,
+          sessionId: id,
+        }),
+      );
+
       const result = await getSession(undefined, createContext());
 
       expect(result.ok).toBe(true);
@@ -144,24 +145,26 @@ describe('Session Helpers', () => {
       const existingState = {
         ...defaultState,
         sessionId: 'test-session',
-        completed_steps: ['step1']
+        completed_steps: ['step1'],
       };
 
       sessionManager.get.mockResolvedValue(Success(existingState));
-      sessionManager.update.mockResolvedValue(Success({
-        ...existingState,
-        completed_steps: ['step1', 'step2'],
-        current_step: 'step2'
-      }));
-      
+      sessionManager.update.mockResolvedValue(
+        Success({
+          ...existingState,
+          completed_steps: ['step1', 'step2'],
+          current_step: 'step2',
+        }),
+      );
+
       const result = await completeStep('test-session', 'step2', createContext());
 
       expect(result.ok).toBe(true);
       expect(sessionManager.update).toHaveBeenCalledWith(
         'test-session',
         expect.objectContaining({
-          completed_steps: ['step1', 'step2']
-        })
+          completed_steps: ['step1', 'step2'],
+        }),
       );
     });
 
@@ -169,30 +172,32 @@ describe('Session Helpers', () => {
       const existingState = {
         ...defaultState,
         sessionId: 'test-session',
-        completed_steps: ['step1', 'step2']
+        completed_steps: ['step1', 'step2'],
       };
 
       sessionManager.get.mockResolvedValue(Success(existingState));
-      sessionManager.update.mockResolvedValue(Success({
-        ...existingState,
-        completed_steps: ['step1', 'step2'],
-        current_step: 'step2'
-      }));
-      
+      sessionManager.update.mockResolvedValue(
+        Success({
+          ...existingState,
+          completed_steps: ['step1', 'step2'],
+          current_step: 'step2',
+        }),
+      );
+
       const result = await completeStep('test-session', 'step2', createContext());
 
       expect(result.ok).toBe(true);
       expect(sessionManager.update).toHaveBeenCalledWith(
         'test-session',
         expect.objectContaining({
-          completed_steps: ['step1', 'step2'] // No duplicate
-        })
+          completed_steps: ['step1', 'step2'], // No duplicate
+        }),
       );
     });
 
     it('should fail for non-existent session', async () => {
       sessionManager.get.mockResolvedValue(Success(null));
-      
+
       const result = await completeStep('missing-session', 'step1', createContext());
 
       expect(result.ok).toBe(false);
@@ -204,12 +209,14 @@ describe('Session Helpers', () => {
 
   describe('createSession', () => {
     it('should create new session with initial data', async () => {
-      sessionManager.create.mockResolvedValue(Success({
-        ...defaultState,
-        sessionId: 'new-session',
-        workflow_state: { test: 'data' }
-      }));
-      
+      sessionManager.create.mockResolvedValue(
+        Success({
+          ...defaultState,
+          sessionId: 'new-session',
+          workflow_state: { test: 'data' },
+        }),
+      );
+
       const result = await createSession('new-session', createContext());
 
       expect(result.ok).toBe(true);
@@ -220,11 +227,13 @@ describe('Session Helpers', () => {
     });
 
     it('should generate ID if not provided', async () => {
-      sessionManager.create.mockImplementation(async (id) => Success({
-        ...defaultState,
-        sessionId: id
-      }));
-      
+      sessionManager.create.mockImplementation(async (id) =>
+        Success({
+          ...defaultState,
+          sessionId: id,
+        }),
+      );
+
       const result = await createSession(undefined, createContext());
 
       expect(result.ok).toBe(true);
@@ -239,42 +248,36 @@ describe('Session Helpers', () => {
       const existingState = {
         ...defaultState,
         sessionId: 'test-session',
-        workflow_state: { existing: 'data' }
+        workflow_state: { existing: 'data' },
       };
 
       sessionManager.get.mockResolvedValue(Success(existingState));
-      sessionManager.update.mockResolvedValue(Success({
-        ...existingState,
-        metadata: {
-          ...existingState.metadata,
-          new: 'data'
-        }
-      }));
-      
-      const result = await updateSession(
-        'test-session',
-        { new: 'data' },
-        createContext()
+      sessionManager.update.mockResolvedValue(
+        Success({
+          ...existingState,
+          metadata: {
+            ...existingState.metadata,
+            new: 'data',
+          },
+        }),
       );
+
+      const result = await updateSession('test-session', { new: 'data' }, createContext());
 
       expect(result.ok).toBe(true);
       expect(sessionManager.update).toHaveBeenCalledWith(
         'test-session',
         expect.objectContaining({
-          new: 'data'
-        })
+          new: 'data',
+        }),
       );
     });
 
     it('should handle update failure', async () => {
       sessionManager.get.mockResolvedValue(Success(defaultState));
       sessionManager.update.mockResolvedValue(Failure('Update failed'));
-      
-      const result = await updateSession(
-        'test-session',
-        { test: 'data' },
-        createContext()
-      );
+
+      const result = await updateSession('test-session', { test: 'data' }, createContext());
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -284,12 +287,8 @@ describe('Session Helpers', () => {
 
     it('should fail for non-existent session', async () => {
       sessionManager.get.mockResolvedValue(Success(null));
-      
-      const result = await updateSession(
-        'missing-session',
-        { test: 'data' },
-        createContext()
-      );
+
+      const result = await updateSession('missing-session', { test: 'data' }, createContext());
 
       expect(result.ok).toBe(false);
       if (!result.ok) {

@@ -17,20 +17,20 @@
  * ```
  */
 
-import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
-import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import { extractErrorMessage } from '@lib/error-utils';
-import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
-import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
-import type { SamplingOptions } from '@lib/sampling';
-import { createStandardProgress } from '@mcp/progress-helper';
-import type { ToolContext } from '@mcp/context';
-import type { Logger } from '@lib/logger';
-import { getRecommendedBaseImage } from '@lib/base-images';
-import { Success, Failure, type Result } from '@types';
-import { DEFAULT_PORTS } from '@config/defaults';
-import { stripFencesAndNoise, isValidDockerfileContent } from '@lib/text-processing';
-import { scoreConfigCandidates } from '@lib/integrated-scoring';
+import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { extractErrorMessage } from '@/lib/error-utils';
+import { aiGenerateWithSampling } from '@/mcp/tool-ai-helpers';
+import { enhancePromptWithKnowledge } from '@/lib/ai-knowledge-enhancer';
+import type { SamplingOptions } from '@/lib/sampling';
+import { createStandardProgress } from '@/mcp/progress-helper';
+import type { ToolContext } from '@/mcp/context';
+import type { Logger } from '@/lib/logger';
+import { getRecommendedBaseImage } from '@/lib/base-images';
+import { Success, Failure, type Result } from '@/types';
+import { DEFAULT_PORTS } from '@/config/defaults';
+import { stripFencesAndNoise, isValidDockerfileContent } from '@/lib/text-processing';
+import { scoreConfigCandidates } from '@/lib/integrated-scoring';
 import { fixDockerfileSchema, type FixDockerfileParams } from './schema';
 import { z } from 'zod';
 
@@ -130,6 +130,7 @@ async function attemptAIFix(
   errors: string[] | undefined,
   language: string | undefined,
   framework: string | undefined,
+  frameworkVersion: string | undefined,
   analysis: string | undefined,
   context: ToolContext,
   logger: Logger,
@@ -153,6 +154,7 @@ async function attemptAIFix(
       errors: errors || undefined,
       language: language || undefined,
       framework: framework || undefined,
+      frameworkVersion: frameworkVersion || undefined,
       analysis: analysis || undefined,
     };
     // Filter out undefined values
@@ -389,11 +391,15 @@ async function fixDockerfileImpl(
     const buildError = error ?? buildResult?.error;
     // Get analysis context
     const analysisResult = session?.results?.['analyze_repo'] as
-      | { language?: string; framework?: string }
+      | { language?: string; framework?: string; frameworkVersion?: string }
       | undefined;
     const language = analysisResult?.language;
     const framework = analysisResult?.framework;
-    logger.info({ hasError: !!buildError, language, framework }, 'Analyzing Dockerfile for issues');
+    const frameworkVersion = analysisResult?.frameworkVersion;
+    logger.info(
+      { hasError: !!buildError, language, framework, frameworkVersion },
+      'Analyzing Dockerfile for issues',
+    );
 
     // Score the original Dockerfile
     let originalScore: number | undefined;
@@ -444,6 +450,7 @@ async function fixDockerfileImpl(
         issues, // Use issues parameter if provided
         language,
         framework,
+        frameworkVersion,
         undefined, // Could include analysis summary in future
         toolContext,
         logger,

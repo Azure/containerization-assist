@@ -3,9 +3,9 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '@types';
+import { Success, Failure, type Result } from '@/types';
 import { z } from 'zod';
-import type { ToolContext, SamplingRequest } from '@mcp/context';
+import type { ToolContext, SamplingRequest } from '@/mcp/context';
 import { createParameterSuggestionPrompt } from './prompt-builder';
 import { createSuggestionRegistry, type SuggestionGenerator } from './default-suggestions';
 

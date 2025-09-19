@@ -4,13 +4,9 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import pino from 'pino';
-import { createToolRouter, type ToolRouter } from '@mcp/tool-router';
-import type { Step } from '@mcp/tool-graph';
-import {
-  createMockToolsMap,
-  resetExecutionLog,
-  executionLog,
-} from './fixtures/mock-tools';
+import { createToolRouter, type ToolRouter } from '@/mcp/tool-router';
+import type { Step } from '@/mcp/tool-graph';
+import { createMockToolsMap, resetExecutionLog, executionLog } from './fixtures/mock-tools';
 import { MockSessionManager } from './fixtures/mock-session';
 import { createMockContext } from './fixtures/mock-context';
 
@@ -58,7 +54,7 @@ describe('Automatic Precondition Satisfaction', () => {
       expect(result.executedTools).toContain('resolve_base_images');
 
       // Verify order
-      const toolOrder = executionLog.map(e => e.tool);
+      const toolOrder = executionLog.map((e) => e.tool);
       expect(toolOrder[0]).toBe('analyze_repo');
       expect(toolOrder[1]).toBe('resolve_base_images');
     });
@@ -74,7 +70,7 @@ describe('Automatic Precondition Satisfaction', () => {
       expect(result.result.ok).toBe(true);
 
       // Should run full build chain
-      const toolOrder = executionLog.map(e => e.tool);
+      const toolOrder = executionLog.map((e) => e.tool);
       expect(toolOrder).toContain('analyze_repo');
       expect(toolOrder).toContain('generate_dockerfile');
       expect(toolOrder).toContain('build_image');
@@ -94,7 +90,7 @@ describe('Automatic Precondition Satisfaction', () => {
       expect(result.result.ok).toBe(true);
 
       // Check all prerequisites were satisfied
-      const executedTools = new Set(executionLog.map(e => e.tool));
+      const executedTools = new Set(executionLog.map((e) => e.tool));
       expect(executedTools.has('analyze_repo')).toBe(true);
       expect(executedTools.has('build_image')).toBe(true);
       expect(executedTools.has('prepare_cluster')).toBe(true);
@@ -126,7 +122,7 @@ describe('Automatic Precondition Satisfaction', () => {
       expect(result.result.ok).toBe(true);
 
       // Should not re-run analyze-repo
-      const toolOrder = executionLog.map(e => e.tool);
+      const toolOrder = executionLog.map((e) => e.tool);
       expect(toolOrder).not.toContain('analyze_repo');
 
       // Should run the three branches
@@ -151,7 +147,7 @@ describe('Automatic Precondition Satisfaction', () => {
       expect(result.result.ok).toBe(true);
 
       // Check execution order respects dependencies
-      const toolOrder = executionLog.map(e => e.tool);
+      const toolOrder = executionLog.map((e) => e.tool);
       const analyzeIdx = toolOrder.indexOf('analyze_repo');
       const resolveIdx = toolOrder.indexOf('resolve_base_images');
       const generateIdx = toolOrder.indexOf('generate_dockerfile');
@@ -184,7 +180,7 @@ describe('Automatic Precondition Satisfaction', () => {
       expect(result.result.ok).toBe(true);
 
       // Should not run already completed steps
-      const toolOrder = executionLog.map(e => e.tool);
+      const toolOrder = executionLog.map((e) => e.tool);
       expect(toolOrder).not.toContain('analyze_repo');
       expect(toolOrder).not.toContain('prepare_cluster');
 
@@ -214,7 +210,7 @@ describe('Automatic Precondition Satisfaction', () => {
       expect(result.result.ok).toBe(true);
 
       // Count how many times analyze-repo was run
-      const analyzeCount = executionLog.filter(e => e.tool === 'analyze_repo').length;
+      const analyzeCount = executionLog.filter((e) => e.tool === 'analyze_repo').length;
       expect(analyzeCount).toBe(1);
     });
   });
@@ -222,7 +218,11 @@ describe('Automatic Precondition Satisfaction', () => {
   describe('canExecute checks', () => {
     it('should correctly identify when tool can execute', async () => {
       const sessionResult = await sessionManager.createWithState({
-        completed_steps: ['analyzed_repo', 'resolved_base_images', 'dockerfile_generated'] as Step[],
+        completed_steps: [
+          'analyzed_repo',
+          'resolved_base_images',
+          'dockerfile_generated',
+        ] as Step[],
       });
       expect(sessionResult.ok).toBe(true);
       if (!sessionResult.ok) return;
@@ -274,14 +274,15 @@ describe('Automatic Precondition Satisfaction', () => {
       const completed = new Set<Step>(['analyzed_repo', 'resolved_base_images']);
       const plan = router.getExecutionPlan('build_image', completed);
 
-      expect(plan).toEqual([
-        'generate_dockerfile',
-        'build_image',
-      ]);
+      expect(plan).toEqual(['generate_dockerfile', 'build_image']);
     });
 
     it('should return single tool when all preconditions met', () => {
-      const completed = new Set<Step>(['analyzed_repo', 'resolved_base_images', 'dockerfile_generated']);
+      const completed = new Set<Step>([
+        'analyzed_repo',
+        'resolved_base_images',
+        'dockerfile_generated',
+      ]);
       const plan = router.getExecutionPlan('build_image', completed);
 
       expect(plan).toEqual(['build_image']);
@@ -303,11 +304,11 @@ describe('Automatic Precondition Satisfaction', () => {
       expect(result.result.ok).toBe(true);
 
       // Check that path was passed to analyze-repo
-      const analyzeExec = executionLog.find(e => e.tool === 'analyze_repo');
+      const analyzeExec = executionLog.find((e) => e.tool === 'analyze_repo');
       expect(analyzeExec?.params.path).toBe('./custom-path');
 
       // Check that final params reached build_image
-      const buildExec = executionLog.find(e => e.tool === 'build_image');
+      const buildExec = executionLog.find((e) => e.tool === 'build_image');
       expect(buildExec?.params.imageName).toBe('my-app');
       expect(buildExec?.params.tag).toBe('v1.2.3');
     });
@@ -359,7 +360,7 @@ describe('Automatic Precondition Satisfaction', () => {
       });
 
       // Should not re-run analyze-repo or prepare_cluster
-      const finalTools = executionLog.map(e => e.tool);
+      const finalTools = executionLog.map((e) => e.tool);
       expect(finalTools).not.toContain('analyze_repo');
       expect(finalTools).not.toContain('prepare_cluster');
     });

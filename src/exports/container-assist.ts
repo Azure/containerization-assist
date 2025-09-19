@@ -7,14 +7,13 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as crypto from 'crypto';
 import type { Logger } from 'pino';
 
-import { createSessionManager, type SessionManager } from '@lib/session.js';
-import { createLogger } from '@lib/logger.js';
-import { createToolContext, type ToolContext } from '@mcp/context.js';
-import { createToolRouter, type ToolRouter, type RouterTool } from '@mcp/tool-router.js';
-import { getAllInternalTools } from './tools.js';
-import { extractErrorMessage } from '@lib/error-utils.js';
-import type { Tool, Result } from '@types';
-import type { ToolName } from './tool-names.js';
+import { createSessionManager, type SessionManager } from '@/lib/session.js';
+import { createLogger } from '@/lib/logger.js';
+import { createToolContext, type ToolContext } from '@/mcp/context.js';
+import { createToolRouter, type ToolRouter, type RouterTool } from '@/mcp/tool-router.js';
+import { ToolName, getAllInternalTools } from './tools.js';
+import { extractErrorMessage } from '@/lib/error-utils.js';
+import type { Tool, Result } from '@/types';
 
 /**
  * Tool registration configuration
@@ -107,8 +106,8 @@ export function createContainerAssist(
 /**
  * Load all internal tools into a map
  */
-function loadAllTools(): Map<string, Tool> {
-  const toolsMap = new Map<string, Tool>();
+function loadAllTools(): Map<ToolName, Tool> {
+  const toolsMap = new Map<ToolName, Tool>();
   const internalTools = getAllInternalTools();
 
   for (const tool of internalTools) {
@@ -124,9 +123,9 @@ function loadAllTools(): Map<string, Tool> {
 function createRouter(
   sessionManager: SessionManager,
   logger: Logger,
-  tools: Map<string, Tool>,
+  tools: Map<ToolName, Tool>,
 ): ToolRouter {
-  const routerTools = new Map<string, RouterTool>();
+  const routerTools = new Map<ToolName, RouterTool>();
 
   for (const [name, tool] of tools.entries()) {
     routerTools.set(name, {

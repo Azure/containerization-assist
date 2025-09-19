@@ -1,6 +1,6 @@
 /**
  * Type declarations for the validate-dockerfile npm package
- * Use ValidationResult from @types/consolidated-types instead of the duplicate interface
+ * Use ValidationResult from @/types/consolidated-types instead of the duplicate interface
  */
 declare module 'validate-dockerfile' {
   // Use consolidated ValidationResult type instead

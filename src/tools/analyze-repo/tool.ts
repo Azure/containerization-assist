@@ -19,21 +19,23 @@
  * ```
  */
 
-import { joinPaths, getExtension, safeNormalizePath } from '@lib/path-utils';
 import { promises as fs, constants } from 'node:fs';
-import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
-import { createStandardProgress } from '@mcp/progress-helper';
-import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
-import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
-import { getBaseImageRecommendations } from '@lib/base-images';
-import type { ToolContext } from '@mcp/context';
-import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import { Success, Failure, type Result } from '@types';
+import * as path from 'node:path';
+import { normalizePath } from '@/lib/path-utils';
+import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
+import type { Logger } from '@/lib/logger';
+import { createStandardProgress } from '@/mcp/progress-helper';
+import { aiGenerateWithSampling } from '@/mcp/tool-ai-helpers';
+import { enhancePromptWithKnowledge } from '@/lib/ai-knowledge-enhancer';
+import { getBaseImageRecommendations } from '@/lib/base-images';
+import type { ToolContext } from '@/mcp/context';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { Success, Failure, type Result } from '@/types';
 import { analyzeRepoSchema, type AnalyzeRepoParams } from './schema';
 import { z } from 'zod';
-import { parsePackageJson, getAllDependencies } from '@lib/parsing-package-json';
-import { DEFAULT_PORTS } from '@config/defaults';
-import { extractErrorMessage } from '@lib/error-utils';
+import { parsePackageJson, getAllDependencies } from '@/lib/parsing-package-json';
+import { DEFAULT_PORTS } from '@/config/defaults';
+import { extractErrorMessage } from '@/lib/error-utils';
 
 // Define the result schema for type safety
 const AnalyzeRepoResultSchema = z.object({
@@ -68,7 +70,7 @@ const AnalyzeRepoResultSchema = z.object({
     securityNotes: z.array(z.string()),
   }),
   confidence: z.number(),
-  detectionMethod: z.enum(['signature', 'extension', 'fallback', 'ai-enhanced']),
+  detectionMethod: z.enum(['signature', 'extension', 'provided', 'fallback', 'ai-enhanced']),
   detectionDetails: z.object({
     signatureMatches: z.number(),
     extensionMatches: z.number(),
@@ -82,6 +84,7 @@ const AnalyzeRepoResultSchema = z.object({
     includeTests: z.boolean().optional(),
     aiInsights: z.unknown().optional(),
   }),
+  modules: z.array(z.string()).optional(), // Detected module paths for multi-module projects
 });
 
 // Define the result type from the schema
@@ -98,7 +101,7 @@ const StateSchema = z.object({
 });
 const LANGUAGE_SIGNATURES: Record<string, { extensions: string[]; files: string[] }> = {
   javascript: {
-    extensions: ['', '.mjs', '.cjs'],
+    extensions: ['.js', '.mjs', '.cjs'],
     files: ['package.json', 'node_modules'],
   },
   typescript: {
@@ -196,6 +199,7 @@ interface DetectionDetails {
   extensionMatches: number;
   frameworkSignals: number;
   buildSystemSignals: number;
+  provided?: number;
 }
 
 /**
@@ -209,16 +213,24 @@ function calculateConfidence(
   framework: string | undefined,
   buildSystem: any,
   detectionDetails: DetectionDetails,
-): { confidence: number; method: 'signature' | 'extension' | 'fallback' | 'ai-enhanced' } {
+): {
+  confidence: number;
+  method: 'signature' | 'extension' | 'provided' | 'fallback' | 'ai-enhanced';
+} {
   if (language === 'unknown') {
     return { confidence: 0, method: 'fallback' };
   }
 
   let score = 0;
-  let method: 'signature' | 'extension' | 'fallback' | 'ai-enhanced' = 'fallback';
+  let method: 'signature' | 'extension' | 'provided' | 'fallback' | 'ai-enhanced' = 'fallback';
 
+  // If language was provided by agent give high confidence
+  if (detectionDetails.provided && detectionDetails.provided > 0) {
+    score += 50;
+    method = 'provided';
+  }
   // Language confidence - signature files are stronger indicators
-  if (detectionDetails.signatureMatches > 0) {
+  else if (detectionDetails.signatureMatches > 0) {
     score += 40;
     method = 'signature';
   } else if (detectionDetails.extensionMatches > 0) {
@@ -268,7 +280,10 @@ async function validateRepositoryPath(
  *
  * Trade-off: Prioritizes signature files over extensions for higher accuracy
  */
-async function detectLanguage(repoPath: string): Promise<{
+async function detectLanguage(
+  repoPath: string,
+  providedLanguage: string | undefined,
+): Promise<{
   language: string;
   version?: string;
   detectionDetails: DetectionDetails;
@@ -281,7 +296,7 @@ async function detectLanguage(repoPath: string): Promise<{
     const files = await fs.readdir(dir);
 
     for (const file of files) {
-      const filePath = joinPaths(dir, file);
+      const filePath = path.join(dir, file);
       const stats = await fs.stat(filePath);
       const relativePath = filePath.replace(`${repoPath}/`, '');
 
@@ -297,7 +312,7 @@ async function detectLanguage(repoPath: string): Promise<{
 
   const fileStats = await Promise.all(
     allFiles.map(async (file) => {
-      const filePath = joinPaths(repoPath, file);
+      const filePath = path.join(repoPath, file);
       const stats = await fs.stat(filePath);
       return { name: file, path: filePath, isFile: stats.isFile() };
     }),
@@ -310,10 +325,15 @@ async function detectLanguage(repoPath: string): Promise<{
     buildSystemSignals: 0,
   };
 
+  if (providedLanguage) {
+    detectionDetails.provided = 1;
+    return { language: providedLanguage, detectionDetails, allFiles };
+  }
+
   // Count file extensions
   const extensionCounts: Record<string, number> = {};
   for (const file of fileStats.filter((f) => f.isFile)) {
-    const ext = getExtension(file.name);
+    const ext = path.extname(file.name);
     if (ext) {
       extensionCounts[ext] = (extensionCounts[ext] ?? 0) + 1;
     }
@@ -381,7 +401,7 @@ async function detectFramework(
       const csprojFiles = files.filter((f) => f.endsWith('.csproj'));
       for (const csprojFile of csprojFiles) {
         try {
-          const csprojPath = joinPaths(repoPath, csprojFile);
+          const csprojPath = path.join(repoPath, csprojFile);
           const csprojContent = await fs.readFile(csprojPath, 'utf-8');
 
           // Check for .NET Framework version
@@ -456,6 +476,97 @@ async function detectFramework(
 }
 
 /**
+ * Detects module roots in multi-module projects (Maven, Gradle, Node monorepos)
+ */
+async function detectModuleRoots(
+  repoPath: string,
+  language: string,
+  logger: Logger,
+): Promise<string[]> {
+  // Skip module detection for languages that typically don't have multi-module structures
+  if (
+    language === 'dotnet' ||
+    language === 'python' ||
+    language === 'go' ||
+    language === 'rust' ||
+    language === 'php' ||
+    language === 'ruby'
+  ) {
+    return [];
+  }
+
+  const moduleRoots: string[] = [];
+  const buildFiles =
+    language === 'java'
+      ? ['pom.xml', 'build.gradle', 'build.gradle.kts']
+      : language === 'javascript' || language === 'typescript'
+        ? ['package.json']
+        : [];
+
+  if (buildFiles.length === 0) return [];
+
+  async function scanDirectory(dirPath: string, depth: number = 0): Promise<void> {
+    if (depth > 3) return;
+
+    try {
+      const entries = await fs.readdir(dirPath, { withFileTypes: true });
+
+      for (const buildFile of buildFiles) {
+        const buildFilePath = path.join(dirPath, buildFile);
+        try {
+          // Directly read the file to avoid TOCTOU race condition
+          if (buildFile === 'pom.xml') {
+            const pomContent = await fs.readFile(buildFilePath, 'utf-8');
+            const isParentPom = pomContent.includes('<modules>') && pomContent.includes('<module>');
+            const srcDir = path.join(dirPath, 'src');
+            const hasSrc = await fs
+              .stat(srcDir)
+              .then((stats) => stats.isDirectory())
+              .catch(() => false);
+
+            if (!isParentPom || hasSrc) {
+              const relativePath = path.relative(repoPath, dirPath) || '.';
+              if (!moduleRoots.includes(relativePath)) {
+                moduleRoots.push(relativePath);
+                logger.debug({ moduleRoot: relativePath, buildFile }, 'Found module root');
+              }
+            }
+          } else {
+            // For non-pom.xml files, just check if we can stat the file
+            await fs.stat(buildFilePath);
+            const relativePath = path.relative(repoPath, dirPath) || '.';
+            if (!moduleRoots.includes(relativePath)) {
+              moduleRoots.push(relativePath);
+              logger.debug({ moduleRoot: relativePath, buildFile }, 'Found module root');
+            }
+          }
+          break;
+        } catch {
+          // Build file doesn't exist, continue
+        }
+      }
+
+      for (const entry of entries) {
+        if (
+          entry.isDirectory() &&
+          !entry.name.startsWith('.') &&
+          !['node_modules', 'target', 'build', 'dist', 'out'].includes(entry.name)
+        ) {
+          await scanDirectory(path.join(dirPath, entry.name), depth + 1);
+        }
+      }
+    } catch (error) {
+      logger.debug({ dirPath, error }, 'Error scanning directory for modules');
+    }
+  }
+
+  await scanDirectory(repoPath);
+
+  // Only return if we found multiple modules
+  return moduleRoots.length > 1 ? moduleRoots : [];
+}
+
+/**
  * Detects build system by scanning for configuration files.
  * Provides build and test commands for downstream tools.
  */
@@ -471,6 +582,30 @@ async function detectBuildSystem(repoPath: string): Promise<
 > {
   const files = await fs.readdir(repoPath);
 
+  // Simple check for .NET projects - let AI figure out the details
+  const csprojFile = files.find((f) => f.endsWith('.csproj'));
+  if (csprojFile) {
+    return {
+      type: 'dotnet',
+      file: csprojFile,
+      buildCmd: 'dotnet build',
+      testCmd: 'dotnet test',
+      buildSystemSignals: 1,
+    };
+  }
+
+  const slnFile = files.find((f) => f.endsWith('.sln'));
+  if (slnFile) {
+    return {
+      type: 'dotnet',
+      file: slnFile,
+      buildCmd: 'dotnet build',
+      testCmd: 'dotnet test',
+      buildSystemSignals: 1,
+    };
+  }
+
+  // Check other build systems
   for (const [system, config] of Object.entries(BUILD_SYSTEMS)) {
     if (files.includes(config.file)) {
       return {
@@ -603,11 +738,31 @@ async function analyzeRepoImpl(
   const logger = getToolLogger(context, 'analyze-repo');
   const timer = createToolTimer(logger, 'analyze-repo');
 
-  try {
-    const { path: rawPath = process.cwd(), depth = 3, includeTests = false } = params;
-    const repoPath = safeNormalizePath(rawPath);
+  logger.info(
+    {
+      sessionId: params.sessionId,
+      path: params.path,
+      includeTests: params.includeTests,
+      depth: params.depth,
+      language: params.language,
+    },
+    'Analyze repository input parameters',
+  );
 
-    logger.info({ repoPath, depth, includeTests }, 'Starting repository analysis');
+  try {
+    const { path: rawPath = params.path, depth = 3, includeTests = false, language } = params;
+    const repoPath = normalizePath(rawPath);
+
+    // Validate language parameter if provided
+    if (language && !['java', 'dotnet'].includes(language)) {
+      logger.warn(
+        {
+          providedLanguage: language,
+          supportedLanguages: ['java', 'dotnet'],
+        },
+        'Unsupported language provided',
+      );
+    }
 
     // Progress: Starting analysis
     if (progress) await progress('VALIDATING');
@@ -646,7 +801,7 @@ async function analyzeRepoImpl(
       context.getPrompt !== null;
 
     // Perform analysis
-    const languageInfo = await detectLanguage(repoPath);
+    const languageInfo = await detectLanguage(repoPath, language);
     const frameworkInfo = await detectFramework(
       repoPath,
       languageInfo.language,
@@ -656,6 +811,15 @@ async function analyzeRepoImpl(
     const dependencies = await analyzeDependencies(repoPath, languageInfo.language);
     const ports = await detectPorts(languageInfo.language);
     const dockerInfo = await checkDockerFiles(repoPath);
+
+    // Detect multi-module structure
+    const modules = await detectModuleRoots(repoPath, languageInfo.language, logger);
+    if (modules.length > 0) {
+      logger.info(
+        { modules, language: languageInfo.language },
+        'Detected multi-module project structure',
+      );
+    }
 
     // Get AI insights using standardized helper if available
     let aiInsights: string | undefined;
@@ -770,6 +934,9 @@ async function analyzeRepoImpl(
       extensionMatches: languageInfo.detectionDetails.extensionMatches,
       frameworkSignals: frameworkInfo?.frameworkSignals ?? 0,
       buildSystemSignals: buildSystemRaw?.buildSystemSignals ?? 0,
+      ...(languageInfo.detectionDetails.provided && {
+        provided: languageInfo.detectionDetails.provided,
+      }),
     };
 
     const { confidence, method } = calculateConfidence(
@@ -820,6 +987,7 @@ async function analyzeRepoImpl(
           ),
         }),
       },
+      ...(modules.length > 0 && { modules }), // Include detected modules if multi-module project
     };
 
     // Update typed session slice with output and state

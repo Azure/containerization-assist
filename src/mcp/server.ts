@@ -10,4 +10,4 @@ export {
 } from './server-direct';
 
 // Export types for external use
-export type { Tool, Result, Success, Failure } from '@types';
+export type { Tool, Result, Success, Failure } from '@/types';

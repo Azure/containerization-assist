@@ -17,7 +17,6 @@
     "paths": {
       "@domain/*": ["src/domain/*"],
       "@service/*": ["src/service/*"],
-      "@infrastructure/*": ["src/infrastructure/*"],
       "@api/*": ["src/api/*"],
       "@test/*": ["test/*"]
     }

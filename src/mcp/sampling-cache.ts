@@ -1,5 +1,5 @@
-import { cacheInstances } from '@lib/cache';
-import { createLogger } from '@lib/logger';
+import { cacheInstances } from '@/lib/cache';
+import { createLogger } from '@/lib/logger';
 import { createHash } from 'crypto';
 
 const logger = createLogger().child({ module: 'ai-cache' });

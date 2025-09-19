@@ -50,7 +50,7 @@
 1. **Clean Architecture**: Clear separation between domain logic, application services, and infrastructure
 2. **Result-Based Error Handling**: Consistent `Result<T>` pattern throughout the codebase
 3. **Dependency Injection**: Centralized container for managing dependencies
-4. **Path Aliases**: TypeScript path mapping for clean imports (@app, @mcp, @tools, etc.)
+4. **Path Aliases**: TypeScript path mapping for clean imports (@/app, @/mcp, @/tools, etc.)
 5. **Tool Co-location**: Each tool has its own directory with schema, implementation, and exports
 
 ---
@@ -315,9 +315,9 @@ TypeScript path mapping supports clean imports:
 
 ```typescript
 // ✅ Path aliases (from tsconfig.json)
-import { Config } from '@config/types';
-import { Logger } from '@lib/logger';
-import type { Result } from '@types';
+import { Config } from '@/config/types';
+import { Logger } from '@/lib/logger';
+import type { Result } from '@/types';
 
 // ✅ Relative imports (also acceptable)
 import { Config } from '../config/types';

@@ -13,20 +13,27 @@
  * ```
  */
 
-import { resolvePath, joinPaths, getRelativePath, safeNormalizePath } from '@lib/path-utils';
-import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
+import path from 'path';
+import { normalizePath } from '@/lib/path-utils';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { promises as fs } from 'node:fs';
-import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
-import { createStandardProgress } from '@mcp/progress-helper';
-import type { ToolContext } from '@mcp/context';
-import { createDockerClient, type DockerBuildOptions } from '@lib/docker';
+import {
+  ensureSession,
+  defineToolIO,
+  useSessionSlice,
+  getSessionSlice,
+} from '@/mcp/tool-session-helpers';
+import { createStandardProgress } from '@/mcp/progress-helper';
+import type { ToolContext } from '@/mcp/context';
+import { createDockerClient, type DockerBuildOptions } from '@/lib/docker';
 
-import { type Result, Success, Failure } from '@types';
-import { extractErrorMessage } from '@lib/error-utils';
-import { fileExists } from '@lib/file-utils';
+import { type Result, Success, Failure } from '@/types';
+import { extractErrorMessage } from '@/lib/error-utils';
+import { fileExists } from '@/lib/file-utils';
 import { buildImageSchema, type BuildImageParams } from './schema';
 import { z } from 'zod';
-import type { SessionData } from '@tools/session-types';
+import type { SessionData } from '@/tools/session-types';
+import { analyzeRepoSchema } from '@/tools/analyze-repo/schema';
 
 export interface BuildImageResult {
   /** Whether the build completed successfully */
@@ -78,25 +85,52 @@ const StateSchema = z.object({
 /**
  * Prepare build arguments with defaults
  */
-function prepareBuildArgs(
+async function prepareBuildArgs(
   buildArgs: Record<string, string> = {},
-  session: SessionData | null | undefined,
-): Record<string, string> {
+  sessionId: string,
+  context: ToolContext,
+  logger: any,
+): Promise<Record<string, string>> {
   const defaults: Record<string, string> = {
     NODE_ENV: process.env.NODE_ENV ?? 'production',
     BUILD_DATE: new Date().toISOString(),
     VCS_REF: process.env.GIT_COMMIT ?? 'unknown',
   };
 
-  // Add session-specific args if available
-  const analysisResult = session?.results?.['analyze_repo'] as any;
-  if (analysisResult) {
-    if (analysisResult.language) {
-      defaults.LANGUAGE = analysisResult.language;
+  // Get analysis result from session slice
+  try {
+    // Define the IO for analyze-repo to access its slice
+    const AnalyzeRepoResultSchema = z.object({
+      ok: z.boolean(),
+      sessionId: z.string(),
+      language: z.string(),
+      languageVersion: z.string().optional(),
+      framework: z.string().optional(),
+      frameworkVersion: z.string().optional(),
+    });
+
+    const analyzeRepoIO = defineToolIO(analyzeRepoSchema, AnalyzeRepoResultSchema);
+    const analysisSliceResult = await getSessionSlice(
+      'analyze-repo',
+      sessionId,
+      analyzeRepoIO,
+      context,
+    );
+
+    if (analysisSliceResult.ok && analysisSliceResult.value?.output) {
+      const analysisResult = analysisSliceResult.value.output;
+      if (analysisResult.language) {
+        defaults.LANGUAGE = analysisResult.language;
+      }
+      if (analysisResult.framework) {
+        defaults.FRAMEWORK = analysisResult.framework;
+      }
+      if (analysisResult.frameworkVersion) {
+        defaults.FRAMEWORK_VERSION = analysisResult.frameworkVersion;
+      }
     }
-    if (analysisResult.framework) {
-      defaults.FRAMEWORK = analysisResult.framework;
-    }
+  } catch (error) {
+    logger.debug({ error }, 'Could not get analysis result from session, using defaults');
   }
 
   return { ...defaults, ...buildArgs };
@@ -163,8 +197,8 @@ async function buildImageImpl(
     } = params;
 
     // Normalize paths to handle Windows separators
-    const buildContext = safeNormalizePath(rawBuildPath);
-    const dockerfilePath = rawDockerfilePath ? safeNormalizePath(rawDockerfilePath) : undefined;
+    const buildContext = normalizePath(rawBuildPath);
+    const dockerfilePath = rawDockerfilePath ? normalizePath(rawDockerfilePath) : undefined;
 
     logger.info({ path: buildContext, dockerfile, tags }, 'Starting Docker image build');
 
@@ -198,8 +232,8 @@ async function buildImageImpl(
     const sessionData = session as SessionData;
     const repoPath = buildContext;
     let finalDockerfilePath = dockerfilePath
-      ? resolvePath(repoPath, dockerfilePath)
-      : resolvePath(repoPath, dockerfile);
+      ? path.resolve(repoPath, dockerfilePath)
+      : path.resolve(repoPath, dockerfile);
 
     // Check if we should use a generated Dockerfile
     const dockerfileResult = sessionData?.results?.['generate-dockerfile'] as
@@ -210,7 +244,7 @@ async function buildImageImpl(
     if (!(await fileExists(finalDockerfilePath))) {
       // If the specified Dockerfile doesn't exist, check for generated one
       if (generatedPath) {
-        const resolvedGeneratedPath = resolvePath(repoPath, generatedPath);
+        const resolvedGeneratedPath = path.resolve(repoPath, generatedPath);
         if (await fileExists(resolvedGeneratedPath)) {
           finalDockerfilePath = resolvedGeneratedPath;
           logger.info(
@@ -225,7 +259,7 @@ async function buildImageImpl(
           const dockerfileContent = dockerfileResult?.content;
           if (dockerfileContent) {
             // Use the user-specified dockerfile name (defaults to 'Dockerfile')
-            finalDockerfilePath = joinPaths(repoPath, dockerfile);
+            finalDockerfilePath = path.join(repoPath, dockerfile);
             await fs.writeFile(finalDockerfilePath, dockerfileContent, 'utf-8');
             logger.info(
               { dockerfilePath: finalDockerfilePath },
@@ -241,7 +275,7 @@ async function buildImageImpl(
         const dockerfileContent = dockerfileResult?.content;
         if (dockerfileContent) {
           // Use the user-specified dockerfile name (defaults to 'Dockerfile')
-          finalDockerfilePath = joinPaths(repoPath, dockerfile);
+          finalDockerfilePath = path.join(repoPath, dockerfile);
           await fs.writeFile(finalDockerfilePath, dockerfileContent, 'utf-8');
           logger.info(
             { dockerfilePath: finalDockerfilePath },
@@ -269,7 +303,7 @@ async function buildImageImpl(
     }
 
     // Prepare build arguments
-    const finalBuildArgs = prepareBuildArgs(buildArgs, sessionData);
+    const finalBuildArgs = await prepareBuildArgs(buildArgs, sessionId, context, logger);
 
     // Analyze security
     const securityWarnings = analyzeBuildSecurity(dockerfileContent, finalBuildArgs);
@@ -280,7 +314,7 @@ async function buildImageImpl(
     // Prepare Docker build options
     const buildOptions: DockerBuildOptions = {
       context: repoPath, // Build context is the path parameter
-      dockerfile: getRelativePath(repoPath, finalDockerfilePath), // Dockerfile path relative to context
+      dockerfile: path.relative(repoPath, finalDockerfilePath), // Dockerfile path relative to context
       buildargs: finalBuildArgs,
       ...(_platform !== undefined && { platform: _platform }),
     };

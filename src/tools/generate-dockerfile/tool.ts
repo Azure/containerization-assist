@@ -3,31 +3,36 @@
  * Trade-off: AI quality over speed; fallback templates ensure availability.
  */
 
-// import { extractErrorMessage } from '@lib/error-utils'; // Not currently used
+// import { extractErrorMessage } from '@/lib/error-utils'; // Not currently used
 import { promises as fs } from 'node:fs';
-import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import type { Logger } from '@lib/logger';
-import path from 'node:path';
-import { safeNormalizePath } from '@lib/path-utils';
-import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
-import { createStandardProgress } from '@mcp/progress-helper';
-import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
-import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
-import type { SamplingOptions } from '@lib/sampling';
-
-import type { SessionAnalysisResult } from '@tools/session-types';
-import type { ToolContext } from '@mcp/context';
-import { Success, Failure, type Result } from '@types';
-import { getDefaultPort, ANALYSIS_CONFIG } from '@config/defaults';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import type { Logger } from '@/lib/logger';
+import path from 'path';
+import { normalizePath } from '@/lib/path-utils';
+import {
+  ensureSession,
+  defineToolIO,
+  useSessionSlice,
+  getSessionSlice,
+} from '@/mcp/tool-session-helpers';
+import { createStandardProgress } from '@/mcp/progress-helper';
+import { aiGenerateWithSampling } from '@/mcp/tool-ai-helpers';
+import { enhancePromptWithKnowledge } from '@/lib/ai-knowledge-enhancer';
+import type { SamplingOptions } from '@/lib/sampling';
+import { analyzeRepoSchema } from '@/tools/analyze-repo/schema';
+import type { SessionAnalysisResult } from '@/tools/session-types';
+import type { ToolContext } from '@/mcp/context';
+import { Success, Failure, type Result } from '@/types';
+import { getDefaultPort, ANALYSIS_CONFIG } from '@/config/defaults';
 import { getRecommendedBaseImage, getPlatformForBaseImage } from '@lib/base-images';
 import {
   stripFencesAndNoise,
   isValidDockerfileContent,
   extractBaseImage,
-} from '@lib/text-processing';
+} from '@/lib/text-processing';
 import { generateDockerfileSchema, type GenerateDockerfileParams } from './schema';
 import { z } from 'zod';
-import { AnalyzeRepoResult } from '@tools/analyze-repo/tool';
+import { AnalyzeRepoResult } from '@/tools/analyze-repo/tool';
 
 // Define the result schema for type safety - complex nested structure
 const SingleDockerfileResultSchema = z.object({
@@ -112,6 +117,59 @@ const GenerateDockerfileResultSchema = z.object({
 
 // Define tool IO for type-safe session operations
 const io = defineToolIO(generateDockerfileSchema, GenerateDockerfileResultSchema);
+
+// Define analyze-repo tool IO for accessing its session slice data
+// Note: We need to import the result schema from analyze-repo
+const AnalyzeRepoResultSchema = z.object({
+  ok: z.boolean(),
+  sessionId: z.string(),
+  language: z.string(),
+  languageVersion: z.string().optional(),
+  framework: z.string().optional(),
+  frameworkVersion: z.string().optional(),
+  buildSystem: z
+    .object({
+      type: z.string(),
+      file: z.string(),
+      buildCommand: z.string(),
+      testCommand: z.string().optional(),
+    })
+    .optional(),
+  dependencies: z.array(
+    z.object({
+      name: z.string(),
+      version: z.string().optional(),
+      type: z.string(),
+    }),
+  ),
+  ports: z.array(z.number()),
+  hasDockerfile: z.boolean(),
+  hasDockerCompose: z.boolean(),
+  hasKubernetes: z.boolean(),
+  recommendations: z.object({
+    baseImage: z.string(),
+    buildStrategy: z.enum(['multi-stage', 'single-stage']),
+    securityNotes: z.array(z.string()),
+  }),
+  confidence: z.number(),
+  detectionMethod: z.enum(['signature', 'extension', 'fallback', 'ai-enhanced']),
+  detectionDetails: z.object({
+    signatureMatches: z.number(),
+    extensionMatches: z.number(),
+    frameworkSignals: z.number(),
+    buildSystemSignals: z.number(),
+  }),
+  metadata: z.object({
+    path: z.string(),
+    depth: z.number(),
+    timestamp: z.number(),
+    includeTests: z.boolean().optional(),
+    aiInsights: z.unknown().optional(),
+  }),
+  modules: z.array(z.string()).optional(),
+});
+
+const analyzeRepoIO = defineToolIO(analyzeRepoSchema, AnalyzeRepoResultSchema);
 
 // Tool-specific state schema
 const StateSchema = z.object({
@@ -372,21 +430,38 @@ function generateTemplateDockerfile(
       } else {
         // .NET Core/5+ - Linux containers
         dockerfile = `# Multi-stage build for .NET\n`;
-        dockerfile += `FROM mcr.microsoft.com/dotnet/sdk:8.0 AS builder\n`;
+        dockerfile += `FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build\n`;
         dockerfile += `WORKDIR /src\n\n`;
 
         dockerfile += `# Copy project files\n`;
         dockerfile += `COPY *.csproj ./\n`;
-        dockerfile += `RUN dotnet restore\n\n`;
+        dockerfile += `COPY *.sln ./\n`;
+        dockerfile += `COPY Directory.Build.props* ./\n`;
+        dockerfile += `COPY Directory.Packages.props* ./\n`;
+        dockerfile += `COPY global.json* ./\n`;
+        dockerfile += `RUN dotnet restore --no-cache\n\n`;
 
-        dockerfile += `# Copy source code\n`;
+        dockerfile += `# Copy source code and build\n`;
         dockerfile += `COPY . .\n`;
-        dockerfile += `RUN dotnet publish -c Release -o /app/publish\n\n`;
+        dockerfile += `RUN dotnet publish -c Release -o /app/publish --no-restore --no-self-contained\n\n`;
 
-        dockerfile += `# Runtime stage\n`;
-        dockerfile += `FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine\n`;
-        dockerfile += `WORKDIR /app\n`;
-        dockerfile += `COPY --from=builder /app/publish .\n`;
+        dockerfile += `# Runtime stage with optimized security and performance\n`;
+        dockerfile += `FROM mcr.microsoft.com/dotnet/aspnet:8.0-jammy-chiseled\n`;
+        dockerfile += `WORKDIR /app\n\n`;
+
+        dockerfile += `# Set .NET 8+ environment variables for optimal performance\n`;
+        dockerfile += `ENV ASPNETCORE_ENVIRONMENT=Production \\\n`;
+        dockerfile += `    ASPNETCORE_HTTP_PORTS=8080 \\\n`;
+        dockerfile += `    ASPNETCORE_URLS=http://+:8080 \\\n`;
+        dockerfile += `    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 \\\n`;
+        dockerfile += `    DOTNET_RUNNING_IN_CONTAINER=1 \\\n`;
+        dockerfile += `    DOTNET_EnableDiagnostics=0\n\n`;
+
+        dockerfile += `# Copy published app\n`;
+        dockerfile += `COPY --from=build /app/publish .\n\n`;
+
+        dockerfile += `# Use built-in non-root user (UID 1654)\n`;
+        dockerfile += `USER $APP_UID\n\n`;
       }
       break;
     }
@@ -399,10 +474,16 @@ function generateTemplateDockerfile(
     dockerfile += `RUN addgroup -g 1001 -S appgroup && adduser -u 1001 -S appuser -G appgroup\n`;
     dockerfile += `USER appuser\n\n`;
   }
-  // Expose port
+  // Expose port (use 8080 for .NET 8+ projects)
   if (mainPort) {
+    const isDotNetFramework =
+      language === 'dotnet' &&
+      (framework?.includes('framework') ||
+        framework?.includes('aspnet-webapi') ||
+        framework?.includes('aspnet-mvc'));
+    const exposedPort = language === 'dotnet' && !isDotNetFramework ? 8080 : mainPort;
     dockerfile += `# Expose application port\n`;
-    dockerfile += `EXPOSE ${mainPort}\n\n`;
+    dockerfile += `EXPOSE ${exposedPort}\n\n`;
   }
   // Set entrypoint based on language
   dockerfile += `# Start application\n`;
@@ -631,10 +712,12 @@ function buildArgsFromAnalysis(
   const {
     language = 'unknown',
     framework = '',
+    frameworkVersion = '',
     dependencies = [],
     ports = [],
     buildSystem,
     summary = '',
+    recommendations = {},
   } = analysisResult;
   // Infer package manager from build system
   const packageManager =
@@ -659,6 +742,7 @@ function buildArgsFromAnalysis(
   return {
     language,
     framework,
+    frameworkVersion,
     dependencies: dependencies?.map((d) => d.name || d).join(', ') || '',
     ports: ports?.join(', ') || '',
     summary: summary || `${language} ${framework ? `${framework} ` : ''}application`,
@@ -668,13 +752,15 @@ function buildArgsFromAnalysis(
     buildFile,
     hasWrapper,
     ...(platform && { platform }),
+    // Include analysis recommendations - use 'baseImage' to match prompt template
+    baseImage: recommendations?.baseImage || '',
+    buildStrategy: recommendations?.buildStrategy || '',
+    securityNotes: recommendations?.securityNotes?.join('; ') || '',
     ...(optimization && {
       optimization: typeof optimization === 'string' ? optimization : 'performance',
     }),
   };
 }
-
-// computeHash function removed - was unused after tool wrapper elimination
 
 /**
  * Generates Dockerfile through direct AI analysis when initial detection fails.
@@ -687,40 +773,21 @@ async function generateWithDirectAnalysis(
   context: ToolContext,
   logger: Logger,
 ): Promise<Result<SingleDockerfileResult>> {
-  const rawPath = params.path || '.';
-  const repoPath = safeNormalizePath(rawPath);
-  const normalizedModuleRoot = safeNormalizePath(moduleRoot);
+  if (!params.path) {
+    return Failure(
+      'Repository path is required. Please provide the absolute path to your repository.',
+    );
+  }
+  const repoPath = normalizePath(params.path);
+  const normalizedModuleRoot = normalizePath(moduleRoot);
 
-  // Build comprehensive prompt args for direct analysis
+  // Build comprehensive prompt args using the same rich analysis as high-confidence path
   const promptArgs = {
+    ...buildArgsFromAnalysis(analysisResult, params.optimization),
     repoPath: path.isAbsolute(normalizedModuleRoot)
       ? normalizedModuleRoot
       : path.resolve(path.join(repoPath, normalizedModuleRoot)),
-    detectedLanguage: analysisResult.language !== 'unknown' ? analysisResult.language : undefined,
-    optimization: params.optimization === false ? undefined : params.optimization || 'balanced',
     moduleRoot,
-    // Pass discovered framework info to help AI understand structure
-    ...(analysisResult.framework && { framework: analysisResult.framework }),
-    ...(analysisResult.frameworkVersion && { frameworkVersion: analysisResult.frameworkVersion }),
-    // Add build system info for better context
-    ...(analysisResult.buildSystem && {
-      buildSystem: analysisResult.buildSystem.type,
-      buildFile: analysisResult.buildSystem.buildFile,
-      buildCommand: analysisResult.buildSystem.buildCommand,
-    }),
-    // Add detected dependencies for context
-    ...(analysisResult.dependencies &&
-      analysisResult.dependencies.length > 0 && {
-        dependencies: analysisResult.dependencies
-          .map((d) => d.name || d)
-          .slice(0, 10)
-          .join(', '),
-      }),
-    // Add ports if detected
-    ...(analysisResult.ports &&
-      analysisResult.ports.length > 0 && {
-        ports: analysisResult.ports.join(', '),
-      }),
   };
 
   logger.info(
@@ -733,10 +800,41 @@ async function generateWithDirectAnalysis(
     '🤖 AI Direct Analysis: Asking AI to examine repository files and generate Dockerfile without pre-analysis constraints',
   );
 
+  // Enhance prompt with knowledge context (same as high-confidence path)
+  let enhancedPromptArgs = promptArgs;
+  try {
+    const knowledgeResult = await enhancePromptWithKnowledge(promptArgs, {
+      operation: 'generate_dockerfile',
+      ...(analysisResult.language && { language: analysisResult.language }),
+      ...(analysisResult.framework && { framework: analysisResult.framework }),
+      environment: params.environment ?? 'production',
+      tags: ['dockerfile', 'generation', analysisResult.language, analysisResult.framework].filter(
+        Boolean,
+      ) as string[],
+    });
+
+    if (knowledgeResult.bestPractices && knowledgeResult.bestPractices.length > 0) {
+      enhancedPromptArgs = { ...promptArgs, ...knowledgeResult };
+      logger.info(
+        {
+          practicesCount: knowledgeResult.bestPractices.length,
+          examplesCount: knowledgeResult.examples ? knowledgeResult.examples.length : 0,
+          moduleRoot,
+        },
+        'Enhanced direct analysis with knowledge for module',
+      );
+    }
+  } catch (error) {
+    logger.debug(
+      { error, moduleRoot },
+      'Knowledge enhancement failed for direct analysis, using base prompt',
+    );
+  }
+
   // Use direct analysis prompt
   const aiResult = await aiGenerateWithSampling(logger, context, {
     promptName: 'dockerfile-direct-analysis',
-    promptArgs,
+    promptArgs: enhancedPromptArgs,
     expectation: 'dockerfile',
     maxRetries: 3,
     fallbackBehavior: 'default',
@@ -752,18 +850,18 @@ async function generateWithDirectAnalysis(
       const baseImageUsed = extractBaseImage(cleaned) || params.baseImage || 'node:18-alpine'; // fallback
 
       // Handle moduleRoot path resolution correctly
-      let targetPath: string;
+      let dockerfileTargetPath: string;
       if (path.isAbsolute(normalizedModuleRoot)) {
         // Absolute path - use as-is
-        targetPath = normalizedModuleRoot;
+        dockerfileTargetPath = normalizedModuleRoot;
       } else if (normalizedModuleRoot.startsWith(repoPath)) {
         // moduleRoot already includes repoPath - use as-is to avoid duplication
-        targetPath = normalizedModuleRoot;
+        dockerfileTargetPath = normalizedModuleRoot;
       } else {
         // Relative path - join with repoPath
-        targetPath = path.resolve(path.join(repoPath, normalizedModuleRoot));
+        dockerfileTargetPath = path.resolve(path.join(repoPath, normalizedModuleRoot));
       }
-      const dockerfilePath = path.join(targetPath, 'Dockerfile');
+      const dockerfilePath = path.join(dockerfileTargetPath, 'Dockerfile');
 
       await fs.writeFile(dockerfilePath, cleaned, 'utf-8');
 
@@ -829,18 +927,18 @@ async function generateWithDirectAnalysis(
   }
 
   // Handle template fallback similar to existing logic
-  let targetPath: string;
+  let fallbackTargetPath: string;
   if (path.isAbsolute(normalizedModuleRoot)) {
     // Absolute path - use as-is
-    targetPath = normalizedModuleRoot;
+    fallbackTargetPath = normalizedModuleRoot;
   } else if (normalizedModuleRoot.startsWith(repoPath)) {
     // moduleRoot already includes repoPath - use as-is to avoid duplication
-    targetPath = normalizedModuleRoot;
+    fallbackTargetPath = normalizedModuleRoot;
   } else {
     // Relative path - join with repoPath
-    targetPath = path.resolve(path.join(repoPath, normalizedModuleRoot));
+    fallbackTargetPath = path.resolve(path.join(repoPath, normalizedModuleRoot));
   }
-  const dockerfilePath = path.join(targetPath, 'Dockerfile');
+  const dockerfilePath = path.join(fallbackTargetPath, 'Dockerfile');
 
   await fs.writeFile(dockerfilePath, fallbackResult.value.content, 'utf-8');
 
@@ -893,23 +991,20 @@ async function generateSingleDockerfile(
     samplingOptions.returnAllCandidates = params.returnAllCandidates;
   if (params.useCache !== undefined) samplingOptions.useCache = params.useCache;
 
-  // Prefer AI analysis unless we have extremely high confidence in hardcoded detection
-  const shouldUseAIAnalysis =
-    !analysisResult.confidence ||
-    analysisResult.confidence < ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD ||
-    analysisResult.language === 'unknown' ||
+  // Use direct analysis only as fallback for very low confidence or missing data
+  const shouldUseDirectAnalysis =
     !analysisResult.language ||
-    params.preferAI === true; // Allow explicit AI preference
+    analysisResult.language === 'unknown' ||
+    !analysisResult.confidence ||
+    analysisResult.confidence < 50; // Very low confidence threshold for direct analysis
 
-  if (shouldUseAIAnalysis) {
+  if (shouldUseDirectAnalysis) {
     const reason =
-      params.preferAI === true
-        ? 'AI analysis explicitly requested'
-        : analysisResult.language === 'unknown'
-          ? 'language detection failed (unknown)'
-          : !analysisResult.language
-            ? 'no language detected'
-            : `using AI for better accuracy (confidence: ${analysisResult.confidence}/${ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD})`;
+      analysisResult.language === 'unknown'
+        ? 'language detection failed (unknown)'
+        : !analysisResult.language
+          ? 'no language detected'
+          : `very low confidence (confidence: ${analysisResult.confidence}/50)`;
 
     logger.info(
       {
@@ -920,7 +1015,7 @@ async function generateSingleDockerfile(
         moduleRoot,
         reason,
       },
-      `🤖 AI-FIRST ANALYSIS: ${reason} - AI will examine repository files to generate optimal Dockerfile`,
+      `🔧 DIRECT ANALYSIS: ${reason} - AI will examine repository files directly`,
     );
 
     return await generateWithDirectAnalysis(analysisResult, params, moduleRoot, context, logger);
@@ -932,10 +1027,9 @@ async function generateSingleDockerfile(
       language: analysisResult.language,
       framework: analysisResult.framework,
       detectionMethod: analysisResult.detectionMethod,
-      threshold: ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD,
       moduleRoot,
     },
-    `📋 FALLBACK TO TEMPLATE: Extremely high confidence detection (${analysisResult.confidence}/${ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD}) - using pre-analyzed ${analysisResult.language}${analysisResult.framework ? ` + ${analysisResult.framework}` : ''} templates`,
+    `🤖 AI SAMPLING: Using structured analysis data with AI sampling for optimal Dockerfile generation`,
   );
 
   let dockerfileContent: string;
@@ -955,11 +1049,13 @@ async function generateSingleDockerfile(
     {
       language: promptArgs.language,
       framework: promptArgs.framework,
+      frameworkVersion: analysisResult.frameworkVersion,
+      baseImage: promptArgs.baseImage,
+      buildStrategy: promptArgs.buildStrategy,
       buildSystem: promptArgs.buildSystem,
       buildFile: promptArgs.buildFile,
       buildCommand: promptArgs.buildCommand,
       packageManager: promptArgs.packageManager,
-      hasWrapper: promptArgs.hasWrapper,
     },
     'Prompt arguments being sent to AI',
   );
@@ -1046,23 +1142,27 @@ async function generateSingleDockerfile(
   }
 
   // Determine output path - write to each module root directory
-  const rawPath = params.path || '.';
-  const repoPath = safeNormalizePath(rawPath);
-  const normalizedModuleRoot = safeNormalizePath(moduleRoot);
+  if (!params.path) {
+    return Failure(
+      'Repository path is required. Please provide the absolute path to your repository.',
+    );
+  }
+  const repoPath = normalizePath(params.path);
+  const normalizedModuleRoot = normalizePath(moduleRoot);
 
   // Handle moduleRoot path resolution correctly
-  let targetPath: string;
+  let outputTargetPath: string;
   if (path.isAbsolute(normalizedModuleRoot)) {
     // Absolute path - use as-is
-    targetPath = normalizedModuleRoot;
+    outputTargetPath = normalizedModuleRoot;
   } else if (normalizedModuleRoot.startsWith(repoPath)) {
     // moduleRoot already includes repoPath - use as-is to avoid duplication
-    targetPath = normalizedModuleRoot;
+    outputTargetPath = normalizedModuleRoot;
   } else {
     // Relative path - join with repoPath
-    targetPath = path.resolve(path.join(repoPath, normalizedModuleRoot));
+    outputTargetPath = path.resolve(path.join(repoPath, normalizedModuleRoot));
   }
-  const dockerfilePath = path.join(targetPath, 'Dockerfile');
+  const dockerfilePath = path.join(outputTargetPath, 'Dockerfile');
 
   // Write Dockerfile to disk
   await fs.writeFile(dockerfilePath, dockerfileContent, 'utf-8');
@@ -1135,7 +1235,7 @@ async function generateDockerfileImpl(
       return Failure(sessionResult.error);
     }
 
-    const { id: sessionId, state: session } = sessionResult.value;
+    const { id: sessionId } = sessionResult.value;
     const slice = useSessionSlice('generate-dockerfile', io, context, StateSchema);
 
     if (!slice) {
@@ -1146,47 +1246,110 @@ async function generateDockerfileImpl(
 
     // Record input in session slice
     await slice.patch(sessionId, { input: params });
-    // Get analysis result from session results
-    const rawAnalysisResult = session.results?.['analyze_repo'] as any;
 
-    // Map the analyze-repo result to SessionAnalysisResult format
-    const analysisResult: SessionAnalysisResult | undefined = rawAnalysisResult
-      ? {
-          language: rawAnalysisResult.language,
-          framework: rawAnalysisResult.framework,
-          frameworkVersion: rawAnalysisResult.frameworkVersion,
-          dependencies: rawAnalysisResult.dependencies,
-          ports: rawAnalysisResult.ports,
-          confidence: rawAnalysisResult.confidence,
-          detectionMethod: rawAnalysisResult.detectionMethod,
-          ...(rawAnalysisResult.buildSystem && {
-            buildSystem: {
-              type: rawAnalysisResult.buildSystem.type,
-              buildFile: rawAnalysisResult.buildSystem.file,
-              buildCommand: rawAnalysisResult.buildSystem.buildCommand,
-            },
-          }),
-          summary: rawAnalysisResult.summary,
-        }
-      : undefined;
-    if (!analysisResult) {
+    // Get analysis result from analyze-repo session slice
+    const analyzeRepoSliceResult = await getSessionSlice(
+      'analyze-repo',
+      sessionId,
+      analyzeRepoIO,
+      context,
+    );
+    if (!analyzeRepoSliceResult.ok) {
+      logger.debug(
+        { sessionId, error: analyzeRepoSliceResult.error },
+        'Failed to get analyze-repo session slice',
+      );
       return Failure(
         `Repository must be analyzed first. Please run 'analyze-repo' before 'generate-dockerfile'.`,
       );
     }
 
-    // Auto-detect module roots if not provided
-    let rawModuleRoots: string[];
-    if (params.moduleRoots && params.moduleRoots.length > 0) {
-      rawModuleRoots = params.moduleRoots;
-      logger.info({ providedModuleRoots: params.moduleRoots }, 'Using provided module roots');
-    } else {
-      // Auto-detect modules based on repository analysis
-      const repoPath = safeNormalizePath(params.path || '.');
-      rawModuleRoots = await detectModuleRoots(repoPath, analysisResult.language, logger);
-      logger.info({ detectedModuleRoots: rawModuleRoots }, 'Auto-detected module roots');
+    const analyzeRepoSlice = analyzeRepoSliceResult.value;
+    const rawAnalysisResult = analyzeRepoSlice?.output;
+
+    // Debug: Log what we found in session slice
+    logger.info(
+      {
+        sessionId,
+        hasSlice: !!analyzeRepoSlice,
+        hasOutput: !!rawAnalysisResult,
+        analyzeRepoSliceKeys: analyzeRepoSlice ? Object.keys(analyzeRepoSlice) : [],
+        analysisLanguage: rawAnalysisResult?.language,
+        analysisFramework: rawAnalysisResult?.framework,
+        analysisFrameworkVersion: rawAnalysisResult?.frameworkVersion,
+        analysisRecommendations: rawAnalysisResult?.recommendations,
+      },
+      'Session analysis slice lookup',
+    );
+
+    if (!rawAnalysisResult) {
+      return Failure(
+        `Repository analysis not found in session. Please run 'analyze-repo' before 'generate-dockerfile'.`,
+      );
     }
-    const moduleRoots = rawModuleRoots.map(safeNormalizePath);
+
+    // Map the analyze-repo result to SessionAnalysisResult format
+    const analysisResult: SessionAnalysisResult = {
+      language: rawAnalysisResult.language,
+      ...(rawAnalysisResult.framework && { framework: rawAnalysisResult.framework }),
+      ...(rawAnalysisResult.frameworkVersion && {
+        frameworkVersion: rawAnalysisResult.frameworkVersion,
+      }),
+      dependencies: rawAnalysisResult.dependencies.map((dep) => ({
+        name: dep.name,
+        ...(dep.version && { version: dep.version }),
+      })),
+      ports: rawAnalysisResult.ports,
+      confidence: rawAnalysisResult.confidence,
+      detectionMethod: rawAnalysisResult.detectionMethod,
+      ...(rawAnalysisResult.buildSystem && {
+        buildSystem: {
+          type: rawAnalysisResult.buildSystem.type,
+          buildFile: rawAnalysisResult.buildSystem.file,
+          buildCommand: rawAnalysisResult.buildSystem.buildCommand,
+        },
+      }),
+      summary: `${rawAnalysisResult.language} ${rawAnalysisResult.framework || ''} project`.trim(),
+      // Include recommendations
+      ...(rawAnalysisResult.recommendations && {
+        recommendations: {
+          baseImage: rawAnalysisResult.recommendations.baseImage,
+          buildStrategy: rawAnalysisResult.recommendations.buildStrategy,
+          securityNotes: rawAnalysisResult.recommendations.securityNotes,
+        },
+      }),
+      // Include detected modules
+      ...(rawAnalysisResult.modules && { modules: rawAnalysisResult.modules }),
+    };
+
+    // Determine module roots from analysis or provided paths
+    let rawModuleRoots: string[];
+
+    // First check if analyze-repo detected modules
+    if (analysisResult.modules && analysisResult.modules.length > 0) {
+      rawModuleRoots = analysisResult.modules;
+      logger.info(
+        { modulesFromAnalysis: rawModuleRoots },
+        'Using module roots detected by analyze-repo',
+      );
+    } else if (params.dockerfileDirectoryPaths && params.dockerfileDirectoryPaths.length > 0) {
+      rawModuleRoots = params.dockerfileDirectoryPaths;
+      logger.info(
+        { providedModuleRoots: params.dockerfileDirectoryPaths },
+        'Using provided module roots',
+      );
+    } else {
+      // Fallback: Auto-detect modules based on repository analysis
+      if (!params.path) {
+        return Failure(
+          'Repository path is required. Please provide the absolute path to your repository.',
+        );
+      }
+      const repoPath = normalizePath(params.path);
+      rawModuleRoots = await detectModuleRoots(repoPath, analysisResult.language, logger);
+      logger.info({ detectedModuleRoots: rawModuleRoots }, 'Auto-detected module roots (fallback)');
+    }
+    const moduleRoots = rawModuleRoots.map((r) => normalizePath(r));
 
     if (progress) await progress('EXECUTING');
 

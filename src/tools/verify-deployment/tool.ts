@@ -22,17 +22,17 @@
  * ```
  */
 
-import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
-import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import { extractErrorMessage } from '@lib/error-utils';
-import type { ToolContext } from '@mcp/context';
-import { createKubernetesClient, KubernetesClient } from '@lib/kubernetes';
+import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { extractErrorMessage } from '@/lib/error-utils';
+import type { ToolContext } from '@/mcp/context';
+import { createKubernetesClient, KubernetesClient } from '@/lib/kubernetes';
 
-import { DEFAULT_TIMEOUTS } from '@config/defaults';
-import { Success, Failure, type Result } from '@types';
+import { DEFAULT_TIMEOUTS } from '@/config/defaults';
+import { Success, Failure, type Result } from '@/types';
 import { verifyDeploymentSchema, type VerifyDeploymentParams } from './schema';
 import { z } from 'zod';
-import type { SessionData } from '@tools/session-types';
+import type { SessionData } from '@/tools/session-types';
 
 export interface VerifyDeploymentResult {
   success: boolean;
@@ -310,7 +310,7 @@ async function verifyDeploymentImpl(
 
     // Prepare the result
     const result: VerifyDeploymentResult = {
-      success: true,
+      success: overallStatus === 'healthy',
       sessionId,
       namespace,
       deploymentName,
@@ -355,16 +355,31 @@ async function verifyDeploymentImpl(
     });
 
     timer.end({ deploymentName, ready: health.ready, sessionId });
-    logger.info(
-      {
-        sessionId,
-        deploymentName,
-        namespace,
-        ready: health.ready,
-        healthStatus: overallStatus,
-      },
-      'Kubernetes deployment verification completed',
-    );
+
+    if (overallStatus === 'healthy') {
+      logger.info(
+        {
+          sessionId,
+          deploymentName,
+          namespace,
+          ready: health.ready,
+          healthStatus: overallStatus,
+        },
+        'Kubernetes deployment verification successful - deployment is healthy',
+      );
+    } else {
+      logger.warn(
+        {
+          sessionId,
+          deploymentName,
+          namespace,
+          ready: health.ready,
+          healthStatus: overallStatus,
+          healthChecks: healthChecks.length > 0 ? healthChecks : undefined,
+        },
+        `Kubernetes deployment verification found issues - status: ${overallStatus}`,
+      );
+    }
 
     const enrichedResult = {
       ...result,

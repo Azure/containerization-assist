@@ -1,4 +1,4 @@
-import type { SessionManager } from '@lib/session/session-manager';
+import type { SessionManager } from '@/lib/session/session-manager';
 
 /**
  * Creates a mock implementation for tool-session-helpers module
@@ -26,6 +26,8 @@ export function createToolSessionHelpersMock() {
       };
     }),
     defineToolIO: jest.fn((input: any, output: any) => ({ input, output })),
+    getSessionSlice: jest.fn(),
+    updateSessionSlice: jest.fn(),
   };
 }
 

@@ -34,6 +34,7 @@ jest.mock('../../../src/mcp/tool-session-helpers', () => ({
   ensureSession: jest.fn(),
   defineToolIO: jest.fn(),
   useSessionSlice: jest.fn(),
+  getSessionSlice: jest.fn(),
 }));
 
 // Mock tool helpers
@@ -65,7 +66,7 @@ jest.mock('../../../src/mcp/progress-helper', () => ({
 
 const mockFs = fs as jest.Mocked<typeof fs>;
 const { aiGenerateWithSampling } = require('../../../src/mcp/tool-ai-helpers');
-const { ensureSession, useSessionSlice } = require('../../../src/mcp/tool-session-helpers');
+const { ensureSession, useSessionSlice, getSessionSlice } = require('../../../src/mcp/tool-session-helpers');
 
 describe('generate-dockerfile smart routing', () => {
   const logger = createLogger();
@@ -90,6 +91,12 @@ describe('generate-dockerfile smart routing', () => {
       patch: jest.fn().mockResolvedValue({ ok: true }),
     });
 
+    // Default mock for getSessionSlice - tests will override as needed
+    getSessionSlice.mockResolvedValue({
+      ok: true,
+      value: null  // Default to no existing slice
+    });
+
     // Mock successful AI generation
     aiGenerateWithSampling.mockResolvedValue({
       ok: true,
@@ -107,6 +114,15 @@ describe('generate-dockerfile smart routing', () => {
   });
 
   it('should use template generation for very high confidence detection', async () => {
+    const analyzeRepoResult = {
+      language: 'javascript',
+      framework: 'express',
+      confidence: 96, // Very high confidence (above threshold of 95)
+      detectionMethod: 'signature',
+      dependencies: [{ name: 'express', version: '4.18.0' }],
+      ports: [3000],
+    };
+
     // Override session state for this test
     ensureSession.mockResolvedValueOnce({
       ok: true,
@@ -114,16 +130,20 @@ describe('generate-dockerfile smart routing', () => {
         id: 'test-session',
         state: {
           results: {
-            'analyze_repo': {
-              language: 'javascript',
-              framework: 'express',
-              confidence: 96, // Very high confidence (above threshold of 95)
-              detectionMethod: 'signature',
-              dependencies: [{ name: 'express', version: '4.18.0' }],
-              ports: [3000],
-            },
+            'analyze_repo': analyzeRepoResult,
           },
         }
+      }
+    });
+
+    // Mock getSessionSlice to return the analyze-repo results
+    getSessionSlice.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        input: {},
+        output: analyzeRepoResult,
+        state: {},
+        updatedAt: new Date()
       }
     });
 
@@ -163,6 +183,14 @@ describe('generate-dockerfile smart routing', () => {
   });
 
   it('should use direct analysis for low confidence detection', async () => {
+    const analyzeRepoResult = {
+      language: 'python',
+      confidence: 30, // Low confidence - below threshold
+      detectionMethod: 'extension',
+      dependencies: [],
+      ports: [8000],
+    };
+
     // Override session state for this test
     ensureSession.mockResolvedValueOnce({
       ok: true,
@@ -170,15 +198,20 @@ describe('generate-dockerfile smart routing', () => {
         id: 'test-session',
         state: {
           results: {
-            'analyze_repo': {
-              language: 'python',
-              confidence: 30, // Low confidence - below threshold
-              detectionMethod: 'extension',
-              dependencies: [],
-              ports: [8000],
-            },
+            'analyze_repo': analyzeRepoResult,
           },
         }
+      }
+    });
+
+    // Mock getSessionSlice to return the analyze-repo results
+    getSessionSlice.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        input: {},
+        output: analyzeRepoResult,
+        state: {},
+        updatedAt: new Date()
       }
     });
 
@@ -217,6 +250,14 @@ describe('generate-dockerfile smart routing', () => {
   });
 
   it('should use direct analysis for unknown language', async () => {
+    const analyzeRepoResult = {
+      language: 'unknown',
+      confidence: 0,
+      detectionMethod: 'fallback',
+      dependencies: [],
+      ports: [3000],
+    };
+
     // Override session state for this test
     ensureSession.mockResolvedValueOnce({
       ok: true,
@@ -224,15 +265,20 @@ describe('generate-dockerfile smart routing', () => {
         id: 'test-session',
         state: {
           results: {
-            'analyze_repo': {
-              language: 'unknown',
-              confidence: 0,
-              detectionMethod: 'fallback',
-              dependencies: [],
-              ports: [3000],
-            },
+            'analyze_repo': analyzeRepoResult,
           },
         }
+      }
+    });
+
+    // Mock getSessionSlice to return the analyze-repo results
+    getSessionSlice.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        input: {},
+        output: analyzeRepoResult,
+        state: {},
+        updatedAt: new Date()
       }
     });
 
@@ -272,6 +318,14 @@ describe('generate-dockerfile smart routing', () => {
   });
 
   it('should use direct analysis when confidence is exactly at threshold', async () => {
+    const analyzeRepoResult = {
+      language: 'go',
+      confidence: ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD, // Exactly at threshold
+      detectionMethod: 'signature',
+      dependencies: [],
+      ports: [8080],
+    };
+
     // Override session state for this test
     ensureSession.mockResolvedValueOnce({
       ok: true,
@@ -279,15 +333,20 @@ describe('generate-dockerfile smart routing', () => {
         id: 'test-session',
         state: {
           results: {
-            'analyze_repo': {
-              language: 'go',
-              confidence: ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD, // Exactly at threshold
-              detectionMethod: 'signature',
-              dependencies: [],
-              ports: [8080],
-            },
+            'analyze_repo': analyzeRepoResult,
           },
         }
+      }
+    });
+
+    // Mock getSessionSlice to return the analyze-repo results
+    getSessionSlice.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        input: {},
+        output: analyzeRepoResult,
+        state: {},
+        updatedAt: new Date()
       }
     });
 
@@ -326,6 +385,14 @@ describe('generate-dockerfile smart routing', () => {
   });
 
   it('should include proper prompt args for direct analysis', async () => {
+    const analyzeRepoResult = {
+      language: 'unknown',
+      confidence: 0,
+      detectionMethod: 'fallback',
+      dependencies: [],
+      ports: [],
+    };
+
     // Override session state for this test
     ensureSession.mockResolvedValueOnce({
       ok: true,
@@ -333,15 +400,20 @@ describe('generate-dockerfile smart routing', () => {
         id: 'test-session',
         state: {
           results: {
-            'analyze_repo': {
-              language: 'unknown',
-              confidence: 0,
-              detectionMethod: 'fallback',
-              dependencies: [],
-              ports: [],
-            },
+            'analyze_repo': analyzeRepoResult,
           },
         }
+      }
+    });
+
+    // Mock getSessionSlice to return the analyze-repo results
+    getSessionSlice.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        input: {},
+        output: analyzeRepoResult,
+        state: {},
+        updatedAt: new Date()
       }
     });
 

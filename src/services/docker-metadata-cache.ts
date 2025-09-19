@@ -1,6 +1,6 @@
-import { cacheInstances, type CacheStats } from '@lib/cache';
-import { createLogger } from '@lib/logger';
-import { Result, Success, Failure } from '@types';
+import { cacheInstances, type CacheStats } from '@/lib/cache';
+import { createLogger } from '@/lib/logger';
+import { Result, Success, Failure } from '@/types';
 
 const logger = createLogger().child({ module: 'docker-metadata' });
 

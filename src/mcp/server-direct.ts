@@ -11,12 +11,12 @@ import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { randomUUID } from 'node:crypto';
 import { getSystemStatus, type Dependencies } from '@/container';
 import { createMCPToolContext, type ToolContext } from './context';
-import { extractErrorMessage } from '@lib/error-utils';
+import { extractErrorMessage } from '@/lib/error-utils';
 import { createToolRouter, type ToolRouter } from './tool-router';
 
 // Single unified tool definition structure
 interface ToolDefinition {
-  name: string;
+  name: ToolName;
   description: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   schema: any; // Zod schema object (needs to be any for .shape property)
@@ -24,41 +24,42 @@ interface ToolDefinition {
 }
 
 // Import all tools with their schemas and handlers in one place
-import { analyzeRepo } from '@tools/analyze-repo/tool';
-import { analyzeRepoSchema } from '@tools/analyze-repo/schema';
-import type { Result } from '@types';
-import { generateDockerfile } from '@tools/generate-dockerfile/tool';
-import { generateDockerfileSchema } from '@tools/generate-dockerfile/schema';
-import { buildImage } from '@tools/build-image/tool';
-import { buildImageSchema } from '@tools/build-image/schema';
-import { scanImage } from '@tools/scan/tool';
-import { scanImageSchema } from '@tools/scan/schema';
-import { deployApplication } from '@tools/deploy/tool';
-import { deployApplicationSchema } from '@tools/deploy/schema';
-import { pushImage } from '@tools/push-image/tool';
-import { pushImageSchema } from '@tools/push-image/schema';
-import { tagImage } from '@tools/tag-image/tool';
-import { tagImageSchema } from '@tools/tag-image/schema';
-import { fixDockerfile } from '@tools/fix-dockerfile/tool';
-import { fixDockerfileSchema } from '@tools/fix-dockerfile/schema';
-import { resolveBaseImages } from '@tools/resolve-base-images/tool';
-import { resolveBaseImagesSchema } from '@tools/resolve-base-images/schema';
-import { prepareCluster } from '@tools/prepare-cluster/tool';
-import { prepareClusterSchema } from '@tools/prepare-cluster/schema';
-import { opsTool } from '@tools/ops/tool';
-import { opsToolSchema } from '@tools/ops/schema';
-import { generateK8sManifests } from '@tools/generate-k8s-manifests/tool';
-import { generateK8sManifestsSchema } from '@tools/generate-k8s-manifests/schema';
-import { verifyDeployment } from '@tools/verify-deployment/tool';
-import { verifyDeploymentSchema } from '@tools/verify-deployment/schema';
-import { generateHelmCharts } from '@tools/generate-helm-charts/tool';
-import { generateHelmChartsSchema } from '@tools/generate-helm-charts/schema';
-import { generateAcaManifests } from '@tools/generate-aca-manifests/tool';
-import { generateAcaManifestsSchema } from '@tools/generate-aca-manifests/schema';
-import { convertAcaToK8s } from '@tools/convert-aca-to-k8s/tool';
-import { convertAcaToK8sSchema } from '@tools/convert-aca-to-k8s/schema';
-import { inspectSession } from '@tools/inspect-session/tool';
-import { InspectSessionParamsSchema as inspectSessionSchema } from '@tools/inspect-session/schema';
+import { analyzeRepo } from '@/tools/analyze-repo/tool';
+import { analyzeRepoSchema } from '@/tools/analyze-repo/schema';
+import type { Result } from '@/types';
+import { generateDockerfile } from '@/tools/generate-dockerfile/tool';
+import { generateDockerfileSchema } from '@/tools/generate-dockerfile/schema';
+import { buildImage } from '@/tools/build-image/tool';
+import { buildImageSchema } from '@/tools/build-image/schema';
+import { scanImage } from '@/tools/scan/tool';
+import { scanImageSchema } from '@/tools/scan/schema';
+import { deployApplication } from '@/tools/deploy/tool';
+import { deployApplicationSchema } from '@/tools/deploy/schema';
+import { pushImage } from '@/tools/push-image/tool';
+import { pushImageSchema } from '@/tools/push-image/schema';
+import { tagImage } from '@/tools/tag-image/tool';
+import { tagImageSchema } from '@/tools/tag-image/schema';
+import { fixDockerfile } from '@/tools/fix-dockerfile/tool';
+import { fixDockerfileSchema } from '@/tools/fix-dockerfile/schema';
+import { resolveBaseImages } from '@/tools/resolve-base-images/tool';
+import { resolveBaseImagesSchema } from '@/tools/resolve-base-images/schema';
+import { prepareCluster } from '@/tools/prepare-cluster/tool';
+import { prepareClusterSchema } from '@/tools/prepare-cluster/schema';
+import { opsTool } from '@/tools/ops/tool';
+import { opsToolSchema } from '@/tools/ops/schema';
+import { generateK8sManifests } from '@/tools/generate-k8s-manifests/tool';
+import { generateK8sManifestsSchema } from '@/tools/generate-k8s-manifests/schema';
+import { verifyDeployment } from '@/tools/verify-deployment/tool';
+import { verifyDeploymentSchema } from '@/tools/verify-deployment/schema';
+import { generateHelmCharts } from '@/tools/generate-helm-charts/tool';
+import { generateHelmChartsSchema } from '@/tools/generate-helm-charts/schema';
+import { generateAcaManifests } from '@/tools/generate-aca-manifests/tool';
+import { generateAcaManifestsSchema } from '@/tools/generate-aca-manifests/schema';
+import { convertAcaToK8s } from '@/tools/convert-aca-to-k8s/tool';
+import { convertAcaToK8sSchema } from '@/tools/convert-aca-to-k8s/schema';
+import { inspectSession } from '@/tools/inspect-session/tool';
+import { InspectSessionParamsSchema as inspectSessionSchema } from '@/tools/inspect-session/schema';
+import { ToolName } from '@/exports/tools';
 
 // Unified tool definitions
 const TOOLS: ToolDefinition[] = [
@@ -90,7 +91,7 @@ const TOOLS: ToolDefinition[] = [
     ) => Promise<Result<unknown>>,
   },
   {
-    name: 'scan',
+    name: 'scan_image',
     description: 'Scan image for vulnerabilities',
     schema: scanImageSchema,
     handler: scanImage as (
@@ -293,7 +294,7 @@ export const registerHandlers = async (state: MCPServerState): Promise<void> => 
  */
 export const initializeRouter = (state: MCPServerState): void => {
   // Create tools map for router
-  const tools = new Map<string, import('./tool-router').RouterTool>();
+  const tools = new Map<ToolName, import('./tool-router').RouterTool>();
   for (const tool of TOOLS) {
     tools.set(tool.name, {
       name: tool.name,
@@ -378,12 +379,24 @@ export const createToolHandler = (state: MCPServerState, tool: ToolDefinition) =
       if (result && typeof result === 'object' && 'ok' in result) {
         const typedResult = result;
         if (typedResult.ok) {
+          // Extract sessionId from the result for highlighting
+          const resultValue = typedResult.value as any;
+          const sessionId = resultValue?.sessionId;
+
           const content = [
             {
               type: 'text' as const,
               text: JSON.stringify(typedResult.value, null, 2),
             },
           ];
+
+          // Add session continuation reminder if sessionId exists
+          if (sessionId) {
+            content.push({
+              type: 'text' as const,
+              text: `\n🔗 **SESSION CONTINUATION:** Use sessionId "${sessionId}" in your next tool call to share analysis data`,
+            });
+          }
 
           // Add workflow hint as separate content block if present
           if (routeResult.workflowHint) {

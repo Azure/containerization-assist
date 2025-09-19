@@ -8,7 +8,7 @@ import type { Logger } from 'pino';
 import { createLogger } from './lib/logger';
 import { createSessionManager, SessionManager } from './lib/session';
 import * as promptRegistry from './prompts/registry';
-import { findPromptsDirectory } from '@lib/find-prompts-dir';
+import { findPromptsDirectory } from '@/lib/find-prompts-dir';
 import * as resourceManager from './resources/manager';
 import type { AIService } from './types';
 import { createAppConfig, type AppConfig } from './config/app-config';
@@ -55,21 +55,6 @@ export function createDependencies(config?: AppConfig): Dependencies {
     promptRegistry,
     resourceManager,
   };
-}
-
-/**
- * Create test dependencies with appropriate defaults
- */
-export function createTestDependencies(overrides?: Partial<Dependencies>): Dependencies {
-  const testConfig = createAppConfig();
-  // Apply test-specific settings
-  testConfig.server.logLevel = 'error';
-  testConfig.session.ttl = 60;
-  testConfig.session.maxSessions = 10;
-  testConfig.workspace.maxFileSize = 1024 * 1024; // 1MB
-
-  const base = createDependencies(testConfig);
-  return { ...base, ...overrides };
 }
 
 /**

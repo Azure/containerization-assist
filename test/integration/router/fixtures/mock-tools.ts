@@ -2,7 +2,7 @@
  * Mock tools for router integration testing
  */
 
-import { Success, Failure, type Result } from '@types';
+import { Success, Failure, type Result } from '@/types';
 import { z } from 'zod';
 
 export interface MockToolResult {

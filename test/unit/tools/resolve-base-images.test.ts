@@ -119,13 +119,14 @@ describe('resolveBaseImagesTool', () => {
     mockUpdateSessionData = sessionHelpers.updateSessionData = jest.fn();
     mockResolveSession = sessionHelpers.resolveSession = jest.fn();
     const mockEnsureSession = sessionHelpers.ensureSession;
+    const mockGetSessionSlice = sessionHelpers.getSessionSlice;
 
     // Reset all mocks
     jest.clearAllMocks();
-    
+
     // Setup createTimer to return the mockTimer
     (createTimer as jest.Mock).mockReturnValue(mockTimer);
-    
+
     // Setup default session helper mocks
     mockEnsureSession.mockResolvedValue({
       ok: true,
@@ -147,6 +148,23 @@ describe('resolveBaseImagesTool', () => {
         },
       },
     });
+
+    // Mock getSessionSlice to return analyze-repo results
+    mockGetSessionSlice.mockResolvedValue({
+      ok: true,
+      value: {
+        input: {},
+        output: {
+          language: 'javascript',
+          framework: 'react',
+          packageManager: 'npm',
+          mainFile: 'src/index.js',
+        },
+        state: {},
+        updatedAt: new Date()
+      }
+    });
+
     mockUpdateSession.mockResolvedValue({ ok: true });
     mockUpdateSessionData.mockResolvedValue({ ok: true });
 
@@ -263,6 +281,20 @@ describe('resolveBaseImagesTool', () => {
         },
       });
 
+      // Mock getSessionSlice for Python
+      sessionHelpers.getSessionSlice.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          input: {},
+          output: {
+            language: 'python',
+            framework: 'flask',
+          },
+          state: {},
+          updatedAt: new Date()
+        }
+      });
+
       const pythonMetadata = {
         ...mockImageMetadata,
         name: 'python',
@@ -335,6 +367,12 @@ describe('resolveBaseImagesTool', () => {
             // No analysis result
           },
         },
+      });
+
+      // Mock getSessionSlice to return no analyze-repo results
+      sessionHelpers.getSessionSlice.mockResolvedValueOnce({
+        ok: true,
+        value: null  // No slice found
       });
 
       const mockContext = { sessionManager: mockSessionManager } as any;

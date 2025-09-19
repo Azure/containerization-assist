@@ -5,19 +5,19 @@
  * Following the same patterns as generate-k8s-manifests
  */
 
-import { joinPaths } from '@lib/path-utils';
-import { getToolLogger, createToolTimer } from '@lib/tool-helpers';
-import { extractErrorMessage } from '@lib/error-utils';
+import path from 'path';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { extractErrorMessage } from '@/lib/error-utils';
 import { promises as fs } from 'node:fs';
-import { ensureSession, defineToolIO, useSessionSlice } from '@mcp/tool-session-helpers';
-import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
-import { enhancePromptWithKnowledge } from '@lib/ai-knowledge-enhancer';
-import type { SamplingOptions } from '@lib/sampling';
-import { createStandardProgress } from '@mcp/progress-helper';
-import type { ToolContext } from '@mcp/context';
-import type { SessionData } from '@tools/session-types';
-import { Success, Failure, type Result } from '@types';
-import { stripFencesAndNoise } from '@lib/text-processing';
+import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
+import { aiGenerateWithSampling } from '@/mcp/tool-ai-helpers';
+import { enhancePromptWithKnowledge } from '@/lib/ai-knowledge-enhancer';
+import type { SamplingOptions } from '@/lib/sampling';
+import { createStandardProgress } from '@/mcp/progress-helper';
+import type { ToolContext } from '@/mcp/context';
+import type { SessionData } from '@/tools/session-types';
+import { Success, Failure, type Result } from '@/types';
+import { stripFencesAndNoise } from '@/lib/text-processing';
 import { generateAcaManifestsSchema, type GenerateAcaManifestsParams } from './schema';
 import { z } from 'zod';
 
@@ -490,9 +490,10 @@ async function generateAcaManifestsImpl(
     const manifestContent = JSON.stringify(manifest, null, 2);
 
     // Write manifest to disk - use current directory as base
-    const outputPath = joinPaths('.', 'aca');
+    const outputPath = path.join(params.path, 'aca');
+
     await fs.mkdir(outputPath, { recursive: true });
-    const manifestPath = joinPaths(outputPath, 'app.json');
+    const manifestPath = path.join(outputPath, 'app.json');
     await fs.writeFile(manifestPath, manifestContent, 'utf-8');
 
     // Check for warnings

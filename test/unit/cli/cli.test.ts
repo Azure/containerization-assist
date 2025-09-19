@@ -103,9 +103,7 @@ describe('CLI Interface', () => {
       const content = readFileSync(cliPath, 'utf-8');
       
       expect(content).toContain('validateDockerSocket');
-      expect(content).toContain('defaultDockerSockets');
-      expect(content).toContain('/var/run/docker.sock');
-      expect(content).toContain('colima');
+      expect(content).toContain('autoDetectDockerSocket');
       expect(content).toContain('isSocket');
     });
 

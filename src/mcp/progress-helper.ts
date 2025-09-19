@@ -1,4 +1,4 @@
-import type { ProgressReporter } from '@mcp/context';
+import type { ProgressReporter } from '@/mcp/context';
 
 /**
  * Standardized 4-stage progress pattern for all tools

@@ -1,31 +1,44 @@
 /**
  * Integration tests for knowledge-enhanced AI generation
- * 
+ *
  * Tests the complete pipeline from knowledge loading through AI generation
  * with enhanced prompts.
  */
 
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
-import { createLogger } from '@lib/logger';
-import { aiGenerateWithSampling } from '@mcp/tool-ai-helpers';
-import { loadKnowledgeBase, isKnowledgeLoaded, getKnowledgeStats, getEntriesByTag, getEntryById } from '../../src/knowledge';
-import type { ToolContext } from '@mcp/context';
+import { createLogger } from '@/lib/logger';
+import { aiGenerateWithSampling } from '@/mcp/tool-ai-helpers';
+import {
+  loadKnowledgeBase,
+  isKnowledgeLoaded,
+  getKnowledgeStats,
+  getEntriesByTag,
+  getEntryById,
+} from '../../src/knowledge';
+import type { ToolContext } from '@/mcp/context';
 
 // Mock tool context for testing
 const mockContext: ToolContext = {
   logger: createLogger({ name: 'test' }),
   sampling: {
     createMessage: jest.fn().mockResolvedValue({
-      content: [{ type: 'text', text: 'FROM node:18-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --only=production\nCOPY . .\nUSER node\nEXPOSE 3000\nCMD ["node", "server.js"]' }],
-      metadata: { model: 'test-model' }
-    })
+      content: [
+        {
+          type: 'text',
+          text: 'FROM node:18-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --only=production\nCOPY . .\nUSER node\nEXPOSE 3000\nCMD ["node", "server.js"]',
+        },
+      ],
+      metadata: { model: 'test-model' },
+    }),
   },
   getPrompt: jest.fn().mockResolvedValue({
-    messages: [{
-      role: 'user',
-      content: { type: 'text', text: 'Generate a Dockerfile' }
-    }]
-  })
+    messages: [
+      {
+        role: 'user',
+        content: { type: 'text', text: 'Generate a Dockerfile' },
+      },
+    ],
+  }),
 };
 
 describe('Knowledge Integration Tests', () => {
@@ -42,7 +55,7 @@ describe('Knowledge Integration Tests', () => {
   describe('Knowledge Base Loading', () => {
     test('should load all knowledge packs successfully', async () => {
       const stats = await getKnowledgeStats();
-      
+
       expect(stats.totalEntries).toBeGreaterThan(100); // Should have loaded all packs
       expect(stats.byCategory['dockerfile']).toBeGreaterThan(20);
       expect(stats.byCategory['kubernetes']).toBeGreaterThan(15);
@@ -64,11 +77,11 @@ describe('Knowledge Integration Tests', () => {
     test('should have security-focused entries', () => {
       const securityEntries = getEntriesByTag('security');
       expect(securityEntries.length).toBeGreaterThan(20);
-      
+
       // Check for specific high-priority security entries
       const rootUserEntry = getEntryById('container-root-user');
       const secretsEntry = getEntryById('secrets-in-dockerfile');
-      
+
       expect(rootUserEntry).toBeDefined();
       expect(secretsEntry).toBeDefined();
       expect(rootUserEntry?.severity).toBe('high');
@@ -79,18 +92,18 @@ describe('Knowledge Integration Tests', () => {
   describe('AI Generation with Knowledge Enhancement', () => {
     test('should enhance Node.js Dockerfile generation with knowledge', async () => {
       const logger = createLogger({ name: 'test-nodejs' });
-      
+
       const result = await aiGenerateWithSampling(logger, mockContext, {
         promptName: 'dockerfile-generation',
         promptArgs: {
           language: 'javascript',
           framework: 'express',
           baseImage: 'node:18',
-          optimization: 'production'
+          optimization: 'production',
         },
         expectation: 'dockerfile',
         maxCandidates: 1,
-        enableSampling: false
+        enableSampling: false,
       });
 
       expect(result.ok).toBe(true);
@@ -107,13 +120,13 @@ describe('Knowledge Integration Tests', () => {
           framework: 'express',
           // Should contain enhanced knowledge fields
           bestPractices: expect.any(Array),
-        })
+        }),
       );
     });
 
     test('should gracefully handle knowledge enhancement failures', async () => {
       const logger = createLogger({ name: 'test-error-handling' });
-      
+
       // Create a context with invalid prompt args that might cause knowledge enhancement to fail
       const result = await aiGenerateWithSampling(logger, mockContext, {
         promptName: 'dockerfile-generation',
@@ -123,7 +136,7 @@ describe('Knowledge Integration Tests', () => {
         },
         expectation: 'dockerfile',
         maxCandidates: 1,
-        enableSampling: false
+        enableSampling: false,
       });
 
       // Should still succeed even if knowledge enhancement fails
@@ -137,16 +150,16 @@ describe('Knowledge Integration Tests', () => {
   describe('Cache Integration with Knowledge Enhancement', () => {
     test('should cache knowledge-enhanced responses', async () => {
       const logger = createLogger({ name: 'test-cache' });
-      
+
       const requestArgs = {
         promptName: 'dockerfile-generation',
         promptArgs: {
           language: 'go',
-          optimization: 'size'
+          optimization: 'size',
         },
         expectation: 'dockerfile' as const,
         maxCandidates: 1,
-        enableSampling: false
+        enableSampling: false,
       };
 
       // First request should call AI
@@ -157,7 +170,7 @@ describe('Knowledge Integration Tests', () => {
       jest.clearAllMocks();
       const result2 = await aiGenerateWithSampling(logger, mockContext, requestArgs);
       expect(result2.ok).toBe(true);
-      
+
       // Both results should be valid
       if (result1.ok && result2.ok) {
         expect(result1.value.winner.content).toBeTruthy();

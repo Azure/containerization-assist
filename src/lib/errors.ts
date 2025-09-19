@@ -11,7 +11,7 @@
  * - Result<T> pattern support
  */
 
-import { Result, Failure } from '@types';
+import { Result, Failure } from '@/types';
 
 /**
  * Error codes for standardized error handling

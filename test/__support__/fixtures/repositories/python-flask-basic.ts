@@ -13,14 +13,14 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-@app.route('/')
+@/app.route('/')
 def hello():
     return jsonify({
         'message': 'Hello World!',
         'timestamp': datetime.now().isoformat()
     })
 
-@app.route('/health')
+@/app.route('/health')
 def health():
     return jsonify({
         'status': 'healthy',
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)`,
   'runtime.txt': 'python-3.11.5',
-  'Procfile': 'web: gunicorn app:app',
+  Procfile: 'web: gunicorn app:app',
   '.env.example': `PORT=5000
 FLASK_ENV=production`,
   'README.md': `# Python Flask Basic

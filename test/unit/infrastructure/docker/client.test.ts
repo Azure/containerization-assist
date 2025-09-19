@@ -7,7 +7,7 @@ describe('Docker Client', () => {
     it('should have docker client implementation file', () => {
       const clientPath = join(__dirname, '../../../../src/services/docker-client.ts');
       const content = readFileSync(clientPath, 'utf-8');
-      
+
       expect(content).toContain('createDockerClient');
       expect(content).toContain('DockerClient');
       expect(content).toContain('buildImage');
@@ -19,7 +19,7 @@ describe('Docker Client', () => {
     it('should define proper interface types', () => {
       const clientPath = join(__dirname, '../../../../src/services/docker-client.ts');
       const content = readFileSync(clientPath, 'utf-8');
-      
+
       expect(content).toContain('DockerBuildOptions');
       expect(content).toContain('DockerBuildResult');
       expect(content).toContain('DockerPushResult');
@@ -29,7 +29,7 @@ describe('Docker Client', () => {
     it('should use Result pattern for error handling', () => {
       const clientPath = join(__dirname, '../../../../src/services/docker-client.ts');
       const content = readFileSync(clientPath, 'utf-8');
-      
+
       expect(content).toContain('Result<');
       expect(content).toContain('Success');
       expect(content).toContain('Failure');
@@ -38,9 +38,9 @@ describe('Docker Client', () => {
     it('should integrate with dockerode library', () => {
       const clientPath = join(__dirname, '../../../../src/services/docker-client.ts');
       const content = readFileSync(clientPath, 'utf-8');
-      
+
       expect(content).toContain('dockerode');
-      expect(content).toContain('new Docker()');
+      expect(content).toContain('new Docker(');
     });
   });
 
@@ -48,7 +48,7 @@ describe('Docker Client', () => {
     it('should support build configuration options', () => {
       const clientPath = join(__dirname, '../../../../src/services/docker-client.ts');
       const content = readFileSync(clientPath, 'utf-8');
-      
+
       expect(content).toContain('dockerfile');
       expect(content).toContain('buildargs');
       expect(content).toContain('context');
@@ -58,7 +58,7 @@ describe('Docker Client', () => {
     it('should support logging integration', () => {
       const clientPath = join(__dirname, '../../../../src/services/docker-client.ts');
       const content = readFileSync(clientPath, 'utf-8');
-      
+
       expect(content).toContain('Logger');
       expect(content).toContain('logger.debug');
       expect(content).toContain('logger.info');
@@ -79,14 +79,14 @@ describe('Docker Client', () => {
       it('should import error handling functions from errors module', () => {
         const clientPath = join(__dirname, '../../../../src/services/docker-client.ts');
         const content = readFileSync(clientPath, 'utf-8');
-        
+
         expect(content).toContain("import { extractDockerErrorMessage } from './errors'");
       });
 
       it('should have proper TypeScript interfaces in errors module', () => {
         const errorsPath = join(__dirname, '../../../../src/services/errors.ts');
         const content = readFileSync(errorsPath, 'utf-8');
-        
+
         expect(content).toContain('interface DockerodeError extends Error');
         expect(content).toContain('statusCode?: number');
         expect(content).toContain('json?: Record<string, unknown>');
@@ -97,7 +97,7 @@ describe('Docker Client', () => {
       it('should have type guard for Docker errors in errors module', () => {
         const errorsPath = join(__dirname, '../../../../src/services/errors.ts');
         const content = readFileSync(errorsPath, 'utf-8');
-        
+
         expect(content).toContain('function hasDockerodeProperties(error: Error): error is DockerodeError');
         expect(content).toContain('return (');
       });
@@ -105,7 +105,7 @@ describe('Docker Client', () => {
       it('should have error message extraction function in errors module', () => {
         const errorsPath = join(__dirname, '../../../../src/services/errors.ts');
         const content = readFileSync(errorsPath, 'utf-8');
-        
+
         expect(content).toContain('export function extractDockerErrorMessage');
         expect(content).toContain('message: string;');
         expect(content).toContain('details: Record<string, unknown>;');
@@ -116,7 +116,7 @@ describe('Docker Client', () => {
       it('should contain enhanced progress error handling for buildImage', () => {
         const clientPath = join(__dirname, '../../../../src/services/docker-client.ts');
         const content = readFileSync(clientPath, 'utf-8');
-        
+
         // Verify enhanced followProgress callback is implemented
         expect(content).toContain('Docker build followProgress error');
         expect(content).toContain('errorDetails: details');
@@ -126,7 +126,7 @@ describe('Docker Client', () => {
       it('should contain enhanced progress error handling for pushImage', () => {
         const clientPath = join(__dirname, '../../../../src/services/docker-client.ts');
         const content = readFileSync(clientPath, 'utf-8');
-        
+
         // Verify enhanced followProgress callback is implemented
         expect(content).toContain('Docker push followProgress error');
         expect(content).toContain('Docker push error event received');

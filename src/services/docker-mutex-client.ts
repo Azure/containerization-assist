@@ -4,8 +4,8 @@
 
 import type { Logger } from 'pino';
 import { createHash } from 'crypto';
-import { createKeyedMutex } from '@lib/mutex';
-import { config } from '@config/index';
+import { createKeyedMutex } from '@/lib/mutex';
+import { config } from '@/config/index';
 import {
   createDockerClient as createBaseDockerClient,
   type DockerClient,
@@ -15,7 +15,7 @@ import {
   type DockerPushResult,
   type DockerContainerInfo,
 } from './docker-client';
-import { Failure, type Result } from '@types';
+import { Failure, type Result } from '@/types';
 
 /**
  * Creates a hash key for Docker build operations to prevent concurrent builds
