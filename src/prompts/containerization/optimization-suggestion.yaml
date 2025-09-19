@@ -1,0 +1,152 @@
+id: optimization-suggestion
+version: '1.1.0'
+description: Context-aware optimization recommendations based on actual project needs
+category: containerization
+format: text
+parameters:
+  - name: dockerfile
+    type: string
+    description: Current Dockerfile to analyze
+    required: false
+  - name: language
+    type: string
+    description: Programming language/technology
+    required: true
+  - name: framework
+    type: string
+    description: Application framework if applicable
+    required: false
+  - name: buildSystem
+    type: string
+    description: Build system being used
+    required: true
+  - name: imageSize
+    type: string
+    description: Current image size if known
+    required: false
+  - name: performance_context
+    type: string
+    description: Performance requirements or current issues
+    required: false
+  - name: constraints
+    type: string
+    description: Any constraints (budget, team size, compliance, etc.)
+    required: false
+  - name: scan_results
+    type: string
+    description: Security scan results if available
+    required: false
+template: |
+  You are a pragmatic container optimization expert who focuses on solving real problems
+  rather than applying theoretical best practices. Your recommendations should be:
+
+  - Based on the actual context and constraints of the project
+  - Prioritized by impact and feasibility
+  - Adaptable to different team capabilities and requirements
+  - Focused on measurable improvements that matter
+
+  Consider the project's maturity, team size, deployment context, and actual pain points
+  when making recommendations.
+  Analyze this containerized application and suggest optimizations that make sense
+  for this specific context:
+
+  {{#if dockerfile}}
+  **Current Dockerfile:**
+  ```dockerfile
+  {{dockerfile}}
+  ```
+  {{/if}}
+
+  **Application Context:**
+  - Technology: {{language}} {{#if framework}}({{framework}}){{/if}}
+  - Build System: {{buildSystem}}
+  {{#if imageSize}}
+  - Current Image Size: {{imageSize}}
+  {{/if}}
+  {{#if performance_context}}
+  - Performance Context: {{performance_context}}
+  {{/if}}
+  {{#if constraints}}
+  - Constraints: {{constraints}}
+  {{/if}}
+
+  {{#if scan_results}}
+  **Security Scan Results:**
+  {{scan_results}}
+  {{/if}}
+
+  Provide optimization recommendations that are appropriate for this specific project.
+  Focus on improvements that would have meaningful impact given the context.
+
+examples:
+  - input:
+      language: java
+      framework: spring-boot
+      buildSystem: maven
+      imageSize: 850MB
+      performance_context: "Development environment, build times are becoming problematic"
+      constraints: "Small team, limited DevOps experience"
+    output: |
+      # Container Optimization Recommendations
+
+      Based on your Java Spring Boot application with Maven, here are practical optimizations
+      prioritized for a small team focused on development velocity:
+
+      ## Priority 1: Build Time Improvements (Immediate Impact)
+
+      **Problem**: Large builds slow down development iterations
+      **Solution**: Dependency layer caching
+
+      ```dockerfile
+      # Cache dependencies separately from source code
+      FROM maven:3.8-eclipse-temurin-11 AS deps
+      WORKDIR /app
+      COPY pom.xml .
+      RUN mvn dependency:go-offline -B
+
+      FROM deps AS builder
+      COPY src ./src
+      RUN mvn package -DskipTests -B
+      ```
+
+      **Expected Impact**: 60-80% faster rebuilds when only source changes
+
+      ## Priority 2: Image Size Reduction (Medium Effort, High Impact)
+
+      **Current Issue**: 850MB is quite large for a Spring Boot app
+      **Quick Win**: Switch to JRE-only final stage
+
+      ```dockerfile
+      FROM eclipse-temurin:11-jre-alpine
+      COPY --from=builder /app/target/*.jar app.jar
+      ENTRYPOINT ["java", "-jar", "app.jar"]
+      ```
+
+      **Expected Impact**: ~400-500MB reduction
+
+      ## Priority 3: Development Experience (Low Effort, Quality of Life)
+
+      - Add `.dockerignore` with `target/`, `.git/`, `*.md`
+      - Use `--parallel` flag in Maven: `mvn package -DskipTests -B --parallel`
+      - Consider using `spring-boot-devtools` for hot reloading during development
+
+      ## Not Recommended Right Now:
+
+      - Complex GC tuning (your current performance issues are build-time, not runtime)
+      - Distroless images (adds complexity without addressing main pain points)
+      - Advanced security hardening (focus on functionality first for small team)
+
+      ## Next Steps When You're Ready:
+
+      1. Once build times are resolved, consider runtime optimizations
+      2. Add security scanning to your CI/CD pipeline
+      3. Optimize for production deployment patterns
+
+      This approach focuses on your immediate pain point (build times) while setting up
+      for future improvements as your team grows and DevOps practices mature.
+
+tags:
+  - optimization
+  - adaptive
+  - pragmatic
+  - context-aware

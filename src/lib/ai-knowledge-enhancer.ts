@@ -73,7 +73,7 @@ export async function enhancePromptWithKnowledge(
       // Extract relevant text based on category
       if (category === 'dockerfile' && context.dockerfileContent) {
         text = context.dockerfileContent;
-      } else if (category === 'dockerfile' && context.operation === 'generate_dockerfile') {
+      } else if (category === 'dockerfile' && context.operation === 'generate-dockerfile') {
         // For generation, use language and framework as matching context for knowledge patterns
         const contextParts = [];
         if (context.language) contextParts.push(context.language);
@@ -150,13 +150,13 @@ export async function enhancePromptWithKnowledge(
  */
 function getRelevantCategories(operation: string): Array<'dockerfile' | 'kubernetes' | 'security'> {
   const categoryMap: Record<string, Array<'dockerfile' | 'kubernetes' | 'security'>> = {
-    generate_dockerfile: ['dockerfile', 'security'],
-    fix_dockerfile: ['dockerfile', 'security'],
-    generate_k8s_manifests: ['kubernetes', 'security'],
-    resolve_base_images: ['dockerfile'],
-    analyze_repository: ['dockerfile', 'security'],
-    validate_dockerfile: ['dockerfile', 'security'],
-    validate_k8s: ['kubernetes', 'security'],
+    'generate-dockerfile': ['dockerfile', 'security'],
+    'fix-dockerfile': ['dockerfile', 'security'],
+    'generate-k8s-manifests': ['kubernetes', 'security'],
+    'resolve-base-images': ['dockerfile'],
+    'analyze-repo': ['dockerfile', 'security'],
+    'validate-dockerfile': ['dockerfile', 'security'],
+    'validate-k8s': ['kubernetes', 'security'],
   };
 
   return categoryMap[operation] || ['dockerfile', 'kubernetes', 'security'];
@@ -208,4 +208,43 @@ export async function getSecurityKnowledge(
     logger.warn({ error }, 'Failed to get security knowledge');
     return [];
   }
+}
+
+/**
+ * Format knowledge matches with prominent reason display for LLM context
+ * This provides better visibility into why each knowledge item was matched
+ */
+export function formatKnowledgeContext(knowledge: KnowledgeMatch[]): string {
+  if (!knowledge || knowledge.length === 0) {
+    return '';
+  }
+
+  const contextBlocks = knowledge.map((match) => {
+    const id = match.entry.id;
+    const category = match.entry.category;
+    const score = match.score.toFixed(2);
+    const reasons = match.reasons.join(', ');
+    const content = match.entry.recommendation;
+    const example = match.entry.example;
+    const severity = match.entry.severity || 'medium';
+    const description = match.entry.description || `${category} best practice`;
+
+    let block = `## Relevant Knowledge: ${description}
+**ID:** ${id}
+**Category:** ${category}
+**Relevance Score:** ${score}
+**Why this matches:** ${reasons}
+**Severity:** ${severity}
+
+${content}`;
+
+    if (example) {
+      block += `\n\n### Example:\n\`\`\`\n${example}\n\`\`\``;
+    }
+
+    return block;
+  });
+
+  return `### Knowledge Context
+${contextBlocks.join('\n---\n')}`;
 }

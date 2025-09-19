@@ -10,9 +10,10 @@
 
 import type { Logger } from 'pino';
 import { z } from 'zod';
-import { Success, Failure, type Result } from '@/types';
-import type { ToolContext, SamplingRequest, SamplingResponse } from '@/mcp/context';
-import { extractErrorMessage, formatErrorMessage } from './error-utils';
+import { Success, Failure, type Result } from '@types';
+import type { ToolContext, SamplingRequest, SamplingResponse } from '@mcp/context';
+import { extractErrorMessage } from './error-utils';
+import { safeJsonParse } from './parsing-utils';
 
 // ============================================================================
 // Core Types and Interfaces
@@ -56,7 +57,7 @@ export interface ParameterSuggestionResponse {
 }
 
 // ============================================================================
-// Default Parameter Generators (simplified from default-suggestions.ts)
+// Default Parameter Generators (from default-suggestions.ts)
 // ============================================================================
 
 const DEFAULT_SUGGESTIONS: Record<string, (params: Record<string, unknown>) => unknown> = {
@@ -111,13 +112,13 @@ function validateResponse(
       }
       return Success(trimmed);
 
-    case 'json':
-      try {
-        JSON.parse(trimmed);
-        return Success(trimmed);
-      } catch (error) {
-        return Failure(formatErrorMessage('Invalid JSON', error));
+    case 'json': {
+      const parseResult = safeJsonParse(trimmed);
+      if (!parseResult.ok) {
+        return Failure(`Invalid JSON: ${parseResult.error}`);
       }
+      return Success(trimmed);
+    }
 
     case 'text':
     default:
@@ -345,12 +346,16 @@ export async function suggestMissingParameters(
         const content = extractContent(response);
 
         if (content) {
-          try {
-            const aiSuggestions = JSON.parse(content);
+          const parseResult = safeJsonParse(content);
+          if (parseResult.ok) {
+            const aiSuggestions = parseResult.value;
             Object.assign(suggestions, aiSuggestions);
             logger.debug({ aiSuggestions, stillMissing }, 'AI generated additional suggestions');
-          } catch (parseError) {
-            logger.warn({ parseError, content }, 'Failed to parse AI suggestions as JSON');
+          } else {
+            logger.warn(
+              { error: parseResult.error, content },
+              'Failed to parse AI suggestions as JSON',
+            );
           }
         }
       } catch (error) {

@@ -69,7 +69,7 @@
       "variants": ["semantic", "git-based", "custom"],
       "fixtures": ["version-tags", "environment-tags"]
     },
-    "verify-deployment": {
+    "verify-deploy": {
       "description": "Deployment verification results",
       "variants": ["success", "partial", "failure"],
       "fixtures": ["k8s-healthy", "k8s-unhealthy", "service-checks"]
@@ -88,7 +88,7 @@
     },
     "deployment-pipeline": {
       "description": "End-to-end deployment workflow",
-      "steps": ["analyze-repo", "generate-k8s-manifests", "prepare-cluster", "deploy", "verify-deployment"],
+      "steps": ["analyze-repo", "generate-k8s-manifests", "prepare-cluster", "deploy", "verify-deploy"],
       "fixtures": ["web-app-deployment", "microservices-deployment"]
     },
     "security-scanning": {

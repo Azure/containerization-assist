@@ -169,7 +169,7 @@ describe('prepareCluster', () => {
         logger: mockLogger,
         sessionManager: mockSessionManager,
       } as any;
-      const result = await prepareCluster(config, mockContext);
+      const result = await prepareCluster.execute(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -199,7 +199,7 @@ describe('prepareCluster', () => {
         logger: mockLogger,
         sessionManager: mockSessionManager,
       } as any;
-      const result = await prepareCluster(config, mockContext);
+      const result = await prepareCluster.execute(config, mockContext);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -219,7 +219,7 @@ describe('prepareCluster', () => {
         logger: mockLogger,
         sessionManager: mockSessionManager,
       } as any;
-      const result = await prepareCluster(config, mockContext);
+      const result = await prepareCluster.execute(config, mockContext);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -234,7 +234,7 @@ describe('prepareCluster', () => {
         logger: mockLogger,
         sessionManager: mockSessionManager,
       } as any;
-      const result = await prepareCluster(config, mockContext);
+      const result = await prepareCluster.execute(config, mockContext);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -263,7 +263,7 @@ describe('prepareCluster', () => {
         logger: mockLogger,
         sessionManager: mockSessionManager,
       } as any;
-      const result = await prepareCluster(config, mockContext);
+      const result = await prepareCluster.execute(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -279,7 +279,7 @@ describe('prepareCluster', () => {
         logger: mockLogger,
         sessionManager: mockSessionManager,
       } as any;
-      const result = await prepareCluster(config, mockContext);
+      const result = await prepareCluster.execute(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -308,14 +308,30 @@ describe('prepareCluster', () => {
       mockK8sClient.namespaceExists.mockResolvedValue(true);
       mockK8sClient.checkPermissions.mockResolvedValue(true);
 
+      // Create a mock for the slice's patch function
+      const mockPatch = jest.fn().mockResolvedValue({ ok: true });
+      mockUseSessionSlice.mockReturnValue({
+        get: jest.fn().mockResolvedValue({ ok: true, value: null }),
+        set: jest.fn().mockResolvedValue({ ok: true }),
+        patch: mockPatch,
+      });
+
       const mockContext = {
         logger: mockLogger,
         sessionManager: mockSessionManager,
       } as any;
-      await prepareCluster(config, mockContext);
+      await prepareCluster.execute(config, mockContext);
 
-      // Verify session was retrieved/created (using ensureSession now)
-      expect(mockEnsureSession).toHaveBeenCalledWith(mockContext, 'test-session-123');
+      // Verify the slice's patch was called with results
+      expect(mockPatch).toHaveBeenCalledWith(
+        'test-session-123',
+        expect.objectContaining({
+          output: expect.objectContaining({
+            clusterReady: true,
+            namespace: 'test-namespace',
+          })
+        })
+      );
     });
   });
 });

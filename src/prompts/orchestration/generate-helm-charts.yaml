@@ -1,0 +1,125 @@
+id: generate-helm-charts
+version: '1.0.0'
+description: Generate production-ready Helm charts for Kubernetes applications
+category: orchestration
+format: text
+parameters:
+  - name: applicationName
+    type: string
+    required: false
+    description: Name of the application
+  - name: image
+    type: string
+    required: false
+    description: Docker image to deploy
+  - name: namespace
+    type: string
+    required: false
+    description: Kubernetes namespace
+  - name: replicas
+    type: number
+    required: false
+    description: Number of replicas
+  - name: port
+    type: number
+    required: false
+    description: Application port
+  - name: environment
+    type: string
+    required: false
+    description: Environment (dev/staging/production)
+  - name: resources
+    type: string
+    required: false
+    description: Resource requirements
+  - name: ingress
+    type: string
+    required: false
+    description: Ingress configuration
+  - name: persistence
+    type: string
+    required: false
+    description: Persistence requirements
+  - name: configMaps
+    type: string
+    required: false
+    description: ConfigMap definitions
+  - name: secrets
+    type: string
+    required: false
+    description: Secret definitions
+  - name: healthChecks
+    type: string
+    required: false
+    description: Health check configuration
+  - name: autoscaling
+    type: string
+    required: false
+    description: Autoscaling configuration
+  - name: requirements
+    type: string
+    required: false
+    description: Additional requirements
+template: |
+  You are a Helm chart expert who creates production-ready Kubernetes deployment configurations.
+
+  Generate a comprehensive Helm chart for the following application:
+
+  {{#applicationName}}**Application Name:** {{applicationName}}{{/applicationName}}
+  {{#image}}**Docker Image:** {{image}}{{/image}}
+  {{#namespace}}**Namespace:** {{namespace}}{{/namespace}}
+  {{#replicas}}**Replicas:** {{replicas}}{{/replicas}}
+  {{#port}}**Port:** {{port}}{{/port}}
+  {{#environment}}**Environment:** {{environment}}{{/environment}}
+  {{#resources}}**Resources:** {{resources}}{{/resources}}
+  {{#ingress}}**Ingress Configuration:** {{ingress}}{{/ingress}}
+  {{#persistence}}**Persistence Requirements:** {{persistence}}{{/persistence}}
+  {{#configMaps}}**ConfigMaps:** {{configMaps}}{{/configMaps}}
+  {{#secrets}}**Secrets:** {{secrets}}{{/secrets}}
+  {{#healthChecks}}**Health Checks:** {{healthChecks}}{{/healthChecks}}
+  {{#autoscaling}}**Autoscaling:** {{autoscaling}}{{/autoscaling}}
+  {{#requirements}}**Additional Requirements:** {{requirements}}{{/requirements}}
+
+  Generate a production-ready Helm chart with the following structure as JSON:
+  {
+    "chartName": "string",
+    "chartVersion": "string",
+    "apiVersion": "v2",
+    "description": "string",
+    "values": {
+      // Default values.yaml content
+    },
+    "templates": {
+      "deployment.yaml": "string - full deployment template",
+      "service.yaml": "string - full service template",
+      "ingress.yaml": "string - full ingress template if needed",
+      "configmap.yaml": "string - configmap if needed",
+      "secret.yaml": "string - secret template if needed",
+      "hpa.yaml": "string - horizontal pod autoscaler if needed",
+      "pvc.yaml": "string - persistent volume claim if needed"
+    },
+    "helpers": "string - template helpers (_helpers.tpl)",
+    "notes": "string - NOTES.txt content",
+    "recommendations": [
+      {
+        "category": "security|performance|reliability|cost",
+        "suggestion": "string",
+        "priority": "high|medium|low"
+      }
+    ]
+  }
+
+  Best Practices to Follow:
+  1. Use semantic versioning for chart version
+  2. Include comprehensive labels and selectors
+  3. Parameterize all environment-specific values
+  4. Include resource limits and requests
+  5. Add health checks and readiness probes
+  6. Use secrets for sensitive data
+  7. Include network policies if security is important
+  8. Add pod disruption budgets for high availability
+  9. Include proper RBAC if needed
+  10. Use init containers for setup tasks
+
+  Ensure all YAML in templates is valid and production-ready.
+  Include comments explaining key configuration choices.

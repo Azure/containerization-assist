@@ -1,0 +1,196 @@
+id: jvm-analysis
+version: '2.1.0'
+description: Context-aware JVM project analysis focused on practical containerization
+category: analysis
+format: json
+parameters:
+  - name: file_list
+    type: string
+    description: List of files in the repository
+    required: true
+  - name: config_files
+    type: string
+    description: Content of configuration files
+    required: true
+  - name: build_files_content
+    type: string
+    description: Content of build files (pom.xml, build.gradle, etc.)
+    required: true
+  - name: directory_structure
+    type: string
+    description: Directory structure of the repository
+    required: true
+template: |
+  You are a JVM ecosystem expert who understands that every project has its own
+  characteristics and constraints. Your analysis should be practical and focused
+  on what will actually help with containerization.
+
+  Consider:
+  - The apparent maturity and complexity of the project
+  - What the project is actually trying to achieve
+  - The team's likely experience level based on the project structure
+  - Practical trade-offs between different approaches
+
+  Focus on actionable insights rather than exhaustive catalogs.
+
+  Analyze this JVM project to provide practical containerization guidance:
+
+  **File Structure:**
+  {{file_list}}
+
+  **Configuration Files:**
+  {{config_files}}
+
+  **Build Files Content:**
+  {{build_files_content}}
+
+  **Directory Structure:**
+  {{directory_structure}}
+
+  Based on what you can observe about this project, provide an analysis that helps
+  with containerization decisions. Focus on what's actually relevant and determinable
+  from the available information.
+
+  Provide your analysis in JSON format, including only information that's clearly
+  evident or reasonably inferred from the project structure:
+
+  {
+    "project_assessment": {
+      "confidence_level": "high|medium|low",
+      "primary_language": "java|kotlin|scala|mixed",
+      "jvm_target": "detected or recommended JVM version",
+      "project_complexity": "simple|moderate|complex",
+      "apparent_purpose": "description of what this project seems to do"
+    },
+    "framework_analysis": {
+      "primary_framework": "detected framework or null",
+      "framework_version": "version if determinable",
+      "application_type": "web|batch|library|microservice|monolith|cli|other",
+      "key_characteristics": ["notable aspects that affect containerization"]
+    },
+    "build_system": {
+      "type": "maven|gradle|sbt|other",
+      "containerization_readiness": "ready|needs_work|unknown",
+      "recommended_optimizations": ["practical build improvements for containers"]
+    },
+    "containerization_recommendations": {
+      "complexity_level": "simple|moderate|advanced",
+      "recommended_strategy": "description of the most appropriate approach",
+      "base_image_recommendation": "specific recommendation with rationale",
+      "jvm_configuration": {
+        "memory_considerations": "guidance for this specific project",
+        "startup_optimizations": "relevant startup improvements",
+        "runtime_tuning": "practical runtime settings"
+      }
+    },
+    "practical_next_steps": [
+      "ordered list of actionable steps for containerizing this project"
+    ],
+    "potential_challenges": [
+      "specific issues this project might face during containerization"
+    ],
+    "notes": "any important observations or context-specific advice"
+  }
+
+examples:
+  - input:
+      file_list: |
+        pom.xml
+        src/main/java/com/example/Application.java
+        src/main/java/com/example/controller/UserController.java
+        src/main/resources/application.yml
+        src/test/java/com/example/ApplicationTest.java
+      build_files_content: |
+        === pom.xml ===
+        <project>
+          <groupId>com.example</groupId>
+          <artifactId>demo-app</artifactId>
+          <version>1.0.0</version>
+          <parent>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-parent</artifactId>
+            <version>2.7.2</version>
+          </parent>
+          <dependencies>
+            <dependency>
+              <groupId>org.springframework.boot</groupId>
+              <artifactId>spring-boot-starter-web</artifactId>
+            </dependency>
+          </dependencies>
+        </project>
+      config_files: |
+        === application.yml ===
+        server:
+          port: 8080
+        spring:
+          application:
+            name: demo-app
+      directory_structure: |
+        pom.xml
+        src/
+          main/
+            java/com/example/
+              Application.java
+              controller/UserController.java
+            resources/application.yml
+          test/java/com/example/ApplicationTest.java
+    output: |
+      {
+        "project_assessment": {
+          "confidence_level": "high",
+          "primary_language": "java",
+          "jvm_target": "11",
+          "project_complexity": "simple",
+          "apparent_purpose": "Basic Spring Boot REST API with user management functionality"
+        },
+        "framework_analysis": {
+          "primary_framework": "spring-boot",
+          "framework_version": "2.7.2",
+          "application_type": "web",
+          "key_characteristics": [
+            "RESTful web service",
+            "Standard Spring Boot structure",
+            "Embedded Tomcat server",
+            "Single module Maven project"
+          ]
+        },
+        "build_system": {
+          "type": "maven",
+          "containerization_readiness": "ready",
+          "recommended_optimizations": [
+            "Use Maven wrapper for consistent builds",
+            "Consider multi-stage build for smaller final image",
+            "Cache dependencies separately from source code"
+          ]
+        },
+        "containerization_recommendations": {
+          "complexity_level": "simple",
+          "recommended_strategy": "Standard multi-stage Docker build with dependency caching. This is a straightforward Spring Boot app that follows conventions.",
+          "base_image_recommendation": "eclipse-temurin:11-jre-alpine - matches Spring Boot 2.7.x requirements and provides good size/security balance",
+          "jvm_configuration": {
+            "memory_considerations": "Use container-aware JVM flags (-XX:MaxRAMPercentage=75.0) for proper memory management",
+            "startup_optimizations": "Enable Class Data Sharing (-XX:+UseAppCDS) for faster startup",
+            "runtime_tuning": "G1GC is good default for Spring Boot apps (-XX:+UseG1GC)"
+          }
+        },
+        "practical_next_steps": [
+          "Create multi-stage Dockerfile with Maven build stage and JRE runtime stage",
+          "Copy pom.xml first and run mvn dependency:go-offline for layer caching",
+          "Configure health check endpoint using Spring Boot Actuator",
+          "Set up proper logging configuration for container environments",
+          "Test with docker-compose for local development"
+        ],
+        "potential_challenges": [
+          "Spring Boot 2.7.x uses older dependency versions - consider security scanning",
+          "Default embedded Tomcat configuration may need tuning for production",
+          "Application.yml configuration may need environment-specific overrides"
+        ],
+        "notes": "Well-structured Spring Boot project that should containerize easily. The main focus should be on build optimization and proper JVM configuration for container environments."
+      }
+
+tags:
+  - jvm
+  - analysis
+  - adaptive
+  - spring-boot
+  - practical

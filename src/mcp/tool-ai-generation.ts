@@ -72,8 +72,35 @@ function validateResponse(
 
   const trimmed = content.trim();
 
+  // Debug: Log AI response for troubleshooting
+  if (expectation === 'dockerfile') {
+    console.error('=== AI RESPONSE DEBUG ===');
+    console.error('Length:', trimmed.length);
+    console.error('First 200 chars:', trimmed.substring(0, 200));
+    console.error('Last 100 chars:', trimmed.substring(Math.max(0, trimmed.length - 100)));
+    console.error('=========================');
+  }
+
   switch (expectation) {
     case 'dockerfile':
+      // Handle JSON response format from dockerfile-generation prompt
+      if (trimmed.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (parsed.content && typeof parsed.content === 'string') {
+            const dockerfileContent = parsed.content.trim();
+            if (!dockerfileContent.match(/^FROM\s+/im)) {
+              return Failure('Invalid Dockerfile: missing FROM instruction in JSON content field');
+            }
+            return Success(dockerfileContent);
+          } else {
+            return Failure('Invalid JSON response: missing content field');
+          }
+        } catch {
+          return Failure('Invalid JSON response for Dockerfile');
+        }
+      }
+      // Handle raw Dockerfile content (fallback)
       if (!trimmed.match(/^FROM\s+/im)) {
         return Failure('Invalid Dockerfile: missing FROM instruction');
       }
@@ -158,9 +185,28 @@ export async function aiGenerate(
         throw new Error(`Prompt '${promptName}' returned no messages`);
       }
 
+      // Debug: Log the actual prompt being sent to AI
+      if (expectation === 'dockerfile') {
+        console.error('=== PROMPT DEBUG ===');
+        console.error('Prompt name:', promptName);
+        console.error('Number of messages:', prompt.messages.length);
+        if (prompt.messages[0]) {
+          const firstMessage = prompt.messages[0];
+          const content = firstMessage.content;
+          if (Array.isArray(content) && content[0]) {
+            const firstItem = content[0] as any;
+            console.error('First message type:', firstItem.type);
+            if (firstItem.type === 'text' && firstItem.text) {
+              console.error('First message preview:', firstItem.text.substring(0, 200));
+            }
+          }
+        }
+        console.error('====================');
+      }
+
       const request: SamplingRequest = {
         messages: prompt.messages,
-        includeContext: 'allServers', // Allow AI to use all available tools, not just this MCP server
+        includeContext: 'thisServer', // Only include context from this MCP server to avoid contamination
         maxTokens,
       };
 

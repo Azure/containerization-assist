@@ -1,69 +1,42 @@
 /**
  * Session Type Definitions
  *
- * Provides type-safe session slices for tools while maintaining backward compatibility
- * with existing session infrastructure.
+ * Simple session storage without complex generics.
  */
-
-import { z } from 'zod';
 
 /**
- * Typed session slice for tool-specific data
- * @template In - Input type (from tool parameters)
- * @template Out - Output type (from tool result)
- * @template State - Tool-specific state type
+ * Simple session slice for tool-specific data
  */
-export interface SessionSlice<In, Out, State = Record<string, unknown>> {
-  /** Last validated input to the tool */
-  input: In;
-  /** Last validated output from the tool */
-  output?: Out;
-  /** Tool-specific progress/flags */
-  state: State;
+export interface SessionSlice {
+  /** Last input to the tool */
+  input: Record<string, unknown>;
+  /** Last output from the tool */
+  output?: unknown;
+  /** Tool-specific state */
+  state: Record<string, unknown>;
   /** Timestamp of last update */
   updatedAt?: Date;
 }
 
 /**
- * Tool IO definition pairing input and output schemas
- */
-export interface ToolIO<In, Out> {
-  input: z.ZodType<In>;
-  output: z.ZodType<Out>;
-}
-
-/**
- * Define tool input/output schemas for type-safe session operations
- * @param input - Zod schema for tool input parameters
- * @param output - Zod schema for tool output results
- * @returns ToolIO object with paired schemas
- */
-export function defineToolIO<In, Out>(
-  input: z.ZodType<In>,
-  output: z.ZodType<Out>,
-): ToolIO<In, Out> {
-  return { input, output };
-}
-
-/**
  * Session slice operations interface
  */
-export interface SessionSliceOperations<In, Out, State> {
+export interface SessionSliceOperations {
   /**
-   * Get typed slice for a tool
+   * Get slice for a tool
    * @returns SessionSlice or null if not found
    */
-  get(sessionId: string): Promise<SessionSlice<In, Out, State> | null>;
+  get(sessionId: string): Promise<SessionSlice | null>;
 
   /**
    * Set entire slice for a tool
    */
-  set(sessionId: string, slice: SessionSlice<In, Out, State>): Promise<void>;
+  set(sessionId: string, slice: SessionSlice): Promise<void>;
 
   /**
    * Partial update to slice
    */
-  patch(sessionId: string, partial: Partial<SessionSlice<In, Out, State>>): Promise<void>;
+  patch(sessionId: string, partial: Partial<SessionSlice>): Promise<void>;
 
   /**
    * Clear slice for a tool

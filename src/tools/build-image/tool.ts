@@ -17,23 +17,16 @@ import path from 'path';
 import { normalizePath } from '@/lib/path-utils';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { promises as fs } from 'node:fs';
-import {
-  ensureSession,
-  defineToolIO,
-  useSessionSlice,
-  getSessionSlice,
-} from '@/mcp/tool-session-helpers';
+import { ensureSession, useSessionSlice, getSessionSlice } from '@/mcp/tool-session-helpers';
 import { createStandardProgress } from '@/mcp/progress-helper';
 import type { ToolContext } from '@/mcp/context';
-import { createDockerClient, type DockerBuildOptions } from '@/lib/docker';
+import { createDockerClient, type DockerBuildOptions } from '@/services/docker-client';
 
 import { type Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { fileExists } from '@/lib/file-utils';
-import { buildImageSchema, type BuildImageParams } from './schema';
-import { z } from 'zod';
-import type { SessionData } from '@/tools/session-types';
-import { analyzeRepoSchema } from '@/tools/analyze-repo/schema';
+import { type BuildImageParams, buildImageSchema } from './schema';
+import type { SessionData } from '@/types/tool-session-types';
 
 export interface BuildImageResult {
   /** Whether the build completed successfully */
@@ -56,32 +49,6 @@ export interface BuildImageResult {
   securityWarnings?: string[];
 }
 
-// Define the result schema for type safety
-const BuildImageResultSchema = z.object({
-  success: z.boolean(),
-  sessionId: z.string(),
-  imageId: z.string(),
-  tags: z.array(z.string()),
-  size: z.number(),
-  layers: z.number().optional(),
-  buildTime: z.number(),
-  logs: z.array(z.string()),
-  securityWarnings: z.array(z.string()).optional(),
-});
-
-// Define tool IO for type-safe session operations
-const io = defineToolIO(buildImageSchema, BuildImageResultSchema);
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastBuiltAt: z.date().optional(),
-  lastBuiltImageId: z.string().optional(),
-  lastBuiltTags: z.array(z.string()).optional(),
-  totalBuilds: z.number().optional(),
-  lastBuildTime: z.number().optional(),
-  lastSecurityWarningCount: z.number().optional(),
-});
-
 /**
  * Prepare build arguments with defaults
  */
@@ -99,26 +66,15 @@ async function prepareBuildArgs(
 
   // Get analysis result from session slice
   try {
-    // Define the IO for analyze-repo to access its slice
-    const AnalyzeRepoResultSchema = z.object({
-      ok: z.boolean(),
-      sessionId: z.string(),
-      language: z.string(),
-      languageVersion: z.string().optional(),
-      framework: z.string().optional(),
-      frameworkVersion: z.string().optional(),
-    });
-
-    const analyzeRepoIO = defineToolIO(analyzeRepoSchema, AnalyzeRepoResultSchema);
-    const analysisSliceResult = await getSessionSlice(
-      'analyze-repo',
-      sessionId,
-      analyzeRepoIO,
-      context,
-    );
+    // Get analysis result from session slice
+    const analysisSliceResult = await getSessionSlice('analyze-repo', sessionId, context);
 
     if (analysisSliceResult.ok && analysisSliceResult.value?.output) {
-      const analysisResult = analysisSliceResult.value.output;
+      const analysisResult = analysisSliceResult.value.output as {
+        language?: string;
+        framework?: string;
+        frameworkVersion?: string;
+      };
       if (analysisResult.language) {
         defaults.LANGUAGE = analysisResult.language;
       }
@@ -214,7 +170,7 @@ async function buildImageImpl(
     }
 
     const { id: sessionId, state: session } = sessionResult.value;
-    const slice = useSessionSlice('build-image', io, context, StateSchema);
+    const slice = useSessionSlice('build-image', context);
 
     if (!slice) {
       return Failure('Session manager not available');
@@ -395,4 +351,10 @@ async function buildImageImpl(
 /**
  * Build image tool with selective progress reporting
  */
-export const buildImage = buildImageImpl;
+export const buildImage: import('@/mcp/tools/types').StandardToolExport = {
+  type: 'standard',
+  name: 'build-image',
+  description: 'Build Docker images from Dockerfiles',
+  inputSchema: buildImageSchema,
+  execute: buildImageImpl,
+};

@@ -9,6 +9,8 @@ describe('Docker Client Enhanced Error Handling', () => {
   const logger = createLogger({ level: 'silent' });
   const dockerClient = createDockerClient(logger);
 
+
+
   describe('extractDockerErrorMessage', () => {
     test('should handle network connectivity errors', () => {
       const mockError = new Error('getaddrinfo ENOTFOUND registry-1.docker.io') as any;

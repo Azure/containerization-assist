@@ -1,0 +1,131 @@
+id: deploy-application
+version: '1.0.0'
+description: AI-guided Kubernetes deployment strategies and recommendations
+category: orchestration
+parameters:
+  - name: manifests
+    type: array
+    required: true
+    description: List of Kubernetes manifest files to deploy
+  - name: namespace
+    type: string
+    required: true
+    description: Target Kubernetes namespace
+  - name: cluster
+    type: string
+    required: false
+    description: Target cluster information
+  - name: environment
+    type: string
+    required: false
+    description: Deployment environment (dev/staging/prod)
+  - name: strategy
+    type: string
+    required: false
+    description: Deployment strategy preference
+  - name: existingDeployment
+    type: object
+    required: false
+    description: Information about existing deployment if any
+  - name: sessionAnalysis
+    type: object
+    required: false
+    description: Previous analysis from session
+template: |
+  Analyze and provide deployment strategy recommendations for a Kubernetes deployment.
+
+  Deployment Configuration:
+  - Manifests: {{manifests}}
+  - Namespace: {{namespace}}
+
+  - Cluster: {{cluster}}
+
+
+  - Environment: {{environment}}
+
+
+  - Preferred Strategy: {{strategy}}
+
+
+
+  Existing Deployment:
+  {{existingDeployment}}
+
+
+
+  Previous Analysis:
+  {{sessionAnalysis}}
+
+
+
+  Deployment Best Practices:
+  {{knowledge}}
+
+
+
+  Deployment Policies:
+  {{policy}}
+
+
+  Provide a JSON response with the following structure:
+  ```json
+  {
+    "deploymentStrategy": {
+      "type": "string (rolling|recreate|blue-green|canary)",
+      "reasoning": "string",
+      "parameters": {
+        "maxSurge": "string",
+        "maxUnavailable": "string",
+        "progressDeadlineSeconds": number
+      }
+    },
+    "preDeploymentChecks": [
+      {
+        "check": "string",
+        "required": boolean,
+        "description": "string"
+      }
+    ],
+    "rolloutSteps": [
+      {
+        "step": number,
+        "action": "string",
+        "validation": "string"
+      }
+    ],
+    "healthChecks": {
+      "readinessProbe": {
+        "enabled": boolean,
+        "initialDelaySeconds": number,
+        "periodSeconds": number
+      },
+      "livenessProbe": {
+        "enabled": boolean,
+        "initialDelaySeconds": number,
+        "periodSeconds": number
+      }
+    },
+    "scaling": {
+      "replicas": number,
+      "autoScaling": boolean,
+      "minReplicas": number,
+      "maxReplicas": number
+    },
+    "monitoring": {
+      "metrics": ["string"],
+      "alerts": ["string"],
+      "dashboards": ["string"]
+    },
+    "rollbackTriggers": ["string"],
+    "postDeploymentValidation": ["string"],
+    "estimatedDeploymentTime": "string",
+    "riskAssessment": {
+      "level": "string (low|medium|high)",
+      "factors": ["string"],
+      "mitigations": ["string"]
+    }
+  }
+  ```
+
+  Focus on safe, reliable deployment strategies appropriate for the target environment.
+format: text

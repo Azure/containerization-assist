@@ -9,57 +9,19 @@ import path from 'path';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { promises as fs } from 'node:fs';
-import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
+import { ensureSession, useSessionSlice } from '@/mcp/tool-session-helpers';
 // AI imports commented out for now - can be added later for enhanced generation
 // import { aiGenerateWithSampling } from '@/mcp/tool-ai-helpers';
 // import { enhancePromptWithKnowledge } from '@/lib/ai-knowledge-enhancer';
 // import type { SamplingOptions } from '@/lib/sampling';
 import { createStandardProgress } from '@/mcp/progress-helper';
 import type { ToolContext } from '@/mcp/context';
-import type { SessionData } from '@/tools/session-types';
+import type { SessionData } from '@/types/tool-session-types';
 import { Success, Failure, type Result } from '@/types';
 // import { stripFencesAndNoise } from '@/lib/text-processing';
 import { execSync } from 'child_process';
 import * as yaml from 'js-yaml';
-import { generateHelmChartsSchema, type GenerateHelmChartsParams } from './schema';
-import { z } from 'zod';
-
-// Define the result schema for type safety
-const GenerateHelmChartsResultSchema = z.object({
-  chartPath: z.string(),
-  chartName: z.string(),
-  files: z.array(z.string()),
-  validationResult: z
-    .object({
-      passed: z.boolean(),
-      output: z.string(),
-      warnings: z.array(z.string()).optional(),
-      errors: z.array(z.string()).optional(),
-    })
-    .optional(),
-  warnings: z.array(z.string()).optional(),
-  sessionId: z.string().optional(),
-  samplingMetadata: z
-    .object({
-      stoppedEarly: z.boolean().optional(),
-      candidatesGenerated: z.number(),
-      winnerScore: z.number(),
-      samplingDuration: z.number().optional(),
-    })
-    .optional(),
-});
-
-// Define tool IO for type-safe session operations
-const io = defineToolIO(generateHelmChartsSchema, GenerateHelmChartsResultSchema);
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastGeneratedAt: z.date().optional(),
-  chartCount: z.number().optional(),
-  lastChartName: z.string().optional(),
-  lastChartVersion: z.string().optional(),
-  validationPassed: z.boolean().optional(),
-});
+import { type GenerateHelmChartsParams, generateHelmChartsSchema } from './schema';
 
 /**
  * Result from Helm chart generation
@@ -604,7 +566,7 @@ async function generateHelmChartsImpl(
     }
 
     const { id: sessionId, state: session } = sessionResult.value;
-    const slice = useSessionSlice('generate-helm-charts', io, context, StateSchema);
+    const slice = useSessionSlice('generate-helm-charts', context);
 
     if (!slice) {
       return Failure('Session manager not available');
@@ -625,7 +587,7 @@ async function generateHelmChartsImpl(
     // Progress: Executing generation
     if (progress) await progress('EXECUTING');
 
-    // Generate Helm chart structure (simplified - no AI for now, just templates)
+    // Generate Helm chart structure using templates
     const chart = generateBasicHelmChart({ ...params, imageId });
 
     // Progress: Writing files
@@ -758,3 +720,14 @@ async function generateHelmChartsImpl(
  * Generate Helm charts tool
  */
 export const generateHelmCharts = generateHelmChartsImpl;
+
+/**
+ * Export the tool for MCP registration
+ */
+export const tool = {
+  type: 'standard' as const,
+  name: 'generate-helm-charts',
+  description: 'Generate Helm chart structure with templates and values',
+  inputSchema: generateHelmChartsSchema,
+  execute: generateHelmCharts,
+};

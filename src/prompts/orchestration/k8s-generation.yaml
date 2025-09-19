@@ -1,0 +1,196 @@
+id: k8s-generation
+version: '3.0.0'
+description: Generate Kubernetes manifests tailored to specific application needs
+category: orchestration
+format: yaml
+parameters:
+  - name: image
+    type: string
+    description: Container image reference
+    required: true
+  - name: port
+    type: number
+    description: Application port (if it exposes one)
+    required: false
+  - name: appType
+    type: string
+    description: Type of application (web, api, worker, job, etc.)
+    required: false
+  - name: deploymentContext
+    type: string
+    description: Where/how this will be deployed
+    required: false
+  - name: requirements
+    type: string
+    description: Specific needs or features required
+    required: false
+  - name: constraints
+    type: string
+    description: Limitations or restrictions to work within
+    required: false
+  - name: existingResources
+    type: string
+    description: Existing K8s resources this needs to work with
+    required: false
+template: |
+  You are a Kubernetes deployment expert who creates manifests based on actual requirements.
+
+  ADAPTIVE APPROACH:
+  - Start with what's needed, not what's possible
+  - Add complexity only when justified
+  - Consider the operational context
+  - Balance best practices with practicality
+
+  CONTEXTUAL DECISIONS:
+  - Not every app needs HPA (some have predictable load)
+  - Not every app needs strict resource limits (may cause issues)
+  - Not every app can provide health endpoints
+  - Security contexts depend on cluster policies
+  - ConfigMaps/Secrets depend on config complexity
+  Generate Kubernetes manifests for this application:
+
+  **Application:**
+  - Image: {{image}}
+  {{#port}}- Port: {{port}}{{/port}}
+  {{#appType}}- Type: {{appType}}{{/appType}}
+
+  {{#deploymentContext}}
+  **Context:**
+  {{deploymentContext}}
+  {{/deploymentContext}}
+
+  {{#requirements}}
+  **Specific Requirements:**
+  {{requirements}}
+  {{/requirements}}
+
+  {{#constraints}}
+  **Constraints/Limitations:**
+  {{constraints}}
+  {{/constraints}}
+
+  {{#existingResources}}
+  **Existing Resources to Consider:**
+  {{existingResources}}
+  {{/existingResources}}
+
+  Generate Kubernetes manifests that:
+  1. Meet the specific requirements
+  2. Work within stated constraints
+  3. Follow appropriate practices for this context
+  4. Include brief comments explaining key decisions
+
+examples:
+  - input:
+      image: "myapp:v1.2.3"
+      port: "3000"
+      appType: "web api"
+      deploymentContext: "Production cluster with Istio service mesh"
+      requirements: "High availability, gradual rollouts"
+    output: |
+      ---
+      # Deployment with rolling updates and pod disruption budget for HA
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: myapp
+        labels:
+          app: myapp
+          version: v1.2.3
+      spec:
+        replicas: 3  # HA requirement
+        strategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxSurge: 1
+            maxUnavailable: 0  # Gradual rollout, maintain availability
+        selector:
+          matchLabels:
+            app: myapp
+        template:
+          metadata:
+            labels:
+              app: myapp
+              version: v1.2.3
+          spec:
+            containers:
+            - name: myapp
+              image: myapp:v1.2.3
+              ports:
+              - containerPort: 3000
+                name: http
+              # Basic readiness check, Istio handles advanced routing
+              readinessProbe:
+                httpGet:
+                  path: /
+                  port: 3000
+                initialDelaySeconds: 10
+                periodSeconds: 5
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+      ---
+      # Service for Istio to discover
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: myapp
+        labels:
+          app: myapp
+      spec:
+        selector:
+          app: myapp
+        ports:
+        - port: 3000
+          targetPort: 3000
+          name: http  # Named port for Istio
+      ---
+      # PodDisruptionBudget for HA during cluster operations
+      apiVersion: policy/v1
+      kind: PodDisruptionBudget
+      metadata:
+        name: myapp
+      spec:
+        minAvailable: 2  # Always keep 2 pods running
+        selector:
+          matchLabels:
+            app: myapp
+
+  - input:
+      image: "batch-processor:latest"
+      appType: "cronjob"
+      deploymentContext: "Dev cluster for data processing"
+      requirements: "Run every 6 hours, complete within 2 hours"
+    output: |
+      ---
+      # CronJob for periodic batch processing
+      apiVersion: batch/v1
+      kind: CronJob
+      metadata:
+        name: batch-processor
+      spec:
+        schedule: "0 */6 * * *"  # Every 6 hours
+        concurrencyPolicy: Forbid  # Don't overlap runs
+        successfulJobsHistoryLimit: 3
+        failedJobsHistoryLimit: 3
+        jobTemplate:
+          spec:
+            activeDeadlineSeconds: 7200  # 2 hour timeout
+            template:
+              spec:
+                restartPolicy: OnFailure
+                containers:
+                - name: processor
+                  image: batch-processor:latest
+                  # No resource limits in dev, let it use what it needs
+                  # No probes needed for batch job
+                  # No service needed - doesn't expose ports
+tags:
+  - kubernetes
+  - adaptive
+  - context-aware
+  - manifests

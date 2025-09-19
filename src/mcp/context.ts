@@ -9,7 +9,7 @@
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Logger } from 'pino';
 import type { SessionManager } from '@/lib/session';
-import type * as promptRegistry from '@/prompts/registry';
+import type * as promptRegistry from '@/prompts/prompt-registry';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { extractProgressReporter } from './context-helpers.js';
 
@@ -149,6 +149,16 @@ export interface ToolContext {
    * Use this for structured logging instead of console.log
    */
   logger: Logger;
+
+  /**
+   * Optional knowledge context for AI-powered tools
+   * Contains domain-specific knowledge and best practices
+   */
+  knowledge?: Array<{
+    id: string;
+    recommendation: string;
+    example?: string;
+  }>;
 }
 
 // ===== PROGRESS HANDLING =====
@@ -157,7 +167,7 @@ export interface ToolContext {
 export type { EnhancedProgressReporter } from './context-helpers.js';
 export { extractProgressToken, createProgressReporter } from './context-helpers.js';
 
-// ===== SIMPLIFIED CONTEXT CREATION =====
+// ===== CONTEXT CREATION =====
 
 /**
  * Options for creating a tool context

@@ -1,0 +1,272 @@
+[
+  {
+    "id": "pytorch-cuda-base",
+    "category": "dockerfile",
+    "pattern": "(torch|pytorch|cuda)",
+    "recommendation": "Use official PyTorch images with CUDA support for GPU workloads",
+    "example": "# For GPU support\nFROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime\n\n# For CPU only\nFROM pytorch/pytorch:2.1.0-cpu-runtime\n\n# Multi-stage for smaller image\nFROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-devel AS builder\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\n\nFROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime\nWORKDIR /app\nCOPY --from=builder /usr/local/lib/python*/dist-packages /usr/local/lib/python*/dist-packages\nCOPY --from=builder /app .\n\n# Verify GPU\nRUN python -c \"import torch; print(f'CUDA available: {torch.cuda.is_available()}')\"",
+    "severity": "high",
+    "tags": ["pytorch", "ml", "cuda", "gpu", "deep-learning"],
+    "description": "PyTorch images include CUDA libraries for GPU acceleration",
+    "rationale": "Pre-built images save hours of CUDA/cuDNN setup",
+    "tradeoffs": "Large image sizes (5-15GB with CUDA)",
+    "alternatives": ["build from source", "conda environments", "nvidia base images"],
+    "metrics": {
+      "sizeImpact": "+5GB",
+      "buildTimeImpact": "-120min",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "tensorflow-serving",
+    "category": "dockerfile",
+    "pattern": "(tensorflow|tf.*serving|saved_model)",
+    "recommendation": "Use TensorFlow Serving for production model deployment",
+    "example": "# Model serving container\nFROM tensorflow/serving:2.14.0-gpu\n\n# Copy saved model\nCOPY --chown=tensorflow:tensorflow ./saved_model /models/my_model/1/\n\n# Configuration\nENV MODEL_NAME=my_model \\\n    TF_CPP_MIN_LOG_LEVEL=2 \\\n    TF_ENABLE_ONEDNN_OPTS=0\n\n# Custom configuration\nCOPY model_config.conf /models/\nCMD [\"--model_config_file=/models/model_config.conf\", \\\n     \"--rest_api_port=8501\", \\\n     \"--grpc_port=8500\", \\\n     \"--enable_batching=true\", \\\n     \"--batching_parameters_file=/models/batching.conf\"]\n\n# Client container\nFROM python:3.11-slim\nRUN pip install tensorflow-serving-api requests\nCOPY client.py .\nCMD [\"python\", \"client.py\"]",
+    "severity": "high",
+    "tags": ["tensorflow", "serving", "inference", "production"],
+    "description": "TensorFlow Serving optimizes model inference in production",
+    "rationale": "Optimized for serving, supports batching, versioning, monitoring",
+    "tradeoffs": "Only for TensorFlow models, requires SavedModel format",
+    "alternatives": ["TorchServe", "Triton", "KFServing", "BentoML"],
+    "metrics": {
+      "sizeImpact": "+2GB",
+      "buildTimeImpact": "-60min",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "jupyter-notebook-container",
+    "category": "dockerfile",
+    "pattern": "(jupyter|notebook|lab)",
+    "recommendation": "Containerize Jupyter environments for reproducible research",
+    "example": "FROM jupyter/tensorflow-notebook:latest\n\n# Install additional packages\nUSER root\nRUN apt-get update && apt-get install -y \\\n    graphviz \\\n    && rm -rf /var/lib/apt/lists/*\n\nUSER $NB_UID\n\n# Python packages\nCOPY requirements.txt /tmp/\nRUN pip install --no-cache-dir -r /tmp/requirements.txt && \\\n    jupyter labextension install @jupyterlab/toc\n\n# Copy notebooks and data\nCOPY --chown=$NB_UID:$NB_GID notebooks/ /home/$NB_USER/work/\nCOPY --chown=$NB_UID:$NB_GID data/ /home/$NB_USER/data/\n\n# Enable extensions\nRUN jupyter nbextension enable --py widgetsnbextension\n\n# Custom startup script\nCOPY start-notebook.sh /usr/local/bin/\nCMD [\"start-notebook.sh\", \"--NotebookApp.token=''\", \"--NotebookApp.password=''\"]",
+    "severity": "medium",
+    "tags": ["jupyter", "notebook", "research", "interactive"],
+    "description": "Jupyter containers provide consistent research environments",
+    "rationale": "Reproducible notebooks, pre-configured environments",
+    "tradeoffs": "Not suitable for production inference",
+    "alternatives": ["Google Colab", "Kaggle Kernels", "Paperspace Gradient"],
+    "metrics": {
+      "sizeImpact": "+3GB",
+      "buildTimeImpact": "+30min",
+      "securityScore": "-2"
+    }
+  },
+  {
+    "id": "mlflow-tracking-server",
+    "category": "dockerfile",
+    "pattern": "(mlflow|experiment.*tracking)",
+    "recommendation": "Deploy MLflow for experiment tracking and model registry",
+    "example": "# MLflow server\nFROM python:3.11-slim\n\nRUN pip install --no-cache-dir \\\n    mlflow[extras]==2.8.0 \\\n    psycopg2-binary \\\n    boto3\n\n# Backend store and artifact location\nENV BACKEND_STORE_URI=postgresql://user:pass@postgres/mlflow \\\n    DEFAULT_ARTIFACT_ROOT=s3://mlflow-artifacts/ \\\n    MLFLOW_S3_ENDPOINT_URL=http://minio:9000\n\nEXPOSE 5000\n\nCMD [\"mlflow\", \"server\", \\\n     \"--host\", \"0.0.0.0\", \\\n     \"--port\", \"5000\", \\\n     \"--backend-store-uri\", \"${BACKEND_STORE_URI}\", \\\n     \"--default-artifact-root\", \"${DEFAULT_ARTIFACT_ROOT}\"]\n\n# Client configuration\nENV MLFLOW_TRACKING_URI=http://mlflow:5000 \\\n    MLFLOW_S3_ENDPOINT_URL=http://minio:9000\n\nimport mlflow\nmlflow.set_tracking_uri(os.environ['MLFLOW_TRACKING_URI'])\nmlflow.log_param(\"learning_rate\", 0.01)\nmlflow.log_metric(\"accuracy\", 0.95)",
+    "severity": "medium",
+    "tags": ["mlflow", "tracking", "experiments", "mlops"],
+    "description": "MLflow centralizes experiment tracking and model management",
+    "rationale": "Track experiments, compare models, deploy from registry",
+    "tradeoffs": "Requires database and object storage setup",
+    "alternatives": ["Weights & Biases", "Neptune", "Comet", "TensorBoard"],
+    "metrics": {
+      "sizeImpact": "+500MB",
+      "buildTimeImpact": "+10min",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "huggingface-transformers",
+    "category": "dockerfile",
+    "pattern": "(transformers|huggingface|bert|gpt)",
+    "recommendation": "Optimize Hugging Face model deployment with proper caching",
+    "example": "FROM python:3.11-slim\n\n# Install transformers and dependencies\nRUN pip install --no-cache-dir \\\n    transformers==4.35.0 \\\n    torch==2.1.0 \\\n    accelerate==0.24.0 \\\n    sentencepiece \\\n    protobuf\n\n# Cache models during build (optional)\nENV HF_HOME=/app/.cache/huggingface \\\n    TRANSFORMERS_CACHE=/app/.cache/huggingface/transformers \\\n    TRANSFORMERS_OFFLINE=1\n\n# Pre-download models\nRUN python -c \"from transformers import AutoModel, AutoTokenizer; \\\n    AutoModel.from_pretrained('bert-base-uncased'); \\\n    AutoTokenizer.from_pretrained('bert-base-uncased')\"\n\n# Copy application\nWORKDIR /app\nCOPY . .\n\n# Runtime optimization\nENV OMP_NUM_THREADS=4 \\\n    TOKENIZERS_PARALLELISM=false\n\nCMD [\"python\", \"app.py\"]",
+    "severity": "medium",
+    "tags": ["huggingface", "transformers", "nlp", "bert", "llm"],
+    "description": "Proper caching and configuration for transformer models",
+    "rationale": "Avoid downloading models at runtime, optimize inference",
+    "tradeoffs": "Large image sizes with pre-cached models",
+    "alternatives": ["model servers", "API endpoints", "edge deployment"],
+    "metrics": {
+      "sizeImpact": "+2GB",
+      "buildTimeImpact": "+20min",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "ray-distributed-training",
+    "category": "dockerfile",
+    "pattern": "(ray|distributed.*training|ray.*serve)",
+    "recommendation": "Use Ray for distributed ML training and serving",
+    "example": "# Ray head node\nFROM rayproject/ray:2.8.0-gpu\n\n# Install ML libraries\nRUN pip install --no-cache-dir \\\n    torch torchvision \\\n    tensorflow \\\n    xgboost \\\n    lightgbm\n\n# Ray configuration\nENV RAY_HEAD_SERVICE_HOST=ray-head \\\n    RAY_HEAD_SERVICE_PORT=10001 \\\n    RAY_REDIS_PASSWORD=${REDIS_PASSWORD}\n\n# Head node\nCMD [\"ray\", \"start\", \"--head\", \\\n     \"--port=10001\", \\\n     \"--dashboard-host=0.0.0.0\", \\\n     \"--dashboard-port=8265\", \\\n     \"--num-cpus=4\", \\\n     \"--num-gpus=1\", \\\n     \"--block\"]\n\n# Worker node\nCMD [\"ray\", \"start\", \\\n     \"--address=${RAY_HEAD_SERVICE_HOST}:${RAY_HEAD_SERVICE_PORT}\", \\\n     \"--num-cpus=4\", \\\n     \"--num-gpus=1\", \\\n     \"--block\"]",
+    "severity": "medium",
+    "tags": ["ray", "distributed", "training", "scaling"],
+    "description": "Ray enables distributed training and hyperparameter tuning",
+    "rationale": "Scale training across multiple nodes, built-in serving",
+    "tradeoffs": "Complex cluster management, resource overhead",
+    "alternatives": ["Horovod", "PyTorch DDP", "TF distributed", "Dask"],
+    "metrics": {
+      "sizeImpact": "+3GB",
+      "buildTimeImpact": "+15min",
+      "securityScore": "-1"
+    }
+  },
+  {
+    "id": "nvidia-triton-inference",
+    "category": "dockerfile",
+    "pattern": "(triton|tensorrt|inference.*server)",
+    "recommendation": "Deploy NVIDIA Triton for multi-framework model serving",
+    "example": "# Triton Inference Server\nFROM nvcr.io/nvidia/tritonserver:23.10-py3\n\n# Model repository structure\n# models/\n# ├── model_name/\n# │   ├── 1/\n# │   │   └── model.onnx\n# │   └── config.pbtxt\n\nCOPY models /models\n\n# Optimization scripts\nRUN pip install --no-cache-dir tritonclient[all]\nCOPY optimize_models.py /\nRUN python /optimize_models.py\n\nCMD [\"tritonserver\", \\\n     \"--model-repository=/models\", \\\n     \"--strict-model-config=false\", \\\n     \"--http-port=8000\", \\\n     \"--grpc-port=8001\", \\\n     \"--metrics-port=8002\", \\\n     \"--allow-gpu-metrics=true\", \\\n     \"--log-verbose=1\"]",
+    "severity": "high",
+    "tags": ["triton", "nvidia", "inference", "tensorrt", "serving"],
+    "description": "Triton supports TensorFlow, PyTorch, ONNX, and custom backends",
+    "rationale": "Optimized inference, dynamic batching, model ensembles",
+    "tradeoffs": "NVIDIA GPU required for best performance",
+    "alternatives": ["TorchServe", "TF Serving", "KFServing", "Seldon"],
+    "metrics": {
+      "sizeImpact": "+10GB",
+      "buildTimeImpact": "+30min",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "kubeflow-pipelines",
+    "category": "dockerfile",
+    "pattern": "(kubeflow|kfp|pipeline)",
+    "recommendation": "Package ML workflows as Kubeflow Pipeline components",
+    "example": "FROM python:3.11-slim\n\n# Install KFP SDK\nRUN pip install --no-cache-dir kfp==2.4.0\n\n# Component code\nCOPY src/ /app/\nWORKDIR /app\n\n# Component definition\nfrom kfp import dsl\n\n@dsl.component(\n    base_image='python:3.11-slim',\n    packages_to_install=['pandas', 'scikit-learn']\n)\ndef train_model(\n    data_path: str,\n    model_path: str,\n    hyperparameters: dict\n) -> dict:\n    import pandas as pd\n    from sklearn.model_selection import train_test_split\n    # Training code here\n    return {'accuracy': 0.95}\n\n# Pipeline\n@dsl.pipeline(\n    name='ml-training-pipeline',\n    description='End-to-end ML pipeline'\n)\ndef ml_pipeline():\n    train_task = train_model(\n        data_path='gs://data/train.csv',\n        model_path='gs://models/',\n        hyperparameters={'lr': 0.01}\n    )",
+    "severity": "medium",
+    "tags": ["kubeflow", "pipelines", "mlops", "workflow"],
+    "description": "Kubeflow Pipelines orchestrate ML workflows on Kubernetes",
+    "rationale": "Reproducible pipelines, experiment tracking, artifact management",
+    "tradeoffs": "Requires Kubernetes cluster, learning curve",
+    "alternatives": ["Airflow", "Prefect", "Dagster", "Metaflow"],
+    "metrics": {
+      "sizeImpact": "+200MB",
+      "buildTimeImpact": "+5min",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "dvc-data-versioning",
+    "category": "dockerfile",
+    "pattern": "(dvc|data.*version)",
+    "recommendation": "Use DVC for data and model versioning",
+    "example": "FROM python:3.11-slim\n\n# Install DVC with cloud storage support\nRUN pip install --no-cache-dir \\\n    dvc[s3]==3.30.0 \\\n    dvc[gs] \\\n    dvc[azure]\n\n# Configure DVC\nCOPY .dvc /app/.dvc\nCOPY dvc.yaml dvc.lock /app/\n\nWORKDIR /app\n\n# Pull data and models\nRUN dvc remote add -d storage s3://my-bucket/dvc-cache && \\\n    dvc pull\n\n# Copy application code\nCOPY src/ ./src/\n\n# Environment for cloud access\nENV AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \\\n    AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}\n\nCMD [\"python\", \"src/train.py\"]",
+    "severity": "low",
+    "tags": ["dvc", "versioning", "data", "mlops"],
+    "description": "DVC tracks data and model versions alongside code",
+    "rationale": "Reproducible experiments, data lineage, storage optimization",
+    "tradeoffs": "Additional tooling complexity",
+    "alternatives": ["LakeFS", "Pachyderm", "Delta Lake", "Git LFS"],
+    "metrics": {
+      "sizeImpact": "+100MB",
+      "buildTimeImpact": "+5min",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "onnx-runtime-optimization",
+    "category": "dockerfile",
+    "pattern": "(onnx|onnxruntime)",
+    "recommendation": "Convert models to ONNX for optimized inference",
+    "example": "FROM python:3.11-slim\n\n# Install ONNX Runtime with GPU support\nRUN pip install --no-cache-dir \\\n    onnxruntime-gpu==1.16.0 \\\n    onnx==1.15.0 \\\n    tf2onnx \\\n    torch\n\n# Convert and optimize models\nCOPY convert_to_onnx.py /\nCOPY models/ /models/\n\nRUN python /convert_to_onnx.py \\\n    --input-model /models/model.pt \\\n    --output-model /models/model.onnx \\\n    --optimize\n\n# Inference code\nCOPY app.py /\n\n# Runtime configuration\nENV OMP_NUM_THREADS=4 \\\n    ORT_TENSORRT_ENGINE_CACHE_ENABLE=1 \\\n    ORT_TENSORRT_ENGINE_CACHE_PATH=/tmp/trt_cache\n\nCMD [\"python\", \"app.py\"]",
+    "severity": "medium",
+    "tags": ["onnx", "optimization", "inference", "cross-platform"],
+    "description": "ONNX Runtime provides optimized inference across frameworks",
+    "rationale": "Hardware acceleration, cross-framework compatibility",
+    "tradeoffs": "Conversion complexity, potential accuracy loss",
+    "alternatives": ["TensorRT", "OpenVINO", "Core ML", "TFLite"],
+    "metrics": {
+      "sizeImpact": "+500MB",
+      "buildTimeImpact": "+15min",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "wandb-experiment-tracking",
+    "category": "dockerfile",
+    "pattern": "(wandb|weights.*biases)",
+    "recommendation": "Integrate Weights & Biases for experiment tracking",
+    "example": "FROM python:3.11-slim\n\nRUN pip install --no-cache-dir wandb\n\n# Login during build (for private projects)\nARG WANDB_API_KEY\nRUN wandb login ${WANDB_API_KEY}\n\n# Runtime configuration\nENV WANDB_PROJECT=my-ml-project \\\n    WANDB_ENTITY=my-team \\\n    WANDB_MODE=online \\\n    WANDB_START_METHOD=fork\n\n# Training script with W&B\nimport wandb\n\nwandb.init(\n    project=os.environ['WANDB_PROJECT'],\n    config={\n        \"learning_rate\": 0.001,\n        \"batch_size\": 32,\n        \"epochs\": 100\n    }\n)\n\n# Log metrics\nwandb.log({\"loss\": loss, \"accuracy\": accuracy})\n\n# Save model\nwandb.save('model.h5')",
+    "severity": "low",
+    "tags": ["wandb", "tracking", "experiments", "visualization"],
+    "description": "W&B provides experiment tracking and visualization",
+    "rationale": "Real-time monitoring, hyperparameter sweeps, team collaboration",
+    "tradeoffs": "External service dependency, data privacy considerations",
+    "alternatives": ["MLflow", "Neptune", "Comet", "TensorBoard"],
+    "metrics": {
+      "sizeImpact": "+50MB",
+      "buildTimeImpact": "+2min",
+      "securityScore": "-1"
+    }
+  },
+  {
+    "id": "opencv-computer-vision",
+    "category": "dockerfile",
+    "pattern": "(opencv|cv2|computer.*vision)",
+    "recommendation": "Install OpenCV with minimal dependencies for CV workloads",
+    "example": "# Minimal OpenCV installation\nFROM python:3.11-slim\n\n# Install OpenCV dependencies\nRUN apt-get update && apt-get install -y \\\n    libglib2.0-0 \\\n    libsm6 \\\n    libxext6 \\\n    libxrender-dev \\\n    libgomp1 \\\n    libglu1-mesa \\\n    && rm -rf /var/lib/apt/lists/*\n\n# Install OpenCV Python\nRUN pip install --no-cache-dir \\\n    opencv-python-headless==4.8.1.* \\\n    numpy\n\n# For GPU acceleration\n# RUN pip install opencv-contrib-python-headless\n\nCOPY app.py /\nCMD [\"python\", \"app.py\"]",
+    "severity": "medium",
+    "tags": ["opencv", "computer-vision", "image-processing"],
+    "description": "Headless OpenCV for server environments",
+    "rationale": "Minimal dependencies, no GUI components",
+    "tradeoffs": "No GUI support, limited codec support",
+    "alternatives": ["PIL/Pillow", "scikit-image", "ImageMagick"],
+    "metrics": {
+      "sizeImpact": "+200MB",
+      "buildTimeImpact": "+5min",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "rapids-gpu-acceleration",
+    "category": "dockerfile",
+    "pattern": "(rapids|cudf|cuml|cugraph)",
+    "recommendation": "Use RAPIDS for GPU-accelerated data science",
+    "example": "# RAPIDS for GPU data processing\nFROM rapidsai/rapidsai:23.10-cuda12.0-runtime-ubuntu22.04-py3.10\n\n# Additional packages\nRUN pip install --no-cache-dir \\\n    matplotlib \\\n    seaborn \\\n    plotly\n\n# Verify GPU libraries\nRUN python -c \"import cudf; import cuml; print('RAPIDS ready')\"\n\nWORKDIR /rapids/notebooks\nCOPY notebooks/ .\n\n# Environment\nENV CUDA_VISIBLE_DEVICES=0 \\\n    RAPIDS_NO_INITIALIZE=1\n\nCMD [\"jupyter\", \"lab\", \"--ip=0.0.0.0\", \"--no-browser\", \"--allow-root\"]",
+    "severity": "low",
+    "tags": ["rapids", "gpu", "cuda", "data-science"],
+    "description": "RAPIDS accelerates pandas, scikit-learn on GPUs",
+    "rationale": "100x speedup for data processing and ML on GPUs",
+    "tradeoffs": "NVIDIA GPU required, API differences from CPU libraries",
+    "alternatives": ["CuPy", "JAX", "standard pandas/sklearn"],
+    "metrics": {
+      "sizeImpact": "+8GB",
+      "buildTimeImpact": "+20min",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "bentoml-model-serving",
+    "category": "dockerfile",
+    "pattern": "(bentoml|bento.*service)",
+    "recommendation": "Package ML models with BentoML for production serving",
+    "example": "# Build Bento\nFROM python:3.11-slim AS builder\nRUN pip install bentoml\nCOPY . /workspace\nWORKDIR /workspace\nRUN bentoml build\n\n# Serve Bento\nFROM bentoml/model-server:0.13.1-slim\nCOPY --from=builder /home/bentoml/bentos /home/bentoml/bentos\n\n# Get latest bento\nRUN LATEST_BENTO=$(ls -t /home/bentoml/bentos | head -n1) && \\\n    ln -s /home/bentoml/bentos/$LATEST_BENTO /bento\n\nENV BENTOML_PORT=3000 \\\n    BENTOML_PRODUCTION=true \\\n    BENTOML_ENABLE_METRICS=true\n\nEXPOSE 3000\nCMD [\"bentoml\", \"serve\", \"/bento\", \"--production\"]",
+    "severity": "medium",
+    "tags": ["bentoml", "serving", "packaging", "deployment"],
+    "description": "BentoML packages models with dependencies and serving logic",
+    "rationale": "Unified format for model packaging and deployment",
+    "tradeoffs": "Additional abstraction layer, learning curve",
+    "alternatives": ["Seldon", "KFServing", "MLflow", "TorchServe"],
+    "metrics": {
+      "sizeImpact": "+500MB",
+      "buildTimeImpact": "+10min",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "spark-ml-distributed",
+    "category": "dockerfile",
+    "pattern": "(spark|pyspark|mllib)",
+    "recommendation": "Configure Spark containers for distributed ML",
+    "example": "FROM spark:3.5.0-scala2.12-java11-python3-ubuntu\n\n# Install ML libraries\nRUN pip install --no-cache-dir \\\n    pyspark[ml]==3.5.0 \\\n    numpy \\\n    pandas \\\n    pyarrow\n\n# Spark configuration\nENV SPARK_HOME=/opt/spark \\\n    PYSPARK_PYTHON=python3 \\\n    PYSPARK_DRIVER_PYTHON=python3\n\n# Copy application\nCOPY app.py /app/\nCOPY data/ /data/\n\n# Spark submit command\nCMD [\"spark-submit\", \\\n     \"--master\", \"spark://spark-master:7077\", \\\n     \"--deploy-mode\", \"client\", \\\n     \"--driver-memory\", \"2g\", \\\n     \"--executor-memory\", \"2g\", \\\n     \"--executor-cores\", \"2\", \\\n     \"--num-executors\", \"3\", \\\n     \"/app/app.py\"]",
+    "severity": "medium",
+    "tags": ["spark", "distributed", "big-data", "ml"],
+    "description": "Spark MLlib for distributed machine learning",
+    "rationale": "Process large datasets, distributed training",
+    "tradeoffs": "Complex cluster setup, JVM overhead",
+    "alternatives": ["Dask", "Ray", "Horovod"],
+    "metrics": {
+      "sizeImpact": "+2GB",
+      "buildTimeImpact": "+10min",
+      "securityScore": "0"
+    }
+  }
+]

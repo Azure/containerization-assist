@@ -1,0 +1,272 @@
+[
+  {
+    "id": "react-production-build",
+    "category": "dockerfile",
+    "pattern": "^FROM\\s+node.*\\n.*react",
+    "recommendation": "Use multi-stage builds for React apps with optimized production builds",
+    "example": "FROM node:20-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\n\nFROM nginx:alpine\nCOPY --from=build /app/build /usr/share/nginx/html\nCOPY nginx.conf /etc/nginx/conf.d/default.conf",
+    "severity": "high",
+    "tags": ["react", "frontend", "spa", "nginx", "multistage"],
+    "description": "React apps need static file serving, multi-stage builds reduce size by 90%",
+    "rationale": "React builds produce static files that don't need Node.js runtime",
+    "tradeoffs": "Requires nginx configuration for client-side routing",
+    "alternatives": ["serve", "express static server"],
+    "metrics": {
+      "sizeImpact": "-800MB",
+      "buildTimeImpact": "+60s",
+      "securityScore": "+3"
+    }
+  },
+  {
+    "id": "nextjs-standalone-deployment",
+    "category": "dockerfile",
+    "pattern": "(next\\.config|_app\\.(tsx?|jsx?)|pages/|app/)",
+    "recommendation": "Use Next.js standalone output mode for optimal container deployment",
+    "example": "# next.config.js\nmodule.exports = {\n  output: 'standalone',\n}\n\n# Dockerfile\nFROM node:20-alpine AS deps\nRUN apk add --no-cache libc6-compat\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\n\nFROM node:20-alpine AS builder\nWORKDIR /app\nCOPY --from=deps /app/node_modules ./node_modules\nCOPY . .\nRUN npm run build\n\nFROM node:20-alpine AS runner\nWORKDIR /app\nENV NODE_ENV=production\nRUN addgroup --system --gid 1001 nodejs\nRUN adduser --system --uid 1001 nextjs\nCOPY --from=builder /app/public ./public\nCOPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./\nCOPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static\nUSER nextjs\nEXPOSE 3000\nCMD [\"node\", \"server.js\"]",
+    "severity": "high",
+    "tags": ["nextjs", "react", "ssr", "standalone", "optimization"],
+    "description": "Standalone mode reduces Next.js container from 1GB+ to ~100MB",
+    "rationale": "Standalone bundles only required dependencies, eliminating node_modules",
+    "tradeoffs": "Requires Next.js 12.2+ and output configuration",
+    "alternatives": ["full node_modules deployment", "serverless deployment"],
+    "metrics": {
+      "sizeImpact": "-900MB",
+      "buildTimeImpact": "+90s",
+      "securityScore": "+2"
+    }
+  },
+  {
+    "id": "vue-spa-nginx-routing",
+    "category": "dockerfile",
+    "pattern": "(vue\\.config|App\\.vue|main\\.(ts|js))",
+    "recommendation": "Configure nginx for Vue.js SPA routing with try_files directive",
+    "example": "# nginx.conf\nserver {\n    listen 80;\n    root /usr/share/nginx/html;\n    index index.html;\n    \n    location / {\n        try_files $uri $uri/ /index.html;\n    }\n    \n    location ~* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {\n        expires 1y;\n        add_header Cache-Control \"public, immutable\";\n    }\n}\n\n# Dockerfile\nFROM node:20-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\n\nFROM nginx:alpine\nCOPY --from=build /app/dist /usr/share/nginx/html\nCOPY nginx.conf /etc/nginx/conf.d/default.conf",
+    "severity": "medium",
+    "tags": ["vue", "vuejs", "spa", "nginx", "routing"],
+    "description": "Vue Router requires special nginx configuration for client-side routing",
+    "rationale": "Without try_files, deep links and refreshes return 404 errors",
+    "tradeoffs": "Requires maintaining nginx configuration",
+    "alternatives": ["Node.js server with history fallback", "static hosting services"],
+    "metrics": {
+      "sizeImpact": "-700MB",
+      "buildTimeImpact": "+45s",
+      "securityScore": "+2"
+    }
+  },
+  {
+    "id": "angular-aot-compilation",
+    "category": "dockerfile",
+    "pattern": "(angular\\.json|@angular/|ng\\s+(build|serve))",
+    "recommendation": "Use Angular AOT compilation and production builds for containers",
+    "example": "FROM node:20-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build -- --configuration production --aot\n\nFROM nginx:alpine\nCOPY --from=build /app/dist/my-app /usr/share/nginx/html\nCOPY nginx.conf /etc/nginx/conf.d/default.conf\nEXPOSE 80\nCMD [\"nginx\", \"-g\", \"daemon off;\"]",
+    "severity": "high",
+    "tags": ["angular", "aot", "production", "optimization"],
+    "description": "AOT compilation reduces bundle size and improves performance",
+    "rationale": "AOT eliminates Angular compiler from bundles, reducing size by ~50%",
+    "tradeoffs": "Longer build times, stricter type checking",
+    "alternatives": ["JIT compilation (development only)", "Angular Universal for SSR"],
+    "metrics": {
+      "sizeImpact": "-400MB",
+      "buildTimeImpact": "+120s",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "vite-static-assets",
+    "category": "dockerfile",
+    "pattern": "(vite\\.config|vite/|vitest)",
+    "recommendation": "Optimize Vite builds with proper asset handling and base URL configuration",
+    "example": "# vite.config.js\nexport default {\n  base: process.env.PUBLIC_URL || '/',\n  build: {\n    rollupOptions: {\n      output: {\n        manualChunks: {\n          vendor: ['react', 'react-dom'],\n        },\n      },\n    },\n  },\n}\n\n# Dockerfile\nFROM node:20-alpine AS build\nARG PUBLIC_URL=/\nENV PUBLIC_URL=$PUBLIC_URL\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\n\nFROM nginx:alpine\nCOPY --from=build /app/dist /usr/share/nginx/html",
+    "severity": "medium",
+    "tags": ["vite", "bundler", "react", "vue", "assets"],
+    "description": "Vite requires proper base URL and chunking strategy for production",
+    "rationale": "Improves caching and reduces initial load time",
+    "tradeoffs": "Manual chunk configuration requires maintenance",
+    "alternatives": ["automatic chunking", "single bundle"],
+    "metrics": {
+      "sizeImpact": "-50MB",
+      "buildTimeImpact": "+10s",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "spa-environment-runtime",
+    "category": "dockerfile",
+    "pattern": "(REACT_APP_|VUE_APP_|NEXT_PUBLIC_|VITE_)",
+    "recommendation": "Handle environment variables at runtime for SPAs using window config",
+    "example": "# config.sh\n#!/bin/sh\ncat <<EOF > /usr/share/nginx/html/config.js\nwindow.ENV = {\n  API_URL: \"${API_URL}\",\n  APP_VERSION: \"${APP_VERSION}\"\n};\nEOF\n\n# Dockerfile\nFROM nginx:alpine\nCOPY --from=build /app/build /usr/share/nginx/html\nCOPY config.sh /docker-entrypoint.d/40-config.sh\nRUN chmod +x /docker-entrypoint.d/40-config.sh",
+    "severity": "medium",
+    "tags": ["spa", "environment", "configuration", "runtime"],
+    "description": "SPAs need runtime configuration for different environments",
+    "rationale": "Build-time env vars require rebuilding for each environment",
+    "tradeoffs": "Requires additional configuration injection step",
+    "alternatives": ["build per environment", "server-side configuration API"],
+    "metrics": {
+      "sizeImpact": "+1KB",
+      "buildTimeImpact": "+5s",
+      "securityScore": "-1"
+    }
+  },
+  {
+    "id": "react-native-web",
+    "category": "dockerfile",
+    "pattern": "react-native-web",
+    "recommendation": "Configure webpack aliases for React Native Web compatibility",
+    "example": "# webpack.config.js\nmodule.exports = {\n  resolve: {\n    alias: {\n      'react-native$': 'react-native-web'\n    },\n    extensions: ['.web.js', '.js']\n  }\n}\n\n# Dockerfile\nFROM node:20-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build:web",
+    "severity": "low",
+    "tags": ["react-native", "react-native-web", "mobile", "web"],
+    "description": "React Native Web requires special webpack configuration",
+    "rationale": "Enables code sharing between mobile and web platforms",
+    "tradeoffs": "Larger bundle sizes, potential compatibility issues",
+    "alternatives": ["separate web implementation", "Expo web"],
+    "metrics": {
+      "sizeImpact": "+100MB",
+      "buildTimeImpact": "+30s",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "nuxt-nitro-preset",
+    "category": "dockerfile",
+    "pattern": "(nuxt\\.config|nuxtjs/|@nuxt/)",
+    "recommendation": "Use Nuxt 3 with Nitro preset for optimal containerization",
+    "example": "// nuxt.config.ts\nexport default defineNuxtConfig({\n  nitro: {\n    preset: 'node-server'\n  }\n})\n\n# Dockerfile\nFROM node:20-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\n\nFROM node:20-alpine\nWORKDIR /app\nCOPY --from=build /app/.output ./\nEXPOSE 3000\nCMD [\"node\", \".output/server/index.mjs\"]",
+    "severity": "medium",
+    "tags": ["nuxt", "nuxt3", "vue", "ssr", "nitro"],
+    "description": "Nuxt 3 with Nitro provides optimized server builds",
+    "rationale": "Nitro creates minimal server bundles with all dependencies included",
+    "tradeoffs": "Requires Nuxt 3, migration from Nuxt 2 may be needed",
+    "alternatives": ["static generation", "serverless deployment"],
+    "metrics": {
+      "sizeImpact": "-500MB",
+      "buildTimeImpact": "+60s",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "svelte-adapter-node",
+    "category": "dockerfile",
+    "pattern": "(svelte\\.config|\\+page\\.svelte|sveltekit)",
+    "recommendation": "Use adapter-node for SvelteKit containerization",
+    "example": "// svelte.config.js\nimport adapter from '@sveltejs/adapter-node';\n\nexport default {\n  kit: {\n    adapter: adapter({\n      out: 'build',\n      precompress: false\n    })\n  }\n};\n\n# Dockerfile\nFROM node:20-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\n\nFROM node:20-alpine\nWORKDIR /app\nCOPY --from=build /app/build ./build\nCOPY --from=build /app/package.json ./\nEXPOSE 3000\nCMD [\"node\", \"build\"]",
+    "severity": "medium",
+    "tags": ["svelte", "sveltekit", "adapter", "node"],
+    "description": "SvelteKit requires specific adapter for Node.js deployment",
+    "rationale": "adapter-node creates standalone Node.js server",
+    "tradeoffs": "Larger than static adapter, requires Node.js runtime",
+    "alternatives": ["adapter-static for SPAs", "adapter-vercel for serverless"],
+    "metrics": {
+      "sizeImpact": "-300MB",
+      "buildTimeImpact": "+45s",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "remix-production-build",
+    "category": "dockerfile",
+    "pattern": "(remix\\.config|remix\\.run|\\@remix-run)",
+    "recommendation": "Deploy Remix apps with optimized production builds",
+    "example": "FROM node:20-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\n\nFROM node:20-alpine\nWORKDIR /app\nCOPY --from=build /app/node_modules ./node_modules\nCOPY --from=build /app/build ./build\nCOPY --from=build /app/public ./public\nCOPY --from=build /app/package.json ./\nENV NODE_ENV=production\nEXPOSE 3000\nCMD [\"npm\", \"start\"]",
+    "severity": "medium",
+    "tags": ["remix", "react", "ssr", "fullstack"],
+    "description": "Remix requires both build artifacts and runtime dependencies",
+    "rationale": "Remix is a full-stack framework needing server runtime",
+    "tradeoffs": "Larger images due to server-side requirements",
+    "alternatives": ["static export (limited features)", "serverless deployment"],
+    "metrics": {
+      "sizeImpact": "-200MB",
+      "buildTimeImpact": "+60s",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "webpack-bundle-analyzer",
+    "category": "dockerfile",
+    "pattern": "webpack-bundle-analyzer",
+    "recommendation": "Remove bundle analyzer from production builds",
+    "example": "# Only include in development\nRUN if [ \"$NODE_ENV\" != \"production\" ]; then npm install --save-dev webpack-bundle-analyzer; fi\n\n# Use environment-specific webpack config\nRUN npm run build:prod",
+    "severity": "low",
+    "tags": ["webpack", "bundle", "analyzer", "development"],
+    "description": "Bundle analyzer should not be included in production",
+    "rationale": "Analyzer adds unnecessary dependencies and potential security risks",
+    "tradeoffs": "Loss of bundle analysis in production",
+    "alternatives": ["CI/CD bundle analysis", "separate analysis builds"],
+    "metrics": {
+      "sizeImpact": "-20MB",
+      "buildTimeImpact": "-10s",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "pnpm-workspace-monorepo",
+    "category": "dockerfile",
+    "pattern": "(pnpm-workspace\\.yaml|pnpm-lock\\.yaml)",
+    "recommendation": "Use pnpm with proper workspace handling for monorepos",
+    "example": "FROM node:20-alpine AS build\nRUN corepack enable && corepack prepare pnpm@latest --activate\nWORKDIR /app\n\n# Copy workspace config\nCOPY pnpm-workspace.yaml ./\nCOPY pnpm-lock.yaml ./\n\n# Copy all package.json files\nCOPY packages/*/package.json ./packages/\nCOPY apps/*/package.json ./apps/\n\n# Install dependencies\nRUN pnpm install --frozen-lockfile\n\n# Copy source and build\nCOPY . .\nRUN pnpm run -r build",
+    "severity": "medium",
+    "tags": ["pnpm", "monorepo", "workspace", "frontend"],
+    "description": "pnpm workspaces require special handling in Docker",
+    "rationale": "Proper caching strategy for monorepo dependencies",
+    "tradeoffs": "Complex Dockerfile structure for monorepos",
+    "alternatives": ["npm workspaces", "yarn workspaces", "rush"],
+    "metrics": {
+      "sizeImpact": "-100MB",
+      "buildTimeImpact": "-60s",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "tailwind-css-purge",
+    "category": "dockerfile",
+    "pattern": "tailwindcss|tailwind\\.config",
+    "recommendation": "Configure Tailwind CSS purging for production builds",
+    "example": "// tailwind.config.js\nmodule.exports = {\n  content: [\n    './src/**/*.{js,jsx,ts,tsx}',\n    './public/index.html'\n  ],\n  theme: { extend: {} },\n  plugins: []\n}\n\n# Ensure NODE_ENV=production for CSS purging\nENV NODE_ENV=production\nRUN npm run build",
+    "severity": "medium",
+    "tags": ["tailwind", "css", "optimization", "purge"],
+    "description": "Tailwind CSS can be 10MB+ without proper purging",
+    "rationale": "Removes unused CSS classes reducing bundle size by 95%+",
+    "tradeoffs": "Dynamic classes may be purged if not properly configured",
+    "alternatives": ["CSS modules", "styled-components", "emotion"],
+    "metrics": {
+      "sizeImpact": "-9MB",
+      "buildTimeImpact": "+15s",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "gatsby-public-folder",
+    "category": "dockerfile",
+    "pattern": "gatsby-config|gatsbyjs",
+    "recommendation": "Serve Gatsby static builds with proper cache headers",
+    "example": "FROM node:20-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\n\nFROM nginx:alpine\nCOPY --from=build /app/public /usr/share/nginx/html\n# Gatsby generates immutable assets with hashes\nCOPY nginx-gatsby.conf /etc/nginx/conf.d/default.conf",
+    "severity": "low",
+    "tags": ["gatsby", "react", "static", "ssg"],
+    "description": "Gatsby static sites need proper nginx configuration",
+    "rationale": "Gatsby's asset optimization requires specific cache headers",
+    "tradeoffs": "Static generation limits dynamic features",
+    "alternatives": ["Gatsby Cloud", "Netlify", "Vercel"],
+    "metrics": {
+      "sizeImpact": "-600MB",
+      "buildTimeImpact": "+90s",
+      "securityScore": "+2"
+    }
+  },
+  {
+    "id": "typescript-source-maps",
+    "category": "dockerfile",
+    "pattern": "(\\.tsx?$|tsconfig\\.json)",
+    "recommendation": "Include source maps in development, exclude in production",
+    "example": "// tsconfig.prod.json\n{\n  \"extends\": \"./tsconfig.json\",\n  \"compilerOptions\": {\n    \"sourceMap\": false,\n    \"inlineSourceMap\": false\n  }\n}\n\n# Dockerfile\nRUN npm run build -- --project tsconfig.prod.json",
+    "severity": "low",
+    "tags": ["typescript", "sourcemaps", "debugging", "production"],
+    "description": "Source maps increase bundle size but aid debugging",
+    "rationale": "Production source maps expose source code structure",
+    "tradeoffs": "Harder debugging in production without source maps",
+    "alternatives": ["private source map server", "sentry source maps"],
+    "metrics": {
+      "sizeImpact": "-30MB",
+      "buildTimeImpact": "-20s",
+      "securityScore": "+1"
+    }
+  }
+]

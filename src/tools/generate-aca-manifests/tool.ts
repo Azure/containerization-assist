@@ -9,59 +9,23 @@ import path from 'path';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { promises as fs } from 'node:fs';
-import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
+import { ensureSession, useSessionSlice } from '@/mcp/tool-session-helpers';
 import { aiGenerateWithSampling } from '@/mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@/lib/ai-knowledge-enhancer';
 import type { SamplingOptions } from '@/lib/sampling';
 import { createStandardProgress } from '@/mcp/progress-helper';
 import type { ToolContext } from '@/mcp/context';
-import type { SessionData } from '@/tools/session-types';
+// Session data type
+interface SessionData {
+  results?: Record<string, unknown>;
+  workflowState?: {
+    results?: Record<string, unknown>;
+  };
+}
 import { Success, Failure, type Result } from '@/types';
 import { stripFencesAndNoise } from '@/lib/text-processing';
-import { generateAcaManifestsSchema, type GenerateAcaManifestsParams } from './schema';
-import { z } from 'zod';
-
-// Define the result schema for type safety
-const GenerateAcaManifestsResultSchema = z.object({
-  manifest: z.string(),
-  outputPath: z.string(),
-  appName: z.string(),
-  warnings: z.array(z.string()).optional(),
-  sessionId: z.string().optional(),
-  samplingMetadata: z
-    .object({
-      stoppedEarly: z.boolean().optional(),
-      candidatesGenerated: z.number(),
-      winnerScore: z.number(),
-      samplingDuration: z.number().optional(),
-    })
-    .optional(),
-  winnerScore: z.number().optional(),
-  scoreBreakdown: z.record(z.number()).optional(),
-  allCandidates: z
-    .array(
-      z.object({
-        id: z.string(),
-        content: z.string(),
-        score: z.number(),
-        scoreBreakdown: z.record(z.number()),
-        rank: z.number().optional(),
-      }),
-    )
-    .optional(),
-});
-
-// Define tool IO for type-safe session operations
-const io = defineToolIO(generateAcaManifestsSchema, GenerateAcaManifestsResultSchema);
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastGeneratedAt: z.date().optional(),
-  manifestCount: z.number().optional(),
-  lastAppName: z.string().optional(),
-  lastLocation: z.string().optional(),
-  aiStrategy: z.enum(['ai', 'template', 'hybrid']).optional(),
-});
+import { type GenerateAcaManifestsParams, generateAcaManifestsSchema } from './schema';
+// Type definitions for session operations
 
 /**
  * Result from ACA manifest generation
@@ -216,7 +180,7 @@ function validateAcaResource(obj: unknown): obj is AcaResource {
 /**
  * Generate basic ACA manifest (fallback)
  */
-function generateBasicAcaManifest(params: GenerateAcaManifestsParams): AcaResource {
+function generateAcaManifest(params: GenerateAcaManifestsParams): AcaResource {
   const {
     appName,
     imageId,
@@ -368,7 +332,7 @@ async function generateAcaManifestsImpl(
     }
 
     const { id: sessionId, state: session } = sessionResult.value;
-    const slice = useSessionSlice('generate-aca-manifests', io, context, StateSchema);
+    const slice = useSessionSlice('generate-aca-manifests', context);
 
     if (!slice) {
       return Failure('Session manager not available');
@@ -416,13 +380,13 @@ async function generateAcaManifestsImpl(
 
         try {
           // Get analysis from session for language/framework context
-          const analysisResult = (sessionData?.results?.['analyze_repo'] ||
-            sessionData?.workflowState?.results?.['analyze_repo']) as
+          const analysisResult = (sessionData?.results?.['analyze-repo'] ||
+            sessionData?.workflowState?.results?.['analyze-repo']) as
             | { language?: string; framework?: string }
             | undefined;
 
           const knowledgeResult = await enhancePromptWithKnowledge(promptArgs, {
-            operation: 'generate_aca_manifests',
+            operation: 'generate-aca-manifests',
             ...(analysisResult?.language && { language: analysisResult.language }),
             ...(analysisResult?.framework && { framework: analysisResult.framework }),
             environment: params.environment ?? 'production',
@@ -469,18 +433,18 @@ async function generateAcaManifestsImpl(
             scoreBreakdown = aiResult.value.winner.scoreBreakdown;
             allCandidates = aiResult.value.allCandidates;
           } else {
-            manifest = generateBasicAcaManifest({ ...params, imageId });
+            manifest = generateAcaManifest({ ...params, imageId });
           }
         } else {
-          manifest = generateBasicAcaManifest({ ...params, imageId });
+          manifest = generateAcaManifest({ ...params, imageId });
         }
       } else {
         // Standard generation without sampling
-        manifest = generateBasicAcaManifest({ ...params, imageId });
+        manifest = generateAcaManifest({ ...params, imageId });
       }
     } catch {
       // Fallback to basic generation
-      manifest = generateBasicAcaManifest({ ...params, imageId });
+      manifest = generateAcaManifest({ ...params, imageId });
     }
 
     // Progress: Finalizing results
@@ -560,3 +524,14 @@ async function generateAcaManifestsImpl(
  * Generate Azure Container Apps manifests tool
  */
 export const generateAcaManifests = generateAcaManifestsImpl;
+
+/**
+ * Export the tool for MCP registration
+ */
+export const tool = {
+  type: 'standard' as const,
+  name: 'generate-aca-manifests',
+  description: 'Generate Azure Container Apps manifests',
+  inputSchema: generateAcaManifestsSchema,
+  execute: generateAcaManifests,
+};

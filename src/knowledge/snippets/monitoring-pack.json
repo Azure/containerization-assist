@@ -1,0 +1,254 @@
+[
+  {
+    "id": "prometheus-metrics-endpoint",
+    "category": "dockerfile",
+    "pattern": "(prometheus|metrics|/metrics)",
+    "recommendation": "Expose Prometheus metrics endpoint for monitoring",
+    "example": "// Node.js with prom-client\nconst prometheus = require('prom-client');\nconst register = new prometheus.Registry();\nprometheus.collectDefaultMetrics({ register });\n\napp.get('/metrics', async (req, res) => {\n  res.set('Content-Type', register.contentType);\n  res.end(await register.metrics());\n});\n\n# Python with prometheus_client\nfrom prometheus_client import Counter, Histogram, generate_latest\n\nREQUEST_COUNT = Counter('app_requests_total', 'Total requests')\nREQUEST_LATENCY = Histogram('app_request_latency_seconds', 'Request latency')\n\n@app.route('/metrics')\ndef metrics():\n    return generate_latest()\n\n# Kubernetes ServiceMonitor\napiVersion: monitoring.coreos.com/v1\nkind: ServiceMonitor\nmetadata:\n  name: app-metrics\nspec:\n  selector:\n    matchLabels:\n      app: my-app\n  endpoints:\n  - port: web\n    path: /metrics",
+    "severity": "medium",
+    "tags": ["prometheus", "metrics", "monitoring", "observability"],
+    "description": "Prometheus metrics enable application performance monitoring",
+    "rationale": "Standard metrics format, works with Grafana dashboards",
+    "tradeoffs": "Exposes internal metrics, needs authentication in production",
+    "alternatives": ["push gateway", "statsd", "cloud metrics APIs"],
+    "metrics": {
+      "sizeImpact": "+2MB",
+      "buildTimeImpact": "+5s",
+      "securityScore": "-1"
+    }
+  },
+  {
+    "id": "grafana-dashboard-labels",
+    "category": "dockerfile",
+    "pattern": "(LABEL.*grafana|dashboard)",
+    "recommendation": "Add labels for automatic Grafana dashboard generation",
+    "example": "# Dockerfile labels for dashboard discovery\nLABEL grafana.dashboard=\"true\" \\\n      grafana.dashboard.uid=\"app-overview\" \\\n      grafana.dashboard.title=\"Application Overview\" \\\n      prometheus.io/scrape=\"true\" \\\n      prometheus.io/port=\"8080\" \\\n      prometheus.io/path=\"/metrics\"\n\n# ConfigMap with dashboard JSON\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: grafana-dashboard-app\n  labels:\n    grafana_dashboard: \"1\"\ndata:\n  app-dashboard.json: |\n    {\n      \"dashboard\": {\n        \"title\": \"Application Metrics\",\n        \"panels\": [...]\n      }\n    }",
+    "severity": "low",
+    "tags": ["grafana", "dashboard", "visualization", "labels"],
+    "description": "Labels enable automatic dashboard provisioning",
+    "rationale": "Consistent dashboards across environments",
+    "tradeoffs": "Dashboard maintenance overhead",
+    "alternatives": ["manual dashboard creation", "terraform dashboards"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "0",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "opentelemetry-collector",
+    "category": "dockerfile",
+    "pattern": "(otel|opentelemetry|otlp)",
+    "recommendation": "Configure OpenTelemetry collector for unified observability",
+    "example": "# Application configuration\nENV OTEL_SERVICE_NAME=\"my-app\" \\\n    OTEL_EXPORTER_OTLP_ENDPOINT=\"http://otel-collector:4317\" \\\n    OTEL_EXPORTER_OTLP_PROTOCOL=\"grpc\" \\\n    OTEL_RESOURCE_ATTRIBUTES=\"service.version=1.0.0,deployment.environment=prod\"\n\n# Collector configuration\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: otel-collector-config\ndata:\n  config.yaml: |\n    receivers:\n      otlp:\n        protocols:\n          grpc:\n            endpoint: 0.0.0.0:4317\n          http:\n            endpoint: 0.0.0.0:4318\n    processors:\n      batch:\n        timeout: 10s\n      resource:\n        attributes:\n        - key: cluster.name\n          value: production\n          action: insert\n    exporters:\n      prometheus:\n        endpoint: 0.0.0.0:8889\n      jaeger:\n        endpoint: jaeger-collector:14250\n      logging:\n        loglevel: info\n    service:\n      pipelines:\n        traces:\n          receivers: [otlp]\n          processors: [batch, resource]\n          exporters: [jaeger]\n        metrics:\n          receivers: [otlp]\n          processors: [batch, resource]\n          exporters: [prometheus]",
+    "severity": "medium",
+    "tags": ["opentelemetry", "collector", "traces", "metrics"],
+    "description": "OTel collector centralizes telemetry collection and routing",
+    "rationale": "Vendor-agnostic, single integration point for observability",
+    "tradeoffs": "Additional infrastructure component to manage",
+    "alternatives": ["direct integration", "agent per signal", "sidecar pattern"],
+    "metrics": {
+      "sizeImpact": "+10MB",
+      "buildTimeImpact": "+10s",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "jaeger-distributed-tracing",
+    "category": "dockerfile",
+    "pattern": "(jaeger|tracing|span)",
+    "recommendation": "Implement distributed tracing with Jaeger",
+    "example": "// Node.js tracing\nconst { initTracer } = require('jaeger-client');\nconst config = {\n  serviceName: process.env.SERVICE_NAME || 'my-app',\n  sampler: {\n    type: 'probabilistic',\n    param: 0.1,  // Sample 10% of traces\n  },\n  reporter: {\n    agentHost: process.env.JAEGER_AGENT_HOST || 'localhost',\n    agentPort: 6831,\n  },\n};\nconst tracer = initTracer(config);\n\n# Python tracing\nfrom jaeger_client import Config\nconfig = Config(\n    config={\n        'sampler': {'type': 'probabilistic', 'param': 0.1},\n        'logging': True,\n        'local_agent': {\n            'reporting_host': os.environ.get('JAEGER_AGENT_HOST', 'localhost'),\n            'reporting_port': 6831,\n        },\n    },\n    service_name='my-app',\n)\ntracer = config.initialize_tracer()\n\n# Docker environment\nENV JAEGER_AGENT_HOST=jaeger-agent \\\n    JAEGER_SAMPLER_TYPE=probabilistic \\\n    JAEGER_SAMPLER_PARAM=0.1",
+    "severity": "medium",
+    "tags": ["jaeger", "tracing", "distributed", "apm"],
+    "description": "Distributed tracing helps debug microservices interactions",
+    "rationale": "Visualize request flow across multiple services",
+    "tradeoffs": "Performance overhead, storage requirements",
+    "alternatives": ["zipkin", "tempo", "x-ray", "datadog apm"],
+    "metrics": {
+      "sizeImpact": "+5MB",
+      "buildTimeImpact": "+5s",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "elastic-apm-agent",
+    "category": "dockerfile",
+    "pattern": "(elastic|apm|elasticsearch)",
+    "recommendation": "Use Elastic APM for application performance monitoring",
+    "example": "# Node.js with Elastic APM\nFROM node:20-alpine\nRUN npm install elastic-apm-node\n\n# Start APM at app entry\nENV ELASTIC_APM_SERVICE_NAME=my-app \\\n    ELASTIC_APM_SERVER_URL=http://apm-server:8200 \\\n    ELASTIC_APM_SECRET_TOKEN=${APM_SECRET_TOKEN} \\\n    ELASTIC_APM_ENVIRONMENT=production \\\n    NODE_OPTIONS=\"-r elastic-apm-node/start\"\n\n# Java with Elastic APM\nFROM openjdk:17-alpine\nRUN wget -O /app/elastic-apm-agent.jar \\\n    https://repo1.maven.org/maven2/co/elastic/apm/elastic-apm-agent/1.34.0/elastic-apm-agent-1.34.0.jar\n\nCMD [\"java\", \"-javaagent:/app/elastic-apm-agent.jar\", \\\n     \"-Delastic.apm.service_name=my-app\", \\\n     \"-Delastic.apm.server_url=http://apm-server:8200\", \\\n     \"-jar\", \"app.jar\"]",
+    "severity": "medium",
+    "tags": ["elastic", "apm", "performance", "monitoring"],
+    "description": "Elastic APM provides deep application insights",
+    "rationale": "Integrates with ELK stack, detailed performance metrics",
+    "tradeoffs": "Vendor lock-in, requires Elastic infrastructure",
+    "alternatives": ["new relic", "datadog", "appdynamics", "dynatrace"],
+    "metrics": {
+      "sizeImpact": "+15MB",
+      "buildTimeImpact": "+10s",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "fluentd-logging",
+    "category": "dockerfile",
+    "pattern": "(fluentd|fluent-bit|logging)",
+    "recommendation": "Use Fluentd/Fluent Bit for log aggregation",
+    "example": "# Application logs to stdout/stderr in JSON\nimport json\nimport sys\n\ndef log(level, message, **kwargs):\n    log_entry = {\n        'timestamp': datetime.utcnow().isoformat(),\n        'level': level,\n        'message': message,\n        **kwargs\n    }\n    print(json.dumps(log_entry), file=sys.stderr)\n\n# Fluent Bit sidecar configuration\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: fluent-bit-config\ndata:\n  fluent-bit.conf: |\n    [SERVICE]\n        Flush        1\n        Daemon       Off\n        Log_Level    info\n\n    [INPUT]\n        Name              tail\n        Path              /var/log/containers/*.log\n        Parser            docker\n        Tag               kube.*\n        Refresh_Interval  5\n\n    [FILTER]\n        Name                kubernetes\n        Match               kube.*\n        Kube_URL            https://kubernetes.default.svc:443\n        Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt\n        Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token\n\n    [OUTPUT]\n        Name            es\n        Match           *\n        Host            elasticsearch\n        Port            9200\n        Index           app-logs\n        Type            _doc",
+    "severity": "medium",
+    "tags": ["fluentd", "fluent-bit", "logging", "aggregation"],
+    "description": "Centralized logging with structured data collection",
+    "rationale": "Unified log collection across all containers",
+    "tradeoffs": "Additional resource consumption for log agents",
+    "alternatives": ["filebeat", "vector", "logstash", "cloudwatch"],
+    "metrics": {
+      "sizeImpact": "+50MB",
+      "buildTimeImpact": "0",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "datadog-agent-integration",
+    "category": "dockerfile",
+    "pattern": "(datadog|dd-agent|ddtrace)",
+    "recommendation": "Integrate Datadog for comprehensive monitoring",
+    "example": "# Python with Datadog APM\nFROM python:3.11-slim\nRUN pip install ddtrace\n\nENV DD_SERVICE=my-app \\\n    DD_ENV=production \\\n    DD_VERSION=1.0.0 \\\n    DD_AGENT_HOST=datadog-agent \\\n    DD_TRACE_ENABLED=true \\\n    DD_LOGS_INJECTION=true \\\n    DD_PROFILING_ENABLED=true\n\nCMD [\"ddtrace-run\", \"python\", \"app.py\"]\n\n# Kubernetes annotations for autodiscovery\napiVersion: v1\nkind: Pod\nmetadata:\n  annotations:\n    ad.datadoghq.com/my-app.logs: '[{\"source\": \"python\", \"service\": \"my-app\"}]'\n    ad.datadoghq.com/my-app.check_names: '[\"prometheus\"]'\n    ad.datadoghq.com/my-app.init_configs: '[{}]'\n    ad.datadoghq.com/my-app.instances: '[{\"prometheus_url\": \"http://%%host%%:8080/metrics\"}]'",
+    "severity": "medium",
+    "tags": ["datadog", "apm", "monitoring", "logs"],
+    "description": "Datadog provides unified monitoring platform",
+    "rationale": "Single platform for metrics, logs, traces, and profiles",
+    "tradeoffs": "Vendor lock-in, cost at scale",
+    "alternatives": ["new relic", "dynatrace", "appdynamics", "splunk"],
+    "metrics": {
+      "sizeImpact": "+20MB",
+      "buildTimeImpact": "+10s",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "loki-log-aggregation",
+    "category": "dockerfile",
+    "pattern": "(loki|promtail|logql)",
+    "recommendation": "Use Loki for cost-effective log aggregation",
+    "example": "# Configure structured logging\nimport logging\nimport json\n\nclass JsonFormatter(logging.Formatter):\n    def format(self, record):\n        log_obj = {\n            'timestamp': self.formatTime(record),\n            'level': record.levelname,\n            'logger': record.name,\n            'message': record.getMessage(),\n            'trace_id': getattr(record, 'trace_id', None)\n        }\n        return json.dumps(log_obj)\n\n# Promtail configuration\nserver:\n  http_listen_port: 9080\n  grpc_listen_port: 0\n\npositions:\n  filename: /tmp/positions.yaml\n\nclients:\n  - url: http://loki:3100/loki/api/v1/push\n\nscrape_configs:\n  - job_name: containers\n    static_configs:\n      - targets:\n          - localhost\n        labels:\n          job: containerlogs\n          __path__: /var/log/containers/*.log\n    pipeline_stages:\n      - json:\n          expressions:\n            level: level\n            trace_id: trace_id\n      - labels:\n          level:\n          trace_id:",
+    "severity": "medium",
+    "tags": ["loki", "promtail", "logs", "grafana"],
+    "description": "Loki provides Prometheus-like logging with minimal storage",
+    "rationale": "Cost-effective, integrates with Grafana, uses object storage",
+    "tradeoffs": "Limited indexing compared to Elasticsearch",
+    "alternatives": ["elasticsearch", "splunk", "cloudwatch logs"],
+    "metrics": {
+      "sizeImpact": "+30MB",
+      "buildTimeImpact": "0",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "statsd-metrics",
+    "category": "dockerfile",
+    "pattern": "(statsd|metrics|udp)",
+    "recommendation": "Use StatsD for lightweight metrics collection",
+    "example": "// Node.js with node-statsd\nconst StatsD = require('node-statsd');\nconst client = new StatsD({\n  host: process.env.STATSD_HOST || 'localhost',\n  port: 8125,\n  prefix: 'app.'\n});\n\n// Track metrics\nclient.increment('requests.count');\nclient.timing('request.duration', responseTime);\nclient.gauge('memory.usage', process.memoryUsage().heapUsed);\n\n# Python with statsd\nimport statsd\nc = statsd.StatsClient('localhost', 8125, prefix='app')\n\nc.incr('requests.count')\nc.timing('request.duration', response_time)\nc.gauge('queue.size', queue_size)\n\n# Environment configuration\nENV STATSD_HOST=statsd-exporter \\\n    STATSD_PORT=8125",
+    "severity": "low",
+    "tags": ["statsd", "metrics", "lightweight", "udp"],
+    "description": "StatsD provides simple, fire-and-forget metrics",
+    "rationale": "Minimal performance impact, wide language support",
+    "tradeoffs": "UDP can lose metrics, requires aggregation server",
+    "alternatives": ["prometheus", "influxdb", "graphite"],
+    "metrics": {
+      "sizeImpact": "+1MB",
+      "buildTimeImpact": "+2s",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "sentry-error-tracking",
+    "category": "dockerfile",
+    "pattern": "(sentry|error.*tracking|exception)",
+    "recommendation": "Integrate Sentry for error tracking and monitoring",
+    "example": "# Node.js\nimport * as Sentry from '@sentry/node';\n\nSentry.init({\n  dsn: process.env.SENTRY_DSN,\n  environment: process.env.NODE_ENV,\n  release: process.env.APP_VERSION,\n  tracesSampleRate: 0.1,\n  integrations: [\n    new Sentry.Integrations.Http({ tracing: true }),\n  ],\n});\n\n# Python\nimport sentry_sdk\nfrom sentry_sdk.integrations.flask import FlaskIntegration\n\nsentry_sdk.init(\n    dsn=os.environ['SENTRY_DSN'],\n    integrations=[FlaskIntegration()],\n    traces_sample_rate=0.1,\n    environment=os.environ.get('ENV', 'development'),\n    release=os.environ.get('VERSION', 'unknown')\n)\n\n# Dockerfile\nENV SENTRY_DSN=${SENTRY_DSN} \\\n    SENTRY_ENVIRONMENT=production \\\n    SENTRY_RELEASE=${GIT_SHA}",
+    "severity": "medium",
+    "tags": ["sentry", "errors", "exceptions", "monitoring"],
+    "description": "Sentry provides real-time error tracking and alerting",
+    "rationale": "Detailed error context, user impact tracking, release tracking",
+    "tradeoffs": "Sends error data to external service",
+    "alternatives": ["rollbar", "bugsnag", "airbrake", "raygun"],
+    "metrics": {
+      "sizeImpact": "+5MB",
+      "buildTimeImpact": "+5s",
+      "securityScore": "-1"
+    }
+  },
+  {
+    "id": "new-relic-full-stack",
+    "category": "dockerfile",
+    "pattern": "(newrelic|new-relic|nr-agent)",
+    "recommendation": "Use New Relic for full-stack observability",
+    "example": "# Node.js with New Relic\nFROM node:20-alpine\nRUN npm install newrelic\nCOPY newrelic.js .\n\nENV NEW_RELIC_APP_NAME=\"my-app\" \\\n    NEW_RELIC_LICENSE_KEY=${NR_LICENSE_KEY} \\\n    NEW_RELIC_LOG_LEVEL=\"info\" \\\n    NEW_RELIC_DISTRIBUTED_TRACING_ENABLED=true \\\n    NODE_OPTIONS=\"-r newrelic\"\n\n# Java with New Relic\nFROM openjdk:17-alpine\nRUN wget https://download.newrelic.com/newrelic/java-agent/newrelic-agent/current/newrelic.jar\n\nCMD [\"java\", \\\n     \"-javaagent:/app/newrelic.jar\", \\\n     \"-Dnewrelic.config.app_name=my-app\", \\\n     \"-Dnewrelic.config.distributed_tracing.enabled=true\", \\\n     \"-jar\", \"app.jar\"]",
+    "severity": "medium",
+    "tags": ["newrelic", "apm", "observability", "monitoring"],
+    "description": "New Relic provides comprehensive application monitoring",
+    "rationale": "Full-stack visibility, AI-powered insights",
+    "tradeoffs": "Cost, performance overhead, vendor lock-in",
+    "alternatives": ["datadog", "dynatrace", "appdynamics"],
+    "metrics": {
+      "sizeImpact": "+25MB",
+      "buildTimeImpact": "+10s",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "cloudwatch-container-insights",
+    "category": "dockerfile",
+    "pattern": "(cloudwatch|aws.*logs|container.*insights)",
+    "recommendation": "Use CloudWatch Container Insights for AWS workloads",
+    "example": "# Application logging configuration\nimport logging\nimport watchtower\n\nlogging.basicConfig(level=logging.INFO)\nlogger = logging.getLogger(__name__)\nlogger.addHandler(watchtower.CloudWatchLogHandler(\n    log_group='/aws/containerinsights/cluster-name/application',\n    stream_name=os.environ.get('HOSTNAME', 'container'),\n    use_queues=True,\n    create_log_group=False\n))\n\n# ECS task definition\n{\n  \"logConfiguration\": {\n    \"logDriver\": \"awslogs\",\n    \"options\": {\n      \"awslogs-group\": \"/ecs/my-app\",\n      \"awslogs-region\": \"us-east-1\",\n      \"awslogs-stream-prefix\": \"ecs\"\n    }\n  }\n}\n\n# Environment variables\nENV AWS_DEFAULT_REGION=us-east-1 \\\n    AWS_EMF_NAMESPACE=MyApp \\\n    AWS_EMF_SERVICE_NAME=my-service",
+    "severity": "medium",
+    "tags": ["cloudwatch", "aws", "logs", "metrics"],
+    "description": "Native AWS monitoring for containers",
+    "rationale": "Deep AWS integration, no additional infrastructure",
+    "tradeoffs": "AWS-specific, costs can escalate with volume",
+    "alternatives": ["datadog", "new relic", "elastic"],
+    "metrics": {
+      "sizeImpact": "+10MB",
+      "buildTimeImpact": "+5s",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "tempo-trace-storage",
+    "category": "dockerfile",
+    "pattern": "(tempo|trace.*storage|grafana.*tempo)",
+    "recommendation": "Use Tempo for scalable trace storage",
+    "example": "# Application sends traces via OTLP\nENV OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317 \\\n    OTEL_SERVICE_NAME=my-app \\\n    OTEL_TRACES_SAMPLER=parentbased_traceidratio \\\n    OTEL_TRACES_SAMPLER_ARG=0.1\n\n# Tempo configuration\nserver:\n  http_listen_port: 3200\n\ndistributor:\n  receivers:\n    otlp:\n      protocols:\n        grpc:\n          endpoint: 0.0.0.0:4317\n\ningester:\n  lifecycler:\n    address: 127.0.0.1\n    ring:\n      kvstore:\n        store: inmemory\n      replication_factor: 1\n\nstorage:\n  trace:\n    backend: s3\n    s3:\n      bucket: tempo-traces\n      endpoint: s3.amazonaws.com\n      region: us-east-1\n\nquerier:\n  frontend_worker:\n    frontend_address: tempo-query-frontend:9095",
+    "severity": "low",
+    "tags": ["tempo", "traces", "grafana", "storage"],
+    "description": "Tempo provides cost-effective trace storage using object storage",
+    "rationale": "Scales with S3/GCS, integrates with Grafana, minimal operational overhead",
+    "tradeoffs": "Query performance depends on object storage",
+    "alternatives": ["jaeger", "zipkin", "x-ray", "lightstep"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "0",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "kube-state-metrics",
+    "category": "dockerfile",
+    "pattern": "(kube-state-metrics|kubernetes.*metrics)",
+    "recommendation": "Add Kubernetes resource metrics with labels",
+    "example": "# Add labels for kube-state-metrics\nLABEL app=\"my-app\" \\\n      version=\"1.0.0\" \\\n      team=\"platform\" \\\n      cost-center=\"engineering\"\n\n# Deployment with labels\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: my-app\n  labels:\n    app: my-app\n    version: \"1.0.0\"\n    team: platform\nspec:\n  template:\n    metadata:\n      labels:\n        app: my-app\n        version: \"1.0.0\"\n      annotations:\n        prometheus.io/scrape: \"true\"\n        prometheus.io/port: \"8080\"\n        prometheus.io/path: \"/metrics\"\n\n# Query examples\n# Pod count by team: kube_pod_labels{label_team=\"platform\"}\n# Resource requests: kube_pod_container_resource_requests",
+    "severity": "low",
+    "tags": ["kubernetes", "metrics", "kube-state-metrics", "labels"],
+    "description": "Kubernetes object metrics enable cluster-wide monitoring",
+    "rationale": "Track resource usage, scaling events, pod lifecycle",
+    "tradeoffs": "Requires cluster-wide permissions",
+    "alternatives": ["metrics-server", "cadvisor", "custom controllers"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "0",
+      "securityScore": "0"
+    }
+  }
+]

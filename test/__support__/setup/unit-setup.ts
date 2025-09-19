@@ -7,11 +7,13 @@ jest.setTimeout(10000);
 // Mock Docker client for unit tests
 function createMockDockerClient() {
   return {
-    buildImage: jest.fn(),
-    pushImage: jest.fn(),
-    tagImage: jest.fn(),
-    listImages: jest.fn(),
-    removeImage: jest.fn(),
+    buildImage: jest.fn().mockResolvedValue({ ok: false, error: 'Build failed: mock error' }),
+    getImage: jest.fn().mockResolvedValue({ ok: false, error: 'Failed to get image: mock error' }),
+    tagImage: jest.fn().mockResolvedValue({ ok: false, error: 'Failed to tag image: mock error' }),
+    pushImage: jest.fn().mockResolvedValue({ ok: false, error: 'Failed to push image: mock error' }),
+    removeImage: jest.fn().mockResolvedValue({ ok: false, error: 'Failed to remove image: mock error' }),
+    removeContainer: jest.fn().mockResolvedValue({ ok: false, error: 'Failed to remove container: mock error' }),
+    listContainers: jest.fn().mockResolvedValue({ ok: false, error: 'Failed to list containers: mock error' }),
   };
 }
 
@@ -27,7 +29,7 @@ function createMockKubernetesClient() {
 }
 
 // Mock external dependencies by default for unit tests
-jest.mock('../../../src/lib/docker', () => ({
+jest.mock('../../../src/services/docker-client', () => ({
   DockerClient: jest.fn(),
   createDockerClient: jest.fn(() => createMockDockerClient()),
 }));

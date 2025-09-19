@@ -23,38 +23,28 @@ import * as yaml from 'js-yaml';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import type { Logger } from '@/lib/logger';
 import { extractErrorMessage } from '@/lib/error-utils';
-import {
-  ensureSession,
-  defineToolIO,
-  useSessionSlice,
-  getSessionSlice,
-} from '@/mcp/tool-session-helpers';
+import { ensureSession, useSessionSlice, getSessionSlice } from '@/mcp/tool-session-helpers';
 import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient } from '@/lib/kubernetes';
 
-import { Success, Failure, type Result } from '@/types';
-import { generateK8sManifestsSchema } from '@/tools/generate-k8s-manifests/schema';
-import { z } from 'zod';
-import { DEFAULT_TIMEOUTS } from '@/config/defaults';
-import { deployApplicationSchema, type DeployApplicationParams } from './schema';
+import { Success, Failure, type Result, type K8sManifest } from '@/types';
+import type { K8sManifestOutput } from '@tools/generate-k8s-manifests/schema';
+// Default timeout configuration (in milliseconds)
+const DEFAULT_TIMEOUTS = {
+  deploymentPollMs: 5000, // Poll interval for deployment status checks in milliseconds
+};
+import { type DeployApplicationParams, deployApplicationSchema } from './schema';
 
 // Type definitions for Kubernetes manifests
-interface KubernetesManifest {
-  kind?: string;
-  metadata?: {
-    name?: string;
-    namespace?: string;
-  };
-}
 
-interface DeploymentManifest extends KubernetesManifest {
+interface DeploymentManifest extends K8sManifest {
   kind: 'Deployment';
   spec?: {
     replicas?: number;
   };
 }
 
-interface ServiceManifest extends KubernetesManifest {
+interface ServiceManifest extends K8sManifest {
   kind: 'Service';
   spec?: {
     ports?: Array<{ port?: number; targetPort?: number; nodePort?: number }>;
@@ -62,7 +52,7 @@ interface ServiceManifest extends KubernetesManifest {
   };
 }
 
-interface IngressManifest extends KubernetesManifest {
+interface IngressManifest extends K8sManifest {
   kind: 'Ingress';
   spec?: {
     rules?: Array<{ host?: string; http?: unknown }>;
@@ -132,56 +122,12 @@ export interface DeployApplicationResult {
   chainHint?: string; // Hint for next tool in workflow chain
 }
 
-// Define the result schema for type safety
-const DeployApplicationResultSchema = z.object({
-  success: z.boolean(),
-  sessionId: z.string(),
-  namespace: z.string(),
-  deploymentName: z.string(),
-  serviceName: z.string(),
-  endpoints: z.array(
-    z.object({
-      type: z.enum(['internal', 'external']),
-      url: z.string(),
-      port: z.number(),
-    }),
-  ),
-  ready: z.boolean(),
-  replicas: z.number(),
-  status: z
-    .object({
-      readyReplicas: z.number(),
-      totalReplicas: z.number(),
-      conditions: z.array(
-        z.object({
-          type: z.string(),
-          status: z.string(),
-          message: z.string(),
-        }),
-      ),
-    })
-    .optional(),
-  chainHint: z.string().optional(),
-});
-
-// Define tool IO for type-safe session operations
-const io = defineToolIO(deployApplicationSchema, DeployApplicationResultSchema);
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastDeployedAt: z.date().optional(),
-  lastDeployedNamespace: z.string().optional(),
-  lastDeploymentName: z.string().optional(),
-  lastServiceName: z.string().optional(),
-  totalDeployments: z.number().optional(),
-  lastDeploymentReady: z.boolean().optional(),
-  lastEndpointCount: z.number().optional(),
-});
+// Type definitions for session operations
 
 /**
  * Parse YAML/JSON manifest content with validation
  */
-function parseManifest(content: string, logger: Logger): KubernetesManifest[] {
+function parseManifest(content: string, logger: Logger): K8sManifest[] {
   try {
     // Try parsing as JSON first
     const parsed = JSON.parse(content);
@@ -203,8 +149,8 @@ function parseManifest(content: string, logger: Logger): KubernetesManifest[] {
 /**
  * Validate manifests have required structure
  */
-function validateManifests(manifests: unknown[], logger: Logger): KubernetesManifest[] {
-  const validated: KubernetesManifest[] = [];
+function validateManifests(manifests: unknown[], logger: Logger): K8sManifest[] {
+  const validated: K8sManifest[] = [];
 
   for (const manifest of manifests) {
     if (!manifest || typeof manifest !== 'object') {
@@ -212,7 +158,7 @@ function validateManifests(manifests: unknown[], logger: Logger): KubernetesMani
       continue;
     }
 
-    const m = manifest as KubernetesManifest;
+    const m = manifest as K8sManifest;
     if (!m.kind) {
       logger.warn({ manifest }, 'Skipping manifest without kind');
       continue;
@@ -231,7 +177,7 @@ function validateManifests(manifests: unknown[], logger: Logger): KubernetesMani
 /**
  * Order manifests for deployment based on resource dependencies
  */
-function orderManifests(manifests: KubernetesManifest[]): KubernetesManifest[] {
+function orderManifests(manifests: K8sManifest[]): K8sManifest[] {
   return manifests.sort((a, b) => {
     const aIndex =
       a.kind && MANIFEST_ORDER.includes(a.kind as any)
@@ -248,8 +194,8 @@ function orderManifests(manifests: KubernetesManifest[]): KubernetesManifest[] {
 /**
  * Find manifest by kind with type safety
  */
-function findManifestByKind<T extends KubernetesManifest>(
-  manifests: KubernetesManifest[],
+function findManifestByKind<T extends K8sManifest>(
+  manifests: K8sManifest[],
   kind: string,
 ): T | undefined {
   return manifests.find((m) => m.kind === kind) as T | undefined;
@@ -259,13 +205,13 @@ function findManifestByKind<T extends KubernetesManifest>(
  * Deploy a single manifest with error recovery
  */
 async function deployManifest(
-  manifest: KubernetesManifest,
+  manifest: K8sManifest,
   namespace: string,
   k8sClient: ReturnType<typeof createKubernetesClient>,
   logger: Logger,
 ): Promise<{ success: boolean; resource?: { kind: string; name: string; namespace: string } }> {
   const { kind = 'unknown', metadata } = manifest;
-  const name = metadata?.name ?? 'unknown';
+  const name = metadata.name;
 
   try {
     const applyResult = await k8sClient.applyManifest(manifest, namespace);
@@ -310,7 +256,7 @@ async function deployApplicationImpl(
     const cluster = DEPLOYMENT_CONFIG.DEFAULT_CLUSTER;
     const dryRun = DEPLOYMENT_CONFIG.DRY_RUN;
     const wait = DEPLOYMENT_CONFIG.WAIT_FOR_READY;
-    const timeout = DEPLOYMENT_CONFIG.WAIT_TIMEOUT_SECONDS;
+    const timeoutSeconds = DEPLOYMENT_CONFIG.WAIT_TIMEOUT_SECONDS;
     logger.info({ namespace, cluster, dryRun, environment }, 'Starting application deployment');
 
     // Ensure session exists and get typed slice operations
@@ -320,7 +266,7 @@ async function deployApplicationImpl(
     }
 
     const { id: sessionId } = sessionResult.value;
-    const slice = useSessionSlice('deploy', io, context, StateSchema);
+    const slice = useSessionSlice('deploy', context);
 
     if (!slice) {
       return Failure('Session manager not available');
@@ -338,31 +284,11 @@ async function deployApplicationImpl(
     // Get K8s manifests from session slice
     let manifestContents: string | undefined;
     try {
-      const GenerateK8sManifestsResultSchema = z.object({
-        manifests: z.string(),
-        outputPath: z.string(),
-        resources: z.array(
-          z.object({
-            kind: z.string(),
-            name: z.string(),
-            namespace: z.string(),
-          }),
-        ),
-        sessionId: z.string().optional(),
-      });
-      const generateK8sIO = defineToolIO(
-        generateK8sManifestsSchema,
-        GenerateK8sManifestsResultSchema,
-      );
-      const k8sSliceResult = await getSessionSlice(
-        'generate-k8s-manifests',
-        sessionId,
-        generateK8sIO,
-        context,
-      );
+      const k8sSliceResult = await getSessionSlice('generate-k8s-manifests', sessionId, context);
 
       if (k8sSliceResult.ok && k8sSliceResult.value?.output) {
-        manifestContents = k8sSliceResult.value.output.manifests;
+        const output = k8sSliceResult.value.output as K8sManifestOutput;
+        manifestContents = output.manifests.join('\n---\n');
       }
     } catch (error) {
       logger.error({ error }, 'Failed to get K8s manifests from session');
@@ -375,7 +301,7 @@ async function deployApplicationImpl(
     }
 
     // Parse and validate manifests
-    let manifests: KubernetesManifest[];
+    let manifests: K8sManifest[];
     try {
       // The manifests are already a string containing all YAML documents
 
@@ -470,17 +396,14 @@ async function deployApplicationImpl(
     const totalReplicas = deployment?.spec?.replicas ?? replicas;
     if (wait && !dryRun) {
       // Wait for deployment with configurable retry delay
-      logger.info(
-        { deploymentName, timeoutSeconds: timeout },
-        'Waiting for deployment to be ready',
-      );
+      logger.info({ deploymentName, timeoutSeconds }, 'Waiting for deployment to be ready');
 
       const startTime = Date.now();
-      const retryDelay = DEFAULT_TIMEOUTS.deploymentPoll || 5000;
-      const maxWaitTime = timeout * 1000;
+      const retryDelayMs = DEFAULT_TIMEOUTS.deploymentPollMs || 5000;
+      const maxWaitTimeMs = timeoutSeconds * 1000;
       let attempts = 0;
 
-      while (Date.now() - startTime < maxWaitTime) {
+      while (Date.now() - startTime < maxWaitTimeMs) {
         attempts++;
         const statusResult = await k8sClient.getDeploymentStatus(namespace, deploymentName);
 
@@ -514,12 +437,12 @@ async function deployApplicationImpl(
         }
 
         // Wait before checking again using configured delay
-        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
       }
 
       if (!ready) {
         logger.error(
-          { deploymentName, timeoutSeconds: timeout, attempts },
+          { deploymentName, timeoutSeconds, attempts },
           'Deployment did not become ready within timeout - check pod status and logs',
         );
       }
@@ -632,6 +555,12 @@ async function deployApplicationImpl(
 }
 
 /**
- * Export the deploy tool directly
+ * Export the deploy tool with proper structure
  */
-export const deployApplication = deployApplicationImpl;
+export const deployApplication: import('@/mcp/tools/types').StandardToolExport = {
+  type: 'standard',
+  name: 'deploy',
+  description: 'Deploy application to Kubernetes cluster',
+  inputSchema: deployApplicationSchema,
+  execute: deployApplicationImpl,
+};

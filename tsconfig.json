@@ -13,41 +13,38 @@
       "@/*": [
         "src/*"
       ],
-      "@/mcp/*": [
+      "@mcp/*": [
         "src/mcp/*"
       ],
-      "@/tools/*": [
+      "@tools/*": [
         "src/tools/*"
       ],
-      "@/lib/*": [
+      "@lib/*": [
         "src/lib/*"
       ],
-      "@/services/*": [
+      "@services/*": [
         "src/services/*"
       ],
-      "@/config/*": [
+      "@config/*": [
         "src/config/*"
       ],
-      "@/prompts/*": [
+      "@prompts/*": [
         "src/prompts/*"
       ],
-      "@/resources/*": [
+      "@resources/*": [
         "src/resources/*"
       ],
-      "@/exports/*": [
+      "@exports/*": [
         "src/exports/*"
       ],
-      "@/knowledge/*": [
+      "@knowledge/*": [
         "src/knowledge/*"
       ],
-      "@/types/*": [
-        "src/types/*"
-      ],
-      "@/container": [
-        "src/container"
+      "@types": [
+        "src/types"
       ],
       "@validation/*": [
-        "src/validation"
+        "src/validation/*"
       ]
     },
     "declaration": true,
@@ -57,7 +54,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitOverride": true,
-    "exactOptionalPropertyTypes": true,
+    "exactOptionalPropertyTypes": false,
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,

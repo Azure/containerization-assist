@@ -9,177 +9,58 @@ import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import type { Logger } from '@/lib/logger';
 import path from 'path';
 import { normalizePath } from '@/lib/path-utils';
-import {
-  ensureSession,
-  defineToolIO,
-  useSessionSlice,
-  getSessionSlice,
-} from '@/mcp/tool-session-helpers';
+import { ensureSession, useSessionSlice, getSessionSlice } from '@/mcp/tool-session-helpers';
 import { createStandardProgress } from '@/mcp/progress-helper';
 import { aiGenerateWithSampling } from '@/mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@/lib/ai-knowledge-enhancer';
 import type { SamplingOptions } from '@/lib/sampling';
-import { analyzeRepoSchema } from '@/tools/analyze-repo/schema';
 
-import type { SessionAnalysisResult } from '@/tools/session-types';
+import type { SessionAnalysisResult } from '@/types/tool-session-types';
 import type { ToolContext } from '@/mcp/context';
 import { Success, Failure, type Result } from '@/types';
-import { getDefaultPort, ANALYSIS_CONFIG } from '@/config/defaults';
+// Default configurations moved inline
+const ANALYSIS_CONFIG = {
+  CONFIDENCE_THRESHOLD: 0.7,
+  DIRECT_ANALYSIS_MAX_TOKENS: 4096,
+};
+
+function getDefaultPort(languageOrFramework: string): string {
+  const portMap: Record<string, string> = {
+    nodejs: '3000',
+    python: '8000',
+    java: '8080',
+    go: '8080',
+    ruby: '3000',
+    php: '80',
+    dotnet: '5000',
+    rust: '8000',
+    express: '3000',
+    fastapi: '8000',
+    flask: '5000',
+    django: '8000',
+    spring: '8080',
+    rails: '3000',
+    laravel: '8000',
+    aspnet: '5000',
+    actix: '8080',
+    gin: '8080',
+    echo: '8080',
+    nextjs: '3000',
+    nuxt: '3000',
+    gatsby: '8000',
+    generic: '8080',
+    default: '8080',
+  };
+  return portMap[languageOrFramework.toLowerCase()] || '8080';
+}
 import { getRecommendedBaseImage } from '@/lib/base-images';
 import {
   stripFencesAndNoise,
   isValidDockerfileContent,
   extractBaseImage,
 } from '@/lib/text-processing';
-import { generateDockerfileSchema, type GenerateDockerfileParams } from './schema';
-import { z } from 'zod';
+import { type GenerateDockerfileParams, generateDockerfileSchema } from './schema';
 import { AnalyzeRepoResult } from '@/tools/analyze-repo/tool';
-
-// Define the result schema for type safety - complex nested structure
-const SingleDockerfileResultSchema = z.object({
-  content: z.string(),
-  path: z.string(),
-  moduleRoot: z.string(),
-  baseImage: z.string(),
-  optimization: z.boolean(),
-  multistage: z.boolean(),
-  warnings: z.array(z.string()).optional(),
-  samplingMetadata: z
-    .object({
-      stoppedEarly: z.boolean().optional(),
-      candidatesGenerated: z.number(),
-      winnerScore: z.number(),
-      samplingDuration: z.number().optional(),
-    })
-    .optional(),
-  winnerScore: z.number().optional(),
-  scoreBreakdown: z.record(z.number()).optional(),
-  allCandidates: z
-    .array(
-      z.object({
-        id: z.string(),
-        content: z.string(),
-        score: z.number(),
-        scoreBreakdown: z.record(z.number()),
-        rank: z.number().optional(),
-      }),
-    )
-    .optional(),
-  validationScore: z.number().optional(),
-  validationGrade: z.string().optional(),
-  validationReport: z.string().optional(),
-});
-
-const GenerateDockerfileResultSchema = z.object({
-  content: z.string().optional(),
-  path: z.string().optional(),
-  baseImage: z.string().optional(),
-  optimization: z.boolean(),
-  multistage: z.boolean(),
-  warnings: z.array(z.string()).optional(),
-  sessionId: z.string().optional(),
-  dockerfiles: z.array(SingleDockerfileResultSchema),
-  count: z.number(),
-  samplingMetadata: z
-    .object({
-      stoppedEarly: z.boolean().optional(),
-      candidatesGenerated: z.number(),
-      winnerScore: z.number(),
-      samplingDuration: z.number().optional(),
-    })
-    .optional(),
-  winnerScore: z.number().optional(),
-  scoreBreakdown: z.record(z.number()).optional(),
-  allCandidates: z
-    .array(
-      z.object({
-        id: z.string(),
-        content: z.string(),
-        score: z.number(),
-        scoreBreakdown: z.record(z.number()),
-        rank: z.number().optional(),
-      }),
-    )
-    .optional(),
-  scoringDetails: z
-    .object({
-      candidates: z
-        .array(
-          z
-            .object({
-              score: z.number(),
-            })
-            .catchall(z.any()),
-        )
-        .optional(),
-    })
-    .optional(),
-});
-
-// Define tool IO for type-safe session operations
-const io = defineToolIO(generateDockerfileSchema, GenerateDockerfileResultSchema);
-
-// Define analyze-repo tool IO for accessing its session slice data
-// Note: We need to import the result schema from analyze-repo
-const AnalyzeRepoResultSchema = z.object({
-  ok: z.boolean(),
-  sessionId: z.string(),
-  language: z.string(),
-  languageVersion: z.string().optional(),
-  framework: z.string().optional(),
-  frameworkVersion: z.string().optional(),
-  buildSystem: z
-    .object({
-      type: z.string(),
-      file: z.string(),
-      buildCommand: z.string(),
-      testCommand: z.string().optional(),
-    })
-    .optional(),
-  dependencies: z.array(
-    z.object({
-      name: z.string(),
-      version: z.string().optional(),
-      type: z.string(),
-    }),
-  ),
-  ports: z.array(z.number()),
-  hasDockerfile: z.boolean(),
-  hasDockerCompose: z.boolean(),
-  hasKubernetes: z.boolean(),
-  recommendations: z.object({
-    baseImage: z.string(),
-    buildStrategy: z.enum(['multi-stage', 'single-stage']),
-    securityNotes: z.array(z.string()),
-  }),
-  confidence: z.number(),
-  detectionMethod: z.enum(['signature', 'extension', 'fallback', 'ai-enhanced']),
-  detectionDetails: z.object({
-    signatureMatches: z.number(),
-    extensionMatches: z.number(),
-    frameworkSignals: z.number(),
-    buildSystemSignals: z.number(),
-  }),
-  metadata: z.object({
-    path: z.string(),
-    depth: z.number(),
-    timestamp: z.number(),
-    includeTests: z.boolean().optional(),
-    aiInsights: z.unknown().optional(),
-  }),
-  modules: z.array(z.string()).optional(),
-});
-
-const analyzeRepoIO = defineToolIO(analyzeRepoSchema, AnalyzeRepoResultSchema);
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastGeneratedAt: z.date().optional(),
-  dockerfileCount: z.number().optional(),
-  primaryModule: z.string().optional(),
-  generationStrategy: z.enum(['ai', 'template', 'hybrid']).optional(),
-  lastOptimization: z.string().optional(),
-});
 
 /**
  * Single module Dockerfile generation result with optional sampling metadata
@@ -306,8 +187,8 @@ function generateTemplateDockerfile(
     case 'javascript':
     case 'typescript': {
       // Handle Node.js projects - detect package manager
-      const hasYarn = dependencies.some((d) => d.name === 'yarn');
-      const hasPnpm = dependencies.some((d) => d.name === 'pnpm');
+      const hasYarn = dependencies.some((d: { name: string }) => d.name === 'yarn');
+      const hasPnpm = dependencies.some((d: { name: string }) => d.name === 'pnpm');
       const packageManager = hasPnpm ? 'pnpm' : hasYarn ? 'yarn' : 'npm';
       dockerfile += `# Copy package files\n`;
       if (packageManager === 'pnpm') {
@@ -337,7 +218,8 @@ function generateTemplateDockerfile(
     case 'java': {
       // Handle Java projects - detect build system
       const javaBuildSystem =
-        buildSystem?.type || (dependencies.some((d) => d.name === 'gradle') ? 'gradle' : 'maven');
+        buildSystem?.type ||
+        (dependencies.some((d: { name: string }) => d.name === 'gradle') ? 'gradle' : 'maven');
       // Use system commands if no wrapper detected
       const mavenCmd = buildSystem?.buildCommand?.includes('mvnw') ? './mvnw' : 'mvn';
       const gradleCmd = buildSystem?.buildCommand?.includes('gradlew') ? './gradlew' : 'gradle';
@@ -579,6 +461,9 @@ async function detectModuleRoots(
         for (const buildFile of buildFiles) {
           const buildFilePath = path.join(dirPath, buildFile);
           try {
+            // First check if the build file actually exists
+            await fs.access(buildFilePath);
+
             // For Java projects, ensure this is an actual module, not just a parent pom
             if (buildFile === 'pom.xml') {
               const pomContent = await fs.readFile(buildFilePath, 'utf-8');
@@ -600,7 +485,7 @@ async function detectModuleRoots(
                 }
               }
             } else {
-              // For non-Maven build files, add the module
+              // For non-Maven build files, also check existence and add the module
               const relativePath = path.relative(repoPath, dirPath) || '.';
               if (!moduleRoots.includes(relativePath)) {
                 moduleRoots.push(relativePath);
@@ -744,6 +629,7 @@ function buildArgsFromAnalysis(
     summary: summary || `${language} ${framework ? `${framework} ` : ''}application`,
     packageManager,
     buildSystem: buildSystem?.type || 'none',
+    buildSystemType: buildSystem?.type || 'none', // Match prompt parameter name
     buildCommand: recommendedBuildCommand,
     buildFile,
     hasWrapper,
@@ -751,6 +637,15 @@ function buildArgsFromAnalysis(
     baseImage: recommendations?.baseImage || '',
     buildStrategy: recommendations?.buildStrategy || '',
     securityNotes: recommendations?.securityNotes?.join('; ') || '',
+    // Add entryPoint - required by prompt
+    entryPoint:
+      framework === 'spring'
+        ? 'java -jar app.jar'
+        : language === 'python'
+          ? 'python app.py'
+          : language === 'javascript' || language === 'typescript'
+            ? 'node index.js'
+            : 'sh',
     ...(optimization && {
       optimization: typeof optimization === 'string' ? optimization : 'performance',
     }),
@@ -841,6 +736,19 @@ async function generateWithDirectAnalysis(
     const cleaned = stripFencesAndNoise(aiResult.value.winner.content, 'dockerfile');
 
     if (isValidDockerfileContent(cleaned)) {
+      // Extract actual Dockerfile content from JSON if needed
+      let actualDockerfileContent = cleaned;
+      if (cleaned.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(cleaned);
+          if (parsed.content && typeof parsed.content === 'string') {
+            actualDockerfileContent = parsed.content.trim();
+          }
+        } catch {
+          // If JSON parsing fails, use cleaned content as-is
+        }
+      }
+
       // Success - extract info from generated content
       const baseImageUsed = extractBaseImage(cleaned) || params.baseImage || 'node:18-alpine'; // fallback
 
@@ -858,15 +766,17 @@ async function generateWithDirectAnalysis(
       }
       const dockerfilePath = path.join(dockerfileTargetPath, 'Dockerfile');
 
-      await fs.writeFile(dockerfilePath, cleaned, 'utf-8');
+      await fs.writeFile(dockerfilePath, actualDockerfileContent, 'utf-8');
 
       const result: SingleDockerfileResult = {
-        content: cleaned,
+        content: actualDockerfileContent,
         path: path.resolve(repoPath),
         moduleRoot,
         baseImage: baseImageUsed,
         optimization: params.optimization !== false,
-        multistage: cleaned.includes('FROM ') && cleaned.split('FROM ').length > 2,
+        multistage:
+          actualDockerfileContent.includes('FROM ') &&
+          actualDockerfileContent.split('FROM ').length > 2,
         warnings: [], // Could add analysis for warnings
       };
 
@@ -1095,9 +1005,59 @@ async function generateSingleDockerfile(
     ...samplingOptions,
   });
 
+  logger.info(
+    {
+      aiResultOk: aiResult.ok,
+      hasWinner: aiResult.ok ? !!aiResult.value?.winner : false,
+      error: !aiResult.ok ? aiResult.error : undefined,
+    },
+    '🎯 AI_RESULT: Sampling result status',
+  );
+
   if (aiResult.ok) {
     const cleaned = stripFencesAndNoise(aiResult.value.winner.content, 'dockerfile');
-    if (!isValidDockerfileContent(cleaned)) {
+
+    logger.info(
+      {
+        cleanedLength: cleaned.length,
+        cleanedPreview: cleaned.substring(0, 200),
+        startsWithBrace: cleaned.trim().startsWith('{'),
+      },
+      '🔍 VALIDATION: Cleaned AI response',
+    );
+
+    // Extract actual Dockerfile content from JSON if the response is JSON
+    let actualDockerfileContent = cleaned;
+    if (cleaned.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(cleaned);
+        if (parsed.content && typeof parsed.content === 'string') {
+          actualDockerfileContent = parsed.content.trim();
+          logger.info(
+            {
+              extractedLength: actualDockerfileContent.length,
+              extractedPreview: actualDockerfileContent.substring(0, 200),
+            },
+            '✅ VALIDATION: Successfully extracted Dockerfile from JSON',
+          );
+        }
+      } catch (e) {
+        logger.warn({ error: e }, '⚠️ VALIDATION: JSON parsing failed');
+        // If JSON parsing fails, use cleaned content as-is
+      }
+    }
+
+    // Now validate the extracted content (not the JSON wrapper)
+    const isValid = isValidDockerfileContent(actualDockerfileContent);
+    logger.info(
+      {
+        isValid,
+        contentPreview: actualDockerfileContent.substring(0, 200),
+      },
+      '🔍 VALIDATION: Dockerfile validation result',
+    );
+
+    if (!isValid) {
       // Fall back to template if AI output is invalid
       const fallbackResult = generateTemplateDockerfile(
         sessionToAnalyzeRepoResult(analysisResult),
@@ -1110,9 +1070,9 @@ async function generateSingleDockerfile(
       dockerfileContent = fallbackResult.value.content;
       baseImageUsed = fallbackResult.value.baseImage;
     } else {
-      dockerfileContent = cleaned;
+      dockerfileContent = actualDockerfileContent;
       baseImageUsed =
-        extractBaseImage(cleaned) ||
+        extractBaseImage(actualDockerfileContent) ||
         params.baseImage ||
         getRecommendedBaseImage(analysisResult.language ?? 'unknown');
 
@@ -1160,6 +1120,15 @@ async function generateSingleDockerfile(
   const dockerfilePath = path.join(outputTargetPath, 'Dockerfile');
 
   // Write Dockerfile to disk
+  logger.info(
+    {
+      dockerfilePath,
+      contentLength: dockerfileContent.length,
+      contentPreview: dockerfileContent.substring(0, 200),
+      startsWithFROM: dockerfileContent.startsWith('FROM'),
+    },
+    '📝 WRITING: Dockerfile to disk',
+  );
   await fs.writeFile(dockerfilePath, dockerfileContent, 'utf-8');
 
   // Check for warnings
@@ -1231,7 +1200,7 @@ async function generateDockerfileImpl(
     }
 
     const { id: sessionId } = sessionResult.value;
-    const slice = useSessionSlice('generate-dockerfile', io, context, StateSchema);
+    const slice = useSessionSlice('generate-dockerfile', context);
 
     if (!slice) {
       return Failure('Session manager not available');
@@ -1243,12 +1212,7 @@ async function generateDockerfileImpl(
     await slice.patch(sessionId, { input: params });
 
     // Get analysis result from analyze-repo session slice
-    const analyzeRepoSliceResult = await getSessionSlice(
-      'analyze-repo',
-      sessionId,
-      analyzeRepoIO,
-      context,
-    );
+    const analyzeRepoSliceResult = await getSessionSlice('analyze-repo', sessionId, context);
     if (!analyzeRepoSliceResult.ok) {
       logger.debug(
         { sessionId, error: analyzeRepoSliceResult.error },
@@ -1260,7 +1224,27 @@ async function generateDockerfileImpl(
     }
 
     const analyzeRepoSlice = analyzeRepoSliceResult.value;
-    const rawAnalysisResult = analyzeRepoSlice?.output;
+    const rawAnalysisResult = analyzeRepoSlice?.output as
+      | {
+          language?: string;
+          framework?: string;
+          frameworkVersion?: string;
+          recommendations?: unknown;
+          dependencies?: Array<{ name: string; version?: string }>;
+          ports?: number[];
+          confidence?: number;
+          detectionMethod?: string;
+          buildSystem?: {
+            type: string;
+            file: string;
+            buildCommand: string;
+          };
+          modules?: unknown;
+          baseImage?: string;
+          buildStrategy?: string;
+          securityNotes?: string[];
+        }
+      | undefined;
 
     // Debug: Log what we found in session slice
     logger.info(
@@ -1286,35 +1270,40 @@ async function generateDockerfileImpl(
     // Map the analyze-repo result to SessionAnalysisResult format
     const analysisResult: SessionAnalysisResult = {
       language: rawAnalysisResult.language,
-      ...(rawAnalysisResult.framework && { framework: rawAnalysisResult.framework }),
-      ...(rawAnalysisResult.frameworkVersion && {
-        frameworkVersion: rawAnalysisResult.frameworkVersion,
-      }),
-      dependencies: rawAnalysisResult.dependencies.map((dep) => ({
+      framework: rawAnalysisResult.framework,
+      frameworkVersion: rawAnalysisResult.frameworkVersion,
+      dependencies: (rawAnalysisResult.dependencies || []).map((dep) => ({
         name: dep.name,
-        ...(dep.version && { version: dep.version }),
+        version: dep.version,
       })),
       ports: rawAnalysisResult.ports,
       confidence: rawAnalysisResult.confidence,
-      detectionMethod: rawAnalysisResult.detectionMethod,
-      ...(rawAnalysisResult.buildSystem && {
-        buildSystem: {
-          type: rawAnalysisResult.buildSystem.type,
-          buildFile: rawAnalysisResult.buildSystem.file,
-          buildCommand: rawAnalysisResult.buildSystem.buildCommand,
-        },
-      }),
+      detectionMethod: rawAnalysisResult.detectionMethod as
+        | 'signature'
+        | 'extension'
+        | 'ai-enhanced'
+        | 'fallback'
+        | 'provided'
+        | undefined,
+      buildSystem: rawAnalysisResult.buildSystem
+        ? {
+            type: rawAnalysisResult.buildSystem.type,
+            buildFile: rawAnalysisResult.buildSystem.file,
+            buildCommand: rawAnalysisResult.buildSystem.buildCommand,
+          }
+        : undefined,
       summary: `${rawAnalysisResult.language} ${rawAnalysisResult.framework || ''} project`.trim(),
-      // Include recommendations
-      ...(rawAnalysisResult.recommendations && {
-        recommendations: {
-          baseImage: rawAnalysisResult.recommendations.baseImage,
-          buildStrategy: rawAnalysisResult.recommendations.buildStrategy,
-          securityNotes: rawAnalysisResult.recommendations.securityNotes,
-        },
-      }),
-      // Include detected modules
-      ...(rawAnalysisResult.modules && { modules: rawAnalysisResult.modules }),
+      recommendations:
+        rawAnalysisResult.recommendations &&
+        typeof rawAnalysisResult.recommendations === 'object' &&
+        'baseImage' in rawAnalysisResult.recommendations
+          ? {
+              baseImage: (rawAnalysisResult.recommendations as any).baseImage,
+              buildStrategy: (rawAnalysisResult.recommendations as any).buildStrategy,
+              securityNotes: (rawAnalysisResult.recommendations as any).securityNotes,
+            }
+          : undefined,
+      modules: rawAnalysisResult.modules as string[] | undefined,
     };
 
     // Determine module roots from analysis or provided paths
@@ -1483,3 +1472,14 @@ async function generateDockerfileImpl(
  * Provides AI-powered containerization with intelligent fallbacks.
  */
 export const generateDockerfile = generateDockerfileImpl;
+
+/**
+ * Export the tool for MCP registration
+ */
+export const tool: import('@/mcp/tools/types').StandardToolExport = {
+  type: 'standard',
+  name: 'generate-dockerfile',
+  description: 'Generate AI-powered or template-based Dockerfiles from repository analysis',
+  inputSchema: generateDockerfileSchema,
+  execute: generateDockerfile,
+};

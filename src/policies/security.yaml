@@ -1,0 +1,31 @@
+version: "1.0.0"
+id: "security"
+description: "Security policy with constraints and patterns"
+
+security:
+  forbiddenPatterns:
+    - "API_KEY"
+    - "SECRET"
+    - "PASSWORD"
+    - "latest" # Avoid latest tags in production
+  requireSecurityScan: true
+  enforceNonRootUser: true
+  preventPrivilegedContainers: true
+
+limits:
+  maxTokens: 8192
+  maxCost: 0.8
+  maxTimeMs: 180000
+
+quality:
+  requireLinting: true
+  requireDocumentation: true
+
+toolPolicies:
+  "generate-dockerfile":
+    requireMultiStage: true
+    maxLayers: 15
+    enforceNonRootUser: true
+  "build-image":
+    requireSecurityScan: true
+    maxBuildTimeMs: 300000

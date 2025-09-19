@@ -4,7 +4,7 @@
  * Resolves sampling strategies based on configuration and context
  */
 
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '@mcp/context';
 import {
   ConfigurationManagerInterface,
   SamplingConfiguration,

@@ -1,0 +1,272 @@
+[
+  {
+    "id": "github-actions-docker-cache",
+    "category": "dockerfile",
+    "pattern": "(\\.github/workflows/|github\\.workflow)",
+    "recommendation": "Use GitHub Actions cache for Docker layers",
+    "example": "# .github/workflows/docker.yml\n- name: Set up Docker Buildx\n  uses: docker/setup-buildx-action@v2\n\n- name: Build and push\n  uses: docker/build-push-action@v4\n  with:\n    context: .\n    push: true\n    tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}\n    cache-from: type=gha\n    cache-to: type=gha,mode=max",
+    "severity": "medium",
+    "tags": ["github-actions", "ci-cd", "docker", "cache"],
+    "description": "GitHub Actions cache significantly speeds up Docker builds",
+    "rationale": "Reduces build time from 10+ minutes to 2-3 minutes with cache hits",
+    "tradeoffs": "Cache storage limits apply (10GB per repository)",
+    "alternatives": ["registry cache", "local cache", "inline cache"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "-70%",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "gitlab-ci-kaniko",
+    "category": "dockerfile",
+    "pattern": "(\\.gitlab-ci\\.yml|gitlab-ci)",
+    "recommendation": "Use Kaniko for rootless Docker builds in GitLab CI",
+    "example": "# .gitlab-ci.yml\nbuild:\n  stage: build\n  image:\n    name: gcr.io/kaniko-project/executor:debug\n    entrypoint: [\"\"]\n  script:\n    - mkdir -p /kaniko/.docker\n    - echo \"{\\\"auths\\\":{\\\"${CI_REGISTRY}\\\":{\\\"auth\\\":\\\"$(printf \"%s:%s\" \"${CI_REGISTRY_USER}\" \"${CI_REGISTRY_PASSWORD}\" | base64 | tr -d '\\n')\\\"}}}\" > /kaniko/.docker/config.json\n    - /kaniko/executor\n      --context \"${CI_PROJECT_DIR}\"\n      --dockerfile \"${CI_PROJECT_DIR}/Dockerfile\"\n      --destination \"${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}\"\n      --cache=true\n      --cache-repo=\"${CI_REGISTRY_IMAGE}/cache\"",
+    "severity": "high",
+    "tags": ["gitlab", "kaniko", "rootless", "security"],
+    "description": "Kaniko builds containers without Docker daemon, improving security",
+    "rationale": "Eliminates need for Docker-in-Docker or privileged containers",
+    "tradeoffs": "Slightly different behavior from Docker in edge cases",
+    "alternatives": ["buildah", "img", "docker-in-docker"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "+10%",
+      "securityScore": "+3"
+    }
+  },
+  {
+    "id": "jenkins-docker-agent",
+    "category": "dockerfile",
+    "pattern": "(Jenkinsfile|jenkins\\.pipeline)",
+    "recommendation": "Use Docker agents for consistent Jenkins builds",
+    "example": "// Jenkinsfile\npipeline {\n    agent {\n        dockerfile {\n            filename 'Dockerfile.build'\n            args '-v /var/run/docker.sock:/var/run/docker.sock'\n            reuseNode true\n        }\n    }\n    stages {\n        stage('Build') {\n            steps {\n                sh 'docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .'\n            }\n        }\n        stage('Push') {\n            steps {\n                withCredentials([usernamePassword(credentialsId: 'docker-hub', usernameVariable: 'USER', passwordVariable: 'PASS')]) {\n                    sh 'echo $PASS | docker login -u $USER --password-stdin'\n                    sh 'docker push ${IMAGE_NAME}:${BUILD_NUMBER}'\n                }\n            }\n        }\n    }\n}",
+    "severity": "medium",
+    "tags": ["jenkins", "docker", "agent", "pipeline"],
+    "description": "Docker agents provide clean, reproducible build environments",
+    "rationale": "Isolates builds and ensures consistent dependencies",
+    "tradeoffs": "Requires Docker socket mounting for Docker commands",
+    "alternatives": ["kubernetes agents", "static agents", "cloud agents"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "+30s",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "buildkit-secrets",
+    "category": "security",
+    "pattern": "(RUN.*--mount=type=secret|DOCKER_BUILDKIT)",
+    "recommendation": "Use BuildKit secrets for secure credential handling",
+    "example": "# Dockerfile\n# syntax=docker/dockerfile:1\nFROM node:20-alpine\nRUN --mount=type=secret,id=npm_token \\\n    NPM_TOKEN=$(cat /run/secrets/npm_token) \\\n    npm config set //registry.npmjs.org/:_authToken $NPM_TOKEN && \\\n    npm ci && \\\n    npm config delete //registry.npmjs.org/:_authToken\n\n# Build command\nDOCKER_BUILDKIT=1 docker build --secret id=npm_token,src=.npm_token .",
+    "severity": "high",
+    "tags": ["buildkit", "secrets", "security", "credentials"],
+    "description": "BuildKit secrets prevent credentials from appearing in image layers",
+    "rationale": "Traditional ARG/ENV expose secrets in image history",
+    "tradeoffs": "Requires BuildKit enabled and Docker 18.09+",
+    "alternatives": ["multi-stage builds with COPY --from", "runtime secrets"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "0",
+      "securityScore": "+5"
+    }
+  },
+  {
+    "id": "trivy-vulnerability-scan",
+    "category": "security",
+    "pattern": "(trivy|vulnerability.*scan)",
+    "recommendation": "Integrate Trivy for container vulnerability scanning",
+    "example": "# GitHub Actions\n- name: Run Trivy vulnerability scanner\n  uses: aquasecurity/trivy-action@master\n  with:\n    image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}'\n    format: 'sarif'\n    output: 'trivy-results.sarif'\n    severity: 'CRITICAL,HIGH'\n    exit-code: '1'\n\n# GitLab CI\ntrivy:\n  stage: scan\n  image:\n    name: aquasec/trivy:latest\n    entrypoint: [\"\"]\n  script:\n    - trivy image --exit-code 1 --severity HIGH,CRITICAL ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}",
+    "severity": "high",
+    "tags": ["trivy", "security", "scanning", "vulnerabilities"],
+    "description": "Automated vulnerability scanning prevents shipping vulnerable images",
+    "rationale": "Catches CVEs before deployment, integrates with CI/CD",
+    "tradeoffs": "May slow pipeline, false positives possible",
+    "alternatives": ["snyk", "clair", "grype", "docker scout"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "+60s",
+      "securityScore": "+4"
+    }
+  },
+  {
+    "id": "cosign-image-signing",
+    "category": "security",
+    "pattern": "(cosign|image.*sign|sigstore)",
+    "recommendation": "Sign container images with Cosign for supply chain security",
+    "example": "# GitHub Actions with keyless signing\n- name: Install Cosign\n  uses: sigstore/cosign-installer@v3\n\n- name: Sign container image\n  env:\n    COSIGN_EXPERIMENTAL: 1\n  run: |\n    cosign sign --yes ${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}\n\n# Verify signature\ncosign verify --certificate-identity-regexp '.*' --certificate-oidc-issuer https://token.actions.githubusercontent.com ${IMAGE_REF}",
+    "severity": "medium",
+    "tags": ["cosign", "sigstore", "signing", "supply-chain"],
+    "description": "Image signing ensures authenticity and prevents tampering",
+    "rationale": "Cryptographic proof of image origin and integrity",
+    "tradeoffs": "Adds complexity, requires key management",
+    "alternatives": ["docker content trust", "notary", "in-toto"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "+15s",
+      "securityScore": "+3"
+    }
+  },
+  {
+    "id": "semantic-versioning-tags",
+    "category": "dockerfile",
+    "pattern": "(v\\d+\\.\\d+\\.\\d+|semver)",
+    "recommendation": "Use semantic versioning for Docker image tags",
+    "example": "# CI/CD script\nVERSION=$(git describe --tags --abbrev=0)\nMAJOR=$(echo $VERSION | cut -d. -f1)\nMINOR=$(echo $VERSION | cut -d. -f1,2)\n\ndocker build -t ${REGISTRY}/${IMAGE}:${VERSION} \\\n             -t ${REGISTRY}/${IMAGE}:${MINOR} \\\n             -t ${REGISTRY}/${IMAGE}:${MAJOR} \\\n             -t ${REGISTRY}/${IMAGE}:latest .\n\n# Rolling updates\ndocker tag ${REGISTRY}/${IMAGE}:${VERSION} ${REGISTRY}/${IMAGE}:stable",
+    "severity": "medium",
+    "tags": ["versioning", "semver", "tags", "release"],
+    "description": "Semantic versioning enables controlled rollbacks and updates",
+    "rationale": "Clear version tracking, supports different update strategies",
+    "tradeoffs": "Requires discipline in version management",
+    "alternatives": ["git sha tags", "date-based tags", "branch tags"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "+5s",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "multi-arch-builds",
+    "category": "dockerfile",
+    "pattern": "(--platform|linux/amd64|linux/arm64|buildx)",
+    "recommendation": "Build multi-architecture images with Docker Buildx",
+    "example": "# Setup buildx\ndocker buildx create --name multiarch --driver docker-container --use\n\n# Build for multiple platforms\ndocker buildx build \\\n  --platform linux/amd64,linux/arm64,linux/arm/v7 \\\n  --tag ${REGISTRY}/${IMAGE}:${TAG} \\\n  --push .\n\n# GitHub Actions\n- name: Set up QEMU\n  uses: docker/setup-qemu-action@v2\n- name: Set up Docker Buildx\n  uses: docker/setup-buildx-action@v2\n- name: Build and push\n  uses: docker/build-push-action@v4\n  with:\n    platforms: linux/amd64,linux/arm64",
+    "severity": "low",
+    "tags": ["buildx", "multi-arch", "arm", "cross-platform"],
+    "description": "Multi-arch images support diverse deployment targets",
+    "rationale": "Single image works on Intel, ARM, including M1/M2 Macs",
+    "tradeoffs": "Longer build times, larger manifest",
+    "alternatives": ["separate arch-specific images", "runtime arch detection"],
+    "metrics": {
+      "sizeImpact": "2x",
+      "buildTimeImpact": "+100%",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "docker-sbom-generation",
+    "category": "security",
+    "pattern": "(sbom|syft|software.*bill.*materials)",
+    "recommendation": "Generate SBOM for container images",
+    "example": "# Generate SBOM with Syft\nsyft ${IMAGE_REF} -o spdx-json > sbom.spdx.json\n\n# Docker native SBOM\ndocker sbom ${IMAGE_REF} --format spdx-json > sbom.json\n\n# Attach SBOM to image with Cosign\ncosign attach sbom --sbom sbom.spdx.json ${IMAGE_REF}\n\n# GitHub Actions\n- name: Generate SBOM\n  uses: anchore/sbom-action@v0\n  with:\n    image: ${IMAGE_REF}\n    format: spdx-json",
+    "severity": "medium",
+    "tags": ["sbom", "supply-chain", "compliance", "inventory"],
+    "description": "SBOM provides complete inventory of image components",
+    "rationale": "Required for compliance, vulnerability tracking, license management",
+    "tradeoffs": "Additional storage for SBOM artifacts",
+    "alternatives": ["built-in docker sbom", "tern", "bom"],
+    "metrics": {
+      "sizeImpact": "+1MB",
+      "buildTimeImpact": "+30s",
+      "securityScore": "+2"
+    }
+  },
+  {
+    "id": "hadolint-dockerfile-lint",
+    "category": "dockerfile",
+    "pattern": "(hadolint|dockerfile.*lint)",
+    "recommendation": "Use Hadolint for Dockerfile best practices validation",
+    "example": "# .hadolint.yaml\nignored:\n  - DL3008  # Pin versions in apt get\n  - DL3009  # Delete apt lists\ntrustedRegistries:\n  - docker.io\n  - gcr.io\n\n# CI integration\n- name: Dockerfile linting\n  run: |\n    docker run --rm -i hadolint/hadolint < Dockerfile\n\n# Pre-commit hook\n- repo: https://github.com/hadolint/hadolint\n  rev: v2.12.0\n  hooks:\n    - id: hadolint-docker",
+    "severity": "low",
+    "tags": ["hadolint", "linting", "best-practices", "quality"],
+    "description": "Automated Dockerfile linting catches common mistakes",
+    "rationale": "Enforces best practices and consistency",
+    "tradeoffs": "May require exceptions for specific use cases",
+    "alternatives": ["dockerfilelint", "dockerfile_lint"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "+5s",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "docker-build-attestation",
+    "category": "security",
+    "pattern": "(provenance|attestation|slsa)",
+    "recommendation": "Generate build attestations for SLSA compliance",
+    "example": "# BuildKit with attestations\ndocker buildx build \\\n  --sbom=true \\\n  --provenance=true \\\n  --tag ${IMAGE} \\\n  --push .\n\n# GitHub Actions with SLSA\n- name: Build and push with attestations\n  uses: docker/build-push-action@v4\n  with:\n    push: true\n    tags: ${{ env.IMAGE }}\n    provenance: true\n    sbom: true\n\n# Verify attestations\ncosign verify-attestation --type slsaprovenance \\\n  --certificate-identity-regexp '.*' \\\n  --certificate-oidc-issuer https://token.actions.githubusercontent.com \\\n  ${IMAGE}",
+    "severity": "medium",
+    "tags": ["attestation", "slsa", "provenance", "supply-chain"],
+    "description": "Build attestations provide verifiable build provenance",
+    "rationale": "SLSA compliance, supply chain security requirements",
+    "tradeoffs": "Requires modern tooling, additional metadata storage",
+    "alternatives": ["in-toto", "manual provenance tracking"],
+    "metrics": {
+      "sizeImpact": "+100KB",
+      "buildTimeImpact": "+10s",
+      "securityScore": "+3"
+    }
+  },
+  {
+    "id": "registry-mirror-cache",
+    "category": "dockerfile",
+    "pattern": "(registry.*mirror|pull.*through.*cache)",
+    "recommendation": "Use registry mirrors for faster pulls and reduced bandwidth",
+    "example": "# Docker daemon configuration\n{\n  \"registry-mirrors\": [\n    \"https://mirror.gcr.io\",\n    \"https://registry-cache.company.com\"\n  ]\n}\n\n# Harbor pull-through cache\ndocker pull registry-cache.company.com/dockerhub/node:20-alpine\n\n# Kubernetes with registry mirror\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: docker-registry-mirror\ndata:\n  registries.conf: |\n    [registries.search]\n    registries = ['docker.io']\n    \n    [registries.insecure]\n    registries = []\n    \n    [registries.block]\n    registries = []\n    \n    [[registry]]\n    location = \"docker.io\"\n    mirror = [{location = \"mirror.company.com\"}]",
+    "severity": "low",
+    "tags": ["registry", "mirror", "cache", "performance"],
+    "description": "Registry mirrors reduce external bandwidth and improve pull speed",
+    "rationale": "Faster builds, reduced Docker Hub rate limiting impact",
+    "tradeoffs": "Requires mirror infrastructure maintenance",
+    "alternatives": ["local registry", "pre-pulled images", "image streaming"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "-50%",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "container-structure-test",
+    "category": "dockerfile",
+    "pattern": "(structure.*test|container.*test)",
+    "recommendation": "Use Container Structure Tests for image validation",
+    "example": "# structure-test.yaml\nschemaVersion: 2.0.0\nfileExistenceTests:\n  - name: 'App files exist'\n    path: '/app/server.js'\n    shouldExist: true\nfileContentTests:\n  - name: 'Node version'\n    path: '/etc/os-release'\n    expectedContents: ['Alpine Linux']\ncommandTests:\n  - name: 'Node runs'\n    command: 'node'\n    args: ['--version']\n    exitCode: 0\nmetadataTest:\n  envVars:\n    - key: NODE_ENV\n      value: production\n  exposedPorts: [\"3000\"]\n  user: \"node\"\n\n# Run tests\ncontainer-structure-test test --image ${IMAGE} --config structure-test.yaml",
+    "severity": "low",
+    "tags": ["testing", "validation", "structure-test", "quality"],
+    "description": "Automated tests validate container structure and configuration",
+    "rationale": "Catches configuration errors before deployment",
+    "tradeoffs": "Additional test maintenance required",
+    "alternatives": ["dgoss", "inspec", "serverspec"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "+30s",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "oci-image-format",
+    "category": "dockerfile",
+    "pattern": "(oci.*image|image.*spec|org\\.opencontainers)",
+    "recommendation": "Use OCI image format for better compatibility",
+    "example": "# Build OCI image with buildah\nbuildah bud --format=oci -t ${IMAGE} .\n\n# Docker with OCI format\ndocker buildx build --output type=oci,dest=image.tar .\n\n# Skopeo copy to OCI layout\nskopeo copy docker://${IMAGE} oci:image:latest\n\n# OCI annotations\nLABEL org.opencontainers.image.title=\"My App\" \\\n      org.opencontainers.image.description=\"Application description\" \\\n      org.opencontainers.image.version=\"1.0.0\" \\\n      org.opencontainers.image.created=\"2024-01-01T00:00:00Z\" \\\n      org.opencontainers.image.source=\"https://github.com/org/repo\" \\\n      org.opencontainers.image.licenses=\"MIT\"",
+    "severity": "low",
+    "tags": ["oci", "standards", "compatibility", "format"],
+    "description": "OCI format ensures compatibility across container runtimes",
+    "rationale": "Industry standard, works with Docker, Podman, containerd",
+    "tradeoffs": "Some older tools may not support OCI format",
+    "alternatives": ["docker format", "conversion on demand"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "0",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "distroless-final-stage",
+    "category": "security",
+    "pattern": "(distroless|gcr\\.io/distroless)",
+    "recommendation": "Use distroless images for minimal attack surface",
+    "example": "# Multi-stage with distroless\nFROM golang:1.21 AS build\nWORKDIR /app\nCOPY . .\nRUN CGO_ENABLED=0 go build -o server .\n\nFROM gcr.io/distroless/static-debian12\nCOPY --from=build /app/server /\nENTRYPOINT [\"/server\"]\n\n# Node.js distroless\nFROM node:20 AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --only=production\nCOPY . .\n\nFROM gcr.io/distroless/nodejs20-debian12\nWORKDIR /app\nCOPY --from=build /app /app\nCMD [\"index.js\"]",
+    "severity": "high",
+    "tags": ["distroless", "security", "minimal", "hardening"],
+    "description": "Distroless images contain only runtime dependencies",
+    "rationale": "No shell, package managers, or unnecessary tools to exploit",
+    "tradeoffs": "No shell for debugging, limited troubleshooting capability",
+    "alternatives": ["alpine", "scratch", "chainguard images"],
+    "metrics": {
+      "sizeImpact": "-50MB",
+      "buildTimeImpact": "0",
+      "securityScore": "+4"
+    }
+  }
+]

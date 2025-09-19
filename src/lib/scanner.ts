@@ -1,7 +1,7 @@
 /**
  * Security Scanner - Direct Scanner Integration
  *
- * Simplified security scanning operations using direct scanner integration
+ * Security scanning operations using direct scanner integration
  * Removes unnecessary wrapper complexity while maintaining core functionality
  */
 
@@ -47,7 +47,7 @@ export const createSecurityScanner = (logger: Logger, scannerType?: string): Sec
       try {
         logger.info({ imageId, scanner: scannerType }, 'Starting security scan');
 
-        // Simplified implementation - can be enhanced with specific scanner integrations
+        /* Basic implementation - can be enhanced with specific scanner integrations */
         const result: BasicScanResult = {
           imageId,
           vulnerabilities: [],

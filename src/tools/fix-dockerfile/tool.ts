@@ -1,579 +1,113 @@
 /**
- * Fix Dockerfile Tool - Standardized Implementation
- *
- * Analyzes and fixes Dockerfile build errors using standardized helpers
- * for consistency and improved error handling
- * @example
- * ```typescript
- * const result = await fixDockerfile({
- *   sessionId: 'session-123', // optional
- *   dockerfile: dockerfileContent,
- *   error: 'Build failed due to missing dependency'
- * }, context, logger);
- * if (result.ok) {
- *   console.log('Fixed Dockerfile:', result.dockerfile);
- *   console.log('Applied fixes:', result.fixes);
- * }
- * ```
+ * AI-powered Dockerfile fixing tool
  */
 
-import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
-import { extractErrorMessage } from '@/lib/error-utils';
-import { aiGenerateWithSampling } from '@/mcp/tool-ai-helpers';
-import { enhancePromptWithKnowledge } from '@/lib/ai-knowledge-enhancer';
-import type { SamplingOptions } from '@/lib/sampling';
-import { createStandardProgress } from '@/mcp/progress-helper';
-import type { ToolContext } from '@/mcp/context';
-import type { Logger } from '@/lib/logger';
-import { getRecommendedBaseImage } from '@/lib/base-images';
-import { Success, Failure, type Result } from '@/types';
-import { DEFAULT_PORTS } from '@/config/defaults';
-import { stripFencesAndNoise, isValidDockerfileContent } from '@/lib/text-processing';
-import { scoreConfigCandidates } from '@/lib/integrated-scoring';
-import { fixDockerfileSchema, type FixDockerfileParams } from './schema';
-import { z } from 'zod';
-
-// Define the result schema for type safety
-const FixDockerfileResultSchema = z.object({
-  ok: z.boolean(),
-  sessionId: z.string(),
-  dockerfile: z.string(),
-  path: z.string(),
-  fixes: z.array(z.string()),
-  validation: z.array(z.string()),
-  aiUsed: z.boolean(),
-  generationMethod: z.enum(['AI', 'fallback']),
-  originalScore: z.number().optional(),
-  fixedScore: z.number().optional(),
-  improvement: z.number().optional(),
-  samplingMetadata: z
-    .object({
-      stoppedEarly: z.boolean().optional(),
-      candidatesGenerated: z.number(),
-      winnerScore: z.number(),
-      samplingDuration: z.number().optional(),
-    })
-    .optional(),
-  winnerScore: z.number().optional(),
-  scoreBreakdown: z.record(z.number()).optional(),
-  allCandidates: z
-    .array(
-      z.object({
-        id: z.string(),
-        content: z.string(),
-        score: z.number(),
-        scoreBreakdown: z.record(z.number()),
-        rank: z.number().optional(),
-      }),
-    )
-    .optional(),
-});
-
-// Define tool IO for type-safe session operations
-const io = defineToolIO(fixDockerfileSchema, FixDockerfileResultSchema);
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastFixedAt: z.date().optional(),
-  fixCount: z.number().optional(),
-  lastError: z.string().optional(),
-  improvementScore: z.number().optional(),
-  fixStrategy: z.enum(['ai', 'fallback', 'hybrid']).optional(),
-});
+import type { ToolContext } from '@mcp/context';
+import { Success, Failure, type Result } from '@types';
+import { extractErrorMessage } from '@lib/error-utils';
+import {
+  DockerfileFixOutputSchema,
+  fixDockerfileSchema,
+  type FixDockerfileParams,
+  type DockerfileFixOutput,
+} from './schema';
 
 /**
- * Result interface for Dockerfile fix operations with AI tracking
+ * Fix and optimize Dockerfile using AI analysis
  */
-export interface FixDockerfileResult {
-  ok: boolean;
-  sessionId: string;
-  dockerfile: string;
-  path: string;
-  fixes: string[];
-  validation: string[];
-  aiUsed: boolean;
-  generationMethod: 'AI' | 'fallback';
-  /** Score of the original Dockerfile */
-  originalScore?: number;
-  /** Score of the fixed Dockerfile */
-  fixedScore?: number;
-  /** Score improvement (fixedScore - originalScore) */
-  improvement?: number;
-  /** Sampling metadata if sampling was used */
-  samplingMetadata?: {
-    stoppedEarly?: boolean;
-    candidatesGenerated: number;
-    winnerScore: number;
-    samplingDuration?: number;
-  };
-  /** Winner score if sampling was used */
-  winnerScore?: number;
-  /** Score breakdown if requested */
-  scoreBreakdown?: Record<string, number>;
-  /** All candidates if requested */
-  allCandidates?: Array<{
-    id: string;
-    content: string;
-    score: number;
-    scoreBreakdown: Record<string, number>;
-    rank?: number;
-  }>;
-}
-
-/**
- * Attempt to fix Dockerfile using standardized AI helper
- */
-async function attemptAIFix(
-  dockerfileContent: string,
-  buildError: string | undefined,
-  errors: string[] | undefined,
-  language: string | undefined,
-  framework: string | undefined,
-  frameworkVersion: string | undefined,
-  analysis: string | undefined,
-  context: ToolContext,
-  logger: Logger,
-  samplingOptions?: SamplingOptions,
-): Promise<
-  Result<{
-    fixedDockerfile: string;
-    appliedFixes: string[];
-    samplingMetadata?: FixDockerfileResult['samplingMetadata'];
-    winnerScore?: number;
-    scoreBreakdown?: Record<string, number>;
-    allCandidates?: FixDockerfileResult['allCandidates'];
-  }>
-> {
-  try {
-    logger.info('Attempting AI-enhanced Dockerfile fix');
-    // Prepare arguments for the fix-dockerfile prompt
-    const promptArgs = {
-      dockerfileContent,
-      buildError: buildError || undefined,
-      errors: errors || undefined,
-      language: language || undefined,
-      framework: framework || undefined,
-      frameworkVersion: frameworkVersion || undefined,
-      analysis: analysis || undefined,
-    };
-    // Filter out undefined values
-    let cleanedArgs = Object.fromEntries(
-      Object.entries(promptArgs).filter(([_, value]) => value !== undefined),
-    );
-
-    // Enhance with knowledge context
-    try {
-      const knowledgeResult = await enhancePromptWithKnowledge(cleanedArgs, {
-        operation: 'fix_dockerfile',
-        ...(language && { language }),
-        ...(framework && { framework }),
-        environment: 'production',
-        dockerfileContent,
-        tags: ['dockerfile', 'fixes', 'optimization', language, framework].filter(
-          Boolean,
-        ) as string[],
-      });
-
-      cleanedArgs = knowledgeResult as Record<string, string | string[] | undefined>;
-      logger.info('Enhanced Dockerfile fix with knowledge');
-    } catch (error) {
-      logger.debug({ error }, 'Knowledge enhancement failed, using base prompt');
-    }
-
-    logger.debug({ args: cleanedArgs }, 'Using prompt arguments');
-    let fixedDockerfile: string;
-    let samplingMetadata: FixDockerfileResult['samplingMetadata'];
-    let winnerScore: number | undefined;
-    let scoreBreakdown: Record<string, number> | undefined;
-    let allCandidates: FixDockerfileResult['allCandidates'];
-    if (samplingOptions?.enableSampling) {
-      // Use sampling-aware generation
-      const aiResult = await aiGenerateWithSampling(logger, context, {
-        promptName: 'fix-dockerfile',
-        promptArgs: cleanedArgs,
-        expectation: 'dockerfile',
-        fallbackBehavior: 'error',
-        maxRetries: 2,
-        maxTokens: 2048,
-        stopSequences: ['```', '\n\n```', '\n\n# ', '\n\n---'],
-        modelHints: ['code'],
-        ...samplingOptions,
-      });
-      if (!aiResult.ok) {
-        logger.error(
-          {
-            tool: 'fix-dockerfile',
-            operation: 'dockerfile-fix',
-            error: aiResult.error,
-          },
-          'AI Dockerfile fix failed',
-        );
-        return Failure(`Failed to fix Dockerfile: ${aiResult.error}`);
-      }
-      // Clean up the response
-      fixedDockerfile = stripFencesAndNoise(aiResult.value.winner.content, 'dockerfile');
-      // Capture sampling metadata
-      samplingMetadata = aiResult.value.samplingMetadata;
-      winnerScore = aiResult.value.winner.score;
-      scoreBreakdown = aiResult.value.winner.scoreBreakdown;
-      allCandidates = aiResult.value.allCandidates;
-    } else {
-      // Standard generation without sampling
-      const aiResult = await aiGenerateWithSampling(logger, context, {
-        promptName: 'fix-dockerfile',
-        promptArgs: cleanedArgs,
-        expectation: 'dockerfile',
-        fallbackBehavior: 'error',
-        maxRetries: 2,
-        maxTokens: 2048,
-        stopSequences: ['```', '\n\n```', '\n\n# ', '\n\n---'],
-        modelHints: ['code'],
-        enableSampling: false,
-        maxCandidates: 1,
-      });
-
-      if (!aiResult.ok) {
-        logger.error(
-          {
-            tool: 'fix-dockerfile',
-            operation: 'dockerfile-fix',
-            error: aiResult.error,
-          },
-          'AI Dockerfile fix failed',
-        );
-        return Failure(`Failed to fix Dockerfile: ${aiResult.error}`);
-      }
-
-      // Clean up the response
-      fixedDockerfile = stripFencesAndNoise(aiResult.value.winner.content, 'dockerfile');
-
-      samplingMetadata = aiResult.value.samplingMetadata;
-    }
-    // Additional validation (aiGenerate already validates basic Dockerfile structure)
-    if (!isValidDockerfileContent(fixedDockerfile)) {
-      return Failure('AI generated invalid dockerfile (missing FROM instruction or malformed)');
-    }
-    logger.info('AI fix completed successfully');
-    const result: any = {
-      fixedDockerfile,
-      appliedFixes: ['AI-generated comprehensive fix based on error analysis'],
-    };
-    // Add sampling metadata if available
-    if (samplingMetadata) result.samplingMetadata = samplingMetadata;
-    if (winnerScore !== undefined) result.winnerScore = winnerScore;
-    if (scoreBreakdown && samplingOptions?.includeScoreBreakdown)
-      result.scoreBreakdown = scoreBreakdown;
-    if (allCandidates && samplingOptions?.returnAllCandidates) result.allCandidates = allCandidates;
-    return Success(result);
-  } catch (error) {
-    logger.error({ error: extractErrorMessage(error) }, 'AI fix attempt failed');
-    return Failure(`AI fix failed: ${extractErrorMessage(error)}`);
-  }
-}
-
-/**
- * Apply rule-based fixes as fallback when AI is unavailable
- */
-async function applyRuleBasedFixes(
-  dockerfileContent: string,
-  _buildError: string | undefined,
-  language: string | undefined,
-  logger: Logger,
-): Promise<Result<{ fixedDockerfile: string; appliedFixes: string[] }>> {
-  let fixed = dockerfileContent;
-  const appliedFixes: string[] = [];
-  logger.info('Applying rule-based Dockerfile fixes');
-  // Common dockerfile fixes
-  const fixes = [
-    {
-      pattern: /^FROM\s+([^:]+)$/gm,
-      replacement: 'FROM $1:latest',
-      description: 'Added missing tag to base image',
-    },
-    {
-      pattern: /RUN\s+apt-get\s+update\s*$/gm,
-      replacement: 'RUN apt-get update && apt-get clean && rm -rf /var/lib/apt/lists/*',
-      description: 'Added cleanup after apt-get update',
-    },
-    {
-      pattern: /RUN\s+npm\s+install\s*$/gm,
-      replacement: 'RUN npm ci --only=production',
-      description: 'Changed npm install to npm ci for production builds',
-    },
-    {
-      pattern: /COPY\s+\.\s+\./gm,
-      replacement: 'COPY package*.json ./\nRUN npm ci --only=production\nCOPY . .',
-      description: 'Improved layer caching by copying package files first',
-    },
-  ];
-  for (const fix of fixes) {
-    if (fix.pattern.test(fixed)) {
-      fixed = fixed.replace(fix.pattern, fix.replacement);
-      appliedFixes.push(fix.description);
-      logger.debug({ fix: fix.description }, 'Applied fix');
-    }
-  }
-  // Language-specific fixes
-  if (language) {
-    const baseImage = getRecommendedBaseImage(language);
-    const port = DEFAULT_PORTS[language as keyof typeof DEFAULT_PORTS]?.[0] || 3000;
-    // If no fixes were applied, generate a basic template
-    if (appliedFixes.length === 0 && !fixed?.includes('FROM')) {
-      if (language === 'dotnet') {
-        fixed = `FROM ${baseImage}\nWORKDIR /app\nCOPY *.csproj* *.sln ./\nCOPY */*.csproj ./*/\nRUN dotnet restore\nCOPY . .\nRUN dotnet publish -c Release -o out\nEXPOSE ${port}\nCMD ["dotnet", "*.dll"]`;
-      } else {
-        fixed = `FROM ${baseImage}\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --only=production\nCOPY . .\nEXPOSE ${port}\nCMD ["npm", "start"]`;
-      }
-      appliedFixes.push(`Applied ${language} containerization template`);
-    }
-  }
-  // If still no fixes, add general improvements
-  if (appliedFixes.length === 0) {
-    appliedFixes.push('Applied standard containerization best practices');
-  }
-  logger.info({ fixCount: appliedFixes.length }, 'Rule-based fixes completed');
-  return Success({
-    fixedDockerfile: fixed,
-    appliedFixes,
-  });
-}
-
-/**
- * Fix dockerfile implementation - direct execution with selective progress
- */
-async function fixDockerfileImpl(
+async function fixDockerfileHandler(
   params: FixDockerfileParams,
-  context?: ToolContext,
-): Promise<Result<FixDockerfileResult>> {
-  // Basic parameter validation (essential validation only)
-  if (!params || typeof params !== 'object') {
-    return Failure('Invalid parameters provided');
-  }
-  // Optional progress reporting for AI operations
-  const progress = context?.progress ? createStandardProgress(context.progress) : undefined;
-  const logger = getToolLogger(context || ({} as any), 'fix-dockerfile');
-  const timer = createToolTimer(logger, 'fix-dockerfile');
+  context: ToolContext,
+): Promise<Result<DockerfileFixOutput>> {
+  const { logger } = context;
+
   try {
-    const { error, dockerfile, issues } = params;
-    logger.info({ hasError: !!error, hasDockerfile: !!dockerfile }, 'Starting Dockerfile fix');
-    // Progress: Starting validation
-    if (progress) await progress('VALIDATING');
-    // Ensure session exists and get typed slice operations
-    const sessionResult = await ensureSession(context, params.sessionId);
-    if (!sessionResult.ok) {
-      return Failure(sessionResult.error);
-    }
+    // Create prompt for AI analysis
+    const prompt = `Fix and optimize the following Dockerfile.
 
-    const { id: sessionId, state: session } = sessionResult.value;
-    const slice = useSessionSlice('fix-dockerfile', io, context, StateSchema);
+Original Dockerfile:
+${params.dockerfile}
 
-    if (!slice) {
-      return Failure('Session manager not available');
-    }
+${params.error ? `Error to fix: ${params.error}\n` : ''}
+${params.issues?.length ? `Issues to address:\n- ${params.issues.join('\n- ')}\n` : ''}
 
-    logger.info({ sessionId }, 'Starting Dockerfile fix operation');
+Target environment: ${params.targetEnvironment || 'production'}
 
-    // Record input in session slice
-    await slice.patch(sessionId, { input: params });
-    // Get the Dockerfile to fix (from session or provided)
-    const sessionState = session as { dockerfile_result?: { content?: string } } | null | undefined;
-    const dockerfileResult = sessionState?.dockerfile_result;
-    const dockerfileToFix = dockerfile ?? dockerfileResult?.content;
-    if (!dockerfileToFix) {
-      return Failure(
-        'No Dockerfile found to fix. Provide dockerfile parameter or run generate-dockerfile tool first.',
-      );
-    }
-    // Get build error from session if not provided
-    const buildResult = (session as { build_result?: { error?: string } } | null | undefined)
-      ?.build_result;
-    const buildError = error ?? buildResult?.error;
-    // Get analysis context
-    const analysisResult = session?.results?.['analyze_repo'] as
-      | { language?: string; framework?: string; frameworkVersion?: string }
-      | undefined;
-    const language = analysisResult?.language;
-    const framework = analysisResult?.framework;
-    const frameworkVersion = analysisResult?.frameworkVersion;
+Analyze the Dockerfile and provide:
+1. Fixed Dockerfile content
+2. List of changes made with explanations
+3. Security improvements applied
+4. Performance optimizations applied
+5. Size reduction techniques used
+6. Validation status
+
+Return the result in JSON format:
+{
+  "fixedDockerfile": "string - the complete fixed Dockerfile content",
+  "changes": [{
+    "type": "security" | "performance" | "best-practice" | "syntax" | "deprecation",
+    "description": "string",
+    "before": "string",
+    "after": "string",
+    "impact": "high" | "medium" | "low"
+  }],
+  "securityImprovements": ["string"],
+  "performanceOptimizations": ["string"],
+  "sizeReduction": "string or null",
+  "warnings": ["string"] or null,
+  "isValid": boolean,
+  "estimatedBuildTime": "string or null",
+  "estimatedImageSize": "string or null"
+}`;
+
+    // Call AI through context
+    const response = await context.sampling.createMessage({
+      messages: [
+        {
+          role: 'user',
+          content: [{ type: 'text', text: prompt }],
+        },
+      ],
+      maxTokens: 4096,
+    });
+
+    // Extract text from response
+    const text = response.content
+      .filter((c) => c.type === 'text')
+      .map((c) => c.text)
+      .join('');
+
+    // Parse JSON response
+    const result = JSON.parse(text);
+
+    // Validate with schema
+    const validated = DockerfileFixOutputSchema.parse(result);
+
     logger.info(
-      { hasError: !!buildError, language, framework, frameworkVersion },
-      'Analyzing Dockerfile for issues',
-    );
-
-    // Score the original Dockerfile
-    let originalScore: number | undefined;
-    try {
-      const originalScoring = await scoreConfigCandidates(
-        [dockerfileToFix],
-        'dockerfile',
-        params.targetEnvironment || 'production',
-        logger,
-      );
-      if (originalScoring.ok && originalScoring.value[0]) {
-        originalScore = originalScoring.value[0].score;
-        logger.info({ originalScore }, 'Scored original Dockerfile');
-      }
-    } catch (error) {
-      logger.debug({ error }, 'Could not score original Dockerfile, continuing without score');
-    }
-
-    let fixedDockerfile: string = '';
-    let fixes: string[] = [];
-    let aiUsed = false;
-    let generationMethod: 'AI' | 'fallback' = 'fallback';
-    let samplingMetadata: any;
-    let winnerScore: number | undefined;
-    let scoreBreakdown: any;
-    let allCandidates: any;
-    const isToolContext = context && 'sampling' in context && 'getPrompt' in context;
-    // Progress: Main execution (AI fix or fallback)
-    if (progress) await progress('EXECUTING');
-    // Prepare sampling options
-    const samplingOptions: SamplingOptions = {};
-    // Sampling is enabled by default unless explicitly disabled
-    samplingOptions.enableSampling = !params.disableSampling;
-    if (params.maxCandidates !== undefined) samplingOptions.maxCandidates = params.maxCandidates;
-    if (params.earlyStopThreshold !== undefined)
-      samplingOptions.earlyStopThreshold = params.earlyStopThreshold;
-    if (params.includeScoreBreakdown !== undefined)
-      samplingOptions.includeScoreBreakdown = params.includeScoreBreakdown;
-    if (params.returnAllCandidates !== undefined)
-      samplingOptions.returnAllCandidates = params.returnAllCandidates;
-    if (params.useCache !== undefined) samplingOptions.useCache = params.useCache;
-    // Try AI-enhanced fix if context is available
-    if (isToolContext && context) {
-      const toolContext = context;
-      const aiResult = await attemptAIFix(
-        dockerfileToFix,
-        buildError,
-        issues, // Use issues parameter if provided
-        language,
-        framework,
-        frameworkVersion,
-        undefined, // Could include analysis summary in future
-        toolContext,
-        logger,
-        samplingOptions, // Pass sampling options
-      );
-      if (aiResult.ok) {
-        fixedDockerfile = aiResult.value.fixedDockerfile;
-        fixes = aiResult.value.appliedFixes;
-        aiUsed = true;
-        generationMethod = 'AI';
-        // Capture sampling metadata if available
-        samplingMetadata = aiResult.value.samplingMetadata;
-        winnerScore = aiResult.value.winnerScore;
-        scoreBreakdown = aiResult.value.scoreBreakdown;
-        allCandidates = aiResult.value.allCandidates;
-        logger.info('Successfully used AI to fix Dockerfile');
-      } else {
-        logger.warn({ error: aiResult.error }, 'AI fix failed, falling back to rule-based fixes');
-      }
-    }
-    // Fallback to rule-based fixes if AI unavailable or failed
-    if (!aiUsed) {
-      const fallbackResult = await applyRuleBasedFixes(
-        dockerfileToFix,
-        buildError,
-        language,
-        logger,
-      );
-      if (fallbackResult.ok) {
-        fixedDockerfile = fallbackResult.value.fixedDockerfile;
-        fixes = fallbackResult.value.appliedFixes;
-      } else {
-        return Failure(`Both AI and fallback fixes failed: ${fallbackResult.error}`);
-      }
-    }
-    // Score the fixed Dockerfile
-    let fixedScore: number | undefined;
-    let improvement: number | undefined;
-    try {
-      const fixedScoring = await scoreConfigCandidates(
-        [fixedDockerfile],
-        'dockerfile',
-        params.targetEnvironment || 'production',
-        logger,
-      );
-      if (fixedScoring.ok && fixedScoring.value[0]) {
-        fixedScore = fixedScoring.value[0].score;
-        if (originalScore !== undefined && fixedScore !== undefined) {
-          improvement = fixedScore - originalScore;
-        }
-        logger.info({ fixedScore, originalScore, improvement }, 'Scored fixed Dockerfile');
-      }
-    } catch (error) {
-      logger.debug({ error }, 'Could not score fixed Dockerfile, continuing without score');
-    }
-
-    // Prepare the result for session update
-    const fixResult: FixDockerfileResult = {
-      ok: true,
-      sessionId,
-      dockerfile: fixedDockerfile,
-      path: './Dockerfile',
-      fixes,
-      validation: ['Dockerfile validated successfully'],
-      aiUsed,
-      generationMethod,
-      ...(originalScore !== undefined ? { originalScore } : {}),
-      ...(fixedScore !== undefined ? { fixedScore } : {}),
-      ...(improvement !== undefined ? { improvement } : {}),
-    };
-
-    // Update typed session slice with output and state
-    await slice.patch(sessionId, {
-      output: fixResult,
-      state: {
-        lastFixedAt: new Date(),
-        fixCount: fixes.length,
-        lastError: error || 'none',
-        improvementScore: improvement,
-        fixStrategy: aiUsed ? 'ai' : 'fallback',
+      {
+        changeCount: validated.changes?.length || 0,
+        sessionId: params.sessionId,
       },
-    });
-    // Progress: Finalizing results
-    if (progress) await progress('FINALIZING');
-    timer.end({ fixCount: fixes.length, sessionId, aiUsed });
-    logger.info(
-      { sessionId, fixCount: fixes.length, aiUsed, generationMethod },
-      'Dockerfile fix completed',
+      'Dockerfile fixed successfully',
     );
-    // Progress: Complete
-    if (progress) await progress('COMPLETE');
 
-    // Add sampling metadata if sampling was used
-    if (!params.disableSampling) {
-      if (samplingMetadata) {
-        fixResult.samplingMetadata = samplingMetadata;
-      }
-      if (winnerScore !== undefined) {
-        fixResult.winnerScore = winnerScore;
-      }
-      if (scoreBreakdown && params.includeScoreBreakdown) {
-        fixResult.scoreBreakdown = scoreBreakdown;
-      }
-      if (allCandidates && params.returnAllCandidates) {
-        fixResult.allCandidates = allCandidates;
-      }
-    }
-
-    return Success({
-      ...fixResult,
-      _fileWritten: true,
-      _fileWrittenPath: './Dockerfile',
-    });
+    return Success(validated);
   } catch (error) {
-    timer.error(error);
-    logger.error({ error }, 'Dockerfile fix failed');
-
-    const logErrorMessage = extractErrorMessage(error);
-    return Failure(logErrorMessage);
+    logger.error({ error: extractErrorMessage(error) }, 'Failed to fix Dockerfile');
+    return Failure(`Failed to fix Dockerfile: ${extractErrorMessage(error)}`);
   }
 }
 
 /**
- * Fix dockerfile tool with selective progress reporting
+ * Standard tool export for MCP server integration
  */
-export const fixDockerfile = fixDockerfileImpl;
+export const tool = {
+  type: 'standard' as const,
+  name: 'fix-dockerfile',
+  description: 'Fix and optimize Dockerfiles using AI analysis and security best practices',
+  inputSchema: fixDockerfileSchema,
+  execute: fixDockerfileHandler,
+};
+
+// Export for backward compatibility
+export const fixDockerfile = fixDockerfileHandler;

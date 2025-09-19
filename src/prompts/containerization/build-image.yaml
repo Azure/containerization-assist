@@ -1,0 +1,98 @@
+id: build-image
+version: '1.0.0'
+description: AI-guided Docker image building with optimization recommendations
+category: containerization
+parameters:
+  - name: dockerfilePath
+    type: string
+    required: true
+    description: Path to the Dockerfile
+  - name: contextPath
+    type: string
+    required: true
+    description: Build context directory path
+  - name: imageName
+    type: string
+    required: true
+    description: Name for the Docker image
+  - name: baseImage
+    type: string
+    required: false
+    description: Base image being used
+  - name: buildArgs
+    type: object
+    required: false
+    description: Build arguments to pass
+  - name: platform
+    type: string
+    required: false
+    description: Target platform (e.g., linux/amd64)
+  - name: sessionAnalysis
+    type: object
+    required: false
+    description: Previous analysis results from session
+template: |
+  Analyze and provide build optimization recommendations for a Docker image build.
+
+  Build Configuration:
+  - Dockerfile: {{dockerfilePath}}
+  - Context Path: {{contextPath}}
+  - Image Name: {{imageName}}
+
+  - Base Image: {{baseImage}}
+
+
+  - Target Platform: {{platform}}
+
+
+  - Build Arguments: {{buildArgs}}
+
+
+
+  Previous Analysis:
+  {{sessionAnalysis}}
+
+
+
+  Relevant Build Patterns:
+  {{knowledge}}
+
+
+
+  Build Policies:
+  {{policy}}
+
+
+  Provide a JSON response with the following structure:
+  ```json
+  {
+    "buildStrategy": {
+      "approach": "string (multi-stage|single-stage|builder-pattern)",
+      "reasoning": "string"
+    },
+    "optimizations": [
+      {
+        "type": "string (cache|layer|size|security)",
+        "recommendation": "string",
+        "impact": "string (high|medium|low)"
+      }
+    ],
+    "cacheStrategy": {
+      "mountCache": boolean,
+      "cacheFrom": ["string"],
+      "inlineCache": boolean
+    },
+    "securityChecks": {
+      "scanBeforePush": boolean,
+      "nonRootUser": boolean,
+      "signImage": boolean
+    },
+    "estimatedSize": "string (e.g., '150MB')",
+    "estimatedBuildTime": "string (e.g., '2-3 minutes')",
+    "warnings": ["string"],
+    "recommendations": ["string"]
+  }
+  ```
+
+  Focus on practical, actionable recommendations that improve build speed, image size, and security.
+format: json

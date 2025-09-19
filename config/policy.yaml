@@ -1,0 +1,360 @@
+# Unified Policy Configuration
+# Consolidates scoring rules, strategies, environment overrides, and tool defaults
+version: "2.0.0"
+metadata:
+  description: "Unified configuration policy for containerization-assist"
+  created: "2024-09-18"
+  author: "containerization-assist"
+  migration_from: "1.0.0 (separate files)"
+
+# Global configuration weights and limits
+weights:
+  # Category importance weights (applied across all content types)
+  global_categories:
+    security: 1.2        # Security is highest priority
+    performance: 1.1     # Performance optimization
+    quality: 1.0         # Standard quality practices
+    maintainability: 0.9 # Code maintainability
+    efficiency: 0.9      # Resource efficiency
+
+  # Content-type specific weight adjustments
+  content_types:
+    dockerfile:
+      security: 1.2      # Extra security focus for containers
+      performance: 1.1   # Image size/build optimization critical
+      quality: 1.0
+      maintainability: 0.9 # Less critical for containers
+
+    kubernetes:
+      security: 1.3      # Security critical in production
+      performance: 1.0
+      quality: 1.1       # Manifest quality important
+      maintainability: 1.0
+
+    generic:
+      security: 1.1      # Basic security awareness
+      performance: 0.9
+      quality: 1.0       # Standard practices
+      maintainability: 1.0
+
+# Scoring rules organized by content type and category
+rules:
+  dockerfile:
+    base_score: 30
+    max_score: 100
+    timeout_ms: 2000
+
+    security:
+      - name: "non_root_user"
+        matcher:
+          type: "function"
+          function: "hasNonRootUser"
+        points: 25
+        weight: 1.3
+        description: "Runs container as non-root user"
+
+      - name: "no_hardcoded_secrets"
+        matcher:
+          type: "function"
+          function: "hasNoSecretPatterns"
+        points: 15
+        weight: 1.2
+        description: "Avoids hardcoded secrets and credentials"
+
+      - name: "versioned_images"
+        matcher:
+          type: "function"
+          function: "hasVersionedImages"
+        points: 10
+        weight: 1.1
+        description: "Uses specific image versions instead of latest"
+
+      - name: "distroless_base"
+        matcher:
+          type: "regex"
+          pattern: "FROM.*distroless"
+          flags: "i"
+        points: 25
+        weight: 1.1
+        description: "Uses distroless images for minimal attack surface"
+
+    performance:
+      - name: "multistage_build"
+        matcher:
+          type: "regex"
+          pattern: "^FROM\\s+"
+          count_threshold: 2
+          comparison: "greater_than"
+        points: 15
+        weight: 1.0
+        description: "Uses multi-stage Docker builds for optimization"
+
+      - name: "dependency_caching"
+        matcher:
+          type: "function"
+          function: "hasDependencyCaching"
+        points: 20
+        weight: 1.2
+        description: "Optimizes dependency installation caching"
+
+      - name: "alpine_base"
+        matcher:
+          type: "regex"
+          pattern: "FROM.*alpine"
+          flags: "i"
+        points: 20
+        weight: 1.0
+        description: "Uses Alpine Linux for smaller image size"
+
+    quality:
+      - name: "proper_workdir"
+        matcher:
+          type: "regex"
+          pattern: "^WORKDIR\\s+"
+        points: 10
+        weight: 0.8
+        description: "Sets appropriate working directory"
+
+      - name: "health_checks"
+        matcher:
+          type: "regex"
+          pattern: "^HEALTHCHECK\\s+"
+        points: 10
+        weight: 0.9
+        description: "Includes health check for container monitoring"
+
+    penalties:
+      - name: "root_user_usage"
+        matcher:
+          type: "regex"
+          pattern: "USER\\s+root"
+        points: -10
+        weight: 1.0
+        description: "Penalize explicit root user usage"
+
+  kubernetes:
+    base_score: 35
+    max_score: 100
+    timeout_ms: 2500
+
+    security:
+      - name: "security_context"
+        matcher:
+          type: "function"
+          function: "hasSecurityContext"
+        points: 30
+        weight: 1.4
+        description: "Defines proper security context"
+
+      - name: "resource_limits"
+        matcher:
+          type: "function"
+          function: "hasResourceLimits"
+        points: 20
+        weight: 1.2
+        description: "Sets resource limits and requests"
+
+      - name: "network_policies"
+        matcher:
+          type: "regex"
+          pattern: "kind:\\s*NetworkPolicy"
+        points: 15
+        weight: 1.1
+        description: "Includes network policies for security"
+
+    quality:
+      - name: "proper_labels"
+        matcher:
+          type: "function"
+          function: "hasProperLabels"
+        points: 15
+        weight: 1.0
+        description: "Uses consistent labeling strategy"
+
+      - name: "readiness_probes"
+        matcher:
+          type: "regex"
+          pattern: "readinessProbe:"
+        points: 10
+        weight: 1.0
+        description: "Includes readiness probes"
+
+  generic:
+    base_score: 40
+    max_score: 100
+    timeout_ms: 1500
+
+    quality:
+      - name: "sufficient_content_length"
+        matcher:
+          type: "function"
+          function: "hasMinimumLines"
+          threshold: 5
+          comparison: "greater_than_or_equal"
+        points: 15
+        weight: 1.0
+        description: "Has sufficient content length"
+
+      - name: "has_documentation"
+        matcher:
+          type: "function"
+          function: "hasDocumentation"
+        points: 20
+        weight: 1.1
+        description: "Includes documentation or comments"
+
+    security:
+      - name: "no_hardcoded_secrets"
+        matcher:
+          type: "function"
+          function: "hasNoGenericSecrets"
+        points: 25
+        weight: 1.3
+        description: "Avoids hardcoded secrets and credentials"
+
+# Strategy definitions for progressive refinement
+strategies:
+  dockerfile:
+    - "Create a Dockerfile for {language} application"
+    - "Generate production-ready Dockerfile with security best practices for {language}"
+    - "Optimize Dockerfile for {language} with multi-stage build and minimal layers"
+
+  kubernetes:
+    - "Create basic Kubernetes deployment for {appName}"
+    - "Generate Kubernetes manifests with best practices for {appName}"
+    - "Create production Kubernetes deployment with monitoring and scaling for {appName}"
+
+  yaml:
+    - "Generate {contentType} YAML content"
+    - "Create well-structured {contentType} YAML following best practices"
+    - "Generate optimized {contentType} YAML with comprehensive configuration"
+
+  generic:
+    - "Generate {contentType} content"
+    - "Create well-structured {contentType} following best practices"
+    - "Generate optimized {contentType} with comprehensive configuration"
+
+# Strategy selection rules based on context
+strategy_selection:
+  dockerfile:
+    conditions:
+      - key: "hasDockerfile"
+        value: false
+        strategy_index: 0
+      - key: "complexity"
+        value: "high"
+        strategy_index: 2
+      - key: "environment"
+        value: "production"
+        strategy_index: 2
+    default_strategy_index: 1
+
+  kubernetes:
+    conditions:
+      - key: "environment"
+        value: "production"
+        strategy_index: 2
+      - key: "scaling_required"
+        value: true
+        strategy_index: 2
+    default_strategy_index: 1
+
+# Environment-specific overrides
+env_overrides:
+  development:
+    weights:
+      content_types:
+        dockerfile:
+          security: 1.0       # Less critical in dev
+          performance: 0.9    # Less critical
+          quality: 1.0        # Still important
+          maintainability: 1.1 # More important for dev velocity
+
+    rules:
+      dockerfile:
+        security:
+          - name: "non_root_user"
+            points: 15  # Lower than base (25) - less critical in dev
+            weight: 1.0  # Lower than base (1.3)
+          - name: "versioned_images"
+            points: 5   # Lower than base (10) - latest tags ok in dev
+            weight: 0.8  # Lower than base (1.1)
+
+    sampling:
+      max_candidates: 3       # Fewer candidates for faster iteration
+      timeout_ms: 5000        # Faster timeout for development speed
+      early_stop_threshold: 80 # Lower bar for early stopping
+
+    strategies:
+      dockerfile:
+        default_strategy_index: 0  # Use simpler strategy by default
+        conditions:
+          - key: "complexity"
+            value: "high"
+            strategy_index: 1  # Only go to intermediate for high complexity
+
+  production:
+    weights:
+      content_types:
+        dockerfile:
+          security: 1.4       # Higher security requirements
+          performance: 1.2    # Optimization critical
+          quality: 1.1        # Higher quality bar
+          maintainability: 1.0
+        kubernetes:
+          security: 1.5       # Maximum security focus
+          performance: 1.1
+          quality: 1.2        # High quality requirements
+          maintainability: 1.0
+
+    sampling:
+      max_candidates: 5       # More thorough evaluation
+      timeout_ms: 8000        # Allow more time for optimization
+      early_stop_threshold: 95 # Higher bar for early stopping
+
+    strategies:
+      dockerfile:
+        default_strategy_index: 2  # Use most advanced strategy
+      kubernetes:
+        default_strategy_index: 2  # Production-ready by default
+
+# Tool-specific default configurations
+tool_defaults:
+  generate-dockerfile:
+    content_type: "dockerfile"
+    environment: "development"  # Default to development unless specified
+    strategy_override: null     # Use environment-based selection
+
+  generate-k8s-manifests:
+    content_type: "kubernetes"
+    environment: "production"   # Default to production for k8s
+    strategy_override: null
+
+  analyze-repo:
+    content_type: "generic"
+    environment: "development"
+    timeout_ms: 10000          # Allow longer analysis time
+
+  fix-dockerfile:
+    content_type: "dockerfile"
+    environment: "production"   # Fixes should target production standards
+    strategy_override: 2        # Always use most comprehensive strategy
+
+# Global penalties that apply across all content types
+global_penalties:
+  - name: "excessive_empty_lines"
+    matcher:
+      type: "regex"
+      pattern: "\\n\\s*\\n\\s*\\n\\s*\\n"
+    points: -5
+    description: "Penalize excessive empty lines"
+
+  - name: "very_long_lines"
+    matcher:
+      type: "function"
+      function: "hasExcessivelyLongLines"
+    points: -3
+    description: "Penalize excessively long lines"
+
+# Configuration validation schema version
+schema_version: "2.0.0"

@@ -1,0 +1,41 @@
+id: strategy-optimization
+version: '1.0.0'
+description: Generate strategy-specific optimization prompts for sampling
+category: sampling
+parameters:
+  - name: strategy
+    type: string
+    required: true
+    description: Strategy type (security, performance, size, balanced)
+  - name: context
+    type: string
+    required: true
+    description: Analysis context including language and framework
+  - name: language
+    type: string
+    required: false
+    description: Programming language
+  - name: framework
+    type: string
+    required: false
+    description: Framework being used
+  - name: focus
+    type: string
+    required: false
+    description: Specific focus area
+  - name: environment
+    type: string
+    required: false
+    description: Target environment
+template: |
+  Generate optimized containerization strategy for {{strategy}} optimization.
+  Language: {{language}}
+  Framework: {{framework}}
+  Context: {{context}}
+
+  Strategy focus: {{strategy}}
+  Specific focus: {{focus}}
+  Target environment: {{environment}}
+
+  Provide specific recommendations for optimizing the containerization approach.
+format: text

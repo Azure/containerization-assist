@@ -1,0 +1,272 @@
+[
+  {
+    "id": "12factor-config-env",
+    "category": "dockerfile",
+    "pattern": "(ENV\\s+\\w+|ARG\\s+\\w+)",
+    "recommendation": "Store config in environment variables per 12-factor app methodology",
+    "example": "# Runtime configuration\nENV PORT=8080 \\\n    LOG_LEVEL=info \\\n    NODE_ENV=production\n\n# Build-time args with defaults\nARG VERSION=latest\nARG BUILD_DATE\n\n# Reference: Use ConfigMaps/Secrets in K8s\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: app-config\ndata:\n  PORT: \"8080\"\n  LOG_LEVEL: \"info\"",
+    "severity": "high",
+    "tags": ["12factor", "configuration", "cloud-native", "environment"],
+    "description": "12-factor apps separate config from code for portability",
+    "rationale": "Same container runs in dev, staging, prod with different configs",
+    "tradeoffs": "Sensitive data needs secret management, not plain env vars",
+    "alternatives": ["config files", "configuration service", "vault"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "0",
+      "securityScore": "+2"
+    }
+  },
+  {
+    "id": "12factor-dependencies",
+    "category": "dockerfile",
+    "pattern": "(requirements\\.txt|package.*\\.json|go\\.mod|Gemfile)",
+    "recommendation": "Explicitly declare and isolate dependencies (12-factor principle II)",
+    "example": "# Python with pinned versions\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\n\n# Node with lock file\nCOPY package*.json ./\nRUN npm ci --only=production\n\n# Go modules\nCOPY go.mod go.sum ./\nRUN go mod download\n\n# Principle: Never rely on system packages",
+    "severity": "high",
+    "tags": ["12factor", "dependencies", "isolation", "reproducible"],
+    "description": "Explicit dependency declaration ensures reproducible builds",
+    "rationale": "Prevents 'works on my machine' issues, enables reliable deploys",
+    "tradeoffs": "Requires dependency management discipline",
+    "alternatives": ["vendoring", "private registries"],
+    "metrics": {
+      "sizeImpact": "+10MB",
+      "buildTimeImpact": "0",
+      "securityScore": "+2"
+    }
+  },
+  {
+    "id": "12factor-port-binding",
+    "category": "dockerfile",
+    "pattern": "(EXPOSE\\s+\\d+|PORT)",
+    "recommendation": "Export services via port binding (12-factor principle VII)",
+    "example": "# Self-contained web server\nENV PORT=8080\nEXPOSE $PORT\n\n# Application code\nconst port = process.env.PORT || 8080;\napp.listen(port, '0.0.0.0', () => {\n  console.log(`Listening on port ${port}`);\n});\n\n# No Apache/Nginx needed in same container",
+    "severity": "medium",
+    "tags": ["12factor", "port-binding", "self-contained", "microservices"],
+    "description": "Apps should be self-contained with embedded web server",
+    "rationale": "Enables horizontal scaling, service discovery, load balancing",
+    "tradeoffs": "Each service manages its own web server",
+    "alternatives": ["sidecar proxy", "service mesh"],
+    "metrics": {
+      "sizeImpact": "+5MB",
+      "buildTimeImpact": "0",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "12factor-logs-stdout",
+    "category": "dockerfile",
+    "pattern": "(log|LOG|winston|morgan|bunyan|pino)",
+    "recommendation": "Treat logs as event streams to stdout/stderr (12-factor principle XI)",
+    "example": "# Python\nimport logging\nlogging.basicConfig(\n    level=logging.INFO,\n    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',\n    handlers=[logging.StreamHandler()]\n)\n\n# Node.js\nconst logger = require('pino')();\nlogger.info('Application started');\n\n# Docker captures stdout/stderr\ndocker logs <container-id>\n\n# K8s aggregates logs\nkubectl logs <pod-name>",
+    "severity": "high",
+    "tags": ["12factor", "logging", "stdout", "observability"],
+    "description": "Cloud-native apps write logs to stdout for platform handling",
+    "rationale": "Platform handles log routing, aggregation, analysis",
+    "tradeoffs": "No local log files, requires log aggregation service",
+    "alternatives": ["log files with sidecar", "direct log shipping"],
+    "metrics": {
+      "sizeImpact": "-10MB",
+      "buildTimeImpact": "0",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "12factor-processes-stateless",
+    "category": "dockerfile",
+    "pattern": "(session|state|cache|tmp|temp)",
+    "recommendation": "Execute app as stateless processes (12-factor principle VI)",
+    "example": "# Bad: Local file session store\n# app.use(session({ store: new FileStore() }))\n\n# Good: External session store\nconst RedisStore = require('connect-redis')(session);\napp.use(session({\n  store: new RedisStore({ client: redisClient }),\n  secret: process.env.SESSION_SECRET\n}));\n\n# Dockerfile: No persistent volumes needed\nFROM node:20-alpine\nWORKDIR /app\n# No VOLUME declarations\n# No local state directories",
+    "severity": "high",
+    "tags": ["12factor", "stateless", "scalability", "processes"],
+    "description": "Stateless processes enable horizontal scaling and resilience",
+    "rationale": "Any process can handle any request, enables easy scaling",
+    "tradeoffs": "Requires external stores for state (Redis, database)",
+    "alternatives": ["sticky sessions", "stateful sets"],
+    "metrics": {
+      "sizeImpact": "-20MB",
+      "buildTimeImpact": "0",
+      "securityScore": "+2"
+    }
+  },
+  {
+    "id": "graceful-shutdown-sigterm",
+    "category": "dockerfile",
+    "pattern": "(SIGTERM|SIGINT|graceful|shutdown)",
+    "recommendation": "Implement graceful shutdown on SIGTERM for cloud deployments",
+    "example": "// Node.js\nprocess.on('SIGTERM', () => {\n  console.log('SIGTERM received, closing connections...');\n  server.close(() => {\n    console.log('Server closed');\n    process.exit(0);\n  });\n});\n\n# Python\nimport signal\nimport sys\n\ndef sigterm_handler(_signo, _stack_frame):\n    # Cleanup code here\n    sys.exit(0)\n\nsignal.signal(signal.SIGTERM, sigterm_handler)\n\n# Kubernetes terminationGracePeriodSeconds\nspec:\n  terminationGracePeriodSeconds: 30",
+    "severity": "high",
+    "tags": ["cloud-native", "graceful-shutdown", "signals", "reliability"],
+    "description": "Graceful shutdown prevents data loss and connection errors",
+    "rationale": "Cloud platforms send SIGTERM before force killing containers",
+    "tradeoffs": "Requires signal handling implementation",
+    "alternatives": ["preStop hooks", "init systems"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "0",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "health-readiness-probes",
+    "category": "dockerfile",
+    "pattern": "(health|ready|alive|probe)",
+    "recommendation": "Implement health and readiness endpoints for orchestrators",
+    "example": "# Application endpoints\napp.get('/health', (req, res) => {\n  // Liveness: Is the app running?\n  res.status(200).json({ status: 'ok' });\n});\n\napp.get('/ready', async (req, res) => {\n  // Readiness: Can the app serve traffic?\n  const dbOk = await checkDatabase();\n  if (dbOk) {\n    res.status(200).json({ status: 'ready' });\n  } else {\n    res.status(503).json({ status: 'not ready' });\n  }\n});\n\n# Dockerfile\nHEALTHCHECK --interval=30s --timeout=3s \\\n  CMD curl -f http://localhost:8080/health || exit 1\n\n# Kubernetes\nlivenessProbe:\n  httpGet:\n    path: /health\n    port: 8080\nreadinessProbe:\n  httpGet:\n    path: /ready\n    port: 8080",
+    "severity": "high",
+    "tags": ["cloud-native", "health", "probes", "kubernetes"],
+    "description": "Health checks enable automatic recovery and traffic management",
+    "rationale": "Orchestrators use probes for routing and restart decisions",
+    "tradeoffs": "Requires endpoint implementation and monitoring",
+    "alternatives": ["TCP checks", "exec probes", "gRPC health"],
+    "metrics": {
+      "sizeImpact": "+1KB",
+      "buildTimeImpact": "0",
+      "securityScore": "+2"
+    }
+  },
+  {
+    "id": "aws-ecs-fargate",
+    "category": "dockerfile",
+    "pattern": "(ecs|fargate|aws|ecr)",
+    "recommendation": "Optimize containers for AWS ECS/Fargate deployment",
+    "example": "# Fargate-optimized Dockerfile\nFROM public.ecr.aws/lambda/nodejs:20 AS builder\n# Or FROM node:20-alpine for ECS\n\n# Use AWS SDK v3 for smaller bundles\nRUN npm install @aws-sdk/client-s3\n\n# Log to stdout for CloudWatch\nENV LOG_FORMAT=json\n\n# Task definition\n{\n  \"family\": \"my-app\",\n  \"networkMode\": \"awsvpc\",\n  \"requiresCompatibilities\": [\"FARGATE\"],\n  \"cpu\": \"256\",\n  \"memory\": \"512\",\n  \"containerDefinitions\": [{\n    \"name\": \"app\",\n    \"image\": \"${ECR_URI}:latest\",\n    \"logConfiguration\": {\n      \"logDriver\": \"awslogs\"\n    }\n  }]\n}",
+    "severity": "medium",
+    "tags": ["aws", "ecs", "fargate", "cloud-native"],
+    "description": "Fargate has specific requirements for networking and logging",
+    "rationale": "Optimized for serverless container execution",
+    "tradeoffs": "Limited to specific CPU/memory combinations",
+    "alternatives": ["ECS EC2", "EKS", "Lambda containers"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "0",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "gcp-cloud-run",
+    "category": "dockerfile",
+    "pattern": "(cloud.*run|gcr\\.io|gcp)",
+    "recommendation": "Configure containers for Google Cloud Run requirements",
+    "example": "# Cloud Run requirements\nFROM node:20-alpine\n\n# Must listen on $PORT\nENV PORT=8080\nEXPOSE $PORT\n\n# Maximum 32GB disk\nWORKDIR /app\n\n# Service account auth\nENV GOOGLE_APPLICATION_CREDENTIALS=/tmp/key.json\n\n# Deploy\ngcloud run deploy my-service \\\n  --image gcr.io/$PROJECT_ID/my-app \\\n  --platform managed \\\n  --allow-unauthenticated \\\n  --memory 512Mi \\\n  --cpu 1 \\\n  --max-instances 100 \\\n  --concurrency 80",
+    "severity": "medium",
+    "tags": ["gcp", "cloud-run", "serverless", "container"],
+    "description": "Cloud Run requires specific port binding and resource limits",
+    "rationale": "Serverless containers with automatic scaling",
+    "tradeoffs": "Request timeout limits, cold starts",
+    "alternatives": ["GKE", "App Engine", "Cloud Functions"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "0",
+      "securityScore": "+2"
+    }
+  },
+  {
+    "id": "azure-container-instances",
+    "category": "dockerfile",
+    "pattern": "(azure|acr\\.io|container.*instances)",
+    "recommendation": "Optimize for Azure Container Instances deployment",
+    "example": "# Azure-optimized\nFROM mcr.microsoft.com/dotnet/aspnet:8.0\n\n# Managed Identity support\nENV AZURE_CLIENT_ID=${AZURE_CLIENT_ID}\n\n# Application Insights\nRUN apt-get update && apt-get install -y curl\nENV APPLICATIONINSIGHTS_CONNECTION_STRING=${APP_INSIGHTS_CONNECTION}\n\n# Deploy\naz container create \\\n  --resource-group myRG \\\n  --name myapp \\\n  --image myacr.azurecr.io/myapp:latest \\\n  --cpu 1 \\\n  --memory 1.5 \\\n  --ports 80 \\\n  --ip-address public \\\n  --assign-identity",
+    "severity": "medium",
+    "tags": ["azure", "aci", "container-instances", "cloud"],
+    "description": "ACI provides serverless containers with Azure integration",
+    "rationale": "Simple container deployment without orchestration",
+    "tradeoffs": "Limited orchestration features compared to AKS",
+    "alternatives": ["AKS", "App Service", "Container Apps"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "0",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "service-mesh-sidecar",
+    "category": "dockerfile",
+    "pattern": "(istio|linkerd|consul|envoy)",
+    "recommendation": "Design containers for service mesh sidecar proxy",
+    "example": "# Application container - no proxy logic needed\nFROM node:20-alpine\nWORKDIR /app\nCOPY . .\n# Listen on localhost only\nENV BIND_ADDRESS=127.0.0.1\nEXPOSE 8080\nCMD [\"node\", \"server.js\"]\n\n# Istio injection annotation\napiVersion: v1\nkind: Namespace\nmetadata:\n  name: production\n  labels:\n    istio-injection: enabled\n\n# Service definition\napiVersion: v1\nkind: Service\nmetadata:\n  name: my-app\nspec:\n  ports:\n  - name: http  # Named ports required\n    port: 8080",
+    "severity": "low",
+    "tags": ["service-mesh", "istio", "sidecar", "microservices"],
+    "description": "Service mesh handles cross-cutting concerns externally",
+    "rationale": "Separates business logic from networking/security concerns",
+    "tradeoffs": "Additional complexity, resource overhead",
+    "alternatives": ["library-based", "api gateway", "direct integration"],
+    "metrics": {
+      "sizeImpact": "-50MB",
+      "buildTimeImpact": "0",
+      "securityScore": "+3"
+    }
+  },
+  {
+    "id": "knative-serving",
+    "category": "dockerfile",
+    "pattern": "(knative|serving|serverless)",
+    "recommendation": "Configure containers for Knative serverless workloads",
+    "example": "# Knative-ready container\nFROM node:20-alpine\nWORKDIR /app\nCOPY . .\n# Must handle concurrent requests\nENV NODE_CLUSTER_WORKERS=4\n# Quick startup for scale-from-zero\nRUN npm run build\nEXPOSE 8080\nCMD [\"node\", \"dist/server.js\"]\n\n# Knative Service\napiVersion: serving.knative.dev/v1\nkind: Service\nmetadata:\n  name: my-app\nspec:\n  template:\n    metadata:\n      annotations:\n        autoscaling.knative.dev/target: \"100\"\n    spec:\n      containers:\n      - image: gcr.io/project/app\n        resources:\n          limits:\n            cpu: 1000m\n            memory: 512Mi",
+    "severity": "low",
+    "tags": ["knative", "serverless", "kubernetes", "scale-to-zero"],
+    "description": "Knative enables serverless workloads on Kubernetes",
+    "rationale": "Automatic scaling including scale-to-zero",
+    "tradeoffs": "Cold starts, requires Kubernetes cluster",
+    "alternatives": ["KEDA", "cloud functions", "OpenFaaS"],
+    "metrics": {
+      "sizeImpact": "0",
+      "buildTimeImpact": "0",
+      "securityScore": "+1"
+    }
+  },
+  {
+    "id": "opentelemetry-instrumentation",
+    "category": "dockerfile",
+    "pattern": "(opentelemetry|otel|tracing|telemetry)",
+    "recommendation": "Add OpenTelemetry for cloud-native observability",
+    "example": "# Auto-instrumentation for Node.js\nFROM node:20-alpine\nRUN npm install @opentelemetry/auto-instrumentations-node\nENV NODE_OPTIONS=\"--require @opentelemetry/auto-instrumentations-node/register\"\nENV OTEL_SERVICE_NAME=\"my-app\"\nENV OTEL_EXPORTER_OTLP_ENDPOINT=\"http://otel-collector:4317\"\nENV OTEL_RESOURCE_ATTRIBUTES=\"environment=prod,version=1.0.0\"\n\n# Python\nRUN pip install opentelemetry-distro[otlp]\nRUN opentelemetry-bootstrap --action=install\nENV OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true\nCMD [\"opentelemetry-instrument\", \"python\", \"app.py\"]",
+    "severity": "medium",
+    "tags": ["observability", "opentelemetry", "tracing", "metrics"],
+    "description": "OpenTelemetry provides vendor-agnostic observability",
+    "rationale": "Unified observability across different cloud providers",
+    "tradeoffs": "Performance overhead, additional complexity",
+    "alternatives": ["APM vendors", "cloud-native tools", "custom instrumentation"],
+    "metrics": {
+      "sizeImpact": "+20MB",
+      "buildTimeImpact": "+10s",
+      "securityScore": "0"
+    }
+  },
+  {
+    "id": "cloud-native-buildpacks",
+    "category": "dockerfile",
+    "pattern": "(buildpack|paketo|pack|cnb)",
+    "recommendation": "Consider Cloud Native Buildpacks for automated container creation",
+    "example": "# No Dockerfile needed!\n# Install pack CLI\nbrew install buildpacks/tap/pack\n\n# Build with Paketo buildpacks\npack build my-app --builder paketobuildpacks/builder:base\n\n# Or with specific buildpack\npack build my-app \\\n  --buildpack paketo-buildpacks/nodejs \\\n  --builder paketobuildpacks/builder:base\n\n# project.toml for configuration\n[[build.env]]\nname = \"BP_NODE_VERSION\"\nvalue = \"20.*\"\n\n[[build.env]]\nname = \"BP_NODE_OPTIMIZE_MEMORY\"\nvalue = \"true\"\n\n# Rebase for security updates\npack rebase my-app",
+    "severity": "low",
+    "tags": ["buildpacks", "cnb", "automation", "paketo"],
+    "description": "Buildpacks automate container creation with best practices",
+    "rationale": "No Dockerfile maintenance, automatic security updates",
+    "tradeoffs": "Less control, may not support all use cases",
+    "alternatives": ["Dockerfile", "Nixpacks", "source-to-image"],
+    "metrics": {
+      "sizeImpact": "+100MB",
+      "buildTimeImpact": "+60s",
+      "securityScore": "+3"
+    }
+  },
+  {
+    "id": "workload-identity",
+    "category": "security",
+    "pattern": "(workload.*identity|pod.*identity|irsa|managed.*identity)",
+    "recommendation": "Use workload identity for cloud resource access",
+    "example": "# AWS IRSA\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: my-app\n  annotations:\n    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/my-app-role\n\n# GCP Workload Identity\nkubectl annotate serviceaccount my-app \\\n  iam.gke.io/gcp-service-account=my-app@project.iam.gserviceaccount.com\n\n# Azure Pod Identity\napiVersion: v1\nkind: Pod\nmetadata:\n  labels:\n    azure.workload.identity/use: \"true\"\nspec:\n  serviceAccountName: my-app\n\n# No credentials in container!\nFROM node:20-alpine\n# AWS SDK auto-discovers IRSA credentials\n# GCP client libraries auto-discover WI\n# Azure SDK uses managed identity",
+    "severity": "high",
+    "tags": ["security", "identity", "cloud-native", "credentials"],
+    "description": "Workload identity eliminates credential management",
+    "rationale": "No secrets to rotate, leak, or manage",
+    "tradeoffs": "Cloud-specific configuration required",
+    "alternatives": ["secret management", "vault", "environment variables"],
+    "metrics": {
+      "sizeImpact": "-1MB",
+      "buildTimeImpact": "0",
+      "securityScore": "+5"
+    }
+  }
+]

@@ -1,0 +1,139 @@
+id: error-analysis
+version: '2.1.0'
+description: Context-aware containerization troubleshooting across all technologies
+category: validation
+format: text
+parameters:
+  - name: language
+    type: string
+    description: Programming language/technology
+    required: true
+  - name: framework
+    type: string
+    description: Application framework if applicable
+    required: false
+  - name: buildSystem
+    type: string
+    description: Build system being used
+    required: false
+  - name: error_stage
+    type: string
+    description: When the error occurs (build, startup, runtime, etc.)
+    required: false
+  - name: errorMessage
+    type: string
+    description: The actual error message or output
+    required: true
+  - name: additional_context
+    type: string
+    description: Any additional context about the situation
+    required: false
+template: |
+  You are an expert troubleshooter who understands that errors happen in context.
+  Your goal is to help developers understand what went wrong and how to fix it,
+  considering their specific situation and skill level.
+
+  Approach each error by:
+  - Understanding the full context of what the developer is trying to achieve
+  - Identifying the most likely cause based on the technology and error pattern
+  - Providing solutions that match the team's apparent experience level
+  - Focusing on getting things working first, optimization second
+  Help me understand and fix this containerization issue:
+
+  **Technology Context:**
+  - Language/Framework: {{language}} {{#if framework}}with {{framework}}{{/if}}
+  {{#if buildSystem}}
+  - Build System: {{buildSystem}}
+  {{/if}}
+  {{#if error_stage}}
+  - When Error Occurs: {{error_stage}}
+  {{/if}}
+
+  **The Error:**
+  ```
+  {{errorMessage}}
+  ```
+
+  {{#if additional_context}}
+  **Additional Context:**
+  {{additional_context}}
+  {{/if}}
+
+  Please help me:
+  1. Understand what's actually going wrong
+  2. Get this working with a practical solution
+  3. Learn how to avoid similar issues
+
+examples:
+  - input:
+      language: "Node.js"
+      framework: "Express"
+      buildSystem: "npm"
+      error_stage: "container startup"
+      errorMessage: |
+        npm ERR! code ENOENT
+        npm ERR! syscall open
+        npm ERR! path /app/package.json
+        npm ERR! errno -2
+        npm ERR! enoent ENOENT: no such file or directory, open '/app/package.json'
+      additional_context: "New to Docker, trying to containerize my first Node.js app"
+    output: |
+      ## What's Going Wrong
+
+      The error shows that npm can't find your `package.json` file in the `/app` directory inside the container. This is a classic Docker file copying issue - the problem isn't with your Node.js code, but with how files are being copied into the container.
+
+      ## Most Likely Causes
+
+      1. **Dockerfile COPY command issue**: The `package.json` isn't being copied to the right location
+      2. **Wrong working directory**: The commands are running from a different directory than expected
+      3. **Build context problem**: Docker isn't seeing your files during the build
+
+      ## Quick Fix
+
+      Check your Dockerfile for these common patterns:
+
+      **Problem Pattern:**
+      ```dockerfile
+      FROM node:18
+      WORKDIR /app
+      RUN npm install  # This runs before copying package.json!
+      COPY . .
+      ```
+
+      **Fixed Pattern:**
+      ```dockerfile
+      FROM node:18
+      WORKDIR /app
+      COPY package*.json ./  # Copy package files first
+      RUN npm install       # Now this can find package.json
+      COPY . .              # Copy rest of the app
+      CMD ["npm", "start"]
+      ```
+
+      ## Why This Works
+
+      1. **Files copied in right order**: `package.json` is available before `npm install` runs
+      2. **Explicit working directory**: `/app` is set before any operations
+      3. **Layer optimization**: Dependencies are installed before app code changes
+
+      ## Quick Debug Steps
+
+      If you're still having issues:
+      1. Check that `package.json` exists in your project root
+      2. Make sure you're running `docker build` from the directory containing `package.json`
+      3. Add `RUN ls -la` after `WORKDIR /app` to see what's actually in the container
+
+      ## Prevention Tips
+
+      - Always copy dependency files (`package*.json`) before running install commands
+      - Use `COPY package*.json ./` to copy both `package.json` and `package-lock.json`
+      - Set `WORKDIR` early and stick to it
+      - Test with a minimal Dockerfile first, then add complexity
+
+      This is a very common first Docker issue - once you understand the file copying order, you'll rarely see this error again!
+
+tags:
+  - error-analysis
+  - troubleshooting
+  - adaptive
+  - beginner-friendly

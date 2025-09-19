@@ -1,35 +1,17 @@
-# Production Environment Overrides
-environment: "production"
+# Production environment configuration overrides
+environment: production
 
 overrides:
   scoring:
     dockerfile:
-      # Higher security requirements in production
-      rules:
-        security:
-          - name: "non_root_user"
-            points: 30  # Higher than base (25)
-            weight: 1.5  # Higher than base (1.3)
-          - name: "no_hardcoded_secrets"  
-            points: 20  # Higher than base (15)
-            weight: 1.5  # Higher than base (1.2)
-          - name: "versioned_images"
-            points: 15  # Higher than base (10)
-            weight: 1.3  # Higher than base (1.1)
-      
-      # Stricter category weights
       category_weights:
-        security: 1.5      # Even higher priority
-        performance: 1.2   # Still important
-        quality: 1.1       # More important in prod
-        maintainability: 1.0 # Standard
-  
+        security: 0.35  # Higher weight on security in production
+        correctness: 0.30
+        efficiency: 0.20
+        maintainability: 0.10
+        completeness: 0.05
+
   sampling:
-    max_candidates: 5      # More candidates for production
-    timeout_ms: 10000      # Longer timeout for quality
-    early_stop_threshold: 95 # Higher bar for early stopping
-    
-  # Production-specific strategy selection
-  strategies:
-    dockerfile:
-      default_strategy_index: 2  # Use production-focused strategy by default
+    max_candidates: 5
+    timeout_ms: 10000
+    early_stop_threshold: 0.95

@@ -1,0 +1,112 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Prompt Golden File Regression Tests deploy-application prompt should render consistently with known parameters: deploy-application-golden 1`] = `
+"Analyze and provide deployment strategy recommendations for a Kubernetes deployment.
+
+Deployment Configuration:
+- Manifests: deployment.yaml,service.yaml
+- Namespace: production
+
+- Cluster: main-cluster
+
+
+- Environment: production
+
+
+- Preferred Strategy: rolling
+
+
+
+Existing Deployment:
+{
+  "name": "my-app",
+  "replicas": 3,
+  "version": "1.2.0"
+}
+
+
+
+Previous Analysis:
+{
+  "risks": [
+    "high-traffic"
+  ],
+  "recommendations": [
+    "enable-hpa"
+  ]
+}
+
+
+
+Deployment Best Practices:
+Best practices for production deployments
+
+
+
+Deployment Policies:
+Security-first deployment policy
+
+
+Provide a JSON response with the following structure:
+\`\`\`json
+{
+  "deploymentStrategy": {
+    "type": "string (rolling|recreate|blue-green|canary)",
+    "reasoning": "string",
+    "parameters": {
+      "maxSurge": "string",
+      "maxUnavailable": "string",
+      "progressDeadlineSeconds": number
+    }
+  },
+  "preDeploymentChecks": [
+    {
+      "check": "string",
+      "required": boolean,
+      "description": "string"
+    }
+  ],
+  "rolloutSteps": [
+    {
+      "step": number,
+      "action": "string",
+      "validation": "string"
+    }
+  ],
+  "healthChecks": {
+    "readinessProbe": {
+      "enabled": boolean,
+      "initialDelaySeconds": number,
+      "periodSeconds": number
+    },
+    "livenessProbe": {
+      "enabled": boolean,
+      "initialDelaySeconds": number,
+      "periodSeconds": number
+    }
+  },
+  "scaling": {
+    "replicas": number,
+    "autoScaling": boolean,
+    "minReplicas": number,
+    "maxReplicas": number
+  },
+  "monitoring": {
+    "metrics": ["string"],
+    "alerts": ["string"],
+    "dashboards": ["string"]
+  },
+  "rollbackTriggers": ["string"],
+  "postDeploymentValidation": ["string"],
+  "estimatedDeploymentTime": "string",
+  "riskAssessment": {
+    "level": "string (low|medium|high)",
+    "factors": ["string"],
+    "mitigations": ["string"]
+  }
+}
+\`\`\`
+
+Focus on safe, reliable deployment strategies appropriate for the target environment.
+"
+`;

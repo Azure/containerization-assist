@@ -1,0 +1,145 @@
+id: repository-analysis
+version: '2.1.0'
+description: Context-aware technology stack detection that adapts to project reality
+category: analysis
+format: json
+parameters:
+  - name: fileList
+    type: string
+    description: List of files in the repository
+    required: true
+  - name: configFiles
+    type: string
+    description: Content of configuration files
+    required: true
+  - name: directoryTree
+    type: string
+    description: Directory structure of the repository
+    required: true
+template: |
+  You are an experienced software architect who understands that every project is unique.
+  Your goal is to understand what this project actually does and how it's structured,
+  rather than forcing it into predefined categories.
+
+  Key principles:
+  - Identify the most likely primary technology based on actual evidence
+  - Consider the project's apparent purpose and scale
+  - Adapt recommendations to the specific context
+  - Focus on what would actually work for this specific project
+  - Acknowledge uncertainty when evidence is ambiguous
+
+  Analyze this repository to understand its technology stack and provide containerization guidance:
+
+  **File listing:**
+  {{fileList}}
+
+  **Configuration files:**
+  {{configFiles}}
+
+  **Directory structure:**
+  {{directoryTree}}
+
+  Based on the evidence, provide your analysis in JSON format. Include only fields that are
+  clearly determinable from the available information. Use null for uncertain values.
+
+  Focus on:
+  - What technology stack is most likely being used
+  - How the project appears to be built and run
+  - What containerization approach would fit this specific project
+  - Any special considerations based on the project structure
+
+  Return JSON matching this flexible structure:
+  {
+    "analysis_confidence": "high|medium|low",
+    "primary_technology": {
+      "language": "string",
+      "version": "string or null",
+      "ecosystem": "string or null"
+    },
+    "application_type": {
+      "category": "web|cli|library|desktop|service|monorepo|other",
+      "framework": "string or null",
+      "framework_version": "string or null"
+    },
+    "build_approach": {
+      "system": "string or null",
+      "entry_files": ["array of potential entry points"],
+      "build_commands": ["array of likely build commands"],
+      "test_approach": "string or null"
+    },
+    "runtime_characteristics": {
+      "likely_ports": [array of numbers],
+      "dependencies": ["key dependencies that affect containerization"],
+      "special_requirements": ["any unique needs this project might have"]
+    },
+    "containerization_guidance": {
+      "recommended_approach": "string describing the recommended strategy",
+      "base_image_suggestions": ["array of suitable base images"],
+      "considerations": ["array of project-specific considerations"]
+    },
+    "notes": "any important observations or uncertainties"
+  }
+
+examples:
+  - input:
+      fileList: |
+        package.json
+        server.js
+        routes/index.js
+        public/index.html
+      configFiles: |
+        === package.json ===
+        {
+          "name": "my-app",
+          "version": "1.0.0",
+          "dependencies": {
+            "express": "^4.18.0"
+          },
+          "scripts": {
+            "start": "node server.js"
+          }
+        }
+      directoryTree: |
+        package.json
+        server.js
+        routes/
+          index.js
+        public/
+          index.html
+    output: |
+      {
+        "analysis_confidence": "high",
+        "primary_technology": {
+          "language": "javascript",
+          "version": null,
+          "ecosystem": "node.js"
+        },
+        "application_type": {
+          "category": "web",
+          "framework": "express",
+          "framework_version": "4.18.0"
+        },
+        "build_approach": {
+          "system": "npm",
+          "entry_files": ["server.js"],
+          "build_commands": ["npm install", "npm start"],
+          "test_approach": null
+        },
+        "runtime_characteristics": {
+          "likely_ports": [3000],
+          "dependencies": ["express"],
+          "special_requirements": ["static file serving from public directory"]
+        },
+        "containerization_guidance": {
+          "recommended_approach": "Simple single-stage build suitable for a basic Express app",
+          "base_image_suggestions": ["node:18-slim", "node:20-alpine"],
+          "considerations": ["Consider multi-stage if build process becomes more complex", "Static files in public/ directory need to be included"]
+        },
+        "notes": "Simple Express application with static file serving. Good candidate for straightforward containerization."
+      }
+
+tags:
+  - repository
+  - analysis
+  - adaptive
+  - context-aware

@@ -13,8 +13,8 @@ export type {
   CompilationStats,
 } from './types';
 
-export { KnowledgeEntrySchema, KnowledgeQuerySchema } from './schemas';
-export type { ValidatedKnowledgeEntry, ValidatedKnowledgeQuery } from './schemas';
+export { KnowledgeEntrySchema, KnowledgeQuerySchema } from './pack-schema';
+export type { ValidatedKnowledgeEntry, ValidatedKnowledgeQuery } from './pack-schema';
 
 export {
   loadKnowledgeBase,

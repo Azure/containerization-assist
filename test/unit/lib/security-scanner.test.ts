@@ -122,7 +122,7 @@ describe('SecurityScanner', () => {
       const result = await scanImageVulnerabilities(ctx, 'test-image:latest');
 
       expect(result.ok).toBe(false);
-      expect(result.error).toContain('Failed to parse scan results');
+      expect(result.error).toContain('Failed to parse Trivy output');
     });
 
     it('should apply severity filters correctly', async () => {

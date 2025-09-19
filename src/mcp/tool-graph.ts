@@ -28,6 +28,21 @@ export type Step =
  * Dependency edge defining tool's preconditions and effects.
  * Enables automatic workflow orchestration through declarative dependencies.
  */
+// Common parameters that most tools accept
+interface CommonToolParams {
+  path?: string;
+  sessionId?: string;
+  imageId?: string;
+  imageName?: string;
+  tag?: string;
+  registry?: string;
+  namespace?: string;
+  technology?: string;
+  language?: string;
+  framework?: string;
+  [key: string]: unknown;
+}
+
 export interface ToolEdge {
   /** Preconditions that must be satisfied before tool execution */
   requires?: Step[];
@@ -41,7 +56,7 @@ export interface ToolEdge {
       Step,
       {
         tool: string;
-        buildParams: (params: any) => any;
+        buildParams: (params: CommonToolParams) => Record<string, unknown>;
       }
     >
   >;
@@ -50,7 +65,7 @@ export interface ToolEdge {
   nextSteps?: {
     tool: string;
     description: string;
-    buildParams?: (params: any) => any;
+    buildParams?: (params: CommonToolParams) => Record<string, unknown>;
   }[];
 }
 
@@ -59,11 +74,11 @@ export interface ToolEdge {
  * Central source of truth for tool orchestration and auto-correction.
  */
 export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
-  analyze_repo: {
+  'analyze-repo': {
     provides: ['analyzed_repo'],
     nextSteps: [
       {
-        tool: 'generate_dockerfile',
+        tool: 'generate-dockerfile',
         description: 'Generate optimized Dockerfile based on the repository analysis',
         buildParams: (p) => ({
           path: p.path || '.',
@@ -73,12 +88,12 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
     ],
   },
 
-  resolve_base_images: {
+  'resolve-base-images': {
     requires: ['analyzed_repo'],
     provides: ['resolved_base_images'],
     autofix: {
       analyzed_repo: {
-        tool: 'analyze_repo',
+        tool: 'analyze-repo',
         buildParams: (p) => ({
           path: p.path || '.',
           sessionId: p.sessionId,
@@ -87,7 +102,7 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
     },
     nextSteps: [
       {
-        tool: 'generate_dockerfile',
+        tool: 'generate-dockerfile',
         description: 'Generate Dockerfile using the resolved base images',
         buildParams: (p) => ({
           path: p.path || '.',
@@ -97,19 +112,19 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
     ],
   },
 
-  generate_dockerfile: {
+  'generate-dockerfile': {
     requires: ['analyzed_repo', 'resolved_base_images'],
     provides: ['dockerfile_generated'],
     autofix: {
       analyzed_repo: {
-        tool: 'analyze_repo',
+        tool: 'analyze-repo',
         buildParams: (p) => ({
           path: p.path || '.',
           sessionId: p.sessionId,
         }),
       },
       resolved_base_images: {
-        tool: 'resolve_base_images',
+        tool: 'resolve-base-images',
         buildParams: (p) => ({
           path: p.path || '.',
           technology: p.technology,
@@ -121,7 +136,7 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
     },
     nextSteps: [
       {
-        tool: 'build_image',
+        tool: 'build-image',
         description: 'Build Docker image from the generated Dockerfile',
         buildParams: (p) => ({
           path: p.path || '.',
@@ -130,7 +145,7 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
         }),
       },
       {
-        tool: 'fix_dockerfile',
+        tool: 'fix-dockerfile',
         description: 'Optimize or fix issues in the generated Dockerfile',
         buildParams: (p) => ({
           path: p.path || '.',
@@ -140,12 +155,12 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
     ],
   },
 
-  fix_dockerfile: {
+  'fix-dockerfile': {
     requires: ['dockerfile_generated'],
     provides: ['dockerfile_generated'],
     autofix: {
       dockerfile_generated: {
-        tool: 'generate_dockerfile',
+        tool: 'generate-dockerfile',
         buildParams: (p) => ({
           path: p.path || '.',
           sessionId: p.sessionId,
@@ -154,7 +169,7 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
     },
     nextSteps: [
       {
-        tool: 'build_image',
+        tool: 'build-image',
         description: 'Build Docker image from the fixed Dockerfile',
         buildParams: (p) => ({
           path: p.path || '.',
@@ -165,19 +180,19 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
     ],
   },
 
-  build_image: {
+  'build-image': {
     requires: ['analyzed_repo', 'dockerfile_generated'],
     provides: ['built_image'],
     autofix: {
       analyzed_repo: {
-        tool: 'analyze_repo',
+        tool: 'analyze-repo',
         buildParams: (p) => ({
           path: p.path || '.',
           sessionId: p.sessionId,
         }),
       },
       dockerfile_generated: {
-        tool: 'generate_dockerfile',
+        tool: 'generate-dockerfile',
         buildParams: (p) => ({
           path: p.path || '.',
           sessionId: p.sessionId,
@@ -194,7 +209,7 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
         }),
       },
       {
-        tool: 'push_image',
+        tool: 'push-image',
         description: 'Push the built image to a container registry',
         buildParams: (p) => ({
           imageId: p.imageId || p.imageName || p.tag,
@@ -214,12 +229,12 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
     ],
   },
 
-  scan_image: {
+  scan: {
     requires: ['built_image'],
     provides: ['scanned_image'],
     autofix: {
       built_image: {
-        tool: 'build_image',
+        tool: 'build-image',
         buildParams: (p) => ({
           path: p.path || '.',
           imageName: p.imageId || p.imageName || 'app:latest',
@@ -229,7 +244,7 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
     },
     nextSteps: [
       {
-        tool: 'push_image',
+        tool: 'push-image',
         description: 'Push the scanned image to a container registry',
         buildParams: (p) => ({
           imageId: p.imageId || p.imageName,
@@ -249,11 +264,11 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
     ],
   },
 
-  tag_image: {
+  'tag-image': {
     requires: ['built_image'],
     nextSteps: [
       {
-        tool: 'push_image',
+        tool: 'push-image',
         description: 'Push the tagged image to a container registry',
         buildParams: (p) => ({
           imageId: p.imageId || p.imageName,
@@ -264,12 +279,12 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
     ],
   },
 
-  push_image: {
+  'push-image': {
     requires: ['built_image'],
     provides: ['pushed_image'],
     autofix: {
       built_image: {
-        tool: 'build_image',
+        tool: 'build-image',
         buildParams: (p) => ({
           path: p.path || '.',
           imageName: p.imageId || p.imageName || 'app:latest',
@@ -290,11 +305,11 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
     ],
   },
 
-  prepare_cluster: {
+  'prepare-cluster': {
     provides: ['k8s_prepared'],
     nextSteps: [
       {
-        tool: 'generate_k8s_manifests',
+        tool: 'generate-k8s-manifests',
         description: 'Generate Kubernetes manifests for deployment',
         buildParams: (p) => ({
           path: p.path || '.',
@@ -304,12 +319,12 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
     ],
   },
 
-  generate_k8s_manifests: {
+  'generate-k8s-manifests': {
     requires: ['analyzed_repo'],
     provides: ['manifests_generated'],
     autofix: {
       analyzed_repo: {
-        tool: 'analyze_repo',
+        tool: 'analyze-repo',
         buildParams: (p) => ({
           path: p.path || '.',
           sessionId: p.sessionId,
@@ -329,12 +344,12 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
     ],
   },
 
-  generate_helm_charts: {
+  'generate-helm-charts': {
     requires: ['analyzed_repo'],
     provides: ['helm_charts_generated', 'manifests_generated'],
     autofix: {
       analyzed_repo: {
-        tool: 'analyze_repo',
+        tool: 'analyze-repo',
         buildParams: (p) => ({
           path: p.path || '.',
           sessionId: p.sessionId,
@@ -354,12 +369,12 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
     ],
   },
 
-  generate_aca_manifests: {
+  'generate-aca-manifests': {
     requires: ['analyzed_repo'],
     provides: ['aca_manifests_generated', 'manifests_generated'],
     autofix: {
       analyzed_repo: {
-        tool: 'analyze_repo',
+        tool: 'analyze-repo',
         buildParams: (p) => ({
           path: p.path || '.',
           sessionId: p.sessionId,
@@ -383,7 +398,7 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
     provides: ['deployed'],
     autofix: {
       built_image: {
-        tool: 'build_image',
+        tool: 'build-image',
         buildParams: (p) => ({
           path: p.path || '.',
           imageName: p.imageId || p.imageName || 'app:latest',
@@ -391,11 +406,11 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
         }),
       },
       k8s_prepared: {
-        tool: 'prepare_cluster',
+        tool: 'prepare-cluster',
         buildParams: () => ({}),
       },
       manifests_generated: {
-        tool: 'generate_k8s_manifests',
+        tool: 'generate-k8s-manifests',
         buildParams: (p) => ({
           path: p.path || '.',
           imageId: p.imageId,
@@ -405,7 +420,7 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
     },
     nextSteps: [
       {
-        tool: 'verify_deployment',
+        tool: 'verify-deploy',
         description: 'Verify that the deployment is running successfully',
         buildParams: (p) => ({
           namespace: p.namespace || 'default',
@@ -415,13 +430,13 @@ export const TOOL_GRAPH: Record<ToolName, ToolEdge> = {
     ],
   },
 
-  verify_deployment: {
+  'verify-deploy': {
     requires: ['deployed'],
   },
 
   ops: {},
-  inspect_session: {},
-  convert_aca_to_k8s: {},
+  'inspect-session': {},
+  'convert-aca-to-k8s': {},
 };
 
 /**
@@ -472,7 +487,7 @@ export function getExecutionOrder(
   while (toProcess.size > 0) {
     let madeProgress = false;
 
-    for (const step of toProcess) {
+    for (const step of Array.from(toProcess)) {
       const provider = Object.entries(TOOL_GRAPH).find(([_, edge]) =>
         edge.provides?.includes(step),
       ) as [ToolName, ToolEdge] | undefined;
@@ -498,7 +513,7 @@ export function getExecutionOrder(
       // Expansion tracking prevents infinite loops from circular dependencies
       let newDepsAdded = false;
 
-      for (const step of toProcess) {
+      for (const step of Array.from(toProcess)) {
         const attempts = expansionAttempts.get(step) || 0;
         if (attempts >= maxExpansions) {
           throw new Error(`Circular dependency detected: ${step} expanded ${attempts} times`);

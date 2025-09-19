@@ -62,8 +62,8 @@ if (existsSync(promptsSource)) {
     // Ensure destination directory exists
     await mkdir(join('dist', 'src'), { recursive: true });
     await cp(promptsSource, promptsDest, { recursive: true, filter: (source) => {
-      // Copy only JSON files and directories
-      return source.endsWith('.json') || !source.includes('.');
+      // Copy JSON, YAML, and TypeScript files, plus directories
+      return source.endsWith('.json') || source.endsWith('.yaml') || source.endsWith('.yml') || source.endsWith('.ts') || !source.includes('.');
     }});
     console.log('✅ Prompts directory copied');
   } catch (err) {

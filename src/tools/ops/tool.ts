@@ -1,22 +1,15 @@
 /**
- * Ops Tool - Flat Architecture
- *
+ * Ops Tool
  * Provides operational utilities like ping and server status
- * Follows architectural requirement: only imports from src/lib/
  */
 
-import * as os from 'os';
-import { extractErrorMessage } from '@/lib/error-utils';
-import { createToolTimer } from '@/lib/tool-helpers';
-import { Success, Failure, type Result } from '@/types';
-import type { ToolContext } from '@/mcp/context';
-import type { OpsToolParams } from './schema';
+import * as os from 'node:os';
+import type { Logger } from 'pino';
+import type { ToolContext } from '@mcp/context';
+import { Success, Failure, type Result } from '@types';
+import { opsToolSchema, type OpsToolParams } from './schema';
 
-interface PingConfig {
-  message?: string;
-}
-
-interface PingResult {
+export interface PingResult {
   success: boolean;
   message: string;
   timestamp: string;
@@ -33,48 +26,7 @@ interface PingResult {
   };
 }
 
-/**
- * Ping operation - test server connectivity
- */
-export async function ping(config: PingConfig, context: ToolContext): Promise<Result<PingResult>> {
-  const timer = createToolTimer(context.logger, 'ops-ping');
-
-  try {
-    const { message = 'ping' } = config;
-
-    context.logger.info({ message }, 'Processing ping request');
-
-    const result: PingResult = {
-      success: true,
-      message: `pong: ${message}`,
-      timestamp: new Date().toISOString(),
-      server: {
-        name: 'containerization-assist-mcp',
-        version: '2.0.0',
-        uptime: process.uptime(),
-        pid: process.pid,
-      },
-      capabilities: {
-        tools: true,
-        sampling: true,
-        progress: true,
-      },
-    };
-
-    timer.end();
-    return Success(result);
-  } catch (error) {
-    timer.error(error);
-    context.logger.error({ error }, 'Ping failed');
-    return Failure(extractErrorMessage(error));
-  }
-}
-
-interface ServerStatusConfig {
-  details?: boolean;
-}
-
-interface ServerStatusResult {
+export interface ServerStatusResult {
   success: boolean;
   version: string;
   uptime: number;
@@ -101,19 +53,50 @@ interface ServerStatusResult {
   sessions?: number;
 }
 
+export type OpsResult = PingResult | ServerStatusResult;
+
+export interface OpsDeps {
+  logger: Logger;
+}
+
+/**
+ * Ping operation - test server connectivity
+ */
+function pingOperation(message = 'ping', logger: Logger): Result<PingResult> {
+  try {
+    logger.info({ message }, 'Processing ping request');
+
+    const result: PingResult = {
+      success: true,
+      message: `pong: ${message}`,
+      timestamp: new Date().toISOString(),
+      server: {
+        name: 'containerization-assist-mcp',
+        version: '2.0.0',
+        uptime: process.uptime(),
+        pid: process.pid,
+      },
+      capabilities: {
+        tools: true,
+        sampling: true,
+        progress: true,
+      },
+    };
+
+    return Success(result);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.error({ error: msg }, 'Ping failed');
+    return Failure(`Ping failed: ${msg}`);
+  }
+}
+
 /**
  * Get server status
  */
-export async function serverStatus(
-  config: ServerStatusConfig,
-  context: ToolContext,
-): Promise<Result<ServerStatusResult>> {
-  const timer = createToolTimer(context.logger, 'ops-server-status');
-
+function serverStatusOperation(details: boolean, logger: Logger): Result<ServerStatusResult> {
   try {
-    const { details = false } = config;
-
-    context.logger.info({ details }, 'Server status requested');
+    logger.info({ details }, 'Server status requested');
 
     const uptime = Math.floor(process.uptime());
     const version = '2.0.0';
@@ -125,7 +108,8 @@ export async function serverStatus(
     const cpus = os.cpus();
     const loadAverage = os.loadavg();
 
-    const migratedToolCount = 12;
+    // These are hardcoded for now but could be dynamic
+    const migratedToolCount = 14; // Updated based on actual progress
 
     const status: ServerStatusResult = {
       success: true,
@@ -148,12 +132,12 @@ export async function serverStatus(
         hostname: os.hostname(),
       },
       tools: {
-        count: 14,
+        count: 18, // Total tools
         migrated: migratedToolCount,
       },
     };
 
-    context.logger.info(
+    logger.info(
       {
         uptime,
         memoryUsed: usedMem,
@@ -163,44 +147,56 @@ export async function serverStatus(
       'Server status compiled',
     );
 
-    timer.end();
     return Success(status);
   } catch (error) {
-    timer.error(error);
-    context.logger.error({ error }, 'Error collecting server status');
-    return Failure(extractErrorMessage(error));
-  }
-}
-
-// Combined ops interface
-export interface OpsConfig {
-  operation: 'ping' | 'status';
-  message?: string;
-  details?: boolean;
-}
-
-export type OpsResult = PingResult | ServerStatusResult;
-
-/**
- * Main ops function that delegates to specific operations
- */
-async function opsImpl(params: OpsToolParams, context: ToolContext): Promise<Result<OpsResult>> {
-  const { operation } = params;
-
-  switch (operation) {
-    case 'ping':
-      return ping({ ...(params.message !== undefined && { message: params.message }) }, context);
-    case 'status':
-      return serverStatus(
-        { ...(params.details !== undefined && { details: params.details }) },
-        context,
-      );
-    default:
-      return Failure(`Unknown operation: ${params.operation}`);
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.error({ error: msg }, 'Error collecting server status');
+    return Failure(`Error collecting server status: ${msg}`);
   }
 }
 
 /**
- * Export the ops tool directly
+ * Create ops tool with explicit dependencies
  */
-export const opsTool = opsImpl;
+export function createOpsTool(deps: OpsDeps) {
+  return async (params: OpsToolParams, _context: ToolContext): Promise<Result<OpsResult>> => {
+    const start = Date.now();
+    const { logger } = deps;
+    const { operation } = params;
+
+    try {
+      let result: Result<OpsResult>;
+
+      switch (operation) {
+        case 'ping':
+          result = pingOperation(params.message, logger);
+          break;
+        case 'status':
+          result = serverStatusOperation(params.details ?? false, logger);
+          break;
+        default:
+          result = Failure(`Unknown operation: ${operation}`);
+      }
+
+      const duration = Date.now() - start;
+      logger.info({ duration, tool: 'ops', operation }, 'Tool execution complete');
+      return result;
+    } catch (error) {
+      const duration = Date.now() - start;
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error({ duration, error: message, tool: 'ops' }, 'Tool execution failed');
+      return Failure(`Operation failed: ${message}`);
+    }
+  };
+}
+
+/**
+ * Standard tool export for MCP server integration
+ */
+export const tool = {
+  type: 'standard' as const,
+  name: 'ops',
+  description: 'Operational utilities like ping and server status',
+  inputSchema: opsToolSchema,
+  execute: createOpsTool,
+};

@@ -18,6 +18,8 @@ export const deployApplicationSchema = z.object({
   replicas: z.number().optional().describe('Number of replicas'),
   port: z.number().optional().describe('Application port'),
   environment: environmentSchema,
+  wait: z.boolean().optional().describe('Wait for deployment to be ready'),
+  timeout: z.number().optional().describe('Timeout in seconds for deployment readiness'),
 });
 
 export type DeployApplicationParams = z.infer<typeof deployApplicationSchema>;

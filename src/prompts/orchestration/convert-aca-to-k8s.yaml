@@ -1,0 +1,196 @@
+id: convert-aca-to-k8s
+version: '1.0.0'
+description: Convert Azure Container Apps manifests to Kubernetes manifests
+category: orchestration
+parameters:
+  - name: acaManifest
+    type: string
+    required: true
+    description: Azure Container Apps manifest content to convert
+  - name: namespace
+    type: string
+    required: false
+    description: Target Kubernetes namespace
+  - name: includeComments
+    type: boolean
+    required: false
+    description: Add helpful comments in the output
+  - name: convertDapr
+    type: boolean
+    required: false
+    description: Convert Dapr configuration to annotations
+  - name: ingressClass
+    type: string
+    required: false
+    description: Ingress controller class (nginx, traefik)
+  - name: storageClass
+    type: string
+    required: false
+    description: Storage class for persistent volumes
+  - name: targetCluster
+    type: string
+    required: false
+    description: Target cluster type (aks, generic)
+  - name: conversionRules
+    type: array
+    required: false
+    description: Specific conversion rules to apply
+template: >
+  Convert Azure Container Apps manifest to Kubernetes manifests.
+
+
+  **Input Azure Container Apps Manifest:**
+
+  ```json
+
+  {{acaManifest}}
+
+  ```
+
+
+
+  Target Namespace: {{namespace}}
+
+
+
+  Include Comments: Yes - Add helpful comments explaining the conversion
+
+
+
+  Convert Dapr: Yes - Convert Dapr configuration to Kubernetes annotations
+
+
+
+  Ingress Class: {{ingressClass}}
+
+
+
+  Storage Class: {{storageClass}}
+
+
+
+  Target Cluster: {{targetCluster}}
+
+
+
+
+  Conversion Rules:
+
+  {{#.}}- {{source}} → {{target}} ({{notes}})
+
+  {{/.}}
+
+
+
+  **Conversion Requirements:**
+
+
+  1. **Container Configuration Mapping:**
+     - Map `properties.template.containers` to Deployment `spec.template.spec.containers`
+     - Convert ACA resource format (cpu: 0.5, memory: "1Gi") to K8s format
+     - Map environment variables, maintaining secretRef references
+     - Convert volume mounts appropriately
+     - Map container probes (liveness, readiness, startup)
+
+  2. **Scaling Configuration:**
+     - Convert `properties.template.scale` to HorizontalPodAutoscaler
+     - Map minReplicas and maxReplicas
+     - Convert scaling rules:
+       - HTTP rules → HPA with custom metrics or KEDA ScaledObject
+       - CPU rules → HPA with CPU utilization
+       - Memory rules → HPA with memory utilization
+       - Queue rules → KEDA ScaledObject with appropriate scaler
+
+  3. **Ingress and Service:**
+     - Create Service from ingress configuration
+     - If `ingress.external: true`, create LoadBalancer or Ingress
+     - If `ingress.external: false`, create ClusterIP service
+     - Map targetPort and exposed ports
+     - Convert custom domains to Ingress rules
+     - Add TLS configuration if certificates present
+
+  4. **Secrets and ConfigMaps:**
+     - Convert `properties.configuration.secrets` to Kubernetes Secrets
+     - Extract non-sensitive env vars to ConfigMap
+     - Maintain proper references in Deployment
+     - Use base64 encoding for Secret data
+
+  5. **Dapr Configuration (if enabled):**
+     - Convert Dapr settings to pod annotations:
+       - `dapr.io/enabled: "true"`
+       - `dapr.io/app-id: "<app-id>"`
+       - `dapr.io/app-port: "<port>"`
+       - `dapr.io/app-protocol: "<protocol>"`
+
+  6. **Volume Configuration:**
+     - Convert Azure Files volumes to PersistentVolumeClaims
+     - Map EmptyDir volumes appropriately
+     - Include volumeMounts in container spec
+
+  7. **Identity and RBAC:**
+     - Create ServiceAccount for managed identity equivalent
+     - Add appropriate annotations for workload identity (if AKS)
+     - Include RBAC resources if needed
+
+  8. **Additional Resources:**
+     - Create NetworkPolicy if IP restrictions present
+     - Add PodDisruptionBudget for high availability
+     - Include appropriate labels and annotations
+     - Add resource quotas if limits defined
+
+  **Conversion Mapping Reference:**
+
+
+  | Azure Container Apps | Kubernetes Resource | Notes |
+
+  |---------------------|-------------------|-------|
+
+  | Container App | Deployment + Service + Ingress | Core application components |
+
+  | properties.template.containers | Deployment.spec.template.spec.containers | Container definitions |
+
+  | properties.template.scale | HorizontalPodAutoscaler | Scaling configuration |
+
+  | properties.configuration.ingress | Service + Ingress | Network exposure |
+
+  | properties.configuration.secrets | Secret | Sensitive data |
+
+  | properties.configuration.dapr | Pod annotations | Dapr sidecar config |
+
+  | properties.template.volumes | PersistentVolumeClaim | Storage |
+
+  | managedIdentities | ServiceAccount | Identity |
+
+
+  **Output Format:**
+
+
+  Generate complete, valid Kubernetes YAML manifests separated by `---`. Include all necessary resources:
+
+  1. Namespace (if specified)
+
+  2. ConfigMap (if env vars present)
+
+  3. Secret (if secrets present)
+
+  4. PersistentVolumeClaim (if volumes present)
+
+  5. ServiceAccount (if identity present)
+
+  6. Deployment
+
+  7. Service
+
+  8. Ingress (if external access)
+
+  9. HorizontalPodAutoscaler (if scaling rules)
+
+  10. NetworkPolicy (if restrictions)
+
+
+  Ensure all resources are properly linked through labels and selectors. The output should be ready for deployment to a
+  Kubernetes cluster using `kubectl apply`.
+
+
+  Return only the YAML manifests without explanation or code fences.
+format: json

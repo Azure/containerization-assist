@@ -22,6 +22,12 @@ export const config = {
     maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '10485760'),
   },
 
+  session: {
+    ttl: parseInt(process.env.SESSION_TTL || '86400'), // 24h in seconds
+    maxSessions: parseInt(process.env.MAX_SESSIONS || '100'),
+    cleanupInterval: parseInt(process.env.SESSION_CLEANUP_INTERVAL || '3600000'), // 1h in ms
+  },
+
   sampling: {
     maxCandidates: parseInt(process.env.MAX_CANDIDATES || '5'),
     timeout: parseInt(process.env.SAMPLING_TIMEOUT || '30000'),
@@ -67,6 +73,7 @@ export const config = {
   },
 
   ai: {
+    defaultModel: process.env.AI_DEFAULT_MODEL || 'claude-3-haiku',
     maxRetries: parseInt(process.env.AI_MAX_RETRIES || '3'),
     retryDelay: parseInt(process.env.AI_RETRY_DELAY || '1000'),
     defaultMaxTokens: parseInt(process.env.AI_MAX_TOKENS || '4096'),
@@ -76,12 +83,6 @@ export const config = {
       enabled: process.env.AI_CACHE_ENABLED !== 'false',
       ttl: parseInt(process.env.AI_CACHE_TTL || '300000'), // 5 minutes
     },
-  },
-
-  mutex: {
-    defaultTimeout: parseInt(process.env.MUTEX_DEFAULT_TIMEOUT || '30000'),
-    dockerBuildTimeout: parseInt(process.env.MUTEX_DOCKER_TIMEOUT || '300000'),
-    monitoringEnabled: process.env.MUTEX_MONITORING !== 'false',
   },
 
   errors: {

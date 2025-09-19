@@ -1,5 +1,5 @@
 /**
- * Simplified scoring for knowledge entries
+ * Scoring for knowledge entries
  */
 import type { LoadedEntry, KnowledgeMatch } from './types';
 

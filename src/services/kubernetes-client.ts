@@ -1,13 +1,19 @@
 /**
  * Kubernetes Client - Direct k8s API Access
  *
- * Simplified Kubernetes operations using direct @kubernetes/client-node integration
+ * Kubernetes operations using direct @kubernetes/client-node integration
  * Removes unnecessary wrapper complexity while maintaining core functionality
  */
 
 import * as k8s from '@kubernetes/client-node';
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '@/types';
+import {
+  Success,
+  Failure,
+  type Result,
+  type K8sManifest,
+  type SelfSubjectAccessReview,
+} from '@/types';
 import { formatErrorMessage } from '@/lib/error-utils';
 
 export interface DeploymentResult {
@@ -23,7 +29,7 @@ export interface ClusterInfo {
 }
 
 export interface KubernetesClient {
-  applyManifest: (manifest: any, namespace?: string) => Promise<Result<void>>;
+  applyManifest: (manifest: K8sManifest, namespace?: string) => Promise<Result<void>>;
   getDeploymentStatus: (namespace: string, name: string) => Promise<Result<DeploymentResult>>;
   deleteResource: (kind: string, name: string, namespace?: string) => Promise<Result<void>>;
   ping: () => Promise<boolean>;
@@ -53,15 +59,15 @@ export const createKubernetesClient = (logger: Logger, kubeconfig?: string): Kub
     /**
      * Apply Kubernetes manifest
      */
-    async applyManifest(manifest: any, namespace = 'default'): Promise<Result<void>> {
+    async applyManifest(manifest: K8sManifest, namespace = 'default'): Promise<Result<void>> {
       try {
         logger.debug({ manifest: manifest.kind, namespace }, 'Applying Kubernetes manifest');
 
         // Simple apply logic - in production this would handle different resource types
         if (manifest.kind === 'Deployment') {
-          await k8sApi.createNamespacedDeployment({ namespace, body: manifest });
+          await k8sApi.createNamespacedDeployment({ namespace, body: manifest as any });
         } else if (manifest.kind === 'Service') {
-          await coreApi.createNamespacedService({ namespace, body: manifest });
+          await coreApi.createNamespacedService({ namespace, body: manifest as any });
         }
 
         logger.info(
@@ -146,8 +152,8 @@ export const createKubernetesClient = (logger: Logger, kubeconfig?: string): Kub
         return true;
       } catch (error: unknown) {
         if (error && typeof error === 'object' && 'response' in error) {
-          const response = (error as any).response;
-          if (response?.statusCode === 404) {
+          const errorWithResponse = error as { response?: { statusCode?: number } };
+          if (errorWithResponse.response?.statusCode === 404) {
             return false;
           }
         }
@@ -177,7 +183,9 @@ export const createKubernetesClient = (logger: Logger, kubeconfig?: string): Kub
 
         // Use authorization API for SelfSubjectAccessReview
         const authApi = kc.makeApiClient(k8s.AuthorizationV1Api);
-        const response = await authApi.createSelfSubjectAccessReview({ body: accessReview as any });
+        const response = await authApi.createSelfSubjectAccessReview({
+          body: accessReview as SelfSubjectAccessReview,
+        });
         return response.status?.allowed === true;
       } catch (error) {
         logger.warn({ namespace, error }, 'Error checking permissions');

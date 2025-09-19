@@ -10,12 +10,7 @@ import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { withDefaults, K8S_DEFAULTS } from '@/lib/param-defaults';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { promises as fs } from 'node:fs';
-import {
-  ensureSession,
-  defineToolIO,
-  useSessionSlice,
-  getSessionSlice,
-} from '@/mcp/tool-session-helpers';
+import { ensureSession, useSessionSlice, getSessionSlice } from '@/mcp/tool-session-helpers';
 import { aiGenerateWithSampling } from '@/mcp/tool-ai-helpers';
 import { enhancePromptWithKnowledge } from '@/lib/ai-knowledge-enhancer';
 import type { SamplingOptions } from '@/lib/sampling';
@@ -25,12 +20,9 @@ import type { ToolContext } from '@/mcp/context';
 import { Success, Failure, type Result } from '@/types';
 import { stripFencesAndNoise, isValidKubernetesContent } from '@/lib/text-processing';
 import { createKubernetesValidator, getValidationSummary } from '@/validation';
-import { scoreConfigCandidates } from '@/lib/integrated-scoring';
+import { scoreConfigCandidates } from '@/lib/scoring';
 import * as yaml from 'js-yaml';
-import { generateK8sManifestsSchema, type GenerateK8sManifestsParams } from './schema';
-import { z } from 'zod';
-import { buildImageSchema } from '@/tools/build-image/schema';
-import { analyzeRepoSchema } from '@/tools/analyze-repo/schema';
+import { type GenerateK8sManifestsParams, generateK8sManifestsSchema } from './schema';
 // Note: Tool now uses GenerateK8sManifestsParams from schema for type safety
 
 /**
@@ -78,59 +70,7 @@ export interface GenerateK8sManifestsResult {
   score?: number;
 }
 
-// Define the result schema for type safety
-const GenerateK8sManifestsResultSchema = z.object({
-  manifests: z.string(),
-  outputPath: z.string(),
-  resources: z.array(
-    z.object({
-      kind: z.string(),
-      name: z.string(),
-      namespace: z.string(),
-    }),
-  ),
-  warnings: z.array(z.string()).optional(),
-  sessionId: z.string().optional(),
-  samplingMetadata: z
-    .object({
-      stoppedEarly: z.boolean().optional(),
-      candidatesGenerated: z.number(),
-      winnerScore: z.number(),
-      samplingDuration: z.number().optional(),
-    })
-    .optional(),
-  winnerScore: z.number().optional(),
-  scoreBreakdown: z.record(z.number()).optional(),
-  allCandidates: z
-    .array(
-      z.object({
-        id: z.string(),
-        content: z.string(),
-        score: z.number(),
-        scoreBreakdown: z.record(z.number()),
-        rank: z.number().optional(),
-      }),
-    )
-    .optional(),
-  validationScore: z.number().optional(),
-  validationGrade: z.string().optional(),
-  validationReport: z.string().optional(),
-  score: z.number().optional(),
-});
-
-// Define tool IO for type-safe session operations
-const io = defineToolIO(generateK8sManifestsSchema, GenerateK8sManifestsResultSchema);
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastGeneratedAt: z.date().optional(),
-  lastAppName: z.string().optional(),
-  lastNamespace: z.string().optional(),
-  totalManifestsGenerated: z.number().optional(),
-  lastManifestCount: z.number().optional(),
-  lastValidationScore: z.number().optional(),
-  lastUsedAI: z.boolean().optional(),
-});
+// Type definitions for session operations
 
 /**
  * Kubernetes resource type definitions
@@ -203,7 +143,7 @@ function validateK8sResource(obj: unknown): obj is K8sResource {
 /**
  * Generate basic K8s manifests (fallback)
  */
-function generateBasicManifests(
+function generateManifests(
   params: GenerateK8sManifestsParams,
   image: string,
 ): Result<{ manifests: K8sResource[]; aiUsed: boolean }> {
@@ -448,7 +388,7 @@ async function generateK8sManifestsImpl(
     }
 
     const { id: sessionId } = sessionResult.value;
-    const slice = useSessionSlice('generate-k8s-manifests', io, context, StateSchema);
+    const slice = useSessionSlice('generate-k8s-manifests', context);
 
     if (!slice) {
       return Failure('Session manager not available');
@@ -462,22 +402,10 @@ async function generateK8sManifestsImpl(
     // Get build result from session slice for image tag
     let image = params.imageId || `${appName}:latest`;
     try {
-      const BuildImageResultSchema = z.object({
-        success: z.boolean(),
-        sessionId: z.string(),
-        imageId: z.string(),
-        tags: z.array(z.string()),
-      });
-      const buildImageIO = defineToolIO(buildImageSchema, BuildImageResultSchema);
-      const buildSliceResult = await getSessionSlice(
-        'build-image',
-        sessionId,
-        buildImageIO,
-        context,
-      );
+      const buildSliceResult = await getSessionSlice('build-image', sessionId, context);
 
       if (buildSliceResult.ok && buildSliceResult.value?.output) {
-        const buildResult = buildSliceResult.value.output;
+        const buildResult = buildSliceResult.value.output as any;
         if (!params.imageId && buildResult.tags?.[0]) {
           image = buildResult.tags[0];
           logger.debug({ image }, 'Using image tag from build-image session');
@@ -516,23 +444,14 @@ async function generateK8sManifestsImpl(
             | { language?: string; framework?: string; frameworkVersion?: string }
             | undefined;
           try {
-            const AnalyzeRepoResultSchema = z.object({
-              ok: z.boolean(),
-              sessionId: z.string(),
-              language: z.string(),
-              framework: z.string().optional(),
-              frameworkVersion: z.string().optional(),
-            });
-            const analyzeRepoIO = defineToolIO(analyzeRepoSchema, AnalyzeRepoResultSchema);
             const analysisSliceResult = await getSessionSlice(
-              'analyze-repo',
+              'analyzeRepoResult',
               sessionId,
-              analyzeRepoIO,
               context,
             );
 
             if (analysisSliceResult.ok && analysisSliceResult.value?.output) {
-              const output = analysisSliceResult.value.output;
+              const output = analysisSliceResult.value.output as any;
               analysisResult = {
                 language: output.language,
                 ...(output.framework && { framework: output.framework }),
@@ -590,21 +509,21 @@ async function generateK8sManifestsImpl(
               scoreBreakdown = aiResult.value.winner.scoreBreakdown;
               allCandidates = aiResult.value.allCandidates;
             } else {
-              result = generateBasicManifests(params, image);
+              result = generateManifests(params, image);
             }
           } else {
-            result = generateBasicManifests(params, image);
+            result = generateManifests(params, image);
           }
         } else {
-          result = generateBasicManifests(params, image);
+          result = generateManifests(params, image);
         }
       } else {
         // Standard generation without sampling
-        result = generateBasicManifests(params, image);
+        result = generateManifests(params, image);
       }
     } catch {
       // Fallback to basic generation
-      result = generateBasicManifests(params, image);
+      result = generateManifests(params, image);
     }
     if (!result.ok) {
       return Failure('Failed to generate K8s manifests');
@@ -743,3 +662,14 @@ async function generateK8sManifestsImpl(
  * Generate K8s manifests tool with selective progress reporting
  */
 export const generateK8sManifests = generateK8sManifestsImpl;
+
+/**
+ * Export the tool for MCP registration
+ */
+export const tool = {
+  type: 'standard' as const,
+  name: 'generate-k8s-manifests',
+  description: 'Generate Kubernetes manifests for application deployment',
+  inputSchema: generateK8sManifestsSchema,
+  execute: generateK8sManifests,
+};

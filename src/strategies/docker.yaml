@@ -1,0 +1,57 @@
+# Docker Strategy Configuration
+version: "1.0.0"
+id: "docker"
+description: "Strategy for Docker and containerization operations"
+
+# Model parameters (model selection handled externally)
+parameters:
+  temperature: 0.2
+  topP: 0.95
+  maxTokens: 8192
+
+# Selection rules
+selectionRules:
+  preferredCapabilities:
+    dockerfile: "high-accuracy"
+    optimization: "high-accuracy"
+    security: "high-accuracy"
+
+# Tool chain preferences
+toolChain:
+  - "analyze-repo"
+  - "generate-dockerfile"
+  - "fix-dockerfile"
+  - "build-image"
+  - "scan"
+
+# Timeout configuration
+timeouts:
+  stepMs: 45000
+  totalMs: 180000
+
+# Cost limits
+cost:
+  maxUsd: 0.25
+
+# Dockerfile generation strategies
+strategies:
+  dockerfile:
+    - "Create a Dockerfile for {language} application"
+    - "Generate production-ready Dockerfile with security best practices for {language}"
+    - "Optimize Dockerfile for {language} with multi-stage build and minimal layers"
+    - "Generate enterprise-grade Dockerfile for {language} with health checks and proper user management"
+
+# Strategy selection rules based on context
+selection_rules:
+  dockerfile:
+    conditions:
+      - key: "hasDockerfile"
+        value: false
+        strategy_index: 0
+      - key: "complexity"
+        value: "high"
+        strategy_index: 3
+      - key: "environment"
+        value: "production"
+        strategy_index: 2
+    default_strategy_index: 1

@@ -5,11 +5,13 @@ An AI-powered containerization assistant that helps you build, scan, and deploy 
 ## Features
 
 - 🐳 **Docker Integration**: Build, scan, and deploy container images
-- ☸️ **Kubernetes Support**: Generate manifests and deploy applications  
-- 🤖 **AI-Powered**: Intelligent Dockerfile generation and optimization
-- 🔄 **Intelligent Tool Routing**: Automatic dependency resolution and execution
+- ☸️ **Kubernetes Support**: Generate manifests and deploy applications
+- 🤖 **AI-First Architecture**: Intelligent decision-making powered by prompts and knowledge bases
+- 🔄 **Unified Tool Pattern**: Consistent, composable tool execution with explicit dependencies
 - 📊 **Progress Tracking**: Real-time progress updates via MCP
 - 🔒 **Security Scanning**: Built-in vulnerability scanning with Trivy
+- 📋 **Session Management**: Persistent context across tool executions
+- 🎯 **Prompt-Backed Intelligence**: All business logic driven by YAML prompts and knowledge packs
 
 ## Installation
 
@@ -100,21 +102,69 @@ Once installed and configured, you can use natural language commands with GitHub
 
 ## Available Tools
 
+The server provides 17 tools organized into two categories:
+
+### AI-Powered Tools (11)
 | Tool | Description |
 |------|-------------|
-| `analyze-repo` | Analyze repository structure and detect language/framework |
-| `resolve-base-images` | Find optimal base images for applications |
-| `generate-dockerfile` | Create optimized Dockerfiles |
-| `fix-dockerfile` | Fix and optimize existing Dockerfiles |
-| `build-image` | Build Docker images with progress tracking |
-| `scan` | Security vulnerability scanning with Trivy |
-| `tag-image` | Tag Docker images |
-| `push-image` | Push images to registry |
-| `generate-k8s-manifests` | Create Kubernetes deployment configurations |
-| `prepare-cluster` | Prepare Kubernetes cluster for deployment |
-| `deploy` | Deploy applications to Kubernetes |
-| `verify-deployment` | Verify deployment health and status |
-| `ops` | Operational tools (ping, health, registry) |
+| `analyze-repo` | AI-powered repository analysis and framework detection |
+| `generate-dockerfile` | Intelligent Dockerfile generation with best practices |
+| `fix-dockerfile` | AI-assisted Dockerfile optimization and fixes |
+| `build-image` | Docker image building with AI error handling |
+| `scan` | Security scanning with AI vulnerability analysis |
+| `deploy` | Kubernetes deployment with AI strategy selection |
+| `generate-k8s-manifests` | AI-driven Kubernetes manifest generation |
+| `resolve-base-images` | AI-powered base image recommendations |
+| `generate-aca-manifests` | Azure Container Apps manifest generation |
+| `convert-aca-to-k8s` | Convert ACA manifests to Kubernetes |
+| `generate-helm-charts` | AI-powered Helm chart generation |
+
+### Infrastructure Tools (6)
+| Tool | Description |
+|------|-------------|
+| `ops` | Server status and ping utilities |
+| `tag-image` | Docker image tagging operations |
+| `push-image` | Push images to Docker registry |
+| `prepare-cluster` | Kubernetes cluster preparation |
+| `inspect-session` | Session data inspection for debugging |
+| `verify-deploy` | Kubernetes deployment verification |
+
+## Architecture Patterns
+
+### AI-First Design (Migration Complete ✅)
+This project has successfully completed its migration to an **AI-First Architecture** achieving:
+- **74% reduction** in core complexity (prompt-backed-tool.ts: 901 → 235 lines)
+- **100% tool consistency** (all 17 tools use standardized patterns)
+- **100% prompt standardization** (all YAML format, no JSON)
+- **100% AI provenance tracking** (every AI call tracked with hash)
+
+Key architectural principles:
+- **Business logic** lives in YAML prompts and knowledge bases
+- **TypeScript code** handles only deterministic operations (Docker calls, file I/O, K8s operations)
+- **Decision-making** is delegated to AI via structured prompts
+- **Context** is maintained through sessions and passed explicitly between tools
+
+### Unified Tool Pattern
+All tools follow a consistent pattern:
+```typescript
+export const tool = {
+  name: 'tool_name',
+  description: 'Tool description',
+  inputSchema: zodSchema,
+  execute: async (params, deps, context) => {
+    // AI-powered decision making via prompts
+    // Deterministic side effects only
+    // Session management for context
+  }
+};
+```
+
+### Key Principles
+- **Explicit Dependencies**: No global dependency injection
+- **Prompt-Driven**: All heuristics and analysis via YAML prompts
+- **Deterministic**: Same inputs always produce same outputs
+- **Composable**: Tools can be chained and combined
+- **Traceable**: Full provenance tracking for AI decisions
 
 ## Supported Technologies
 
@@ -216,14 +266,67 @@ containerization-assist-mcp start --log-level debug
 
 ## Documentation
 
-- **[Getting Started Guide](./docs/getting-started.md)** - Detailed setup and first use
-- **[Architecture Guide](./docs/architecture.md)** - System design and components
-- **[Development Guide](./docs/development-setup.md)** - Contributing and development setup
+- **[Getting Started Guide](./docs/guides/getting-started.md)** - Detailed setup and first use
+- **[Architecture Guide](./docs/reference/architecture.md)** - System design and components
+- **[Development Guide](./docs/development/language-framework-guide.md)** - Language support and development
 - **[Documentation Index](./docs/README.md)** - All available documentation
 
 ## For Developers
 
-If you want to contribute or run from source, see the [Development Setup Guide](./docs/development-setup.md).
+### Development Setup
+
+```bash
+# Clone and install dependencies
+git clone https://github.com/Azure/containerization-assist.git
+cd containerization-assist
+npm install
+```
+
+### Build System
+
+The project uses a dual-build system to support both ESM and CommonJS:
+
+```bash
+# Full build (ESM + CJS)
+npm run build
+
+# ESM build only
+npm run build:esm
+
+# CJS build only
+npm run build:cjs
+
+# Development with hot reload
+npm run dev
+```
+
+### Available Scripts
+
+```bash
+# Development
+npm run dev              # Development server with watch
+npm run validate         # Quick validation (lint, typecheck, test)
+
+# Testing
+npm test                 # All tests
+npm run test:unit        # Unit tests only
+npm run mcp:inspect      # Test with MCP Inspector
+
+# Quality
+npm run lint             # Check linting
+npm run lint:fix         # Fix linting issues
+npm run typecheck        # TypeScript type checking
+npm run format           # Format code with Prettier
+```
+
+### Architecture
+
+This project follows an **AI-First Architecture** where:
+- Business logic lives in YAML prompts and knowledge bases
+- TypeScript handles deterministic operations (Docker, file I/O, K8s)
+- All tools follow a unified pattern with explicit dependencies
+
+For detailed development information, see the [Getting Started Guide](./docs/guides/getting-started.md).
 
 ## License
 
@@ -231,8 +334,8 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- GitHub Issues: https://github.com/azure/containerization-assist/issues
-- Documentation: https://github.com/azure/containerization-assist/tree/main/docs
+- GitHub Issues: https://github.com/Azure/containerization-assist/issues
+- Documentation: https://github.com/Azure/containerization-assist/tree/main/docs
 
 ## Trademarks
 

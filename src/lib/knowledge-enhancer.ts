@@ -1,8 +1,8 @@
 /**
- * Simplified knowledge enhancer for AI prompts
+ * Knowledge enhancer for AI prompts
  */
 import { createLogger } from '@/lib/logger';
-import { getEntriesByCategoryEnhanced } from '@/knowledge/enhanced-loader';
+import { getEntriesByCategoryEnhanced as getEntriesByCategory } from '@/knowledge/pack-loader';
 import { scoreEntry, rankMatches } from '@/knowledge/simple-scoring';
 import type { KnowledgeMatch } from '@/knowledge/types';
 
@@ -31,7 +31,7 @@ export async function enhanceWithKnowledge(
     }
 
     // Load relevant knowledge entries
-    const entries = await getEntriesByCategoryEnhanced(category, {
+    const entries = await getEntriesByCategory(category, {
       ...(context.language && { language: context.language }),
       ...(context.framework && { framework: context.framework }),
     });
@@ -86,12 +86,12 @@ export async function enhanceWithKnowledge(
  */
 function getCategory(operation: string): string | null {
   const categoryMap: Record<string, string> = {
-    generate_dockerfile: 'dockerfile',
-    fix_dockerfile: 'dockerfile',
-    analyze_repo: 'dockerfile',
-    generate_k8s_manifests: 'kubernetes',
-    generate_aca_manifests: 'kubernetes',
-    convert_aca_to_k8s: 'kubernetes',
+    'generate-dockerfile': 'dockerfile',
+    'fix-dockerfile': 'dockerfile',
+    'analyze-repo': 'dockerfile',
+    'generate-k8s-manifests': 'kubernetes',
+    'generate-aca-manifests': 'kubernetes',
+    'convert-aca-to-k8s': 'kubernetes',
     scan: 'security',
   };
 

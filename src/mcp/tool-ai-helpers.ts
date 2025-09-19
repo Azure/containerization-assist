@@ -35,11 +35,7 @@ import type { ToolContext } from '@/mcp/context';
 import { Result, Success, Failure } from '@/types';
 import { type AIResponse, type AIGenerateOptions, aiGenerate } from './tool-ai-generation';
 import type { SamplingOptions, SamplingResult, SamplingCandidate } from '@/lib/sampling';
-import {
-  scoreConfigCandidates,
-  getConfigStrategies,
-  quickConfigScore,
-} from '@/lib/integrated-scoring';
+import { scoreConfigCandidates, getConfigStrategies } from '@/lib/scoring';
 import {
   enhancePromptWithKnowledge,
   type PromptEnhancementContext,
@@ -96,10 +92,7 @@ async function generateCandidates(
 
       // Quick score check for early stopping (only after we have at least 2 candidates)
       if (candidates.length >= 2 && options.earlyStopThreshold) {
-        const quickScore = await quickScoreCandidate(
-          result.value.value.content,
-          options.expectation,
-        );
+        const quickScore = await scoreCandidate(result.value.value.content, options.expectation);
         if (quickScore >= earlyStopThreshold) {
           logger.debug(
             { score: quickScore, threshold: earlyStopThreshold },
@@ -365,10 +358,21 @@ async function scoreCandidates(
 /**
  * Quick scoring for early stop decisions
  */
-async function quickScoreCandidate(content: string, expectation?: string): Promise<number> {
+async function scoreCandidate(content: string, expectation?: string): Promise<number> {
   // Use config-based quick scoring
   const environment = process.env.NODE_ENV || 'development';
-  return quickConfigScore(content, expectation as AIGenerateOptions['expectation'], environment);
+  const result = await scoreConfigCandidates(
+    [content],
+    expectation as AIGenerateOptions['expectation'],
+    environment,
+  );
+
+  if (result.ok && result.value.length > 0 && result.value[0]) {
+    return result.value[0].score;
+  }
+
+  // Return a default score if scoring fails
+  return 30;
 }
 
 /**

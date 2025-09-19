@@ -8,6 +8,7 @@
 import type { Logger } from 'pino';
 import { Result, Success, Failure, isFail } from '@/types';
 import { extractErrorMessage } from './error-utils';
+import { safeJsonParse } from './parsing-utils';
 
 // Type definitions expected by tests and other components
 export interface ScanOptions {
@@ -335,7 +336,7 @@ export async function getScannerVersion(ctx: ScannerContext): Promise<Result<str
 export async function updateDatabase(ctx: ScannerContext): Promise<Result<void>> {
   try {
     const result = await ctx.commandExecutor.execute('trivy', ['image', '--download-db-only'], {
-      timeout: 300000, // 5 minutes for database update
+      timeout: 300000, // 5 minutes (in milliseconds) for database update
     });
 
     if (isFail(result)) {
@@ -350,8 +351,13 @@ export async function updateDatabase(ctx: ScannerContext): Promise<Result<void>>
 
 // Parsing helpers
 function parseTrivyOutput(output: string): Result<SecurityScanResult> {
+  const parseResult = safeJsonParse(output);
+  if (!parseResult.ok) {
+    return Failure(`Failed to parse Trivy output: ${parseResult.error}`);
+  }
+
   try {
-    const trivyResult = JSON.parse(output);
+    const trivyResult = parseResult.value as any;
     const vulnerabilities: VulnerabilityFinding[] = [];
 
     let critical = 0,
@@ -416,8 +422,13 @@ function parseTrivyOutput(output: string): Result<SecurityScanResult> {
 }
 
 function parseSecretOutput(output: string): Result<SecretScanResult> {
+  const parseResult = safeJsonParse(output);
+  if (!parseResult.ok) {
+    return Failure(`Failed to parse secret scan output: ${parseResult.error}`);
+  }
+
   try {
-    const trivyResult = JSON.parse(output);
+    const trivyResult = parseResult.value as any;
     const secrets: SecretFinding[] = [];
 
     let high = 0,

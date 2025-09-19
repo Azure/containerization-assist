@@ -1,0 +1,223 @@
+id: base-image-resolution
+version: '1.0.0'
+description: Recommend Docker base images with structured JSON output
+category: containerization
+format: json
+parameters:
+  - name: language
+    type: string
+    required: false
+    description: Programming language
+  - name: languageVersion
+    type: string
+    required: false
+    description: Language version
+  - name: framework
+    type: string
+    required: false
+    description: Framework name
+  - name: technology
+    type: string
+    required: false
+    description: Technology stack
+  - name: requirements
+    type: object
+    required: false
+    description: Additional requirements
+  - name: constraints
+    type: object
+    required: false
+    description: Constraints to consider
+  - name: targetEnvironment
+    type: string
+    required: false
+    description: Target deployment environment
+  - name: context
+    type: string
+    required: false
+    description: Additional context
+template: |
+  You are a Docker image selection expert who provides structured recommendations in JSON format.
+
+  Analyze the following requirements and provide base image recommendations:
+
+  {{#language}}**Language:** {{language}} {{languageVersion}}{{/language}}
+  {{#framework}}**Framework:** {{framework}}{{/framework}}
+  {{#technology}}**Technology:** {{technology}}{{/technology}}
+  {{#requirements}}**Requirements:** {{requirements}}{{/requirements}}
+  {{#constraints}}**Constraints:** {{constraints}}{{/constraints}}
+  {{#targetEnvironment}}**Environment:** {{targetEnvironment}}{{/targetEnvironment}}
+  {{#context}}**Context:** {{context}}{{/context}}
+
+  Provide recommendations as a JSON object with this exact structure:
+  {
+    "recommendations": [
+      {
+        "image": "image:tag",
+        "reason": "why this image is recommended",
+        "pros": ["advantage1", "advantage2"],
+        "cons": ["disadvantage1", "disadvantage2"],
+        "size": "approximate size",
+        "securityLevel": "high|medium|low",
+        "performanceLevel": "high|medium|low",
+        "compatibility": "excellent|good|fair|limited",
+        "bestFor": ["use case 1", "use case 2"]
+      }
+    ],
+    "primary": {
+      "image": "top recommended image:tag",
+      "rationale": "detailed explanation",
+      "alternates": ["alt1:tag", "alt2:tag"]
+    },
+    "considerations": {
+      "security": ["security note 1"],
+      "performance": ["performance note 1"],
+      "compatibility": ["compatibility note 1"],
+      "licensing": ["licensing note 1"]
+    },
+    "metadata": {
+      "language": "detected language",
+      "framework": "detected framework",
+      "environment": "target environment",
+      "analysisSource": "session|params|defaults"
+    },
+    "warnings": ["important warning if any"]
+  }
+
+  IMPORTANT RULES:
+  1. Return ONLY valid JSON - no markdown, no code blocks, no explanations outside JSON
+  2. Include at least 2-3 recommendations in the array
+  3. Always provide primary.image, primary.rationale, and primary.alternates
+  4. All enum fields must use exact values (high/medium/low, excellent/good/fair/limited)
+  5. Make recommendations practical and specific to the requirements
+  6. Consider security, size, performance, and compatibility trade-offs
+  7. For Node.js/JavaScript, consider node:VERSION-alpine, node:VERSION-slim, node:VERSION
+  8. For Python, consider python:VERSION-alpine, python:VERSION-slim, python:VERSION
+  9. For Java, prefer mcr.microsoft.com/openjdk/jdk:VERSION-azurelinux (build) and mcr.microsoft.com/openjdk/jre:VERSION-distroless (runtime)
+  10. For .NET, consider mcr.microsoft.com/dotnet/aspnet:VERSION, mcr.microsoft.com/dotnet/runtime:VERSION
+
+examples:
+  - input:
+      language: "Node.js"
+      languageVersion: "20"
+      requirements: "Small image for cloud functions"
+      targetEnvironment: "production"
+    output: |
+      {
+        "recommendations": [
+          {
+            "image": "node:20-alpine",
+            "reason": "Smallest Node.js image with excellent cold start performance",
+            "pros": ["Under 50MB base size", "Fast container startup", "Minimal attack surface"],
+            "cons": ["musl libc may cause compatibility issues", "Limited debugging tools"],
+            "size": "~50MB",
+            "securityLevel": "high",
+            "performanceLevel": "high",
+            "compatibility": "good",
+            "bestFor": ["Microservices", "Serverless functions", "CI/CD"]
+          },
+          {
+            "image": "node:20-slim",
+            "reason": "Debian-based slim image with better compatibility",
+            "pros": ["glibc compatibility", "More stable for native modules", "Debian package ecosystem"],
+            "cons": ["Larger than Alpine (~150MB)", "Slower cold starts"],
+            "size": "~150MB",
+            "securityLevel": "high",
+            "performanceLevel": "medium",
+            "compatibility": "excellent",
+            "bestFor": ["Applications with native dependencies", "Complex Node.js apps"]
+          },
+          {
+            "image": "node:20-bookworm-slim",
+            "reason": "Latest Debian stable base with security updates",
+            "pros": ["Latest security patches", "Full Debian stability", "Good for production"],
+            "cons": ["Larger size", "More packages than needed"],
+            "size": "~180MB",
+            "securityLevel": "high",
+            "performanceLevel": "medium",
+            "compatibility": "excellent",
+            "bestFor": ["Enterprise applications", "Long-running services"]
+          }
+        ],
+        "primary": {
+          "image": "node:20-alpine",
+          "rationale": "For cloud functions, Alpine provides the best balance of size and performance with sub-second cold starts",
+          "alternates": ["node:20-slim", "node:20-distroless"]
+        },
+        "considerations": {
+          "security": ["Alpine uses musl instead of glibc", "Regularly update base images"],
+          "performance": ["Alpine has fastest cold start times", "Consider multi-stage builds"],
+          "compatibility": ["Test native modules thoroughly", "Some npm packages may need rebuilding"]
+        },
+        "metadata": {
+          "language": "Node.js",
+          "framework": "none",
+          "environment": "production",
+          "analysisSource": "params"
+        }
+      }
+  - input:
+      language: "Java"
+      languageVersion: "17"
+      framework: "Spring Boot"
+      requirements: "Multi-stage build for Maven project"
+      targetEnvironment: "production"
+    output: |
+      {
+        "recommendations": [
+          {
+            "image": "mcr.microsoft.com/openjdk/jdk:17-azurelinux",
+            "reason": "Microsoft Azure Linux with OpenJDK for build stage - install Maven/Gradle manually",
+            "pros": ["Secure Azure Linux base", "Microsoft support", "Smaller than pre-built Maven images", "Better control over build tools"],
+            "cons": ["Need to install Maven/Gradle", "Extra setup steps"],
+            "size": "~400MB",
+            "securityLevel": "high",
+            "performanceLevel": "high",
+            "compatibility": "excellent",
+            "bestFor": ["Build stage", "Security-focused deployments", "Azure environments"]
+          },
+          {
+            "image": "mcr.microsoft.com/openjdk/jre:17-distroless",
+            "reason": "Microsoft distroless for minimal attack surface runtime",
+            "pros": ["Minimal attack surface", "No shell or package manager", "Very secure", "Small size ~180MB"],
+            "cons": ["No debugging tools", "No shell access", "Limited troubleshooting"],
+            "size": "~180MB",
+            "securityLevel": "high",
+            "performanceLevel": "high",
+            "compatibility": "excellent",
+            "bestFor": ["Production runtime", "Security-critical applications", "Microservices"]
+          },
+          {
+            "image": "amazoncorretto:17-alpine",
+            "reason": "AWS-optimized Java runtime",
+            "pros": ["AWS support", "Performance tuned", "Alpine base"],
+            "cons": ["Vendor lock-in considerations", "Less common"],
+            "size": "~250MB",
+            "securityLevel": "high",
+            "performanceLevel": "high",
+            "compatibility": "excellent",
+            "bestFor": ["AWS deployments", "Lambda containers"]
+          }
+        ],
+        "primary": {
+          "image": "mcr.microsoft.com/openjdk/jdk:17-azurelinux",
+          "rationale": "Use Microsoft Azure Linux JDK for build (with manual Maven/Gradle install) and Microsoft distroless JRE for runtime to minimize attack surface",
+          "alternates": ["eclipse-temurin:17-alpine", "amazoncorretto:17-alpine"]
+        },
+        "considerations": {
+          "security": ["Use JRE instead of JDK in runtime", "Run as non-root user", "Regularly update base images"],
+          "performance": ["Use -XX:+UseContainerSupport JVM flag", "Set memory limits appropriately"],
+          "compatibility": ["Ensure Maven wrapper version matches", "Test with target JVM version"]
+        },
+        "metadata": {
+          "language": "Java",
+          "framework": "Spring Boot",
+          "environment": "production",
+          "analysisSource": "params"
+        }
+      }
+tags:
+  - docker
+  - base-image
+  - json-output
+  - structured-recommendations

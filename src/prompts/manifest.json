@@ -1,0 +1,188 @@
+{
+  "prompts": [
+    {
+      "id": "dotnet-analysis",
+      "path": "analysis/dotnet-analysis.yaml",
+      "sha256": "2de565f08b3f50262d52e9052908fbda9cdb584821f88aa7b850181fd9da73ad",
+      "category": "analysis",
+      "version": "2.1.0"
+    },
+    {
+      "id": "enhance-repo-analysis",
+      "path": "analysis/enhance-repo-analysis.yaml",
+      "sha256": "e9e3ac777797fa2541689c3671c85e5ef21be05fbee33df71b54956630ea4e2a",
+      "category": "analysis",
+      "version": "1.0.0"
+    },
+    {
+      "id": "jvm-analysis",
+      "path": "analysis/jvm-analysis.yaml",
+      "sha256": "88ef6f2ff877ac3cd214f57e96bf64a79665e0fb54f0c13aedc5e0f2026598fe",
+      "category": "analysis",
+      "version": "2.1.0"
+    },
+    {
+      "id": "repository-analysis-comprehensive",
+      "path": "analysis/repository-analysis-comprehensive.yaml",
+      "sha256": "7e6e20da6c800ebd9b9f11da191fcfbf8ea69546a7aff77522e05a3aab7ba8de",
+      "category": "analysis",
+      "version": "1.0.0"
+    },
+    {
+      "id": "repository-analysis",
+      "path": "analysis/repository-analysis.yaml",
+      "sha256": "da90a16cfa5e79491046a38dcbf6f3d2299db6d1584eae1e573d382f9ab038d1",
+      "category": "analysis",
+      "version": "2.1.0"
+    },
+    {
+      "id": "base-image-resolution",
+      "path": "containerization/base-image-resolution.yaml",
+      "sha256": "3a40e3f16fc88b62a70945570d339290e0e45005a8d8806255b3ec5d35bf9f1b",
+      "category": "containerization",
+      "version": "1.0.0"
+    },
+    {
+      "id": "build-image",
+      "path": "containerization/build-image.yaml",
+      "sha256": "b20bcdfb19a921686df47ed90d7c901bcf313fbf15e0a5e0f0fcb14444cfb9af",
+      "category": "containerization",
+      "version": "1.0.0"
+    },
+    {
+      "id": "dockerfile-generation",
+      "path": "containerization/dockerfile-generation.yaml",
+      "sha256": "df8a4f19d54582f86b985b12f825f824d9d7ed7a80fadeb8ab2168cfa99f3b7c",
+      "category": "containerization",
+      "version": "2.0.0"
+    },
+    {
+      "id": "fix-dockerfile",
+      "path": "containerization/fix-dockerfile.yaml",
+      "sha256": "5e5a5ee295fed6e293fc8136647ce46e8a048a868257e4a0a5dd1fea907a2aa7",
+      "category": "containerization",
+      "version": "1.0.0"
+    },
+    {
+      "id": "optimization-suggestion",
+      "path": "containerization/optimization-suggestion.yaml",
+      "sha256": "756ab211342bddbfbf81624374ab30790d71094f67ebca010170b05b34a5c2bd",
+      "category": "containerization",
+      "version": "1.1.0"
+    },
+    {
+      "id": "convert-aca-to-k8s",
+      "path": "orchestration/convert-aca-to-k8s.yaml",
+      "sha256": "c3110961e2dd2585363ebc7e6a9671ac22e71a239223c519642842234584b53c",
+      "category": "orchestration",
+      "version": "1.0.0"
+    },
+    {
+      "id": "deploy-application",
+      "path": "orchestration/deploy-application.yaml",
+      "sha256": "49c2f8e2bc44dde700d5a8ef647b5b710239151eeee86ce65520f39085866fed",
+      "category": "orchestration",
+      "version": "1.0.0"
+    },
+    {
+      "id": "generate-aca-manifests",
+      "path": "orchestration/generate-aca-manifests.yaml",
+      "sha256": "1b1a13506f02281a0ad14156bf699235e511e4f690a862c9e09437923368e82f",
+      "category": "orchestration",
+      "version": "1.0.0"
+    },
+    {
+      "id": "generate-helm-charts",
+      "path": "orchestration/generate-helm-charts.yaml",
+      "sha256": "785584555bc18187f94f442cbcb164c274d39434ca3cd4b598184b46b0b4d941",
+      "category": "orchestration",
+      "version": "1.0.0"
+    },
+    {
+      "id": "generate-k8s-manifests",
+      "path": "orchestration/generate-k8s-manifests.yaml",
+      "sha256": "9e90dd63632eb27cb390a839763c58c93bfc306b904d6d22d296dbf93b667718",
+      "category": "orchestration",
+      "version": "2.0.0"
+    },
+    {
+      "id": "k8s-fix",
+      "path": "orchestration/k8s-fix.yaml",
+      "sha256": "cdf12b3ae0cdb57c8086fd1911c54edb5dd2e8b62bf14c5c3652c274d05c621f",
+      "category": "orchestration",
+      "version": "1.1.0"
+    },
+    {
+      "id": "k8s-generation",
+      "path": "orchestration/k8s-generation.yaml",
+      "sha256": "6fdc1d2f4e1431d5e4c3fd6d7f703bcc38f9445a2f26cf10268c31642b0846cd",
+      "category": "orchestration",
+      "version": "3.0.0"
+    },
+    {
+      "id": "dockerfile-sampling",
+      "path": "sampling/dockerfile-sampling.yaml",
+      "sha256": "7f27581f3eb53744f127a7c07ed4086d8123cc7e162068efe986f9769840c769",
+      "category": "sampling",
+      "version": "1.0.0"
+    },
+    {
+      "id": "strategy-optimization",
+      "path": "sampling/strategy-optimization.yaml",
+      "sha256": "0cb226c1dbad356c301c1869f8bfc3d729cf5aaa8633b9dec4174fbe3ef4d949",
+      "category": "sampling",
+      "version": "1.0.0"
+    },
+    {
+      "id": "security-analysis",
+      "path": "security/security-analysis.yaml",
+      "sha256": "2bb4c285c99c783e77fdbb5a9feda1f7c200cb4f379bba8141fa92beb8dccb48",
+      "category": "security",
+      "version": "1.0.0"
+    },
+    {
+      "id": "vulnerability-scan",
+      "path": "security/vulnerability-scan.yaml",
+      "sha256": "a28a02ee55fde41a39b2b183829f247088327e52b254cc65ea59b4abeef75ba0",
+      "category": "security",
+      "version": "1.0.0"
+    },
+    {
+      "id": "error-analysis",
+      "path": "validation/error-analysis.yaml",
+      "sha256": "4ebc79f46f8eb8635bf76c5e59eba4f928f28f3c46d44b8cb28d57e81df43015",
+      "category": "validation",
+      "version": "2.1.0"
+    },
+    {
+      "id": "json-repair",
+      "path": "validation/json-repair.yaml",
+      "sha256": "8aab852cbaa75a05c0bf9ea0c7aa1ef0ef468b6aaf3a9ad27cfb413f3c837ff4",
+      "category": "validation",
+      "version": "1.0.0"
+    },
+    {
+      "id": "parameter-suggestions",
+      "path": "validation/parameter-suggestions.yaml",
+      "sha256": "a83c6bee88a56f15f68c6b0c747b181d5605415582dbe6161122734df08ba994",
+      "category": "validation",
+      "version": "1.0.0"
+    },
+    {
+      "id": "parameter-validation",
+      "path": "validation/parameter-validation.yaml",
+      "sha256": "059c1df9d72b01bad85c272cbc84ea6814d22359578b86736b3cae26a916f411",
+      "category": "validation",
+      "version": "1.0.0"
+    }
+  ],
+  "embedded": [
+    "repository-analysis",
+    "build-image",
+    "dockerfile-generation",
+    "fix-dockerfile",
+    "generate-k8s-manifests",
+    "k8s-generation"
+  ],
+  "generatedAt": "2025-09-19T13:59:08.561Z"
+}

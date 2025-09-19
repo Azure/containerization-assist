@@ -84,9 +84,24 @@ export const isValidDockerfileContent = (content: string): boolean => {
     return false;
   }
 
+  // Handle JSON response format from dockerfile-generation prompt
+  let dockerfileContent = cleaned;
+  if (cleaned.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(cleaned);
+      if (parsed.content && typeof parsed.content === 'string') {
+        dockerfileContent = parsed.content.trim();
+      } else {
+        return false; // Invalid JSON structure
+      }
+    } catch {
+      return false; // Invalid JSON
+    }
+  }
+
   try {
     // Parse to ensure valid Dockerfile structure
-    const commands = dockerParser.parse(cleaned);
+    const commands = dockerParser.parse(dockerfileContent);
 
     // Check if there's at least one FROM instruction
     const hasFROM = commands.some((cmd: any) => cmd.name === 'FROM');
@@ -94,7 +109,7 @@ export const isValidDockerfileContent = (content: string): boolean => {
     // Optionally use validate-dockerfile for additional checks (but don't fail on it)
     // as it can be too strict for some valid Dockerfiles
     try {
-      const validationResult = validateDockerfile(cleaned);
+      const validationResult = validateDockerfile(dockerfileContent);
       if (!validationResult.valid && validationResult.priority === 0) {
         // Only fail on priority 0 (fatal) errors
         return false;
@@ -127,8 +142,23 @@ export const isValidDockerfileContent = (content: string): boolean => {
  * ```
  */
 export const extractBaseImage = (dockerfileContent: string): string | null => {
+  // Handle JSON response format from dockerfile-generation prompt
+  let actualDockerfileContent = dockerfileContent.trim();
+  if (actualDockerfileContent.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(actualDockerfileContent);
+      if (parsed.content && typeof parsed.content === 'string') {
+        actualDockerfileContent = parsed.content.trim();
+      } else {
+        return null; // Invalid JSON structure
+      }
+    } catch {
+      return null; // Invalid JSON
+    }
+  }
+
   try {
-    const commands = dockerParser.parse(dockerfileContent);
+    const commands = dockerParser.parse(actualDockerfileContent);
 
     // Find the first FROM instruction
     const fromCommand = commands.find((cmd: any) => cmd.name === 'FROM');
@@ -153,7 +183,7 @@ export const extractBaseImage = (dockerfileContent: string): string | null => {
     return null;
   } catch {
     // Failed to parse, fallback to regex for backwards compatibility
-    const fromMatch = dockerfileContent.match(/^\s*FROM\s+(\S+)/im);
+    const fromMatch = actualDockerfileContent.match(/^\s*FROM\s+(\S+)/im);
     return fromMatch?.[1] ?? null;
   }
 };

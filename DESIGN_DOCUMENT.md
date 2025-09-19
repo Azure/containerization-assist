@@ -235,7 +235,7 @@
 - `resolve-base-images`: Base image recommendations
 - `scan`: Security vulnerability scanning
 - `tag-image`: Docker image tagging
-- `verify-deployment`: Deployment verification and health checks
+- `verify-deploy`: Deployment verification and health checks
 - `workflow`: Workflow orchestration tools
 
 **Additional Files**:

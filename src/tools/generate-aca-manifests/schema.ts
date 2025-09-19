@@ -28,7 +28,7 @@ export const generateAcaManifestsSchema = z.object({
   targetPort: z.number().optional().default(8080).describe('Container port to expose'),
   external: z.boolean().optional().default(true).describe('Enable external vs internal ingress'),
 
-  // Environment config (simplified)
+  /* Environment config */
   envVars: z
     .array(
       z.object({

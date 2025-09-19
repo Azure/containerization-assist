@@ -20,8 +20,8 @@ describe('Server Entry Point', () => {
       
       const content = readFileSync(serverPath, 'utf-8');
       expect(content).toContain('async function main');
-      expect(content).toContain('MCPServer');
-      expect(content).toContain('createDependencies');
+expect(content).toContain('McpServer');
+      expect(content).toContain('createLogger');
     });
 
     it('should contain MCP mode setting', () => {
@@ -42,10 +42,9 @@ describe('Server Entry Point', () => {
     it('should contain dependency injection setup', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
-      
-      expect(content).toContain('createDependencies');
-      expect(content).toContain('shutdownDependencies');
-      expect(content).toContain('deps');
+
+      expect(content).toContain('createLogger');
+      expect(content).toContain('createSessionManager');
     });
   });
 
@@ -65,8 +64,7 @@ describe('Server Entry Point', () => {
       
       expect(content).toContain('const shutdown = async');
       expect(content).toContain('Shutting down server');
-      expect(content).toContain('server.stop()');
-      expect(content).toContain('shutdownDependencies');
+      expect(content).toContain('sessionManager.close');
     });
   });
 
@@ -88,11 +86,10 @@ describe('Server Entry Point', () => {
       expect(content).toContain('logger.error');
     });
 
-    it('should contain logger fallback for when deps is unavailable', () => {
+    it('should contain logger fallback for when logger is unavailable', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
-      
-      expect(content).toContain('deps?.logger ?? console');
+
       expect(content).toContain('console.error');
     });
   });
@@ -120,18 +117,17 @@ describe('Server Entry Point', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
       
-      expect(content).toContain('createMCPServer');
-      expect(content).toContain('await server.start()');
+      expect(content).toContain('createServer');
       expect(content).toContain('Starting SDK-Native MCP Server');
-      expect(content).toContain('MCP Server started successfully');
+      expect(content).toContain('MCP Server created successfully');
     });
 
     it('should contain proper variable scoping', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
-      
-      expect(content).toContain('let deps: Dependencies | undefined');
-      expect(content).toContain('let server: IMCPServer | undefined');
+
+      expect(content).toContain('let logger:');
+      expect(content).toContain('let server: McpServer | undefined');
     });
   });
 });

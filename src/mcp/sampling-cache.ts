@@ -158,8 +158,9 @@ export function cacheResponse(
   // Use operation-specific TTL if available
   const ttl = AI_CACHE_TTL[key.operation as keyof typeof AI_CACHE_TTL] || AI_CACHE_TTL.default;
 
-  // Note: TTL is configured at cache creation time, not per-item
-  // The ttl variable is used for logging purposes only
+  /**
+   * Invariant: TTL is global, not per-item - prevents cache fragmentation
+   */
   cacheInstances.aiResponses.set(fingerprint, JSON.stringify(entry));
 
   logger.info(
@@ -213,7 +214,7 @@ export function shouldCacheOperation(operation: string): boolean {
  */
 export function invalidateOperationCache(operation: string): number {
   // Since we can't inspect cache entries directly, we'll clear the entire cache
-  // This is a simplified approach - in production, we might need a different strategy
+  /* Trade-off: Clear entire cache vs selective eviction - chose simplicity */
   const stats = cacheInstances.aiResponses.getStats();
   const sizeBefore = stats.size;
 
@@ -231,7 +232,7 @@ export function getAICacheStats(): AICacheStats {
   const stats = cacheInstances.aiResponses.getStats();
 
   // Without inspect method, we can't get detailed operation counts
-  // Return simplified stats
+  /* Return basic stats without detailed operation counts */
   const byOperation: Record<string, number> = {
     unknown: stats.size,
   };

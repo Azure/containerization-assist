@@ -74,9 +74,9 @@ describe('Service Dependencies', () => {
   });
 
   test('should support infrastructure standardization', () => {
-    // Test unified logger and single Docker abstraction
+    // Test logger and Docker abstraction
     const infrastructureDeps = {
-      logger: mockLogger, // Unified logger interface
+      logger: mockLogger,
       dockerService: {    // Single Docker abstraction
         build: jest.fn(),
         scan: jest.fn(),

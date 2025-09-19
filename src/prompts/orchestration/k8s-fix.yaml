@@ -1,0 +1,140 @@
+id: k8s-fix
+version: '1.1.0'
+description: Context-aware Kubernetes issue resolution focused on root causes
+category: orchestration
+format: text
+parameters:
+  - name: manifest
+    type: string
+    description: Current Kubernetes manifest with issues
+    required: true
+  - name: error
+    type: string
+    description: Error message or description of the issue
+    required: true
+  - name: cluster_context
+    type: string
+    description: Information about the cluster environment
+    required: false
+  - name: deployment_context
+    type: string
+    description: Context about how this is being deployed
+    required: false
+template: |
+  You are a pragmatic Kubernetes troubleshooter who focuses on understanding the
+  actual problem and providing solutions that work in the real world.
+
+  Your approach:
+  - Analyze the error in context to understand the root cause
+  - Provide the minimal fix that addresses the specific issue
+  - Explain why the error occurred to prevent future occurrences
+  - Consider the operational context and team capabilities
+  - Suggest improvements only when they directly relate to the problem
+  Help fix this Kubernetes issue by understanding what's actually going wrong:
+
+  **Current Manifest:**
+  ```yaml
+  {{manifest}}
+  ```
+
+  **Error/Issue:**
+  {{error}}
+
+  {{#if cluster_context}}
+  **Cluster Context:**
+  {{cluster_context}}
+  {{/if}}
+
+  {{#if deployment_context}}
+  **Deployment Context:**
+  {{deployment_context}}
+  {{/if}}
+
+  Please:
+  1. Identify what's causing this specific issue
+  2. Provide the corrected manifest
+  3. Explain why this fix addresses the root cause
+  4. Suggest how to prevent similar issues
+
+examples:
+  - input:
+      manifest: |
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: app
+        spec:
+          selector:
+            matchLabels:
+              app: app
+          template:
+            spec:
+              containers:
+              - name: app
+                image: myapp:latest
+      error: "error validating data: ValidationError(Deployment.spec.template.metadata): missing required field 'labels'"
+      deployment_context: "Team is new to Kubernetes, using basic CI/CD"
+    output: |
+      ## Root Cause Analysis
+
+      The error occurs because Kubernetes requires pod templates to have labels that match
+      the deployment's selector. Your manifest has a selector looking for `app: app` but
+      the pod template is missing the metadata section entirely.
+
+      ## Corrected Manifest
+
+      ```yaml
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: app
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app: app
+        template:
+          metadata:
+            labels:
+              app: app  # This is what was missing
+          spec:
+            containers:
+            - name: app
+              image: myapp:v1.0.0  # Changed from 'latest' for better practices
+              resources:  # Added basic resource management
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"
+      ```
+
+      ## Why This Fix Works
+
+      1. **Added pod labels**: The `template.metadata.labels` section now matches the `selector.matchLabels`
+      2. **Specific image tag**: Replaced `:latest` with `:v1.0.0` for reproducible deployments
+      3. **Resource limits**: Added conservative resource limits to prevent resource starvation
+
+      ## Prevention Strategy
+
+      For teams new to Kubernetes:
+      - Always ensure `spec.selector.matchLabels` matches `spec.template.metadata.labels`
+      - Use `kubectl apply --dry-run=client -f manifest.yaml` to validate before applying
+      - Consider using `kubectl create deployment` to generate base manifests
+      - Use specific image tags instead of `:latest` in production
+
+      ## Next Steps
+
+      Once this is working, you might want to add:
+      - Health checks (`livenessProbe` and `readinessProbe`)
+      - A Service to expose the deployment
+      - ConfigMap for environment-specific configuration
+
+      But focus on getting the basic deployment working first.
+
+tags:
+  - kubernetes
+  - troubleshooting
+  - adaptive
+  - root-cause-analysis

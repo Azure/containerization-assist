@@ -21,7 +21,7 @@
  * ```
  */
 
-import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
+import { ensureSession, useSessionSlice } from '@/mcp/tool-session-helpers';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import type { ToolContext } from '@/mcp/context';
@@ -30,10 +30,9 @@ import { getSystemInfo, getDownloadOS, getDownloadArch } from '@/lib/platform-ut
 import { downloadFile, makeExecutable, createTempFile, deleteTempFile } from '@/lib/file-utils';
 
 import type * as pino from 'pino';
-import { Success, Failure, type Result } from '@/types';
-import { prepareClusterSchema, type PrepareClusterParams } from './schema';
-import { z } from 'zod';
-import type { SessionData } from '@/tools/session-types';
+import { Success, Failure, type Result, type K8sManifest } from '@/types';
+import { type PrepareClusterParams, prepareClusterSchema } from './schema';
+import type { SessionData } from '@/types/tool-session-types';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -63,41 +62,6 @@ export interface PrepareClusterResult {
   localRegistryUrl?: string;
 }
 
-// Define the result schema for type safety
-const PrepareClusterResultSchema = z.object({
-  success: z.boolean(),
-  sessionId: z.string(),
-  clusterReady: z.boolean(),
-  cluster: z.string(),
-  namespace: z.string(),
-  checks: z.object({
-    connectivity: z.boolean(),
-    permissions: z.boolean(),
-    namespaceExists: z.boolean(),
-    ingressController: z.boolean().optional(),
-    rbacConfigured: z.boolean().optional(),
-    kindInstalled: z.boolean().optional(),
-    kindClusterCreated: z.boolean().optional(),
-    localRegistryCreated: z.boolean().optional(),
-  }),
-  warnings: z.array(z.string()).optional(),
-  localRegistryUrl: z.string().optional(),
-});
-
-// Define tool IO for type-safe session operations
-const io = defineToolIO(prepareClusterSchema, PrepareClusterResultSchema);
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastPreparedAt: z.date().optional(),
-  lastClusterName: z.string().optional(),
-  lastNamespace: z.string().optional(),
-  totalPreparations: z.number().optional(),
-  lastClusterReady: z.boolean().optional(),
-  lastChecksPassed: z.number().optional(),
-  lastWarningCount: z.number().optional(),
-});
-
 interface K8sClientAdapter {
   ping(): Promise<boolean>;
   namespaceExists(namespace: string): Promise<boolean>;
@@ -116,7 +80,7 @@ function createK8sClientAdapter(
     ping: () => k8sClient.ping(),
     namespaceExists: (namespace: string) => k8sClient.namespaceExists(namespace),
     applyManifest: async (manifest: Record<string, unknown>, namespace?: string) => {
-      const result = await k8sClient.applyManifest(manifest, namespace);
+      const result = await k8sClient.applyManifest(manifest as unknown as K8sManifest, namespace);
       if (result.ok) {
         return { success: true };
       } else {
@@ -464,7 +428,7 @@ async function prepareClusterImpl(
     }
 
     const { id: sessionId, state: session } = sessionResult.value;
-    const slice = useSessionSlice('prepare-cluster', io, context, StateSchema);
+    const slice = useSessionSlice('prepare-cluster', context);
 
     if (!slice) {
       return Failure('Session manager not available');
@@ -640,6 +604,12 @@ async function prepareClusterImpl(
 }
 
 /**
- * Export the prepare cluster tool directly
+ * Export the prepare cluster tool for MCP registration
  */
-export const prepareCluster = prepareClusterImpl;
+export const prepareCluster = {
+  type: 'standard' as const,
+  name: 'prepare-cluster',
+  description: 'Prepare and validate Kubernetes cluster for deployment',
+  inputSchema: prepareClusterSchema,
+  execute: prepareClusterImpl,
+};

@@ -5,7 +5,7 @@
 
 import { EnvironmentCapabilities, detectEnvironment } from '../utilities/environment-detector';
 import { fixtureRegistry, FixtureMetadata } from './fixture-registry';
-import { unifiedMockFactory } from '../mocks/unified-mock-factory';
+import { mockFactory } from '../mocks/mock-factory';
 import { goldenFileLoader } from './golden-file-loader';
 import { Result, Success, Failure } from '../../../src/types';
 
@@ -151,14 +151,14 @@ export class EnvironmentAwareFixtureLoader {
       } else {
         // Fallback to mock if no real fixture found
         if (this.config.fallbackToMocks) {
-          return Success(unifiedMockFactory.createDockerMock(mockBehavior));
+          return Success(mockFactory.createDockerMock(mockBehavior));
         } else {
           return Failure(`Docker fixture not found: ${fixtureName}`);
         }
       }
     } else {
       // Use mock Docker
-      return Success(unifiedMockFactory.createDockerMock(mockBehavior));
+      return Success(mockFactory.createDockerMock(mockBehavior));
     }
   }
 
@@ -192,7 +192,7 @@ export class EnvironmentAwareFixtureLoader {
       } else {
         if (this.config.fallbackToMocks) {
           const clusterType = this.capabilities!.kubernetes.type as any;
-          return Success(unifiedMockFactory.createKubernetesMock(clusterType || 'kind'));
+          return Success(mockFactory.createKubernetesMock(clusterType || 'kind'));
         } else {
           return Failure(`Kubernetes fixture not found: ${fixtureName}`);
         }
@@ -202,7 +202,7 @@ export class EnvironmentAwareFixtureLoader {
       const clusterType = this.capabilities!.kubernetes.available 
         ? (this.capabilities!.kubernetes.type as any)
         : 'unavailable';
-      return Success(unifiedMockFactory.createKubernetesMock(clusterType));
+      return Success(mockFactory.createKubernetesMock(clusterType));
     }
   }
 
@@ -232,7 +232,7 @@ export class EnvironmentAwareFixtureLoader {
 
     // Use mock security scanner
     const findingsLevel = this.mapScenarioToFindings(scenario);
-    return Success(unifiedMockFactory.createTrivyMock(findingsLevel));
+    return Success(mockFactory.createTrivyMock(findingsLevel));
   }
 
   /**
@@ -324,7 +324,7 @@ export class EnvironmentAwareFixtureLoader {
       'push-image': ['docker'],
       'tag-image': ['docker'],
       'deploy': ['kubernetes'],
-      'verify-deployment': ['kubernetes'],
+      'verify-deploy': ['kubernetes'],
       'prepare-cluster': ['kubernetes'],
       'scan': ['trivy'],
       'generate-k8s-manifests': [], // Can run without cluster

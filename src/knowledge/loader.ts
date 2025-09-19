@@ -1,9 +1,9 @@
 import { createLogger } from '@/lib/logger';
 import type { KnowledgeEntry, KnowledgeStats, LoadedEntry, CompilationStats } from './types';
-import { KnowledgeEntrySchema } from './schemas';
+import { KnowledgeEntrySchema } from './pack-schema';
 import { z } from 'zod';
 import { readFileSync, existsSync } from 'fs';
-import path from 'path';
+import { resolve } from 'node:path';
 
 const logger = createLogger().child({ module: 'knowledge-loader' });
 
@@ -66,7 +66,6 @@ const updateCompilationStats = (time: number): void => {
 };
 
 const compilePattern = (entry: KnowledgeEntry): LoadedEntry => {
-  const startTime = performance.now();
   const loaded: LoadedEntry = { ...entry };
 
   if (entry.pattern) {
@@ -96,8 +95,7 @@ const compilePattern = (entry: KnowledgeEntry): LoadedEntry => {
     }
   }
 
-  const compilationTime = performance.now() - startTime;
-  updateCompilationStats(compilationTime);
+  updateCompilationStats(0);
 
   return loaded;
 };
@@ -177,11 +175,11 @@ export const loadKnowledgeBase = async (): Promise<void> => {
     for (const packFile of knowledgePacks) {
       try {
         const possiblePaths = [
-          path.resolve(process.cwd(), 'src/knowledge/data', packFile),
-          path.resolve(process.cwd(), 'dist/src/knowledge/data', packFile),
-          path.resolve(
+          resolve(process.cwd(), 'src/knowledge/snippets', packFile),
+          resolve(process.cwd(), 'dist/src/knowledge/snippets', packFile),
+          resolve(
             process.cwd(),
-            'node_modules/@thgamble/containerization-assist-mcp/dist/src/knowledge/data',
+            'node_modules/@thgamble/containerization-assist-mcp/dist/src/knowledge/snippets',
             packFile,
           ),
         ] as const;

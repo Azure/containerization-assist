@@ -1,0 +1,55 @@
+id: dockerfile-sampling
+version: '1.0.0'
+description: Generate Dockerfile variants for sampling
+category: sampling
+parameters:
+  - name: strategy
+    type: string
+    required: true
+    description: Optimization strategy (security, performance, size, balanced)
+  - name: language
+    type: string
+    required: true
+    description: Programming language
+  - name: context
+    type: string
+    required: false
+    description: Application context
+template: >
+  Generate an optimized Dockerfile for {{strategy}} strategy.
+
+
+  Language: {{language}}
+
+  Context: {{context}}
+
+
+  Requirements:
+
+  - Optimize for {{strategy}}
+
+  - Follow containerization best practices
+
+  - Use appropriate base images
+
+  - Include security considerations
+
+  - Minimize image size where possible
+
+
+  CRITICAL: Return ONLY the raw Dockerfile content. Do not include:
+
+  - Explanatory text before or after the Dockerfile
+
+  - Markdown code blocks or formatting
+
+  - Comments about best practices
+
+  - Installation instructions
+
+  - Any text that is not part of the Dockerfile itself
+
+
+  Start your response directly with the FROM instruction and end with the last Dockerfile instruction. No additional
+  text.
+format: text

@@ -1,4 +1,4 @@
-import * as path from 'path';
+import { join, posix } from 'node:path';
 
 /**
  * Using native Node.js path.posix.normalize for consistent forward slash behavior
@@ -11,5 +11,14 @@ export function normalizePath(inputPath: string): string {
   if (inputPath == null) return inputPath; // handles both null and undefined
   if (inputPath === '') return inputPath;
   // Convert all backslashes to forward slashes, then normalize
-  return path.posix.normalize(inputPath.replace(/\\/g, '/'));
+  return posix.normalize(inputPath.replace(/\\/g, '/'));
+}
+
+// Alias for backward compatibility
+export const normalizePathSeparators = normalizePath;
+export const safeNormalizePath = normalizePath;
+
+// Join paths using Node.js path.join
+export function joinPaths(...paths: string[]): string {
+  return join(...paths);
 }

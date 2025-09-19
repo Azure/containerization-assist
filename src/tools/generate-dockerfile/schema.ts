@@ -46,6 +46,7 @@ export const generateDockerfileSchema = z.object({
   dockerfileDirectoryPaths: z
     .array(z.string())
     .nonempty()
+    .optional()
     .describe(
       'List of paths in the repository to generate separate Dockerfiles (use forward slashes: /path/to/directory/where/dockerfile/will/be/placed/)',
     ),
@@ -75,3 +76,45 @@ export const generateDockerfileSchema = z.object({
 });
 
 export type GenerateDockerfileParams = z.infer<typeof generateDockerfileSchema>;
+
+/**
+ * Single Dockerfile result schema
+ */
+export const SingleDockerfileOutputSchema = z.object({
+  content: z.string().min(20).describe('Generated Dockerfile content'),
+  path: z.string().describe('Path where the Dockerfile should be created'),
+  moduleRoot: z.string().describe('Root directory of the module'),
+  metadata: z
+    .object({
+      baseImage: z.string().describe('Base image used'),
+      runtimeImage: z.string().optional().describe('Runtime image for multi-stage builds'),
+      exposedPorts: z.array(z.number()).optional().describe('List of exposed ports'),
+      hasHealthCheck: z.boolean().describe('Whether health check is included'),
+      isMultiStage: z.boolean().describe('Whether multi-stage build is used'),
+      optimizationStrategy: z
+        .enum(['size', 'security', 'performance', 'balanced'])
+        .optional()
+        .describe('Applied optimization strategy'),
+      securityLevel: z
+        .enum(['basic', 'standard', 'strict'])
+        .optional()
+        .describe('Applied security level'),
+      estimatedSize: z.string().optional().describe('Estimated final image size'),
+    })
+    .optional()
+    .describe('Metadata about the generated Dockerfile'),
+  recommendations: z.array(z.string()).optional().describe('Additional recommendations'),
+});
+
+/**
+ * Output schema for generate-dockerfile tool (supports multiple modules)
+ */
+export const DockerfileOutputSchema = z.object({
+  dockerfiles: z
+    .array(SingleDockerfileOutputSchema)
+    .describe('Generated Dockerfiles for each module'),
+  count: z.number().describe('Number of Dockerfiles generated'),
+  warnings: z.array(z.string()).optional().describe('Warnings encountered during generation'),
+});
+
+export type DockerfileOutput = z.infer<typeof DockerfileOutputSchema>;

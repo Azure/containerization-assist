@@ -86,7 +86,7 @@ function main() {
     console.log('Copying prompts directory for CommonJS build...');
     try {
       fs.mkdirSync(path.join(distCjsDir, 'src'), { recursive: true });
-      copyDirRecursive(promptsSource, promptsDest, (file) => file.endsWith('.json'));
+      copyDirRecursive(promptsSource, promptsDest, (file) => file.endsWith('.json') || file.endsWith('.yaml') || file.endsWith('.yml') || file.endsWith('.ts'));
       console.log('Prompts directory copied to dist-cjs');
     } catch (err) {
       console.warn('Warning: Could not copy prompts:', err.message);

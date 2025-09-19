@@ -2,7 +2,7 @@
  * Mock tools for router integration testing
  */
 
-import { Success, Failure, type Result } from '@/types';
+import { Success, Failure, type Result } from '../../../../src/types';
 import { z } from 'zod';
 
 export interface MockToolResult {
@@ -22,14 +22,14 @@ export const resetExecutionLog = () => {
 
 // Mock tool handlers
 export const mockAnalyzeRepo = {
-  name: 'analyze_repo',
+  name: 'analyze-repo',
   schema: z.object({
     path: z.string().default('.'),
     sessionId: z.string().optional(),
   }),
   handler: async (params: Record<string, unknown>, _context?: any): Promise<Result<unknown>> => {
     executionLog.push({
-      tool: 'analyze_repo',
+      tool: 'analyze-repo',
       executed: true,
       params,
       timestamp: new Date(),
@@ -43,7 +43,7 @@ export const mockAnalyzeRepo = {
 };
 
 export const mockResolveBaseImages = {
-  name: 'resolve_base_images',
+  name: 'resolve-base-images',
   schema: z.object({
     framework: z.string().optional(),
     version: z.string().optional(),
@@ -51,7 +51,7 @@ export const mockResolveBaseImages = {
   }),
   handler: async (params: Record<string, unknown>, _context?: any): Promise<Result<unknown>> => {
     executionLog.push({
-      tool: 'resolve_base_images',
+      tool: 'resolve-base-images',
       executed: true,
       params,
       timestamp: new Date(),
@@ -64,7 +64,7 @@ export const mockResolveBaseImages = {
 };
 
 export const mockGenerateDockerfile = {
-  name: 'generate_dockerfile',
+  name: 'generate-dockerfile',
   schema: z.object({
     path: z.string().default('.'),
     framework: z.string().optional(),
@@ -73,7 +73,7 @@ export const mockGenerateDockerfile = {
   }),
   handler: async (params: Record<string, unknown>, _context?: any): Promise<Result<unknown>> => {
     executionLog.push({
-      tool: 'generate_dockerfile',
+      tool: 'generate-dockerfile',
       executed: true,
       params,
       timestamp: new Date(),
@@ -86,7 +86,7 @@ export const mockGenerateDockerfile = {
 };
 
 export const mockBuildImage = {
-  name: 'build_image',
+  name: 'build-image',
   schema: z.object({
     dockerfilePath: z.string().default('./Dockerfile'),
     imageName: z.string(),
@@ -95,7 +95,7 @@ export const mockBuildImage = {
   }),
   handler: async (params: Record<string, unknown>, _context?: any): Promise<Result<unknown>> => {
     executionLog.push({
-      tool: 'build_image',
+      tool: 'build-image',
       executed: true,
       params,
       timestamp: new Date(),
@@ -109,7 +109,7 @@ export const mockBuildImage = {
 };
 
 export const mockPushImage = {
-  name: 'push_image',
+  name: 'push-image',
   schema: z.object({
     imageId: z.string(),
     registry: z.string().optional(),
@@ -117,7 +117,7 @@ export const mockPushImage = {
   }),
   handler: async (params: Record<string, unknown>, _context?: any): Promise<Result<unknown>> => {
     executionLog.push({
-      tool: 'push_image',
+      tool: 'push-image',
       executed: true,
       params,
       timestamp: new Date(),
@@ -156,14 +156,14 @@ export const mockScanImage = {
 };
 
 export const mockPrepareCluster = {
-  name: 'prepare_cluster',
+  name: 'prepare-cluster',
   schema: z.object({
     context: z.string().optional(),
     sessionId: z.string().optional(),
   }),
   handler: async (params: Record<string, unknown>, _context?: any): Promise<Result<unknown>> => {
     executionLog.push({
-      tool: 'prepare_cluster',
+      tool: 'prepare-cluster',
       executed: true,
       params,
       timestamp: new Date(),
@@ -176,7 +176,7 @@ export const mockPrepareCluster = {
 };
 
 export const mockGenerateK8sManifests = {
-  name: 'generate_k8s_manifests',
+  name: 'generate-k8s-manifests',
   schema: z.object({
     appName: z.string(),
     imageName: z.string(),
@@ -184,7 +184,7 @@ export const mockGenerateK8sManifests = {
   }),
   handler: async (params: Record<string, unknown>, _context?: any): Promise<Result<unknown>> => {
     executionLog.push({
-      tool: 'generate_k8s_manifests',
+      tool: 'generate-k8s-manifests',
       executed: true,
       params,
       timestamp: new Date(),
@@ -244,14 +244,14 @@ export const mockFailingTool = {
 export const createMockToolsMap = () => {
   const tools = new Map();
 
-  tools.set('analyze_repo', mockAnalyzeRepo);
-  tools.set('resolve_base_images', mockResolveBaseImages);
-  tools.set('generate_dockerfile', mockGenerateDockerfile);
-  tools.set('build_image', mockBuildImage);
-  tools.set('push_image', mockPushImage);
+  tools.set('analyze-repo', mockAnalyzeRepo);
+  tools.set('resolve-base-images', mockResolveBaseImages);
+  tools.set('generate-dockerfile', mockGenerateDockerfile);
+  tools.set('build-image', mockBuildImage);
+  tools.set('push-image', mockPushImage);
   tools.set('scan', mockScanImage);
-  tools.set('prepare_cluster', mockPrepareCluster);
-  tools.set('generate_k8s_manifests', mockGenerateK8sManifests);
+  tools.set('prepare-cluster', mockPrepareCluster);
+  tools.set('generate-k8s-manifests', mockGenerateK8sManifests);
   tools.set('deploy', mockDeploy);
   tools.set('failing-tool', mockFailingTool);
 

@@ -1,0 +1,24 @@
+rules:
+  - id: multi-stage-builds
+    text: Must use multi-stage builds for production optimization
+    priority: 5
+    tools: ["generate-dockerfile"]
+    when:
+      optimization: performance
+
+  - id: health-checks
+    text: Must include health checks for all service containers
+    priority: 6
+    tools: ["generate-k8s-manifests", "deploy"]
+
+  - id: resource-limits
+    text: Must define CPU and memory limits for all containers
+    priority: 7
+    tools: ["generate-k8s-manifests"]
+
+  - id: cache-layers
+    text: Must optimize Docker layer caching for faster builds
+    priority: 8
+    tools: ["generate-dockerfile", "build-image"]
+    when:
+      optimization: size

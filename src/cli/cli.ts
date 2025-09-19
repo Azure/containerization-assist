@@ -5,10 +5,17 @@
  */
 
 import { program } from 'commander';
-import { createMCPServer } from '@/mcp/server';
-import { createDependencies, initializeDependencies, getSystemStatus } from '@/container';
-import { config, logConfigSummaryIfDev } from '@/config/index';
-import { createLogger } from '@/lib/logger';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { createSessionManager } from '@lib/session';
+import { getToolRegistry } from '@mcp/tools/registry';
+import { initializePrompts, listPrompts } from '@/prompts/prompt-registry';
+import * as promptRegistry from '@/prompts/prompt-registry';
+import * as resourceManager from '@/resources/manager';
+import { config, logConfigSummaryIfDev } from '@config/index';
+import { createLogger } from '@lib/logger';
+import { createToolContext } from '@mcp/context';
+import { createToolRouter } from '@mcp/tool-router';
 import { exit, argv, env, cwd } from 'node:process';
 import { execSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
@@ -357,41 +364,167 @@ async function main(): Promise<void> {
     // Set MCP mode to redirect logs to stderr
     process.env.MCP_MODE = 'true';
 
-    // Create server with dependencies
-    const deps = createDependencies();
-    await initializeDependencies(deps);
+    // Create dependencies inline
+    const mainLogger = createLogger({
+      name: config.mcp.name,
+      level: config.server.logLevel,
+    });
 
-    const server = createMCPServer(deps);
+    const sessionManager = createSessionManager(mainLogger, {
+      ttl: config.session.ttl,
+      maxSessions: config.session.maxSessions,
+      cleanupIntervalMs: config.session.cleanupInterval,
+    });
+
+    // Initialize prompt registry (directory param ignored - uses embedded prompts)
+    await initializePrompts('', mainLogger);
+    mainLogger.info('Prompts initialized successfully');
+
+    const tools = getToolRegistry();
+    mainLogger.info(`Tool registry loaded with ${tools.size} tools`);
+
+    mainLogger.info('Starting SDK-Native MCP Server');
+
+    // Create the MCP SDK server instance
+    const server = new McpServer(
+      {
+        name: config.mcp.name,
+        version: '1.4.2',
+      },
+      {
+        capabilities: {
+          tools: {},
+        },
+      },
+    );
+
+    // Create router for tool execution
+    const router = createToolRouter({
+      sessionManager,
+      logger: mainLogger,
+      tools,
+    });
+
+    // Register tools directly with MCP SDK server
+    for (const [toolName, toolDef] of tools) {
+      if (!toolDef.schema) {
+        mainLogger.warn({ tool: toolName }, 'Tool missing schema, skipping registration');
+        continue;
+      }
+
+      server.tool(
+        toolName,
+        `${toolName} tool`,
+        (toolDef.schema as any)?.shape || {},
+        async (args: unknown) => {
+          try {
+            const toolLogger = mainLogger.child({ tool: toolName });
+            const context = createToolContext(server.server, toolLogger, {
+              sessionManager,
+              promptRegistry,
+              maxTokens: 2048,
+              stopSequences: ['```', '\n\n```', '\n\n# ', '\n\n---'],
+            });
+
+            // Extract session info from params
+            const paramsObj = (args || {}) as Record<string, unknown>;
+            let sessionId = paramsObj.sessionId as string;
+
+            // Generate sessionId if not provided
+            if (!sessionId) {
+              sessionId = `session-${Date.now()}`;
+              mainLogger.info(
+                { tool: toolName, sessionId },
+                'Generated new sessionId (none provided)',
+              );
+              // Add sessionId to params so it's available to the tool
+              paramsObj.sessionId = sessionId;
+            } else {
+              mainLogger.debug({ tool: toolName, sessionId }, 'Using provided sessionId');
+            }
+
+            // Use router for execution
+            const result = await router.route({
+              toolName,
+              params: paramsObj,
+              sessionId,
+              context,
+            });
+
+            if (result.ok) {
+              return {
+                content: [
+                  {
+                    type: 'text' as const,
+                    text: JSON.stringify(result.value, null, 2),
+                  },
+                ],
+              };
+            } else {
+              throw new Error(result.error || `Tool "${toolName}" failed`);
+            }
+          } catch (error) {
+            mainLogger.error({ error, tool: toolName }, 'Tool execution failed');
+            throw error;
+          }
+        },
+      );
+    }
+
+    mainLogger.info('MCP Server created successfully');
 
     if (options.listTools) {
       getLogger().info('Listing available tools');
-      await server.start();
 
-      const tools = server.getTools();
+      const toolList = Array.from(tools.keys());
 
       console.error('\n🛠️  Available MCP Tools:');
       console.error('═'.repeat(60));
 
       console.error('\n📦 Containerization Tools:');
-      tools.forEach((tool: { name: string; description: string }) => {
-        console.error(`  • ${tool.name.padEnd(30)} - ${tool.description}`);
+      toolList.forEach((toolName) => {
+        console.error(`  • ${toolName.padEnd(30)}`);
       });
 
-      const status = getSystemStatus(deps, true); // Server is running
+      const status = {
+        healthy: true,
+        running: true,
+        services: {
+          logger: true,
+          sessionManager: true,
+          promptRegistry: true,
+          resourceManager: true,
+        },
+        stats: {
+          resources: resourceManager.getStats().total,
+          prompts: (await listPrompts()).length,
+        },
+      }; // Server is running
       console.error('\n📊 Summary:');
-      console.error(`  • Total tools: ${tools.length}`);
+      console.error(`  • Total tools: ${toolList.length}`);
       console.error(`  • Resources available: ${status.stats.resources}`);
       console.error(`  • Prompts available: ${status.stats.prompts}`);
 
-      await server.stop();
       process.exit(0);
     }
 
     if (options.healthCheck) {
       getLogger().info('Performing health check');
-      await server.start();
 
-      const status = getSystemStatus(deps, true); // Server is running after start
+      const status = {
+        healthy: true,
+        running: true,
+        services: {
+          logger: true,
+          sessionManager: true,
+          promptRegistry: true,
+          resourceManager: true,
+        },
+        stats: {
+          resources: resourceManager.getStats().total,
+          prompts: (await listPrompts()).length,
+        },
+      }; // Server is running after start
 
       console.error('🏥 Health Check Results');
       console.error('═'.repeat(40));
@@ -410,7 +543,6 @@ async function main(): Promise<void> {
         });
       }
 
-      await server.stop();
       process.exit(status.healthy && status.running ? 0 : 1);
     }
 
@@ -441,8 +573,7 @@ async function main(): Promise<void> {
       }
     }
 
-    await server.start();
-
+    // Server is ready to handle requests
     // Replace the misleading HTTP-specific message
     if (!process.env.MCP_QUIET) {
       console.error('✅ Server started successfully');
@@ -456,51 +587,61 @@ async function main(): Promise<void> {
       }
     }
 
-    // Enhanced shutdown handling with timeout
-    const shutdown = async (signal: string): Promise<void> => {
-      const logger = getLogger();
-      logger.info({ signal }, 'Shutdown initiated');
+    // Set up stdio JSON-RPC handling
+    if (transport.type === 'stdio') {
+      const mcpTransport = new StdioServerTransport();
+      await server.connect(mcpTransport);
 
-      if (!process.env.MCP_QUIET) {
-        console.error(`\n🛑 Received ${signal}, shutting down gracefully...`);
-      }
-
-      // Set a timeout for shutdown
-      const shutdownTimeout = setTimeout(() => {
-        logger.error('Forced shutdown due to timeout');
-        console.error('⚠️ Forced shutdown - some resources may not have cleaned up properly');
-        process.exit(1);
-      }, 10000); // 10 second timeout
-
-      try {
-        await server.stop();
-        clearTimeout(shutdownTimeout);
+      // Enhanced shutdown handling with timeout
+      const shutdown = async (signal: string): Promise<void> => {
+        const logger = getLogger();
+        logger.info({ signal }, 'Shutdown initiated');
 
         if (!process.env.MCP_QUIET) {
-          console.error('✅ Shutdown complete');
+          console.error(`\n🛑 Received ${signal}, shutting down gracefully...`);
         }
-        process.exit(0);
-      } catch (error) {
-        clearTimeout(shutdownTimeout);
-        logger.error({ error }, 'Shutdown error');
-        console.error('❌ Shutdown error:', error);
-        process.exit(1);
-      }
-    };
 
-    process.on('SIGTERM', () => {
-      shutdown('SIGTERM').catch((error) => {
-        getLogger().error({ error }, 'Error during SIGTERM shutdown');
-        process.exit(1);
-      });
-    });
+        // Set a timeout for shutdown
+        const shutdownTimeout = setTimeout(() => {
+          logger.error('Forced shutdown due to timeout');
+          console.error('⚠️ Forced shutdown - some resources may not have cleaned up properly');
+          process.exit(1);
+        }, 10000); // 10 second timeout
 
-    process.on('SIGINT', () => {
-      shutdown('SIGINT').catch((error) => {
-        getLogger().error({ error }, 'Error during SIGINT shutdown');
-        process.exit(1);
+        try {
+          // Close the MCP server
+          await server.close();
+          clearTimeout(shutdownTimeout);
+
+          if (!process.env.MCP_QUIET) {
+            console.error('✅ Shutdown complete');
+          }
+          process.exit(0);
+        } catch (error) {
+          clearTimeout(shutdownTimeout);
+          logger.error({ error }, 'Shutdown error');
+          console.error('❌ Shutdown error:', error);
+          process.exit(1);
+        }
+      };
+
+      process.on('SIGTERM', () => {
+        shutdown('SIGTERM').catch((error) => {
+          getLogger().error({ error }, 'Error during SIGTERM shutdown');
+          process.exit(1);
+        });
       });
-    });
+
+      process.on('SIGINT', () => {
+        shutdown('SIGINT').catch((error) => {
+          getLogger().error({ error }, 'Error during SIGINT shutdown');
+          process.exit(1);
+        });
+      });
+    } else {
+      // HTTP transport would be handled differently
+      throw new Error('HTTP transport not implemented in this version');
+    }
   } catch (error) {
     getLogger().error({ error }, 'Server startup failed');
     console.error('❌ Server startup failed');

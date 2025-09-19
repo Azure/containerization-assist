@@ -13,7 +13,7 @@ import { ValidationResult } from '@validation/core-types';
  * Type for the prompt registry functions
  */
 interface PromptRegistry {
-  getPrompt?: (name: string, parameters?: Record<string, any>) => Promise<any>;
+  getPrompt?: (name: string, parameters?: Record<string, unknown>) => Promise<unknown>;
   hasPrompt?: (name: string) => boolean;
 }
 
@@ -46,6 +46,34 @@ export interface ParameterSuggestions {
 }
 
 /**
+ * Validation capabilities type
+ */
+interface ValidationCapabilities {
+  aiValidation: boolean;
+  contextAware: boolean;
+  suggestions: boolean;
+  supportedTools: string[];
+}
+
+/**
+ * AI Parameter Validator interface
+ */
+interface AIParameterValidator {
+  validateParameters: (
+    toolName: string,
+    parameters: Record<string, unknown>,
+    context?: ValidationContext,
+  ) => Promise<Result<ValidationResult>>;
+  suggestParameters: (
+    toolName: string,
+    partialParameters: Record<string, unknown>,
+    context?: ValidationContext,
+  ) => Promise<Result<ParameterSuggestions>>;
+  isAIValidationAvailable: () => boolean;
+  getCapabilities: () => ValidationCapabilities;
+}
+
+/**
  * Dependencies for AI parameter validation
  */
 export interface AIValidatorDeps {
@@ -68,7 +96,7 @@ export const validateParameters = async (
 
   try {
     // 1. Perform basic validation
-    const basicValidation = performBasicValidation(toolName, parameters, context);
+    const basicValidation = performValidation(toolName, parameters, context);
 
     // 2. AI-powered validation if available
     if (isAIValidationAvailable(deps)) {
@@ -203,7 +231,7 @@ export const getValidationCapabilities = (
 /**
  * Perform basic parameter validation
  */
-const performBasicValidation = (
+const performValidation = (
   toolName: string,
   parameters: Record<string, unknown>,
   context?: ValidationContext,
@@ -268,7 +296,7 @@ const performBasicValidation = (
     isValid: errors.length === 0,
     errors,
     warnings,
-    confidence: calculateBasicConfidence(errors.length, warnings.length),
+    confidence: calculateConfidence(errors.length, warnings.length),
     metadata: {
       validationTime: 0, // Will be set by caller
       aiEnhanced: false,
@@ -280,7 +308,7 @@ const performBasicValidation = (
 /**
  * Calculate confidence for basic validation
  */
-const calculateBasicConfidence = (errorCount: number, warningCount: number): number => {
+const calculateConfidence = (errorCount: number, warningCount: number): number => {
   if (errorCount > 0) return 0.3;
   if (warningCount > 3) return 0.6;
   if (warningCount > 1) return 0.7;
@@ -394,7 +422,7 @@ const handleValidationError = (
 /**
  * Create AI parameter validator factory for backward compatibility
  */
-export const createAIParameterValidator = (deps: AIValidatorDeps) => ({
+export const createAIParameterValidator = (deps: AIValidatorDeps): AIParameterValidator => ({
   validateParameters: (
     toolName: string,
     parameters: Record<string, unknown>,

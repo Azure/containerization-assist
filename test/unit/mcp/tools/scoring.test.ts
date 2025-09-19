@@ -283,9 +283,7 @@ metadata:
 });
 
 describe('Dockerfile Scoring Functions', () => {
-  // Note: These would typically be tested via integration tests
-  // since the scoring functions are not exported individually.
-  // Here we can test them indirectly through the sampling flow.
+  // Testing scoring functions indirectly through the sampling flow
 
   describe('Integration with sampling', () => {
     it('should score valid Dockerfile higher than invalid', () => {

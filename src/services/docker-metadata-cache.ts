@@ -1,6 +1,6 @@
 import { cacheInstances, type CacheStats } from '@/lib/cache';
 import { createLogger } from '@/lib/logger';
-import { Result, Success, Failure } from '@/types';
+import { Result, Success, Failure, type DockerRegistryResponse } from '@/types';
 
 const logger = createLogger().child({ module: 'docker-metadata' });
 
@@ -104,7 +104,7 @@ async function fetchFromDockerHub(imageName: string): Promise<Result<ImageMetada
       return Failure(`Docker Hub API error: ${response.status}`);
     }
 
-    const data = (await response.json()) as any;
+    const data = (await response.json()) as DockerRegistryResponse;
 
     // Extract metadata from response
     const metadata: ImageMetadata = {

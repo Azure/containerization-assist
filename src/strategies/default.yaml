@@ -1,0 +1,51 @@
+# Default Strategy Configuration
+version: "1.0.0"
+id: "default"
+description: "Default strategy for generic content generation"
+
+# Model parameters (model selection handled externally)
+parameters:
+  temperature: 0.3
+  topP: 0.95
+  maxTokens: 4096
+
+# Selection rules
+selectionRules:
+  preferredCapabilities:
+    analysis: "high-accuracy"
+    generation: "balanced"
+    validation: "fast"
+
+# Timeout configuration
+timeouts:
+  stepMs: 30000
+  totalMs: 120000
+
+# Cost limits
+cost:
+  maxUsd: 0.10
+
+# Generic strategies
+strategies:
+  generic:
+    - "Generate {contentType} content"
+    - "Create well-structured {contentType} following best practices"
+    - "Generate optimized {contentType} with comprehensive configuration"
+
+  yaml:
+    - "Generate {contentType} YAML content"
+    - "Create well-structured {contentType} YAML following best practices"
+    - "Generate optimized {contentType} YAML with comprehensive configuration"
+
+# Selection conditions
+selection_rules:
+  generic:
+    conditions: []
+    default_strategy_index: 1
+
+  yaml:
+    conditions:
+      - key: "complexity"
+        value: "high"
+        strategy_index: 2
+    default_strategy_index: 1

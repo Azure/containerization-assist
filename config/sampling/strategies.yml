@@ -1,62 +1,42 @@
-# Sampling Strategies Configuration
+# Sampling strategies configuration
 version: "1.0.0"
 
-# Strategy definitions - progressive refinement patterns
+# Define available sampling strategies (ordered lists of prompts)
 strategies:
   dockerfile:
-    - "Create a Dockerfile for {language} application"
-    - "Generate production-ready Dockerfile with security best practices for {language}"
-    - "Optimize Dockerfile for {language} with multi-stage build and minimal layers" 
-    - "Generate enterprise-grade Dockerfile for {language} with health checks and proper user management"
-    
-  kubernetes:
-    - "Create basic Kubernetes deployment for {appName}"
-    - "Generate Kubernetes manifests with best practices for {appName}"
-    - "Create production Kubernetes deployment with monitoring and scaling for {appName}"
-    - "Generate complete Kubernetes stack with RBAC, networking, and persistence for {appName}"
+    - "dockerfile-generation"
 
-  yaml:
-    - "Generate {contentType} YAML content"
-    - "Create well-structured {contentType} YAML following best practices"
-    - "Generate optimized {contentType} YAML with comprehensive configuration"
+  k8s:
+    - "k8s-manifest-generation"
 
   generic:
-    - "Generate {contentType} content"
-    - "Create well-structured {contentType} following best practices"
-    - "Generate optimized {contentType} with comprehensive configuration"
+    - "generic-generation"
 
 # Strategy selection rules based on context
 selection_rules:
   dockerfile:
     conditions:
-      - key: "hasDockerfile"
-        value: false
+      - key: "language"
+        value: "java"
         strategy_index: 0
-      - key: "complexity" 
-        value: "high"
-        strategy_index: 3
-      - key: "environment"
-        value: "production"
-        strategy_index: 2
-    default_strategy_index: 1
-    
-  kubernetes:
+      - key: "language"
+        value: "python"
+        strategy_index: 0
+      - key: "language"
+        value: "nodejs"
+        strategy_index: 0
+    default_strategy_index: 0
+
+  k8s:
     conditions:
-      - key: "environment"
-        value: "production"
-        strategy_index: 2
-      - key: "scaling_required"
-        value: true
-        strategy_index: 3
-    default_strategy_index: 1
-    
-  yaml:
-    conditions:
-      - key: "complexity"
-        value: "high" 
-        strategy_index: 2
-    default_strategy_index: 1
+      - key: "type"
+        value: "deployment"
+        strategy_index: 0
+      - key: "type"
+        value: "service"
+        strategy_index: 0
+    default_strategy_index: 0
 
   generic:
     conditions: []
-    default_strategy_index: 1
+    default_strategy_index: 0

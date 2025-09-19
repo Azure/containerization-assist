@@ -1,0 +1,318 @@
+id: generate-k8s-manifests
+version: '2.0.0'
+description: Generate Kubernetes manifests for containerized applications with adaptive best practices
+category: orchestration
+format: text
+parameters:
+  - name: appName
+    type: string
+    required: true
+    description: Application name for the deployment
+  - name: imageId
+    type: string
+    required: true
+    description: Docker image to deploy
+  - name: namespace
+    type: string
+    required: false
+    default: "default"
+    description: Kubernetes namespace
+  - name: port
+    type: number
+    required: false
+    description: Primary service port
+  - name: replicas
+    type: number
+    required: false
+    default: 3
+    description: Number of replicas to deploy
+  - name: environment
+    type: string
+    required: false
+    default: "production"
+    description: Target environment (development, staging, production)
+  - name: appType
+    type: string
+    required: false
+    description: Application type (web, api, worker, etc.)
+  - name: resources
+    type: object
+    required: false
+    description: Resource limits and requests specification
+  - name: securityLevel
+    type: string
+    required: false
+    default: "standard"
+    description: Security level (basic, standard, strict)
+  - name: highAvailability
+    type: boolean
+    required: false
+    default: false
+    description: Enable high availability features
+  - name: deploymentContext
+    type: string
+    required: false
+    description: Deployment context and environment details
+  - name: requirements
+    type: string
+    required: false
+    description: Specific requirements for the deployment
+  - name: constraints
+    type: string
+    required: false
+    description: Constraints or limitations to consider
+  - name: existingResources
+    type: string
+    required: false
+    description: Existing Kubernetes resources to consider
+template: |
+  You are a Kubernetes deployment expert who creates manifests based on actual requirements.
+
+  ## ADAPTIVE APPROACH:
+  - Start with what's needed, not what's possible
+  - Add complexity only when justified
+  - Consider the operational context
+  - Balance best practices with practicality
+
+  ## CONTEXTUAL DECISIONS:
+  - Not every app needs HPA (some have predictable load)
+  - Not every app needs strict resource limits (may cause issues)
+  - Not every app can provide health endpoints
+  - Security contexts depend on cluster policies
+  - ConfigMaps/Secrets depend on config complexity
+
+  Generate Kubernetes manifests for this application:
+
+  **Application:**
+  - Name: {{appName}}
+  - Image: {{imageId}}
+  - Namespace: {{namespace}}
+  {{#port}}
+  - Port: {{port}}
+  {{/port}}
+  - Replicas: {{replicas}}
+  - Environment: {{environment}}
+  {{#appType}}
+  - Type: {{appType}}
+  {{/appType}}
+
+  {{#deploymentContext}}
+  **Deployment Context:**
+  {{deploymentContext}}
+  {{/deploymentContext}}
+
+  {{#requirements}}
+  **Specific Requirements:**
+  {{requirements}}
+  {{/requirements}}
+
+  {{#constraints}}
+  **Constraints/Limitations:**
+  {{constraints}}
+  {{/constraints}}
+
+  {{#existingResources}}
+  **Existing Resources to Consider:**
+  {{existingResources}}
+  {{/existingResources}}
+
+  ## Generate Kubernetes manifests that:
+
+  1. **Meet the specific requirements** outlined above
+  2. **Follow security best practices** appropriate for {{securityLevel}} level:
+     - Basic: Non-root user, resource limits
+     - Standard: Security contexts, network policies
+     - Strict: Pod security standards, admission controllers
+  3. **Include appropriate resources** based on application type:
+     - Always: Deployment, Service
+     - Web apps: Ingress (if external access needed)
+     - Stateful apps: StatefulSet instead of Deployment
+     - Background jobs: Job or CronJob
+     - High availability: PodDisruptionBudget, anti-affinity rules
+  4. **Apply environment-specific configurations**:
+     - Development: Relaxed security, easy debugging
+     - Staging: Production-like but with more observability
+     - Production: Security, reliability, monitoring
+
+  ## Resource Templates by Application Type:
+
+  ### Web Application ({{environment}} environment):
+  ```yaml
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: {{appName}}
+    namespace: {{namespace}}
+    labels:
+      app: {{appName}}
+      environment: {{environment}}
+  spec:
+    replicas: {{replicas}}
+    selector:
+      matchLabels:
+        app: {{appName}}
+    template:
+      metadata:
+        labels:
+          app: {{appName}}
+          environment: {{environment}}
+      spec:
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1001
+          fsGroup: 1001
+        containers:
+        - name: {{appName}}
+          image: {{imageId}}
+          ports:
+          - containerPort: {{port}}
+            protocol: TCP
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{port}}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: {{port}}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+  ---
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: {{appName}}-service
+    namespace: {{namespace}}
+    labels:
+      app: {{appName}}
+  spec:
+    selector:
+      app: {{appName}}
+    ports:
+    - port: 80
+      targetPort: {{port}}
+      protocol: TCP
+    type: ClusterIP
+  ```
+
+  ### Background Worker:
+  ```yaml
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: {{appName}}-worker
+    namespace: {{namespace}}
+  spec:
+    replicas: {{replicas}}
+    selector:
+      matchLabels:
+        app: {{appName}}
+        component: worker
+    template:
+      metadata:
+        labels:
+          app: {{appName}}
+          component: worker
+      spec:
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1001
+        containers:
+        - name: worker
+          image: {{imageId}}
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+  ```
+
+  ## High Availability Features (if enabled):
+
+  ### Pod Disruption Budget:
+  ```yaml
+  apiVersion: policy/v1
+  kind: PodDisruptionBudget
+  metadata:
+    name: {{appName}}-pdb
+    namespace: {{namespace}}
+  spec:
+    minAvailable: 2
+    selector:
+      matchLabels:
+        app: {{appName}}
+  ```
+
+  ### Horizontal Pod Autoscaler:
+  ```yaml
+  apiVersion: autoscaling/v2
+  kind: HorizontalPodAutoscaler
+  metadata:
+    name: {{appName}}-hpa
+    namespace: {{namespace}}
+  spec:
+    scaleTargetRef:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: {{appName}}
+    minReplicas: {{replicas}}
+    maxReplicas: 10
+    metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  ```
+
+  ## Security Configurations:
+
+  ### Network Policy (for strict security):
+  ```yaml
+  apiVersion: networking.k8s.io/v1
+  kind: NetworkPolicy
+  metadata:
+    name: {{appName}}-netpol
+    namespace: {{namespace}}
+  spec:
+    podSelector:
+      matchLabels:
+        app: {{appName}}
+    policyTypes:
+    - Ingress
+    - Egress
+    ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+      ports:
+      - protocol: TCP
+        port: {{port}}
+    egress:
+    - {}  # Allow all egress (customize as needed)
+  ```
+
+  ## Instructions:
+  1. **Analyze the requirements** and determine which resources are actually needed
+  2. **Choose appropriate resource configurations** based on app type and environment
+  3. **Include security measures** appropriate for the specified security level
+  4. **Add high availability features** only if explicitly requested
+  5. **Customize resource limits** based on application type and requirements
+  6. **Include health checks** only if the application supports them
+  7. **Generate clean, well-commented YAML** that follows Kubernetes best practices
+
+  Generate the manifests as a single YAML document with resources separated by `---`.
+  Include comments explaining key decisions and configurations.

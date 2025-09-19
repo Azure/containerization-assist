@@ -13,12 +13,12 @@
  */
 
 import pino from 'pino';
-import { loadMCPConfig } from '../../src/config/mcp-config.js';
+import { config as appConfig } from '../../../src/config/index';
 import { McpResourceManager } from '../../src/mcp/resources/manager.js';
 import { McpProgressNotifier } from '../../src/mcp/events/emitter.js';
 import type { ResourceManager } from '../../src/mcp/resources/types.js';
 import type { ProgressNotifier } from '../../src/mcp/events/types.js';
-import type { MCPConfig } from '../../src/config/mcp-config.js';
+import type { AppConfig } from '../../../src/config/index';
 import { createMockProgressNotifier } from './orchestration-mocks.js';
 
 // Export mock implementations for testing
@@ -26,6 +26,33 @@ export {
   MockResourceManager,
   createMockResourceManager,
 } from './resource-manager.mock.js';
+
+/**
+ * Standardized logger mock for all tests
+ */
+export const mockLogger = {
+  error: jest.fn(),
+  warn: jest.fn(),
+  info: jest.fn(),
+  debug: jest.fn(),
+  trace: jest.fn(),
+  fatal: jest.fn(),
+  child: jest.fn().mockReturnThis(),
+  level: 'info',
+};
+
+/**
+ * Standardized tool context mock for all tests
+ */
+export const mockToolContext = {
+  sessionManager: {
+    get: jest.fn(),
+    set: jest.fn(),
+    has: jest.fn(),
+    delete: jest.fn(),
+  },
+  requestId: 'test-request-id',
+};
 
 // MockProgressNotifier removed - use the one in orchestration-mocks.ts instead
 
@@ -46,20 +73,15 @@ export type { MockConfigPreset } from './mcp-config.mock.js';
 /**
  * Create real MCP infrastructure with production implementations
  */
-export function createMCPInfrastructure(configOverrides?: Partial<MCPConfig>): {
-  config: MCPConfig;
+export function createMCPInfrastructure(configOverrides?: Partial<AppConfig>): {
+  config: AppConfig;
   resourceManager: ResourceManager;
   progressNotifier: ProgressNotifier;
 } {
-  // Load real configuration
-  const configResult = loadMCPConfig();
-  if (!configResult.success) {
-    throw new Error(`Failed to load MCP config: ${configResult.error}`);
-  }
-
-  const config = configOverrides 
-    ? { ...configResult.data, ...configOverrides }
-    : configResult.data;
+  // Use the imported configuration
+  const config = configOverrides
+    ? { ...appConfig, ...configOverrides } as AppConfig
+    : appConfig;
 
   // Create logger
   const logger = pino({ 
@@ -70,10 +92,10 @@ export function createMCPInfrastructure(configOverrides?: Partial<MCPConfig>): {
   // Create real implementations
   const resourceManager = new McpResourceManager(
     {
-      defaultTtl: config.resources.defaultTtl,
-      maxResourceSize: config.resources.maxSize,
+      defaultTtl: config.cache?.ttl || 3600,
+      maxResourceSize: config.workspace?.maxFileSize || 10485760,
       cacheConfig: {
-        defaultTtl: config.resources.defaultTtl
+        defaultTtl: config.cache?.ttl || 3600
       }
     },
     logger
@@ -99,8 +121,8 @@ export function createMockMCPInfrastructure(preset: 'fast' | 'development' | 'mi
 } {
   const config = getMockConfig(preset);
   const resourceManager = createMockResourceManager({
-    maxSize: config.resources.maxSize,
-    defaultTtl: config.resources.defaultTtl,
+    maxSize: config.resources?.maxSize || 10485760,
+    defaultTtl: config.resources?.defaultTtl || 3600,
     simulateLatency: preset === 'stress',
     failureRate: preset === 'stress' ? 0.02 : 0, // 2% failure rate for stress testing
   });

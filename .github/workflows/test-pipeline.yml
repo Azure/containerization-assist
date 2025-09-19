@@ -1,4 +1,4 @@
-name: Test Pipeline
+name: CI
 
 on:
   push:
@@ -10,30 +10,27 @@ env:
   NODE_VERSION: '20'
 
 jobs:
-  # Single test job with all essential validations
   test:
-    name: Tests & Quality Gates
+    name: Test & Quality
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
-      - name: Run validation pipeline
-        run: npm run validate:pr
-        env:
-          DOCKER_AVAILABLE: true
-      
-      - name: Upload coverage reports
+
+      - name: Run validation
+        run: npm run validate
+
+      - name: Upload coverage
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -41,7 +38,6 @@ jobs:
           path: coverage/
           retention-days: 7
 
-  # Optional security scan (parallel to main tests)
   security:
     name: Security Scan
     runs-on: ubuntu-latest
@@ -50,31 +46,31 @@ jobs:
       actions: read
       contents: read
       security-events: write
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Dependency audit
         run: npm audit --audit-level moderate || true
-      
+
       - name: CodeQL Analysis
         uses: github/codeql-action/init@192325c86100d080feab897ff886c34abd4c83a3 # v3
         with:
           languages: typescript
-          queries: security-and-quality
-      
+          config-file: ./.github/codeql/codeql-config.yml
+
       - name: Build for analysis
-        run: npm run build:fast
-      
+        run: npm run build
+
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@192325c86100d080feab897ff886c34abd4c83a3 # v3

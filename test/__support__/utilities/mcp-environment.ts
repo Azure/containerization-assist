@@ -238,7 +238,7 @@ CMD ["npm", "start"]`;
                 },
               },
           });
-        case 'verify-deployment':
+        case 'verify-deploy':
           return Success({});
         case 'scan':
           return Success({

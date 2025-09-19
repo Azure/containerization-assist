@@ -9,39 +9,11 @@ import path from 'path';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { promises as fs } from 'node:fs';
-import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
+import { ensureSession, useSessionSlice } from '@/mcp/tool-session-helpers';
 import type { ToolContext } from '@/mcp/context';
 import { Success, Failure, type Result } from '@/types';
 import * as yaml from 'js-yaml';
-import { convertAcaToK8sSchema, type ConvertAcaToK8sParams } from './schema';
-import { z } from 'zod';
-
-// Define the result schema for type safety
-const ConvertAcaToK8sResultSchema = z.object({
-  manifests: z.string(),
-  outputPath: z.string(),
-  resourceCount: z.number(),
-  resources: z.array(
-    z.object({
-      kind: z.string(),
-      name: z.string(),
-      namespace: z.string(),
-    }),
-  ),
-  sessionId: z.string().optional(),
-});
-
-// Define tool IO for type-safe session operations
-const io = defineToolIO(convertAcaToK8sSchema, ConvertAcaToK8sResultSchema);
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastConvertedAt: z.date().optional(),
-  conversionCount: z.number().optional(),
-  lastAppName: z.string().optional(),
-  lastNamespace: z.string().optional(),
-  resourceTypes: z.array(z.string()).optional(),
-});
+import { type ConvertAcaToK8sParams, convertAcaToK8sSchema } from './schema';
 
 /**
  * Result from ACA to K8s conversion
@@ -92,6 +64,9 @@ async function convertAcaToK8sImpl(
   try {
     // Parse ACA manifest
     let aca: any;
+    if (!params.acaManifest) {
+      return Failure('ACA manifest content is required');
+    }
     try {
       aca = JSON.parse(params.acaManifest);
     } catch {
@@ -388,7 +363,7 @@ async function convertAcaToK8sImpl(
     }
 
     const { id: sessionId } = sessionResult.value;
-    const slice = useSessionSlice('convert-aca-to-k8s', io, context, StateSchema);
+    const slice = useSessionSlice('convert-aca-to-k8s', context);
 
     if (!slice) {
       return Failure('Session manager not available');
@@ -436,4 +411,10 @@ async function convertAcaToK8sImpl(
 /**
  * Convert Azure Container Apps to Kubernetes tool
  */
-export const convertAcaToK8s = convertAcaToK8sImpl;
+export const convertAcaToK8s = {
+  type: 'standard' as const,
+  name: 'convert-aca-to-k8s',
+  description: 'Convert Azure Container Apps manifests to Kubernetes',
+  inputSchema: convertAcaToK8sSchema,
+  execute: convertAcaToK8sImpl,
+};

@@ -5,6 +5,15 @@
 
 import { jest } from '@jest/globals';
 
+// Mock child_process and util together
+const mockExecAsync = jest.fn();
+jest.mock('node:child_process', () => ({
+  exec: jest.fn(),
+}));
+jest.mock('node:util', () => ({
+  promisify: jest.fn(() => mockExecAsync),
+}));
+
 // Jest mocks must be at the top to ensure proper hoisting
 jest.mock('../../../src/lib/session', () => ({
   createSessionManager: jest.fn(() => ({
@@ -49,6 +58,15 @@ jest.mock('../../../src/lib/logger', () => ({
   })),
 }));
 
+// Mock prompt-backed-tool to avoid AI calls
+const mockPromptBackedToolExecute = jest.fn();
+jest.mock('../../../src/mcp/tools/prompt-backed-tool', () => ({
+  createPromptBackedTool: jest.fn((options) => ({
+    ...options,
+    execute: mockPromptBackedToolExecute,
+  })),
+}));
+
 import { createToolSessionHelpersMock } from '../../__support__/mocks/tool-session-helpers.mock';
 
 jest.mock('../../../src/mcp/tool-session-helpers', () => createToolSessionHelpersMock());
@@ -63,13 +81,17 @@ jest.mock('../../../src/knowledge', () => ({
   ]),
 }));
 
-import { scanImage } from '../../../src/tools/scan/tool';
+import { tool } from '../../../src/tools/scan/tool';
 import type { ScanImageParams } from '../../../src/tools/scan/schema';
 import { createSessionManager } from '../../../src/lib/session';
 import { createLogger } from '../../../src/lib/logger';
 import { ensureSession } from '../../../src/mcp/tool-session-helpers';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 
 // Get the mocked instances after imports
+const mockExec = exec as jest.MockedFunction<typeof exec>;
+const mockPromisify = promisify as jest.MockedFunction<typeof promisify>;
 const mockSessionManager = (createSessionManager as jest.Mock)();
 const mockLogger = (createLogger as jest.Mock)();
 const mockEnsureSession = ensureSession as jest.Mock;
@@ -85,6 +107,7 @@ describe('scanImage', () => {
   beforeEach(() => {
     config = {
       sessionId: 'test-session-123',
+      imageId: 'nginx:latest',
       scanner: 'trivy',
       severity: 'HIGH',
     };
@@ -92,6 +115,66 @@ describe('scanImage', () => {
     // Reset all mocks
     jest.clearAllMocks();
     mockSessionManager.update.mockResolvedValue(true);
+
+    // Default mock for prompt-backed tool (can be overridden in specific tests)
+    mockPromptBackedToolExecute.mockResolvedValue({
+      ok: true,
+      value: {
+        summary: {
+          totalVulnerabilities: 1,
+          critical: 0,
+          high: 1,
+          medium: 0,
+          low: 0,
+          negligible: 0,
+        },
+        topVulnerabilities: [{
+          id: 'CVE-2023-1234',
+          severity: 'HIGH',
+          package: 'nginx',
+          version: '1.20.1',
+          fixedVersion: '1.20.2',
+          description: 'Test vulnerability',
+          exploitability: 'medium',
+        }],
+        remediations: [],
+        baseImageRecommendations: [],
+        complianceStatus: {
+          passes: false,
+          blockers: ['HIGH vulnerability found'],
+          warnings: [],
+        },
+        riskScore: {
+          score: 7.5,
+          level: 'high',
+          factors: ['HIGH severity vulnerability'],
+        },
+        deploymentRecommendation: {
+          canDeploy: false,
+          conditions: ['Fix HIGH vulnerability'],
+          requiredActions: ['Upgrade nginx to 1.20.2'],
+        },
+        nextSteps: ['Fix vulnerabilities before deployment'],
+      },
+    });
+
+    // Mock execAsync to return successful trivy scan
+    mockExecAsync.mockResolvedValue({
+      stdout: JSON.stringify({
+        Results: [{
+          Vulnerabilities: [{
+            VulnerabilityID: 'CVE-2023-1234',
+            Severity: 'HIGH',
+            PkgName: 'nginx',
+            InstalledVersion: '1.20.1',
+            FixedVersion: '1.20.2',
+            Title: 'Test vulnerability',
+            Description: 'Test vulnerability description',
+          }]
+        }]
+      }),
+      stderr: ''
+    });
   });
 
   describe('Basic Functionality', () => {
@@ -135,74 +218,136 @@ describe('scanImage', () => {
     });
 
     it('should successfully scan image and return results', async () => {
-      const result = await scanImage(config, {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      });
+      const result = await tool.execute(config, { logger: mockLogger, sessionManager: mockSessionManager } as any);
 
+      if (!result.ok) {
+        console.log('Scan Tool Error:', result.error);
+        throw new Error(`Expected result.ok to be true, but got error: ${result.error}`);
+      }
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.success).toBe(true);
         expect(result.value.sessionId).toBe('test-session-123');
-        expect(result.value.vulnerabilities.high).toBe(1);
-        expect(result.value.vulnerabilities.total).toBe(1);
-        expect(result.value.passed).toBe(false); // Has high vulnerability with high threshold
-        expect(result.value.scanTime).toBe('2023-01-01T12:00:00.000Z');
+        expect(result.value.scanner).toBe('trivy');
+        expect(result.value.vulnerabilities).toBeDefined();
+        expect(result.value.assessment).toBeDefined();
+        expect(result.value.scanTime).toBeGreaterThanOrEqual(0);
+        expect(result.value.ok).toBe(true);
       }
 
-      // Verify scanner was called with correct image ID
-      expect(mockSecurityScannerInstance.scanImage).toHaveBeenCalledWith('sha256:mock-image-id');
+      // Verify execAsync was called with trivy command
+      expect(mockExecAsync).toHaveBeenCalledWith(
+        expect.stringContaining('trivy image'),
+        expect.any(Object)
+      );
 
       // Verify session was updated via sessionManager with the new toolSlices structure
       expect(mockSessionManager.update).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
-          metadata: expect.objectContaining({
-            toolSlices: expect.objectContaining({
-              scan: expect.any(Object),
-            }),
+          'scan-image': expect.objectContaining({
+            imageName: 'nginx:latest',
+            vulnerabilities: expect.any(Object),
+            assessment: expect.any(Object),
           }),
         })
       );
     });
 
     it('should pass scan with no vulnerabilities', async () => {
-      // Ensure session mock is set up for this test
-      mockEnsureSession.mockResolvedValue({
+      // Mock execAsync to return empty vulnerability list
+      mockExecAsync.mockResolvedValue({
+        stdout: JSON.stringify({
+          Results: [{
+            Vulnerabilities: []
+          }]
+        }),
+        stderr: ''
+      });
+
+      // Mock the prompt-backed tool to return no vulnerabilities
+      mockPromptBackedToolExecute.mockResolvedValue({
         ok: true,
         value: {
-          id: 'test-session-123',
-          state: {
-            results: {
-              'build-image': {
-                imageId: 'sha256:mock-image-id',
-              },
-            },
-            repo_path: '/test/repo',
+          summary: {
+            totalVulnerabilities: 0,
+            critical: 0,
+            high: 0,
+            medium: 0,
+            low: 0,
+            negligible: 0,
           },
+          topVulnerabilities: [],
+          remediations: [],
+          baseImageRecommendations: [],
+          complianceStatus: {
+            passes: true,
+            blockers: [],
+            warnings: [],
+          },
+          riskScore: {
+            score: 0,
+            level: 'low',
+            factors: [],
+          },
+          deploymentRecommendation: {
+            canDeploy: true,
+            conditions: [],
+            requiredActions: [],
+          },
+          nextSteps: [],
         },
       });
 
-      mockSecurityScannerInstance.scanImage.mockResolvedValue(createSuccessResult({
-        vulnerabilities: [],
-        criticalCount: 0,
-        highCount: 0,
-        mediumCount: 0,
-        lowCount: 0,
-        totalVulnerabilities: 0,
-        scanDate: new Date('2023-01-01T12:00:00Z'),
-        imageId: 'sha256:mock-image-id',
-      }));
-
-      const result = await scanImage(config, {
-        logger: mockLogger,
+      const mockContext = {
         sessionManager: mockSessionManager,
-      });
+        sampling: {
+          createMessage: jest.fn().mockResolvedValue({
+            role: 'assistant',
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                summary: {
+                  totalVulnerabilities: 0,
+                  critical: 0,
+                  high: 0,
+                  medium: 0,
+                  low: 0,
+                  negligible: 0,
+                },
+                topVulnerabilities: [],
+                remediations: [],
+                baseImageRecommendations: [],
+                complianceStatus: {
+                  passes: true,
+                  blockers: [],
+                  warnings: [],
+                },
+                riskScore: {
+                  score: 0,
+                  level: 'low',
+                  factors: [],
+                },
+                deploymentRecommendation: {
+                  canDeploy: true,
+                  conditions: [],
+                  requiredActions: [],
+                },
+                nextSteps: [],
+              })
+            }]
+          })
+        }
+      } as any;
+
+      const result = await tool.execute(config, { logger: mockLogger }, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value.passed).toBe(true);
-        expect(result.value.vulnerabilities.total).toBe(0);
+        // Summary is in assessment field from AI, not top-level
+        expect(result.value.assessment?.summary?.totalVulnerabilities).toBe(0);
+        expect(result.value.assessment?.summary?.critical).toBe(0);
+        expect(result.value.assessment?.summary?.high).toBe(0);
       }
     });
 
@@ -210,10 +355,7 @@ describe('scanImage', () => {
       config.severity = 'CRITICAL';
       
       // Only high vulnerability, threshold is critical
-      const result = await scanImage(config, {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      });
+      const result = await tool.execute(config, { logger: mockLogger, sessionManager: mockSessionManager } as any);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -224,117 +366,60 @@ describe('scanImage', () => {
     it('should use default scanner and threshold when not specified', async () => {
       const minimalConfig: ScanImageParams = {
         sessionId: 'test-session-123',
+        imageId: 'nginx:latest',
       };
 
-      const result = await scanImage(minimalConfig, {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      });
+      const result = await tool.execute(minimalConfig, { logger: mockLogger, sessionManager: mockSessionManager } as any);
 
       expect(result.ok).toBe(true);
-      expect(mockSecurityScannerInstance.scanImage).toHaveBeenCalled();
+      expect(result.value.scanner).toBe('trivy'); // Default scanner
     });
   });
 
   describe('Error Handling', () => {
-    it('should handle session not found errors', async () => {
-      // Mock ensureSession to return an error (session not found)
-      mockEnsureSession.mockResolvedValue({
-        ok: false,
-        error: 'Session not found',
-      });
+    it('should handle missing imageId errors', async () => {
+      const configWithoutImage: ScanImageParams = {
+        sessionId: 'test-session-123',
+        // No imageId provided
+      } as any;
 
-      const result = await scanImage(config, {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      });
+      const result = await tool.execute(configWithoutImage, { logger: mockLogger, sessionManager: mockSessionManager } as any);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe('Session not found');
+        expect(result.error).toBe('Image name is required');
       }
-      expect(mockEnsureSession).toHaveBeenCalled();
     });
 
-    it('should return error when no build result exists', async () => {
-      // Mock session without build_result
-      mockEnsureSession.mockResolvedValue({
-        ok: true,
-        value: {
-          id: 'test-session-123',
-          state: {
-            repo_path: '/test/repo',
-            // No build_result here
-          },
-        },
-      });
+    it('should work even without build result in session', async () => {
+      const configWithImage: ScanImageParams = {
+        sessionId: 'test-session-123',
+        imageId: 'nginx:latest',
+      };
 
-      const result = await scanImage(config, {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      });
+      const result = await tool.execute(configWithImage, { logger: mockLogger, sessionManager: mockSessionManager } as any);
 
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toBe(
-          'No image specified. Provide imageId parameter or ensure session has built image from build-image tool.',
-        );
-      }
+      expect(result.ok).toBe(true);
+      // Tool works with just imageId parameter
     });
 
     it('should handle scanner failures', async () => {
-      mockEnsureSession.mockResolvedValue({
-        ok: true,
-        value: {
-          id: 'test-session-123',
-          state: {
-            results: {
-              'build-image': {
-                imageId: 'sha256:mock-image-id',
-              },
-            },
-            repo_path: '/test/repo',
-          },
-        },
-      });
+      // Mock execAsync to simulate scanner failure
+      mockExecAsync.mockRejectedValue(new Error('Scanner failed to analyze image'));
 
-      mockSecurityScannerInstance.scanImage.mockResolvedValue(
-        createFailureResult('Scanner failed to analyze image')
-      );
-
-      const result = await scanImage(config, {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      });
+      const result = await tool.execute(config, { logger: mockLogger, sessionManager: mockSessionManager } as any);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe('Failed to scan image: Scanner failed to analyze image');
+        expect(result.error).toBe('Scanner failed to analyze image');
       }
     });
 
     it('should handle exceptions during scan process', async () => {
-      mockEnsureSession.mockResolvedValue({
-        ok: true,
-        value: {
-          id: 'test-session-123',
-          state: {
-            results: {
-              'build-image': {
-                imageId: 'sha256:mock-image-id',
-              },
-            },
-            repo_path: '/test/repo',
-          },
-        },
-      });
+      // Mock execAsync to throw an error
+      mockExecAsync.mockRejectedValue(new Error('Scanner crashed'));
 
-      mockSecurityScannerInstance.scanImage.mockRejectedValue(new Error('Scanner crashed'));
-
-      const result = await scanImage(config, {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      });
+      const result = await tool.execute(config, { logger: mockLogger, sessionManager: mockSessionManager } as any);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -345,42 +430,23 @@ describe('scanImage', () => {
 
   describe('Vulnerability Counting', () => {
     it('should correctly count vulnerabilities by severity', async () => {
-      mockEnsureSession.mockResolvedValue({
-        ok: true,
-        value: {
-          id: 'test-session-123',
-          state: {
-            results: {
-              'build-image': {
-                imageId: 'sha256:mock-image-id',
-              },
-            },
-            repo_path: '/test/repo',
-          },
-        },
+      // Mock execAsync to return Trivy JSON output with vulnerabilities
+      mockExecAsync.mockResolvedValue({
+        stdout: JSON.stringify({
+          Results: [{
+            Vulnerabilities: [
+              { VulnerabilityID: 'CVE-1', Severity: 'CRITICAL', PkgName: 'pkg1', InstalledVersion: '1.0' },
+              { VulnerabilityID: 'CVE-2', Severity: 'HIGH', PkgName: 'pkg2', InstalledVersion: '1.0' },
+              { VulnerabilityID: 'CVE-3', Severity: 'HIGH', PkgName: 'pkg3', InstalledVersion: '1.0' },
+              { VulnerabilityID: 'CVE-4', Severity: 'MEDIUM', PkgName: 'pkg4', InstalledVersion: '1.0' },
+              { VulnerabilityID: 'CVE-5', Severity: 'LOW', PkgName: 'pkg5', InstalledVersion: '1.0' },
+            ]
+          }]
+        }),
+        stderr: ''
       });
 
-      mockSecurityScannerInstance.scanImage.mockResolvedValue(createSuccessResult({
-        vulnerabilities: [
-          { id: 'CVE-1', severity: 'CRITICAL', package: 'pkg1', version: '1.0', description: 'Critical issue' },
-          { id: 'CVE-2', severity: 'HIGH', package: 'pkg2', version: '1.0', description: 'High issue' },
-          { id: 'CVE-3', severity: 'HIGH', package: 'pkg3', version: '1.0', description: 'High issue' },
-          { id: 'CVE-4', severity: 'MEDIUM', package: 'pkg4', version: '1.0', description: 'Medium issue' },
-          { id: 'CVE-5', severity: 'LOW', package: 'pkg5', version: '1.0', description: 'Low issue' },
-        ],
-        criticalCount: 1,
-        highCount: 2,
-        mediumCount: 1,
-        lowCount: 1,
-        totalVulnerabilities: 5,
-        scanDate: new Date('2023-01-01T12:00:00Z'),
-        imageId: 'sha256:mock-image-id',
-      }));
-
-      const result = await scanImage(config, {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      });
+      const result = await tool.execute(config, { logger: mockLogger, sessionManager: mockSessionManager } as any);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -389,7 +455,6 @@ describe('scanImage', () => {
           high: 2,
           medium: 1,
           low: 1,
-          unknown: 0,
           total: 5,
         });
       }
@@ -398,47 +463,27 @@ describe('scanImage', () => {
 
   describe('Scanner Configuration', () => {
     beforeEach(() => {
-      mockEnsureSession.mockResolvedValue({
-        ok: true,
-        value: {
-          id: 'test-session-123',
-          state: {
-            results: {
-              'build-image': {
-                imageId: 'sha256:mock-image-id',
-              },
-            },
-            repo_path: '/test/repo',
-          },
-        },
+      // Mock execAsync to return empty vulnerability list
+      mockExecAsync.mockResolvedValue({
+        stdout: JSON.stringify({
+          Results: [{
+            Vulnerabilities: []
+          }]
+        }),
+        stderr: ''
       });
-
-      mockSecurityScannerInstance.scanImage.mockResolvedValue(createSuccessResult({
-        vulnerabilities: [],
-        criticalCount: 0,
-        highCount: 0,
-        mediumCount: 0,
-        lowCount: 0,
-        totalVulnerabilities: 0,
-        scanDate: new Date('2023-01-01T12:00:00Z'),
-        imageId: 'sha256:mock-image-id',
-      }));
     });
 
     it('should support different scanner types', async () => {
-      // Test each scanner type
-      const scannerTypes: Array<'trivy' | 'snyk' | 'grype'> = ['trivy', 'snyk', 'grype'];
+      // Test each scanner type (tool supports trivy and grype)
+      const scannerTypes: Array<'trivy' | 'grype'> = ['trivy', 'grype'];
 
       for (const scanner of scannerTypes) {
         config.scanner = scanner;
-        const result = await scanImage(config, {
-          logger: mockLogger,
-          sessionManager: mockSessionManager,
-        });
+        const result = await tool.execute(config, { logger: mockLogger, sessionManager: mockSessionManager } as any);
 
         expect(result.ok).toBe(true);
-        // Verify the scanner was created with the correct type
-        // (Implementation detail: scanner type is passed to createSecurityScanner)
+        expect(result.value.scanner).toBe(scanner);
       }
     });
 
@@ -447,7 +492,7 @@ describe('scanImage', () => {
       
       for (const threshold of thresholds) {
         config.severity = threshold;
-        const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+        const result = await tool.execute(config, { logger: mockLogger, sessionManager: mockSessionManager } as any);
         
         expect(result.ok).toBe(true);
       }

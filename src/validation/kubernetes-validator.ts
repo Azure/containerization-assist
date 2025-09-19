@@ -16,6 +16,7 @@ import {
   ValidationCategory,
   ValidationGrade,
 } from './core-types';
+import type { K8sPodSpec, K8sContainer, K8sVolume } from '@/types';
 
 export interface KubernetesValidatorInstance {
   validate(yamlContent: string): ValidationReport;
@@ -34,24 +35,32 @@ const isWorkload = (manifest: KubernetesManifest): boolean => {
 /**
  * Get pod spec from different workload types
  */
-const getPodSpec = (manifest: KubernetesManifest): Record<string, unknown> | undefined => {
+const getPodSpec = (manifest: KubernetesManifest): K8sPodSpec | undefined => {
   if (manifest.kind === 'Pod') {
-    return manifest.spec;
+    const spec = manifest.spec as Record<string, unknown>;
+    if (spec && typeof spec === 'object' && 'containers' in spec) {
+      return spec as unknown as K8sPodSpec;
+    }
+    return undefined;
   }
   if (manifest.kind === 'Job' || manifest.kind === 'CronJob') {
-    const spec = manifest.spec as any;
+    const spec = manifest.spec as {
+      jobTemplate?: { spec?: { template?: { spec?: K8sPodSpec } } };
+      template?: { spec?: K8sPodSpec };
+    };
     return spec?.jobTemplate?.spec?.template?.spec || spec?.template?.spec;
   }
-  return (manifest.spec as any)?.template?.spec;
+  const spec = manifest.spec as { template?: { spec?: K8sPodSpec } };
+  return spec?.template?.spec;
 };
 
 /**
  * Get all containers from manifest
  */
-const getContainers = (manifest: KubernetesManifest): Array<Record<string, unknown>> => {
+const getContainers = (manifest: KubernetesManifest): K8sContainer[] => {
   const podSpec = getPodSpec(manifest);
-  const spec = podSpec as any;
-  return [...(spec?.containers || []), ...(spec?.initContainers || [])];
+  if (!podSpec) return [];
+  return [...(podSpec.containers || []), ...(podSpec.initContainers || [])];
 };
 
 /**
@@ -67,7 +76,7 @@ const KUBERNETES_RULES: KubernetesValidationRule[] = [
 
       const containers = getContainers(manifest);
       return containers.every((container) => {
-        const resources = (container as any).resources;
+        const resources = container.resources;
         return resources?.limits?.cpu && resources?.limits?.memory;
       });
     },
@@ -86,7 +95,7 @@ const KUBERNETES_RULES: KubernetesValidationRule[] = [
 
       const containers = getContainers(manifest);
       return containers.every((container) => {
-        const resources = (container as any).resources;
+        const resources = container.resources;
         return resources?.requests?.cpu && resources?.requests?.memory;
       });
     },
@@ -138,7 +147,7 @@ const KUBERNETES_RULES: KubernetesValidationRule[] = [
 
       const containers = getContainers(manifest);
       return containers.every((container) => {
-        const securityContext = (container as any).securityContext;
+        const securityContext = container.securityContext;
         return !securityContext?.privileged;
       });
     },
@@ -156,7 +165,7 @@ const KUBERNETES_RULES: KubernetesValidationRule[] = [
       if (!isWorkload(manifest)) return true;
 
       const podSpec = getPodSpec(manifest);
-      const securityContext = (podSpec as any)?.securityContext;
+      const securityContext = podSpec?.securityContext;
 
       return !!(
         securityContext?.runAsNonRoot ||
@@ -194,7 +203,7 @@ const KUBERNETES_RULES: KubernetesValidationRule[] = [
 
       const containers = getContainers(manifest);
       return containers.every((container) => {
-        const c = container as any;
+        const c = container;
         // :latest tags change content, requiring Always pull policy
         if (c.image?.includes(':latest')) {
           return c.imagePullPolicy === 'Always';
@@ -233,9 +242,9 @@ const KUBERNETES_RULES: KubernetesValidationRule[] = [
       if (!isWorkload(manifest)) return true;
 
       const podSpec = getPodSpec(manifest);
-      const volumes = (podSpec as any)?.volumes || [];
+      const volumes = podSpec?.volumes || [];
 
-      return !volumes.some((volume: Record<string, unknown>) => volume.hostPath);
+      return !volumes.some((volume: K8sVolume) => volume.hostPath);
     },
     message: 'Avoid hostPath volumes for better security',
     severity: ValidationSeverity.WARNING,
@@ -265,7 +274,8 @@ const KUBERNETES_RULES: KubernetesValidationRule[] = [
     check: (manifest: KubernetesManifest) => {
       if (manifest.kind !== 'Deployment') return true;
 
-      return !!(manifest.spec as any)?.strategy?.type;
+      const spec = manifest.spec as { strategy?: { type?: string } };
+      return !!spec?.strategy?.type;
     },
     message: 'Define deployment strategy for updates',
     severity: ValidationSeverity.INFO,

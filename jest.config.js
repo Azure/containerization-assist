@@ -2,8 +2,19 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 
 const commonModuleNameMapper = {
-  // Path aliases from tsconfig
+  // Path aliases from tsconfig (simplified)
   '^@/(.*)$': '<rootDir>/src/$1',
+  '^@mcp/(.*)$': '<rootDir>/src/mcp/$1',
+  '^@tools/(.*)$': '<rootDir>/src/tools/$1',
+  '^@lib/(.*)$': '<rootDir>/src/lib/$1',
+  '^@services/(.*)$': '<rootDir>/src/services/$1',
+  '^@config/(.*)$': '<rootDir>/src/config/$1',
+  '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
+  '^@resources/(.*)$': '<rootDir>/src/resources/$1',
+  '^@exports/(.*)$': '<rootDir>/src/exports/$1',
+  '^@knowledge/(.*)$': '<rootDir>/src/knowledge/$1',
+  '^@types$': '<rootDir>/src/types/index.ts',
+  '^@validation/(.*)$': '<rootDir>/src/validation/$1',
 
   // Handle .js imports and map them to .ts
   '^(\\.{1,2}/.*)\\.js$': '$1',
@@ -14,68 +25,62 @@ const commonModuleNameMapper = {
   '^@test/mocks/(.*)$': '<rootDir>/test/__support__/mocks/$1',
 };
 
-const commonTsConfig = {
-  module: 'ES2022',
-  moduleResolution: 'bundler',
-  target: 'ES2022',
-  allowSyntheticDefaultImports: true,
-  esModuleInterop: true,
-  isolatedModules: true,
-};
-
-const commonTransform = {
-  '^.+\\.tsx?$': [
-    'ts-jest',
-    {
-      useESM: true,
-      tsconfig: commonTsConfig,
-    },
-  ],
-};
-
 /** @type {import('jest').Config} */
 export default {
   preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
   extensionsToTreatAsEsm: ['.ts'],
 
-  // Multiple test configurations for different test types
+  // Simplified projects - just unit and integration
   projects: [
     {
       displayName: 'unit',
       testMatch: ['<rootDir>/test/unit/**/*.test.ts'],
       setupFilesAfterEnv: ['<rootDir>/test/__support__/setup/unit-setup.ts'],
-      testEnvironment: 'node',
       moduleNameMapper: commonModuleNameMapper,
-      transform: commonTransform,
-      coveragePathIgnorePatterns: ['/node_modules/', '/test/'],
+      transform: {
+        '^.+\\.tsx?$': [
+          'ts-jest',
+          {
+            useESM: true,
+            tsconfig: {
+              module: 'ES2022',
+              moduleResolution: 'bundler',
+              target: 'ES2022',
+              allowSyntheticDefaultImports: true,
+              esModuleInterop: true,
+              isolatedModules: true,
+            },
+          },
+        ],
+      },
     },
     {
       displayName: 'integration',
       testMatch: ['<rootDir>/test/integration/**/*.test.ts'],
       setupFilesAfterEnv: ['<rootDir>/test/__support__/setup/integration-setup.ts'],
-      testEnvironment: 'node',
       moduleNameMapper: commonModuleNameMapper,
-      transform: commonTransform,
-    },
-    {
-      displayName: 'e2e',
-      testMatch: ['<rootDir>/test/e2e/**/*.test.ts'],
-      setupFilesAfterEnv: ['<rootDir>/test/__support__/setup/e2e-setup.ts'],
-      testEnvironment: 'node',
-      moduleNameMapper: commonModuleNameMapper,
-      transform: commonTransform,
-      maxWorkers: 1,
+      transform: {
+        '^.+\\.tsx?$': [
+          'ts-jest',
+          {
+            useESM: true,
+            tsconfig: {
+              module: 'ES2022',
+              moduleResolution: 'bundler',
+              target: 'ES2022',
+              allowSyntheticDefaultImports: true,
+              esModuleInterop: true,
+              isolatedModules: true,
+            },
+          },
+        ],
+      },
     },
   ],
 
   // Transform ESM packages
   transformIgnorePatterns: ['node_modules/(?!(@kubernetes/client-node)/)'],
-
-  // Performance optimizations
-  maxWorkers: '50%', // Use half of available CPU cores
-  cache: true,
-  cacheDirectory: '<rootDir>/node_modules/.cache/jest',
 
   // Coverage configuration
   collectCoverageFrom: [
@@ -86,59 +91,18 @@ export default {
     '!src/**/index.ts',
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
+  coverageReporters: ['text', 'lcov', 'html'],
   coverageThreshold: {
-    global: {
-      branches: 7,
-      functions: 18,
-      lines: 8,
-      statements: 9,
-    },
-    './src/mcp/': {
-      branches: 14,
-      functions: 22,
-      lines: 20,
-      statements: 19,
-    },
-    './src/tools/': {
-      branches: 51,
-      functions: 55,
-      lines: 62,
-      statements: 62,
-    },
-    './src/workflows/': {
-      branches: 0,
-      functions: 0,
-      lines: 0,
-      statements: 0,
-    },
-    './src/lib/': {
-      branches: 22,
-      functions: 41,
-      lines: 39,
-      statements: 39,
-    },
+    global: { branches: 80, functions: 80, lines: 80, statements: 80 }
   },
-
-  // File extensions and test configuration
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  roots: ['<rootDir>/src', '<rootDir>/test'],
-  testPathIgnorePatterns: ['/node_modules/', '/dist/', 'test/unit/lib/kubernetes.test.ts'],
-
-  // Timeout handling for different test types
-  testTimeout: 30000, // Default 30s
-
-  // Better error reporting
-  verbose: false, // Reduce noise for CI
-  silent: false,
-
-  // Fail fast for development
-  bail: false, // Continue running tests to get full picture
 
   // Global setup and teardown
   globalSetup: '<rootDir>/test/__support__/setup/global-setup.ts',
   globalTeardown: '<rootDir>/test/__support__/setup/global-teardown.ts',
 
-  // Setup files
-  setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
+  // Performance and timeout settings
+  maxWorkers: '50%',
+  testTimeout: 30000,
+  cache: true,
+  cacheDirectory: '<rootDir>/node_modules/.cache/jest',
 };

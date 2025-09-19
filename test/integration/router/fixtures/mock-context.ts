@@ -2,7 +2,7 @@
  * Mock MCP context for router integration testing
  */
 
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext } from '../../../../src/mcp/context';
 
 export const createMockContext = (): ToolContext => {
   return {

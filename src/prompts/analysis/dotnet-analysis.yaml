@@ -1,0 +1,222 @@
+id: dotnet-analysis
+version: '2.1.0'
+description: Context-aware .NET project analysis focused on practical containerization
+category: analysis
+format: json
+parameters:
+  - name: file_list
+    type: string
+    description: List of files in the repository
+    required: true
+  - name: project_files_content
+    type: string
+    description: Content of .csproj, .sln, or other project files
+    required: true
+  - name: config_files
+    type: string
+    description: Content of configuration files (appsettings.json, web.config, etc.)
+    required: true
+  - name: directory_structure
+    type: string
+    description: Directory structure of the repository
+    required: true
+template: |
+  You are a .NET ecosystem expert who understands that .NET projects come in many
+  forms with different goals and constraints. Your analysis should be practical
+  and focused on what will actually help with containerization.
+
+  Consider:
+  - The apparent age and migration status of the project (.NET Framework vs .NET Core/5+)
+  - What the application is actually trying to accomplish
+  - The complexity level and likely team experience
+  - Practical trade-offs between different containerization approaches
+
+  Focus on actionable guidance rather than comprehensive catalogs.
+
+  Analyze this .NET project to provide practical containerization guidance:
+
+  **File Structure:**
+  {{file_list}}
+
+  **Project Files Content:**
+  {{project_files_content}}
+
+  **Configuration Files:**
+  {{config_files}}
+
+  **Directory Structure:**
+  {{directory_structure}}
+
+  Based on what you can observe about this project, provide an analysis that helps
+  with containerization decisions. Focus on what's actually relevant and determinable
+  from the available information.
+
+  Provide your analysis in JSON format, including only information that's clearly
+  evident or reasonably inferred from the project structure:
+
+  {
+    "project_assessment": {
+      "confidence_level": "high|medium|low",
+      "dotnet_version": "detected .NET version",
+      "target_framework": "net6.0|net7.0|net8.0|netframework4.x|netstandard",
+      "project_maturity": "legacy|modern|mixed",
+      "containerization_feasibility": "straightforward|requires_work|challenging",
+      "apparent_purpose": "description of what this project seems to do"
+    },
+    "application_analysis": {
+      "primary_project_type": "web|console|library|desktop|service|worker",
+      "hosting_model": "kestrel|iis|selfhost|unknown",
+      "framework_stack": "detected framework stack",
+      "key_characteristics": ["notable aspects that affect containerization"]
+    },
+    "containerization_readiness": {
+      "current_status": "container_ready|needs_migration|requires_significant_work",
+      "blocking_issues": ["specific issues that prevent containerization"],
+      "quick_wins": ["immediate improvements that would help"]
+    },
+    "recommended_approach": {
+      "strategy": "description of the most appropriate containerization approach",
+      "base_image_recommendation": "specific recommendation with rationale",
+      "build_approach": "sdk_multistage|runtime_only|source_based|other",
+      "special_considerations": ["project-specific considerations"]
+    },
+    "practical_guidance": {
+      "immediate_next_steps": ["actionable steps to start containerization"],
+      "configuration_needs": ["configuration changes likely needed"],
+      "performance_considerations": ["runtime optimization opportunities"],
+      "deployment_recommendations": ["suggestions for production deployment"]
+    },
+    "migration_opportunities": {
+      "framework_modernization": "recommendations if applicable",
+      "containerization_benefits": ["specific benefits this project would gain"],
+      "effort_estimation": "low|medium|high effort required"
+    },
+    "notes": "important observations or context-specific advice"
+  }
+
+examples:
+  - input:
+      file_list: |
+        MyApp.sln
+        src/MyApp/MyApp.csproj
+        src/MyApp/Program.cs
+        src/MyApp/Controllers/HomeController.cs
+        src/MyApp/appsettings.json
+        src/MyApp/appsettings.Development.json
+      project_files_content: |
+        === MyApp.csproj ===
+        <Project Sdk="Microsoft.NET.Sdk.Web">
+          <PropertyGroup>
+            <TargetFramework>net6.0</TargetFramework>
+            <Nullable>enable</Nullable>
+            <ImplicitUsings>enable</ImplicitUsings>
+          </PropertyGroup>
+          <ItemGroup>
+            <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.10" />
+            <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="6.0.10" />
+          </ItemGroup>
+        </Project>
+      config_files: |
+        === appsettings.json ===
+        {
+          "Logging": {
+            "LogLevel": {
+              "Default": "Information"
+            }
+          },
+          "ConnectionStrings": {
+            "DefaultConnection": "Server=localhost;Database=MyAppDb;Trusted_Connection=true;"
+          },
+          "AllowedHosts": "*"
+        }
+      directory_structure: |
+        MyApp.sln
+        src/
+          MyApp/
+            MyApp.csproj
+            Program.cs
+            Controllers/HomeController.cs
+            appsettings.json
+            appsettings.Development.json
+    output: |
+      {
+        "project_assessment": {
+          "confidence_level": "high",
+          "dotnet_version": "6.0",
+          "target_framework": "net6.0",
+          "project_maturity": "modern",
+          "containerization_feasibility": "straightforward",
+          "apparent_purpose": "ASP.NET Core web application with Entity Framework database integration"
+        },
+        "application_analysis": {
+          "primary_project_type": "web",
+          "hosting_model": "kestrel",
+          "framework_stack": "ASP.NET Core 6.0 with Entity Framework Core",
+          "key_characteristics": [
+            "Modern .NET 6 SDK-style project",
+            "Entity Framework Core with SQL Server",
+            "Standard ASP.NET Core MVC structure",
+            "Environment-specific configuration support"
+          ]
+        },
+        "containerization_readiness": {
+          "current_status": "container_ready",
+          "blocking_issues": [],
+          "quick_wins": [
+            "Already using .NET 6 which has excellent container support",
+            "Standard project structure will work well with multi-stage builds",
+            "Environment-specific configuration is container-friendly"
+          ]
+        },
+        "recommended_approach": {
+          "strategy": "Standard multi-stage Docker build leveraging .NET 6 SDK and runtime images. This project follows modern .NET patterns and should containerize very smoothly.",
+          "base_image_recommendation": "mcr.microsoft.com/dotnet/aspnet:6.0-alpine for runtime - good balance of size and compatibility",
+          "build_approach": "sdk_multistage",
+          "special_considerations": [
+            "Database connection string will need environment variable override",
+            "Consider health checks for Entity Framework database connectivity",
+            "Enable SQL Server connection in container environment"
+          ]
+        },
+        "practical_guidance": {
+          "immediate_next_steps": [
+            "Create Dockerfile with multi-stage build (SDK for build, aspnet for runtime)",
+            "Configure connection string to use environment variables",
+            "Set up docker-compose with SQL Server for local development",
+            "Add health check endpoint for database connectivity"
+          ],
+          "configuration_needs": [
+            "Override ConnectionStrings:DefaultConnection via environment variable",
+            "Configure logging for container environments (JSON formatting)",
+            "Set ASPNETCORE_ENVIRONMENT appropriately"
+          ],
+          "performance_considerations": [
+            "Consider ReadyToRun images for faster startup",
+            "Use globalization-invariant mode if applicable",
+            "Configure Entity Framework connection pooling for container environments"
+          ],
+          "deployment_recommendations": [
+            "Use health checks in Kubernetes/container orchestrator",
+            "Implement database migration strategy (init containers or startup migration)",
+            "Consider using managed database service instead of containerized SQL Server"
+          ]
+        },
+        "migration_opportunities": {
+          "framework_modernization": "Project is already on modern .NET 6 - no migration needed",
+          "containerization_benefits": [
+            "Simplified deployment across environments",
+            "Better resource utilization and scaling",
+            "Easier CI/CD pipeline integration",
+            "Consistent runtime environment"
+          ],
+          "effort_estimation": "low"
+        },
+        "notes": "Excellent candidate for containerization. Modern .NET 6 project with standard structure. Main consideration is database connectivity configuration for container environments."
+      }
+
+tags:
+  - dotnet
+  - analysis
+  - adaptive
+  - aspnet-core
+  - practical

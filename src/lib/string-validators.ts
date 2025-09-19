@@ -184,3 +184,27 @@ export function requireNonEmptyArray<T>(arr: T[] | null | undefined, fieldName: 
   }
   return arr as T[];
 }
+
+/**
+ * Sanitizes Docker image name to meet Docker requirements.
+ * Consolidates sanitizeImageName from build-image tool.
+ * - Must be lowercase
+ * - Can only contain letters, numbers, dash, underscore, and period
+ * - Cannot start with period or dash
+ */
+export function sanitizeDockerImageName(name: string): string {
+  let sanitized = name.toLowerCase();
+  sanitized = sanitized.replace(/[^a-z0-9._-]/g, '-');
+  sanitized = sanitized.replace(/^[.-]+|[.-]+$/g, '');
+  return sanitized || 'app';
+}
+
+/**
+ * Sanitizes Docker tag to meet requirements.
+ * Consolidates sanitizeTag from build-image tool.
+ */
+export function sanitizeDockerTag(tag: string): string {
+  let sanitized = tag.replace(/[^a-zA-Z0-9._-]/g, '-');
+  sanitized = sanitized.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '');
+  return sanitized || 'latest';
+}

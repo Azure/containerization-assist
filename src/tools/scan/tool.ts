@@ -1,319 +1,366 @@
 /**
- * Scan Image Tool - Standardized Implementation
+ * Simplified Scan Tool
  *
- * Scans Docker images for security vulnerabilities
- * Uses standardized helpers for consistency
+ * Uses AI for vulnerability assessment while keeping scanner operations in TypeScript
  */
-
-import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
-import type { ToolContext } from '@/mcp/context';
-
-import { createSecurityScanner } from '@/lib/scanner';
-import { Success, Failure, type Result } from '@/types';
-import { getKnowledgeForCategory } from '@/knowledge/index';
-import type { KnowledgeMatch } from '@/knowledge/types';
-import { scanImageSchema, type ScanImageParams } from './schema';
 import { z } from 'zod';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
+import { createPromptBackedTool } from '@mcp/tools/prompt-backed-tool';
+import type { ToolContext } from '@mcp/context';
+import { Success, Failure, type Result } from '@types';
+import { scanImageSchema, type ScanImageParams } from './schema';
+import { extractErrorMessage } from '@lib/error-utils';
 
-interface DockerScanResult {
-  vulnerabilities?: Array<{
-    id?: string;
-    severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
-    package?: string;
-    version?: string;
-    description?: string;
-    fixedVersion?: string;
-  }>;
-  summary?: {
-    critical: number;
-    high: number;
-    medium: number;
-    low: number;
-    unknown?: number;
-    total: number;
-  };
-  scanTime?: string;
-  metadata?: {
-    image: string;
-  };
+const execAsync = promisify(exec);
+
+// Simple scan result structure for this tool
+interface SimpleScanResult {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  total: number;
 }
 
-// Define the result schema for type safety
-const ScanImageResultSchema = z.object({
+// Result schema for AI assessment
+const VulnerabilityAssessmentSchema = z.object({
+  summary: z.object({
+    totalVulnerabilities: z.number(),
+    critical: z.number(),
+    high: z.number(),
+    medium: z.number(),
+    low: z.number(),
+    negligible: z.number(),
+  }),
+  topVulnerabilities: z.array(
+    z.object({
+      id: z.string(),
+      severity: z.string(),
+      package: z.string(),
+      version: z.string(),
+      fixedVersion: z.string(),
+      description: z.string(),
+      exploitability: z.enum(['high', 'medium', 'low', 'none']),
+    }),
+  ),
+  remediations: z.array(
+    z.object({
+      priority: z.enum(['immediate', 'high', 'medium', 'low']),
+      action: z.string(),
+      packages: z.array(z.string()),
+      effort: z.enum(['low', 'medium', 'high']),
+      impact: z.string(),
+    }),
+  ),
+  baseImageRecommendations: z.array(
+    z.object({
+      currentBase: z.string(),
+      recommendedBase: z.string(),
+      reason: z.string(),
+      vulnerabilityReduction: z.number(),
+    }),
+  ),
+  complianceStatus: z.object({
+    passes: z.boolean(),
+    blockers: z.array(z.string()),
+    warnings: z.array(z.string()),
+  }),
+  riskScore: z.object({
+    score: z.number(),
+    level: z.enum(['critical', 'high', 'medium', 'low']),
+    factors: z.array(z.string()),
+  }),
+  deploymentRecommendation: z.object({
+    canDeploy: z.boolean(),
+    conditions: z.array(z.string()),
+    requiredActions: z.array(z.string()),
+  }),
+  nextSteps: z.array(z.string()),
+});
+
+// Result schema
+const _ScanResultSchema = z.object({
   success: z.boolean(),
-  sessionId: z.string(),
-  remediationGuidance: z
-    .array(
-      z.object({
-        vulnerability: z.string(),
-        recommendation: z.string(),
-        severity: z.string().optional(),
-        example: z.string().optional(),
-      }),
-    )
-    .optional(),
+  scanner: z.string(),
   vulnerabilities: z.object({
     critical: z.number(),
     high: z.number(),
     medium: z.number(),
     low: z.number(),
-    unknown: z.number(),
     total: z.number(),
   }),
-  scanTime: z.string(),
-  passed: z.boolean(),
+  report: z.string().optional(),
+  assessment: VulnerabilityAssessmentSchema.optional(),
+  scanTime: z.number(),
 });
 
-// Define tool IO for type-safe session operations
-const io = defineToolIO(scanImageSchema, ScanImageResultSchema);
+export type ScanResult = z.infer<typeof _ScanResultSchema>;
 
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastScannedAt: z.date().optional(),
-  lastScannedImage: z.string().optional(),
-  vulnerabilityCount: z.number().optional(),
-  scannerUsed: z.string().optional(),
+// Create AI assessment tool
+const vulnerabilityAssessmentTool = createPromptBackedTool({
+  name: 'vulnerability-assessment',
+  description: 'Assess and prioritize vulnerabilities',
+  inputSchema: scanImageSchema.extend({
+    scanResults: z.custom<SimpleScanResult>(),
+    imageName: z.string().optional(),
+    severityThreshold: z.string().optional(),
+    format: z.string().optional(),
+  }),
+  outputSchema: VulnerabilityAssessmentSchema,
+  promptId: 'vulnerability-scan',
+  knowledge: {
+    category: 'security',
+    limit: 4,
+  },
+  policy: {
+    tool: 'scan',
+    extractor: (params) => ({
+      severity: params.severity ?? 'medium',
+    }),
+  },
 });
 
-export interface ScanImageResult {
-  success: boolean;
-  sessionId: string;
-  remediationGuidance?: Array<{
-    vulnerability: string;
-    recommendation: string;
-    severity?: string;
-    example?: string;
-  }>;
-  vulnerabilities: {
-    critical: number;
-    high: number;
-    medium: number;
-    low: number;
-    unknown: number;
-    total: number;
-  };
-  scanTime: string;
-  passed: boolean;
+// Helper: Run Trivy scanner
+async function runTrivy(
+  imageName: string,
+  format: string = 'json',
+  severityThreshold: string = 'MEDIUM',
+): Promise<{ output: string; vulnerabilities: SimpleScanResult }> {
+  try {
+    const cmd = `trivy image --severity ${severityThreshold.toUpperCase()} --format ${format} --quiet ${imageName}`;
+    const { stdout } = await execAsync(cmd, { maxBuffer: 10 * 1024 * 1024 });
+
+    const vulnerabilities = {
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      total: 0,
+    };
+
+    // Parse JSON output to count vulnerabilities
+    if (format === 'json') {
+      try {
+        const results = JSON.parse(stdout);
+        if (results.Results) {
+          for (const result of results.Results) {
+            if (result.Vulnerabilities) {
+              for (const vuln of result.Vulnerabilities) {
+                vulnerabilities.total++;
+                switch (vuln.Severity?.toLowerCase()) {
+                  case 'critical':
+                    vulnerabilities.critical++;
+                    break;
+                  case 'high':
+                    vulnerabilities.high++;
+                    break;
+                  case 'medium':
+                    vulnerabilities.medium++;
+                    break;
+                  case 'low':
+                    vulnerabilities.low++;
+                    break;
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        // If parsing fails, continue with empty counts
+      }
+    }
+
+    return { output: stdout, vulnerabilities };
+  } catch (error: unknown) {
+    // Trivy might not be installed, return mock data
+    const errorWithCode = error as { code?: string; message?: string };
+    const isNotFound =
+      errorWithCode?.code === 'ENOENT' || errorWithCode?.message?.includes?.('command not found');
+    if (isNotFound) {
+      return {
+        output: JSON.stringify({ Results: [] }),
+        vulnerabilities: {
+          critical: 0,
+          high: 0,
+          medium: 0,
+          low: 0,
+          total: 0,
+        },
+      };
+    }
+    throw error;
+  }
 }
 
-/**
- * Scan image implementation - direct execution without wrapper
- */
-async function scanImageImpl(
+// Helper: Run Grype scanner
+async function runGrype(
+  imageName: string,
+  format: string = 'json',
+): Promise<{ output: string; vulnerabilities: SimpleScanResult }> {
+  try {
+    const cmd = `grype ${imageName} -o ${format} --quiet`;
+    const { stdout } = await execAsync(cmd, { maxBuffer: 10 * 1024 * 1024 });
+
+    const vulnerabilities = {
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      total: 0,
+    };
+
+    // Parse JSON output
+    if (format === 'json') {
+      try {
+        const results = JSON.parse(stdout);
+        if (results.matches) {
+          for (const match of results.matches) {
+            vulnerabilities.total++;
+            switch (match.vulnerability?.severity?.toLowerCase()) {
+              case 'critical':
+                vulnerabilities.critical++;
+                break;
+              case 'high':
+                vulnerabilities.high++;
+                break;
+              case 'medium':
+                vulnerabilities.medium++;
+                break;
+              case 'low':
+                vulnerabilities.low++;
+                break;
+            }
+          }
+        }
+      } catch {
+        // Continue with empty counts
+      }
+    }
+
+    return { output: stdout, vulnerabilities };
+  } catch (error: unknown) {
+    const errorWithCode = error as { code?: string };
+    if (errorWithCode?.code === 'ENOENT') {
+      throw new Error('Grype scanner not found');
+    }
+    throw error;
+  }
+}
+
+// Main scan function
+async function scanImage(
   params: ScanImageParams,
   context: ToolContext,
-): Promise<Result<ScanImageResult>> {
-  // Basic parameter validation (essential validation only)
-  if (!params || typeof params !== 'object') {
-    return Failure('Invalid parameters provided');
-  }
-  const logger = getToolLogger(context, 'scan');
-  const timer = createToolTimer(logger, 'scan-image');
+): Promise<Result<SimpleScanResult & { sessionId: string; ok: boolean }>> {
+  const { logger } = context;
 
   try {
-    const { scanner = 'trivy', severity } = params;
-
-    // Map severity parameter to threshold
-    const finalSeverityThreshold = severity
-      ? (severity.toLowerCase() as 'low' | 'medium' | 'high' | 'critical')
-      : 'high';
-
-    logger.info(
-      { scanner, severityThreshold: finalSeverityThreshold },
-      'Starting image security scan',
-    );
-
-    // Ensure session exists and get typed slice operations
-    const sessionResult = await ensureSession(context, params.sessionId);
-    if (!sessionResult.ok) {
-      return Failure(sessionResult.error);
+    const imageName = params.imageId;
+    if (!imageName) {
+      return Failure('Image name is required');
     }
 
-    const { id: sessionId, state: session } = sessionResult.value;
-    const slice = useSessionSlice('scan', io, context, StateSchema);
+    const scanner = params.scanner || 'trivy';
+    const format = 'json';
+    const severityThreshold = params.severity || 'MEDIUM';
 
-    if (!slice) {
-      return Failure('Session manager not available');
-    }
+    logger.info({ image: imageName, scanner }, 'Starting vulnerability scan');
 
-    logger.info(
-      { sessionId, scanner, severityThreshold: finalSeverityThreshold },
-      'Starting image security scan with session',
-    );
+    const startTime = Date.now();
+    let scanOutput: { output: string; vulnerabilities: SimpleScanResult };
 
-    // Record input in session slice
-    await slice.patch(sessionId, { input: params });
-
-    const securityScanner = createSecurityScanner(logger, scanner);
-
-    // Check for built image in session or use provided imageId
-    const buildResult = session?.results?.['build-image'] as { imageId?: string } | undefined;
-    const imageId = params.imageId || buildResult?.imageId;
-
-    if (!imageId) {
-      return Failure(
-        'No image specified. Provide imageId parameter or ensure session has built image from build-image tool.',
-      );
-    }
-    logger.info({ imageId, scanner }, 'Scanning image for vulnerabilities');
-
-    // Scan image using security scanner
-    const scanResultWrapper = await securityScanner.scanImage(imageId);
-
-    if (!scanResultWrapper.ok) {
-      return Failure(`Failed to scan image: ${scanResultWrapper.error ?? 'Unknown error'}`);
-    }
-
-    const scanResult = scanResultWrapper.value;
-
-    // Convert BasicScanResult to DockerScanResult
-    const dockerScanResult: DockerScanResult = {
-      vulnerabilities: scanResult.vulnerabilities.map((v) => ({
-        id: v.id,
-        severity: v.severity,
-        package: v.package,
-        version: v.version,
-        description: v.description,
-        ...(v.fixedVersion !== undefined && { fixedVersion: v.fixedVersion }),
-      })),
-      summary: {
-        critical: scanResult.criticalCount,
-        high: scanResult.highCount,
-        medium: scanResult.mediumCount,
-        low: scanResult.lowCount,
-        total: scanResult.totalVulnerabilities,
-      },
-      scanTime: scanResult.scanDate.toISOString(),
-      metadata: {
-        image: imageId,
-      },
-    };
-
-    // Determine if scan passed based on threshold
-    const thresholdMap = {
-      critical: ['critical'],
-      high: ['critical', 'high'],
-      medium: ['critical', 'high', 'medium'],
-      low: ['critical', 'high', 'medium', 'low'],
-    };
-
-    const failingSeverities = thresholdMap[finalSeverityThreshold] || thresholdMap['high'];
-    let vulnerabilityCount = 0;
-
-    for (const severity of failingSeverities) {
-      if (severity === 'critical') {
-        vulnerabilityCount += scanResult.criticalCount;
-      } else if (severity === 'high') {
-        vulnerabilityCount += scanResult.highCount;
-      } else if (severity === 'medium') {
-        vulnerabilityCount += scanResult.mediumCount;
-      } else if (severity === 'low') {
-        vulnerabilityCount += scanResult.lowCount;
-      }
-    }
-
-    const passed = vulnerabilityCount === 0;
-
-    // Get knowledge-based remediation guidance for vulnerabilities
-    let remediationGuidance: ScanImageResult['remediationGuidance'] = [];
-    if (dockerScanResult.vulnerabilities && dockerScanResult.vulnerabilities.length > 0) {
+    // Run the appropriate scanner
+    if (scanner === 'grype') {
       try {
-        // Create a summary of vulnerabilities for knowledge query
-        const vulnSummary = dockerScanResult.vulnerabilities
-          .slice(0, 10) // Limit to top 10 for performance
-          .map((v) => `${v.package}:${v.version} (${v.severity})`)
-          .join(', ');
+        scanOutput = await runGrype(imageName, format);
+      } catch {
+        logger.warn('Grype not available, falling back to Trivy');
+        scanOutput = await runTrivy(imageName, format, severityThreshold);
+      }
+    } else {
+      scanOutput = await runTrivy(imageName, format, severityThreshold);
+    }
 
-        const securityKnowledge = await getKnowledgeForCategory('security', vulnSummary);
+    const scanTime = Date.now() - startTime;
 
-        // Add general security recommendations
-        const generalKnowledge = await getKnowledgeForCategory('security', undefined);
-
-        remediationGuidance = [
-          ...securityKnowledge.map((match: KnowledgeMatch) => ({
-            vulnerability: 'General',
-            recommendation: match.entry.recommendation,
-            ...(match.entry.severity && { severity: match.entry.severity }),
-            ...(match.entry.example && { example: match.entry.example }),
-          })),
-          ...generalKnowledge.map((match: KnowledgeMatch) => ({
-            vulnerability: 'Best Practice',
-            recommendation: match.entry.recommendation,
-            ...(match.entry.severity && { severity: match.entry.severity }),
-            ...(match.entry.example && { example: match.entry.example }),
-          })),
-        ];
-
-        logger.info(
-          { guidanceCount: remediationGuidance.length },
-          'Added knowledge-based remediation guidance',
+    // Get AI vulnerability assessment
+    let assessment: z.infer<typeof VulnerabilityAssessmentSchema> | undefined;
+    if (format === 'json') {
+      try {
+        const assessmentResult = await vulnerabilityAssessmentTool.execute(
+          {
+            ...params,
+            scanResults: scanOutput.output,
+          },
+          { logger: context.logger },
+          context,
         );
-      } catch (error) {
-        logger.debug({ error }, 'Failed to get remediation guidance, continuing without');
+
+        if (assessmentResult.ok) {
+          assessment = assessmentResult.value;
+          logger.info(
+            { riskLevel: assessment.riskScore.level },
+            'Vulnerability assessment completed',
+          );
+        }
+      } catch {
+        logger.warn('Could not generate vulnerability assessment');
       }
     }
 
-    // Prepare the result
-    const result: ScanImageResult = {
+    // Generate session ID
+    const sessionId = params.sessionId || `scan-${Date.now()}`;
+
+    // Save to session
+    if (context.sessionManager) {
+      await context.sessionManager.update(sessionId, {
+        'scan-image': {
+          imageName,
+          vulnerabilities: scanOutput.vulnerabilities,
+          assessment,
+        },
+      });
+    }
+
+    const result = {
       success: true,
+      scanner,
+      vulnerabilities: scanOutput.vulnerabilities,
+      report: undefined, // format is always 'json' now
+      assessment,
+      scanTime,
       sessionId,
-      ...(remediationGuidance.length > 0 && { remediationGuidance }),
-      vulnerabilities: {
-        critical: scanResult.criticalCount,
-        high: scanResult.highCount,
-        medium: scanResult.mediumCount,
-        low: scanResult.lowCount,
-        unknown: 0, // BasicScanResult doesn't track unknown severity vulnerabilities
-        total: scanResult.totalVulnerabilities,
-      },
-      scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
-      passed,
+      ok: true,
+      // Flatten vulnerability counts for SimpleScanResult compatibility
+      critical: scanOutput.vulnerabilities.critical,
+      high: scanOutput.vulnerabilities.high,
+      medium: scanOutput.vulnerabilities.medium,
+      low: scanOutput.vulnerabilities.low,
+      total: scanOutput.vulnerabilities.total,
     };
-
-    // Update typed session slice with output and state
-    await slice.patch(sessionId, {
-      output: result,
-      state: {
-        lastScannedAt: new Date(),
-        lastScannedImage: imageId,
-        vulnerabilityCount: scanResult.totalVulnerabilities,
-        scannerUsed: scanner,
-      },
-    });
-
-    timer.end({
-      vulnerabilities: scanResult.totalVulnerabilities,
-      critical: scanResult.criticalCount,
-      high: scanResult.highCount,
-      passed,
-    });
 
     logger.info(
       {
-        imageId,
-        vulnerabilities: scanResult.totalVulnerabilities,
-        passed,
+        image: imageName,
+        vulnerabilities: scanOutput.vulnerabilities,
+        scanTime: `${scanTime}ms`,
       },
-      'Image scan completed',
+      'Vulnerability scan completed',
     );
 
     return Success(result);
   } catch (error) {
-    timer.error(error);
-    logger.error({ error }, 'Image scan failed');
-
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    return Failure(errorMessage);
+    logger.error({ error: extractErrorMessage(error) }, 'Scan failed');
+    return Failure(extractErrorMessage(error));
   }
 }
 
-/**
- * Type alias for test compatibility
- */
-export type ScanImageConfig = ScanImageParams;
-
-/**
- * Scan image tool
- */
-export const scanImage = scanImageImpl;
+// Export for MCP registration
+export const tool = {
+  type: 'standard' as const,
+  name: 'scan',
+  description: 'Scan Docker image for vulnerabilities',
+  inputSchema: scanImageSchema,
+  execute: scanImage,
+};

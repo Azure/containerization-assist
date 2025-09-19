@@ -2,8 +2,8 @@
  * Mock session manager for router integration testing
  */
 
-import type { SessionManager } from '@/lib/session';
-import type { WorkflowState, Result } from '@/types';
+import type { SessionManager } from '../../../../src/lib/session';
+import type { WorkflowState, Result } from '../../../../src/types';
 import { Success, Failure } from '../../../../src/types';
 
 export class MockSessionManager implements SessionManager {

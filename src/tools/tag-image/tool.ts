@@ -1,141 +1,227 @@
 /**
- * Tag Image Tool - Standardized Implementation
- *
+ * Tag Image Tool
  * Tags Docker images with version and registry information
- * Uses standardized helpers for consistency
  */
 
-import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
-import { extractErrorMessage } from '@/lib/error-utils';
-import type { ToolContext } from '@/mcp/context';
-import { createDockerClient } from '@/lib/docker';
-
-import { Success, Failure, type Result } from '@/types';
+import type { Logger } from 'pino';
+import type { ToolContext } from '@mcp/context';
+import type { DockerClient } from '@services/docker-client';
+import { Success, Failure, type Result } from '@types';
 import { tagImageSchema, type TagImageParams } from './schema';
-import { z } from 'zod';
 
-// Define the result schema for type safety
-const TagImageResultSchema = z.object({
-  success: z.boolean(),
-  sessionId: z.string(),
-  tags: z.array(z.string()),
-  imageId: z.string(),
-});
-
-// Define tool IO for type-safe session operations
-const io = defineToolIO(tagImageSchema, TagImageResultSchema);
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastTaggedAt: z.date().optional(),
-  tagsApplied: z.array(z.string()).default([]),
-});
+export interface SingleTagResult {
+  success: boolean;
+  imageId: string;
+  sourceTag: string;
+  targetTag: string;
+  moduleRoot?: string;
+}
 
 export interface TagImageResult {
-  success: boolean;
+  images: SingleTagResult[];
+  successCount: number;
+  failureCount: number;
+  warnings?: string[];
   sessionId: string;
-  tags: string[];
-  imageId: string;
+}
+
+export interface TagImageDeps {
+  docker: DockerClient;
+  logger: Logger;
 }
 
 /**
- * Tag image implementation - direct execution without wrapper
+ * Tag a single Docker image
  */
-async function tagImageImpl(
-  params: TagImageParams,
-  context: ToolContext,
-): Promise<Result<TagImageResult>> {
-  // Basic parameter validation (essential validation only)
-  if (!params || typeof params !== 'object') {
-    return Failure('Invalid parameters provided');
-  }
-  const logger = getToolLogger(context, 'tag-image');
-  const timer = createToolTimer(logger, 'tag-image');
+async function tagSingleImage(
+  imageId: string,
+  tag: string,
+  moduleRoot: string | undefined,
+  deps: TagImageDeps,
+): Promise<Result<SingleTagResult>> {
+  const { docker, logger } = deps;
 
   try {
-    const { tag } = params;
-
-    if (!tag) {
-      return Failure('Tag parameter is required');
-    }
-
-    // Ensure session exists and get typed slice operations
-    const sessionResult = await ensureSession(context, params.sessionId);
-    if (!sessionResult.ok) {
-      return Failure(sessionResult.error);
-    }
-
-    const { id: sessionId, state: session } = sessionResult.value;
-    const slice = useSessionSlice('tag-image', io, context, StateSchema);
-
-    if (!slice) {
-      return Failure('Session manager not available');
-    }
-
-    logger.info({ sessionId, tag }, 'Starting image tagging');
-
-    // Record input in session slice
-    await slice.patch(sessionId, { input: params });
-
-    const dockerClient = createDockerClient(logger);
-
-    // Check for built image in session metadata or use provided imageId
-    const buildResult = session.metadata?.build_result as
-      | { imageId?: string; tags?: string[] }
-      | undefined;
-    const source = params.imageId || buildResult?.imageId;
-
-    if (!source) {
-      return Failure(
-        'No image specified. Provide imageId parameter or ensure session has built image from build-image tool.',
-      );
-    }
-
-    // Tag image using lib docker client
-    // Parse repository and tag from the tag parameter
+    // Parse repository and tag
     const parts = tag.split(':');
     const repository = parts[0];
     const tagName = parts[1] || 'latest';
 
     if (!repository) {
-      return Failure('Invalid tag format');
+      return Failure('Invalid tag format. Use repository:tag');
     }
 
-    const tagResult = await dockerClient.tagImage(source, repository, tagName);
+    logger.info({ sourceImage: imageId, repository, tagName, moduleRoot }, 'Tagging Docker image');
+
+    // Perform Docker tag operation
+    const tagResult = await docker.tagImage(imageId, repository, tagName);
     if (!tagResult.ok) {
-      return Failure(`Failed to tag image: ${tagResult.error ?? 'Unknown error'}`);
+      return Failure(`Failed to tag image: ${tagResult.error}`);
     }
 
-    const tags = [tag];
-    const result: TagImageResult = {
+    const result: SingleTagResult = {
       success: true,
-      sessionId,
-      tags,
-      imageId: source,
+      imageId,
+      sourceTag: imageId.includes(':') ? imageId : `${imageId}:latest`,
+      targetTag: tag,
+      ...(moduleRoot && { moduleRoot }),
     };
-
-    // Update typed session slice with output and state
-    await slice.patch(sessionId, {
-      output: result,
-      state: {
-        lastTaggedAt: new Date(),
-        tagsApplied: tags,
-      },
-    });
-
-    timer.end({ tags, sessionId });
-    logger.info({ sessionId, tags }, 'Image tagging completed');
 
     return Success(result);
   } catch (error) {
-    timer.error(error);
-    logger.error({ error }, 'Image tagging failed');
-    return Failure(extractErrorMessage(error));
+    const message = error instanceof Error ? error.message : String(error);
+    return Failure(`Failed to tag image ${imageId}: ${message}`);
   }
 }
 
 /**
- * Tag image tool
+ * Create tag image tool with explicit dependencies - supports multi-module
  */
-export const tagImage = tagImageImpl;
+export function createTagImageTool(deps: TagImageDeps) {
+  return async (params: TagImageParams, context: ToolContext): Promise<Result<TagImageResult>> => {
+    const start = Date.now();
+    const { logger } = deps;
+    const sessionId = params.sessionId || `tag-${Date.now()}`;
+
+    try {
+      // Validate parameters
+      const validated = tagImageSchema.parse(params);
+      const { tag, imageId } = validated;
+
+      if (!tag) {
+        return Failure('Tag parameter is required');
+      }
+
+      // Determine images to tag
+      let imagesToTag: Array<{ imageId: string; moduleRoot?: string }> = [];
+
+      if (imageId) {
+        // Single image specified
+        imagesToTag = [{ imageId }];
+      } else if (params.sessionId && context.sessionManager) {
+        // Try to get multi-module build results from session
+        const sessionResult = await context.sessionManager.get(params.sessionId);
+        if (sessionResult.ok && sessionResult.value?.state) {
+          const state = sessionResult.value.state as Record<string, any>;
+          const buildData = state['build-image'];
+
+          if (buildData?.images && Array.isArray(buildData.images)) {
+            // Multi-module build: tag all images
+            imagesToTag = buildData.images.map((img: any) => ({
+              imageId: `${img.image}:${img.tag}`,
+              moduleRoot: img.moduleRoot,
+            }));
+            logger.info(
+              { count: imagesToTag.length },
+              'Tagging all images from multi-module build',
+            );
+          } else {
+            // Try legacy single image format
+            const buildResult = sessionResult.value?.metadata?.buildResult as
+              | { imageId?: string }
+              | undefined;
+            if (buildResult?.imageId) {
+              imagesToTag = [{ imageId: buildResult.imageId }];
+            }
+          }
+        }
+      }
+
+      if (imagesToTag.length === 0) {
+        return Failure(
+          'No images to tag. Provide imageId parameter or ensure session has built images.',
+        );
+      }
+
+      // Tag all images
+      const taggedImages: SingleTagResult[] = [];
+      const warnings: string[] = [];
+      let successCount = 0;
+      let failureCount = 0;
+
+      for (const imageToTag of imagesToTag) {
+        // Generate tag with module-specific naming for multi-module
+        let finalTag = tag;
+        if (imagesToTag.length > 1 && imageToTag.moduleRoot) {
+          // For multi-module, append module name to tag
+          const moduleName = imageToTag.moduleRoot.split('/').pop() || 'module';
+          const [repo, tagPart] = tag.split(':');
+          finalTag = `${repo}/${moduleName}:${tagPart || 'latest'}`;
+        }
+
+        const tagResult = await tagSingleImage(
+          imageToTag.imageId,
+          finalTag,
+          imageToTag.moduleRoot,
+          deps,
+        );
+
+        if (tagResult.ok) {
+          taggedImages.push(tagResult.value);
+          successCount++;
+        } else {
+          const warning = `Failed to tag ${imageToTag.imageId}: ${tagResult.error}`;
+          warnings.push(warning);
+          failureCount++;
+          logger.warn({ imageId: imageToTag.imageId, error: tagResult.error }, warning);
+        }
+      }
+
+      if (taggedImages.length === 0) {
+        return Failure('No images could be tagged successfully');
+      }
+
+      // Update session if provided
+      if (context.sessionManager) {
+        await context.sessionManager.update(sessionId, {
+          'tag-image': {
+            lastTaggedAt: new Date().toISOString(),
+            images: taggedImages.map((img) => ({
+              imageId: img.imageId,
+              targetTag: img.targetTag,
+              moduleRoot: img.moduleRoot,
+            })),
+            successCount,
+            failureCount,
+          },
+        });
+      }
+
+      const result: TagImageResult = {
+        images: taggedImages,
+        successCount,
+        failureCount,
+        ...(warnings.length > 0 && { warnings }),
+        sessionId,
+      };
+
+      const duration = Date.now() - start;
+      logger.info(
+        {
+          successCount,
+          failureCount,
+          duration,
+          tool: 'tag-image',
+        },
+        'Multi-module tag operation complete',
+      );
+      return Success(result);
+    } catch (error) {
+      const duration = Date.now() - start;
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error({ error: message, duration, tool: 'tag-image' }, 'Tool execution failed');
+      return Failure(`Failed to tag image: ${message}`);
+    }
+  };
+}
+
+/**
+ * Standard tool export for MCP server integration
+ */
+export const tool = {
+  type: 'standard' as const,
+  name: 'tag-image',
+  description: 'Tag Docker images with version and registry information',
+  inputSchema: tagImageSchema,
+  execute: createTagImageTool,
+};

@@ -6,6 +6,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as crypto from 'crypto';
 import type { Logger } from 'pino';
+import { z } from 'zod';
 
 import { createSessionManager, type SessionManager } from '@/lib/session.js';
 import { createLogger } from '@/lib/logger.js';
@@ -138,7 +139,7 @@ function createRouter(
         const toolLogger = logger.child({ tool: name });
         return await tool.execute(params, toolLogger, context);
       },
-      schema: tool.zodSchema ? (tool.zodSchema as any) : undefined,
+      schema: tool.zodSchema ? z.object(tool.zodSchema) : undefined,
     });
   }
 
@@ -229,7 +230,7 @@ function registerSingleTool(
         const sessionId = getSessionIdForParams(paramsObj, defaultSessionId);
 
         // Use router for execution with dependency resolution
-        const routeResult = await router.route({
+        const result = await router.route({
           toolName: tool.name,
           params: paramsObj,
           sessionId,
@@ -237,22 +238,10 @@ function registerSingleTool(
           force: paramsObj.force === true,
         });
 
-        // Log execution info
-        if (routeResult.executedTools.length > 0) {
-          toolLogger.info(
-            { executedTools: routeResult.executedTools },
-            'Router executed tools in sequence',
-          );
-        }
+        // Log execution info - lean router doesn't provide execution details
+        toolLogger.info('Tool execution completed');
 
-        if (routeResult.workflowHint) {
-          toolLogger.info(
-            { hint: routeResult.workflowHint.message },
-            'Workflow continuation available',
-          );
-        }
-
-        return formatResult(routeResult.result);
+        return formatResult(result);
       } catch (error) {
         return {
           content: [

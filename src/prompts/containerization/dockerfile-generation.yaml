@@ -1,0 +1,293 @@
+id: dockerfile-generation
+version: '2.0.0'
+description: Generate context-aware Dockerfiles optimized for specific requirements
+category: containerization
+format: json
+parameters:
+  - name: language
+    type: string
+    required: true
+    description: Programming language
+  - name: languageVersion
+    type: string
+    required: false
+    description: Language version (if known)
+  - name: framework
+    type: string
+    required: false
+    description: Framework used
+  - name: frameworkVersion
+    type: string
+    required: false
+    description: Framework version
+  - name: buildSystemType
+    type: string
+    required: true
+    description: Build system or package manager
+  - name: entryPoint
+    type: string
+    required: true
+    description: How the application starts
+  - name: port
+    type: number
+    required: false
+    description: Service port (if applicable)
+  - name: environment
+    type: string
+    required: false
+    default: "production"
+    description: Target environment (development/staging/production)
+  - name: baseImage
+    type: string
+    required: false
+    description: Recommended base image (if specified, MUST be used)
+  - name: requirements
+    type: object
+    required: false
+    description: Specific requirements or features needed
+  - name: constraints
+    type: object
+    required: false
+    description: Limitations or restrictions to consider
+  - name: optimizeFor
+    type: string
+    required: false
+    default: "balanced"
+    description: Primary optimization goal (size/speed/security/compatibility/balanced)
+  - name: repoSummary
+    type: string
+    required: false
+    description: Repository summary for context
+  - name: analysisContext
+    type: object
+    required: false
+    description: Repository analysis results to inform decisions
+template: |
+  You are a Docker containerization expert. Generate production-ready Dockerfiles that balance:
+  - Security best practices
+  - Image size optimization
+  - Build performance
+  - Runtime efficiency
+  - Specific user requirements
+
+  ## DECISION FRAMEWORK:
+
+  ### 1. BASE IMAGE SELECTION TREE:
+  ```
+  What type of application?
+  ├─ Static Binary (Go, Rust) → scratch or distroless
+  ├─ JVM-based → openjdk:*-alpine or eclipse-temurin
+  ├─ Node.js → node:*-alpine (prod) or node:* (dev)
+  ├─ Python → python:*-slim or python:*-alpine
+  ├─ .NET → mcr.microsoft.com/dotnet/aspnet or runtime
+  └─ Other → Evaluate specific ecosystem needs
+  ```
+
+  ### 2. BUILD STRATEGY MATRIX:
+  | Language Type | Build Needed | Recommended Pattern |
+  |--------------|--------------|--------------------|
+  | Compiled     | Always       | Multi-stage build  |
+  | Transpiled   | Yes          | Multi-stage build  |
+  | Interpreted  | Dependencies | Optional multi-stage|
+  | Scripts      | No           | Single stage       |
+
+  ### 3. SECURITY REQUIREMENTS (MANDATORY for production):
+  ✅ ALWAYS create and use non-root user (RUN useradd -m -u 1001 appuser && USER appuser)
+  ✅ ALWAYS use .dockerignore to exclude .git, .env, secrets, etc.
+  ✅ PREFER multi-stage builds to exclude build tools from runtime
+  ✅ PREFER distroless or minimal base images when possible
+  ✅ NEVER include hardcoded secrets or credentials
+  ✅ ALWAYS specify HEALTHCHECK for container orchestration
+
+  ### 4. OPTIMIZATION PRIORITIES:
+  - Layer Caching: Order COPY by change frequency
+  - Size: Remove build deps, clean caches
+  - Speed: Parallel RUN when possible
+  - Security: Scan for vulnerabilities
+
+  ### 5. CONTEXTUAL ADAPTATION:
+  - Production: Security > Size > Speed
+  - Development: Speed > Convenience > Size
+  - CI/CD: Cache efficiency > Build time
+  - Edge/IoT: Size > Everything
+
+  ## Generate Dockerfile for this application:
+
+  **Context:**
+  - Technology: {{language}} {{languageVersion}} with {{framework}} {{frameworkVersion}}
+  - Build System: {{buildSystemType}}
+  - Entry Point: {{entryPoint}}
+  - Environment: {{environment}}
+  {{#port}}
+  - Service Port: {{port}}
+  {{/port}}
+  {{#baseImage}}
+  - **IMPORTANT: You MUST use this base image**: {{baseImage}}
+  {{/baseImage}}
+  {{#requirements}}
+  **Specific Requirements:**
+  {{requirements}}
+  {{/requirements}}
+  {{#constraints}}
+  **Constraints:**
+  {{constraints}}
+  {{/constraints}}
+  {{#optimizeFor}}
+  **Optimize For:** {{optimizeFor}}
+  {{/optimizeFor}}
+  {{#repoSummary}}
+  **Project Summary:** {{repoSummary}}
+  {{/repoSummary}}
+  {{#analysisContext}}
+  **Repository Analysis:** {{analysisContext}}
+  {{/analysisContext}}
+
+  ## Required Analysis Before Generation:
+
+  1. **Technology Stack Assessment:**
+     - Does this require compilation? → Multi-stage needed
+     - Are there native dependencies? → Full base image may be needed
+     - Is this CPU/Memory intensive? → Consider runtime limits
+
+  2. **Security Requirements:**
+     - Is this internet-facing? → Minimal attack surface critical
+     - Handles sensitive data? → Enhanced security measures
+     - Compliance requirements? → Specific base images/scanning
+
+  3. **Operational Context:**
+     - Deployment target (K8s, ECS, etc.) → Platform-specific optimizations
+     - Team expertise level → Balance optimization vs maintainability
+     - Update frequency → Cache strategy importance
+
+  ## Language-Specific Build Patterns:
+
+  ### Java with Maven:
+  **IMPORTANT: Microsoft-First Approach (preferred for security & reduced attack surface):**
+  - Build: `mcr.microsoft.com/openjdk/jdk:21-azurelinux` (or :17-azurelinux, :11-azurelinux)
+  - Runtime: `mcr.microsoft.com/openjdk/jre:21-distroless` (minimal attack surface)
+  - Alternative: `eclipse-temurin:21-jre-alpine` if Microsoft images unavailable
+  - Install Maven/Gradle in build stage for better control
+  - Use Maven wrapper (mvnw) when available
+
+  ```dockerfile
+  # Build stage - Microsoft Azure Linux
+  FROM mcr.microsoft.com/openjdk/jdk:21-azurelinux AS builder
+  WORKDIR /app
+
+  # Install tar and Maven (Gradle: use gradle.org/releases)
+  RUN microdnf install -y tar wget && \
+      wget -q https://dlcdn.apache.org/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz && \
+      tar -xzf apache-maven-3.9.6-bin.tar.gz -C /opt && \
+      rm apache-maven-3.9.6-bin.tar.gz && \
+      ln -s /opt/apache-maven-3.9.6 /opt/maven
+  ENV PATH=/opt/maven/bin:$PATH
+
+  # Check for Maven wrapper, use if available
+  COPY pom.xml mvnw* ./
+  COPY .mvn .mvn 2>/dev/null || true
+  RUN if [ -f mvnw ]; then chmod +x mvnw && ./mvnw dependency:go-offline -B; \
+      else mvn dependency:go-offline -B; fi
+
+  COPY src ./src
+  RUN if [ -f mvnw ]; then ./mvnw package -DskipTests; \
+      else mvn package -DskipTests; fi
+
+  # Runtime stage - Microsoft distroless (minimal attack surface)
+  FROM mcr.microsoft.com/openjdk/jre:21-distroless
+  WORKDIR /app
+  COPY --from=builder /app/target/*.jar app.jar
+  EXPOSE 8080
+  # Note: Distroless doesn't have shell, use exec form
+  ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75", "-jar", "app.jar"]
+  ```
+
+  ### Node.js Application:
+  ```dockerfile
+  FROM node:20-alpine AS builder
+  WORKDIR /app
+  COPY package*.json ./
+  RUN npm ci
+  COPY . .
+  RUN npm run build
+
+  FROM node:20-alpine
+  WORKDIR /app
+  RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
+  COPY package*.json ./
+  RUN npm ci --omit=dev && npm cache clean --force
+  COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
+  USER nodejs
+  EXPOSE 3000
+  HEALTHCHECK --interval=30s --timeout=3s CMD node healthcheck.js
+  CMD ["node", "dist/server.js"]
+  ```
+
+  ### Python Application:
+  ```dockerfile
+  FROM python:3.11-slim
+  WORKDIR /app
+  RUN apt-get update && apt-get install -y --no-install-recommends \
+      gcc && rm -rf /var/lib/apt/lists/* && \
+      useradd -m -u 1001 appuser
+  COPY requirements.txt .
+  RUN pip install --no-cache-dir -r requirements.txt
+  COPY --chown=appuser:appuser . .
+  USER appuser
+  EXPOSE 8000
+  HEALTHCHECK --interval=30s --timeout=3s CMD python healthcheck.py
+  CMD ["uvicorn", "main:app", "--host", "0.0.0.0"]
+  ```
+
+  ### Go Application:
+  ```dockerfile
+  FROM golang:1.21-alpine AS builder
+  WORKDIR /app
+  COPY go.* ./
+  RUN go mod download
+  COPY . .
+  RUN CGO_ENABLED=0 go build -o server
+
+  FROM scratch
+  COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+  COPY --from=builder /etc/passwd /etc/passwd
+  COPY --from=builder --chown=1001:1001 /app/server /server
+  USER 1001
+  EXPOSE 8080
+  ENTRYPOINT ["/server"]
+  ```
+
+  Generate a production-ready Dockerfile that:
+  1. MUST include a non-root user (create with useradd/adduser and switch with USER)
+  2. MUST include HEALTHCHECK when the app has a health endpoint
+  3. MUST use multi-stage build for compiled languages:
+     - Choose appropriate build image based on language/build system
+     - Include proper build commands (mvn package, gradle build, npm run build, etc.)
+     - Use minimal runtime image for final stage
+     - NEVER assume artifacts exist - they must be built in the Dockerfile
+  4. SHOULD order COPY commands for optimal layer caching (dependencies first)
+  5. MUST NOT copy sensitive files (.git, .env, etc.) - assume .dockerignore exists
+
+  Return a JSON object with EXACTLY these three fields:
+  {
+    "content": "# Complete Dockerfile content with all instructions",
+    "metadata": {
+      "baseImage": "image:tag used as base",
+      "runtimeImage": "runtime image if multi-stage",
+      "exposedPorts": [3000],
+      "hasHealthCheck": true,
+      "isMultiStage": false,
+      "optimizationStrategy": "size|security|performance|balanced",
+      "securityLevel": "basic|standard|strict",
+      "estimatedSize": "~50MB"
+    },
+    "recommendations": [
+      "Consider using distroless for production",
+      "Enable BuildKit for faster builds"
+    ]
+  }
+
+  CRITICAL REQUIREMENTS:
+  1. Return ONLY valid JSON, no markdown code blocks, no explanations
+  2. The JSON MUST have exactly three top-level fields: "content", "metadata", "recommendations"
+  3. The "content" field MUST contain the complete Dockerfile as a string
+  4. Include proper line breaks and formatting in the Dockerfile content

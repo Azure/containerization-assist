@@ -233,7 +233,7 @@ export const createMockIntelligentTools = (logger: Logger): Record<string, Intel
   },
 
   generate_dockerfile: {
-    name: 'generate_dockerfile',
+    name: 'generate-dockerfile',
     supportsSampling: true,
     samplingConfig: {
       maxCandidates: 5,
@@ -280,7 +280,7 @@ export const createMockIntelligentTools = (logger: Logger): Record<string, Intel
   },
 
   build_image: {
-    name: 'build_image',
+    name: 'build-image',
     supportsSampling: false,
     async execute(args: Record<string, unknown>): Promise<Result<ToolResult>> {
       logger.info({ args }, 'Mock: Building image');
@@ -336,7 +336,7 @@ export const createMockIntelligentTools = (logger: Logger): Record<string, Intel
   },
 
   generate_k8s_manifests: {
-    name: 'generate_k8s_manifests',
+    name: 'generate-k8s-manifests',
     supportsSampling: true,
     samplingConfig: {
       maxCandidates: 3,
@@ -400,7 +400,7 @@ export const createMockIntelligentTools = (logger: Logger): Record<string, Intel
   },
 
   verify_deployment: {
-    name: 'verify_deployment',
+    name: 'verify-deploy',
     supportsSampling: false,
     async execute(args: Record<string, unknown>): Promise<Result<ToolResult>> {
       logger.info({ args }, 'Mock: Verifying deployment');

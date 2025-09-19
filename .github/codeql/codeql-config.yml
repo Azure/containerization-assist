@@ -1,0 +1,16 @@
+name: "CodeQL config"
+
+paths-ignore:
+  - test
+  - tests
+  - '**/*.test.ts'
+  - '**/*.spec.ts'
+  - '**/test/**'
+  - '**/tests/**'
+  - '__tests__'
+  - '**/__tests__/**'
+  - '**/*.test.js'
+  - '**/*.spec.js'
+
+queries:
+  - uses: security-and-quality

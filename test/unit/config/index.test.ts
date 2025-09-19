@@ -1,4 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+
+// Mock the docker-client module before importing config
+jest.mock('../../../src/services/docker-client', () => ({
+  autoDetectDockerSocket: jest.fn(() => '/var/run/docker.sock'),
+  createDockerClient: jest.fn(),
+}));
+
 import { config, logConfigSummaryIfDev } from '../../../src/config/index';
 
 describe('Main Configuration', () => {

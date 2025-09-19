@@ -1,4 +1,4 @@
-import type { MCPConfig } from '../../src/config/mcp-config.js';
+import type { AppConfig } from '../../../src/config/index';
 
 /**
  * Mock configuration presets for different testing scenarios
@@ -58,7 +58,7 @@ export const MOCK_CONFIG_PRESETS = {
       enableDeploymentVerification: false, // Disabled for faster tests
       verificationTimeout: 30000,
     },
-  } as MCPConfig,
+  } as any, // TODO: Align with AppConfig structure
 
   /**
    * Development configuration with debugging enabled
@@ -114,7 +114,7 @@ export const MOCK_CONFIG_PRESETS = {
       enableDeploymentVerification: true,
       verificationTimeout: 180000, // 3 minutes
     },
-  } as MCPConfig,
+  } as any, // TODO: Align with AppConfig structure
 
   /**
    * Minimal configuration for basic functionality testing
@@ -170,7 +170,7 @@ export const MOCK_CONFIG_PRESETS = {
       enableDeploymentVerification: false,
       verificationTimeout: 60000,
     },
-  } as MCPConfig,
+  } as any, // TODO: Align with AppConfig structure
 
   /**
    * Stress test configuration for performance testing
@@ -226,7 +226,7 @@ export const MOCK_CONFIG_PRESETS = {
       enableDeploymentVerification: true,
       verificationTimeout: 600000, // 10 minutes
     },
-  } as MCPConfig,
+  } as any, // TODO: Align with AppConfig structure
 } as const;
 
 export type MockConfigPreset = keyof typeof MOCK_CONFIG_PRESETS;
@@ -234,8 +234,8 @@ export type MockConfigPreset = keyof typeof MOCK_CONFIG_PRESETS;
 /**
  * Get a mock configuration by preset name
  */
-export const getMockConfig = (preset: MockConfigPreset): MCPConfig => {
-  return JSON.parse(JSON.stringify(MOCK_CONFIG_PRESETS[preset])) as MCPConfig;
+export const getMockConfig = (preset: MockConfigPreset): any => {
+  return JSON.parse(JSON.stringify(MOCK_CONFIG_PRESETS[preset])) as any;
 };
 
 /**
@@ -244,7 +244,7 @@ export const getMockConfig = (preset: MockConfigPreset): MCPConfig => {
 export const createMockConfig = (
   basePreset: MockConfigPreset = 'development',
   overrides: Partial<MCPConfig> = {},
-): MCPConfig => {
+): any => {
   const baseConfig = getMockConfig(basePreset);
   return {
     ...baseConfig,
@@ -312,7 +312,7 @@ export const getTestConfigForIntegration = (): MCPConfig => createMockConfig('de
 /**
  * Configuration validator for testing
  */
-export const validateMockConfig = (config: MCPConfig): { valid: boolean; errors: string[] } => {
+export const validateMockConfig = (config: any): { valid: boolean; errors: string[] } => {
   const errors: string[] = [];
 
   // Validate scoring weights

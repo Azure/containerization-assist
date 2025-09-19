@@ -107,7 +107,7 @@ function isContainerizationError(error: unknown): error is DomainError {
  * logger.error(getErrorDetails(error), 'Tool execution failed');
  * ```
  */
-export function getErrorDetails(error: unknown): Record<string, any> {
+export function getErrorDetails(error: unknown): Record<string, unknown> {
   if (error instanceof McpError) {
     return {
       code: error.code,

@@ -494,16 +494,16 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
     },
 
     {
-      name: 'verify-deployment-tool',
+      name: 'verify-deploy-tool',
       category: 'tool-validation',
       description: 'Test deployment verification functionality',
       tags: ['tools', 'verification', 'kubernetes'],
       timeout: 25000,
       execute: async () => {
         const start = performance.now();
-        
+
         const result = await client.callTool({
-          name: 'verify-deployment',
+          name: 'verify-deploy',
           arguments: {
             sessionId: 'verify-test-123',
             deploymentName: 'test-deployment',

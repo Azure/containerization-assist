@@ -6,6 +6,10 @@ import type { SessionManager } from '@/lib/session/session-manager';
 export function createToolSessionHelpersMock() {
   return {
     ensureSession: jest.fn(),
+    getSession: jest.fn(),
+    updateSession: jest.fn(),
+    createSession: jest.fn(),
+    completeStep: jest.fn(),
     useSessionSlice: jest.fn((toolName: string, io: any, context: any) => {
       // Simulate the actual behavior where patch calls sessionManager.update
       return {

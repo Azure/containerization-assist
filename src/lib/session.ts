@@ -1,5 +1,5 @@
 /**
- * Session Manager - Simplified workflow state persistence
+ * Session Manager - Workflow state persistence
  *
  * Invariant: Sessions expire after TTL to prevent memory leaks
  * Trade-off: In-memory storage for simplicity over persistence
@@ -31,7 +31,7 @@ export interface SessionConfig {
 }
 
 /**
- * Simplified Session Manager using class-based approach
+ * Session Manager using class-based approach
  */
 export class SessionManager {
   private sessions = new Map<string, Session>();
@@ -39,9 +39,12 @@ export class SessionManager {
   private logger: Logger;
   private ttl: number;
   private maxSessions: number;
+  private static instanceCounter = 0;
+  private instanceId: number;
 
   constructor(logger: Logger, config: SessionConfig = {}) {
-    this.logger = logger.child({ service: 'session-manager' });
+    this.instanceId = ++SessionManager.instanceCounter;
+    this.logger = logger.child({ service: 'session-manager', instanceId: this.instanceId });
     this.ttl = config.ttl ?? DEFAULT_TTL;
     this.maxSessions = config.maxSessions ?? DEFAULT_MAX_SESSIONS;
 
@@ -52,6 +55,7 @@ export class SessionManager {
 
     this.logger.info(
       {
+        instanceId: this.instanceId,
         maxSessions: this.maxSessions,
         ttlSeconds: this.ttl,
       },
@@ -105,27 +109,52 @@ export class SessionManager {
   async get(sessionId: string): Promise<Result<WorkflowState | null>> {
     const session = this.sessions.get(sessionId);
 
-    this.logger.debug(
+    this.logger.info(
       {
         sessionId,
         found: !!session,
+        totalSessions: this.sessions.size,
+        allSessionIds: Array.from(this.sessions.keys()),
       },
       'Session lookup',
     );
 
     if (!session) {
+      this.logger.warn(
+        { sessionId, availableSessions: Array.from(this.sessions.keys()) },
+        'Session not found',
+      );
       return Success(null);
     }
 
     // Check if expired based on lastAccessedAt
-    if (Date.now() - session.lastAccessedAt.getTime() > this.ttl * 1000) {
+    const sessionAge = Date.now() - session.lastAccessedAt.getTime();
+    const ttlMs = this.ttl * 1000;
+    if (sessionAge > ttlMs) {
       this.sessions.delete(sessionId);
-      this.logger.debug({ sessionId }, 'Expired session removed');
+      this.logger.warn(
+        {
+          sessionId,
+          sessionAgeMs: sessionAge,
+          ttlMs,
+          sessionAgeMinutes: Math.round(sessionAge / 60000),
+        },
+        'Expired session removed',
+      );
       return Success(null);
     }
 
     // Update access time
     session.lastAccessedAt = new Date();
+
+    this.logger.info(
+      {
+        sessionId,
+        sessionKeys: Object.keys(session),
+        hasAnalyzeRepoResult: 'analyze-repo-result' in session,
+      },
+      'Session found and returning',
+    );
 
     // Return without lastAccessedAt to match WorkflowState interface
     const { lastAccessedAt: _lastAccessed, ...workflowState } = session;
@@ -138,8 +167,22 @@ export class SessionManager {
   async update(sessionId: string, state: Partial<WorkflowState>): Promise<Result<WorkflowState>> {
     const session = this.sessions.get(sessionId);
     if (!session) {
+      this.logger.error(
+        { sessionId, availableSessions: Array.from(this.sessions.keys()) },
+        'Session not found for update',
+      );
       return Failure(`Session ${sessionId} not found`);
     }
+
+    this.logger.info(
+      {
+        sessionId,
+        beforeUpdateKeys: Object.keys(session),
+        updateDataKeys: Object.keys(state),
+        hasAnalyzeRepoResultInUpdate: 'analyze-repo-result' in state,
+      },
+      'About to update session',
+    );
 
     // Update session with merged metadata
     const now = new Date();
@@ -152,12 +195,17 @@ export class SessionManager {
       lastAccessedAt: now,
     });
 
-    this.logger.debug(
+    this.logger.info(
       {
         sessionId,
-        updatedFields: Object.keys(state).length,
+        updatedFields: Object.keys(state),
+        afterUpdateKeys: Object.keys(session),
+        hasAnalyzeRepoResultAfterUpdate: 'analyze-repo-result' in session,
+        analyzeRepoResultData: session['analyze-repo-result']
+          ? JSON.stringify(session['analyze-repo-result']).substring(0, 100)
+          : null,
       },
-      'Session updated',
+      'Session updated successfully',
     );
 
     // Return without lastAccessedAt to match WorkflowState interface

@@ -15,6 +15,21 @@ export * from './categories';
 // Export consolidated core types
 export * from './core';
 
+// Export MCP types
+export * from './mcp';
+
+// Export Docker and Kubernetes types
+export * from './docker';
+export * from './kubernetes';
+
+// Export AI-first output schemas
+export { DockerfileOutputSchema, type DockerfileOutput } from '@tools/generate-dockerfile/schema';
+export {
+  K8sManifestOutputSchema,
+  type K8sManifestOutput,
+} from '@tools/generate-k8s-manifests/schema';
+export { DockerfileFixOutputSchema, type DockerfileFixOutput } from '@tools/fix-dockerfile/schema';
+
 export type { ToolContext } from '../mcp/context';
 
 /**

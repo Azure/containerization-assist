@@ -39,3 +39,37 @@ export const fixDockerfileSchema = z.object({
 });
 
 export type FixDockerfileParams = z.infer<typeof fixDockerfileSchema>;
+
+/**
+ * Output schema for fix-dockerfile tool (AI-first)
+ */
+export const DockerfileFixOutputSchema = z.object({
+  fixedDockerfile: z.string().describe('Fixed Dockerfile content'),
+  changes: z
+    .array(
+      z.object({
+        type: z
+          .enum(['security', 'performance', 'best-practice', 'syntax', 'deprecation'])
+          .describe('Type of change made'),
+        description: z.string().describe('Description of the change'),
+        before: z.string().describe('Content before the change'),
+        after: z.string().describe('Content after the change'),
+        impact: z.enum(['high', 'medium', 'low']).describe('Impact level of the change'),
+      }),
+    )
+    .describe('List of changes made'),
+  securityImprovements: z.array(z.string()).describe('List of security improvements applied'),
+  performanceOptimizations: z
+    .array(z.string())
+    .describe('List of performance optimizations applied'),
+  sizeReduction: z.string().nullable().describe('Size reduction techniques used or null if none'),
+  warnings: z
+    .array(z.string())
+    .nullable()
+    .describe('Warnings about potential issues or null if none'),
+  isValid: z.boolean().describe('Whether the fixed Dockerfile is valid'),
+  estimatedBuildTime: z.string().nullable().describe('Estimated build time or null if unknown'),
+  estimatedImageSize: z.string().nullable().describe('Estimated image size or null if unknown'),
+});
+
+export type DockerfileFixOutput = z.infer<typeof DockerfileFixOutputSchema>;

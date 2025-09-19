@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-echo "🛡️ Running pre-commit quality gates..."
+echo "🛡️ Running pre-commit checks..."
 
 # Fail fast on any error
 set -eu
@@ -18,13 +18,7 @@ fi
 # Run lint-staged for incremental checks
 npx lint-staged
 
-# Run quality gates
-npm run quality:gates
-
-# Stage the quality-gates.json file if it was modified AND still exists
-if [ -f quality-gates.json ] && git status --porcelain | grep -v '^D ' | grep -q "quality-gates.json"; then
-    echo "📊 Staging updated quality-gates.json metrics..."
-    git add quality-gates.json
-fi
+# Run simplified quality check
+./scripts/quality-check.sh
 
 echo "✅ Pre-commit checks passed!"

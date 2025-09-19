@@ -8,7 +8,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { createConfigurationManager, type ConfigurationManagerInterface } from '../../../../src/lib/sampling-config';
 import { createConfigValidator } from '../../../../src/lib/config-validator';
-import { createConfigScoringEngine } from '../../../../src/lib/config-scoring-engine';
+import { createConfigScoringEngine } from '../../../../src/lib/scoring/internal/config-scoring-engine';
 
 describe('ConfigurationManager', () => {
   let tempDir: string;

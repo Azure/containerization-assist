@@ -22,7 +22,7 @@
 import { promises as fs, constants } from 'node:fs';
 import * as path from 'node:path';
 import { normalizePath } from '@/lib/path-utils';
-import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
+import { ensureSession, useSessionSlice } from '@/mcp/tool-session-helpers';
 import type { Logger } from '@/lib/logger';
 import { createStandardProgress } from '@/mcp/progress-helper';
 import { aiGenerateWithSampling } from '@/mcp/tool-ai-helpers';
@@ -31,14 +31,41 @@ import { getBaseImageRecommendations } from '@/lib/base-images';
 import type { ToolContext } from '@/mcp/context';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { Success, Failure, type Result } from '@/types';
-import { analyzeRepoSchema, type AnalyzeRepoParams } from './schema';
+import { type AnalyzeRepoParams, analyzeRepoSchema } from './schema';
 import { z } from 'zod';
 import { parsePackageJson, getAllDependencies } from '@/lib/parsing-package-json';
-import { DEFAULT_PORTS } from '@/config/defaults';
+// Default ports configuration moved inline
+const DEFAULT_PORTS: Record<string, string | Record<string, string>> = {
+  nodejs: '3000',
+  python: '8000',
+  java: '8080',
+  go: '8080',
+  ruby: '3000',
+  php: '80',
+  dotnet: '5000',
+  rust: '8000',
+  default: '8080',
+  frameworks: {
+    express: '3000',
+    fastapi: '8000',
+    flask: '5000',
+    django: '8000',
+    spring: '8080',
+    rails: '3000',
+    laravel: '8000',
+    aspnet: '5000',
+    actix: '8080',
+    gin: '8080',
+    echo: '8080',
+    nextjs: '3000',
+    nuxt: '3000',
+    gatsby: '8000',
+  },
+};
 import { extractErrorMessage } from '@/lib/error-utils';
 
 // Define the result schema for type safety
-const AnalyzeRepoResultSchema = z.object({
+const _AnalyzeRepoResultSchema = z.object({
   ok: z.boolean(),
   sessionId: z.string(),
   language: z.string(),
@@ -88,17 +115,8 @@ const AnalyzeRepoResultSchema = z.object({
 });
 
 // Define the result type from the schema
-export type AnalyzeRepoResult = z.infer<typeof AnalyzeRepoResultSchema>;
+export type AnalyzeRepoResult = z.infer<typeof _AnalyzeRepoResultSchema>;
 
-// Define tool IO for type-safe session operations
-const io = defineToolIO(analyzeRepoSchema, AnalyzeRepoResultSchema);
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastAnalyzedAt: z.date().optional(),
-  analysisDepth: z.number().optional(),
-  detectedLanguages: z.array(z.string()).default([]),
-});
 const LANGUAGE_SIGNATURES: Record<string, { extensions: string[]; files: string[] }> = {
   javascript: {
     extensions: ['.js', '.mjs', '.cjs'],
@@ -660,11 +678,23 @@ async function detectPorts(language: string): Promise<number[]> {
   const ports: Set<number> = new Set();
 
   // Use centralized default ports by language/framework
-  const languageKey = language as keyof typeof DEFAULT_PORTS;
+  const languageKey = language;
   const languagePorts = DEFAULT_PORTS[languageKey] || DEFAULT_PORTS.default;
 
   if (languagePorts) {
-    languagePorts.forEach((port) => ports.add(port));
+    if (typeof languagePorts === 'string') {
+      const portNum = parseInt(languagePorts, 10);
+      if (!isNaN(portNum)) {
+        ports.add(portNum);
+      }
+    } else if (typeof languagePorts === 'object') {
+      Object.values(languagePorts).forEach((port: string) => {
+        const portNum = parseInt(port, 10);
+        if (!isNaN(portNum)) {
+          ports.add(portNum);
+        }
+      });
+    }
   }
 
   return Array.from(ports);
@@ -780,7 +810,7 @@ async function analyzeRepoImpl(
     }
 
     const { id: sessionId, state: _session } = sessionResult.value;
-    const slice = useSessionSlice('analyze-repo', io, context, StateSchema);
+    const slice = useSessionSlice('analyze-repo', context);
 
     if (!slice) {
       return Failure('Session manager not available');
@@ -1024,4 +1054,10 @@ async function analyzeRepoImpl(
  * Main entry point for repository analysis tool.
  * Provides comprehensive project analysis for containerization planning.
  */
-export const analyzeRepo = analyzeRepoImpl;
+export const analyzeRepo: import('@/mcp/tools/types').StandardToolExport = {
+  type: 'standard',
+  name: 'analyze-repo',
+  description: 'Analyze repository structure for containerization recommendations',
+  inputSchema: analyzeRepoSchema,
+  execute: analyzeRepoImpl,
+};

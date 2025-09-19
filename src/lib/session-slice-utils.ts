@@ -4,14 +4,13 @@
  * Provides typed wrapper utilities for tool-specific session slices
  */
 
-import { z } from 'zod';
 import type { ToolContext } from '@/mcp/context';
 import type { SessionManager } from './session';
 import { Result, Success, Failure } from '@/types';
+import { createLogger } from './logger';
 import {
   SessionSlice,
   SessionSliceOperations,
-  ToolIO,
   ToolSliceMetadata,
   hasToolSlices,
   createSliceMetadata,
@@ -32,27 +31,23 @@ function getSessionManager(context?: ToolContext): SessionManager | null {
 }
 
 /**
- * Create typed session slice operations for a tool
+ * Create session slice operations for a tool
  *
  * @param toolName - Name of the tool (used as namespace in session)
- * @param io - Tool input/output schemas
- * @param stateSchema - Optional schema for tool-specific state
  * @param context - Tool context containing session manager
  * @returns Session slice operations or null if no session manager
  */
-export function useSessionSlice<In, Out, State = Record<string, unknown>>(
+export function useSessionSlice(
   toolName: string,
-  _io: ToolIO<In, Out>,
   context?: ToolContext,
-  _stateSchema?: z.ZodType<State>,
-): SessionSliceOperations<In, Out, State> | null {
+): SessionSliceOperations | null {
   const sessionManager = getSessionManager(context);
   if (!sessionManager) {
     return null;
   }
 
   return {
-    async get(sessionId: string): Promise<SessionSlice<In, Out, State> | null> {
+    async get(sessionId: string): Promise<SessionSlice | null> {
       try {
         const sessionResult = await sessionManager.get(sessionId);
         if (!sessionResult.ok || !sessionResult.value) {
@@ -76,15 +71,16 @@ export function useSessionSlice<In, Out, State = Record<string, unknown>>(
         }
 
         // Type assertion after validation
-        return slice as SessionSlice<In, Out, State>;
+        return slice as SessionSlice;
       } catch (error) {
         // Log error but return null for graceful degradation
-        console.error(`Failed to get session slice for ${toolName}:`, error);
+        const logger = createLogger({ name: 'session-slice-utils' });
+        logger.error({ error }, `Failed to get session slice for ${toolName}`);
         return null;
       }
     },
 
-    async set(sessionId: string, slice: SessionSlice<In, Out, State>): Promise<void> {
+    async set(sessionId: string, slice: SessionSlice): Promise<void> {
       const sessionResult = await sessionManager.get(sessionId);
       if (!sessionResult.ok || !sessionResult.value) {
         // Create new session if it doesn't exist
@@ -124,7 +120,7 @@ export function useSessionSlice<In, Out, State = Record<string, unknown>>(
       });
     },
 
-    async patch(sessionId: string, partial: Partial<SessionSlice<In, Out, State>>): Promise<void> {
+    async patch(sessionId: string, partial: Partial<SessionSlice>): Promise<void> {
       const existing = await this.get(sessionId);
 
       if (!existing) {
@@ -133,9 +129,9 @@ export function useSessionSlice<In, Out, State = Record<string, unknown>>(
           throw new Error('Cannot create new slice without input');
         }
         // Create a minimal slice with the partial data
-        const newSlice: SessionSlice<In, Out, State> = {
+        const newSlice: SessionSlice = {
           input: partial.input,
-          state: (partial.state || {}) as State,
+          state: partial.state || {},
           updatedAt: new Date(),
         };
         // Only add output if it's defined
@@ -147,7 +143,7 @@ export function useSessionSlice<In, Out, State = Record<string, unknown>>(
       }
 
       // Merge with existing slice
-      const updated: SessionSlice<In, Out, State> = {
+      const updated: SessionSlice = {
         ...existing,
         ...partial,
         updatedAt: new Date(),
@@ -181,23 +177,20 @@ export function useSessionSlice<In, Out, State = Record<string, unknown>>(
 }
 
 /**
- * Get typed session slice with Result wrapper
+ * Get session slice with Result wrapper
  *
  * @param toolName - Name of the tool
  * @param sessionId - Session ID
- * @param io - Tool input/output schemas
  * @param context - Tool context
  * @returns Result with session slice or error
  */
-export async function getSessionSlice<In, Out, State = Record<string, unknown>>(
+export async function getSessionSlice(
   toolName: string,
   sessionId: string,
-  io: ToolIO<In, Out>,
   context?: ToolContext,
-  stateSchema?: z.ZodType<State>,
-): Promise<Result<SessionSlice<In, Out, State> | null>> {
+): Promise<Result<SessionSlice | null>> {
   try {
-    const ops = useSessionSlice(toolName, io, context, stateSchema);
+    const ops = useSessionSlice(toolName, context);
     if (!ops) {
       return Failure('Session manager not available');
     }
@@ -209,25 +202,22 @@ export async function getSessionSlice<In, Out, State = Record<string, unknown>>(
 }
 
 /**
- * Update typed session slice with Result wrapper
+ * Update session slice with Result wrapper
  *
  * @param toolName - Name of the tool
  * @param sessionId - Session ID
  * @param slice - Partial slice to update
- * @param io - Tool input/output schemas
  * @param context - Tool context
  * @returns Result indicating success or failure
  */
-export async function updateSessionSlice<In, Out, State = Record<string, unknown>>(
+export async function updateSessionSlice(
   toolName: string,
   sessionId: string,
-  slice: Partial<SessionSlice<In, Out, State>>,
-  io: ToolIO<In, Out>,
+  slice: Partial<SessionSlice>,
   context?: ToolContext,
-  stateSchema?: z.ZodType<State>,
 ): Promise<Result<void>> {
   try {
-    const ops = useSessionSlice(toolName, io, context, stateSchema);
+    const ops = useSessionSlice(toolName, context);
     if (!ops) {
       return Failure('Session manager not available');
     }

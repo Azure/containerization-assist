@@ -1,0 +1,85 @@
+# Organization Policy Configuration
+version: "1.0.0"
+id: "org"
+description: "Organization-wide policies for content generation and tool execution"
+
+# Hard limits that cannot be exceeded
+limits:
+  maxTokens: 8192
+  maxCost: 0.50
+  maxTimeMs: 300000
+  maxRetries: 3
+
+# Security constraints
+security:
+  forbiddenPatterns:
+    - "password:"
+    - "api_key:"
+    - "secret:"
+    - "token:"
+  requireSecurityScan: true
+  enforceNonRootUser: true
+  preventPrivilegedContainers: true
+
+# Performance requirements
+performance:
+  maxLatencyMs: 5000
+  maxMemoryMB: 512
+  requireCaching: true
+  requireOptimization: true
+
+# Quality standards
+quality:
+  minTestCoverage: 80
+  requireLinting: true
+  requireDocumentation: true
+  enforceNamingConventions: true
+
+# Compliance requirements
+compliance:
+  dataResidency: "us-west-2"
+  retentionDays: 90
+  auditLogging: true
+  gdprCompliant: true
+
+# Tool-specific policies
+toolPolicies:
+  "generate-dockerfile":
+    requireMultiStage: true
+    maxLayers: 20
+    requireHealthcheck: true
+
+  "generate-k8s-manifests":
+    requireResourceLimits: true
+    requireLivenessProbe: true
+    requireReadinessProbe: true
+    maxReplicas: 100
+
+  "build-image":
+    maxImageSizeMB: 1024
+    requireSignature: false
+    scanVulnerabilities: true
+
+  "deploy":
+    requireApproval: false
+    allowedNamespaces:
+      - "default"
+      - "development"
+      - "staging"
+      - "production"
+    forbiddenNamespaces:
+      - "kube-system"
+      - "kube-public"
+
+# Cost optimization
+costOptimization:
+  preferCheaperModels: true
+  cacheExpensiveOperations: true
+  batchRequests: true
+
+# Governance
+governance:
+  changeApproval: false
+  requireJustification: false
+  trackUsage: true
+  enforceQuotas: true
