@@ -175,19 +175,27 @@ function applyPreference(
 }
 
 /**
- * Detects the appropriate platform for a given base image
+ * Platform selection:
+ * 1) Images under mcr.microsoft.com/dotnet/framework/* are .NET Framework and Windows-only → use "windows/amd64".
+ * 2) All other modern .NET images live under mcr.microsoft.com/dotnet/* (no "framework"; e.g., aspnet/sdk/runtime)
+ *    and are Linux container images → use "linux/amd64".
  *
- * @param baseImage - The Docker base image name
- * @returns Platform string (e.g., 'linux/amd64', 'windows/amd64')
+ * Windows container images require the Windows kernel.
+ * Modern .NET (5+) images are Linux container images.
+ *
+ * Does not account for retagged private registry images which may have a different name
  */
 export function getPlatformForBaseImage(baseImage: string): string {
-  // .NET Framework requires Windows
-  if (baseImage.includes('dotnet/framework')) {
-    return 'windows/amd64';
-  }
+  const img = baseImage.toLowerCase();
 
-  // Everything else supports Linux
-  return 'linux/amd64';
+  // Simple Heuristics for Windows-only .NET images
+  const isWindows =
+    /(^|\/)dotnet\/framework/.test(img) ||
+    /(^|[-_.:])nanoserver($|[-_.:])/.test(img) ||
+    /(^|[-_.:])servercore($|[-_.:])/.test(img) ||
+    /(^|\/)windows(\/|:)/.test(img);
+
+  return isWindows ? 'windows/amd64' : 'linux/amd64';
 }
 
 /**
