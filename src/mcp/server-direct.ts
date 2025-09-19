@@ -16,7 +16,7 @@ import { createToolRouter, type ToolRouter } from './tool-router';
 
 // Single unified tool definition structure
 interface ToolDefinition {
-  name: string;
+  name: ToolName;
   description: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   schema: any; // Zod schema object (needs to be any for .shape property)
@@ -59,6 +59,7 @@ import { convertAcaToK8s } from '@/tools/convert-aca-to-k8s/tool';
 import { convertAcaToK8sSchema } from '@/tools/convert-aca-to-k8s/schema';
 import { inspectSession } from '@/tools/inspect-session/tool';
 import { InspectSessionParamsSchema as inspectSessionSchema } from '@/tools/inspect-session/schema';
+import { ToolName } from '@/exports/tools';
 
 // Unified tool definitions
 const TOOLS: ToolDefinition[] = [
@@ -90,7 +91,7 @@ const TOOLS: ToolDefinition[] = [
     ) => Promise<Result<unknown>>,
   },
   {
-    name: 'scan',
+    name: 'scan_image',
     description: 'Scan image for vulnerabilities',
     schema: scanImageSchema,
     handler: scanImage as (
@@ -293,7 +294,7 @@ export const registerHandlers = async (state: MCPServerState): Promise<void> => 
  */
 export const initializeRouter = (state: MCPServerState): void => {
   // Create tools map for router
-  const tools = new Map<string, import('./tool-router').RouterTool>();
+  const tools = new Map<ToolName, import('./tool-router').RouterTool>();
   for (const tool of TOOLS) {
     tools.set(tool.name, {
       name: tool.name,
