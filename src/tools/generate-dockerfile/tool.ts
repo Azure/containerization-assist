@@ -24,7 +24,7 @@ import type { SessionAnalysisResult } from '@/tools/session-types';
 import type { ToolContext } from '@/mcp/context';
 import { Success, Failure, type Result } from '@/types';
 import { getDefaultPort, ANALYSIS_CONFIG } from '@/config/defaults';
-import { getRecommendedBaseImage, getPlatformForBaseImage } from '@lib/base-images';
+import { getRecommendedBaseImage, getPlatformForBaseImage } from '@/lib/base-images';
 import {
   stripFencesAndNoise,
   isValidDockerfileContent,

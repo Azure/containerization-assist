@@ -46,8 +46,6 @@ export const generateDockerfileSchema = z.object({
     .string()
     .optional()
     .describe('Target platform (e.g., linux/amd64, linux/arm64, windows/amd64)'),
-  path: z.string().optional().describe('Repository path (use forward slashes: /path/to/repo)'),
-  moduleRoots: z
   path: z.string().describe('Repository path (use forward slashes: /path/to/repo)'),
   dockerfileDirectoryPaths: z
     .array(z.string())
