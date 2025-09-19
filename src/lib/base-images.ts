@@ -190,10 +190,11 @@ export function getPlatformForBaseImage(baseImage: string): string {
 
   // Simple Heuristics for Windows-only .NET images
   const isWindows =
-    /(^|\/)dotnet\/framework/.test(img) ||
-    /(^|[-_.:])nanoserver($|[-_.:])/.test(img) ||
-    /(^|[-_.:])servercore($|[-_.:])/.test(img) ||
-    /(^|\/)windows(\/|:)/.test(img);
+    /(^|\/)dotnet\/framework/.test(img) || // .NET Framework (Windows-only)
+    /(^|\/)windowsservercore(\/|:|$)/.test(img) || // microsoft/windowsservercore legacy
+    /(^|\/)windows(\/|:)/.test(img) || // mcr.microsoft.com/windows/*
+    /(^|[-_.:])nanoserver($|[-_.:])/.test(img) || // *-nanoserver-*
+    /(^|[-_.:])servercore($|[-_.:])/.test(img); // *-servercore-*
 
   return isWindows ? 'windows/amd64' : 'linux/amd64';
 }
