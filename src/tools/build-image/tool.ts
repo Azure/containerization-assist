@@ -16,6 +16,7 @@
 import path from 'path';
 import { normalizePath } from '@/lib/path-utils';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import type { Logger } from '@/lib/logger';
 import { promises as fs } from 'node:fs';
 import {
   ensureSession,
@@ -89,7 +90,7 @@ async function prepareBuildArgs(
   buildArgs: Record<string, string> = {},
   sessionId: string,
   context: ToolContext,
-  logger: any,
+  logger: Logger,
 ): Promise<Record<string, string>> {
   const defaults: Record<string, string> = {
     NODE_ENV: process.env.NODE_ENV ?? 'production',

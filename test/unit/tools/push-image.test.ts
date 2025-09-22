@@ -1,14 +1,14 @@
 /**
- * Unit tests for push-image tool with fake DockerPort
+ * Unit tests for push-image tool with fake DockerClient
  */
 
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import type { DockerPort } from '../../../src/ports/docker';
+import type { DockerClient } from '../../../src/services/docker-client';
 import type { Result } from '../../../src/types';
 import { makePushImage } from '../../../src/tools/push-image/tool';
 
 describe('push-image tool', () => {
-  let fakeDocker: DockerPort;
+  let fakeDocker: DockerClient;
   let tagImageCalled: boolean;
   let pushImageCalled: boolean;
   
@@ -16,7 +16,7 @@ describe('push-image tool', () => {
     tagImageCalled = false;
     pushImageCalled = false;
     
-    // Create fake DockerPort implementation
+    // Create fake DockerClient implementation
     fakeDocker = {
       async pushImage(repository: string, tag: string): Promise<Result<{ digest: string }>> {
         pushImageCalled = true;
@@ -40,6 +40,61 @@ describe('push-image tool', () => {
       async buildImage(): Promise<Result<{ imageId: string; logs?: string[] }>> {
         // Not used in push-image
         return { ok: true, value: { imageId: 'test-id' } };
+      },
+
+      async getImage(): Promise<Result<any>> {
+        // Not used in push-image
+        return { ok: true, value: {} };
+      },
+
+      async removeImage(): Promise<Result<void>> {
+        // Not used in push-image
+        return { ok: true, value: undefined };
+      },
+
+      async removeContainer(): Promise<Result<void>> {
+        // Not used in push-image
+        return { ok: true, value: undefined };
+      },
+
+      async pullImage(): Promise<Result<void>> {
+        // Not used in push-image
+        return { ok: true, value: undefined };
+      },
+
+      async runContainer(): Promise<Result<any>> {
+        // Not used in push-image
+        return { ok: true, value: {} };
+      },
+
+      async listImages(): Promise<Result<any[]>> {
+        // Not used in push-image
+        return { ok: true, value: [] };
+      },
+
+      async listContainers(): Promise<Result<any[]>> {
+        // Not used in push-image
+        return { ok: true, value: [] };
+      },
+
+      async inspectContainer(): Promise<Result<any>> {
+        // Not used in push-image
+        return { ok: true, value: {} };
+      },
+
+      async execContainer(): Promise<Result<any>> {
+        // Not used in push-image
+        return { ok: true, value: {} };
+      },
+
+      async getContainerLogs(): Promise<Result<string>> {
+        // Not used in push-image
+        return { ok: true, value: '' };
+      },
+
+      async pruneImages(): Promise<Result<any>> {
+        // Not used in push-image
+        return { ok: true, value: {} };
       }
     };
   });

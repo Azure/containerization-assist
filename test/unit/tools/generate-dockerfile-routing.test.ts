@@ -163,6 +163,7 @@ describe('generate-dockerfile smart routing', () => {
       {
         sessionId: 'test-session',
         path: '/test/project',
+        dockerfileDirectoryPaths: ['/test/project'],
       },
       mockContext,
     );
@@ -230,6 +231,7 @@ describe('generate-dockerfile smart routing', () => {
       {
         sessionId: 'test-session',
         path: '/test/project',
+        dockerfileDirectoryPaths: ['/test/project'],
       },
       mockContext,
     );
@@ -297,6 +299,7 @@ describe('generate-dockerfile smart routing', () => {
       {
         sessionId: 'test-session',
         path: '/test/project',
+        dockerfileDirectoryPaths: ['/test/project'],
       },
       mockContext,
     );
@@ -365,6 +368,7 @@ describe('generate-dockerfile smart routing', () => {
       {
         sessionId: 'test-session',
         path: '/test/project',
+        dockerfileDirectoryPaths: ['/test/project'],
       },
       mockContext,
     );
@@ -432,6 +436,7 @@ describe('generate-dockerfile smart routing', () => {
       {
         sessionId: 'test-session',
         path: '/test/project',
+        dockerfileDirectoryPaths: ['/test/project'],
         optimization: 'performance',
       },
       mockContext,
@@ -446,7 +451,7 @@ describe('generate-dockerfile smart routing', () => {
         promptArgs: expect.objectContaining({
           repoPath: expect.any(String),
           optimization: 'performance',
-          moduleRoot: '.',
+          moduleRoot: '/test/project',
         }),
       }),
     );

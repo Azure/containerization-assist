@@ -43,6 +43,7 @@ export interface RegisteredTool {
   requires?: string[];
   category?: string;
   version?: string;
+  requiresOrchestration?: boolean; // Tool explicitly needs complex orchestration
 }
 
 /**
@@ -276,58 +277,6 @@ export interface KernelFactoryOptions {
   sessionManager?: SessionManager;
   telemetry?: TelemetrySystem;
   logger?: Logger;
-}
-
-// ============================================================================
-// Error Types
-// ============================================================================
-
-/**
- * Tool execution error
- */
-export class ToolExecutionError extends Error {
-  constructor(
-    public toolName: string,
-    public override message: string,
-    public override cause?: Error,
-  ) {
-    super(message);
-    this.name = 'ToolExecutionError';
-  }
-}
-
-/**
- * Validation error
- */
-export class ValidationError extends Error {
-  constructor(
-    public field: string,
-    public override message: string,
-    public value?: unknown,
-  ) {
-    super(message);
-    this.name = 'ValidationError';
-  }
-}
-
-/**
- * Precondition error
- */
-export class PreconditionError extends Error {
-  constructor(
-    public missing: string[],
-    public override message: string,
-  ) {
-    super(message);
-    this.name = 'PreconditionError';
-  }
-
-  /**
-   * Get a formatted string of missing preconditions
-   */
-  get formattedMissing(): string {
-    return this.missing.join(', ');
-  }
 }
 
 // ============================================================================

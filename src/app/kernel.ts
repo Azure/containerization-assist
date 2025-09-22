@@ -1,12 +1,26 @@
 /**
  * Application Kernel
  * Unified execution path for all tool invocations
+ *
+ * Architecture:
+ * - SimpleRouter: Handles single tool execution without dependencies
+ * - Kernel: Handles complex workflows, dependencies, and policy enforcement
+ *
+ * Routing Decision:
+ * - Simple tools (no dependencies, no complex policies) → SimpleRouter
+ * - Complex tools (with dependencies or policies) → Kernel orchestration
+ *
+ * This separation improves:
+ * - Performance: Simple tools bypass unnecessary complexity
+ * - Maintainability: Clear separation of concerns
+ * - Testability: Isolated components are easier to test
  */
 
 import { z } from 'zod';
 import { type Result, Success, Failure } from '@/types/index';
 import { createLogger } from '@/lib/logger';
 import { loadPolicy, applyPolicy, type UnifiedPolicy } from '@/config/policy';
+import { executeSimpleTool, canExecuteSimply } from '@/mcp/simple-executor';
 import type {
   Kernel,
   KernelConfig,
@@ -341,6 +355,7 @@ export class ApplicationKernel implements Kernel {
   private planner: ExecutionPlanner;
   private policy?: UnifiedPolicy;
   private config: KernelConfig;
+  // Simple tools are executed directly via executeSimpleTool function
 
   constructor(options: KernelFactoryOptions) {
     this.config = options.config;
@@ -359,6 +374,8 @@ export class ApplicationKernel implements Kernel {
         this.logger.warn(`Failed to load policy: ${policyResult.error}`);
       }
     }
+
+    // No router initialization needed - using direct function execution
   }
 
   /**
@@ -377,6 +394,54 @@ export class ApplicationKernel implements Kernel {
     });
 
     try {
+      // Get the tool for checking
+      const tool = this.toolRegistry.get(toolName);
+      if (!tool) {
+        return Failure(`Tool not found: ${toolName}`);
+      }
+
+      // Check if this is a simple tool call
+      if (this.isSimpleToolCall(toolName, params)) {
+        this.logger.debug(`Executing simple tool directly: ${toolName}`);
+
+        // Execute the tool directly without orchestration
+        const result = await executeSimpleTool(tool, params, this.logger as any);
+
+        // If we have a session and the tool succeeded, store the result
+        if (sessionId && result.ok) {
+          const sessionResult = await this.sessionManager.get(sessionId);
+          if (sessionResult.ok) {
+            const updatedSteps = [...sessionResult.value.completed_steps];
+            if (!updatedSteps.includes(toolName)) {
+              updatedSteps.push(toolName);
+            }
+
+            await this.sessionManager.update(sessionId, {
+              data: {
+                ...sessionResult.value.data,
+                [toolName]: result.value,
+                [`${toolName}_result`]: result.value,
+                [`${toolName}_completed`]: true,
+                [`${toolName}_timestamp`]: Date.now(),
+              },
+              completed_steps: updatedSteps,
+            });
+          }
+        }
+
+        // Track completion
+        this.telemetry.track({
+          type: result.ok ? 'tool.execution.success' : 'tool.execution.error',
+          toolName,
+          timestamp: Date.now(),
+          duration: Date.now() - start,
+          ...(result.ok ? {} : { error: result.error }),
+        });
+
+        return result;
+      }
+
+      // Complex orchestration for tools with dependencies or policies
       // 1. Get or create session
       let session: SessionState | undefined;
       if (sessionId) {
@@ -396,13 +461,13 @@ export class ApplicationKernel implements Kernel {
       let lastResult: Result<unknown> = Success(undefined);
 
       for (const stepName of plan.remaining) {
-        const tool = this.toolRegistry.get(stepName);
-        if (!tool) {
+        const stepTool = this.toolRegistry.get(stepName);
+        if (!stepTool) {
           return Failure(`Tool not found in registry: ${stepName}`);
         }
 
         // 4. Validate parameters
-        const validationResult = await this.validateParams(params, tool.schema);
+        const validationResult = await this.validateParams(params, stepTool.schema);
         if (!validationResult.ok) {
           return validationResult;
         }
@@ -428,7 +493,7 @@ export class ApplicationKernel implements Kernel {
 
         // 7. Execute tool
         this.logger.debug(`Executing tool: ${stepName}`);
-        const toolResult = await this.executeWithRetry(tool, validationResult.value, context);
+        const toolResult = await this.executeWithRetry(stepTool, validationResult.value, context);
 
         if (!toolResult.ok) {
           this.telemetry.track({
@@ -632,6 +697,29 @@ export class ApplicationKernel implements Kernel {
     }
 
     return Failure(`Tool ${tool.name} failed after ${maxRetries} attempts: ${lastError?.message}`);
+  }
+
+  /**
+   * Check if this is a simple tool call that can bypass orchestration
+   */
+  private isSimpleToolCall(toolName: string, params: any): boolean {
+    const tool = this.toolRegistry.get(toolName);
+    if (!tool) return false;
+
+    // Check if tool qualifies for simple execution
+    if (!canExecuteSimply(tool, params)) {
+      return false;
+    }
+
+    // Check if tool has complex policy requirements
+    const hasComplexPolicy = this.policy?.rules?.some((r) => {
+      // Check if any condition matches this tool
+      const matchesTool = r.conditions?.some((c: any) => c.type === 'tool' && c.value === toolName);
+      return matchesTool && r.actions && (r.actions.block || r.actions.require_approval);
+    });
+
+    // Simple tool calls have no complex policies
+    return !hasComplexPolicy;
   }
 }
 

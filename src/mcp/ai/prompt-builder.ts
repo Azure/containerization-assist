@@ -112,24 +112,3 @@ export const createContextAnalysisPrompt = (
 
   return buildPrompt(builder([]));
 };
-
-/**
- * Create a generic prompt builder function
- */
-export const createPromptBuilder = (
-  ...builders: Array<(sections: PromptSection[]) => PromptSection[]>
-) => {
-  return pipe(...builders);
-};
-
-/**
- * Factory for creating prompt builder with backward compatibility
- */
-export const createAIPromptBuilder = () => ({
-  addSection: (title: string, content: unknown) => addSection(title, content),
-  addInstruction: (instruction: string) => addInstruction(instruction),
-  addSeparator: () => addSeparator(),
-  build: (sections: PromptSection[]) => buildPrompt(sections),
-  forParameterSuggestion: createParameterSuggestionPrompt,
-  forContextAnalysis: createContextAnalysisPrompt,
-});

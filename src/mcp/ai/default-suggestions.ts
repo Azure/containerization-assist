@@ -197,13 +197,6 @@ export const resetSuggestions = (): void => {
 };
 
 /**
- * Get all generators as a record
- */
-export const getAllGenerators = (): Record<string, SuggestionGenerator> => {
-  return Object.fromEntries(generators);
-};
-
-/**
  * Factory function for creating a suggestion registry instance (for backward compatibility)
  */
 export function createSuggestionRegistry(
