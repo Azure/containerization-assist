@@ -1,57 +1,86 @@
 /**
  * Containerization Assist MCP Server - SDK-Native Entry Point
- * Uses direct SDK patterns with Zod schemas
+ * Uses Application Kernel for tool execution
  */
 
 import { createMCPServer, type IMCPServer } from '@/mcp/server';
-import {
-  createDependencies,
-  initializeDependencies,
-  shutdownDependencies,
-  type Dependencies,
-} from '@/container';
+import { createKernel, type RegisteredTool } from '@/app/kernel';
+import { getAllInternalTools } from '@/exports/tools';
+import { createLogger } from '@/lib/logger';
 import process from 'node:process';
 
 async function main(): Promise<void> {
   // Set MCP mode to ensure logs go to stderr, not stdout (prevents JSON-RPC corruption)
   process.env.MCP_MODE = 'true';
 
-  let deps: Dependencies | undefined;
+  const logger = createLogger({
+    name: 'mcp-server',
+    level: process.env.LOG_LEVEL || 'info',
+  });
+
   let server: IMCPServer | undefined;
 
   try {
-    // Create dependencies
-    deps = createDependencies();
-    await initializeDependencies(deps);
+    // Session manager not needed - kernel creates its own
 
-    deps.logger.info('Starting SDK-Native MCP Server with DI container');
+    // Load and register tools
+    const tools = getAllInternalTools();
+    const registeredTools = new Map<string, RegisteredTool>();
 
-    // Create and start the SDK-native server with injected dependencies
-    server = createMCPServer(deps);
+    for (const tool of tools) {
+      registeredTools.set(tool.name, {
+        name: tool.name,
+        description: tool.description || '',
+        handler: async (params: unknown) => {
+          // Tools execute directly with their own context
+          const toolLogger = logger.child({ tool: tool.name });
+          return await tool.execute(
+            params as Record<string, unknown>,
+            toolLogger,
+            undefined as any,
+          );
+        },
+        schema: tool.zodSchema as any,
+      });
+    }
+
+    // Create kernel
+    const kernel = await createKernel(
+      {
+        sessionStore: 'memory',
+        sessionTTL: 3600000,
+        maxRetries: 2,
+        retryDelay: 1000,
+        policyPath: process.env.POLICY_PATH || 'config/policy.yaml',
+        policyEnvironment: process.env.NODE_ENV || 'production',
+        telemetryEnabled: true,
+      },
+      registeredTools,
+    );
+
+    logger.info('Starting SDK-Native MCP Server with Application Kernel');
+
+    // Create and start the SDK-native server with kernel
+    server = createMCPServer(kernel, {
+      logger,
+      name: 'containerization-assist',
+      version: '1.0.0',
+    });
     await server.start();
 
-    deps.logger.info('MCP Server started successfully');
+    logger.info('MCP Server started successfully');
 
     // Handle graceful shutdown
     const shutdown = async (): Promise<void> => {
-      if (deps) {
-        deps.logger.info('Shutting down server...');
-      }
+      logger.info('Shutting down server...');
       try {
         if (server) {
           await server.stop();
         }
-        if (deps) {
-          await shutdownDependencies(deps);
-          deps.logger.info('Server shutdown complete');
-        }
+        logger.info('Server shutdown complete');
         process.exit(0);
       } catch (error) {
-        if (deps) {
-          deps.logger.error({ error }, 'Error during shutdown');
-        } else {
-          console.error('Error during shutdown:', error);
-        }
+        logger.error({ error }, 'Error during shutdown');
         process.exit(1);
       }
     };
@@ -69,12 +98,7 @@ async function main(): Promise<void> {
     // Keep the process alive
     process.stdin.resume();
   } catch (error) {
-    const errorLogger = deps?.logger ?? console;
-    if (typeof errorLogger.error === 'function') {
-      errorLogger.error({ error }, 'Failed to start server');
-    } else {
-      console.error('Failed to start server:', error);
-    }
+    logger.error({ error }, 'Failed to start server');
     process.exit(1);
   }
 }
