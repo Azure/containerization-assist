@@ -57,7 +57,7 @@ export interface IDirectMCPServer {
 /**
  * Register all tools and resources directly with SDK
  */
-export const registerHandlers = async (state: MCPServerState): Promise<void> => {
+const registerHandlers = async (state: MCPServerState): Promise<void> => {
   // Get tools from kernel
   const tools = state.kernel.tools();
 
@@ -154,7 +154,7 @@ export const registerHandlers = async (state: MCPServerState): Promise<void> => 
 /**
  * Register prompts directly from registry
  */
-export const registerPrompts = async (state: MCPServerState): Promise<void> => {
+const registerPrompts = async (state: MCPServerState): Promise<void> => {
   // For now, prompts are handled separately from the kernel's tool system
   // They can be added to kernel later if needed
   state.logger.info('Prompts registration handled separately from kernel');
@@ -163,7 +163,7 @@ export const registerPrompts = async (state: MCPServerState): Promise<void> => {
 /**
  * Start the server
  */
-export const startServer = async (state: MCPServerState): Promise<void> => {
+const startServer = async (state: MCPServerState): Promise<void> => {
   if (state.isRunning) {
     state.logger.warn('Server already running');
     return;
@@ -187,7 +187,7 @@ export const startServer = async (state: MCPServerState): Promise<void> => {
 /**
  * Stop the server
  */
-export const stopServer = async (state: MCPServerState): Promise<void> => {
+const stopServer = async (state: MCPServerState): Promise<void> => {
   if (!state.isRunning) {
     return;
   }
@@ -200,14 +200,14 @@ export const stopServer = async (state: MCPServerState): Promise<void> => {
 /**
  * Get SDK server instance for sampling
  */
-export const getServer = (state: MCPServerState): unknown => {
+const getServer = (state: MCPServerState): unknown => {
   return state.server.server;
 };
 
 /**
  * Get server status
  */
-export const getStatus = (
+const getStatus = (
   state: MCPServerState,
 ): {
   running: boolean;
@@ -227,7 +227,7 @@ export const getStatus = (
 /**
  * Get available tools for CLI listing
  */
-export const getTools = (state: MCPServerState): Array<{ name: string; description: string }> => {
+const getTools = (state: MCPServerState): Array<{ name: string; description: string }> => {
   const tools = state.kernel.tools();
   return Array.from(tools.entries()).map(([name, tool]) => ({
     name,

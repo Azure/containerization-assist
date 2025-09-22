@@ -1214,9 +1214,10 @@ async function generateDockerfileImpl(
   params: GenerateDockerfileParams,
   context: ToolContext,
 ): Promise<Result<GenerateDockerfileResult>> {
-  // Basic parameter validation (essential validation only)
-  if (!params || typeof params !== 'object') {
-    return Failure('Invalid parameters provided');
+  // Self-validation: Validate parameters using schema
+  const validation = generateDockerfileSchema.safeParse(params);
+  if (!validation.success) {
+    return Failure(`Invalid params: ${validation.error.message}`);
   }
 
   // Optional progress reporting for complex operations (AI generation)

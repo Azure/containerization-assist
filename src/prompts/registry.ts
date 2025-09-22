@@ -568,14 +568,3 @@ export function hasPrompt(name: string): boolean {
 export function getAllPrompts(): string[] {
   return Object.keys(PROMPT_HANDLERS);
 }
-
-/**
- * Get prompts by category
- * @deprecated Categories are not used in TypeScript implementation. This function will throw an error.
- */
-export async function getPromptsByCategory(category: string): Promise<string[]> {
-  throw new Error(
-    `Prompt category filtering is not supported in TypeScript prompts. Category "${category}" was requested. ` +
-      'Use getAllPrompts() instead to get all available prompts.',
-  );
-}

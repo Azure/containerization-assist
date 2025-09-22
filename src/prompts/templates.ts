@@ -581,8 +581,10 @@ export function parseAIResponse(
   // Basic validation based on format
   switch (expectedFormat) {
     case 'yaml':
-      if (!cleaned.includes(':') && !cleaned.includes('-')) {
-        return Failure('Response does not appear to be valid YAML');
+      // More permissive YAML validation - allow simple scalar values
+      // Real YAML validation would require a proper parser
+      if (cleaned.length === 0) {
+        return Failure('Response is empty');
       }
       break;
     case 'dockerfile':

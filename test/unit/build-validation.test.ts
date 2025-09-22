@@ -32,7 +32,7 @@ describe('Build Output Validation', () => {
       });
 
       it('should include TypeScript prompt files', () => {
-        // Check for TypeScript prompt files (template-bridge consolidated into registry)
+        // Check for TypeScript prompt files (registry and templates modules)
         const expectedPromptFiles = [
           'registry.js',
           'templates.js'
@@ -123,7 +123,7 @@ describe('Build Output Validation', () => {
       });
 
       it('should include TypeScript prompt files', () => {
-        // Check for TypeScript prompt files (template-bridge consolidated into registry)
+        // Check for TypeScript prompt files (registry and templates modules)
         const expectedPromptFiles = [
           'registry.js',
           'templates.js'

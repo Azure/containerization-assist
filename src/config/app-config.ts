@@ -230,3 +230,9 @@ export function createAppConfig(): AppConfig {
 
   return result.data;
 }
+
+/**
+ * Export the application configuration
+ * Creates configuration with environment variable overrides
+ */
+export const appConfig = createAppConfig();

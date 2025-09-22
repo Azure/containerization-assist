@@ -20,13 +20,12 @@
     "baselines": {
       "lint": {
         "errors": 0,
-        "warnings": 58,
+        "warnings": 56,
         "warningSignatures": [
           "/home/tng/workspace/containerization-assist/src/exports/container-assist.ts:136:95:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/exports/container-assist.ts:138:33:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/mcp/ai/host-ai-assist.ts:288:83:@typescript-eslint/explicit-function-return-type:Missing return type on function.",
-          "/home/tng/workspace/containerization-assist/src/mcp/ai/prompt-builder.ts:121:3:@typescript-eslint/explicit-function-return-type:Missing return type on function.",
-          "/home/tng/workspace/containerization-assist/src/mcp/ai/prompt-builder.ts:128:41:@typescript-eslint/explicit-function-return-type:Missing return type on function.",
+          "/home/tng/workspace/containerization-assist/src/mcp/simple-executor.ts:58:46:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/mcp/simple-executor.ts:96:64:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/services/docker-mutex-client.ts:147:53:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/services/kubernetes-client.ts:26:29:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/services/kubernetes-client.ts:56:35:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
@@ -43,7 +42,6 @@
           "/home/tng/workspace/containerization-assist/src/services/kubernetes-idempotent-apply.ts:299:21:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/services/kubernetes-idempotent-apply.ts:381:30:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/tools/analyze-repo/tool.ts:214:16:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/build-image/tool.ts:92:11:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/tools/convert-aca-to-k8s/tool.ts:94:14:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/tools/convert-aca-to-k8s/tool.ts:100:48:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/tools/convert-aca-to-k8s/tool.ts:151:44:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
@@ -83,7 +81,7 @@
         ]
       },
       "deadcode": {
-        "count": 310
+        "count": 234
       },
       "typescript": {
         "errors": 0
