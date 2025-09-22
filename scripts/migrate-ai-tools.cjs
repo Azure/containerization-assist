@@ -114,8 +114,10 @@ function migrateToolFile(toolName) {
       '...messages'
     );
 
-    // Save the migrated file
-    fs.writeFileSync(toolPath, content, 'utf8');
+    // Save the migrated file using atomic write to avoid race condition
+    const tmpPath = toolPath + '.tmp';
+    fs.writeFileSync(tmpPath, content, 'utf8');
+    fs.renameSync(tmpPath, toolPath);
 
     // Check if migration was successful
     if (content !== originalContent) {

@@ -14,12 +14,12 @@
 import { z } from 'zod';
 import { type Result, Failure } from '@/types';
 import type { Logger } from '@/lib/logger';
-import type { RegisteredTool, ToolContext, ProgressReporter } from '@/app/types';
+import type { RegisteredTool, ToolContext as AppToolContext, ProgressReporter as AppProgressReporter } from '@/app/types';
 
 /**
- * Minimal progress reporter for simple tools
+ * Minimal progress reporter for simple tools (app format)
  */
-function createMinimalProgress(logger: Logger): ProgressReporter {
+function createMinimalProgress(logger: Logger): AppProgressReporter {
   return {
     start: (message: string) => logger.info(`[START] ${message}`),
     update: (message: string, percentage?: number) => {
@@ -54,11 +54,11 @@ export async function executeSimpleTool(
     const validatedParams = await tool.schema.parseAsync(params);
 
     // 2. Create minimal context (no session, just basics)
-    // Don't include session properties when they're not available
-    const context: ToolContext = {
+    // Provide a minimal AppToolContext for simple execution
+    const context: AppToolContext = {
       logger: toolLogger,
       progress: createMinimalProgress(toolLogger),
-      // Explicitly omit session and sessionId for simple execution
+      // No session properties for simple execution
     };
 
     // 3. Execute the tool
