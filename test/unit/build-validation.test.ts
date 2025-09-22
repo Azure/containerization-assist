@@ -31,50 +31,46 @@ describe('Build Output Validation', () => {
         expect(existsSync(promptsDir)).toBe(true);
       });
 
-      it('should include all prompt category directories', () => {
-        const expectedCategories = [
-          'analysis',
-          'containerization',
-          'orchestration',
-          'sampling',
-          'security',
-          'validation'
+      it('should include TypeScript prompt files', () => {
+        // Check for TypeScript prompt files (template-bridge consolidated into registry)
+        const expectedPromptFiles = [
+          'registry.js',
+          'templates.js'
         ];
 
-        const categories = readdirSync(promptsDir).filter(item => {
-          const itemPath = join(promptsDir, item);
-          return statSync(itemPath).isDirectory();
+        const files = readdirSync(promptsDir).filter(item => {
+          return item.endsWith('.js') || item.endsWith('.d.ts');
         });
 
-        expectedCategories.forEach(category => {
-          expect(categories).toContain(category);
+        expectedPromptFiles.forEach(file => {
+          expect(files).toContain(file);
         });
       });
 
-      it('should include JSON prompt files in each category', () => {
-        const categories = readdirSync(promptsDir).filter(item => {
-          const itemPath = join(promptsDir, item);
-          return statSync(itemPath).isDirectory();
-        });
+      it('should include TypeScript declaration files', () => {
+        const files = readdirSync(promptsDir);
+        const declarationFiles = files.filter(f => f.endsWith('.d.ts'));
 
-        categories.forEach(category => {
-          const categoryPath = join(promptsDir, category);
-          const files = readdirSync(categoryPath);
-          const jsonFiles = files.filter(f => f.endsWith('.json'));
-          
-          expect(jsonFiles.length).toBeGreaterThan(0);
-        });
+        // Should have declaration files for type safety
+        expect(declarationFiles.length).toBeGreaterThan(0);
+
+        // Check for specific declaration files
+        expect(declarationFiles).toContain('registry.d.ts');
+        expect(declarationFiles).toContain('templates.d.ts');
       });
 
-      it('should include specific critical prompt files', () => {
-        const criticalPrompts = [
-          join(promptsDir, 'analysis', 'enhance-repo-analysis.json'),
-          join(promptsDir, 'containerization', 'dockerfile-generation.json'),
-          join(promptsDir, 'orchestration', 'k8s-manifest-generation.json')
+      it('should include critical TypeScript prompt modules', () => {
+        const criticalModules = [
+          join(promptsDir, 'registry.js'),
+          join(promptsDir, 'templates.js')
         ];
 
-        criticalPrompts.forEach(promptFile => {
-          expect(existsSync(promptFile)).toBe(true);
+        criticalModules.forEach(moduleFile => {
+          expect(existsSync(moduleFile)).toBe(true);
+
+          // Also check for corresponding declaration files
+          const declarationFile = moduleFile.replace('.js', '.d.ts');
+          expect(existsSync(declarationFile)).toBe(true);
         });
       });
     });
@@ -126,23 +122,19 @@ describe('Build Output Validation', () => {
         expect(existsSync(promptsDir)).toBe(true);
       });
 
-      it('should include all prompt category directories', () => {
-        const expectedCategories = [
-          'analysis',
-          'containerization',
-          'orchestration',
-          'sampling',
-          'security',
-          'validation'
+      it('should include TypeScript prompt files', () => {
+        // Check for TypeScript prompt files (template-bridge consolidated into registry)
+        const expectedPromptFiles = [
+          'registry.js',
+          'templates.js'
         ];
 
-        const categories = readdirSync(promptsDir).filter(item => {
-          const itemPath = join(promptsDir, item);
-          return statSync(itemPath).isDirectory();
+        const files = readdirSync(promptsDir).filter(item => {
+          return item.endsWith('.js') || item.endsWith('.d.ts');
         });
 
-        expectedCategories.forEach(category => {
-          expect(categories).toContain(category);
+        expectedPromptFiles.forEach(file => {
+          expect(files).toContain(file);
         });
       });
 
@@ -191,29 +183,24 @@ describe('Build Output Validation', () => {
   });
 
   describe('Package Integrity', () => {
-    it('should have consistent file counts between ESM and CommonJS builds', () => {
+    it('should have consistent TypeScript modules between ESM and CommonJS builds', () => {
       const esmPromptsDir = join(distDir, 'src', 'prompts');
       const cjsPromptsDir = join(distCjsDir, 'src', 'prompts');
-      
-      const countFiles = (dir: string): number => {
-        let count = 0;
+
+      // Count JavaScript files (compiled TypeScript)
+      const countJsFiles = (dir: string): number => {
         const items = readdirSync(dir);
-        items.forEach(item => {
-          const itemPath = join(dir, item);
-          if (statSync(itemPath).isDirectory()) {
-            count += countFiles(itemPath);
-          } else if (item.endsWith('.json')) {
-            count++;
-          }
-        });
-        return count;
+        return items.filter(item => item.endsWith('.js')).length;
       };
 
-      const esmPromptCount = countFiles(esmPromptsDir);
-      const cjsPromptCount = countFiles(cjsPromptsDir);
-      
+      const esmPromptCount = countJsFiles(esmPromptsDir);
+      const cjsPromptCount = countJsFiles(cjsPromptsDir);
+
       expect(esmPromptCount).toBe(cjsPromptCount);
       expect(esmPromptCount).toBeGreaterThan(0);
+
+      // Should have at least registry and templates
+      expect(esmPromptCount).toBeGreaterThanOrEqual(2);
     });
 
     it('should have knowledge data files with reasonable sizes', () => {
@@ -232,8 +219,7 @@ describe('Build Output Validation', () => {
   });
 
   describe('Runtime Loading Validation', () => {
-    it('should be able to find prompts directory at runtime', () => {
-      // Verify prompts can be found in expected locations
+    it('should be able to find prompts modules at runtime', () => {
       const possiblePromptDirs = [
         join(rootDir, 'src', 'prompts'),
         join(distDir, 'src', 'prompts'),
@@ -242,15 +228,21 @@ describe('Build Output Validation', () => {
 
       const foundPromptDir = possiblePromptDirs.find(dir => existsSync(dir));
       expect(foundPromptDir).toBeDefined();
-
-      // Verify it contains expected structure
+      
+      // Verify it contains TypeScript modules
       if (foundPromptDir) {
-        const categories = readdirSync(foundPromptDir).filter(item => {
-          const itemPath = join(foundPromptDir, item);
-          return statSync(itemPath).isDirectory();
-        });
+        const files = readdirSync(foundPromptDir);
+        const tsFiles = files.filter(f => f.endsWith('.ts') || f.endsWith('.js'));
 
-        expect(categories.length).toBeGreaterThan(0);
+        // Should have TypeScript source files or compiled JS files
+        expect(tsFiles.length).toBeGreaterThan(0);
+
+        // Check for key modules (template-bridge consolidated into registry)
+        const hasRegistry = files.some(f => f.startsWith('registry'));
+        const hasTemplates = files.some(f => f.startsWith('templates'));
+
+        expect(hasRegistry).toBe(true);
+        expect(hasTemplates).toBe(true);
       }
     });
   });
