@@ -66,19 +66,19 @@ export {
   validateFixturesByType
 } from './fixture-validation';
 
-// Unified mock factory (from mocks directory)
+// Mock factory (from mocks directory)
 export {
-  UnifiedMockFactory,
+  MockFactory,
   MockBehavior,
   SecurityFindingsLevel,
   MockScenario,
-  unifiedMockFactory,
+  mockFactory,
   mockDocker,
   mockKubernetes,
   mockTrivy,
   mockTool,
   mockEnvironment
-} from '../mocks/unified-mock-factory';
+} from '../mocks/mock-factory';
 
 // Environment detection utilities (from utilities directory)
 export {
@@ -140,7 +140,7 @@ export {
  * Example 4: Mock factory usage
  * 
  * ```typescript
- * import { unifiedMockFactory } from '@test/__support__/fixtures';
+ * import { mockFactory } from '@test/__support__/fixtures';
  * 
  * const dockerMock = unifiedMockFactory.createDockerMock('success');
  * const toolMock = unifiedMockFactory.createBuildImageMock('failure');

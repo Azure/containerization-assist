@@ -32,9 +32,8 @@ describe('Build Output Validation', () => {
       });
 
       it('should include TypeScript prompt files', () => {
-        // Check for TypeScript prompt files (registry and templates modules)
+        // Check for TypeScript prompt files (templates module)
         const expectedPromptFiles = [
-          'registry.js',
           'templates.js'
         ];
 
@@ -55,13 +54,11 @@ describe('Build Output Validation', () => {
         expect(declarationFiles.length).toBeGreaterThan(0);
 
         // Check for specific declaration files
-        expect(declarationFiles).toContain('registry.d.ts');
         expect(declarationFiles).toContain('templates.d.ts');
       });
 
       it('should include critical TypeScript prompt modules', () => {
         const criticalModules = [
-          join(promptsDir, 'registry.js'),
           join(promptsDir, 'templates.js')
         ];
 
@@ -123,9 +120,8 @@ describe('Build Output Validation', () => {
       });
 
       it('should include TypeScript prompt files', () => {
-        // Check for TypeScript prompt files (registry and templates modules)
+        // Check for TypeScript prompt files (templates module)
         const expectedPromptFiles = [
-          'registry.js',
           'templates.js'
         ];
 
@@ -199,8 +195,8 @@ describe('Build Output Validation', () => {
       expect(esmPromptCount).toBe(cjsPromptCount);
       expect(esmPromptCount).toBeGreaterThan(0);
 
-      // Should have at least registry and templates
-      expect(esmPromptCount).toBeGreaterThanOrEqual(2);
+      // Should have at least templates
+      expect(esmPromptCount).toBeGreaterThanOrEqual(1);
     });
 
     it('should have knowledge data files with reasonable sizes', () => {

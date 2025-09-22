@@ -14,8 +14,8 @@ export {
   type TestInfrastructurePerformanceMetrics as PerformanceMetrics
 } from '../infrastructure/test-runner.js';
 
-// Also re-export the base types from consolidated types for convenience
+// Also re-export the base types from result types for convenience
 export type {
   TestResult as BaseTestResult,
   PerformanceMetrics as BasePerformanceMetrics
-} from '../../../../src/types/consolidated-types.js';
+} from '../../../../src/types/result-types.js';

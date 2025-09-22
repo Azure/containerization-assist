@@ -19,8 +19,11 @@
 import { z } from 'zod';
 import { type Result, Success, Failure } from '@/types/index';
 import { createLogger } from '@/lib/logger';
-import { loadPolicy, applyPolicy, type UnifiedPolicy } from '@/config/policy';
+import { loadPolicy } from '@/config/policy-io';
+import { applyPolicy } from '@/config/policy-eval';
+import type { Policy } from '@/config/policy-schemas';
 import { executeSimpleTool, canExecuteSimply } from '@/mcp/simple-executor';
+import { SessionManager as SimpleSessionManager } from '@/lib/session-manager';
 import type {
   Kernel,
   KernelConfig,
@@ -44,52 +47,99 @@ import type {
 // ============================================================================
 
 /**
- * In-memory session manager (default implementation)
+ * In-memory session manager using our SimpleSessionManager
  */
 class InMemorySessionManager implements SessionManager {
-  private sessions = new Map<string, SessionState>();
-  private nextId = 1;
+  private manager = new SimpleSessionManager();
 
   async get(sessionId: string): Promise<Result<SessionState>> {
-    const session = this.sessions.get(sessionId);
-    if (!session) {
+    if (!this.manager.has(sessionId)) {
       return Failure(`Session not found: ${sessionId}`);
     }
-    return Success(session);
+
+    // Get session data from simple manager
+    const data = this.manager.get<Record<string, unknown>>(sessionId, 'data') || {};
+    const completedSteps = this.manager.get<string[]>(sessionId, 'completed_steps') || [];
+    const created = this.manager.get<Date>(sessionId, 'created') || new Date();
+    const updated = this.manager.get<Date>(sessionId, 'updated') || new Date();
+    const metadata = this.manager.get<Record<string, unknown>>(sessionId, 'metadata') || {};
+
+    return Success({
+      sessionId,
+      created,
+      updated,
+      completed_steps: completedSteps,
+      data,
+      metadata,
+    });
   }
 
   async create(): Promise<Result<SessionState>> {
-    const sessionId = `session-${this.nextId++}`;
+    const sessionId = this.manager.ensureSession();
+    const now = new Date();
+
     const session: SessionState = {
       sessionId,
-      created: new Date(),
-      updated: new Date(),
+      created: now,
+      updated: now,
       completed_steps: [],
       data: {},
+      metadata: {},
     };
-    this.sessions.set(sessionId, session);
+
+    // Store session data
+    this.manager.set(sessionId, 'created', now);
+    this.manager.set(sessionId, 'updated', now);
+    this.manager.set(sessionId, 'completed_steps', []);
+    this.manager.set(sessionId, 'data', {});
+    this.manager.set(sessionId, 'metadata', {});
+
     return Success(session);
   }
 
   async update(sessionId: string, updates: Partial<SessionState>): Promise<Result<void>> {
-    const session = this.sessions.get(sessionId);
-    if (!session) {
+    if (!this.manager.has(sessionId)) {
       return Failure(`Session not found: ${sessionId}`);
     }
-    Object.assign(session, updates, { updated: new Date() });
+
+    // Update individual fields
+    if (updates.data !== undefined) {
+      const currentData = this.manager.get<Record<string, unknown>>(sessionId, 'data') || {};
+      this.manager.set(sessionId, 'data', { ...currentData, ...updates.data });
+    }
+
+    if (updates.completed_steps !== undefined) {
+      this.manager.set(sessionId, 'completed_steps', updates.completed_steps);
+    }
+
+    if (updates.metadata !== undefined) {
+      const currentMetadata =
+        this.manager.get<Record<string, unknown>>(sessionId, 'metadata') || {};
+      this.manager.set(sessionId, 'metadata', { ...currentMetadata, ...updates.metadata });
+    }
+
+    // Always update the updated timestamp
+    this.manager.set(sessionId, 'updated', new Date());
+
     return Success(undefined);
   }
 
   async delete(sessionId: string): Promise<Result<void>> {
-    if (!this.sessions.has(sessionId)) {
+    if (!this.manager.has(sessionId)) {
       return Failure(`Session not found: ${sessionId}`);
     }
-    this.sessions.delete(sessionId);
+
+    this.manager.delete(sessionId);
     return Success(undefined);
   }
 
   async list(): Promise<Result<string[]>> {
-    return Success(Array.from(this.sessions.keys()));
+    return Success(this.manager.listSessions());
+  }
+
+  // Cleanup when kernel shuts down
+  stop(): void {
+    this.manager.stop();
   }
 }
 
@@ -353,7 +403,7 @@ export class ApplicationKernel implements Kernel {
   private telemetry: TelemetrySystem;
   private logger: Logger;
   private planner: ExecutionPlanner;
-  private policy?: UnifiedPolicy;
+  private policy?: Policy;
   private config: KernelConfig;
   // Simple tools are executed directly via executeSimpleTool function
 
@@ -712,7 +762,7 @@ export class ApplicationKernel implements Kernel {
     }
 
     // Check if tool has complex policy requirements
-    const hasComplexPolicy = this.policy?.rules?.some((r) => {
+    const hasComplexPolicy = this.policy?.rules?.some((r: any) => {
       // Check if any condition matches this tool
       const matchesTool = r.conditions?.some((c: any) => c.type === 'tool' && c.value === toolName);
       return matchesTool && r.actions && (r.actions.block || r.actions.require_approval);

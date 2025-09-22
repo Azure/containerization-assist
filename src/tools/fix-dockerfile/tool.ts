@@ -1,8 +1,7 @@
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates } from '@/prompts/templates';
-import { applyPolicyConstraints } from '@/config/policy-prompt';
-import { enhancePrompt } from '../knowledge-helper';
+import { buildMessages, toMCPMessages } from '@/ai/prompt-engine';
 import { fixDockerfileSchema, type FixDockerfileParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 
@@ -23,25 +22,23 @@ export async function fixDockerfile(
   ];
   const basePrompt = promptTemplates.fix('dockerfile', content, issues);
 
-  // Enhance with knowledge base
-  const enhancedPrompt = await enhancePrompt(basePrompt, 'fix_dockerfile', {
-    environment,
-  });
-
-  // Apply policy constraints
-  const constrained = applyPolicyConstraints(enhancedPrompt, {
+  // Build messages using the new prompt engine
+  const messages = await buildMessages({
+    basePrompt,
+    topic: 'fix_dockerfile',
     tool: 'fix-dockerfile',
     environment,
+    contract: {
+      name: 'dockerfile_fix_v1',
+      description: 'Fix and optimize the Dockerfile',
+    },
+    knowledgeBudget: 2500,
   });
 
-  // Execute via AI
+  // Execute via AI with structured messages
+  const mcpMessages = toMCPMessages(messages);
   const response = await context.sampling.createMessage({
-    messages: [
-      {
-        role: 'user',
-        content: [{ type: 'text', text: constrained }],
-      },
-    ],
+    ...mcpMessages,
     maxTokens: 4096,
     modelPreferences: {
       hints: [{ name: 'dockerfile-optimization' }],

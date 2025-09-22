@@ -9,7 +9,7 @@ import {
   WorkflowStep,
 } from '../../../src/types';
 
-// Test-only Session type (removed from production code)
+// Test-only Session type
 type Session = {
   id: string;
   repo_path: string;

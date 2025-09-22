@@ -27,8 +27,6 @@ export {
   createMockResourceManager,
 } from './resource-manager.mock.js';
 
-// MockProgressNotifier removed - use the one in orchestration-mocks.ts instead
-
 export {
   MOCK_CONFIG_PRESETS,
   getMockConfig,
@@ -246,5 +244,3 @@ export const MockUtils = {
 export function isMockResourceManager(manager: any): manager is MockResourceManager {
   return manager && typeof manager.getResourceCount === 'function';
 }
-
-// isMockProgressNotifier removed - no longer using complex MockProgressNotifier

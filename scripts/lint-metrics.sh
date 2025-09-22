@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+# Set locale to ensure consistent behavior across different environments
+export LC_ALL=C
+
 # Configuration  
 QUALITY_CONFIG="quality-gates.json"
 

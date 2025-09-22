@@ -73,7 +73,7 @@ const compilePattern = (entry: KnowledgeEntry): LoadedEntry => {
     try {
       // Compile with case-insensitive and multiline flags
       const regex = new RegExp(entry.pattern, 'gmi');
-      loaded._compiled = {
+      loaded.compiledCache = {
         pattern: regex,
         lastCompiled: Date.now(),
       };
@@ -87,7 +87,7 @@ const compilePattern = (entry: KnowledgeEntry): LoadedEntry => {
         },
         'Failed to compile pattern',
       );
-      loaded._compiled = {
+      loaded.compiledCache = {
         pattern: null,
         lastCompiled: Date.now(),
         compilationError: error instanceof Error ? error.message : 'Unknown error',
@@ -334,4 +334,17 @@ export const reloadKnowledgeBase = async (): Promise<void> => {
     },
   };
   await loadKnowledgeBase();
+};
+
+/**
+ * Load knowledge data and return entries.
+ * Used by prompt engine for knowledge selection.
+ */
+export const loadKnowledgeData = async (): Promise<{ entries: LoadedEntry[] }> => {
+  if (!isKnowledgeLoaded()) {
+    await loadKnowledgeBase();
+  }
+  return {
+    entries: getAllEntries(),
+  };
 };

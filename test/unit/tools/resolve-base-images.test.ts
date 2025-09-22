@@ -1,6 +1,6 @@
 /**
- * Unit Tests: Resolve Base Images Tool (Simplified)
- * Tests for the simplified AI-driven base image resolution
+ * Unit Tests: Resolve Base Images Tool
+ * Tests for AI-driven base image resolution
  */
 
 import { jest } from '@jest/globals';
@@ -8,7 +8,7 @@ import { resolveBaseImages } from '../../../src/tools/resolve-base-images/tool';
 import type { ResolveBaseImagesParams } from '../../../src/tools/resolve-base-images/schema';
 import type { ToolContext } from '../../../src/mcp/context';
 
-describe('resolveBaseImagesTool (Simplified)', () => {
+describe('resolveBaseImagesTool', () => {
   // Helper function to create a mock context with sampling
   function createMockContext(overrides?: Partial<ToolContext>): ToolContext {
     return {

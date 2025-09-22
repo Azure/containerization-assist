@@ -1,8 +1,7 @@
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates, type AcaManifestParams } from '@/prompts/templates';
-import { applyPolicyConstraints } from '@/config/policy-prompt';
-import { enhancePrompt } from '../knowledge-helper';
+import { buildMessages, toMCPMessages } from '@/ai/prompt-engine';
 import { generateAcaManifestsSchema, type GenerateAcaManifestsParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 
@@ -28,25 +27,23 @@ export async function generateAcaManifests(
   };
   const basePrompt = promptTemplates.acaManifests(promptParams as AcaManifestParams);
 
-  // Enhance with knowledge base
-  const enhancedPrompt = await enhancePrompt(basePrompt, 'generate_aca_manifests', {
-    environment: 'production',
-  });
-
-  // Apply policy constraints
-  const constrained = applyPolicyConstraints(enhancedPrompt, {
+  // Build messages using the new prompt engine
+  const messages = await buildMessages({
+    basePrompt,
+    topic: 'generate_aca_manifests',
     tool: 'generate-aca-manifests',
-    environment: 'production',
+    environment: validatedParams.environment || 'production',
+    contract: {
+      name: 'aca_manifests_v1',
+      description: 'Generate Azure Container Apps manifests',
+    },
+    knowledgeBudget: 3500, // Character budget for knowledge snippets
   });
 
-  // Execute via AI
+  // Execute via AI with structured messages
+  const mcpMessages = toMCPMessages(messages);
   const response = await context.sampling.createMessage({
-    messages: [
-      {
-        role: 'user',
-        content: [{ type: 'text', text: constrained }],
-      },
-    ],
+    ...mcpMessages, // Spreads the messages array
     maxTokens: 8192,
     modelPreferences: {
       hints: [{ name: 'azure-container-apps' }],

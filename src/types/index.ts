@@ -82,3 +82,66 @@ export interface AIService {
   validateParameters?(params: Record<string, unknown>): Promise<Result<unknown>>;
   analyzeResults?(results: unknown): Promise<Result<unknown>>;
 }
+
+// ===== AI MESSAGE TYPES =====
+
+/**
+ * Content block for AI messages (supports text and other types).
+ */
+export interface AIContent {
+  type: 'text' | string;
+  text?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Individual message in AI conversation.
+ */
+export interface AIMessage {
+  role: 'system' | 'developer' | 'user' | 'assistant';
+  content: AIContent[] | string;
+}
+
+/**
+ * Collection of messages for AI conversation.
+ */
+export interface AIMessages {
+  messages: AIMessage[];
+}
+
+/**
+ * Output contract for structured AI responses.
+ */
+export interface OutputContract {
+  name: string;
+  schema?: unknown;
+  description?: string;
+}
+
+/**
+ * Parameters for building AI prompt messages.
+ */
+export interface BuildPromptParams {
+  basePrompt: string;
+  topic: string;
+  tool: string;
+  environment: string;
+  contract?: OutputContract;
+  knowledgeBudget?: number;
+}
+
+/**
+ * Envelope containing structured prompt with metadata.
+ */
+export interface PromptEnvelope {
+  system?: string;
+  developer?: string;
+  user: string;
+  metadata?: {
+    tool: string;
+    environment: string;
+    topic: string;
+    knowledgeCount?: number;
+    policyCount?: number;
+  };
+}

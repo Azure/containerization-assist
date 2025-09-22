@@ -156,7 +156,7 @@ export interface ToolContext {
 export type { EnhancedProgressReporter } from './context-helpers.js';
 export { extractProgressToken, createProgressReporter } from './context-helpers.js';
 
-// ===== SIMPLIFIED CONTEXT CREATION =====
+// ===== CONTEXT CREATION =====
 
 /**
  * Options for creating a tool context
@@ -327,7 +327,6 @@ async function getPromptWithFallback(
   name: string,
   _args?: Record<string, unknown>,
 ): Promise<PromptWithMessages> {
-  // Since prompt registry has been removed, always return the fallback
   return {
     description: 'Prompt not available - no registry',
     messages: [

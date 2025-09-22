@@ -1,8 +1,7 @@
 /**
  * Session Helpers Module
  *
- * Provides simplified session management utilities for all tools.
- * Reduced from 437 lines to ~100 lines by removing enterprise-style complexity.
+ * Provides session management utilities for all tools.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -29,7 +28,7 @@ function getSessionManager(context?: ToolContext): SessionManager | null {
 }
 
 /**
- * Get or create session - simplified replacement for resolveSession
+ * Get or create session
  *
  * @param sessionId - Optional session ID (generates random if not provided)
  * @param context - Tool context that may contain session manager
@@ -69,7 +68,7 @@ export async function getSession(
 }
 
 /**
- * Complete a workflow step - simplified replacement for appendCompletedStep
+ * Complete a workflow step
  *
  * @param sessionId - Session identifier
  * @param stepName - Name of the completed step
@@ -100,7 +99,7 @@ export async function completeStep(
       updatedSteps.push(stepName);
     }
 
-    // Update session using our simplified updateSession function
+    // Update session using our updateSession function
     return updateSession(
       sessionId,
       {
@@ -143,7 +142,7 @@ export async function createSession(
 }
 
 /**
- * Update session with new data - simplified replacement for updateSessionData
+ * Update session with new data
  *
  * @param sessionId - Session identifier
  * @param updates - Partial updates to apply

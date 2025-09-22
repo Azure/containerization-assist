@@ -1,8 +1,7 @@
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates, type BaseImageResolutionParams } from '@/prompts/templates';
-import { applyPolicyConstraints } from '@/config/policy-prompt';
-import { enhancePrompt } from '../knowledge-helper';
+import { buildMessages, toMCPMessages } from '@/ai/prompt-engine';
 import { resolveBaseImagesSchema, type ResolveBaseImagesParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 
@@ -20,26 +19,23 @@ export async function resolveBaseImages(
   };
   const basePrompt = promptTemplates.baseImageResolution(promptParams as BaseImageResolutionParams);
 
-  // Enhance with knowledge base
-  const enhancedPrompt = await enhancePrompt(basePrompt, 'resolve_base_images', {
-    technology: technology || 'auto-detect',
-    environment: 'production',
-  });
-
-  // Apply policy constraints
-  const constrained = applyPolicyConstraints(enhancedPrompt, {
+  // Build messages using the new prompt engine
+  const messages = await buildMessages({
+    basePrompt,
+    topic: 'resolve_base_images',
     tool: 'resolve-base-images',
     environment: 'production',
+    contract: {
+      name: 'base_images_v1',
+      description: 'Recommend optimal Docker base images',
+    },
+    knowledgeBudget: 2000,
   });
 
-  // Execute via AI
+  // Execute via AI with structured messages
+  const mcpMessages = toMCPMessages(messages);
   const response = await context.sampling.createMessage({
-    messages: [
-      {
-        role: 'user',
-        content: [{ type: 'text', text: constrained }],
-      },
-    ],
+    ...mcpMessages,
     maxTokens: 4096,
     modelPreferences: {
       hints: [{ name: 'docker-base-images' }],

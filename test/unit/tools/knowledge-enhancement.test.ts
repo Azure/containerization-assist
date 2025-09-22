@@ -11,11 +11,20 @@ import { resolveBaseImages } from '@/tools/resolve-base-images/tool';
 import { generateAcaManifests } from '@/tools/generate-aca-manifests/tool';
 import { convertAcaToK8s } from '@/tools/convert-aca-to-k8s/tool';
 import type { ToolContext } from '@/mcp/context';
-import * as knowledgeHelper from '@/tools/knowledge-helper';
+import * as promptEngine from '@/ai/prompt-engine';
 
-// Mock the knowledge helper
-jest.mock('@/tools/knowledge-helper', () => ({
-  enhancePrompt: jest.fn().mockImplementation((prompt) => Promise.resolve(prompt + '\n\n## Best Practices to Apply\n- Use multi-stage builds\n- Minimize layers')),
+// Mock the prompt engine
+jest.mock('@/ai/prompt-engine', () => ({
+  buildMessages: jest.fn().mockImplementation(() => Promise.resolve({
+    messages: [
+      { role: 'user', content: [{ type: 'text', text: 'Test prompt with knowledge' }] }
+    ]
+  })),
+  toMCPMessages: jest.fn().mockImplementation((messages) => ({
+    messages: messages.messages || [
+      { role: 'user', content: [{ type: 'text', text: 'Test prompt' }] }
+    ]
+  })),
 }));
 
 describe('Knowledge Enhancement Integration', () => {
@@ -53,10 +62,10 @@ describe('Knowledge Enhancement Integration', () => {
         mockContext,
       );
 
-      expect(knowledgeHelper.enhancePrompt).toHaveBeenCalledWith(
-        expect.any(String),
-        'analyze_repository',
+      expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
+          topic: 'analyze_repository',
+          tool: 'analyze-repo',
           environment: 'production',
         }),
       );
@@ -76,10 +85,10 @@ describe('Knowledge Enhancement Integration', () => {
         mockContext,
       );
 
-      expect(knowledgeHelper.enhancePrompt).toHaveBeenCalledWith(
-        expect.any(String),
-        'generate_dockerfile',
+      expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
+          topic: 'generate_dockerfile',
+          tool: 'generate-dockerfile',
           environment: 'production',
         }),
       );
@@ -98,10 +107,10 @@ describe('Knowledge Enhancement Integration', () => {
         mockContext,
       );
 
-      expect(knowledgeHelper.enhancePrompt).toHaveBeenCalledWith(
-        expect.any(String),
-        'fix_dockerfile',
+      expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
+          topic: 'fix_dockerfile',
+          tool: 'fix-dockerfile',
           environment: 'production',
         }),
       );
@@ -121,10 +130,10 @@ describe('Knowledge Enhancement Integration', () => {
         mockContext,
       );
 
-      expect(knowledgeHelper.enhancePrompt).toHaveBeenCalledWith(
-        expect.any(String),
-        'generate_k8s_manifests',
+      expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
+          topic: 'generate_k8s_manifests',
+          tool: 'generate-k8s-manifests',
           environment: 'production',
         }),
       );
@@ -144,10 +153,10 @@ describe('Knowledge Enhancement Integration', () => {
         mockContext,
       );
 
-      expect(knowledgeHelper.enhancePrompt).toHaveBeenCalledWith(
-        expect.any(String),
-        'generate_helm_charts',
+      expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
+          topic: 'generate_helm_charts',
+          tool: 'generate-helm-charts',
           environment: 'production',
         }),
       );
@@ -165,11 +174,10 @@ describe('Knowledge Enhancement Integration', () => {
         mockContext,
       );
 
-      expect(knowledgeHelper.enhancePrompt).toHaveBeenCalledWith(
-        expect.any(String),
-        'resolve_base_images',
+      expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
-          technology: 'nodejs',
+          topic: 'resolve_base_images',
+          tool: 'resolve-base-images',
           environment: 'production',
         }),
       );
@@ -189,10 +197,10 @@ describe('Knowledge Enhancement Integration', () => {
         mockContext,
       );
 
-      expect(knowledgeHelper.enhancePrompt).toHaveBeenCalledWith(
-        expect.any(String),
-        'generate_aca_manifests',
+      expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
+          topic: 'generate_aca_manifests',
+          tool: 'generate-aca-manifests',
           environment: 'production',
         }),
       );
@@ -210,10 +218,10 @@ describe('Knowledge Enhancement Integration', () => {
         mockContext,
       );
 
-      expect(knowledgeHelper.enhancePrompt).toHaveBeenCalledWith(
-        expect.any(String),
-        'convert_aca_to_k8s',
+      expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
+          topic: 'convert_aca_to_k8s',
+          tool: 'convert-aca-to-k8s',
           environment: 'production',
         }),
       );
@@ -222,30 +230,36 @@ describe('Knowledge Enhancement Integration', () => {
     });
   });
 
-  describe('Knowledge Enhancement Content', () => {
-    it('should include best practices in enhanced prompts', async () => {
-      const enhancedPrompt = await knowledgeHelper.enhancePrompt(
-        'Base prompt text',
-        'generate_dockerfile',
-        { environment: 'production' },
-      );
+  describe('Prompt Engine Integration', () => {
+    it('should build messages with knowledge integration', async () => {
+      // The prompt engine now handles knowledge integration internally
+      const result = await promptEngine.buildMessages({
+        basePrompt: 'Base prompt text',
+        topic: 'generate_dockerfile',
+        tool: 'generate-dockerfile',
+        environment: 'production',
+        knowledgeBudget: 3000,
+      });
 
-      expect(enhancedPrompt).toContain('Best Practices to Apply');
-      expect(enhancedPrompt).toContain('multi-stage builds');
+      // Verify buildMessages was called (mocked to return messages with knowledge)
+      expect(promptEngine.buildMessages).toHaveBeenCalled();
+      expect(result).toHaveProperty('messages');
+      expect(result.messages).toHaveLength(1);
     });
 
-    it('should handle enhancement gracefully', async () => {
-      // Reset the mock to return the original prompt (simulating failure fallback)
-      (knowledgeHelper.enhancePrompt as jest.Mock).mockResolvedValueOnce('Original prompt');
-
-      const result = await knowledgeHelper.enhancePrompt(
-        'Original prompt',
-        'generate_dockerfile',
-        {},
+    it('should handle message building gracefully', async () => {
+      // Test that the prompt engine is properly integrated
+      await generateDockerfile(
+        {
+          path: '/test/repo',
+          dockerfileDirectoryPaths: ['/'],
+          environment: 'production',
+        },
+        mockContext,
       );
 
-      // The helper should return something even if enhancement doesn't add content
-      expect(result).toBe('Original prompt');
+      // Verify the prompt engine was invoked
+      expect(promptEngine.buildMessages).toHaveBeenCalled();
     });
   });
 });

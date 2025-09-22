@@ -70,8 +70,6 @@ jest.mock('../../../src/mcp/tool-session-helpers', () => createToolSessionHelper
 import { prepareCluster } from '../../../src/tools/prepare-cluster/tool';
 import type { PrepareClusterParams } from '../../../src/tools/prepare-cluster/schema';
 
-// wrapTool mock removed - tool now uses direct implementation
-
 jest.mock('@/lib/logger', () => ({
   createTimer: jest.fn(() => mockTimer),
   createLogger: jest.fn(() => createMockLogger()),

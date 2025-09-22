@@ -1,9 +1,9 @@
 /**
- * Common types for simplified AI-delegate tools
+ * Common types for AI-delegate tools
  */
 
 /**
- * Generic AI response type for simplified tools
+ * Generic AI response type for AI tools
  * The actual structure depends on the AI's response
  */
 export type AIResponse = Record<string, unknown>;

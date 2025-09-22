@@ -38,6 +38,14 @@ module.exports = {
     '@typescript-eslint/no-unnecessary-type-assertion': 'error',
     '@typescript-eslint/no-non-null-assertion': 'warn',
     '@typescript-eslint/prefer-as-const': 'error',
+    '@typescript-eslint/consistent-type-imports': [
+      'error',
+      {
+        prefer: 'type-imports',
+        disallowTypeAnnotations: true,
+        fixStyle: 'inline-type-imports'
+      }
+    ],
 
     // Stricter type safety rules
     '@typescript-eslint/no-unsafe-argument': 'error',

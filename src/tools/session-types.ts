@@ -102,6 +102,3 @@ export interface SessionData {
   results?: Record<string, unknown>;
   [key: string]: unknown;
 }
-
-// Note: Helper functions removed - use getSessionSlice from @/mcp/tool-session-helpers instead
-// This provides proper type-safe access to session data across tools

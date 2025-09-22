@@ -1,6 +1,6 @@
 /**
- * Consolidated types for validation and testing results
- * Centralizes duplicate type definitions found across the codebase
+ * Result types for validation, testing, and operation outcomes
+ * Centralizes type definitions for various operation results across the codebase
  */
 
 // Re-export validation types from the canonical source

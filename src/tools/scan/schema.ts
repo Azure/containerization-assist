@@ -18,11 +18,11 @@ export const scanImageSchema = z.object({
     .describe('Minimum severity to report'),
   scanType: z
     .enum(['vulnerability', 'config', 'all'])
-    .optional()
+    .default('vulnerability') // Added default
     .describe('Type of scan to perform'),
   scanner: z
     .enum(['trivy', 'snyk', 'grype'])
-    .optional()
+    .default('trivy') // Added default
     .describe('Scanner to use for vulnerability detection'),
 });
 
