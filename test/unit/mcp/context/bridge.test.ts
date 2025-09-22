@@ -151,34 +151,17 @@ describe('ToolContext Bridge', () => {
       });
     });
 
-    test('getPrompt works with prompt registry provided', async () => {
-      const mockPromptRegistry = {
-        getPromptWithMessages: jest.fn().mockResolvedValue({
-          description: 'Test prompt',
-          messages: [
-            {
-              role: 'user' as const,
-              content: [{ type: 'text' as const, text: 'Test prompt content' }],
-            },
-          ],
-        }),
-      };
-
-      const context = createToolContext(mockServer, mockLogger, {
-        promptRegistry: mockPromptRegistry as any,
-      });
+    test('getPrompt returns fallback message without prompt registry', async () => {
+      const context = createToolContext(mockServer, mockLogger, {});
 
       const result = await context.getPrompt('test-prompt', { arg1: 'value1' });
 
-      expect(mockPromptRegistry.getPromptWithMessages).toHaveBeenCalledWith('test-prompt', {
-        arg1: 'value1',
-      });
       expect(result).toEqual({
-        description: 'Test prompt',
+        description: 'Prompt not available - no registry',
         messages: [
           {
             role: 'user',
-            content: [{ type: 'text', text: 'Test prompt content' }],
+            content: [{ type: 'text', text: "Error: No prompt registry available for prompt 'test-prompt'" }],
           },
         ],
       });

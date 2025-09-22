@@ -571,35 +571,3 @@ export function buildAIPrompt(
 /**
  * Extract structured data from AI response
  */
-export function parseAIResponse(
-  response: string,
-  expectedFormat: 'yaml' | 'dockerfile' | 'json',
-): Result<string> {
-  // Remove markdown fences if present
-  const cleaned = response.replace(/```[\w]*\n?/g, '').trim();
-
-  // Basic validation based on format
-  switch (expectedFormat) {
-    case 'yaml':
-      // More permissive YAML validation - allow simple scalar values
-      // Real YAML validation would require a proper parser
-      if (cleaned.length === 0) {
-        return Failure('Response is empty');
-      }
-      break;
-    case 'dockerfile':
-      if (!cleaned.includes('FROM')) {
-        return Failure('Response does not appear to be a valid Dockerfile');
-      }
-      break;
-    case 'json':
-      try {
-        JSON.parse(cleaned);
-      } catch (e) {
-        return Failure(`Response is not valid JSON: ${e instanceof Error ? e.message : String(e)}`);
-      }
-      break;
-  }
-
-  return Success(cleaned);
-}

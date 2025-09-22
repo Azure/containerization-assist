@@ -237,11 +237,9 @@ describe('Build Output Validation', () => {
         // Should have TypeScript source files or compiled JS files
         expect(tsFiles.length).toBeGreaterThan(0);
 
-        // Check for key modules (template-bridge consolidated into registry)
-        const hasRegistry = files.some(f => f.startsWith('registry'));
+        // Check for key modules
         const hasTemplates = files.some(f => f.startsWith('templates'));
 
-        expect(hasRegistry).toBe(true);
         expect(hasTemplates).toBe(true);
       }
     });

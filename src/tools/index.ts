@@ -309,42 +309,7 @@ export const ALL_TOOLS = [
   verifyDeployTool,
 ] as const;
 
-// Helper to create tool map for runtime lookup
-export function createToolMap(): Map<string, Tool> {
-  const map = new Map<string, Tool>();
-  for (const tool of ALL_TOOLS) {
-    map.set(tool.name, tool);
-  }
-  return map;
-}
-
-// Export individual tools for backwards compatibility if needed
-export {
-  analyzeRepoTool,
-  buildImageTool,
-  convertAcaToK8sTool,
-  deployTool,
-  fixDockerfileTool,
-  generateAcaManifestsTool,
-  generateDockerfileTool,
-  generateHelmChartsTool,
-  generateK8sManifestsTool,
-  inspectSessionTool,
-  opsToolInstance as opsTool,
-  prepareClusterTool,
-  pushImageTool,
-  resolveBaseImagesTool,
-  scanTool,
-  tagImageTool,
-  verifyDeployTool,
-};
-
-// Get all tool names as an array
-export function getAllToolNames(): ToolName[] {
-  return ALL_TOOLS.map((tool) => tool.name);
-}
-
-// Get all tools (same as ALL_TOOLS but as a function for consistency)
-export function getAllTools(): readonly Tool[] {
+// Get all tools (function for consistency with loader pattern)
+export function getAllInternalTools(): readonly Tool[] {
   return ALL_TOOLS;
 }
