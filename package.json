@@ -93,6 +93,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@eslint/js": "^9.36.0",
     "@jest/globals": "^29.7.0",
     "@types/dockerode": "^3.3.23",
     "@types/jest": "^30.0.0",

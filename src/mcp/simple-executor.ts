@@ -54,10 +54,11 @@ export async function executeSimpleTool(
     const validatedParams = await tool.schema.parseAsync(params);
 
     // 2. Create minimal context (no session, just basics)
+    // Don't include session properties when they're not available
     const context: ToolContext = {
-      session: new Map<string, unknown>() as any, // Minimal session for tool compatibility
       logger: toolLogger,
       progress: createMinimalProgress(toolLogger),
+      // Explicitly omit session and sessionId for simple execution
     };
 
     // 3. Execute the tool
@@ -93,14 +94,15 @@ export async function executeSimpleTool(
  * @param params - Parameters for the tool
  * @returns true if the tool can be executed simply
  */
-export function canExecuteSimply(tool: RegisteredTool, params: any): boolean {
+export function canExecuteSimply(tool: RegisteredTool, params: unknown): boolean {
   // Check if tool has dependencies
   if (tool.requires && tool.requires.length > 0) {
     return false;
   }
 
   // Check if this is a workflow or multi-step operation
-  if (Array.isArray(params?.steps) || params?.workflow) {
+  const paramsObj = params as Record<string, unknown>;
+  if (Array.isArray(paramsObj?.steps) || paramsObj?.workflow) {
     return false;
   }
 

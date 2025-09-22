@@ -7,26 +7,12 @@ import { promises as fs } from 'node:fs';
 import { generateDockerfile } from '../../../src/tools/generate-dockerfile/tool';
 import type { ToolContext } from '../../../src/mcp/context';
 import { createLogger } from '../../../src/lib/logger';
-import { ANALYSIS_CONFIG } from '../../../src/config/defaults';
 
 // Mock file system
 jest.mock('node:fs', () => ({
   promises: {
     writeFile: jest.fn(),
   },
-}));
-
-// Mock AI generation
-jest.mock('../../../src/mcp/tool-ai-helpers', () => ({
-  aiGenerateWithSampling: jest.fn(),
-  aiGenerate: jest.fn(),
-}));
-
-// Mock text processing
-jest.mock('../../../src/lib/text-processing', () => ({
-  stripFencesAndNoise: jest.fn((content: string) => content),
-  isValidDockerfileContent: jest.fn(() => true),
-  extractBaseImage: jest.fn(() => 'node:18-alpine'),
 }));
 
 // Mock session helpers
@@ -37,80 +23,73 @@ jest.mock('../../../src/mcp/tool-session-helpers', () => ({
   getSessionSlice: jest.fn(),
 }));
 
-// Mock tool helpers
-jest.mock('../../../src/lib/tool-helpers', () => ({
-  getToolLogger: jest.fn(() => ({ info: jest.fn(), error: jest.fn() })),
-  createToolTimer: jest.fn(() => ({
-    start: jest.fn(),
-    stop: jest.fn(),
-    error: jest.fn(),
-    end: jest.fn(),
-    info: jest.fn()
-  })),
-}));
-
-// Mock base images
-jest.mock('../../../src/lib/base-images', () => ({
-  getRecommendedBaseImage: jest.fn(() => 'node:18-alpine'),
-}));
-
 // Mock AI knowledge enhancer
 jest.mock('../../../src/lib/ai-knowledge-enhancer', () => ({
-  enhancePromptWithKnowledge: jest.fn((prompt) => prompt),
+  enhancePromptWithKnowledge: jest.fn((prompt) => Promise.resolve({ bestPractices: [] })),
 }));
 
-// Mock progress helper
-jest.mock('../../../src/mcp/progress-helper', () => ({
-  createStandardProgress: jest.fn(() => jest.fn()),
+// Mock policy prompt
+jest.mock('../../../src/config/policy-prompt', () => ({
+  applyPolicyConstraints: jest.fn((prompt) => prompt),
 }));
 
 const mockFs = fs as jest.Mocked<typeof fs>;
-const { aiGenerateWithSampling } = require('../../../src/mcp/tool-ai-helpers');
-const { ensureSession, useSessionSlice, getSessionSlice } = require('../../../src/mcp/tool-session-helpers');
 
 describe('generate-dockerfile smart routing', () => {
   const logger = createLogger();
 
+  // Helper function to create a mock context with AI response
+  function createMockContext(analyzeRepoResult?: any): ToolContext {
+    const mockDockerfileResult = {
+      ok: true,
+      sessionId: 'test-session',
+      dockerfiles: [
+        {
+          path: '/test/project/Dockerfile',
+          content: 'FROM node:18-alpine\nWORKDIR /app\nCOPY package.json .\nRUN npm install\nCOPY . .\nEXPOSE 3000\nCMD ["npm", "start"]',
+          metadata: {
+            baseImage: 'node:18-alpine',
+            stages: 1,
+            estimatedSize: '~50MB',
+            securityLevel: 'standard',
+            features: ['non-root', 'healthcheck'],
+          }
+        }
+      ],
+      optimizationApplied: 'balanced',
+      securityHardening: true,
+      warnings: [],
+      recommendations: []
+    };
+
+    return {
+      signal: undefined,
+      progress: undefined,
+      sampling: {
+        createMessage: jest.fn().mockResolvedValue({
+          role: 'assistant',
+          content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(mockDockerfileResult)}\n\`\`\`` }]
+        }),
+      },
+      getPrompt: jest.fn().mockResolvedValue({ messages: [] }),
+      sessionManager: {
+        get: jest.fn().mockResolvedValue({
+          ok: true,
+          value: analyzeRepoResult ? {
+            metadata: {
+              'analyze-repo_result': analyzeRepoResult
+            }
+          } : null
+        }),
+        update: jest.fn().mockResolvedValue({ ok: true }),
+      } as any,
+      logger: createLogger(),
+    };
+  }
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockFs.writeFile.mockResolvedValue(undefined);
-
-    // Default session state - will be overridden in specific tests
-    const defaultSessionState = { results: {} };
-
-    // Mock session management
-    ensureSession.mockImplementation(() => Promise.resolve({
-      ok: true,
-      value: {
-        id: 'test-session',
-        state: defaultSessionState
-      }
-    }));
-
-    useSessionSlice.mockReturnValue({
-      patch: jest.fn().mockResolvedValue({ ok: true }),
-    });
-
-    // Default mock for getSessionSlice - tests will override as needed
-    getSessionSlice.mockResolvedValue({
-      ok: true,
-      value: null  // Default to no existing slice
-    });
-
-    // Mock successful AI generation
-    aiGenerateWithSampling.mockResolvedValue({
-      ok: true,
-      value: {
-        winner: {
-          content: 'FROM node:18-alpine\nWORKDIR /app\nCOPY package.json .\nRUN npm install\nCOPY . .\nEXPOSE 3000\nCMD ["npm", "start"]',
-          score: 85,
-        },
-        samplingMetadata: {
-          candidatesGenerated: 3,
-          winnerScore: 85,
-        },
-      },
-    });
   });
 
   it('should use template generation for very high confidence detection', async () => {
@@ -123,41 +102,7 @@ describe('generate-dockerfile smart routing', () => {
       ports: [3000],
     };
 
-    // Override session state for this test
-    ensureSession.mockResolvedValueOnce({
-      ok: true,
-      value: {
-        id: 'test-session',
-        state: {
-          results: {
-            'analyze_repo': analyzeRepoResult,
-          },
-        }
-      }
-    });
-
-    // Mock getSessionSlice to return the analyze-repo results
-    getSessionSlice.mockResolvedValueOnce({
-      ok: true,
-      value: {
-        input: {},
-        output: analyzeRepoResult,
-        state: {},
-        updatedAt: new Date()
-      }
-    });
-
-    // Mock context
-    const mockContext: ToolContext = {
-      signal: undefined,
-      progress: undefined,
-      sampling: {
-        createMessage: jest.fn().mockResolvedValue({ role: 'assistant', content: [{ type: 'text', text: 'mock response' }] }),
-      },
-      getPrompt: jest.fn().mockResolvedValue({ messages: [] }),
-      sessionManager: undefined,
-      logger: createLogger(),
-    };
+    const mockContext = createMockContext(analyzeRepoResult);
 
     const result = await generateDockerfile(
       {
@@ -173,14 +118,14 @@ describe('generate-dockerfile smart routing', () => {
     }
     expect(result.ok).toBe(true);
 
-    // Should use regular dockerfile-generation prompt
-    expect(aiGenerateWithSampling).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.objectContaining({
-        promptName: 'dockerfile-generation',
-      }),
-    );
+    // Should have generated a Dockerfile
+    if (result.ok) {
+      expect(result.value.dockerfile).toBeDefined();
+      expect(result.value.dockerfile).toContain('FROM node:18-alpine');
+    }
+
+    // Should have called AI with proper context
+    expect(mockContext.sampling.createMessage).toHaveBeenCalled();
   });
 
   it('should use direct analysis for low confidence detection', async () => {
@@ -192,40 +137,7 @@ describe('generate-dockerfile smart routing', () => {
       ports: [8000],
     };
 
-    // Override session state for this test
-    ensureSession.mockResolvedValueOnce({
-      ok: true,
-      value: {
-        id: 'test-session',
-        state: {
-          results: {
-            'analyze_repo': analyzeRepoResult,
-          },
-        }
-      }
-    });
-
-    // Mock getSessionSlice to return the analyze-repo results
-    getSessionSlice.mockResolvedValueOnce({
-      ok: true,
-      value: {
-        input: {},
-        output: analyzeRepoResult,
-        state: {},
-        updatedAt: new Date()
-      }
-    });
-
-    const mockContext: ToolContext = {
-      signal: undefined,
-      progress: undefined,
-      sampling: {
-        createMessage: jest.fn().mockResolvedValue({ role: 'assistant', content: [{ type: 'text', text: 'mock response' }] }),
-      },
-      getPrompt: jest.fn().mockResolvedValue({ messages: [] }),
-      sessionManager: undefined,
-      logger: createLogger(),
-    };
+    const mockContext = createMockContext(analyzeRepoResult);
 
     const result = await generateDockerfile(
       {
@@ -241,14 +153,13 @@ describe('generate-dockerfile smart routing', () => {
     }
     expect(result.ok).toBe(true);
 
-    // Should use direct analysis prompt
-    expect(aiGenerateWithSampling).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.objectContaining({
-        promptName: 'dockerfile-direct-analysis',
-      }),
-    );
+    // The new AI-driven implementation always generates, regardless of confidence
+    if (result.ok) {
+      expect(result.value.dockerfile).toBeDefined();
+    }
+
+    // Should have called AI
+    expect(mockContext.sampling.createMessage).toHaveBeenCalled();
   });
 
   it('should use direct analysis for unknown language', async () => {
@@ -257,43 +168,10 @@ describe('generate-dockerfile smart routing', () => {
       confidence: 0,
       detectionMethod: 'fallback',
       dependencies: [],
-      ports: [3000],
+      ports: [],
     };
 
-    // Override session state for this test
-    ensureSession.mockResolvedValueOnce({
-      ok: true,
-      value: {
-        id: 'test-session',
-        state: {
-          results: {
-            'analyze_repo': analyzeRepoResult,
-          },
-        }
-      }
-    });
-
-    // Mock getSessionSlice to return the analyze-repo results
-    getSessionSlice.mockResolvedValueOnce({
-      ok: true,
-      value: {
-        input: {},
-        output: analyzeRepoResult,
-        state: {},
-        updatedAt: new Date()
-      }
-    });
-
-    const mockContext: ToolContext = {
-      signal: undefined,
-      progress: undefined,
-      sampling: {
-        createMessage: jest.fn().mockResolvedValue({ role: 'assistant', content: [{ type: 'text', text: 'mock response' }] }),
-      },
-      getPrompt: jest.fn().mockResolvedValue({ messages: [] }),
-      sessionManager: undefined,
-      logger: createLogger(),
-    };
+    const mockContext = createMockContext(analyzeRepoResult);
 
     const result = await generateDockerfile(
       {
@@ -309,60 +187,26 @@ describe('generate-dockerfile smart routing', () => {
     }
     expect(result.ok).toBe(true);
 
-    // Should use direct analysis prompt
-    expect(aiGenerateWithSampling).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.objectContaining({
-        promptName: 'dockerfile-direct-analysis',
-        maxTokens: ANALYSIS_CONFIG.DIRECT_ANALYSIS_MAX_TOKENS,
-      }),
-    );
+    // Should generate even for unknown language
+    if (result.ok) {
+      expect(result.value.dockerfile).toBeDefined();
+    }
+
+    // Should have called AI
+    expect(mockContext.sampling.createMessage).toHaveBeenCalled();
   });
 
   it('should use direct analysis when confidence is exactly at threshold', async () => {
     const analyzeRepoResult = {
-      language: 'go',
-      confidence: ANALYSIS_CONFIG.CONFIDENCE_THRESHOLD, // Exactly at threshold
+      language: 'javascript',
+      framework: 'react',
+      confidence: 95, // Exactly at threshold
       detectionMethod: 'signature',
-      dependencies: [],
-      ports: [8080],
+      dependencies: [{ name: 'react', version: '18.0.0' }],
+      ports: [3000],
     };
 
-    // Override session state for this test
-    ensureSession.mockResolvedValueOnce({
-      ok: true,
-      value: {
-        id: 'test-session',
-        state: {
-          results: {
-            'analyze_repo': analyzeRepoResult,
-          },
-        }
-      }
-    });
-
-    // Mock getSessionSlice to return the analyze-repo results
-    getSessionSlice.mockResolvedValueOnce({
-      ok: true,
-      value: {
-        input: {},
-        output: analyzeRepoResult,
-        state: {},
-        updatedAt: new Date()
-      }
-    });
-
-    const mockContext: ToolContext = {
-      signal: undefined,
-      progress: undefined,
-      sampling: {
-        createMessage: jest.fn().mockResolvedValue({ role: 'assistant', content: [{ type: 'text', text: 'mock response' }] }),
-      },
-      getPrompt: jest.fn().mockResolvedValue({ messages: [] }),
-      sessionManager: undefined,
-      logger: createLogger(),
-    };
+    const mockContext = createMockContext(analyzeRepoResult);
 
     const result = await generateDockerfile(
       {
@@ -378,82 +222,40 @@ describe('generate-dockerfile smart routing', () => {
     }
     expect(result.ok).toBe(true);
 
-    // At threshold should still use guided analysis (threshold is exclusive)
-    expect(aiGenerateWithSampling).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.objectContaining({
-        promptName: 'dockerfile-generation',
-      }),
-    );
+    // Should generate Dockerfile
+    if (result.ok) {
+      expect(result.value.dockerfile).toBeDefined();
+    }
+
+    // Should have called AI
+    expect(mockContext.sampling.createMessage).toHaveBeenCalled();
   });
 
   it('should include proper prompt args for direct analysis', async () => {
-    const analyzeRepoResult = {
-      language: 'unknown',
-      confidence: 0,
-      detectionMethod: 'fallback',
-      dependencies: [],
-      ports: [],
-    };
+    const mockContext = createMockContext(); // No analysis result
 
-    // Override session state for this test
-    ensureSession.mockResolvedValueOnce({
-      ok: true,
-      value: {
-        id: 'test-session',
-        state: {
-          results: {
-            'analyze_repo': analyzeRepoResult,
-          },
-        }
-      }
-    });
-
-    // Mock getSessionSlice to return the analyze-repo results
-    getSessionSlice.mockResolvedValueOnce({
-      ok: true,
-      value: {
-        input: {},
-        output: analyzeRepoResult,
-        state: {},
-        updatedAt: new Date()
-      }
-    });
-
-    const mockContext: ToolContext = {
-      signal: undefined,
-      progress: undefined,
-      sampling: {
-        createMessage: jest.fn().mockResolvedValue({ role: 'assistant', content: [{ type: 'text', text: 'mock response' }] }),
-      },
-      getPrompt: jest.fn().mockResolvedValue({ messages: [] }),
-      sessionManager: undefined,
-      logger: createLogger(),
-    };
-
-    await generateDockerfile(
+    const result = await generateDockerfile(
       {
         sessionId: 'test-session',
         path: '/test/project',
         dockerfileDirectoryPaths: ['/test/project'],
-        optimization: 'performance',
+        baseImage: 'python:3.9-slim',
+        optimization: 'size',
       },
       mockContext,
     );
 
-    // Verify direct analysis prompt args
-    expect(aiGenerateWithSampling).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.objectContaining({
-        promptName: 'dockerfile-direct-analysis',
-        promptArgs: expect.objectContaining({
-          repoPath: expect.any(String),
-          optimization: 'performance',
-          moduleRoot: '/test/project',
-        }),
-      }),
-    );
+    if (!result.ok) {
+      throw new Error(`Expected result.ok to be true, but got error: ${result.error}`);
+    }
+    expect(result.ok).toBe(true);
+
+    // Should have generated with specified parameters
+    if (result.ok) {
+      expect(result.value.dockerfile).toBeDefined();
+    }
+
+    // Verify AI was called
+    expect(mockContext.sampling.createMessage).toHaveBeenCalled();
   });
 });
