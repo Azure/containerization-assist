@@ -8,15 +8,16 @@
  * - Output contract specification
  */
 
-import type {
-  AIMessage,
-  AIMessages,
-  BuildPromptParams,
-  OutputContract,
-  PromptEnvelope,
-  Result,
+import {
+  type AIMessage,
+  type AIMessages,
+  type BuildPromptParams,
+  type OutputContract,
+  type PromptEnvelope,
+  type Result,
+  Success,
+  Failure,
 } from '@/types/index';
-import { Success, Failure } from '@/types/index';
 import type { KnowledgeSnippet } from '@/knowledge/schemas';
 import { getKnowledgeSnippets } from '@/knowledge/matcher';
 import { buildPolicyConstraints } from '@/config/policy-prompt';

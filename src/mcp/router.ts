@@ -9,12 +9,11 @@
  * - Error handling and recovery
  */
 
-import type { Tool } from '@/types/index';
+import { type Tool, type Result, Failure } from '@/types/index';
 import type { ToolContext } from '@/mcp/context';
-import type { Result } from '@/types/index';
-import { Failure } from '@/types/index';
 import { createLogger } from '@/lib/logger';
 import type { Logger } from 'pino';
+import { sessionMiddleware } from '@/mcp/middleware/session-middleware';
 
 const logger = createLogger().child({ module: 'mcp-router' });
 
@@ -358,20 +357,30 @@ export const Middleware = {
   },
 
   /**
-   * Validation middleware.
+   * Validation middleware - requires Zod schema for validation.
    */
-  validation(_schema: any): Middleware {
+  validation<T>(schema: { parse: (data: unknown) => T }): Middleware {
     return async (params, logger, context, next) => {
       try {
-        // Basic validation (can be enhanced with Zod)
-        // TODO: Implement schema validation when needed
-        if (!params || typeof params !== 'object') {
-          return Failure('Invalid parameters: expected object');
+        // Validate with Zod schema (required)
+        const validated = schema.parse(params);
+
+        // Pass validated params to next middleware/handler
+        return next(validated as Record<string, unknown>, logger, context);
+      } catch (err: any) {
+        // Format Zod validation errors
+        if (err?.errors && Array.isArray(err.errors)) {
+          const details = err.errors
+            .map((e: any) => {
+              const path = e.path?.join('.') || 'root';
+              return `${path}: ${e.message}`;
+            })
+            .join(', ');
+          return Failure(`Validation failed: ${details}`);
         }
 
-        return next(params, logger, context);
-      } catch (error) {
-        return Failure(`Validation failed: ${error}`);
+        // Fallback for non-Zod errors
+        return Failure(`Validation failed: ${err?.message || String(err)}`);
       }
     };
   },
@@ -388,7 +397,7 @@ export const Middleware = {
       try {
         const result = await Promise.race([next(params, logger, context), timeoutPromise]);
         return result;
-      } catch (error) {
+      } catch {
         return Failure(`Execution timed out after ${ms}ms`);
       }
     };
@@ -454,6 +463,6 @@ export const Middleware = {
 export function createDefaultRouter(config?: RouterConfig): McpRouter {
   return new McpRouter({
     ...config,
-    globalMiddleware: [Middleware.logging(), ...(config?.globalMiddleware || [])],
+    globalMiddleware: [sessionMiddleware, Middleware.logging(), ...(config?.globalMiddleware || [])],
   });
 }
