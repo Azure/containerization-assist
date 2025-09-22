@@ -73,10 +73,16 @@ const PROMPT_HANDLERS: Record<string, { description: string; handler: PromptHand
         multistage: Boolean(args.multistage),
       };
       if (args.framework) params.framework = String(args.framework);
-      if (args.dependencies)
-        params.dependencies = Array.isArray(args.dependencies)
-          ? args.dependencies.map(String)
-          : [String(args.dependencies)];
+      if (args.dependencies) {
+        if (Array.isArray(args.dependencies)) {
+          params.dependencies = args.dependencies
+            .filter((dep) => typeof dep === 'string' || typeof dep === 'number')
+            .map(String);
+        } else if (typeof args.dependencies === 'string' || typeof args.dependencies === 'number') {
+          params.dependencies = [String(args.dependencies)];
+        }
+        // Skip invalid types silently (no logger available in this context)
+      }
       if (args.ports)
         params.ports = Array.isArray(args.ports) ? args.ports.map(Number) : [Number(args.ports)];
       if (args.requirements) params.requirements = String(args.requirements);

@@ -1,6 +1,7 @@
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { applyPolicyConstraints } from '@/config/policy-prompt';
+import { enhancePrompt } from '../knowledge-helper';
 import { convertAcaToK8sSchema, type ConvertAcaToK8sParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 
@@ -12,7 +13,7 @@ export async function convertAcaToK8s(
   const { acaManifest } = validatedParams;
 
   // Generate prompt for conversion
-  const prompt = `Convert the following Azure Container Apps manifest to Kubernetes manifests:
+  const basePrompt = `Convert the following Azure Container Apps manifest to Kubernetes manifests:
 
 \`\`\`yaml
 ${acaManifest}
@@ -26,8 +27,13 @@ Generate equivalent Kubernetes manifests including:
 
 Maintain all configurations and ensure compatibility with standard Kubernetes clusters.`;
 
+  // Enhance with knowledge base
+  const enhancedPrompt = await enhancePrompt(basePrompt, 'convert_aca_to_k8s', {
+    environment: 'production',
+  });
+
   // Apply policy constraints
-  const constrained = applyPolicyConstraints(prompt, {
+  const constrained = applyPolicyConstraints(enhancedPrompt, {
     tool: 'convert-aca-to-k8s',
     environment: 'production',
   });
@@ -59,6 +65,7 @@ Maintain all configurations and ensure compatibility with standard Kubernetes cl
 export const metadata = {
   name: 'convert-aca-to-k8s',
   description: 'Convert Azure Container Apps manifests to Kubernetes',
-  version: '2.0.0',
+  version: '2.1.0',
   aiDriven: true,
+  knowledgeEnhanced: true,
 };

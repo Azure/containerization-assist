@@ -62,21 +62,21 @@ const ENVIRONMENT_KEYWORDS: Record<string, string[]> = {
 /**
  * Get keywords associated with a programming language
  */
-export const getLanguageKeywords = (language: string): string[] => {
+const getLanguageKeywords = (language: string): string[] => {
   return LANGUAGE_KEYWORDS[language.toLowerCase()] || [language.toLowerCase()];
 };
 
 /**
  * Get keywords associated with a framework
  */
-export const getFrameworkKeywords = (framework: string): string[] => {
+const getFrameworkKeywords = (framework: string): string[] => {
   return FRAMEWORK_KEYWORDS[framework.toLowerCase()] || [framework.toLowerCase()];
 };
 
 /**
  * Get keywords associated with an environment
  */
-export const getEnvironmentKeywords = (environment: string): string[] => {
+const getEnvironmentKeywords = (environment: string): string[] => {
   return ENVIRONMENT_KEYWORDS[environment.toLowerCase()] || [environment.toLowerCase()];
 };
 

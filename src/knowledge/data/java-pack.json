@@ -160,33 +160,33 @@
     "description": "Micronaut's AOT compilation reduces startup time and memory usage"
   },
   {
-    "id": "maven-avoid-javac",
+    "id": "java-graalvm-native",
     "category": "dockerfile",
-    "pattern": "java",
-    "recommendation": "NEVER use 'javac' or 'find . -name *.java' commands. For Java projects with pom.xml, always use Maven commands (mvn package)",
-    "example": "FROM maven:3.9-openjdk-17 AS build\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests",
-    "severity": "high",
-    "tags": ["java", "maven", "build", "compilation"],
-    "description": "Raw javac compilation cannot handle Maven dependencies, classpath, or framework packaging"
+    "pattern": "graalvm|native-image",
+    "recommendation": "Use GraalVM native image for reduced memory footprint and instant startup",
+    "example": "FROM ghcr.io/graalvm/native-image:ol9-java17 AS build\nWORKDIR /app\nCOPY . .\nRUN ./mvnw -Pnative native:compile\n\nFROM gcr.io/distroless/base\nCOPY --from=build /app/target/app /app\nENTRYPOINT [\"/app\"]",
+    "severity": "medium",
+    "tags": ["java", "graalvm", "native-image", "performance"],
+    "description": "GraalVM native images provide sub-second startup times and lower memory usage"
   },
   {
-    "id": "spring-boot-maven-build",
+    "id": "java-jlink-optimization",
     "category": "dockerfile",
-    "pattern": "spring.*maven|maven.*spring",
-    "recommendation": "Use proper Maven commands for Spring Boot projects with fat JAR packaging",
-    "example": "FROM maven:3.9-openjdk-17 AS build\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests\n\nFROM openjdk:17-jre-alpine\nCOPY --from=build /app/target/*.jar app.jar\nCMD [\"java\", \"-jar\", \"/app/app.jar\"]",
-    "severity": "high",
-    "tags": ["spring-boot", "maven", "build", "fat-jar"],
-    "description": "Spring Boot requires Maven packaging to create executable JAR with embedded dependencies"
+    "pattern": "jlink|custom-jre",
+    "recommendation": "Use jlink to create custom JRE with only required modules",
+    "example": "FROM eclipse-temurin:17 AS jre-builder\nRUN jlink \\\n  --add-modules java.base,java.logging,java.xml,java.desktop,java.management,java.naming \\\n  --strip-debug \\\n  --no-man-pages \\\n  --no-header-files \\\n  --compress=2 \\\n  --output /javaruntime",
+    "severity": "medium",
+    "tags": ["java", "jlink", "optimization", "jre"],
+    "description": "Custom JRE reduces image size by including only necessary modules"
   },
   {
-    "id": "java-build-system-detection",
-    "category": "dockerfile",
-    "pattern": "java",
-    "recommendation": "CRITICAL: Never use javac directly! Always use Maven (mvn) or Gradle commands for Java projects",
-    "example": "# Maven example\nFROM maven:3.9-openjdk-17 AS build\nCOPY pom.xml .\nCOPY src ./src\nRUN mvn clean package -DskipTests\n\n# Gradle example\nFROM gradle:7-jdk17 AS build\nCOPY build.gradle settings.gradle ./\nCOPY src ./src\nRUN gradle build --no-daemon",
-    "severity": "high",
-    "tags": ["java", "maven", "gradle", "build-system"],
-    "description": "Java projects require build tools to handle dependencies and packaging correctly"
+    "id": "java-security-scanning",
+    "category": "security",
+    "pattern": "java|maven|gradle",
+    "recommendation": "Add security vulnerability scanning to Java builds",
+    "example": "# Security scanning in build stage\nFROM maven:3.9-openjdk-17 AS build\nCOPY . .\nRUN mvn dependency:tree\nRUN mvn org.owasp:dependency-check-maven:check\nRUN mvn compile spotbugs:check\n\n# Scan final image\nFROM aquasec/trivy AS scanner\nCOPY --from=build /app/target/*.jar /scan/\nRUN trivy fs --exit-code 1 --severity HIGH,CRITICAL /scan",
+    "severity": "critical",
+    "tags": ["java", "security", "scanning", "owasp", "vulnerabilities"],
+    "description": "Security scanning identifies vulnerabilities in dependencies and code"
   }
 ]

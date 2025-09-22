@@ -198,5 +198,125 @@
     "severity": "low",
     "tags": ["azure-container-apps", "timeout", "performance"],
     "description": "Timeout settings prevent hung connections and improve reliability"
+  },
+  {
+    "id": "aca-advanced-scaling-rules",
+    "category": "kubernetes",
+    "pattern": "scale:",
+    "recommendation": "Configure advanced scaling rules with multiple metrics for intelligent autoscaling",
+    "example": "scale:\n  minReplicas: 0\n  maxReplicas: 50\n  rules:\n    - name: \"http-requests\"\n      http:\n        metadata:\n          concurrentRequests: \"30\"\n    - name: \"cpu-utilization\"\n      custom:\n        type: \"cpu\"\n        metadata:\n          type: \"utilization\"\n          value: \"70\"\n    - name: \"memory-utilization\"\n      custom:\n        type: \"memory\"\n        metadata:\n          type: \"utilization\"\n          value: \"80\"\n    - name: \"custom-metric\"\n      custom:\n        type: \"azure-monitor\"\n        metadata:\n          metricName: \"RequestsPerSecond\"\n          threshold: \"100\"",
+    "severity": "high",
+    "tags": ["azure-container-apps", "scaling", "metrics", "autoscaling"],
+    "description": "Multi-metric scaling provides intelligent autoscaling based on application behavior"
+  },
+  {
+    "id": "aca-dapr-comprehensive-integration",
+    "category": "kubernetes",
+    "pattern": "dapr:",
+    "recommendation": "Implement comprehensive Dapr integration with state management, pub/sub, and service invocation",
+    "example": "dapr:\n  enabled: true\n  appId: \"${APP_NAME}\"\n  appPort: 8080\n  appProtocol: \"http\"\n  enableApiLogging: true\n  httpReadBufferSize: \"4KB\"\n  httpMaxRequestSize: \"4MB\"\n  logLevel: \"info\"\n  components:\n    - name: \"statestore\"\n      type: \"state.azure.cosmosdb\"\n      metadata:\n        - name: \"url\"\n          value: \"${COSMOS_DB_URL}\"\n        - name: \"masterkey\"\n          secretRef: \"cosmos-key\"\n    - name: \"pubsub\"\n      type: \"pubsub.azure.servicebus\"\n      metadata:\n        - name: \"connectionString\"\n          secretRef: \"servicebus-connection\"",
+    "severity": "medium",
+    "tags": ["azure-container-apps", "dapr", "microservices", "state-management"],
+    "description": "Comprehensive Dapr integration enables resilient microservices patterns"
+  },
+  {
+    "id": "aca-keda-autoscaling",
+    "category": "kubernetes",
+    "pattern": "scale:",
+    "recommendation": "Leverage KEDA autoscaling with Azure-specific scalers for advanced scaling scenarios",
+    "example": "scale:\n  rules:\n    - name: \"azure-queue\"\n      azureQueue:\n        queueName: \"${QUEUE_NAME}\"\n        queueLength: 5\n        auth:\n          secretRef: \"queue-connection\"\n    - name: \"service-bus\"\n      azureServiceBus:\n        topicName: \"${TOPIC_NAME}\"\n        subscriptionName: \"${SUBSCRIPTION_NAME}\"\n        messageCount: 10\n        auth:\n          secretRef: \"servicebus-connection\"\n    - name: \"cosmos-db\"\n      custom:\n        type: \"azure-monitor\"\n        metadata:\n          resourceURI: \"${COSMOS_DB_RESOURCE_URI}\"\n          metricName: \"TotalRequests\"\n          threshold: \"1000\"",
+    "severity": "medium",
+    "tags": ["azure-container-apps", "keda", "autoscaling", "azure-services"],
+    "description": "KEDA provides event-driven autoscaling based on Azure service metrics"
+  },
+  {
+    "id": "aca-blue-green-deployment",
+    "category": "kubernetes",
+    "pattern": "traffic:",
+    "recommendation": "Implement blue-green deployment pattern with traffic splitting and health validation",
+    "example": "activeRevisionsMode: \"multiple\"\ntraffic:\n  - revisionName: \"${APP_NAME}--blue\"\n    weight: 80\n    label: \"blue\"\n  - revisionName: \"${APP_NAME}--green\"\n    weight: 20\n    label: \"green\"\n# Health validation\nprobes:\n  - type: readiness\n    httpGet:\n      path: /health/ready\n      port: 8080\n    initialDelaySeconds: 10\n    periodSeconds: 5\n    failureThreshold: 3\n  - type: liveness\n    httpGet:\n      path: /health/live\n      port: 8080\n    initialDelaySeconds: 30\n    periodSeconds: 30",
+    "severity": "high",
+    "tags": ["azure-container-apps", "blue-green", "deployment", "traffic-splitting"],
+    "description": "Blue-green deployments enable zero-downtime releases with gradual traffic migration"
+  },
+  {
+    "id": "aca-azure-key-vault-integration",
+    "category": "kubernetes",
+    "pattern": "secrets:",
+    "recommendation": "Integrate Azure Key Vault for secure secret management with managed identity",
+    "example": "identity:\n  type: \"UserAssigned\"\n  userAssignedIdentities:\n    \"${KEY_VAULT_IDENTITY_ID}\": {}\nsecrets:\n  - name: \"db-connection\"\n    keyVaultUrl: \"${KEY_VAULT_URL}\"\n    identity: \"${KEY_VAULT_IDENTITY_ID}\"\n  - name: \"api-key\"\n    keyVaultUrl: \"${KEY_VAULT_URL}\"\n    identity: \"${KEY_VAULT_IDENTITY_ID}\"\nenv:\n  - name: \"DATABASE_URL\"\n    secretRef: \"db-connection\"\n  - name: \"API_KEY\"\n    secretRef: \"api-key\"",
+    "severity": "high",
+    "tags": ["azure-container-apps", "key-vault", "security", "managed-identity"],
+    "description": "Key Vault integration provides enterprise-grade secret management"
+  },
+  {
+    "id": "aca-service-bus-integration",
+    "category": "kubernetes",
+    "pattern": "scale:",
+    "recommendation": "Integrate Azure Service Bus for message-driven scaling and processing",
+    "example": "scale:\n  rules:\n    - name: \"servicebus-queue\"\n      azureServiceBus:\n        queueName: \"${QUEUE_NAME}\"\n        messageCount: 5\n        auth:\n          secretRef: \"servicebus-connection\"\n    - name: \"servicebus-topic\"\n      azureServiceBus:\n        topicName: \"${TOPIC_NAME}\"\n        subscriptionName: \"${SUBSCRIPTION_NAME}\"\n        messageCount: 10\n        auth:\n          secretRef: \"servicebus-connection\"\nenv:\n  - name: \"SERVICE_BUS_CONNECTION\"\n    secretRef: \"servicebus-connection\"\n  - name: \"QUEUE_NAME\"\n    value: \"${QUEUE_NAME}\"",
+    "severity": "medium",
+    "tags": ["azure-container-apps", "service-bus", "messaging", "event-driven"],
+    "description": "Service Bus integration enables reliable message processing and scaling"
+  },
+  {
+    "id": "aca-application-insights-integration",
+    "category": "kubernetes",
+    "pattern": "env:",
+    "recommendation": "Integrate Application Insights for comprehensive monitoring and telemetry",
+    "example": "env:\n  - name: \"APPLICATIONINSIGHTS_CONNECTION_STRING\"\n    secretRef: \"appinsights-connection\"\n  - name: \"APPLICATIONINSIGHTS_ROLE_NAME\"\n    value: \"${APP_NAME}\"\n  - name: \"APPLICATIONINSIGHTS_ROLE_INSTANCE\"\n    value: \"${CONTAINER_APP_REVISION}\"\n  - name: \"OTEL_EXPORTER_OTLP_ENDPOINT\"\n    value: \"https://dc.applicationinsights.azure.com/v2/track\"\n# Enable distributed tracing\ndapr:\n  config: \"tracing\"\n  components:\n    - name: \"tracing\"\n      type: \"exporters.zipkin\"\n      metadata:\n        - name: \"endpointAddress\"\n          value: \"https://dc.applicationinsights.azure.com/v2/track\"",
+    "severity": "medium",
+    "tags": ["azure-container-apps", "monitoring", "telemetry", "application-insights"],
+    "description": "Application Insights provides deep application monitoring and distributed tracing"
+  },
+  {
+    "id": "aca-cosmos-db-scaling",
+    "category": "kubernetes",
+    "pattern": "scale:",
+    "recommendation": "Scale based on Cosmos DB metrics for data-intensive applications",
+    "example": "scale:\n  rules:\n    - name: \"cosmos-db-ru\"\n      custom:\n        type: \"azure-monitor\"\n        metadata:\n          resourceURI: \"${COSMOS_DB_RESOURCE_URI}\"\n          metricName: \"TotalRequestUnits\"\n          threshold: \"800\"\n          aggregationType: \"Average\"\n    - name: \"cosmos-db-throttle\"\n      custom:\n        type: \"azure-monitor\"\n        metadata:\n          resourceURI: \"${COSMOS_DB_RESOURCE_URI}\"\n          metricName: \"UserErrors\"\n          threshold: \"5\"\nenv:\n  - name: \"COSMOS_DB_ENDPOINT\"\n    value: \"${COSMOS_DB_ENDPOINT}\"\n  - name: \"COSMOS_DB_KEY\"\n    secretRef: \"cosmos-db-key\"",
+    "severity": "medium",
+    "tags": ["azure-container-apps", "cosmos-db", "scaling", "data"],
+    "description": "Cosmos DB metric-based scaling ensures optimal performance for data workloads"
+  },
+  {
+    "id": "aca-virtual-network-integration",
+    "category": "kubernetes",
+    "pattern": "networkProfile:",
+    "recommendation": "Configure virtual network integration for secure communication with Azure services",
+    "example": "networkProfile:\n  subnetId: \"${SUBNET_ID}\"\n# Enable private endpoints\nprivateEndpoints:\n  - name: \"storage-endpoint\"\n    serviceId: \"${STORAGE_ACCOUNT_ID}\"\n    subresource: \"blob\"\n  - name: \"keyvault-endpoint\"\n    serviceId: \"${KEY_VAULT_ID}\"\n    subresource: \"vault\"\n# Network security\nipSecurityRestrictions:\n  - name: \"Allow-VNet\"\n    ipAddressRange: \"${VNET_ADDRESS_SPACE}\"\n    action: \"Allow\"\n  - name: \"Deny-All\"\n    ipAddressRange: \"0.0.0.0/0\"\n    action: \"Deny\"\n    priority: 1000",
+    "severity": "high",
+    "tags": ["azure-container-apps", "vnet", "security", "private-endpoints"],
+    "description": "VNet integration provides secure, private communication with Azure services"
+  },
+  {
+    "id": "aca-certificate-management",
+    "category": "kubernetes",
+    "pattern": "certificates:",
+    "recommendation": "Implement automated certificate management with Key Vault and custom domains",
+    "example": "certificates:\n  - name: \"${DOMAIN_NAME}-cert\"\n    type: \"ManagedCertificate\"\n    properties:\n      subjectName: \"${DOMAIN_NAME}\"\n      dnsNames:\n        - \"${DOMAIN_NAME}\"\n        - \"www.${DOMAIN_NAME}\"\ncustomDomains:\n  - name: \"${DOMAIN_NAME}\"\n    certificateId: \"/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.App/managedEnvironments/${ENVIRONMENT_NAME}/certificates/${DOMAIN_NAME}-cert\"\n    bindingType: \"SniEnabled\"\n  - name: \"www.${DOMAIN_NAME}\"\n    certificateId: \"/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.App/managedEnvironments/${ENVIRONMENT_NAME}/certificates/${DOMAIN_NAME}-cert\"\n    bindingType: \"SniEnabled\"",
+    "severity": "medium",
+    "tags": ["azure-container-apps", "certificates", "domains", "automation"],
+    "description": "Automated certificate management ensures secure HTTPS without manual intervention"
+  },
+  {
+    "id": "aca-distributed-tracing",
+    "category": "kubernetes",
+    "pattern": "dapr:",
+    "recommendation": "Configure distributed tracing across microservices with Dapr and Application Insights",
+    "example": "dapr:\n  enabled: true\n  appId: \"${APP_NAME}\"\n  config: \"tracing-config\"\n  components:\n    - name: \"tracing\"\n      type: \"middleware.http.opentelemetry\"\n      metadata:\n        - name: \"enabled\"\n          value: \"true\"\n        - name: \"endpoint\"\n          value: \"https://dc.applicationinsights.azure.com/v2/track\"\nenv:\n  - name: \"OTEL_SERVICE_NAME\"\n    value: \"${APP_NAME}\"\n  - name: \"OTEL_RESOURCE_ATTRIBUTES\"\n    value: \"service.name=${APP_NAME},service.version=${APP_VERSION}\"\n  - name: \"APPLICATIONINSIGHTS_CONNECTION_STRING\"\n    secretRef: \"appinsights-connection\"",
+    "severity": "medium",
+    "tags": ["azure-container-apps", "tracing", "observability", "microservices"],
+    "description": "Distributed tracing provides end-to-end visibility across microservices"
+  },
+  {
+    "id": "aca-backup-and-disaster-recovery",
+    "category": "kubernetes",
+    "pattern": "volumes:",
+    "recommendation": "Implement backup and disaster recovery strategies for stateful applications",
+    "example": "volumes:\n  - name: \"data-volume\"\n    storageType: \"AzureFile\"\n    storageName: \"${STORAGE_ACCOUNT_NAME}\"\n    shareName: \"${FILE_SHARE_NAME}\"\n# Backup configuration\nenv:\n  - name: \"BACKUP_STORAGE_ACCOUNT\"\n    value: \"${BACKUP_STORAGE_ACCOUNT}\"\n  - name: \"BACKUP_CONTAINER\"\n    value: \"${BACKUP_CONTAINER}\"\n  - name: \"BACKUP_SCHEDULE\"\n    value: \"0 2 * * *\"  # Daily at 2 AM\n# Cross-region replication\nreplication:\n  enabled: true\n  regions:\n    - \"${PRIMARY_REGION}\"\n    - \"${SECONDARY_REGION}\"",
+    "severity": "high",
+    "tags": ["azure-container-apps", "backup", "disaster-recovery", "resilience"],
+    "description": "Backup and DR strategies ensure business continuity and data protection"
   }
 ]

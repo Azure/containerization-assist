@@ -2,6 +2,7 @@ import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates } from '@/prompts/templates';
 import { applyPolicyConstraints } from '@/config/policy-prompt';
+import { enhancePrompt } from '../knowledge-helper';
 import { fixDockerfileSchema, type FixDockerfileParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 
@@ -20,10 +21,15 @@ export async function fixDockerfile(
     'Layer ordering issues',
     'Best practices violations',
   ];
-  const prompt = promptTemplates.fix('dockerfile', content, issues);
+  const basePrompt = promptTemplates.fix('dockerfile', content, issues);
+
+  // Enhance with knowledge base
+  const enhancedPrompt = await enhancePrompt(basePrompt, 'fix_dockerfile', {
+    environment,
+  });
 
   // Apply policy constraints
-  const constrained = applyPolicyConstraints(prompt, {
+  const constrained = applyPolicyConstraints(enhancedPrompt, {
     tool: 'fix-dockerfile',
     environment,
   });
@@ -55,6 +61,7 @@ export async function fixDockerfile(
 export const metadata = {
   name: 'fix-dockerfile',
   description: 'Fix and optimize existing Dockerfiles',
-  version: '2.0.0',
+  version: '2.1.0',
   aiDriven: true,
+  knowledgeEnhanced: true,
 };
