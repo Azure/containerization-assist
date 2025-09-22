@@ -463,6 +463,10 @@ export const Middleware = {
 export function createDefaultRouter(config?: RouterConfig): McpRouter {
   return new McpRouter({
     ...config,
-    globalMiddleware: [sessionMiddleware, Middleware.logging(), ...(config?.globalMiddleware || [])],
+    globalMiddleware: [
+      sessionMiddleware,
+      Middleware.logging(),
+      ...(config?.globalMiddleware || []),
+    ],
   });
 }

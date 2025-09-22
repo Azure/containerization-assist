@@ -70,19 +70,27 @@ const registerHandlers = async (state: MCPServerState): Promise<void> => {
       // Try to extract shape for ZodObject types
       if (tool.schema instanceof z.ZodObject) {
         schemaShape = tool.schema.shape;
-      } else if ('shape' in tool.schema && typeof tool.schema.shape === 'object' && tool.schema.shape !== null) {
+      } else if (
+        'shape' in tool.schema &&
+        typeof tool.schema.shape === 'object' &&
+        tool.schema.shape !== null
+      ) {
         // Fallback: if it has a shape property, use it
         schemaShape = tool.schema.shape as Record<string, any>;
       } else {
         // Check for ZodEffects (refinements, transforms, etc.)
         const schemaAny = tool.schema as any;
-        if (schemaAny._def && schemaAny._def.typeName === 'ZodEffects' && schemaAny._def.schema instanceof z.ZodObject) {
+        if (
+          schemaAny._def &&
+          schemaAny._def.typeName === 'ZodEffects' &&
+          schemaAny._def.schema instanceof z.ZodObject
+        ) {
           schemaShape = schemaAny._def.schema.shape;
         } else {
           // Log warning for non-standard schema types
           state.logger.warn(
             { tool: name, schemaType: typeof tool.schema },
-            'Tool has non-standard Zod schema type, using empty schema shape'
+            'Tool has non-standard Zod schema type, using empty schema shape',
           );
         }
       }

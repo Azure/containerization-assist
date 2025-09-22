@@ -14,7 +14,11 @@
 import { z } from 'zod';
 import { type Result, Failure } from '@/types';
 import type { Logger } from '@/lib/logger';
-import type { RegisteredTool, ToolContext as AppToolContext, ProgressReporter as AppProgressReporter } from '@/app/types';
+import type {
+  RegisteredTool,
+  ToolContext as AppToolContext,
+  ProgressReporter as AppProgressReporter,
+} from '@/app/types';
 
 /**
  * Minimal progress reporter for simple tools (app format)

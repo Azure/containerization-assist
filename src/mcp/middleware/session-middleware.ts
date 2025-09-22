@@ -15,7 +15,7 @@ export function createSessionMiddleware(manager = new SessionManager()): Middlew
     const sessionId = manager.ensureSession(current);
 
     // Write back so downstream tools see a stable id
-    (params).sessionId = sessionId;
+    params.sessionId = sessionId;
 
     // Very light touch: record last access
     manager.set(sessionId, '__lastAccess', new Date().toISOString());
