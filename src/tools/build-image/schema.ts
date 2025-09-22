@@ -3,11 +3,10 @@
  */
 
 import { z } from 'zod';
-
-const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
+import { sessionId, imageName, tags, buildArgs, platform } from '../shared/schemas';
 
 export const buildImageSchema = z.object({
-  sessionId: sessionIdSchema.optional(),
+  sessionId: sessionId.optional(),
   path: z
     .string()
     .optional()
@@ -17,10 +16,10 @@ export const buildImageSchema = z.object({
     .string()
     .optional()
     .describe('Path to Dockerfile (use forward slashes: /path/to/Dockerfile)'),
-  imageName: z.string().optional().describe('Name for the built image'),
-  tags: z.array(z.string()).optional().describe('Tags to apply to the image'),
-  buildArgs: z.record(z.string()).optional().describe('Build arguments'),
-  platform: z.string().optional().describe('Target platform (e.g., linux/amd64)'),
+  imageName: imageName.optional(),
+  tags: tags.optional(),
+  buildArgs: buildArgs.optional(),
+  platform,
 });
 
 export type BuildImageParams = z.infer<typeof buildImageSchema>;

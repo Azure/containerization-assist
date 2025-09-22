@@ -59,7 +59,7 @@ export function resolveEnvironment(policy: Policy, env: string): Policy {
   const cfg = policy.environments?.[env];
   const out: Policy = JSON.parse(JSON.stringify(policy));
 
-  if (cfg?.defaults) out.defaults = { ...out.defaults, ...(cfg.defaults as any) };
+  if (cfg?.defaults) out.defaults = { ...out.defaults, ...cfg.defaults };
   if (cfg?.overrides?.length) {
     for (const ov of cfg.overrides) {
       const idx = out.rules.findIndex((r) => r.id === ov.rule_id);

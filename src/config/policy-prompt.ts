@@ -84,21 +84,20 @@ export function getPolicySummary(environment?: string): string {
     return 'No policy loaded';
   }
 
-  const envConfig = policy.environments?.[env];
+  // Policy defaults are already resolved for the environment
+  const defaults = policy.defaults;
   const summary = [
     `Environment: ${env}`,
-    `Enforcement: ${policy.defaults?.enforcement || 'advisory'}`,
+    `Enforcement: ${defaults?.enforcement || 'advisory'}`,
     `Rules: ${policy.rules.length}`,
   ];
 
-  if (envConfig?.defaults) {
-    const defaults = envConfig.defaults;
-    if (defaults.allowedBaseImages?.length) {
-      summary.push(`Base Images: ${defaults.allowedBaseImages.length} allowed`);
-    }
-    if (defaults.registries?.allowed?.length) {
-      summary.push(`Registries: ${defaults.registries.allowed.length} allowed`);
-    }
+  // Use resolved defaults directly - no need to check environments
+  if (defaults?.allowedBaseImages?.length) {
+    summary.push(`Base Images: ${defaults.allowedBaseImages.length} allowed`);
+  }
+  if (defaults?.registries?.allowed?.length) {
+    summary.push(`Registries: ${defaults.registries.allowed.length} allowed`);
   }
 
   return summary.join(', ');

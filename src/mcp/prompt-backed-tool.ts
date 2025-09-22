@@ -102,6 +102,41 @@ function validateParameters(
 }
 
 /**
+ * Extracts and parses JSON from text, handling code blocks and common issues.
+ *
+ * @param text - Text potentially containing JSON
+ * @returns Parsed JSON object or throws error
+ */
+export function extractJSON(text: string): unknown {
+  // Try to find JSON in code blocks or raw
+  const codeBlockMatch = text.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
+  const rawJsonMatch = text.match(/{[\s\S]*}/);
+
+  const match = codeBlockMatch || rawJsonMatch;
+  if (!match) {
+    throw new Error('No JSON found in response');
+  }
+
+  const jsonStr = codeBlockMatch ? match[1] : match[0];
+  if (!jsonStr) {
+    throw new Error('No JSON content found');
+  }
+
+  try {
+    return JSON.parse(jsonStr.trim());
+  } catch (error) {
+    // Simple fix: remove trailing commas which are common in LLM responses
+    const fixed = jsonStr.replace(/,(\s*[}\]])/g, '$1');
+    try {
+      return JSON.parse(fixed.trim());
+    } catch {
+      // If still fails, throw original error with context
+      throw new Error(`JSON parsing failed: ${error}`);
+    }
+  }
+}
+
+/**
  * Parses AI response based on configuration.
  */
 function parseResponse(
@@ -120,11 +155,7 @@ function parseResponse(
     config.outputContract?.name.includes('JSON')
   ) {
     try {
-      // Extract JSON from response (handle markdown code blocks)
-      const jsonMatch = response.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
-      const jsonStr = jsonMatch ? jsonMatch[1] : response;
-
-      const parsed = JSON.parse(jsonStr?.trim() || '{}');
+      const parsed = extractJSON(response);
       return Success(parsed);
     } catch (error) {
       logger?.warn({ error, response }, 'Failed to parse JSON response');

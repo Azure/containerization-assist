@@ -63,6 +63,48 @@ export function extractDockerErrorMessage(error: unknown): {
         };
       }
 
+      if (error.code === 'ETIMEDOUT') {
+        return {
+          message: `Network timeout: Operation timed out while connecting to Docker registry - ${error.message}`,
+          details,
+        };
+      }
+
+      if (error.code === 'ECONNRESET') {
+        return {
+          message: `Connection reset: The connection to Docker registry was forcibly closed - ${error.message}`,
+          details,
+        };
+      }
+
+      if (error.code === 'EAI_AGAIN') {
+        return {
+          message: `DNS lookup failed: Temporary failure in name resolution - ${error.message}`,
+          details,
+        };
+      }
+
+      if (error.code === 'EHOSTUNREACH') {
+        return {
+          message: `Host unreachable: Cannot reach the Docker registry host - ${error.message}`,
+          details,
+        };
+      }
+
+      if (error.code === 'ENETUNREACH') {
+        return {
+          message: `Network unreachable: No route to the Docker registry network - ${error.message}`,
+          details,
+        };
+      }
+
+      if (error.code === 'EPIPE') {
+        return {
+          message: `Broken pipe: The connection to Docker registry was unexpectedly closed - ${error.message}`,
+          details,
+        };
+      }
+
       // HTTP status code errors with specific meanings
       if (error.statusCode === 401) {
         return {

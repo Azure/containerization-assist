@@ -91,6 +91,14 @@ export interface EnvironmentDefaults {
 }
 
 /**
+ * Unified defaults that combines base and environment-specific fields
+ */
+export interface UnifiedDefaults extends EnvironmentDefaults {
+  cache_ttl?: number;
+  enforcement?: 'strict' | 'lenient' | 'advisory';
+}
+
+/**
  * Policy structure (v2.0)
  */
 export interface Policy {
@@ -100,10 +108,7 @@ export interface Policy {
     author?: string;
     description?: string;
   };
-  defaults?: {
-    cache_ttl?: number;
-    enforcement?: 'strict' | 'lenient' | 'advisory';
-  };
+  defaults?: UnifiedDefaults;
   rules: PolicyRule[];
   environments?: Record<
     string,
@@ -197,6 +202,54 @@ export const EnvironmentDefaultsSchema = z.object({
     .optional(),
 });
 
+// Unified defaults schema that includes both base and environment-specific fields
+export const UnifiedDefaultsSchema = z.object({
+  cache_ttl: z.number().optional(),
+  enforcement: z.enum(['strict', 'lenient', 'advisory']).optional(),
+  // Include all environment-specific fields as optional
+  allowedBaseImages: z.array(z.string()).optional(),
+  registries: z
+    .object({
+      allowed: z.array(z.string()).optional(),
+      blocked: z.array(z.string()).optional(),
+    })
+    .optional(),
+  security: z
+    .object({
+      scanners: z
+        .object({
+          required: z.boolean().optional(),
+          tools: z.array(z.string()).optional(),
+        })
+        .optional(),
+      nonRootUser: z.boolean().optional(),
+      minimizeSize: z.boolean().optional(),
+    })
+    .optional(),
+  resources: z
+    .object({
+      limits: z
+        .object({
+          cpu: z.string().optional(),
+          memory: z.string().optional(),
+        })
+        .optional(),
+      requests: z
+        .object({
+          cpu: z.string().optional(),
+          memory: z.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  naming: z
+    .object({
+      pattern: z.string().optional(),
+      examples: z.array(z.string()).optional(),
+    })
+    .optional(),
+});
+
 export const PolicySchema = z.object({
   version: z.literal('2.0'),
   metadata: z
@@ -206,12 +259,7 @@ export const PolicySchema = z.object({
       description: z.string().optional(),
     })
     .optional(),
-  defaults: z
-    .object({
-      cache_ttl: z.number().optional(),
-      enforcement: z.enum(['strict', 'lenient', 'advisory']).optional(),
-    })
-    .optional(),
+  defaults: UnifiedDefaultsSchema.optional(),
   rules: z.array(PolicyRuleSchema),
   environments: z
     .record(

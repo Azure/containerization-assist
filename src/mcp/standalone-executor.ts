@@ -35,14 +35,14 @@ function createMinimalProgressReporter(logger: Logger): ProgressReporter {
 }
 
 /**
- * Execute a simple tool directly without orchestration
+ * Shared tool execution function - single point of execution for all tools
  *
  * @param tool - The tool to execute
  * @param params - Parameters for the tool
  * @param logger - Logger for tracking execution
  * @returns Result of the tool execution
  */
-export async function executeSimpleTool(
+export async function runTool(
   tool: RegisteredTool,
   params: unknown,
   logger: Logger,
@@ -53,16 +53,14 @@ export async function executeSimpleTool(
     // 1. Validate parameters
     const validatedParams = await tool.schema.parseAsync(params);
 
-    // 2. Create minimal context (no session, just basics)
-    // Provide a minimal ToolContext for standalone execution
+    // 2. Create minimal context
     const context: ToolContext = {
       logger: toolLogger,
       progress: createMinimalProgressReporter(toolLogger),
-      // Optional fields not provided in standalone mode
     };
 
     // 3. Execute the tool
-    toolLogger.info('Executing simple tool');
+    toolLogger.info('Executing tool');
     const result = await tool.handler(validatedParams, context);
 
     // 4. Log result status

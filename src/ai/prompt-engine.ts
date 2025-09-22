@@ -167,6 +167,20 @@ function createMessage(
 }
 
 /**
+ * Truncates text if it exceeds the maximum length.
+ *
+ * @param text - Text to potentially truncate
+ * @param maxLength - Maximum allowed length
+ * @returns Truncated text with indicator if truncated
+ */
+function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return `${text.slice(0, maxLength)}\n[truncated]`;
+}
+
+/**
  * Main entry point for building structured AI messages.
  *
  * @param params - Parameters for building the prompt
@@ -175,20 +189,23 @@ function createMessage(
  */
 export async function buildMessages(
   params: BuildPromptParams,
-  options?: MessageBuildOptions,
+  options?: MessageBuildOptions & { maxLength?: number },
 ): Promise<AIMessages> {
   const messages: AIMessage[] = [];
+  const maxLength = options?.maxLength || 10000;
 
   // Build system message with policies
   const systemText = buildSystemMessage(params.tool, params.environment);
   if (systemText || options?.forceSystemRole) {
-    messages.push(createMessage('system', systemText || ''));
+    const truncatedSystemText = truncateText(systemText || '', maxLength);
+    messages.push(createMessage('system', truncatedSystemText));
   }
 
   // Build developer message with output contract
   const developerText = buildDeveloperMessage(params.contract);
   if (developerText || options?.forceDeveloperRole) {
-    messages.push(createMessage('developer', developerText || ''));
+    const truncatedDeveloperText = truncateText(developerText || '', maxLength);
+    messages.push(createMessage('developer', truncatedDeveloperText));
   }
 
   // Select and format knowledge
@@ -201,7 +218,8 @@ export async function buildMessages(
 
   // Build user message
   const userText = buildUserMessage(params.basePrompt, knowledgeText);
-  messages.push(createMessage('user', userText));
+  const truncatedUserText = truncateText(userText, maxLength);
+  messages.push(createMessage('user', truncatedUserText));
 
   return { messages };
 }

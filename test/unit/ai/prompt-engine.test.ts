@@ -160,6 +160,71 @@ describe('Prompt Engine', () => {
       expect(systemMessage).toBeDefined();
       expect(developerMessage).toBeDefined();
     });
+
+    it('should truncate messages that exceed maxLength', async () => {
+      const longPrompt = 'A'.repeat(150); // 150 chars
+      const params: BuildPromptParams = {
+        ...baseParams,
+        basePrompt: longPrompt,
+      };
+
+      const result = await buildMessages(params, { maxLength: 100 });
+
+      const userMessage = result.messages[0];
+      expect(userMessage.content[0].text).toContain('[truncated]');
+      expect(userMessage.content[0].text.length).toBeLessThanOrEqual(112); // 100 + '\n[truncated]'
+    });
+
+    it('should not truncate messages within maxLength', async () => {
+      const shortPrompt = 'Short prompt';
+      const params: BuildPromptParams = {
+        ...baseParams,
+        basePrompt: shortPrompt,
+      };
+
+      const result = await buildMessages(params, { maxLength: 1000 });
+
+      const userMessage = result.messages[0];
+      expect(userMessage.content[0].text).not.toContain('[truncated]');
+      expect(userMessage.content[0].text).toContain('Short prompt');
+    });
+
+    it('should use default maxLength of 10000 when not specified', async () => {
+      const longPrompt = 'B'.repeat(10005); // Slightly over default
+      const params: BuildPromptParams = {
+        ...baseParams,
+        basePrompt: longPrompt,
+      };
+
+      const result = await buildMessages(params);
+
+      const userMessage = result.messages[0];
+      expect(userMessage.content[0].text).toContain('[truncated]');
+    });
+
+    it('should handle truncation with knowledge text', async () => {
+      // Mock a long knowledge snippet
+      mockedKnowledgeMatcher.getKnowledgeSnippets.mockResolvedValue([
+        {
+          id: 'long-snippet',
+          text: 'K'.repeat(80), // 80 chars of knowledge
+          weight: 10,
+          source: 'test',
+        },
+      ]);
+
+      const params: BuildPromptParams = {
+        ...baseParams,
+        basePrompt: 'P'.repeat(50), // 50 chars prompt
+      };
+
+      // Combined should be > 100 chars
+      const result = await buildMessages(params, { maxLength: 100 });
+
+      const userMessage = result.messages[0];
+      expect(userMessage.content[0].text).toContain('[truncated]');
+      expect(userMessage.content[0].text.length).toBeLessThanOrEqual(112); // 100 + '\n[truncated]'
+    });
   });
 
   describe('buildPromptEnvelope', () => {

@@ -22,7 +22,7 @@ import { createLogger } from '@/lib/logger';
 import { loadPolicy } from '@/config/policy-io';
 import { applyPolicy } from '@/config/policy-eval';
 import type { Policy } from '@/config/policy-schemas';
-import { executeSimpleTool, canExecuteSimply } from '@/mcp/standalone-executor';
+import { runTool, canExecuteSimply } from '@/mcp/standalone-executor';
 import { SessionManager as SimpleSessionManager } from '@/lib/session-manager';
 import type {
   Kernel,
@@ -405,7 +405,7 @@ export class ApplicationKernel implements Kernel {
   private planner: ExecutionPlanner;
   private policy?: Policy;
   private config: KernelConfig;
-  // Simple tools are executed directly via executeSimpleTool function
+  // Simple tools are executed directly via runTool function
 
   constructor(options: KernelFactoryOptions) {
     this.config = options.config;
@@ -455,7 +455,7 @@ export class ApplicationKernel implements Kernel {
         this.logger.debug(`Executing simple tool directly: ${toolName}`);
 
         // Execute the tool directly without orchestration
-        const result = await executeSimpleTool(tool, params, this.logger as any);
+        const result = await runTool(tool, params, this.logger as any);
 
         // If we have a session and the tool succeeded, store the result
         if (sessionId && result.ok) {

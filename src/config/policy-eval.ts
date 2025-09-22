@@ -62,13 +62,18 @@ export function evaluateMatcher(
 ): boolean {
   switch (matcher.kind) {
     case 'regex': {
-      const regex = new RegExp(matcher.pattern, matcher.flags || 'g');
       const text = typeof input === 'string' ? input : JSON.stringify(input);
 
       if (matcher.count_threshold !== undefined) {
+        // Only use 'g' flag when counting matches
+        const flags = matcher.flags ? `${matcher.flags}g` : 'g';
+        const regex = new RegExp(matcher.pattern, flags);
         const matches = text.match(regex);
         return (matches?.length || 0) >= matcher.count_threshold;
       }
+
+      // Use provided flags or default to none
+      const regex = new RegExp(matcher.pattern, matcher.flags || '');
       return regex.test(text);
     }
 

@@ -1,7 +1,7 @@
 /**
  * Policy Constraints (functional, minimal)
  */
-import type { Policy, EnvironmentDefaults } from './policy-schemas';
+import type { Policy, UnifiedDefaults } from './policy-schemas';
 
 type Str = string;
 type ConstraintList = Str[];
@@ -11,7 +11,7 @@ const addAll = (arr: ConstraintList, vs?: Str[]): ConstraintList =>
   vs?.length ? arr.concat(vs) : arr;
 
 /** Extract constraints from environment defaults */
-export function extractEnvironmentConstraints(defaults: EnvironmentDefaults): ConstraintList {
+export function extractEnvironmentConstraints(defaults: UnifiedDefaults): ConstraintList {
   let out: ConstraintList = [];
 
   if (defaults.allowedBaseImages?.length) {
@@ -166,8 +166,8 @@ export function buildConstraints(ctx: ConstraintContext): string[] {
   const { policy, tool, environment } = ctx;
   let out: ConstraintList = [];
 
-  const envCfg = policy.environments?.[environment]?.defaults;
-  if (envCfg) out = addAll(out, extractEnvironmentConstraints(envCfg));
+  // Policy defaults are already resolved for the environment
+  if (policy.defaults) out = addAll(out, extractEnvironmentConstraints(policy.defaults));
 
   out = addAll(out, getToolConstraints(tool, environment));
   if (environment === 'production') out = addAll(out, getProductionConstraints());

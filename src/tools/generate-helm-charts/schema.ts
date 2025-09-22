@@ -1,13 +1,25 @@
 import { z } from 'zod';
+import {
+  sessionId,
+  imageId,
+  appName,
+  replicas,
+  port,
+  serviceType,
+  ingressEnabled,
+  ingressHost,
+  environmentBasic,
+  samplingOptions,
+} from '../shared/schemas';
 
 export const generateHelmChartsSchema = z.object({
   // Core required fields
   chartName: z.string().min(1).describe('Helm chart name (required)'),
-  appName: z.string().min(1).describe('Application name (required)'),
-  imageId: z.string().min(1).describe('Container image to deploy (required)'),
+  appName,
+  imageId: imageId.min(1).describe('Container image to deploy (required)'),
 
   // Session tracking (standard pattern)
-  sessionId: z.string().optional().describe('Session identifier for tracking operations'),
+  sessionId: sessionId.optional(),
 
   // Basic Helm configuration
   chartVersion: z.string().optional().default('0.1.0').describe('Chart version'),
@@ -15,17 +27,19 @@ export const generateHelmChartsSchema = z.object({
   description: z.string().optional().describe('Chart description'),
 
   // Deployment configuration (reuse from K8s)
-  replicas: z.number().optional().default(1).describe('Number of replicas'),
-  port: z.number().optional().default(8080).describe('Application port'),
-  serviceType: z
-    .enum(['ClusterIP', 'NodePort', 'LoadBalancer'])
-    .optional()
-    .default('ClusterIP')
-    .describe('Service type'),
+  replicas: replicas ?? z.number().optional().default(1).describe('Number of replicas'),
+  port: port ?? z.number().optional().default(8080).describe('Application port'),
+  serviceType:
+    serviceType ??
+    z
+      .enum(['ClusterIP', 'NodePort', 'LoadBalancer'])
+      .optional()
+      .default('ClusterIP')
+      .describe('Service type'),
 
   // Ingress
-  ingressEnabled: z.boolean().optional().describe('Enable ingress'),
-  ingressHost: z.string().optional().describe('Ingress hostname'),
+  ingressEnabled,
+  ingressHost,
   ingressClass: z.string().optional().default('nginx').describe('Ingress class'),
 
   // Resources
@@ -47,7 +61,7 @@ export const generateHelmChartsSchema = z.object({
     .optional()
     .describe('Resource requests and limits'),
 
-  // Health checks
+  // Health checks (using shared but with defaults)
   healthCheck: z
     .object({
       enabled: z.boolean().optional().default(true),
@@ -58,7 +72,7 @@ export const generateHelmChartsSchema = z.object({
     .optional()
     .describe('Health check configuration'),
 
-  // Autoscaling
+  // Autoscaling (using shared but with defaults)
   autoscaling: z
     .object({
       enabled: z.boolean().optional().default(false),
@@ -70,22 +84,14 @@ export const generateHelmChartsSchema = z.object({
     .describe('HPA configuration'),
 
   // Environment
-  environment: z
-    .enum(['development', 'staging', 'production'])
-    .optional()
-    .describe('Target environment'),
+  environment: environmentBasic,
 
   // Validation options
   runValidation: z.boolean().optional().default(true).describe('Run helm lint validation'),
   strictValidation: z.boolean().optional().default(false).describe('Fail on warnings'),
 
-  // Sampling options (reuse existing pattern)
-  disableSampling: z.boolean().optional().describe('Disable multi-candidate sampling'),
-  maxCandidates: z.number().min(1).max(10).optional().describe('Maximum candidates'),
-  earlyStopThreshold: z.number().min(0).max(100).optional().describe('Early stop threshold'),
-  includeScoreBreakdown: z.boolean().optional().describe('Include score breakdown'),
-  returnAllCandidates: z.boolean().optional().describe('Return all candidates'),
-  useCache: z.boolean().optional().describe('Use caching'),
+  // Sampling options
+  ...samplingOptions,
 });
 
 export type GenerateHelmChartsParams = z.infer<typeof generateHelmChartsSchema>;
