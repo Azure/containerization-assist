@@ -1,128 +1,95 @@
 /**
- * Session Manager
- *
- * Simple centralized session management with Map-based storage
+ * Session Manager – tiny, typed, TTL-aware
  */
-
 import { createLogger } from '@/lib/logger';
 import { randomUUID } from 'node:crypto';
 
-const logger = createLogger().child({ module: 'session-manager' });
+const log = createLogger().child({ module: 'session-manager' });
 
-/**
- * Session data stored as a simple Map
- */
+type SessionId = string;
+type Key = string;
+
+interface Entry<T = unknown> {
+  value: T;
+  expiresAt?: number; // if set, key self-expires
+}
+
+type SessionStore = Map<Key, Entry>;
 export class SessionManager {
-  private sessions = new Map<string, Map<string, unknown>>();
+  private sessions = new Map<SessionId, SessionStore>();
   private cleanupTimer?: NodeJS.Timeout;
 
-  constructor() {
-    // Clean up expired sessions every 5 minutes
+  constructor(private maxSessions = 100) {
     this.cleanupTimer = setInterval(() => this.cleanup(), 5 * 60 * 1000);
-    if (this.cleanupTimer.unref) {
-      this.cleanupTimer.unref();
+    this.cleanupTimer.unref?.();
+  }
+
+  ensureSession(id?: SessionId): SessionId {
+    const sid = id ?? randomUUID();
+    if (!this.sessions.has(sid)) {
+      this.sessions.set(sid, new Map());
+      log.debug({ sessionId: sid }, 'Created session');
     }
+    return sid;
   }
 
-  /**
-   * Get or create a session
-   */
-  ensureSession(id?: string): string {
-    const sessionId = id || randomUUID();
-
-    if (!this.sessions.has(sessionId)) {
-      this.sessions.set(sessionId, new Map());
-      logger.debug({ sessionId }, 'Created new session');
+  get<T>(sessionId: SessionId, key: Key): T | undefined {
+    const store = this.sessions.get(sessionId);
+    if (!store) return undefined;
+    const e = store.get(key);
+    if (!e) return undefined;
+    if (e.expiresAt && e.expiresAt <= Date.now()) {
+      store.delete(key);
+      return undefined;
     }
-
-    return sessionId;
+    return e.value as T;
   }
 
-  /**
-   * Get session data
-   */
-  get<T>(sessionId: string, key: string): T | undefined {
-    const session = this.sessions.get(sessionId);
-    return session?.get(key) as T | undefined;
+  set<T>(sessionId: SessionId, key: Key, value: T, ttlMs?: number): void {
+    const store = this.sessions.get(sessionId) ?? new Map();
+    const entry: Entry<T> = ttlMs ? { value, expiresAt: Date.now() + ttlMs } : { value };
+    store.set(key, entry);
+    this.sessions.set(sessionId, store);
   }
 
-  /**
-   * Set session data
-   */
-  set<T>(sessionId: string, key: string, value: T): void {
-    const session = this.sessions.get(sessionId);
-    if (session) {
-      session.set(key, value);
-    } else {
-      const newSession = new Map();
-      newSession.set(key, value);
-      this.sessions.set(sessionId, newSession);
-    }
-  }
-
-  /**
-   * Delete session data
-   */
-  delete(sessionId: string, key?: string): void {
-    if (key) {
-      this.sessions.get(sessionId)?.delete(key);
-    } else {
+  delete(sessionId: SessionId, key?: Key): void {
+    if (!key) {
       this.sessions.delete(sessionId);
+      return;
     }
+    this.sessions.get(sessionId)?.delete(key);
   }
 
-  /**
-   * Check if session exists
-   */
-  has(sessionId: string): boolean {
+  has(sessionId: SessionId): boolean {
     return this.sessions.has(sessionId);
   }
 
-  /**
-   * Get all session IDs
-   */
-  listSessions(): string[] {
-    return Array.from(this.sessions.keys());
+  listSessions(): SessionId[] {
+    return [...this.sessions.keys()];
   }
 
-  /**
-   * Clear all sessions
-   */
   clear(): void {
     this.sessions.clear();
-    logger.info('Cleared all sessions');
+    log.info('Cleared all sessions');
   }
 
-  /**
-   * Clean up old sessions (keep only last 100)
-   */
+  stop(): void {
+    if (this.cleanupTimer) clearInterval(this.cleanupTimer);
+  }
+
   private cleanup(): void {
-    if (this.sessions.size > 100) {
-      const toKeep = Array.from(this.sessions.keys()).slice(-100);
-      const newSessions = new Map<string, Map<string, unknown>>();
-
-      for (const id of toKeep) {
-        const session = this.sessions.get(id);
-        if (session) {
-          newSessions.set(id, session);
-        }
-      }
-
-      const removed = this.sessions.size - newSessions.size;
-      this.sessions = newSessions;
-
-      if (removed > 0) {
-        logger.debug({ removed }, 'Cleaned up old sessions');
+    // Evict expired keys and keep only newest N sessions
+    const now = Date.now();
+    for (const store of this.sessions.values()) {
+      for (const [k, e] of store) {
+        if (e.expiresAt && e.expiresAt <= now) store.delete(k);
       }
     }
-  }
-
-  /**
-   * Stop cleanup timer
-   */
-  stop(): void {
-    if (this.cleanupTimer) {
-      clearInterval(this.cleanupTimer);
+    if (this.sessions.size > this.maxSessions) {
+      const ids = [...this.sessions.keys()];
+      const toRemove = ids.slice(0, this.sessions.size - this.maxSessions);
+      toRemove.forEach((id) => this.sessions.delete(id));
+      log.debug({ removed: toRemove.length }, 'Trimmed old sessions');
     }
   }
 }

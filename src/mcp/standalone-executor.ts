@@ -1,8 +1,8 @@
 /**
- * Simple Tool Executor - Direct execution without orchestration
+ * Standalone Tool Executor - Direct execution without orchestration
  *
  * Purpose:
- * Provides a fast path for executing simple tools that don't require:
+ * Provides a fast path for executing tools in standalone mode without:
  * - Dependency resolution
  * - Complex policy enforcement
  * - Multi-step workflows
@@ -14,16 +14,12 @@
 import { z } from 'zod';
 import { type Result, Failure } from '@/types';
 import type { Logger } from '@/lib/logger';
-import type {
-  RegisteredTool,
-  ToolContext as AppToolContext,
-  ProgressReporter as AppProgressReporter,
-} from '@/app/types';
+import type { RegisteredTool, ToolContext, ProgressReporter } from '@/app/types';
 
 /**
- * Minimal progress reporter for simple tools (app format)
+ * Create a minimal progress reporter for standalone execution
  */
-function createMinimalProgress(logger: Logger): AppProgressReporter {
+function createMinimalProgressReporter(logger: Logger): ProgressReporter {
   return {
     start: (message: string) => logger.info(`[START] ${message}`),
     update: (message: string, percentage?: number) => {
@@ -58,11 +54,11 @@ export async function executeSimpleTool(
     const validatedParams = await tool.schema.parseAsync(params);
 
     // 2. Create minimal context (no session, just basics)
-    // Provide a minimal AppToolContext for simple execution
-    const context: AppToolContext = {
+    // Provide a minimal ToolContext for standalone execution
+    const context: ToolContext = {
       logger: toolLogger,
-      progress: createMinimalProgress(toolLogger),
-      // No session properties for simple execution
+      progress: createMinimalProgressReporter(toolLogger),
+      // Optional fields not provided in standalone mode
     };
 
     // 3. Execute the tool

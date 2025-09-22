@@ -5,21 +5,20 @@ src/mcp/middleware/session-middleware.ts
 src/mcp/prompt-backed-tool.ts             
 src/mcp/router.ts                         
 src/mcp/tool-content-analysis.ts          
-Unused exports (77)
+Unused exports (76)
 ApplicationKernel              class     src/app/kernel.ts:400:14                      
 DefaultProgressReporter                  src/app/kernel.ts:809:26                      
 DefaultTelemetrySystem                   src/app/kernel.ts:810:27                      
 createAppConfig                function  src/config/app-config.ts:152:17               
 appConfig                                src/config/app-config.ts:237:14               
 ANALYSIS_CONFIG                          src/config/defaults.ts:54:14                  
-ConstraintBuilder              class     src/config/policy-constraints.ts:11:14        
-extractEnvironmentConstraints  function  src/config/policy-constraints.ts:34:17        
-getToolConstraints             function  src/config/policy-constraints.ts:96:17        
-getProductionConstraints       function  src/config/policy-constraints.ts:156:17       
-getCategoryConstraints         function  src/config/policy-constraints.ts:169:17       
-formatConstraintsPrompt        function  src/config/policy-constraints.ts:228:17       
-refreshPolicy                  function  src/config/policy-io.ts:105:17                
-clearPolicyCache               function  src/config/policy-io.ts:114:17                
+extractEnvironmentConstraints  function  src/config/policy-constraints.ts:14:17        
+getToolConstraints             function  src/config/policy-constraints.ts:127:17       
+getProductionConstraints       function  src/config/policy-constraints.ts:131:17       
+getCategoryConstraints         function  src/config/policy-constraints.ts:141:17       
+formatConstraintsPrompt        function  src/config/policy-constraints.ts:179:17       
+clearPolicyCache               function  src/config/policy-io.ts:35:17                 
+refreshPolicy                  function  src/config/policy-io.ts:39:17                 
 RegexMatcherSchema                       src/config/policy-schemas.ts:122:14           
 FunctionMatcherSchema                    src/config/policy-schemas.ts:129:14           
 MatcherSchema                            src/config/policy-schemas.ts:135:14           
@@ -83,7 +82,7 @@ normalizeParameters                      src/validation/pipeline.ts:155:14
 validateSchema                           src/validation/pipeline.ts:178:14             
 when                                     src/validation/pipeline.ts:192:14             
 validateBusinessRules                    src/validation/pipeline.ts:207:14             
-Unused exported types (111)
+Unused exported types (113)
 SessionState                type       src/app/kernel.ts:804:15                         
 ToolHandler                 type       src/app/types.ts:52:13                           
 AIClient                    interface  src/app/types.ts:127:18                          
@@ -91,13 +90,15 @@ KnowledgeBase               interface  src/app/types.ts:139:18
 PolicyEngine                interface  src/app/types.ts:147:18                          
 Result                      type       src/app/types.ts:286:14                          
 AppConfig                   type       src/config/app-config.ts:104:13                  
-ConstraintContext           interface  src/config/policy-constraints.ts:194:18          
+ConstraintContext           interface  src/config/policy-constraints.ts:158:18          
 RegexMatcher                interface  src/config/policy-schemas.ts:17:18               
 EnvironmentOverride         interface  src/config/policy-schemas.ts:45:18               
 CacheConfig                 interface  src/config/policy-schemas.ts:55:18               
 ToolConfig                  interface  src/exports/container-assist.ts:20:18            
 MCPToolMetadata             interface  src/exports/types.ts:10:18                       
 MCPServer                   interface  src/exports/types.ts:38:18                       
+ValidatedKnowledgeEntry     type       src/knowledge/schemas.ts:26:13                   
+ValidatedKnowledgeQuery     type       src/knowledge/schemas.ts:27:13                   
 DeploymentResult            type       src/lib/kubernetes.ts:11:7                       
 ClusterInfo                 type       src/lib/kubernetes.ts:12:7                       
 LockStatus                  interface  src/lib/mutex.ts:10:18                           
@@ -118,8 +119,8 @@ SamplingResponse            interface  src/mcp/context.ts:60:18
 PromptWithMessages          interface  src/mcp/context.ts:87:18                         
 EnhancedProgressReporter    type       src/mcp/context.ts:156:14                        
 ContextOptions              interface  src/mcp/context.ts:164:18                        
-ServerOptions               interface  src/mcp/server-direct.ts:20:18                   
-MCPServerState              interface  src/mcp/server-direct.ts:32:18                   
+ServerOptions               interface  src/mcp/server-direct.ts:19:18                   
+MCPServerState              interface  src/mcp/server-direct.ts:31:18                   
 Tool                        type       src/mcp/server.ts:13:14                          
 Result                      type       src/mcp/server.ts:13:20                          
 Success                     type       src/mcp/server.ts:13:28                          

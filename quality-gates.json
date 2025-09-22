@@ -29,9 +29,9 @@
           "/home/tng/workspace/containerization-assist/src/mcp/prompt-backed-tool.ts:271:8:@typescript-eslint/explicit-function-return-type:Missing return type on function.",
           "/home/tng/workspace/containerization-assist/src/mcp/router.ts:370:21:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/mcp/router.ts:374:22:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/mcp/server-direct.ts:67:37:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/mcp/server-direct.ts:79:59:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/mcp/server-direct.ts:82:42:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/mcp/server-direct.ts:66:37:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/mcp/server-direct.ts:69:40:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/mcp/server-direct.ts:102:59:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/mcp/tool-content-analysis.ts:113:29:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/services/kubernetes-client.ts:25:29:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/services/kubernetes-client.ts:55:35:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
@@ -67,13 +67,13 @@
         ]
       },
       "deadcode": {
-        "count": 197
+        "count": 198
       },
       "typescript": {
         "errors": 0
       },
       "build": {
-        "timeMs": 7000,
+        "timeMs": 9000,
         "mode": "clean",
         "environment": {
           "nodeVersion": "v24.1.0",
