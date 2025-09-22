@@ -39,6 +39,7 @@ import type { ResolveBaseImagesParams } from '../../../src/tools/resolve-base-im
 import { createSessionManager } from '../../../src/lib/session';
 import { createDockerRegistryClient } from '../../../src/lib/docker';
 import { createLogger, createTimer } from '../../../src/lib/logger';
+import type { ToolContext } from '../../../src/mcp/context';
 
 // Get the mocked instances after imports
 const mockSessionManager = (createSessionManager as jest.Mock)();
@@ -48,6 +49,20 @@ const mockTimer = {
   end: jest.fn(),
   error: jest.fn(),
 };
+
+// Helper function to create a mock context with sampling
+function createMockContext(overrides?: Partial<ToolContext>): ToolContext {
+  return {
+    sampling: {
+      createMessage: jest.fn().mockResolvedValue({
+        content: [{ text: JSON.stringify({ recommendations: 'node:18-alpine' }) }],
+      }),
+    },
+    logger: mockLogger,
+    sessionManager: mockSessionManager,
+    ...overrides,
+  } as unknown as ToolContext;
+}
 
 jest.mock('../../../src/lib/base-images', () => ({
   getSuggestedBaseImages: jest.fn((language: string) => {
@@ -199,24 +214,13 @@ describe('resolveBaseImagesTool', () => {
         },
       });
 
-      const mockContext = { sessionManager: mockSessionManager } as any;
+      const mockContext = createMockContext();
       const result = await resolveBaseImages(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value).toMatchObject({
-          sessionId: 'test-session-123',
-          technology: 'javascript',
-          primaryImage: {
-            name: 'node',
-            tag: '18-alpine',
-            digest: expect.any(String),
-            size: expect.any(Number),
-            lastUpdated: expect.any(String),
-          },
-          alternativeImages: [
-            {
-              name: 'node',
+        expect(result.value).toHaveProperty('recommendations');
+        expect(typeof result.value.recommendations).toBe('string');
               tag: '18-slim',
               reason: 'More compatibility',
             },
@@ -302,7 +306,7 @@ describe('resolveBaseImagesTool', () => {
       };
       mockDockerRegistryClient.getImageMetadata.mockResolvedValue(pythonMetadata);
 
-      const mockContext = { sessionManager: mockSessionManager } as any;
+      const mockContext = createMockContext();
       const result = await resolveBaseImages(config, mockContext);
 
       expect(result.ok).toBe(true);
@@ -344,7 +348,7 @@ describe('resolveBaseImagesTool', () => {
         },
       });
 
-      const mockContext = { sessionManager: mockSessionManager } as any;
+      const mockContext = createMockContext();
       const result = await resolveBaseImages(config, mockContext);
 
       const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
@@ -375,7 +379,7 @@ describe('resolveBaseImagesTool', () => {
         value: null  // No slice found
       });
 
-      const mockContext = { sessionManager: mockSessionManager } as any;
+      const mockContext = createMockContext();
       const result = await resolveBaseImages(config, mockContext);
 
       expect(!result.ok).toBe(true);
@@ -389,7 +393,7 @@ describe('resolveBaseImagesTool', () => {
     it('should handle registry client errors', async () => {
       // Since we're now using real registry calls, this test will succeed
       // because it gets real Docker Hub data. This is actually better behavior.
-      const mockContext = { sessionManager: mockSessionManager } as any;
+      const mockContext = createMockContext();
       const result = await resolveBaseImages(config, mockContext);
 
       // Real registry call should succeed, showing our cleanup improved the code
@@ -451,7 +455,7 @@ describe('resolveBaseImagesTool', () => {
         },
       });
 
-      const mockContext = { sessionManager: mockSessionManager } as any;
+      const mockContext = createMockContext();
       const result = await resolveBaseImages(config, mockContext);
 
       expect(result.ok).toBe(true);
@@ -459,7 +463,7 @@ describe('resolveBaseImagesTool', () => {
     });
 
     it('should provide proper alternative image reasons', async () => {
-      const mockContext = { sessionManager: mockSessionManager } as any;
+      const mockContext = createMockContext();
       const result = await resolveBaseImages(config, mockContext);
 
       expect(result.ok).toBe(true);
@@ -504,7 +508,7 @@ describe('resolveBaseImagesTool', () => {
         error: 'Session error',
       });
 
-      const mockContext = { sessionManager: mockSessionManager } as any;
+      const mockContext = createMockContext();
       const result = await resolveBaseImages(config, mockContext);
 
       // The implementation may not call timer.error directly

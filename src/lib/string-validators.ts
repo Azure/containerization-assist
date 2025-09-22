@@ -5,7 +5,7 @@
 /**
  * Checks if a string is empty or contains only whitespace.
  */
-export function isEmptyString(value: string | null | undefined): boolean {
+function isEmptyString(value: string | null | undefined): boolean {
   return !value || value.trim().length === 0;
 }
 
@@ -151,16 +151,8 @@ export function weightedAverage(
  * Checks if an array is null, undefined, or empty.
  * Consolidates the pattern: !arr || arr.length === 0
  */
-export function isEmptyArray<T>(arr: T[] | null | undefined): boolean {
+function isEmptyArray<T>(arr: T[] | null | undefined): boolean {
   return !arr || arr.length === 0;
-}
-
-/**
- * Checks if a value is null or undefined.
- * Type guard for narrowing types.
- */
-export function isNullOrUndefined(value: unknown): value is null | undefined {
-  return value === null || value === undefined;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { randomUUID, createHash } from 'crypto';
+import { randomUUID } from 'crypto';
 
 interface MutexState {
   locked: boolean;
@@ -236,12 +236,3 @@ export const createKeyedMutex = (options?: Partial<KeyedMutexOptions>): KeyedMut
     getMetrics,
   };
 };
-
-// Export singleton instance for global use
-export const globalMutex = createKeyedMutex();
-
-// Helper function to hash context for Docker builds
-export function hashContext(context: string | { path?: string; dockerfile?: string }): string {
-  const input = typeof context === 'string' ? context : JSON.stringify(context);
-  return createHash('sha256').update(input).digest('hex').substring(0, 16);
-}

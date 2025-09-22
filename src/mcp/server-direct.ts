@@ -63,10 +63,19 @@ const registerHandlers = async (state: MCPServerState): Promise<void> => {
 
   // Register each tool from kernel
   for (const [name, tool] of tools) {
+    // Extract schema shape, with validation for non-ZodObject schemas
+    let schemaShape = {};
+    if (tool.schema instanceof z.ZodObject) {
+      schemaShape = tool.schema.shape;
+    } else if (tool.schema) {
+      // Log warning for non-standard schema types
+      state.logger.warn({ tool: name }, 'Tool has non-ZodObject schema, using empty schema shape');
+    }
+
     state.server.tool(
       name,
       tool.description,
-      tool.schema instanceof z.ZodObject ? tool.schema.shape : {},
+      schemaShape,
       async (params: Record<string, unknown>) => {
         state.logger.info({ tool: name }, 'Executing tool via kernel');
 

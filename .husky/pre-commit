@@ -1,30 +1,77 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-echo "🛡️ Running pre-commit quality gates..."
+# Exit codes for better debugging
+readonly EXIT_FORMAT_FAILED=1
+readonly EXIT_LINT_STAGED_FAILED=2
+readonly EXIT_QUALITY_GATES_FAILED=3
 
-# Fail fast on any error
-set -eu
+# Files that may be modified by quality gates
+readonly QUALITY_GATE_FILES="quality-gates.json knip-deadcode-output.txt"
 
-# Run format and add any changes
-echo "🎨 Running formatter..."
-npm run format > /dev/null 2>&1
+# Enable strict error handling
+set -euo
 
-# Add any formatting changes with existence check
-if git diff --name-only | grep -q '.'; then
+# Main execution
+main() {
+    echo "🛡️ Running pre-commit quality gates..."
+
+    # Step 1: Format code
+    echo "🎨 Formatting code..."
+    if ! npm run format --silent 2>&1; then
+        echo "❌ Formatting failed"
+        exit $EXIT_FORMAT_FAILED
+    fi
     git add -u
-fi
 
-# Run lint-staged for incremental checks
-npx lint-staged
+    # Step 2: Run lint-staged
+    echo "🔍 Running lint-staged checks..."
+    if ! npx lint-staged; then
+        echo "❌ Lint-staged checks failed"
+        exit $EXIT_LINT_STAGED_FAILED
+    fi
 
-# Run quality gates
-npm run quality:gates
+    # Step 3: Run quality gates
+    echo "📊 Running quality gates..."
+    if ! npm run quality:gates; then
+        echo "❌ Quality gates failed"
+        exit $EXIT_QUALITY_GATES_FAILED
+    fi
 
-# Stage the quality-gates.json file if it was modified AND still exists
-if [ -f quality-gates.json ] && git status --porcelain | grep -v '^D ' | grep -q "quality-gates.json"; then
-    echo "📊 Staging updated quality-gates.json metrics..."
-    git add quality-gates.json
-fi
+    # Step 4: Stage quality gate artifacts
+    stage_quality_artifacts
 
-echo "✅ Pre-commit checks passed!"
+    echo "✅ Pre-commit checks passed!"
+}
+
+# Stage files modified by quality gates
+stage_quality_artifacts() {
+    local staged_files=""
+
+    for file in $QUALITY_GATE_FILES; do
+        if should_stage_file "$file"; then
+            git add "$file"
+            staged_files="${staged_files:+$staged_files, }$file"
+        fi
+    done
+
+    if [ -n "$staged_files" ]; then
+        echo "📊 Staged quality artifacts: $staged_files"
+    fi
+}
+
+# Check if file should be staged
+should_stage_file() {
+    local file="$1"
+
+    # File must exist
+    [ ! -f "$file" ] && return 1
+
+    # Check if file has changes (modified, staged, or untracked)
+    git status --porcelain "$file" 2>/dev/null | grep -qE '^( M|MM|A |UU|\?\?)' || return 1
+
+    return 0
+}
+
+# Run main function
+main "$@"

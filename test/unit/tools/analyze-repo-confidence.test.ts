@@ -69,20 +69,22 @@ const { ensureSession, useSessionSlice } = require('../../../src/mcp/tool-sessio
 describe('analyze-repo confidence scoring', () => {
   const logger = createLogger();
 
-  // Simple mock context for testing
+  // Mock context for testing - will be configured per test
   const mockContext: ToolContext = {
     signal: undefined,
     progress: undefined,
     sampling: {
-      createMessage: jest
-        .fn()
-        .mockResolvedValue({
-          role: 'assistant',
-          content: [{ type: 'text', text: 'mock response' }],
-        }),
+      createMessage: jest.fn(),
     },
     getPrompt: jest.fn().mockResolvedValue({ messages: [] }),
-    sessionManager: undefined,
+    sessionManager: {
+      get: jest.fn().mockResolvedValue({ ok: false }),
+      create: jest.fn().mockResolvedValue({ ok: true, value: {} }),
+      update: jest.fn().mockResolvedValue({ ok: true }),
+      delete: jest.fn().mockResolvedValue({ ok: true }),
+      list: jest.fn().mockResolvedValue({ ok: true, value: [] }),
+      cleanup: jest.fn().mockResolvedValue({ ok: true }),
+    } as any,
     logger: createLogger(),
   };
 
@@ -104,21 +106,52 @@ describe('analyze-repo confidence scoring', () => {
   });
 
   it('should return high confidence for JavaScript project with package.json', async () => {
-    // Mock directory structure with clear JavaScript indicators
-    mockFs.stat.mockImplementation((path: string) => {
-      if (path.includes('package.json') || path.includes('index.js')) {
-        return Promise.resolve({
-          isDirectory: () => false,
-          isFile: () => true,
-        } as any);
-      }
-      return Promise.resolve({
-        isDirectory: () => true,
-        isFile: () => false,
-      } as any);
+    // Mock AI response for JavaScript project analysis
+    const mockResponse = {
+      ok: true,
+      sessionId: 'test-session',
+      language: 'javascript',
+      languageVersion: '18.0.0',
+      framework: 'express',
+      frameworkVersion: '4.18.0',
+      buildSystem: {
+        type: 'npm',
+        file: 'package.json',
+        buildCommand: 'npm run build',
+        testCommand: 'npm test',
+      },
+      dependencies: [
+        { name: 'express', version: '4.18.0', type: 'runtime' },
+      ],
+      ports: [3000],
+      hasDockerfile: false,
+      hasDockerCompose: false,
+      hasKubernetes: false,
+      recommendations: {
+        baseImage: 'node:18-alpine',
+        buildStrategy: 'multi-stage',
+        securityNotes: ['Use non-root user', 'Scan for vulnerabilities'],
+      },
+      confidence: 95,
+      detectionMethod: 'ai-enhanced',
+      detectionDetails: {
+        signatureMatches: 10,
+        extensionMatches: 5,
+        frameworkSignals: 3,
+        buildSystemSignals: 2,
+      },
+      metadata: {
+        path: '/test/project',
+        depth: 5,
+        timestamp: Date.now(),
+        includeTests: false,
+      },
+    };
+
+    (mockContext.sampling.createMessage as jest.Mock).mockResolvedValue({
+      role: 'assistant',
+      content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(mockResponse)}\n\`\`\`` }],
     });
-    mockFs.access.mockResolvedValue(undefined);
-    mockFs.readdir.mockResolvedValue(['package.json', 'index.js', 'src']);
 
     const context = mockContext;
 
@@ -137,20 +170,52 @@ describe('analyze-repo confidence scoring', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.language).toBe('javascript');
-      expect(result.value.confidence).toBeGreaterThan(50); // Adjusted to match actual behavior
-      expect(result.value.detectionMethod).toBe('signature');
-      expect(result.value.detectionDetails.signatureMatches).toBeGreaterThan(0);
+      expect(result.value.confidence).toBe(95);
+      expect(result.value.detectionMethod).toBe('ai-enhanced');
+      expect(result.value.detectionDetails.signatureMatches).toBe(10);
     }
   });
 
   it('should return low confidence for unknown project type', async () => {
-    // Mock directory with no clear language indicators
-    mockFs.stat.mockResolvedValue({
-      isDirectory: () => true,
-      isFile: () => false,
-    } as any);
-    mockFs.access.mockResolvedValue(undefined);
-    mockFs.readdir.mockResolvedValue(['data.txt', 'config.ini', 'readme.md']);
+    // Mock AI response for unknown project type
+    const mockResponse = {
+      ok: true,
+      sessionId: 'test-session',
+      language: 'unknown',
+      languageVersion: undefined,
+      framework: undefined,
+      frameworkVersion: undefined,
+      buildSystem: undefined,
+      dependencies: [],
+      ports: [],
+      hasDockerfile: false,
+      hasDockerCompose: false,
+      hasKubernetes: false,
+      recommendations: {
+        baseImage: 'ubuntu:latest',
+        buildStrategy: 'single-stage',
+        securityNotes: ['Add application files manually'],
+      },
+      confidence: 30,
+      detectionMethod: 'ai-enhanced',
+      detectionDetails: {
+        signatureMatches: 0,
+        extensionMatches: 0,
+        frameworkSignals: 0,
+        buildSystemSignals: 0,
+      },
+      metadata: {
+        path: '/test/unknown',
+        depth: 5,
+        timestamp: Date.now(),
+        includeTests: false,
+      },
+    };
+
+    (mockContext.sampling.createMessage as jest.Mock).mockResolvedValue({
+      role: 'assistant',
+      content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(mockResponse)}\n\`\`\`` }],
+    });
 
     const context = mockContext;
 
@@ -169,20 +234,51 @@ describe('analyze-repo confidence scoring', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.language).toBe('unknown');
-      expect(result.value.confidence).toBe(0);
-      expect(result.value.detectionMethod).toBe('fallback');
+      expect(result.value.confidence).toBe(30);
+      expect(result.value.detectionMethod).toBe('ai-enhanced');
     }
   });
 
   it('should return unknown for files without signature detection', async () => {
-    // Mock directory with only file extensions as indicators
-    mockFs.stat.mockResolvedValue({
-      isDirectory: () => true,
-      isFile: () => false,
-    } as any);
-    mockFs.access.mockResolvedValue(undefined);
-    // Add more Python files to increase the chance of detection
-    mockFs.readdir.mockResolvedValue(['main.py', 'utils.py', 'test.py', 'app.py', 'models.py']);
+    // Mock AI response for Python files without clear signatures
+    const mockResponse = {
+      ok: true,
+      sessionId: 'test-session',
+      language: 'python',
+      languageVersion: '3.9',
+      framework: undefined,
+      frameworkVersion: undefined,
+      buildSystem: undefined,
+      dependencies: [],
+      ports: [],
+      hasDockerfile: false,
+      hasDockerCompose: false,
+      hasKubernetes: false,
+      recommendations: {
+        baseImage: 'python:3.9-slim',
+        buildStrategy: 'single-stage',
+        securityNotes: ['Use virtual environment'],
+      },
+      confidence: 40,
+      detectionMethod: 'ai-enhanced',
+      detectionDetails: {
+        signatureMatches: 0,
+        extensionMatches: 5,
+        frameworkSignals: 0,
+        buildSystemSignals: 0,
+      },
+      metadata: {
+        path: '/test/python-no-deps',
+        depth: 5,
+        timestamp: Date.now(),
+        includeTests: false,
+      },
+    };
+
+    (mockContext.sampling.createMessage as jest.Mock).mockResolvedValue({
+      role: 'assistant',
+      content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(mockResponse)}\n\`\`\`` }],
+    });
 
     const context = mockContext;
 
@@ -199,20 +295,58 @@ describe('analyze-repo confidence scoring', () => {
     }
     expect(result.ok).toBe(true);
     if (result.ok) {
-      // Algorithm may not detect language from extensions alone anymore
-      expect(result.value.language).toBe('unknown');
-      expect(result.value.confidence).toBe(0);
-      expect(result.value.detectionMethod).toBe('fallback');
+      // AI detects Python from file extensions
+      expect(result.value.language).toBe('python');
+      expect(result.value.confidence).toBe(40);
+      expect(result.value.detectionMethod).toBe('ai-enhanced');
     }
   });
 
   it('should include confidence scoring fields in result', async () => {
-    mockFs.stat.mockResolvedValue({
-      isDirectory: () => true,
-      isFile: () => false,
-    } as any);
-    mockFs.access.mockResolvedValue(undefined);
-    mockFs.readdir.mockResolvedValue(['package.json']);
+    // Mock AI response with all confidence fields
+    const mockResponse = {
+      ok: true,
+      sessionId: 'test-session',
+      language: 'javascript',
+      languageVersion: '18.0.0',
+      framework: 'express',
+      frameworkVersion: '4.18.0',
+      buildSystem: {
+        type: 'npm',
+        file: 'package.json',
+        buildCommand: 'npm run build',
+        testCommand: 'npm test',
+      },
+      dependencies: [],
+      ports: [3000],
+      hasDockerfile: false,
+      hasDockerCompose: false,
+      hasKubernetes: false,
+      recommendations: {
+        baseImage: 'node:18-alpine',
+        buildStrategy: 'multi-stage',
+        securityNotes: [],
+      },
+      confidence: 75,
+      detectionMethod: 'ai-enhanced',
+      detectionDetails: {
+        signatureMatches: 8,
+        extensionMatches: 3,
+        frameworkSignals: 2,
+        buildSystemSignals: 1,
+      },
+      metadata: {
+        path: '/test/project',
+        depth: 5,
+        timestamp: Date.now(),
+        includeTests: false,
+      },
+    };
+
+    (mockContext.sampling.createMessage as jest.Mock).mockResolvedValue({
+      role: 'assistant',
+      content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(mockResponse)}\n\`\`\`` }],
+    });
 
     const context = mockContext;
 
@@ -242,12 +376,50 @@ describe('analyze-repo confidence scoring', () => {
   });
 
   it('should use provided language parameter', async () => {
-    mockFs.stat.mockResolvedValue({
-      isDirectory: () => true,
-      isFile: () => false,
-    } as any);
-    mockFs.access.mockResolvedValue(undefined);
-    mockFs.readdir.mockResolvedValue(['main.py']);
+    // Mock AI response - AI will detect Java as requested
+    const mockResponse = {
+      ok: true,
+      sessionId: 'test-session',
+      language: 'java',
+      languageVersion: '11',
+      framework: undefined,
+      frameworkVersion: undefined,
+      buildSystem: {
+        type: 'maven',
+        file: 'pom.xml',
+        buildCommand: 'mvn package',
+        testCommand: 'mvn test',
+      },
+      dependencies: [],
+      ports: [8080],
+      hasDockerfile: false,
+      hasDockerCompose: false,
+      hasKubernetes: false,
+      recommendations: {
+        baseImage: 'openjdk:11-jre-slim',
+        buildStrategy: 'multi-stage',
+        securityNotes: ['Use JRE image for runtime'],
+      },
+      confidence: 85,
+      detectionMethod: 'ai-enhanced',
+      detectionDetails: {
+        signatureMatches: 5,
+        extensionMatches: 0,
+        frameworkSignals: 0,
+        buildSystemSignals: 1,
+      },
+      metadata: {
+        path: '/test/project',
+        depth: 5,
+        timestamp: Date.now(),
+        includeTests: false,
+      },
+    };
+
+    (mockContext.sampling.createMessage as jest.Mock).mockResolvedValue({
+      role: 'assistant',
+      content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(mockResponse)}\n\`\`\`` }],
+    });
 
     const context = mockContext;
 

@@ -3,7 +3,8 @@
  */
 
 export * from './core-types';
-export * from './pipeline';
+// Only export types that are part of the public API
+export type { ValidationFunction, Validator } from './pipeline';
 export {
   validateDockerfileContent,
   getDockerfileRules,
