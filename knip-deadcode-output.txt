@@ -1,43 +1,8 @@
-Unused files (21)
-src/knowledge/enhanced-loader.ts       
-src/knowledge/simple-scoring.ts        
-src/lib/ai-utils.ts                    
-src/lib/correlation.ts                 
-src/lib/errors.ts                      
-src/lib/knowledge-enhancer.ts          
-src/lib/parsing-docker.ts              
-src/lib/result-utils.ts                
-src/mcp/ai/prompt-templates.ts         
-src/mcp/error-mapper.ts                
-src/mcp/sampling-cache.ts              
-src/mcp/tool-validator.ts              
-src/prompts/enhanced-registry.ts       
-src/resources/cache.ts                 
-src/resources/manager.ts               
-src/resources/types.ts                 
-src/resources/uri-schemes.ts           
-src/services/docker-metadata-cache.ts  
-src/tools/analysis-perspectives.ts     
-src/tools/types.ts                     
-src/types/tools.ts                     
-Unused dependencies (5)
-execa               package.json:89:6
-nanoid              package.json:91:6
-p-retry             package.json:92:6
-p-timeout           package.json:93:6
-zod-to-json-schema  package.json:98:6
-Unused devDependencies (6)
-@types/glob     package.json:103:6
-@types/p-retry  package.json:107:6
-@types/uuid     package.json:109:6
-@types/ws       package.json:110:6
-pino-pretty     package.json:117:6
-typedoc         package.json:122:6
 Unlisted dependencies (1)
 @eslint/js  eslint.config.js
 Unresolved imports (1)
 ../../../src/ports/docker  test/unit/tools/push-image.test.ts:6:14
-Unused exports (176)
+Unused exports (183)
 ApplicationKernel                             class     src/app/kernel.ts:336:14                     
 DefaultProgressReporter                                 src/app/kernel.ts:671:26                     
 DefaultTelemetrySystem                                  src/app/kernel.ts:672:27                     
@@ -177,8 +142,15 @@ stopServer                                              src/mcp/server-direct.ts
 getServer                                               src/mcp/server-direct.ts:203:14              
 getStatus                                               src/mcp/server-direct.ts:210:14              
 getTools                                                src/mcp/server-direct.ts:230:14              
-getPromptWithMessages         promptRegistry  function  src/prompts/registry.ts:166:23               
-getPromptsByCategory          promptRegistry  function  src/prompts/registry.ts:204:17               
+setLogger                     promptRegistry  function  src/prompts/registry.ts:467:17               
+listPrompts                   promptRegistry  function  src/prompts/registry.ts:476:23               
+getPrompt                     promptRegistry  function  src/prompts/registry.ts:493:23               
+getPromptWithMessages         promptRegistry  function  src/prompts/registry.ts:525:23               
+hasPrompt                     promptRegistry  function  src/prompts/registry.ts:561:17               
+getAllPrompts                 promptRegistry  function  src/prompts/registry.ts:568:17               
+getPromptsByCategory          promptRegistry  function  src/prompts/registry.ts:576:23               
+clearCache                    promptRegistry  function  src/prompts/registry.ts:587:17               
+parseAIResponse                               function  src/prompts/templates.ts:574:17              
 getDockerMutexStatus                          function  src/services/docker-mutex-client.ts:147:17   
 pathSchema                                              src/tools/analyze-repo/schema.ts:8:14        
 environmentSchema                                       src/tools/deploy/schema.ts:9:14              
@@ -336,4 +308,3 @@ KubernetesValidationRule              type       src/validation/index.ts:29:28
 Validator                             type       src/validation/pipeline.ts:11:13                 
 Duplicate exports (1)
 createParameterBuilder|buildParams  src/lib/param-defaults.ts
-Configuration hints (1)

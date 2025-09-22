@@ -3,7 +3,7 @@
  * Tests for the unified policy system
  */
 
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect } from '@jest/globals';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import {

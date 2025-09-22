@@ -15,7 +15,8 @@ import {
   type ToolContext,
   type ExecuteRequest,
 } from '@/app/kernel';
-import { Success, Failure } from '@/types/index';
+import type { AggregatedMetric } from '@/app/types';
+import { Success, Failure } from '@/types';
 
 describe('Application Kernel', () => {
   let kernel: Kernel;
@@ -365,7 +366,7 @@ describe('Application Kernel', () => {
 
       // Should have duration metrics for tool-a
       const durationMetric = Array.from(metrics.values()).find(
-        m => m.name === 'tool-a.duration'
+        (m: AggregatedMetric) => m.name === 'tool-a.duration'
       );
 
       expect(durationMetric).toBeDefined();
@@ -387,7 +388,7 @@ describe('Application Kernel', () => {
 
       // Should have error metrics
       const errorMetric = Array.from(metrics.values()).find(
-        m => m.name === 'tool-fail.errors'
+        (m: AggregatedMetric) => m.name === 'tool-fail.errors'
       );
 
       expect(errorMetric).toBeDefined();

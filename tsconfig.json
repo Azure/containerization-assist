@@ -40,8 +40,8 @@
       "@/knowledge/*": [
         "src/knowledge/*"
       ],
-      "@/types/*": [
-        "src/types/*"
+      "@types": [
+        "src/types/index.ts"
       ],
       "@/container": [
         "src/container"
