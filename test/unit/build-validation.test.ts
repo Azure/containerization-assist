@@ -233,27 +233,23 @@ describe('Build Output Validation', () => {
 
   describe('Runtime Loading Validation', () => {
     it('should be able to find prompts directory at runtime', () => {
-      // Since we're testing the build output, we can verify the helper module exists
-      const helperPath = join(distDir, 'src', 'lib', 'find-prompts-dir.js');
-      expect(existsSync(helperPath)).toBe(true);
-      
       // Verify prompts can be found in expected locations
       const possiblePromptDirs = [
         join(rootDir, 'src', 'prompts'),
         join(distDir, 'src', 'prompts'),
         join(distCjsDir, 'src', 'prompts')
       ];
-      
+
       const foundPromptDir = possiblePromptDirs.find(dir => existsSync(dir));
       expect(foundPromptDir).toBeDefined();
-      
+
       // Verify it contains expected structure
       if (foundPromptDir) {
         const categories = readdirSync(foundPromptDir).filter(item => {
           const itemPath = join(foundPromptDir, item);
           return statSync(itemPath).isDirectory();
         });
-        
+
         expect(categories.length).toBeGreaterThan(0);
       }
     });

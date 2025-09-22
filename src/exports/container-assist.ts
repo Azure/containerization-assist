@@ -9,8 +9,7 @@ import type { Logger } from 'pino';
 
 import { createSessionManager, type SessionManager } from '@/lib/session.js';
 import { createLogger } from '@/lib/logger.js';
-import { createToolContext, type ToolContext } from '@/mcp/context.js';
-import { createToolRouter, type ToolRouter, type RouterTool } from '@/mcp/tool-router.js';
+import { createKernel, type Kernel, type RegisteredTool } from '@/app/kernel.js';
 import { ToolName, getAllInternalTools } from './tools.js';
 import { extractErrorMessage } from '@/lib/error-utils.js';
 import type { Tool, Result } from '@/types';
@@ -69,16 +68,16 @@ function getSessionIdForParams(params: Record<string, unknown>, defaultSessionId
 /**
  * Create a Container Assist instance with idiomatic TypeScript patterns
  */
-export function createContainerAssist(
+export async function createContainerAssist(
   options: {
     logger?: Logger;
     sessionId?: string;
   } = {},
-): ContainerAssist {
+): Promise<ContainerAssist> {
   const logger = options.logger || createLogger({ name: 'containerization-assist' });
   const sessionManager = createSessionManager(logger);
   const tools = loadAllTools();
-  const router = createRouter(sessionManager, logger, tools);
+  const kernel = await createKernelForTools(tools, logger);
 
   // Generate a consistent session ID for this instance to maintain state across tool calls
   const defaultSessionId =
@@ -87,12 +86,12 @@ export function createContainerAssist(
 
   return {
     bindToServer: (server: McpServer) =>
-      bindAllTools(server, tools, router, logger, sessionManager, defaultSessionId),
+      bindAllTools(server, tools, kernel, logger, sessionManager, defaultSessionId),
     registerTools: (server: McpServer, config?: ToolConfig) =>
       registerSelectedTools(
         server,
         tools,
-        router,
+        kernel,
         config,
         logger,
         sessionManager,
@@ -118,35 +117,36 @@ function loadAllTools(): Map<ToolName, Tool> {
 }
 
 /**
- * Create tool router with proper configuration matching standalone server
+ * Create kernel for tools
  */
-function createRouter(
-  sessionManager: SessionManager,
-  logger: Logger,
-  tools: Map<ToolName, Tool>,
-): ToolRouter {
-  const routerTools = new Map<ToolName, RouterTool>();
+function createKernelForTools(tools: Map<ToolName, Tool>, logger: Logger): Promise<Kernel> {
+  const registeredTools = new Map<string, RegisteredTool>();
 
   for (const [name, tool] of tools.entries()) {
-    routerTools.set(name, {
+    registeredTools.set(name, {
       name,
+      description: tool.description || '',
       handler: async (
-        params: Record<string, unknown>,
-        context: ToolContext,
+        params: unknown,
+        _kernelContext: import('@/app/types').ToolContext,
       ): Promise<Result<unknown>> => {
-        // Use the tool's execute method directly - the router's executeToolImpl will handle session persistence
+        // Tools will use the logger directly, no MCP context needed for kernel
         const toolLogger = logger.child({ tool: name });
-        return await tool.execute(params, toolLogger, context);
+        // Pass null context since tools should work without it
+        return await tool.execute(params as Record<string, unknown>, toolLogger, undefined as any);
       },
-      schema: tool.zodSchema ? (tool.zodSchema as any) : undefined,
+      schema: tool.zodSchema as any,
     });
   }
 
-  return createToolRouter({
-    sessionManager,
-    logger,
-    tools: routerTools,
-  });
+  return createKernel(
+    {
+      sessionStore: 'memory',
+      maxRetries: 2,
+      retryDelay: 1000,
+    },
+    registeredTools,
+  );
 }
 
 /**
@@ -155,12 +155,12 @@ function createRouter(
 function bindAllTools(
   server: McpServerLike,
   tools: Map<string, Tool>,
-  router: ToolRouter,
+  kernel: Kernel,
   logger: Logger,
   sessionManager: SessionManager,
   defaultSessionId: string,
 ): void {
-  registerSelectedTools(server, tools, router, undefined, logger, sessionManager, defaultSessionId);
+  registerSelectedTools(server, tools, kernel, undefined, logger, sessionManager, defaultSessionId);
 }
 
 /**
@@ -169,7 +169,7 @@ function bindAllTools(
 function registerSelectedTools(
   server: McpServerLike,
   tools: Map<string, Tool>,
-  router: ToolRouter,
+  kernel: Kernel,
   config: ToolConfig = {},
   logger: Logger,
   sessionManager: SessionManager,
@@ -182,7 +182,7 @@ function registerSelectedTools(
   for (const [originalName, tool] of toolsToRegister) {
     const customName = config.nameMapping?.[originalName as ToolName] || originalName;
 
-    registerSingleTool(server, tool, customName, router, logger, sessionManager, defaultSessionId);
+    registerSingleTool(server, tool, customName, kernel, logger, sessionManager, defaultSessionId);
   }
 }
 
@@ -193,9 +193,9 @@ function registerSingleTool(
   server: McpServerLike,
   tool: Tool,
   name: string,
-  router: ToolRouter,
+  kernel: Kernel,
   logger: Logger,
-  sessionManager: SessionManager,
+  _sessionManager: SessionManager,
   defaultSessionId: string,
 ): void {
   if (!tool.zodSchema) {
@@ -211,48 +211,23 @@ function registerSingleTool(
     async (args: unknown, _extra: unknown) => {
       try {
         const toolLogger = logger.child({ tool: name });
-        const context = createToolContext(server.server, toolLogger, {
-          sessionManager,
-          maxTokens: 2048,
-          stopSequences: ['```', '\n\n```', '\n\n# ', '\n\n---'],
-          progress: async (message: string, progress?: number, total?: number) => {
-            if (progress !== undefined && total !== undefined) {
-              toolLogger.info({ progress, total }, message);
-            } else {
-              toolLogger.info(message);
-            }
-          },
-        });
 
         // Extract session info from params - use path-based session for path-specific tools
         const paramsObj = (args || {}) as Record<string, unknown>;
         const sessionId = getSessionIdForParams(paramsObj, defaultSessionId);
 
-        // Use router for execution with dependency resolution
-        const routeResult = await router.route({
+        // Use kernel for execution
+        const result = await kernel.execute({
           toolName: tool.name,
           params: paramsObj,
           sessionId,
-          context,
           force: paramsObj.force === true,
         });
 
         // Log execution info
-        if (routeResult.executedTools.length > 0) {
-          toolLogger.info(
-            { executedTools: routeResult.executedTools },
-            'Router executed tools in sequence',
-          );
-        }
+        toolLogger.info({ tool: tool.name, sessionId }, 'Kernel executed tool');
 
-        if (routeResult.workflowHint) {
-          toolLogger.info(
-            { hint: routeResult.workflowHint.message },
-            'Workflow continuation available',
-          );
-        }
-
-        return formatResult(routeResult.result);
+        return formatResult(result);
       } catch (error) {
         return {
           content: [

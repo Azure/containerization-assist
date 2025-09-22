@@ -21,7 +21,7 @@ describe('Server Entry Point', () => {
       const content = readFileSync(serverPath, 'utf-8');
       expect(content).toContain('async function main');
       expect(content).toContain('MCPServer');
-      expect(content).toContain('createDependencies');
+      expect(content).toContain('createKernel');
     });
 
     it('should contain MCP mode setting', () => {
@@ -39,13 +39,13 @@ describe('Server Entry Point', () => {
       expect(content).toContain('SDK-Native');
     });
 
-    it('should contain dependency injection setup', () => {
+    it('should contain kernel setup', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
-      
-      expect(content).toContain('createDependencies');
-      expect(content).toContain('shutdownDependencies');
-      expect(content).toContain('deps');
+
+      expect(content).toContain('createKernel');
+      expect(content).toContain('getAllInternalTools');
+      expect(content).toContain('registeredTools');
     });
   });
 
@@ -62,11 +62,11 @@ describe('Server Entry Point', () => {
     it('should contain graceful shutdown logic', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
-      
+
       expect(content).toContain('const shutdown = async');
       expect(content).toContain('Shutting down server');
       expect(content).toContain('server.stop()');
-      expect(content).toContain('shutdownDependencies');
+      expect(content).toContain('Server shutdown complete');
     });
   });
 
@@ -88,11 +88,11 @@ describe('Server Entry Point', () => {
       expect(content).toContain('logger.error');
     });
 
-    it('should contain logger fallback for when deps is unavailable', () => {
+    it('should contain logger creation and error handling', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
-      
-      expect(content).toContain('deps?.logger ?? console');
+
+      expect(content).toContain('const logger = createLogger');
       expect(content).toContain('console.error');
     });
   });
@@ -129,9 +129,9 @@ describe('Server Entry Point', () => {
     it('should contain proper variable scoping', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
-      
-      expect(content).toContain('let deps: Dependencies | undefined');
+
       expect(content).toContain('let server: IMCPServer | undefined');
+      expect(content).toContain('const kernel = await createKernel');
     });
   });
 });

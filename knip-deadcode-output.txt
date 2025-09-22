@@ -1,4 +1,4 @@
-Unused files (19)
+Unused files (21)
 src/knowledge/enhanced-loader.ts       
 src/knowledge/simple-scoring.ts        
 src/lib/ai-utils.ts                    
@@ -13,6 +13,8 @@ src/mcp/sampling-cache.ts
 src/mcp/tool-validator.ts              
 src/prompts/enhanced-registry.ts       
 src/resources/cache.ts                 
+src/resources/manager.ts               
+src/resources/types.ts                 
 src/resources/uri-schemes.ts           
 src/services/docker-metadata-cache.ts  
 src/tools/analysis-perspectives.ts     
@@ -35,204 +37,196 @@ Unlisted dependencies (1)
 @eslint/js  eslint.config.js
 Unresolved imports (1)
 ../../../src/ports/docker  test/unit/tools/push-image.test.ts:6:14
-Unused exports (194)
-getAllToolNames                                function  src/exports/tools.ts:73:17                   
-getLanguageKeywords                                      src/knowledge/matcher.ts:65:14               
-getFrameworkKeywords                                     src/knowledge/matcher.ts:72:14               
-getEnvironmentKeywords                                   src/knowledge/matcher.ts:79:14               
-getBaseImageKnowledge                          function  src/lib/ai-knowledge-enhancer.ts:168:23      
-getSecurityKnowledge                           function  src/lib/ai-knowledge-enhancer.ts:192:23      
-getSuggestedBaseImages                         function  src/lib/base-images.ts:128:17                
-scoreContent                                             src/lib/config-scoring-engine.ts:24:14       
-evaluateRule                                             src/lib/config-scoring-engine.ts:105:14      
-evaluatePenaltyRule                                      src/lib/config-scoring-engine.ts:124:14      
-evaluateMatcher                                          src/lib/config-scoring-engine.ts:143:14      
-evaluateRegexMatcher                                     src/lib/config-scoring-engine.ts:165:14      
-evaluateFunctionMatcher                                  src/lib/config-scoring-engine.ts:187:14      
-compareValues                                            src/lib/config-scoring-engine.ts:231:14      
-getImageMetadata                                         src/lib/docker.ts:10:9                       
-directoryExists                                function  src/lib/file-utils.ts:12:23                  
-getFormattedConfigStrategy                     function  src/lib/integrated-scoring.ts:194:17         
-globalMutex                                              src/lib/mutex.ts:241:14                      
-hashContext                                    function  src/lib/mutex.ts:244:17                      
-CONTAINER_DEFAULTS                                       src/lib/param-defaults.ts:42:14              
-ACA_DEFAULTS                                             src/lib/param-defaults.ts:53:14              
-BUILD_DEFAULTS                                           src/lib/param-defaults.ts:65:14              
-getToolDefaults                                function  src/lib/param-defaults.ts:74:17              
-addDefault                                               src/lib/param-defaults.ts:102:14             
-addDefaults                                              src/lib/param-defaults.ts:114:14             
-buildParameters                                          src/lib/param-defaults.ts:125:14             
-createParameterBuilder                                   src/lib/param-defaults.ts:142:14             
-buildParams                                              src/lib/param-defaults.ts:176:14             
-parsePackageJsonSync                           function  src/lib/parsing-package-json.ts:62:17        
-hasPackageJson                                 function  src/lib/parsing-package-json.ts:84:23        
-detectPackageManager                           function  src/lib/parsing-package-json.ts:110:23       
-hasDependency                                  function  src/lib/parsing-package-json.ts:126:17       
-getDependencyVersion                           function  src/lib/parsing-package-json.ts:134:17       
-detectFrameworks                               function  src/lib/parsing-package-json.ts:145:17       
-isMonorepo                                     function  src/lib/parsing-package-json.ts:184:17       
-getFileName                                              src/lib/path-utils.ts:7:14                   
-getDirectory                                             src/lib/path-utils.ts:8:14                   
-parsePath                                                src/lib/path-utils.ts:10:14                  
-normalizePathSeparators                        function  src/lib/path-utils.ts:13:17                  
-FROM_INSTRUCTION                                         src/lib/regex-patterns.ts:13:14              
-WORKDIR_INSTRUCTION                                      src/lib/regex-patterns.ts:14:14              
-COPY_INSTRUCTION                                         src/lib/regex-patterns.ts:15:14              
-RUN_INSTRUCTION                                          src/lib/regex-patterns.ts:16:14              
-CMD_INSTRUCTION                                          src/lib/regex-patterns.ts:17:14              
-ENTRYPOINT_INSTRUCTION                                   src/lib/regex-patterns.ts:18:14              
-EXPOSE_INSTRUCTION                                       src/lib/regex-patterns.ts:19:14              
-ENV_INSTRUCTION                                          src/lib/regex-patterns.ts:20:14              
-USER_INSTRUCTION                                         src/lib/regex-patterns.ts:21:14              
-ARG_INSTRUCTION                                          src/lib/regex-patterns.ts:22:14              
-HEALTHCHECK_INSTRUCTION                                  src/lib/regex-patterns.ts:23:14              
-MULTI_STAGE_FROM                                         src/lib/regex-patterns.ts:26:14              
-PINNED_VERSION                                           src/lib/regex-patterns.ts:31:14              
-SEMVER_VERSION                                           src/lib/regex-patterns.ts:32:14              
-ROOT_USER                                                src/lib/regex-patterns.ts:35:14              
-APT_UPDATE                                               src/lib/regex-patterns.ts:40:14              
-APT_CLEAN                                                src/lib/regex-patterns.ts:41:14              
-HTTP_URL                                                 src/lib/regex-patterns.ts:54:14              
-CHMOD_777                                                src/lib/regex-patterns.ts:55:14              
-K8S_API_VERSION                                          src/lib/regex-patterns.ts:62:14              
-K8S_KIND                                                 src/lib/regex-patterns.ts:63:14              
-K8S_DEPLOYMENT                                           src/lib/regex-patterns.ts:64:14              
-K8S_SERVICE                                              src/lib/regex-patterns.ts:65:14              
-K8S_INGRESS                                              src/lib/regex-patterns.ts:66:14              
-K8S_CONFIGMAP                                            src/lib/regex-patterns.ts:67:14              
-K8S_SECRET                                               src/lib/regex-patterns.ts:68:14              
-YAML_DOC_SEPARATOR                                       src/lib/regex-patterns.ts:71:14              
-SECURITY_CONTEXT                                         src/lib/regex-patterns.ts:74:14              
-RUN_AS_NON_ROOT                                          src/lib/regex-patterns.ts:75:14              
-READ_ONLY_ROOT                                           src/lib/regex-patterns.ts:76:14              
-RESOURCE_LIMITS                                          src/lib/regex-patterns.ts:79:14              
-RESOURCE_REQUESTS                                        src/lib/regex-patterns.ts:80:14              
-CPU_LIMIT                                                src/lib/regex-patterns.ts:81:14              
-MEMORY_LIMIT                                             src/lib/regex-patterns.ts:82:14              
-IMAGE_TAG                                                src/lib/regex-patterns.ts:96:14              
-ENV_VAR_PATTERN                                          src/lib/regex-patterns.ts:97:14              
-extractBaseImage                               function  src/lib/regex-patterns.ts:106:17             
-hasLatestTag                                   function  src/lib/regex-patterns.ts:125:17             
-isRunningAsRoot                                function  src/lib/regex-patterns.ts:132:17             
-extractExposedPorts                            function  src/lib/regex-patterns.ts:147:17             
-hasHardcodedSecrets                            function  src/lib/regex-patterns.ts:166:17             
-isMultiStage                                   function  src/lib/regex-patterns.ts:178:17             
-extractK8sKind                                 function  src/lib/regex-patterns.ts:185:17             
-loadConfigurationPure                          function  src/lib/sampling-config.ts:162:23            
-resolveForEnvironmentPure                      function  src/lib/sampling-config.ts:299:17            
-countChainedRuns                               function  src/lib/scoring-functions.ts:10:17           
-hasDependencyCaching                           function  src/lib/scoring-functions.ts:18:17           
-countCleanupOperations                         function  src/lib/scoring-functions.ts:51:17           
-countParallelOperations                        function  src/lib/scoring-functions.ts:66:17           
-hasVersionedImages                             function  src/lib/scoring-functions.ts:81:17           
-hasConsistentIndentation                       function  src/lib/scoring-functions.ts:94:17           
-calculateContentUniqueness                     function  src/lib/scoring-functions.ts:108:17          
-hasDocumentation                               function  src/lib/scoring-functions.ts:119:17          
-countEfficientPatterns                         function  src/lib/scoring-functions.ts:133:17          
-hasNonRootUser                                 function  src/lib/scoring-functions.ts:151:17          
-hasNoSecretPatterns                            function  src/lib/scoring-functions.ts:159:17          
-hasMinimumLines                                function  src/lib/scoring-functions.ts:172:17          
-hasConsistentPatterns                          function  src/lib/scoring-functions.ts:180:17          
-hasProperFormatting                            function  src/lib/scoring-functions.ts:191:17          
-hasNoGenericSecrets                            function  src/lib/scoring-functions.ts:199:17          
-hasNoInsecureFlags                             function  src/lib/scoring-functions.ts:217:17          
-hasOptimalDensity                              function  src/lib/scoring-functions.ts:226:17          
-hasHighUniqueness                              function  src/lib/scoring-functions.ts:237:17          
-hasEfficientPatterns                           function  src/lib/scoring-functions.ts:248:17          
-hasDescriptiveNaming                           function  src/lib/scoring-functions.ts:268:17          
-hasExcessivelyLongLines                        function  src/lib/scoring-functions.ts:283:17          
-scanImage                                      function  src/lib/security-scanner.ts:74:23            
-resolveStrategyPure                            function  src/lib/strategy-resolver.ts:30:17           
-getAllStrategiesPure                           function  src/lib/strategy-resolver.ts:95:17           
-getFormattedStrategyPure                       function  src/lib/strategy-resolver.ts:102:17          
-isEmptyString                                  function  src/lib/string-validators.ts:8:17            
-validateDockerTag                              function  src/lib/string-validators.ts:16:17           
-validateDockerImageName                        function  src/lib/string-validators.ts:36:17           
-validateRegistryUrl                            function  src/lib/string-validators.ts:61:17           
-normalizeRegistryUrl                           function  src/lib/string-validators.ts:80:17           
-validateK8sNamespace                           function  src/lib/string-validators.ts:87:17           
-sanitizeFilename                               function  src/lib/string-validators.ts:111:17          
-isEmptyArray                                   function  src/lib/string-validators.ts:154:17          
-isNullOrUndefined                              function  src/lib/string-validators.ts:162:17          
-requireNonEmptyString                          function  src/lib/string-validators.ts:170:17          
-requireNonEmptyArray                           function  src/lib/string-validators.ts:181:17          
-getAllGenerators                                         src/mcp/ai/default-suggestions.ts:202:14     
-createAIAssistantDeps                                    src/mcp/ai/host-ai-assist.ts:70:14           
-suggestParameters                                        src/mcp/ai/host-ai-assist.ts:87:14           
-validateSuggestions                                      src/mcp/ai/host-ai-assist.ts:126:14          
-isAIAssistanceAvailable                                  src/mcp/ai/host-ai-assist.ts:145:14          
-createPromptBuilder                                      src/mcp/ai/prompt-builder.ts:119:14          
-createAIPromptBuilder                                    src/mcp/ai/prompt-builder.ts:128:14          
-registerHandlers                                         src/mcp/server-direct.ts:252:14              
-initializeRouter                                         src/mcp/server-direct.ts:295:14              
-createToolHandler                                        src/mcp/server-direct.ts:317:14              
-registerPrompts                                          src/mcp/server-direct.ts:439:14              
-startServer                                              src/mcp/server-direct.ts:475:14              
-stopServer                                               src/mcp/server-direct.ts:498:14              
-getServer                                                src/mcp/server-direct.ts:511:14              
-getStatus                                                src/mcp/server-direct.ts:518:14              
-getTools                                                 src/mcp/server-direct.ts:537:14              
-TOOL_GRAPH                                               src/mcp/tool-graph.ts:61:14                  
-isStepSatisfied                                function  src/mcp/tool-graph.ts:440:17                 
-extractSessionContext                                    src/mcp/tool-router.ts:107:14                
-normalizeToolParameters                                  src/mcp/tool-router.ts:123:14                
-updateSessionState                                       src/mcp/tool-router.ts:148:14                
-routeRequestImpl                                         src/mcp/tool-router.ts:192:14                
-buildCorrectiveParams                                    src/mcp/tool-router.ts:432:14                
-buildWorkflowMetadata                                    src/mcp/tool-router.ts:456:14                
-buildWorkflowHint                                        src/mcp/tool-router.ts:503:14                
-executeToolImpl                                          src/mcp/tool-router.ts:535:14                
-getToolDependencies                                      src/mcp/tool-router.ts:605:14                
-fillMissingParameters                                    src/mcp/tool-router.ts:625:14                
-canExecuteImpl                                           src/mcp/tool-router.ts:713:14                
-getExecutionPlan                                         src/mcp/tool-router.ts:739:14                
-getPromptWithMessages         promptRegistry   function  src/prompts/registry.ts:166:23               
-getPromptsByCategory          promptRegistry   function  src/prompts/registry.ts:204:17               
-storeResource                 resourceManager  function  src/resources/manager.ts:52:17               
-getResource                   resourceManager  function  src/resources/manager.ts:85:17               
-listResources                 resourceManager  function  src/resources/manager.ts:119:17              
-clearExpired                  resourceManager  function  src/resources/manager.ts:159:17              
-getStats                      resourceManager  function  src/resources/manager.ts:190:17              
-cleanup                       resourceManager  function  src/resources/manager.ts:237:23              
-URI_SCHEMES                                              src/resources/types.ts:46:14                 
-getDockerMutexStatus                           function  src/services/docker-mutex-client.ts:147:17   
-pathSchema                                               src/tools/analyze-repo/schema.ts:8:14        
-environmentSchema                                        src/tools/deploy/schema.ts:9:14              
-environmentSchema                                        src/tools/generate-dockerfile/schema.ts:13:14
-optimizationSchema                                       src/tools/generate-dockerfile/schema.ts:18:14
-securityLevelSchema                                      src/tools/generate-dockerfile/schema.ts:23:14
-InspectSessionResultSchema                               src/tools/inspect-session/schema.ts:17:14    
-ping                                           function  src/tools/ops/tool.ts:39:23                  
-serverStatus                                   function  src/tools/ops/tool.ts:107:23                 
-getQualityGrade                                function  src/types/categories.ts:109:17               
-getSecurityGrade                               function  src/types/categories.ts:120:17               
-ENVIRONMENT_PROFILES                                     src/types/categories.ts:132:14               
-isSuccess                                                src/types/core.ts:38:14                      
-isFailure                                                src/types/core.ts:41:14                      
-getDockerfileRules                                       src/validation/dockerfile-validator.ts:466:14
-getDockerfileRulesByCategory                             src/validation/dockerfile-validator.ts:473:14
-createDockerfileValidator                                src/validation/dockerfile-validator.ts:482:14
-validateDockerfileContent                                src/validation/index.ts:7:9                  
-getDockerfileRules                                       src/validation/index.ts:8:29                 
-getDockerfileRulesByCategory                             src/validation/index.ts:9:22                 
-createDockerfileValidator                                src/validation/index.ts:10:32                
-validateKubernetesManifests                              src/validation/index.ts:16:24                
-formatValidationReport                         function  src/validation/index.ts:36:17                
-validateKubernetesContent                                src/validation/kubernetes-validator.ts:349:14
-getKubernetesRules                                       src/validation/kubernetes-validator.ts:496:14
-getKubernetesRulesByCategory                             src/validation/kubernetes-validator.ts:503:14
-validateKubernetes                                       src/validation/kubernetes-validator.ts:523:14
-pipe                                                     src/validation/pipeline.ts:21:14             
-createValidator                                          src/validation/pipeline.ts:82:14             
-validateRequired                                         src/validation/pipeline.ts:109:14            
-validateTypes                                            src/validation/pipeline.ts:128:14            
-normalizeParameters                                      src/validation/pipeline.ts:155:14            
-validateSchema                                           src/validation/pipeline.ts:178:14            
-when                                                     src/validation/pipeline.ts:192:14            
-validateBusinessRules                                    src/validation/pipeline.ts:207:14            
-Unused exported types (115)
-SystemStatus                          interface  src/container.ts:120:18                          
-ToolConfig                            interface  src/exports/container-assist.ts:21:18            
+Unused exports (176)
+ApplicationKernel                             class     src/app/kernel.ts:336:14                     
+DefaultProgressReporter                                 src/app/kernel.ts:671:26                     
+DefaultTelemetrySystem                                  src/app/kernel.ts:672:27                     
+ToolExecutionError                            class     src/app/types.ts:288:14                      
+ValidationError                               class     src/app/types.ts:302:14                      
+PreconditionError                             class     src/app/types.ts:316:14                      
+createAppConfig                               function  src/config/app-config.ts:153:17              
+getAllToolNames                               function  src/exports/tools.ts:73:17                   
+getLanguageKeywords                                     src/knowledge/matcher.ts:65:14               
+getFrameworkKeywords                                    src/knowledge/matcher.ts:72:14               
+getEnvironmentKeywords                                  src/knowledge/matcher.ts:79:14               
+getBaseImageKnowledge                         function  src/lib/ai-knowledge-enhancer.ts:168:23      
+getSecurityKnowledge                          function  src/lib/ai-knowledge-enhancer.ts:192:23      
+getSuggestedBaseImages                        function  src/lib/base-images.ts:128:17                
+scoreContent                                            src/lib/config-scoring-engine.ts:24:14       
+evaluateRule                                            src/lib/config-scoring-engine.ts:105:14      
+evaluatePenaltyRule                                     src/lib/config-scoring-engine.ts:124:14      
+evaluateMatcher                                         src/lib/config-scoring-engine.ts:143:14      
+evaluateRegexMatcher                                    src/lib/config-scoring-engine.ts:165:14      
+evaluateFunctionMatcher                                 src/lib/config-scoring-engine.ts:187:14      
+compareValues                                           src/lib/config-scoring-engine.ts:231:14      
+getImageMetadata                                        src/lib/docker.ts:10:9                       
+directoryExists                               function  src/lib/file-utils.ts:70:23                  
+getFormattedConfigStrategy                    function  src/lib/integrated-scoring.ts:194:17         
+globalMutex                                             src/lib/mutex.ts:241:14                      
+hashContext                                   function  src/lib/mutex.ts:244:17                      
+CONTAINER_DEFAULTS                                      src/lib/param-defaults.ts:42:14              
+ACA_DEFAULTS                                            src/lib/param-defaults.ts:53:14              
+BUILD_DEFAULTS                                          src/lib/param-defaults.ts:65:14              
+getToolDefaults                               function  src/lib/param-defaults.ts:74:17              
+addDefault                                              src/lib/param-defaults.ts:102:14             
+addDefaults                                             src/lib/param-defaults.ts:114:14             
+buildParameters                                         src/lib/param-defaults.ts:125:14             
+createParameterBuilder                                  src/lib/param-defaults.ts:142:14             
+buildParams                                             src/lib/param-defaults.ts:176:14             
+parsePackageJsonSync                          function  src/lib/parsing-package-json.ts:62:17        
+hasPackageJson                                function  src/lib/parsing-package-json.ts:84:23        
+detectPackageManager                          function  src/lib/parsing-package-json.ts:110:23       
+hasDependency                                 function  src/lib/parsing-package-json.ts:126:17       
+getDependencyVersion                          function  src/lib/parsing-package-json.ts:134:17       
+detectFrameworks                              function  src/lib/parsing-package-json.ts:145:17       
+isMonorepo                                    function  src/lib/parsing-package-json.ts:184:17       
+FROM_INSTRUCTION                                        src/lib/regex-patterns.ts:13:14              
+WORKDIR_INSTRUCTION                                     src/lib/regex-patterns.ts:14:14              
+COPY_INSTRUCTION                                        src/lib/regex-patterns.ts:15:14              
+RUN_INSTRUCTION                                         src/lib/regex-patterns.ts:16:14              
+CMD_INSTRUCTION                                         src/lib/regex-patterns.ts:17:14              
+ENTRYPOINT_INSTRUCTION                                  src/lib/regex-patterns.ts:18:14              
+EXPOSE_INSTRUCTION                                      src/lib/regex-patterns.ts:19:14              
+ENV_INSTRUCTION                                         src/lib/regex-patterns.ts:20:14              
+USER_INSTRUCTION                                        src/lib/regex-patterns.ts:21:14              
+ARG_INSTRUCTION                                         src/lib/regex-patterns.ts:22:14              
+HEALTHCHECK_INSTRUCTION                                 src/lib/regex-patterns.ts:23:14              
+MULTI_STAGE_FROM                                        src/lib/regex-patterns.ts:26:14              
+PINNED_VERSION                                          src/lib/regex-patterns.ts:31:14              
+SEMVER_VERSION                                          src/lib/regex-patterns.ts:32:14              
+ROOT_USER                                               src/lib/regex-patterns.ts:35:14              
+APT_UPDATE                                              src/lib/regex-patterns.ts:40:14              
+APT_CLEAN                                               src/lib/regex-patterns.ts:41:14              
+HTTP_URL                                                src/lib/regex-patterns.ts:54:14              
+CHMOD_777                                               src/lib/regex-patterns.ts:55:14              
+K8S_API_VERSION                                         src/lib/regex-patterns.ts:62:14              
+K8S_KIND                                                src/lib/regex-patterns.ts:63:14              
+K8S_DEPLOYMENT                                          src/lib/regex-patterns.ts:64:14              
+K8S_SERVICE                                             src/lib/regex-patterns.ts:65:14              
+K8S_INGRESS                                             src/lib/regex-patterns.ts:66:14              
+K8S_CONFIGMAP                                           src/lib/regex-patterns.ts:67:14              
+K8S_SECRET                                              src/lib/regex-patterns.ts:68:14              
+YAML_DOC_SEPARATOR                                      src/lib/regex-patterns.ts:71:14              
+SECURITY_CONTEXT                                        src/lib/regex-patterns.ts:74:14              
+RUN_AS_NON_ROOT                                         src/lib/regex-patterns.ts:75:14              
+READ_ONLY_ROOT                                          src/lib/regex-patterns.ts:76:14              
+RESOURCE_LIMITS                                         src/lib/regex-patterns.ts:79:14              
+RESOURCE_REQUESTS                                       src/lib/regex-patterns.ts:80:14              
+CPU_LIMIT                                               src/lib/regex-patterns.ts:81:14              
+MEMORY_LIMIT                                            src/lib/regex-patterns.ts:82:14              
+IMAGE_TAG                                               src/lib/regex-patterns.ts:96:14              
+ENV_VAR_PATTERN                                         src/lib/regex-patterns.ts:97:14              
+extractBaseImage                              function  src/lib/regex-patterns.ts:106:17             
+hasLatestTag                                  function  src/lib/regex-patterns.ts:125:17             
+isRunningAsRoot                               function  src/lib/regex-patterns.ts:132:17             
+extractExposedPorts                           function  src/lib/regex-patterns.ts:147:17             
+hasHardcodedSecrets                           function  src/lib/regex-patterns.ts:166:17             
+isMultiStage                                  function  src/lib/regex-patterns.ts:178:17             
+extractK8sKind                                function  src/lib/regex-patterns.ts:185:17             
+loadConfigurationPure                         function  src/lib/sampling-config.ts:162:23            
+resolveForEnvironmentPure                     function  src/lib/sampling-config.ts:299:17            
+countChainedRuns                              function  src/lib/scoring-functions.ts:10:17           
+hasDependencyCaching                          function  src/lib/scoring-functions.ts:18:17           
+countCleanupOperations                        function  src/lib/scoring-functions.ts:51:17           
+countParallelOperations                       function  src/lib/scoring-functions.ts:66:17           
+hasVersionedImages                            function  src/lib/scoring-functions.ts:81:17           
+hasConsistentIndentation                      function  src/lib/scoring-functions.ts:94:17           
+calculateContentUniqueness                    function  src/lib/scoring-functions.ts:108:17          
+hasDocumentation                              function  src/lib/scoring-functions.ts:119:17          
+countEfficientPatterns                        function  src/lib/scoring-functions.ts:133:17          
+hasNonRootUser                                function  src/lib/scoring-functions.ts:151:17          
+hasNoSecretPatterns                           function  src/lib/scoring-functions.ts:159:17          
+hasMinimumLines                               function  src/lib/scoring-functions.ts:172:17          
+hasConsistentPatterns                         function  src/lib/scoring-functions.ts:180:17          
+hasProperFormatting                           function  src/lib/scoring-functions.ts:191:17          
+hasNoGenericSecrets                           function  src/lib/scoring-functions.ts:199:17          
+hasNoInsecureFlags                            function  src/lib/scoring-functions.ts:217:17          
+hasOptimalDensity                             function  src/lib/scoring-functions.ts:226:17          
+hasHighUniqueness                             function  src/lib/scoring-functions.ts:237:17          
+hasEfficientPatterns                          function  src/lib/scoring-functions.ts:248:17          
+hasDescriptiveNaming                          function  src/lib/scoring-functions.ts:268:17          
+hasExcessivelyLongLines                       function  src/lib/scoring-functions.ts:283:17          
+scanImage                                     function  src/lib/security-scanner.ts:74:23            
+resolveStrategyPure                           function  src/lib/strategy-resolver.ts:30:17           
+getAllStrategiesPure                          function  src/lib/strategy-resolver.ts:95:17           
+getFormattedStrategyPure                      function  src/lib/strategy-resolver.ts:102:17          
+isEmptyString                                 function  src/lib/string-validators.ts:8:17            
+validateDockerTag                             function  src/lib/string-validators.ts:16:17           
+validateDockerImageName                       function  src/lib/string-validators.ts:36:17           
+validateRegistryUrl                           function  src/lib/string-validators.ts:61:17           
+normalizeRegistryUrl                          function  src/lib/string-validators.ts:80:17           
+validateK8sNamespace                          function  src/lib/string-validators.ts:87:17           
+sanitizeFilename                              function  src/lib/string-validators.ts:111:17          
+isEmptyArray                                  function  src/lib/string-validators.ts:154:17          
+isNullOrUndefined                             function  src/lib/string-validators.ts:162:17          
+requireNonEmptyString                         function  src/lib/string-validators.ts:170:17          
+requireNonEmptyArray                          function  src/lib/string-validators.ts:181:17          
+getAllGenerators                                        src/mcp/ai/default-suggestions.ts:202:14     
+createAIAssistantDeps                                   src/mcp/ai/host-ai-assist.ts:70:14           
+suggestParameters                                       src/mcp/ai/host-ai-assist.ts:87:14           
+validateSuggestions                                     src/mcp/ai/host-ai-assist.ts:126:14          
+isAIAssistanceAvailable                                 src/mcp/ai/host-ai-assist.ts:145:14          
+mergeWithSuggestions                                    src/mcp/ai/host-ai-assist.ts:274:14          
+createHostAIAssistant                                   src/mcp/ai/host-ai-assist.ts:288:14          
+createPromptBuilder                                     src/mcp/ai/prompt-builder.ts:119:14          
+createAIPromptBuilder                                   src/mcp/ai/prompt-builder.ts:128:14          
+registerHandlers                                        src/mcp/server-direct.ts:60:14               
+registerPrompts                                         src/mcp/server-direct.ts:157:14              
+startServer                                             src/mcp/server-direct.ts:166:14              
+stopServer                                              src/mcp/server-direct.ts:190:14              
+getServer                                               src/mcp/server-direct.ts:203:14              
+getStatus                                               src/mcp/server-direct.ts:210:14              
+getTools                                                src/mcp/server-direct.ts:230:14              
+getPromptWithMessages         promptRegistry  function  src/prompts/registry.ts:166:23               
+getPromptsByCategory          promptRegistry  function  src/prompts/registry.ts:204:17               
+getDockerMutexStatus                          function  src/services/docker-mutex-client.ts:147:17   
+pathSchema                                              src/tools/analyze-repo/schema.ts:8:14        
+environmentSchema                                       src/tools/deploy/schema.ts:9:14              
+environmentSchema                                       src/tools/generate-dockerfile/schema.ts:13:14
+optimizationSchema                                      src/tools/generate-dockerfile/schema.ts:18:14
+securityLevelSchema                                     src/tools/generate-dockerfile/schema.ts:23:14
+InspectSessionResultSchema                              src/tools/inspect-session/schema.ts:17:14    
+ping                                          function  src/tools/ops/tool.ts:39:23                  
+serverStatus                                  function  src/tools/ops/tool.ts:107:23                 
+getQualityGrade                               function  src/types/categories.ts:109:17               
+getSecurityGrade                              function  src/types/categories.ts:120:17               
+ENVIRONMENT_PROFILES                                    src/types/categories.ts:132:14               
+isSuccess                                               src/types/core.ts:38:14                      
+isFailure                                               src/types/core.ts:41:14                      
+getDockerfileRules                                      src/validation/dockerfile-validator.ts:466:14
+getDockerfileRulesByCategory                            src/validation/dockerfile-validator.ts:473:14
+createDockerfileValidator                               src/validation/dockerfile-validator.ts:482:14
+validateDockerfileContent                               src/validation/index.ts:7:9                  
+getDockerfileRules                                      src/validation/index.ts:8:29                 
+getDockerfileRulesByCategory                            src/validation/index.ts:9:22                 
+createDockerfileValidator                               src/validation/index.ts:10:32                
+validateKubernetesManifests                             src/validation/index.ts:16:24                
+formatValidationReport                        function  src/validation/index.ts:36:17                
+validateKubernetesContent                               src/validation/kubernetes-validator.ts:349:14
+getKubernetesRules                                      src/validation/kubernetes-validator.ts:496:14
+getKubernetesRulesByCategory                            src/validation/kubernetes-validator.ts:503:14
+validateKubernetes                                      src/validation/kubernetes-validator.ts:523:14
+pipe                                                    src/validation/pipeline.ts:21:14             
+createValidator                                         src/validation/pipeline.ts:82:14             
+validateRequired                                        src/validation/pipeline.ts:109:14            
+validateTypes                                           src/validation/pipeline.ts:128:14            
+normalizeParameters                                     src/validation/pipeline.ts:155:14            
+validateSchema                                          src/validation/pipeline.ts:178:14            
+when                                                    src/validation/pipeline.ts:192:14            
+validateBusinessRules                                   src/validation/pipeline.ts:207:14            
+Unused exported types (119)
+SessionState                          type       src/app/kernel.ts:666:15                         
+ToolHandler                           type       src/app/types.ts:51:13                           
+AIClient                              interface  src/app/types.ts:126:18                          
+KnowledgeBase                         interface  src/app/types.ts:138:18                          
+PolicyEngine                          interface  src/app/types.ts:146:18                          
+Result                                type       src/app/types.ts:337:14                          
+AppConfig                             type       src/config/app-config.ts:105:13                  
+RegexMatcher                          interface  src/config/policy.ts:22:18                       
+FunctionMatcher                       interface  src/config/policy.ts:29:18                       
+EnvironmentOverride                   interface  src/config/policy.ts:50:18                       
+CacheConfig                           interface  src/config/policy.ts:60:18                       
+ToolConfig                            interface  src/exports/container-assist.ts:20:18            
 MCPToolMetadata                       interface  src/exports/types.ts:10:18                       
 MCPServer                             interface  src/exports/types.ts:38:18                       
 EnhancedPromptArgs                    interface  src/lib/ai-knowledge-enhancer.ts:33:18           
@@ -247,6 +241,7 @@ BuilderState                          interface  src/lib/param-defaults.ts:94:18
 ParameterBuilderInterface             interface  src/lib/param-defaults.ts:132:18                 
 ParameterBuilder                      type       src/lib/param-defaults.ts:182:13                 
 PackageJson                           interface  src/lib/parsing-package-json.ts:11:18            
+SystemInfo                            interface  src/lib/platform-utils.ts:5:18                   
 StrategyCondition                     type       src/lib/sampling-config.ts:133:13                
 StrategiesConfig                      type       src/lib/sampling-config.ts:135:13                
 EnvironmentOverride                   type       src/lib/sampling-config.ts:136:13                
@@ -258,46 +253,38 @@ StrategyResolverInterface             interface  src/lib/strategy-resolver.ts:11
 AIParamResponse                       interface  src/mcp/ai/host-ai-assist.ts:33:18               
 AIAssistantConfig                     interface  src/mcp/ai/host-ai-assist.ts:45:18               
 AIAssistantDeps                       interface  src/mcp/ai/host-ai-assist.ts:55:18               
+HostAIAssistant                       interface  src/mcp/ai/host-ai-assist.ts:303:18              
 ProgressNotification                  interface  src/mcp/context-helpers.ts:15:18                 
 EnhancedProgressReporter              type       src/mcp/context-helpers.ts:31:13                 
 TextMessage                           interface  src/mcp/context.ts:22:18                         
 PromptWithMessages                    interface  src/mcp/context.ts:88:18                         
 EnhancedProgressReporter              type       src/mcp/context.ts:157:14                        
 ContextOptions                        interface  src/mcp/context.ts:165:18                        
-MCPServerState                        interface  src/mcp/server-direct.ts:224:18                  
+ServerOptions                         interface  src/mcp/server-direct.ts:20:18                   
+MCPServerState                        interface  src/mcp/server-direct.ts:32:18                   
 Tool                                  type       src/mcp/server.ts:13:14                          
 Result                                type       src/mcp/server.ts:13:20                          
 Success                               type       src/mcp/server.ts:13:28                          
 Failure                               type       src/mcp/server.ts:13:37                          
-RouterConfig                          interface  src/mcp/tool-router.ts:36:18                     
-RouteRequest                          interface  src/mcp/tool-router.ts:44:18                     
-WorkflowMetadata                      interface  src/mcp/tool-router.ts:53:18                     
-WorkflowHint                          interface  src/mcp/tool-router.ts:65:18                     
-RouteResult                           interface  src/mcp/tool-router.ts:71:18                     
-ToolRouterState                       interface  src/mcp/tool-router.ts:82:18                     
 TextContent                           type       src/mcp/types.ts:10:13                           
 Content                               type       src/mcp/types.ts:15:13                           
 MCPToolContext                        interface  src/mcp/types.ts:28:18                           
-Resource                              interface  src/resources/types.ts:14:18                     
-ResourceCache                         interface  src/resources/types.ts:36:18                     
-UriScheme                             type       src/resources/types.ts:54:13                     
-ParsedUri                             interface  src/resources/types.ts:56:18                     
 DockerClientConfig                    interface  src/services/docker-client.ts:17:18              
 DeploymentResult                      interface  src/services/kubernetes-client.ts:13:18          
 ClusterInfo                           interface  src/services/kubernetes-client.ts:19:18          
 ApplyOptions                          interface  src/services/kubernetes-idempotent-apply.ts:13:18
 K8sResource                           interface  src/services/kubernetes-idempotent-apply.ts:19:18
-BuildImageResult                      interface  src/tools/build-image/tool.ts:37:18              
+BuildImageResult                      interface  src/tools/build-image/tool.ts:38:18              
 ConvertAcaToK8sResult                 interface  src/tools/convert-aca-to-k8s/tool.ts:49:18       
 DeployApplicationResult               interface  src/tools/deploy/tool.ts:110:18                  
 FixDockerfileResult                   interface  src/tools/fix-dockerfile/tool.ts:88:18           
 GenerateAcaManifestsResult            interface  src/tools/generate-aca-manifests/tool.ts:69:18   
-GenerateDockerfileResult              interface  src/tools/generate-dockerfile/tool.ts:230:18     
+GenerateDockerfileResult              interface  src/tools/generate-dockerfile/tool.ts:229:18     
 GenerateHelmChartsResult              interface  src/tools/generate-helm-charts/tool.ts:67:18     
 GenerateK8sManifestsResult            interface  src/tools/generate-k8s-manifests/tool.ts:39:18   
 OpsConfig                             interface  src/tools/ops/tool.ts:176:18                     
 OpsResult                             type       src/tools/ops/tool.ts:182:13                     
-PrepareClusterResult                  interface  src/tools/prepare-cluster/tool.ts:40:18          
+PrepareClusterResult                  interface  src/tools/prepare-cluster/tool.ts:46:18          
 PushImageResult                       interface  src/tools/push-image/tool.ts:14:18               
 BaseImageRecommendation               interface  src/tools/resolve-base-images/tool.ts:294:18     
 ScanImageResult                       interface  src/tools/scan/tool.ts:79:18                     
@@ -339,6 +326,7 @@ AnalysisCapability                    interface  src/types/core.ts:66:18
 BuildCapability                       interface  src/types/core.ts:74:18                          
 DeploymentCapability                  interface  src/types/core.ts:83:18                          
 ToolContext                           type       src/types/index.ts:18:14                         
+AIService                             interface  src/types/index.ts:74:18                         
 ValidationConfig                      interface  src/validation/core-types.ts:91:18               
 ValidationReport                      type       src/validation/index.ts:24:20                    
 ValidationCategory                    type       src/validation/index.ts:26:22                    
@@ -348,3 +336,4 @@ KubernetesValidationRule              type       src/validation/index.ts:29:28
 Validator                             type       src/validation/pipeline.ts:11:13                 
 Duplicate exports (1)
 createParameterBuilder|buildParams  src/lib/param-defaults.ts
+Configuration hints (1)

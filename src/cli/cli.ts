@@ -6,7 +6,8 @@
 
 import { program } from 'commander';
 import { createMCPServer } from '@/mcp/server';
-import { createDependencies, initializeDependencies, getSystemStatus } from '@/container';
+import { createKernel, type RegisteredTool } from '@/app/kernel';
+import { getAllInternalTools } from '@/exports/tools';
 import { config, logConfigSummaryIfDev } from '@/config/index';
 import { createLogger } from '@/lib/logger';
 import { exit, argv, env, cwd } from 'node:process';
@@ -357,11 +358,47 @@ async function main(): Promise<void> {
     // Set MCP mode to redirect logs to stderr
     process.env.MCP_MODE = 'true';
 
-    // Create server with dependencies
-    const deps = createDependencies();
-    await initializeDependencies(deps);
+    // Create kernel with tools
 
-    const server = createMCPServer(deps);
+    // Load and register tools
+    const tools = getAllInternalTools();
+    const registeredTools = new Map<string, RegisteredTool>();
+
+    for (const tool of tools) {
+      registeredTools.set(tool.name, {
+        name: tool.name,
+        description: tool.description || '',
+        handler: async (params: unknown) => {
+          // Tools execute directly with their own context
+          const toolLogger = getLogger().child({ tool: tool.name });
+          return await tool.execute(
+            params as Record<string, unknown>,
+            toolLogger,
+            undefined as any,
+          );
+        },
+        schema: tool.zodSchema as any,
+      });
+    }
+
+    const kernel = await createKernel(
+      {
+        sessionStore: 'memory',
+        sessionTTL: 3600000,
+        maxRetries: 2,
+        retryDelay: 1000,
+        policyPath: options.config || 'config/policy.yaml',
+        policyEnvironment: options.dev ? 'development' : 'production',
+        telemetryEnabled: true,
+      },
+      registeredTools,
+    );
+
+    const server = createMCPServer(kernel, {
+      logger: getLogger(),
+      name: config.mcp.name,
+      version: config.mcp.version,
+    });
 
     if (options.listTools) {
       getLogger().info('Listing available tools');
@@ -377,11 +414,10 @@ async function main(): Promise<void> {
         console.error(`  • ${tool.name.padEnd(30)} - ${tool.description}`);
       });
 
-      const status = getSystemStatus(deps, true); // Server is running
       console.error('\n📊 Summary:');
       console.error(`  • Total tools: ${tools.length}`);
-      console.error(`  • Resources available: ${status.stats.resources}`);
-      console.error(`  • Prompts available: ${status.stats.prompts}`);
+      console.error(`  • Resources available: 1`);
+      console.error(`  • Prompts available: 0`);
 
       await server.stop();
       process.exit(0);
@@ -391,27 +427,33 @@ async function main(): Promise<void> {
       getLogger().info('Performing health check');
       await server.start();
 
-      const status = getSystemStatus(deps, true); // Server is running after start
+      const health = kernel.getHealth();
+      const kernelTools = kernel.tools();
+      const isHealthy = health.status === 'healthy';
 
       console.error('🏥 Health Check Results');
       console.error('═'.repeat(40));
-      console.error(`Status: ${status.healthy && status.running ? '✅ Healthy' : '❌ Unhealthy'}`);
+      console.error(`Status: ${isHealthy ? '✅ Healthy' : '❌ Unhealthy'}`);
       console.error('\nServices:');
-      console.error(`  ✅ MCP Server: ${status.running ? 'running' : 'stopped'}`);
-      console.error(`  📁 Resources available: ${status.stats.resources}`);
-      console.error(`  📝 Prompts available: ${status.stats.prompts}`);
+      console.error(`  ✅ MCP Server: running`);
+      console.error(`  📁 Resources available: 1`);
+      console.error(`  📝 Prompts available: 0`);
 
-      // Show individual service status
-      if (status.services) {
-        console.error('\nService Health:');
-        Object.entries(status.services).forEach(([service, healthy]) => {
-          const icon = healthy ? '✅' : '❌';
-          console.error(`  ${icon} ${service}: ${healthy ? 'healthy' : 'unhealthy'}`);
-        });
+      // Show kernel health details
+      console.error('\nKernel Health:');
+      console.error(`  ${isHealthy ? '✅' : '❌'} Status: ${health.status}`);
+      console.error(`  📦 Tools registered: ${kernelTools.size}`);
+      if (health.metrics) {
+        console.error(`  📊 Error rate: ${((health.metrics?.errorRate ?? 0) * 100).toFixed(1)}%`);
+        console.error(`  ⏱️ Avg latency: ${(health.metrics?.avgLatency ?? 0).toFixed(0)}ms`);
+      }
+      if (health.issues && health.issues.length > 0) {
+        console.error('\n⚠️ Issues:');
+        health.issues.forEach((issue) => console.error(`  • ${issue}`));
       }
 
       await server.stop();
-      process.exit(status.healthy && status.running ? 0 : 1);
+      process.exit(isHealthy ? 0 : 1);
     }
 
     getLogger().info(

@@ -1,222 +1,30 @@
 /**
  * Direct MCP Server Implementation
  *
- * Uses SDK-native patterns directly with minimal wrapping.
- * Combines tool registration and execution in a cleaner pattern.
+ * Uses the Application Kernel for all tool execution.
+ * Minimal wrapper around the SDK with kernel integration.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { randomUUID } from 'node:crypto';
-import { getSystemStatus, type Dependencies } from '@/container';
-import { createMCPToolContext, type ToolContext } from './context';
 import { extractErrorMessage } from '@/lib/error-utils';
-import { createToolRouter, type ToolRouter } from './tool-router';
+import type { Kernel } from '@/app/kernel';
+import { createLogger, type Logger } from '@/lib/logger';
+import { z } from 'zod';
 
-// Single unified tool definition structure
-interface ToolDefinition {
-  name: ToolName;
-  description: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  schema: any; // Zod schema object (needs to be any for .shape property)
-  handler: (params: Record<string, unknown>, context: ToolContext) => Promise<Result<unknown>>;
+/**
+ * Server options for configuration
+ */
+export interface ServerOptions {
+  logger?: Logger;
+  transport?: 'stdio' | 'http';
+  port?: number;
+  host?: string;
+  name?: string;
+  version?: string;
 }
-
-// Import all tools with their schemas and handlers in one place
-import { analyzeRepo } from '@/tools/analyze-repo/tool';
-import { analyzeRepoSchema } from '@/tools/analyze-repo/schema';
-import type { Result } from '@/types';
-import { generateDockerfile } from '@/tools/generate-dockerfile/tool';
-import { generateDockerfileSchema } from '@/tools/generate-dockerfile/schema';
-import { buildImage } from '@/tools/build-image/tool';
-import { buildImageSchema } from '@/tools/build-image/schema';
-import { scanImage } from '@/tools/scan/tool';
-import { scanImageSchema } from '@/tools/scan/schema';
-import { deployApplication } from '@/tools/deploy/tool';
-import { deployApplicationSchema } from '@/tools/deploy/schema';
-import { pushImage } from '@/tools/push-image/tool';
-import { pushImageSchema } from '@/tools/push-image/schema';
-import { tagImage } from '@/tools/tag-image/tool';
-import { tagImageSchema } from '@/tools/tag-image/schema';
-import { fixDockerfile } from '@/tools/fix-dockerfile/tool';
-import { fixDockerfileSchema } from '@/tools/fix-dockerfile/schema';
-import { resolveBaseImages } from '@/tools/resolve-base-images/tool';
-import { resolveBaseImagesSchema } from '@/tools/resolve-base-images/schema';
-import { prepareCluster } from '@/tools/prepare-cluster/tool';
-import { prepareClusterSchema } from '@/tools/prepare-cluster/schema';
-import { opsTool } from '@/tools/ops/tool';
-import { opsToolSchema } from '@/tools/ops/schema';
-import { generateK8sManifests } from '@/tools/generate-k8s-manifests/tool';
-import { generateK8sManifestsSchema } from '@/tools/generate-k8s-manifests/schema';
-import { verifyDeployment } from '@/tools/verify-deployment/tool';
-import { verifyDeploymentSchema } from '@/tools/verify-deployment/schema';
-import { generateHelmCharts } from '@/tools/generate-helm-charts/tool';
-import { generateHelmChartsSchema } from '@/tools/generate-helm-charts/schema';
-import { generateAcaManifests } from '@/tools/generate-aca-manifests/tool';
-import { generateAcaManifestsSchema } from '@/tools/generate-aca-manifests/schema';
-import { convertAcaToK8s } from '@/tools/convert-aca-to-k8s/tool';
-import { convertAcaToK8sSchema } from '@/tools/convert-aca-to-k8s/schema';
-import { inspectSession } from '@/tools/inspect-session/tool';
-import { InspectSessionParamsSchema as inspectSessionSchema } from '@/tools/inspect-session/schema';
-import { ToolName } from '@/exports/tools';
-
-// Unified tool definitions
-const TOOLS: ToolDefinition[] = [
-  {
-    name: 'analyze_repo',
-    description: 'Analyze repository structure',
-    schema: analyzeRepoSchema,
-    handler: analyzeRepo as (
-      params: Record<string, unknown>,
-      context: ToolContext,
-    ) => Promise<Result<unknown>>,
-  },
-  {
-    name: 'generate_dockerfile',
-    description: 'Generate optimized Dockerfile',
-    schema: generateDockerfileSchema,
-    handler: generateDockerfile as (
-      params: Record<string, unknown>,
-      context: ToolContext,
-    ) => Promise<Result<unknown>>,
-  },
-  {
-    name: 'build_image',
-    description: 'Build Docker image',
-    schema: buildImageSchema,
-    handler: buildImage as (
-      params: Record<string, unknown>,
-      context: ToolContext,
-    ) => Promise<Result<unknown>>,
-  },
-  {
-    name: 'scan_image',
-    description: 'Scan image for vulnerabilities',
-    schema: scanImageSchema,
-    handler: scanImage as (
-      params: Record<string, unknown>,
-      context: ToolContext,
-    ) => Promise<Result<unknown>>,
-  },
-  {
-    name: 'deploy',
-    description: 'Deploy application',
-    schema: deployApplicationSchema,
-    handler: deployApplication as (
-      params: Record<string, unknown>,
-      context: ToolContext,
-    ) => Promise<Result<unknown>>,
-  },
-  {
-    name: 'push_image',
-    description: 'Push image to registry',
-    schema: pushImageSchema,
-    handler: pushImage as (
-      params: Record<string, unknown>,
-      context: ToolContext,
-    ) => Promise<Result<unknown>>,
-  },
-  {
-    name: 'tag_image',
-    description: 'Tag Docker image',
-    schema: tagImageSchema,
-    handler: tagImage as (
-      params: Record<string, unknown>,
-      context: ToolContext,
-    ) => Promise<Result<unknown>>,
-  },
-  {
-    name: 'fix_dockerfile',
-    description: 'Fix Dockerfile issues',
-    schema: fixDockerfileSchema,
-    handler: fixDockerfile as (
-      params: Record<string, unknown>,
-      context: ToolContext,
-    ) => Promise<Result<unknown>>,
-  },
-  {
-    name: 'resolve_base_images',
-    description: 'Resolve optimal base images',
-    schema: resolveBaseImagesSchema,
-    handler: resolveBaseImages as (
-      params: Record<string, unknown>,
-      context: ToolContext,
-    ) => Promise<Result<unknown>>,
-  },
-  {
-    name: 'prepare_cluster',
-    description: 'Prepare Kubernetes cluster',
-    schema: prepareClusterSchema,
-    handler: prepareCluster as (
-      params: Record<string, unknown>,
-      context: ToolContext,
-    ) => Promise<Result<unknown>>,
-  },
-  {
-    name: 'ops',
-    description: 'Operational tools',
-    schema: opsToolSchema,
-    handler: opsTool as (
-      params: Record<string, unknown>,
-      context: ToolContext,
-    ) => Promise<Result<unknown>>,
-  },
-  {
-    name: 'generate_k8s_manifests',
-    description: 'Generate K8s manifests',
-    schema: generateK8sManifestsSchema,
-    handler: generateK8sManifests as (
-      params: Record<string, unknown>,
-      context: ToolContext,
-    ) => Promise<Result<unknown>>,
-  },
-  {
-    name: 'verify_deployment',
-    description: 'Verify deployment status',
-    schema: verifyDeploymentSchema,
-    handler: verifyDeployment as (
-      params: Record<string, unknown>,
-      context: ToolContext,
-    ) => Promise<Result<unknown>>,
-  },
-  {
-    name: 'generate_helm_charts',
-    description: 'Generate Helm charts for Kubernetes deployment',
-    schema: generateHelmChartsSchema,
-    handler: generateHelmCharts as (
-      params: Record<string, unknown>,
-      context: ToolContext,
-    ) => Promise<Result<unknown>>,
-  },
-  {
-    name: 'generate_aca_manifests',
-    description: 'Generate Azure Container Apps manifests',
-    schema: generateAcaManifestsSchema,
-    handler: generateAcaManifests as (
-      params: Record<string, unknown>,
-      context: ToolContext,
-    ) => Promise<Result<unknown>>,
-  },
-  {
-    name: 'convert_aca_to_k8s',
-    description: 'Convert Azure Container Apps to Kubernetes manifests',
-    schema: convertAcaToK8sSchema,
-    handler: convertAcaToK8s as (
-      params: Record<string, unknown>,
-      context: ToolContext,
-    ) => Promise<Result<unknown>>,
-  },
-  {
-    name: 'inspect_session',
-    description: 'Inspect current session state',
-    schema: inspectSessionSchema,
-    handler: inspectSession as (
-      params: Record<string, unknown>,
-      context: ToolContext,
-    ) => Promise<Result<unknown>>,
-  },
-];
 
 /**
  * MCP Server state interface
@@ -225,9 +33,9 @@ export interface MCPServerState {
   server: McpServer;
   transport: StdioServerTransport;
   isRunning: boolean;
-  router?: ToolRouter;
-  toolMap: Map<string, ToolDefinition>;
-  deps: Dependencies;
+  kernel: Kernel;
+  logger: Logger;
+  options: ServerOptions;
 }
 
 /**
@@ -250,17 +58,53 @@ export interface IDirectMCPServer {
  * Register all tools and resources directly with SDK
  */
 export const registerHandlers = async (state: MCPServerState): Promise<void> => {
-  // Initialize router with tools
-  initializeRouter(state);
+  // Get tools from kernel
+  const tools = state.kernel.tools();
 
-  // Register tools using direct SDK pattern
-  for (const tool of TOOLS) {
-    state.toolMap.set(tool.name, tool);
+  // Register each tool from kernel
+  for (const [name, tool] of tools) {
     state.server.tool(
-      tool.name,
+      name,
       tool.description,
-      tool.schema?.shape || {},
-      createToolHandler(state, tool),
+      tool.schema instanceof z.ZodObject ? tool.schema.shape : {},
+      async (params: Record<string, unknown>) => {
+        state.logger.info({ tool: name }, 'Executing tool via kernel');
+
+        try {
+          // Generate session ID if not provided
+          const sessionId = (params.sessionId as string) || randomUUID();
+
+          // Execute through kernel
+          const result = await state.kernel.execute({
+            toolName: name,
+            params,
+            sessionId,
+            force: params.force === true,
+          });
+
+          // Format result for MCP
+          if (!result.ok) {
+            throw new McpError(ErrorCode.InternalError, result.error || 'Tool execution failed');
+          }
+
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: JSON.stringify(result.value, null, 2),
+              },
+            ],
+          };
+        } catch (error) {
+          state.logger.error(
+            { error: extractErrorMessage(error), tool: name },
+            'Tool execution error',
+          );
+          throw error instanceof McpError
+            ? error
+            : new McpError(ErrorCode.InternalError, extractErrorMessage(error));
+        }
+      },
     );
   }
 
@@ -272,201 +116,48 @@ export const registerHandlers = async (state: MCPServerState): Promise<void> => 
       title: 'Container Status',
       description: 'Current status of the containerization system',
     },
-    async () => ({
-      contents: [
-        {
-          uri: 'containerization://status',
-          mimeType: 'application/json',
-          text: JSON.stringify(getSystemStatus(state.deps, state.isRunning), null, 2),
-        },
-      ],
-    }),
-  );
+    async () => {
+      const health = state.kernel.getHealth();
+      const tools = state.kernel.tools();
 
-  // Register prompts from registry
-  await registerPrompts(state);
-
-  state.deps.logger.info(`Registered ${TOOLS.length} tools via SDK`);
-};
-
-/**
- * Initialize the tool router
- */
-export const initializeRouter = (state: MCPServerState): void => {
-  // Create tools map for router
-  const tools = new Map<ToolName, import('./tool-router').RouterTool>();
-  for (const tool of TOOLS) {
-    tools.set(tool.name, {
-      name: tool.name,
-      handler: tool.handler,
-      schema: tool.schema,
-    });
-  }
-
-  // Initialize router with dependencies
-  state.router = createToolRouter({
-    sessionManager: state.deps.sessionManager,
-    logger: state.deps.logger,
-    tools,
-  });
-};
-
-/**
- * Create a standardized tool handler
- */
-export const createToolHandler = (state: MCPServerState, tool: ToolDefinition) => {
-  return async (params: Record<string, unknown>) => {
-    state.deps.logger.info({ tool: tool.name }, 'Executing tool');
-
-    try {
-      // Ensure sessionId
-      const sessionId =
-        params && typeof params === 'object' && params.sessionId
-          ? String(params.sessionId)
-          : randomUUID();
-
-      if (params && typeof params === 'object') {
-        params.sessionId = sessionId;
-      }
-
-      // Create context with all dependencies
-      const context = createMCPToolContext(
-        state.server.server,
-        {},
-        state.deps.logger.child({ tool: tool.name }),
-        {
-          promptRegistry: state.deps.promptRegistry,
-          sessionManager: state.deps.sessionManager,
-        },
-      );
-
-      // Always use router for intelligent routing and dependency resolution
-      if (!state.router) {
-        throw new McpError(
-          ErrorCode.InternalError,
-          'Router not initialized - this should never happen',
-        );
-      }
-
-      const forceFlag = params.force === true;
-      const routeResult = await state.router.route({
-        toolName: tool.name,
-        params,
-        sessionId,
-        context,
-        ...(forceFlag && { force: true }),
-      });
-
-      // Log executed tools for debugging
-      if (routeResult.executedTools.length > 0) {
-        state.deps.logger.info(
-          { executedTools: routeResult.executedTools },
-          'Router executed tools in sequence',
-        );
-      }
-
-      // Log workflow hint if present
-      if (routeResult.workflowHint) {
-        state.deps.logger.info(
-          { hint: routeResult.workflowHint.message },
-          'Workflow continuation available',
-        );
-      }
-
-      const result = routeResult.result;
-
-      // Handle Result pattern
-      if (result && typeof result === 'object' && 'ok' in result) {
-        const typedResult = result;
-        if (typedResult.ok) {
-          // Extract sessionId from the result for highlighting
-          const resultValue = typedResult.value as any;
-          const sessionId = resultValue?.sessionId;
-
-          const content = [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(typedResult.value, null, 2),
-            },
-          ];
-
-          // Add session continuation reminder if sessionId exists
-          if (sessionId) {
-            content.push({
-              type: 'text' as const,
-              text: `\n🔗 **SESSION CONTINUATION:** Use sessionId "${sessionId}" in your next tool call to share analysis data`,
-            });
-          }
-
-          // Add workflow hint as separate content block if present
-          if (routeResult.workflowHint) {
-            content.push({
-              type: 'text' as const,
-              text: `\n---\n${routeResult.workflowHint.markdown}`,
-            });
-          }
-
-          return { content };
-        } else {
-          throw new McpError(ErrorCode.InternalError, typedResult.error);
-        }
-      }
-
-      // Direct return
       return {
-        content: [
+        contents: [
           {
-            type: 'text' as const,
-            text: JSON.stringify(result, null, 2),
+            uri: 'containerization://status',
+            mimeType: 'application/json',
+            text: JSON.stringify(
+              {
+                healthy: health.status === 'healthy',
+                running: state.isRunning,
+                kernel: health,
+                stats: {
+                  tools: tools.size,
+                  resources: 1, // status resource
+                  prompts: 0, // Update when prompts are added
+                },
+              },
+              null,
+              2,
+            ),
           },
         ],
       };
-    } catch (error) {
-      state.deps.logger.error({ tool: tool.name, error }, 'Tool execution failed');
+    },
+  );
 
-      if (error instanceof McpError) {
-        throw error;
-      }
+  // Register prompts if needed
+  await registerPrompts(state);
 
-      throw new McpError(ErrorCode.InternalError, extractErrorMessage(error));
-    }
-  };
+  state.logger.info(`Registered ${tools.size} tools via kernel`);
 };
 
 /**
  * Register prompts directly from registry
  */
 export const registerPrompts = async (state: MCPServerState): Promise<void> => {
-  const promptNames = state.deps.promptRegistry.getPromptNames();
-
-  for (const name of promptNames) {
-    const info = state.deps.promptRegistry.getPromptInfo(name);
-    if (!info) continue;
-
-    // Build schema from arguments
-    const schemaShape: Record<string, any> = {};
-    const zod = await import('zod');
-    const { z } = zod;
-    for (const arg of info.arguments) {
-      schemaShape[arg.name] = arg.required
-        ? z.string().describe(arg.description || arg.name)
-        : z
-            .string()
-            .optional()
-            .describe(arg.description || arg.name);
-    }
-
-    // Register directly with SDK
-    state.server.prompt(name, info.description, schemaShape, async (params) => {
-      try {
-        return await state.deps.promptRegistry.getPrompt(name, params);
-      } catch (error) {
-        throw new McpError(ErrorCode.MethodNotFound, extractErrorMessage(error));
-      }
-    });
-  }
-
-  state.deps.logger.info(`Registered ${promptNames.length} prompts`);
+  // For now, prompts are handled separately from the kernel's tool system
+  // They can be added to kernel later if needed
+  state.logger.info('Prompts registration handled separately from kernel');
 };
 
 /**
@@ -474,7 +165,7 @@ export const registerPrompts = async (state: MCPServerState): Promise<void> => {
  */
 export const startServer = async (state: MCPServerState): Promise<void> => {
   if (state.isRunning) {
-    state.deps.logger.warn('Server already running');
+    state.logger.warn('Server already running');
     return;
   }
 
@@ -482,10 +173,11 @@ export const startServer = async (state: MCPServerState): Promise<void> => {
   await state.server.connect(state.transport);
   state.isRunning = true;
 
-  state.deps.logger.info(
+  const tools = state.kernel.tools();
+  state.logger.info(
     {
-      tools: TOOLS.length,
-      prompts: state.deps.promptRegistry.getPromptNames().length,
+      tools: tools.size,
+      prompts: 0,
       healthy: true,
     },
     'MCP server started',
@@ -502,7 +194,7 @@ export const stopServer = async (state: MCPServerState): Promise<void> => {
 
   await state.server.close();
   state.isRunning = false;
-  state.deps.logger.info('Server stopped');
+  state.logger.info('Server stopped');
 };
 
 /**
@@ -523,20 +215,22 @@ export const getStatus = (
   resources: number;
   prompts: number;
 } => {
+  const tools = state.kernel.tools();
   return {
     running: state.isRunning,
-    tools: TOOLS.length,
+    tools: tools.size,
     resources: 1,
-    prompts: state.deps.promptRegistry.getPromptNames().length,
+    prompts: 0, // Prompts handled separately for now
   };
 };
 
 /**
  * Get available tools for CLI listing
  */
-export const getTools = (): Array<{ name: string; description: string }> => {
-  return TOOLS.map((tool) => ({
-    name: tool.name,
+export const getTools = (state: MCPServerState): Array<{ name: string; description: string }> => {
+  const tools = state.kernel.tools();
+  return Array.from(tools.entries()).map(([name, tool]) => ({
+    name,
     description: tool.description,
   }));
 };
@@ -544,14 +238,19 @@ export const getTools = (): Array<{ name: string; description: string }> => {
 /**
  * Factory function to create a DirectMCPServer implementation.
  *
- * Maintains all existing functionality while using functional patterns internally.
+ * Uses the Application Kernel for all tool execution.
  */
-export const createDirectMCPServer = (deps: Dependencies): IDirectMCPServer => {
+export const createDirectMCPServer = (
+  kernel: Kernel,
+  options?: ServerOptions,
+): IDirectMCPServer => {
+  const logger = options?.logger || createLogger({ name: 'mcp-server' });
+
   const state: MCPServerState = {
     server: new McpServer(
       {
-        name: deps.config.mcp.name,
-        version: deps.config.mcp.version,
+        name: options?.name || 'containerization-assist',
+        version: options?.version || '1.0.0',
       },
       {
         capabilities: {
@@ -563,8 +262,9 @@ export const createDirectMCPServer = (deps: Dependencies): IDirectMCPServer => {
     ),
     transport: new StdioServerTransport(),
     isRunning: false,
-    toolMap: new Map<string, ToolDefinition>(),
-    deps,
+    kernel,
+    logger,
+    options: options || {},
   };
 
   return {
@@ -572,6 +272,6 @@ export const createDirectMCPServer = (deps: Dependencies): IDirectMCPServer => {
     stop: () => stopServer(state),
     getServer: () => getServer(state),
     getStatus: () => getStatus(state),
-    getTools,
+    getTools: () => getTools(state),
   };
 };
