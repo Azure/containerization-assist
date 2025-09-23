@@ -74,7 +74,7 @@
         "errors": 0
       },
       "build": {
-        "timeMs": 4000,
+        "timeMs": 3000,
         "mode": "clean",
         "environment": {
           "nodeVersion": "v24.1.0",

@@ -14,11 +14,11 @@ DefaultTelemetrySystem                   src/app/kernel.ts:810:27
 createAppConfig                function  src/config/app-config.ts:152:17               
 appConfig                                src/config/app-config.ts:237:14               
 ANALYSIS_CONFIG                          src/config/defaults.ts:54:14                  
-extractEnvironmentConstraints  function  src/config/policy-constraints.ts:14:17        
-getToolConstraints             function  src/config/policy-constraints.ts:127:17       
-getProductionConstraints       function  src/config/policy-constraints.ts:131:17       
-getCategoryConstraints         function  src/config/policy-constraints.ts:141:17       
-formatConstraintsPrompt        function  src/config/policy-constraints.ts:179:17       
+extractEnvironmentConstraints  function  src/config/policy-constraints.ts:13:17        
+getToolConstraints             function  src/config/policy-constraints.ts:126:17       
+getProductionConstraints       function  src/config/policy-constraints.ts:130:17       
+getCategoryConstraints         function  src/config/policy-constraints.ts:140:17       
+formatConstraintsPrompt        function  src/config/policy-constraints.ts:178:17       
 clearPolicyCache               function  src/config/policy-io.ts:34:17                 
 refreshPolicy                  function  src/config/policy-io.ts:38:17                 
 RegexMatcherSchema                       src/config/policy-schemas.ts:127:14           
@@ -97,7 +97,7 @@ KnowledgeBase               interface  src/app/types.ts:139:18
 PolicyEngine                interface  src/app/types.ts:147:18                          
 Result                      type       src/app/types.ts:286:14                          
 AppConfig                   type       src/config/app-config.ts:104:13                  
-ConstraintContext           interface  src/config/policy-constraints.ts:158:18          
+ConstraintContext           interface  src/config/policy-constraints.ts:157:18          
 RegexMatcher                interface  src/config/policy-schemas.ts:17:18               
 EnvironmentOverride         interface  src/config/policy-schemas.ts:45:18               
 CacheConfig                 interface  src/config/policy-schemas.ts:55:18               

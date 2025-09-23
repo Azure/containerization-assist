@@ -3,11 +3,10 @@
  */
 import type { Policy, UnifiedDefaults } from './policy-schemas';
 
-type Str = string;
-type ConstraintList = Str[];
+type ConstraintList = string[];
 
-const add = (arr: ConstraintList, v?: Str | null): ConstraintList => (v ? arr.concat(v) : arr);
-const addAll = (arr: ConstraintList, vs?: Str[]): ConstraintList =>
+const add = (arr: ConstraintList, v?: string | null): ConstraintList => (v ? arr.concat(v) : arr);
+const addAll = (arr: ConstraintList, vs?: string[]): ConstraintList =>
   vs?.length ? arr.concat(vs) : arr;
 
 /** Extract constraints from environment defaults */
