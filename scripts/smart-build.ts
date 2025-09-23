@@ -164,6 +164,8 @@ class SmartBuilder {
       'tsc && tsc-alias -f',
       'Build ESM'
     );
+    // Copy knowledge data files to ESM build
+    await this.copyKnowledgeData('dist');
   }
 
   private async buildCJS() {
@@ -172,6 +174,32 @@ class SmartBuilder {
       'tsc -p tsconfig.cjs.json && tsc-alias -p tsconfig.cjs.json -f',
       'Build CJS'
     );
+    // Copy knowledge data files to CJS build
+    await this.copyKnowledgeData('dist-cjs');
+  }
+
+  private async copyKnowledgeData(outputDir: string) {
+    const sourceDir = path.join(process.cwd(), 'src', 'knowledge', 'data');
+    const targetDir = path.join(process.cwd(), outputDir, 'src', 'knowledge', 'data');
+
+    try {
+      // Create target directory
+      await fs.mkdir(targetDir, { recursive: true });
+
+      // Copy all JSON files
+      const files = await fs.readdir(sourceDir);
+      const jsonFiles = files.filter(f => f.endsWith('.json'));
+
+      for (const file of jsonFiles) {
+        const source = path.join(sourceDir, file);
+        const target = path.join(targetDir, file);
+        await fs.copyFile(source, target);
+      }
+
+      this.log(`Copied ${jsonFiles.length} knowledge pack files to ${outputDir}`, 'success');
+    } catch (error: any) {
+      this.log(`Failed to copy knowledge data: ${error.message}`, 'warning');
+    }
   }
 
   private async validateBuilds(): Promise<void> {
