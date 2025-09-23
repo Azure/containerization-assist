@@ -2,14 +2,28 @@ Unused files (3)
 src/lib/base-images.ts           
 src/lib/param-defaults.ts        
 src/lib/parsing-package-json.ts  
-Unused exports (160)
-ApplicationKernel                               class     src/app/kernel.ts:350:14                      
-DefaultProgressReporter                                   src/app/kernel.ts:759:26                      
-DefaultTelemetrySystem                                    src/app/kernel.ts:760:27                      
+Unused exports (174)
+ApplicationKernel                               class     src/app/kernel.ts:352:14                      
+DefaultProgressReporter                                   src/app/kernel.ts:761:26                      
+DefaultTelemetrySystem                                    src/app/kernel.ts:762:27                      
 createAppConfig                                 function  src/config/app-config.ts:153:17               
 appConfig                                                 src/config/app-config.ts:238:14               
 ANALYSIS_CONFIG                                           src/config/defaults.ts:54:14                  
-getPolicySummary                                function  src/config/policy-prompt.ts:191:17            
+extractEnvironmentConstraints                   function  src/config/policy-constraints.ts:14:17        
+getToolConstraints                              function  src/config/policy-constraints.ts:127:17       
+getProductionConstraints                        function  src/config/policy-constraints.ts:131:17       
+getCategoryConstraints                          function  src/config/policy-constraints.ts:141:17       
+formatConstraintsPrompt                         function  src/config/policy-constraints.ts:179:17       
+clearPolicyCache                                function  src/config/policy-io.ts:34:17                 
+refreshPolicy                                   function  src/config/policy-io.ts:38:17                 
+getPolicySummary                                function  src/config/policy-prompt.ts:78:17             
+RegexMatcherSchema                                        src/config/policy-schemas.ts:127:14           
+FunctionMatcherSchema                                     src/config/policy-schemas.ts:134:14           
+MatcherSchema                                             src/config/policy-schemas.ts:140:14           
+PolicyRuleSchema                                          src/config/policy-schemas.ts:145:14           
+EnvironmentOverrideSchema                                 src/config/policy-schemas.ts:154:14           
+EnvironmentDefaultsSchema                                 src/config/policy-schemas.ts:161:14           
+UnifiedDefaultsSchema                                     src/config/policy-schemas.ts:206:14           
 ALL_TOOLS                                                 src/exports/tools.ts:7:9                      
 getAllToolNames                                           src/exports/tools.ts:9:38                     
 createToolMap                                             src/exports/tools.ts:12:17                    
@@ -100,17 +114,17 @@ getAllPrompts                  promptRegistry   function  src/prompts/registry.t
 parseAIResponse                                 function  src/prompts/templates.ts:574:17               
 getDockerMutexStatus                            function  src/services/docker-mutex-client.ts:147:17    
 pathSchema                                                src/tools/analyze-repo/schema.ts:8:14         
-metadata                                                  src/tools/analyze-repo/tool.ts:74:14          
-metadata                                                  src/tools/convert-aca-to-k8s/tool.ts:65:14    
+metadata                                                  src/tools/analyze-repo/tool.ts:78:14          
+metadata                                                  src/tools/convert-aca-to-k8s/tool.ts:69:14    
 environmentSchema                                         src/tools/deploy/schema.ts:9:14               
-metadata                                                  src/tools/fix-dockerfile/tool.ts:61:14        
-metadata                                                  src/tools/generate-aca-manifests/tool.ts:66:14
+metadata                                                  src/tools/fix-dockerfile/tool.ts:65:14        
+metadata                                                  src/tools/generate-aca-manifests/tool.ts:70:14
 environmentSchema                                         src/tools/generate-dockerfile/schema.ts:13:14 
 optimizationSchema                                        src/tools/generate-dockerfile/schema.ts:18:14 
 securityLevelSchema                                       src/tools/generate-dockerfile/schema.ts:23:14 
-metadata                                                  src/tools/generate-dockerfile/tool.ts:63:14   
-metadata                                                  src/tools/generate-helm-charts/tool.ts:61:14  
-metadata                                                  src/tools/generate-k8s-manifests/tool.ts:80:14
+metadata                                                  src/tools/generate-dockerfile/tool.ts:67:14   
+metadata                                                  src/tools/generate-helm-charts/tool.ts:65:14  
+metadata                                                  src/tools/generate-k8s-manifests/tool.ts:84:14
 ALL_TOOLS                                                 src/tools/index.ts:292:14                     
 createToolMap                                   function  src/tools/index.ts:313:17                     
 analyzeRepoTool                                           src/tools/index.ts:322:9                      
@@ -135,7 +149,7 @@ InspectSessionResultSchema                                src/tools/inspect-sess
 extractKnowledgeMetadata       knowledgeHelper  function  src/tools/knowledge-helper.ts:77:17           
 ping                                            function  src/tools/ops/tool.ts:39:23                   
 serverStatus                                    function  src/tools/ops/tool.ts:107:23                  
-metadata                                                  src/tools/resolve-base-images/tool.ts:59:14   
+metadata                                                  src/tools/resolve-base-images/tool.ts:63:14   
 getQualityGrade                                 function  src/types/categories.ts:109:17                
 getSecurityGrade                                function  src/types/categories.ts:120:17                
 ENVIRONMENT_PROFILES                                      src/types/categories.ts:132:14                
@@ -163,19 +177,20 @@ normalizeParameters                                       src/validation/pipelin
 validateSchema                                            src/validation/pipeline.ts:178:14             
 when                                                      src/validation/pipeline.ts:192:14             
 validateBusinessRules                                     src/validation/pipeline.ts:207:14             
-Unused exported types (118)
-SessionState                                           type       src/app/kernel.ts:754:15                         
+Unused exported types (119)
+SessionState                                           type       src/app/kernel.ts:756:15                         
 ToolHandler                                            type       src/app/types.ts:52:13                           
 AIClient                                               interface  src/app/types.ts:127:18                          
 KnowledgeBase                                          interface  src/app/types.ts:139:18                          
 PolicyEngine                                           interface  src/app/types.ts:147:18                          
 Result                                                 type       src/app/types.ts:286:14                          
 AppConfig                                              type       src/config/app-config.ts:105:13                  
-PolicyPromptContext                                    interface  src/config/policy-prompt.ts:11:18                
-RegexMatcher                                           interface  src/config/policy.ts:22:18                       
-FunctionMatcher                                        interface  src/config/policy.ts:29:18                       
-EnvironmentOverride                                    interface  src/config/policy.ts:50:18                       
-CacheConfig                                            interface  src/config/policy.ts:60:18                       
+ConstraintContext                                      interface  src/config/policy-constraints.ts:158:18          
+PolicyPromptContext                                    interface  src/config/policy-prompt.ts:13:18                
+RegexMatcher                                           interface  src/config/policy-schemas.ts:17:18               
+EnvironmentOverride                                    interface  src/config/policy-schemas.ts:45:18               
+CacheConfig                                            interface  src/config/policy-schemas.ts:55:18               
+EnvironmentDefaults                                    interface  src/config/policy-schemas.ts:63:18               
 ToolConfig                                             interface  src/exports/container-assist.ts:20:18            
 MCPToolMetadata                                        interface  src/exports/types.ts:10:18                       
 MCPServer                                              interface  src/exports/types.ts:38:18                       

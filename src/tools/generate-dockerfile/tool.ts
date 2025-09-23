@@ -1,7 +1,7 @@
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates, type DockerfilePromptParams } from '@/prompts/templates';
-import { applyPolicyConstraints } from '@/config/policy-prompt';
+import { buildPolicyConstraints } from '@/config/policy-prompt';
 import { enhancePrompt } from '../knowledge-helper';
 import { generateDockerfileSchema, type GenerateDockerfileParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
@@ -31,10 +31,14 @@ export async function generateDockerfile(
   });
 
   // Apply policy constraints
-  const constrained = applyPolicyConstraints(enhancedPrompt, {
+  const constraints = buildPolicyConstraints({
     tool: 'generate-dockerfile',
     environment: validatedParams.environment || 'production',
   });
+  const constrained =
+    constraints.length > 0
+      ? `${enhancedPrompt}\n\nPolicy Constraints:\n${constraints.join('\n')}`
+      : enhancedPrompt;
 
   // Execute via AI
   const response = await context.sampling.createMessage({

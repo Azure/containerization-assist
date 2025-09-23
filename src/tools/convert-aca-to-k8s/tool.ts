@@ -1,6 +1,6 @@
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import { applyPolicyConstraints } from '@/config/policy-prompt';
+import { buildPolicyConstraints } from '@/config/policy-prompt';
 import { enhancePrompt } from '../knowledge-helper';
 import { convertAcaToK8sSchema, type ConvertAcaToK8sParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
@@ -33,10 +33,14 @@ Maintain all configurations and ensure compatibility with standard Kubernetes cl
   });
 
   // Apply policy constraints
-  const constrained = applyPolicyConstraints(enhancedPrompt, {
+  const constraints = buildPolicyConstraints({
     tool: 'convert-aca-to-k8s',
     environment: 'production',
   });
+  const constrained =
+    constraints.length > 0
+      ? `${enhancedPrompt}\n\nPolicy Constraints:\n${constraints.join('\n')}`
+      : enhancedPrompt;
 
   // Execute via AI
   const response = await context.sampling.createMessage({

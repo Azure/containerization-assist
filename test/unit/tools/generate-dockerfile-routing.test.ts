@@ -30,7 +30,7 @@ jest.mock('../../../src/lib/ai-knowledge-enhancer', () => ({
 
 // Mock policy prompt
 jest.mock('../../../src/config/policy-prompt', () => ({
-  applyPolicyConstraints: jest.fn((prompt) => prompt),
+  buildPolicyConstraints: jest.fn(() => []),
 }));
 
 const mockFs = fs as jest.Mocked<typeof fs>;

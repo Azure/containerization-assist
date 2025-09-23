@@ -1,7 +1,7 @@
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates } from '@/prompts/templates';
-import { applyPolicyConstraints } from '@/config/policy-prompt';
+import { buildPolicyConstraints } from '@/config/policy-prompt';
 import { enhancePrompt } from '../knowledge-helper';
 import { fixDockerfileSchema, type FixDockerfileParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
@@ -29,10 +29,14 @@ export async function fixDockerfile(
   });
 
   // Apply policy constraints
-  const constrained = applyPolicyConstraints(enhancedPrompt, {
+  const constraints = buildPolicyConstraints({
     tool: 'fix-dockerfile',
     environment,
   });
+  const constrained =
+    constraints.length > 0
+      ? `${enhancedPrompt}\n\nPolicy Constraints:\n${constraints.join('\n')}`
+      : enhancedPrompt;
 
   // Execute via AI
   const response = await context.sampling.createMessage({

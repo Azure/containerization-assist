@@ -60,13 +60,13 @@
         ]
       },
       "deadcode": {
-        "count": 284
+        "count": 299
       },
       "typescript": {
         "errors": 0
       },
       "build": {
-        "timeMs": 6000,
+        "timeMs": 15000,
         "mode": "clean",
         "environment": {
           "nodeVersion": "v24.1.0",

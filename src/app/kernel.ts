@@ -19,7 +19,9 @@
 import { z } from 'zod';
 import { type Result, Success, Failure } from '@/types/index';
 import { createLogger } from '@/lib/logger';
-import { loadPolicy, applyPolicy, type UnifiedPolicy } from '@/config/policy';
+import { loadPolicy } from '@/config/policy-io';
+import { applyPolicy } from '@/config/policy-eval';
+import type { Policy as UnifiedPolicy } from '@/config/policy-schemas';
 import { executeSimpleTool, canExecuteSimply } from '@/mcp/simple-executor';
 import type {
   Kernel,
