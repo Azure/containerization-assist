@@ -73,6 +73,28 @@ export function buildPolicyConstraints(context: { tool: string; environment: str
 }
 
 /**
+ * Apply policy constraints to an AI prompt (compatibility function).
+ * This function maintains backward compatibility with the existing tools.
+ *
+ * @param prompt - The original prompt to constrain
+ * @param context - Context for building constraints
+ * @returns The prompt with constraints appended
+ */
+export function applyPolicyConstraints(prompt: string, context: PolicyPromptContext): string {
+  const constraints = buildPolicyConstraints({
+    tool: context.tool,
+    environment: context.environment || 'development',
+  });
+
+  if (constraints.length === 0) {
+    return prompt;
+  }
+
+  // Append constraints to the prompt
+  return `${prompt}\n\n${constraints.join('\n')}`;
+}
+
+/**
  * Get policy summary for logging/debugging
  */
 export function getPolicySummary(environment?: string): string {

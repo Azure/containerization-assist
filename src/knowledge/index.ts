@@ -1,9 +1,6 @@
 /**
- * Knowledge Base System
- *
- * Provides containerization best practices and recommendations
+ * Knowledge Base – minimal public API
  */
-
 export type {
   KnowledgeEntry,
   KnowledgeQuery,
@@ -12,10 +9,7 @@ export type {
   LoadedEntry,
   CompilationStats,
 } from './types';
-
 export { KnowledgeEntrySchema, KnowledgeQuerySchema } from './schemas';
-export type { ValidatedKnowledgeEntry, ValidatedKnowledgeQuery } from './schemas';
-
 export {
   loadKnowledgeBase,
   getEntryById,
@@ -29,32 +23,16 @@ export {
 export { findKnowledgeMatches, evaluateEntry } from './matcher';
 
 import { findKnowledgeMatches } from './matcher';
-import {
-  loadKnowledgeBase as loadKnowledgeBaseInternal,
-  getAllEntries as getAllEntriesInternal,
-  getKnowledgeStats as getKnowledgeStatsInternal,
-  isKnowledgeLoaded as isKnowledgeLoadedInternal,
-} from './loader';
+import { loadKnowledgeBase, getAllEntries, isKnowledgeLoaded } from './loader';
 import type { KnowledgeQuery, KnowledgeMatch, KnowledgeStats } from './types';
 
-/**
- * High-level function to get knowledge recommendations
- */
 export async function getKnowledgeRecommendations(
   query: KnowledgeQuery,
 ): Promise<KnowledgeMatch[]> {
-  // Ensure knowledge is loaded
-  if (!isKnowledgeLoadedInternal()) {
-    await loadKnowledgeBaseInternal();
-  }
-
-  const entries = getAllEntriesInternal();
-  return findKnowledgeMatches(entries, query);
+  if (!isKnowledgeLoaded()) await loadKnowledgeBase();
+  return findKnowledgeMatches(getAllEntries(), query);
 }
 
-/**
- * Get knowledge recommendations for a specific category
- */
 export async function getKnowledgeForCategory(
   category: 'dockerfile' | 'kubernetes' | 'security',
   text?: string,
@@ -68,24 +46,15 @@ export async function getKnowledgeForCategory(
     ...(context?.environment && { environment: context.environment }),
     limit: 5,
   };
-
   return getKnowledgeRecommendations(query);
 }
 
-/**
- * Get knowledge base statistics
- */
 export async function getKnowledgeStats(): Promise<KnowledgeStats> {
-  if (!isKnowledgeLoadedInternal()) {
-    await loadKnowledgeBaseInternal();
-  }
-
-  return getKnowledgeStatsInternal();
+  if (!isKnowledgeLoaded()) await loadKnowledgeBase();
+  const { getKnowledgeStats: stats } = await import('./loader');
+  return stats();
 }
 
-/**
- * Initialize the knowledge base (call this on startup)
- */
 export async function initializeKnowledge(): Promise<void> {
-  await loadKnowledgeBaseInternal();
+  await loadKnowledgeBase();
 }

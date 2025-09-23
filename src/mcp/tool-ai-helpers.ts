@@ -253,7 +253,7 @@ function extractKnowledgeContext(
 
   // Extract additional tags
   if (Array.isArray(promptArgs.tags)) {
-    context.tags = promptArgs.tags.filter((tag) => typeof tag === 'string') as string[];
+    context.tags = promptArgs.tags.filter((tag): tag is string => typeof tag === 'string');
   }
 
   return context;
