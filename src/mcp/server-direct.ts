@@ -9,6 +9,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import { extractErrorMessage } from '@/lib/error-utils';
 import type { Kernel } from '@/app/kernel';
 import { createLogger, type Logger } from '@/lib/logger';
@@ -66,44 +67,27 @@ const registerHandlers = async (state: MCPServerState): Promise<void> => {
     let schemaShape: Record<string, any> = {};
 
     if (tool.schema) {
-      const schemaAny = tool.schema as any;
+      // Helper function to extract shape from schema
+      const extractShape = (schema: any): Record<string, any> | null => {
+        if (schema instanceof z.ZodObject) {
+          return schema.shape;
+        } else if (schema instanceof z.ZodEffects) {
+          // ZodEffects wraps another schema
+          return extractShape(schema.innerType());
+        } else if ('shape' in schema && typeof schema.shape === 'object') {
+          // Fallback: if it has a shape property, use it
+          return schema.shape as Record<string, any>;
+        }
+        return null;
+      };
 
-      // Check internal Zod type definition for better compatibility
-      if (schemaAny._def?.typeName === 'ZodObject') {
-        // Direct ZodObject
-        schemaShape = schemaAny.shape;
-      } else if (schemaAny._def?.typeName === 'ZodEffects') {
-        // ZodEffects (refinements, transforms, preprocess, etc.)
-        // Recursively unwrap to find the base ZodObject
-        let innerSchema = schemaAny._def.schema;
-        while (innerSchema?._def?.typeName === 'ZodEffects') {
-          innerSchema = innerSchema._def.schema;
-        }
-        if (innerSchema?._def?.typeName === 'ZodObject') {
-          schemaShape = innerSchema.shape;
-        } else {
-          state.logger.warn(
-            { tool: name, schemaType: innerSchema?._def?.typeName || 'unknown' },
-            'Tool schema is wrapped but does not resolve to ZodObject',
-          );
-        }
-      } else if (schemaAny._def?.typeName === 'ZodPipeline') {
-        // ZodPipeline (transform chains)
-        const inSchema = schemaAny._def.in;
-        if (inSchema?._def?.typeName === 'ZodObject') {
-          schemaShape = inSchema.shape;
-        }
-      } else if (
-        'shape' in tool.schema &&
-        typeof tool.schema.shape === 'object' &&
-        tool.schema.shape !== null
-      ) {
-        // Fallback: if it has a shape property, use it (for compatibility)
-        schemaShape = tool.schema.shape as Record<string, any>;
+      const shape = extractShape(tool.schema);
+      if (shape) {
+        schemaShape = shape;
       } else {
         // Log warning for non-standard schema types
         state.logger.warn(
-          { tool: name, schemaType: schemaAny._def?.typeName || 'unknown' },
+          { tool: name, schemaType: tool.schema.constructor.name || 'unknown' },
           'Tool has non-standard Zod schema type, using empty schema shape',
         );
       }

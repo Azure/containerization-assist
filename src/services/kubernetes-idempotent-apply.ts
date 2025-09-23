@@ -377,6 +377,7 @@ export function createIdempotentApply(logger: Logger, kubeconfig?: string) {
  */
 export function parseManifests(yamlContent: string): K8sResource[] {
   try {
+    // In js-yaml v4, loadAll is safe by default (no code execution)
     const docs = yaml.loadAll(yamlContent);
     return docs.filter((doc: any) => doc?.kind && doc.apiVersion) as K8sResource[];
   } catch {

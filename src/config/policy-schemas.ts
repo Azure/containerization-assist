@@ -113,7 +113,7 @@ export interface Policy {
   environments?: Record<
     string,
     {
-      defaults?: EnvironmentDefaults;
+      defaults?: UnifiedDefaults;
       overrides?: EnvironmentOverride[];
     }
   >;
@@ -264,7 +264,7 @@ export const PolicySchema = z.object({
   environments: z
     .record(
       z.object({
-        defaults: EnvironmentDefaultsSchema.optional(),
+        defaults: UnifiedDefaultsSchema.optional(),
         overrides: z.array(EnvironmentOverrideSchema).optional(),
       }),
     )

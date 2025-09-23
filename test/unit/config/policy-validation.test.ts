@@ -473,11 +473,13 @@ describe('Policy System', () => {
       }
     });
 
-    it('should handle missing policy file', () => {
+    it('should always return the TypeScript config', () => {
+      // Now that we use TypeScript config, loadPolicy always succeeds
       const result = loadPolicy('/non/existent/policy.yaml');
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toContain('not found');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value).toBeDefined();
+        expect(result.value.version).toBe('2.0');
       }
     });
   });

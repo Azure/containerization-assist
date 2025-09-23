@@ -1,5 +1,4 @@
-Unused files (6)
-scripts/post-build.js                     
+Unused files (5)
 src/lib/string-validators.ts              
 src/mcp/middleware/session-middleware.ts  
 src/mcp/router.ts                         
@@ -8,7 +7,7 @@ src/types/result-types.ts
 Unused devDependencies (2)
 tsc-alias  package.json:219:6
 tshy       package.json:220:6
-Unused exports (80)
+Unused exports (81)
 ApplicationKernel              class     src/app/kernel.ts:400:14                      
 DefaultProgressReporter                  src/app/kernel.ts:809:26                      
 DefaultTelemetrySystem                   src/app/kernel.ts:810:27                      
@@ -20,8 +19,8 @@ getToolConstraints             function  src/config/policy-constraints.ts:127:17
 getProductionConstraints       function  src/config/policy-constraints.ts:131:17       
 getCategoryConstraints         function  src/config/policy-constraints.ts:141:17       
 formatConstraintsPrompt        function  src/config/policy-constraints.ts:179:17       
-clearPolicyCache               function  src/config/policy-io.ts:35:17                 
-refreshPolicy                  function  src/config/policy-io.ts:39:17                 
+clearPolicyCache               function  src/config/policy-io.ts:34:17                 
+refreshPolicy                  function  src/config/policy-io.ts:38:17                 
 RegexMatcherSchema                       src/config/policy-schemas.ts:127:14           
 FunctionMatcherSchema                    src/config/policy-schemas.ts:134:14           
 MatcherSchema                            src/config/policy-schemas.ts:140:14           
@@ -66,6 +65,7 @@ envVar                                   src/tools/shared/schemas.ts:81:14
 getQualityGrade                function  src/types/categories.ts:109:17                
 getSecurityGrade               function  src/types/categories.ts:120:17                
 ENVIRONMENT_PROFILES                     src/types/categories.ts:132:14                
+isSuccess                                src/types/core.ts:38:14                       
 isFailure                                src/types/core.ts:41:14                       
 getDockerfileRules                       src/validation/dockerfile-validator.ts:466:14 
 getDockerfileRulesByCategory             src/validation/dockerfile-validator.ts:473:14 
@@ -133,8 +133,8 @@ ContextOptions              interface  src/mcp/context.ts:164:18
 PromptBackedToolConfig      interface  src/mcp/prompt-backed-tool.ts:26:18              
 PromptToolExecutionOptions  interface  src/mcp/prompt-backed-tool.ts:50:18              
 PromptToolResult            interface  src/mcp/prompt-backed-tool.ts:67:18              
-ServerOptions               interface  src/mcp/server-direct.ts:19:18                   
-MCPServerState              interface  src/mcp/server-direct.ts:31:18                   
+ServerOptions               interface  src/mcp/server-direct.ts:20:18                   
+MCPServerState              interface  src/mcp/server-direct.ts:32:18                   
 Tool                        type       src/mcp/server.ts:13:14                          
 Result                      type       src/mcp/server.ts:13:20                          
 Success                     type       src/mcp/server.ts:13:28                          
@@ -199,3 +199,4 @@ ValidationGrade             type       src/validation/index.ts:28:22
 DockerfileValidationRule    type       src/validation/index.ts:29:19                    
 KubernetesValidationRule    type       src/validation/index.ts:30:28                    
 Validator                   type       src/validation/pipeline.ts:11:13                 
+Configuration hints (1)

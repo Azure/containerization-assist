@@ -161,7 +161,7 @@ class SmartBuilder {
   private async buildESM() {
     this.stats.phase = 'building-esm';
     await this.runCommand(
-      'tsc && tsc-alias -f && node scripts/post-build.js',
+      'tsc && tsc-alias -f',
       'Build ESM'
     );
   }
@@ -169,7 +169,7 @@ class SmartBuilder {
   private async buildCJS() {
     this.stats.phase = 'building-cjs';
     await this.runCommand(
-      'tsc -p tsconfig.cjs.json && tsc-alias -p tsconfig.cjs.json -f && node scripts/fix-cjs-imports.cjs',
+      'tsc -p tsconfig.cjs.json && tsc-alias -p tsconfig.cjs.json -f',
       'Build CJS'
     );
   }

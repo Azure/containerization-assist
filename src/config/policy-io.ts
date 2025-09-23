@@ -1,14 +1,13 @@
 /**
  * Policy IO - lean cache + strict validation
  */
-import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as yaml from 'js-yaml';
 import { z } from 'zod';
 import { type Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { createLogger } from '@/lib/logger';
 import { type Policy, PolicySchema } from './policy-schemas';
+import { policyConfig } from '../../config/policy';
 
 const log = createLogger().child({ module: 'policy-io' });
 
@@ -87,11 +86,9 @@ export function loadPolicy(file: string, env?: string): Result<Policy> {
       log.debug({ file, env }, 'Using cached policy');
       return Success(cached);
     }
-    if (!fs.existsSync(file)) return Failure(`Policy file not found: ${file}`);
 
-    const raw = fs.readFileSync(file, 'utf8');
-    const yamlObj = yaml.load(raw);
-    const base = validatePolicy(yamlObj);
+    // Use the TypeScript config directly
+    const base = validatePolicy(policyConfig);
     if (!base.ok) return base;
 
     const resolved = env ? resolveEnvironment(base.value, env) : base.value;

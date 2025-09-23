@@ -6,6 +6,9 @@
 
 import type { Logger } from 'pino';
 
+// Configuration constants
+const DOCKER_HUB_REQUEST_TIMEOUT_MS = 7000; // 7 seconds
+
 export interface ImageMetadata {
   name: string;
   tag: string;
@@ -47,9 +50,9 @@ async function fetchDockerHubMetadata(
     // Docker Hub API endpoint
     const url = `https://hub.docker.com/v2/repositories/${namespace}/${repo}/tags/${tag}`;
 
-    // Create AbortController for 7-second timeout
+    // Create AbortController for timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 7000);
+    const timeoutId = setTimeout(() => controller.abort(), DOCKER_HUB_REQUEST_TIMEOUT_MS);
 
     try {
       const response = await fetch(url, {
@@ -111,7 +114,10 @@ async function fetchDockerHubMetadata(
   } catch (error) {
     // Handle timeout error specifically
     if (error instanceof Error && error.name === 'AbortError') {
-      logger.warn({ imageName, tag }, 'Docker Hub request timed out after 7 seconds');
+      logger.warn(
+        { imageName, tag, timeoutMs: DOCKER_HUB_REQUEST_TIMEOUT_MS },
+        `Docker Hub request timed out after ${DOCKER_HUB_REQUEST_TIMEOUT_MS / 1000} seconds`,
+      );
     } else {
       logger.debug({ error, imageName, tag }, 'Error fetching Docker Hub metadata');
     }

@@ -87,7 +87,7 @@ export function detectSecrets(content: string): string[] {
  */
 export function validateYamlSyntax(content: string): boolean {
   try {
-    // Try to load all documents in the content
+    // In js-yaml v4, loadAll is safe by default (no code execution)
     yaml.loadAll(content);
     return true;
   } catch {
@@ -103,7 +103,7 @@ export function extractK8sResources(content: string): ResourceSpec[] {
   const resources: ResourceSpec[] = [];
 
   try {
-    // Use js-yaml to properly parse all documents
+    // In js-yaml v4, loadAll is safe by default (no code execution)
     const documents = yaml.loadAll(content);
 
     for (const doc of documents) {
