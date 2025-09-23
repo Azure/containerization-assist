@@ -151,8 +151,6 @@ function sendProgressNotification(
   );
 }
 
-// Previously had unused helper functions - removed to fix typecheck errors
-
 /**
  * Extract progress reporter from various input types
  */

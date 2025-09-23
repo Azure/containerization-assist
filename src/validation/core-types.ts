@@ -94,5 +94,3 @@ export interface ValidationConfig {
   severityThreshold: ValidationSeverity;
   categories: ValidationCategory[];
 }
-
-// Validator interface removed - use direct functions instead

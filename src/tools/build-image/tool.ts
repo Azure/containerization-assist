@@ -194,7 +194,7 @@ async function buildImageImpl(
       imageName = 'app:latest',
       tags = [],
       buildArgs = {},
-      platform: _platform,
+      platform,
     } = params;
 
     // Normalize paths to handle Windows separators
@@ -229,7 +229,6 @@ async function buildImageImpl(
     const dockerClient = createDockerClient(logger);
 
     // Determine paths
-    // Use build context path directly - no legacy session fields
     const sessionData = session as SessionData;
     const repoPath = buildContext;
     let finalDockerfilePath = dockerfilePath
@@ -317,7 +316,7 @@ async function buildImageImpl(
       context: repoPath, // Build context is the path parameter
       dockerfile: path.relative(repoPath, finalDockerfilePath), // Dockerfile path relative to context
       buildargs: finalBuildArgs,
-      ...(_platform !== undefined && { platform: _platform }),
+      ...(platform !== undefined && { platform }),
     };
 
     // Add tags if provided

@@ -13,7 +13,6 @@ import { autoDetectDockerSocket } from '@/services/docker-client';
 
 /**
  * Flattened configuration defaults
- * Simplified from nested CONSTANTS object for better maintainability
  * Uses cross-platform utilities for paths
  */
 const DEFAULT_CONFIG = {

@@ -174,9 +174,6 @@ describe('tagImage', () => {
     it('should successfully tag image with repository and tag', async () => {
       const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
-      if (!result.ok) {
-        // (debug statement removed)
-      }
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.success).toBe(true);

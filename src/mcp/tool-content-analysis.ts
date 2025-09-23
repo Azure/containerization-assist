@@ -5,6 +5,8 @@
  * Focused on parsing and validation without AI-specific logic.
  */
 
+import yaml from 'js-yaml';
+
 /**
  * Kubernetes resource specification interface
  */
@@ -81,30 +83,17 @@ export function detectSecrets(content: string): string[] {
 }
 
 /**
- * Validate YAML syntax (basic check)
+ * Validate YAML syntax using js-yaml
  */
 export function validateYamlSyntax(content: string): boolean {
-  // Basic YAML validation
-  if (content.includes('\t')) {
-    return false; // YAML doesn't allow tabs
-  }
-
-  // Check for basic YAML structure
-  if (!content.match(/^[\w-]+:/m) && !content.startsWith('---')) {
+  try {
+    // In js-yaml v4, loadAll is safe by default (no code execution)
+    yaml.loadAll(content);
+    return true;
+  } catch {
+    // Invalid YAML
     return false;
   }
-
-  // Check for consistent indentation
-  const lines = content.split('\n');
-  for (const line of lines) {
-    if (line.trim() === '') continue;
-    const indent = line.match(/^(\s*)/)?.[1]?.length || 0;
-    if (indent % 2 !== 0) {
-      return false; // YAML typically uses 2-space indentation
-    }
-  }
-
-  return true;
 }
 
 /**
@@ -112,54 +101,71 @@ export function validateYamlSyntax(content: string): boolean {
  */
 export function extractK8sResources(content: string): ResourceSpec[] {
   const resources: ResourceSpec[] = [];
-  const documents = content.split(/^---$/m);
 
-  for (const doc of documents) {
-    if (!doc.trim()) continue;
+  try {
+    // In js-yaml v4, loadAll is safe by default (no code execution)
+    const documents = yaml.loadAll(content);
 
-    const spec: ResourceSpec = {};
+    for (const doc of documents) {
+      if (!doc || typeof doc !== 'object') continue;
 
-    // Extract basic fields
-    const kindMatch = doc.match(/^kind:\s*(.+)$/m);
-    if (kindMatch?.[1]) spec.kind = kindMatch[1].trim();
+      const spec: ResourceSpec = {};
+      const docObj = doc as any;
 
-    const apiVersionMatch = doc.match(/^apiVersion:\s*(.+)$/m);
-    if (apiVersionMatch?.[1]) spec.apiVersion = apiVersionMatch[1].trim();
+      // Extract basic fields
+      if (docObj.kind) spec.kind = String(docObj.kind);
+      if (docObj.apiVersion) spec.apiVersion = String(docObj.apiVersion);
 
-    const nameMatch = doc.match(/^\s+name:\s*(.+)$/m);
-    if (nameMatch?.[1]) spec.name = nameMatch[1].trim();
-
-    const namespaceMatch = doc.match(/^\s+namespace:\s*(.+)$/m);
-    if (namespaceMatch?.[1]) spec.namespace = namespaceMatch[1].trim();
-
-    const replicasMatch = doc.match(/^\s+replicas:\s*(\d+)$/m);
-    if (replicasMatch?.[1]) spec.replicas = parseInt(replicasMatch[1], 10);
-
-    // Extract resource specifications
-    if (doc.includes('resources:')) {
-      spec.resources = {};
-
-      const cpuLimitMatch = doc.match(/limits:[\s\S]*?cpu:\s*["']?([^"'\n]+)["']?/);
-      const memLimitMatch = doc.match(/limits:[\s\S]*?memory:\s*["']?([^"'\n]+)["']?/);
-      const cpuRequestMatch = doc.match(/requests:[\s\S]*?cpu:\s*["']?([^"'\n]+)["']?/);
-      const memRequestMatch = doc.match(/requests:[\s\S]*?memory:\s*["']?([^"'\n]+)["']?/);
-
-      if (cpuLimitMatch || memLimitMatch) {
-        spec.resources.limits = {};
-        if (cpuLimitMatch?.[1]) spec.resources.limits.cpu = cpuLimitMatch[1].trim();
-        if (memLimitMatch?.[1]) spec.resources.limits.memory = memLimitMatch[1].trim();
+      // Extract metadata fields
+      if (docObj.metadata) {
+        if (docObj.metadata.name) spec.name = String(docObj.metadata.name);
+        if (docObj.metadata.namespace) spec.namespace = String(docObj.metadata.namespace);
       }
 
-      if (cpuRequestMatch || memRequestMatch) {
-        spec.resources.requests = {};
-        if (cpuRequestMatch?.[1]) spec.resources.requests.cpu = cpuRequestMatch[1].trim();
-        if (memRequestMatch?.[1]) spec.resources.requests.memory = memRequestMatch[1].trim();
+      // Extract spec fields
+      if (docObj.spec) {
+        if (typeof docObj.spec.replicas === 'number') {
+          spec.replicas = docObj.spec.replicas;
+        }
+
+        // Extract resources from containers
+        const containers = docObj.spec.template?.spec?.containers || docObj.spec.containers || [];
+        for (const container of containers) {
+          if (container.resources) {
+            spec.resources = {};
+
+            if (container.resources.limits) {
+              spec.resources.limits = {};
+              if (container.resources.limits.cpu) {
+                spec.resources.limits.cpu = String(container.resources.limits.cpu);
+              }
+              if (container.resources.limits.memory) {
+                spec.resources.limits.memory = String(container.resources.limits.memory);
+              }
+            }
+
+            if (container.resources.requests) {
+              spec.resources.requests = {};
+              if (container.resources.requests.cpu) {
+                spec.resources.requests.cpu = String(container.resources.requests.cpu);
+              }
+              if (container.resources.requests.memory) {
+                spec.resources.requests.memory = String(container.resources.requests.memory);
+              }
+            }
+
+            break; // Take resources from first container only
+          }
+        }
+      }
+
+      if (Object.keys(spec).length > 0) {
+        resources.push(spec);
       }
     }
-
-    if (Object.keys(spec).length > 0) {
-      resources.push(spec);
-    }
+  } catch {
+    // If YAML parsing fails, return empty array
+    return [];
   }
 
   return resources;

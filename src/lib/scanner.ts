@@ -1,8 +1,7 @@
 /**
  * Security Scanner - Direct Scanner Integration
  *
- * Simplified security scanning operations using direct scanner integration
- * Removes unnecessary wrapper complexity while maintaining core functionality
+ * Security scanning operations using direct scanner integration
  */
 
 import type { Logger } from 'pino';

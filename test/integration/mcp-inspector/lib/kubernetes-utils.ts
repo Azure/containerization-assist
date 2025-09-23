@@ -7,7 +7,7 @@ import { spawn } from 'child_process';
 import { writeFile, unlink, mkdtemp } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import type { DeployResult, K8sManifest, KubernetesValidationResult } from '../../../../src/types/consolidated-types.js';
+import type { DeployResult, K8sManifest, KubernetesValidationResult } from '../../../../src/types/result-types.js';
 
 // Extended interface for Kubernetes deployment results  
 export interface KubernetesDeployResult extends DeployResult {

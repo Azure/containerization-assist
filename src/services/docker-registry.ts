@@ -6,6 +6,9 @@
 
 import type { Logger } from 'pino';
 
+// Configuration constants
+const DOCKER_HUB_REQUEST_TIMEOUT_MS = 7000; // 7 seconds
+
 export interface ImageMetadata {
   name: string;
   tag: string;
@@ -47,45 +50,77 @@ async function fetchDockerHubMetadata(
     // Docker Hub API endpoint
     const url = `https://hub.docker.com/v2/repositories/${namespace}/${repo}/tags/${tag}`;
 
-    const response = await fetch(url, {
-      headers: {
-        Accept: 'application/json',
-      },
-    });
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), DOCKER_HUB_REQUEST_TIMEOUT_MS);
 
-    if (!response.ok) {
-      logger.debug({ imageName, tag, status: response.status }, 'Failed to fetch from Docker Hub');
-      return null;
-    }
+    try {
+      const response = await fetch(url, {
+        headers: {
+          Accept: 'application/json',
+        },
+        signal: controller.signal,
+      });
 
-    const data = (await response.json()) as DockerHubTagResponse;
+      if (!response.ok) {
+        // Handle rate limiting specifically
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('Retry-After');
+          logger.warn(
+            { imageName, tag, retryAfter },
+            'Docker Hub rate limit exceeded. Please try again later.',
+          );
+        } else {
+          logger.debug(
+            { imageName, tag, status: response.status },
+            'Failed to fetch from Docker Hub',
+          );
+        }
+        return null;
+      }
 
-    const metadata: ImageMetadata = {
-      name: imageName,
-      tag,
-    };
+      const data = (await response.json()) as DockerHubTagResponse;
 
-    if (data.digest) {
-      metadata.digest = data.digest;
-    }
-    const size = data.full_size ?? data.size;
-    if (size !== undefined) {
-      metadata.size = size;
-    }
-    const lastUpdated = data.last_updated ?? data.tag_last_pushed;
-    if (lastUpdated !== undefined) {
-      metadata.lastUpdated = lastUpdated;
-    }
-    if (data.images?.[0]?.architecture) {
-      metadata.architecture = data.images[0].architecture;
-    }
-    if (data.images?.[0]?.os) {
-      metadata.os = data.images[0].os;
-    }
+      // Clear the timeout since request succeeded
+      clearTimeout(timeoutId);
 
-    return metadata;
+      const metadata: ImageMetadata = {
+        name: imageName,
+        tag,
+      };
+
+      if (data.digest) {
+        metadata.digest = data.digest;
+      }
+      const size = data.full_size ?? data.size;
+      if (size !== undefined) {
+        metadata.size = size;
+      }
+      const lastUpdated = data.last_updated ?? data.tag_last_pushed;
+      if (lastUpdated !== undefined) {
+        metadata.lastUpdated = lastUpdated;
+      }
+      if (data.images?.[0]?.architecture) {
+        metadata.architecture = data.images[0].architecture;
+      }
+      if (data.images?.[0]?.os) {
+        metadata.os = data.images[0].os;
+      }
+
+      return metadata;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   } catch (error) {
-    logger.debug({ error, imageName, tag }, 'Error fetching Docker Hub metadata');
+    // Handle timeout error specifically
+    if (error instanceof Error && error.name === 'AbortError') {
+      logger.warn(
+        { imageName, tag, timeoutMs: DOCKER_HUB_REQUEST_TIMEOUT_MS },
+        `Docker Hub request timed out after ${DOCKER_HUB_REQUEST_TIMEOUT_MS / 1000} seconds`,
+      );
+    } else {
+      logger.debug({ error, imageName, tag }, 'Error fetching Docker Hub metadata');
+    }
     return null;
   }
 }

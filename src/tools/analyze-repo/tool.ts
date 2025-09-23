@@ -1,8 +1,7 @@
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates } from '@/prompts/templates';
-import { applyPolicyConstraints } from '@/config/policy-prompt';
-import { enhancePrompt } from '../knowledge-helper';
+import { buildMessages, toMCPMessages } from '@/ai/prompt-engine';
 import { analyzeRepoSchema, type AnalyzeRepoParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 
@@ -20,25 +19,23 @@ export async function analyzeRepo(
     directoryTree: `tree ${repoPath}`,
   });
 
-  // Enhance with knowledge base
-  const enhancedPrompt = await enhancePrompt(basePrompt, 'analyze_repository', {
-    environment: 'production',
-  });
-
-  // Apply policy constraints
-  const constrained = applyPolicyConstraints(enhancedPrompt, {
+  // Build messages using the new prompt engine
+  const messages = await buildMessages({
+    basePrompt,
+    topic: 'analyze_repository',
     tool: 'analyze-repo',
     environment: 'production',
+    contract: {
+      name: 'repository_analysis_v1',
+      description: 'Analyze repository structure and return JSON',
+    },
+    knowledgeBudget: 2500,
   });
 
-  // Execute via AI
+  // Execute via AI with structured messages
+  const mcpMessages = toMCPMessages(messages);
   const response = await context.sampling.createMessage({
-    messages: [
-      {
-        role: 'user',
-        content: [{ type: 'text', text: constrained }],
-      },
-    ],
+    ...mcpMessages,
     maxTokens: 4096,
     modelPreferences: {
       hints: [{ name: 'code-analysis' }, { name: 'json-output' }],

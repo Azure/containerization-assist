@@ -190,8 +190,9 @@ function parseManifest(content: string, logger: Logger): KubernetesManifest[] {
   } catch {
     // Parse YAML documents (supports multi-document YAML)
     try {
+      // In js-yaml v4, loadAll is safe by default (no code execution)
       const documents = yaml.loadAll(content);
-      const filtered = documents.filter((doc) => doc !== null && doc !== undefined);
+      const filtered = documents.filter((doc: unknown) => doc !== null && doc !== undefined);
       return validateManifests(filtered, logger);
     } catch (yamlError) {
       logger.error({ error: yamlError }, 'Failed to parse manifests as YAML');

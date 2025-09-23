@@ -5,7 +5,7 @@
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import type { TestResult, PerformanceMetrics } from '../../../../src/types/consolidated-types.js';
+import type { TestResult, PerformanceMetrics } from '../../../../src/types/result-types.js';
 import { extractErrorMessage, formatErrorMessage } from '../../../../src/lib/error-utils.js';
 
 export interface TestCase {
@@ -19,7 +19,7 @@ export interface TestCase {
   tags?: string[];
 }
 
-// Using TestResult and PerformanceMetrics from consolidated types
+// Using TestResult and PerformanceMetrics from result types
 // Additional properties specific to test infrastructure
 export interface TestInfrastructurePerformanceMetrics extends PerformanceMetrics {
   resourceSize?: number;

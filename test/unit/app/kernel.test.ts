@@ -453,7 +453,8 @@ describe('Application Kernel', () => {
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value.sessionId).toMatch(/^session-\d+$/);
+        // Session IDs are now UUIDs
+        expect(result.value.sessionId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
         expect(result.value.completed_steps).toEqual([]);
       }
     });
@@ -516,8 +517,9 @@ describe('Application Kernel', () => {
       expect(listResult.ok).toBe(true);
       if (listResult.ok) {
         expect(listResult.value).toHaveLength(2);
-        expect(listResult.value[0]).toMatch(/^session-\d+$/);
-        expect(listResult.value[1]).toMatch(/^session-\d+$/);
+        // Session IDs are now UUIDs
+        expect(listResult.value[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+        expect(listResult.value[1]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
       }
     });
   });

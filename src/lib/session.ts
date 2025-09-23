@@ -1,5 +1,5 @@
 /**
- * Session Manager - Simplified workflow state persistence
+ * Session Manager - Workflow state persistence
  *
  * Invariant: Sessions expire after TTL to prevent memory leaks
  * Trade-off: In-memory storage for simplicity over persistence
@@ -31,7 +31,7 @@ export interface SessionConfig {
 }
 
 /**
- * Simplified Session Manager using class-based approach
+ * Session Manager using class-based approach
  */
 export class SessionManager {
   private sessions = new Map<string, Session>();

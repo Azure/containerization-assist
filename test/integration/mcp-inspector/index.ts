@@ -37,7 +37,7 @@ export {
   type Capabilities
 } from './lib/environment.js';
 
-// Type Re-exports from Consolidated Types
+// Type Re-exports from Result Types
 export type {
   TestResult,
   PerformanceMetrics,
@@ -45,4 +45,4 @@ export type {
   DeployResult,
   ValidationResult,
   K8sManifest
-} from '../../../src/types/consolidated-types.js';
+} from '../../../src/types/result-types.js';

@@ -1,21 +1,21 @@
 /**
- * Consolidated types for validation and testing results
- * Centralizes duplicate type definitions found across the codebase
+ * Result types for validation, testing, and operation outcomes
+ * Keep this file runtime-safe and decoupled from test paths.
  */
 
-// Re-export validation types from the canonical source
+import type { ValidationResult } from '@/validation/core-types';
+
+// If you also need to re-export the other validation types, do so from the same local module:
 export type {
-  ValidationResult,
+  ValidationResult as CoreValidationResult,
   ValidationReport,
   ValidationSeverity,
   ValidationGrade,
   ValidationCategory,
-} from '@validation/core-types.js';
+} from '@/validation/core-types';
 
-// Import for local use
-import type { ValidationResult } from '@validation/core-types.js';
-
-// Test-specific result types
+// Test-specific result types — keep these generic and runtime-safe.
+// Do not import from test files here; tests can import from src, not the other way around.
 export interface TestResult {
   success: boolean;
   duration: number;
@@ -51,8 +51,6 @@ export interface DeployResult {
   error?: string;
 }
 
-// ValidationResult now imported from canonical source
-
 // Kubernetes manifest type
 export interface K8sManifest {
   apiVersion: string;
@@ -69,15 +67,3 @@ export interface K8sManifest {
 export interface KubernetesValidationResult extends ValidationResult {
   manifest: K8sManifest;
 }
-
-// Re-export extended test infrastructure types for convenience
-export type {
-  TestInfrastructureResult,
-  TestInfrastructurePerformanceMetrics,
-} from '@/../../test/integration/mcp-inspector/infrastructure/test-runner.js';
-
-// Re-export extended Docker types
-export type { DockerBuildResult } from '@/../../test/integration/mcp-inspector/lib/docker-utils.js';
-
-// Re-export extended Kubernetes types
-export type { KubernetesDeployResult } from '@/../../test/integration/mcp-inspector/lib/kubernetes-utils.js';

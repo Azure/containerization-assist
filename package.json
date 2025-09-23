@@ -18,22 +18,140 @@
     "./server": {
       "types": "./dist/src/mcp/server.d.ts",
       "import": "./dist/src/mcp/server.js",
-      "require": "./dist-cjs/src/mcp/server.js"
+      "require": "./dist-cjs/src/mcp/server.js",
+      "default": "./dist/src/mcp/server.js"
     },
     "./tools": {
       "types": "./dist/src/exports/tools.d.ts",
       "import": "./dist/src/exports/tools.js",
-      "require": "./dist-cjs/src/exports/tools.js"
+      "require": "./dist-cjs/src/exports/tools.js",
+      "default": "./dist/src/exports/tools.js"
     },
     "./types": {
-      "types": "./dist/src/domain/types.d.ts",
-      "import": "./dist/src/domain/types.js",
-      "require": "./dist-cjs/src/domain/types.js"
+      "types": "./dist/src/types/index.d.ts",
+      "import": "./dist/src/types/index.js",
+      "require": "./dist-cjs/src/types/index.js",
+      "default": "./dist/src/types/index.js"
     },
     "./config": {
-      "types": "./dist/src/domain/types.d.ts",
-      "import": "./dist/src/domain/types.js",
-      "require": "./dist-cjs/src/domain/types.js"
+      "types": "./dist/src/config/index.d.ts",
+      "import": "./dist/src/config/index.js",
+      "require": "./dist-cjs/src/config/index.js",
+      "default": "./dist/src/config/index.js"
+    },
+    "./lib": {
+      "types": "./dist/src/lib/index.d.ts",
+      "import": "./dist/src/lib/index.js",
+      "require": "./dist-cjs/src/lib/index.js",
+      "default": "./dist/src/lib/index.js"
+    },
+    "./tools/analyze-repo": {
+      "types": "./dist/src/tools/analyze-repo/index.d.ts",
+      "import": "./dist/src/tools/analyze-repo/index.js",
+      "require": "./dist-cjs/src/tools/analyze-repo/index.js",
+      "default": "./dist/src/tools/analyze-repo/index.js"
+    },
+    "./tools/build-image": {
+      "types": "./dist/src/tools/build-image/index.d.ts",
+      "import": "./dist/src/tools/build-image/index.js",
+      "require": "./dist-cjs/src/tools/build-image/index.js",
+      "default": "./dist/src/tools/build-image/index.js"
+    },
+    "./tools/convert-aca-to-k8s": {
+      "types": "./dist/src/tools/convert-aca-to-k8s/index.d.ts",
+      "import": "./dist/src/tools/convert-aca-to-k8s/index.js",
+      "require": "./dist-cjs/src/tools/convert-aca-to-k8s/index.js",
+      "default": "./dist/src/tools/convert-aca-to-k8s/index.js"
+    },
+    "./tools/deploy": {
+      "types": "./dist/src/tools/deploy/index.d.ts",
+      "import": "./dist/src/tools/deploy/index.js",
+      "require": "./dist-cjs/src/tools/deploy/index.js",
+      "default": "./dist/src/tools/deploy/index.js"
+    },
+    "./tools/fix-dockerfile": {
+      "types": "./dist/src/tools/fix-dockerfile/index.d.ts",
+      "import": "./dist/src/tools/fix-dockerfile/index.js",
+      "require": "./dist-cjs/src/tools/fix-dockerfile/index.js",
+      "default": "./dist/src/tools/fix-dockerfile/index.js"
+    },
+    "./tools/generate-aca-manifests": {
+      "types": "./dist/src/tools/generate-aca-manifests/index.d.ts",
+      "import": "./dist/src/tools/generate-aca-manifests/index.js",
+      "require": "./dist-cjs/src/tools/generate-aca-manifests/index.js",
+      "default": "./dist/src/tools/generate-aca-manifests/index.js"
+    },
+    "./tools/generate-dockerfile": {
+      "types": "./dist/src/tools/generate-dockerfile/index.d.ts",
+      "import": "./dist/src/tools/generate-dockerfile/index.js",
+      "require": "./dist-cjs/src/tools/generate-dockerfile/index.js",
+      "default": "./dist/src/tools/generate-dockerfile/index.js"
+    },
+    "./tools/generate-helm-charts": {
+      "types": "./dist/src/tools/generate-helm-charts/index.d.ts",
+      "import": "./dist/src/tools/generate-helm-charts/index.js",
+      "require": "./dist-cjs/src/tools/generate-helm-charts/index.js",
+      "default": "./dist/src/tools/generate-helm-charts/index.js"
+    },
+    "./tools/generate-k8s-manifests": {
+      "types": "./dist/src/tools/generate-k8s-manifests/index.d.ts",
+      "import": "./dist/src/tools/generate-k8s-manifests/index.js",
+      "require": "./dist-cjs/src/tools/generate-k8s-manifests/index.js",
+      "default": "./dist/src/tools/generate-k8s-manifests/index.js"
+    },
+    "./tools/inspect-session": {
+      "types": "./dist/src/tools/inspect-session/index.d.ts",
+      "import": "./dist/src/tools/inspect-session/index.js",
+      "require": "./dist-cjs/src/tools/inspect-session/index.js",
+      "default": "./dist/src/tools/inspect-session/index.js"
+    },
+    "./tools/ops": {
+      "types": "./dist/src/tools/ops/index.d.ts",
+      "import": "./dist/src/tools/ops/index.js",
+      "require": "./dist-cjs/src/tools/ops/index.js",
+      "default": "./dist/src/tools/ops/index.js"
+    },
+    "./tools/prepare-cluster": {
+      "types": "./dist/src/tools/prepare-cluster/index.d.ts",
+      "import": "./dist/src/tools/prepare-cluster/index.js",
+      "require": "./dist-cjs/src/tools/prepare-cluster/index.js",
+      "default": "./dist/src/tools/prepare-cluster/index.js"
+    },
+    "./tools/push-image": {
+      "types": "./dist/src/tools/push-image/index.d.ts",
+      "import": "./dist/src/tools/push-image/index.js",
+      "require": "./dist-cjs/src/tools/push-image/index.js",
+      "default": "./dist/src/tools/push-image/index.js"
+    },
+    "./tools/resolve-base-images": {
+      "types": "./dist/src/tools/resolve-base-images/index.d.ts",
+      "import": "./dist/src/tools/resolve-base-images/index.js",
+      "require": "./dist-cjs/src/tools/resolve-base-images/index.js",
+      "default": "./dist/src/tools/resolve-base-images/index.js"
+    },
+    "./tools/scan": {
+      "types": "./dist/src/tools/scan/index.d.ts",
+      "import": "./dist/src/tools/scan/index.js",
+      "require": "./dist-cjs/src/tools/scan/index.js",
+      "default": "./dist/src/tools/scan/index.js"
+    },
+    "./tools/shared": {
+      "types": "./dist/src/tools/shared/index.d.ts",
+      "import": "./dist/src/tools/shared/index.js",
+      "require": "./dist-cjs/src/tools/shared/index.js",
+      "default": "./dist/src/tools/shared/index.js"
+    },
+    "./tools/tag-image": {
+      "types": "./dist/src/tools/tag-image/index.d.ts",
+      "import": "./dist/src/tools/tag-image/index.js",
+      "require": "./dist-cjs/src/tools/tag-image/index.js",
+      "default": "./dist/src/tools/tag-image/index.js"
+    },
+    "./tools/verify-deployment": {
+      "types": "./dist/src/tools/verify-deployment/index.d.ts",
+      "import": "./dist/src/tools/verify-deployment/index.js",
+      "require": "./dist-cjs/src/tools/verify-deployment/index.js",
+      "default": "./dist/src/tools/verify-deployment/index.js"
     }
   },
   "bin": {
@@ -49,36 +167,26 @@
   ],
   "scripts": {
     "clean": "rm -rf dist dist-cjs coverage .tsbuildinfo*",
-    "build": "npm run build:esm && npm run build:cjs",
-    "build:esm": "tsc && tsc-alias -f && node scripts/post-build.js",
-    "build:cjs": "tsc -p tsconfig.cjs.json && tsc-alias -p tsconfig.cjs.json -f && node scripts/fix-cjs-imports.cjs",
-    "build:fast": "tsc && tsc-alias -f",
-    "build:watch": "tsc -w",
+    "build": "tsx scripts/smart-build.ts --parallel --skip-tests",
+    "build:watch": "tsx scripts/smart-build.ts --parallel --watch",
     "dev": "tsx watch src/cli/cli.ts",
     "start": "node dist/src/cli/cli.js",
     "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
     "test:unit": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects unit",
     "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage",
-    "test:integration": "tsx test/integration/mcp-inspector/runner.ts --category=integration-flows",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write 'src/**/*.ts'",
-    "format:check": "prettier --check 'src/**/*.ts'",
     "typecheck": "tsc --noEmit",
     "validate": "npm run lint && npm run typecheck && npm run test:unit",
-    "validate:pr": "npm run validate && npm run test:integration",
-    "fix": "npm run lint:fix && npm run format",
-    "quality:check": "./scripts/lint-metrics.sh",
+    "validate:pr": "npm run validate",
+    "fix": "npm run lint:fix && prettier --write 'src/**/*.ts'",
     "quality:gates": "./scripts/quality-gates.sh",
-    "deadcode": "node scripts/deadcode-analysis.cjs",
     "prepack": "node scripts/prepare-cjs-package.cjs",
     "postpack": "node scripts/restore-package.cjs",
     "prepublishOnly": "npm run validate && npm run build",
-    "release": "npm run validate && npm run build && npm publish",
     "prepare": "husky install",
-    "mcp:inspect": "npx @modelcontextprotocol/inspector ./scripts/mcp-start.sh start",
-    "mcp:inspect:mock": "npx @modelcontextprotocol/inspector ./scripts/mcp-start-mock.sh start",
-    "benchmark:knowledge": "tsx scripts/benchmark-knowledge.ts"
+    "mcp:inspect": "npx @modelcontextprotocol/inspector ./scripts/mcp-start.sh start"
   },
   "dependencies": {
     "@kubernetes/client-node": "^1.0.0",
@@ -109,6 +217,7 @@
     "prettier": "^3.1.0",
     "ts-jest": "^29.2.5",
     "tsc-alias": "^1.8.16",
+    "tshy": "^3.0.2",
     "tsx": "^4.7.0",
     "typescript": "^5.3.0",
     "typescript-eslint": "^8.14.0"
@@ -117,6 +226,21 @@
     "src/**/*.ts": [
       "eslint --fix --max-warnings 750",
       "prettier --write"
+    ]
+  },
+  "tshy": {
+    "exports": {
+      ".": "./src/index.ts",
+      "./server": "./src/mcp/server/index.ts",
+      "./tools": "./src/exports/tools.ts",
+      "./tools/analyze-repo": "./src/tools/analyze-repo/index.ts",
+      "./types": "./src/types/index.ts",
+      "./config": "./src/config/index.ts"
+    },
+    "exclude": [
+      "**/*.test.ts",
+      "**/*.spec.ts",
+      "test/**/*"
     ]
   },
   "keywords": [
