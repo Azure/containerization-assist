@@ -20,7 +20,7 @@
     "baselines": {
       "lint": {
         "errors": 0,
-        "warnings": 37,
+        "warnings": 36,
         "warningSignatures": [
           "/home/tng/workspace/containerization-assist/src/exports/container-assist.ts:136:95:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/exports/container-assist.ts:138:33:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
@@ -41,13 +41,12 @@
           "/home/tng/workspace/containerization-assist/src/services/kubernetes-idempotent-apply.ts:279:38:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/services/kubernetes-idempotent-apply.ts:299:21:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/services/kubernetes-idempotent-apply.ts:381:30:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/deploy/tool.ts:237:51:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/deploy/tool.ts:238:44:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/deploy/tool.ts:241:51:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/deploy/tool.ts:242:44:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/deploy/tool.ts:238:51:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/deploy/tool.ts:239:44:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/deploy/tool.ts:242:51:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/deploy/tool.ts:243:44:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/tools/inspect-session/tool.ts:156:40:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/tools/inspect-session/tool.ts:180:38:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/knowledge-helper.ts:77:56:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/validation/dockerfile-validator.ts:263:19:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/validation/kubernetes-validator.ts:42:35:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/validation/kubernetes-validator.ts:45:28:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
@@ -62,7 +61,7 @@
         ]
       },
       "deadcode": {
-        "count": 311
+        "count": 257
       },
       "typescript": {
         "errors": 0

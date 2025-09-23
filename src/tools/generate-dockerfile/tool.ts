@@ -1,8 +1,7 @@
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates, type DockerfilePromptParams } from '@/prompts/templates';
-import { buildPolicyConstraints } from '@/config/policy-prompt';
-import { enhancePrompt } from '../knowledge-helper';
+import { buildMessages, toMCPMessages } from '@/ai/prompt-engine';
 import { generateDockerfileSchema, type GenerateDockerfileParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 
@@ -25,29 +24,23 @@ export async function generateDockerfile(
   } as DockerfilePromptParams;
   const basePrompt = promptTemplates.dockerfile(promptParams);
 
-  // Enhance with knowledge base
-  const enhancedPrompt = await enhancePrompt(basePrompt, 'generate_dockerfile', {
-    environment: validatedParams.environment || 'production',
-  });
-
-  // Apply policy constraints
-  const constraints = buildPolicyConstraints({
+  // Build messages using the new prompt engine
+  const messages = await buildMessages({
+    basePrompt,
+    topic: 'generate_dockerfile',
     tool: 'generate-dockerfile',
     environment: validatedParams.environment || 'production',
+    contract: {
+      name: 'dockerfile_v1',
+      description: 'Generate an optimized Dockerfile',
+    },
+    knowledgeBudget: 3000, // Character budget for knowledge snippets
   });
-  const constrained =
-    constraints.length > 0
-      ? `${enhancedPrompt}\n\nPolicy Constraints:\n${constraints.join('\n')}`
-      : enhancedPrompt;
 
-  // Execute via AI
+  // Execute via AI with structured messages
+  const mcpMessages = toMCPMessages(messages);
   const response = await context.sampling.createMessage({
-    messages: [
-      {
-        role: 'user',
-        content: [{ type: 'text', text: constrained }],
-      },
-    ],
+    ...mcpMessages, // Spreads the MCP-compatible messages
     maxTokens: 8192,
     modelPreferences: {
       hints: [{ name: 'dockerfile-generation' }],

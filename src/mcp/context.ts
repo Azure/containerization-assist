@@ -9,7 +9,6 @@
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Logger } from 'pino';
 import type { SessionManager } from '@/lib/session';
-import type * as promptRegistry from '@/prompts/registry';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { extractProgressReporter } from './context-helpers.js';
 
@@ -157,7 +156,7 @@ export interface ToolContext {
 export type { EnhancedProgressReporter } from './context-helpers.js';
 export { extractProgressToken, createProgressReporter } from './context-helpers.js';
 
-// ===== SIMPLIFIED CONTEXT CREATION =====
+// ===== CONTEXT CREATION =====
 
 /**
  * Options for creating a tool context
@@ -170,7 +169,6 @@ export interface ContextOptions {
   /** Session manager for workflow state tracking */
   sessionManager?: SessionManager;
   /** Prompt registry for template management */
-  promptRegistry?: typeof promptRegistry;
   /** Maximum tokens for sampling (default: 2048) */
   maxTokens?: number;
   /** Stop sequences for sampling */
@@ -209,7 +207,7 @@ export function createToolContext(
         }),
     },
     getPrompt: (name: string, args?: Record<string, unknown>) =>
-      getPromptWithFallback(options.promptRegistry, name, args),
+      getPromptWithFallback(undefined, name, args),
     logger,
     ...(options.sessionManager !== undefined && { sessionManager: options.sessionManager }),
     signal: options.signal,
@@ -325,35 +323,24 @@ async function createSamplingResponse(
 
 // Helper function for prompts with fallback
 async function getPromptWithFallback(
-  promptReg: typeof promptRegistry | undefined,
+  _promptReg: undefined,
   name: string,
-  args?: Record<string, unknown>,
+  _args?: Record<string, unknown>,
 ): Promise<PromptWithMessages> {
-  if (!promptReg) {
-    return {
-      description: 'Prompt not available - no registry',
-      messages: [
-        {
-          role: 'user' as const,
-          content: [
-            {
-              type: 'text' as const,
-              text: `Error: No prompt registry available for prompt '${name}'`,
-            },
-          ],
-        },
-      ],
-    };
-  }
-
-  try {
-    return await promptReg.getPromptWithMessages(name, args);
-  } catch (error) {
-    if (error instanceof Error) {
-      error.message = `getPrompt failed for '${name}': ${error.message}`;
-    }
-    throw error;
-  }
+  return {
+    description: 'Prompt not available - no registry',
+    messages: [
+      {
+        role: 'user' as const,
+        content: [
+          {
+            type: 'text' as const,
+            text: `Error: No prompt registry available for prompt '${name}'`,
+          },
+        ],
+      },
+    ],
+  };
 }
 
 /**
@@ -373,13 +360,11 @@ export function createMCPToolContext(
   request: unknown,
   logger: Logger,
   services: {
-    promptRegistry?: typeof promptRegistry;
     sessionManager?: SessionManager;
   } = {},
 ): ToolContext {
   return createToolContext(server, logger, {
     progress: request, // Will auto-extract progress token
     ...(services.sessionManager !== undefined && { sessionManager: services.sessionManager }),
-    ...(services.promptRegistry !== undefined && { promptRegistry: services.promptRegistry }),
   });
 }

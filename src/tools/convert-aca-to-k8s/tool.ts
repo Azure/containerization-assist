@@ -1,7 +1,6 @@
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import { buildPolicyConstraints } from '@/config/policy-prompt';
-import { enhancePrompt } from '../knowledge-helper';
+import { buildMessages, toMCPMessages } from '@/ai/prompt-engine';
 import { convertAcaToK8sSchema, type ConvertAcaToK8sParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 
@@ -27,29 +26,23 @@ Generate equivalent Kubernetes manifests including:
 
 Maintain all configurations and ensure compatibility with standard Kubernetes clusters.`;
 
-  // Enhance with knowledge base
-  const enhancedPrompt = await enhancePrompt(basePrompt, 'convert_aca_to_k8s', {
-    environment: 'production',
-  });
-
-  // Apply policy constraints
-  const constraints = buildPolicyConstraints({
+  // Build messages using the new prompt engine
+  const messages = await buildMessages({
+    basePrompt,
+    topic: 'convert_aca_to_k8s',
     tool: 'convert-aca-to-k8s',
-    environment: 'production',
+    environment: 'production', // Default environment
+    contract: {
+      name: 'aca_to_k8s_v1',
+      description: 'Convert Azure Container Apps manifests to Kubernetes',
+    },
+    knowledgeBudget: 3000, // Character budget for knowledge snippets
   });
-  const constrained =
-    constraints.length > 0
-      ? `${enhancedPrompt}\n\nPolicy Constraints:\n${constraints.join('\n')}`
-      : enhancedPrompt;
 
-  // Execute via AI
+  // Execute via AI with structured messages
+  const mcpMessages = toMCPMessages(messages);
   const response = await context.sampling.createMessage({
-    messages: [
-      {
-        role: 'user',
-        content: [{ type: 'text', text: constrained }],
-      },
-    ],
+    ...mcpMessages, // Spreads the messages array
     maxTokens: 8192,
     modelPreferences: {
       hints: [{ name: 'kubernetes-conversion' }],

@@ -1,8 +1,7 @@
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates, type HelmChartPromptParams } from '@/prompts/templates';
-import { buildPolicyConstraints } from '@/config/policy-prompt';
-import { enhancePrompt } from '../knowledge-helper';
+import { buildMessages, toMCPMessages } from '@/ai/prompt-engine';
 import { generateHelmChartsSchema, type GenerateHelmChartsParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 
@@ -23,29 +22,23 @@ export async function generateHelmCharts(
   } as HelmChartPromptParams;
   const basePrompt = promptTemplates.helmChart(promptParams);
 
-  // Enhance with knowledge base
-  const enhancedPrompt = await enhancePrompt(basePrompt, 'generate_helm_charts', {
-    environment: 'production',
-  });
-
-  // Apply policy constraints
-  const constraints = buildPolicyConstraints({
+  // Build messages using the new prompt engine
+  const messages = await buildMessages({
+    basePrompt,
+    topic: 'generate_helm_charts',
     tool: 'generate-helm-charts',
-    environment: 'production',
+    environment: validatedParams.environment || 'production',
+    contract: {
+      name: 'helm_chart_v1',
+      description: 'Generate Helm charts for Kubernetes deployments',
+    },
+    knowledgeBudget: 4000, // Character budget for knowledge snippets
   });
-  const constrained =
-    constraints.length > 0
-      ? `${enhancedPrompt}\n\nPolicy Constraints:\n${constraints.join('\n')}`
-      : enhancedPrompt;
 
-  // Execute via AI
+  // Execute via AI with structured messages
+  const mcpMessages = toMCPMessages(messages);
   const response = await context.sampling.createMessage({
-    messages: [
-      {
-        role: 'user',
-        content: [{ type: 'text', text: constrained }],
-      },
-    ],
+    ...mcpMessages, // Spreads the messages array
     maxTokens: 8192,
     modelPreferences: {
       hints: [{ name: 'helm-charts' }],

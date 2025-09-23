@@ -10,9 +10,12 @@ import { Result, Success, Failure } from '@/types';
 import { createConfigurationManager, type ConfigurationManagerInterface } from './sampling-config';
 import { createConfigScoringEngine } from './config-scoring-engine';
 import { createStrategyResolver, type StrategyContext } from './strategy-resolver';
-import type { AIGenerateOptions } from '@/mcp/tool-ai-generation';
+// AI generation moved to prompt-backed-tool
 import type { SamplingCandidate } from '@/lib/sampling';
 import { extractErrorMessage } from './error-utils';
+
+// Define expectation type locally (was in tool-ai-generation)
+type Expectation = 'dockerfile' | 'yaml' | string;
 
 // Global instances (initialized lazily)
 let configManager: ConfigurationManagerInterface | null = null;
@@ -60,7 +63,7 @@ async function ensureInitialized(): Promise<Result<void>> {
  */
 export async function scoreConfigCandidates(
   candidates: string[],
-  expectation: AIGenerateOptions['expectation'],
+  expectation: Expectation,
   environment: string = 'development',
   logger?: Logger,
 ): Promise<Result<SamplingCandidate[]>> {
@@ -262,7 +265,7 @@ export async function validateConfigurationSystem(): Promise<
  */
 export async function quickConfigScore(
   content: string,
-  expectation: AIGenerateOptions['expectation'],
+  expectation: Expectation,
   environment: string = 'development',
 ): Promise<number> {
   const initResult = await ensureInitialized();

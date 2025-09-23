@@ -3,19 +3,12 @@
  */
 
 import { z } from 'zod';
-
-const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
-export const pathSchema = z
-  .string()
-  .describe('Path to the repository to analyze (use forward slashes: /path/to/repo)');
+import { sessionId, path, analysisOptions } from '../shared/schemas';
 
 export const analyzeRepoSchema = z.object({
-  sessionId: sessionIdSchema.optional(),
-  path: pathSchema,
-  depth: z.number().optional().describe('Analysis depth (1-5)'),
-  includeTests: z.boolean().optional().describe('Include test files in analysis'),
-  securityFocus: z.boolean().optional().describe('Focus on security aspects'),
-  performanceFocus: z.boolean().optional().describe('Focus on performance aspects'),
+  sessionId: sessionId.optional(),
+  path,
+  ...analysisOptions,
   dockerfilePaths: z
     .array(z.string())
     .optional()
