@@ -1,6 +1,6 @@
 /**
- * Unified Mock Factory
- * Consolidated mock system for all testing needs
+ * Mock Factory
+ * Mock system for all testing needs
  */
 
 import { jest } from '@jest/globals';
@@ -20,9 +20,9 @@ export interface MockScenario {
 }
 
 /**
- * Unified Mock Factory - Single source for all mocking needs
+ * Mock Factory - Single source for all mocking needs
  */
-export class UnifiedMockFactory {
+export class MockFactory {
   private sessionId: string;
 
   constructor(sessionId: string = nanoid(8)) {
@@ -423,22 +423,22 @@ export class UnifiedMockFactory {
 /**
  * Global factory instance for convenience
  */
-export const unifiedMockFactory = new UnifiedMockFactory();
+export const mockFactory = new MockFactory();
 
 /**
  * Convenience functions for common mocking patterns
  */
-export const mockDocker = (scenario: MockBehavior = 'success') => 
-  unifiedMockFactory.createDockerMock(scenario);
+export const mockDocker = (scenario: MockBehavior = 'success') =>
+  mockFactory.createDockerMock(scenario);
 
-export const mockKubernetes = (clusterType: 'kind' | 'minikube' | 'remote' | 'unavailable' = 'kind') => 
-  unifiedMockFactory.createKubernetesMock(clusterType);
+export const mockKubernetes = (clusterType: 'kind' | 'minikube' | 'remote' | 'unavailable' = 'kind') =>
+  mockFactory.createKubernetesMock(clusterType);
 
-export const mockTrivy = (findings: SecurityFindingsLevel = 'none') => 
-  unifiedMockFactory.createTrivyMock(findings);
+export const mockTrivy = (findings: SecurityFindingsLevel = 'none') =>
+  mockFactory.createTrivyMock(findings);
 
-export const mockTool = <TInput, TOutput>(toolName: string, scenario: MockScenario) => 
-  unifiedMockFactory.createToolMock<TInput, TOutput>(toolName, scenario);
+export const mockTool = <TInput, TOutput>(toolName: string, scenario: MockScenario) =>
+  mockFactory.createToolMock<TInput, TOutput>(toolName, scenario);
 
-export const mockEnvironment = (capabilities: EnvironmentCapabilities) => 
-  unifiedMockFactory.createEnvironmentalMock(capabilities);
+export const mockEnvironment = (capabilities: EnvironmentCapabilities) =>
+  mockFactory.createEnvironmentalMock(capabilities);

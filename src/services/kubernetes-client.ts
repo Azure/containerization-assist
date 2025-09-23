@@ -1,8 +1,7 @@
 /**
  * Kubernetes Client - Direct k8s API Access
  *
- * Simplified Kubernetes operations using direct @kubernetes/client-node integration
- * Removes unnecessary wrapper complexity while maintaining core functionality
+ * Kubernetes operations using direct @kubernetes/client-node integration
  */
 
 import * as k8s from '@kubernetes/client-node';

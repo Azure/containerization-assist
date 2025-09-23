@@ -1,6 +1,6 @@
 /**
  * Policy Validation Tests
- * Tests for the unified policy system
+ * Tests for the policy system
  */
 
 import { describe, it, expect } from '@jest/globals';
@@ -10,20 +10,24 @@ import {
   loadPolicy,
   validatePolicy,
   resolveEnvironment,
+  createDefaultPolicy,
+} from '@/config/policy-io';
+import {
   evaluateMatcher,
   applyPolicy,
   getRuleWeights,
   selectStrategy,
-  createDefaultPolicy,
-  type UnifiedPolicy,
-  type Matcher,
-  type PolicyRule,
-} from '@/config/policy';
+} from '@/config/policy-eval';
+import type {
+  Policy,
+  Matcher,
+  PolicyRule,
+} from '@/config/policy-schemas';
 
 describe('Policy System', () => {
   describe('Policy Validation', () => {
     it('should validate a correct v2.0 policy', () => {
-      const policy: UnifiedPolicy = {
+      const policy: Policy = {
         version: '2.0',
         rules: [
           {
@@ -71,7 +75,7 @@ describe('Policy System', () => {
     });
 
     it('should validate matcher types', () => {
-      const policy: UnifiedPolicy = {
+      const policy: Policy = {
         version: '2.0',
         rules: [
           {
@@ -111,7 +115,7 @@ describe('Policy System', () => {
     });
 
     it('should validate cache configuration', () => {
-      const policy: UnifiedPolicy = {
+      const policy: Policy = {
         version: '2.0',
         rules: [],
         cache: {
@@ -131,7 +135,7 @@ describe('Policy System', () => {
 
   describe('Environment Resolution', () => {
     it('should apply environment overrides', () => {
-      const policy: UnifiedPolicy = {
+      const policy: Policy = {
         version: '2.0',
         rules: [
           {
@@ -164,7 +168,7 @@ describe('Policy System', () => {
     });
 
     it('should disable rules when enabled is false', () => {
-      const policy: UnifiedPolicy = {
+      const policy: Policy = {
         version: '2.0',
         rules: [
           {
@@ -198,7 +202,7 @@ describe('Policy System', () => {
     });
 
     it('should sort rules by priority after resolution', () => {
-      const policy: UnifiedPolicy = {
+      const policy: Policy = {
         version: '2.0',
         rules: [
           {
@@ -322,7 +326,7 @@ describe('Policy System', () => {
 
   describe('Policy Application', () => {
     it('should apply all matching rules', () => {
-      const policy: UnifiedPolicy = {
+      const policy: Policy = {
         version: '2.0',
         rules: [
           {
@@ -365,7 +369,7 @@ describe('Policy System', () => {
     });
 
     it('should require all conditions to match (AND logic)', () => {
-      const policy: UnifiedPolicy = {
+      const policy: Policy = {
         version: '2.0',
         rules: [
           {
@@ -399,7 +403,7 @@ describe('Policy System', () => {
 
   describe('Helper Functions', () => {
     it('should get rule weights', () => {
-      const policy: UnifiedPolicy = {
+      const policy: Policy = {
         version: '2.0',
         rules: [
           { id: 'rule-1', priority: 100, conditions: [], actions: {} },
@@ -415,7 +419,7 @@ describe('Policy System', () => {
     });
 
     it('should select best strategy based on weights', () => {
-      const policy: UnifiedPolicy = {
+      const policy: Policy = {
         version: '2.0',
         rules: [
           { id: 'strategy-1', priority: 100, conditions: [], actions: {} },

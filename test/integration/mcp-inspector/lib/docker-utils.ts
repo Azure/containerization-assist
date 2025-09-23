@@ -7,7 +7,7 @@ import { spawn } from 'child_process';
 import { writeFile, unlink, mkdtemp } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import type { BuildResult } from '../../../../src/types/consolidated-types.js';
+import type { BuildResult } from '../../../../src/types/result-types.js';
 
 export interface BuildConfig {
   dockerfile: string;
@@ -17,7 +17,7 @@ export interface BuildConfig {
   platform?: string;
 }
 
-// Using BuildResult from consolidated types
+// Using BuildResult from result types
 // Extended interface for Docker-specific build results
 export interface DockerBuildResult extends BuildResult {
   imageTag: string;

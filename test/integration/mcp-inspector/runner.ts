@@ -11,8 +11,6 @@ import { createErrorHandlingTests } from './suites/edge-cases/error-handling-tes
 import { createSamplingValidationTests } from './suites/sampling-validation/sampling-tests';
 import { createResourceManagementTests } from './suites/resource-management/resource-tests';
 import { createLoadTestingTests } from './suites/load-testing/concurrent-tests';
-// Workflow tests removed - using intelligent tool routing instead
-// import { createDeploymentPipelineTests } from './suites/integration-flows/deployment-pipeline'; // Disabled - requires K8s cluster
 import { createOrchestratorEventTests } from './suites/orchestrator/event-flow-tests';
 import { createPhaseGateTests } from './suites/orchestrator/phase-gate-tests';
 import { createSamplingDecisionTests } from './suites/sampling/decision-tests';
@@ -37,8 +35,6 @@ async function main() {
     const samplingTests = createSamplingValidationTests(testRunner);
     const resourceTests = createResourceManagementTests(testRunner);
     const loadTests = createLoadTestingTests(testRunner);
-    // Workflow tests removed - using intelligent tool routing instead
-    // const deploymentTests = createDeploymentPipelineTests(testRunner); // Disabled - requires K8s cluster
     const orchestratorEventTests = createOrchestratorEventTests(testRunner);
     const phaseGateTests = createPhaseGateTests(testRunner);
     const samplingDecisionTests = createSamplingDecisionTests(testRunner);
@@ -70,7 +66,7 @@ async function main() {
           testsToRegister = loadTests;
           break;
         case 'integration-flows':
-          testsToRegister = []; // Workflow tests removed - using intelligent tool routing instead
+          testsToRegister = [];
           break;
         case 'orchestrator':
           testsToRegister = [...orchestratorEventTests, ...phaseGateTests];
@@ -86,7 +82,7 @@ async function main() {
           process.exit(1);
       }
     } else {
-      testsToRegister = [...basicTests, ...comprehensiveTests, ...errorHandlingTests, ...samplingTests, ...resourceTests, ...loadTests, /* workflow tests removed */ ...orchestratorEventTests, ...phaseGateTests, ...samplingDecisionTests, ...artifactTests, ...remediationTests];
+      testsToRegister = [...basicTests, ...comprehensiveTests, ...errorHandlingTests, ...samplingTests, ...resourceTests, ...loadTests, ...orchestratorEventTests, ...phaseGateTests, ...samplingDecisionTests, ...artifactTests, ...remediationTests];
     }
 
     testsToRegister.forEach(test => testRunner.register(test));

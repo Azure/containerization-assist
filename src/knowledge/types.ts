@@ -9,7 +9,7 @@ export interface KnowledgeEntry {
   id: string;
 
   /** Main category */
-  category: 'dockerfile' | 'kubernetes' | 'security';
+  category: 'dockerfile' | 'kubernetes' | 'security' | 'generic';
 
   /** Simple regex pattern to match against */
   pattern: string;
@@ -32,7 +32,7 @@ export interface KnowledgeEntry {
 
 export interface KnowledgeQuery {
   /** Category to search in */
-  category?: 'dockerfile' | 'kubernetes' | 'security';
+  category?: 'dockerfile' | 'kubernetes' | 'security' | 'generic';
 
   /** Text to match patterns against */
   text?: string;
@@ -66,7 +66,7 @@ export interface KnowledgeMatch {
 
 export interface LoadedEntry extends KnowledgeEntry {
   /** Precompiled regex patterns for performance */
-  _compiled?: {
+  compiledCache?: {
     pattern: RegExp | null;
     lastCompiled: number;
     compilationError?: string;

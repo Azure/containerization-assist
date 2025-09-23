@@ -12,7 +12,6 @@ import { randomUUID } from 'node:crypto';
 import { extractErrorMessage } from '@/lib/error-utils';
 import type { Kernel } from '@/app/kernel';
 import { createLogger, type Logger } from '@/lib/logger';
-import { z } from 'zod';
 
 /**
  * Server options for configuration
@@ -63,13 +62,51 @@ const registerHandlers = async (state: MCPServerState): Promise<void> => {
 
   // Register each tool from kernel
   for (const [name, tool] of tools) {
-    // Extract schema shape, with validation for non-ZodObject schemas
-    let schemaShape = {};
-    if (tool.schema instanceof z.ZodObject) {
-      schemaShape = tool.schema.shape;
-    } else if (tool.schema) {
-      // Log warning for non-standard schema types
-      state.logger.warn({ tool: name }, 'Tool has non-ZodObject schema, using empty schema shape');
+    // Extract schema shape, with robust handling for different Zod schema types
+    let schemaShape: Record<string, any> = {};
+
+    if (tool.schema) {
+      const schemaAny = tool.schema as any;
+
+      // Check internal Zod type definition for better compatibility
+      if (schemaAny._def?.typeName === 'ZodObject') {
+        // Direct ZodObject
+        schemaShape = schemaAny.shape;
+      } else if (schemaAny._def?.typeName === 'ZodEffects') {
+        // ZodEffects (refinements, transforms, preprocess, etc.)
+        // Recursively unwrap to find the base ZodObject
+        let innerSchema = schemaAny._def.schema;
+        while (innerSchema?._def?.typeName === 'ZodEffects') {
+          innerSchema = innerSchema._def.schema;
+        }
+        if (innerSchema?._def?.typeName === 'ZodObject') {
+          schemaShape = innerSchema.shape;
+        } else {
+          state.logger.warn(
+            { tool: name, schemaType: innerSchema?._def?.typeName || 'unknown' },
+            'Tool schema is wrapped but does not resolve to ZodObject',
+          );
+        }
+      } else if (schemaAny._def?.typeName === 'ZodPipeline') {
+        // ZodPipeline (transform chains)
+        const inSchema = schemaAny._def.in;
+        if (inSchema?._def?.typeName === 'ZodObject') {
+          schemaShape = inSchema.shape;
+        }
+      } else if (
+        'shape' in tool.schema &&
+        typeof tool.schema.shape === 'object' &&
+        tool.schema.shape !== null
+      ) {
+        // Fallback: if it has a shape property, use it (for compatibility)
+        schemaShape = tool.schema.shape as Record<string, any>;
+      } else {
+        // Log warning for non-standard schema types
+        state.logger.warn(
+          { tool: name, schemaType: schemaAny._def?.typeName || 'unknown' },
+          'Tool has non-standard Zod schema type, using empty schema shape',
+        );
+      }
     }
 
     state.server.tool(

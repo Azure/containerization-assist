@@ -49,9 +49,10 @@ describe('Docker Registry Client', () => {
 
       expect(global.fetch).toHaveBeenCalledWith(
         'https://hub.docker.com/v2/repositories/library/node/tags/18-alpine',
-        {
+        expect.objectContaining({
           headers: { Accept: 'application/json' },
-        }
+          signal: expect.any(AbortSignal),
+        })
       );
 
       expect(mockLogger.debug).toHaveBeenCalledWith(
@@ -81,9 +82,10 @@ describe('Docker Registry Client', () => {
 
       expect(global.fetch).toHaveBeenCalledWith(
         'https://hub.docker.com/v2/repositories/myorg/myapp/tags/latest',
-        {
+        expect.objectContaining({
           headers: { Accept: 'application/json' },
-        }
+          signal: expect.any(AbortSignal),
+        })
       );
     });
 
@@ -220,7 +222,10 @@ describe('Docker Registry Client', () => {
 
       expect(global.fetch).toHaveBeenCalledWith(
         'https://hub.docker.com/v2/repositories/library/redis/tags/latest',
-        { headers: { Accept: 'application/json' } }
+        expect.objectContaining({
+          headers: { Accept: 'application/json' },
+          signal: expect.any(AbortSignal),
+        })
       );
     });
 
@@ -232,7 +237,10 @@ describe('Docker Registry Client', () => {
 
       expect(global.fetch).toHaveBeenCalledWith(
         'https://hub.docker.com/v2/repositories/bitnami/redis/tags/7.0',
-        { headers: { Accept: 'application/json' } }
+        expect.objectContaining({
+          headers: { Accept: 'application/json' },
+          signal: expect.any(AbortSignal),
+        })
       );
     });
 
@@ -244,7 +252,10 @@ describe('Docker Registry Client', () => {
 
       expect(global.fetch).toHaveBeenCalledWith(
         'https://hub.docker.com/v2/repositories/registry.io/org/tags/v1.0',
-        { headers: { Accept: 'application/json' } }
+        expect.objectContaining({
+          headers: { Accept: 'application/json' },
+          signal: expect.any(AbortSignal),
+        })
       );
     });
 

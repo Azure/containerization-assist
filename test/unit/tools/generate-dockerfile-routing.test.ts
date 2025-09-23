@@ -23,14 +23,15 @@ jest.mock('../../../src/mcp/tool-session-helpers', () => ({
   getSessionSlice: jest.fn(),
 }));
 
-// Mock AI knowledge enhancer
-jest.mock('../../../src/lib/ai-knowledge-enhancer', () => ({
-  enhancePromptWithKnowledge: jest.fn((prompt) => Promise.resolve({ bestPractices: [] })),
-}));
-
 // Mock policy prompt
 jest.mock('../../../src/config/policy-prompt', () => ({
-  applyPolicyConstraints: jest.fn((prompt) => prompt),
+  buildPolicyConstraints: jest.fn(() => []),
+}));
+
+// Mock prompt engine
+jest.mock('../../../src/ai/prompt-engine', () => ({
+  buildMessages: jest.fn(async () => ({ messages: [{ role: 'user', content: 'test' }] })),
+  toMCPMessages: jest.fn((messages) => messages),
 }));
 
 const mockFs = fs as jest.Mocked<typeof fs>;

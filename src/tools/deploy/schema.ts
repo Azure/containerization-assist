@@ -3,21 +3,15 @@
  */
 
 import { z } from 'zod';
-
-const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
-
-export const environmentSchema = z
-  .enum(['development', 'staging', 'production', 'testing'])
-  .optional()
-  .describe('Target deployment environment');
+import { sessionId, namespaceOptional, replicas, port, environmentFull } from '../shared/schemas';
 
 export const deployApplicationSchema = z.object({
-  sessionId: sessionIdSchema.optional(),
+  sessionId: sessionId.optional(),
   imageId: z.string().optional().describe('Docker image to deploy'),
-  namespace: z.string().optional().describe('Kubernetes namespace'),
-  replicas: z.number().optional().describe('Number of replicas'),
-  port: z.number().optional().describe('Application port'),
-  environment: environmentSchema,
+  namespace: namespaceOptional,
+  replicas,
+  port,
+  environment: environmentFull,
 });
 
 export type DeployApplicationParams = z.infer<typeof deployApplicationSchema>;

@@ -1,8 +1,8 @@
 /**
- * Simple Tool Executor - Direct execution without orchestration
+ * Standalone Tool Executor - Direct execution without orchestration
  *
  * Purpose:
- * Provides a fast path for executing simple tools that don't require:
+ * Provides a fast path for executing tools in standalone mode without:
  * - Dependency resolution
  * - Complex policy enforcement
  * - Multi-step workflows
@@ -17,9 +17,9 @@ import type { Logger } from '@/lib/logger';
 import type { RegisteredTool, ToolContext, ProgressReporter } from '@/app/types';
 
 /**
- * Minimal progress reporter for simple tools
+ * Create a minimal progress reporter for standalone execution
  */
-function createMinimalProgress(logger: Logger): ProgressReporter {
+function createMinimalProgressReporter(logger: Logger): ProgressReporter {
   return {
     start: (message: string) => logger.info(`[START] ${message}`),
     update: (message: string, percentage?: number) => {
@@ -35,14 +35,14 @@ function createMinimalProgress(logger: Logger): ProgressReporter {
 }
 
 /**
- * Execute a simple tool directly without orchestration
+ * Shared tool execution function - single point of execution for all tools
  *
  * @param tool - The tool to execute
  * @param params - Parameters for the tool
  * @param logger - Logger for tracking execution
  * @returns Result of the tool execution
  */
-export async function executeSimpleTool(
+export async function runTool(
   tool: RegisteredTool,
   params: unknown,
   logger: Logger,
@@ -53,16 +53,14 @@ export async function executeSimpleTool(
     // 1. Validate parameters
     const validatedParams = await tool.schema.parseAsync(params);
 
-    // 2. Create minimal context (no session, just basics)
-    // Don't include session properties when they're not available
+    // 2. Create minimal context
     const context: ToolContext = {
       logger: toolLogger,
-      progress: createMinimalProgress(toolLogger),
-      // Explicitly omit session and sessionId for simple execution
+      progress: createMinimalProgressReporter(toolLogger),
     };
 
     // 3. Execute the tool
-    toolLogger.info('Executing simple tool');
+    toolLogger.info('Executing tool');
     const result = await tool.handler(validatedParams, context);
 
     // 4. Log result status

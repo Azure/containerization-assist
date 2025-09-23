@@ -1,5 +1,6 @@
 import { createLogger } from '@/lib/logger';
 import type { KnowledgeQuery, KnowledgeMatch, LoadedEntry } from './types';
+import type { KnowledgeSnippet } from './schemas';
 
 const logger = createLogger().child({ module: 'knowledge-matcher' });
 
@@ -90,20 +91,20 @@ const evaluatePatternMatch = (
   if (!query.text || !entry.pattern) return { score: 0, reasons: [] };
 
   // Use precompiled pattern if available
-  if (entry._compiled?.pattern) {
+  if (entry.compiledCache?.pattern) {
     // Reset regex lastIndex for stateful regex
-    entry._compiled.pattern.lastIndex = 0;
+    entry.compiledCache.pattern.lastIndex = 0;
 
-    if (entry._compiled.pattern.test(query.text)) {
+    if (entry.compiledCache.pattern.test(query.text)) {
       return {
         score: SCORING.PATTERN,
         reasons: ['Pattern match (precompiled)'],
       };
     }
-  } else if (entry._compiled?.compilationError) {
+  } else if (entry.compiledCache?.compilationError) {
     // Pattern failed to compile during load, skip
     logger.debug(
-      { entryId: entry.id, error: entry._compiled.compilationError },
+      { entryId: entry.id, error: entry.compiledCache.compilationError },
       'Skipping entry with compilation error',
     );
   }
@@ -284,3 +285,116 @@ export const findKnowledgeMatches = (
   const limit = query.limit || 5;
   return matches.slice(0, limit);
 };
+
+/**
+ * Options for knowledge snippet retrieval.
+ */
+export interface KnowledgeSnippetOptions {
+  environment: string;
+  tool: string;
+  maxChars?: number;
+  maxSnippets?: number;
+}
+
+/**
+ * Get weighted knowledge snippets for selective injection.
+ *
+ * @param topic - Topic to search for
+ * @param options - Options for snippet selection
+ * @returns Promise resolving to weighted snippets
+ */
+export async function getKnowledgeSnippets(
+  topic: string,
+  options: KnowledgeSnippetOptions,
+): Promise<KnowledgeSnippet[]> {
+  try {
+    // Import loader dynamically to avoid circular dependencies
+    const { loadKnowledgeData } = await import('./loader');
+    const knowledgeData = await loadKnowledgeData();
+
+    // Build query from topic and options
+    const query: KnowledgeQuery = {
+      text: topic,
+      environment: options.environment,
+      tags: [options.tool, topic],
+      limit: options.maxSnippets || 10,
+    };
+
+    // Find matches
+    const matches = findKnowledgeMatches(knowledgeData.entries, query);
+
+    // Convert matches to snippets
+    const snippets: KnowledgeSnippet[] = matches.map((match, index) => ({
+      id: `${match.entry.id}:${index}`,
+      text: formatEntryAsSnippet(match.entry),
+      weight: match.score,
+      ...(match.entry.tags && { tags: match.entry.tags }),
+      category: match.entry.category,
+      source: match.entry.id,
+    }));
+
+    // Apply character budget if specified
+    if (options.maxChars && options.maxChars > 0) {
+      return applyCharacterBudget(snippets, options.maxChars);
+    }
+
+    return snippets;
+  } catch (error) {
+    logger.error({ error, topic, options }, 'Failed to get knowledge snippets');
+    return [];
+  }
+}
+
+/**
+ * Formats a knowledge entry as a concise snippet.
+ *
+ * @param entry - Knowledge entry to format
+ * @returns Formatted snippet text
+ */
+function formatEntryAsSnippet(entry: LoadedEntry): string {
+  const parts: string[] = [];
+
+  // Add recommendation (primary content)
+  parts.push(entry.recommendation);
+
+  // Add example if present and concise
+  if (entry.example && entry.example.length <= 200) {
+    parts.push(`Example: ${entry.example}`);
+  }
+
+  return parts.join(' ');
+}
+
+/**
+ * Apply character budget to snippets, selecting highest weighted ones.
+ *
+ * @param snippets - Snippets to budget
+ * @param maxChars - Maximum character count
+ * @returns Snippets within budget
+ */
+function applyCharacterBudget(snippets: KnowledgeSnippet[], maxChars: number): KnowledgeSnippet[] {
+  const selected: KnowledgeSnippet[] = [];
+  let currentChars = 0;
+
+  // Snippets are already sorted by weight/score
+  for (const snippet of snippets) {
+    const snippetLength = snippet.text.length;
+
+    if (currentChars + snippetLength <= maxChars) {
+      selected.push(snippet);
+      currentChars += snippetLength;
+    } else if (currentChars === 0 && snippetLength > maxChars) {
+      // If first snippet exceeds budget, truncate it
+      selected.push({
+        ...snippet,
+        text: `${snippet.text.substring(0, maxChars - 3)}...`,
+      });
+      break;
+    } else {
+      // Budget exhausted
+      break;
+    }
+  }
+
+  return selected;
+}

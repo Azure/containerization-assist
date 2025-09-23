@@ -70,8 +70,6 @@ describe('Cache', () => {
       expect(cache.get('key1')).toBeUndefined();
     });
 
-    // Note: cleanExpired and updateTTL methods removed in functional implementation
-    // TTL is set at cache creation time and expired entries are cleaned on access
     test('should clean expired entries on access', async () => {
       cache.set('key1', 'value1');
       cache.set('key2', 'value2');
@@ -167,9 +165,6 @@ describe('Cache', () => {
       expect(stats.misses).toBe(0);
     });
   });
-
-  // Note: inspect method removed in functional implementation for simplicity
-  // Use getStats() and size() methods for cache monitoring
 
   describe('enable/disable', () => {
     test('should respect enabled flag at creation', () => {

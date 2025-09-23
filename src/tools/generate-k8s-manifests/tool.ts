@@ -1,8 +1,7 @@
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates, K8sManifestPromptParams } from '@/prompts/templates';
-import { applyPolicyConstraints } from '@/config/policy-prompt';
-import { enhancePrompt } from '../knowledge-helper';
+import { buildMessages, toMCPMessages } from '@/ai/prompt-engine';
 import { generateK8sManifestsSchema, type GenerateK8sManifestsParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 
@@ -42,25 +41,23 @@ export async function generateK8sManifests(
   } as K8sManifestPromptParams;
   const basePrompt = promptTemplates.k8sManifests(promptParams);
 
-  // Enhance with knowledge base
-  const enhancedPrompt = await enhancePrompt(basePrompt, 'generate_k8s_manifests', {
-    environment: 'production',
-  });
-
-  // Apply policy constraints
-  const constrained = applyPolicyConstraints(enhancedPrompt, {
+  // Build messages using the new prompt engine
+  const messages = await buildMessages({
+    basePrompt,
+    topic: 'generate_k8s_manifests',
     tool: 'generate-k8s-manifests',
     environment: 'production',
+    contract: {
+      name: 'kubernetes_manifests_v1',
+      description: 'Generate Kubernetes YAML manifests',
+    },
+    knowledgeBudget: 4000, // Larger budget for K8s manifests
   });
 
-  // Execute via AI
+  // Execute via AI with structured messages
+  const mcpMessages = toMCPMessages(messages);
   const response = await context.sampling.createMessage({
-    messages: [
-      {
-        role: 'user',
-        content: [{ type: 'text', text: constrained }],
-      },
-    ],
+    ...mcpMessages,
     maxTokens: 8192,
     modelPreferences: {
       hints: [{ name: 'kubernetes-manifests' }],
