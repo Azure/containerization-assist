@@ -2,6 +2,7 @@ import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates, type DockerfilePromptParams } from '@/prompts/templates';
 import { applyPolicyConstraints } from '@/config/policy-prompt';
+import { enhancePrompt } from '../knowledge-helper';
 import { generateDockerfileSchema, type GenerateDockerfileParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 
@@ -22,10 +23,15 @@ export async function generateDockerfile(
     multistage,
     baseImage,
   } as DockerfilePromptParams;
-  const prompt = promptTemplates.dockerfile(promptParams);
+  const basePrompt = promptTemplates.dockerfile(promptParams);
+
+  // Enhance with knowledge base
+  const enhancedPrompt = await enhancePrompt(basePrompt, 'generate_dockerfile', {
+    environment: validatedParams.environment || 'production',
+  });
 
   // Apply policy constraints
-  const constrained = applyPolicyConstraints(prompt, {
+  const constrained = applyPolicyConstraints(enhancedPrompt, {
     tool: 'generate-dockerfile',
     environment: validatedParams.environment || 'production',
   });
@@ -57,6 +63,7 @@ export async function generateDockerfile(
 export const metadata = {
   name: 'generate-dockerfile',
   description: 'Generate optimized Dockerfiles for containerization',
-  version: '2.0.0',
+  version: '2.1.0',
   aiDriven: true,
+  knowledgeEnhanced: true,
 };

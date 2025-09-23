@@ -2,6 +2,7 @@ import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates, type HelmChartPromptParams } from '@/prompts/templates';
 import { applyPolicyConstraints } from '@/config/policy-prompt';
+import { enhancePrompt } from '../knowledge-helper';
 import { generateHelmChartsSchema, type GenerateHelmChartsParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 
@@ -20,10 +21,15 @@ export async function generateHelmCharts(
     values: {},
     description,
   } as HelmChartPromptParams;
-  const prompt = promptTemplates.helmChart(promptParams);
+  const basePrompt = promptTemplates.helmChart(promptParams);
+
+  // Enhance with knowledge base
+  const enhancedPrompt = await enhancePrompt(basePrompt, 'generate_helm_charts', {
+    environment: 'production',
+  });
 
   // Apply policy constraints
-  const constrained = applyPolicyConstraints(prompt, {
+  const constrained = applyPolicyConstraints(enhancedPrompt, {
     tool: 'generate-helm-charts',
     environment: 'production',
   });
@@ -55,6 +61,7 @@ export async function generateHelmCharts(
 export const metadata = {
   name: 'generate-helm-charts',
   description: 'Generate Helm charts for Kubernetes deployments',
-  version: '2.0.0',
+  version: '2.1.0',
   aiDriven: true,
+  knowledgeEnhanced: true,
 };

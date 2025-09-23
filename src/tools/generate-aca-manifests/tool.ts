@@ -2,6 +2,7 @@ import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates, type AcaManifestParams } from '@/prompts/templates';
 import { applyPolicyConstraints } from '@/config/policy-prompt';
+import { enhancePrompt } from '../knowledge-helper';
 import { generateAcaManifestsSchema, type GenerateAcaManifestsParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 
@@ -17,18 +18,23 @@ export async function generateAcaManifests(
     appName,
     image: imageId,
     resources: {
-      cpu: cpu?.toString() || '0.5',
-      memory: memory || '1Gi',
+      cpu: cpu?.toString() ?? '0.5',
+      memory: memory ?? '1Gi',
     },
     scaling: {
-      minReplicas: minReplicas || 0,
-      maxReplicas: maxReplicas || 10,
+      minReplicas: minReplicas ?? 0,
+      maxReplicas: maxReplicas ?? 10,
     },
   };
-  const prompt = promptTemplates.acaManifests(promptParams as AcaManifestParams);
+  const basePrompt = promptTemplates.acaManifests(promptParams as AcaManifestParams);
+
+  // Enhance with knowledge base
+  const enhancedPrompt = await enhancePrompt(basePrompt, 'generate_aca_manifests', {
+    environment: 'production',
+  });
 
   // Apply policy constraints
-  const constrained = applyPolicyConstraints(prompt, {
+  const constrained = applyPolicyConstraints(enhancedPrompt, {
     tool: 'generate-aca-manifests',
     environment: 'production',
   });
@@ -60,6 +66,7 @@ export async function generateAcaManifests(
 export const metadata = {
   name: 'generate-aca-manifests',
   description: 'Generate Azure Container Apps manifests',
-  version: '2.0.0',
+  version: '2.1.0',
   aiDriven: true,
+  knowledgeEnhanced: true,
 };

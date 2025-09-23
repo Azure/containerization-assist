@@ -198,5 +198,145 @@
     "severity": "medium",
     "tags": ["node", "logging", "stdout"],
     "description": "Container logs should go to stdout/stderr for proper log aggregation"
+  },
+  {
+    "id": "typescript-compilation-optimization",
+    "category": "dockerfile",
+    "pattern": "tsc.*build",
+    "recommendation": "Optimize TypeScript compilation with proper configuration and caching",
+    "example": "# Use build cache\nRUN npm run build -- --incremental\n# Or with tsc directly\nRUN npx tsc --build --force",
+    "severity": "medium",
+    "tags": ["typescript", "compilation", "performance", "caching"],
+    "description": "TypeScript incremental compilation reduces build times in containers"
+  },
+  {
+    "id": "typescript-type-checking-ci",
+    "category": "dockerfile",
+    "pattern": "typescript|tsc",
+    "recommendation": "Add TypeScript type checking as a separate build step for CI/CD validation",
+    "example": "RUN npm run type-check\n# In package.json: \"type-check\": \"tsc --noEmit\"",
+    "severity": "medium",
+    "tags": ["typescript", "type-checking", "ci", "validation"],
+    "description": "Separate type checking catches errors early without affecting runtime builds"
+  },
+  {
+    "id": "deno-runtime-patterns",
+    "category": "dockerfile",
+    "pattern": "FROM.*deno",
+    "recommendation": "Use Deno with proper security permissions and dependency caching",
+    "example": "FROM denoland/deno:alpine\nWORKDIR /app\nCOPY deps.ts .\nRUN deno cache deps.ts\nCOPY . .\nCMD [\"deno\", \"run\", \"--allow-net\", \"--allow-read\", \"main.ts\"]",
+    "severity": "medium",
+    "tags": ["deno", "security", "permissions", "caching"],
+    "description": "Deno requires explicit permissions and benefits from dependency pre-caching"
+  },
+  {
+    "id": "bun-runtime-optimization",
+    "category": "dockerfile",
+    "pattern": "FROM.*bun|bun install",
+    "recommendation": "Optimize Bun runtime for fast startup and efficient dependency management",
+    "example": "FROM oven/bun:alpine\nWORKDIR /app\nCOPY package.json bun.lockb ./\nRUN bun install --frozen-lockfile --production\nCOPY . .\nCMD [\"bun\", \"run\", \"start\"]",
+    "severity": "medium",
+    "tags": ["bun", "performance", "dependencies", "startup"],
+    "description": "Bun offers faster package installation and JavaScript execution"
+  },
+  {
+    "id": "pnpm-advanced-caching",
+    "category": "dockerfile",
+    "pattern": "pnpm",
+    "recommendation": "Use pnpm with advanced caching strategies for optimal Docker layer efficiency",
+    "example": "# Copy pnpm files for dependency caching\nCOPY pnpm-lock.yaml package.json .npmrc ./\n# Use pnpm fetch for better caching\nRUN pnpm fetch\nCOPY . .\nRUN pnpm install --offline --frozen-lockfile --prod",
+    "severity": "medium",
+    "tags": ["pnpm", "caching", "optimization", "layers"],
+    "description": "pnpm fetch enables better Docker layer caching for dependencies"
+  },
+  {
+    "id": "npm-audit-security-scanning",
+    "category": "security",
+    "pattern": "npm (install|ci)",
+    "recommendation": "Integrate npm audit and Snyk security scanning in container builds",
+    "example": "RUN npm ci --only=production\n# Security scanning\nRUN npm audit --audit-level=moderate\n# Optional: Snyk scanning\n# RUN npx snyk test --severity-threshold=medium",
+    "severity": "high",
+    "tags": ["security", "npm", "audit", "snyk", "vulnerability"],
+    "description": "Security scanning identifies vulnerable dependencies before deployment"
+  },
+  {
+    "id": "esm-module-support",
+    "category": "dockerfile",
+    "pattern": "\"type\":\\s*\"module\"",
+    "recommendation": "Configure proper ESM module support with Node.js flags and package.json settings",
+    "example": "# In package.json: \"type\": \"module\"\nCMD [\"node\", \"--experimental-modules\", \"--es-module-specifier-resolution=node\", \"index.js\"]",
+    "severity": "medium",
+    "tags": ["esm", "modules", "node", "configuration"],
+    "description": "ESM modules require specific Node.js configuration for proper execution"
+  },
+  {
+    "id": "turborepo-monorepo-optimization",
+    "category": "dockerfile",
+    "pattern": "turbo|turborepo",
+    "recommendation": "Optimize Turborepo monorepo builds with proper pruning and caching",
+    "example": "# Use turbo prune for focused builds\nRUN npx turbo prune --scope=@myorg/web --docker\n# Copy pruned package.json files\nCOPY --from=pruned /app/out/json/ .\nRUN npm ci\n# Copy source and build\nCOPY --from=pruned /app/out/full/ .\nRUN npx turbo run build --filter=@myorg/web",
+    "severity": "medium",
+    "tags": ["turborepo", "monorepo", "pruning", "caching"],
+    "description": "Turborepo pruning reduces Docker context size for focused builds"
+  },
+  {
+    "id": "nx-monorepo-optimization",
+    "category": "dockerfile",
+    "pattern": "nx|@nrwl",
+    "recommendation": "Use Nx affected commands and caching for efficient monorepo container builds",
+    "example": "# Install dependencies\nRUN npm ci\n# Build only affected projects\nRUN npx nx affected:build --prod --base=origin/main\n# Or build specific project\nRUN npx nx build myapp --prod",
+    "severity": "medium",
+    "tags": ["nx", "monorepo", "affected", "caching"],
+    "description": "Nx affected builds optimize CI/CD by building only changed projects"
+  },
+  {
+    "id": "node-inspector-debug",
+    "category": "dockerfile",
+    "pattern": "NODE_ENV.*development",
+    "recommendation": "Enable Node.js inspector for debugging in development containers",
+    "example": "# Development debugging\nEXPOSE 9229\nCMD [\"node\", \"--inspect=0.0.0.0:9229\", \"index.js\"]",
+    "severity": "low",
+    "tags": ["node", "debugging", "inspector", "development"],
+    "description": "Node.js inspector enables remote debugging in development containers"
+  },
+  {
+    "id": "node-heap-snapshot",
+    "category": "dockerfile",
+    "pattern": "CMD.*node",
+    "recommendation": "Configure Node.js heap snapshot generation for memory leak debugging",
+    "example": "CMD [\"node\", \"--heapsnapshot-signal=SIGUSR2\", \"--max-old-space-size=${NODE_MEMORY_LIMIT:-512}\", \"index.js\"]",
+    "severity": "low",
+    "tags": ["node", "memory", "debugging", "heap"],
+    "description": "Heap snapshots help diagnose memory leaks in production"
+  },
+  {
+    "id": "node-cluster-mode",
+    "category": "dockerfile",
+    "pattern": "CMD.*node",
+    "recommendation": "Consider cluster mode for CPU-intensive Node.js applications",
+    "example": "# Use PM2 for cluster mode\nRUN npm install -g pm2\nCOPY ecosystem.config.js .\nCMD [\"pm2-runtime\", \"ecosystem.config.js\"]",
+    "severity": "low",
+    "tags": ["node", "cluster", "pm2", "performance"],
+    "description": "Cluster mode utilizes multiple CPU cores for better performance"
+  },
+  {
+    "id": "node-experimental-features",
+    "category": "dockerfile",
+    "pattern": "CMD.*node",
+    "recommendation": "Use stable Node.js features and avoid experimental flags in production",
+    "example": "# Avoid in production:\n# CMD [\"node\", \"--experimental-*\", \"index.js\"]\n# Prefer stable features:\nCMD [\"node\", \"--enable-source-maps\", \"index.js\"]",
+    "severity": "medium",
+    "tags": ["node", "stability", "production", "experimental"],
+    "description": "Experimental Node.js features may be unstable in production environments"
+  },
+  {
+    "id": "node-worker-threads",
+    "category": "dockerfile",
+    "pattern": "worker_threads",
+    "recommendation": "Configure proper resource limits for Node.js worker threads",
+    "example": "ENV UV_THREADPOOL_SIZE=${THREAD_POOL_SIZE:-4}\nCMD [\"node\", \"--max-old-space-size=${NODE_MEMORY_LIMIT:-512}\", \"index.js\"]",
+    "severity": "medium",
+    "tags": ["node", "worker-threads", "performance", "concurrency"],
+    "description": "Worker threads require proper resource configuration for optimal performance"
   }
 ]

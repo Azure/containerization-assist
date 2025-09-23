@@ -20,7 +20,7 @@
     "baselines": {
       "lint": {
         "errors": 0,
-        "warnings": 34,
+        "warnings": 35,
         "warningSignatures": [
           "/home/tng/workspace/containerization-assist/src/exports/container-assist.ts:136:95:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/exports/container-assist.ts:138:33:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
@@ -45,6 +45,7 @@
           "/home/tng/workspace/containerization-assist/src/tools/deploy/tool.ts:242:44:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/tools/inspect-session/tool.ts:156:40:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/tools/inspect-session/tool.ts:180:38:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/knowledge-helper.ts:77:56:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/validation/dockerfile-validator.ts:263:19:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/validation/kubernetes-validator.ts:42:35:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/validation/kubernetes-validator.ts:45:28:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
@@ -59,13 +60,13 @@
         ]
       },
       "deadcode": {
-        "count": 285
+        "count": 284
       },
       "typescript": {
         "errors": 0
       },
       "build": {
-        "timeMs": 9000,
+        "timeMs": 6000,
         "mode": "clean",
         "environment": {
           "nodeVersion": "v24.1.0",

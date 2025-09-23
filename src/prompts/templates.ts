@@ -595,8 +595,8 @@ export function parseAIResponse(
     case 'json':
       try {
         JSON.parse(cleaned);
-      } catch {
-        return Failure('Response is not valid JSON');
+      } catch (e) {
+        return Failure(`Response is not valid JSON: ${e instanceof Error ? e.message : String(e)}`);
       }
       break;
   }

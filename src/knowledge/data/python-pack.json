@@ -198,5 +198,145 @@
     "severity": "medium",
     "tags": ["python", "dependencies", "reproducible"],
     "description": "Pinned versions ensure consistent builds across environments"
+  },
+  {
+    "id": "fastapi-async-optimization",
+    "category": "dockerfile",
+    "pattern": "fastapi.*async",
+    "recommendation": "Optimize FastAPI for async workloads with proper ASGI server configuration",
+    "example": "RUN pip install uvicorn[standard] gunicorn\nCMD [\"gunicorn\", \"-w\", \"4\", \"-k\", \"uvicorn.workers.UvicornWorker\", \"--bind\", \"0.0.0.0:8000\", \"main:app\"]",
+    "severity": "high",
+    "tags": ["fastapi", "async", "uvicorn", "performance"],
+    "description": "Proper ASGI configuration maximizes async FastAPI performance"
+  },
+  {
+    "id": "aiohttp-async-patterns",
+    "category": "dockerfile",
+    "pattern": "aiohttp",
+    "recommendation": "Configure aiohttp with proper connector limits and session management",
+    "example": "# In app code: set connector limits for production\n# aiohttp.ClientSession(connector=aiohttp.TCPConnector(limit=100))\nCMD [\"python\", \"-m\", \"aiohttp.web\", \"-H\", \"0.0.0.0\", \"-P\", \"8080\", \"app:init_app\"]",
+    "severity": "medium",
+    "tags": ["aiohttp", "async", "connectors", "performance"],
+    "description": "Proper aiohttp configuration prevents connection pool exhaustion"
+  },
+  {
+    "id": "poetry-docker-optimization",
+    "category": "dockerfile",
+    "pattern": "poetry",
+    "recommendation": "Use Poetry with Docker-optimized caching and virtual environment management",
+    "example": "ENV POETRY_HOME=\"/opt/poetry\" POETRY_CACHE_DIR=/opt/poetry/cache\nRUN pip install poetry\nCOPY pyproject.toml poetry.lock ./\nRUN poetry config virtualenvs.create false && poetry install --no-dev --no-interaction\nCOPY . .",
+    "severity": "high",
+    "tags": ["poetry", "caching", "optimization", "virtualenv"],
+    "description": "Poetry configuration optimizes dependency management in containers"
+  },
+  {
+    "id": "python-security-scanning-comprehensive",
+    "category": "security",
+    "pattern": "pip install|poetry install",
+    "recommendation": "Implement comprehensive Python security scanning with multiple tools",
+    "example": "# Install security tools\nRUN pip install pip-audit bandit safety\n# Run security scans\nRUN pip-audit --fix --dry-run\nRUN bandit -r . -x tests/\nRUN safety check --json",
+    "severity": "high",
+    "tags": ["security", "pip-audit", "bandit", "safety", "scanning"],
+    "description": "Multi-tool security scanning provides comprehensive vulnerability detection"
+  },
+  {
+    "id": "uv-package-manager",
+    "category": "dockerfile",
+    "pattern": "uv pip|uv install",
+    "recommendation": "Use uv for faster Python package installation and management",
+    "example": "# Install uv\nRUN pip install uv\n# Use uv for faster installs\nCOPY requirements.txt .\nRUN uv pip install --no-cache -r requirements.txt\n# Or with sync\nRUN uv pip sync requirements.txt",
+    "severity": "medium",
+    "tags": ["uv", "performance", "package-manager", "rust"],
+    "description": "uv provides significantly faster Python package installation"
+  },
+  {
+    "id": "pyo3-maturin-rust-extensions",
+    "category": "dockerfile",
+    "pattern": "maturin|pyo3",
+    "recommendation": "Optimize PyO3/Maturin Rust extensions build in multi-stage containers",
+    "example": "FROM rust:alpine AS rust-builder\nRUN apk add --no-cache musl-dev\nCOPY Cargo.toml pyproject.toml ./\nRUN maturin build --release\n\nFROM python:alpine\nCOPY --from=rust-builder /app/target/wheels/*.whl .\nRUN pip install *.whl",
+    "severity": "medium",
+    "tags": ["pyo3", "maturin", "rust", "extensions", "performance"],
+    "description": "Rust extensions provide significant performance improvements for Python"
+  },
+  {
+    "id": "mypy-type-checking-ci",
+    "category": "dockerfile",
+    "pattern": "mypy",
+    "recommendation": "Integrate mypy type checking in CI/CD pipeline for type safety",
+    "example": "RUN pip install mypy\n# Type check during build\nRUN mypy src/ --ignore-missing-imports --strict\n# Or as separate validation step\nRUN python -m mypy --config-file mypy.ini src/",
+    "severity": "medium",
+    "tags": ["mypy", "type-checking", "ci", "validation"],
+    "description": "mypy type checking catches type errors before runtime"
+  },
+  {
+    "id": "asyncio-event-loop-optimization",
+    "category": "dockerfile",
+    "pattern": "asyncio|uvloop",
+    "recommendation": "Use uvloop for better asyncio performance in production",
+    "example": "RUN pip install uvloop\n# In application code:\n# import uvloop\n# uvloop.install()\nENV PYTHONPATH=/app",
+    "severity": "medium",
+    "tags": ["asyncio", "uvloop", "performance", "event-loop"],
+    "description": "uvloop provides 2x+ better performance for asyncio applications"
+  },
+  {
+    "id": "python-distroless-security",
+    "category": "security",
+    "pattern": "FROM.*python",
+    "recommendation": "Consider Google Distroless Python images for enhanced security",
+    "example": "# Multi-stage with distroless\nFROM python:3.11-slim AS builder\nRUN pip install --user -r requirements.txt\n\nFROM gcr.io/distroless/python3-debian11\nCOPY --from=builder /root/.local /root/.local\nCOPY . .\nCMD [\"main.py\"]",
+    "severity": "medium",
+    "tags": ["security", "distroless", "minimal", "attack-surface"],
+    "description": "Distroless images provide minimal attack surface with no shell or package manager"
+  },
+  {
+    "id": "python-multiprocessing-optimization",
+    "category": "dockerfile",
+    "pattern": "multiprocessing|concurrent",
+    "recommendation": "Configure Python multiprocessing for containerized environments",
+    "example": "# Set shared memory size if needed\n# In docker run: --shm-size=2g\nENV PYTHONUNBUFFERED=1\n# Configure multiprocessing start method\nENV MP_START_METHOD=spawn",
+    "severity": "medium",
+    "tags": ["multiprocessing", "concurrency", "performance", "configuration"],
+    "description": "Proper multiprocessing configuration prevents issues in containers"
+  },
+  {
+    "id": "python-profile-guided-optimization",
+    "category": "dockerfile",
+    "pattern": "FROM python:.*optimize",
+    "recommendation": "Use Python PGO (Profile Guided Optimization) builds for performance-critical applications",
+    "example": "FROM python:3.11-slim\n# For PGO Python builds:\n# FROM python:3.11-slim-bullseye\nENV PYTHONOPTIMIZE=2\nRUN python -O -m py_compile /app/*.py",
+    "severity": "low",
+    "tags": ["optimization", "pgo", "performance", "compilation"],
+    "description": "PGO builds can provide 10-20% performance improvements"
+  },
+  {
+    "id": "django-async-views",
+    "category": "dockerfile",
+    "pattern": "django.*async",
+    "recommendation": "Configure Django for async views with proper ASGI deployment",
+    "example": "RUN pip install uvicorn gunicorn\n# Use ASGI for async Django\nCMD [\"gunicorn\", \"myproject.asgi:application\", \"-w\", \"4\", \"-k\", \"uvicorn.workers.UvicornWorker\", \"--bind\", \"0.0.0.0:8000\"]",
+    "severity": "medium",
+    "tags": ["django", "async", "asgi", "performance"],
+    "description": "ASGI deployment enables async Django views and better performance"
+  },
+  {
+    "id": "python-memory-profiling",
+    "category": "dockerfile",
+    "pattern": "memory|profile",
+    "recommendation": "Include memory profiling tools for production debugging",
+    "example": "# Install profiling tools\nRUN pip install memory-profiler pympler\n# Set environment for profiling\nENV PYTHONTRACEMALLOC=1\n# Optional: Install tracemalloc utilities",
+    "severity": "low",
+    "tags": ["memory", "profiling", "debugging", "monitoring"],
+    "description": "Memory profiling tools help identify memory leaks and optimization opportunities"
+  },
+  {
+    "id": "python-dependency-vulnerability-scanning",
+    "category": "security",
+    "pattern": "requirements.*txt|pyproject.toml",
+    "recommendation": "Implement continuous dependency vulnerability monitoring",
+    "example": "# During build\nRUN pip-audit --requirement requirements.txt --format=json --output=audit-results.json\n# Runtime monitoring\nCOPY audit-results.json /app/\n# Consider tools like snyk, sonatype, or dependabot",
+    "severity": "high",
+    "tags": ["security", "dependencies", "monitoring", "vulnerability"],
+    "description": "Continuous vulnerability monitoring ensures ongoing security"
   }
 ]

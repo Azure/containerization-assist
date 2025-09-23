@@ -4,9 +4,19 @@ import type { KnowledgeQuery, KnowledgeMatch } from '@/knowledge/types';
 
 const logger = createLogger().child({ module: 'knowledge-enhancer' });
 
+export type KnowledgeOperation =
+  | 'analyze_repository'
+  | 'generate_dockerfile'
+  | 'fix_dockerfile'
+  | 'generate_k8s_manifests'
+  | 'generate_helm_charts'
+  | 'resolve_base_images'
+  | 'generate_aca_manifests'
+  | 'convert_aca_to_k8s';
+
 export interface PromptEnhancementContext {
   /** The operation being performed */
-  operation: string;
+  operation: KnowledgeOperation | string;
 
   /** Programming language */
   language?: string;
@@ -16,6 +26,9 @@ export interface PromptEnhancementContext {
 
   /** Target environment */
   environment?: string;
+
+  /** Technology stack */
+  technology?: string;
 
   /** Base image being used */
   baseImage?: string;
@@ -42,6 +55,12 @@ export interface EnhancedPromptArgs {
 
   /** Security recommendations */
   securityRecommendations?: string[];
+
+  /** Security guidelines */
+  securityGuidelines?: string[];
+
+  /** Optimization tips */
+  optimizationTips?: string[];
 
   /** Knowledge-based suggestions */
   knowledgeSuggestions?: Array<{
@@ -122,6 +141,16 @@ export async function enhancePromptWithKnowledge(
         .filter((m) => m.entry.category === 'security' || m.entry.tags?.includes('security'))
         .map((m) => m.entry.recommendation);
 
+      // Extract security guidelines (alias for backwards compatibility)
+      enhancedArgs.securityGuidelines = enhancedArgs.securityRecommendations;
+
+      // Extract optimization tips
+      enhancedArgs.optimizationTips = topMatches
+        .filter(
+          (m) => m.entry.tags?.includes('optimization') || m.entry.tags?.includes('performance'),
+        )
+        .map((m) => m.entry.recommendation);
+
       // Create detailed suggestions with context
       enhancedArgs.knowledgeSuggestions = topMatches.map((m) => ({
         recommendation: m.entry.recommendation,
@@ -150,11 +179,14 @@ export async function enhancePromptWithKnowledge(
  */
 function getRelevantCategories(operation: string): Array<'dockerfile' | 'kubernetes' | 'security'> {
   const categoryMap: Record<string, Array<'dockerfile' | 'kubernetes' | 'security'>> = {
+    analyze_repository: ['dockerfile', 'security'],
     generate_dockerfile: ['dockerfile', 'security'],
     fix_dockerfile: ['dockerfile', 'security'],
     generate_k8s_manifests: ['kubernetes', 'security'],
+    generate_helm_charts: ['kubernetes', 'security'],
     resolve_base_images: ['dockerfile'],
-    analyze_repository: ['dockerfile', 'security'],
+    generate_aca_manifests: ['kubernetes', 'security'],
+    convert_aca_to_k8s: ['kubernetes', 'security'],
     validate_dockerfile: ['dockerfile', 'security'],
     validate_k8s: ['kubernetes', 'security'],
   };

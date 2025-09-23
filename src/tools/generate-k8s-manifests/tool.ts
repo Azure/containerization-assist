@@ -2,6 +2,7 @@ import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates, K8sManifestPromptParams } from '@/prompts/templates';
 import { applyPolicyConstraints } from '@/config/policy-prompt';
+import { enhancePrompt } from '../knowledge-helper';
 import { generateK8sManifestsSchema, type GenerateK8sManifestsParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 
@@ -39,10 +40,15 @@ export async function generateK8sManifests(
         }
       : undefined,
   } as K8sManifestPromptParams;
-  const prompt = promptTemplates.k8sManifests(promptParams);
+  const basePrompt = promptTemplates.k8sManifests(promptParams);
+
+  // Enhance with knowledge base
+  const enhancedPrompt = await enhancePrompt(basePrompt, 'generate_k8s_manifests', {
+    environment: 'production',
+  });
 
   // Apply policy constraints
-  const constrained = applyPolicyConstraints(prompt, {
+  const constrained = applyPolicyConstraints(enhancedPrompt, {
     tool: 'generate-k8s-manifests',
     environment: 'production',
   });
@@ -74,6 +80,7 @@ export async function generateK8sManifests(
 export const metadata = {
   name: 'generate-k8s-manifests',
   description: 'Generate Kubernetes deployment manifests',
-  version: '2.0.0',
+  version: '2.1.0',
   aiDriven: true,
+  knowledgeEnhanced: true,
 };
