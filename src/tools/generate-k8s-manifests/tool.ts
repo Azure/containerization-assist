@@ -173,7 +173,7 @@ export async function generateK8sManifests(
         if (manifest.kind === 'Ingress') {
           if (
             typeof manifest.apiVersion === 'string' &&
-            !manifest.apiVersion.includes('networking.k8s.io')
+            !manifest.apiVersion.startsWith('networking.k8s.io/')
           ) {
             context.logger.warn(
               { apiVersion: manifest.apiVersion },
