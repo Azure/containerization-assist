@@ -17,6 +17,7 @@ const createMockServer = (): Server =>
 const createMockLogger = (): Logger =>
   ({
     debug: jest.fn(),
+    info: jest.fn(),
     error: jest.fn(),
     warn: jest.fn(),
     child: jest.fn(() => createMockLogger()),
@@ -303,10 +304,29 @@ describe('ToolContext Bridge', () => {
         'Making sampling request',
       );
 
-      expect(mockLogger.debug).toHaveBeenCalledWith(
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'sampling/createMessage',
+          hasServer: true,
+        }),
+        'About to call createMessage',
+      );
+
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hasResponse: true,
+          hasContent: true,
+          contentType: 'text',
+          textLength: 8, // 'Response' length
+        }),
+        'Received sampling response',
+      );
+
+      expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
           duration: expect.any(Number),
           responseLength: 8, // 'Response' length
+          preview: 'Response',
         }),
         'Sampling request completed',
       );

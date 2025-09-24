@@ -7,6 +7,7 @@ import { promises as fs } from 'node:fs';
 import { generateDockerfile } from '../../../src/tools/generate-dockerfile/tool';
 import type { ToolContext } from '../../../src/mcp/context';
 import { createLogger } from '../../../src/lib/logger';
+import { getSession } from '../../../src/mcp/tool-session-helpers';
 
 // Mock file system
 jest.mock('node:fs', () => ({
@@ -21,6 +22,8 @@ jest.mock('../../../src/mcp/tool-session-helpers', () => ({
   defineToolIO: jest.fn(),
   useSessionSlice: jest.fn(),
   getSessionSlice: jest.fn(),
+  getSession: jest.fn(),
+  updateSession: jest.fn(),
 }));
 
 // Mock policy prompt
@@ -91,6 +94,16 @@ describe('generate-dockerfile smart routing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFs.writeFile.mockResolvedValue(undefined);
+
+    // Setup getSession mock to return empty session by default
+    (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue({
+      ok: true,
+      value: {
+        state: {
+          metadata: {}
+        }
+      } as any
+    });
   });
 
   it('should use template generation for very high confidence detection', async () => {
@@ -102,6 +115,18 @@ describe('generate-dockerfile smart routing', () => {
       dependencies: [{ name: 'express', version: '4.18.0' }],
       ports: [3000],
     };
+
+    // Setup getSession mock to return the analyzeRepoResult
+    (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue({
+      ok: true,
+      value: {
+        state: {
+          metadata: {
+            repositoryAnalysis: analyzeRepoResult
+          }
+        }
+      } as any
+    });
 
     const mockContext = createMockContext(analyzeRepoResult);
 
@@ -138,6 +163,18 @@ describe('generate-dockerfile smart routing', () => {
       ports: [8000],
     };
 
+    // Setup getSession mock to return the analyzeRepoResult
+    (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue({
+      ok: true,
+      value: {
+        state: {
+          metadata: {
+            repositoryAnalysis: analyzeRepoResult
+          }
+        }
+      } as any
+    });
+
     const mockContext = createMockContext(analyzeRepoResult);
 
     const result = await generateDockerfile(
@@ -171,6 +208,18 @@ describe('generate-dockerfile smart routing', () => {
       dependencies: [],
       ports: [],
     };
+
+    // Setup getSession mock to return the analyzeRepoResult
+    (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue({
+      ok: true,
+      value: {
+        state: {
+          metadata: {
+            repositoryAnalysis: analyzeRepoResult
+          }
+        }
+      } as any
+    });
 
     const mockContext = createMockContext(analyzeRepoResult);
 
@@ -206,6 +255,18 @@ describe('generate-dockerfile smart routing', () => {
       dependencies: [{ name: 'react', version: '18.0.0' }],
       ports: [3000],
     };
+
+    // Setup getSession mock to return the analyzeRepoResult
+    (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue({
+      ok: true,
+      value: {
+        state: {
+          metadata: {
+            repositoryAnalysis: analyzeRepoResult
+          }
+        }
+      } as any
+    });
 
     const mockContext = createMockContext(analyzeRepoResult);
 

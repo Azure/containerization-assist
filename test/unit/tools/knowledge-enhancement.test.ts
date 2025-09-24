@@ -31,15 +31,67 @@ jest.mock('@/ai/prompt-engine', () => ({
 jest.mock('node:fs', () => ({
   promises: {
     writeFile: jest.fn().mockResolvedValue(undefined),
+    mkdir: jest.fn().mockResolvedValue(undefined),
   },
 }));
 
+// Mock path module for consistent behavior
+jest.mock('node:path', () => ({
+  ...jest.requireActual('node:path'),
+  resolve: jest.fn((cwd, p) => `/test/${p || ''}`),
+  join: jest.fn((...parts) => parts.join('/')),
+  isAbsolute: jest.fn((p) => p.startsWith('/')),
+}));
+
 describe('Knowledge Enhancement Integration', () => {
+  // Create a mock that returns different responses based on the input
+  const createMessageMock = jest.fn().mockImplementation((params) => {
+    // Check for hints or other parameters to determine the response type
+    const hints = params?.modelPreferences?.hints;
+
+    if (hints?.some((h: any) => h.name === 'json-output' || h.name === 'code-analysis')) {
+      // For analyze-repo - return JSON analysis
+      return Promise.resolve({
+        content: [{ text: JSON.stringify({
+          language: 'JavaScript',
+          framework: 'Express',
+          dependencies: ['express', 'mongodb'],
+          suggestedPorts: [3000],
+          buildSystem: { type: 'npm' },
+          entryPoint: 'server.js'
+        }) }],
+      });
+    } else if (hints?.some((h: any) => h.name === 'kubernetes-manifests')) {
+      // For K8s manifests - return YAML
+      return Promise.resolve({
+        content: [{ text: `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-app
+spec:
+  selector:
+    matchLabels:
+      app: test-app
+  template:
+    metadata:
+      labels:
+        app: test-app
+    spec:
+      containers:
+      - name: test-app
+        image: test:latest` }],
+      });
+    } else {
+      // Default - return Dockerfile for generate-dockerfile and others
+      return Promise.resolve({
+        content: [{ text: 'FROM node:18-alpine\nWORKDIR /app\nCOPY . .\nRUN npm install\nCMD ["npm", "start"]' }],
+      });
+    }
+  });
+
   const mockContext: ToolContext = {
     sampling: {
-      createMessage: jest.fn().mockResolvedValue({
-        content: [{ text: 'FROM node:18-alpine\nWORKDIR /app\nCOPY . .\nRUN npm install\nCMD ["npm", "start"]' }],
-      }),
+      createMessage: createMessageMock,
     },
     session: {
       get: jest.fn(),

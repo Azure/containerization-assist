@@ -1,3 +1,5 @@
+Unused devDependencies (1)
+tsc-alias  package.json:220:6
 Unused exports (81)
 ApplicationKernel              class     src/app/kernel.ts:400:14                       
 DefaultProgressReporter                  src/app/kernel.ts:820:26                       
@@ -43,7 +45,7 @@ optimizationSchema                       src/tools/generate-dockerfile/schema.ts
 securityLevelSchema                      src/tools/generate-dockerfile/schema.ts:22:14  
 metadata                                 src/tools/generate-dockerfile/tool.ts:282:14   
 metadata                                 src/tools/generate-helm-charts/tool.ts:58:14   
-metadata                                 src/tools/generate-k8s-manifests/tool.ts:214:14
+metadata                                 src/tools/generate-k8s-manifests/tool.ts:243:14
 ALL_TOOLS                                src/tools/index.ts:309:14                      
 InspectSessionResultSchema               src/tools/inspect-session/schema.ts:17:14      
 ping                           function  src/tools/ops/tool.ts:39:23                    

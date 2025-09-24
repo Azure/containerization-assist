@@ -8,6 +8,32 @@ import * as yaml from 'js-yaml';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
+// Type definition for Kubernetes manifests
+interface KubernetesManifest extends Record<string, unknown> {
+  apiVersion: string;
+  kind: string;
+  metadata?: {
+    name?: string;
+    namespace?: string;
+    labels?: Record<string, string>;
+    [key: string]: unknown;
+  };
+  spec?: {
+    selector?: {
+      matchLabels?: Record<string, string>;
+      [key: string]: unknown;
+    };
+    template?: {
+      metadata?: {
+        labels?: Record<string, string>;
+        [key: string]: unknown;
+      };
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
+}
+
 export async function generateK8sManifests(
   params: GenerateK8sManifestsParams,
   context: ToolContext,
@@ -83,24 +109,24 @@ export async function generateK8sManifests(
     }
 
     // Parse YAML to validate it
-    const manifests: any[] = [];
+    const manifests: KubernetesManifest[] = [];
     const docs = manifestsContent.split(/^---$/m).filter((doc) => doc.trim());
 
     for (const doc of docs) {
       try {
-        const manifest = yaml.load(doc) as any;
+        const manifest = yaml.load(doc) as KubernetesManifest;
         if (!manifest || typeof manifest !== 'object') {
           context.logger.warn({ doc: doc.substring(0, 100) }, 'Skipping non-object manifest');
           continue;
         }
 
         // Validate essential Kubernetes fields
-        if (!manifest.apiVersion) {
+        if (!manifest.apiVersion || typeof manifest.apiVersion !== 'string') {
           return Failure(
             `Manifest missing apiVersion: ${JSON.stringify(manifest).substring(0, 100)}`,
           );
         }
-        if (!manifest.kind) {
+        if (!manifest.kind || typeof manifest.kind !== 'string') {
           return Failure(`Manifest missing kind: ${JSON.stringify(manifest).substring(0, 100)}`);
         }
         if (!manifest.metadata?.name) {
@@ -109,7 +135,7 @@ export async function generateK8sManifests(
 
         // Validate specific resource types
         if (manifest.kind === 'Deployment') {
-          if (manifest.apiVersion !== 'apps/v1') {
+          if (typeof manifest.apiVersion === 'string' && manifest.apiVersion !== 'apps/v1') {
             context.logger.warn(
               { apiVersion: manifest.apiVersion },
               'Deployment using non-standard API version',
@@ -132,7 +158,7 @@ export async function generateK8sManifests(
         }
 
         if (manifest.kind === 'Service') {
-          if (manifest.apiVersion !== 'v1') {
+          if (typeof manifest.apiVersion === 'string' && manifest.apiVersion !== 'v1') {
             context.logger.warn(
               { apiVersion: manifest.apiVersion },
               'Service using non-standard API version',
@@ -144,7 +170,10 @@ export async function generateK8sManifests(
         }
 
         if (manifest.kind === 'Ingress') {
-          if (!manifest.apiVersion.includes('networking.k8s.io')) {
+          if (
+            typeof manifest.apiVersion === 'string' &&
+            !manifest.apiVersion.includes('networking.k8s.io')
+          ) {
             context.logger.warn(
               { apiVersion: manifest.apiVersion },
               'Ingress using legacy API version',

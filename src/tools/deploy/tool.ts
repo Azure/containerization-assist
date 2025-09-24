@@ -234,18 +234,21 @@ function validateManifests(manifests: unknown[], logger: Logger): KubernetesMani
 }
 
 /**
+ * Check if a kind is in the manifest order
+ */
+function getManifestOrderIndex(kind: string | undefined): number {
+  if (!kind) return 999;
+  const index = MANIFEST_ORDER.indexOf(kind as (typeof MANIFEST_ORDER)[number]);
+  return index >= 0 ? index : 999;
+}
+
+/**
  * Order manifests for deployment based on resource dependencies
  */
 function orderManifests(manifests: KubernetesManifest[]): KubernetesManifest[] {
   return manifests.sort((a, b) => {
-    const aIndex =
-      a.kind && MANIFEST_ORDER.includes(a.kind as (typeof MANIFEST_ORDER)[number])
-        ? MANIFEST_ORDER.indexOf(a.kind as (typeof MANIFEST_ORDER)[number])
-        : 999;
-    const bIndex =
-      b.kind && MANIFEST_ORDER.includes(b.kind as (typeof MANIFEST_ORDER)[number])
-        ? MANIFEST_ORDER.indexOf(b.kind as (typeof MANIFEST_ORDER)[number])
-        : 999;
+    const aIndex = getManifestOrderIndex(a.kind);
+    const bIndex = getManifestOrderIndex(b.kind);
     return aIndex - bIndex;
   });
 }
