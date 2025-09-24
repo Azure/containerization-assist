@@ -252,8 +252,8 @@ export function createPromptBackedTool(config: PromptBackedToolConfig) {
 
       // Extract response text
       const responseText = aiResponse.content
-        .filter((block: any) => block.type === 'text')
-        .map((block: any) => block.text)
+        .filter((block: { type: string }) => block.type === 'text')
+        .map((block: { text: string }) => block.text)
         .join('\n');
 
       if (!responseText) {
@@ -304,7 +304,16 @@ export function createMcpPromptTool(
     description: string;
     inputSchema: Record<string, unknown>;
   },
-) {
+): {
+  name: string;
+  description: string;
+  schema: Record<string, unknown>;
+  execute: (
+    params: Record<string, unknown>,
+    logger: Logger,
+    context?: ToolContext,
+  ) => Promise<Result<unknown>>;
+} {
   const executor = createPromptBackedTool(config);
 
   return {

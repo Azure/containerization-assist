@@ -13,24 +13,21 @@
 
 import { z } from 'zod';
 import { type Result, Failure } from '@/types';
-import type { Logger } from '@/lib/logger';
-import type { RegisteredTool, ToolContext, ProgressReporter } from '@/app/types';
+import type { Logger } from 'pino';
+import type { RegisteredTool } from '@/app/types';
+import type { ToolContext, ProgressReporter } from '@/mcp/context';
 
 /**
  * Create a minimal progress reporter for standalone execution
  */
 function createMinimalProgressReporter(logger: Logger): ProgressReporter {
-  return {
-    start: (message: string) => logger.info(`[START] ${message}`),
-    update: (message: string, percentage?: number) => {
-      if (percentage !== undefined) {
-        logger.info(`[${percentage}%] ${message}`);
-      } else {
-        logger.info(`[UPDATE] ${message}`);
-      }
-    },
-    complete: (message: string) => logger.info(`[COMPLETE] ${message}`),
-    fail: (message: string) => logger.error(`[FAILED] ${message}`),
+  // MCP ProgressReporter is a function
+  return async (message: string, progress?: number, _total?: number) => {
+    if (progress !== undefined) {
+      logger.info(`[${progress}%] ${message}`);
+    } else {
+      logger.info(`[PROGRESS] ${message}`);
+    }
   };
 }
 
@@ -53,10 +50,19 @@ export async function runTool(
     // 1. Validate parameters
     const validatedParams = await tool.schema.parseAsync(params);
 
-    // 2. Create minimal context
+    // 2. Create minimal MCP context for standalone execution
     const context: ToolContext = {
       logger: toolLogger,
       progress: createMinimalProgressReporter(toolLogger),
+      signal: undefined,
+      sampling: {
+        createMessage: async () => {
+          throw new Error('Sampling not available in standalone execution mode');
+        },
+      },
+      getPrompt: async () => {
+        throw new Error('Prompts not available in standalone execution mode');
+      },
     };
 
     // 3. Execute the tool

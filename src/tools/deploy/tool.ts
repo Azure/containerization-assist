@@ -130,6 +130,10 @@ export interface DeployApplicationResult {
     }>;
   };
   chainHint?: string; // Hint for next tool in workflow chain
+  workflowHints?: {
+    nextStep: string;
+    message: string;
+  };
 }
 
 // Define the result schema for type safety
@@ -235,12 +239,12 @@ function validateManifests(manifests: unknown[], logger: Logger): KubernetesMani
 function orderManifests(manifests: KubernetesManifest[]): KubernetesManifest[] {
   return manifests.sort((a, b) => {
     const aIndex =
-      a.kind && MANIFEST_ORDER.includes(a.kind as any)
-        ? MANIFEST_ORDER.indexOf(a.kind as any)
+      a.kind && MANIFEST_ORDER.includes(a.kind as (typeof MANIFEST_ORDER)[number])
+        ? MANIFEST_ORDER.indexOf(a.kind as (typeof MANIFEST_ORDER)[number])
         : 999;
     const bIndex =
-      b.kind && MANIFEST_ORDER.includes(b.kind as any)
-        ? MANIFEST_ORDER.indexOf(b.kind as any)
+      b.kind && MANIFEST_ORDER.includes(b.kind as (typeof MANIFEST_ORDER)[number])
+        ? MANIFEST_ORDER.indexOf(b.kind as (typeof MANIFEST_ORDER)[number])
         : 999;
     return aIndex - bIndex;
   });
@@ -594,6 +598,10 @@ async function deployApplicationImpl(
             message: ready ? 'Deployment is available' : 'Deployment is pending',
           },
         ],
+      },
+      workflowHints: {
+        nextStep: 'verify-deploy',
+        message: `Application deployed successfully. Use "verify-deploy" with sessionId ${sessionId} to check deployment status, or access your application at: ${endpoints.length > 0 ? endpoints[0]?.url || 'the service endpoint' : 'the service endpoint'}.`,
       },
     };
 

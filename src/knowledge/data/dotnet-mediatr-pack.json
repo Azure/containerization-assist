@@ -91,7 +91,7 @@
   },
   {
     "id": "mediatr-observability",
-    "category": "monitoring",
+    "category": "generic",
     "pattern": "MediatR.*OpenTelemetry",
     "recommendation": "Configure OpenTelemetry observability for MediatR handlers",
     "example": "ENV OTEL_EXPORTER_OTLP_ENDPOINT=\"${JAEGER_ENDPOINT}\" \\\n    OTEL_SERVICE_NAME=\"mediatr-service\" \\\n    Metrics__Enabled=\"true\" \\\n    Metrics__CommandHandlerMetrics=\"true\" \\\n    Metrics__QueryHandlerMetrics=\"true\"",
@@ -125,7 +125,7 @@
     "pattern": "MediatR",
     "recommendation": "Add security scanning to MediatR Docker builds",
     "example": "# Security scanning stage\nFROM build AS security\nRUN dotnet list package --vulnerable --include-transitive\nRUN dotnet tool install -g dotnet-outdated-tool && \\\n    ~/.dotnet/tools/dotnet-outdated\n\n# Scan final image with Trivy\nRUN apk add --no-cache curl && \\\n    curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin && \\\n    trivy fs --exit-code 1 --no-progress /app",
-    "severity": "critical",
+    "severity": "high",
     "tags": ["dotnet", "mediatr", "security", "scanning", "vulnerabilities"],
     "description": "Security vulnerability scanning for MediatR applications"
   },
@@ -151,7 +151,7 @@
   },
   {
     "id": "mediatr-batch-processing",
-    "category": "performance",
+    "category": "generic",
     "pattern": "MediatR.*Batch.*Processing",
     "recommendation": "Configure batch processing for MediatR commands",
     "example": "ENV BatchProcessing__MaxBatchSize=\"100\" \\\n    BatchProcessing__ProcessingInterval=\"5000\" \\\n    BatchProcessing__MaxConcurrency=\"5\" \\\n    BatchProcessing__EnableAutoRetry=\"true\"",
@@ -181,7 +181,7 @@
   },
   {
     "id": "mediatr-grpc-integration",
-    "category": "integration",
+    "category": "generic",
     "pattern": "MediatR.*Grpc",
     "recommendation": "Integrate MediatR with gRPC services",
     "example": "ENV Kestrel__Endpoints__Grpc__Url=\"http://+:5000\" \\\n    Kestrel__Endpoints__Grpc__Protocols=\"Http2\" \\\n    Grpc__MaxReceiveMessageSize=\"4194304\" \\\n    Grpc__MaxSendMessageSize=\"4194304\"",

@@ -16,6 +16,11 @@ export interface PushImageResult {
   registry: string;
   digest: string;
   pushedTag: string;
+  sessionId?: string;
+  workflowHints?: {
+    nextStep: string;
+    message: string;
+  };
 }
 
 /**
@@ -101,6 +106,11 @@ export function makePushImage(
         registry: params.registry ?? 'docker.io',
         digest: pushResult.value.digest,
         pushedTag: `${repository}:${tag}`,
+        ...(params.sessionId && { sessionId: params.sessionId }),
+        workflowHints: {
+          nextStep: 'generate-k8s-manifests',
+          message: `Image pushed successfully. Use "generate-k8s-manifests" with sessionId ${params.sessionId || '<sessionId>'} to create Kubernetes deployment manifests.`,
+        },
       };
 
       return {

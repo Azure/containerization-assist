@@ -252,7 +252,22 @@ async function createSamplingResponse(
       modelPreferences: samplingRequest.modelPreferences,
     };
 
+    logger.info(
+      { method: 'sampling/createMessage', hasServer: !!server },
+      'About to call createMessage',
+    );
+
     const response = await server.createMessage(requestWithDefaults);
+
+    logger.info(
+      {
+        hasResponse: !!response,
+        hasContent: !!response?.content,
+        contentType: response?.content?.type,
+        textLength: (response?.content as { text?: string })?.text?.length || 0,
+      },
+      'Received sampling response',
+    );
 
     // Validate response
     if (!response?.content || response.content.type !== 'text') {
@@ -265,7 +280,14 @@ async function createSamplingResponse(
     }
 
     const duration = Date.now() - startTime;
-    logger.debug({ duration, responseLength: text.length }, 'Sampling request completed');
+    logger.info(
+      {
+        duration,
+        responseLength: text.length,
+        preview: text.substring(0, 200),
+      },
+      'Sampling request completed',
+    );
 
     // Return standardized response
     const metadata: {

@@ -95,7 +95,7 @@
     "pattern": "POSTGRES_PASSWORD|MYSQL_ROOT_PASSWORD",
     "recommendation": "Use Docker secrets or external secret management for database credentials",
     "example": "secrets:\n  db_password:\n    external: true\n  db_user:\n    external: true\nenvironment:\n  POSTGRES_PASSWORD_FILE: /run/secrets/db_password\n  POSTGRES_USER_FILE: /run/secrets/db_user",
-    "severity": "critical",
+    "severity": "high",
     "tags": ["database", "secrets", "security", "credentials"],
     "description": "Secure credential management prevents password exposure"
   },
@@ -215,7 +215,7 @@
     "pattern": "(postgres|mysql|mongo|redis):",
     "recommendation": "Implement security scanning for database containers",
     "example": "# Security scanning stage\nFROM aquasec/trivy:latest AS security\nCOPY --from=database /app /app\nRUN trivy fs --exit-code 1 --severity HIGH,CRITICAL --no-progress /app\n\n# Scan for known CVEs\nRUN trivy image --exit-code 1 --severity HIGH,CRITICAL postgres:15",
-    "severity": "critical",
+    "severity": "high",
     "tags": ["database", "security", "scanning", "vulnerabilities"],
     "description": "Security scanning identifies vulnerabilities in database images"
   },
@@ -295,7 +295,7 @@
     "pattern": "(postgres|mysql|mongo):",
     "recommendation": "Enable TLS/SSL for database connections",
     "example": "command: postgres -c ssl=on -c ssl_cert_file=/certs/server.crt -c ssl_key_file=/certs/server.key -c ssl_ca_file=/certs/ca.crt\nvolumes:\n  - ./certs:/certs:ro\nenvironment:\n  - POSTGRES_HOST_AUTH_METHOD=scram-sha-256",
-    "severity": "critical",
+    "severity": "high",
     "tags": ["database", "tls", "ssl", "security", "encryption"],
     "description": "TLS encryption protects data in transit"
   },
@@ -315,7 +315,7 @@
     "pattern": "mongo:",
     "recommendation": "Enable MongoDB authentication and authorization",
     "example": "command: mongod --auth --keyFile /data/keyfile --replSet rs0\nenvironment:\n  - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER}\n  - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASS}\n  - MONGO_INITDB_DATABASE=admin",
-    "severity": "critical",
+    "severity": "high",
     "tags": ["mongodb", "authentication", "security", "authorization"],
     "description": "Authentication prevents unauthorized database access"
   },
@@ -331,7 +331,7 @@
   },
   {
     "id": "database-performance-tuning",
-    "category": "performance",
+    "category": "generic",
     "pattern": "(postgres|mysql):",
     "recommendation": "Apply performance tuning based on workload",
     "example": "# OLTP workload tuning\ncommand: postgres \\\n  -c max_connections=400 \\\n  -c shared_buffers=4GB \\\n  -c effective_cache_size=12GB \\\n  -c work_mem=10MB \\\n  -c random_page_cost=1.1 \\\n  -c effective_io_concurrency=200",
@@ -351,7 +351,7 @@
   },
   {
     "id": "database-zero-downtime-migration",
-    "category": "deployment",
+    "category": "kubernetes",
     "pattern": "(flyway|liquibase):",
     "recommendation": "Implement zero-downtime database migrations",
     "example": "# Blue-green migration strategy\nservices:\n  migrate-pre:\n    image: flyway/flyway\n    command: migrate -placeholders.deployment.type=blue\n  app-blue:\n    depends_on:\n      migrate-pre:\n        condition: service_completed_successfully",
@@ -361,11 +361,11 @@
   },
   {
     "id": "database-disaster-recovery",
-    "category": "backup",
+    "category": "generic",
     "pattern": "(postgres|mysql):",
     "recommendation": "Implement comprehensive disaster recovery strategy",
     "example": "# WAL-E for PostgreSQL continuous archiving\nservices:\n  wal-e:\n    image: postgres:15\n    command: |\n      sh -c 'wal-e backup-push /var/lib/postgresql/data'\n    environment:\n      - AWS_ACCESS_KEY_ID=${AWS_KEY}\n      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET}\n      - WALE_S3_PREFIX=s3://backup-bucket/postgres",
-    "severity": "critical",
+    "severity": "high",
     "tags": ["database", "disaster-recovery", "backup", "archiving"],
     "description": "Continuous archiving enables point-in-time recovery"
   },
@@ -381,7 +381,7 @@
   },
   {
     "id": "database-observability-stack",
-    "category": "monitoring",
+    "category": "generic",
     "pattern": "(postgres|mysql|mongo):",
     "recommendation": "Deploy comprehensive observability stack",
     "example": "# Grafana + Prometheus + Loki stack\nservices:\n  prometheus:\n    image: prom/prometheus\n    volumes:\n      - ./prometheus.yml:/etc/prometheus/prometheus.yml\n  grafana:\n    image: grafana/grafana\n    environment:\n      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASS}\n  loki:\n    image: grafana/loki\n    command: -config.file=/etc/loki/config.yml",
@@ -411,7 +411,7 @@
   },
   {
     "id": "database-cdc-setup",
-    "category": "integration",
+    "category": "generic",
     "pattern": "(postgres|mysql):",
     "recommendation": "Implement Change Data Capture (CDC) for real-time data streaming",
     "example": "# Debezium for CDC\nservices:\n  debezium:\n    image: debezium/connect\n    environment:\n      - BOOTSTRAP_SERVERS=kafka:9092\n      - GROUP_ID=1\n      - CONFIG_STORAGE_TOPIC=connect-configs\n      - OFFSET_STORAGE_TOPIC=connect-offsets\n      - STATUS_STORAGE_TOPIC=connect-status",
@@ -445,7 +445,7 @@
     "pattern": "(postgres|mysql):",
     "recommendation": "Implement compliance controls for regulated industries",
     "example": "# HIPAA/PCI compliance settings\ncommand: postgres \\\n  -c log_connections=on \\\n  -c log_disconnections=on \\\n  -c log_statement=all \\\n  -c log_min_duration_statement=0 \\\n  -c ssl=on \\\n  -c ssl_ciphers='HIGH:!aNULL:!MD5'",
-    "severity": "critical",
+    "severity": "high",
     "tags": ["database", "compliance", "hipaa", "pci", "security"],
     "description": "Compliance controls meet regulatory requirements"
   }

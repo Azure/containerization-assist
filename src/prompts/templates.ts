@@ -109,7 +109,50 @@ export const promptTemplates = {
       prompt += ` using ${params.framework}`;
     }
 
-    prompt += `.\n\nRequirements:\n`;
+    prompt += `.\n\n`;
+
+    // Add critical constraints first to prevent common errors
+    prompt += `CRITICAL CONSTRAINTS (MUST FOLLOW):\n`;
+    prompt += `1. Package Manager Consistency:\n`;
+
+    // Language-specific package manager rules
+    if (params.language?.toLowerCase().includes('java')) {
+      prompt += `   - This is a Java application. DO NOT use apt-get to install Java tools\n`;
+      prompt += `   - Use Maven or Gradle commands that are included in the base image\n`;
+      prompt += `   - For Alpine-based images, use 'apk add' not 'apt-get'\n`;
+      prompt += `   - For Debian-based images, use 'apt-get' not 'apk'\n`;
+    } else if (
+      params.language?.toLowerCase().includes('node') ||
+      params.language?.toLowerCase().includes('javascript')
+    ) {
+      prompt += `   - This is a Node.js application. Use npm, yarn, or pnpm commands\n`;
+      prompt += `   - For Alpine-based images, use 'apk add' not 'apt-get'\n`;
+      prompt += `   - For Debian-based images, use 'apt-get' not 'apk'\n`;
+    } else if (params.language?.toLowerCase().includes('python')) {
+      prompt += `   - This is a Python application. Use pip for Python packages\n`;
+      prompt += `   - For Alpine-based images, use 'apk add' not 'apt-get'\n`;
+      prompt += `   - For Debian-based images, use 'apt-get' not 'apk'\n`;
+    }
+
+    prompt += `2. Base Image Selection:\n`;
+    prompt += `   - Choose appropriate base image for ${params.language}\n`;
+    prompt += `   - If using slim/alpine images, ensure required tools are available\n`;
+    prompt += `   - maven:3-eclipse-temurin-17-alpine includes Maven but not apt-get\n`;
+    prompt += `   - node:18-alpine includes Node but uses apk not apt-get\n`;
+
+    prompt += `3. Health Check Commands:\n`;
+    prompt += `   - Only use commands that exist in the chosen base image\n`;
+    prompt += `   - For minimal images: use built-in tools or install required ones\n`;
+    prompt += `   - Common tools: curl (often missing), wget (sometimes available)\n`;
+    prompt += `   - For Java: consider using the application's health endpoint directly\n`;
+
+    prompt += `4. Build Tools:\n`;
+    prompt += `   - Maven images already include mvn command\n`;
+    prompt += `   - Gradle images already include gradle command\n`;
+    prompt += `   - Node images already include npm/node commands\n`;
+    prompt += `   - DO NOT try to install these if using their respective base images\n\n`;
+
+    prompt += `Requirements:\n`;
     prompt += `- Language: ${params.language}\n`;
 
     if (params.framework) {
@@ -121,26 +164,37 @@ export const promptTemplates = {
 
     if (params.baseImage) {
       prompt += `- Use base image: ${params.baseImage}\n`;
+    } else {
+      prompt += `- Select an appropriate base image for ${params.language}\n`;
     }
 
     if (params.multistage) {
       prompt += `- Use multi-stage build for optimization\n`;
+      prompt += `- Ensure each stage uses compatible base images\n`;
     }
 
     if (params.securityHardening) {
       prompt += `- Apply security best practices (non-root user, minimal attack surface)\n`;
+      prompt += `- Create a non-root user appropriately for the base image\n`;
     }
 
     if (params.optimization) {
       prompt += `- Optimize for size and build time\n`;
       prompt += `- Use layer caching effectively\n`;
+      prompt += `- Minimize layer count where possible\n`;
     }
 
     if (params.requirements) {
-      prompt += `\nAdditional requirements:\n${params.requirements}\n`;
+      prompt += `\nAdditional context:\n${params.requirements}\n`;
     }
 
-    prompt += `\nProvide only the Dockerfile content without explanations or markdown fences.`;
+    prompt += `\nOutput Format:\n`;
+    prompt += `- Provide ONLY the Dockerfile content\n`;
+    prompt += `- NO explanations or markdown fences\n`;
+    prompt += `- NO JSON wrapping\n`;
+    prompt += `- Start directly with FROM statement\n`;
+    prompt += `- End with CMD or ENTRYPOINT statement\n`;
+    prompt += `- Ensure the Dockerfile will build without errors\n`;
 
     return prompt;
   },
@@ -151,7 +205,29 @@ export const promptTemplates = {
   k8sManifests: (params: K8sManifestPromptParams): string => {
     let prompt = `Generate production-ready Kubernetes manifests for deploying ${params.appName}.\n\n`;
 
-    prompt += `Requirements:\n`;
+    // Add critical constraints first
+    prompt += `CRITICAL REQUIREMENTS (MUST FOLLOW):\n`;
+    prompt += `1. Valid Kubernetes API versions:\n`;
+    prompt += `   - Deployment: apps/v1\n`;
+    prompt += `   - Service: v1\n`;
+    prompt += `   - Ingress: networking.k8s.io/v1\n`;
+    prompt += `   - ConfigMap/Secret: v1\n`;
+    prompt += `2. Required fields:\n`;
+    prompt += `   - All resources must have metadata.name and metadata.namespace\n`;
+    prompt += `   - Deployments must have spec.selector.matchLabels matching template.metadata.labels\n`;
+    prompt += `   - Services must have spec.selector matching deployment pod labels\n`;
+    prompt += `3. Best practices:\n`;
+    prompt += `   - Always set resource requests and limits\n`;
+    prompt += `   - Include liveness and readiness probes\n`;
+    prompt += `   - Use non-root security context\n`;
+    prompt += `   - Set imagePullPolicy: IfNotPresent for tagged images\n`;
+    prompt += `4. Label conventions:\n`;
+    prompt += `   - app.kubernetes.io/name: ${params.appName}\n`;
+    prompt += `   - app.kubernetes.io/instance: ${params.appName}\n`;
+    prompt += `   - app.kubernetes.io/version: "1.0.0"\n`;
+    prompt += `   - app.kubernetes.io/managed-by: "mcp"\n\n`;
+
+    prompt += `Application Requirements:\n`;
     prompt += `- Application name: ${params.appName}\n`;
     prompt += `- Container image: ${params.image}\n`;
     prompt += `- Namespace: ${params.namespace || 'default'}\n`;
@@ -161,6 +237,8 @@ export const promptTemplates = {
 
     if (params.ingressEnabled) {
       prompt += `- Include Ingress resource for external access\n`;
+      prompt += `  - Use pathType: Prefix\n`;
+      prompt += `  - Include proper annotations for your ingress controller\n`;
     }
 
     if (params.resources) {
@@ -171,21 +249,29 @@ export const promptTemplates = {
       if (params.resources.memory) {
         prompt += `  - Memory: ${params.resources.memory}\n`;
       }
+    } else {
+      prompt += `- Use sensible default resource limits (e.g., 100m CPU request, 500m limit; 128Mi memory request, 512Mi limit)\n`;
     }
 
     if (params.healthCheck) {
-      prompt += `- Include liveness and readiness probes\n`;
+      prompt += `- Include liveness probe (failureThreshold: 3, periodSeconds: 10)\n`;
+      prompt += `- Include readiness probe (initialDelaySeconds: 10, periodSeconds: 5)\n`;
     }
 
     prompt += `\nGenerate the following resources:\n`;
-    prompt += `1. Deployment\n`;
-    prompt += `2. Service\n`;
+    prompt += `1. Deployment (with proper labels, selectors, and security context)\n`;
+    prompt += `2. Service (with correct selector matching deployment labels)\n`;
 
     if (params.ingressEnabled) {
-      prompt += `3. Ingress\n`;
+      prompt += `3. Ingress (with proper API version and pathType)\n`;
     }
 
-    prompt += `\nProvide valid YAML manifests separated by "---". No explanations or markdown fences.`;
+    prompt += `\nOutput Format:\n`;
+    prompt += `- Provide ONLY valid Kubernetes YAML manifests\n`;
+    prompt += `- Separate resources with "---"\n`;
+    prompt += `- NO explanations, comments, or markdown fences\n`;
+    prompt += `- Start directly with "apiVersion:"\n`;
+    prompt += `- Ensure all manifests will apply without errors\n`;
 
     return prompt;
   },
@@ -263,7 +349,7 @@ export const promptTemplates = {
   /**
    * Repository analysis prompt
    */
-  repositoryAnalysis: (params: RepositoryAnalysisParams): string => {
+  repositoryAnalysis: (params: RepositoryAnalysisParams & { sessionId?: string }): string => {
     return `You are an expert software architect with deep knowledge of ALL programming languages,
 frameworks, and build systems. Analyze repositories without bias toward any specific language.
 
@@ -274,16 +360,12 @@ Languages you support include but are not limited to:
 - Data/ML: Python, R, Julia, Jupyter
 - Systems: C, C++, Rust, Zig
 
-Provide accurate, unbiased analysis focusing on the most likely language and framework.
+## Repository Data to Analyze
 
-## User Request
-
-Analyze this repository to identify the technology stack:
-
-**File listing:**
+**Files in repository:**
 ${params.fileList}
 
-**Configuration files:**
+**Configuration files content:**
 ${params.configFiles}
 
 **Directory structure:**
@@ -319,6 +401,11 @@ Return ONLY valid JSON matching this structure:
     "baseImage": "recommended base image",
     "multistage": true/false,
     "nonRootUser": true/false
+  },
+  "sessionId": "${params.sessionId || 'generate a new UUID v4 session ID'}",
+  "workflowHints": {
+    "nextStep": "generate-dockerfile",
+    "message": "Repository analyzed successfully. Use 'generate-dockerfile' with the sessionId to create an optimized Dockerfile."
   }
 }`;
   },

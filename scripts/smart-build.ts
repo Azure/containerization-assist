@@ -137,12 +137,12 @@ class SmartBuilder {
 
   private async updateCache(filepath: string): Promise<void> {
     const hash = await this.getFileHash(filepath);
-    const stats = await fs.stat(filepath);
+    const fileStats = await fs.stat(filepath);
 
     this.buildCache.set(filepath, {
       filepath,
       hash,
-      lastModified: stats.mtimeMs,
+      lastModified: fileStats.mtimeMs,
       dependencies: []
     });
   }
@@ -264,7 +264,7 @@ class SmartBuilder {
           };
         }
       }
-    } catch (error) {
+    } catch {
       this.log('Could not read tools directory', 'warning');
     }
 
@@ -315,7 +315,7 @@ class SmartBuilder {
       console.log(`    • Peak: ${(memUsed.heapUsed / 1024 / 1024).toFixed(1)} MB`);
       console.log(`    • Delta: ${memDelta > 0 ? '+' : ''}${memDelta.toFixed(1)} MB`);
       console.log(`  Errors: ${this.stats.errors}`);
-    } catch (error) {
+    } catch {
       this.log('Could not measure all performance metrics', 'warning');
     }
   }

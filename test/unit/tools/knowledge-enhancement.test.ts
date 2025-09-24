@@ -27,11 +27,18 @@ jest.mock('@/ai/prompt-engine', () => ({
   })),
 }));
 
+// Mock fs module to prevent actual file writes
+jest.mock('node:fs', () => ({
+  promises: {
+    writeFile: jest.fn().mockResolvedValue(undefined),
+  },
+}));
+
 describe('Knowledge Enhancement Integration', () => {
   const mockContext: ToolContext = {
     sampling: {
       createMessage: jest.fn().mockResolvedValue({
-        content: [{ text: '{"result": "success"}' }],
+        content: [{ text: 'FROM node:18-alpine\nWORKDIR /app\nCOPY . .\nRUN npm install\nCMD ["npm", "start"]' }],
       }),
     },
     session: {

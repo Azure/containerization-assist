@@ -5,6 +5,8 @@
 
 import type { z } from 'zod';
 import type { Result } from '@/types/index';
+import type { Logger } from 'pino';
+import type { ToolContext } from '@/mcp/context';
 
 // ============================================================================
 // Core Types
@@ -51,19 +53,8 @@ export interface RegisteredTool {
  */
 export type ToolHandler = (params: unknown, context: ToolContext) => Promise<Result<unknown>>;
 
-/**
- * Context provided to tool handlers
- */
-export interface ToolContext {
-  sessionId?: string;
-  session?: SessionState;
-  logger: Logger;
-  progress: ProgressReporter;
-  telemetry?: TelemetrySystem;
-  ai?: AIClient;
-  knowledge?: KnowledgeBase;
-  policies?: PolicyEngine;
-}
+// ToolContext is now imported from @/mcp/context above
+export type { ToolContext };
 
 // ============================================================================
 // Session Types
@@ -96,16 +87,8 @@ export interface SessionManager {
 // Logging & Progress Types
 // ============================================================================
 
-/**
- * Logger interface
- */
-export interface Logger {
-  error(message: string, ...args: unknown[]): void;
-  warn(message: string, ...args: unknown[]): void;
-  info(message: string, ...args: unknown[]): void;
-  debug(message: string, ...args: unknown[]): void;
-  trace(message: string, ...args: unknown[]): void;
-}
+// Logger is now imported from pino above
+export type { Logger };
 
 /**
  * Progress reporter interface
@@ -228,6 +211,9 @@ export interface Kernel {
   // Health & metrics
   getHealth(): HealthStatus;
   getMetrics(): Map<string, AggregatedMetric>;
+
+  // MCP access
+  getMcpServer(): any; // Returns the internal MCP Server instance
 }
 
 // ============================================================================

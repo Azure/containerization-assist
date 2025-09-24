@@ -1,108 +1,99 @@
-Unused files (5)
-src/lib/string-validators.ts              
-src/mcp/middleware/session-middleware.ts  
-src/mcp/router.ts                         
-src/mcp/tool-content-analysis.ts          
-src/types/result-types.ts                 
-Unused devDependencies (2)
-tsc-alias  package.json:219:6
-tshy       package.json:220:6
 Unused exports (81)
-ApplicationKernel              class     src/app/kernel.ts:400:14                      
-DefaultProgressReporter                  src/app/kernel.ts:809:26                      
-DefaultTelemetrySystem                   src/app/kernel.ts:810:27                      
-createAppConfig                function  src/config/app-config.ts:152:17               
-appConfig                                src/config/app-config.ts:237:14               
-ANALYSIS_CONFIG                          src/config/defaults.ts:54:14                  
-extractEnvironmentConstraints  function  src/config/policy-constraints.ts:13:17        
-getToolConstraints             function  src/config/policy-constraints.ts:126:17       
-getProductionConstraints       function  src/config/policy-constraints.ts:130:17       
-getCategoryConstraints         function  src/config/policy-constraints.ts:140:17       
-formatConstraintsPrompt        function  src/config/policy-constraints.ts:178:17       
-clearPolicyCache               function  src/config/policy-io.ts:34:17                 
-refreshPolicy                  function  src/config/policy-io.ts:38:17                 
-RegexMatcherSchema                       src/config/policy-schemas.ts:127:14           
-FunctionMatcherSchema                    src/config/policy-schemas.ts:134:14           
-MatcherSchema                            src/config/policy-schemas.ts:140:14           
-PolicyRuleSchema                         src/config/policy-schemas.ts:145:14           
-EnvironmentOverrideSchema                src/config/policy-schemas.ts:154:14           
-EnvironmentDefaultsSchema                src/config/policy-schemas.ts:161:14           
-UnifiedDefaultsSchema                    src/config/policy-schemas.ts:206:14           
-ALL_TOOLS                                src/exports/tools.ts:7:9                      
-KnowledgeCategorySchema                  src/knowledge/schemas.ts:3:14                 
-getImageMetadata                         src/lib/docker.ts:10:9                        
-directoryExists                function  src/lib/file-utils.ts:70:23                   
-IMAGE_TAG                                src/lib/regex-patterns.ts:47:14               
-ENV_VAR_PATTERN                          src/lib/regex-patterns.ts:48:14               
-extractBaseImage               function  src/lib/regex-patterns.ts:57:17               
-scanImage                      function  src/lib/security-scanner.ts:74:23             
-initializeToolInstrumentation  function  src/lib/tool-helpers.ts:73:17                 
-createMcpPromptTool            function  src/mcp/prompt-backed-tool.ts:302:17          
-OutputContracts                          src/mcp/prompt-backed-tool.ts:331:14          
-PromptToolFactory              class     src/mcp/prompt-backed-tool.ts:366:14          
-validatePromptParams           function  src/prompts/templates.ts:523:17               
-buildAIPrompt                  function  src/prompts/templates.ts:538:17               
-createMutexDockerClient        function  src/services/docker-client.ts:743:23          
-getDockerMutexStatus           function  src/services/docker-client.ts:761:17          
-metadata                                 src/tools/analyze-repo/tool.ts:71:14          
-metadata                                 src/tools/convert-aca-to-k8s/tool.ts:62:14    
-metadata                                 src/tools/fix-dockerfile/tool.ts:58:14        
-metadata                                 src/tools/generate-aca-manifests/tool.ts:63:14
-optimizationSchema                       src/tools/generate-dockerfile/schema.ts:17:14 
-securityLevelSchema                      src/tools/generate-dockerfile/schema.ts:22:14 
-metadata                                 src/tools/generate-dockerfile/tool.ts:60:14   
-metadata                                 src/tools/generate-helm-charts/tool.ts:58:14  
-metadata                                 src/tools/generate-k8s-manifests/tool.ts:77:14
-ALL_TOOLS                                src/tools/index.ts:292:14                     
-InspectSessionResultSchema               src/tools/inspect-session/schema.ts:17:14     
-ping                           function  src/tools/ops/tool.ts:39:23                   
-serverStatus                   function  src/tools/ops/tool.ts:107:23                  
-metadata                                 src/tools/resolve-base-images/tool.ts:55:14   
-resourceObject                           src/tools/shared/schemas.ts:44:14             
-resourceObjectWithDefaults               src/tools/shared/schemas.ts:49:14             
-resourcesWithDefaults                    src/tools/shared/schemas.ts:62:14             
-envVar                                   src/tools/shared/schemas.ts:81:14             
-getQualityGrade                function  src/types/categories.ts:109:17                
-getSecurityGrade               function  src/types/categories.ts:120:17                
-ENVIRONMENT_PROFILES                     src/types/categories.ts:132:14                
-isSuccess                                src/types/core.ts:38:14                       
-isFailure                                src/types/core.ts:41:14                       
-getDockerfileRules                       src/validation/dockerfile-validator.ts:466:14 
-getDockerfileRulesByCategory             src/validation/dockerfile-validator.ts:473:14 
-createDockerfileValidator                src/validation/dockerfile-validator.ts:482:14 
-validateDockerfileContent                src/validation/index.ts:8:9                   
-getDockerfileRules                       src/validation/index.ts:9:29                  
-getDockerfileRulesByCategory             src/validation/index.ts:10:22                 
-createDockerfileValidator                src/validation/index.ts:11:32                 
-validateKubernetesManifests              src/validation/index.ts:17:24                 
-formatValidationReport         function  src/validation/index.ts:37:17                 
-getValidationSummary           function  src/validation/index.ts:101:17                
-validateKubernetesContent                src/validation/kubernetes-validator.ts:349:14 
-getKubernetesRules                       src/validation/kubernetes-validator.ts:496:14 
-getKubernetesRulesByCategory             src/validation/kubernetes-validator.ts:503:14 
-validateKubernetes                       src/validation/kubernetes-validator.ts:523:14 
-pipe                                     src/validation/pipeline.ts:21:14              
-createValidator                          src/validation/pipeline.ts:82:14              
-validateRequired                         src/validation/pipeline.ts:109:14             
-validateTypes                            src/validation/pipeline.ts:128:14             
-normalizeParameters                      src/validation/pipeline.ts:155:14             
-validateSchema                           src/validation/pipeline.ts:178:14             
-when                                     src/validation/pipeline.ts:192:14             
-validateBusinessRules                    src/validation/pipeline.ts:207:14             
+ApplicationKernel              class     src/app/kernel.ts:400:14                       
+DefaultProgressReporter                  src/app/kernel.ts:820:26                       
+DefaultTelemetrySystem                   src/app/kernel.ts:821:27                       
+createAppConfig                function  src/config/app-config.ts:152:17                
+appConfig                                src/config/app-config.ts:237:14                
+ANALYSIS_CONFIG                          src/config/defaults.ts:54:14                   
+extractEnvironmentConstraints  function  src/config/policy-constraints.ts:13:17         
+getToolConstraints             function  src/config/policy-constraints.ts:126:17        
+getProductionConstraints       function  src/config/policy-constraints.ts:130:17        
+getCategoryConstraints         function  src/config/policy-constraints.ts:140:17        
+formatConstraintsPrompt        function  src/config/policy-constraints.ts:178:17        
+clearPolicyCache               function  src/config/policy-io.ts:34:17                  
+refreshPolicy                  function  src/config/policy-io.ts:38:17                  
+RegexMatcherSchema                       src/config/policy-schemas.ts:127:14            
+FunctionMatcherSchema                    src/config/policy-schemas.ts:134:14            
+MatcherSchema                            src/config/policy-schemas.ts:140:14            
+PolicyRuleSchema                         src/config/policy-schemas.ts:145:14            
+EnvironmentOverrideSchema                src/config/policy-schemas.ts:154:14            
+EnvironmentDefaultsSchema                src/config/policy-schemas.ts:161:14            
+UnifiedDefaultsSchema                    src/config/policy-schemas.ts:206:14            
+ALL_TOOLS                                src/exports/tools.ts:7:9                       
+KnowledgeCategorySchema                  src/knowledge/schemas.ts:3:14                  
+getImageMetadata                         src/lib/docker.ts:10:9                         
+directoryExists                function  src/lib/file-utils.ts:70:23                    
+IMAGE_TAG                                src/lib/regex-patterns.ts:47:14                
+ENV_VAR_PATTERN                          src/lib/regex-patterns.ts:48:14                
+extractBaseImage               function  src/lib/regex-patterns.ts:57:17                
+scanImage                      function  src/lib/security-scanner.ts:74:23              
+initializeToolInstrumentation  function  src/lib/tool-helpers.ts:73:17                  
+createMcpPromptTool            function  src/mcp/prompt-backed-tool.ts:302:17           
+OutputContracts                          src/mcp/prompt-backed-tool.ts:340:14           
+PromptToolFactory              class     src/mcp/prompt-backed-tool.ts:375:14           
+validatePromptParams           function  src/prompts/templates.ts:610:17                
+buildAIPrompt                  function  src/prompts/templates.ts:625:17                
+createMutexDockerClient        function  src/services/docker-client.ts:743:23           
+getDockerMutexStatus           function  src/services/docker-client.ts:761:17           
+metadata                                 src/tools/analyze-repo/tool.ts:219:14          
+metadata                                 src/tools/convert-aca-to-k8s/tool.ts:62:14     
+metadata                                 src/tools/fix-dockerfile/tool.ts:128:14        
+metadata                                 src/tools/generate-aca-manifests/tool.ts:63:14 
+optimizationSchema                       src/tools/generate-dockerfile/schema.ts:17:14  
+securityLevelSchema                      src/tools/generate-dockerfile/schema.ts:22:14  
+metadata                                 src/tools/generate-dockerfile/tool.ts:282:14   
+metadata                                 src/tools/generate-helm-charts/tool.ts:58:14   
+metadata                                 src/tools/generate-k8s-manifests/tool.ts:214:14
+ALL_TOOLS                                src/tools/index.ts:309:14                      
+InspectSessionResultSchema               src/tools/inspect-session/schema.ts:17:14      
+ping                           function  src/tools/ops/tool.ts:39:23                    
+serverStatus                   function  src/tools/ops/tool.ts:107:23                   
+metadata                                 src/tools/resolve-base-images/tool.ts:68:14    
+resourceObject                           src/tools/shared/schemas.ts:44:14              
+resourceObjectWithDefaults               src/tools/shared/schemas.ts:49:14              
+resourcesWithDefaults                    src/tools/shared/schemas.ts:62:14              
+envVar                                   src/tools/shared/schemas.ts:81:14              
+getQualityGrade                function  src/types/categories.ts:109:17                 
+getSecurityGrade               function  src/types/categories.ts:120:17                 
+ENVIRONMENT_PROFILES                     src/types/categories.ts:132:14                 
+isSuccess                                src/types/core.ts:38:14                        
+isFailure                                src/types/core.ts:41:14                        
+getDockerfileRules                       src/validation/dockerfile-validator.ts:466:14  
+getDockerfileRulesByCategory             src/validation/dockerfile-validator.ts:473:14  
+createDockerfileValidator                src/validation/dockerfile-validator.ts:482:14  
+validateDockerfileContent                src/validation/index.ts:8:9                    
+getDockerfileRules                       src/validation/index.ts:9:29                   
+getDockerfileRulesByCategory             src/validation/index.ts:10:22                  
+createDockerfileValidator                src/validation/index.ts:11:32                  
+validateKubernetesManifests              src/validation/index.ts:17:24                  
+formatValidationReport         function  src/validation/index.ts:37:17                  
+getValidationSummary           function  src/validation/index.ts:101:17                 
+validateKubernetesContent                src/validation/kubernetes-validator.ts:349:14  
+getKubernetesRules                       src/validation/kubernetes-validator.ts:496:14  
+getKubernetesRulesByCategory             src/validation/kubernetes-validator.ts:503:14  
+validateKubernetes                       src/validation/kubernetes-validator.ts:523:14  
+pipe                                     src/validation/pipeline.ts:21:14               
+createValidator                          src/validation/pipeline.ts:82:14               
+validateRequired                         src/validation/pipeline.ts:109:14              
+validateTypes                            src/validation/pipeline.ts:128:14              
+normalizeParameters                      src/validation/pipeline.ts:155:14              
+validateSchema                           src/validation/pipeline.ts:178:14              
+when                                     src/validation/pipeline.ts:192:14              
+validateBusinessRules                    src/validation/pipeline.ts:207:14              
 Unused exported types (109)
-SessionState                type       src/app/kernel.ts:804:15                         
-ToolHandler                 type       src/app/types.ts:52:13                           
-AIClient                    interface  src/app/types.ts:127:18                          
-KnowledgeBase               interface  src/app/types.ts:139:18                          
-PolicyEngine                interface  src/app/types.ts:147:18                          
-Result                      type       src/app/types.ts:286:14                          
+SessionState                type       src/app/kernel.ts:815:15                         
+ToolHandler                 type       src/app/types.ts:54:13                           
+AIClient                    interface  src/app/types.ts:110:18                          
+KnowledgeBase               interface  src/app/types.ts:122:18                          
+PolicyEngine                interface  src/app/types.ts:130:18                          
+Result                      type       src/app/types.ts:272:14                          
 AppConfig                   type       src/config/app-config.ts:104:13                  
 ConstraintContext           interface  src/config/policy-constraints.ts:157:18          
 RegexMatcher                interface  src/config/policy-schemas.ts:17:18               
 EnvironmentOverride         interface  src/config/policy-schemas.ts:45:18               
 CacheConfig                 interface  src/config/policy-schemas.ts:55:18               
 EnvironmentDefaults         interface  src/config/policy-schemas.ts:63:18               
-ToolConfig                  interface  src/exports/container-assist.ts:20:18            
+ToolConfig                  interface  src/exports/container-assist.ts:21:18            
 MCPToolMetadata             interface  src/exports/types.ts:10:18                       
 MCPServer                   interface  src/exports/types.ts:38:18                       
 ValidatedKnowledgeEntry     type       src/knowledge/schemas.ts:26:13                   
@@ -133,8 +124,8 @@ ContextOptions              interface  src/mcp/context.ts:164:18
 PromptBackedToolConfig      interface  src/mcp/prompt-backed-tool.ts:26:18              
 PromptToolExecutionOptions  interface  src/mcp/prompt-backed-tool.ts:50:18              
 PromptToolResult            interface  src/mcp/prompt-backed-tool.ts:67:18              
-ServerOptions               interface  src/mcp/server-direct.ts:20:18                   
-MCPServerState              interface  src/mcp/server-direct.ts:32:18                   
+ServerOptions               interface  src/mcp/server-direct.ts:22:18                   
+MCPServerState              interface  src/mcp/server-direct.ts:34:18                   
 Tool                        type       src/mcp/server.ts:13:14                          
 Result                      type       src/mcp/server.ts:13:20                          
 Success                     type       src/mcp/server.ts:13:28                          

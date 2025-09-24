@@ -405,7 +405,6 @@ export class ApplicationKernel implements Kernel {
   private planner: ExecutionPlanner;
   private policy?: Policy;
   private config: KernelConfig;
-  // Simple tools are executed directly via runTool function
 
   constructor(options: KernelFactoryOptions) {
     this.config = options.config;
@@ -414,6 +413,8 @@ export class ApplicationKernel implements Kernel {
     this.telemetry = options.telemetry || new DefaultTelemetrySystem();
     this.logger = options.logger || createLogger({ name: 'kernel' });
     this.planner = new ExecutionPlanner(this.toolRegistry);
+
+    // No MCP context needed - tools receive it at execution time
 
     // Load policy if configured
     if (this.config.policyPath) {
@@ -681,6 +682,11 @@ export class ApplicationKernel implements Kernel {
     return this.telemetry.getMetrics();
   }
 
+  getMcpServer(): any {
+    // Kernel no longer maintains MCP server - that's handled by server-direct
+    return undefined;
+  }
+
   // ============================================================================
   // Private Helper Methods
   // ============================================================================
@@ -702,19 +708,24 @@ export class ApplicationKernel implements Kernel {
   }
 
   /**
-   * Build tool context
+   * Build tool context - returns the shared MCP context
    */
-  private async buildContext(toolName: string, session?: SessionState): Promise<ToolContext> {
-    const logger = createLogger({ name: toolName });
-    const progress = new DefaultProgressReporter(logger);
-
+  private async buildContext(_toolName: string, _session?: SessionState): Promise<ToolContext> {
+    // Return a minimal context for kernel-internal use only
+    // Real MCP context comes from server at execution time
     return {
-      ...(session ? { sessionId: session.sessionId } : {}),
-      session,
-      logger,
-      progress,
-      telemetry: this.telemetry,
-    } as ToolContext;
+      logger: this.logger,
+      sampling: {
+        createMessage: async () => {
+          throw new Error('Sampling not available in kernel context');
+        },
+      },
+      getPrompt: async () => {
+        throw new Error('Prompts not available in kernel context');
+      },
+      signal: undefined,
+      progress: undefined,
+    };
   }
 
   /**
@@ -786,7 +797,7 @@ export async function createKernel(
 ): Promise<Kernel> {
   const kernel = new ApplicationKernel({
     config,
-    ...(tools ? { tools } : {}),
+    ...(tools && { tools }),
   });
 
   return kernel;

@@ -8,11 +8,13 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { extractErrorMessage } from '@/lib/error-utils';
 import type { Kernel } from '@/app/kernel';
 import { createLogger, type Logger } from '@/lib/logger';
+import { createToolContext } from '@/mcp/context';
+import { getAllInternalTools } from '@/exports/tools';
+import { createSessionManager } from '@/lib/session';
 
 /**
  * Server options for configuration
@@ -58,17 +60,29 @@ export interface IDirectMCPServer {
  * Register all tools and resources directly with SDK
  */
 const registerHandlers = async (state: MCPServerState): Promise<void> => {
-  // Get tools from kernel
-  const tools = state.kernel.tools();
+  // Load tools directly - don't get from kernel
+  const tools = getAllInternalTools();
 
-  // Register each tool from kernel
-  for (const [name, tool] of tools) {
-    // Extract schema shape, with robust handling for different Zod schema types
-    let schemaShape: Record<string, any> = {};
+  // Create session manager for tools to share data
+  const sessionManager = createSessionManager(state.logger);
+
+  // Create MCP context from the server with session manager
+  const mcpContext = createToolContext(state.server.server, state.logger, {
+    sessionManager,
+  });
+
+  // Register each tool
+  for (const tool of tools) {
+    const name = tool.name;
+    // Tools have both 'schema' (shape) and 'zodSchema' (full schema)
+    let schemaShape: Record<string, unknown> = {};
 
     if (tool.schema) {
-      // Helper function to extract shape from schema
-      const extractShape = (schema: any): Record<string, any> | null => {
+      // Use the shape directly
+      schemaShape = tool.schema;
+    } else if (tool.zodSchema) {
+      // Extract shape from zodSchema if needed
+      const extractShape = (schema: z.ZodTypeAny): Record<string, unknown> | null => {
         if (schema instanceof z.ZodObject) {
           return schema.shape;
         } else if (schema instanceof z.ZodEffects) {
@@ -76,18 +90,21 @@ const registerHandlers = async (state: MCPServerState): Promise<void> => {
           return extractShape(schema.innerType());
         } else if ('shape' in schema && typeof schema.shape === 'object') {
           // Fallback: if it has a shape property, use it
-          return schema.shape as Record<string, any>;
+          return schema.shape as Record<string, unknown>;
         }
         return null;
       };
 
-      const shape = extractShape(tool.schema);
+      const shape = extractShape(tool.zodSchema);
       if (shape) {
         schemaShape = shape;
       } else {
         // Log warning for non-standard schema types
         state.logger.warn(
-          { tool: name, schemaType: tool.schema.constructor.name || 'unknown' },
+          {
+            tool: name,
+            schemaType: (tool.zodSchema as z.ZodTypeAny).constructor.name || 'unknown',
+          },
           'Tool has non-standard Zod schema type, using empty schema shape',
         );
       }
@@ -95,22 +112,14 @@ const registerHandlers = async (state: MCPServerState): Promise<void> => {
 
     state.server.tool(
       name,
-      tool.description,
-      schemaShape,
+      tool.description || `${name} tool`,
+      schemaShape as any, // Type mismatch between zod schema and MCP server expectations
       async (params: Record<string, unknown>) => {
-        state.logger.info({ tool: name }, 'Executing tool via kernel');
+        state.logger.info({ tool: name }, 'Executing tool directly');
 
         try {
-          // Generate session ID if not provided
-          const sessionId = (params.sessionId as string) || randomUUID();
-
-          // Execute through kernel
-          const result = await state.kernel.execute({
-            toolName: name,
-            params,
-            sessionId,
-            force: params.force === true,
-          });
+          // Execute tool directly with MCP context
+          const result = await tool.execute(params, state.logger.child({ tool: name }), mcpContext);
 
           // Format result for MCP
           if (!result.ok) {
@@ -148,7 +157,7 @@ const registerHandlers = async (state: MCPServerState): Promise<void> => {
     },
     async () => {
       const health = state.kernel.getHealth();
-      const tools = state.kernel.tools();
+      const tools = getAllInternalTools();
 
       return {
         contents: [
@@ -161,7 +170,7 @@ const registerHandlers = async (state: MCPServerState): Promise<void> => {
                 running: state.isRunning,
                 kernel: health,
                 stats: {
-                  tools: tools.size,
+                  tools: tools.length,
                   resources: 1, // status resource
                   prompts: 0, // Update when prompts are added
                 },
@@ -178,7 +187,7 @@ const registerHandlers = async (state: MCPServerState): Promise<void> => {
   // Register prompts if needed
   await registerPrompts(state);
 
-  state.logger.info(`Registered ${tools.size} tools via kernel`);
+  state.logger.info(`Registered ${tools.length} tools directly`);
 };
 
 /**
@@ -203,10 +212,10 @@ const startServer = async (state: MCPServerState): Promise<void> => {
   await state.server.connect(state.transport);
   state.isRunning = true;
 
-  const tools = state.kernel.tools();
+  const tools = getAllInternalTools();
   state.logger.info(
     {
-      tools: tools.size,
+      tools: tools.length,
       prompts: 0,
       healthy: true,
     },
@@ -245,10 +254,10 @@ const getStatus = (
   resources: number;
   prompts: number;
 } => {
-  const tools = state.kernel.tools();
+  const tools = getAllInternalTools();
   return {
     running: state.isRunning,
-    tools: tools.size,
+    tools: tools.length,
     resources: 1,
     prompts: 0, // Prompts handled separately for now
   };
@@ -257,11 +266,11 @@ const getStatus = (
 /**
  * Get available tools for CLI listing
  */
-const getTools = (state: MCPServerState): Array<{ name: string; description: string }> => {
-  const tools = state.kernel.tools();
-  return Array.from(tools.entries()).map(([name, tool]) => ({
-    name,
-    description: tool.description,
+const getTools = (): Array<{ name: string; description: string }> => {
+  const tools = getAllInternalTools();
+  return tools.map((tool) => ({
+    name: tool.name,
+    description: tool.description || '',
   }));
 };
 
@@ -302,6 +311,6 @@ export const createDirectMCPServer = (
     stop: () => stopServer(state),
     getServer: () => getServer(state),
     getStatus: () => getStatus(state),
-    getTools: () => getTools(state),
+    getTools: () => getTools(),
   };
 };

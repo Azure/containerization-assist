@@ -185,7 +185,7 @@
     "pattern": "java|maven|gradle",
     "recommendation": "Add security vulnerability scanning to Java builds",
     "example": "# Security scanning in build stage\nFROM maven:3.9-openjdk-17 AS build\nCOPY . .\nRUN mvn dependency:tree\nRUN mvn org.owasp:dependency-check-maven:check\nRUN mvn compile spotbugs:check\n\n# Scan final image\nFROM aquasec/trivy AS scanner\nCOPY --from=build /app/target/*.jar /scan/\nRUN trivy fs --exit-code 1 --severity HIGH,CRITICAL /scan",
-    "severity": "critical",
+    "severity": "high",
     "tags": ["java", "security", "scanning", "owasp", "vulnerabilities"],
     "description": "Security scanning identifies vulnerabilities in dependencies and code"
   }
