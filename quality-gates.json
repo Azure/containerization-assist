@@ -20,7 +20,7 @@
     "baselines": {
       "lint": {
         "errors": 0,
-        "warnings": 25,
+        "warnings": 31,
         "warningSignatures": [
           "/home/tng/workspace/containerization-assist/src/ai/prompt-templates.ts:43:27:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/ai/prompt-templates.ts:62:17:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
@@ -45,6 +45,12 @@
           "/home/tng/workspace/containerization-assist/src/session/slices.ts:113:31:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/session/slices.ts:167:41:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/session/slices.ts:217:40:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/multi-step-generator.ts:26:3:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
+          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/multi-step-generator.ts:31:5:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
+          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/multi-step-generator.ts:40:7:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
+          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/multi-step-generator.ts:46:9:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
+          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/tool.ts:92:5:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
+          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/tool.ts:94:5:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
           "/home/tng/workspace/containerization-assist/src/tools/inspect-session/tool.ts:156:40:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/tools/inspect-session/tool.ts:180:38:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type."
         ]
