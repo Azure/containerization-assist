@@ -89,7 +89,9 @@ export async function generateDockerfile(
   try {
     // Step 1: Generate base image and initial setup
     context.logger.info('Step 1/4: Generating base image instructions');
+    console.log('[DEBUG] Calling generateBaseImage with:', { language, framework, environment });
     const baseResult = await generateBaseImage(language, framework, context, environment);
+    console.log('[DEBUG] Base result:', baseResult);
     if (!baseResult.ok) {
       return Failure(`Failed to generate base image: ${baseResult.error}`);
     }

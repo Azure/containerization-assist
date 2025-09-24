@@ -44,14 +44,14 @@ OutputContracts                          src/mcp/ai-tool-factory.ts:341:14
 PromptToolFactory              class     src/mcp/ai-tool-factory.ts:376:14              
 metadata                                 src/tools/analyze-repo/tool.ts:220:14          
 metadata                                 src/tools/convert-aca-to-k8s/tool.ts:63:14     
-metadata                                 src/tools/fix-dockerfile/tool.ts:129:14        
+metadata                                 src/tools/fix-dockerfile/tool.ts:185:14        
 metadata                                 src/tools/generate-aca-manifests/tool.ts:64:14 
 optimizationSchema                       src/tools/generate-dockerfile/schema.ts:17:14  
 securityLevelSchema                      src/tools/generate-dockerfile/schema.ts:22:14  
-metadata                                 src/tools/generate-dockerfile/tool.ts:266:14   
+metadata                                 src/tools/generate-dockerfile/tool.ts:268:14   
 metadata                                 src/tools/generate-helm-charts/tool.ts:59:14   
 metadata                                 src/tools/generate-k8s-manifests/tool.ts:244:14
-ALL_TOOLS                                src/tools/index.ts:309:14                      
+ALL_TOOLS                                src/tools/index.ts:310:14                      
 InspectSessionResultSchema               src/tools/inspect-session/schema.ts:17:14      
 ping                           function  src/tools/ops/tool.ts:39:23                    
 serverStatus                   function  src/tools/ops/tool.ts:107:23                   
