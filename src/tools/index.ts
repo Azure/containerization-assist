@@ -138,7 +138,8 @@ const deployTool: Tool = {
 
 const fixDockerfileTool: Tool = {
   name: TOOL_NAMES.FIX_DOCKERFILE,
-  description: 'Fix issues in a Dockerfile',
+  description:
+    'Validate and fix Dockerfile issues including syntax errors, [object Object] problems, and best practices',
   schema: fixDockerfileSchema.shape,
   zodSchema: fixDockerfileSchema,
   execute: async (params, _logger, context) => {

@@ -18,25 +18,102 @@ interface StepResult {
  * Extracts clean Dockerfile instructions from AI response
  */
 function extractInstructions(text: string): string {
-  // Remove JSON wrapper if present
-  try {
-    const parsed = JSON.parse(text);
-    if (parsed.dockerfile_partial || parsed.dockerfile_v1) {
-      const content = parsed.dockerfile_partial || parsed.dockerfile_v1;
-      return Array.isArray(content) ? content.join('\n') : content;
-    }
-    if (typeof parsed === 'string') return parsed;
-  } catch {
-    // Not JSON, proceed with text cleanup
+  if (!text) {
+    console.error('[extractInstructions] Received empty text');
+    return '';
   }
 
-  // Remove markdown code blocks
-  const cleaned = text
-    .replace(/```dockerfile?\n?/gi, '')
-    .replace(/```/g, '')
-    .trim();
+  console.log('[extractInstructions] Input text (first 200 chars):', text.substring(0, 200));
 
-  return cleaned;
+  // First, try to parse as JSON
+  try {
+    const parsed = JSON.parse(text);
+    console.log(
+      '[extractInstructions] Parsed as JSON:',
+      typeof parsed,
+      Array.isArray(parsed) ? 'array' : 'not array',
+    );
+
+    // Handle the expected contract format
+    if (parsed.dockerfile_partial || parsed.dockerfile_v1) {
+      const content = parsed.dockerfile_partial || parsed.dockerfile_v1;
+      console.log(
+        '[extractInstructions] Found dockerfile_partial/v1, content type:',
+        typeof content,
+      );
+
+      if (Array.isArray(content)) {
+        console.log('[extractInstructions] Content is array with', content.length, 'items');
+        // Filter out any [object Object] entries and properly stringify
+        return content
+          .filter((item) => item !== null && item !== undefined)
+          .map((item) => {
+            if (typeof item === 'string') return item;
+            if (typeof item === 'object') {
+              // Try to extract meaningful content from object
+              if ('instruction' in item) return String(item.instruction);
+              if ('line' in item) return String(item.line);
+              if ('content' in item) return String(item.content);
+              if ('value' in item) return String(item.value);
+              // Don't return [object Object]
+              console.warn('Skipping unrecognized object in Dockerfile content:', item);
+              return '';
+            }
+            return String(item);
+          })
+          .filter((line) => line && line !== '[object Object]')
+          .join('\n');
+      }
+
+      return typeof content === 'string' ? content : String(content);
+    }
+
+    // Handle plain string JSON
+    if (typeof parsed === 'string') {
+      return parsed;
+    }
+
+    // Handle array at root
+    if (Array.isArray(parsed)) {
+      return parsed
+        .filter((item) => item !== null && item !== undefined)
+        .map((item) => {
+          if (typeof item === 'string') return item;
+          if (typeof item === 'object') {
+            if ('instruction' in item) return String(item.instruction);
+            if ('line' in item) return String(item.line);
+            if ('content' in item) return String(item.content);
+            console.warn('Skipping unrecognized object:', item);
+            return '';
+          }
+          return String(item);
+        })
+        .filter((line) => line && line !== '[object Object]')
+        .join('\n');
+    }
+
+    // If JSON but not in expected format, might be the instructions directly
+    if (typeof parsed === 'object' && parsed.content) {
+      return extractInstructions(String(parsed.content));
+    }
+  } catch {
+    // Not JSON, treat as plain text
+  }
+
+  // Remove markdown code blocks and clean up
+  let cleaned = text;
+
+  // Remove markdown code fences
+  cleaned = cleaned.replace(/```dockerfile?\s*/gi, '');
+  cleaned = cleaned.replace(/```\s*/g, '');
+
+  // Remove any [object Object] lines
+  cleaned = cleaned
+    .split('\n')
+    .filter((line) => !line.includes('[object Object]'))
+    .join('\n');
+
+  return cleaned.trim();
 }
 
 /**
@@ -78,9 +155,16 @@ Keep it minimal and focused.`;
       },
     });
 
-    const content = extractInstructions(response.content[0]?.text || '');
+    const rawText = response.content[0]?.text || '';
+    context.logger.debug({ rawText: rawText.substring(0, 200) }, 'Raw AI response for base image');
+
+    const content = extractInstructions(rawText);
 
     if (!content?.includes('FROM')) {
+      context.logger.error(
+        { content, rawText: rawText.substring(0, 200) },
+        'Base image missing FROM instruction',
+      );
       return Failure('Failed to generate base image instructions');
     }
 
