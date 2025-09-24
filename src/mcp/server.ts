@@ -7,7 +7,7 @@
 export {
   createDirectMCPServer as createMCPServer,
   type IDirectMCPServer as IMCPServer,
-} from './server-direct';
+} from './mcp-server';
 
 // Export types for external use
 export type { Tool, Result, Success, Failure } from '@/types';

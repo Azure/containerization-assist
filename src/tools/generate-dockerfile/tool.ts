@@ -1,28 +1,33 @@
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import { promptTemplates, type DockerfilePromptParams } from '@/prompts/templates';
-import { buildMessages, toMCPMessages } from '@/ai/prompt-engine';
+// Removed unused imports - now using multi-step-generator
 import { generateDockerfileSchema, type GenerateDockerfileParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 import { getSession, updateSession } from '@/mcp/tool-session-helpers';
 import { promises as fs } from 'node:fs';
 import nodePath from 'node:path';
 import { DockerfileParser } from 'dockerfile-ast';
+import {
+  generateBaseImage,
+  generateDependencies,
+  generateBuildSteps,
+  generateRuntime,
+  combineDockerfileSteps,
+} from './multi-step-generator';
 
 export async function generateDockerfile(
   params: GenerateDockerfileParams,
   context: ToolContext,
 ): Promise<Result<AIResponse>> {
   const validatedParams = generateDockerfileSchema.parse(params);
-  const { baseImage, multistage, securityHardening, optimization, sessionId, path } =
-    validatedParams;
+  const { multistage, securityHardening, optimization, sessionId, path } = validatedParams;
 
   // Retrieve repository analysis from session if sessionId is provided
   let language = 'auto-detect';
   let framework = null;
   let dependencies: string[] = [];
   let ports = [8080];
-  let promptPrefix = '';
+  let _promptPrefix = '';
 
   if (sessionId) {
     const sessionResult = await getSession(sessionId, context);
@@ -43,21 +48,21 @@ export async function generateDockerfile(
         : [8080];
 
       // Create a detailed prompt with the actual analysis data
-      promptPrefix = `Repository Analysis Results:
+      _promptPrefix = `Repository Analysis Results:
 `;
-      promptPrefix += `- Language: ${language} ${typeof analysis.languageVersion === 'string' ? `(${analysis.languageVersion})` : ''}\n`;
+      _promptPrefix += `- Language: ${language} ${typeof analysis.languageVersion === 'string' ? `(${analysis.languageVersion})` : ''}\n`;
       if (framework) {
-        promptPrefix += `- Framework: ${framework} ${typeof analysis.frameworkVersion === 'string' ? `(${analysis.frameworkVersion})` : ''}\n`;
+        _promptPrefix += `- Framework: ${framework} ${typeof analysis.frameworkVersion === 'string' ? `(${analysis.frameworkVersion})` : ''}\n`;
       }
       const buildSystem = analysis.buildSystem as Record<string, unknown> | undefined;
-      promptPrefix += `- Build System: ${buildSystem?.type || 'unknown'}\n`;
+      _promptPrefix += `- Build System: ${buildSystem?.type || 'unknown'}\n`;
       if (dependencies.length > 0) {
-        promptPrefix += `- Key Dependencies: ${dependencies.slice(0, 5).join(', ')}${dependencies.length > 5 ? '...' : ''}\n`;
+        _promptPrefix += `- Key Dependencies: ${dependencies.slice(0, 5).join(', ')}${dependencies.length > 5 ? '...' : ''}\n`;
       }
       if (typeof analysis.entryPoint === 'string') {
-        promptPrefix += `- Entry Point: ${analysis.entryPoint}\n`;
+        _promptPrefix += `- Entry Point: ${analysis.entryPoint}\n`;
       }
-      promptPrefix += `\nGenerate a Dockerfile based on this analysis.\n\n`;
+      _promptPrefix += `\nGenerate a Dockerfile based on this analysis.\n\n`;
 
       context.logger.info(
         { sessionId, language, framework },
@@ -65,112 +70,91 @@ export async function generateDockerfile(
       );
     } else {
       context.logger.warn({ sessionId }, 'Session not found or no analysis data available');
-      promptPrefix = `Warning: Could not retrieve analysis data from session ${sessionId}. Analyze the repository to determine the best configuration.\n\n`;
+      _promptPrefix = `Warning: Could not retrieve analysis data from session ${sessionId}. Analyze the repository to determine the best configuration.\n\n`;
     }
   } else if (path) {
-    promptPrefix = `Analyze the repository at ${path} to detect the technology stack, dependencies, and requirements.\n\n`;
+    _promptPrefix = `Analyze the repository at ${path} to detect the technology stack, dependencies, and requirements.\n\n`;
   }
 
-  const promptParams = {
-    language,
-    framework,
-    dependencies,
-    ports,
-    optimization: optimization === 'size' || optimization === 'balanced',
-    securityHardening,
-    multistage,
-    baseImage,
-    requirements: promptPrefix,
-  } as DockerfilePromptParams;
-  const basePrompt = promptTemplates.dockerfile(promptParams);
+  // Use multi-step approach to avoid timeout
+  const environment = validatedParams.environment || 'production';
 
-  // Build messages using the new prompt engine - minimize for speed
-  const messages = await buildMessages({
-    basePrompt,
-    topic: 'generate_dockerfile',
-    tool: 'generate-dockerfile',
-    environment: validatedParams.environment || 'production',
-    contract: {
-      name: 'dockerfile_v1',
-      description: 'Generate a Dockerfile',
-    },
-    knowledgeBudget: 500, // Minimal knowledge to prevent timeout
-  });
-
-  // Execute via AI with structured messages
-  const mcpMessages = toMCPMessages(messages);
-
-  // Log message size for debugging
   context.logger.info(
-    {
-      messageSize: JSON.stringify(mcpMessages).length,
-      messageCount: mcpMessages.messages.length,
-    },
-    'Sending Dockerfile generation request',
+    { language, framework, multistage, optimization },
+    'Starting multi-step Dockerfile generation to avoid timeout',
   );
 
-  const response = await context.sampling.createMessage({
-    ...mcpMessages, // Spreads the MCP-compatible messages
-    maxTokens: 3000, // Slightly increased for complete Dockerfiles
-    modelPreferences: {
-      hints: [{ name: 'dockerfile-generation' }],
-    },
-  });
+  let dockerfileContent = '';
+
+  try {
+    // Step 1: Generate base image and initial setup
+    context.logger.info('Step 1/4: Generating base image instructions');
+    const baseResult = await generateBaseImage(language, framework, context, environment);
+    if (!baseResult.ok) {
+      return Failure(`Failed to generate base image: ${baseResult.error}`);
+    }
+
+    // Step 2: Generate dependency installation
+    context.logger.info('Step 2/4: Generating dependency installation');
+    const depsResult = await generateDependencies(
+      language,
+      framework,
+      baseResult.value.content,
+      dependencies,
+      context,
+      environment,
+    );
+    if (!depsResult.ok) {
+      return Failure(`Failed to generate dependencies: ${depsResult.error}`);
+    }
+
+    // Step 3: Generate build steps
+    context.logger.info('Step 3/4: Generating build steps');
+    const buildResult = await generateBuildSteps(language, framework, context, environment);
+    if (!buildResult.ok) {
+      return Failure(`Failed to generate build steps: ${buildResult.error}`);
+    }
+
+    // Step 4: Generate runtime configuration
+    context.logger.info('Step 4/4: Generating runtime configuration');
+    const runtimeResult = await generateRuntime(
+      language,
+      framework,
+      ports,
+      securityHardening || false,
+      typeof optimization === 'string' ? optimization : undefined,
+      context,
+      environment,
+    );
+    if (!runtimeResult.ok) {
+      return Failure(`Failed to generate runtime: ${runtimeResult.error}`);
+    }
+
+    // Combine all steps
+    dockerfileContent = combineDockerfileSteps(
+      baseResult.value.content,
+      depsResult.value.content,
+      buildResult.value.content,
+      runtimeResult.value.content,
+    );
+
+    context.logger.info(
+      { contentLength: dockerfileContent.length },
+      'Successfully generated Dockerfile using multi-step approach',
+    );
+  } catch (stepError) {
+    // Handle any errors during multi-step generation
+    const errorMessage = stepError instanceof Error ? stepError.message : String(stepError);
+    context.logger.error({ error: errorMessage }, 'Multi-step generation failed');
+    return Failure(`Multi-step Dockerfile generation failed: ${errorMessage}`);
+  }
+
+  // Response object is no longer needed with multi-step approach
 
   // Return result with workflow hints
   try {
-    const responseText = response.content[0]?.text || '';
-
-    // Parse the response to extract the actual Dockerfile
-    let dockerfileContent = '';
-
-    // First check if it's already a plain Dockerfile (starts with FROM)
-    if (responseText.trim().startsWith('FROM')) {
-      dockerfileContent = responseText.trim();
-    } else {
-      // Try to parse as JSON
-      try {
-        const parsed = JSON.parse(responseText);
-
-        // Extract Dockerfile from various possible formats
-        if (parsed.dockerfile_v1) {
-          // Format: { dockerfile_v1: { Dockerfile: [...] } }
-          if (Array.isArray(parsed.dockerfile_v1.Dockerfile)) {
-            dockerfileContent = parsed.dockerfile_v1.Dockerfile.join('\n');
-          } else if (typeof parsed.dockerfile_v1.Dockerfile === 'string') {
-            dockerfileContent = parsed.dockerfile_v1.Dockerfile;
-          } else if (typeof parsed.dockerfile_v1 === 'string') {
-            dockerfileContent = parsed.dockerfile_v1;
-          }
-        } else if (parsed.Dockerfile) {
-          // Format: { Dockerfile: [...] } or { Dockerfile: "..." }
-          if (Array.isArray(parsed.Dockerfile)) {
-            dockerfileContent = parsed.Dockerfile.join('\n');
-          } else {
-            dockerfileContent = parsed.Dockerfile;
-          }
-        } else if (parsed.dockerfile) {
-          // Format: { dockerfile: "..." }
-          dockerfileContent = parsed.dockerfile;
-        } else if (typeof parsed === 'string') {
-          // The JSON might just be a string
-          dockerfileContent = parsed;
-        }
-      } catch {
-        // Not JSON, might have markdown fences or other formatting
-        // Try to extract content between ```dockerfile and ```
-        const dockerfileMatch = responseText.match(/```dockerfile?\n([\s\S]*?)```/);
-        if (dockerfileMatch?.[1]) {
-          dockerfileContent = dockerfileMatch[1].trim();
-        } else {
-          // Last resort: use as-is but clean up common issues
-          dockerfileContent = responseText
-            .replace(/```/g, '')
-            .replace(/^dockerfile\s*\n/i, '')
-            .trim();
-        }
-      }
-    }
+    // dockerfileContent is already set from multi-step generation
+    const responseText = dockerfileContent;
 
     // Validate the extracted Dockerfile using proper parser
     try {

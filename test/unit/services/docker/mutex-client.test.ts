@@ -1,4 +1,4 @@
-import { createDockerClient } from '../../../../src/services/docker-client';
+import { createDockerClient } from '../../../../src/infra/docker/client';
 import { Success, Failure } from '../../../../src/types';
 import pino from 'pino';
 

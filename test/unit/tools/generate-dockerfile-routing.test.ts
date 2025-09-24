@@ -34,6 +34,10 @@ jest.mock('../../../src/config/policy-prompt', () => ({
 // Mock prompt engine
 jest.mock('../../../src/ai/prompt-engine', () => ({
   buildMessages: jest.fn(async () => ({ messages: [{ role: 'user', content: 'test' }] })),
+}));
+
+// Mock MCP message converter
+jest.mock('../../../src/mcp/ai/message-converter', () => ({
   toMCPMessages: jest.fn((messages) => messages),
 }));
 
@@ -72,7 +76,10 @@ describe('generate-dockerfile smart routing', () => {
       sampling: {
         createMessage: jest.fn().mockResolvedValue({
           role: 'assistant',
-          content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(mockDockerfileResult)}\n\`\`\`` }]
+          content: [{
+            type: 'text',
+            text: 'FROM node:18-alpine\nWORKDIR /app\nCOPY package.json .\nRUN npm install\nCOPY . .\nEXPOSE 3000\nCMD ["npm", "start"]'
+          }]
         }),
       },
       getPrompt: jest.fn().mockResolvedValue({ messages: [] }),

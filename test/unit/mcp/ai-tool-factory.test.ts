@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from '@jest/globals';
-import { extractJSON } from '@/mcp/prompt-backed-tool';
+import { extractJSON } from '@/mcp/ai-tool-factory';
 
 describe('Prompt-Backed Tool', () => {
   describe('extractJSON', () => {

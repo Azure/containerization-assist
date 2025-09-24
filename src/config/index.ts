@@ -4,7 +4,10 @@
  * Single source of configuration replacing 9 separate config files
  * Simple, focused configuration without complex validation overhead
  */
-import { autoDetectDockerSocket } from '@/services/docker-client';
+import { autoDetectDockerSocket } from '@/infra/docker/client';
+
+// Export unified environment module
+export * from './environment';
 
 export const config = {
   mcp: {

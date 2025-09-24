@@ -17,6 +17,66 @@ import {
   ValidationGrade,
 } from './core-types';
 
+// Type definitions for Kubernetes resources
+interface PodSpec {
+  containers?: Container[];
+  initContainers?: Container[];
+  volumes?: Volume[];
+  securityContext?: SecurityContext;
+  hostNetwork?: boolean;
+}
+
+interface Container {
+  name?: string;
+  resources?: {
+    limits?: Record<string, string>;
+    requests?: Record<string, string>;
+  };
+  securityContext?: SecurityContext;
+  image?: string;
+  imagePullPolicy?: string;
+  livenessProbe?: Probe;
+  readinessProbe?: Probe;
+}
+
+interface SecurityContext {
+  runAsNonRoot?: boolean;
+  readOnlyRootFilesystem?: boolean;
+  capabilities?: {
+    drop?: string[];
+  };
+  privileged?: boolean;
+  runAsUser?: number;
+  fsGroup?: number;
+}
+
+interface Volume {
+  emptyDir?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+interface Probe {
+  httpGet?: unknown;
+  tcpSocket?: unknown;
+  exec?: unknown;
+}
+
+interface WorkloadSpec {
+  template?: {
+    spec?: PodSpec;
+  };
+  jobTemplate?: {
+    spec?: {
+      template?: {
+        spec?: PodSpec;
+      };
+    };
+  };
+  strategy?: {
+    type?: string;
+  };
+}
+
 export interface KubernetesValidatorInstance {
   validate(yamlContent: string): ValidationReport;
   getRules(): KubernetesValidationRule[];
@@ -34,24 +94,23 @@ const isWorkload = (manifest: KubernetesManifest): boolean => {
 /**
  * Get pod spec from different workload types
  */
-const getPodSpec = (manifest: KubernetesManifest): Record<string, unknown> | undefined => {
+const getPodSpec = (manifest: KubernetesManifest): PodSpec | undefined => {
   if (manifest.kind === 'Pod') {
-    return manifest.spec;
+    return manifest.spec as PodSpec;
   }
   if (manifest.kind === 'Job' || manifest.kind === 'CronJob') {
-    const spec = manifest.spec as any;
+    const spec = manifest.spec as WorkloadSpec;
     return spec?.jobTemplate?.spec?.template?.spec || spec?.template?.spec;
   }
-  return (manifest.spec as any)?.template?.spec;
+  return (manifest.spec as WorkloadSpec)?.template?.spec;
 };
 
 /**
  * Get all containers from manifest
  */
-const getContainers = (manifest: KubernetesManifest): Array<Record<string, unknown>> => {
+const getContainers = (manifest: KubernetesManifest): Container[] => {
   const podSpec = getPodSpec(manifest);
-  const spec = podSpec as any;
-  return [...(spec?.containers || []), ...(spec?.initContainers || [])];
+  return [...(podSpec?.containers || []), ...(podSpec?.initContainers || [])];
 };
 
 /**
@@ -67,7 +126,7 @@ const KUBERNETES_RULES: KubernetesValidationRule[] = [
 
       const containers = getContainers(manifest);
       return containers.every((container) => {
-        const resources = (container as any).resources;
+        const resources = container.resources;
         return resources?.limits?.cpu && resources?.limits?.memory;
       });
     },
@@ -86,7 +145,7 @@ const KUBERNETES_RULES: KubernetesValidationRule[] = [
 
       const containers = getContainers(manifest);
       return containers.every((container) => {
-        const resources = (container as any).resources;
+        const resources = container.resources;
         return resources?.requests?.cpu && resources?.requests?.memory;
       });
     },
@@ -138,7 +197,7 @@ const KUBERNETES_RULES: KubernetesValidationRule[] = [
 
       const containers = getContainers(manifest);
       return containers.every((container) => {
-        const securityContext = (container as any).securityContext;
+        const securityContext = container.securityContext;
         return !securityContext?.privileged;
       });
     },
@@ -156,7 +215,7 @@ const KUBERNETES_RULES: KubernetesValidationRule[] = [
       if (!isWorkload(manifest)) return true;
 
       const podSpec = getPodSpec(manifest);
-      const securityContext = (podSpec as any)?.securityContext;
+      const securityContext = podSpec?.securityContext;
 
       return !!(
         securityContext?.runAsNonRoot ||
@@ -194,7 +253,7 @@ const KUBERNETES_RULES: KubernetesValidationRule[] = [
 
       const containers = getContainers(manifest);
       return containers.every((container) => {
-        const c = container as any;
+        const c = container;
         // :latest tags change content, requiring Always pull policy
         if (c.image?.includes(':latest')) {
           return c.imagePullPolicy === 'Always';
@@ -233,7 +292,7 @@ const KUBERNETES_RULES: KubernetesValidationRule[] = [
       if (!isWorkload(manifest)) return true;
 
       const podSpec = getPodSpec(manifest);
-      const volumes = (podSpec as any)?.volumes || [];
+      const volumes = podSpec?.volumes || [];
 
       return !volumes.some((volume: Record<string, unknown>) => volume.hostPath);
     },
@@ -265,7 +324,7 @@ const KUBERNETES_RULES: KubernetesValidationRule[] = [
     check: (manifest: KubernetesManifest) => {
       if (manifest.kind !== 'Deployment') return true;
 
-      return !!(manifest.spec as any)?.strategy?.type;
+      return !!(manifest.spec as WorkloadSpec)?.strategy?.type;
     },
     message: 'Define deployment strategy for updates',
     severity: ValidationSeverity.INFO,

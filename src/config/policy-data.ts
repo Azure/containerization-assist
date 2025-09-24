@@ -1,11 +1,11 @@
 /**
- * Policy Configuration
- * TypeScript version of the policy configuration
+ * Policy Configuration Data
+ * TypeScript-only policy configuration
  */
 
-import type { Policy } from '../src/config/policy-schemas';
+import type { Policy } from './policy-schemas';
 
-export const policyConfig: Policy = {
+export const policyData: Policy = {
   version: '2.0',
 
   metadata: {
@@ -56,6 +56,42 @@ export const policyConfig: Policy = {
         notify_security: true,
       },
     },
+    {
+      id: 'non-root-user',
+      category: 'security',
+      priority: 88,
+      description: 'Enforce non-root user in containers',
+      conditions: [
+        {
+          kind: 'regex',
+          pattern: 'USER root$',
+          flags: 'm',
+        },
+      ],
+      actions: {
+        require_non_root: true,
+        suggest_user: 'app',
+        severity: 'error',
+      },
+    },
+    {
+      id: 'secret-prevention',
+      category: 'security',
+      priority: 92,
+      description: 'Prevent secrets from being included in images',
+      conditions: [
+        {
+          kind: 'regex',
+          pattern: '(API_KEY|SECRET|PASSWORD|TOKEN)\\s*=',
+          flags: 'i',
+        },
+      ],
+      actions: {
+        block_build: true,
+        severity: 'critical',
+        suggest_secret_manager: true,
+      },
+    },
 
     // Quality Rules (Priority 80-99)
     {
@@ -90,24 +126,6 @@ export const policyConfig: Policy = {
       actions: {
         suggest_layer_split: true,
         max_layers: 50,
-      },
-    },
-    {
-      id: 'non-root-user',
-      category: 'security',
-      priority: 88,
-      description: 'Enforce non-root user in containers',
-      conditions: [
-        {
-          kind: 'regex',
-          pattern: 'USER root$',
-          flags: 'm',
-        },
-      ],
-      actions: {
-        require_non_root: true,
-        suggest_user: 'app',
-        severity: 'error',
       },
     },
 
@@ -166,24 +184,6 @@ export const policyConfig: Policy = {
           'org.opencontainers.image.description',
         ],
         validate_oci_compliance: true,
-      },
-    },
-    {
-      id: 'secret-prevention',
-      category: 'security',
-      priority: 92,
-      description: 'Prevent secrets from being included in images',
-      conditions: [
-        {
-          kind: 'regex',
-          pattern: '(API_KEY|SECRET|PASSWORD|TOKEN)\\s*=',
-          flags: 'i',
-        },
-      ],
-      actions: {
-        block_build: true,
-        severity: 'critical',
-        suggest_secret_manager: true,
       },
     },
   ],

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { environmentSchema } from '@/config/environment';
 
 export const generateAcaManifestsSchema = z.object({
   // Core required fields
@@ -41,10 +42,7 @@ export const generateAcaManifestsSchema = z.object({
     .describe('Environment variables configuration'),
 
   // Standard deployment environment
-  environment: z
-    .enum(['development', 'staging', 'production'])
-    .optional()
-    .describe('Target environment'),
+  environment: environmentSchema.optional(),
 
   // Location for ACA
   location: z.string().optional().default('eastus').describe('Azure region'),

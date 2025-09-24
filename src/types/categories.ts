@@ -3,15 +3,17 @@
  * Provides strong typing for categories, environments, and quality metrics
  */
 
+import type { Environment } from '@/config/environment';
+
 /**
  * Content categories for scoring and validation
  */
 export type ContentCategory = 'dockerfile' | 'kubernetes' | 'security' | 'generic';
 
 /**
- * Deployment environment types
+ * Re-export Environment type from unified module for backwards compatibility
  */
-export type Environment = 'development' | 'staging' | 'production' | 'testing';
+export type { Environment };
 
 /**
  * Security/quality grade ratings

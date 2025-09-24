@@ -1,7 +1,8 @@
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import { promptTemplates } from '@/prompts/templates';
-import { buildMessages, toMCPMessages } from '@/ai/prompt-engine';
+import { promptTemplates } from '@/ai/prompt-templates';
+import { buildMessages } from '@/ai/prompt-engine';
+import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { analyzeRepoSchema, type AnalyzeRepoParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 import { randomUUID } from 'node:crypto';

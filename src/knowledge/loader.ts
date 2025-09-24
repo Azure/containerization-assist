@@ -177,11 +177,11 @@ export const loadKnowledgeBase = async (): Promise<void> => {
     for (const packFile of knowledgePacks) {
       try {
         const possiblePaths = [
-          path.resolve(process.cwd(), 'src/knowledge/data', packFile),
-          path.resolve(process.cwd(), 'dist/src/knowledge/data', packFile),
+          path.resolve(process.cwd(), 'knowledge/packs', packFile),
+          path.resolve(process.cwd(), 'dist/knowledge/packs', packFile),
           path.resolve(
             process.cwd(),
-            'node_modules/@thgamble/containerization-assist-mcp/dist/src/knowledge/data',
+            'node_modules/@thgamble/containerization-assist-mcp/knowledge/packs',
             packFile,
           ),
         ] as const;

@@ -20,6 +20,10 @@ jest.mock('@/ai/prompt-engine', () => ({
       { role: 'user', content: [{ type: 'text', text: 'Test prompt with knowledge' }] }
     ]
   })),
+}));
+
+// Mock the MCP message converter
+jest.mock('@/mcp/ai/message-converter', () => ({
   toMCPMessages: jest.fn().mockImplementation((messages) => ({
     messages: messages.messages || [
       { role: 'user', content: [{ type: 'text', text: 'Test prompt' }] }
@@ -144,9 +148,10 @@ spec:
         mockContext,
       );
 
+      // The multi-step generator uses multiple specific topics
       expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
-          topic: 'generate_dockerfile',
+          topic: 'dockerfile_base',
           tool: 'generate-dockerfile',
           environment: 'production',
         }),

@@ -13,7 +13,8 @@ import {
   Success,
   Failure,
 } from '@/types/index';
-import { buildMessages, toMCPMessages } from '@/ai/prompt-engine';
+import { buildMessages } from '@/ai/prompt-engine';
+import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { createLogger } from '@/lib/logger';
 import type { Logger } from 'pino';
 import { z } from 'zod';

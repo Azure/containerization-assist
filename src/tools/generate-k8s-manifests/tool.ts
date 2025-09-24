@@ -1,7 +1,8 @@
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import { promptTemplates, K8sManifestPromptParams } from '@/prompts/templates';
-import { buildMessages, toMCPMessages } from '@/ai/prompt-engine';
+import { promptTemplates, K8sManifestPromptParams } from '@/ai/prompt-templates';
+import { buildMessages } from '@/ai/prompt-engine';
+import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { generateK8sManifestsSchema, type GenerateK8sManifestsParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 import * as yaml from 'js-yaml';

@@ -16,7 +16,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extractErrorMessage } from '@/lib/error-utils';
-import { autoDetectDockerSocket } from '@/services/docker-client';
+import { autoDetectDockerSocket } from '@/infra/docker/client';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

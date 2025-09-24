@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
-import { autoDetectDockerSocket } from '@/services/docker-client';
+import { autoDetectDockerSocket } from '@/infra/docker/client';
 
 /**
  * Flattened configuration defaults

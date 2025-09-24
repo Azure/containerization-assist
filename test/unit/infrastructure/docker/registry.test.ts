@@ -2,7 +2,7 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import {
   getImageMetadata,
   type ImageMetadata,
-} from '../../../../src/services/docker-registry';
+} from '../../../../src/infra/docker/registry';
 
 // Mock fetch globally
 global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;

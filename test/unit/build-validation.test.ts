@@ -24,20 +24,20 @@ describe('Build Output Validation', () => {
   });
 
   describe('ESM Build (dist)', () => {
-    describe('Prompts Directory', () => {
-      const promptsDir = join(distDir, 'src', 'prompts');
+    describe('AI Module', () => {
+      const aiDir = join(distDir, 'src', 'ai');
 
-      it('should include prompts directory in dist', () => {
-        expect(existsSync(promptsDir)).toBe(true);
+      it('should include AI directory in dist', () => {
+        expect(existsSync(aiDir)).toBe(true);
       });
 
-      it('should include TypeScript prompt files', () => {
-        // Check for TypeScript prompt files (templates module)
+      it('should include prompt template files', () => {
+        // Check for prompt template module in AI directory
         const expectedPromptFiles = [
-          'templates.js'
+          'prompt-templates.js'
         ];
 
-        const files = readdirSync(promptsDir).filter(item => {
+        const files = readdirSync(aiDir).filter(item => {
           return item.endsWith('.js') || item.endsWith('.d.ts');
         });
 
@@ -47,19 +47,20 @@ describe('Build Output Validation', () => {
       });
 
       it('should include TypeScript declaration files', () => {
-        const files = readdirSync(promptsDir);
+        const files = readdirSync(aiDir);
         const declarationFiles = files.filter(f => f.endsWith('.d.ts'));
 
         // Should have declaration files for type safety
         expect(declarationFiles.length).toBeGreaterThan(0);
 
         // Check for specific declaration files
-        expect(declarationFiles).toContain('templates.d.ts');
+        expect(declarationFiles).toContain('prompt-templates.d.ts');
       });
 
-      it('should include critical TypeScript prompt modules', () => {
+      it('should include critical AI modules', () => {
         const criticalModules = [
-          join(promptsDir, 'templates.js')
+          join(aiDir, 'prompt-templates.js'),
+          join(aiDir, 'prompt-engine.js')
         ];
 
         criticalModules.forEach(moduleFile => {
@@ -73,9 +74,10 @@ describe('Build Output Validation', () => {
     });
 
     describe('Knowledge Data Directory', () => {
-      const knowledgeDataDir = join(distDir, 'src', 'knowledge', 'data');
+      // Knowledge data has been moved to top-level knowledge/packs/ directory
+      const knowledgeDataDir = join(rootDir, 'knowledge', 'packs');
 
-      it('should include knowledge data directory in dist', () => {
+      it('should have knowledge data in top-level knowledge/packs directory', () => {
         expect(existsSync(knowledgeDataDir)).toBe(true);
       });
 
@@ -92,7 +94,7 @@ describe('Build Output Validation', () => {
         ];
 
         const files = readdirSync(knowledgeDataDir);
-        
+
         expectedPacks.forEach(pack => {
           expect(files).toContain(pack);
         });
@@ -100,7 +102,7 @@ describe('Build Output Validation', () => {
 
       it('should have valid JSON content in knowledge files', () => {
         const files = readdirSync(knowledgeDataDir).filter(f => f.endsWith('.json'));
-        
+
         files.forEach(file => {
           const filePath = join(knowledgeDataDir, file);
           expect(() => {
@@ -112,20 +114,20 @@ describe('Build Output Validation', () => {
   });
 
   describe('CommonJS Build (dist-cjs)', () => {
-    describe('Prompts Directory', () => {
-      const promptsDir = join(distCjsDir, 'src', 'prompts');
+    describe('AI Module', () => {
+      const aiDir = join(distCjsDir, 'src', 'ai');
 
-      it('should include prompts directory in dist-cjs', () => {
-        expect(existsSync(promptsDir)).toBe(true);
+      it('should include AI directory in dist-cjs', () => {
+        expect(existsSync(aiDir)).toBe(true);
       });
 
-      it('should include TypeScript prompt files', () => {
-        // Check for TypeScript prompt files (templates module)
+      it('should include prompt template files', () => {
+        // Check for prompt template module in AI directory
         const expectedPromptFiles = [
-          'templates.js'
+          'prompt-templates.js'
         ];
 
-        const files = readdirSync(promptsDir).filter(item => {
+        const files = readdirSync(aiDir).filter(item => {
           return item.endsWith('.js') || item.endsWith('.d.ts');
         });
 
@@ -133,55 +135,16 @@ describe('Build Output Validation', () => {
           expect(files).toContain(file);
         });
       });
-
-      it('should include JSON prompt files in CommonJS build', () => {
-        const categories = readdirSync(promptsDir).filter(item => {
-          const itemPath = join(promptsDir, item);
-          return statSync(itemPath).isDirectory();
-        });
-
-        categories.forEach(category => {
-          const categoryPath = join(promptsDir, category);
-          const files = readdirSync(categoryPath);
-          const jsonFiles = files.filter(f => f.endsWith('.json'));
-          
-          expect(jsonFiles.length).toBeGreaterThan(0);
-        });
-      });
     });
 
-    describe('Knowledge Data Directory', () => {
-      const knowledgeDataDir = join(distCjsDir, 'src', 'knowledge', 'data');
-
-      it('should include knowledge data directory in dist-cjs', () => {
-        expect(existsSync(knowledgeDataDir)).toBe(true);
-      });
-
-      it('should include all knowledge pack files in CommonJS build', () => {
-        const expectedPacks = [
-          'starter-pack.json',
-          'nodejs-pack.json',
-          'python-pack.json',
-          'java-pack.json',
-          'dotnet-pack.json',
-          'go-pack.json',
-          'kubernetes-pack.json',
-          'security-pack.json'
-        ];
-
-        const files = readdirSync(knowledgeDataDir);
-        
-        expectedPacks.forEach(pack => {
-          expect(files).toContain(pack);
-        });
-      });
-    });
+    // Knowledge data is no longer duplicated in dist-cjs
+    // It's in the top-level knowledge/packs/ directory only
   });
 
   describe('Package Integrity', () => {
     it('should have consistent TypeScript modules between ESM and CommonJS builds', () => {
-      const esmPromptsDir = join(distDir, 'src', 'prompts');
-      const cjsPromptsDir = join(distCjsDir, 'src', 'prompts');
+      const esmAiDir = join(distDir, 'src', 'ai');
+      const cjsAiDir = join(distCjsDir, 'src', 'ai');
 
       // Count JavaScript files (compiled TypeScript)
       const countJsFiles = (dir: string): number => {
@@ -189,24 +152,25 @@ describe('Build Output Validation', () => {
         return items.filter(item => item.endsWith('.js')).length;
       };
 
-      const esmPromptCount = countJsFiles(esmPromptsDir);
-      const cjsPromptCount = countJsFiles(cjsPromptsDir);
+      const esmAiCount = countJsFiles(esmAiDir);
+      const cjsAiCount = countJsFiles(cjsAiDir);
 
-      expect(esmPromptCount).toBe(cjsPromptCount);
-      expect(esmPromptCount).toBeGreaterThan(0);
+      expect(esmAiCount).toBe(cjsAiCount);
+      expect(esmAiCount).toBeGreaterThan(0);
 
-      // Should have at least templates
-      expect(esmPromptCount).toBeGreaterThanOrEqual(1);
+      // Should have at least prompt-templates and prompt-engine
+      expect(esmAiCount).toBeGreaterThanOrEqual(2);
     });
 
     it('should have knowledge data files with reasonable sizes', () => {
-      const knowledgeDataDir = join(distDir, 'src', 'knowledge', 'data');
+      // Knowledge data is now in top-level knowledge/packs/ directory
+      const knowledgeDataDir = join(rootDir, 'knowledge', 'packs');
       const files = readdirSync(knowledgeDataDir).filter(f => f.endsWith('.json'));
-      
+
       files.forEach(file => {
         const filePath = join(knowledgeDataDir, file);
         const stats = statSync(filePath);
-        
+
         // Each knowledge pack should be at least 1KB but not more than 100KB
         expect(stats.size).toBeGreaterThan(1000);
         expect(stats.size).toBeLessThan(100000);
@@ -215,26 +179,26 @@ describe('Build Output Validation', () => {
   });
 
   describe('Runtime Loading Validation', () => {
-    it('should be able to find prompts modules at runtime', () => {
-      const possiblePromptDirs = [
-        join(rootDir, 'src', 'prompts'),
-        join(distDir, 'src', 'prompts'),
-        join(distCjsDir, 'src', 'prompts')
+    it('should be able to find AI modules at runtime', () => {
+      const possibleAiDirs = [
+        join(rootDir, 'src', 'ai'),
+        join(distDir, 'src', 'ai'),
+        join(distCjsDir, 'src', 'ai')
       ];
 
-      const foundPromptDir = possiblePromptDirs.find(dir => existsSync(dir));
-      expect(foundPromptDir).toBeDefined();
-      
+      const foundAiDir = possibleAiDirs.find(dir => existsSync(dir));
+      expect(foundAiDir).toBeDefined();
+
       // Verify it contains TypeScript modules
-      if (foundPromptDir) {
-        const files = readdirSync(foundPromptDir);
+      if (foundAiDir) {
+        const files = readdirSync(foundAiDir);
         const tsFiles = files.filter(f => f.endsWith('.ts') || f.endsWith('.js'));
 
         // Should have TypeScript source files or compiled JS files
         expect(tsFiles.length).toBeGreaterThan(0);
 
         // Check for key modules
-        const hasTemplates = files.some(f => f.startsWith('templates'));
+        const hasTemplates = files.some(f => f.includes('prompt-templates'));
 
         expect(hasTemplates).toBe(true);
       }

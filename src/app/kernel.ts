@@ -22,7 +22,7 @@ import { createLogger } from '@/lib/logger';
 import { loadPolicy } from '@/config/policy-io';
 import { applyPolicy } from '@/config/policy-eval';
 import type { Policy } from '@/config/policy-schemas';
-import { runTool, canExecuteSimply } from '@/mcp/standalone-executor';
+import { runTool, canExecuteSimply } from '@/mcp/executor';
 import { SessionManager as SimpleSessionManager } from '@/lib/session-manager';
 import type {
   Kernel,

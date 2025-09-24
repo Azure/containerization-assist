@@ -179,8 +179,8 @@ class SmartBuilder {
   }
 
   private async copyKnowledgeData(outputDir: string) {
-    const sourceDir = path.join(process.cwd(), 'src', 'knowledge', 'data');
-    const targetDir = path.join(process.cwd(), outputDir, 'src', 'knowledge', 'data');
+    const sourceDir = path.join(process.cwd(), 'knowledge', 'packs');
+    const targetDir = path.join(process.cwd(), outputDir, 'knowledge', 'packs');
 
     try {
       // Create target directory

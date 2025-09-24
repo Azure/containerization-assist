@@ -1,7 +1,8 @@
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import { promptTemplates, type BaseImageResolutionParams } from '@/prompts/templates';
-import { buildMessages, toMCPMessages } from '@/ai/prompt-engine';
+import { promptTemplates, type BaseImageResolutionParams } from '@/ai/prompt-templates';
+import { buildMessages } from '@/ai/prompt-engine';
+import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { resolveBaseImagesSchema, type ResolveBaseImagesParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 

@@ -258,9 +258,16 @@ const validateSyntax = (content: string): Result<boolean> => {
   if (!basicValidation.valid) {
     // Check if there are true syntax/parse errors (priority 0)
     const syntaxErrors =
-      (basicValidation.errors as Array<{ line: number; message: string; level?: string }>)?.filter(
+      (
+        basicValidation.errors as Array<{
+          line: number;
+          message: string;
+          level?: string;
+          priority?: number;
+        }>
+      )?.filter(
         (err) =>
-          (err as any).priority === 0 &&
+          err.priority === 0 &&
           (err.message.includes('Invalid instruction') ||
             err.message.includes('Missing or misplaced FROM')),
       ) || [];
