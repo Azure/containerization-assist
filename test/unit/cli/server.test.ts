@@ -21,7 +21,7 @@ describe('Server Entry Point', () => {
       const content = readFileSync(serverPath, 'utf-8');
       expect(content).toContain('async function main');
       expect(content).toContain('createApp');
-      expect(content).toContain('startServer');
+      expect(content).toContain('app.startServer');
     });
 
     it('should contain MCP mode setting', () => {

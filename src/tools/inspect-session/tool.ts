@@ -48,7 +48,7 @@ export async function inspectSession(
         });
       }
 
-      const sessionInfo = {
+      const sessionInfo: SessionData = {
         id: params.sessionId,
         createdAt: session.createdAt || new Date(),
         updatedAt: session.updatedAt || new Date(),
@@ -56,18 +56,24 @@ export async function inspectSession(
         completedSteps: session.completed_steps || [],
         currentStep: (session.current_step as string) || null,
         metadata: session.metadata || {},
-        toolSlices: params.includeSlices ? extractToolSlices(session.metadata || {}) : undefined,
-        errors: session.errors ? (session.errors as Record<string, string>) : undefined,
       };
 
+      if (params.includeSlices) {
+        sessionInfo.toolSlices = extractToolSlices(session.metadata || {});
+      }
+
+      if (session.errors) {
+        sessionInfo.errors = session.errors as Record<string, string>;
+      }
+
       return Success({
-        sessions: [sessionInfo as any],
+        sessions: [sessionInfo],
         totalSessions: allSessionIds.length,
         maxSessions: 1000,
         message:
           params.format === 'json'
             ? JSON.stringify(sessionInfo, null, 2)
-            : formatSessionSummary(sessionInfo as any),
+            : formatSessionSummary(sessionInfo),
       });
     }
 
@@ -77,7 +83,7 @@ export async function inspectSession(
       const sessionResult = await sessionManager.get(id);
       if (sessionResult.ok && sessionResult.value) {
         const session = sessionResult.value;
-        sessions.push({
+        const sessionData: SessionData = {
           id,
           createdAt: session.createdAt || new Date(),
           updatedAt: session.updatedAt || new Date(),
@@ -85,9 +91,16 @@ export async function inspectSession(
           completedSteps: session.completed_steps || [],
           currentStep: (session.current_step as string) || null,
           metadata: session.metadata || {},
-          toolSlices: params.includeSlices ? extractToolSlices(session.metadata || {}) : undefined,
-          errors: session.errors ? (session.errors as Record<string, string>) : undefined,
-        });
+        };
+
+        if (params.includeSlices) {
+          sessionData.toolSlices = extractToolSlices(session.metadata || {});
+        }
+
+        if (session.errors) {
+          sessionData.errors = session.errors as Record<string, string>;
+        }
+        sessions.push(sessionData);
       }
     }
 
@@ -95,10 +108,10 @@ export async function inspectSession(
     sessions.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 
     return Success({
-      sessions: sessions as any,
+      sessions,
       totalSessions: sessions.length,
       maxSessions: 1000,
-      message: formatSessionList(sessions as any, params.format),
+      message: formatSessionList(sessions, params.format),
     });
   } catch (error) {
     return Failure(`Failed to inspect session: ${extractErrorMessage(error)}`);
@@ -158,9 +171,10 @@ interface SessionData {
   createdAt: Date;
   updatedAt: Date;
   ttlRemaining: number;
-  currentStep?: string;
+  currentStep: string | null;
   completedSteps: string[];
-  errors?: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  errors?: Record<string, string>;
   toolSlices?: Record<string, unknown>;
 }
 

@@ -138,7 +138,15 @@ export function useSessionSlice<
         }
 
         if ('updatedAt' in slice) {
-          validatedSlice.updatedAt = new Date(slice.updatedAt as string);
+          const rawUpdatedAt = slice.updatedAt;
+          if (typeof rawUpdatedAt === 'string' || typeof rawUpdatedAt === 'number') {
+            const date = new Date(rawUpdatedAt);
+            if (!isNaN(date.getTime())) {
+              validatedSlice.updatedAt = date;
+            }
+          } else if (rawUpdatedAt instanceof Date) {
+            validatedSlice.updatedAt = rawUpdatedAt;
+          }
         }
 
         return validatedSlice as SessionSlice<In, Out, State>;

@@ -158,7 +158,9 @@ export function createIdempotentApply(logger: Logger, kubeconfig?: string) {
         'Resource applied successfully',
       );
 
-      return Success((result as any).body || result);
+      // K8s client returns either the resource directly or wrapped in a body property
+      const resourceBody = 'body' in result && result.body ? result.body : result;
+      return Success(resourceBody as K8sResource);
     } catch (error) {
       const errorMessage = extractErrorMessage(error);
       logger.error(
@@ -249,7 +251,9 @@ export function createIdempotentApply(logger: Logger, kubeconfig?: string) {
         'Resource created successfully',
       );
 
-      return Success((result as any).body || result);
+      // K8s client returns either the resource directly or wrapped in a body property
+      const resourceBody = 'body' in result && result.body ? result.body : result;
+      return Success(resourceBody as K8sResource);
     } catch (error: any) {
       // Check if it's an "already exists" error
       if (error.statusCode === 409 || error.response?.statusCode === 409) {
