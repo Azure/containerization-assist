@@ -474,13 +474,10 @@ Return ONLY the runtime configuration instructions.`,
   if (result.ok) {
     const content = result.value.content;
     if (!content.includes('CMD') && !content.includes('ENTRYPOINT')) {
-      return Failure('Failed to generate runtime instructions: missing CMD or ENTRYPOINT');
+      return Failure('Failed to generate runtime instructions');
     }
-    // Validation passed, return the successful result
-    return result;
   }
 
-  // If generateStep failed, return its error
   return result;
 }
 
