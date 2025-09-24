@@ -130,6 +130,10 @@ export interface DeployApplicationResult {
     }>;
   };
   chainHint?: string; // Hint for next tool in workflow chain
+  workflowHints?: {
+    nextStep: string;
+    message: string;
+  };
 }
 
 // Define the result schema for type safety
@@ -230,18 +234,21 @@ function validateManifests(manifests: unknown[], logger: Logger): KubernetesMani
 }
 
 /**
+ * Check if a kind is in the manifest order
+ */
+function getManifestOrderIndex(kind: string | undefined): number {
+  if (!kind) return 999;
+  const index = MANIFEST_ORDER.indexOf(kind as (typeof MANIFEST_ORDER)[number]);
+  return index >= 0 ? index : 999;
+}
+
+/**
  * Order manifests for deployment based on resource dependencies
  */
 function orderManifests(manifests: KubernetesManifest[]): KubernetesManifest[] {
   return manifests.sort((a, b) => {
-    const aIndex =
-      a.kind && MANIFEST_ORDER.includes(a.kind as any)
-        ? MANIFEST_ORDER.indexOf(a.kind as any)
-        : 999;
-    const bIndex =
-      b.kind && MANIFEST_ORDER.includes(b.kind as any)
-        ? MANIFEST_ORDER.indexOf(b.kind as any)
-        : 999;
+    const aIndex = getManifestOrderIndex(a.kind);
+    const bIndex = getManifestOrderIndex(b.kind);
     return aIndex - bIndex;
   });
 }
@@ -594,6 +601,10 @@ async function deployApplicationImpl(
             message: ready ? 'Deployment is available' : 'Deployment is pending',
           },
         ],
+      },
+      workflowHints: {
+        nextStep: 'verify-deploy',
+        message: `Application deployed successfully. Use "verify-deploy" with sessionId ${sessionId} to check deployment status, or access your application at: ${endpoints.length > 0 ? endpoints[0]?.url || 'the service endpoint' : 'the service endpoint'}.`,
       },
     };
 

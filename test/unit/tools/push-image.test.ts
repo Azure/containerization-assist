@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import type { DockerClient } from '../../../src/services/docker-client';
+import type { DockerClient } from '../../../src/infra/docker/client';
 import type { Result } from '../../../src/types';
 import { makePushImage } from '../../../src/tools/push-image/tool';
 

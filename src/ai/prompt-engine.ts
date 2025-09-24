@@ -20,7 +20,7 @@ import {
 } from '@/types/index';
 import type { KnowledgeSnippet } from '@/knowledge/schemas';
 import { getKnowledgeSnippets } from '@/knowledge/matcher';
-import { buildPolicyConstraints } from '@/config/policy-prompt';
+import { getSystemConstraintText } from '@/ai/policy-constraints-adapter';
 
 /**
  * Options for knowledge selection.
@@ -42,24 +42,16 @@ interface MessageBuildOptions {
 }
 
 /**
- * Builds policy constraints for the system role.
+ * Builds policy constraints for the system role using the new adapter.
  *
  * @param tool - Tool name for context
  * @param environment - Environment (e.g., 'production', 'development')
- * @returns Array of policy constraint strings
+ * @returns Formatted policy constraint text or undefined
  */
 function buildSystemMessage(tool: string, environment: string): string | undefined {
   try {
-    const constraints = buildPolicyConstraints({ tool, environment });
-
-    if (!constraints || constraints.length === 0) {
-      return undefined;
-    }
-
-    return [
-      'You must follow these organizational policies:',
-      ...constraints.map((c: string) => `- ${c}`),
-    ].join('\n');
+    // Use the new adapter for clean separation of concerns
+    return getSystemConstraintText(tool, environment, 2000);
   } catch (error) {
     // If policy loading fails, return undefined to omit system message
     console.warn('Failed to load policy constraints:', error);
@@ -326,61 +318,4 @@ export function validateMessages(messages: AIMessages): Result<void> {
   }
 
   return Success(undefined);
-}
-
-/**
- * Converts AIMessages to MCP-compatible TextMessage format.
- *
- * MCP protocol only supports 'user' and 'assistant' roles, so we need to:
- * - Combine system and developer messages into the first user message
- * - Ensure all messages have the proper content array format
- *
- * @param aiMessages - Messages from the prompt engine
- * @returns MCP-compatible TextMessage array
- */
-export function toMCPMessages(aiMessages: AIMessages): {
-  messages: Array<{ role: 'user' | 'assistant'; content: Array<{ type: 'text'; text: string }> }>;
-} {
-  const messages = aiMessages.messages;
-  const mcpMessages: Array<{
-    role: 'user' | 'assistant';
-    content: Array<{ type: 'text'; text: string }>;
-  }> = [];
-
-  // Collect system and developer messages
-  const systemMessages: string[] = [];
-
-  for (const message of messages) {
-    if (message.role === 'system' || message.role === 'developer') {
-      const text =
-        typeof message.content === 'string' ? message.content : message.content[0]?.text || '';
-      if (text) {
-        systemMessages.push(text);
-      }
-    } else if (message.role === 'user') {
-      // Combine system messages with the first user message
-      let userText =
-        typeof message.content === 'string' ? message.content : message.content[0]?.text || '';
-
-      if (systemMessages.length > 0) {
-        userText = `${systemMessages.join('\n\n')}\n\n${userText}`;
-        systemMessages.length = 0; // Clear after using
-      }
-
-      mcpMessages.push({
-        role: 'user',
-        content: [{ type: 'text', text: userText }],
-      });
-    } else if (message.role === 'assistant') {
-      const text =
-        typeof message.content === 'string' ? message.content : message.content[0]?.text || '';
-
-      mcpMessages.push({
-        role: 'assistant',
-        content: [{ type: 'text', text }],
-      });
-    }
-  }
-
-  return { messages: mcpMessages };
 }

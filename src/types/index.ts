@@ -5,7 +5,7 @@
 
 import type { Logger } from 'pino';
 import type { ToolContext } from '../mcp/context';
-import type { ZodRawShape } from 'zod';
+import type { z, ZodRawShape } from 'zod';
 import type { Result } from './core';
 import { ToolName } from '@/exports/tools';
 
@@ -25,10 +25,10 @@ export interface Tool {
   name: ToolName;
   /** Human-readable tool description */
   description?: string;
-  /** JSON schema for parameter validation */
-  schema?: Record<string, unknown>;
-  /** Zod schema for McpServer compatibility (optional) */
-  zodSchema?: ZodRawShape;
+  /** Zod raw shape for MCP server registration */
+  schema?: ZodRawShape;
+  /** Full Zod schema for validation */
+  zodSchema?: z.ZodSchema;
   /**
    * Executes the tool with provided parameters.
    * @param params - Tool-specific parameters

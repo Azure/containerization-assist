@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { buildMessages, buildPromptEnvelope, estimateMessageSize, validateMessages, toMCPMessages } from '@/ai/prompt-engine';
+import { buildMessages, buildPromptEnvelope, estimateMessageSize, validateMessages } from '@/ai/prompt-engine';
 import type { BuildPromptParams, AIMessages, OutputContract } from '@/types';
 import * as knowledgeMatcher from '@/knowledge/matcher';
 import * as policyPrompt from '@/config/policy-prompt';
@@ -279,78 +279,6 @@ describe('Prompt Engine', () => {
     });
   });
 
-  describe('toMCPMessages', () => {
-    it('should combine system and developer messages into first user message', () => {
-      const aiMessages: AIMessages = {
-        messages: [
-          {
-            role: 'system',
-            content: [{ type: 'text', text: 'System policy constraints' }],
-          },
-          {
-            role: 'developer',
-            content: [{ type: 'text', text: 'Output as JSON' }],
-          },
-          {
-            role: 'user',
-            content: [{ type: 'text', text: 'User prompt' }],
-          },
-        ],
-      };
-
-      const result = toMCPMessages(aiMessages);
-
-      expect(result.messages).toHaveLength(1);
-      expect(result.messages[0].role).toBe('user');
-      expect(result.messages[0].content[0].text).toBe(
-        'System policy constraints\n\nOutput as JSON\n\nUser prompt'
-      );
-    });
-
-    it('should handle string content', () => {
-      const aiMessages: AIMessages = {
-        messages: [
-          { role: 'user', content: 'String content' },
-        ],
-      };
-
-      const result = toMCPMessages(aiMessages);
-
-      expect(result.messages).toHaveLength(1);
-      expect(result.messages[0].content[0].text).toBe('String content');
-    });
-
-    it('should preserve assistant messages', () => {
-      const aiMessages: AIMessages = {
-        messages: [
-          { role: 'user', content: [{ type: 'text', text: 'Question' }] },
-          { role: 'assistant', content: [{ type: 'text', text: 'Answer' }] },
-          { role: 'user', content: [{ type: 'text', text: 'Follow-up' }] },
-        ],
-      };
-
-      const result = toMCPMessages(aiMessages);
-
-      expect(result.messages).toHaveLength(3);
-      expect(result.messages[0].role).toBe('user');
-      expect(result.messages[1].role).toBe('assistant');
-      expect(result.messages[2].role).toBe('user');
-    });
-
-    it('should handle empty system messages gracefully', () => {
-      const aiMessages: AIMessages = {
-        messages: [
-          { role: 'system', content: '' },
-          { role: 'user', content: [{ type: 'text', text: 'User prompt' }] },
-        ],
-      };
-
-      const result = toMCPMessages(aiMessages);
-
-      expect(result.messages).toHaveLength(1);
-      expect(result.messages[0].content[0].text).toBe('User prompt');
-    });
-  });
 
   describe('estimateMessageSize', () => {
     it('should calculate total character count for string content', () => {

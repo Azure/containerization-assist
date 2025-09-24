@@ -1,4 +1,4 @@
-import { createIdempotentApply, parseManifests } from '../../../../src/services/kubernetes-idempotent-apply';
+import { createIdempotentApply, parseManifests } from '../../../../src/infra/kubernetes/idempotent-apply';
 import * as k8s from '@kubernetes/client-node';
 import pino from 'pino';
 import { Success, Failure } from '../../../../src/types';

@@ -13,6 +13,9 @@
       "@/*": [
         "src/*"
       ],
+      "@/ai/*": [
+        "src/ai/*"
+      ],
       "@/mcp/*": [
         "src/mcp/*"
       ],
@@ -22,14 +25,14 @@
       "@/lib/*": [
         "src/lib/*"
       ],
-      "@/services/*": [
-        "src/services/*"
+      "@/infra/*": [
+        "src/infra/*"
+      ],
+      "@/session/*": [
+        "src/session/*"
       ],
       "@/config/*": [
         "src/config/*"
-      ],
-      "@/prompts/*": [
-        "src/prompts/*"
       ],
       "@/resources/*": [
         "src/resources/*"

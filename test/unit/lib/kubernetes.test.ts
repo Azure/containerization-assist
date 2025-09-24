@@ -32,7 +32,7 @@ jest.mock('@kubernetes/client-node', () => ({
 describe('Kubernetes Client', () => {
 
   it('should be importable without errors', async () => {
-    const { createKubernetesClient } = await import('../../../src/services/kubernetes-client');
+    const { createKubernetesClient } = await import('../../../src/infra/kubernetes/client');
     expect(createKubernetesClient).toBeDefined();
     expect(typeof createKubernetesClient).toBe('function');
   });
@@ -69,14 +69,14 @@ describe('Kubernetes Client', () => {
 
   // Test basic type safety of the module
   it('should export createKubernetesClient function', async () => {
-    const { createKubernetesClient } = await import('../../../src/services/kubernetes-client');
+    const { createKubernetesClient } = await import('../../../src/infra/kubernetes/client');
     expect(createKubernetesClient).toBeDefined();
     expect(typeof createKubernetesClient).toBe('function');
   });
 
   // Test that the function signature is correct
   it('should accept logger and optional kubeconfig parameters', async () => {
-    const { createKubernetesClient } = await import('../../../src/services/kubernetes-client');
+    const { createKubernetesClient } = await import('../../../src/infra/kubernetes/client');
 
     // Should not throw when called with valid parameters
     try {

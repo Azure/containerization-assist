@@ -88,6 +88,7 @@ const analyzeRepoTool: Tool = {
   name: TOOL_NAMES.ANALYZE_REPO,
   description: 'Analyze repository structure and detect technologies',
   schema: analyzeRepoSchema.shape,
+  zodSchema: analyzeRepoSchema,
   execute: async (params, _logger, context) => {
     if (!context) {
       return { ok: false, error: 'Context is required for tool execution' };
@@ -100,6 +101,7 @@ const buildImageTool: Tool = {
   name: TOOL_NAMES.BUILD_IMAGE,
   description: 'Build a Docker image',
   schema: buildImageSchema.shape,
+  zodSchema: buildImageSchema,
   execute: async (params, _logger, context) => {
     if (!context) {
       return { ok: false, error: 'Context is required for tool execution' };
@@ -112,6 +114,7 @@ const convertAcaToK8sTool: Tool = {
   name: TOOL_NAMES.CONVERT_ACA_TO_K8S,
   description: 'Convert Azure Container Apps manifests to Kubernetes',
   schema: convertAcaToK8sSchema.shape,
+  zodSchema: convertAcaToK8sSchema,
   execute: async (params, _logger, context) => {
     if (!context) {
       return { ok: false, error: 'Context is required for tool execution' };
@@ -124,6 +127,7 @@ const deployTool: Tool = {
   name: TOOL_NAMES.DEPLOY,
   description: 'Deploy application to Kubernetes',
   schema: deployApplicationSchema.shape,
+  zodSchema: deployApplicationSchema,
   execute: async (params, _logger, context) => {
     if (!context) {
       return { ok: false, error: 'Context is required for tool execution' };
@@ -136,6 +140,7 @@ const fixDockerfileTool: Tool = {
   name: TOOL_NAMES.FIX_DOCKERFILE,
   description: 'Fix issues in a Dockerfile',
   schema: fixDockerfileSchema.shape,
+  zodSchema: fixDockerfileSchema,
   execute: async (params, _logger, context) => {
     if (!context) {
       return { ok: false, error: 'Context is required for tool execution' };
@@ -148,6 +153,7 @@ const generateAcaManifestsTool: Tool = {
   name: TOOL_NAMES.GENERATE_ACA_MANIFESTS,
   description: 'Generate Azure Container Apps manifests',
   schema: generateAcaManifestsSchema.shape,
+  zodSchema: generateAcaManifestsSchema,
   execute: async (params, _logger, context) => {
     if (!context) {
       return { ok: false, error: 'Context is required for tool execution' };
@@ -160,6 +166,7 @@ const generateDockerfileTool: Tool = {
   name: TOOL_NAMES.GENERATE_DOCKERFILE,
   description: 'Generate a Dockerfile for the analyzed repository',
   schema: generateDockerfileSchema.shape,
+  zodSchema: generateDockerfileSchema,
   execute: async (params, _logger, context) => {
     if (!context) {
       return { ok: false, error: 'Context is required for tool execution' };
@@ -172,6 +179,7 @@ const generateHelmChartsTool: Tool = {
   name: TOOL_NAMES.GENERATE_HELM_CHARTS,
   description: 'Generate Helm charts for Kubernetes deployments',
   schema: generateHelmChartsSchema.shape,
+  zodSchema: generateHelmChartsSchema,
   execute: async (params, _logger, context) => {
     if (!context) {
       return { ok: false, error: 'Context is required for tool execution' };
@@ -184,6 +192,7 @@ const generateK8sManifestsTool: Tool = {
   name: TOOL_NAMES.GENERATE_K8S_MANIFESTS,
   description: 'Generate Kubernetes manifests',
   schema: generateK8sManifestsSchema.shape,
+  zodSchema: generateK8sManifestsSchema,
   execute: async (params, _logger, context) => {
     if (!context) {
       return { ok: false, error: 'Context is required for tool execution' };
@@ -196,6 +205,7 @@ const inspectSessionTool: Tool = {
   name: TOOL_NAMES.INSPECT_SESSION,
   description: 'Inspect session data for debugging',
   schema: inspectSessionSchema.shape,
+  zodSchema: inspectSessionSchema,
   execute: async (params, _logger, context) => {
     if (!context) {
       return { ok: false, error: 'Context is required for tool execution' };
@@ -208,6 +218,7 @@ const opsToolInstance: Tool = {
   name: TOOL_NAMES.OPS,
   description: 'Operational utilities',
   schema: opsToolSchema.shape,
+  zodSchema: opsToolSchema,
   execute: async (params, _logger, context) => {
     if (!context) {
       return { ok: false, error: 'Context is required for tool execution' };
@@ -220,6 +231,7 @@ const prepareClusterTool: Tool = {
   name: TOOL_NAMES.PREPARE_CLUSTER,
   description: 'Prepare Kubernetes cluster for deployment',
   schema: prepareClusterSchema.shape,
+  zodSchema: prepareClusterSchema,
   execute: async (params, _logger, context) => {
     if (!context) {
       return { ok: false, error: 'Context is required for tool execution' };
@@ -232,6 +244,7 @@ const pushImageTool: Tool = {
   name: TOOL_NAMES.PUSH_IMAGE,
   description: 'Push a Docker image to a registry',
   schema: pushImageSchema.shape,
+  zodSchema: pushImageSchema,
   execute: async (params, _logger, context) => {
     if (!context) {
       return { ok: false, error: 'Context is required for tool execution' };
@@ -244,6 +257,7 @@ const resolveBaseImagesTool: Tool = {
   name: TOOL_NAMES.RESOLVE_BASE_IMAGES,
   description: 'Resolve and recommend base images',
   schema: resolveBaseImagesSchema.shape,
+  zodSchema: resolveBaseImagesSchema,
   execute: async (params, _logger, context) => {
     if (!context) {
       return { ok: false, error: 'Context is required for tool execution' };
@@ -256,6 +270,7 @@ const scanTool: Tool = {
   name: TOOL_NAMES.SCAN,
   description: 'Scan a Docker image for vulnerabilities',
   schema: scanImageSchema.shape,
+  zodSchema: scanImageSchema,
   execute: async (params, _logger, context) => {
     if (!context) {
       return { ok: false, error: 'Context is required for tool execution' };
@@ -268,6 +283,7 @@ const tagImageTool: Tool = {
   name: TOOL_NAMES.TAG_IMAGE,
   description: 'Tag a Docker image',
   schema: tagImageSchema.shape,
+  zodSchema: tagImageSchema,
   execute: async (params, _logger, context) => {
     if (!context) {
       return { ok: false, error: 'Context is required for tool execution' };
@@ -280,6 +296,7 @@ const verifyDeployTool: Tool = {
   name: TOOL_NAMES.VERIFY_DEPLOY,
   description: 'Verify deployment status',
   schema: verifyDeploymentSchema.shape,
+  zodSchema: verifyDeploymentSchema,
   execute: async (params, _logger, context) => {
     if (!context) {
       return { ok: false, error: 'Context is required for tool execution' };

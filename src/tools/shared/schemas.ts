@@ -4,6 +4,7 @@
  */
 
 import { z } from 'zod';
+import { environmentSchema } from '@/config/environment';
 
 // Session management
 export const sessionId = z.string().describe('Session identifier for tracking operations');
@@ -18,16 +19,12 @@ export const namespace = z.string().default('default').describe('Kubernetes name
 
 export const namespaceOptional = z.string().optional().describe('Kubernetes namespace');
 
-// Environment enum (two variations in codebase)
-export const environmentFull = z
-  .enum(['development', 'staging', 'production', 'testing'])
-  .optional()
-  .describe('Target environment');
+// Unified environment schema - single source of truth
+export const environment = environmentSchema.optional();
 
-export const environmentBasic = z
-  .enum(['development', 'staging', 'production'])
-  .optional()
-  .describe('Target environment');
+// Legacy compatibility exports (deprecated - use 'environment' instead)
+export const environmentFull = environment;
+export const environmentBasic = environment;
 
 // Docker image fields
 export const imageId = z.string().describe('Docker image identifier');
