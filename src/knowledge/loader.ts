@@ -159,6 +159,7 @@ export const loadKnowledgeBase = async (): Promise<void> => {
   try {
     const knowledgePacks = [
       'starter-pack.json',
+      'base-images-pack.json',
       'nodejs-pack.json',
       'python-pack.json',
       'java-pack.json',

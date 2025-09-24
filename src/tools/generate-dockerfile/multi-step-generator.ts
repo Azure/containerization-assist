@@ -7,6 +7,8 @@ import type { ToolContext } from '@/mcp/context';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { Success, Failure, type Result } from '@/types';
+import { promises as fs } from 'node:fs';
+import nodePath from 'node:path';
 
 interface StepResult {
   content: string;
@@ -91,6 +93,17 @@ function processInstructionArray(items: unknown[]): string {
 }
 
 /**
+ * Validates and fixes SHA256 digests in Dockerfile content
+ */
+function fixInvalidDigests(content: string): string {
+  // Pattern to match invalid SHA256 digests (repeated characters or placeholder patterns)
+  const invalidDigestPattern = /@sha256:([0-9a-f]{1,64})\1{2,}|@sha256:[67e]+$/gi;
+
+  // Remove invalid SHA256 digests, keeping just the tag
+  return content.replace(invalidDigestPattern, '');
+}
+
+/**
  * Extracts clean Dockerfile instructions from AI response
  */
 function extractInstructions(text: string): string {
@@ -127,10 +140,11 @@ function extractInstructions(text: string): string {
         if (Array.isArray(content)) {
           // Log array length for debugging
           // console.log('[extractInstructions] Content is array with', content.length, 'items');
-          return processInstructionArray(content);
+          return fixInvalidDigests(processInstructionArray(content));
         }
 
-        return typeof content === 'string' ? content : String(content);
+        const stringContent = typeof content === 'string' ? content : String(content);
+        return fixInvalidDigests(stringContent);
       }
 
       // Check for nested content property
@@ -141,12 +155,12 @@ function extractInstructions(text: string): string {
 
     // Handle plain string JSON
     if (typeof parsed === 'string') {
-      return parsed;
+      return fixInvalidDigests(parsed);
     }
 
     // Handle array at root
     if (Array.isArray(parsed)) {
-      return processInstructionArray(parsed);
+      return fixInvalidDigests(processInstructionArray(parsed));
     }
   } catch {
     // Not JSON, treat as plain text
@@ -160,7 +174,8 @@ function extractInstructions(text: string): string {
     .filter((line) => !line.includes('[object Object]'))
     .join('\n');
 
-  return cleaned.trim();
+  // Fix any invalid SHA256 digests before returning
+  return fixInvalidDigests(cleaned.trim());
 }
 
 /**
@@ -222,11 +237,16 @@ export async function generateBaseImage(
   framework: string | null,
   context: ToolContext,
   environment: string,
+  baseImagePreference?: string,
 ): Promise<Result<StepResult>> {
+  const preferenceHint = baseImagePreference
+    ? `\nBase image preference: ${baseImagePreference}\n`
+    : '';
+
   const config: GeneratorConfig = {
     prompt: `Generate ONLY the FROM instruction and initial setup for a ${language} ${
       framework ? `(${framework})` : ''
-    } application.
+    } application.${preferenceHint}
 Return only the first 3-5 lines of a Dockerfile including:
 1. FROM instruction with appropriate base image
 2. WORKDIR setup
@@ -260,8 +280,58 @@ export async function generateDependencies(
   dependencies: string[],
   context: ToolContext,
   environment: string,
+  projectPath?: string,
 ): Promise<Result<StepResult>> {
   const depList = dependencies.length > 0 ? dependencies.slice(0, 5).join(', ') : '';
+
+  // Check which dependency files actually exist
+  const existingFiles: string[] = [];
+  if (projectPath) {
+    const commonDepFiles = [
+      'package.json',
+      'package-lock.json',
+      'yarn.lock',
+      'pnpm-lock.yaml',
+      'pom.xml',
+      'mvnw',
+      '.mvn',
+      'requirements.txt',
+      'Pipfile',
+      'Pipfile.lock',
+      'poetry.lock',
+      'pyproject.toml',
+      'go.mod',
+      'go.sum',
+      'Gemfile',
+      'Gemfile.lock',
+      'build.gradle',
+      'gradlew',
+      'gradle',
+      'Cargo.toml',
+      'Cargo.lock',
+      'composer.json',
+      'composer.lock',
+    ];
+
+    for (const file of commonDepFiles) {
+      try {
+        const filePath = nodePath.join(projectPath, file);
+        const stats = await fs.stat(filePath);
+        if (stats.isFile() || stats.isDirectory()) {
+          existingFiles.push(file);
+        }
+      } catch {
+        // File doesn't exist, skip it
+      }
+    }
+
+    context.logger.info({ projectPath, existingFiles }, 'Detected existing dependency files');
+  }
+
+  const existingFilesHint =
+    existingFiles.length > 0
+      ? `\nIMPORTANT: Only use COPY instructions for these files that actually exist in the project: ${existingFiles.join(', ')}\nDo NOT use COPY for files that are not in this list.`
+      : '';
 
   const config: GeneratorConfig = {
     prompt: `Continue this Dockerfile for a ${language} ${
@@ -272,9 +342,10 @@ Current Dockerfile start:
 ${baseInstructions}
 
 ${depList ? `Key dependencies to install: ${depList}` : ''}
+${existingFilesHint}
 
 Add:
-1. COPY instructions for dependency files (package.json, pom.xml, requirements.txt, etc.)
+1. COPY instructions ONLY for dependency files that exist
 2. RUN commands to install dependencies
 3. Any caching optimizations
 
@@ -297,14 +368,54 @@ export async function generateBuildSteps(
   framework: string | null,
   context: ToolContext,
   environment: string,
+  projectPath?: string,
 ): Promise<Result<StepResult>> {
+  // Check for common source directories and files
+  const existingSourcePaths: string[] = [];
+  if (projectPath) {
+    const commonSourcePaths = [
+      'src',
+      'app',
+      'lib',
+      'bin',
+      'cmd',
+      'pkg',
+      'public',
+      'static',
+      'dist',
+      'build',
+      'target',
+      '.', // Current directory for simple projects
+    ];
+
+    for (const path of commonSourcePaths) {
+      try {
+        const fullPath = nodePath.join(projectPath, path);
+        const stats = await fs.stat(fullPath);
+        if (stats.isDirectory()) {
+          existingSourcePaths.push(path);
+        }
+      } catch {
+        // Path doesn't exist
+      }
+    }
+
+    context.logger.info({ projectPath, existingSourcePaths }, 'Detected existing source paths');
+  }
+
+  const sourcePathHint =
+    existingSourcePaths.length > 0
+      ? `\nIMPORTANT: The project has these directories: ${existingSourcePaths.join(', ')}. Use COPY . . or COPY src src/ based on what actually exists.`
+      : '\nIMPORTANT: Use COPY . . to copy all project files since specific source directories were not detected.';
+
   const config: GeneratorConfig = {
     prompt: `Generate the application build steps for a ${language} ${
       framework ? `(${framework})` : ''
     } application.
+${sourcePathHint}
 
 Add:
-1. COPY instructions for application source code
+1. COPY instructions for application source code (use paths that exist)
 2. RUN commands for building/compiling if needed
 3. Any build-time optimizations
 
@@ -402,5 +513,7 @@ export function combineDockerfileSteps(
     sections.push(runtime);
   }
 
-  return sections.join('\n\n');
+  // Clean up any invalid digests in the final Dockerfile
+  const combined = sections.join('\n\n');
+  return fixInvalidDigests(combined);
 }
