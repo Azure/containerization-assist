@@ -207,7 +207,7 @@
     "@types/dockerode": "^3.3.23",
     "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^20.19.13",
+    "@types/node": "^24.5.2",
     "@types/tar-fs": "^2.0.4",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
