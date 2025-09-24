@@ -24,10 +24,21 @@ export const securityLevelSchema = z
   .optional()
   .describe('Security level for container configuration');
 
+export const baseImagePreferenceSchema = z
+  .string()
+  .optional()
+  .describe(
+    'Base image preference hint (e.g., "microsoft", "distroless", "alpine", "security-focused", "size-optimized")',
+  );
+
 export const generateDockerfileSchema = z.object({
   sessionId: sessionIdSchema.optional(),
-  baseImage: z.string().optional().describe('Base Docker image to use'),
+  baseImage: z
+    .string()
+    .optional()
+    .describe('Base Docker image to use (overrides automatic selection)'),
   runtimeImage: z.string().optional().describe('Runtime image for multi-stage builds'),
+  baseImagePreference: baseImagePreferenceSchema,
   environment: environmentFull,
   optimization: z.union([optimizationSchema, z.boolean()]).optional(),
   preferAI: z

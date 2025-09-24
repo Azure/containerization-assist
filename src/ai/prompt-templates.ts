@@ -136,9 +136,9 @@ export const promptTemplates = {
 
     prompt += `2. Base Image Selection:\n`;
     prompt += `   - Choose appropriate base image for ${params.language}\n`;
-    prompt += `   - If using slim/alpine images, ensure required tools are available\n`;
-    prompt += `   - maven:3-eclipse-temurin-17-alpine includes Maven but not apt-get\n`;
-    prompt += `   - node:18-alpine includes Node but uses apk not apt-get\n`;
+    prompt += `   - Consider security, size, and compatibility requirements\n`;
+    prompt += `   - Use valid and current image tags\n`;
+    prompt += `   - Match package manager to base image (tdnf for Mariner, apk for Alpine, apt for Debian)\n`;
 
     prompt += `3. Health Check Commands:\n`;
     prompt += `   - Only use commands that exist in the chosen base image\n`;
@@ -147,10 +147,10 @@ export const promptTemplates = {
     prompt += `   - For Java: consider using the application's health endpoint directly\n`;
 
     prompt += `4. Build Tools:\n`;
-    prompt += `   - Maven images already include mvn command\n`;
-    prompt += `   - Gradle images already include gradle command\n`;
-    prompt += `   - Node images already include npm/node commands\n`;
-    prompt += `   - DO NOT try to install these if using their respective base images\n\n`;
+    prompt += `   - Use wrapper scripts when available (mvnw, gradlew)\n`;
+    prompt += `   - Download dependencies during build for better caching\n`;
+    prompt += `   - For Node: npm ci is preferred over npm install\n`;
+    prompt += `   - DO NOT install build tools if already in base image\n\n`;
 
     prompt += `Requirements:\n`;
     prompt += `- Language: ${params.language}\n`;
