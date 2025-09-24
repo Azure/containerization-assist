@@ -1,7 +1,8 @@
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import { promptTemplates, type BaseImageResolutionParams } from '@/prompts/templates';
-import { buildMessages, toMCPMessages } from '@/ai/prompt-engine';
+import { promptTemplates, type BaseImageResolutionParams } from '@/ai/prompt-templates';
+import { buildMessages } from '@/ai/prompt-engine';
+import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { resolveBaseImagesSchema, type ResolveBaseImagesParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 
@@ -12,10 +13,23 @@ export async function resolveBaseImages(
   const validatedParams = resolveBaseImagesSchema.parse(params);
   const { technology } = validatedParams;
 
-  // Generate prompt from template
+  // Generate prompt from template - provide context for better recommendations
+  let contextPrefix = '';
+  if (technology && technology !== 'auto-detect') {
+    contextPrefix = `Technology stack: ${technology}\n`;
+  } else {
+    contextPrefix = `First, examine the repository to identify the technology stack, framework, and dependencies.\n`;
+  }
+
   const promptParams = {
     language: technology || 'auto-detect',
-    requirements: [],
+    requirements: [
+      contextPrefix,
+      'Check Docker Hub and official repositories for the latest stable base images',
+      'Consider both Alpine and Debian/Ubuntu variants',
+      'Evaluate distroless options for production security',
+      'Check for language-specific optimized images (e.g., node:slim, python:slim)',
+    ],
   };
   const basePrompt = promptTemplates.baseImageResolution(promptParams as BaseImageResolutionParams);
 

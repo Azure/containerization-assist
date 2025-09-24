@@ -55,6 +55,11 @@ export interface BuildImageResult {
   logs: string[];
   /** Security-related warnings discovered during build */
   securityWarnings?: string[];
+  /** Workflow hints for the next step */
+  workflowHints?: {
+    nextStep: string;
+    message: string;
+  };
 }
 
 // Define the result schema for type safety
@@ -68,6 +73,12 @@ const BuildImageResultSchema = z.object({
   buildTime: z.number(),
   logs: z.array(z.string()),
   securityWarnings: z.array(z.string()).optional(),
+  workflowHints: z
+    .object({
+      nextStep: z.string(),
+      message: z.string(),
+    })
+    .optional(),
 });
 
 // Define tool IO for type-safe session operations
@@ -361,6 +372,10 @@ async function buildImageImpl(
       buildTime,
       logs: buildResult.value.logs,
       ...(securityWarnings.length > 0 && { securityWarnings }),
+      workflowHints: {
+        nextStep: 'push-image',
+        message: `Image built successfully. Use "push-image" with sessionId ${sessionId} to push to a registry, or "generate-k8s-manifests" to create deployment manifests.`,
+      },
     };
 
     // Update typed session slice with output and state

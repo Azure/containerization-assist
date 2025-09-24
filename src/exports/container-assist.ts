@@ -4,12 +4,13 @@
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import * as crypto from 'crypto';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Logger } from 'pino';
 
-import { createSessionManager, type SessionManager } from '@/lib/session.js';
 import { createLogger } from '@/lib/logger.js';
+import { createSessionManager } from '@/lib/session.js';
 import { createKernel, type Kernel, type RegisteredTool } from '@/app/kernel.js';
+import { createToolContext } from '@/mcp/context.js';
 import { ToolName, getAllInternalTools } from './tools.js';
 import { extractErrorMessage } from '@/lib/error-utils.js';
 import type { Tool, Result } from '@/types';
@@ -44,61 +45,23 @@ export interface ContainerAssist {
 type McpServerLike = McpServer;
 
 /**
- * Generate a session ID based on tool parameters, using path-specific IDs when applicable
- */
-function getSessionIdForParams(params: Record<string, unknown>, defaultSessionId: string): string {
-  // If user explicitly provided a sessionId, use it
-  if (typeof params.sessionId === 'string') {
-    return params.sessionId;
-  }
-
-  // For tools that work on specific paths, create path-based session IDs
-  if (typeof params.path === 'string') {
-    const pathHash = Buffer.from(params.path)
-      .toString('base64')
-      .replace(/[/+=]/g, '')
-      .substring(0, 8);
-    return `${defaultSessionId}-path-${pathHash}`;
-  }
-
-  // For other tools, use the default instance session ID
-  return defaultSessionId;
-}
-
-/**
  * Create a Container Assist instance with idiomatic TypeScript patterns
  */
 export async function createContainerAssist(
   options: {
     logger?: Logger;
-    sessionId?: string;
   } = {},
 ): Promise<ContainerAssist> {
   const logger = options.logger || createLogger({ name: 'containerization-assist' });
-  const sessionManager = createSessionManager(logger);
   const tools = loadAllTools();
   const kernel = await createKernelForTools(tools, logger);
 
-  // Generate a consistent session ID for this instance to maintain state across tool calls
-  const defaultSessionId =
-    options.sessionId ||
-    `container-assist-${Date.now()}-${crypto.randomBytes(6).toString('base64').replace(/[/+=]/g, '').substring(0, 9)}`;
-
   return {
-    bindToServer: (server: McpServer) =>
-      bindAllTools(server, tools, kernel, logger, sessionManager, defaultSessionId),
+    bindToServer: (server: McpServer) => bindAllTools(server, tools, kernel, logger),
     registerTools: (server: McpServer, config?: ToolConfig) =>
-      registerSelectedTools(
-        server,
-        tools,
-        kernel,
-        config,
-        logger,
-        sessionManager,
-        defaultSessionId,
-      ),
+      registerSelectedTools(server, tools, kernel, config, logger),
     getAvailableTools: () => Object.keys(tools) as readonly string[],
-    getSessionId: () => defaultSessionId,
+    getSessionId: () => 'deprecated-use-tool-params',
   } as const;
 }
 
@@ -123,6 +86,12 @@ function createKernelForTools(tools: Map<ToolName, Tool>, logger: Logger): Promi
   const registeredTools = new Map<string, RegisteredTool>();
 
   for (const [name, tool] of tools.entries()) {
+    // Skip tools without schemas
+    if (!tool.zodSchema) {
+      logger.warn({ tool: name }, 'Tool missing Zod schema, skipping kernel registration');
+      continue;
+    }
+
     registeredTools.set(name, {
       name,
       description: tool.description || '',
@@ -132,10 +101,10 @@ function createKernelForTools(tools: Map<ToolName, Tool>, logger: Logger): Promi
       ): Promise<Result<unknown>> => {
         // Tools will use the logger directly, no MCP context needed for kernel
         const toolLogger = logger.child({ tool: name });
-        // Pass null context since tools should work without it
-        return await tool.execute(params as Record<string, unknown>, toolLogger, undefined as any);
+        // Pass undefined context - tools should handle optional context
+        return await tool.execute(params as Record<string, unknown>, toolLogger, undefined);
       },
-      schema: tool.zodSchema as any,
+      schema: tool.zodSchema,
     });
   }
 
@@ -157,10 +126,20 @@ function bindAllTools(
   tools: Map<string, Tool>,
   kernel: Kernel,
   logger: Logger,
-  sessionManager: SessionManager,
-  defaultSessionId: string,
 ): void {
-  registerSelectedTools(server, tools, kernel, undefined, logger, sessionManager, defaultSessionId);
+  // Create session manager for tools to share data
+  const sessionManager = createSessionManager(logger);
+
+  // Create MCP context from the provided server with session manager
+  const mcpContext = createToolContext((server as McpServer & { server: Server }).server, logger, {
+    sessionManager,
+  });
+
+  // Register all tools (no config filtering)
+  const toolsToRegister = Array.from(tools.entries());
+  for (const [name, tool] of toolsToRegister) {
+    registerSingleToolWithContext(server, tool, name, kernel, logger, mcpContext);
+  }
 }
 
 /**
@@ -172,60 +151,59 @@ function registerSelectedTools(
   kernel: Kernel,
   config: ToolConfig = {},
   logger: Logger,
-  sessionManager: SessionManager,
-  defaultSessionId: string,
 ): void {
+  // Create session manager for tools to share data
+  const sessionManager = createSessionManager(logger);
+
+  // Create MCP context from the provided server with session manager
+  const mcpContext = createToolContext((server as McpServer & { server: Server }).server, logger, {
+    sessionManager,
+  });
+
+  // Filter tools based on config
   const toolsToRegister = config.tools
     ? Array.from(tools.entries()).filter(([name]) => config.tools?.includes(name as ToolName))
     : Array.from(tools.entries());
 
+  // Register with optional name mapping
   for (const [originalName, tool] of toolsToRegister) {
     const customName = config.nameMapping?.[originalName as ToolName] || originalName;
-
-    registerSingleTool(server, tool, customName, kernel, logger, sessionManager, defaultSessionId);
+    registerSingleToolWithContext(server, tool, customName, kernel, logger, mcpContext);
   }
 }
 
 /**
- * Register a single tool with the MCP server
+ * Register a single tool with the MCP server and context
  */
-function registerSingleTool(
+function registerSingleToolWithContext(
   server: McpServerLike,
   tool: Tool,
   name: string,
-  kernel: Kernel,
+  _kernel: Kernel,
   logger: Logger,
-  _sessionManager: SessionManager,
-  defaultSessionId: string,
+  mcpContext: import('@/mcp/context').ToolContext,
 ): void {
-  if (!tool.zodSchema) {
-    logger.warn({ tool: name }, 'Tool missing Zod schema, skipping registration');
+  if (!tool.zodSchema || !tool.schema) {
+    logger.warn({ tool: name }, 'Tool missing Zod schema or shape, skipping registration');
     return;
   }
 
   // Register with MCP server using clean handler
+  // MCP SDK expects the raw shape, not the full schema
   server.tool(
     name,
     tool.description || `${name} tool`,
-    tool.zodSchema,
+    tool.schema,
     async (args: unknown, _extra: unknown) => {
       try {
         const toolLogger = logger.child({ tool: name });
-
-        // Extract session info from params - use path-based session for path-specific tools
         const paramsObj = (args || {}) as Record<string, unknown>;
-        const sessionId = getSessionIdForParams(paramsObj, defaultSessionId);
 
-        // Use kernel for execution
-        const result = await kernel.execute({
-          toolName: tool.name,
-          params: paramsObj,
-          sessionId,
-          force: paramsObj.force === true,
-        });
+        // Execute tool directly with MCP context (bypass kernel for MCP calls)
+        const result = await tool.execute(paramsObj, toolLogger, mcpContext);
 
         // Log execution info
-        toolLogger.info({ tool: tool.name, sessionId }, 'Kernel executed tool');
+        toolLogger.info({ tool: tool.name }, 'Tool executed directly');
 
         return formatResult(result);
       } catch (error) {

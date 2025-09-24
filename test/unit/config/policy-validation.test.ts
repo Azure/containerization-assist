@@ -475,7 +475,7 @@ describe('Policy System', () => {
 
     it('should always return the TypeScript config', () => {
       // Now that we use TypeScript config, loadPolicy always succeeds
-      const result = loadPolicy('/non/existent/policy.yaml');
+      const result = loadPolicy('/any/path/policy.yaml');
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value).toBeDefined();

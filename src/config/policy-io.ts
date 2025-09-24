@@ -7,7 +7,7 @@ import { type Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { createLogger } from '@/lib/logger';
 import { type Policy, PolicySchema } from './policy-schemas';
-import { policyConfig } from '../../config/policy';
+import { policyData } from './policy-data';
 
 const log = createLogger().child({ module: 'policy-io' });
 
@@ -87,8 +87,8 @@ export function loadPolicy(file: string, env?: string): Result<Policy> {
       return Success(cached);
     }
 
-    // Use the TypeScript config directly
-    const base = validatePolicy(policyConfig);
+    // Use the TypeScript policy data directly
+    const base = validatePolicy(policyData);
     if (!base.ok) return base;
 
     const resolved = env ? resolveEnvironment(base.value, env) : base.value;
@@ -97,6 +97,7 @@ export function loadPolicy(file: string, env?: string): Result<Policy> {
 
     const ttl = final.value.cache?.ttl ?? 300;
     putCached(file, env, final.value, ttl);
+    log.debug({ env }, 'Loaded policy from TypeScript data');
     return final;
   } catch (err) {
     return Failure(`Failed to load policy: ${extractErrorMessage(err)}`);

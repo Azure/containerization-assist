@@ -11,9 +11,9 @@
  * - Sufficient disk space for image operations
  */
 
-import { createDockerClient } from '../../../../src/services/docker-client';
+import { createDockerClient } from '../../../../src/infra/docker/client';
 import { createLogger } from '../../../../src/lib/logger';
-import type { DockerBuildOptions, DockerClient } from '../../../../src/services/docker-client';
+import type { DockerBuildOptions, DockerClient } from '../../../../src/infra/docker/client';
 import { DockerTestCleaner, TEST_IMAGE_NAME } from '../../../__support__/utilities/docker-test-cleaner';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';

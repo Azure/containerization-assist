@@ -1,11 +1,9 @@
 import { z } from 'zod';
+import { environmentSchema } from '@/config/environment';
 
 export const prepareClusterSchema = z.object({
   sessionId: z.string().optional().describe('Session identifier for tracking operations'),
-  environment: z
-    .enum(['development', 'staging', 'production', 'testing'])
-    .optional()
-    .describe('Target environment'),
+  environment: environmentSchema.optional(),
   namespace: z.string().optional().describe('Kubernetes namespace'),
 });
 

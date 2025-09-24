@@ -7,7 +7,7 @@ import { type Result, Success, Failure } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { z, type ZodType } from 'zod';
 import { createSuggestionRegistry, type SuggestionGenerator } from './default-suggestions';
-import { extractJSON } from '@/mcp/prompt-backed-tool';
+import { extractJSON } from '@/mcp/ai-tool-factory';
 
 /**
  * AI parameter suggestion request

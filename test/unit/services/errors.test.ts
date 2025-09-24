@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { extractDockerErrorMessage } from '@/services/errors';
+import { extractDockerErrorMessage } from '@/infra/docker/errors';
 
 describe('extractDockerErrorMessage', () => {
   describe('network error codes', () => {
