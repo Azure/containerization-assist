@@ -363,10 +363,13 @@ Return ONLY the runtime configuration instructions.`,
   if (result.ok) {
     const content = result.value.content;
     if (!content.includes('CMD') && !content.includes('ENTRYPOINT')) {
-      return Failure('Failed to generate runtime instructions');
+      return Failure('Failed to generate runtime instructions: missing CMD or ENTRYPOINT');
     }
+    // Validation passed, return the successful result
+    return result;
   }
 
+  // If generateStep failed, return its error
   return result;
 }
 
@@ -397,11 +400,6 @@ export function combineDockerfileSteps(
 
   if (runtime && !runtime.startsWith('FROM')) {
     sections.push(runtime);
-  }
-
-  // Ensure we have at least the base image
-  if (sections.length === 0) {
-    return baseImage || '';
   }
 
   return sections.join('\n\n');
