@@ -48,7 +48,7 @@ export const IMAGE_TAG = /^(.+?)(?::([^/]+))?$/;
 export const ENV_VAR_PATTERN = /^[A-Z_][A-Z0-9_]*=.*$/;
 
 // ============================================
-// Simple extraction functions - only where actually needed
+// Extraction functions
 // ============================================
 
 /**

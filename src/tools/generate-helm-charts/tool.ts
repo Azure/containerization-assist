@@ -46,7 +46,6 @@ export async function generateHelmCharts(
     },
   });
 
-  // Return result
   try {
     const responseText = response.content[0]?.text || '';
     return Success({ charts: responseText });

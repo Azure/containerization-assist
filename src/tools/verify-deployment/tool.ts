@@ -214,7 +214,6 @@ async function verifyDeploymentImpl(
   params: VerifyDeploymentParams,
   context: ToolContext,
 ): Promise<Result<VerifyDeploymentResult>> {
-  // Basic parameter validation (essential validation only)
   if (!params || typeof params !== 'object') {
     return Failure('Invalid parameters provided');
   }

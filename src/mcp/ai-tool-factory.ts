@@ -126,7 +126,7 @@ export function extractJSON(text: string): unknown {
   try {
     return JSON.parse(jsonStr.trim());
   } catch (error) {
-    // Simple fix: remove trailing commas which are common in LLM responses
+    // Remove trailing commas which are common in LLM responses
     const fixed = jsonStr.replace(/,(\s*[}\]])/g, '$1');
     try {
       return JSON.parse(fixed.trim());

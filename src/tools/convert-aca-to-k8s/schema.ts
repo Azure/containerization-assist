@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
 export const convertAcaToK8sSchema = z.object({
-  // Just the essentials
   acaManifest: z
     .string()
     .min(1)
@@ -9,7 +8,6 @@ export const convertAcaToK8sSchema = z.object({
   sessionId: z.string().optional().describe('Session identifier for tracking operations'),
   namespace: z.string().optional().default('default').describe('Target Kubernetes namespace'),
 
-  // Keep it simple - always output YAML, always include basic conversions
   includeComments: z
     .boolean()
     .optional()

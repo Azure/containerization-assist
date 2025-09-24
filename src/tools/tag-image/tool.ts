@@ -46,7 +46,6 @@ async function tagImageImpl(
   params: TagImageParams,
   context: ToolContext,
 ): Promise<Result<TagImageResult>> {
-  // Basic parameter validation (essential validation only)
   if (!params || typeof params !== 'object') {
     return Failure('Invalid parameters provided');
   }

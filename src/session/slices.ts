@@ -98,7 +98,7 @@ export function useSessionSlice<
   return {
     async get(sessionId: string): Promise<SessionSlice<In, Out, State> | null> {
       try {
-        const metadata = await store.get<any>(sessionId, 'metadata');
+        const metadata = await store.get<Record<string, unknown>>(sessionId, 'metadata');
         if (!metadata || !hasToolSlices(metadata)) {
           return null;
         }
@@ -109,8 +109,8 @@ export function useSessionSlice<
         }
 
         // Cast to any for property access, then validate
-        const slice = rawSlice as any;
-        const validatedSlice: any = {};
+        const slice = rawSlice as Record<string, unknown>;
+        const validatedSlice: Partial<SessionSlice<In, Out, State>> = {};
 
         // Validate with schemas if provided
         if ('input' in slice && slice.input !== undefined) {
@@ -138,7 +138,7 @@ export function useSessionSlice<
         }
 
         if ('updatedAt' in slice) {
-          validatedSlice.updatedAt = slice.updatedAt;
+          validatedSlice.updatedAt = new Date(slice.updatedAt as string);
         }
 
         return validatedSlice as SessionSlice<In, Out, State>;
@@ -164,7 +164,7 @@ export function useSessionSlice<
         validatedSlice.state = stateSchema.parse(slice.state);
       }
 
-      const metadata = (await store.get<any>(sessionId, 'metadata')) || {};
+      const metadata = (await store.get<Record<string, unknown>>(sessionId, 'metadata')) || {};
       const sliceMetadata = hasToolSlices(metadata) ? metadata : createSliceMetadata();
 
       await store.set(sessionId, 'metadata', {
@@ -214,7 +214,7 @@ export function useSessionSlice<
     },
 
     async clear(sessionId: string): Promise<void> {
-      const metadata = await store.get<any>(sessionId, 'metadata');
+      const metadata = await store.get<Record<string, unknown>>(sessionId, 'metadata');
       if (!metadata || !hasToolSlices(metadata)) {
         return;
       }

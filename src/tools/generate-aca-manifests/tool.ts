@@ -51,7 +51,6 @@ export async function generateAcaManifests(
     },
   });
 
-  // Return result
   try {
     const responseText = response.content[0]?.text || '';
     return Success({ manifests: responseText });

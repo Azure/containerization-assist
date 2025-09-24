@@ -25,8 +25,8 @@ export interface K8sResource {
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
   };
-  spec?: any;
-  data?: any;
+  spec?: Record<string, unknown>;
+  data?: Record<string, unknown>;
 }
 
 /**
@@ -77,110 +77,75 @@ export function createIdempotentApply(logger: Logger, kubeconfig?: string) {
    */
   async function serverSideApply(
     resource: K8sResource,
-    options: ApplyOptions,
+    _options: ApplyOptions,
   ): Promise<Result<K8sResource>> {
     const api = getApiClient(resource.apiVersion);
     const namespace = resource.metadata.namespace || 'default';
     const name = resource.metadata.name;
-    const fieldManager = options.fieldManager || 'containerization-assist';
+    // const fieldManager = options.fieldManager || 'containerization-assist';
 
     try {
-      let result: any;
+      let result: { body?: K8sResource } | K8sResource;
 
       // Different API methods for different resource types
       if (resource.kind === 'Namespace') {
-        result = await api.patchNamespace(
+        result = await api.patchNamespace({
           name,
-          resource,
-          undefined,
-          options.dryRun ? 'All' : undefined,
-          fieldManager,
-          undefined,
-          { headers: { 'Content-Type': 'application/apply-patch+yaml' } },
-        );
+          body: resource,
+        });
       } else if (resource.kind === 'Deployment') {
-        result = await api.patchNamespacedDeployment(
+        result = await api.patchNamespacedDeployment({
           name,
           namespace,
-          resource,
-          undefined,
-          options.dryRun ? 'All' : undefined,
-          fieldManager,
-          undefined,
-          { headers: { 'Content-Type': 'application/apply-patch+yaml' } },
-        );
+          body: resource,
+        });
       } else if (resource.kind === 'Service') {
-        result = await api.patchNamespacedService(
+        result = await api.patchNamespacedService({
           name,
           namespace,
-          resource,
-          undefined,
-          options.dryRun ? 'All' : undefined,
-          fieldManager,
-          undefined,
-          { headers: { 'Content-Type': 'application/apply-patch+yaml' } },
-        );
+          body: resource,
+        });
       } else if (resource.kind === 'ConfigMap') {
-        result = await api.patchNamespacedConfigMap(
+        result = await api.patchNamespacedConfigMap({
           name,
           namespace,
-          resource,
-          undefined,
-          options.dryRun ? 'All' : undefined,
-          fieldManager,
-          undefined,
-          { headers: { 'Content-Type': 'application/apply-patch+yaml' } },
-        );
+          body: resource,
+        });
       } else if (resource.kind === 'Secret') {
-        result = await api.patchNamespacedSecret(
+        result = await api.patchNamespacedSecret({
           name,
           namespace,
-          resource,
-          undefined,
-          options.dryRun ? 'All' : undefined,
-          fieldManager,
-          undefined,
-          { headers: { 'Content-Type': 'application/apply-patch+yaml' } },
-        );
+          body: resource,
+        });
       } else if (resource.kind === 'Ingress') {
-        result = await api.patchNamespacedIngress(
+        result = await api.patchNamespacedIngress({
           name,
           namespace,
-          resource,
-          undefined,
-          options.dryRun ? 'All' : undefined,
-          fieldManager,
-          undefined,
-          { headers: { 'Content-Type': 'application/apply-patch+yaml' } },
-        );
+          body: resource,
+        });
       } else if (resource.kind === 'HorizontalPodAutoscaler') {
-        result = await api.patchNamespacedHorizontalPodAutoscaler(
+        result = await api.patchNamespacedHorizontalPodAutoscaler({
           name,
           namespace,
-          resource,
-          undefined,
-          options.dryRun ? 'All' : undefined,
-          fieldManager,
-          undefined,
-          { headers: { 'Content-Type': 'application/apply-patch+yaml' } },
-        );
+          body: resource,
+        });
       } else {
         // For custom resources or unsupported types, try custom objects API
         const group = resource.apiVersion.includes('/') ? resource.apiVersion.split('/')[0] : '';
         const version = resource.apiVersion.includes('/')
           ? resource.apiVersion.split('/')[1]
           : resource.apiVersion;
-        const plural = `${resource.kind.toLowerCase()}s`; // Simple pluralization
+        const plural = `${resource.kind.toLowerCase()}s`;
 
         const customApi = kc.makeApiClient(k8s.CustomObjectsApi);
-        result = await (customApi as any).patchNamespacedCustomObject(
-          group,
-          version,
+        result = await customApi.patchNamespacedCustomObject({
+          group: group || '',
+          version: version || 'v1',
           namespace,
           plural,
-          name,
-          resource,
-        );
+          name: name || '',
+          body: resource,
+        });
       }
 
       logger.debug(
@@ -193,11 +158,12 @@ export function createIdempotentApply(logger: Logger, kubeconfig?: string) {
         'Resource applied successfully',
       );
 
-      return Success(result.body || result);
-    } catch (error: any) {
+      return Success((result as any).body || result);
+    } catch (error) {
+      const errorMessage = extractErrorMessage(error);
       logger.error(
         {
-          error: error.message,
+          error: errorMessage,
           kind: resource.kind,
           name,
           namespace,
@@ -205,7 +171,7 @@ export function createIdempotentApply(logger: Logger, kubeconfig?: string) {
         'Server-side apply failed',
       );
 
-      return Failure(`Failed to apply ${resource.kind}/${name}: ${error.message}`);
+      return Failure(`Failed to apply ${resource.kind}/${name}: ${errorMessage}`);
     }
   }
 
@@ -221,52 +187,40 @@ export function createIdempotentApply(logger: Logger, kubeconfig?: string) {
     const name = resource.metadata.name;
 
     try {
-      let result: any;
+      let result: { body?: K8sResource } | K8sResource;
 
       if (resource.kind === 'Namespace') {
-        result = await api.createNamespace(resource, undefined, options.dryRun ? 'All' : undefined);
+        result = await api.createNamespace({ body: resource });
       } else if (resource.kind === 'Deployment') {
-        result = await api.createNamespacedDeployment(
+        result = await api.createNamespacedDeployment({
           namespace,
-          resource,
-          undefined,
-          options.dryRun ? 'All' : undefined,
-        );
+          body: resource,
+        });
       } else if (resource.kind === 'Service') {
-        result = await api.createNamespacedService(
+        result = await api.createNamespacedService({
           namespace,
-          resource,
-          undefined,
-          options.dryRun ? 'All' : undefined,
-        );
+          body: resource,
+        });
       } else if (resource.kind === 'ConfigMap') {
-        result = await api.createNamespacedConfigMap(
+        result = await api.createNamespacedConfigMap({
           namespace,
-          resource,
-          undefined,
-          options.dryRun ? 'All' : undefined,
-        );
+          body: resource,
+        });
       } else if (resource.kind === 'Secret') {
-        result = await api.createNamespacedSecret(
+        result = await api.createNamespacedSecret({
           namespace,
-          resource,
-          undefined,
-          options.dryRun ? 'All' : undefined,
-        );
+          body: resource,
+        });
       } else if (resource.kind === 'Ingress') {
-        result = await api.createNamespacedIngress(
+        result = await api.createNamespacedIngress({
           namespace,
-          resource,
-          undefined,
-          options.dryRun ? 'All' : undefined,
-        );
+          body: resource,
+        });
       } else if (resource.kind === 'HorizontalPodAutoscaler') {
-        result = await api.createNamespacedHorizontalPodAutoscaler(
+        result = await api.createNamespacedHorizontalPodAutoscaler({
           namespace,
-          resource,
-          undefined,
-          options.dryRun ? 'All' : undefined,
-        );
+          body: resource,
+        });
       } else {
         // For custom resources
         const group = resource.apiVersion.includes('/') ? resource.apiVersion.split('/')[0] : '';
@@ -276,13 +230,13 @@ export function createIdempotentApply(logger: Logger, kubeconfig?: string) {
         const plural = `${resource.kind.toLowerCase()}s`;
 
         const customApi = kc.makeApiClient(k8s.CustomObjectsApi);
-        result = await (customApi as any).createNamespacedCustomObject(
-          group,
-          version,
+        result = await customApi.createNamespacedCustomObject({
+          group: group || '',
+          version: version || 'v1',
           namespace,
           plural,
-          resource,
-        );
+          body: resource,
+        });
       }
 
       logger.debug(
@@ -295,7 +249,7 @@ export function createIdempotentApply(logger: Logger, kubeconfig?: string) {
         'Resource created successfully',
       );
 
-      return Success(result.body || result);
+      return Success((result as any).body || result);
     } catch (error: any) {
       // Check if it's an "already exists" error
       if (error.statusCode === 409 || error.response?.statusCode === 409) {
@@ -379,7 +333,10 @@ export function parseManifests(yamlContent: string): K8sResource[] {
   try {
     // In js-yaml v4, loadAll is safe by default (no code execution)
     const docs = yaml.loadAll(yamlContent);
-    return docs.filter((doc: any) => doc?.kind && doc.apiVersion) as K8sResource[];
+    return docs.filter((doc: unknown) => {
+      const resource = doc as Record<string, unknown>;
+      return resource?.kind && resource.apiVersion;
+    }) as K8sResource[];
   } catch {
     // Return empty array if js-yaml parsing fails
     // Note: No logger available here as this is a standalone utility function

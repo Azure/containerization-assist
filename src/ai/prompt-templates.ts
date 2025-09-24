@@ -40,7 +40,7 @@ export interface HelmChartPromptParams {
   description?: string;
   version?: string;
   dependencies?: string[];
-  values?: Record<string, any>;
+  values?: Record<string, unknown>;
 }
 
 export interface OptimizationPromptParams {
@@ -59,7 +59,7 @@ export interface RepositoryAnalysisParams {
 export interface SecurityAnalysisParams {
   dockerfileContent?: string;
   imageId?: string;
-  scanResults?: any;
+  scanResults?: Record<string, unknown>;
 }
 
 export interface BaseImageResolutionParams {
@@ -607,7 +607,7 @@ Return only the corrected JSON without explanations.`;
 /**
  * Validate required parameters are present
  */
-export function validatePromptParams<T extends Record<string, any>>(
+export function validatePromptParams<T extends Record<string, unknown>>(
   params: T,
   required: (keyof T)[],
 ): Result<void> {

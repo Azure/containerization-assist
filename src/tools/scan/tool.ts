@@ -104,7 +104,6 @@ async function scanImageImpl(
   params: ScanImageParams,
   context: ToolContext,
 ): Promise<Result<ScanImageResult>> {
-  // Basic parameter validation (essential validation only)
   if (!params || typeof params !== 'object') {
     return Failure('Invalid parameters provided');
   }

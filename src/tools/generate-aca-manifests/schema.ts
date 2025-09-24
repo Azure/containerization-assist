@@ -24,7 +24,7 @@ export const generateAcaManifestsSchema = z.object({
   minReplicas: z.number().optional().default(0).describe('Minimum instances (0 for serverless)'),
   maxReplicas: z.number().optional().default(10).describe('Maximum instances'),
 
-  // Simple ingress
+  // Ingress configuration
   ingressEnabled: z.boolean().optional().describe('Enable ingress for external access'),
   targetPort: z.number().optional().default(8080).describe('Container port to expose'),
   external: z.boolean().optional().default(true).describe('Enable external vs internal ingress'),

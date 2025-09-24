@@ -5,9 +5,7 @@
  */
 
 import { program } from 'commander';
-import { createMCPServer } from '@/mcp/server';
-import { createKernel, type RegisteredTool } from '@/app/kernel';
-import { getAllInternalTools } from '@/exports/tools';
+import { createApp } from '@/app';
 import { config, logConfigSummaryIfDev } from '@/config/index';
 import { createLogger } from '@/lib/logger';
 import { exit, argv, env, cwd } from 'node:process';
@@ -65,12 +63,6 @@ Examples:
   $ containerization-assist-mcp --list-tools             Show all available MCP tools
   $ containerization-assist-mcp --health-check           Check system dependencies
   $ containerization-assist-mcp --validate               Validate configuration
-
-Quick Start:
-  1. Copy .env.example to .env and configure
-  2. Run: containerization-assist-mcp --health-check
-  3. Start server: containerization-assist-mcp
-  4. Test with: echo '{"method":"tools/ping","params":{},"id":1}' | containerization-assist-mcp
 
 MCP Tools Available:
   • Analysis: analyze-repo, resolve-base-images
@@ -321,7 +313,6 @@ async function main(): Promise<void> {
       console.error(`  • Workspace: ${config.workspace?.workspaceDir ?? process.cwd()}`);
       console.error(`  • Docker Socket: ${process.env.DOCKER_SOCKET ?? '/var/run/docker.sock'}`);
       console.error(`  • K8s Namespace: ${process.env.K8S_NAMESPACE ?? 'default'}`);
-      console.error(`  • SDK Native: enabled`);
       console.error(`  • Environment: ${process.env.NODE_ENV ?? 'production'}`);
 
       // Test Docker connection
@@ -358,53 +349,20 @@ async function main(): Promise<void> {
     // Set MCP mode to redirect logs to stderr
     process.env.MCP_MODE = 'true';
 
-    // Create kernel with tools
-
-    // Load and register tools
-    const tools = getAllInternalTools();
-    const registeredTools = new Map<string, RegisteredTool>();
-
-    for (const tool of tools) {
-      registeredTools.set(tool.name, {
-        name: tool.name,
-        description: tool.description || '',
-        handler: async (params: unknown) => {
-          // Tools execute directly with their own context
-          const toolLogger = getLogger().child({ tool: tool.name });
-          return await tool.execute(
-            params as Record<string, unknown>,
-            toolLogger,
-            undefined as any,
-          );
-        },
-        schema: tool.zodSchema as any,
-      });
-    }
-
-    const kernel = await createKernel(
-      {
-        sessionStore: 'memory',
-        sessionTTL: 3600000,
-        maxRetries: 2,
-        retryDelay: 1000,
-        policyPath: options.config || 'config/policy.yaml',
-        policyEnvironment: options.dev ? 'development' : 'production',
-        telemetryEnabled: true,
-      },
-      registeredTools,
-    );
-
-    const server = createMCPServer(kernel, {
+    // Create the application
+    const app = createApp({
       logger: getLogger(),
-      name: config.mcp.name,
-      version: config.mcp.version,
+      policyPath: options.config || 'config/policy.yaml',
+      policyEnvironment: options.dev ? 'development' : 'production',
+      maxRetries: 2,
+      retryDelay: 1000,
+      sessionTTL: 3600000,
     });
 
     if (options.listTools) {
       getLogger().info('Listing available tools');
-      await server.start();
 
-      const tools = server.getTools();
+      const tools = app.listTools();
 
       console.error('\n🛠️  Available MCP Tools:');
       console.error('═'.repeat(60));
@@ -416,44 +374,23 @@ async function main(): Promise<void> {
 
       console.error('\n📊 Summary:');
       console.error(`  • Total tools: ${tools.length}`);
-      console.error(`  • Resources available: 1`);
-      console.error(`  • Prompts available: 0`);
 
-      await server.stop();
       process.exit(0);
     }
 
     if (options.healthCheck) {
       getLogger().info('Performing health check');
-      await server.start();
 
-      const health = kernel.getHealth();
-      const kernelTools = kernel.tools();
-      const isHealthy = health.status === 'healthy';
+      const health = app.healthCheck();
 
       console.error('🏥 Health Check Results');
       console.error('═'.repeat(40));
-      console.error(`Status: ${isHealthy ? '✅ Healthy' : '❌ Unhealthy'}`);
+      console.error(`Status: ✅ ${health.status}`);
       console.error('\nServices:');
-      console.error(`  ✅ MCP Server: running`);
-      console.error(`  📁 Resources available: 1`);
-      console.error(`  📝 Prompts available: 0`);
+      console.error(`  ✅ MCP Server: ready`);
+      console.error(`  📦 Tools loaded: ${health.tools}`);
 
-      // Show kernel health details
-      console.error('\nKernel Health:');
-      console.error(`  ${isHealthy ? '✅' : '❌'} Status: ${health.status}`);
-      console.error(`  📦 Tools registered: ${kernelTools.size}`);
-      if (health.metrics) {
-        console.error(`  📊 Error rate: ${((health.metrics?.errorRate ?? 0) * 100).toFixed(1)}%`);
-        console.error(`  ⏱️ Avg latency: ${(health.metrics?.avgLatency ?? 0).toFixed(0)}ms`);
-      }
-      if (health.issues && health.issues.length > 0) {
-        console.error('\n⚠️ Issues:');
-        health.issues.forEach((issue) => console.error(`  • ${issue}`));
-      }
-
-      await server.stop();
-      process.exit(isHealthy ? 0 : 1);
+      process.exit(0);
     }
 
     getLogger().info(
@@ -483,7 +420,11 @@ async function main(): Promise<void> {
       }
     }
 
-    await server.start();
+    await app.startServer({
+      transport: options.port ? 'http' : 'stdio',
+      port: options.port,
+      host: options.host,
+    });
 
     // Replace the misleading HTTP-specific message
     if (!process.env.MCP_QUIET) {
@@ -515,7 +456,7 @@ async function main(): Promise<void> {
       }, 10000); // 10 second timeout
 
       try {
-        await server.stop();
+        await app.stop();
         clearTimeout(shutdownTimeout);
 
         if (!process.env.MCP_QUIET) {

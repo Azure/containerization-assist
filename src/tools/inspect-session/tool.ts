@@ -61,13 +61,13 @@ export async function inspectSession(
       };
 
       return Success({
-        sessions: [sessionInfo],
+        sessions: [sessionInfo as any],
         totalSessions: allSessionIds.length,
         maxSessions: 1000,
         message:
           params.format === 'json'
             ? JSON.stringify(sessionInfo, null, 2)
-            : formatSessionSummary(sessionInfo),
+            : formatSessionSummary(sessionInfo as any),
       });
     }
 
@@ -95,10 +95,10 @@ export async function inspectSession(
     sessions.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 
     return Success({
-      sessions,
+      sessions: sessions as any,
       totalSessions: sessions.length,
       maxSessions: 1000,
-      message: formatSessionList(sessions, params.format),
+      message: formatSessionList(sessions as any, params.format),
     });
   } catch (error) {
     return Failure(`Failed to inspect session: ${extractErrorMessage(error)}`);
@@ -153,7 +153,18 @@ function extractToolSlices(metadata: Record<string, unknown>): Record<string, un
 /**
  * Format session summary for display
  */
-function formatSessionSummary(session: any): string {
+interface SessionData {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  ttlRemaining: number;
+  currentStep?: string;
+  completedSteps: string[];
+  errors?: Record<string, unknown>;
+  toolSlices?: Record<string, unknown>;
+}
+
+function formatSessionSummary(session: SessionData): string {
   const lines = [
     `Session: ${session.id}`,
     `Created: ${session.createdAt.toISOString()}`,
@@ -177,7 +188,7 @@ function formatSessionSummary(session: any): string {
 /**
  * Format session list for display
  */
-function formatSessionList(sessions: any[], format: string): string {
+function formatSessionList(sessions: SessionData[], format: string): string {
   if (format === 'json') {
     return JSON.stringify(sessions, null, 2);
   }

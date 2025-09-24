@@ -187,7 +187,6 @@ async function buildImageImpl(
   params: BuildImageParams,
   context: ToolContext,
 ): Promise<Result<BuildImageResult>> {
-  // Basic parameter validation (essential validation only)
   if (!params || typeof params !== 'object') {
     return Failure('Invalid parameters provided');
   }
