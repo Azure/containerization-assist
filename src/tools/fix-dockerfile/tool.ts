@@ -6,24 +6,58 @@ import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { fixDockerfileSchema, type FixDockerfileParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
 import { DockerfileParser } from 'dockerfile-ast';
+import validateDockerfileLib from 'validate-dockerfile';
+import { promises as fs } from 'node:fs';
+import nodePath from 'node:path';
 
 export async function fixDockerfile(
   params: FixDockerfileParams,
   context: ToolContext,
 ): Promise<Result<AIResponse>> {
   const validatedParams = fixDockerfileSchema.parse(params);
-  const { dockerfile: content = '', targetEnvironment: environment = 'production' } =
-    validatedParams;
+  const { targetEnvironment: environment = 'production', path } = validatedParams;
 
-  // First, parse the Dockerfile to identify real issues
+  // Get Dockerfile content from either path or direct content
+  let content = validatedParams.dockerfile || '';
+  let dockerfilePath: string | undefined;
+
+  if (path) {
+    dockerfilePath = nodePath.isAbsolute(path) ? path : nodePath.resolve(process.cwd(), path);
+    try {
+      content = await fs.readFile(dockerfilePath, 'utf-8');
+    } catch (error) {
+      return Failure(`Failed to read Dockerfile at ${dockerfilePath}: ${error}`);
+    }
+  }
+
+  // First, use validate-dockerfile library for basic syntax validation
+  const libraryValidation = validateDockerfileLib(content);
   const parseIssues: string[] = [];
+
+  if (!libraryValidation.valid) {
+    parseIssues.push(libraryValidation.message || 'Invalid Dockerfile syntax');
+  }
+
+  // Check for [object Object] or similar serialization issues
+  const lines = content.split('\n');
+  lines.forEach((line, idx) => {
+    if (line.includes('[object Object]')) {
+      parseIssues.push(`Line ${idx + 1}: Contains [object Object] serialization error`);
+    }
+  });
+
+  // Check for empty COPY/RUN instructions
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim();
+    if (trimmed === 'COPY' || trimmed === 'RUN' || trimmed === 'ADD') {
+      parseIssues.push(`Line ${idx + 1}: Empty ${trimmed} instruction without arguments`);
+    }
+  });
+
+  // Parse with dockerfile-ast for additional checks
   try {
     const dockerfile = DockerfileParser.parse(content);
     const instructions = dockerfile.getInstructions();
-
-    // Check for common issues
-    const hasFrom = instructions.some((i) => i.getInstruction() === 'FROM');
-    if (!hasFrom) parseIssues.push('Missing FROM instruction');
 
     const hasUser = instructions.some((i) => {
       if (i.getInstruction() === 'USER') {
@@ -112,12 +146,34 @@ Then fix the identified issues.`;
   // Return result with workflow hints
   try {
     const responseText = response.content[0]?.text || '';
+
+    // Extract actual Dockerfile content if wrapped in JSON
+    let fixedDockerfile = responseText;
+    try {
+      const parsed = JSON.parse(responseText);
+      if (parsed.dockerfile_v1 || parsed.dockerfile) {
+        fixedDockerfile = parsed.dockerfile_v1 || parsed.dockerfile;
+      }
+    } catch {
+      // Not JSON, use as-is
+    }
+
+    // Write back to file if path was provided
+    if (dockerfilePath) {
+      await fs.writeFile(dockerfilePath, fixedDockerfile, 'utf-8');
+      context.logger.info({ dockerfilePath }, 'Fixed Dockerfile written to disk');
+    }
+
     return Success({
-      fixedContent: responseText,
+      fixedContent: fixedDockerfile,
+      dockerfilePath,
+      issues: parseIssues,
       sessionId: validatedParams.sessionId,
       workflowHints: {
         nextStep: 'build-image',
-        message: `Dockerfile fixed successfully. Use "build-image" with sessionId ${validatedParams.sessionId || '<sessionId>'} to build the optimized image.`,
+        message: dockerfilePath
+          ? `Dockerfile fixed and saved to ${dockerfilePath}. Use "build-image" to build the optimized image.`
+          : `Dockerfile fixed successfully. Use "build-image" with sessionId ${validatedParams.sessionId || '<sessionId>'} to build the optimized image.`,
       },
     });
   } catch (e) {
