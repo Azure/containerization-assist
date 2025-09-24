@@ -48,7 +48,7 @@ export async function inspectSession(
         });
       }
 
-      const sessionInfo = {
+      const sessionInfo: SessionData = {
         id: params.sessionId,
         createdAt: session.createdAt || new Date(),
         updatedAt: session.updatedAt || new Date(),
@@ -56,9 +56,15 @@ export async function inspectSession(
         completedSteps: session.completed_steps || [],
         currentStep: (session.current_step as string) || null,
         metadata: session.metadata || {},
-        toolSlices: params.includeSlices ? extractToolSlices(session.metadata || {}) : undefined,
-        errors: session.errors ? (session.errors as Record<string, string>) : undefined,
       };
+
+      if (params.includeSlices) {
+        sessionInfo.toolSlices = extractToolSlices(session.metadata || {});
+      }
+
+      if (session.errors) {
+        sessionInfo.errors = session.errors as Record<string, string>;
+      }
 
       return Success({
         sessions: [sessionInfo],
@@ -77,7 +83,7 @@ export async function inspectSession(
       const sessionResult = await sessionManager.get(id);
       if (sessionResult.ok && sessionResult.value) {
         const session = sessionResult.value;
-        sessions.push({
+        const sessionData: SessionData = {
           id,
           createdAt: session.createdAt || new Date(),
           updatedAt: session.updatedAt || new Date(),
@@ -85,9 +91,16 @@ export async function inspectSession(
           completedSteps: session.completed_steps || [],
           currentStep: (session.current_step as string) || null,
           metadata: session.metadata || {},
-          toolSlices: params.includeSlices ? extractToolSlices(session.metadata || {}) : undefined,
-          errors: session.errors ? (session.errors as Record<string, string>) : undefined,
-        });
+        };
+
+        if (params.includeSlices) {
+          sessionData.toolSlices = extractToolSlices(session.metadata || {});
+        }
+
+        if (session.errors) {
+          sessionData.errors = session.errors as Record<string, string>;
+        }
+        sessions.push(sessionData);
       }
     }
 
@@ -153,7 +166,19 @@ function extractToolSlices(metadata: Record<string, unknown>): Record<string, un
 /**
  * Format session summary for display
  */
-function formatSessionSummary(session: any): string {
+interface SessionData {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  ttlRemaining: number;
+  currentStep: string | null;
+  completedSteps: string[];
+  metadata: Record<string, unknown>;
+  errors?: Record<string, string>;
+  toolSlices?: Record<string, unknown>;
+}
+
+function formatSessionSummary(session: SessionData): string {
   const lines = [
     `Session: ${session.id}`,
     `Created: ${session.createdAt.toISOString()}`,
@@ -177,7 +202,7 @@ function formatSessionSummary(session: any): string {
 /**
  * Format session list for display
  */
-function formatSessionList(sessions: any[], format: string): string {
+function formatSessionList(sessions: SessionData[], format: string): string {
   if (format === 'json') {
     return JSON.stringify(sessions, null, 2);
   }

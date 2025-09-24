@@ -99,12 +99,10 @@ export async function runTool(
  * @returns true if the tool can be executed simply
  */
 export function canExecuteSimply(tool: RegisteredTool, params: unknown): boolean {
-  // Check if tool has dependencies
   if (tool.requires && tool.requires.length > 0) {
     return false;
   }
 
-  // Check if this is a workflow or multi-step operation
   const paramsObj = params as Record<string, unknown>;
   if (Array.isArray(paramsObj?.steps) || paramsObj?.workflow) {
     return false;
@@ -115,6 +113,5 @@ export function canExecuteSimply(tool: RegisteredTool, params: unknown): boolean
     return false;
   }
 
-  // All checks passed - this is a simple tool
   return true;
 }

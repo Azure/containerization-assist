@@ -17,11 +17,11 @@ describe('Server Entry Point', () => {
     it('should have server entry point file', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       expect(() => statSync(serverPath)).not.toThrow();
-      
+
       const content = readFileSync(serverPath, 'utf-8');
       expect(content).toContain('async function main');
-      expect(content).toContain('MCPServer');
-      expect(content).toContain('createKernel');
+      expect(content).toContain('createApp');
+      expect(content).toContain('app.startServer');
     });
 
     it('should contain MCP mode setting', () => {
@@ -34,18 +34,18 @@ describe('Server Entry Point', () => {
     it('should contain server configuration', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
-      
+
       expect(content).toContain('Containerization Assist MCP Server');
-      expect(content).toContain('SDK-Native');
+      expect(content).toContain('stdio');
     });
 
-    it('should contain kernel setup', () => {
+    it('should contain app setup', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
 
-      expect(content).toContain('createKernel');
-      expect(content).toContain('getAllInternalTools');
-      expect(content).toContain('registeredTools');
+      expect(content).toContain('createApp');
+      expect(content).toContain('app.startServer');
+      expect(content).toContain('app.stop');
     });
   });
 
@@ -53,10 +53,9 @@ describe('Server Entry Point', () => {
     it('should contain signal handler registration', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
-      
+
       expect(content).toContain("process.on('SIGINT'");
       expect(content).toContain("process.on('SIGTERM'");
-      expect(content).toContain("process.on('SIGQUIT'");
     });
 
     it('should contain graceful shutdown logic', () => {
@@ -65,8 +64,8 @@ describe('Server Entry Point', () => {
 
       expect(content).toContain('const shutdown = async');
       expect(content).toContain('Shutting down server');
-      expect(content).toContain('server.stop()');
-      expect(content).toContain('Server shutdown complete');
+      expect(content).toContain('app.stop()');
+      expect(content).toContain('Server stopped successfully');
     });
   });
 
@@ -101,28 +100,28 @@ describe('Server Entry Point', () => {
     it('should contain module execution guard', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
-      
-      expect(content).toContain('import.meta.url');
-      expect(content).toContain('process.argv[1]');
-      expect(content).toContain('main().catch');
+
+      // Our new implementation just runs main() directly
+      expect(content).toContain('void main()');
     });
   });
 
   describe('Process Lifecycle', () => {
-    it('should contain stdin resume for keeping process alive', () => {
+    it('should contain stdio transport configuration', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
-      
-      expect(content).toContain('process.stdin.resume()');
+
+      // Our new implementation uses stdio transport instead
+      expect(content).toContain("transport: 'stdio'");
     });
 
     it('should contain server startup sequence', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
-      
-      expect(content).toContain('createMCPServer');
-      expect(content).toContain('await server.start()');
-      expect(content).toContain('Starting SDK-Native MCP Server');
+
+      expect(content).toContain('createApp');
+      expect(content).toContain('await app.startServer');
+      expect(content).toContain('Starting Containerization Assist MCP Server');
       expect(content).toContain('MCP Server started successfully');
     });
 
@@ -130,8 +129,8 @@ describe('Server Entry Point', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
 
-      expect(content).toContain('let server: IMCPServer | undefined');
-      expect(content).toContain('const kernel = await createKernel');
+      expect(content).toContain('let app: ReturnType<typeof createApp>');
+      expect(content).toContain('app = createApp');
     });
   });
 });

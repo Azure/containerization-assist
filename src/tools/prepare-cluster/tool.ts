@@ -26,6 +26,7 @@ import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient } from '@/lib/kubernetes';
+import type { K8sManifest } from '@/infra/kubernetes/client';
 import { getSystemInfo, getDownloadOS, getDownloadArch } from '@/lib/platform-utils';
 import { downloadFile, makeExecutable, createTempFile, deleteTempFile } from '@/lib/file-utils';
 
@@ -116,7 +117,7 @@ function createK8sClientAdapter(
     ping: () => k8sClient.ping(),
     namespaceExists: (namespace: string) => k8sClient.namespaceExists(namespace),
     applyManifest: async (manifest: Record<string, unknown>, namespace?: string) => {
-      const result = await k8sClient.applyManifest(manifest, namespace);
+      const result = await k8sClient.applyManifest(manifest as unknown as K8sManifest, namespace);
       if (result.ok) {
         return { success: true };
       } else {

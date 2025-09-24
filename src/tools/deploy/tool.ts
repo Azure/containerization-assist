@@ -31,6 +31,7 @@ import {
 } from '@/mcp/tool-session-helpers';
 import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient } from '@/lib/kubernetes';
+import type { K8sManifest } from '@/infra/kubernetes/client';
 
 import { Success, Failure, type Result } from '@/types';
 import { generateK8sManifestsSchema } from '@/tools/generate-k8s-manifests/schema';
@@ -276,7 +277,7 @@ async function deployManifest(
   const name = metadata?.name ?? 'unknown';
 
   try {
-    const applyResult = await k8sClient.applyManifest(manifest, namespace);
+    const applyResult = await k8sClient.applyManifest(manifest as K8sManifest, namespace);
 
     if (!applyResult.ok) {
       logger.error({ kind, name, error: applyResult.error }, 'Failed to apply manifest');

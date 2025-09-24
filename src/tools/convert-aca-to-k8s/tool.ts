@@ -50,7 +50,6 @@ Maintain all configurations and ensure compatibility with standard Kubernetes cl
     },
   });
 
-  // Return result
   try {
     const responseText = response.content[0]?.text || '';
     return Success({ k8sManifests: responseText });

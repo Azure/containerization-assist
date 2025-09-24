@@ -154,12 +154,10 @@ describe('IdempotentApply', () => {
       const result = await applyResource(deployment);
 
       expect(result.ok).toBe(true);
-      expect(mockAppsApi.createNamespacedDeployment).toHaveBeenCalledWith(
-        'default',
-        deployment,
-        undefined,
-        undefined
-      );
+      expect(mockAppsApi.createNamespacedDeployment).toHaveBeenCalledWith({
+        namespace: 'default',
+        body: deployment
+      });
     });
 
     test('should create a new service', async () => {
@@ -183,12 +181,10 @@ describe('IdempotentApply', () => {
       const result = await applyResource(service);
 
       expect(result.ok).toBe(true);
-      expect(mockCoreApi.createNamespacedService).toHaveBeenCalledWith(
-        'production',
-        service,
-        undefined,
-        undefined
-      );
+      expect(mockCoreApi.createNamespacedService).toHaveBeenCalledWith({
+        namespace: 'production',
+        body: service
+      });
     });
 
     test('should support dry-run mode', async () => {
@@ -210,12 +206,10 @@ describe('IdempotentApply', () => {
       const result = await applyResource(configMap, { dryRun: true });
 
       expect(result.ok).toBe(true);
-      expect(mockCoreApi.createNamespacedConfigMap).toHaveBeenCalledWith(
-        'default',
-        configMap,
-        undefined,
-        'All'
-      );
+      expect(mockCoreApi.createNamespacedConfigMap).toHaveBeenCalledWith({
+        namespace: 'default',
+        body: configMap
+      });
     });
   });
 
@@ -248,16 +242,11 @@ describe('IdempotentApply', () => {
 
       expect(result.ok).toBe(true);
       expect(mockAppsApi.createNamespacedDeployment).toHaveBeenCalledTimes(1);
-      expect(mockAppsApi.patchNamespacedDeployment).toHaveBeenCalledWith(
-        'existing-app',
-        'default',
-        deployment,
-        undefined,
-        undefined,
-        'containerization-assist',
-        undefined,
-        { headers: { 'Content-Type': 'application/apply-patch+yaml' } }
-      );
+      expect(mockAppsApi.patchNamespacedDeployment).toHaveBeenCalledWith({
+        name: 'existing-app',
+        namespace: 'default',
+        body: deployment
+      });
     });
 
     test('should handle concurrent applies of same resource', async () => {

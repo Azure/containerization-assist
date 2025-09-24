@@ -21,8 +21,21 @@ export interface ClusterInfo {
   ready: boolean;
 }
 
+export interface K8sManifest {
+  apiVersion: string;
+  kind: string;
+  metadata: {
+    name: string;
+    namespace?: string;
+    labels?: Record<string, string>;
+    annotations?: Record<string, string>;
+  };
+  spec?: Record<string, unknown>;
+  data?: Record<string, unknown>;
+}
+
 export interface KubernetesClient {
-  applyManifest: (manifest: any, namespace?: string) => Promise<Result<void>>;
+  applyManifest: (manifest: K8sManifest, namespace?: string) => Promise<Result<void>>;
   getDeploymentStatus: (namespace: string, name: string) => Promise<Result<DeploymentResult>>;
   deleteResource: (kind: string, name: string, namespace?: string) => Promise<Result<void>>;
   ping: () => Promise<boolean>;
@@ -52,15 +65,20 @@ export const createKubernetesClient = (logger: Logger, kubeconfig?: string): Kub
     /**
      * Apply Kubernetes manifest
      */
-    async applyManifest(manifest: any, namespace = 'default'): Promise<Result<void>> {
+    async applyManifest(manifest: K8sManifest, namespace = 'default'): Promise<Result<void>> {
       try {
         logger.debug({ manifest: manifest.kind, namespace }, 'Applying Kubernetes manifest');
 
-        // Simple apply logic - in production this would handle different resource types
         if (manifest.kind === 'Deployment') {
-          await k8sApi.createNamespacedDeployment({ namespace, body: manifest });
+          await k8sApi.createNamespacedDeployment({
+            namespace,
+            body: manifest as unknown as k8s.V1Deployment,
+          });
         } else if (manifest.kind === 'Service') {
-          await coreApi.createNamespacedService({ namespace, body: manifest });
+          await coreApi.createNamespacedService({
+            namespace,
+            body: manifest as unknown as k8s.V1Service,
+          });
         }
 
         logger.info(
@@ -145,7 +163,7 @@ export const createKubernetesClient = (logger: Logger, kubeconfig?: string): Kub
         return true;
       } catch (error: unknown) {
         if (error && typeof error === 'object' && 'response' in error) {
-          const response = (error as any).response;
+          const response = (error as { response?: { statusCode?: number } }).response;
           if (response?.statusCode === 404) {
             return false;
           }
@@ -176,7 +194,9 @@ export const createKubernetesClient = (logger: Logger, kubeconfig?: string): Kub
 
         // Use authorization API for SelfSubjectAccessReview
         const authApi = kc.makeApiClient(k8s.AuthorizationV1Api);
-        const response = await authApi.createSelfSubjectAccessReview({ body: accessReview as any });
+        const response = await authApi.createSelfSubjectAccessReview({
+          body: accessReview as k8s.V1SelfSubjectAccessReview,
+        });
         return response.status?.allowed === true;
       } catch (error) {
         logger.warn({ namespace, error }, 'Error checking permissions');

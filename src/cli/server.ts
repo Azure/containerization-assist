@@ -1,11 +1,9 @@
 /**
- * Containerization Assist MCP Server - SDK-Native Entry Point
- * Uses Application Kernel for tool execution
+ * Containerization Assist MCP Server - Direct Entry Point
+ * Uses the simplified app architecture
  */
 
-import { createMCPServer, type IMCPServer } from '@/mcp/server';
-import { createKernel, type RegisteredTool } from '@/app/kernel';
-import { getAllInternalTools } from '@/exports/tools';
+import { createApp } from '@/app';
 import { createLogger } from '@/lib/logger';
 import process from 'node:process';
 
@@ -18,66 +16,37 @@ async function main(): Promise<void> {
     level: process.env.LOG_LEVEL || 'info',
   });
 
-  let server: IMCPServer | undefined;
+  let app: ReturnType<typeof createApp> | undefined;
 
   try {
-    // Session manager not needed - kernel creates its own
+    logger.info('Starting Containerization Assist MCP Server');
 
-    // Load and register tools
-    const tools = getAllInternalTools();
-    const registeredTools = new Map<string, RegisteredTool>();
-
-    for (const tool of tools) {
-      registeredTools.set(tool.name, {
-        name: tool.name,
-        description: tool.description || '',
-        handler: async (params: unknown) => {
-          // Tools execute directly with their own context
-          const toolLogger = logger.child({ tool: tool.name });
-          return await tool.execute(
-            params as Record<string, unknown>,
-            toolLogger,
-            undefined as any,
-          );
-        },
-        schema: tool.zodSchema as any,
-      });
-    }
-
-    // Create kernel
-    const kernel = await createKernel(
-      {
-        sessionStore: 'memory',
-        sessionTTL: 3600000,
-        maxRetries: 2,
-        retryDelay: 1000,
-        policyPath: process.env.POLICY_PATH || 'config/policy.yaml',
-        policyEnvironment: process.env.NODE_ENV || 'production',
-        telemetryEnabled: true,
-      },
-      registeredTools,
-    );
-
-    logger.info('Starting SDK-Native MCP Server with Application Kernel');
-
-    // Create and start the SDK-native server with kernel
-    server = createMCPServer(kernel, {
+    // Create the application
+    app = createApp({
       logger,
-      name: 'containerization-assist',
-      version: '1.0.0',
+      policyPath: process.env.POLICY_PATH || 'config/policy.yaml',
+      policyEnvironment: process.env.NODE_ENV || 'production',
+      sessionTTL: 3600000, // 1 hour
+      maxRetries: 2,
+      retryDelay: 1000,
     });
-    await server.start();
 
-    logger.info('MCP Server started successfully');
+    // Start the server with stdio transport
+    await app.startServer({
+      transport: 'stdio',
+    });
+
+    logger.info('MCP Server started successfully with stdio transport');
 
     // Handle graceful shutdown
-    const shutdown = async (): Promise<void> => {
-      logger.info('Shutting down server...');
+    const shutdown = async (signal: string): Promise<void> => {
+      logger.info({ signal }, 'Shutting down server');
+
       try {
-        if (server) {
-          await server.stop();
+        if (app) {
+          await app.stop();
         }
-        logger.info('Server shutdown complete');
+        logger.info('Server stopped successfully');
         process.exit(0);
       } catch (error) {
         logger.error({ error }, 'Error during shutdown');
@@ -85,28 +54,25 @@ async function main(): Promise<void> {
       }
     };
 
-    process.on('SIGINT', () => {
-      void shutdown();
-    });
-    process.on('SIGTERM', () => {
-      void shutdown();
-    });
-    process.on('SIGQUIT', () => {
-      void shutdown();
-    });
-
-    // Keep the process alive
-    process.stdin.resume();
+    // Register signal handlers
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
   } catch (error) {
-    logger.error({ error }, 'Failed to start server');
+    logger.fatal({ error }, 'Failed to start server');
     process.exit(1);
   }
 }
 
-// Start the server
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
-    console.error('Unhandled error:', error);
-    process.exit(1);
-  });
-}
+// Handle uncaught errors
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason);
+  process.exit(1);
+});
+
+// Run the server
+void main();

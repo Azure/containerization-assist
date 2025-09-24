@@ -1,14 +1,13 @@
 /**
- * Clean, idiomatic TypeScript API for Container Assist MCP tools
+ * Clean, idiomatic TypeScript API for Container Assist
  */
 
-// Primary functional API
-export { createContainerAssist as default } from './exports/container-assist.js';
-export { createContainerAssist, type ContainerAssist } from './exports/container-assist.js';
+// Primary API - simple function that creates the app
+export { createApp } from './app/index.js';
+export type { AppConfig, TransportConfig } from './app/index.js';
 
-// Tool names and types for type-safe registration
+// Tool names and types
 export { TOOLS, type ToolName } from './exports/tools.js';
 
-// Core types for external usage
-export type { MCPTool, MCPToolResult } from './exports/types.js';
+// Core types
 export type { Tool, Result, Success, Failure } from './types/index.js';
