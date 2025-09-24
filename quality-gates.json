@@ -1,0 +1,58 @@
+{
+  "$schema": "./quality-gates.schema.json",
+  "schemaVersion": 1,
+  "metrics": {
+    "thresholds": {
+      "lint": {
+        "maxErrors": 0,
+        "maxWarnings": 400
+      },
+      "deadcode": {
+        "max": 200
+      },
+      "typescript": {
+        "maxErrors": 0
+      },
+      "build": {
+        "maxTimeMs": 60000
+      }
+    },
+    "baselines": {
+      "lint": {
+        "errors": 0,
+        "warnings": 14,
+        "warningSignatures": [
+          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:55:46:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:161:33:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:252:33:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:253:21:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/multi-step-generator.ts:26:3:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
+          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/multi-step-generator.ts:31:5:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
+          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/multi-step-generator.ts:40:7:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
+          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/multi-step-generator.ts:46:9:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
+          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/tool.ts:92:5:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
+          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/tool.ts:94:5:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
+          "/home/tng/workspace/containerization-assist/src/tools/inspect-session/tool.ts:64:35:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/inspect-session/tool.ts:70:51:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/inspect-session/tool.ts:98:29:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/inspect-session/tool.ts:101:46:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type."
+        ]
+      },
+      "deadcode": {
+        "count": 197
+      },
+      "typescript": {
+        "errors": 0
+      },
+      "build": {
+        "timeMs": 8000,
+        "mode": "clean",
+        "environment": {
+          "nodeVersion": "v24.1.0",
+          "os": "Linux",
+          "cpu": "x86_64"
+        }
+      }
+    }
+  }
+}

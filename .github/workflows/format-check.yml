@@ -31,7 +31,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-            npm run install:all
+            npm run install
 
       - name: Run Prettier check
         run: npx prettier --check "**/*.{ts,tsx,json,css,md}"

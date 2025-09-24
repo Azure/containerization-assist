@@ -61,14 +61,17 @@ class SmartBuilder {
   }
 
   private log(message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') {
-    const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(1);
-    const prefix = {
-      info: '📝',
-      success: '✅',
-      error: '❌',
-      warning: '⚠️'
-    }[type];
-    console.log(`[${elapsed}s] ${prefix} ${message}`);
+    // Only show essential messages
+    if (type === 'error' || type === 'warning' || this.options.verbose) {
+      const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(1);
+      const prefix = {
+        info: '📝',
+        success: '✅',
+        error: '❌',
+        warning: '⚠️'
+      }[type];
+      console.log(`[${elapsed}s] ${prefix} ${message}`);
+    }
   }
 
   private async withRetry<T>(
@@ -100,7 +103,6 @@ class SmartBuilder {
   private async runCommand(cmd: string, description: string): Promise<void> {
     await this.withRetry(
       async () => {
-        this.log(`Starting: ${description}`);
         const { stdout, stderr } = await execAsync(cmd, {
           maxBuffer: 10 * 1024 * 1024, // 10MB buffer
           env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=4096' }
@@ -110,8 +112,6 @@ class SmartBuilder {
           if (stdout) console.log(stdout);
           if (stderr && !stderr.includes('Warning')) console.error(stderr);
         }
-
-        this.log(`Completed: ${description}`, 'success');
       },
       description
     );
@@ -196,7 +196,7 @@ class SmartBuilder {
         await fs.copyFile(source, target);
       }
 
-      this.log(`Copied ${jsonFiles.length} knowledge pack files to ${outputDir}`, 'success');
+      // Knowledge pack files copied
     } catch (error: any) {
       this.log(`Failed to copy knowledge data: ${error.message}`, 'warning');
     }
@@ -204,7 +204,6 @@ class SmartBuilder {
 
   private async validateBuilds(): Promise<void> {
     this.stats.phase = 'validating';
-    this.log('Validating build outputs...');
 
     const requiredFiles = [
       'dist/src/index.js',
@@ -221,13 +220,10 @@ class SmartBuilder {
         throw new Error(`Required build output missing: ${file}`);
       }
     }
-
-    this.log('Build validation passed', 'success');
   }
 
   private async generateExports() {
     this.stats.phase = 'generating-exports';
-    this.log('Generating package.json exports...');
 
     const exportPatterns = [
       { path: 'src/index', name: '.' },
@@ -268,7 +264,6 @@ class SmartBuilder {
       this.log('Could not read tools directory', 'warning');
     }
 
-    this.log(`Generated exports for ${Object.keys(exports).length} entries`, 'success');
     return exports;
   }
 
@@ -280,7 +275,6 @@ class SmartBuilder {
     if (JSON.stringify(pkg.exports) !== JSON.stringify(exports)) {
       pkg.exports = exports;
       await fs.writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
-      this.log('Updated package.json exports', 'success');
     }
   }
 
@@ -298,35 +292,21 @@ class SmartBuilder {
 
   private async measurePerformance() {
     this.stats.phase = 'measuring';
-    this.log('Measuring build performance...');
+
+    if (!this.options.verbose) return;
 
     try {
       const distSize = execSync('du -sh dist/ 2>/dev/null || echo "0"').toString().trim();
       const cjsSize = execSync('du -sh dist-cjs/ 2>/dev/null || echo "0"').toString().trim();
 
-      const memUsed = process.memoryUsage();
-      const memDelta = (memUsed.heapUsed - this.stats.memory) / 1024 / 1024;
-
-      console.log('\n📊 Build Metrics:');
-      console.log(`  Bundle Sizes:`);
-      console.log(`    • ESM: ${distSize}`);
-      console.log(`    • CJS: ${cjsSize}`);
-      console.log(`  Memory Usage:`);
-      console.log(`    • Peak: ${(memUsed.heapUsed / 1024 / 1024).toFixed(1)} MB`);
-      console.log(`    • Delta: ${memDelta > 0 ? '+' : ''}${memDelta.toFixed(1)} MB`);
-      console.log(`  Errors: ${this.stats.errors}`);
+      console.log(`\n📊 Build sizes: ESM ${distSize}, CJS ${cjsSize}`);
     } catch {
-      this.log('Could not measure all performance metrics', 'warning');
+      // Silently skip metrics if not available
     }
   }
 
   async build() {
-    console.log('\n🚀 Smart Build System - Production Ready\n');
-    console.log(`  Mode: ${this.options.parallel ? 'PARALLEL' : 'SEQUENTIAL'}`);
-    console.log(`  Verbose: ${this.options.verbose ? 'YES' : 'NO'}`);
-    console.log(`  Tests: ${this.options.skipTests ? 'SKIP' : 'RUN'}`);
-    console.log(`  Clean: ${this.options.clean ? 'YES' : 'NO'}`);
-    console.log(`  Watch: ${this.options.watch ? 'YES' : 'NO'}\n`);
+    console.log(`🚀 Building (${this.options.parallel ? 'parallel' : 'sequential'})...`);
 
     try {
       // Clean phase
@@ -337,28 +317,16 @@ class SmartBuilder {
       let exports: any;
 
       if (this.options.parallel) {
-        this.log('Starting parallel builds...', 'info');
-        const startBuild = Date.now();
-
         const [, , generatedExports] = await Promise.all([
           this.buildESM(),
           this.buildCJS(),
           this.generateExports()
         ]);
-
         exports = generatedExports;
-        const buildTime = ((Date.now() - startBuild) / 1000).toFixed(2);
-        this.log(`Parallel build completed in ${buildTime}s`, 'success');
       } else {
-        this.log('Starting sequential builds...', 'info');
-        const startBuild = Date.now();
-
         await this.buildESM();
         await this.buildCJS();
         exports = await this.generateExports();
-
-        const buildTime = ((Date.now() - startBuild) / 1000).toFixed(2);
-        this.log(`Sequential build completed in ${buildTime}s`, 'success');
       }
 
       // Validate builds
@@ -377,17 +345,7 @@ class SmartBuilder {
       this.stats.endTime = Date.now();
       const totalTime = ((this.stats.endTime - this.startTime) / 1000).toFixed(2);
 
-      console.log('\n✨ Build Summary:');
-      console.log(`  Total Time: ${totalTime}s`);
-      console.log(`  Status: SUCCESS`);
-
-      if (this.options.parallel) {
-        const baseline = 5.65;
-        const improvement = ((baseline - parseFloat(totalTime)) / baseline * 100).toFixed(0);
-        console.log(`  Performance: ${improvement}% faster than baseline`);
-      }
-
-      console.log('\n🎉 Build completed successfully!\n');
+      console.log(`✅ Build completed in ${totalTime}s`);
 
       // Watch mode
       if (this.options.watch) {
@@ -398,29 +356,26 @@ class SmartBuilder {
       this.stats.endTime = Date.now();
       const totalTime = ((this.stats.endTime - this.startTime) / 1000).toFixed(2);
 
-      console.error('\n❌ Build Failed:');
-      console.error(`  Phase: ${this.stats.phase}`);
-      console.error(`  Time: ${totalTime}s`);
-      console.error(`  Error: ${error.message}`);
-      console.error('\nRun with --verbose for more details\n');
+      console.error(`❌ Build failed in ${totalTime}s: ${error.message}`);
+      if (!this.options.verbose) {
+        console.error('Run with --verbose for more details');
+      }
 
       process.exit(1);
     }
   }
 
   private async startWatchMode() {
-    console.log('\n👀 Watch mode activated - monitoring for changes...\n');
-    console.log('Press Ctrl+C to exit\n');
+    console.log('👀 Watch mode activated (Ctrl+C to exit)');
 
     // Simple watch implementation - in production would use chokidar
     const watchInterval = setInterval(async () => {
       // This is a placeholder - real implementation would monitor file changes
-      this.log('Checking for changes...', 'info');
     }, 5000);
 
     process.on('SIGINT', () => {
       clearInterval(watchInterval);
-      console.log('\n👋 Watch mode terminated\n');
+      console.log('Watch mode terminated');
       process.exit(0);
     });
   }
