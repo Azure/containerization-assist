@@ -110,6 +110,35 @@ async function run(
         consecutiveRuns = 0;
       }
     });
+
+    const hasUser = instructions.some((i) => {
+      if (i.getInstruction() === 'USER') {
+        const args = i.getArguments();
+        return args.length > 0 && !args.some((arg) => arg.getValue() === 'root');
+      }
+      return false;
+    });
+    if (!hasUser) parseIssues.push('No non-root USER specified (security issue)');
+
+    const hasHealthcheck = instructions.some((i) => i.getInstruction() === 'HEALTHCHECK');
+    if (!hasHealthcheck) parseIssues.push('No HEALTHCHECK defined');
+
+    // Check for inefficient layer ordering
+    const copyInstructions = instructions.filter(
+      (i) => i.getInstruction() === 'COPY' || i.getInstruction() === 'ADD',
+    );
+    const runInstructions = instructions.filter((i) => i.getInstruction() === 'RUN');
+    if (copyInstructions.length > 0 && runInstructions.length > 0) {
+      const firstCopy = copyInstructions[0];
+      const lastRun = runInstructions[runInstructions.length - 1];
+      if (firstCopy && lastRun) {
+        const firstCopyIndex = instructions.indexOf(firstCopy);
+        const lastRunIndex = instructions.indexOf(lastRun);
+        if (firstCopyIndex < lastRunIndex) {
+          parseIssues.push('COPY/ADD instructions before RUN commands may break cache efficiency');
+        }
+      }
+    }
   }
 
   ctx.logger.info(
