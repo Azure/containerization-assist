@@ -410,3 +410,16 @@ async function buildImageImpl(
  * Build image tool with selective progress reporting
  */
 export const buildImage = buildImageImpl;
+
+// New Tool interface export
+import type { Tool } from '@/types/tool';
+
+const tool: Tool<typeof buildImageSchema, BuildImageResult> = {
+  name: 'build-image',
+  description: 'Build Docker images from Dockerfiles',
+  version: '2.0.0',
+  schema: buildImageSchema,
+  run: buildImageImpl,
+};
+
+export default tool;

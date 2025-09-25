@@ -4,13 +4,15 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { createLogger, type Logger } from '@/lib/logger';
+import { extractSchemaShape } from '@/lib/zod-utils';
 import { createToolContext } from '@/mcp/context';
 import { createSessionManager } from '@/lib/session';
-import type { Tool } from '@/types';
+import type { Tool } from '@/types/tool';
 
 /**
  * Server options
@@ -30,14 +32,17 @@ export interface ServerOptions {
 export interface MCPServer {
   start(): Promise<void>;
   stop(): Promise<void>;
-  getServer(): McpServer;
+  getServer(): Server;
   getTools(): Array<{ name: string; description: string }>;
 }
 
 /**
  * Create an MCP server that uses tools from registry
  */
-export function createMCPServer(tools: Tool[], options: ServerOptions = {}): MCPServer {
+export function createMCPServer(
+  tools: Array<Tool<any, any>>,
+  options: ServerOptions = {},
+): MCPServer {
   const logger = options.logger || createLogger({ name: 'mcp-server' });
   const serverOptions = {
     name: options.name || 'containerization-assist',
@@ -58,20 +63,22 @@ export function createMCPServer(tools: Tool[], options: ServerOptions = {}): MCP
 
   // Register all tools
   for (const tool of tools) {
-    if (!tool.schema) {
-      logger.warn({ tool: tool.name }, 'Tool missing schema, skipping');
-      continue;
-    }
+    // Get the schema shape for MCP protocol
+    const schemaShape = extractSchemaShape(tool.schema);
 
     server.tool(
       tool.name,
-      tool.description || `${tool.name} tool`,
-      tool.schema,
+      tool.description,
+      schemaShape, // For MCP protocol
       async (params: Record<string, unknown>) => {
         logger.info({ tool: tool.name }, 'Executing tool');
 
         try {
-          const result = await tool.execute(params, logger.child({ tool: tool.name }), mcpContext);
+          // Validation at the edge
+          const input = tool.schema.parse(params);
+
+          // Direct execution with proper context
+          const result = await tool.run(input, mcpContext);
 
           if (!result.ok) {
             throw new McpError(ErrorCode.InternalError, result.error || 'Tool execution failed');
@@ -146,14 +153,14 @@ export function createMCPServer(tools: Tool[], options: ServerOptions = {}): MCP
       logger.info('MCP server stopped');
     },
 
-    getServer(): McpServer {
-      return server;
+    getServer(): Server {
+      return server.server;
     },
 
     getTools(): Array<{ name: string; description: string }> {
       return tools.map((t) => ({
         name: t.name,
-        description: t.description || '',
+        description: t.description,
       }));
     },
   };

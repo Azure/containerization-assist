@@ -8,12 +8,24 @@ import { z } from 'zod';
 import { createOrchestrator } from '@/app/orchestrator';
 import type { ToolOrchestrator } from '@/app/orchestrator-types';
 import { Success, Failure, type Tool } from '@/types';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
 describe('Tool Orchestrator', () => {
   let orchestrator: ToolOrchestrator;
   let mockTools: Map<string, Tool>;
+  let mockServer: Server;
 
   beforeEach(() => {
+    // Create mock server
+    mockServer = {
+      createMessage: jest.fn().mockResolvedValue({
+        content: {
+          type: 'text',
+          text: 'Mock AI response'
+        }
+      })
+    } as unknown as Server;
+
     // Create mock tools
     mockTools = new Map();
 
@@ -21,9 +33,8 @@ describe('Tool Orchestrator', () => {
     const toolA: Tool = {
       name: 'tool-a',
       description: 'Test tool A',
-      schema: { input: z.string() },
-      zodSchema: z.object({ input: z.string() }),
-      execute: jest.fn().mockResolvedValue(Success({ result: 'A executed' })),
+      schema: z.object({ input: z.string() }),
+      run: jest.fn().mockResolvedValue(Success({ result: 'A executed' })),
     };
     mockTools.set('tool-a', toolA);
 
@@ -31,15 +42,15 @@ describe('Tool Orchestrator', () => {
     const toolB: Tool = {
       name: 'tool-b',
       description: 'Test tool B',
-      schema: { value: z.number() },
-      zodSchema: z.object({ value: z.number() }),
-      execute: jest.fn().mockResolvedValue(Success({ result: 'B executed' })),
+      schema: z.object({ value: z.number() }),
+      run: jest.fn().mockResolvedValue(Success({ result: 'B executed' })),
     };
     mockTools.set('tool-b', toolB);
 
-    // Create orchestrator
+    // Create orchestrator with mock server
     orchestrator = createOrchestrator({
       registry: mockTools,
+      server: mockServer,
     });
   });
 
@@ -86,6 +97,7 @@ describe('Tool Orchestrator', () => {
       // Create orchestrator with policy
       const orchestratorWithPolicy = createOrchestrator({
         registry: mockTools,
+        server: mockServer,
         config: {
           policyPath: 'test-policy.yaml', // Would need to mock policy loading
         },

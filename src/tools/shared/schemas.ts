@@ -22,10 +22,6 @@ export const namespaceOptional = z.string().optional().describe('Kubernetes name
 // Unified environment schema - single source of truth
 export const environment = environmentSchema.optional();
 
-// Legacy compatibility exports (deprecated - use 'environment' instead)
-export const environmentFull = environment;
-export const environmentBasic = environment;
-
 // Docker image fields
 export const imageId = z.string().describe('Docker image identifier');
 export const imageName = z.string().describe('Name for the Docker image');

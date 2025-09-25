@@ -1,17 +1,26 @@
+/**
+ * Resolve Base Images tool using the new Tool pattern
+ */
+
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
+import type { Tool } from '@/types/tool';
 import { promptTemplates, type BaseImageResolutionParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
-import { resolveBaseImagesSchema, type ResolveBaseImagesParams } from './schema';
+import { resolveBaseImagesSchema } from './schema';
 import type { AIResponse } from '../ai-response-types';
+import type { z } from 'zod';
 
-export async function resolveBaseImages(
-  params: ResolveBaseImagesParams,
-  context: ToolContext,
+const name = 'resolve-base-images';
+const description = 'Recommend optimal Docker base images';
+const version = '2.1.0';
+
+async function run(
+  input: z.infer<typeof resolveBaseImagesSchema>,
+  ctx: ToolContext,
 ): Promise<Result<AIResponse>> {
-  const validatedParams = resolveBaseImagesSchema.parse(params);
-  const { technology } = validatedParams;
+  const { technology } = input;
 
   // Generate prompt from template - provide context for better recommendations
   let contextPrefix = '';
@@ -48,7 +57,7 @@ export async function resolveBaseImages(
 
   // Execute via AI with structured messages
   const mcpMessages = toMCPMessages(messages);
-  const response = await context.sampling.createMessage({
+  const response = await ctx.sampling.createMessage({
     ...mcpMessages,
     maxTokens: 4096,
     modelPreferences: {
@@ -65,10 +74,21 @@ export async function resolveBaseImages(
   }
 }
 
+const tool: Tool<typeof resolveBaseImagesSchema, AIResponse> = {
+  name,
+  description,
+  category: 'docker',
+  version,
+  schema: resolveBaseImagesSchema,
+  run,
+};
+
+export default tool;
+
 export const metadata = {
-  name: 'resolve-base-images',
-  description: 'Recommend optimal Docker base images',
-  version: '2.1.0',
+  name,
+  description,
+  version,
   aiDriven: true,
   knowledgeEnhanced: true,
 };

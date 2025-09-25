@@ -648,3 +648,16 @@ async function deployApplicationImpl(
  * Export the deploy tool directly
  */
 export const deployApplication = deployApplicationImpl;
+
+// New Tool interface export
+import type { Tool } from '@/types/tool';
+
+const tool: Tool<typeof deployApplicationSchema, DeployApplicationResult> = {
+  name: 'deploy',
+  description: 'Deploy applications to Kubernetes clusters',
+  version: '2.0.0',
+  schema: deployApplicationSchema,
+  run: deployApplicationImpl,
+};
+
+export default tool;
