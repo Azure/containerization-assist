@@ -10,6 +10,15 @@ import { updateSession, ensureSession } from '@/mcp/tool-session-helpers';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
+const CONFIG_FILES = [
+  'package.json',
+  'pom.xml',
+  'build.gradle',
+  'requirements.txt',
+  'go.mod',
+  'Cargo.toml',
+];
+
 export async function analyzeRepo(
   params: AnalyzeRepoParams,
   context: ToolContext,
@@ -45,16 +54,7 @@ export async function analyzeRepo(
     const files = await fs.readdir(repoPath);
     fileList = files.join('\n');
 
-    // Read common config files
-    const configFiles = [
-      'package.json',
-      'pom.xml',
-      'build.gradle',
-      'requirements.txt',
-      'go.mod',
-      'Cargo.toml',
-    ];
-    for (const configFile of configFiles) {
+    for (const configFile of CONFIG_FILES) {
       try {
         const content = await fs.readFile(path.join(repoPath, configFile), 'utf-8');
         configContent += `\n=== ${configFile} ===\n${content}\n`;

@@ -41,7 +41,7 @@ export interface DockerClientConfig {
 /**
  * Get Colima socket paths in order of preference.
  */
-function getColimaSockets(): string[] {
+export function getColimaSockets(): string[] {
   const homeDir = homedir();
   return [
     join(homeDir, '.colima/default/docker.sock'),

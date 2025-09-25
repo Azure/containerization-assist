@@ -5,6 +5,7 @@ import {
 } from '../../../src/config/config';
 import os from 'os';
 import path from 'path';
+import { getColimaSockets } from '../../../src/infra/docker/client';
 
 describe('Configuration Module', () => {
   let originalEnv: Record<string, string | undefined>;
@@ -67,7 +68,10 @@ describe('Configuration Module', () => {
     it('should have proper Docker configuration', () => {
       const config = createDefaultConfig();
 
-      expect(config.docker.socketPath).toBe('/var/run/docker.sock');
+      const allSockets = ['//./pipe/docker_engine',
+        '/var/run/docker.sock',
+        ...getColimaSockets()]
+      expect(allSockets).toContain(config.docker.socketPath);
       expect(config.docker.host).toBe('localhost');
       expect(config.docker.port).toBe(2375);
       expect(config.docker.registry).toBe('docker.io');
@@ -150,7 +154,7 @@ describe('Configuration Module', () => {
     });
 
     it('should handle invalid integer environment variables gracefully', () => {
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => { });
 
       process.env.PORT = 'invalid';
       process.env.MAX_SESSIONS = 'not-a-number';
