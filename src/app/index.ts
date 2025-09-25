@@ -3,10 +3,12 @@
  * Simple functional composition for all use cases
  */
 
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import type { Result } from '@/types';
 import type { Tool } from '@/types/tool';
+import type { ZodTypeAny } from 'zod';
 
 import { createLogger } from '@/lib/logger';
 import { extractSchemaShape } from '@/lib/zod-utils';
@@ -29,7 +31,7 @@ export interface TransportConfig {
  * Application configuration
  */
 export interface AppConfig {
-  tools?: Array<Tool<any, any>>;
+  tools?: Array<Tool<ZodTypeAny, any>>;
   sessionTTL?: number;
   policyPath?: string;
   policyEnvironment?: string;
@@ -51,7 +53,7 @@ export function createApp(config: AppConfig = {}): {
 } {
   const logger = config.logger || createLogger({ name: 'containerization-assist' });
   const tools = config.tools || getAllInternalTools();
-  const registry = createToolRegistry([...tools]); // Convert readonly array to mutable
+  const registry = createToolRegistry([...tools] as Tool<ZodTypeAny, any>[]); // Convert readonly array to mutable
 
   const orchestratorConfig: OrchestratorConfig = {};
   if (config.sessionTTL !== undefined) orchestratorConfig.sessionTTL = config.sessionTTL;
@@ -61,23 +63,39 @@ export function createApp(config: AppConfig = {}): {
   if (config.maxRetries !== undefined) orchestratorConfig.maxRetries = config.maxRetries;
   if (config.retryDelay !== undefined) orchestratorConfig.retryDelay = config.retryDelay;
 
-  const orchestrator = createOrchestrator({
-    registry: registry.list().reduce((map, tool) => {
-      map.set(tool.name, tool);
-      return map;
-    }, new Map<string, Tool<any, any>>()),
-    logger,
-    config: orchestratorConfig,
-  });
-
   let mcpServer: ReturnType<typeof createMCPServer> | null = null;
+  let orchestrator: ReturnType<typeof createOrchestrator> | null = null;
 
   return {
     /**
      * Execute a tool directly
      */
-    execute: (toolName: string, params: unknown): Promise<Result<unknown>> =>
-      orchestrator.execute({ toolName, params }),
+    execute: async (toolName: string, params: unknown): Promise<Result<unknown>> => {
+      if (!orchestrator) {
+        // If orchestrator doesn't exist yet, we need to create an MCP server first
+        if (!mcpServer) {
+          mcpServer = createMCPServer(registry.list(), {
+            logger,
+            transport: 'stdio',
+            name: 'containerization-assist',
+            version: '1.0.0',
+          });
+          await mcpServer.start();
+        }
+
+        // Now create the orchestrator with the MCP server
+        orchestrator = createOrchestrator({
+          registry: registry.list().reduce((map, tool) => {
+            map.set(tool.name, tool);
+            return map;
+          }, new Map<string, Tool<ZodTypeAny, any>>()),
+          server: mcpServer.getServer(),
+          logger,
+          config: orchestratorConfig,
+        });
+      }
+      return orchestrator.execute({ toolName, params });
+    },
 
     /**
      * Start MCP server with the specified transport
@@ -101,8 +119,19 @@ export function createApp(config: AppConfig = {}): {
       if (transport.host !== undefined) serverOptions.host = transport.host;
 
       mcpServer = createMCPServer(registry.list(), serverOptions);
-
       await mcpServer.start();
+
+      // Create orchestrator now that we have an MCP server
+      orchestrator = createOrchestrator({
+        registry: registry.list().reduce((map, tool) => {
+          map.set(tool.name, tool);
+          return map;
+        }, new Map<string, Tool<any, any>>()),
+        server: mcpServer.getServer(),
+        logger,
+        config: orchestratorConfig,
+      });
+
       return mcpServer;
     },
 
@@ -110,6 +139,21 @@ export function createApp(config: AppConfig = {}): {
      * Bind to existing MCP server
      */
     bindToMCP: (server: McpServer) => {
+      // Create orchestrator with the provided server if not already created
+      if (!orchestrator) {
+        // Extract the underlying SDK Server from McpServer
+        const sdkServer = (server as any).server as Server;
+        orchestrator = createOrchestrator({
+          registry: registry.list().reduce((map, tool) => {
+            map.set(tool.name, tool);
+            return map;
+          }, new Map<string, Tool<ZodTypeAny, any>>()),
+          server: sdkServer,
+          logger,
+          config: orchestratorConfig,
+        });
+      }
+
       // Register each tool with the MCP server
       for (const tool of registry.list()) {
         // Get the schema shape for MCP protocol
@@ -121,7 +165,7 @@ export function createApp(config: AppConfig = {}): {
         }
 
         server.tool(tool.name, description, schema, async (params: unknown) => {
-          const result = await orchestrator.execute({
+          const result = await orchestrator!.execute({
             toolName: tool.name,
             params,
           });

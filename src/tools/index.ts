@@ -68,7 +68,7 @@ tagImageTool.name = TOOL_NAMES.TAG_IMAGE;
 verifyDeployTool.name = TOOL_NAMES.VERIFY_DEPLOY;
 
 // Create a union type of all tool types for better type safety
-type AllToolTypes =
+export type AllToolTypes =
   | typeof analyzeRepoTool
   | typeof buildImageTool
   | typeof convertAcaToK8sTool
@@ -112,3 +112,6 @@ export const ALL_TOOLS: readonly AllToolTypes[] = [
 export function getAllInternalTools(): readonly AllToolTypes[] {
   return ALL_TOOLS;
 }
+
+// Export a type-safe version of "any tool" that's actually the union of all tools
+export type InternalTool = AllToolTypes;

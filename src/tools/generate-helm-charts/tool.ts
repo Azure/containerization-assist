@@ -67,15 +67,13 @@ async function run(
 const tool: Tool<typeof generateHelmChartsSchema, AIResponse> = {
   name,
   description,
+  category: 'kubernetes',
   version,
   schema: generateHelmChartsSchema,
   run,
 };
 
 export default tool;
-
-// Keep legacy export for backward compatibility during migration
-export { run as generateHelmCharts };
 
 export const metadata = {
   name,

@@ -77,15 +77,13 @@ async function run(
 const tool: Tool<typeof resolveBaseImagesSchema, AIResponse> = {
   name,
   description,
+  category: 'docker',
   version,
   schema: resolveBaseImagesSchema,
   run,
 };
 
 export default tool;
-
-// Keep legacy export for backward compatibility during migration
-export { run as resolveBaseImages };
 
 export const metadata = {
   name,

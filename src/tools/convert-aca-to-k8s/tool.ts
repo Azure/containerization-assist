@@ -60,15 +60,13 @@ async function run(
 const tool: Tool<typeof convertAcaToK8sSchema, AIResponse> = {
   name,
   description,
+  category: 'azure',
   version,
   schema: convertAcaToK8sSchema,
   run,
 };
 
 export default tool;
-
-// Keep legacy export for backward compatibility during migration
-export { run as convertAcaToK8s };
 
 export const metadata = {
   name,

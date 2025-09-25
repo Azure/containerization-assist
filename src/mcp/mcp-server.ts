@@ -4,6 +4,7 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { extractErrorMessage } from '@/lib/error-utils';
@@ -31,7 +32,7 @@ export interface ServerOptions {
 export interface MCPServer {
   start(): Promise<void>;
   stop(): Promise<void>;
-  getServer(): McpServer;
+  getServer(): Server;
   getTools(): Array<{ name: string; description: string }>;
 }
 
@@ -152,8 +153,8 @@ export function createMCPServer(
       logger.info('MCP server stopped');
     },
 
-    getServer(): McpServer {
-      return server;
+    getServer(): Server {
+      return server.server;
     },
 
     getTools(): Array<{ name: string; description: string }> {

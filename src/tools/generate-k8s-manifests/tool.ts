@@ -253,15 +253,13 @@ async function run(
 const tool: Tool<typeof generateK8sManifestsSchema, AIResponse> = {
   name,
   description,
+  category: 'kubernetes',
   version,
   schema: generateK8sManifestsSchema,
   run,
 };
 
 export default tool;
-
-// Keep legacy export for backward compatibility during migration
-export { run as generateK8sManifests };
 
 export const metadata = {
   name,

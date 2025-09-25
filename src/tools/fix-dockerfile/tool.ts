@@ -211,12 +211,10 @@ async function run(
 const tool: Tool<typeof fixDockerfileSchema, AIResponse> = {
   name,
   description,
+  category: 'docker',
   version,
   schema: fixDockerfileSchema,
   run,
 };
 
 export default tool;
-
-// Keep legacy export for backward compatibility during migration
-export { run as fixDockerfile };

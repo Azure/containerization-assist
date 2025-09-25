@@ -332,12 +332,10 @@ async function run(
 const tool: Tool<typeof generateDockerfileSchema, AIResponse> = {
   name,
   description,
+  category: 'docker',
   version,
   schema: generateDockerfileSchema,
   run,
 };
 
 export default tool;
-
-// Keep legacy export for backward compatibility during migration
-export { run as generateDockerfile };

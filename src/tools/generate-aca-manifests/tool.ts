@@ -72,15 +72,13 @@ async function run(
 const tool: Tool<typeof generateAcaManifestsSchema, AIResponse> = {
   name,
   description,
+  category: 'azure',
   version,
   schema: generateAcaManifestsSchema,
   run,
 };
 
 export default tool;
-
-// Keep legacy export for backward compatibility during migration
-export { run as generateAcaManifests };
 
 export const metadata = {
   name,

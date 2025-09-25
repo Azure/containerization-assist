@@ -1,15 +1,16 @@
 /**
  * Tool Orchestrator
- * Simplified tool execution with optional dependency resolution
+ * Tool execution with optional dependency resolution
  */
 
-import { z } from 'zod';
-import { type Result, Success, Failure, type ToolContext } from '@/types/index';
+import { z, type ZodTypeAny } from 'zod';
+import { type Result, Success, Failure } from '@/types/index';
 import { createLogger } from '@/lib/logger';
 import { loadPolicy } from '@/config/policy-io';
 import { applyPolicy } from '@/config/policy-eval';
 import type { Policy } from '@/config/policy-schemas';
-// Removed unused imports
+import { createToolContext } from '@/mcp/context';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type {
   ToolOrchestrator,
   OrchestratorConfig,
@@ -19,17 +20,16 @@ import type {
 import type { Logger } from 'pino';
 import type { Tool } from '@/types/tool';
 
-type AnyTool = Tool<any, any>;
-
 /**
  * Create a tool orchestrator
  */
-export function createOrchestrator(options: {
-  registry: Map<string, AnyTool>;
+export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
+  registry: Map<string, T>;
+  server: Server;
   logger?: Logger;
   config?: OrchestratorConfig;
 }): ToolOrchestrator {
-  const { registry, config = {} } = options;
+  const { registry, server, config = {} } = options;
   const logger = options.logger || createLogger({ name: 'orchestrator' });
   const sessions = new Map<string, SessionState>();
 
@@ -57,7 +57,7 @@ export function createOrchestrator(options: {
 
     if (isSimpleTool(tool, policy, sessionId)) {
       logger.debug(`Executing ${toolName} directly (no orchestration needed)`);
-      return await executeSimple(tool, params, logger);
+      return await executeSimple(tool, params, server, logger);
     }
 
     // Complex case: handle dependencies, policies, sessions
@@ -66,6 +66,7 @@ export function createOrchestrator(options: {
       registry,
       logger,
       config,
+      server,
     };
     if (policy) context.policy = policy;
     return await executeWithOrchestration(tool, request, context);
@@ -77,7 +78,7 @@ export function createOrchestrator(options: {
 /**
  * Check if a tool can be executed simply without orchestration
  */
-function isSimpleTool(tool: AnyTool, policy?: Policy, sessionId?: string): boolean {
+function isSimpleTool(tool: Tool<ZodTypeAny, any>, policy?: Policy, sessionId?: string): boolean {
   // Needs orchestration if:
   // 1. Has dependencies (if we add this to Tool interface later)
   // 2. Has complex policy rules
@@ -101,32 +102,11 @@ function isSimpleTool(tool: AnyTool, policy?: Policy, sessionId?: string): boole
 /**
  * Execute a simple tool directly
  */
-/**
- * Create a minimal ToolContext for tools running without MCP server
- * This is used when tools are executed through the orchestrator
- */
-function createMinimalContext(logger: Logger): ToolContext {
-  const context: ToolContext = {
-    logger,
-    sampling: {
-      createMessage: async () => {
-        throw new Error('AI sampling not available in orchestrator mode');
-      },
-    },
-    getPrompt: async () => {
-      throw new Error('Prompt retrieval not available in orchestrator mode');
-    },
-    signal: undefined,
-    progress: undefined,
-  };
 
-  // Don't set sessionManager to undefined - leave it unset for optional property
-  return context;
-}
-
-async function executeSimple(
-  tool: AnyTool,
+async function executeSimple<T extends Tool<ZodTypeAny, any>>(
+  tool: T,
   params: unknown,
+  server: Server,
   logger: Logger,
 ): Promise<Result<unknown>> {
   try {
@@ -134,11 +114,11 @@ async function executeSimple(
     const validation = await validateParams(params, tool.schema);
     if (!validation.ok) return validation;
 
-    // Create a minimal context for the tool
+    // Create a proper context with MCP server
     const toolLogger = logger.child({ tool: tool.name });
-    const minimalContext = createMinimalContext(toolLogger);
+    const context = createToolContext(server, toolLogger);
 
-    return await tool.run(validation.value, minimalContext);
+    return await tool.run(validation.value, context);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return Failure(`Tool execution failed: ${message}`);
@@ -148,19 +128,20 @@ async function executeSimple(
 /**
  * Execute with full orchestration (dependencies, policies, sessions)
  */
-async function executeWithOrchestration(
-  tool: AnyTool,
+async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
+  tool: T,
   request: ExecuteRequest,
   context: {
     sessions: Map<string, SessionState>;
     policy?: Policy;
-    registry: Map<string, AnyTool>;
+    registry: Map<string, T>;
     logger: Logger;
     config: OrchestratorConfig;
+    server: Server;
   },
 ): Promise<Result<unknown>> {
   const { params, sessionId } = request;
-  const { sessions, policy, logger, config } = context;
+  const { sessions, policy, logger, config, server } = context;
 
   // Get or create session if needed
   let session: SessionState | undefined;
@@ -207,9 +188,9 @@ async function executeWithOrchestration(
     try {
       const toolLogger = logger.child({ tool: tool.name, attempt });
 
-      // Create a minimal context for tools
-      const minimalContext = createMinimalContext(toolLogger);
-      const result = await tool.run(params as any, minimalContext);
+      // Create a proper context with MCP server
+      const context = createToolContext(server, toolLogger);
+      const result = await tool.run(params as any, context);
 
       // Update session if successful
       if (result.ok && session) {

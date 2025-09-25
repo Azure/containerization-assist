@@ -8,12 +8,24 @@ import { z } from 'zod';
 import { createOrchestrator } from '@/app/orchestrator';
 import type { ToolOrchestrator } from '@/app/orchestrator-types';
 import { Success, Failure, type Tool } from '@/types';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
 describe('Tool Orchestrator', () => {
   let orchestrator: ToolOrchestrator;
   let mockTools: Map<string, Tool>;
+  let mockServer: Server;
 
   beforeEach(() => {
+    // Create mock server
+    mockServer = {
+      createMessage: jest.fn().mockResolvedValue({
+        content: {
+          type: 'text',
+          text: 'Mock AI response'
+        }
+      })
+    } as unknown as Server;
+
     // Create mock tools
     mockTools = new Map();
 
@@ -35,9 +47,10 @@ describe('Tool Orchestrator', () => {
     };
     mockTools.set('tool-b', toolB);
 
-    // Create orchestrator
+    // Create orchestrator with mock server
     orchestrator = createOrchestrator({
       registry: mockTools,
+      server: mockServer,
     });
   });
 
@@ -84,6 +97,7 @@ describe('Tool Orchestrator', () => {
       // Create orchestrator with policy
       const orchestratorWithPolicy = createOrchestrator({
         registry: mockTools,
+        server: mockServer,
         config: {
           policyPath: 'test-policy.yaml', // Would need to mock policy loading
         },

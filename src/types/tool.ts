@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import type { Result } from './core';
 import type { ToolContext } from '@/mcp/context';
+import type { ToolCategory } from './categories';
 
 /**
  * Unified tool interface for all MCP tools
@@ -11,6 +12,9 @@ export interface Tool<TSchema extends z.ZodTypeAny = z.ZodAny, TOut = unknown> {
 
   /** Human-readable description */
   description: string;
+
+  /** Tool category for organization and grouping */
+  category?: ToolCategory;
 
   /** Optional semantic version */
   version?: string;
