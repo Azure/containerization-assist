@@ -31,8 +31,8 @@ EnvironmentOverrideSchema                src/config/policy-schemas.ts:154:14
 EnvironmentDefaultsSchema                src/config/policy-schemas.ts:161:14            
 UnifiedDefaultsSchema                    src/config/policy-schemas.ts:206:14            
 ALL_TOOLS                                src/exports/tools.ts:7:9                       
-createMutexDockerClient        function  src/infra/docker/client.ts:743:23              
-getDockerMutexStatus           function  src/infra/docker/client.ts:761:17              
+createMutexDockerClient        function  src/infra/docker/client.ts:747:23              
+getDockerMutexStatus           function  src/infra/docker/client.ts:765:17              
 KnowledgeCategorySchema                  src/knowledge/schemas.ts:3:14                  
 getImageMetadata                         src/lib/docker.ts:10:9                         
 directoryExists                function  src/lib/file-utils.ts:70:23                    
@@ -109,10 +109,10 @@ EnvironmentOverride          interface  src/config/policy-schemas.ts:45:18
 CacheConfig                  interface  src/config/policy-schemas.ts:55:18              
 EnvironmentDefaults          interface  src/config/policy-schemas.ts:63:18              
 DockerClientConfig           interface  src/infra/docker/client.ts:19:18                
-DockerBuildResult            interface  src/infra/docker/client.ts:109:18               
-DockerPushResult             interface  src/infra/docker/client.ts:121:18               
-DockerContainerInfo          interface  src/infra/docker/client.ts:131:18               
-DockerImageInfo              interface  src/infra/docker/client.ts:147:18               
+DockerBuildResult            interface  src/infra/docker/client.ts:113:18               
+DockerPushResult             interface  src/infra/docker/client.ts:125:18               
+DockerContainerInfo          interface  src/infra/docker/client.ts:135:18               
+DockerImageInfo              interface  src/infra/docker/client.ts:151:18               
 DeploymentResult             interface  src/infra/kubernetes/client.ts:12:18            
 ClusterInfo                  interface  src/infra/kubernetes/client.ts:18:18            
 ApplyOptions                 interface  src/infra/kubernetes/idempotent-apply.ts:13:18  
