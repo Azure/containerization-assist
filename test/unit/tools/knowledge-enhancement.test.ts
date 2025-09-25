@@ -3,13 +3,13 @@
  */
 
 import analyzeRepoTool from '@/tools/analyze-repo/tool';
-import { generateDockerfile } from '@/tools/generate-dockerfile/tool';
-import { fixDockerfile } from '@/tools/fix-dockerfile/tool';
-import { generateK8sManifests } from '@/tools/generate-k8s-manifests/tool';
-import { generateHelmCharts } from '@/tools/generate-helm-charts/tool';
-import { resolveBaseImages } from '@/tools/resolve-base-images/tool';
-import { generateAcaManifests } from '@/tools/generate-aca-manifests/tool';
-import { convertAcaToK8s } from '@/tools/convert-aca-to-k8s/tool';
+import generateDockerfileTool from '@/tools/generate-dockerfile/tool';
+import fixDockerfileTool from '@/tools/fix-dockerfile/tool';
+import generateK8sManifestsTool from '@/tools/generate-k8s-manifests/tool';
+import generateHelmChartsTool from '@/tools/generate-helm-charts/tool';
+import resolveBaseImagesTool from '@/tools/resolve-base-images/tool';
+import generateAcaManifestsTool from '@/tools/generate-aca-manifests/tool';
+import convertAcaToK8sTool from '@/tools/convert-aca-to-k8s/tool';
 import type { ToolContext } from '@/mcp/context';
 import * as promptEngine from '@/ai/prompt-engine';
 
@@ -139,7 +139,7 @@ spec:
 
   describe('generate-dockerfile', () => {
     it('should enhance prompt with knowledge base', async () => {
-      const result = await generateDockerfile(
+      const result = await generateDockerfileTool.run(
         {
           path: '/test/repo',
           dockerfileDirectoryPaths: ['/'],
@@ -163,7 +163,7 @@ spec:
 
   describe('fix-dockerfile', () => {
     it('should enhance prompt with knowledge base', async () => {
-      const result = await fixDockerfile(
+      const result = await fixDockerfileTool.run(
         {
           dockerfile: 'FROM node:16\nRUN npm install',
           targetEnvironment: 'production',
@@ -185,7 +185,7 @@ spec:
 
   describe('generate-k8s-manifests', () => {
     it('should enhance prompt with knowledge base', async () => {
-      const result = await generateK8sManifests(
+      const result = await generateK8sManifestsTool.run(
         {
           appName: 'test-app',
           imageId: 'test:latest',
@@ -208,7 +208,7 @@ spec:
 
   describe('generate-helm-charts', () => {
     it('should enhance prompt with knowledge base', async () => {
-      const result = await generateHelmCharts(
+      const result = await generateHelmChartsTool.run(
         {
           appName: 'test-app',
           chartName: 'test-chart',
@@ -231,7 +231,7 @@ spec:
 
   describe('resolve-base-images', () => {
     it('should enhance prompt with technology-specific knowledge', async () => {
-      const result = await resolveBaseImages(
+      const result = await resolveBaseImagesTool.run(
         {
           technology: 'nodejs',
         },
@@ -252,7 +252,7 @@ spec:
 
   describe('generate-aca-manifests', () => {
     it('should enhance prompt with Azure-specific knowledge', async () => {
-      const result = await generateAcaManifests(
+      const result = await generateAcaManifestsTool.run(
         {
           appName: 'test-app',
           imageId: 'test:latest',
@@ -275,7 +275,7 @@ spec:
 
   describe('convert-aca-to-k8s', () => {
     it('should enhance prompt with conversion knowledge', async () => {
-      const result = await convertAcaToK8s(
+      const result = await convertAcaToK8sTool.run(
         {
           acaManifest: 'apiVersion: apps.azure.com/v1\nkind: ContainerApp',
         },
@@ -313,7 +313,7 @@ spec:
 
     it('should handle message building gracefully', async () => {
       // Test that the prompt engine is properly integrated
-      await generateDockerfile(
+      await generateDockerfileTool.run(
         {
           path: '/test/repo',
           dockerfileDirectoryPaths: ['/'],
