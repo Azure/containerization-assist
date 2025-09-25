@@ -14,7 +14,6 @@ import { DockerfileParser } from 'dockerfile-ast';
 import validateDockerfileLib from 'validate-dockerfile';
 import { promises as fs } from 'node:fs';
 import nodePath from 'node:path';
-import type { z } from 'zod';
 
 const name = 'fix-dockerfile';
 const description = 'Fix and optimize existing Dockerfiles';
@@ -24,7 +23,8 @@ async function run(
   input: z.infer<typeof fixDockerfileSchema>,
   ctx: ToolContext,
 ): Promise<Result<AIResponse>> {
-  const { targetEnvironment: environment = 'production', path } = input;
+  const validatedParams = fixDockerfileSchema.parse(params);
+  const { targetEnvironment: environment = 'production', path } = validatedParams;
 
   // Get Dockerfile content from either path or direct content
   let content = input.dockerfile || '';
@@ -62,21 +62,7 @@ async function run(
     }
   });
 
-  // Check for continuation issues
-  let inContinuation = false;
-  lines.forEach((line, idx) => {
-    if (line.endsWith('\\')) {
-      inContinuation = true;
-    } else if (inContinuation) {
-      if (line.trim().length === 0) {
-        parseIssues.push(`Line ${idx + 1}: Empty continuation line`);
-      }
-      inContinuation = false;
-    }
-  });
-
-  // Use dockerfile-ast parser for semantic analysis
-  let dockerfile;
+  // Parse with dockerfile-ast for additional checks
   try {
     dockerfile = DockerfileParser.parse(content);
   } catch (parseError) {
@@ -89,27 +75,6 @@ async function run(
   // Semantic analysis if parsing succeeded
   if (dockerfile) {
     const instructions = dockerfile.getInstructions();
-
-    // Check for basic requirements
-    const hasFrom = instructions.some((i) => i.getInstruction() === 'FROM');
-    if (!hasFrom) {
-      parseIssues.push('Missing FROM instruction');
-    }
-
-    // Check for multiple consecutive RUN commands that could be combined
-    let consecutiveRuns = 0;
-    instructions.forEach((instr, idx) => {
-      if (instr.getInstruction() === 'RUN') {
-        consecutiveRuns++;
-        if (consecutiveRuns > 3) {
-          parseIssues.push(
-            `Lines around ${instr.getRange()?.start.line || idx}: Multiple consecutive RUN commands could be combined`,
-          );
-        }
-      } else {
-        consecutiveRuns = 0;
-      }
-    });
 
     const hasUser = instructions.some((i) => {
       if (i.getInstruction() === 'USER') {
@@ -179,9 +144,9 @@ async function run(
     },
   });
 
-  // Extract the fixed Dockerfile content
-  const responseText = response.content[0]?.text || '';
-  let fixedContent = responseText;
+  // Return result with workflow hints
+  try {
+    const responseText = response.content[0]?.text || '';
 
   // Try to extract from code blocks if present
   const codeBlockMatch = responseText.match(/```(?:dockerfile)?\s*\n([\s\S]*?)```/);
@@ -193,6 +158,28 @@ async function run(
     if (fromMatch?.[1]) {
       fixedContent = fromMatch[1].trim();
     }
+
+    // Write back to file if path was provided
+    if (dockerfilePath) {
+      await fs.writeFile(dockerfilePath, fixedDockerfile, 'utf-8');
+      context.logger.info({ dockerfilePath }, 'Fixed Dockerfile written to disk');
+    }
+
+    return Success({
+      fixedContent: fixedDockerfile,
+      dockerfilePath,
+      issues: parseIssues,
+      sessionId: validatedParams.sessionId,
+      workflowHints: {
+        nextStep: 'build-image',
+        message: dockerfilePath
+          ? `Dockerfile fixed and saved to ${dockerfilePath}. Use "build-image" to build the optimized image.`
+          : `Dockerfile fixed successfully. Use "build-image" with sessionId ${validatedParams.sessionId || '<sessionId>'} to build the optimized image.`,
+      },
+    });
+  } catch (e) {
+    const error = e as Error;
+    return Failure(`AI response parsing failed: ${error.message}`);
   }
 
   // Validate the fixed content

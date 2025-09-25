@@ -87,10 +87,6 @@ program.parse(argv);
 
 const options = program.opts();
 const command = program.args[0] ?? 'start';
-<<<<<<< HEAD
-const defaultDockerSocket = autoDetectDockerSocket();
-=======
->>>>>>> 4ee7c7c (unit test fix)
 
 // Enhanced transport detection and logging
 function getTransportInfo(options: any): { type: 'stdio' | 'http'; details: string } {
@@ -110,42 +106,6 @@ function getTransportInfo(options: any): { type: 'stdio' | 'http'; details: stri
 function validateDockerSocket(options: any): { dockerSocket: string; warnings: string[] } {
   const warnings: string[] = [];
   let dockerSocket = '';
-<<<<<<< HEAD
-
-  const allSocketOptions = [
-    options.dockerSocket,
-    process.env.DOCKER_SOCKET,
-    defaultDockerSocket,
-  ].filter(Boolean);
-
-  for (const thisSocket of allSocketOptions) {
-    if (!thisSocket) continue;
-
-    try {
-      const stat = statSync(thisSocket);
-      if (!stat.isSocket()) {
-        warnings.push(`${thisSocket} exists but is not a socket`);
-        continue;
-      }
-
-      // Only log when not in pure MCP mode or quiet mode
-      if (!process.env.MCP_MODE && !process.env.MCP_QUIET) {
-        console.error(`✅ Using Docker socket: ${thisSocket}`);
-      }
-      dockerSocket = thisSocket;
-      break;
-    } catch (error) {
-      const errorMsg = extractErrorMessage(error);
-      warnings.push(`Cannot access Docker socket: ${thisSocket} - ${errorMsg}`);
-    }
-  }
-
-  if (!dockerSocket) {
-    return {
-      dockerSocket: '',
-      warnings: [
-        `No valid Docker socket found in: ${allSocketOptions.join(', ')}`,
-=======
   const defaultDockerSocket = autoDetectDockerSocket();
 
   // Priority order: CLI option -> Environment variable -> Default
@@ -195,7 +155,6 @@ function validateDockerSocket(options: any): { dockerSocket: string; warnings: s
       warnings: [
         ...warnings,
         'No valid Docker socket found',
->>>>>>> 4ee7c7c (unit test fix)
         'Docker operations require a valid Docker connection',
         'Consider: 1) Starting Docker Desktop, 2) Specifying --docker-socket <path>',
       ],

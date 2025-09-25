@@ -1,0 +1,75 @@
+{
+  "$schema": "./quality-gates.schema.json",
+  "schemaVersion": 1,
+  "metrics": {
+    "thresholds": {
+      "lint": {
+        "maxErrors": 0,
+        "maxWarnings": 400
+      },
+      "deadcode": {
+        "max": 200
+      },
+      "typescript": {
+        "maxErrors": 0
+      },
+      "build": {
+        "maxTimeMs": 60000
+      }
+    },
+    "baselines": {
+      "lint": {
+        "errors": 0,
+        "warnings": 31,
+        "warningSignatures": [
+          "/home/tng/workspace/containerization-assist/src/ai/prompt-templates.ts:43:27:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/ai/prompt-templates.ts:62:17:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/ai/prompt-templates.ts:610:63:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/client.ts:25:29:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/client.ts:55:35:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/client.ts:148:38:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/client.ts:179:94:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:28:10:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:29:10:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:55:46:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:88:19:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:176:38:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:197:21:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:224:19:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:279:38:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:299:21:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:382:30:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/mcp/mcp-server.ts:62:67:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/session/slices.ts:101:42:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/session/slices.ts:112:35:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/session/slices.ts:113:31:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/session/slices.ts:167:41:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/session/slices.ts:217:40:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/multi-step-generator.ts:26:3:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
+          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/multi-step-generator.ts:31:5:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
+          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/multi-step-generator.ts:40:7:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
+          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/multi-step-generator.ts:46:9:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
+          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/tool.ts:92:5:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
+          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/tool.ts:94:5:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
+          "/home/tng/workspace/containerization-assist/src/tools/inspect-session/tool.ts:156:40:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/inspect-session/tool.ts:180:38:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type."
+        ]
+      },
+      "deadcode": {
+        "count": 207
+      },
+      "typescript": {
+        "errors": 0
+      },
+      "build": {
+        "timeMs": 4000,
+        "mode": "clean",
+        "environment": {
+          "nodeVersion": "v24.1.0",
+          "os": "Linux",
+          "cpu": "x86_64"
+        }
+      }
+    }
+  }
+}
