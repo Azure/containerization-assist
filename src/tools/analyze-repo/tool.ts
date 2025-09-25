@@ -1,14 +1,15 @@
-import { Success, Failure, type Result, TOPICS } from '@/types';
-import type { ToolContext } from '@/mcp/context';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { Success, Failure, type Result, type ToolContext, TOPICS } from '@/types';
 import { promptTemplates } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
-import { analyzeRepoSchema, type AnalyzeRepoParams } from './schema';
-import type { AIResponse } from '../ai-response-types';
-import { randomUUID } from 'node:crypto';
 import { updateSession, ensureSession } from '@/mcp/tool-session-helpers';
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
+import { analyzeRepoSchema } from './schema';
+import type { AIResponse } from '../ai-response-types';
+import type { Tool } from '@/types/tool';
+import type { z } from 'zod';
 
 const CONFIG_FILES = [
   'package.json',
@@ -19,13 +20,15 @@ const CONFIG_FILES = [
   'Cargo.toml',
 ];
 
-export async function analyzeRepo(
-  params: AnalyzeRepoParams,
-  context: ToolContext,
+/**
+ * Analyze repository structure and detect technologies
+ */
+async function run(
+  input: z.infer<typeof analyzeRepoSchema>,
+  ctx: ToolContext,
 ): Promise<Result<AIResponse>> {
-  const validatedParams = analyzeRepoSchema.parse(params);
-  let { path: repoPath } = validatedParams;
-  const { sessionId } = validatedParams;
+  let { path: repoPath } = input;
+  const { sessionId } = input;
 
   // Convert to absolute path if relative
   if (!path.isAbsolute(repoPath)) {
@@ -33,10 +36,10 @@ export async function analyzeRepo(
   }
 
   // Log the path being analyzed
-  context.logger.info(
+  ctx.logger.info(
     {
       requestedPath: repoPath,
-      params: validatedParams,
+      params: input,
     },
     'Starting repository analysis',
   );
@@ -79,7 +82,7 @@ export async function analyzeRepo(
     };
     directoryStructure = await getDirStructure(repoPath);
   } catch (error) {
-    context.logger.error({ error, repoPath }, 'Failed to read repository files');
+    ctx.logger.error({ error, repoPath }, 'Failed to read repository files');
     fileList = 'Could not read directory';
     configContent = 'No config files found';
     directoryStructure = 'Could not read structure';
@@ -94,7 +97,7 @@ export async function analyzeRepo(
   });
 
   // Log the generated prompt
-  context.logger.info(
+  ctx.logger.info(
     {
       promptLength: basePrompt.length,
       promptPreview: basePrompt.substring(0, 500),
@@ -120,7 +123,7 @@ export async function analyzeRepo(
   const mcpMessages = toMCPMessages(messages);
 
   // Log the messages being sent to AI
-  context.logger.info(
+  ctx.logger.info(
     {
       messageCount: mcpMessages.messages.length,
       messages: mcpMessages.messages.map((m) => ({
@@ -134,7 +137,7 @@ export async function analyzeRepo(
 
   let response;
   try {
-    response = await context.sampling.createMessage({
+    response = await ctx.sampling.createMessage({
       ...mcpMessages,
       maxTokens: 4096,
       modelPreferences: {
@@ -142,7 +145,7 @@ export async function analyzeRepo(
       },
     });
   } catch (error) {
-    context.logger.error(
+    ctx.logger.error(
       { error: error instanceof Error ? error.message : String(error) },
       'AI sampling failed',
     );
@@ -151,7 +154,7 @@ export async function analyzeRepo(
 
   // Return parsed result
   const responseText = response.content[0]?.text || '';
-  context.logger.info(
+  ctx.logger.info(
     {
       responseLength: responseText.length,
       responsePreview: responseText.substring(0, 200),
@@ -162,7 +165,7 @@ export async function analyzeRepo(
 
   const jsonMatch = responseText.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    context.logger.error(
+    ctx.logger.error(
       { responseText: responseText.substring(0, 500) },
       'AI response did not contain valid JSON',
     );
@@ -173,7 +176,7 @@ export async function analyzeRepo(
     const analysisResult = JSON.parse(jsonMatch[0]);
 
     // Store the analysis result in session for other tools to use
-    const sessionResult = await ensureSession(context, workflowSessionId);
+    const sessionResult = await ensureSession(ctx, workflowSessionId);
     if (sessionResult.ok) {
       await updateSession(
         workflowSessionId,
@@ -186,16 +189,11 @@ export async function analyzeRepo(
           current_step: 'analyze-repo',
           completed_steps: [...(sessionResult.value.state.completed_steps || []), 'analyze-repo'],
         },
-        context,
+        ctx,
       );
-      context.logger.info(
-        { sessionId: workflowSessionId },
-        'Stored repository analysis in session',
-      );
+      ctx.logger.info({ sessionId: workflowSessionId }, 'Stored repository analysis in session');
     } else {
-      context.logger.warn(
-        'Could not store analysis in session - session manager may not be available',
-      );
+      ctx.logger.warn('Could not store analysis in session - session manager may not be available');
     }
 
     // Add sessionId to the result
@@ -217,10 +215,12 @@ export async function analyzeRepo(
   }
 }
 
-export const metadata = {
+const tool: Tool<typeof analyzeRepoSchema, AIResponse> = {
   name: 'analyze-repo',
   description: 'Analyze repository structure and detect technologies',
-  version: '2.1.0',
-  aiDriven: true,
-  knowledgeEnhanced: true,
+  version: '3.0.0',
+  schema: analyzeRepoSchema,
+  run,
 };
+
+export default tool;

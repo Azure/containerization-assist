@@ -1,17 +1,22 @@
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
+import type { Tool } from '@/types/tool';
 import { promptTemplates, type AcaManifestParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
-import { generateAcaManifestsSchema, type GenerateAcaManifestsParams } from './schema';
+import { generateAcaManifestsSchema } from './schema';
 import type { AIResponse } from '../ai-response-types';
+import type { z } from 'zod';
 
-export async function generateAcaManifests(
-  params: GenerateAcaManifestsParams,
-  context: ToolContext,
+const name = 'generate-aca-manifests';
+const description = 'Generate Azure Container Apps manifests';
+const version = '2.1.0';
+
+async function run(
+  input: z.infer<typeof generateAcaManifestsSchema>,
+  ctx: ToolContext,
 ): Promise<Result<AIResponse>> {
-  const validatedParams = generateAcaManifestsSchema.parse(params);
-  const { appName, imageId, cpu, memory, minReplicas, maxReplicas } = validatedParams;
+  const { appName, imageId, cpu, memory, minReplicas, maxReplicas } = input;
 
   // Generate prompt from template
   const promptParams = {
@@ -33,7 +38,7 @@ export async function generateAcaManifests(
     basePrompt,
     topic: TOPICS.GENERATE_ACA_MANIFESTS,
     tool: 'generate-aca-manifests',
-    environment: validatedParams.environment || 'production',
+    environment: input.environment || 'production',
     contract: {
       name: 'aca_manifests_v1',
       description: 'Generate Azure Container Apps manifests',
@@ -43,7 +48,7 @@ export async function generateAcaManifests(
 
   // Execute via AI with structured messages
   const mcpMessages = toMCPMessages(messages);
-  const response = await context.sampling.createMessage({
+  const response = await ctx.sampling.createMessage({
     ...mcpMessages, // Spreads the messages array
     maxTokens: 8192,
     modelPreferences: {
@@ -60,10 +65,21 @@ export async function generateAcaManifests(
   }
 }
 
+const tool: Tool<typeof generateAcaManifestsSchema, AIResponse> = {
+  name,
+  description,
+  category: 'azure',
+  version,
+  schema: generateAcaManifestsSchema,
+  run,
+};
+
+export default tool;
+
 export const metadata = {
-  name: 'generate-aca-manifests',
-  description: 'Generate Azure Container Apps manifests',
-  version: '2.1.0',
+  name,
+  description,
+  version,
   aiDriven: true,
   knowledgeEnhanced: true,
 };

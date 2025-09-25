@@ -4,7 +4,7 @@
  */
 
 import { jest } from '@jest/globals';
-import { resolveBaseImages } from '../../../src/tools/resolve-base-images/tool';
+import resolveBaseImagesTool from '../../../src/tools/resolve-base-images/tool';
 import type { ResolveBaseImagesParams } from '../../../src/tools/resolve-base-images/schema';
 import type { ToolContext } from '../../../src/mcp/context';
 
@@ -37,7 +37,7 @@ describe('resolveBaseImagesTool', () => {
       };
 
       const mockContext = createMockContext();
-      const result = await resolveBaseImages(config, mockContext);
+      const result = await resolveBaseImagesTool.run(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -55,7 +55,7 @@ describe('resolveBaseImagesTool', () => {
       };
 
       const mockContext = createMockContext();
-      const result = await resolveBaseImages(config, mockContext);
+      const result = await resolveBaseImagesTool.run(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -67,7 +67,7 @@ describe('resolveBaseImagesTool', () => {
       const config: ResolveBaseImagesParams = {};
 
       const mockContext = createMockContext();
-      const result = await resolveBaseImages(config, mockContext);
+      const result = await resolveBaseImagesTool.run(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -90,7 +90,7 @@ describe('resolveBaseImagesTool', () => {
         },
       } as unknown as ToolContext);
 
-      const result = await resolveBaseImages(config, mockContext);
+      const result = await resolveBaseImagesTool.run(config, mockContext);
 
       // With invalid JSON, tool returns the raw text as recommendations
       expect(result.ok).toBe(true);
@@ -112,7 +112,7 @@ describe('resolveBaseImagesTool', () => {
         },
       } as unknown as ToolContext);
 
-      const result = await resolveBaseImages(config, mockContext);
+      const result = await resolveBaseImagesTool.run(config, mockContext);
 
       // Should return with empty response
       expect(result.ok).toBe(true);

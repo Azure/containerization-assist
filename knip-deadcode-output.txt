@@ -1,10 +1,12 @@
-Unused files (6)
-src/app/types.ts                
-src/exports/types.ts            
-src/infra/kubernetes/errors.ts  
-src/mcp/executor.ts             
-src/mcp/server.ts               
-src/session/index.ts            
+Unused files (8)
+src/app/types.ts                                       
+src/exports/types.ts                                   
+src/infra/kubernetes/errors.ts                         
+src/mcp/executor.ts                                    
+src/mcp/server.ts                                      
+src/mcp/types.ts                                       
+src/session/index.ts                                   
+src/tools/generate-dockerfile/multi-step-generator.ts  
 Unused devDependencies (1)
 tsc-alias  package.json:220:6
 Unused exports (82)
@@ -43,31 +45,31 @@ initializeToolInstrumentation  function  src/lib/tool-helpers.ts:73:17
 createMcpPromptTool            function  src/mcp/ai-tool-factory.ts:305:17              
 OutputContracts                          src/mcp/ai-tool-factory.ts:343:14              
 PromptToolFactory              class     src/mcp/ai-tool-factory.ts:378:14              
-metadata                                 src/tools/analyze-repo/tool.ts:220:14          
-metadata                                 src/tools/convert-aca-to-k8s/tool.ts:62:14     
-metadata                                 src/tools/fix-dockerfile/tool.ts:185:14        
-metadata                                 src/tools/generate-aca-manifests/tool.ts:63:14 
+metadata                                 src/tools/convert-aca-to-k8s/tool.ts:67:14     
+metadata                                 src/tools/generate-aca-manifests/tool.ts:79:14 
 optimizationSchema                       src/tools/generate-dockerfile/schema.ts:17:14  
 securityLevelSchema                      src/tools/generate-dockerfile/schema.ts:22:14  
 baseImagePreferenceSchema                src/tools/generate-dockerfile/schema.ts:27:14  
-metadata                                 src/tools/generate-dockerfile/tool.ts:300:14   
-metadata                                 src/tools/generate-helm-charts/tool.ts:58:14   
-metadata                                 src/tools/generate-k8s-manifests/tool.ts:244:14
-ALL_TOOLS                                src/tools/index.ts:310:14                      
+metadata                                 src/tools/generate-helm-charts/tool.ts:74:14   
+metadata                                 src/tools/generate-k8s-manifests/tool.ts:260:14
+ALL_TOOLS                                src/tools/index.ts:91:14                       
 InspectSessionResultSchema               src/tools/inspect-session/schema.ts:17:14      
-ping                           function  src/tools/ops/tool.ts:39:23                    
-serverStatus                   function  src/tools/ops/tool.ts:107:23                   
-metadata                                 src/tools/resolve-base-images/tool.ts:68:14    
-environment                              src/tools/shared/schemas.ts:23:14              
-resourceObject                           src/tools/shared/schemas.ts:41:14              
-resourceObjectWithDefaults               src/tools/shared/schemas.ts:46:14              
-resourcesWithDefaults                    src/tools/shared/schemas.ts:59:14              
-envVar                                   src/tools/shared/schemas.ts:78:14              
-getQualityGrade                function  src/types/categories.ts:111:17                 
-getSecurityGrade               function  src/types/categories.ts:122:17                 
-ENVIRONMENT_PROFILES                     src/types/categories.ts:134:14                 
+ping                           function  src/tools/ops/tool.ts:41:23                    
+serverStatus                   function  src/tools/ops/tool.ts:109:23                   
+metadata                                 src/tools/resolve-base-images/tool.ts:84:14    
+resourceObject                           src/tools/shared/schemas.ts:37:14              
+resourceObjectWithDefaults               src/tools/shared/schemas.ts:42:14              
+resourcesWithDefaults                    src/tools/shared/schemas.ts:55:14              
+envVar                                   src/tools/shared/schemas.ts:74:14              
+verifyDeployment                         src/tools/verify-deployment/tool.ts:399:14     
+getQualityGrade                function  src/types/categories.ts:131:17                 
+getSecurityGrade               function  src/types/categories.ts:142:17                 
+ENVIRONMENT_PROFILES                     src/types/categories.ts:154:14                 
+TOOL_CATEGORIES                          src/types/categories.ts:180:14                 
+getToolCategory                function  src/types/categories.ts:214:17                 
 isSuccess                                src/types/core.ts:38:14                        
 isFailure                                src/types/core.ts:41:14                        
+createTool                     function  src/types/tool.ts:38:17                        
 getDockerfileRules                       src/validation/dockerfile-validator.ts:473:14  
 getDockerfileRulesByCategory             src/validation/dockerfile-validator.ts:480:14  
 createDockerfileValidator                src/validation/dockerfile-validator.ts:489:14  
@@ -90,109 +92,117 @@ normalizeParameters                      src/validation/pipeline.ts:155:14
 validateSchema                           src/validation/pipeline.ts:178:14              
 when                                     src/validation/pipeline.ts:192:14              
 validateBusinessRules                    src/validation/pipeline.ts:207:14              
-Unused exported types (102)
-ConstraintFormattingOptions  interface  src/ai/policy-constraints-adapter.ts:16:18    
-FormattedConstraints         interface  src/ai/policy-constraints-adapter.ts:30:18    
-DockerfilePromptParams       interface  src/ai/prompt-templates.ts:11:18              
-OptimizationPromptParams     interface  src/ai/prompt-templates.ts:46:18              
-RepositoryAnalysisParams     interface  src/ai/prompt-templates.ts:53:18              
-SecurityAnalysisParams       interface  src/ai/prompt-templates.ts:59:18              
-ParameterSuggestionParams    interface  src/ai/prompt-templates.ts:86:18              
-RegisteredTool               interface  src/app/orchestrator-types.ts:23:18           
-ToolRegistry                 interface  src/app/tool-registry.ts:8:18                 
-AppConfig                    type       src/config/app-config.ts:104:13               
-ConstraintContext            interface  src/config/policy-constraints.ts:157:18       
-RegexMatcher                 interface  src/config/policy-schemas.ts:17:18            
-EnvironmentOverride          interface  src/config/policy-schemas.ts:45:18            
-CacheConfig                  interface  src/config/policy-schemas.ts:55:18            
-EnvironmentDefaults          interface  src/config/policy-schemas.ts:63:18            
-DockerClientConfig           interface  src/infra/docker/client.ts:19:18              
-DockerBuildResult            interface  src/infra/docker/client.ts:109:18             
-DockerPushResult             interface  src/infra/docker/client.ts:121:18             
-DockerContainerInfo          interface  src/infra/docker/client.ts:131:18             
-DockerImageInfo              interface  src/infra/docker/client.ts:147:18             
-DeploymentResult             interface  src/infra/kubernetes/client.ts:12:18          
-ClusterInfo                  interface  src/infra/kubernetes/client.ts:18:18          
-ApplyOptions                 interface  src/infra/kubernetes/idempotent-apply.ts:13:18
-K8sResource                  interface  src/infra/kubernetes/idempotent-apply.ts:19:18
-ValidatedKnowledgeEntry      type       src/knowledge/schemas.ts:26:13                
-ValidatedKnowledgeQuery      type       src/knowledge/schemas.ts:27:13                
-DeploymentResult             type       src/lib/kubernetes.ts:11:7                    
-ClusterInfo                  type       src/lib/kubernetes.ts:12:7                    
-LockStatus                   interface  src/lib/mutex.ts:10:18                        
-SystemInfo                   interface  src/lib/platform-utils.ts:5:18                
-SamplingOptions              interface  src/lib/sampling.ts:22:18                     
-SamplingResult               interface  src/lib/sampling.ts:37:18                     
-ScoringWeights               interface  src/lib/sampling.ts:59:18                     
-BasicScanResult              interface  src/lib/scanner.ts:14:18                      
-SecretFinding                interface  src/lib/security-scanner.ts:42:18             
-PromptBackedToolConfig       interface  src/mcp/ai-tool-factory.ts:29:18              
-PromptToolExecutionOptions   interface  src/mcp/ai-tool-factory.ts:53:18              
-PromptToolResult             interface  src/mcp/ai-tool-factory.ts:70:18              
-AIParamResponse              interface  src/mcp/ai/host-ai-assist.ts:33:18            
-AIAssistantConfig            interface  src/mcp/ai/host-ai-assist.ts:45:18            
-AIAssistantDeps              interface  src/mcp/ai/host-ai-assist.ts:55:18            
-HostAIAssistant              interface  src/mcp/ai/host-ai-assist.ts:64:18            
-MCPMessage                   interface  src/mcp/ai/message-converter.ts:10:18         
-ProgressNotification         interface  src/mcp/context-helpers.ts:15:18              
-EnhancedProgressReporter     type       src/mcp/context-helpers.ts:31:13              
-TextMessage                  interface  src/mcp/context.ts:21:18                      
-SamplingRequest              interface  src/mcp/context.ts:34:18                      
-SamplingResponse             interface  src/mcp/context.ts:60:18                      
-PromptWithMessages           interface  src/mcp/context.ts:87:18                      
-EnhancedProgressReporter     type       src/mcp/context.ts:156:14                     
-ContextOptions               interface  src/mcp/context.ts:164:18                     
-ServerOptions                interface  src/mcp/mcp-server.ts:18:18                   
-MCPServer                    interface  src/mcp/mcp-server.ts:30:18                   
-TextContent                  type       src/mcp/types.ts:10:13                        
-Content                      type       src/mcp/types.ts:15:13                        
-MCPToolContext               interface  src/mcp/types.ts:28:18                        
-InferredInput                type       src/session/types.ts:38:13                    
-InferredOutput               type       src/session/types.ts:41:13                    
-PromptParams                 type       src/tools/ai-response-types.ts:15:13          
-BuildImageResult             interface  src/tools/build-image/tool.ts:39:18           
-DeployApplicationResult      interface  src/tools/deploy/tool.ts:111:18               
-OpsConfig                    interface  src/tools/ops/tool.ts:176:18                  
-OpsResult                    type       src/tools/ops/tool.ts:182:13                  
-PrepareClusterResult         interface  src/tools/prepare-cluster/tool.ts:47:18       
-PushImageResult              interface  src/tools/push-image/tool.ts:14:18            
-ScanImageResult              interface  src/tools/scan/tool.ts:79:18                  
-ScanImageConfig              type       src/tools/scan/tool.ts:313:13                 
-SessionAnalysisResult        interface  src/tools/session-types.ts:12:18              
-SessionBuildResult           interface  src/tools/session-types.ts:43:18              
-SessionDockerfileResult      interface  src/tools/session-types.ts:53:18              
-SessionK8sResult             interface  src/tools/session-types.ts:64:18              
-SessionMetadata              interface  src/tools/session-types.ts:80:18              
-TagImageResult               interface  src/tools/tag-image/tool.ts:35:18             
-VerifyDeploymentResult       interface  src/tools/verify-deployment/tool.ts:37:18     
-ContentCategory              type       src/types/categories.ts:11:13                 
-Environment                  type       src/types/categories.ts:16:14                 
-SecurityGrade                type       src/types/categories.ts:21:13                 
-QualityMetrics               interface  src/types/categories.ts:26:18                 
-SupportedLanguage            type       src/types/categories.ts:37:13                 
-SupportedFramework           type       src/types/categories.ts:52:13                 
-BaseToolParams               interface  src/types/categories.ts:72:18                 
-AIEnhancedParams             interface  src/types/categories.ts:81:18                 
-QualityAssessment            interface  src/types/categories.ts:91:18                 
-ScoringComparison            interface  src/types/categories.ts:101:18                
-ToolExecutionMetadata        interface  src/types/core.ts:49:18                       
-ValidationResult             interface  src/types/core.ts:58:18                       
-AnalysisCapability           interface  src/types/core.ts:66:18                       
-BuildCapability              interface  src/types/core.ts:74:18                       
-DeploymentCapability         interface  src/types/core.ts:83:18                       
-ToolContext                  type       src/types/index.ts:18:14                      
-AIService                    interface  src/types/index.ts:96:18                      
-AIContent                    interface  src/types/index.ts:113:18                     
-ValidationConfig             interface  src/validation/core-types.ts:91:18            
-ValidationFunction           type       src/validation/index.ts:7:14                  
-Validator                    type       src/validation/index.ts:7:34                  
-ValidationResult             type       src/validation/index.ts:24:14                 
-ValidationReport             type       src/validation/index.ts:25:20                 
-ValidationCategory           type       src/validation/index.ts:27:22                 
-ValidationGrade              type       src/validation/index.ts:28:22                 
-DockerfileValidationRule     type       src/validation/index.ts:29:19                 
-KubernetesValidationRule     type       src/validation/index.ts:30:28                 
-Validator                    type       src/validation/pipeline.ts:11:13              
-Duplicate exports (1)
-environment|environmentFull|environmentBasic  src/tools/shared/schemas.ts
+Unused exported types (112)
+ConstraintFormattingOptions  interface  src/ai/policy-constraints-adapter.ts:16:18      
+FormattedConstraints         interface  src/ai/policy-constraints-adapter.ts:30:18      
+DockerfilePromptParams       interface  src/ai/prompt-templates.ts:11:18                
+OptimizationPromptParams     interface  src/ai/prompt-templates.ts:46:18                
+RepositoryAnalysisParams     interface  src/ai/prompt-templates.ts:53:18                
+SecurityAnalysisParams       interface  src/ai/prompt-templates.ts:59:18                
+ParameterSuggestionParams    interface  src/ai/prompt-templates.ts:86:18                
+RegisteredTool               interface  src/app/orchestrator-types.ts:23:18             
+ToolRegistry                 interface  src/app/tool-registry.ts:11:18                  
+AppConfig                    type       src/config/app-config.ts:104:13                 
+ConstraintContext            interface  src/config/policy-constraints.ts:157:18         
+RegexMatcher                 interface  src/config/policy-schemas.ts:17:18              
+EnvironmentOverride          interface  src/config/policy-schemas.ts:45:18              
+CacheConfig                  interface  src/config/policy-schemas.ts:55:18              
+EnvironmentDefaults          interface  src/config/policy-schemas.ts:63:18              
+DockerClientConfig           interface  src/infra/docker/client.ts:19:18                
+DockerBuildResult            interface  src/infra/docker/client.ts:109:18               
+DockerPushResult             interface  src/infra/docker/client.ts:121:18               
+DockerContainerInfo          interface  src/infra/docker/client.ts:131:18               
+DockerImageInfo              interface  src/infra/docker/client.ts:147:18               
+DeploymentResult             interface  src/infra/kubernetes/client.ts:12:18            
+ClusterInfo                  interface  src/infra/kubernetes/client.ts:18:18            
+ApplyOptions                 interface  src/infra/kubernetes/idempotent-apply.ts:13:18  
+K8sResource                  interface  src/infra/kubernetes/idempotent-apply.ts:19:18  
+ValidatedKnowledgeEntry      type       src/knowledge/schemas.ts:26:13                  
+ValidatedKnowledgeQuery      type       src/knowledge/schemas.ts:27:13                  
+DeploymentResult             type       src/lib/kubernetes.ts:11:7                      
+ClusterInfo                  type       src/lib/kubernetes.ts:12:7                      
+LockStatus                   interface  src/lib/mutex.ts:10:18                          
+SystemInfo                   interface  src/lib/platform-utils.ts:5:18                  
+SamplingOptions              interface  src/lib/sampling.ts:22:18                       
+SamplingResult               interface  src/lib/sampling.ts:37:18                       
+ScoringWeights               interface  src/lib/sampling.ts:59:18                       
+BasicScanResult              interface  src/lib/scanner.ts:14:18                        
+SecretFinding                interface  src/lib/security-scanner.ts:42:18               
+PromptBackedToolConfig       interface  src/mcp/ai-tool-factory.ts:29:18                
+PromptToolExecutionOptions   interface  src/mcp/ai-tool-factory.ts:53:18                
+PromptToolResult             interface  src/mcp/ai-tool-factory.ts:70:18                
+AIParamResponse              interface  src/mcp/ai/host-ai-assist.ts:33:18              
+AIAssistantConfig            interface  src/mcp/ai/host-ai-assist.ts:45:18              
+AIAssistantDeps              interface  src/mcp/ai/host-ai-assist.ts:55:18              
+HostAIAssistant              interface  src/mcp/ai/host-ai-assist.ts:64:18              
+MCPMessage                   interface  src/mcp/ai/message-converter.ts:10:18           
+ProgressNotification         interface  src/mcp/context-helpers.ts:15:18                
+EnhancedProgressReporter     type       src/mcp/context-helpers.ts:31:13                
+TextMessage                  interface  src/mcp/context.ts:21:18                        
+SamplingRequest              interface  src/mcp/context.ts:34:18                        
+SamplingResponse             interface  src/mcp/context.ts:60:18                        
+PromptWithMessages           interface  src/mcp/context.ts:87:18                        
+EnhancedProgressReporter     type       src/mcp/context.ts:156:14                       
+ContextOptions               interface  src/mcp/context.ts:164:18                       
+ServerOptions                interface  src/mcp/mcp-server.ts:20:18                     
+MCPServer                    interface  src/mcp/mcp-server.ts:32:18                     
+InferredInput                type       src/session/types.ts:38:13                      
+InferredOutput               type       src/session/types.ts:41:13                      
+PromptParams                 type       src/tools/ai-response-types.ts:15:13            
+AnalyzeRepoParams            type       src/tools/analyze-repo/schema.ts:26:13          
+BuildImageResult             interface  src/tools/build-image/tool.ts:39:18             
+ConvertAcaToK8sParams        type       src/tools/convert-aca-to-k8s/schema.ts:18:13    
+DeployApplicationResult      interface  src/tools/deploy/tool.ts:111:18                 
+FixDockerfileParams          type       src/tools/fix-dockerfile/schema.ts:15:13        
+GenerateAcaManifestsParams   type       src/tools/generate-aca-manifests/schema.ts:74:13
+GenerateDockerfileParams     type       src/tools/generate-dockerfile/schema.ts:66:13   
+GenerateHelmChartsParams     type       src/tools/generate-helm-charts/schema.ts:91:13  
+GenerateK8sManifestsParams   type       src/tools/generate-k8s-manifests/schema.ts:42:13
+AllToolTypes                 type       src/tools/index.ts:71:13                        
+InternalTool                 type       src/tools/index.ts:117:13                       
+InspectSessionParams         type       src/tools/inspect-session/schema.ts:38:13       
+OpsConfig                    interface  src/tools/ops/tool.ts:178:18                    
+OpsResult                    type       src/tools/ops/tool.ts:184:13                    
+PrepareClusterResult         interface  src/tools/prepare-cluster/tool.ts:47:18         
+PushImageParams              type       src/tools/push-image/schema.ts:23:13            
+PushImageResult              interface  src/tools/push-image/tool.ts:16:18              
+ScanImageResult              interface  src/tools/scan/tool.ts:79:18                    
+ScanImageConfig              type       src/tools/scan/tool.ts:313:13                   
+SessionAnalysisResult        interface  src/tools/session-types.ts:12:18                
+SessionBuildResult           interface  src/tools/session-types.ts:43:18                
+SessionDockerfileResult      interface  src/tools/session-types.ts:53:18                
+SessionK8sResult             interface  src/tools/session-types.ts:64:18                
+SessionMetadata              interface  src/tools/session-types.ts:80:18                
+TagImageResult               interface  src/tools/tag-image/tool.ts:35:18               
+VerifyDeploymentResult       interface  src/tools/verify-deployment/tool.ts:37:18       
+ContentCategory              type       src/types/categories.ts:11:13                   
+ToolCategoryMetadata         interface  src/types/categories.ts:27:18                   
+Environment                  type       src/types/categories.ts:36:14                   
+SecurityGrade                type       src/types/categories.ts:41:13                   
+QualityMetrics               interface  src/types/categories.ts:46:18                   
+SupportedLanguage            type       src/types/categories.ts:57:13                   
+SupportedFramework           type       src/types/categories.ts:72:13                   
+BaseToolParams               interface  src/types/categories.ts:92:18                   
+AIEnhancedParams             interface  src/types/categories.ts:101:18                  
+QualityAssessment            interface  src/types/categories.ts:111:18                  
+ScoringComparison            interface  src/types/categories.ts:121:18                  
+ToolExecutionMetadata        interface  src/types/core.ts:49:18                         
+ValidationResult             interface  src/types/core.ts:58:18                         
+AnalysisCapability           interface  src/types/core.ts:66:18                         
+BuildCapability              interface  src/types/core.ts:74:18                         
+DeploymentCapability         interface  src/types/core.ts:83:18                         
+AIService                    interface  src/types/index.ts:72:18                        
+AIContent                    interface  src/types/index.ts:89:18                        
+ToolInput                    type       src/types/tool.ts:33:13                         
+ToolOutput                   type       src/types/tool.ts:35:13                         
+ValidationConfig             interface  src/validation/core-types.ts:91:18              
+ValidationFunction           type       src/validation/index.ts:7:14                    
+Validator                    type       src/validation/index.ts:7:34                    
+ValidationResult             type       src/validation/index.ts:24:14                   
+ValidationReport             type       src/validation/index.ts:25:20                   
+ValidationCategory           type       src/validation/index.ts:27:22                   
+ValidationGrade              type       src/validation/index.ts:28:22                   
+DockerfileValidationRule     type       src/validation/index.ts:29:19                   
+KubernetesValidationRule     type       src/validation/index.ts:30:28                   
+Validator                    type       src/validation/pipeline.ts:11:13                
 Configuration hints (1)

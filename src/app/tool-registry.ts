@@ -3,19 +3,24 @@
  * Simple registry for managing tools
  */
 
-import type { Tool } from '@/types';
+import type { Tool } from '@/types/tool';
+import type { ZodTypeAny } from 'zod';
 
-export interface ToolRegistry {
-  get(name: string): Tool | undefined;
-  list(): Tool[];
+// Use the base Tool interface with generics for flexibility
+// This allows any tool that conforms to the Tool interface
+export interface ToolRegistry<T extends Tool<ZodTypeAny, any> = Tool<ZodTypeAny, any>> {
+  get(name: string): T | undefined;
+  list(): T[];
   has(name: string): boolean;
 }
 
 /**
  * Create a tool registry
  */
-export function createToolRegistry(tools: Tool[]): ToolRegistry {
-  const registry = new Map<string, Tool>();
+export function createToolRegistry<T extends Tool<ZodTypeAny, any>>(
+  tools: readonly T[],
+): ToolRegistry<T> {
+  const registry = new Map<string, T>();
 
   for (const tool of tools) {
     registry.set(tool.name, tool);

@@ -11,6 +11,26 @@ import type { Environment } from '@/config/environment';
 export type ContentCategory = 'dockerfile' | 'kubernetes' | 'security' | 'generic';
 
 /**
+ * Tool categories for grouping and organization
+ */
+export type ToolCategory =
+  | 'docker' // Docker image operations (build, tag, push, fix)
+  | 'kubernetes' // Kubernetes deployment & management
+  | 'azure' // Azure-specific tools (ACA)
+  | 'analysis' // Repository and code analysis
+  | 'security' // Security scanning and validation
+  | 'utility'; // General utilities and session management
+
+/**
+ * Tool category metadata for enhanced organization
+ */
+export interface ToolCategoryMetadata {
+  category: ToolCategory;
+  tags?: string[];
+  aiDriven?: boolean;
+}
+
+/**
  * Re-export Environment type from unified module for backwards compatibility
  */
 export type { Environment };
@@ -153,3 +173,44 @@ export const ENVIRONMENT_PROFILES = {
     debuggingWeight: 0.5,
   },
 } as const;
+
+/**
+ * Tool category mappings for all available tools
+ */
+export const TOOL_CATEGORIES: Record<string, ToolCategory> = {
+  // Docker tools
+  'build-image': 'docker',
+  'fix-dockerfile': 'docker',
+  'generate-dockerfile': 'docker',
+  'push-image': 'docker',
+  'tag-image': 'docker',
+  'resolve-base-images': 'docker',
+
+  // Kubernetes tools
+  'generate-k8s-manifests': 'kubernetes',
+  deploy: 'kubernetes',
+  'prepare-cluster': 'kubernetes',
+  'verify-deploy': 'kubernetes',
+  'generate-helm-charts': 'kubernetes',
+
+  // Azure-specific tools
+  'generate-aca-manifests': 'azure',
+  'convert-aca-to-k8s': 'azure',
+
+  // Analysis tools
+  'analyze-repo': 'analysis',
+
+  // Security tools
+  scan: 'security',
+
+  // Utility tools
+  'inspect-session': 'utility',
+  ops: 'utility',
+} as const;
+
+/**
+ * Get category for a tool by name
+ */
+export function getToolCategory(toolName: string): ToolCategory {
+  return TOOL_CATEGORIES[toolName] ?? 'utility';
+}

@@ -397,3 +397,16 @@ async function verifyDeploymentImpl(
  * Verify deployment tool
  */
 export const verifyDeployment = verifyDeploymentImpl;
+
+// New Tool interface export
+import type { Tool } from '@/types/tool';
+
+const tool: Tool<typeof verifyDeploymentSchema, VerifyDeploymentResult> = {
+  name: 'verify-deploy',
+  description: 'Verify Kubernetes deployment status',
+  version: '2.0.0',
+  schema: verifyDeploymentSchema,
+  run: verifyDeploymentImpl,
+};
+
+export default tool;

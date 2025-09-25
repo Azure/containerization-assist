@@ -3,17 +3,14 @@
  * Provides Result type for error handling and tool system interfaces.
  */
 
-import type { Logger } from 'pino';
-import type { ToolContext } from '../mcp/context';
-import type { z, ZodRawShape } from 'zod';
-import type { Result } from './core';
-import { ToolName } from '@/exports/tools';
-
 // Export enhanced category types
 export * from './categories';
 
-// Export consolidated core types
+// Export consolidated core types (includes Result type)
 export * from './core';
+
+// Export the new unified Tool interface
+export * from './tool';
 
 export type { ToolContext } from '../mcp/context';
 
@@ -39,31 +36,10 @@ export const TOPICS = {
  * Union type of all topic values
  */
 export type Topic = (typeof TOPICS)[keyof typeof TOPICS];
-/**
- * Tool definition for MCP server operations.
- */
-export interface Tool {
-  /** Unique tool identifier */
-  name: ToolName;
-  /** Human-readable tool description */
-  description?: string;
-  /** Zod raw shape for MCP server registration */
-  schema?: ZodRawShape;
-  /** Full Zod schema for validation */
-  zodSchema?: z.ZodSchema;
-  /**
-   * Executes the tool with provided parameters.
-   * @param params - Tool-specific parameters
-   * @param logger - Logger instance for tool execution
-   * @param context - Optional ToolContext for AI capabilities and progress reporting
-   * @returns Promise resolving to Result with tool output or error
-   */
-  execute: (
-    params: Record<string, unknown>,
-    logger: Logger,
-    context?: ToolContext,
-  ) => Promise<Result<unknown>>;
-}
+
+import { ToolName } from '@/tools';
+// Import Result for local use in this file
+import type { Result } from './core';
 
 // ===== SESSION =====
 

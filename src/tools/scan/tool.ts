@@ -316,3 +316,16 @@ export type ScanImageConfig = ScanImageParams;
  * Scan image tool
  */
 export const scanImage = scanImageImpl;
+
+// New Tool interface export
+import type { Tool } from '@/types/tool';
+
+const tool: Tool<typeof scanImageSchema, ScanImageResult> = {
+  name: 'scan',
+  description: 'Scan Docker images for security vulnerabilities',
+  version: '2.0.0',
+  schema: scanImageSchema,
+  run: scanImageImpl,
+};
+
+export default tool;
