@@ -124,7 +124,7 @@ export interface OutputContract {
 export interface BuildPromptParams {
   basePrompt: string;
   topic: string;
-  tool: string;
+  tool: ToolName;
   environment: string;
   contract?: OutputContract;
   knowledgeBudget?: number;

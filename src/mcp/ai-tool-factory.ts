@@ -18,6 +18,7 @@ import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { createLogger } from '@/lib/logger';
 import type { Logger } from 'pino';
 import { z } from 'zod';
+import { ToolName } from '@/tools';
 
 const logger = createLogger().child({ module: 'prompt-backed-tool' });
 
@@ -26,7 +27,7 @@ const logger = createLogger().child({ module: 'prompt-backed-tool' });
  */
 export interface PromptBackedToolConfig {
   /** Tool name for identification and logging */
-  name: string;
+  name: ToolName;
   /** Topic for knowledge selection */
   topic: string;
   /** Default environment if not specified */

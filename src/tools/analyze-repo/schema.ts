@@ -9,6 +9,11 @@ export const analyzeRepoSchema = z.object({
   sessionId: sessionId.optional(),
   path,
   ...analysisOptions,
+  serviceRootsAbsolute: z
+    .array(z.string())
+    .describe(
+      'List of absolute paths to service root directories within the repository (use forward slashes: /path/to/service)',
+    ),
   dockerfilePaths: z
     .array(z.string())
     .optional()

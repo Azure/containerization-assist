@@ -40,9 +40,9 @@ extractBaseImage               function  src/lib/regex-patterns.ts:57:17
 scanImage                      function  src/lib/security-scanner.ts:74:23              
 EnhancedSessionManager                   src/lib/session-manager.ts:8:9                 
 initializeToolInstrumentation  function  src/lib/tool-helpers.ts:73:17                  
-createMcpPromptTool            function  src/mcp/ai-tool-factory.ts:303:17              
-OutputContracts                          src/mcp/ai-tool-factory.ts:341:14              
-PromptToolFactory              class     src/mcp/ai-tool-factory.ts:376:14              
+createMcpPromptTool            function  src/mcp/ai-tool-factory.ts:304:17              
+OutputContracts                          src/mcp/ai-tool-factory.ts:342:14              
+PromptToolFactory              class     src/mcp/ai-tool-factory.ts:377:14              
 metadata                                 src/tools/analyze-repo/tool.ts:220:14          
 metadata                                 src/tools/convert-aca-to-k8s/tool.ts:62:14     
 metadata                                 src/tools/fix-dockerfile/tool.ts:185:14        
@@ -126,9 +126,9 @@ SamplingResult               interface  src/lib/sampling.ts:37:18
 ScoringWeights               interface  src/lib/sampling.ts:59:18                     
 BasicScanResult              interface  src/lib/scanner.ts:14:18                      
 SecretFinding                interface  src/lib/security-scanner.ts:42:18             
-PromptBackedToolConfig       interface  src/mcp/ai-tool-factory.ts:27:18              
-PromptToolExecutionOptions   interface  src/mcp/ai-tool-factory.ts:51:18              
-PromptToolResult             interface  src/mcp/ai-tool-factory.ts:68:18              
+PromptBackedToolConfig       interface  src/mcp/ai-tool-factory.ts:28:18              
+PromptToolExecutionOptions   interface  src/mcp/ai-tool-factory.ts:52:18              
+PromptToolResult             interface  src/mcp/ai-tool-factory.ts:69:18              
 AIParamResponse              interface  src/mcp/ai/host-ai-assist.ts:33:18            
 AIAssistantConfig            interface  src/mcp/ai/host-ai-assist.ts:45:18            
 AIAssistantDeps              interface  src/mcp/ai/host-ai-assist.ts:55:18            
