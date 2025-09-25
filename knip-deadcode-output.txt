@@ -89,7 +89,7 @@ normalizeParameters                      src/validation/pipeline.ts:155:14
 validateSchema                           src/validation/pipeline.ts:178:14              
 when                                     src/validation/pipeline.ts:192:14              
 validateBusinessRules                    src/validation/pipeline.ts:207:14              
-Unused exported types (102)
+Unused exported types (100)
 ConstraintFormattingOptions  interface  src/ai/policy-constraints-adapter.ts:16:18    
 FormattedConstraints         interface  src/ai/policy-constraints-adapter.ts:30:18    
 DockerfilePromptParams       interface  src/ai/prompt-templates.ts:11:18              
@@ -146,8 +146,6 @@ MCPServer                    interface  src/mcp/mcp-server.ts:30:18
 TextContent                  type       src/mcp/types.ts:10:13                        
 Content                      type       src/mcp/types.ts:15:13                        
 MCPToolContext               interface  src/mcp/types.ts:28:18                        
-InferredInput                type       src/session/types.ts:38:13                    
-InferredOutput               type       src/session/types.ts:41:13                    
 PromptParams                 type       src/tools/ai-response-types.ts:15:13          
 BuildImageResult             interface  src/tools/build-image/tool.ts:33:18           
 DeployApplicationResult      interface  src/tools/deploy/tool.ts:104:18               

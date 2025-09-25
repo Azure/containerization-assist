@@ -10,10 +10,6 @@ import type { SessionManager } from '@/lib/session';
 import type { ToolContext } from '@/mcp/context';
 import { extractErrorMessage } from '@/lib/error-utils';
 
-// Re-export typed utilities for tools to use
-export { useSessionSlice, getSessionSlice, updateSessionSlice } from '@/lib/session-slice-utils';
-export { defineToolIO, type SessionSlice, type ToolIO } from '@/lib/session-types';
-
 /**
  * Get session manager from context - returns null if not available
  */

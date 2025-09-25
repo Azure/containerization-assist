@@ -13,9 +13,3 @@ export { SessionManager, type SessionConfig } from './core';
 
 // Alternative enhanced manager with stats
 export { EnhancedSessionManager } from './manager';
-
-// Session slice utilities
-export * from './slices';
-
-// Session types
-export * from './types';
