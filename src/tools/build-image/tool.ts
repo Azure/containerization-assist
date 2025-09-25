@@ -26,7 +26,7 @@ import { createDockerClient, type DockerBuildOptions } from '@/lib/docker';
 import { type Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { fileExists } from '@/lib/file-utils';
-import { type BuildImageParams } from './schema';
+import { type BuildImageParams, buildImageSchema } from './schema';
 import type { SessionData } from '@/tools/session-types';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 
@@ -351,3 +351,16 @@ async function buildImageImpl(
  * Build image tool with selective progress reporting
  */
 export const buildImage = buildImageImpl;
+
+// New Tool interface export
+import type { Tool } from '@/types/tool';
+
+const tool: Tool<typeof buildImageSchema, BuildImageResult> = {
+  name: 'build-image',
+  description: 'Build Docker images from Dockerfiles',
+  version: '2.0.0',
+  schema: buildImageSchema,
+  run: buildImageImpl,
+};
+
+export default tool;

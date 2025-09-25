@@ -1,14 +1,20 @@
+/**
+ * Generate Kubernetes Manifests tool using the new Tool pattern
+ */
+
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
+import type { Tool } from '@/types/tool';
 import { promptTemplates, K8sManifestPromptParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
-import { generateK8sManifestsSchema, type GenerateK8sManifestsParams } from './schema';
+import { generateK8sManifestsSchema } from './schema';
 import type { AIResponse } from '../ai-response-types';
 import * as yaml from 'js-yaml';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { updateSession } from '@/mcp/tool-session-helpers';
+import type { z } from 'zod';
 
 // Type definition for Kubernetes manifests
 interface KubernetesManifest extends Record<string, unknown> {
@@ -36,11 +42,14 @@ interface KubernetesManifest extends Record<string, unknown> {
   };
 }
 
-export async function generateK8sManifests(
-  params: GenerateK8sManifestsParams,
-  context: ToolContext,
+const name = 'generate-k8s-manifests';
+const description = 'Generate Kubernetes deployment manifests';
+const version = '2.1.0';
+
+async function run(
+  input: z.infer<typeof generateK8sManifestsSchema>,
+  ctx: ToolContext,
 ): Promise<Result<AIResponse>> {
-  const validatedParams = generateK8sManifestsSchema.parse(params);
   const {
     appName,
     imageId,
@@ -51,7 +60,7 @@ export async function generateK8sManifests(
     ingressEnabled = false,
     resources,
     healthCheck,
-  } = validatedParams;
+  } = input;
 
   // Generate prompt from template
   const promptParams = {
@@ -87,7 +96,7 @@ export async function generateK8sManifests(
 
   // Execute via AI with structured messages
   const mcpMessages = toMCPMessages(messages);
-  const response = await context.sampling.createMessage({
+  const response = await ctx.sampling.createMessage({
     ...mcpMessages,
     maxTokens: 8192,
     modelPreferences: {
@@ -118,7 +127,7 @@ export async function generateK8sManifests(
       try {
         const manifest = yaml.load(doc) as KubernetesManifest;
         if (!manifest || typeof manifest !== 'object') {
-          context.logger.warn({ doc: doc.substring(0, 100) }, 'Skipping non-object manifest');
+          ctx.logger.warn({ doc: doc.substring(0, 100) }, 'Skipping non-object manifest');
           continue;
         }
 
@@ -138,7 +147,7 @@ export async function generateK8sManifests(
         // Validate specific resource types
         if (manifest.kind === 'Deployment') {
           if (typeof manifest.apiVersion === 'string' && manifest.apiVersion !== 'apps/v1') {
-            context.logger.warn(
+            ctx.logger.warn(
               { apiVersion: manifest.apiVersion },
               'Deployment using non-standard API version',
             );
@@ -161,7 +170,7 @@ export async function generateK8sManifests(
 
         if (manifest.kind === 'Service') {
           if (typeof manifest.apiVersion === 'string' && manifest.apiVersion !== 'v1') {
-            context.logger.warn(
+            ctx.logger.warn(
               { apiVersion: manifest.apiVersion },
               'Service using non-standard API version',
             );
@@ -176,7 +185,7 @@ export async function generateK8sManifests(
             typeof manifest.apiVersion === 'string' &&
             !manifest.apiVersion.startsWith('networking.k8s.io/')
           ) {
-            context.logger.warn(
+            ctx.logger.warn(
               { apiVersion: manifest.apiVersion },
               'Ingress using legacy API version',
             );
@@ -185,7 +194,7 @@ export async function generateK8sManifests(
 
         manifests.push(manifest);
       } catch (parseError) {
-        context.logger.error(
+        ctx.logger.error(
           {
             error: parseError instanceof Error ? parseError.message : String(parseError),
             doc: doc.substring(0, 200),
@@ -203,7 +212,7 @@ export async function generateK8sManifests(
     }
 
     // Log what we validated
-    context.logger.info(
+    ctx.logger.info(
       {
         manifestCount: manifests.length,
         kinds: manifests.map((m) => m.kind),
@@ -214,22 +223,22 @@ export async function generateK8sManifests(
 
     // Write manifests to file if path is provided
     let manifestPath = '';
-    if (validatedParams.path) {
-      manifestPath = path.isAbsolute(validatedParams.path)
-        ? validatedParams.path
-        : path.resolve(process.cwd(), validatedParams.path);
+    if (input.path) {
+      manifestPath = path.isAbsolute(input.path)
+        ? input.path
+        : path.resolve(process.cwd(), input.path);
 
-      const filename = `${validatedParams.appName}-manifests.yaml`;
+      const filename = `${input.appName}-manifests.yaml`;
       manifestPath = path.join(manifestPath, filename);
 
       await fs.writeFile(manifestPath, manifestsContent, 'utf-8');
-      context.logger.info({ manifestPath }, 'Kubernetes manifests written to disk');
+      ctx.logger.info({ manifestPath }, 'Kubernetes manifests written to disk');
     }
 
     // Store the manifests in session if we have a sessionId
-    if (validatedParams.sessionId) {
+    if (input.sessionId) {
       await updateSession(
-        validatedParams.sessionId,
+        input.sessionId,
         {
           metadata: {
             k8sManifests: manifestsContent,
@@ -238,7 +247,7 @@ export async function generateK8sManifests(
           },
           current_step: 'generate-k8s-manifests',
         },
-        context,
+        ctx,
       );
     }
 
@@ -246,10 +255,10 @@ export async function generateK8sManifests(
       manifests: manifestsContent,
       manifestPath,
       validatedResources: manifests.map((m) => ({ kind: m.kind, name: m.metadata?.name })),
-      sessionId: validatedParams.sessionId,
+      sessionId: input.sessionId,
       workflowHints: {
         nextStep: 'deploy',
-        message: `Kubernetes manifests generated and validated successfully. ${manifestPath ? `Saved to ${manifestPath}. ` : ''}Use "deploy" with sessionId ${validatedParams.sessionId || '<sessionId>'} to deploy to your cluster.`,
+        message: `Kubernetes manifests generated and validated successfully. ${manifestPath ? `Saved to ${manifestPath}. ` : ''}Use "deploy" with sessionId ${input.sessionId || '<sessionId>'} to deploy to your cluster.`,
       },
     });
   } catch (e) {
@@ -258,10 +267,21 @@ export async function generateK8sManifests(
   }
 }
 
+const tool: Tool<typeof generateK8sManifestsSchema, AIResponse> = {
+  name,
+  description,
+  category: 'kubernetes',
+  version,
+  schema: generateK8sManifestsSchema,
+  run,
+};
+
+export default tool;
+
 export const metadata = {
-  name: 'generate-k8s-manifests',
-  description: 'Generate Kubernetes deployment manifests',
-  version: '2.1.0',
+  name,
+  description,
+  version,
   aiDriven: true,
   knowledgeEnhanced: true,
 };

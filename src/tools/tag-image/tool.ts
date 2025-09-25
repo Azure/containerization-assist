@@ -1,18 +1,19 @@
 /**
- * Tag Image Tool - Standardized Implementation
+ * Tag Image Tool - Modernized Implementation
  *
  * Tags Docker images with version and registry information
- * Uses standardized helpers for consistency
+ * Follows the new Tool interface pattern
  */
 
 import { ensureSession, updateSession } from '@/mcp/tool-session-helpers';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
-import type { ToolContext } from '@/mcp/context';
 import { createDockerClient } from '@/lib/docker';
-
 import { Success, Failure, type Result } from '@/types';
-import { type TagImageParams } from './schema';
+import type { ToolContext } from '@/mcp/context';
+import type { Tool } from '@/types/tool';
+import { tagImageSchema } from './schema';
+import { z } from 'zod';
 
 export interface TagImageResult {
   success: boolean;
@@ -22,27 +23,24 @@ export interface TagImageResult {
 }
 
 /**
- * Tag image implementation - direct execution without wrapper
+ * Tag image implementation
  */
-async function tagImageImpl(
-  params: TagImageParams,
-  context: ToolContext,
+async function run(
+  input: z.infer<typeof tagImageSchema>,
+  ctx: ToolContext,
 ): Promise<Result<TagImageResult>> {
-  if (!params || typeof params !== 'object') {
-    return Failure('Invalid parameters provided');
-  }
-  const logger = getToolLogger(context, 'tag-image');
+  const logger = getToolLogger(ctx, 'tag-image');
   const timer = createToolTimer(logger, 'tag-image');
 
   try {
-    const { tag } = params;
+    const { tag } = input;
 
     if (!tag) {
       return Failure('Tag parameter is required');
     }
 
     // Ensure session exists and get typed slice operations
-    const sessionResult = await ensureSession(context, params.sessionId);
+    const sessionResult = await ensureSession(ctx, input.sessionId);
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
     }
@@ -57,7 +55,7 @@ async function tagImageImpl(
     const buildResult = session.metadata?.buildResult as
       | { imageId?: string; tags?: string[] }
       | undefined;
-    const source = params.imageId || buildResult?.imageId;
+    const source = input.imageId || buildResult?.imageId;
 
     if (!source) {
       return Failure(
@@ -100,7 +98,7 @@ async function tagImageImpl(
         },
         current_step: 'tag-image',
       },
-      context,
+      ctx,
     );
 
     timer.end({ tags, sessionId });
@@ -115,6 +113,14 @@ async function tagImageImpl(
 }
 
 /**
- * Tag image tool
+ * Tag image tool conforming to Tool interface
  */
-export const tagImage = tagImageImpl;
+const tool: Tool<typeof tagImageSchema, TagImageResult> = {
+  name: 'tag-image',
+  description: 'Tag Docker images with version and registry information',
+  version: '2.0.0',
+  schema: tagImageSchema,
+  run,
+};
+
+export default tool;

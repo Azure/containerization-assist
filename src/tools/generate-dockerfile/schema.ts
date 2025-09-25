@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import {
   sessionId as sharedSessionId,
-  environmentFull,
+  environment,
   platform,
   samplingOptions,
 } from '../shared/schemas';
@@ -39,7 +39,7 @@ export const generateDockerfileSchema = z.object({
     .describe('Base Docker image to use (overrides automatic selection)'),
   runtimeImage: z.string().optional().describe('Runtime image for multi-stage builds'),
   baseImagePreference: baseImagePreferenceSchema,
-  environment: environmentFull,
+  environment,
   optimization: z.union([optimizationSchema, z.boolean()]).optional(),
   preferAI: z
     .boolean()

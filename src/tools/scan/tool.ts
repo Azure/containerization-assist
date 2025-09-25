@@ -13,7 +13,7 @@ import { createSecurityScanner } from '@/lib/scanner';
 import { Success, Failure, type Result } from '@/types';
 import { getKnowledgeForCategory } from '@/knowledge/index';
 import type { KnowledgeMatch } from '@/knowledge/types';
-import { type ScanImageParams } from './schema';
+import { type ScanImageParams, scanImageSchema } from './schema';
 
 interface DockerScanResult {
   vulnerabilities?: Array<{
@@ -275,3 +275,16 @@ export type ScanImageConfig = ScanImageParams;
  * Scan image tool
  */
 export const scanImage = scanImageImpl;
+
+// New Tool interface export
+import type { Tool } from '@/types/tool';
+
+const tool: Tool<typeof scanImageSchema, ScanImageResult> = {
+  name: 'scan',
+  description: 'Scan Docker images for security vulnerabilities',
+  version: '2.0.0',
+  schema: scanImageSchema,
+  run: scanImageImpl,
+};
+
+export default tool;

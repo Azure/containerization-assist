@@ -32,7 +32,7 @@ import { downloadFile, makeExecutable, createTempFile, deleteTempFile } from '@/
 
 import type * as pino from 'pino';
 import { Success, Failure, type Result } from '@/types';
-import { type PrepareClusterParams } from './schema';
+import { type PrepareClusterParams, prepareClusterSchema } from './schema';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -599,3 +599,16 @@ async function prepareClusterImpl(
  * Export the prepare cluster tool directly
  */
 export const prepareCluster = prepareClusterImpl;
+
+// New Tool interface export
+import type { Tool } from '@/types/tool';
+
+const tool: Tool<typeof prepareClusterSchema, PrepareClusterResult> = {
+  name: 'prepare-cluster',
+  description: 'Prepare Kubernetes cluster for deployment',
+  version: '2.0.0',
+  schema: prepareClusterSchema,
+  run: prepareClusterImpl,
+};
+
+export default tool;

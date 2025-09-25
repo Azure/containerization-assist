@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { sessionId, namespaceOptional, replicas, port, environmentFull } from '../shared/schemas';
+import { sessionId, namespaceOptional, replicas, port, environment } from '../shared/schemas';
 
 export const deployApplicationSchema = z.object({
   sessionId: sessionId.optional(),
@@ -11,7 +11,7 @@ export const deployApplicationSchema = z.object({
   namespace: namespaceOptional,
   replicas,
   port,
-  environment: environmentFull,
+  environment,
 });
 
 export type DeployApplicationParams = z.infer<typeof deployApplicationSchema>;

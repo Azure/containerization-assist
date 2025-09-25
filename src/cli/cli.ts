@@ -87,7 +87,6 @@ program.parse(argv);
 
 const options = program.opts();
 const command = program.args[0] ?? 'start';
-const defaultDockerSocket = autoDetectDockerSocket();
 
 // Enhanced transport detection and logging
 function getTransportInfo(options: any): { type: 'stdio' | 'http'; details: string } {
@@ -107,40 +106,55 @@ function getTransportInfo(options: any): { type: 'stdio' | 'http'; details: stri
 function validateDockerSocket(options: any): { dockerSocket: string; warnings: string[] } {
   const warnings: string[] = [];
   let dockerSocket = '';
+  const defaultDockerSocket = autoDetectDockerSocket();
 
-  const allSocketOptions = [
-    options.dockerSocket,
-    process.env.DOCKER_SOCKET,
-    defaultDockerSocket,
-  ].filter(Boolean);
-
-  for (const thisSocket of allSocketOptions) {
-    if (!thisSocket) continue;
-
-    try {
-      const stat = statSync(thisSocket);
-      if (!stat.isSocket()) {
-        warnings.push(`${thisSocket} exists but is not a socket`);
-        continue;
-      }
-
-      // Only log when not in pure MCP mode or quiet mode
-      if (!process.env.MCP_MODE && !process.env.MCP_QUIET) {
-        console.error(`✅ Using Docker socket: ${thisSocket}`);
-      }
-      dockerSocket = thisSocket;
-      break;
-    } catch (error) {
-      const errorMsg = extractErrorMessage(error);
-      warnings.push(`Cannot access Docker socket: ${thisSocket} - ${errorMsg}`);
-    }
+  // Priority order: CLI option -> Environment variable -> Default
+  if (options.dockerSocket) {
+    dockerSocket = options.dockerSocket;
+  } else if (process.env.DOCKER_SOCKET) {
+    dockerSocket = process.env.DOCKER_SOCKET;
+  } else {
+    dockerSocket = defaultDockerSocket;
   }
 
-  if (!dockerSocket) {
+  // Validate the selected socket
+  try {
+    // Handle Windows named pipes specially - they can't be stat()'d
+    if (dockerSocket.includes('pipe')) {
+      // For Windows named pipes, assume they're valid and let Docker client handle validation
+      if (!process.env.MCP_MODE && !process.env.MCP_QUIET) {
+        console.error(`✅ Using Docker named pipe: ${dockerSocket}`);
+      }
+      return { dockerSocket, warnings };
+    }
+
+    // For Unix sockets and other paths, check if they exist and are valid
+    const stat = statSync(dockerSocket);
+    if (!stat.isSocket()) {
+      warnings.push(`${dockerSocket} exists but is not a socket`);
+      return {
+        dockerSocket: '',
+        warnings: [
+          ...warnings,
+          'No valid Docker socket found',
+          'Docker operations require a valid Docker connection',
+          'Consider: 1) Starting Docker Desktop, 2) Specifying --docker-socket <path>',
+        ],
+      };
+    }
+
+    // Only log when not in pure MCP mode or quiet mode
+    if (!process.env.MCP_MODE && !process.env.MCP_QUIET) {
+      console.error(`✅ Using Docker socket: ${dockerSocket}`);
+    }
+  } catch (error) {
+    const errorMsg = extractErrorMessage(error);
+    warnings.push(`Cannot access Docker socket: ${dockerSocket} - ${errorMsg}`);
     return {
       dockerSocket: '',
       warnings: [
-        `No valid Docker socket found in: ${allSocketOptions.join(', ')}`,
+        ...warnings,
+        'No valid Docker socket found',
         'Docker operations require a valid Docker connection',
         'Consider: 1) Starting Docker Desktop, 2) Specifying --docker-socket <path>',
       ],

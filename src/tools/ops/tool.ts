@@ -1,8 +1,8 @@
 /**
- * Ops Tool - Flat Architecture
+ * Ops Tool - Modernized Implementation
  *
  * Provides operational utilities like ping and server status
- * Follows architectural requirement: only imports from src/lib/
+ * Follows the new Tool interface pattern
  */
 
 import * as os from 'os';
@@ -10,7 +10,9 @@ import { extractErrorMessage } from '@/lib/error-utils';
 import { createToolTimer } from '@/lib/tool-helpers';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { OpsToolParams } from './schema';
+import type { Tool } from '@/types/tool';
+import { opsToolSchema } from './schema';
+import type { z } from 'zod';
 
 interface PingConfig {
   message?: string;
@@ -182,25 +184,36 @@ export interface OpsConfig {
 export type OpsResult = PingResult | ServerStatusResult;
 
 /**
- * Main ops function that delegates to specific operations
+ * Main ops implementation
  */
-async function opsImpl(params: OpsToolParams, context: ToolContext): Promise<Result<OpsResult>> {
-  const { operation } = params;
+async function run(
+  input: z.infer<typeof opsToolSchema>,
+  context: ToolContext,
+): Promise<Result<OpsResult>> {
+  const { operation } = input;
 
   switch (operation) {
     case 'ping':
-      return ping({ ...(params.message !== undefined && { message: params.message }) }, context);
+      return ping({ ...(input.message !== undefined && { message: input.message }) }, context);
     case 'status':
       return serverStatus(
-        { ...(params.details !== undefined && { details: params.details }) },
+        { ...(input.details !== undefined && { details: input.details }) },
         context,
       );
     default:
-      return Failure(`Unknown operation: ${params.operation}`);
+      return Failure(`Unknown operation: ${input.operation}`);
   }
 }
 
 /**
- * Export the ops tool directly
+ * Ops tool conforming to Tool interface
  */
-export const opsTool = opsImpl;
+const tool: Tool<typeof opsToolSchema, OpsResult> = {
+  name: 'ops',
+  description: 'Operational utilities for ping and server status',
+  version: '2.0.0',
+  schema: opsToolSchema,
+  run,
+};
+
+export default tool;

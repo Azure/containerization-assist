@@ -8,7 +8,7 @@ import {
   serviceType,
   ingressEnabled,
   ingressHost,
-  environmentBasic,
+  environment,
   samplingOptions,
 } from '../shared/schemas';
 
@@ -78,7 +78,7 @@ export const generateHelmChartsSchema = z.object({
     .describe('HPA configuration'),
 
   // Environment
-  environment: environmentBasic,
+  environment,
 
   // Validation options
   runValidation: z.boolean().optional().default(true).describe('Run helm lint validation'),

@@ -30,7 +30,7 @@ import { createKubernetesClient, KubernetesClient } from '@/lib/kubernetes';
 
 import { DEFAULT_TIMEOUTS } from '@/config/defaults';
 import { Success, Failure, type Result } from '@/types';
-import { type VerifyDeploymentParams } from './schema';
+import { type VerifyDeploymentParams, verifyDeploymentSchema } from './schema';
 
 export interface VerifyDeploymentResult {
   success: boolean;
@@ -333,3 +333,16 @@ async function verifyDeploymentImpl(
  * Verify deployment tool
  */
 export const verifyDeployment = verifyDeploymentImpl;
+
+// New Tool interface export
+import type { Tool } from '@/types/tool';
+
+const tool: Tool<typeof verifyDeploymentSchema, VerifyDeploymentResult> = {
+  name: 'verify-deploy',
+  description: 'Verify Kubernetes deployment status',
+  version: '2.0.0',
+  schema: verifyDeploymentSchema,
+  run: verifyDeploymentImpl,
+};
+
+export default tool;
