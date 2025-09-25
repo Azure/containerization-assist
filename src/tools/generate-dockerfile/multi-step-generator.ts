@@ -112,9 +112,18 @@ function extractInstructions(text: string): string {
     return '';
   }
 
+  // Log input for debugging
+  // console.log('[extractInstructions] Input text (first 200 chars):', text.substring(0, 200));
+
   // First, try to parse as JSON
   try {
     const parsed = JSON.parse(text) as unknown;
+    // Log parsed type for debugging
+    // console.log(
+    //   '[extractInstructions] Parsed as JSON:',
+    //   typeof parsed,
+    //   Array.isArray(parsed) ? 'array' : 'not array',
+    // );
 
     // Handle the expected contract format
     if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
@@ -122,7 +131,15 @@ function extractInstructions(text: string): string {
 
       const content = response.dockerfile_partial || response.dockerfile_v1;
       if (content !== undefined) {
+        // Log content type for debugging
+        // console.log(
+        //   '[extractInstructions] Found dockerfile_partial/v1, content type:',
+        //   typeof content,
+        // );
+
         if (Array.isArray(content)) {
+          // Log array length for debugging
+          // console.log('[extractInstructions] Content is array with', content.length, 'items');
           return fixInvalidDigests(processInstructionArray(content));
         }
 
@@ -157,7 +174,59 @@ function extractInstructions(text: string): string {
     .filter((line) => !line.includes('[object Object]'))
     .join('\n');
 
-  return cleaned.trim();
+  // Fix any invalid SHA256 digests before returning
+  return fixInvalidDigests(cleaned.trim());
+}
+
+/**
+ * Common generator function to reduce duplication
+ */
+async function generateStep(
+  config: GeneratorConfig,
+  context: ToolContext,
+  environment: string,
+): Promise<Result<StepResult>> {
+  try {
+    const messages = await buildMessages({
+      basePrompt: config.prompt,
+      topic: config.topic,
+      tool: 'generate-dockerfile',
+      environment,
+      contract: {
+        name: 'dockerfile_partial',
+        description: config.contractDescription,
+      },
+      knowledgeBudget: config.knowledgeBudget,
+    });
+
+    const response = await context.sampling.createMessage({
+      ...toMCPMessages(messages),
+      maxTokens: config.maxTokens,
+      modelPreferences: {
+        hints: [{ name: config.hint }],
+      },
+    });
+
+    const rawText = response.content[0]?.text || '';
+    context.logger.debug(
+      { rawText: rawText.substring(0, 200) },
+      `Raw AI response for ${config.topic}`,
+    );
+
+    const content = extractInstructions(rawText);
+
+    if (!content) {
+      return Failure(`Failed to generate ${config.topic} instructions`);
+    }
+
+    return Success({ content, success: true });
+  } catch (error) {
+    return Failure(
+      `${config.topic} generation failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
 }
 
 /**
@@ -192,32 +261,10 @@ Keep it minimal and focused.`,
 
   const result = await generateStep(config, context, environment);
 
-    const response = await context.sampling.createMessage({
-      ...toMCPMessages(messages),
-      maxTokens: 500, // Small response expected
-      modelPreferences: {
-        hints: [{ name: 'dockerfile-base' }],
-      },
-    });
-
-    const rawText = response.content[0]?.text || '';
-    context.logger.debug({ rawText: rawText.substring(0, 200) }, 'Raw AI response for base image');
-
-    const content = extractInstructions(rawText);
-
-    if (!content?.includes('FROM')) {
-      context.logger.error(
-        { content, rawText: rawText.substring(0, 200) },
-        'Base image missing FROM instruction',
-      );
-      return Failure('Failed to generate base image instructions');
-    }
-
-    return Success({ content, success: true });
-  } catch (error) {
-    return Failure(
-      `Base image generation failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
+  // Additional validation for base image
+  if (result.ok && !result.value.content.includes('FROM')) {
+    context.logger.error({ content: result.value.content }, 'Base image missing FROM instruction');
+    return Failure('Failed to generate base image instructions');
   }
 
   return result;
