@@ -18,12 +18,7 @@ import { normalizePath } from '@/lib/path-utils';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import type { Logger } from '@/lib/logger';
 import { promises as fs } from 'node:fs';
-import {
-  ensureSession,
-  defineToolIO,
-  useSessionSlice,
-  getSessionSlice,
-} from '@/mcp/tool-session-helpers';
+import { ensureSession, getSession, updateSession } from '@/mcp/tool-session-helpers';
 import { createStandardProgress } from '@/mcp/progress-helper';
 import type { ToolContext } from '@/mcp/context';
 import { createDockerClient, type DockerBuildOptions } from '@/lib/docker';
@@ -31,10 +26,9 @@ import { createDockerClient, type DockerBuildOptions } from '@/lib/docker';
 import { type Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { fileExists } from '@/lib/file-utils';
-import { buildImageSchema, type BuildImageParams } from './schema';
-import { z } from 'zod';
+import { type BuildImageParams } from './schema';
 import type { SessionData } from '@/tools/session-types';
-import { analyzeRepoSchema } from '@/tools/analyze-repo/schema';
+import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 
 export interface BuildImageResult {
   /** Whether the build completed successfully */
@@ -62,38 +56,6 @@ export interface BuildImageResult {
   };
 }
 
-// Define the result schema for type safety
-const BuildImageResultSchema = z.object({
-  success: z.boolean(),
-  sessionId: z.string(),
-  imageId: z.string(),
-  tags: z.array(z.string()),
-  size: z.number(),
-  layers: z.number().optional(),
-  buildTime: z.number(),
-  logs: z.array(z.string()),
-  securityWarnings: z.array(z.string()).optional(),
-  workflowHints: z
-    .object({
-      nextStep: z.string(),
-      message: z.string(),
-    })
-    .optional(),
-});
-
-// Define tool IO for type-safe session operations
-const io = defineToolIO(buildImageSchema, BuildImageResultSchema);
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastBuiltAt: z.date().optional(),
-  lastBuiltImageId: z.string().optional(),
-  lastBuiltTags: z.array(z.string()).optional(),
-  totalBuilds: z.number().optional(),
-  lastBuildTime: z.number().optional(),
-  lastSecurityWarningCount: z.number().optional(),
-});
-
 /**
  * Prepare build arguments with defaults
  */
@@ -109,28 +71,12 @@ async function prepareBuildArgs(
     VCS_REF: process.env.GIT_COMMIT ?? 'unknown',
   };
 
-  // Get analysis result from session slice
   try {
-    // Define the IO for analyze-repo to access its slice
-    const AnalyzeRepoResultSchema = z.object({
-      ok: z.boolean(),
-      sessionId: z.string(),
-      language: z.string(),
-      languageVersion: z.string().optional(),
-      framework: z.string().optional(),
-      frameworkVersion: z.string().optional(),
-    });
-
-    const analyzeRepoIO = defineToolIO(analyzeRepoSchema, AnalyzeRepoResultSchema);
-    const analysisSliceResult = await getSessionSlice(
-      'analyze-repo',
-      sessionId,
-      analyzeRepoIO,
-      context,
-    );
-
-    if (analysisSliceResult.ok && analysisSliceResult.value?.output) {
-      const analysisResult = analysisSliceResult.value.output;
+    // Get analysis data from session metadata
+    const sessionData = await getSession(sessionId, context);
+    if (sessionData.ok && sessionData.value.state.metadata?.repositoryAnalysis) {
+      const analysisResult = sessionData.value.state.metadata
+        .repositoryAnalysis as RepositoryAnalysis;
       if (analysisResult.language) {
         defaults.LANGUAGE = analysisResult.language;
       }
@@ -225,16 +171,8 @@ async function buildImageImpl(
     }
 
     const { id: sessionId, state: session } = sessionResult.value;
-    const slice = useSessionSlice('build-image', io, context, StateSchema);
-
-    if (!slice) {
-      return Failure('Session manager not available');
-    }
 
     logger.info({ sessionId }, 'Starting Docker image build with session');
-
-    // Record input in session slice
-    await slice.patch(sessionId, { input: params });
 
     const dockerClient = createDockerClient(logger);
 
@@ -377,19 +315,22 @@ async function buildImageImpl(
       },
     };
 
-    // Update typed session slice with output and state
-    await slice.patch(sessionId, {
-      output: result,
-      state: {
-        lastBuiltAt: new Date(),
-        lastBuiltImageId: buildResult.value.imageId,
-        lastBuiltTags: finalTags,
-        totalBuilds:
-          (session?.completed_steps || []).filter((s: string) => s === 'build-image').length + 1,
-        lastBuildTime: buildTime,
-        lastSecurityWarningCount: securityWarnings.length,
+    // Store build result in session metadata
+    await updateSession(
+      sessionId,
+      {
+        metadata: {
+          buildResult: result,
+          lastBuiltAt: new Date(),
+          lastBuiltImageId: buildResult.value.imageId,
+          lastBuiltTags: finalTags,
+          lastBuildTime: buildTime,
+          lastSecurityWarningCount: securityWarnings.length,
+        },
+        current_step: 'build-image',
       },
-    });
+      context,
+    );
 
     timer.end({ imageId: buildResult.value.imageId, buildTime });
     logger.info({ imageId: buildResult.value.imageId, buildTime }, 'Docker image build completed');

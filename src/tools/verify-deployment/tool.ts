@@ -22,7 +22,7 @@
  * ```
  */
 
-import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
+import { ensureSession, updateSession } from '@/mcp/tool-session-helpers';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import type { ToolContext } from '@/mcp/context';
@@ -30,9 +30,7 @@ import { createKubernetesClient, KubernetesClient } from '@/lib/kubernetes';
 
 import { DEFAULT_TIMEOUTS } from '@/config/defaults';
 import { Success, Failure, type Result } from '@/types';
-import { verifyDeploymentSchema, type VerifyDeploymentParams } from './schema';
-import { z } from 'zod';
-import type { SessionData } from '@/tools/session-types';
+import { type VerifyDeploymentParams } from './schema';
 
 export interface VerifyDeploymentResult {
   success: boolean;
@@ -67,63 +65,6 @@ export interface VerifyDeploymentResult {
     }>;
   };
 }
-
-// Define the result schema for type safety
-const VerifyDeploymentResultSchema = z.object({
-  success: z.boolean(),
-  sessionId: z.string(),
-  namespace: z.string(),
-  deploymentName: z.string(),
-  serviceName: z.string(),
-  endpoints: z.array(
-    z.object({
-      type: z.enum(['internal', 'external']),
-      url: z.string(),
-      port: z.number(),
-      healthy: z.boolean().optional(),
-    }),
-  ),
-  ready: z.boolean(),
-  replicas: z.number(),
-  status: z.object({
-    readyReplicas: z.number(),
-    totalReplicas: z.number(),
-    conditions: z.array(
-      z.object({
-        type: z.string(),
-        status: z.string(),
-        message: z.string(),
-      }),
-    ),
-  }),
-  healthCheck: z
-    .object({
-      status: z.enum(['healthy', 'unhealthy', 'unknown']),
-      message: z.string(),
-      checks: z
-        .array(
-          z.object({
-            name: z.string(),
-            status: z.enum(['pass', 'fail']),
-            message: z.string().optional(),
-          }),
-        )
-        .optional(),
-    })
-    .optional(),
-});
-
-// Define tool IO for type-safe session operations
-const io = defineToolIO(verifyDeploymentSchema, VerifyDeploymentResultSchema);
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastVerifiedAt: z.date().optional(),
-  lastVerifiedDeployment: z.string().optional(),
-  lastNamespace: z.string().optional(),
-  verificationsPassed: z.number().optional(),
-  lastHealthStatus: z.enum(['healthy', 'unhealthy', 'unknown']).optional(),
-});
 
 /**
  * Check deployment health
@@ -241,22 +182,13 @@ async function verifyDeploymentImpl(
     }
 
     const { id: sessionId, state: session } = sessionResult.value;
-    const slice = useSessionSlice('verify-deployment', io, context, StateSchema);
-
-    if (!slice) {
-      return Failure('Session manager not available');
-    }
 
     logger.info({ sessionId, checks }, 'Starting Kubernetes deployment verification with session');
 
-    // Record input in session slice
-    await slice.patch(sessionId, { input: params });
-
     const k8sClient = createKubernetesClient(logger);
 
-    // Get deployment info from session or config
-    const sessionData = session as SessionData;
-    const deploymentResult = sessionData?.deployment_result as
+    // Get deployment info from session metadata or config
+    const deploymentResult = session?.metadata?.deploymentResult as
       | {
           namespace?: string;
           deploymentName?: string;
@@ -341,17 +273,21 @@ async function verifyDeploymentImpl(
     };
 
     // Update typed session slice with output and state
-    await slice.patch(sessionId, {
-      output: result,
-      state: {
-        lastVerifiedAt: new Date(),
-        lastVerifiedDeployment: deploymentName,
-        lastNamespace: namespace,
-        verificationsPassed:
-          (session.completed_steps || []).filter((s) => s === 'verify-deployment').length + 1,
-        lastHealthStatus: overallStatus,
+    // Store verification result in session metadata
+    await updateSession(
+      sessionId,
+      {
+        metadata: {
+          verificationResult: result,
+          lastVerifiedAt: new Date(),
+          lastVerifiedDeployment: deploymentName,
+          lastVerifiedNamespace: namespace,
+          lastHealthStatus: overallStatus,
+        },
+        current_step: 'verify-deployment',
       },
-    });
+      context,
+    );
 
     timer.end({ deploymentName, ready: health.ready, sessionId });
 

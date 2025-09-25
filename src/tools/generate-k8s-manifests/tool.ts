@@ -8,6 +8,7 @@ import type { AIResponse } from '../ai-response-types';
 import * as yaml from 'js-yaml';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { updateSession } from '@/mcp/tool-session-helpers';
 
 // Type definition for Kubernetes manifests
 interface KubernetesManifest extends Record<string, unknown> {
@@ -223,6 +224,22 @@ export async function generateK8sManifests(
 
       await fs.writeFile(manifestPath, manifestsContent, 'utf-8');
       context.logger.info({ manifestPath }, 'Kubernetes manifests written to disk');
+    }
+
+    // Store the manifests in session if we have a sessionId
+    if (validatedParams.sessionId) {
+      await updateSession(
+        validatedParams.sessionId,
+        {
+          metadata: {
+            k8sManifests: manifestsContent,
+            manifestPath,
+            validatedResources: manifests.map((m) => ({ kind: m.kind, name: m.metadata?.name })),
+          },
+          current_step: 'generate-k8s-manifests',
+        },
+        context,
+      );
     }
 
     return Success({

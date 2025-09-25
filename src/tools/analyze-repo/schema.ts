@@ -19,3 +19,19 @@ export const analyzeRepoSchema = z.object({
 });
 
 export type AnalyzeRepoParams = z.infer<typeof analyzeRepoSchema>;
+
+export interface RepositoryAnalysis {
+  language?: string;
+  framework?: string;
+  languageVersion?: string;
+  frameworkVersion?: string;
+  buildSystem?: {
+    type?: string;
+    configFile?: string;
+    [key: string]: unknown;
+  };
+  dependencies?: string[];
+  suggestedPorts?: number[];
+  entryPoint?: string;
+  [key: string]: unknown;
+}

@@ -3,6 +3,7 @@ import type { ToolContext } from '@/mcp/context';
 // Removed unused imports - now using multi-step-generator
 import { generateDockerfileSchema, type GenerateDockerfileParams } from './schema';
 import type { AIResponse } from '../ai-response-types';
+import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import { getSession, updateSession } from '@/mcp/tool-session-helpers';
 import { promises as fs } from 'node:fs';
 import nodePath from 'node:path';
@@ -32,34 +33,26 @@ export async function generateDockerfile(
   if (sessionId) {
     const sessionResult = await getSession(sessionId, context);
     if (sessionResult.ok && sessionResult.value.state.metadata?.repositoryAnalysis) {
-      const analysis = sessionResult.value.state.metadata.repositoryAnalysis as Record<
-        string,
-        unknown
-      >;
+      const analysis = sessionResult.value.state.metadata.repositoryAnalysis as RepositoryAnalysis;
 
       // Use actual values from the analysis
-      language = typeof analysis.language === 'string' ? analysis.language : 'auto-detect';
-      framework = typeof analysis.framework === 'string' ? analysis.framework : null;
-      dependencies = Array.isArray(analysis.dependencies)
-        ? (analysis.dependencies as string[])
-        : [];
-      ports = Array.isArray(analysis.suggestedPorts)
-        ? (analysis.suggestedPorts as number[])
-        : [8080];
+      language = analysis.language || 'auto-detect';
+      framework = analysis.framework || null;
+      dependencies = analysis.dependencies || [];
+      ports = analysis.suggestedPorts || [8080];
 
       // Create a detailed prompt with the actual analysis data
       _promptPrefix = `Repository Analysis Results:
 `;
-      _promptPrefix += `- Language: ${language} ${typeof analysis.languageVersion === 'string' ? `(${analysis.languageVersion})` : ''}\n`;
+      _promptPrefix += `- Language: ${language}${analysis.languageVersion ? ` (${analysis.languageVersion})` : ''}\n`;
       if (framework) {
-        _promptPrefix += `- Framework: ${framework} ${typeof analysis.frameworkVersion === 'string' ? `(${analysis.frameworkVersion})` : ''}\n`;
+        _promptPrefix += `- Framework: ${framework}${analysis.frameworkVersion ? ` (${analysis.frameworkVersion})` : ''}\n`;
       }
-      const buildSystem = analysis.buildSystem as Record<string, unknown> | undefined;
-      _promptPrefix += `- Build System: ${buildSystem?.type || 'unknown'}\n`;
+      _promptPrefix += `- Build System: ${analysis.buildSystem?.type || 'unknown'}\n`;
       if (dependencies.length > 0) {
         _promptPrefix += `- Key Dependencies: ${dependencies.slice(0, 5).join(', ')}${dependencies.length > 5 ? '...' : ''}\n`;
       }
-      if (typeof analysis.entryPoint === 'string') {
+      if (analysis.entryPoint) {
         _promptPrefix += `- Entry Point: ${analysis.entryPoint}\n`;
       }
       _promptPrefix += `\nGenerate a Dockerfile based on this analysis.\n\n`;

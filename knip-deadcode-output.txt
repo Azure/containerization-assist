@@ -49,9 +49,9 @@ metadata                                 src/tools/fix-dockerfile/tool.ts:185:14
 metadata                                 src/tools/generate-aca-manifests/tool.ts:63:14 
 optimizationSchema                       src/tools/generate-dockerfile/schema.ts:17:14  
 securityLevelSchema                      src/tools/generate-dockerfile/schema.ts:22:14  
-metadata                                 src/tools/generate-dockerfile/tool.ts:268:14   
+metadata                                 src/tools/generate-dockerfile/tool.ts:261:14   
 metadata                                 src/tools/generate-helm-charts/tool.ts:58:14   
-metadata                                 src/tools/generate-k8s-manifests/tool.ts:244:14
+metadata                                 src/tools/generate-k8s-manifests/tool.ts:261:14
 ALL_TOOLS                                src/tools/index.ts:310:14                      
 InspectSessionResultSchema               src/tools/inspect-session/schema.ts:17:14      
 ping                           function  src/tools/ops/tool.ts:39:23                    
@@ -149,21 +149,21 @@ MCPToolContext               interface  src/mcp/types.ts:28:18
 InferredInput                type       src/session/types.ts:38:13                    
 InferredOutput               type       src/session/types.ts:41:13                    
 PromptParams                 type       src/tools/ai-response-types.ts:15:13          
-BuildImageResult             interface  src/tools/build-image/tool.ts:39:18           
-DeployApplicationResult      interface  src/tools/deploy/tool.ts:111:18               
+BuildImageResult             interface  src/tools/build-image/tool.ts:33:18           
+DeployApplicationResult      interface  src/tools/deploy/tool.ts:104:18               
 OpsConfig                    interface  src/tools/ops/tool.ts:176:18                  
 OpsResult                    type       src/tools/ops/tool.ts:182:13                  
-PrepareClusterResult         interface  src/tools/prepare-cluster/tool.ts:47:18       
+PrepareClusterResult         interface  src/tools/prepare-cluster/tool.ts:45:18       
 PushImageResult              interface  src/tools/push-image/tool.ts:14:18            
-ScanImageResult              interface  src/tools/scan/tool.ts:79:18                  
-ScanImageConfig              type       src/tools/scan/tool.ts:313:13                 
+ScanImageResult              interface  src/tools/scan/tool.ts:41:18                  
+ScanImageConfig              type       src/tools/scan/tool.ts:272:13                 
 SessionAnalysisResult        interface  src/tools/session-types.ts:12:18              
 SessionBuildResult           interface  src/tools/session-types.ts:43:18              
 SessionDockerfileResult      interface  src/tools/session-types.ts:53:18              
 SessionK8sResult             interface  src/tools/session-types.ts:64:18              
 SessionMetadata              interface  src/tools/session-types.ts:80:18              
-TagImageResult               interface  src/tools/tag-image/tool.ts:35:18             
-VerifyDeploymentResult       interface  src/tools/verify-deployment/tool.ts:37:18     
+TagImageResult               interface  src/tools/tag-image/tool.ts:17:18             
+VerifyDeploymentResult       interface  src/tools/verify-deployment/tool.ts:35:18     
 ContentCategory              type       src/types/categories.ts:11:13                 
 Environment                  type       src/types/categories.ts:16:14                 
 SecurityGrade                type       src/types/categories.ts:21:13                 
