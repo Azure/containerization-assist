@@ -45,11 +45,12 @@ export async function generateDockerfile(
       // Create a detailed prompt with the actual analysis data
       _promptPrefix = `Repository Analysis Results:
 `;
-      _promptPrefix += `- Language: ${language}${analysis.languageVersion ? ` (${analysis.languageVersion})` : ''}\n`;
+      _promptPrefix += `- Language: ${language} ${typeof analysis.languageVersion === 'string' ? `(${analysis.languageVersion})` : ''}\n`;
       if (framework) {
-        _promptPrefix += `- Framework: ${framework}${analysis.frameworkVersion ? ` (${analysis.frameworkVersion})` : ''}\n`;
+        _promptPrefix += `- Framework: ${framework} ${typeof analysis.frameworkVersion === 'string' ? `(${analysis.frameworkVersion})` : ''}\n`;
       }
-      _promptPrefix += `- Build System: ${analysis.buildSystem?.type || 'unknown'}\n`;
+      const buildSystem = analysis.buildSystem as Record<string, unknown> | undefined;
+      _promptPrefix += `- Build System: ${buildSystem?.type || 'unknown'}\n`;
       if (dependencies.length > 0) {
         _promptPrefix += `- Key Dependencies: ${dependencies.slice(0, 5).join(', ')}${dependencies.length > 5 ? '...' : ''}\n`;
       }

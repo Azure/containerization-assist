@@ -50,7 +50,7 @@ metadata                                 src/tools/generate-aca-manifests/tool.t
 optimizationSchema                       src/tools/generate-dockerfile/schema.ts:17:14  
 securityLevelSchema                      src/tools/generate-dockerfile/schema.ts:22:14  
 baseImagePreferenceSchema                src/tools/generate-dockerfile/schema.ts:27:14  
-metadata                                 src/tools/generate-dockerfile/tool.ts:293:14   
+metadata                                 src/tools/generate-dockerfile/tool.ts:294:14   
 metadata                                 src/tools/generate-helm-charts/tool.ts:58:14   
 metadata                                 src/tools/generate-k8s-manifests/tool.ts:261:14
 ALL_TOOLS                                src/tools/index.ts:310:14                      
