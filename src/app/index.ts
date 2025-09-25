@@ -9,6 +9,7 @@ import type { Result } from '@/types';
 import type { Tool } from '@/types/tool';
 
 import { createLogger } from '@/lib/logger';
+import { extractSchemaShape } from '@/lib/zod-utils';
 import { getAllInternalTools } from '@/exports/tools';
 import { createToolRegistry } from './tool-registry';
 import { createOrchestrator } from './orchestrator';
@@ -112,21 +113,11 @@ export function createApp(config: AppConfig = {}): {
       // Register each tool with the MCP server
       for (const tool of registry.list()) {
         // Get the schema shape for MCP protocol
-        let schema;
-        if ('shape' in tool.schema) {
-          schema = tool.schema.shape;
-        } else if (tool.schema._def && typeof tool.schema._def.shape === 'function') {
-          schema = tool.schema._def.shape();
-        } else {
-          // For ZodAny or other types, create an empty shape
-          schema = {};
-        }
-
+        const schema = extractSchemaShape(tool.schema);
         const description = tool.description;
 
-        if (!schema) {
-          logger.warn({ tool: tool.name }, 'Tool missing schema, skipping MCP registration');
-          continue;
+        if (!schema || Object.keys(schema).length === 0) {
+          logger.warn({ tool: tool.name }, 'Tool missing schema shape, using empty schema');
         }
 
         server.tool(tool.name, description, schema, async (params: unknown) => {

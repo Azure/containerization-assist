@@ -41,7 +41,9 @@ async function run(
     }
 
     // Use docker from context if provided (for testing), otherwise create new client
-    const dockerClient = (ctx as any).docker || createDockerClient(logger);
+    // Type guard for test context with docker property
+    const dockerClient =
+      (ctx && 'docker' in ctx && (ctx as any).docker) || createDockerClient(logger);
 
     // Parse repository and tag from imageId
     let repository: string;

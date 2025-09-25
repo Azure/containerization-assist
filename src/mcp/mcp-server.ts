@@ -8,6 +8,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { createLogger, type Logger } from '@/lib/logger';
+import { extractSchemaShape } from '@/lib/zod-utils';
 import { createToolContext } from '@/mcp/context';
 import { createSessionManager } from '@/lib/session';
 import type { Tool } from '@/types/tool';
@@ -62,16 +63,7 @@ export function createMCPServer(
   // Register all tools
   for (const tool of tools) {
     // Get the schema shape for MCP protocol
-    // ZodObject has .shape, others use ._def.shape()
-    let schemaShape;
-    if ('shape' in tool.schema) {
-      schemaShape = tool.schema.shape;
-    } else if (tool.schema._def && typeof tool.schema._def.shape === 'function') {
-      schemaShape = tool.schema._def.shape();
-    } else {
-      // For ZodAny or other types, create an empty shape
-      schemaShape = {};
-    }
+    const schemaShape = extractSchemaShape(tool.schema);
 
     server.tool(
       tool.name,

@@ -57,10 +57,7 @@ async function run(
 
   // Check for empty COPY/RUN instructions
   lines.forEach((line, idx) => {
-    if (
-      (line.trim().startsWith('COPY ') && line.trim() === 'COPY') ||
-      (line.trim().startsWith('RUN ') && line.trim() === 'RUN')
-    ) {
+    if (line.trim() === 'COPY' || line.trim() === 'RUN') {
       parseIssues.push(`Line ${idx + 1}: Empty ${line.trim()} instruction`);
     }
   });

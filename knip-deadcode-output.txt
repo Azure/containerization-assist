@@ -1,4 +1,4 @@
-Unused files (9)
+Unused files (8)
 src/app/types.ts                                       
 src/exports/types.ts                                   
 src/infra/kubernetes/errors.ts                         
@@ -7,7 +7,6 @@ src/mcp/server.ts
 src/mcp/types.ts                                       
 src/session/index.ts                                   
 src/tools/generate-dockerfile/multi-step-generator.ts  
-src/tools/generate-dockerfile/tool-old.ts              
 Unused devDependencies (1)
 tsc-alias  package.json:220:6
 Unused exports (80)
@@ -143,8 +142,8 @@ SamplingResponse             interface  src/mcp/context.ts:60:18
 PromptWithMessages           interface  src/mcp/context.ts:87:18                        
 EnhancedProgressReporter     type       src/mcp/context.ts:156:14                       
 ContextOptions               interface  src/mcp/context.ts:164:18                       
-ServerOptions                interface  src/mcp/mcp-server.ts:18:18                     
-MCPServer                    interface  src/mcp/mcp-server.ts:30:18                     
+ServerOptions                interface  src/mcp/mcp-server.ts:19:18                     
+MCPServer                    interface  src/mcp/mcp-server.ts:31:18                     
 InferredInput                type       src/session/types.ts:38:13                      
 InferredOutput               type       src/session/types.ts:41:13                      
 PromptParams                 type       src/tools/ai-response-types.ts:15:13            
