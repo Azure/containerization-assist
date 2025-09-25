@@ -52,7 +52,7 @@ securityLevelSchema                      src/tools/generate-dockerfile/schema.ts
 baseImagePreferenceSchema                src/tools/generate-dockerfile/schema.ts:27:14  
 metadata                                 src/tools/generate-helm-charts/tool.ts:80:14   
 metadata                                 src/tools/generate-k8s-manifests/tool.ts:266:14
-ALL_TOOLS                                src/tools/index.ts:73:14                       
+ALL_TOOLS                                src/tools/index.ts:91:14                       
 InspectSessionResultSchema               src/tools/inspect-session/schema.ts:17:14      
 ping                           function  src/tools/ops/tool.ts:41:23                    
 serverStatus                   function  src/tools/ops/tool.ts:109:23                   

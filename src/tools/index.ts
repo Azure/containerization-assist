@@ -5,8 +5,6 @@
  * This replaces the distributed tool registration across multiple files.
  */
 
-import type { Tool } from '@/types/tool';
-
 // Direct tool imports - all tools now use the unified Tool interface
 import analyzeRepoTool from './analyze-repo/tool';
 import buildImageTool from './build-image/tool';
@@ -69,8 +67,28 @@ scanTool.name = TOOL_NAMES.SCAN;
 tagImageTool.name = TOOL_NAMES.TAG_IMAGE;
 verifyDeployTool.name = TOOL_NAMES.VERIFY_DEPLOY;
 
-// Type-safe tool array - all tools use the unified Tool interface
-export const ALL_TOOLS: readonly Tool<any, any>[] = [
+// Create a union type of all tool types for better type safety
+type AllToolTypes =
+  | typeof analyzeRepoTool
+  | typeof buildImageTool
+  | typeof convertAcaToK8sTool
+  | typeof deployTool
+  | typeof fixDockerfileTool
+  | typeof generateAcaManifestsTool
+  | typeof generateDockerfileTool
+  | typeof generateHelmChartsTool
+  | typeof generateK8sManifestsTool
+  | typeof inspectSessionTool
+  | typeof opsTool
+  | typeof prepareClusterTool
+  | typeof pushImageTool
+  | typeof resolveBaseImagesTool
+  | typeof scanTool
+  | typeof tagImageTool
+  | typeof verifyDeployTool;
+
+// Type-safe tool array using the union type
+export const ALL_TOOLS: readonly AllToolTypes[] = [
   analyzeRepoTool,
   buildImageTool,
   convertAcaToK8sTool,
@@ -91,6 +109,6 @@ export const ALL_TOOLS: readonly Tool<any, any>[] = [
 ] as const;
 
 // Get all tools (function for consistency with loader pattern)
-export function getAllInternalTools(): readonly Tool<any, any>[] {
+export function getAllInternalTools(): readonly AllToolTypes[] {
   return ALL_TOOLS;
 }
