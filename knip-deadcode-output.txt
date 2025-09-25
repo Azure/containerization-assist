@@ -7,7 +7,7 @@ src/mcp/server.ts
 src/session/index.ts            
 Unused devDependencies (1)
 tsc-alias  package.json:220:6
-Unused exports (81)
+Unused exports (82)
 formatPolicyConstraints        function  src/ai/policy-constraints-adapter.ts:60:17     
 validatePromptParams           function  src/ai/prompt-templates.ts:610:17              
 buildAIPrompt                  function  src/ai/prompt-templates.ts:625:17              
@@ -49,7 +49,8 @@ metadata                                 src/tools/fix-dockerfile/tool.ts:185:14
 metadata                                 src/tools/generate-aca-manifests/tool.ts:63:14 
 optimizationSchema                       src/tools/generate-dockerfile/schema.ts:17:14  
 securityLevelSchema                      src/tools/generate-dockerfile/schema.ts:22:14  
-metadata                                 src/tools/generate-dockerfile/tool.ts:261:14   
+baseImagePreferenceSchema                src/tools/generate-dockerfile/schema.ts:27:14  
+metadata                                 src/tools/generate-dockerfile/tool.ts:293:14   
 metadata                                 src/tools/generate-helm-charts/tool.ts:58:14   
 metadata                                 src/tools/generate-k8s-manifests/tool.ts:261:14
 ALL_TOOLS                                src/tools/index.ts:310:14                      

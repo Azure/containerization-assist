@@ -20,29 +20,25 @@
     "baselines": {
       "lint": {
         "errors": 0,
-        "warnings": 8,
+        "warnings": 4,
         "warningSignatures": [
-          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:55:46:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:257:21:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/multi-step-generator.ts:26:3:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
-          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/multi-step-generator.ts:31:5:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
-          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/multi-step-generator.ts:40:7:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
-          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/multi-step-generator.ts:46:9:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
-          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/tool.ts:92:5:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
-          "/home/tng/workspace/containerization-assist/src/tools/generate-dockerfile/tool.ts:94:5:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info."
+          "/root/workspace/src/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:55:46:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/root/workspace/src/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:257:21:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/root/workspace/src/containerization-assist/src/tools/generate-dockerfile/tool.ts:99:5:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info.",
+          "/root/workspace/src/containerization-assist/src/tools/generate-dockerfile/tool.ts:112:5:no-console:Unexpected console statement. Only these console methods are allowed: warn, error, info."
         ]
       },
       "deadcode": {
-        "count": 195
+        "count": 196
       },
       "typescript": {
         "errors": 0
       },
       "build": {
-        "timeMs": 4000,
+        "timeMs": 22000,
         "mode": "clean",
         "environment": {
-          "nodeVersion": "v24.1.0",
+          "nodeVersion": "v22.16.0",
           "os": "Linux",
           "cpu": "x86_64"
         }

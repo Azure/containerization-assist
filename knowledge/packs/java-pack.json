@@ -1,10 +1,20 @@
 [
   {
+    "id": "java-microsoft-azure-linux",
+    "category": "dockerfile",
+    "pattern": "FROM.*openjdk|FROM.*eclipse-temurin|FROM.*java",
+    "recommendation": "Prefer Microsoft Azure Linux or distroless images for enhanced security",
+    "example": "# Azure Linux (Mariner) - preferred for Microsoft environments\nFROM mcr.microsoft.com/openjdk/jdk:21-mariner AS builder\n# Or for runtime:\nFROM mcr.microsoft.com/openjdk/jdk:17-distroless AS runtime",
+    "severity": "high",
+    "tags": ["java", "microsoft", "azure", "security", "distroless"],
+    "description": "Microsoft Azure Linux (Mariner) provides enterprise-grade security with reduced attack surface"
+  },
+  {
     "id": "java-jre-runtime",
     "category": "dockerfile",
     "pattern": "FROM.*openjdk.*jdk",
     "recommendation": "Use JRE instead of JDK for production runtime to reduce image size",
-    "example": "FROM openjdk:17-jre-alpine AS runtime\nCOPY --from=build /app/target/app.jar ./app.jar",
+    "example": "FROM eclipse-temurin:17-jre-alpine AS runtime\nCOPY --from=build /app/target/app.jar ./app.jar",
     "severity": "medium",
     "tags": ["java", "jre", "size", "production"],
     "description": "JRE is sufficient for running Java applications and significantly smaller"
@@ -102,12 +112,12 @@
   {
     "id": "java-maven-wrapper",
     "category": "dockerfile",
-    "pattern": "mvn ",
-    "recommendation": "Use Maven wrapper (mvnw) instead of system Maven for reproducible builds",
-    "example": "COPY mvnw pom.xml ./\nCOPY .mvn .mvn\nRUN ./mvnw dependency:go-offline",
-    "severity": "medium",
-    "tags": ["maven", "wrapper", "reproducible"],
-    "description": "Maven wrapper ensures consistent build tool version"
+    "pattern": "mvn |maven",
+    "recommendation": "Use Maven wrapper (mvnw) for reproducible builds and offline dependency caching",
+    "example": "# Install tar if needed (for Azure Linux)\nRUN yum install -y tar || apt-get update && apt-get install -y tar || apk add tar\n\n# Copy Maven wrapper files\nCOPY mvnw pom.xml ./\nCOPY .mvn .mvn\n\n# Download dependencies at container build time for better caching\nRUN chmod +x mvnw && ./mvnw dependency:go-offline -B\n\n# Copy source and build\nCOPY src ./src\nRUN ./mvnw clean package -DskipTests -B",
+    "severity": "high",
+    "tags": ["maven", "wrapper", "reproducible", "caching", "offline"],
+    "description": "Maven wrapper ensures consistent build tool version and offline mode improves build reliability"
   },
   {
     "id": "java-distroless-base",

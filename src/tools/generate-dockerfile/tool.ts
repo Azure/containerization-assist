@@ -21,7 +21,8 @@ export async function generateDockerfile(
   context: ToolContext,
 ): Promise<Result<AIResponse>> {
   const validatedParams = generateDockerfileSchema.parse(params);
-  const { multistage, securityHardening, optimization, sessionId, path } = validatedParams;
+  const { multistage, securityHardening, optimization, sessionId, path, baseImagePreference } =
+    validatedParams;
 
   // Retrieve repository analysis from session if sessionId is provided
   let language = 'auto-detect';
@@ -72,8 +73,21 @@ export async function generateDockerfile(
   // Use multi-step approach to avoid timeout
   const environment = validatedParams.environment || 'production';
 
+  // Determine the project path for file existence checks
+  let projectPath: string | undefined;
+  if (sessionId) {
+    const sessionResult = await getSession(sessionId, context);
+    if (sessionResult.ok && sessionResult.value.state.metadata?.analyzedPath) {
+      projectPath = sessionResult.value.state.metadata.analyzedPath as string;
+    }
+  } else if (path) {
+    projectPath = nodePath.isAbsolute(path) ? path : nodePath.resolve(process.cwd(), path);
+  } else {
+    projectPath = process.cwd();
+  }
+
   context.logger.info(
-    { language, framework, multistage, optimization },
+    { language, framework, multistage, optimization, projectPath },
     'Starting multi-step Dockerfile generation to avoid timeout',
   );
 
@@ -82,8 +96,19 @@ export async function generateDockerfile(
   try {
     // Step 1: Generate base image and initial setup
     context.logger.info('Step 1/4: Generating base image instructions');
-    console.log('[DEBUG] Calling generateBaseImage with:', { language, framework, environment });
-    const baseResult = await generateBaseImage(language, framework, context, environment);
+    console.log('[DEBUG] Calling generateBaseImage with:', {
+      language,
+      framework,
+      environment,
+      baseImagePreference,
+    });
+    const baseResult = await generateBaseImage(
+      language,
+      framework,
+      context,
+      environment,
+      baseImagePreference,
+    );
     console.log('[DEBUG] Base result:', baseResult);
     if (!baseResult.ok) {
       return Failure(`Failed to generate base image: ${baseResult.error}`);
@@ -98,6 +123,7 @@ export async function generateDockerfile(
       dependencies,
       context,
       environment,
+      projectPath,
     );
     if (!depsResult.ok) {
       return Failure(`Failed to generate dependencies: ${depsResult.error}`);
@@ -105,7 +131,13 @@ export async function generateDockerfile(
 
     // Step 3: Generate build steps
     context.logger.info('Step 3/4: Generating build steps');
-    const buildResult = await generateBuildSteps(language, framework, context, environment);
+    const buildResult = await generateBuildSteps(
+      language,
+      framework,
+      context,
+      environment,
+      projectPath,
+    );
     if (!buildResult.ok) {
       return Failure(`Failed to generate build steps: ${buildResult.error}`);
     }
