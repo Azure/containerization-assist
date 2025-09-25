@@ -1,37 +1,35 @@
+/**
+ * Convert ACA to K8s tool using the new Tool pattern
+ */
+
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
+import type { Tool } from '@/types/tool';
+import { promptTemplates } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
-import { convertAcaToK8sSchema, type ConvertAcaToK8sParams } from './schema';
+import { convertAcaToK8sSchema } from './schema';
 import type { AIResponse } from '../ai-response-types';
+import type { z } from 'zod';
 
-export async function convertAcaToK8s(
-  params: ConvertAcaToK8sParams,
-  context: ToolContext,
+const name = 'convert-aca-to-k8s';
+const description = 'Convert Azure Container Apps manifests to Kubernetes';
+const version = '2.1.0';
+
+async function run(
+  input: z.infer<typeof convertAcaToK8sSchema>,
+  ctx: ToolContext,
 ): Promise<Result<AIResponse>> {
-  const validatedParams = convertAcaToK8sSchema.parse(params);
-  const { acaManifest } = validatedParams;
+  const { acaManifest } = input;
 
-  // Generate prompt for conversion
-  const basePrompt = `Convert the following Azure Container Apps manifest to Kubernetes manifests:
+  // Use the prompt template from @/ai/prompt-templates
+  const basePrompt = promptTemplates.convertAcaToK8s(acaManifest);
 
-\`\`\`yaml
-${acaManifest}
-\`\`\`
-
-Generate equivalent Kubernetes manifests including:
-1. Deployment with proper resource limits and replica configuration
-2. Service for internal communication
-3. Ingress if external access is enabled
-4. ConfigMaps/Secrets for environment variables
-
-Maintain all configurations and ensure compatibility with standard Kubernetes clusters.`;
-
-  // Build messages using the new prompt engine
+  // Build messages using the prompt engine with knowledge injection
   const messages = await buildMessages({
     basePrompt,
     topic: 'convert_aca_to_k8s',
-    tool: 'convert-aca-to-k8s',
+    tool: name,
     environment: 'production', // Default environment
     contract: {
       name: 'aca_to_k8s_v1',
@@ -42,7 +40,7 @@ Maintain all configurations and ensure compatibility with standard Kubernetes cl
 
   // Execute via AI with structured messages
   const mcpMessages = toMCPMessages(messages);
-  const response = await context.sampling.createMessage({
+  const response = await ctx.sampling.createMessage({
     ...mcpMessages, // Spreads the messages array
     maxTokens: 8192,
     modelPreferences: {
@@ -59,10 +57,23 @@ Maintain all configurations and ensure compatibility with standard Kubernetes cl
   }
 }
 
+const tool: Tool<typeof convertAcaToK8sSchema, AIResponse> = {
+  name,
+  description,
+  version,
+  schema: convertAcaToK8sSchema,
+  run,
+};
+
+export default tool;
+
+// Keep legacy export for backward compatibility during migration
+export { run as convertAcaToK8s };
+
 export const metadata = {
-  name: 'convert-aca-to-k8s',
-  description: 'Convert Azure Container Apps manifests to Kubernetes',
-  version: '2.1.0',
+  name,
+  description,
+  version,
   aiDriven: true,
   knowledgeEnhanced: true,
 };

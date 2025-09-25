@@ -10,7 +10,7 @@ import { extractErrorMessage } from '@/lib/error-utils';
 import { createLogger, type Logger } from '@/lib/logger';
 import { createToolContext } from '@/mcp/context';
 import { createSessionManager } from '@/lib/session';
-import type { Tool } from '@/types';
+import type { Tool } from '@/types/tool';
 
 /**
  * Server options
@@ -37,7 +37,10 @@ export interface MCPServer {
 /**
  * Create an MCP server that uses tools from registry
  */
-export function createMCPServer(tools: Tool[], options: ServerOptions = {}): MCPServer {
+export function createMCPServer(
+  tools: Array<Tool<any, any>>,
+  options: ServerOptions = {},
+): MCPServer {
   const logger = options.logger || createLogger({ name: 'mcp-server' });
   const serverOptions = {
     name: options.name || 'containerization-assist',
@@ -58,20 +61,31 @@ export function createMCPServer(tools: Tool[], options: ServerOptions = {}): MCP
 
   // Register all tools
   for (const tool of tools) {
-    if (!tool.schema) {
-      logger.warn({ tool: tool.name }, 'Tool missing schema, skipping');
-      continue;
+    // Get the schema shape for MCP protocol
+    // ZodObject has .shape, others use ._def.shape()
+    let schemaShape;
+    if ('shape' in tool.schema) {
+      schemaShape = tool.schema.shape;
+    } else if (tool.schema._def && typeof tool.schema._def.shape === 'function') {
+      schemaShape = tool.schema._def.shape();
+    } else {
+      // For ZodAny or other types, create an empty shape
+      schemaShape = {};
     }
 
     server.tool(
       tool.name,
-      tool.description || `${tool.name} tool`,
-      tool.schema,
+      tool.description,
+      schemaShape, // For MCP protocol
       async (params: Record<string, unknown>) => {
         logger.info({ tool: tool.name }, 'Executing tool');
 
         try {
-          const result = await tool.execute(params, logger.child({ tool: tool.name }), mcpContext);
+          // Validation at the edge
+          const input = tool.schema.parse(params);
+
+          // Direct execution with proper context
+          const result = await tool.run(input, mcpContext);
 
           if (!result.ok) {
             throw new McpError(ErrorCode.InternalError, result.error || 'Tool execution failed');
@@ -153,7 +167,7 @@ export function createMCPServer(tools: Tool[], options: ServerOptions = {}): MCP
     getTools(): Array<{ name: string; description: string }> {
       return tools.map((t) => ({
         name: t.name,
-        description: t.description || '',
+        description: t.description,
       }));
     },
   };

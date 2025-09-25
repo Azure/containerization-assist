@@ -80,7 +80,8 @@ jest.mock('../../../src/lib/tool-helpers', () => ({
 jest.mock('../../../src/mcp/tool-session-helpers', () => createToolSessionHelpersMock());
 
 // Import these after mocks are set up
-import { tagImage, type TagImageParams } from '../../../src/tools/tag-image/tool';
+import tagImageTool from '../../../src/tools/tag-image/tool';
+import type { TagImageParams } from '../../../src/tools/tag-image/schema';
 
 // Mock the session slice operations
 const mockSlicePatch = jest.fn().mockResolvedValue(undefined);
@@ -172,7 +173,7 @@ describe('tagImage', () => {
     });
 
     it('should successfully tag image with repository and tag', async () => {
-      const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await tagImageTool.run(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -217,7 +218,7 @@ describe('tagImage', () => {
     it('should handle tag without explicit version (defaults to latest)', async () => {
       config.tag = 'myapp';
 
-      const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await tagImageTool.run(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -255,7 +256,7 @@ describe('tagImage', () => {
       for (const testCase of testCases) {
         config.tag = testCase.input;
 
-        const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+        const result = await tagImageTool.run(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -304,7 +305,7 @@ describe('tagImage', () => {
         },
       });
 
-      const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await tagImageTool.run(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       expect(mockSlicePatch).toHaveBeenCalledWith(
@@ -356,7 +357,7 @@ describe('tagImage', () => {
 
       for (const tag of validTags) {
         config.tag = tag;
-        const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+        const result = await tagImageTool.run(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -387,7 +388,7 @@ describe('tagImage', () => {
       for (const testCase of testCases) {
         config.tag = testCase.tag;
 
-        const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+        const result = await tagImageTool.run(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
         expect(result.ok).toBe(true);
         expect(mockDockerClient.tagImage).toHaveBeenCalledWith(
@@ -424,7 +425,7 @@ describe('tagImage', () => {
         },
       });
 
-      const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await tagImageTool.run(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(sessionHelpers.ensureSession).toHaveBeenCalledWith(
         expect.any(Object),
@@ -448,7 +449,7 @@ describe('tagImage', () => {
         },
       });
 
-      const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await tagImageTool.run(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -478,7 +479,7 @@ describe('tagImage', () => {
         },
       });
 
-      const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await tagImageTool.run(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -503,7 +504,7 @@ describe('tagImage', () => {
 
       config.tag = ''; // Empty tag
 
-      const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await tagImageTool.run(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -528,7 +529,7 @@ describe('tagImage', () => {
         createFailureResult('Failed to create tag: image not found'),
       );
 
-      const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await tagImageTool.run(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -553,7 +554,7 @@ describe('tagImage', () => {
         createFailureResult(null as any), // No error message
       );
 
-      const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await tagImageTool.run(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -576,7 +577,7 @@ describe('tagImage', () => {
 
       mockDockerClient.tagImage.mockRejectedValue(new Error('Docker daemon not responding'));
 
-      const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await tagImageTool.run(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -618,7 +619,7 @@ describe('tagImage', () => {
       // Mock slice update failure
       mockSlicePatch.mockRejectedValue(new Error('Update failed'));
 
-      const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await tagImageTool.run(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       // Should fail if session update fails (slice.patch is not wrapped in try-catch)
       expect(result.ok).toBe(false);
@@ -680,7 +681,7 @@ describe('tagImage', () => {
         }),
       );
 
-      const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await tagImageTool.run(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -735,7 +736,7 @@ describe('tagImage', () => {
         }),
       );
 
-      const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      const result = await tagImageTool.run(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -816,7 +817,7 @@ describe('tagImage', () => {
           },
         });
 
-        const result = await tagImage(testConfig, { logger: mockLogger, sessionManager: mockSessionManager });
+        const result = await tagImageTool.run(testConfig, { logger: mockLogger, sessionManager: mockSessionManager });
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -865,7 +866,7 @@ describe('tagImage', () => {
 
       for (const tag of tags) {
         config.tag = tag;
-        const result = await tagImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
+        const result = await tagImageTool.run(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -890,10 +891,12 @@ describe('tagImage', () => {
 
   describe('Tool Instance', () => {
     it('should provide correctly configured tool instance', async () => {
-      const { tagImage: tagImageTool } = await import('../../../src/tools/tag-image/tool');
+      const importedTool = await import('../../../src/tools/tag-image/tool');
+      const tagImageTool = importedTool.default;
 
-      // The wrapped tool is now a function directly
-      expect(typeof tagImageTool).toBe('function');
+      // The tool is now an object with a run method
+      expect(typeof tagImageTool).toBe('object');
+      expect(typeof tagImageTool.run).toBe('function');
 
       // Verify tool can be executed through the tool instance interface
       const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
@@ -931,8 +934,8 @@ describe('tagImage', () => {
         }),
       );
 
-      // The wrapped tool can be called directly with params and context
-      const result = await tagImageTool(config, { logger: mockLogger, sessionManager: mockSessionManager });
+      // The tool can be called via its run method
+      const result = await tagImageTool.run(config, { logger: mockLogger, sessionManager: mockSessionManager });
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.success).toBe(true);

@@ -254,7 +254,7 @@ Return only the first 3-5 lines of a Dockerfile including:
 Keep it minimal and focused.`,
     topic: 'dockerfile_base',
     contractDescription: 'Base Dockerfile instructions only',
-    knowledgeBudget: 50,
+    knowledgeBudget: 20,
     maxTokens: 500,
     hint: 'dockerfile-base',
   };
@@ -352,7 +352,7 @@ Add:
 Return ONLY the new instructions to add (not the existing ones).`,
     topic: 'dockerfile_dependencies',
     contractDescription: 'Dependency installation instructions',
-    knowledgeBudget: 100,
+    knowledgeBudget: 30,
     maxTokens: 1000,
     hint: 'dockerfile-deps',
   };
@@ -422,7 +422,7 @@ Add:
 Return ONLY the build-related instructions.`,
     topic: 'dockerfile_build',
     contractDescription: 'Build step instructions',
-    knowledgeBudget: 50,
+    knowledgeBudget: 20,
     maxTokens: 800,
     hint: 'dockerfile-build',
   };
@@ -463,7 +463,7 @@ ${securityHardening ? '2. USER directive for non-root user' : ''}
 Return ONLY the runtime configuration instructions.`,
     topic: 'dockerfile_runtime',
     contractDescription: 'Runtime configuration instructions',
-    knowledgeBudget: 50,
+    knowledgeBudget: 20,
     maxTokens: 600,
     hint: 'dockerfile-runtime',
   };

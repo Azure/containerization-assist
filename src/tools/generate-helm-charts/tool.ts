@@ -1,17 +1,26 @@
+/**
+ * Generate Helm Charts tool using the new Tool pattern
+ */
+
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
+import type { Tool } from '@/types/tool';
 import { promptTemplates, type HelmChartPromptParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
-import { generateHelmChartsSchema, type GenerateHelmChartsParams } from './schema';
+import { generateHelmChartsSchema } from './schema';
 import type { AIResponse } from '../ai-response-types';
+import type { z } from 'zod';
 
-export async function generateHelmCharts(
-  params: GenerateHelmChartsParams,
-  context: ToolContext,
+const name = 'generate-helm-charts';
+const description = 'Generate Helm charts for Kubernetes deployments';
+const version = '2.1.0';
+
+async function run(
+  input: z.infer<typeof generateHelmChartsSchema>,
+  ctx: ToolContext,
 ): Promise<Result<AIResponse>> {
-  const validatedParams = generateHelmChartsSchema.parse(params);
-  const { chartName, appName, chartVersion = '0.1.0', description } = validatedParams;
+  const { chartName, appName, chartVersion = '0.1.0', description } = input;
 
   // Generate prompt from template
   const promptParams = {
@@ -27,8 +36,8 @@ export async function generateHelmCharts(
   const messages = await buildMessages({
     basePrompt,
     topic: 'generate_helm_charts',
-    tool: 'generate-helm-charts',
-    environment: validatedParams.environment || 'production',
+    tool: name,
+    environment: input.environment || 'production',
     contract: {
       name: 'helm_chart_v1',
       description: 'Generate Helm charts for Kubernetes deployments',
@@ -38,7 +47,7 @@ export async function generateHelmCharts(
 
   // Execute via AI with structured messages
   const mcpMessages = toMCPMessages(messages);
-  const response = await context.sampling.createMessage({
+  const response = await ctx.sampling.createMessage({
     ...mcpMessages, // Spreads the messages array
     maxTokens: 8192,
     modelPreferences: {
@@ -55,10 +64,23 @@ export async function generateHelmCharts(
   }
 }
 
+const tool: Tool<typeof generateHelmChartsSchema, AIResponse> = {
+  name,
+  description,
+  version,
+  schema: generateHelmChartsSchema,
+  run,
+};
+
+export default tool;
+
+// Keep legacy export for backward compatibility during migration
+export { run as generateHelmCharts };
+
 export const metadata = {
-  name: 'generate-helm-charts',
-  description: 'Generate Helm charts for Kubernetes deployments',
-  version: '2.1.0',
+  name,
+  description,
+  version,
   aiDriven: true,
   knowledgeEnhanced: true,
 };

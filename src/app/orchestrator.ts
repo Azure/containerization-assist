@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import { type Result, Success, Failure } from '@/types/index';
+import { type Result, Success, Failure, type ToolContext } from '@/types/index';
 import { createLogger } from '@/lib/logger';
 import { loadPolicy } from '@/config/policy-io';
 import { applyPolicy } from '@/config/policy-eval';
@@ -17,13 +17,15 @@ import type {
   SessionState,
 } from './orchestrator-types';
 import type { Logger } from 'pino';
-import type { Tool } from '@/types';
+import type { Tool } from '@/types/tool';
+
+type AnyTool = Tool<any, any>;
 
 /**
  * Create a tool orchestrator
  */
 export function createOrchestrator(options: {
-  registry: Map<string, Tool>;
+  registry: Map<string, AnyTool>;
   logger?: Logger;
   config?: OrchestratorConfig;
 }): ToolOrchestrator {
@@ -75,7 +77,7 @@ export function createOrchestrator(options: {
 /**
  * Check if a tool can be executed simply without orchestration
  */
-function isSimpleTool(tool: Tool, policy?: Policy, sessionId?: string): boolean {
+function isSimpleTool(tool: AnyTool, policy?: Policy, sessionId?: string): boolean {
   // Needs orchestration if:
   // 1. Has dependencies (if we add this to Tool interface later)
   // 2. Has complex policy rules
@@ -99,22 +101,44 @@ function isSimpleTool(tool: Tool, policy?: Policy, sessionId?: string): boolean 
 /**
  * Execute a simple tool directly
  */
+/**
+ * Create a minimal ToolContext for tools running without MCP server
+ * This is used when tools are executed through the orchestrator
+ */
+function createMinimalContext(logger: Logger): ToolContext {
+  const context: ToolContext = {
+    logger,
+    sampling: {
+      createMessage: async () => {
+        throw new Error('AI sampling not available in orchestrator mode');
+      },
+    },
+    getPrompt: async () => {
+      throw new Error('Prompt retrieval not available in orchestrator mode');
+    },
+    signal: undefined,
+    progress: undefined,
+  };
+
+  // Don't set sessionManager to undefined - leave it unset for optional property
+  return context;
+}
+
 async function executeSimple(
-  tool: Tool,
+  tool: AnyTool,
   params: unknown,
   logger: Logger,
 ): Promise<Result<unknown>> {
   try {
-    // Validate parameters if schema exists
-    if (tool.zodSchema) {
-      const validation = await validateParams(params, tool.zodSchema);
-      if (!validation.ok) return validation;
-      params = validation.value;
-    }
+    // Validate parameters with the tool's schema
+    const validation = await validateParams(params, tool.schema);
+    if (!validation.ok) return validation;
 
-    // Execute tool directly with logger and no MCP context
+    // Create a minimal context for the tool
     const toolLogger = logger.child({ tool: tool.name });
-    return await tool.execute(params as Record<string, unknown>, toolLogger, undefined);
+    const minimalContext = createMinimalContext(toolLogger);
+
+    return await tool.run(validation.value, minimalContext);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return Failure(`Tool execution failed: ${message}`);
@@ -125,12 +149,12 @@ async function executeSimple(
  * Execute with full orchestration (dependencies, policies, sessions)
  */
 async function executeWithOrchestration(
-  tool: Tool,
+  tool: AnyTool,
   request: ExecuteRequest,
   context: {
     sessions: Map<string, SessionState>;
     policy?: Policy;
-    registry: Map<string, Tool>;
+    registry: Map<string, AnyTool>;
     logger: Logger;
     config: OrchestratorConfig;
   },
@@ -155,10 +179,8 @@ async function executeWithOrchestration(
   }
 
   // Validate parameters
-  if (tool.zodSchema) {
-    const validation = await validateParams(params, tool.zodSchema);
-    if (!validation.ok) return validation;
-  }
+  const validation = await validateParams(params, tool.schema);
+  if (!validation.ok) return validation;
 
   // Apply policies
   if (policy) {
@@ -184,11 +206,10 @@ async function executeWithOrchestration(
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const toolLogger = logger.child({ tool: tool.name, attempt });
-      const result = await tool.execute(
-        params as Record<string, unknown>,
-        toolLogger,
-        undefined, // No MCP context in orchestrator
-      );
+
+      // Create a minimal context for tools
+      const minimalContext = createMinimalContext(toolLogger);
+      const result = await tool.run(params as any, minimalContext);
 
       // Update session if successful
       if (result.ok && session) {

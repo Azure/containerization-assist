@@ -2,7 +2,7 @@
  * Tests for knowledge enhancement integration in AI-delegate tools
  */
 
-import { analyzeRepo } from '@/tools/analyze-repo/tool';
+import analyzeRepoTool from '@/tools/analyze-repo/tool';
 import { generateDockerfile } from '@/tools/generate-dockerfile/tool';
 import { fixDockerfile } from '@/tools/fix-dockerfile/tool';
 import { generateK8sManifests } from '@/tools/generate-k8s-manifests/tool';
@@ -118,7 +118,7 @@ spec:
 
   describe('analyze-repo', () => {
     it('should enhance prompt with knowledge base', async () => {
-      const result = await analyzeRepo(
+      const result = await analyzeRepoTool.run(
         {
           path: '/test/repo',
         },
@@ -148,10 +148,10 @@ spec:
         mockContext,
       );
 
-      // The multi-step generator uses multiple specific topics
+      // Now uses a single call with unified topic
       expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
-          topic: 'dockerfile_base',
+          topic: 'dockerfile_generation',
           tool: 'generate-dockerfile',
           environment: 'production',
         }),

@@ -1,20 +1,26 @@
 /**
- * Session Inspection Tool
+ * Session Inspection Tool - Modernized Implementation
  *
  * Provides debugging capabilities for session management.
  * Allows listing all sessions or inspecting specific sessions.
+ * Follows the new Tool interface pattern
  */
 
 import type { ToolContext } from '@/mcp/context';
 import { Result, Success, Failure } from '@/types';
-import { InspectSessionParams, InspectSessionResult } from './schema';
+import { InspectSessionParamsSchema, type InspectSessionResult } from './schema';
 import type { SessionManager } from '@/lib/session';
 import { extractErrorMessage } from '@/lib/error-utils';
+import type { Tool } from '@/types/tool';
+import type { z } from 'zod';
 
 const DEFAULT_TTL = 86400; // 24 hours in seconds
 
-export async function inspectSession(
-  params: InspectSessionParams,
+/**
+ * Session inspection implementation
+ */
+async function run(
+  input: z.infer<typeof InspectSessionParamsSchema>,
   context?: ToolContext,
 ): Promise<Result<InspectSessionResult>> {
   try {
@@ -32,8 +38,8 @@ export async function inspectSession(
     const allSessionIds = listResult.value;
 
     // If specific session requested
-    if (params.sessionId) {
-      const sessionResult = await sessionManager.get(params.sessionId);
+    if (input.sessionId) {
+      const sessionResult = await sessionManager.get(input.sessionId);
       if (!sessionResult.ok) {
         return Failure(`Failed to get session: ${sessionResult.error}`);
       }
@@ -44,12 +50,12 @@ export async function inspectSession(
           sessions: [],
           totalSessions: allSessionIds.length,
           maxSessions: 1000, // Default from session manager
-          message: `Session ${params.sessionId} not found`,
+          message: `Session ${input.sessionId} not found`,
         });
       }
 
       const sessionInfo: SessionData = {
-        id: params.sessionId,
+        id: input.sessionId,
         createdAt: session.createdAt || new Date(),
         updatedAt: session.updatedAt || new Date(),
         ttlRemaining: calculateTTLRemaining(session.createdAt || new Date()),
@@ -58,7 +64,7 @@ export async function inspectSession(
         metadata: session.metadata || {},
       };
 
-      if (params.includeSlices) {
+      if (input.includeSlices) {
         sessionInfo.toolSlices = extractToolSlices(session.metadata || {});
       }
 
@@ -71,7 +77,7 @@ export async function inspectSession(
         totalSessions: allSessionIds.length,
         maxSessions: 1000,
         message:
-          params.format === 'json'
+          input.format === 'json'
             ? JSON.stringify(sessionInfo, null, 2)
             : formatSessionSummary(sessionInfo),
       });
@@ -93,7 +99,7 @@ export async function inspectSession(
           metadata: session.metadata || {},
         };
 
-        if (params.includeSlices) {
+        if (input.includeSlices) {
           sessionData.toolSlices = extractToolSlices(session.metadata || {});
         }
 
@@ -111,7 +117,7 @@ export async function inspectSession(
       sessions,
       totalSessions: sessions.length,
       maxSessions: 1000,
-      message: formatSessionList(sessions, params.format),
+      message: formatSessionList(sessions, input.format),
     });
   } catch (error) {
     return Failure(`Failed to inspect session: ${extractErrorMessage(error)}`);
@@ -227,3 +233,16 @@ function formatSessionList(sessions: SessionData[], format: string): string {
 
   return lines.join('\n');
 }
+
+/**
+ * Inspect session tool conforming to Tool interface
+ */
+const tool: Tool<typeof InspectSessionParamsSchema, InspectSessionResult> = {
+  name: 'inspect-session',
+  description: 'Provides debugging capabilities for session management',
+  version: '2.0.0',
+  schema: InspectSessionParamsSchema,
+  run,
+};
+
+export default tool;

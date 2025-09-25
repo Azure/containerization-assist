@@ -15,7 +15,7 @@ import {
   configMapData,
   healthCheck,
   autoscaling,
-  environmentFull,
+  environment,
   samplingOptions,
 } from '../shared/schemas';
 
@@ -35,7 +35,7 @@ export const generateK8sManifestsSchema = z.object({
   configMapData,
   healthCheck,
   autoscaling,
-  environment: environmentFull,
+  environment,
   ...samplingOptions,
 });
 

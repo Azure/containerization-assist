@@ -5,7 +5,8 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
-import type { Result, Tool } from '@/types';
+import type { Result } from '@/types';
+import type { Tool } from '@/types/tool';
 
 import { createLogger } from '@/lib/logger';
 import { getAllInternalTools } from '@/exports/tools';
@@ -27,7 +28,7 @@ export interface TransportConfig {
  * Application configuration
  */
 export interface AppConfig {
-  tools?: Tool[];
+  tools?: Array<Tool<any, any>>;
   sessionTTL?: number;
   policyPath?: string;
   policyEnvironment?: string;
@@ -63,7 +64,7 @@ export function createApp(config: AppConfig = {}): {
     registry: registry.list().reduce((map, tool) => {
       map.set(tool.name, tool);
       return map;
-    }, new Map<string, Tool>()),
+    }, new Map<string, Tool<any, any>>()),
     logger,
     config: orchestratorConfig,
   });
@@ -110,35 +111,43 @@ export function createApp(config: AppConfig = {}): {
     bindToMCP: (server: McpServer) => {
       // Register each tool with the MCP server
       for (const tool of registry.list()) {
-        if (!tool.zodSchema || !tool.schema) {
+        // Get the schema shape for MCP protocol
+        let schema;
+        if ('shape' in tool.schema) {
+          schema = tool.schema.shape;
+        } else if (tool.schema._def && typeof tool.schema._def.shape === 'function') {
+          schema = tool.schema._def.shape();
+        } else {
+          // For ZodAny or other types, create an empty shape
+          schema = {};
+        }
+
+        const description = tool.description;
+
+        if (!schema) {
           logger.warn({ tool: tool.name }, 'Tool missing schema, skipping MCP registration');
           continue;
         }
 
-        server.tool(
-          tool.name,
-          tool.description || `${tool.name} tool`,
-          tool.schema,
-          async (params: unknown) => {
-            const result = await orchestrator.execute({
-              toolName: tool.name,
-              params,
-            });
+        server.tool(tool.name, description, schema, async (params: unknown) => {
+          const result = await orchestrator.execute({
+            toolName: tool.name,
+            params,
+          });
 
-            if (!result.ok) {
-              throw new Error(result.error);
-            }
+          if (!result.ok) {
+            throw new Error(result.error);
+          }
 
-            return {
-              content: [
-                {
-                  type: 'text' as const,
-                  text: JSON.stringify(result.value, null, 2),
-                },
-              ],
-            };
-          },
-        );
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: JSON.stringify(result.value, null, 2),
+              },
+            ],
+          };
+        });
       }
     },
 
@@ -148,7 +157,7 @@ export function createApp(config: AppConfig = {}): {
     listTools: () =>
       registry.list().map((t) => ({
         name: t.name,
-        description: t.description || '',
+        description: t.description,
       })),
 
     /**

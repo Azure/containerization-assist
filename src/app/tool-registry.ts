@@ -3,19 +3,21 @@
  * Simple registry for managing tools
  */
 
-import type { Tool } from '@/types';
+import type { Tool } from '@/types/tool';
+
+type AnyTool = Tool<any, any>;
 
 export interface ToolRegistry {
-  get(name: string): Tool | undefined;
-  list(): Tool[];
+  get(name: string): AnyTool | undefined;
+  list(): AnyTool[];
   has(name: string): boolean;
 }
 
 /**
  * Create a tool registry
  */
-export function createToolRegistry(tools: Tool[]): ToolRegistry {
-  const registry = new Map<string, Tool>();
+export function createToolRegistry(tools: AnyTool[]): ToolRegistry {
+  const registry = new Map<string, AnyTool>();
 
   for (const tool of tools) {
     registry.set(tool.name, tool);

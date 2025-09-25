@@ -644,3 +644,16 @@ async function prepareClusterImpl(
  * Export the prepare cluster tool directly
  */
 export const prepareCluster = prepareClusterImpl;
+
+// New Tool interface export
+import type { Tool } from '@/types/tool';
+
+const tool: Tool<typeof prepareClusterSchema, PrepareClusterResult> = {
+  name: 'prepare-cluster',
+  description: 'Prepare Kubernetes cluster for deployment',
+  version: '2.0.0',
+  schema: prepareClusterSchema,
+  run: prepareClusterImpl,
+};
+
+export default tool;
