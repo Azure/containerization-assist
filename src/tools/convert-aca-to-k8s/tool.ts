@@ -1,4 +1,4 @@
-import { Success, Failure, type Result } from '@/types';
+import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
@@ -30,7 +30,7 @@ Maintain all configurations and ensure compatibility with standard Kubernetes cl
   // Build messages using the new prompt engine
   const messages = await buildMessages({
     basePrompt,
-    topic: 'convert_aca_to_k8s',
+    topic: TOPICS.CONVERT_ACA_TO_K8S,
     tool: 'convert-aca-to-k8s',
     environment: 'production', // Default environment
     contract: {

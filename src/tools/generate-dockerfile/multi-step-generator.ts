@@ -6,7 +6,7 @@
 import type { ToolContext } from '@/mcp/context';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
-import { Success, Failure, type Result } from '@/types';
+import { Success, Failure, type Result, TOPICS, type Topic } from '@/types';
 import { promises as fs } from 'node:fs';
 import nodePath from 'node:path';
 
@@ -35,7 +35,7 @@ interface DockerfileResponse {
 // Common generator configuration
 interface GeneratorConfig {
   prompt: string;
-  topic: string;
+  topic: Topic;
   contractDescription: string;
   knowledgeBudget: number;
   maxTokens: number;
@@ -252,7 +252,7 @@ Return only the first 3-5 lines of a Dockerfile including:
 2. WORKDIR setup
 3. Any initial ENV variables or ARG declarations
 Keep it minimal and focused.`,
-    topic: 'dockerfile_base',
+    topic: TOPICS.DOCKERFILE_BASE,
     contractDescription: 'Base Dockerfile instructions only',
     knowledgeBudget: 50,
     maxTokens: 500,
@@ -350,7 +350,7 @@ Add:
 3. Any caching optimizations
 
 Return ONLY the new instructions to add (not the existing ones).`,
-    topic: 'dockerfile_dependencies',
+    topic: TOPICS.DOCKERFILE_DEPENDENCIES,
     contractDescription: 'Dependency installation instructions',
     knowledgeBudget: 100,
     maxTokens: 1000,
@@ -420,7 +420,7 @@ Add:
 3. Any build-time optimizations
 
 Return ONLY the build-related instructions.`,
-    topic: 'dockerfile_build',
+    topic: TOPICS.DOCKERFILE_BUILD,
     contractDescription: 'Build step instructions',
     knowledgeBudget: 50,
     maxTokens: 800,
@@ -461,7 +461,7 @@ ${securityHardening ? '2. USER directive for non-root user' : ''}
 4. CMD or ENTRYPOINT to start the application
 
 Return ONLY the runtime configuration instructions.`,
-    topic: 'dockerfile_runtime',
+    topic: TOPICS.DOCKERFILE_RUNTIME,
     contractDescription: 'Runtime configuration instructions',
     knowledgeBudget: 50,
     maxTokens: 600,

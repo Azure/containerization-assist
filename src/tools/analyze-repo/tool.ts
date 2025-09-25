@@ -1,4 +1,4 @@
-import { Success, Failure, type Result } from '@/types';
+import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
@@ -106,7 +106,7 @@ export async function analyzeRepo(
   // Build messages using the new prompt engine
   const messages = await buildMessages({
     basePrompt,
-    topic: 'analyze_repository',
+    topic: TOPICS.ANALYZE_REPOSITORY,
     tool: 'analyze-repo',
     environment: 'production',
     contract: {

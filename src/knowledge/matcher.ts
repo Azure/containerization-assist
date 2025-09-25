@@ -1,4 +1,5 @@
 import { createLogger } from '@/lib/logger';
+import { type Topic } from '@/types/index';
 import type { KnowledgeQuery, KnowledgeMatch, LoadedEntry } from './types';
 import type { KnowledgeSnippet } from './schemas';
 
@@ -304,7 +305,7 @@ export interface KnowledgeSnippetOptions {
  * @returns Promise resolving to weighted snippets
  */
 export async function getKnowledgeSnippets(
-  topic: string,
+  topic: Topic,
   options: KnowledgeSnippetOptions,
 ): Promise<KnowledgeSnippet[]> {
   try {

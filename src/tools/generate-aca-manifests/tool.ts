@@ -1,4 +1,4 @@
-import { Success, Failure, type Result } from '@/types';
+import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates, type AcaManifestParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
@@ -31,7 +31,7 @@ export async function generateAcaManifests(
   // Build messages using the new prompt engine
   const messages = await buildMessages({
     basePrompt,
-    topic: 'generate_aca_manifests',
+    topic: TOPICS.GENERATE_ACA_MANIFESTS,
     tool: 'generate-aca-manifests',
     environment: validatedParams.environment || 'production',
     contract: {

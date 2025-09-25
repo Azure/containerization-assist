@@ -17,6 +17,7 @@ import {
   type Result,
   Success,
   Failure,
+  type Topic,
 } from '@/types/index';
 import type { KnowledgeSnippet } from '@/knowledge/schemas';
 import { getKnowledgeSnippets } from '@/knowledge/matcher';
@@ -91,7 +92,7 @@ function buildDeveloperMessage(contract?: OutputContract): string | undefined {
  * @returns Promise resolving to selected snippets
  */
 async function selectKnowledgeSnippets(
-  topic: string,
+  topic: Topic,
   options: KnowledgeSelectionOptions,
 ): Promise<KnowledgeSnippet[]> {
   try {

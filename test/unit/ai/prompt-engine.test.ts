@@ -3,8 +3,14 @@
  */
 
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { buildMessages, buildPromptEnvelope, estimateMessageSize, validateMessages } from '@/ai/prompt-engine';
+import {
+  buildMessages,
+  buildPromptEnvelope,
+  estimateMessageSize,
+  validateMessages,
+} from '@/ai/prompt-engine';
 import type { BuildPromptParams, AIMessages, OutputContract } from '@/types';
+import { TOPICS } from '@/types';
 import * as knowledgeMatcher from '@/knowledge/matcher';
 import * as policyPrompt from '@/config/policy-prompt';
 
@@ -30,8 +36,8 @@ describe('Prompt Engine', () => {
 
   describe('buildMessages', () => {
     const baseParams: BuildPromptParams = {
-      basePrompt: 'Generate a Dockerfile for a Node.js application',
-      topic: 'generate_dockerfile',
+      basePrompt: 'Generate a Dockerfile',
+      topic: TOPICS.GENERATE_DOCKERFILE,
       tool: 'generate-dockerfile',
       environment: 'production',
     };
@@ -257,7 +263,7 @@ describe('Prompt Engine', () => {
         expect(envelope.metadata).toEqual({
           tool: 'test-tool',
           environment: 'development',
-          topic: 'test_topic',
+          topic: TOPICS.GENERATE_DOCKERFILE,
           knowledgeCount: 2,
           policyCount: 2,
         });

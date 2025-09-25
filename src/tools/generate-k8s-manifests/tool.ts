@@ -1,4 +1,4 @@
-import { Success, Failure, type Result } from '@/types';
+import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates, K8sManifestPromptParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
@@ -74,7 +74,7 @@ export async function generateK8sManifests(
   // Build messages using the new prompt engine
   const messages = await buildMessages({
     basePrompt,
-    topic: 'generate_k8s_manifests',
+    topic: TOPICS.GENERATE_K8S_MANIFESTS,
     tool: 'generate-k8s-manifests',
     environment: 'production',
     contract: {

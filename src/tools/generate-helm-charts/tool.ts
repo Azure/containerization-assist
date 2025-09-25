@@ -1,4 +1,4 @@
-import { Success, Failure, type Result } from '@/types';
+import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates, type HelmChartPromptParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
@@ -26,7 +26,7 @@ export async function generateHelmCharts(
   // Build messages using the new prompt engine
   const messages = await buildMessages({
     basePrompt,
-    topic: 'generate_helm_charts',
+    topic: TOPICS.GENERATE_HELM_CHARTS,
     tool: 'generate-helm-charts',
     environment: validatedParams.environment || 'production',
     contract: {

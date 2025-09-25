@@ -18,6 +18,28 @@ export * from './core';
 export type { ToolContext } from '../mcp/context';
 
 /**
+ * Topics for knowledge selection and AI context
+ */
+export const TOPICS = {
+  ANALYZE_REPOSITORY: 'analyze_repository',
+  DOCKERFILE_BASE: 'dockerfile_base',
+  DOCKERFILE_DEPENDENCIES: 'dockerfile_dependencies',
+  DOCKERFILE_BUILD: 'dockerfile_build',
+  DOCKERFILE_RUNTIME: 'dockerfile_runtime',
+  RESOLVE_BASE_IMAGES: 'resolve_base_images',
+  CONVERT_ACA_TO_K8S: 'convert_aca_to_k8s',
+  FIX_DOCKERFILE: 'fix_dockerfile',
+  GENERATE_HELM_CHARTS: 'generate_helm_charts',
+  GENERATE_ACA_MANIFESTS: 'generate_aca_manifests',
+  GENERATE_K8S_MANIFESTS: 'generate_k8s_manifests',
+  GENERATE_DOCKERFILE: 'generate_dockerfile',
+} as const;
+
+/**
+ * Union type of all topic values
+ */
+export type Topic = (typeof TOPICS)[keyof typeof TOPICS];
+/**
  * Tool definition for MCP server operations.
  */
 export interface Tool {
@@ -123,7 +145,7 @@ export interface OutputContract {
  */
 export interface BuildPromptParams {
   basePrompt: string;
-  topic: string;
+  topic: Topic;
   tool: ToolName;
   environment: string;
   contract?: OutputContract;
@@ -140,7 +162,7 @@ export interface PromptEnvelope {
   metadata?: {
     tool: string;
     environment: string;
-    topic: string;
+    topic: Topic;
     knowledgeCount?: number;
     policyCount?: number;
   };

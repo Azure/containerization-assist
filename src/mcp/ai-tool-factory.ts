@@ -12,6 +12,7 @@ import {
   type BuildPromptParams,
   Success,
   Failure,
+  type Topic,
 } from '@/types/index';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
@@ -29,7 +30,7 @@ export interface PromptBackedToolConfig {
   /** Tool name for identification and logging */
   name: ToolName;
   /** Topic for knowledge selection */
-  topic: string;
+  topic: Topic;
   /** Default environment if not specified */
   defaultEnvironment?: string;
   /** Output contract for structured responses */

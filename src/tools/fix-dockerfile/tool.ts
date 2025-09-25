@@ -1,4 +1,4 @@
-import { Success, Failure, type Result } from '@/types';
+import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { promptTemplates } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
@@ -123,7 +123,7 @@ Then fix the identified issues.`;
   // Build messages using the new prompt engine
   const messages = await buildMessages({
     basePrompt,
-    topic: 'fix_dockerfile',
+    topic: TOPICS.FIX_DOCKERFILE,
     tool: 'fix-dockerfile',
     environment,
     contract: {
