@@ -2,7 +2,7 @@
  * Resolve Base Images tool using the new Tool pattern
  */
 
-import { Success, Failure, type Result } from '@/types';
+import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
 import { promptTemplates, type BaseImageResolutionParams } from '@/ai/prompt-templates';
@@ -45,7 +45,7 @@ async function run(
   // Build messages using the new prompt engine
   const messages = await buildMessages({
     basePrompt,
-    topic: 'resolve_base_images',
+    topic: TOPICS.RESOLVE_BASE_IMAGES,
     tool: 'resolve-base-images',
     environment: 'production',
     contract: {

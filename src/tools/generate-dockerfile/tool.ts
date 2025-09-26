@@ -2,7 +2,7 @@
  * Generate Dockerfile tool using the new Tool pattern
  */
 
-import { Success, Failure, type Result } from '@/types';
+import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
 import { generateDockerfileSchema } from './schema';
@@ -159,7 +159,7 @@ async function run(
     // Use knowledge injection via buildMessages
     const messages = await buildMessages({
       basePrompt,
-      topic: 'dockerfile_generation',
+      topic: TOPICS.DOCKERFILE_GENERATION,
       tool: name,
       environment,
       contract: {

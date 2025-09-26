@@ -2,7 +2,7 @@
  * Generate Helm Charts tool using the new Tool pattern
  */
 
-import { Success, Failure, type Result } from '@/types';
+import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
 import { promptTemplates, type HelmChartPromptParams } from '@/ai/prompt-templates';
@@ -35,7 +35,7 @@ async function run(
   // Build messages using the new prompt engine
   const messages = await buildMessages({
     basePrompt,
-    topic: 'generate_helm_charts',
+    topic: TOPICS.GENERATE_HELM_CHARTS,
     tool: name,
     environment: input.environment || 'production',
     contract: {

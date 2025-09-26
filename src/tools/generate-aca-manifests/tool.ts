@@ -2,7 +2,7 @@
  * Generate Azure Container Apps Manifests tool using the new Tool pattern
  */
 
-import { Success, Failure, type Result } from '@/types';
+import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
 import { promptTemplates, type AcaManifestParams } from '@/ai/prompt-templates';
@@ -40,7 +40,7 @@ async function run(
   // Build messages using the new prompt engine
   const messages = await buildMessages({
     basePrompt,
-    topic: 'generate_aca_manifests',
+    topic: TOPICS.GENERATE_ACA_MANIFESTS,
     tool: name,
     environment: input.environment || 'production',
     contract: {
