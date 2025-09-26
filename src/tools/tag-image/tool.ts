@@ -51,8 +51,8 @@ async function run(
 
     const dockerClient = createDockerClient(logger);
 
-    // Check for built image in session metadata or use provided imageId
-    const buildResult = session.metadata?.buildResult as
+    // Check for built image in session results or use provided imageId
+    const buildResult = session.results?.['build-image'] as
       | { imageId?: string; tags?: string[] }
       | undefined;
     const source = input.imageId || buildResult?.imageId;
@@ -86,16 +86,15 @@ async function run(
       imageId: source,
     };
 
-    // Update typed session slice with output and state
-    // Store tag result in session metadata
+    // Store tag result in session
+    const currentSteps = sessionResult.ok ? sessionResult.value.state.completed_steps || [] : [];
     await updateSession(
       sessionId,
       {
-        metadata: {
-          tagResult: result,
-          lastTaggedAt: new Date(),
-          lastTaggedTags: tags,
+        results: {
+          'tag-image': result,
         },
+        completed_steps: [...currentSteps, 'tag-image'],
         current_step: 'tag-image',
       },
       ctx,

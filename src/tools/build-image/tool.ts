@@ -74,9 +74,8 @@ async function prepareBuildArgs(
   try {
     // Get analysis data from session metadata
     const sessionData = await getSession(sessionId, context);
-    if (sessionData.ok && sessionData.value.state.metadata?.repositoryAnalysis) {
-      const analysisResult = sessionData.value.state.metadata
-        .repositoryAnalysis as RepositoryAnalysis;
+    if (sessionData.ok && sessionData.value.state.results?.['analyze-repo']) {
+      const analysisResult = sessionData.value.state.results['analyze-repo'] as RepositoryAnalysis;
       if (analysisResult.language) {
         defaults.LANGUAGE = analysisResult.language;
       }
@@ -315,18 +314,15 @@ async function buildImageImpl(
       },
     };
 
-    // Store build result in session metadata
+    // Store build result in session
+    const currentSteps = sessionResult.ok ? sessionResult.value.state.completed_steps || [] : [];
     await updateSession(
       sessionId,
       {
-        metadata: {
-          buildResult: result,
-          lastBuiltAt: new Date(),
-          lastBuiltImageId: buildResult.value.imageId,
-          lastBuiltTags: finalTags,
-          lastBuildTime: buildTime,
-          lastSecurityWarningCount: securityWarnings.length,
+        results: {
+          'build-image': result,
         },
+        completed_steps: [...currentSteps, 'build-image'],
         current_step: 'build-image',
       },
       context,

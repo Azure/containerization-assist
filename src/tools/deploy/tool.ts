@@ -285,13 +285,18 @@ async function deployApplicationImpl(
     );
     const k8sClient = createKubernetesClient(logger);
 
-    // Get K8s manifests from session metadata
+    // Get K8s manifests from session results
     let manifestContents: string | undefined;
     try {
       const sessionResult = await getSession(sessionId, context);
-      if (sessionResult.ok && sessionResult.value.state.metadata?.k8sManifests) {
-        manifestContents = sessionResult.value.state.metadata.k8sManifests as string;
-        logger.info({ sessionId }, 'Retrieved K8s manifests from session metadata');
+      if (sessionResult.ok && sessionResult.value.state.results?.['generate-k8s-manifests']) {
+        const k8sResult = sessionResult.value.state.results['generate-k8s-manifests'] as {
+          manifests?: string;
+        };
+        if (k8sResult.manifests) {
+          manifestContents = k8sResult.manifests;
+          logger.info({ sessionId }, 'Retrieved K8s manifests from session results');
+        }
       }
     } catch (error) {
       logger.error({ error }, 'Failed to get K8s manifests from session');
@@ -529,19 +534,15 @@ async function deployApplicationImpl(
       },
     };
 
-    // Update session with deployment results in metadata
+    // Store deployment result in session
+    const currentSteps = sessionResult.ok ? sessionResult.value.state.completed_steps || [] : [];
     await updateSession(
       sessionId,
       {
-        metadata: {
-          deploymentResult: result,
-          lastDeployedAt: new Date(),
-          lastDeployedNamespace: namespace,
-          lastDeploymentName: deploymentName,
-          lastServiceName: serviceName,
-          lastDeploymentReady: ready,
-          lastEndpointCount: endpoints.length,
+        results: {
+          deploy: result,
         },
+        completed_steps: [...currentSteps, 'deploy'],
         current_step: 'deploy',
       },
       context,

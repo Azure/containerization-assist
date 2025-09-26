@@ -61,7 +61,7 @@ resourceObject                           src/tools/shared/schemas.ts:37:14
 resourceObjectWithDefaults               src/tools/shared/schemas.ts:42:14              
 resourcesWithDefaults                    src/tools/shared/schemas.ts:55:14              
 envVar                                   src/tools/shared/schemas.ts:74:14              
-verifyDeployment                         src/tools/verify-deployment/tool.ts:335:14     
+verifyDeployment                         src/tools/verify-deployment/tool.ts:332:14     
 getQualityGrade                function  src/types/categories.ts:131:17                 
 getSecurityGrade               function  src/types/categories.ts:142:17                 
 ENVIRONMENT_PROFILES                     src/types/categories.ts:154:14                 
@@ -165,7 +165,7 @@ PrepareClusterResult         interface  src/tools/prepare-cluster/tool.ts:45:18
 PushImageParams              type       src/tools/push-image/schema.ts:23:13            
 PushImageResult              interface  src/tools/push-image/tool.ts:16:18              
 ScanImageResult              interface  src/tools/scan/tool.ts:41:18                    
-ScanImageConfig              type       src/tools/scan/tool.ts:272:13                   
+ScanImageConfig              type       src/tools/scan/tool.ts:270:13                   
 SessionAnalysisResult        interface  src/tools/session-types.ts:12:18                
 SessionBuildResult           interface  src/tools/session-types.ts:43:18                
 SessionDockerfileResult      interface  src/tools/session-types.ts:53:18                

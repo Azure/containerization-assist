@@ -41,7 +41,7 @@
         "errors": 0
       },
       "build": {
-        "timeMs": 38000,
+        "timeMs": 34000,
         "mode": "clean",
         "environment": {
           "nodeVersion": "v22.16.0",

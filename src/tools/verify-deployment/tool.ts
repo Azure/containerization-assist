@@ -158,8 +158,8 @@ async function verifyDeploymentImpl(
   if (!params || typeof params !== 'object') {
     return Failure('Invalid parameters provided');
   }
-  const logger = getToolLogger(context, 'verify-deployment');
-  const timer = createToolTimer(logger, 'verify-deployment');
+  const logger = getToolLogger(context, 'verify-deploy');
+  const timer = createToolTimer(logger, 'verify-deploy');
 
   try {
     const {
@@ -272,19 +272,16 @@ async function verifyDeploymentImpl(
       },
     };
 
-    // Update typed session slice with output and state
-    // Store verification result in session metadata
+    // Store verification result in session
+    const currentSteps = sessionResult.ok ? sessionResult.value.state.completed_steps || [] : [];
     await updateSession(
       sessionId,
       {
-        metadata: {
-          verificationResult: result,
-          lastVerifiedAt: new Date(),
-          lastVerifiedDeployment: deploymentName,
-          lastVerifiedNamespace: namespace,
-          lastHealthStatus: overallStatus,
+        results: {
+          'verify-deploy': result,
         },
-        current_step: 'verify-deployment',
+        completed_steps: [...currentSteps, 'verify-deploy'],
+        current_step: 'verify-deploy',
       },
       context,
     );

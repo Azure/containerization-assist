@@ -280,13 +280,38 @@ spec:
   describe('Successful Deployments', () => {
     beforeEach(() => {
       // Session with K8s manifests
-      mockSessionManager.get.mockResolvedValue({
-        results: {
-          'generate-k8s-manifests': {
-            manifests: sampleManifests,
+      const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
+      sessionHelpers.ensureSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            sessionId: 'test-session-123',
+            results: {
+              'generate-k8s-manifests': {
+                manifests: sampleManifests,
+              },
+            },
+            completed_steps: [],
+          },
+          isNew: false,
+        },
+      });
+      
+      sessionHelpers.getSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            sessionId: 'test-session-123',
+            results: {
+              'generate-k8s-manifests': {
+                manifests: sampleManifests,
+              },
+            },
+            completed_steps: [],
           },
         },
-        repo_path: '/test/repo',
       });
 
       // Mock successful manifest application
@@ -346,18 +371,23 @@ spec:
       // Verify deployment status was checked
       expect(mockKubernetesClient.getDeploymentStatus).toHaveBeenCalledWith('default', 'test-app');
 
-      // Verify session slice was updated with new pattern
-      const sliceMock = mockUseSessionSlice.mock.results[0].value;
-      expect(sliceMock.patch).toHaveBeenCalledWith(
+      // Verify session was updated with deployment result
+      const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
+      expect(sessionHelpers.updateSession).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
-          output: expect.objectContaining({
-            namespace: 'default',
-            deploymentName: 'test-app',
-            serviceName: 'test-app',
-            ready: true,
+          results: expect.objectContaining({
+            'deploy': expect.objectContaining({
+              namespace: 'default',
+              deploymentName: 'test-app',
+              serviceName: 'test-app',
+              ready: true,
+              success: true,
+            }),
           }),
+          completed_steps: expect.arrayContaining(['deploy']),
         }),
+        expect.any(Object),
       );
     });
 
@@ -403,13 +433,38 @@ spec:
   describe('Manifest Parsing and Ordering', () => {
     beforeEach(() => {
       // Use the existing sampleManifests which are properly handled by the YAML mock
-      mockSessionManager.get.mockResolvedValue({
-        results: {
-          'generate-k8s-manifests': {
-            manifests: sampleManifests,
+      const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
+      sessionHelpers.ensureSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            sessionId: 'test-session-123',
+            results: {
+              'generate-k8s-manifests': {
+                manifests: sampleManifests,
+              },
+            },
+            completed_steps: [],
+          },
+          isNew: false,
+        },
+      });
+      
+      sessionHelpers.getSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            sessionId: 'test-session-123',
+            results: {
+              'generate-k8s-manifests': {
+                manifests: sampleManifests,
+              },
+            },
+            completed_steps: [],
           },
         },
-        repo_path: '/test/repo',
       });
 
       mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
@@ -447,13 +502,38 @@ spec:
 
   describe('Error Handling', () => {
     it('should handle Kubernetes client failures gracefully', async () => {
-      mockSessionManager.get.mockResolvedValue({
-        results: {
-          'generate-k8s-manifests': {
-            manifests: sampleManifests,
+      const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
+      sessionHelpers.ensureSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            sessionId: 'test-session-123',
+            results: {
+              'generate-k8s-manifests': {
+                manifests: sampleManifests,
+              },
+            },
+            completed_steps: [],
+          },
+          isNew: false,
+        },
+      });
+      
+      sessionHelpers.getSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            sessionId: 'test-session-123',
+            results: {
+              'generate-k8s-manifests': {
+                manifests: sampleManifests,
+              },
+            },
+            completed_steps: [],
           },
         },
-        repo_path: '/test/repo',
       });
 
       mockKubernetesClient.applyManifest.mockResolvedValue(
@@ -468,8 +548,41 @@ spec:
     });
 
     it('should handle session update failures', async () => {
+      const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
+      sessionHelpers.ensureSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            sessionId: 'test-session-123',
+            results: {
+              'generate-k8s-manifests': {
+                manifests: sampleManifests,
+              },
+            },
+            completed_steps: [],
+          },
+          isNew: false,
+        },
+      });
+      
+      sessionHelpers.getSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            sessionId: 'test-session-123',
+            results: {
+              'generate-k8s-manifests': {
+                manifests: sampleManifests,
+              },
+            },
+            completed_steps: [],
+          },
+        },
+      });
+
       // Mock updateSessionData to fail
-      const sessionHelpers = require('@/mcp/tool-session-helpers');
       sessionHelpers.updateSession.mockResolvedValueOnce({
         ok: false,
         error: 'Failed to update session',
@@ -495,13 +608,38 @@ spec:
 
   describe('Configuration Options', () => {
     beforeEach(() => {
-      mockSessionManager.get.mockResolvedValue({
-        results: {
-          'generate-k8s-manifests': {
-            manifests: sampleManifests,
+      const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
+      sessionHelpers.ensureSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            sessionId: 'test-session-123',
+            results: {
+              'generate-k8s-manifests': {
+                manifests: sampleManifests,
+              },
+            },
+            completed_steps: [],
+          },
+          isNew: false,
+        },
+      });
+      
+      sessionHelpers.getSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            sessionId: 'test-session-123',
+            results: {
+              'generate-k8s-manifests': {
+                manifests: sampleManifests,
+              },
+            },
+            completed_steps: [],
           },
         },
-        repo_path: '/test/repo',
       });
 
       mockKubernetesClient.getDeploymentStatus.mockResolvedValue(

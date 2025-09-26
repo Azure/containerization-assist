@@ -70,7 +70,7 @@ async function scanImageImpl(
     return Failure('Invalid parameters provided');
   }
   const logger = getToolLogger(context, 'scan');
-  const timer = createToolTimer(logger, 'scan-image');
+  const timer = createToolTimer(logger, 'scan');
 
   try {
     const { scanner = 'trivy', severity } = params;
@@ -100,8 +100,8 @@ async function scanImageImpl(
 
     const securityScanner = createSecurityScanner(logger, scanner);
 
-    // Check for built image in session metadata or use provided imageId
-    const buildResult = session?.metadata?.buildResult as { imageId?: string } | undefined;
+    // Check for built image in session results or use provided imageId
+    const buildResult = session?.results?.['build-image'] as { imageId?: string } | undefined;
     const imageId = params.imageId || buildResult?.imageId;
 
     if (!imageId) {
@@ -224,17 +224,15 @@ async function scanImageImpl(
       passed,
     };
 
-    // Store scan result in session metadata
+    // Store scan result in session
+    const currentSteps = sessionResult.ok ? sessionResult.value.state.completed_steps || [] : [];
     await updateSession(
       sessionId,
       {
-        metadata: {
-          scanResult: result,
-          lastScannedAt: new Date(),
-          lastScannedImage: imageId,
-          vulnerabilityCount: scanResult.totalVulnerabilities,
-          scannerUsed: scanner,
+        results: {
+          scan: result,
         },
+        completed_steps: [...currentSteps, 'scan'],
         current_step: 'scan',
       },
       context,

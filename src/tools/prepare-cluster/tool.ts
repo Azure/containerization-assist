@@ -561,19 +561,15 @@ async function prepareClusterImpl(
       ...(localRegistryUrl && { localRegistryUrl }),
     };
 
-    // Store cluster preparation result in session metadata
+    // Store cluster preparation result in session
+    const currentSteps = sessionResult.ok ? sessionResult.value.state.completed_steps || [] : [];
     await updateSession(
       sessionId,
       {
-        metadata: {
-          clusterPreparationResult: result,
-          lastPreparedAt: new Date(),
-          lastClusterName: cluster,
-          lastNamespace: namespace,
-          lastClusterReady: clusterReady,
-          lastChecksPassed: Object.values(checks).filter(Boolean).length,
-          lastWarningCount: warnings.length,
+        results: {
+          'prepare-cluster': result,
         },
+        completed_steps: [...currentSteps, 'prepare-cluster'],
         current_step: 'prepare-cluster',
       },
       context,

@@ -96,7 +96,7 @@ jest.mock('../../../src/mcp/tool-session-helpers', () => createToolSessionHelper
 
 // Import these after mocks are set up
 import { buildImage } from '../../../src/tools/build-image/tool';
-import { ensureSession, getSession } from '../../../src/mcp/tool-session-helpers';
+import { ensureSession, getSession, updateSession } from '../../../src/mcp/tool-session-helpers';
 
 const mockFs = fs as jest.Mocked<typeof fs>;
 
@@ -159,6 +159,12 @@ CMD ["node", "index.js"]`;
     mockFs.writeFile.mockResolvedValue(undefined);
     mockSessionManager.update.mockResolvedValue(true);
 
+    // Mock the updateSession helper
+    (updateSession as jest.MockedFunction<typeof updateSession>).mockResolvedValue({
+      ok: true,
+      value: true,
+    } as any);
+
     // Default successful Docker build
     mockDockerClient.buildImage.mockResolvedValue(createSuccessResult({
       imageId: 'sha256:mock-image-id',
@@ -180,7 +186,7 @@ CMD ["node", "index.js"]`;
           state: {
             workflow_state: {},
             results: {
-              'analyze_repo': {
+              'analyze-repo': {
                 language: 'javascript',
                 framework: 'express',
               },
@@ -194,15 +200,15 @@ CMD ["node", "index.js"]`;
         },
       });
 
-      // Setup getSession mock with repository analysis in metadata
+      // Setup getSession mock with repository analysis in results
       (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue({
         ok: true,
         value: {
           id: 'test-session',
           isNew: false,
           state: {
-            metadata: {
-              repositoryAnalysis: {
+            results: {
+              'analyze-repo': {
                 language: 'javascript',
                 framework: 'express',
               },
@@ -290,14 +296,14 @@ CMD ["node", "index.js"]`;
       const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
-      // With the new session slice utils, the update happens in toolSlices
-      expect(mockSessionManager.update).toHaveBeenCalledWith('test-session-123', expect.objectContaining({
-        metadata: expect.objectContaining({
-          toolSlices: expect.objectContaining({
-            'build-image': expect.any(Object),
-          }),
+      // The build-image tool updates session using updateSession helper
+      expect(updateSession).toHaveBeenCalledWith('test-session-123', expect.objectContaining({
+        results: expect.objectContaining({
+          'build-image': expect.any(Object),
         }),
-      }));
+        completed_steps: expect.arrayContaining(['build-image']),
+        current_step: 'build-image',
+      }), expect.any(Object));
     });
   });
 
@@ -694,7 +700,7 @@ CMD ["node", "index.js"]`;
           state: {
             workflow_state: {},
             results: {
-              'analyze_repo': {
+              'analyze-repo': {
                 language: 'python',
                 framework: 'flask',
               },
@@ -715,8 +721,8 @@ CMD ["node", "index.js"]`;
           id: 'test-session',
           isNew: false,
           state: {
-            metadata: {
-              repositoryAnalysis: {
+            results: {
+              'analyze-repo': {
                 language: 'python',
                 framework: 'flask',
               },
