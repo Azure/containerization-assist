@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { Success, Failure, type Result, type ToolContext } from '@/types';
+import { Success, Failure, type Result, type ToolContext, TOPICS } from '@/types';
 import { promptTemplates } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
@@ -109,7 +109,7 @@ async function run(
   // Build messages using the new prompt engine
   const messages = await buildMessages({
     basePrompt,
-    topic: 'analyze_repository',
+    topic: TOPICS.ANALYZE_REPOSITORY,
     tool: 'analyze-repo',
     environment: 'production',
     contract: {

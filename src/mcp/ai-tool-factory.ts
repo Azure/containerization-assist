@@ -10,6 +10,7 @@ import {
   type Result,
   type OutputContract,
   type BuildPromptParams,
+  type Topic,
   Success,
   Failure,
 } from '@/types/index';
@@ -28,7 +29,7 @@ export interface PromptBackedToolConfig {
   /** Tool name for identification and logging */
   name: string;
   /** Topic for knowledge selection */
-  topic: string;
+  topic: Topic;
   /** Default environment if not specified */
   defaultEnvironment?: string;
   /** Output contract for structured responses */

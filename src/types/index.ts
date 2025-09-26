@@ -12,10 +12,14 @@ export * from './core';
 // Export the new unified Tool interface
 export * from './tool';
 
+// Export topic types and constants
+export * from './topics';
+
 export type { ToolContext } from '../mcp/context';
 
-// Import Result for local use in this file
+// Import Result and Topic for local use in this file
 import type { Result } from './core';
+import type { Topic } from './topics';
 
 // ===== SESSION =====
 
@@ -97,7 +101,7 @@ export interface OutputContract {
  */
 export interface BuildPromptParams {
   basePrompt: string;
-  topic: string;
+  topic: Topic;
   tool: string;
   environment: string;
   contract?: OutputContract;
@@ -114,7 +118,7 @@ export interface PromptEnvelope {
   metadata?: {
     tool: string;
     environment: string;
-    topic: string;
+    topic: Topic;
     knowledgeCount?: number;
     policyCount?: number;
   };

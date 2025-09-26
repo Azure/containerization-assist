@@ -2,7 +2,7 @@
  * Convert ACA to K8s tool using the new Tool pattern
  */
 
-import { Success, Failure, type Result } from '@/types';
+import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
 import { promptTemplates } from '@/ai/prompt-templates';
@@ -28,7 +28,7 @@ async function run(
   // Build messages using the prompt engine with knowledge injection
   const messages = await buildMessages({
     basePrompt,
-    topic: 'convert_aca_to_k8s',
+    topic: TOPICS.CONVERT_ACA_TO_K8S,
     tool: name,
     environment: 'production', // Default environment
     contract: {

@@ -9,7 +9,7 @@ src/session/index.ts
 src/tools/generate-dockerfile/multi-step-generator.ts  
 Unused devDependencies (1)
 tsc-alias  package.json:220:6
-Unused exports (82)
+Unused exports (84)
 formatPolicyConstraints        function  src/ai/policy-constraints-adapter.ts:60:17     
 validatePromptParams           function  src/ai/prompt-templates.ts:610:17              
 buildAIPrompt                  function  src/ai/prompt-templates.ts:625:17              
@@ -42,9 +42,9 @@ extractBaseImage               function  src/lib/regex-patterns.ts:57:17
 scanImage                      function  src/lib/security-scanner.ts:74:23              
 EnhancedSessionManager                   src/lib/session-manager.ts:8:9                 
 initializeToolInstrumentation  function  src/lib/tool-helpers.ts:73:17                  
-createMcpPromptTool            function  src/mcp/ai-tool-factory.ts:303:17              
-OutputContracts                          src/mcp/ai-tool-factory.ts:341:14              
-PromptToolFactory              class     src/mcp/ai-tool-factory.ts:376:14              
+createMcpPromptTool            function  src/mcp/ai-tool-factory.ts:304:17              
+OutputContracts                          src/mcp/ai-tool-factory.ts:342:14              
+PromptToolFactory              class     src/mcp/ai-tool-factory.ts:377:14              
 metadata                                 src/tools/convert-aca-to-k8s/tool.ts:71:14     
 metadata                                 src/tools/generate-aca-manifests/tool.ts:83:14 
 optimizationSchema                       src/tools/generate-dockerfile/schema.ts:17:14  
@@ -70,6 +70,8 @@ getToolCategory                function  src/types/categories.ts:214:17
 isSuccess                                src/types/core.ts:38:14                        
 isFailure                                src/types/core.ts:41:14                        
 createTool                     function  src/types/tool.ts:38:17                        
+isValidTopic                   function  src/types/topics.ts:38:17                      
+getAllTopics                   function  src/types/topics.ts:45:17                      
 getDockerfileRules                       src/validation/dockerfile-validator.ts:473:14  
 getDockerfileRulesByCategory             src/validation/dockerfile-validator.ts:480:14  
 createDockerfileValidator                src/validation/dockerfile-validator.ts:489:14  
@@ -128,9 +130,9 @@ SamplingResult               interface  src/lib/sampling.ts:37:18
 ScoringWeights               interface  src/lib/sampling.ts:59:18                       
 BasicScanResult              interface  src/lib/scanner.ts:14:18                        
 SecretFinding                interface  src/lib/security-scanner.ts:42:18               
-PromptBackedToolConfig       interface  src/mcp/ai-tool-factory.ts:27:18                
-PromptToolExecutionOptions   interface  src/mcp/ai-tool-factory.ts:51:18                
-PromptToolResult             interface  src/mcp/ai-tool-factory.ts:68:18                
+PromptBackedToolConfig       interface  src/mcp/ai-tool-factory.ts:28:18                
+PromptToolExecutionOptions   interface  src/mcp/ai-tool-factory.ts:52:18                
+PromptToolResult             interface  src/mcp/ai-tool-factory.ts:69:18                
 AIParamResponse              interface  src/mcp/ai/host-ai-assist.ts:33:18              
 AIAssistantConfig            interface  src/mcp/ai/host-ai-assist.ts:45:18              
 AIAssistantDeps              interface  src/mcp/ai/host-ai-assist.ts:55:18              
@@ -191,8 +193,8 @@ ValidationResult             interface  src/types/core.ts:58:18
 AnalysisCapability           interface  src/types/core.ts:66:18                         
 BuildCapability              interface  src/types/core.ts:74:18                         
 DeploymentCapability         interface  src/types/core.ts:83:18                         
-AIService                    interface  src/types/index.ts:48:18                        
-AIContent                    interface  src/types/index.ts:65:18                        
+AIService                    interface  src/types/index.ts:52:18                        
+AIContent                    interface  src/types/index.ts:69:18                        
 ToolInput                    type       src/types/tool.ts:33:13                         
 ToolOutput                   type       src/types/tool.ts:35:13                         
 ValidationConfig             interface  src/validation/core-types.ts:91:18              
