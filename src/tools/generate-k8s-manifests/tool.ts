@@ -2,7 +2,7 @@
  * Generate Kubernetes Manifests tool using the new Tool pattern
  */
 
-import { Success, Failure, type Result } from '@/types';
+import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
 import { promptTemplates, K8sManifestPromptParams } from '@/ai/prompt-templates';
@@ -83,7 +83,7 @@ async function run(
   // Build messages using the new prompt engine
   const messages = await buildMessages({
     basePrompt,
-    topic: 'generate_k8s_manifests',
+    topic: TOPICS.GENERATE_K8S_MANIFESTS,
     tool: 'generate-k8s-manifests',
     environment: 'production',
     contract: {

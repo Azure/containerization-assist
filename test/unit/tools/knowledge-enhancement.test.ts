@@ -12,6 +12,7 @@ import generateAcaManifestsTool from '@/tools/generate-aca-manifests/tool';
 import convertAcaToK8sTool from '@/tools/convert-aca-to-k8s/tool';
 import type { ToolContext } from '@/mcp/context';
 import * as promptEngine from '@/ai/prompt-engine';
+import { TOPICS } from '@/types/topics';
 
 // Mock the prompt engine
 jest.mock('@/ai/prompt-engine', () => ({
@@ -127,7 +128,7 @@ spec:
 
       expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
-          topic: 'analyze_repository',
+          topic: TOPICS.ANALYZE_REPOSITORY,
           tool: 'analyze-repo',
           environment: 'production',
         }),
@@ -151,7 +152,7 @@ spec:
       // Now uses a single call with unified topic
       expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
-          topic: 'dockerfile_generation',
+          topic: TOPICS.DOCKERFILE_GENERATION,
           tool: 'generate-dockerfile',
           environment: 'production',
         }),
@@ -173,7 +174,7 @@ spec:
 
       expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
-          topic: 'fix_dockerfile',
+          topic: TOPICS.FIX_DOCKERFILE,
           tool: 'fix-dockerfile',
           environment: 'production',
         }),
@@ -196,7 +197,7 @@ spec:
 
       expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
-          topic: 'generate_k8s_manifests',
+          topic: TOPICS.GENERATE_K8S_MANIFESTS,
           tool: 'generate-k8s-manifests',
           environment: 'production',
         }),
@@ -219,7 +220,7 @@ spec:
 
       expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
-          topic: 'generate_helm_charts',
+          topic: TOPICS.GENERATE_HELM_CHARTS,
           tool: 'generate-helm-charts',
           environment: 'production',
         }),
@@ -240,7 +241,7 @@ spec:
 
       expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
-          topic: 'resolve_base_images',
+          topic: TOPICS.RESOLVE_BASE_IMAGES,
           tool: 'resolve-base-images',
           environment: 'production',
         }),
@@ -263,7 +264,7 @@ spec:
 
       expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
-          topic: 'generate_aca_manifests',
+          topic: TOPICS.GENERATE_ACA_MANIFESTS,
           tool: 'generate-aca-manifests',
           environment: 'production',
         }),
@@ -284,7 +285,7 @@ spec:
 
       expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
-          topic: 'convert_aca_to_k8s',
+          topic: TOPICS.CONVERT_ACA_TO_K8S,
           tool: 'convert-aca-to-k8s',
           environment: 'production',
         }),
@@ -299,7 +300,7 @@ spec:
       // The prompt engine now handles knowledge integration internally
       const result = await promptEngine.buildMessages({
         basePrompt: 'Base prompt text',
-        topic: 'generate_dockerfile',
+        topic: TOPICS.DOCKERFILE_GENERATION,
         tool: 'generate-dockerfile',
         environment: 'production',
         knowledgeBudget: 3000,

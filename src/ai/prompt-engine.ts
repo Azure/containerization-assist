@@ -15,6 +15,7 @@ import {
   type OutputContract,
   type PromptEnvelope,
   type Result,
+  type Topic,
   Success,
   Failure,
 } from '@/types/index';
@@ -91,7 +92,7 @@ function buildDeveloperMessage(contract?: OutputContract): string | undefined {
  * @returns Promise resolving to selected snippets
  */
 async function selectKnowledgeSnippets(
-  topic: string,
+  topic: Topic,
   options: KnowledgeSelectionOptions,
 ): Promise<KnowledgeSnippet[]> {
   try {
