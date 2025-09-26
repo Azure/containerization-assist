@@ -51,7 +51,7 @@ export function getColimaSockets(): string[] {
 }
 
 /**
- * Find the first available Docker socket from the given paths.
+ * Find the first available Docker socket from the given paths (synchronous file-based check).
  */
 function findAvailableDockerSocket(socketPaths: string[]): string | null {
   for (const socketPath of socketPaths) {
@@ -70,16 +70,20 @@ function findAvailableDockerSocket(socketPaths: string[]): string | null {
 }
 
 /**
- * Auto-detect Docker socket path with Colima support.
+ * Auto-detect Docker socket path with Colima support (synchronous).
  */
 export function autoDetectDockerSocket(): string {
-  const defaultPaths = [
-    '//./pipe/docker_engine', //windows default pipe
-    '/var/run/docker.sock', // Standard Docker socket
+  //If Windows, use default windows socket
+  if (process.platform === 'win32') {
+    return 'npipe://./pipe/docker_engine'; //Windows Default Pipe, not a socket
+  }
+
+  const unixDefaultPaths = [
+    '/var/run/docker.sock', // Standard Unix Docker socket
     ...getColimaSockets(), // Colima sockets
   ];
 
-  const availableSocket = findAvailableDockerSocket(defaultPaths);
+  const availableSocket = findAvailableDockerSocket(unixDefaultPaths);
   return availableSocket || '/var/run/docker.sock'; // Fallback to default
 }
 
