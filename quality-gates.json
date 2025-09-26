@@ -22,31 +22,31 @@
         "errors": 0,
         "warnings": 10,
         "warningSignatures": [
-          "/Users/d/containerization-assist/src/app/index.ts:168:32:@typescript-eslint/no-non-null-assertion:Forbidden non-null assertion.",
-          "/Users/d/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:55:46:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/Users/d/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:257:21:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/Users/d/containerization-assist/src/mcp/mcp-server.ts:43:21:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/Users/d/containerization-assist/src/mcp/mcp-server.ts:43:26:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/Users/d/containerization-assist/src/tools/fix-dockerfile/tool.ts:121:29:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/Users/d/containerization-assist/src/tools/generate-dockerfile/tool.ts:148:29:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/Users/d/containerization-assist/src/tools/push-image/tool.ts:46:42:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/Users/d/containerization-assist/src/types/tool.ts:33:52:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/Users/d/containerization-assist/src/types/tool.ts:35:44:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type."
+          "/root/workspace/src/containerization-assist/src/app/index.ts:168:32:@typescript-eslint/no-non-null-assertion:Forbidden non-null assertion.",
+          "/root/workspace/src/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:55:46:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/root/workspace/src/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:257:21:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/root/workspace/src/containerization-assist/src/mcp/mcp-server.ts:43:21:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/root/workspace/src/containerization-assist/src/mcp/mcp-server.ts:43:26:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/root/workspace/src/containerization-assist/src/tools/fix-dockerfile/tool.ts:121:29:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/root/workspace/src/containerization-assist/src/tools/generate-dockerfile/tool.ts:142:29:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/root/workspace/src/containerization-assist/src/tools/push-image/tool.ts:46:42:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/root/workspace/src/containerization-assist/src/types/tool.ts:33:52:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/root/workspace/src/containerization-assist/src/types/tool.ts:35:44:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type."
         ]
       },
       "deadcode": {
-        "count": 210
+        "count": 208
       },
       "typescript": {
         "errors": 0
       },
       "build": {
-        "timeMs": 2000,
+        "timeMs": 38000,
         "mode": "clean",
         "environment": {
-          "nodeVersion": "v24.7.0",
-          "os": "Darwin",
-          "cpu": "arm64"
+          "nodeVersion": "v22.16.0",
+          "os": "Linux",
+          "cpu": "x86_64"
         }
       }
     }

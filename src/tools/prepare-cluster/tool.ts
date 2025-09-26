@@ -21,7 +21,7 @@
  * ```
  */
 
-import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
+import { ensureSession, updateSession } from '@/mcp/tool-session-helpers';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import type { ToolContext } from '@/mcp/context';
@@ -32,9 +32,7 @@ import { downloadFile, makeExecutable, createTempFile, deleteTempFile } from '@/
 
 import type * as pino from 'pino';
 import { Success, Failure, type Result } from '@/types';
-import { prepareClusterSchema, type PrepareClusterParams } from './schema';
-import { z } from 'zod';
-import type { SessionData } from '@/tools/session-types';
+import { type PrepareClusterParams, prepareClusterSchema } from './schema';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -63,41 +61,6 @@ export interface PrepareClusterResult {
   warnings?: string[];
   localRegistryUrl?: string;
 }
-
-// Define the result schema for type safety
-const PrepareClusterResultSchema = z.object({
-  success: z.boolean(),
-  sessionId: z.string(),
-  clusterReady: z.boolean(),
-  cluster: z.string(),
-  namespace: z.string(),
-  checks: z.object({
-    connectivity: z.boolean(),
-    permissions: z.boolean(),
-    namespaceExists: z.boolean(),
-    ingressController: z.boolean().optional(),
-    rbacConfigured: z.boolean().optional(),
-    kindInstalled: z.boolean().optional(),
-    kindClusterCreated: z.boolean().optional(),
-    localRegistryCreated: z.boolean().optional(),
-  }),
-  warnings: z.array(z.string()).optional(),
-  localRegistryUrl: z.string().optional(),
-});
-
-// Define tool IO for type-safe session operations
-const io = defineToolIO(prepareClusterSchema, PrepareClusterResultSchema);
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastPreparedAt: z.date().optional(),
-  lastClusterName: z.string().optional(),
-  lastNamespace: z.string().optional(),
-  totalPreparations: z.number().optional(),
-  lastClusterReady: z.boolean().optional(),
-  lastChecksPassed: z.number().optional(),
-  lastWarningCount: z.number().optional(),
-});
 
 interface K8sClientAdapter {
   ping(): Promise<boolean>;
@@ -464,20 +427,11 @@ async function prepareClusterImpl(
       return Failure(sessionResult.error);
     }
 
-    const { id: sessionId, state: session } = sessionResult.value;
-    const slice = useSessionSlice('prepare-cluster', io, context, StateSchema);
-
-    if (!slice) {
-      return Failure('Session manager not available');
-    }
-
+    const { id: sessionId } = sessionResult.value;
     logger.info(
       { sessionId, environment, namespace },
       'Starting Kubernetes cluster preparation with session',
     );
-
-    // Record input in session slice
-    await slice.patch(sessionId, { input: params });
 
     const k8sClientRaw = createKubernetesClient(logger);
     const k8sClient = createK8sClientAdapter(k8sClientRaw);
@@ -607,22 +561,19 @@ async function prepareClusterImpl(
       ...(localRegistryUrl && { localRegistryUrl }),
     };
 
-    // Update typed session slice with output and state
-    const sessionData = session as SessionData;
-    await slice.patch(sessionId, {
-      output: result,
-      state: {
-        lastPreparedAt: new Date(),
-        lastClusterName: cluster,
-        lastNamespace: namespace,
-        totalPreparations:
-          (sessionData?.completedSteps || []).filter((s: string) => s === 'prepare_cluster')
-            .length + 1,
-        lastClusterReady: clusterReady,
-        lastChecksPassed: Object.values(checks).filter(Boolean).length,
-        lastWarningCount: warnings.length,
+    // Store cluster preparation result in session
+    const currentSteps = sessionResult.ok ? sessionResult.value.state.completed_steps || [] : [];
+    await updateSession(
+      sessionId,
+      {
+        results: {
+          'prepare-cluster': result,
+        },
+        completed_steps: [...currentSteps, 'prepare-cluster'],
+        current_step: 'prepare-cluster',
       },
-    });
+      context,
+    );
 
     timer.end({ clusterReady, sessionId, environment });
     logger.info(

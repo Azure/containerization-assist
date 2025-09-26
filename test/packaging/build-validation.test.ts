@@ -85,7 +85,7 @@ describe('Build Validation', () => {
         'resolve-base-images',
         'scan',
         'tag-image',
-        'verify-deployment',
+        'verify-deploy',
         'workflow'
       ];
 

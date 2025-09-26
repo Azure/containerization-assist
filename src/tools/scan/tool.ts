@@ -5,7 +5,7 @@
  * Uses standardized helpers for consistency
  */
 
-import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
+import { ensureSession, updateSession } from '@/mcp/tool-session-helpers';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import type { ToolContext } from '@/mcp/context';
 
@@ -13,8 +13,7 @@ import { createSecurityScanner } from '@/lib/scanner';
 import { Success, Failure, type Result } from '@/types';
 import { getKnowledgeForCategory } from '@/knowledge/index';
 import type { KnowledgeMatch } from '@/knowledge/types';
-import { scanImageSchema, type ScanImageParams } from './schema';
-import { z } from 'zod';
+import { type ScanImageParams, scanImageSchema } from './schema';
 
 interface DockerScanResult {
   vulnerabilities?: Array<{
@@ -38,43 +37,6 @@ interface DockerScanResult {
     image: string;
   };
 }
-
-// Define the result schema for type safety
-const ScanImageResultSchema = z.object({
-  success: z.boolean(),
-  sessionId: z.string(),
-  remediationGuidance: z
-    .array(
-      z.object({
-        vulnerability: z.string(),
-        recommendation: z.string(),
-        severity: z.string().optional(),
-        example: z.string().optional(),
-      }),
-    )
-    .optional(),
-  vulnerabilities: z.object({
-    critical: z.number(),
-    high: z.number(),
-    medium: z.number(),
-    low: z.number(),
-    unknown: z.number(),
-    total: z.number(),
-  }),
-  scanTime: z.string(),
-  passed: z.boolean(),
-});
-
-// Define tool IO for type-safe session operations
-const io = defineToolIO(scanImageSchema, ScanImageResultSchema);
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastScannedAt: z.date().optional(),
-  lastScannedImage: z.string().optional(),
-  vulnerabilityCount: z.number().optional(),
-  scannerUsed: z.string().optional(),
-});
 
 export interface ScanImageResult {
   success: boolean;
@@ -108,7 +70,7 @@ async function scanImageImpl(
     return Failure('Invalid parameters provided');
   }
   const logger = getToolLogger(context, 'scan');
-  const timer = createToolTimer(logger, 'scan-image');
+  const timer = createToolTimer(logger, 'scan');
 
   try {
     const { scanner = 'trivy', severity } = params;
@@ -130,23 +92,15 @@ async function scanImageImpl(
     }
 
     const { id: sessionId, state: session } = sessionResult.value;
-    const slice = useSessionSlice('scan', io, context, StateSchema);
-
-    if (!slice) {
-      return Failure('Session manager not available');
-    }
 
     logger.info(
       { sessionId, scanner, severityThreshold: finalSeverityThreshold },
       'Starting image security scan with session',
     );
 
-    // Record input in session slice
-    await slice.patch(sessionId, { input: params });
-
     const securityScanner = createSecurityScanner(logger, scanner);
 
-    // Check for built image in session or use provided imageId
+    // Check for built image in session results or use provided imageId
     const buildResult = session?.results?.['build-image'] as { imageId?: string } | undefined;
     const imageId = params.imageId || buildResult?.imageId;
 
@@ -270,16 +224,19 @@ async function scanImageImpl(
       passed,
     };
 
-    // Update typed session slice with output and state
-    await slice.patch(sessionId, {
-      output: result,
-      state: {
-        lastScannedAt: new Date(),
-        lastScannedImage: imageId,
-        vulnerabilityCount: scanResult.totalVulnerabilities,
-        scannerUsed: scanner,
+    // Store scan result in session
+    const currentSteps = sessionResult.ok ? sessionResult.value.state.completed_steps || [] : [];
+    await updateSession(
+      sessionId,
+      {
+        results: {
+          scan: result,
+        },
+        completed_steps: [...currentSteps, 'scan'],
+        current_step: 'scan',
       },
-    });
+      context,
+    );
 
     timer.end({
       vulnerabilities: scanResult.totalVulnerabilities,

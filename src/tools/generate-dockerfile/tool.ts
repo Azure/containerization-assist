@@ -7,6 +7,7 @@ import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
 import { generateDockerfileSchema } from './schema';
 import type { AIResponse } from '../ai-response-types';
+import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import { getSession, updateSession } from '@/mcp/tool-session-helpers';
 import { promises as fs } from 'node:fs';
 import nodePath from 'node:path';
@@ -70,21 +71,14 @@ async function run(
 
   if (sessionId) {
     const sessionResult = await getSession(sessionId, ctx);
-    if (sessionResult.ok && sessionResult.value.state.metadata?.repositoryAnalysis) {
-      const analysis = sessionResult.value.state.metadata.repositoryAnalysis as Record<
-        string,
-        unknown
-      >;
+    if (sessionResult.ok && sessionResult.value.state.results?.['analyze-repo']) {
+      const analysis = sessionResult.value.state.results['analyze-repo'] as RepositoryAnalysis;
 
       // Use actual values from the analysis
       language = typeof analysis.language === 'string' ? analysis.language : 'auto-detect';
       framework = typeof analysis.framework === 'string' ? analysis.framework : undefined;
-      dependencies = Array.isArray(analysis.dependencies)
-        ? (analysis.dependencies as string[])
-        : [];
-      ports = Array.isArray(analysis.suggestedPorts)
-        ? (analysis.suggestedPorts as number[])
-        : [8080];
+      dependencies = Array.isArray(analysis.dependencies) ? analysis.dependencies : [];
+      ports = Array.isArray(analysis.suggestedPorts) ? analysis.suggestedPorts : [8080];
 
       // Build requirements from analysis
       const reqParts: string[] = [];
@@ -277,29 +271,6 @@ async function run(
       }
     }
 
-    // Update session if available
-    if (sessionId) {
-      const updateResult = await updateSession(
-        sessionId,
-        {
-          metadata: {
-            dockerfileGenerated: true,
-            dockerfilePath: written ? dockerfilePath : undefined,
-            dockerfileContent,
-            baseImage: dockerfileContent.match(/FROM\s+([^\s]+)/)?.[1],
-            multistage,
-            securityHardening,
-            optimization,
-          },
-        },
-        ctx,
-      );
-
-      if (!updateResult.ok) {
-        ctx.logger.warn({ sessionId }, 'Failed to update session with Dockerfile info');
-      }
-    }
-
     // Build workflow hints
     const workflowHints: string[] = [];
     workflowHints.push(
@@ -315,13 +286,39 @@ async function run(
       workflowHints.push(`4. Generate K8s manifests: use generate-k8s-manifests with sessionId`);
     }
 
-    return Success({
+    const result = {
       content: dockerfileContent,
       language: 'dockerfile',
       analysis: undefined,
       confidence: 0.9,
       suggestions: workflowHints,
-    });
+      sessionId,
+      dockerfilePath: written ? dockerfilePath : undefined,
+      baseImage: dockerfileContent.match(/FROM\s+([^\s]+)/)?.[1],
+      multistage,
+      securityHardening,
+      optimization,
+    };
+
+    // Update session if available
+    if (sessionId) {
+      const updateResult = await updateSession(
+        sessionId,
+        {
+          results: {
+            'generate-dockerfile': result,
+          },
+          current_step: 'generate-dockerfile',
+        },
+        ctx,
+      );
+
+      if (!updateResult.ok) {
+        ctx.logger.warn({ sessionId }, 'Failed to update session with Dockerfile info');
+      }
+    }
+
+    return Success(result);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     ctx.logger.error({ error: errorMessage }, 'Dockerfile generation failed');

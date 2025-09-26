@@ -6,7 +6,7 @@ import { promptTemplates } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { updateSession, ensureSession } from '@/mcp/tool-session-helpers';
-import { analyzeRepoSchema } from './schema';
+import { analyzeRepoSchema, RepositoryAnalysis } from './schema';
 import type { AIResponse } from '../ai-response-types';
 import type { Tool } from '@/types/tool';
 import type { z } from 'zod';
@@ -177,17 +177,18 @@ async function run(
 
     // Store the analysis result in session for other tools to use
     const sessionResult = await ensureSession(ctx, workflowSessionId);
+    const result = { ...analysisResult, sessionId: workflowSessionId };
+
     if (sessionResult.ok) {
+      const currentSteps = sessionResult.value.state.completed_steps || [];
       await updateSession(
         workflowSessionId,
         {
-          metadata: {
-            ...sessionResult.value.state.metadata,
-            repositoryAnalysis: analysisResult,
-            analyzedPath: repoPath,
+          results: {
+            'analyze-repo': result as RepositoryAnalysis,
           },
           current_step: 'analyze-repo',
-          completed_steps: [...(sessionResult.value.state.completed_steps || []), 'analyze-repo'],
+          completed_steps: [...currentSteps, 'analyze-repo'],
         },
         ctx,
       );
@@ -196,8 +197,7 @@ async function run(
       ctx.logger.warn('Could not store analysis in session - session manager may not be available');
     }
 
-    // Add sessionId to the result
-    return Success({ ...analysisResult, sessionId: workflowSessionId });
+    return Success(result);
   } catch (e) {
     const error = e as Error;
     const invalidJson = (() => {

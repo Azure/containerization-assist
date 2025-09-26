@@ -5,7 +5,7 @@
  * Follows the new Tool interface pattern
  */
 
-import { ensureSession, defineToolIO, useSessionSlice } from '@/mcp/tool-session-helpers';
+import { ensureSession, updateSession } from '@/mcp/tool-session-helpers';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { createDockerClient } from '@/lib/docker';
@@ -14,23 +14,6 @@ import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
 import { tagImageSchema } from './schema';
 import { z } from 'zod';
-
-// Define the result schema for type safety
-const TagImageResultSchema = z.object({
-  success: z.boolean(),
-  sessionId: z.string(),
-  tags: z.array(z.string()),
-  imageId: z.string(),
-});
-
-// Define tool IO for type-safe session operations
-const io = defineToolIO(tagImageSchema, TagImageResultSchema);
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastTaggedAt: z.date().optional(),
-  tagsApplied: z.array(z.string()).default([]),
-});
 
 export interface TagImageResult {
   success: boolean;
@@ -63,21 +46,13 @@ async function run(
     }
 
     const { id: sessionId, state: session } = sessionResult.value;
-    const slice = useSessionSlice('tag-image', io, ctx, StateSchema);
-
-    if (!slice) {
-      return Failure('Session manager not available');
-    }
 
     logger.info({ sessionId, tag }, 'Starting image tagging');
 
-    // Record input in session slice
-    await slice.patch(sessionId, { input });
-
     const dockerClient = createDockerClient(logger);
 
-    // Check for built image in session metadata or use provided imageId
-    const buildResult = session.metadata?.build_result as
+    // Check for built image in session results or use provided imageId
+    const buildResult = session.results?.['build-image'] as
       | { imageId?: string; tags?: string[] }
       | undefined;
     const source = input.imageId || buildResult?.imageId;
@@ -111,14 +86,19 @@ async function run(
       imageId: source,
     };
 
-    // Update typed session slice with output and state
-    await slice.patch(sessionId, {
-      output: result,
-      state: {
-        lastTaggedAt: new Date(),
-        tagsApplied: tags,
+    // Store tag result in session
+    const currentSteps = sessionResult.ok ? sessionResult.value.state.completed_steps || [] : [];
+    await updateSession(
+      sessionId,
+      {
+        results: {
+          'tag-image': result,
+        },
+        completed_steps: [...currentSteps, 'tag-image'],
+        current_step: 'tag-image',
       },
-    });
+      ctx,
+    );
 
     timer.end({ tags, sessionId });
     logger.info({ sessionId, tags }, 'Image tagging completed');

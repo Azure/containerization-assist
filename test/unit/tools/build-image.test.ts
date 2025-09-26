@@ -92,15 +92,11 @@ jest.mock('../../../src/lib/logger', () => ({
 }));
 
 // Mock the session helpers
-const mockGetSessionSlice = jest.fn();
-jest.mock('../../../src/mcp/tool-session-helpers', () => ({
-  ...createToolSessionHelpersMock(),
-  getSessionSlice: mockGetSessionSlice,
-}));
+jest.mock('../../../src/mcp/tool-session-helpers', () => createToolSessionHelpersMock());
 
 // Import these after mocks are set up
-import { buildImage, type BuildImageConfig } from '../../../src/tools/build-image/tool';
-import { ensureSession } from '../../../src/mcp/tool-session-helpers';
+import { buildImage } from '../../../src/tools/build-image/tool';
+import { ensureSession, getSession, updateSession } from '../../../src/mcp/tool-session-helpers';
 
 const mockFs = fs as jest.Mocked<typeof fs>;
 
@@ -163,6 +159,12 @@ CMD ["node", "index.js"]`;
     mockFs.writeFile.mockResolvedValue(undefined);
     mockSessionManager.update.mockResolvedValue(true);
 
+    // Mock the updateSession helper
+    (updateSession as jest.MockedFunction<typeof updateSession>).mockResolvedValue({
+      ok: true,
+      value: true,
+    } as any);
+
     // Default successful Docker build
     mockDockerClient.buildImage.mockResolvedValue(createSuccessResult({
       imageId: 'sha256:mock-image-id',
@@ -184,7 +186,7 @@ CMD ["node", "index.js"]`;
           state: {
             workflow_state: {},
             results: {
-              'analyze_repo': {
+              'analyze-repo': {
                 language: 'javascript',
                 framework: 'express',
               },
@@ -198,22 +200,21 @@ CMD ["node", "index.js"]`;
         },
       });
 
-      // Setup getSessionSlice mock for analyze-repo
-      mockGetSessionSlice.mockImplementation((toolName: string) => {
-        if (toolName === 'analyze-repo') {
-          return {
-            ok: true,
-            value: {
-              output: {
-                ok: true,
-                sessionId: 'test-session-123',
+      // Setup getSession mock with repository analysis in results
+      (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session',
+          isNew: false,
+          state: {
+            results: {
+              'analyze-repo': {
                 language: 'javascript',
                 framework: 'express',
               },
             },
-          };
-        }
-        return { ok: true, value: null };
+          },
+        },
       });
 
       mockSessionManager.get.mockResolvedValue({
@@ -295,14 +296,14 @@ CMD ["node", "index.js"]`;
       const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
-      // With the new session slice utils, the update happens in toolSlices
-      expect(mockSessionManager.update).toHaveBeenCalledWith('test-session-123', expect.objectContaining({
-        metadata: expect.objectContaining({
-          toolSlices: expect.objectContaining({
-            'build-image': expect.any(Object),
-          }),
+      // The build-image tool updates session using updateSession helper
+      expect(updateSession).toHaveBeenCalledWith('test-session-123', expect.objectContaining({
+        results: expect.objectContaining({
+          'build-image': expect.any(Object),
         }),
-      }));
+        completed_steps: expect.arrayContaining(['build-image']),
+        current_step: 'build-image',
+      }), expect.any(Object));
     });
   });
 
@@ -699,7 +700,7 @@ CMD ["node", "index.js"]`;
           state: {
             workflow_state: {},
             results: {
-              'analyze_repo': {
+              'analyze-repo': {
                 language: 'python',
                 framework: 'flask',
               },
@@ -713,22 +714,21 @@ CMD ["node", "index.js"]`;
         },
       });
 
-      // Setup getSessionSlice mock for analyze-repo with python/flask
-      mockGetSessionSlice.mockImplementation((toolName: string) => {
-        if (toolName === 'analyze-repo') {
-          return {
-            ok: true,
-            value: {
-              output: {
-                ok: true,
-                sessionId: 'test-session-123',
+      // Setup getSession mock for analyze-repo with python/flask
+      (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session',
+          isNew: false,
+          state: {
+            results: {
+              'analyze-repo': {
                 language: 'python',
                 framework: 'flask',
               },
             },
-          };
-        }
-        return { ok: true, value: null };
+          },
+        },
       });
 
       // Setup filesystem mocks
@@ -800,11 +800,16 @@ CMD ["node", "index.js"]`;
         },
       });
 
-      // Reset getSessionSlice mock to return no analysis data
-      mockGetSessionSlice.mockReset();
-      mockGetSessionSlice.mockResolvedValue({
+      // Reset getSession mock to return no analysis data
+      (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue({
         ok: true,
-        value: null  // No analysis data available
+        value: {
+          id: 'test-session',
+          isNew: false,
+          state: {
+            metadata: {},  // No analysis data available
+          },
+        },
       });
 
       mockSessionManager.get.mockResolvedValue({

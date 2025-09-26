@@ -153,16 +153,16 @@ describe('scanImage', () => {
       // Verify scanner was called with correct image ID
       expect(mockSecurityScannerInstance.scanImage).toHaveBeenCalledWith('sha256:mock-image-id');
 
-      // Verify session was updated via sessionManager with the new toolSlices structure
-      expect(mockSessionManager.update).toHaveBeenCalledWith(
+      // Verify session was updated with scan results
+      const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
+      expect(sessionHelpers.updateSession).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
-          metadata: expect.objectContaining({
-            toolSlices: expect.objectContaining({
-              scan: expect.any(Object),
-            }),
+          results: expect.objectContaining({
+            'scan': expect.any(Object),
           }),
-        })
+        }),
+        expect.any(Object),
       );
     });
 
