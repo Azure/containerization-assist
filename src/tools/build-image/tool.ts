@@ -493,9 +493,20 @@ async function buildImageImpl(
       };
 
       // Update session with failed result
-      await slice.patch(sessionId, {
-        output: failedResult,
-      });
+      await updateSession(
+        sessionId,
+        {
+          results: {
+            'build-image': failedResult,
+          },
+          completed_steps: [
+            ...(sessionResult.ok ? sessionResult.value.state.completed_steps || [] : []),
+            'build-image',
+          ],
+          current_step: 'build-image',
+        },
+        context,
+      );
 
       return Failure(`Failed to build image: ${errorMessage}`);
     }

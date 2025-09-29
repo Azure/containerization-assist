@@ -31,7 +31,6 @@ import { createKubernetesClient, KubernetesClient } from '@/lib/kubernetes';
 import { DEFAULT_TIMEOUTS } from '@/config/defaults';
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import { verifyDeploymentSchema, type VerifyDeploymentParams } from './schema';
-import { z } from 'zod';
 import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
@@ -82,74 +81,6 @@ export interface DeploymentValidationInsights {
   performanceInsights: string[];
   confidence: number;
 }
-
-// Define the result schema for type safety
-const VerifyDeploymentResultSchema = z.object({
-  success: z.boolean(),
-  sessionId: z.string(),
-  namespace: z.string(),
-  deploymentName: z.string(),
-  serviceName: z.string(),
-  endpoints: z.array(
-    z.object({
-      type: z.enum(['internal', 'external']),
-      url: z.string(),
-      port: z.number(),
-      healthy: z.boolean().optional(),
-    }),
-  ),
-  ready: z.boolean(),
-  replicas: z.number(),
-  status: z.object({
-    readyReplicas: z.number(),
-    totalReplicas: z.number(),
-    conditions: z.array(
-      z.object({
-        type: z.string(),
-        status: z.string(),
-        message: z.string(),
-      }),
-    ),
-  }),
-  healthCheck: z
-    .object({
-      status: z.enum(['healthy', 'unhealthy', 'unknown']),
-      message: z.string(),
-      checks: z
-        .array(
-          z.object({
-            name: z.string(),
-            status: z.enum(['pass', 'fail']),
-            message: z.string().optional(),
-          }),
-        )
-        .optional(),
-    })
-    .optional(),
-  validationInsights: z
-    .object({
-      troubleshootingSteps: z.array(z.string()),
-      healthRecommendations: z.array(z.string()),
-      performanceInsights: z.array(z.string()),
-      confidence: z.number(),
-    })
-    .optional(),
-  workflowHints: z
-    .object({
-      nextStep: z.string(),
-      message: z.string(),
-    })
-    .optional(),
-});
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastVerifiedAt: z.date().optional(),
-  lastVerifiedDeployment: z.string().optional(),
-  lastNamespace: z.string().optional(),
-  verificationsPassed: z.number().optional(),
-  lastHealthStatus: z.enum(['healthy', 'unhealthy', 'unknown']).optional(),
-});
 
 /**
  * Check deployment health

@@ -13,11 +13,9 @@ import { createSecurityScanner } from '@/lib/scanner';
 import { Success, Failure, type Result } from '@/types';
 import { getKnowledgeForCategory } from '@/knowledge/index';
 import type { KnowledgeMatch } from '@/knowledge/types';
-<<<<<<< HEAD
 import { enhanceValidationWithAI } from '@/validation/ai-enhancement';
 import type { ValidationResult } from '@/validation/core-types';
 import { scanImageSchema, type ScanImageParams } from './schema';
-import { z } from 'zod';
 
 interface DockerScanResult {
   vulnerabilities?: Array<{
@@ -42,64 +40,6 @@ interface DockerScanResult {
   };
 }
 
-// Define the result schema for type safety
-const ScanImageResultSchema = z.object({
-  success: z.boolean(),
-  sessionId: z.string(),
-  remediationGuidance: z
-    .array(
-      z.object({
-        vulnerability: z.string(),
-        recommendation: z.string(),
-        severity: z.string().optional(),
-        example: z.string().optional(),
-      }),
-    )
-    .optional(),
-  vulnerabilities: z.object({
-    critical: z.number(),
-    high: z.number(),
-    medium: z.number(),
-    low: z.number(),
-    unknown: z.number(),
-    total: z.number(),
-  }),
-  scanTime: z.string(),
-  passed: z.boolean(),
-  workflowHints: z
-    .object({
-      nextStep: z.string(),
-      message: z.string(),
-    })
-    .optional(),
-  aiSuggestions: z.array(z.string()).optional(),
-  aiAnalysis: z
-    .object({
-      assessment: z.string(),
-      riskLevel: z.enum(['low', 'medium', 'high', 'critical']),
-      priorities: z.array(
-        z.object({
-          area: z.string(),
-          severity: z.string(),
-          description: z.string(),
-          impact: z.string(),
-        }),
-      ),
-      confidence: z.number(),
-    })
-    .optional(),
-});
-
-// Define tool IO for type-safe session operations
-const io = defineToolIO(scanImageSchema, ScanImageResultSchema);
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastScannedAt: z.date().optional(),
-  lastScannedImage: z.string().optional(),
-  vulnerabilityCount: z.number().optional(),
-  scannerUsed: z.string().optional(),
-});
 export interface ScanImageResult {
   success: boolean;
   sessionId: string;

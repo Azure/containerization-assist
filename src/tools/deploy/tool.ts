@@ -29,8 +29,6 @@ import { createKubernetesClient } from '@/lib/kubernetes';
 import type { K8sManifest } from '@/infra/kubernetes/client';
 
 import { Success, Failure, type Result, TOPICS } from '@/types';
-import { generateK8sManifestsSchema } from '@/tools/generate-k8s-manifests/schema';
-import { z } from 'zod';
 import { DEFAULT_TIMEOUTS } from '@/config/defaults';
 import { deployApplicationSchema, type DeployApplicationParams } from './schema';
 import { sampleWithRerank } from '@/mcp/ai/sampling-runner';

@@ -26,36 +26,6 @@ export interface TaggingStrategySuggestions {
   confidence: number;
 }
 
-// Define the result schema for type safety
-const TagImageResultSchema = z.object({
-  success: z.boolean(),
-  sessionId: z.string(),
-  tags: z.array(z.string()),
-  imageId: z.string(),
-  taggingSuggestions: z
-    .object({
-      recommendations: z.array(z.string()),
-      bestPractices: z.array(z.string()),
-      alternatives: z.array(z.string()),
-      confidence: z.number(),
-    })
-    .optional(),
-  workflowHints: z
-    .object({
-      nextStep: z.string(),
-      message: z.string(),
-    })
-    .optional(),
-});
-
-// Define tool IO for type-safe session operations
-const io = defineToolIO(tagImageSchema, TagImageResultSchema);
-
-// Tool-specific state schema
-const StateSchema = z.object({
-  lastTaggedAt: z.date().optional(),
-  tagsApplied: z.array(z.string()).default([]),
-});
 export interface TagImageResult {
   success: boolean;
   sessionId: string;

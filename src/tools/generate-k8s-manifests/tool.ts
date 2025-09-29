@@ -447,7 +447,8 @@ async function run(
       ctx.logger.info({ manifestPath }, 'Kubernetes manifests written to disk');
     }
 
-    return Success({
+    // Prepare the result
+    const result = {
       manifests: finalManifestsContent,
       manifestPath,
       validatedResources: manifests.map((m) => ({ kind: m.kind, name: m.metadata?.name })),
