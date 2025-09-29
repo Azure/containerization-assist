@@ -134,6 +134,9 @@ spec:
         }),
       );
 
+      if (!result.ok) {
+        console.log('Analyze repo failed:', result.error);
+      }
       expect(result.ok).toBe(true);
     });
   });
