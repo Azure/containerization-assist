@@ -130,7 +130,7 @@ export function validateWithSchema(
   }
 
   const errors = parseResult.error.issues
-    .map((e: any) => `${e.path.join('.')}: ${e.message}`)
+    .map((e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`)
     .join(', ');
 
   return Failure(`Validation failed: ${errors}`);
