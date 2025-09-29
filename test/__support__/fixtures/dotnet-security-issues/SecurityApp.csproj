@@ -8,7 +8,7 @@
 
   <ItemGroup>
     <!-- These are intentionally outdated packages with known security vulnerabilities for testing -->
-    <PackageReference Include="Newtonsoft.Json" Version="12.0.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="System.Text.Encodings.Web" Version="4.7.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.6.0" />
