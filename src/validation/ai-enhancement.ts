@@ -7,6 +7,9 @@
 
 import type { ToolContext } from '@/mcp/context';
 import { ValidationSeverity, ValidationCategory, type ValidationResult } from './core-types';
+
+// Re-export for convenience to avoid duplicate import issues
+export { ValidationSeverity, ValidationCategory, type ValidationResult };
 import { sampleWithPlan } from '@/mcp/ai/sampling-runner';
 import { Success, Failure, type Result, type AIMessage } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
