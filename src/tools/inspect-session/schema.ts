@@ -24,9 +24,9 @@ export const InspectSessionResultSchema = z.object({
         ttlRemaining: z.number().describe('TTL remaining in seconds'),
         completedSteps: z.array(z.string()),
         currentStep: z.string().nullable(),
-        metadata: z.record(z.unknown()),
-        toolSlices: z.record(z.unknown()).optional(),
-        errors: z.record(z.string()).optional(),
+        metadata: z.record(z.string(), z.unknown()),
+        toolSlices: z.record(z.string(), z.unknown()).optional(),
+        errors: z.record(z.string(), z.string()).optional(),
       }),
     )
     .optional(),

@@ -72,7 +72,7 @@ const AppConfigSchema = z.object({
       port: z.coerce.number().int().min(1).max(65535).default(2375),
       registry: z.string().default(DEFAULT_CONFIG.DOCKER_REGISTRY),
       timeout: z.coerce.number().int().positive().default(DEFAULT_CONFIG.DOCKER_TIMEOUT),
-      buildArgs: z.record(z.string()).default({}),
+      buildArgs: z.record(z.string(), z.string()).default({}),
     }),
     kubernetes: z.object({
       namespace: z.string().default(DEFAULT_CONFIG.K8S_NAMESPACE),

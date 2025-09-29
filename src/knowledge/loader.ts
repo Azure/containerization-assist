@@ -46,7 +46,7 @@ const validateEntry = (entry: unknown): entry is KnowledgeEntry => {
       logger.warn(
         {
           entryId: (entry as { id?: string })?.id || 'unknown',
-          errors: error.errors.map((e) => ({
+          errors: error.issues.map((e: any) => ({
             path: e.path.join('.'),
             message: e.message,
           })),

@@ -92,10 +92,10 @@ function validateParameters(
 
   try {
     const validated = schema.parse(params);
-    return Success(validated);
+    return Success(validated as Record<string, unknown>);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const errors = error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ');
+      const errors = error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ');
       logger?.warn({ errors, params }, 'Parameter validation failed');
       return Failure(`Invalid parameters: ${errors}`);
     }

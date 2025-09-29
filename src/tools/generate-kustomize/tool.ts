@@ -18,6 +18,8 @@ import path from 'node:path';
 import { parseAllDocuments, stringify as yamlStringify } from 'yaml';
 import type { z } from 'zod';
 
+type GenerateKustomizeParams = z.infer<typeof generateKustomizeSchema>;
+
 const name = 'generate-kustomize';
 const description =
   'Generate Kustomize structure from Kubernetes manifests for multi-environment deployments';
@@ -181,7 +183,8 @@ async function run(
     > = {};
 
     for (const env of environments) {
-      const envOverrides = envConfig[env] || {};
+      const envOverrides =
+        envConfig[env] || ({} as NonNullable<GenerateKustomizeParams['envConfig']>[string]);
 
       const overlay: KustomizationConfig = {
         apiVersion: 'kustomize.config.k8s.io/v1beta1',
@@ -240,7 +243,7 @@ async function run(
       if (envOverrides.patches) {
         // Transform patches to match KustomizationConfig interface
         patches.push(
-          ...envOverrides.patches.map((p) => ({
+          ...envOverrides.patches.map((p: any) => ({
             target: {
               ...(p.target.kind && { kind: p.target.kind }),
               ...(p.target.name && { name: p.target.name }),

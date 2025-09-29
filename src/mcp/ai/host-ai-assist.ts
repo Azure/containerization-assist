@@ -129,8 +129,8 @@ export function validateWithSchema(
     return Success(parseResult.data as Record<string, unknown>);
   }
 
-  const errors = parseResult.error.errors
-    .map((e) => `${e.path.join('.')}: ${e.message}`)
+  const errors = parseResult.error.issues
+    .map((e: any) => `${e.path.join('.')}: ${e.message}`)
     .join(', ');
 
   return Failure(`Validation failed: ${errors}`);
