@@ -20,31 +20,40 @@
     "baselines": {
       "lint": {
         "errors": 0,
-        "warnings": 10,
+        "warnings": 19,
         "warningSignatures": [
-          "/root/workspace/src/containerization-assist/src/app/index.ts:168:32:@typescript-eslint/no-non-null-assertion:Forbidden non-null assertion.",
-          "/root/workspace/src/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:55:46:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/root/workspace/src/containerization-assist/src/infra/kubernetes/idempotent-apply.ts:257:21:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/root/workspace/src/containerization-assist/src/mcp/mcp-server.ts:43:21:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/root/workspace/src/containerization-assist/src/mcp/mcp-server.ts:43:26:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/root/workspace/src/containerization-assist/src/tools/fix-dockerfile/tool.ts:121:29:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/root/workspace/src/containerization-assist/src/tools/generate-dockerfile/tool.ts:142:29:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/root/workspace/src/containerization-assist/src/tools/push-image/tool.ts:46:42:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/root/workspace/src/containerization-assist/src/types/tool.ts:33:52:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/root/workspace/src/containerization-assist/src/types/tool.ts:35:44:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type."
+          "/home/tng/workspace/containerization-assist/src/tools/build-image/tool.ts:89:44:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/build-image/tool.ts:373:24:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/build-image/tool.ts:499:65:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/build-image/tool.ts:572:63:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/deploy/tool.ts:495:41:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/deploy/tool.ts:791:63:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/index.ts:184:10:@typescript-eslint/no-non-null-assertion:Forbidden non-null assertion.",
+          "/home/tng/workspace/containerization-assist/src/tools/scan/tool.ts:123:24:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/tag-image/tool.ts:224:24:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/tag-image/tool.ts:292:59:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/verify-deployment/tool.ts:231:71:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/verify-deployment/tool.ts:243:77:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/verify-deployment/tool.ts:243:130:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/verify-deployment/tool.ts:244:55:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/verify-deployment/tool.ts:245:56:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/verify-deployment/tool.ts:247:47:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/verify-deployment/tool.ts:247:98:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/verify-deployment/tool.ts:394:25:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
+          "/home/tng/workspace/containerization-assist/src/tools/verify-deployment/tool.ts:482:63:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type."
         ]
       },
       "deadcode": {
-        "count": 208
+        "count": 195
       },
       "typescript": {
         "errors": 0
       },
       "build": {
-        "timeMs": 38000,
+        "timeMs": 5000,
         "mode": "clean",
         "environment": {
-          "nodeVersion": "v22.16.0",
+          "nodeVersion": "v24.1.0",
           "os": "Linux",
           "cpu": "x86_64"
         }

@@ -24,6 +24,20 @@ export const scanImageSchema = z.object({
     .enum(['trivy', 'snyk', 'grype'])
     .default('trivy') // Added default
     .describe('Scanner to use for vulnerability detection'),
+  enableAISuggestions: z
+    .boolean()
+    .default(true)
+    .describe('Enable AI-powered suggestions for vulnerability remediation'),
+  aiEnhancementOptions: z
+    .object({
+      mode: z.enum(['suggestions', 'fixes', 'analysis']).default('suggestions'),
+      focus: z.enum(['security', 'performance', 'best-practices', 'all']).default('security'),
+      confidence: z.number().min(0).max(1).default(0.8),
+      maxSuggestions: z.number().min(1).max(10).default(5),
+      includeExamples: z.boolean().default(true),
+    })
+    .optional()
+    .describe('Configuration for AI-powered enhancement'),
 });
 
 export type ScanImageParams = z.infer<typeof scanImageSchema>;

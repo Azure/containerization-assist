@@ -32,11 +32,92 @@ jest.mock('@/mcp/ai/message-converter', () => ({
   })),
 }));
 
-// Mock fs module to prevent actual file writes
+// Mock the sampling runner
+jest.mock('@/mcp/ai/sampling-runner', () => ({
+  sampleWithRerank: jest.fn().mockImplementation(async (ctx, buildRequest, score, options) => {
+    // Call buildRequest to get the request details and check for hints
+    const request = await buildRequest();
+    const hints = request?.modelPreferences?.hints;
+
+    let text = '';
+    if (hints?.some((h: any) => h.name === 'repo-analysis')) {
+      // For analyze-repo - return JSON analysis
+      text = JSON.stringify({
+        language: 'JavaScript',
+        framework: 'Express',
+        dependencies: ['express'],
+        suggestedPorts: [3000],
+        buildSystem: { type: 'npm' },
+        entryPoint: 'index.js'
+      });
+    } else if (hints?.some((h: any) => h.name === 'kubernetes-manifests')) {
+      // For K8s manifests - return YAML
+      text = `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-app
+spec:
+  selector:
+    matchLabels:
+      app: test-app
+  template:
+    metadata:
+      labels:
+        app: test-app
+    spec:
+      containers:
+      - name: test-app
+        image: test:latest`;
+    } else {
+      // Default - return Dockerfile for generate-dockerfile and others
+      text = 'FROM node:18-alpine\nWORKDIR /app\nCOPY . .\nRUN npm install\nCMD ["npm", "start"]';
+    }
+
+    return Promise.resolve({
+      ok: true,
+      value: {
+        text,
+        winner: {
+          score: 85,
+          scoreBreakdown: {
+            structure: 20,
+            completeness: 25,
+            clarity: 20,
+            actionability: 20
+          }
+        }
+      }
+    });
+  }),
+}));
+
+// Mock fs module to prevent actual file operations
 jest.mock('node:fs', () => ({
   promises: {
     writeFile: jest.fn().mockResolvedValue(undefined),
     mkdir: jest.fn().mockResolvedValue(undefined),
+    readdir: jest.fn().mockImplementation((path, options) => {
+      // Mock directory listing for analyze-repo
+      if (path === '/test/repo') {
+        return Promise.resolve(['package.json', 'src', 'README.md']);
+      }
+      if (path.includes('/test/repo/src')) {
+        return Promise.resolve([{ name: 'index.js', isDirectory: () => false }]);
+      }
+      return Promise.resolve([]);
+    }),
+    readFile: jest.fn().mockImplementation((filePath) => {
+      // Mock config file contents for analyze-repo
+      if (filePath.includes('package.json')) {
+        return Promise.resolve(JSON.stringify({
+          name: 'test-app',
+          version: '1.0.0',
+          dependencies: { express: '^4.0.0' },
+          scripts: { start: 'node index.js' }
+        }));
+      }
+      return Promise.reject(new Error('File not found'));
+    }),
   },
 }));
 
@@ -54,7 +135,7 @@ describe('Knowledge Enhancement Integration', () => {
     // Check for hints or other parameters to determine the response type
     const hints = params?.modelPreferences?.hints;
 
-    if (hints?.some((h: any) => h.name === 'json-output' || h.name === 'code-analysis')) {
+    if (hints?.some((h: any) => h.name === 'json-output' || h.name === 'code-analysis' || h.name === 'repo-analysis')) {
       // For analyze-repo - return JSON analysis
       return Promise.resolve({
         content: [{ text: JSON.stringify({
@@ -99,11 +180,13 @@ spec:
       createMessage: createMessageMock,
     },
     session: {
+      id: 'test-session-id',
       get: jest.fn(),
       set: jest.fn(),
       delete: jest.fn(),
       exists: jest.fn(),
       clear: jest.fn(),
+      pushStep: jest.fn(),
     },
     logger: {
       info: jest.fn(),

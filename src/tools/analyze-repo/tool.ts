@@ -5,7 +5,8 @@ import { Success, Failure, type Result, type ToolContext, TOPICS } from '@/types
 import { promptTemplates } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
-import { updateSession, ensureSession } from '@/mcp/tool-session-helpers';
+import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
+import { scoreRepositoryAnalysis } from '@/lib/sampling';
 import { analyzeRepoSchema, RepositoryAnalysis } from './schema';
 import type { AIResponse } from '../ai-response-types';
 import type { Tool } from '@/types/tool';
@@ -137,13 +138,20 @@ async function run(
 
   let response;
   try {
-    response = await ctx.sampling.createMessage({
-      ...mcpMessages,
-      maxTokens: 4096,
-      modelPreferences: {
-        hints: [{ name: 'code-analysis' }, { name: 'json-output' }],
-      },
-    });
+    response = await sampleWithRerank(
+      ctx,
+      async (attempt) => ({
+        ...mcpMessages,
+        maxTokens: 4096,
+        modelPreferences: {
+          hints: [{ name: 'repo-analysis' }],
+          intelligencePriority: 0.9,
+          speedPriority: attempt > 0 ? 0.7 : 0.4,
+        },
+      }),
+      scoreRepositoryAnalysis,
+      { count: 2, stopAt: 80 },
+    );
   } catch (error) {
     ctx.logger.error(
       { error: error instanceof Error ? error.message : String(error) },
@@ -152,13 +160,17 @@ async function run(
     return Failure(`AI sampling failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 
+  if (!response.ok) {
+    return Failure(`AI sampling failed: ${response.error}`);
+  }
+
   // Return parsed result
-  const responseText = response.content[0]?.text || '';
+  const responseText = response.value.text;
   ctx.logger.info(
     {
       responseLength: responseText.length,
       responsePreview: responseText.substring(0, 200),
-      hasContent: response.content.length,
+      hasContent: responseText.length,
     },
     'Received AI response',
   );
@@ -176,28 +188,29 @@ async function run(
     const analysisResult = JSON.parse(jsonMatch[0]);
 
     // Store the analysis result in session for other tools to use
-    const sessionResult = await ensureSession(ctx, workflowSessionId);
     const result = { ...analysisResult, sessionId: workflowSessionId };
 
-    if (sessionResult.ok) {
-      const currentSteps = sessionResult.value.state.completed_steps || [];
-      await updateSession(
-        workflowSessionId,
-        {
-          results: {
-            'analyze-repo': result as RepositoryAnalysis,
-          },
-          current_step: 'analyze-repo',
-          completed_steps: [...currentSteps, 'analyze-repo'],
-        },
-        ctx,
-      );
+    if (ctx.session) {
+      // Use the session facade to store results
+      ctx.session.set('results', {
+        'analyze-repo': result as RepositoryAnalysis,
+      });
+      ctx.session.set('current_step', 'analyze-repo');
+      ctx.session.pushStep('analyze-repo');
+
       ctx.logger.info({ sessionId: workflowSessionId }, 'Stored repository analysis in session');
     } else {
-      ctx.logger.warn('Could not store analysis in session - session manager may not be available');
+      ctx.logger.warn('Could not store analysis in session - session may not be available');
     }
 
-    return Success(result);
+    // Add sessionId and workflowHints to the result
+    return Success({
+      ...result,
+      workflowHints: {
+        nextStep: 'generate-dockerfile',
+        message: `Repository analysis complete. Use "generate-dockerfile" with sessionId ${workflowSessionId} to create an optimized Dockerfile for your ${result.language || 'application'}.`,
+      },
+    });
   } catch (e) {
     const error = e as Error;
     const invalidJson = (() => {
@@ -220,6 +233,12 @@ const tool: Tool<typeof analyzeRepoSchema, AIResponse> = {
   description: 'Analyze repository structure and detect technologies',
   version: '3.0.0',
   schema: analyzeRepoSchema,
+  metadata: {
+    aiDriven: true,
+    knowledgeEnhanced: true,
+    samplingStrategy: 'rerank',
+    enhancementCapabilities: ['content-generation', 'analysis', 'technology-detection'],
+  },
   run,
 };
 

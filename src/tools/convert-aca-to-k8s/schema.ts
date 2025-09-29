@@ -14,5 +14,3 @@ export const convertAcaToK8sSchema = z.object({
     .default(true)
     .describe('Add helpful comments in the output'),
 });
-
-export type ConvertAcaToK8sParams = z.infer<typeof convertAcaToK8sSchema>;

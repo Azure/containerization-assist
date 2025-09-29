@@ -52,6 +52,7 @@ export function createIdempotentApply(logger: Logger, kubeconfig?: string) {
    * Invariant: Falls back to CustomObjectsApi for unknown apiVersions to ensure all resources are supported
    * Trade-off: Uses any type for flexibility across diverse K8s API clients
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function getApiClient(apiVersion: string): any {
     // Explicit API client mapping ensures type safety for common resource types
     if (apiVersion === 'v1') {
@@ -254,9 +255,14 @@ export function createIdempotentApply(logger: Logger, kubeconfig?: string) {
       // K8s client returns either the resource directly or wrapped in a body property
       const resourceBody = 'body' in result && result.body ? result.body : result;
       return Success(resourceBody as K8sResource);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Check if it's an "already exists" error
-      if (error.statusCode === 409 || error.response?.statusCode === 409) {
+      const errorObj = error as {
+        statusCode?: number;
+        response?: { statusCode?: number };
+        message?: string;
+      };
+      if (errorObj.statusCode === 409 || errorObj.response?.statusCode === 409) {
         logger.debug({ kind: resource.kind, name }, 'Resource already exists, attempting update');
         // Resource already exists, try server-side apply
         return serverSideApply(resource, options);
@@ -264,8 +270,8 @@ export function createIdempotentApply(logger: Logger, kubeconfig?: string) {
 
       logger.error(
         {
-          error: error.message,
-          statusCode: error.statusCode,
+          error: errorObj.message,
+          statusCode: errorObj.statusCode,
           kind: resource.kind,
           name,
           namespace,
@@ -273,7 +279,9 @@ export function createIdempotentApply(logger: Logger, kubeconfig?: string) {
         'Failed to create resource',
       );
 
-      return Failure(`Failed to create ${resource.kind}/${name}: ${error.message}`);
+      return Failure(
+        `Failed to create ${resource.kind}/${name}: ${errorObj.message || 'Unknown error'}`,
+      );
     }
   }
 
@@ -342,8 +350,6 @@ export function parseManifests(yamlContent: string): K8sResource[] {
       return resource?.kind && resource.apiVersion;
     }) as K8sResource[];
   } catch {
-    // Return empty array if js-yaml parsing fails
-    // Note: No logger available here as this is a standalone utility function
     return [];
   }
 }

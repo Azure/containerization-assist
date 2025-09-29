@@ -2,7 +2,7 @@
  * Mock MCP Sampler for testing
  */
 
-import { Success as ok, Failure as fail, type Result } from '../../src/core/types';
+import { Success as ok, Failure as fail, type Result } from "../../src/types"
 
 export class MockMCPSampler {
   private mockResponses: Map<string, any> = new Map();

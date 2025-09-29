@@ -6,5 +6,3 @@
 
 // Re-export from infrastructure
 export { createDockerClient, type DockerBuildOptions } from '@/infra/docker/client';
-
-export { getImageMetadata } from '@/infra/docker/registry';

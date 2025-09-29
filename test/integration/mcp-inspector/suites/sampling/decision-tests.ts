@@ -4,7 +4,7 @@
  * Tests for validating sampling decisions, scoring, and tie-breaking
  */
 
-import type { TestCase, MCPTestRunner, TestResult } from '../../services/test-runner.js';
+import type { TestCase, MCPTestRunner, TestInfrastructureResult as TestResult } from "../../infrastructure/test-runner".js';
 import { config } from '../../../../../src/config/index.js';
 
 export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase[] => {
@@ -17,7 +17,7 @@ export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase
       description: 'Verify scoring produces consistent results',
       tags: ['sampling', 'scoring', 'deterministic'],
       timeout: 60000,
-      execute: async (): Promise<TestResult> => {
+      execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
         const sessionId = `scoring-${Date.now()}`;
         
@@ -81,7 +81,7 @@ export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase
       description: 'Verify early stop triggers on high score',
       tags: ['sampling', 'optimization', 'early-stop'],
       timeout: 45000,
-      execute: async (): Promise<TestResult> => {
+      execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
         const sessionId = `early-stop-${Date.now()}`;
         
@@ -133,7 +133,7 @@ export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase
       description: 'Verify candidates are ranked correctly',
       tags: ['sampling', 'ranking'],
       timeout: 45000,
-      execute: async (): Promise<TestResult> => {
+      execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
         const sessionId = `ranking-${Date.now()}`;
         
@@ -197,7 +197,7 @@ export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase
       description: 'Verify score breakdown is tracked for each candidate',
       tags: ['sampling', 'scoring', 'observability'],
       timeout: 45000,
-      execute: async (): Promise<TestResult> => {
+      execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
         const sessionId = `breakdown-${Date.now()}`;
         
@@ -252,7 +252,7 @@ export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase
       description: 'Verify sampling cache improves performance',
       tags: ['sampling', 'cache', 'performance'],
       timeout: 90000,
-      execute: async (): Promise<TestResult> => {
+      execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
         const sessionId = `cache-test-${Date.now()}`;
         

@@ -8,6 +8,8 @@ import type { Tool } from '@/types/tool';
 import { promptTemplates, type AcaManifestParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
+import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
+import { scoreACAManifest } from '@/lib/sampling';
 import { generateAcaManifestsSchema } from './schema';
 import type { AIResponse } from '../ai-response-types';
 import type { z } from 'zod';
@@ -50,23 +52,41 @@ async function run(
     knowledgeBudget: 3500, // Character budget for knowledge snippets
   });
 
-  // Execute via AI with structured messages
-  const mcpMessages = toMCPMessages(messages);
-  const response = await ctx.sampling.createMessage({
-    ...mcpMessages, // Spreads the messages array
-    maxTokens: 8192,
-    modelPreferences: {
-      hints: [{ name: 'azure-container-apps' }],
-    },
-  });
+  // Execute via AI with sampling and reranking
+  const samplingResult = await sampleWithRerank(
+    ctx,
+    async (attemptIndex) => ({
+      ...toMCPMessages(messages),
+      maxTokens: 8192,
+      modelPreferences: {
+        hints: [{ name: 'azure-container-apps' }],
+        intelligencePriority: 0.85,
+        speedPriority: attemptIndex > 0 ? 0.8 : 0.5,
+        costPriority: 0.3,
+      },
+    }),
+    scoreACAManifest,
+    { count: 3, stopAt: 80 },
+  );
 
-  try {
-    const responseText = response.content[0]?.text || '';
-    return Success({ manifests: responseText });
-  } catch (e) {
-    const error = e as Error;
-    return Failure(`AI response parsing failed: ${error.message}`);
+  if (!samplingResult.ok) {
+    return Failure(`ACA manifest generation failed: ${samplingResult.error}`);
   }
+
+  const responseText = samplingResult.value.text;
+  if (!responseText) {
+    return Failure('Empty response from AI');
+  }
+
+  ctx.logger.info(
+    {
+      score: samplingResult.value.winner.score,
+      scoreBreakdown: samplingResult.value.winner.scoreBreakdown,
+    },
+    'ACA manifest generated with sampling',
+  );
+
+  return Success({ manifests: responseText });
 }
 
 const tool: Tool<typeof generateAcaManifestsSchema, AIResponse> = {
@@ -75,15 +95,13 @@ const tool: Tool<typeof generateAcaManifestsSchema, AIResponse> = {
   category: 'azure',
   version,
   schema: generateAcaManifestsSchema,
+  metadata: {
+    aiDriven: true,
+    knowledgeEnhanced: true,
+    samplingStrategy: 'rerank',
+    enhancementCapabilities: ['content-generation', 'manifest-generation', 'azure-optimization'],
+  },
   run,
 };
 
 export default tool;
-
-export const metadata = {
-  name,
-  description,
-  version,
-  aiDriven: true,
-  knowledgeEnhanced: true,
-};

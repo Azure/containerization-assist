@@ -11,7 +11,7 @@ import { extractErrorMessage } from '@/lib/error-utils';
 import { createLogger, type Logger } from '@/lib/logger';
 import { extractSchemaShape } from '@/lib/zod-utils';
 import { createToolContext } from '@/mcp/context';
-import { createSessionManager } from '@/lib/session';
+import { createSessionManager } from '@/session/core';
 import type { Tool } from '@/types/tool';
 
 /**
@@ -40,6 +40,7 @@ export interface MCPServer {
  * Create an MCP server that uses tools from registry
  */
 export function createMCPServer(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tools: Array<Tool<any, any>>,
   options: ServerOptions = {},
 ): MCPServer {

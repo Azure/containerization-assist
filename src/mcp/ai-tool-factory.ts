@@ -274,7 +274,6 @@ export function createPromptBackedTool(config: PromptBackedToolConfig) {
         data: parseResult.value,
         metadata: {
           environment,
-          // tokensUsed removed - SamplingResponse doesn't have usage field
         },
       };
 

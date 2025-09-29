@@ -46,8 +46,6 @@ describe('Docker Client Enhanced Error Handling', () => {
   });
 
   describe('buildImage error scenarios', () => {
-    // Removed skipped test: tar-fs library hangs on non-existent paths
-    // This is a known library issue, not a problem with our error handling
   });
 
   describe('getImage error scenarios', () => {

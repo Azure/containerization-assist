@@ -18,17 +18,26 @@ import { normalizePath } from '@/lib/path-utils';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import type { Logger } from '@/lib/logger';
 import { promises as fs } from 'node:fs';
-import { ensureSession, getSession, updateSession } from '@/mcp/tool-session-helpers';
 import { createStandardProgress } from '@/mcp/progress-helper';
 import type { ToolContext } from '@/mcp/context';
 import { createDockerClient, type DockerBuildOptions } from '@/lib/docker';
 
-import { type Result, Success, Failure } from '@/types';
+import { type Result, Success, Failure, TOPICS } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { fileExists } from '@/lib/file-utils';
 import { type BuildImageParams, buildImageSchema } from './schema';
-import type { SessionData } from '@/tools/session-types';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
+import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
+import { buildMessages } from '@/ai/prompt-engine';
+import { toMCPMessages, type MCPMessage } from '@/mcp/ai/message-converter';
+
+// Additional result interface for AI suggestions
+export interface BuildOptimizationSuggestions {
+  suggestions: string[];
+  optimizations: string[];
+  nextSteps: string[];
+  confidence: number;
+}
 
 export interface BuildImageResult {
   /** Whether the build completed successfully */
@@ -49,6 +58,8 @@ export interface BuildImageResult {
   logs: string[];
   /** Security-related warnings discovered during build */
   securityWarnings?: string[];
+  /** AI-powered optimization suggestions */
+  optimizationSuggestions?: BuildOptimizationSuggestions;
   /** Workflow hints for the next step */
   workflowHints?: {
     nextStep: string;
@@ -61,7 +72,6 @@ export interface BuildImageResult {
  */
 async function prepareBuildArgs(
   buildArgs: Record<string, string> = {},
-  sessionId: string,
   context: ToolContext,
   logger: Logger,
 ): Promise<Record<string, string>> {
@@ -73,17 +83,19 @@ async function prepareBuildArgs(
 
   try {
     // Get analysis data from session metadata
-    const sessionData = await getSession(sessionId, context);
-    if (sessionData.ok && sessionData.value.state.results?.['analyze-repo']) {
-      const analysisResult = sessionData.value.state.results['analyze-repo'] as RepositoryAnalysis;
-      if (analysisResult.language) {
-        defaults.LANGUAGE = analysisResult.language;
-      }
-      if (analysisResult.framework) {
-        defaults.FRAMEWORK = analysisResult.framework;
-      }
-      if (analysisResult.frameworkVersion) {
-        defaults.FRAMEWORK_VERSION = analysisResult.frameworkVersion;
+    if (context.session) {
+      const results = context.session.get('results');
+      if (results && typeof results === 'object' && 'analyze-repo' in results) {
+        const analysisResult = (results as any)['analyze-repo'] as RepositoryAnalysis;
+        if (analysisResult.language) {
+          defaults.LANGUAGE = analysisResult.language;
+        }
+        if (analysisResult.framework) {
+          defaults.FRAMEWORK = analysisResult.framework;
+        }
+        if (analysisResult.frameworkVersion) {
+          defaults.FRAMEWORK_VERSION = analysisResult.frameworkVersion;
+        }
       }
     }
   } catch (error) {
@@ -91,6 +103,181 @@ async function prepareBuildArgs(
   }
 
   return { ...defaults, ...buildArgs };
+}
+
+/**
+ * Score build optimization suggestions based on content quality and relevance
+ */
+function scoreBuildOptimization(text: string): number {
+  let score = 0;
+
+  // Basic content quality (30 points)
+  if (text.length > 100) score += 10;
+  if (text.includes('\n')) score += 10;
+  if (!text.toLowerCase().includes('error')) score += 10;
+
+  // Optimization indicators (40 points)
+  if (/layer|cache|size|performance|speed/i.test(text)) score += 15;
+  if (/multi-stage|alpine|distroless/i.test(text)) score += 10;
+  if (/security|vulnerability|best.practice/i.test(text)) score += 15;
+
+  // Structure and actionability (30 points)
+  if (/\d+\.|-|\*/.test(text)) score += 10; // Has list structure
+  if (/optimize|improve|reduce|enhance/i.test(text)) score += 10;
+  if (text.split('\n').length >= 3) score += 10; // Multi-line content
+
+  return Math.min(score, 100);
+}
+
+/**
+ * Build optimization prompt for AI enhancement
+ */
+async function buildOptimizationPrompt(
+  buildContext: string,
+  dockerfileContent: string,
+  buildLogs: string[],
+  imageSize: number,
+  buildTime: number,
+): Promise<{ messages: MCPMessage[]; maxTokens: number }> {
+  const basePrompt = `You are a Docker optimization expert. Analyze build results and provide specific optimization suggestions.
+
+Focus on:
+1. Image size reduction techniques
+2. Build time optimization
+3. Layer caching strategies
+4. Security improvements
+5. Performance enhancements
+
+Provide concrete, actionable recommendations.
+
+Analyze this Docker build and provide optimization suggestions:
+
+**Build Context:** ${buildContext}
+
+**Dockerfile Content:**
+\`\`\`dockerfile
+${dockerfileContent}
+\`\`\`
+
+**Build Metrics:**
+- Image size: ${(imageSize / (1024 * 1024)).toFixed(2)} MB
+- Build time: ${(buildTime / 1000).toFixed(2)} seconds
+
+**Build Logs (last 10 lines):**
+${buildLogs.slice(-10).join('\n')}
+
+Please provide:
+1. **Size Optimization:** Specific techniques to reduce image size
+2. **Build Performance:** Ways to improve build speed and caching
+3. **Security Enhancements:** Security-focused improvements
+4. **Best Practices:** Docker best practices not currently followed
+
+Format your response as clear, actionable recommendations.`;
+
+  const messages = await buildMessages({
+    basePrompt,
+    topic: TOPICS.DOCKER_OPTIMIZATION,
+    tool: 'build-image',
+    environment: 'docker',
+  });
+
+  return { messages: toMCPMessages(messages).messages, maxTokens: 2048 };
+}
+
+/**
+ * Generate AI-powered build optimization suggestions
+ */
+async function generateOptimizationSuggestions(
+  buildContext: string,
+  dockerfileContent: string,
+  buildResult: { logs?: string[]; size?: number; imageId: string },
+  ctx: ToolContext,
+  buildStartTime: number,
+): Promise<Result<BuildOptimizationSuggestions>> {
+  try {
+    const optimizationResult = await sampleWithRerank(
+      ctx,
+      async () =>
+        buildOptimizationPrompt(
+          buildContext,
+          dockerfileContent,
+          buildResult.logs || [],
+          buildResult.size || 0,
+          Date.now() - buildStartTime || 0,
+        ),
+      scoreBuildOptimization,
+      { count: 2, stopAt: 85 },
+    );
+
+    if (!optimizationResult.ok) {
+      return Failure(`Failed to generate optimization suggestions: ${optimizationResult.error}`);
+    }
+
+    const text = optimizationResult.value.text;
+
+    // Parse the AI response to extract structured suggestions
+    const suggestions: string[] = [];
+    const optimizations: string[] = [];
+    const nextSteps: string[] = [];
+
+    const lines = text
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    let currentSection = '';
+    for (const line of lines) {
+      if (line.includes('Size Optimization') || line.includes('size') || line.includes('Size')) {
+        currentSection = 'size';
+        continue;
+      }
+      if (
+        line.includes('Build Performance') ||
+        line.includes('performance') ||
+        line.includes('Performance')
+      ) {
+        currentSection = 'performance';
+        continue;
+      }
+      if (line.includes('Security') || line.includes('security')) {
+        currentSection = 'security';
+        continue;
+      }
+      if (line.includes('Best Practices') || line.includes('practices')) {
+        currentSection = 'practices';
+        continue;
+      }
+
+      if (line.startsWith('-') || line.startsWith('*') || line.match(/^\d+\./)) {
+        const cleanLine = line.replace(/^[-*\d.]\s*/, '');
+        if (cleanLine.length > 10) {
+          if (currentSection === 'size') {
+            optimizations.push(`Size: ${cleanLine}`);
+          } else if (currentSection === 'performance') {
+            optimizations.push(`Performance: ${cleanLine}`);
+          } else if (currentSection === 'security') {
+            suggestions.push(`Security: ${cleanLine}`);
+          } else {
+            suggestions.push(cleanLine);
+          }
+        }
+      }
+    }
+
+    // Add general next steps
+    nextSteps.push('Consider implementing multi-stage builds if not already used');
+    nextSteps.push('Review and optimize layer caching strategy');
+    nextSteps.push('Scan image for security vulnerabilities');
+
+    return Success({
+      suggestions,
+      optimizations,
+      nextSteps,
+      confidence: optimizationResult.value.winner.score,
+    });
+  } catch (error) {
+    return Failure(`Failed to generate optimization suggestions: ${extractErrorMessage(error)}`);
+  }
 }
 
 /**
@@ -163,29 +350,30 @@ async function buildImageImpl(
 
     const startTime = Date.now();
 
-    // Ensure session exists and get typed slice operations
-    const sessionResult = await ensureSession(context, params.sessionId);
-    if (!sessionResult.ok) {
-      return Failure(sessionResult.error);
+    // Use session facade directly
+    const sessionId = params.sessionId || context.session?.id;
+    if (!sessionId) {
+      return Failure('Session ID is required for build operations');
     }
-
-    const { id: sessionId, state: session } = sessionResult.value;
 
     logger.info({ sessionId }, 'Starting Docker image build with session');
 
     const dockerClient = createDockerClient(logger);
 
     // Determine paths
-    const sessionData = session as SessionData;
     const repoPath = buildContext;
     let finalDockerfilePath = dockerfilePath
       ? path.resolve(repoPath, dockerfilePath)
       : path.resolve(repoPath, dockerfile);
 
     // Check if we should use a generated Dockerfile
-    const dockerfileResult = sessionData?.results?.['generate-dockerfile'] as
-      | { path?: string; content?: string }
-      | undefined;
+    const results = context.session?.get('results');
+    const dockerfileResult =
+      results && typeof results === 'object' && 'generate-dockerfile' in results
+        ? ((results as any)['generate-dockerfile'] as
+            | { path?: string; content?: string }
+            | undefined)
+        : undefined;
     const generatedPath = dockerfileResult?.path;
 
     if (!(await fileExists(finalDockerfilePath))) {
@@ -250,7 +438,7 @@ async function buildImageImpl(
     }
 
     // Prepare build arguments
-    const finalBuildArgs = await prepareBuildArgs(buildArgs, sessionId, context, logger);
+    const finalBuildArgs = await prepareBuildArgs(buildArgs, context, logger);
 
     // Analyze security
     const securityWarnings = analyzeBuildSecurity(dockerfileContent, finalBuildArgs);
@@ -286,6 +474,35 @@ async function buildImageImpl(
 
     if (!buildResult.ok) {
       const errorMessage = buildResult.error ?? 'Unknown error';
+
+      // Prepare tags for failed result
+      const resultTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
+
+      // Create a failed result but with workflowHints to guide next steps
+      const failedResult: BuildImageResult = {
+        success: false,
+        sessionId,
+        imageId: '',
+        tags: resultTags,
+        size: 0,
+        buildTime: Date.now() - startTime,
+        logs: [],
+        workflowHints: {
+          nextStep: 'fix-dockerfile',
+          message: `Build failed. Use "fix-dockerfile" with the same Dockerfile to automatically fix common issues, or review build logs for specific problems.`,
+        },
+      };
+
+      // Update session with failed result
+      if (context.session) {
+        context.session.set('results', {
+          ...((context.session.get('results') as Record<string, any>) || {}),
+          'build-image': failedResult,
+        });
+        context.session.set('current_step', 'build-image');
+        context.session.pushStep('build-image');
+      }
+
       return Failure(`Failed to build image: ${errorMessage}`);
     }
 
@@ -293,6 +510,40 @@ async function buildImageImpl(
 
     // Progress: Finalizing build results and updating session
     if (progress) await progress('FINALIZING');
+
+    // Generate AI-powered optimization suggestions for successful builds
+    let optimizationSuggestions: BuildOptimizationSuggestions | undefined;
+    try {
+      // Generate optimization suggestions
+      const suggestionResult = await generateOptimizationSuggestions(
+        buildContext,
+        dockerfileContent,
+        buildResult.value,
+        context,
+        startTime,
+      );
+
+      if (suggestionResult.ok) {
+        optimizationSuggestions = suggestionResult.value;
+        logger.info(
+          {
+            suggestions: optimizationSuggestions.suggestions.length,
+            confidence: optimizationSuggestions.confidence,
+          },
+          'Generated AI optimization suggestions',
+        );
+      } else {
+        logger.warn(
+          { error: suggestionResult.error },
+          'Failed to generate optimization suggestions',
+        );
+      }
+    } catch (error) {
+      logger.warn(
+        { error: extractErrorMessage(error) },
+        'Error generating optimization suggestions',
+      );
+    }
 
     // Prepare the result
     const finalTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
@@ -308,25 +559,22 @@ async function buildImageImpl(
       buildTime,
       logs: buildResult.value.logs,
       ...(securityWarnings.length > 0 && { securityWarnings }),
+      ...(optimizationSuggestions && { optimizationSuggestions }),
       workflowHints: {
         nextStep: 'push-image',
-        message: `Image built successfully. Use "push-image" with sessionId ${sessionId} to push to a registry, or "generate-k8s-manifests" to create deployment manifests.`,
+        message: `Image built successfully. Use "push-image" with sessionId ${sessionId} to push to a registry, or "generate-k8s-manifests" to create deployment manifests.${optimizationSuggestions ? ' Review AI optimization suggestions for improvements.' : ''}`,
       },
     };
 
     // Store build result in session
-    const currentSteps = sessionResult.ok ? sessionResult.value.state.completed_steps || [] : [];
-    await updateSession(
-      sessionId,
-      {
-        results: {
-          'build-image': result,
-        },
-        completed_steps: [...currentSteps, 'build-image'],
-        current_step: 'build-image',
-      },
-      context,
-    );
+    if (context.session) {
+      context.session.set('results', {
+        ...((context.session.get('results') as Record<string, any>) || {}),
+        'build-image': result,
+      });
+      context.session.set('current_step', 'build-image');
+      context.session.pushStep('build-image');
+    }
 
     timer.end({ imageId: buildResult.value.imageId, buildTime });
     logger.info({ imageId: buildResult.value.imageId, buildTime }, 'Docker image build completed');
@@ -353,9 +601,15 @@ import type { Tool } from '@/types/tool';
 
 const tool: Tool<typeof buildImageSchema, BuildImageResult> = {
   name: 'build-image',
-  description: 'Build Docker images from Dockerfiles',
+  description: 'Build Docker images from Dockerfiles with AI-powered optimization suggestions',
   version: '2.0.0',
   schema: buildImageSchema,
+  metadata: {
+    aiDriven: true,
+    knowledgeEnhanced: true,
+    samplingStrategy: 'rerank',
+    enhancementCapabilities: ['optimization-suggestions', 'build-analysis', 'performance-insights'],
+  },
   run: buildImageImpl,
 };
 

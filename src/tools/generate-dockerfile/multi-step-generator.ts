@@ -112,18 +112,9 @@ function extractInstructions(text: string): string {
     return '';
   }
 
-  // Log input for debugging
-  // console.log('[extractInstructions] Input text (first 200 chars):', text.substring(0, 200));
-
   // First, try to parse as JSON
   try {
     const parsed = JSON.parse(text) as unknown;
-    // Log parsed type for debugging
-    // console.log(
-    //   '[extractInstructions] Parsed as JSON:',
-    //   typeof parsed,
-    //   Array.isArray(parsed) ? 'array' : 'not array',
-    // );
 
     // Handle the expected contract format
     if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
@@ -131,12 +122,6 @@ function extractInstructions(text: string): string {
 
       const content = response.dockerfile_partial || response.dockerfile_v1;
       if (content !== undefined) {
-        // Log content type for debugging
-        // console.log(
-        //   '[extractInstructions] Found dockerfile_partial/v1, content type:',
-        //   typeof content,
-        // );
-
         if (Array.isArray(content)) {
           // Log array length for debugging
           // console.log('[extractInstructions] Content is array with', content.length, 'items');
@@ -476,7 +461,6 @@ Return ONLY the runtime configuration instructions.`,
     if (!content.includes('CMD') && !content.includes('ENTRYPOINT')) {
       return Failure('Failed to generate runtime instructions: missing CMD or ENTRYPOINT');
     }
-    // Validation passed, return the successful result
     return result;
   }
 

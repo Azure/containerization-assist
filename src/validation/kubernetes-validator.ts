@@ -16,6 +16,9 @@ import {
   ValidationCategory,
   ValidationGrade,
 } from './core-types';
+import { AIValidator } from './ai-validator';
+import type { ToolContext } from '@/mcp/context';
+import type { KnowledgeEnhancementResult } from '@/mcp/ai/knowledge-enhancement';
 
 // Type definitions for Kubernetes resources
 interface PodSpec {
@@ -550,6 +553,113 @@ export const validateKubernetesContent = (yamlContent: string): ValidationReport
 };
 
 /**
+ * Enhanced validation options for AI integration
+ */
+export interface KubernetesValidationOptions {
+  enableAI?: boolean;
+  aiOptions?: {
+    focus?: 'security' | 'performance' | 'best-practices' | 'all';
+    confidence?: number;
+    maxIssues?: number;
+    includeFixes?: boolean;
+  };
+}
+
+/**
+ * Validate Kubernetes content with optional AI enhancement
+ */
+export async function validateKubernetesContentWithAI(
+  content: string,
+  ctx: ToolContext,
+  options: KubernetesValidationOptions = {},
+): Promise<ValidationReport> {
+  // Run standard validation first
+  const baseReport = validateKubernetesContent(content);
+
+  // If AI enhancement is disabled or no context, return base report
+  if (options.enableAI === false || !ctx) {
+    return baseReport;
+  }
+
+  try {
+    // Run AI validation for additional insights
+    const aiValidator = new AIValidator();
+    const aiValidationResult = await aiValidator.validateWithAI(
+      content,
+      {
+        contentType: 'kubernetes',
+        focus: options.aiOptions?.focus || 'all',
+        confidence: options.aiOptions?.confidence || 0.7,
+        maxIssues: options.aiOptions?.maxIssues || 10,
+        includeFixes: options.aiOptions?.includeFixes ?? true,
+      },
+      ctx,
+    );
+
+    if (aiValidationResult.ok) {
+      const aiReport = aiValidationResult.value;
+
+      // Filter out AI results that duplicate existing rule-based results
+      // to avoid noise while preserving AI-unique insights
+      const existingRuleIds = new Set(baseReport.results.map((r) => r.ruleId));
+      const uniqueAIResults = aiReport.results.filter((result) => {
+        // Keep AI results that don't duplicate existing rules
+        // or provide additional insights with high confidence
+        return (
+          !existingRuleIds.has(result.ruleId) || (result.confidence && result.confidence > 0.8)
+        );
+      });
+
+      // Merge reports, prioritizing rule-based results but adding AI insights
+      const combinedResults = [
+        ...baseReport.results,
+        ...uniqueAIResults.map((aiResult) => ({
+          ...aiResult,
+          metadata: {
+            ...aiResult.metadata,
+            aiEnhanced: true,
+            aiModel: aiReport.aiMetadata.model,
+            aiConfidence: aiReport.aiMetadata.confidence,
+          },
+        })),
+      ];
+
+      // Calculate new counts with combined results
+      const errorCount = combinedResults.filter(
+        (r) => !r.isValid && r.metadata?.severity === ValidationSeverity.ERROR,
+      ).length;
+      const warningCount = combinedResults.filter(
+        (r) =>
+          (r.warnings && r.warnings.length > 0) ||
+          r.metadata?.severity === ValidationSeverity.WARNING,
+      ).length;
+      const infoCount = combinedResults.filter(
+        (r) => r.metadata?.severity === ValidationSeverity.INFO,
+      ).length;
+
+      return {
+        ...baseReport,
+        results: combinedResults,
+        passed: combinedResults.filter((r) => r.isValid).length,
+        failed: combinedResults.filter((r) => !r.isValid).length,
+        errors: errorCount,
+        warnings: warningCount,
+        info: infoCount,
+      };
+    } else {
+      ctx.logger.warn(
+        { error: aiValidationResult.error },
+        'AI validation failed, using standard validation only',
+      );
+      return baseReport;
+    }
+  } catch (error) {
+    ctx.logger.debug({ error }, 'AI validation threw exception, using standard validation only');
+    return baseReport;
+  }
+}
+
+/**
  * Get all Kubernetes validation rules
  */
 export const getKubernetesRules = (): KubernetesValidationRule[] => {
@@ -575,6 +685,86 @@ export const createKubernetesValidator = (): KubernetesValidatorInstance => {
     getCategory: getKubernetesRulesByCategory,
   };
 };
+
+/**
+ * Extended validation options for knowledge enhancement
+ */
+export interface KubernetesValidationKnowledgeOptions extends KubernetesValidationOptions {
+  enableKnowledge?: boolean;
+  knowledgeOptions?: {
+    targetImprovement?: 'security' | 'performance' | 'best-practices' | 'enhancement' | 'all';
+    userQuery?: string;
+  };
+}
+
+/**
+ * Validate Kubernetes manifests with knowledge enhancement integration
+ */
+export async function validateKubernetesManifestsWithKnowledge(
+  manifests: string,
+  ctx: ToolContext,
+  options: KubernetesValidationKnowledgeOptions = {},
+): Promise<ValidationReport & { knowledgeEnhancement?: KnowledgeEnhancementResult }> {
+  // Run standard validation first (including AI if enabled)
+  const baseReport = await validateKubernetesContentWithAI(manifests, ctx, options);
+
+  // If knowledge enhancement is disabled or no issues to address, return base report
+  if (options.enableKnowledge === false || !ctx) {
+    return baseReport;
+  }
+
+  // Only apply knowledge enhancement if there are validation issues
+  const hasIssues = !baseReport.results.every((r) => r.passed);
+
+  if (hasIssues) {
+    try {
+      // Import knowledge enhancement function
+      const { enhanceWithKnowledge, createEnhancementFromValidation } = await import(
+        '@/mcp/ai/knowledge-enhancement'
+      );
+
+      // Create knowledge enhancement request from validation results
+      const enhancementRequest = createEnhancementFromValidation(
+        manifests,
+        'kubernetes',
+        baseReport.results
+          .filter((r) => !r.passed)
+          .map((r) => ({
+            message: r.message || 'Validation issue',
+            severity: r.metadata?.severity === ValidationSeverity.ERROR ? 'error' : 'warning',
+            category: r.ruleId?.split('-')[1] || 'general',
+          })),
+        options.knowledgeOptions?.targetImprovement || 'security',
+      );
+
+      // Add user query if provided
+      if (options.knowledgeOptions?.userQuery) {
+        enhancementRequest.userQuery = options.knowledgeOptions.userQuery;
+      }
+
+      const enhancementResult = await enhanceWithKnowledge(enhancementRequest, ctx);
+
+      if (enhancementResult.ok) {
+        return {
+          ...baseReport,
+          knowledgeEnhancement: enhancementResult.value,
+        };
+      } else {
+        ctx.logger.warn(
+          { error: enhancementResult.error },
+          'Knowledge enhancement failed, using validation results only',
+        );
+      }
+    } catch (error) {
+      ctx.logger.debug(
+        { error },
+        'Knowledge enhancement threw exception, using validation results only',
+      );
+    }
+  }
+
+  return baseReport;
+}
 
 /**
  * Standalone validation function for simple use cases
