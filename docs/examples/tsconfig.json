@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@thgamble/containerization-assist-mcp": ["../../src/index.ts"],
+      "@thgamble/containerization-assist-mcp/*": ["../../src/*"],
+      "@thgamble/containerization-assist-mcp/server": ["../../src/mcp/server.ts"],
+      "@thgamble/containerization-assist-mcp/tools": ["../../src/exports/tools.ts"],
+      "@thgamble/containerization-assist-mcp/types": ["../../src/types/index.ts"],
+      "@thgamble/containerization-assist-mcp/config": ["../../src/config/index.ts"],
+      "@thgamble/containerization-assist-mcp/lib": ["../../src/lib/index.ts"],
+      "@thgamble/containerization-assist-mcp/tools/*": ["../../src/tools/*/index.ts"]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.js"
+  ]
+}

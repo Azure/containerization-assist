@@ -41,12 +41,12 @@
         "errors": 0
       },
       "build": {
-        "timeMs": 38000,
+        "timeMs": 2000,
         "mode": "clean",
         "environment": {
-          "nodeVersion": "v22.16.0",
-          "os": "Linux",
-          "cpu": "x86_64"
+          "nodeVersion": "v24.7.0",
+          "os": "Darwin",
+          "cpu": "arm64"
         }
       }
     }
