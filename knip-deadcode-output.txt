@@ -5,6 +5,8 @@ src/lib/content-utils.ts
 src/mcp/ai/index.ts                                    
 src/mcp/ai/knowledge-helpers.ts                        
 src/tools/generate-dockerfile/multi-step-generator.ts  
+Unused devDependencies (1)
+husky  package.json:228:6
 Unused exports (128)
 formatGitHubAnnotation                    function  src/cli/error-formatting.ts:43:17            
 handleCIError                             function  src/cli/error-formatting.ts:75:17            

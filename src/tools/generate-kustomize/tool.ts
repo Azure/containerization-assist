@@ -20,6 +20,13 @@ import type { z } from 'zod';
 
 type GenerateKustomizeParams = z.infer<typeof generateKustomizeSchema>;
 
+/**
+ * Type for environment patch configuration
+ */
+type PatchConfig = NonNullable<
+  NonNullable<GenerateKustomizeParams['envConfig']>[string]['patches']
+>[number];
+
 const name = 'generate-kustomize';
 const description =
   'Generate Kustomize structure from Kubernetes manifests for multi-environment deployments';
@@ -243,7 +250,7 @@ async function run(
       if (envOverrides.patches) {
         // Transform patches to match KustomizationConfig interface
         patches.push(
-          ...envOverrides.patches.map((p: any) => ({
+          ...envOverrides.patches.map((p: PatchConfig) => ({
             target: {
               ...(p.target.kind && { kind: p.target.kind }),
               ...(p.target.name && { name: p.target.name }),
