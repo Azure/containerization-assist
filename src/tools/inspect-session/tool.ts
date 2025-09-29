@@ -242,6 +242,12 @@ const tool: Tool<typeof InspectSessionParamsSchema, InspectSessionResult> = {
   description: 'Provides debugging capabilities for session management',
   version: '2.0.0',
   schema: InspectSessionParamsSchema,
+  metadata: {
+    aiDriven: false,
+    knowledgeEnhanced: false,
+    samplingStrategy: 'none',
+    enhancementCapabilities: [],
+  },
   run,
 };
 

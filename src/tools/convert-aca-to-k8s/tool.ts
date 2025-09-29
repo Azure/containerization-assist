@@ -8,6 +8,8 @@ import type { Tool } from '@/types/tool';
 import { promptTemplates } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
+import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
+import { scoreACAConversion } from '@/lib/sampling';
 import { convertAcaToK8sSchema } from './schema';
 import type { AIResponse } from '../ai-response-types';
 import type { z } from 'zod';
@@ -40,16 +42,27 @@ async function run(
 
   // Execute via AI with structured messages
   const mcpMessages = toMCPMessages(messages);
-  const response = await ctx.sampling.createMessage({
-    ...mcpMessages, // Spreads the messages array
-    maxTokens: 8192,
-    modelPreferences: {
-      hints: [{ name: 'kubernetes-conversion' }],
-    },
-  });
+  const response = await sampleWithRerank(
+    ctx,
+    async (attempt) => ({
+      ...mcpMessages,
+      maxTokens: 8192,
+      modelPreferences: {
+        hints: [{ name: 'kubernetes-conversion' }],
+        intelligencePriority: 0.85,
+        speedPriority: attempt > 0 ? 0.6 : 0.3,
+      },
+    }),
+    scoreACAConversion,
+    { count: 3, stopAt: 85 },
+  );
+
+  if (!response.ok) {
+    return Failure(`AI sampling failed: ${response.error}`);
+  }
 
   try {
-    const responseText = response.content[0]?.text || '';
+    const responseText = response.value.text;
     return Success({ k8sManifests: responseText });
   } catch (e) {
     const error = e as Error;
@@ -63,15 +76,13 @@ const tool: Tool<typeof convertAcaToK8sSchema, AIResponse> = {
   category: 'azure',
   version,
   schema: convertAcaToK8sSchema,
+  metadata: {
+    aiDriven: true,
+    knowledgeEnhanced: true,
+    samplingStrategy: 'rerank',
+    enhancementCapabilities: ['content-generation', 'manifest-conversion', 'platform-translation'],
+  },
   run,
 };
 
 export default tool;
-
-export const metadata = {
-  name,
-  description,
-  version,
-  aiDriven: true,
-  knowledgeEnhanced: true,
-};

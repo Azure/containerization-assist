@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import type { Result } from './core';
 import type { ToolContext } from '@/mcp/context';
 import type { ToolCategory } from './categories';
+import type { ToolMetadata } from './tool-metadata';
 
 /**
  * Unified tool interface for all MCP tools
@@ -22,6 +23,9 @@ export interface Tool<TSchema extends z.ZodTypeAny = z.ZodAny, TOut = unknown> {
   /** Zod schema for input validation */
   schema: TSchema;
 
+  /** Tool metadata for AI enhancement tracking (required) */
+  metadata: ToolMetadata;
+
   /**
    * Execute the tool with validated input
    * Validation happens at the MCP server level
@@ -30,9 +34,9 @@ export interface Tool<TSchema extends z.ZodTypeAny = z.ZodAny, TOut = unknown> {
 }
 
 // Utility types for tool creation
-export type ToolInput<T> = T extends Tool<infer S, any> ? z.infer<S> : never;
+export type ToolInput<T> = T extends Tool<infer S, unknown> ? z.infer<S> : never;
 
-export type ToolOutput<T> = T extends Tool<any, infer O> ? O : never;
+export type ToolOutput<T> = T extends Tool<z.ZodTypeAny, infer O> ? O : never;
 
 // Tool factory for consistency
 export function createTool<TSchema extends z.ZodTypeAny, TOut>(

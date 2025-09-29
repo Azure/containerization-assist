@@ -54,7 +54,7 @@ describe('Knowledge Enhancement Integration', () => {
     // Check for hints or other parameters to determine the response type
     const hints = params?.modelPreferences?.hints;
 
-    if (hints?.some((h: any) => h.name === 'json-output' || h.name === 'code-analysis')) {
+    if (hints?.some((h: any) => h.name === 'json-output' || h.name === 'code-analysis' || h.name === 'repo-analysis')) {
       // For analyze-repo - return JSON analysis
       return Promise.resolve({
         content: [{ text: JSON.stringify({

@@ -741,25 +741,6 @@ export const createDockerClient = (logger: Logger, config?: DockerClientConfig):
 };
 
 /**
- * Create a mutex-protected Docker client (for backward compatibility)
- * @deprecated Use createDockerClient with enableMutex option instead
- */
-export async function createMutexDockerClient(logger: Logger): Promise<DockerClient> {
-  // Import config lazily to avoid circular dependency
-  const configModule = await import('@/config/index');
-  const { config } = configModule;
-
-  return createDockerClient(logger, {
-    enableMutex: true,
-    mutexConfig: {
-      defaultTimeout: config.mutex.defaultTimeout,
-      dockerBuildTimeout: config.mutex.dockerBuildTimeout,
-      monitoringEnabled: config.mutex.monitoringEnabled,
-    },
-  });
-}
-
-/**
  * Get mutex status for monitoring
  */
 export function getDockerMutexStatus(): Map<string, unknown> {

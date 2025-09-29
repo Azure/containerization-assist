@@ -178,8 +178,7 @@ export class DockerTestCleaner {
   private async performCleanup(): Promise<void> {
     // Clean tracked containers first (they might reference images)
     await this.cleanTrackedContainers();
-    
-    // Clean tracked images - this is sufficient since we track everything we create
+
     await this.cleanTrackedImages();
     
     // Optional: Clean build cache if requested

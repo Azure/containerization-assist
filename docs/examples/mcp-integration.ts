@@ -1,15 +1,10 @@
 /**
  * Example: Integration with MCP SDK
- * Shows how to register Container Assist tools with an MCP server
+ * Shows how to use Container Assist with an MCP server
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import {
-  createContainerAssistServer,
-  registerAllTools,
-  registerTool,
-  tools
-} from '@thgamble/containerization-assist-mcp';
+import { createApp } from '@thgamble/containerization-assist-mcp';
 
 /**
  * Example 1: Register all tools with default names
@@ -19,83 +14,90 @@ async function registerAllToolsExample() {
     name: 'my-mcp-server',
     version: '1.0.0'
   });
-  
-  const caServer = createContainerAssistServer();
-  caServer.bindAll({ server });
-  
-  // Start the server
+
+  const app = createApp();
+  app.bindToMCP(server);
+
+  console.log('✅ All Container Assist tools registered with default names');
+
+  // List tools
+  const tools = app.listTools();
+  console.log(`Registered ${tools.length} tools:`);
+  tools.forEach(tool => console.log(`- ${tool.name}`));
+
   // McpServer uses connect() instead of start()
   // await server.connect(transport);
 }
 
 /**
- * Example 2: Register specific tools with custom names
+ * Example 2: Register tools with custom names
  */
 async function registerCustomToolsExample() {
-  
   const server = new McpServer({
     name: 'my-custom-server',
     version: '1.0.0'
   });
-  
-  // Create Container Assist instance and register specific tools
-  const caServer = createContainerAssistServer();
-  caServer.bindSampling({ server });
-  caServer.registerTools(
-    { server },
-    {
-      tools: ['analyze_repo', 'build_image', 'deploy_application'],
-      nameMapping: {
-        'analyze_repo': 'analyze_repository',
-        'build_image': 'docker_build',
-        'deploy_application': 'k8s_deploy'
-      }
+
+  // Create app with custom tool names
+  const app = createApp({
+    toolAliases: {
+      'analyze-repo': 'analyze_repository',
+      'build-image': 'docker_build',
+      'deploy': 'k8s_deploy'
     }
-  );
-  
+  });
+
+  app.bindToMCP(server);
+
   console.log('Custom tools registered:');
-  console.log('- analyze_repository (was: analyze_repo)');
-  console.log('- docker_build (was: build_image)');
-  console.log('- k8s_deploy (was: deploy_application)\n');
-  
+  console.log('- analyze_repository (was: analyze-repo)');
+  console.log('- docker_build (was: build-image)');
+  console.log('- k8s_deploy (was: deploy)\n');
+
   // McpServer uses connect() instead of start()
   // await server.connect(transport);
 }
 
 /**
- * Example 3: Register tools with name mapping
+ * Example 3: Register tools with comprehensive name mapping
  */
 async function registerWithMappingExample() {
   console.log('=== Name Mapping Example ===\n');
-  
+
   const server = new McpServer({
     name: 'mapped-server',
     version: '1.0.0'
   });
-  
-  // Create Container Assist instance
-  const caServer = createContainerAssistServer();
-  
-  // Define custom names for all tools
-  const nameMapping = {
-    analyze_repo: 'project_analyze',
-    generate_dockerfile: 'dockerfile_create',
-    build_image: 'image_build',
-    scan_image: 'security_scan',
-    deploy_application: 'app_deploy',
-    verify_deployment: 'deployment_check'
-  };
-  
-  // Register all tools with custom names
-  caServer.bindSampling({ server });
-  caServer.registerTools({ server }, { nameMapping });
-  
+
+  // Define custom names for tools
+  const app = createApp({
+    toolAliases: {
+      'analyze-repo': 'project_analyze',
+      'generate-dockerfile': 'dockerfile_create',
+      'build-image': 'image_build',
+      'scan': 'security_scan',
+      'deploy': 'app_deploy',
+      'verify-deploy': 'deployment_check'
+    }
+  });
+
+  app.bindToMCP(server);
+
   console.log('Tools registered with custom names:');
-  Object.entries(nameMapping).forEach(([original, custom]) => {
+  const aliases = {
+    'analyze-repo': 'project_analyze',
+    'generate-dockerfile': 'dockerfile_create',
+    'build-image': 'image_build',
+    'scan': 'security_scan',
+    'deploy': 'app_deploy',
+    'verify-deploy': 'deployment_check'
+  };
+
+  Object.entries(aliases).forEach(([original, custom]) => {
     console.log(`- ${custom} (was: ${original})`);
   });
   console.log('');
-  
+
   // McpServer uses connect() instead of start()
   // await server.connect(transport);
 }
@@ -103,7 +105,7 @@ async function registerWithMappingExample() {
 // Run examples (choose one)
 if (import.meta.url === `file://${process.argv[1]}`) {
   const example = process.argv[2] || 'all';
-  
+
   switch (example) {
     case 'all':
       await registerAllToolsExample();
@@ -119,8 +121,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   }
 }
 
-export { 
-  registerAllToolsExample, 
-  registerCustomToolsExample, 
-  registerWithMappingExample 
+export {
+  registerAllToolsExample,
+  registerCustomToolsExample,
+  registerWithMappingExample
 };

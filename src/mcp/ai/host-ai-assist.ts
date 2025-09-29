@@ -8,6 +8,7 @@ import type { ToolContext } from '@/mcp/context';
 import { z, type ZodType } from 'zod';
 import { createSuggestionRegistry, type SuggestionGenerator } from './default-suggestions';
 import { extractJSON } from '@/mcp/ai-tool-factory';
+import { AI_CONFIG } from '@/config/ai-constants';
 
 /**
  * AI parameter suggestion request
@@ -144,7 +145,7 @@ export function createHostAIAssistant(
   logger?: Logger,
 ): HostAIAssistant {
   const enabled = config.enabled ?? true;
-  const defaultConfidence = config.defaultConfidence ?? 0.7;
+  const defaultConfidence = config.defaultConfidence ?? AI_CONFIG.CONFIDENCE.DEFAULT;
 
   return {
     async suggestParameters(

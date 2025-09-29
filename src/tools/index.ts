@@ -15,6 +15,7 @@ import generateAcaManifestsTool from './generate-aca-manifests/tool';
 import generateDockerfileTool from './generate-dockerfile/tool';
 import generateHelmChartsTool from './generate-helm-charts/tool';
 import generateK8sManifestsTool from './generate-k8s-manifests/tool';
+import generateKustomizeTool from './generate-kustomize/tool';
 import inspectSessionTool from './inspect-session/tool';
 import opsTool from './ops/tool';
 import prepareClusterTool from './prepare-cluster/tool';
@@ -35,6 +36,7 @@ export const TOOL_NAMES = {
   GENERATE_DOCKERFILE: 'generate-dockerfile',
   GENERATE_HELM_CHARTS: 'generate-helm-charts',
   GENERATE_K8S_MANIFESTS: 'generate-k8s-manifests',
+  GENERATE_KUSTOMIZE: 'generate-kustomize',
   INSPECT_SESSION: 'inspect-session',
   OPS: 'ops',
   PREPARE_CLUSTER: 'prepare-cluster',
@@ -58,6 +60,7 @@ generateAcaManifestsTool.name = TOOL_NAMES.GENERATE_ACA_MANIFESTS;
 generateDockerfileTool.name = TOOL_NAMES.GENERATE_DOCKERFILE;
 generateHelmChartsTool.name = TOOL_NAMES.GENERATE_HELM_CHARTS;
 generateK8sManifestsTool.name = TOOL_NAMES.GENERATE_K8S_MANIFESTS;
+generateKustomizeTool.name = TOOL_NAMES.GENERATE_KUSTOMIZE;
 inspectSessionTool.name = TOOL_NAMES.INSPECT_SESSION;
 opsTool.name = TOOL_NAMES.OPS;
 prepareClusterTool.name = TOOL_NAMES.PREPARE_CLUSTER;
@@ -78,6 +81,7 @@ export type AllToolTypes =
   | typeof generateDockerfileTool
   | typeof generateHelmChartsTool
   | typeof generateK8sManifestsTool
+  | typeof generateKustomizeTool
   | typeof inspectSessionTool
   | typeof opsTool
   | typeof prepareClusterTool
@@ -98,6 +102,7 @@ export const ALL_TOOLS: readonly AllToolTypes[] = [
   generateDockerfileTool,
   generateHelmChartsTool,
   generateK8sManifestsTool,
+  generateKustomizeTool,
   inspectSessionTool,
   opsTool,
   prepareClusterTool,

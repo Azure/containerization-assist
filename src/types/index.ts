@@ -104,6 +104,8 @@ export interface BuildPromptParams {
   topic: Topic;
   tool: string;
   environment: string;
+  language?: string;
+  framework?: string;
   contract?: OutputContract;
   knowledgeBudget?: number;
 }

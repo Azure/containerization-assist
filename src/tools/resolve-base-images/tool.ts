@@ -8,6 +8,8 @@ import type { Tool } from '@/types/tool';
 import { promptTemplates, type BaseImageResolutionParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
+import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
+import { scoreBaseImageRecommendation } from '@/lib/sampling';
 import { resolveBaseImagesSchema } from './schema';
 import type { AIResponse } from '../ai-response-types';
 import type { z } from 'zod';
@@ -55,23 +57,48 @@ async function run(
     knowledgeBudget: 2000,
   });
 
-  // Execute via AI with structured messages
-  const mcpMessages = toMCPMessages(messages);
-  const response = await ctx.sampling.createMessage({
-    ...mcpMessages,
-    maxTokens: 4096,
-    modelPreferences: {
-      hints: [{ name: 'docker-base-images' }],
-    },
-  });
+  // Execute via AI with sampling and reranking
+  const samplingResult = await sampleWithRerank(
+    ctx,
+    async (attemptIndex) => ({
+      ...toMCPMessages(messages),
+      maxTokens: 4096,
+      modelPreferences: {
+        hints: [{ name: 'docker-base-images' }],
+        intelligencePriority: 0.9, // Higher priority for accurate recommendations
+        speedPriority: attemptIndex > 0 ? 0.7 : 0.4,
+        costPriority: 0.4,
+      },
+    }),
+    scoreBaseImageRecommendation,
+    { count: 3, stopAt: 85 },
+  );
 
-  try {
-    const responseText = response.content[0]?.text || '';
-    return Success({ recommendations: responseText });
-  } catch (e) {
-    const error = e as Error;
-    return Failure(`AI response parsing failed: ${error.message}`);
+  if (!samplingResult.ok) {
+    // Check if failure is due to empty AI responses - be graceful in this case
+    if (samplingResult.error?.includes('No valid candidates generated')) {
+      ctx.logger.debug('AI returned empty responses, returning empty recommendations');
+      return Success({ recommendations: '' });
+    }
+    return Failure(`Base image recommendation failed: ${samplingResult.error}`);
   }
+
+  const responseText = samplingResult.value.text;
+  if (!responseText) {
+    // Return empty recommendations rather than failing when AI response is empty
+    ctx.logger.debug('AI returned empty response, returning empty recommendations');
+    return Success({ recommendations: '' });
+  }
+
+  ctx.logger.info(
+    {
+      score: samplingResult.value.winner.score,
+      scoreBreakdown: samplingResult.value.winner.scoreBreakdown,
+    },
+    'Base image recommendations generated with sampling',
+  );
+
+  return Success({ recommendations: responseText });
 }
 
 const tool: Tool<typeof resolveBaseImagesSchema, AIResponse> = {
@@ -80,15 +107,13 @@ const tool: Tool<typeof resolveBaseImagesSchema, AIResponse> = {
   category: 'docker',
   version,
   schema: resolveBaseImagesSchema,
+  metadata: {
+    aiDriven: true,
+    knowledgeEnhanced: true,
+    samplingStrategy: 'rerank',
+    enhancementCapabilities: ['content-generation', 'image-recommendation', 'security-analysis'],
+  },
   run,
 };
 
 export default tool;
-
-export const metadata = {
-  name,
-  description,
-  version,
-  aiDriven: true,
-  knowledgeEnhanced: true,
-};

@@ -40,6 +40,7 @@ export interface MCPServer {
  * Create an MCP server that uses tools from registry
  */
 export function createMCPServer(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tools: Array<Tool<any, any>>,
   options: ServerOptions = {},
 ): MCPServer {

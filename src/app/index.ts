@@ -19,6 +19,24 @@ import { createMCPServer } from '@/mcp/mcp-server';
 import type { OrchestratorConfig } from './orchestrator-types';
 
 /**
+ * Apply tool aliases to create renamed versions of tools
+ */
+function applyToolAliases(
+  tools: readonly Tool<ZodTypeAny, any>[],
+  aliases?: Record<string, string>,
+): Tool<ZodTypeAny, any>[] {
+  if (!aliases) return [...tools];
+
+  return tools.map((tool) => {
+    const alias = aliases[tool.name];
+    if (!alias) return tool;
+
+    // Create a new tool object with the alias name
+    return { ...tool, name: alias };
+  });
+}
+
+/**
  * Transport configuration for MCP server
  */
 export interface TransportConfig {
@@ -32,6 +50,7 @@ export interface TransportConfig {
  */
 export interface AppConfig {
   tools?: Array<Tool<ZodTypeAny, any>>;
+  toolAliases?: Record<string, string>;
   sessionTTL?: number;
   policyPath?: string;
   policyEnvironment?: string;
@@ -53,7 +72,11 @@ export function createApp(config: AppConfig = {}): {
 } {
   const logger = config.logger || createLogger({ name: 'containerization-assist' });
   const tools = config.tools || getAllInternalTools();
-  const registry = createToolRegistry([...tools] as Tool<ZodTypeAny, any>[]); // Convert readonly array to mutable
+  const aliasedTools = applyToolAliases(
+    tools as readonly Tool<ZodTypeAny, any>[],
+    config.toolAliases,
+  );
+  const registry = createToolRegistry(aliasedTools);
 
   const orchestratorConfig: OrchestratorConfig = {};
   if (config.sessionTTL !== undefined) orchestratorConfig.sessionTTL = config.sessionTTL;
@@ -165,7 +188,10 @@ export function createApp(config: AppConfig = {}): {
         }
 
         server.tool(tool.name, description, schema, async (params: unknown) => {
-          const result = await orchestrator!.execute({
+          if (!orchestrator) {
+            throw new Error('Orchestrator not initialized');
+          }
+          const result = await orchestrator.execute({
             toolName: tool.name,
             params,
           });

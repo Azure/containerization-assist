@@ -10,6 +10,7 @@ import type { CommandEntry } from 'docker-file-parser';
 import validateDockerfileSyntax from 'validate-dockerfile';
 import { Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
+import { createLogger } from '@/lib/logger';
 import {
   DockerfileValidationRule,
   ValidationResult,
@@ -18,7 +19,8 @@ import {
   ValidationCategory,
   ValidationGrade,
 } from './core-types';
-import { combine, ValidationFunction } from './pipeline';
+import { lintWithDockerfilelint } from './dockerfilelint-adapter';
+import { mergeReports } from './merge-reports';
 import {
   SUDO_INSTALL,
   AS_CLAUSE,
@@ -29,6 +31,9 @@ import {
   SECRET_PATTERN,
   TOKEN_PATTERN,
 } from '@/lib/regex-patterns';
+import { AIValidator } from './ai-validator';
+import type { ToolContext } from '@/mcp/context';
+import type { KnowledgeEnhancementResult } from '@/mcp/ai/knowledge-enhancement';
 
 type DockerCommand = CommandEntry;
 
@@ -206,7 +211,6 @@ const DOCKERFILE_RULES: DockerfileValidationRule[] = [
       );
       const hasExpose = commands.some((cmd: DockerCommand) => cmd.name === 'EXPOSE');
 
-      // If no CMD/ENTRYPOINT, this check doesn't apply
       if (!hasCmd) return true;
 
       return hasExpose;
@@ -244,6 +248,16 @@ const parseDockerfile = (content: string): Result<DockerCommand[]> => {
 };
 
 /**
+ * Check if a specific line contains a HEALTHCHECK instruction
+ * @param lines Pre-split lines array for efficient lookup
+ * @param lineNumber 1-based line number
+ */
+const isHealthCheckLine = (lines: string[], lineNumber: number): boolean => {
+  const line = lines[lineNumber - 1]; // lineNumber is 1-based
+  return line?.trim().toUpperCase().startsWith('HEALTHCHECK') ?? false;
+};
+
+/**
  * Validate Dockerfile syntax using external validator
  */
 const validateSyntax = (content: string): Result<boolean> => {
@@ -256,7 +270,11 @@ const validateSyntax = (content: string): Result<boolean> => {
   };
 
   if (!basicValidation.valid) {
+    // Split content once for efficient line lookups
+    const lines = content.split('\n');
+
     // Check if there are true syntax/parse errors (priority 0)
+    // Exclude HEALTHCHECK instruction which validate-dockerfile incorrectly flags as invalid
     const syntaxErrors =
       (
         basicValidation.errors as Array<{
@@ -268,8 +286,8 @@ const validateSyntax = (content: string): Result<boolean> => {
       )?.filter(
         (err) =>
           err.priority === 0 &&
-          (err.message.includes('Invalid instruction') ||
-            err.message.includes('Missing or misplaced FROM')),
+          (err.message.includes('Missing or misplaced FROM') ||
+            (err.message.includes('Invalid instruction') && !isHealthCheckLine(lines, err.line))),
       ) || [];
 
     if (syntaxErrors.length > 0) {
@@ -281,40 +299,36 @@ const validateSyntax = (content: string): Result<boolean> => {
 };
 
 /**
- * Create validation function for a single rule
+ * Security-critical rules that cap the grade
  */
-const createRuleValidator = (
-  rule: DockerfileValidationRule,
-): ValidationFunction<DockerCommand[]> => {
-  return (commands: DockerCommand[]): Result<ValidationResult> => {
-    const passed = rule.check(commands);
+const SECURITY_RULES = ['no-root-user', 'no-sudo-install', 'no-secrets'];
 
-    const result: ValidationResult = {
-      ruleId: rule.id,
-      isValid: passed,
-      passed,
-      errors: passed ? [] : [`${rule.name}: ${rule.message}`],
-      warnings: [],
-      message: passed ? `✓ ${rule.name}` : `✗ ${rule.name}: ${rule.message}`,
-      suggestions: !passed && rule.fix ? [rule.fix] : [],
-      metadata: {
-        severity: rule.severity,
-      },
-    };
-
-    return Success(result);
-  };
+/**
+ * Severity weights for scoring
+ */
+const SEVERITY_WEIGHTS = {
+  [ValidationSeverity.ERROR]: 15,
+  [ValidationSeverity.WARNING]: 4,
+  [ValidationSeverity.INFO]: 1,
 };
 
 /**
  * Calculate validation grade from score
  */
-const calculateGrade = (score: number): ValidationGrade => {
-  if (score >= 90) return 'A';
-  if (score >= 80) return 'B';
-  if (score >= 70) return 'C';
-  if (score >= 60) return 'D';
-  return 'F';
+const calculateGrade = (score: number, hasCriticalSecurity: boolean): ValidationGrade => {
+  let grade: ValidationGrade;
+  if (score >= 90) grade = 'A';
+  else if (score >= 80) grade = 'B';
+  else if (score >= 70) grade = 'C';
+  else if (score >= 60) grade = 'D';
+  else grade = 'F';
+
+  // Cap at C if critical security issues
+  if (hasCriticalSecurity && (grade === 'A' || grade === 'B')) {
+    grade = 'C';
+  }
+
+  return grade;
 };
 
 /**
@@ -333,9 +347,23 @@ const createReport = (results: ValidationResult[]): ValidationReport => {
   const passed = results.filter((r) => r.passed).length;
   const total = results.length;
 
-  // Weighted scoring: errors = -15, warnings = -5, info = -2
-  const score = Math.max(0, 100 - errors * 15 - warnings * 5 - info * 2);
-  const grade = calculateGrade(score);
+  // Calculate weighted score
+  const deductions =
+    errors * SEVERITY_WEIGHTS[ValidationSeverity.ERROR] +
+    warnings * SEVERITY_WEIGHTS[ValidationSeverity.WARNING] +
+    info * SEVERITY_WEIGHTS[ValidationSeverity.INFO];
+
+  const score = Math.max(0, 100 - deductions);
+
+  // Check for critical security failures
+  const hasCriticalSecurity = results.some(
+    (r) =>
+      SECURITY_RULES.includes(r.ruleId || '') &&
+      r.metadata?.severity === ValidationSeverity.ERROR &&
+      !r.passed,
+  );
+
+  const grade = calculateGrade(score, hasCriticalSecurity);
 
   return {
     results,
@@ -351,9 +379,260 @@ const createReport = (results: ValidationResult[]): ValidationReport => {
 };
 
 /**
+ * Detect BuildKit features in Dockerfile content
+ */
+function detectBuildKitFeatures(content: string): {
+  syntax?: string;
+  hasHeredocs: boolean;
+  hasMounts: boolean;
+  hasSecrets: boolean;
+} {
+  const lines = content.split('\n');
+  const syntaxLine = lines.find((l) => l.startsWith('# syntax='));
+
+  const syntaxMatch = syntaxLine?.replace('# syntax=', '').trim();
+  return {
+    ...(syntaxMatch && { syntax: syntaxMatch }),
+    hasHeredocs: /RUN\s+<</.test(content),
+    hasMounts: /RUN\s+--mount/.test(content),
+    hasSecrets: /RUN\s+--mount=type=secret/.test(content),
+  };
+}
+
+/**
+ * Validate BuildKit Dockerfile with simplified rule set
+ * Used when standard parser fails due to BuildKit syntax
+ */
+function validateBuildKitDockerfile(content: string): ValidationReport {
+  const results: ValidationResult[] = [];
+  const lines = content.split('\n');
+
+  lines.forEach((line, idx) => {
+    const lineNumber = idx + 1;
+    const trimmedLine = line.trim();
+
+    // Skip comments and empty lines
+    if (!trimmedLine || trimmedLine.startsWith('#')) {
+      return;
+    }
+
+    // Check for :latest tags
+    if (line.includes('latest') && line.startsWith('FROM')) {
+      results.push({
+        ruleId: 'specific-base-image',
+        isValid: false,
+        passed: false,
+        errors: [`Line ${lineNumber}: Avoid using :latest tag`],
+        warnings: [],
+        message: `✗ Use specific version tags: Line ${lineNumber}`,
+        suggestions: ['Replace :latest with specific version (e.g., node:20-alpine)'],
+        metadata: {
+          severity: ValidationSeverity.WARNING,
+          location: `line ${lineNumber}`,
+          aiEnhanced: false,
+        },
+      });
+    }
+
+    // Check for potential secrets (simplified check)
+    if (/password|api_key|secret|token/i.test(line) && !line.startsWith('#')) {
+      // Skip if it's in a comment or mount directive (secrets are OK in BuildKit mounts)
+      if (!line.includes('--mount=type=secret')) {
+        // Extract the variable name from ENV/ARG statements
+        const envMatch = line.match(/^\s*(?:ENV|ARG)\s+([A-Z_][A-Z0-9_]*)\s*=/i);
+        const variableName = envMatch ? envMatch[1] : 'secret';
+
+        results.push({
+          ruleId: 'no-secrets',
+          isValid: false,
+          passed: false,
+          errors: [`Line ${lineNumber}: Potential secret exposed`],
+          warnings: [],
+          message: `✗ No hardcoded secrets: Do not hardcode secrets in Dockerfile (found: ${variableName})`,
+          suggestions: ['Use build arguments or runtime environment variables'],
+          metadata: {
+            severity: ValidationSeverity.ERROR,
+            location: `line ${lineNumber}`,
+            aiEnhanced: false,
+          },
+        });
+      }
+    }
+
+    // Check for root user
+    if (line.startsWith('USER root') || line.startsWith('USER 0')) {
+      results.push({
+        ruleId: 'no-root-user',
+        isValid: false,
+        passed: false,
+        errors: [`Line ${lineNumber}: Container runs as root user`],
+        warnings: [],
+        message: `✗ Non-root user required: Line ${lineNumber}`,
+        suggestions: ['Add USER directive with non-root user (e.g., USER node)'],
+        metadata: {
+          severity: ValidationSeverity.ERROR,
+          location: `line ${lineNumber}`,
+          aiEnhanced: false,
+        },
+      });
+    }
+
+    // Check for package manager optimizations
+    if (line.includes('apt-get install') && !line.includes('--no-install-recommends')) {
+      results.push({
+        ruleId: 'optimize-package-install',
+        isValid: false,
+        passed: false,
+        errors: [`Line ${lineNumber}: Missing --no-install-recommends flag`],
+        warnings: [],
+        message: `✗ Optimize package install: Line ${lineNumber}`,
+        suggestions: ['Add --no-install-recommends to apt-get install commands'],
+        metadata: {
+          severity: ValidationSeverity.WARNING,
+          location: `line ${lineNumber}`,
+          aiEnhanced: false,
+        },
+      });
+    }
+  });
+
+  // Add positive results for detected BuildKit features
+  const buildKit = detectBuildKitFeatures(content);
+  if (buildKit.syntax) {
+    results.push({
+      ruleId: 'buildkit-syntax',
+      isValid: true,
+      passed: true,
+      errors: [],
+      warnings: [],
+      message: `✓ Uses BuildKit syntax: ${buildKit.syntax}`,
+      suggestions: [],
+      metadata: {
+        severity: ValidationSeverity.INFO,
+        location: 'BuildKit syntax',
+        aiEnhanced: false,
+      },
+    });
+  }
+
+  if (buildKit.hasMounts) {
+    results.push({
+      ruleId: 'buildkit-mounts',
+      isValid: true,
+      passed: true,
+      errors: [],
+      warnings: [],
+      message: '✓ Uses BuildKit mount optimizations',
+      suggestions: [],
+      metadata: {
+        severity: ValidationSeverity.INFO,
+        location: 'BuildKit mounts',
+        aiEnhanced: false,
+      },
+    });
+  }
+
+  return createReport(results);
+}
+/**
  * Validate Dockerfile content using functional pipeline
  */
-export const validateDockerfileContent = (dockerfileContent: string): ValidationReport => {
+export const validateDockerfileContent = async (
+  dockerfileContent: string,
+  options?: { enableExternalLinter?: boolean },
+): Promise<ValidationReport> => {
+  // Detect BuildKit features first
+  const buildKit = detectBuildKitFeatures(dockerfileContent);
+
+  if (buildKit.syntax || buildKit.hasHeredocs || buildKit.hasMounts) {
+    // Log BuildKit features detected
+    const logger = createLogger({ name: 'dockerfile-validator' });
+    logger.info({ buildKit }, 'BuildKit features detected');
+
+    // Try standard parsing first
+    const parseResult = parseDockerfile(dockerfileContent);
+    if (parseResult.ok) {
+      // Standard validation path works despite BuildKit features
+      const commands = parseResult.value;
+
+      // Run all validation rules directly
+      const results: ValidationResult[] = [];
+
+      for (const rule of DOCKERFILE_RULES) {
+        const passed = rule.check(commands);
+
+        // Special handling for no-secrets rule to include the specific secret name
+        let message = passed ? `✓ ${rule.name}` : `✗ ${rule.name}: ${rule.message}`;
+        if (!passed && rule.id === 'no-secrets') {
+          // Extract the secret variable name from the ENV/ARG commands
+          const secretVariable = commands.find((cmd: DockerCommand) => {
+            if (cmd.name === 'ENV' || cmd.name === 'ARG') {
+              const value = getArgValue(cmd);
+              const suspicious = [PASSWORD_PATTERN, API_KEY_PATTERN, SECRET_PATTERN, TOKEN_PATTERN];
+              return suspicious.some((pattern) => pattern.test(value));
+            }
+            return false;
+          });
+
+          if (secretVariable) {
+            const value = getArgValue(secretVariable);
+            const variableMatch = value.match(/^([A-Z_][A-Z0-9_]*)\s*=/i);
+            const variableName = variableMatch ? variableMatch[1] : 'secret';
+            message = `✗ ${rule.name}: ${rule.message} (found: ${variableName})`;
+          }
+        }
+
+        results.push({
+          ruleId: rule.id,
+          isValid: passed,
+          passed,
+          errors: passed ? [] : [`${rule.name}: ${rule.message}`],
+          warnings: [],
+          message,
+          suggestions: !passed && rule.fix ? [rule.fix] : [],
+          metadata: {
+            severity: rule.severity,
+          },
+        });
+      }
+
+      const internalReport = createReport(results);
+
+      // Add external linter if enabled
+      if (options?.enableExternalLinter !== false) {
+        try {
+          const externalReport = await lintWithDockerfilelint(dockerfileContent);
+          return mergeReports(internalReport, externalReport);
+        } catch (error) {
+          console.warn('External linter failed, using internal validation only:', error);
+          return internalReport;
+        }
+      }
+
+      return internalReport;
+    }
+
+    // Fall back to BuildKit-specific validation
+    const buildKitReport = validateBuildKitDockerfile(dockerfileContent);
+
+    // Add external linter if enabled (it might handle BuildKit better)
+    if (options?.enableExternalLinter !== false) {
+      try {
+        const externalReport = await lintWithDockerfilelint(dockerfileContent);
+        return mergeReports(buildKitReport, externalReport);
+      } catch (error) {
+        console.warn(
+          'External linter failed with BuildKit file, using BuildKit-specific validation:',
+          error,
+        );
+        return buildKitReport;
+      }
+    }
+
+    return buildKitReport;
+  }
+
+  // Standard validation path for non-BuildKit files
   // First check syntax
   const syntaxResult = validateSyntax(dockerfileContent);
   if (!syntaxResult.ok) {
@@ -412,86 +691,248 @@ export const validateDockerfileContent = (dockerfileContent: string): Validation
 
   const commands = parseResult.value;
 
-  // Create validators for each rule
-  const validators = DOCKERFILE_RULES.map((rule) => createRuleValidator(rule));
+  // Run all validation rules directly
+  const results: ValidationResult[] = [];
 
-  // Run all validations
-  const combinedValidator = combine(validators);
-  const validationResult = combinedValidator(commands);
+  for (const rule of DOCKERFILE_RULES) {
+    const passed = rule.check(commands);
 
-  if (validationResult.ok) {
-    // Extract individual results from combined validation
-    const results: ValidationResult[] = [];
-
-    for (const rule of DOCKERFILE_RULES) {
-      const passed = rule.check(commands);
-      results.push({
-        ruleId: rule.id,
-        isValid: passed,
-        passed,
-        errors: passed ? [] : [`${rule.name}: ${rule.message}`],
-        warnings: [],
-        message: passed ? `✓ ${rule.name}` : `✗ ${rule.name}: ${rule.message}`,
-        suggestions: !passed && rule.fix ? [rule.fix] : [],
-        metadata: {
-          severity: rule.severity,
-        },
+    // Special handling for no-secrets rule to include the specific secret name
+    let message = passed ? `✓ ${rule.name}` : `✗ ${rule.name}: ${rule.message}`;
+    if (!passed && rule.id === 'no-secrets') {
+      // Extract the secret variable name from the ENV/ARG commands
+      const secretVariable = commands.find((cmd: DockerCommand) => {
+        if (cmd.name === 'ENV' || cmd.name === 'ARG') {
+          const value = getArgValue(cmd);
+          const suspicious = [PASSWORD_PATTERN, API_KEY_PATTERN, SECRET_PATTERN, TOKEN_PATTERN];
+          return suspicious.some((pattern) => pattern.test(value));
+        }
+        return false;
       });
+
+      if (secretVariable) {
+        const value = getArgValue(secretVariable);
+        const variableMatch = value.match(/^([A-Z_][A-Z0-9_]*)\s*=/i);
+        const variableName = variableMatch ? variableMatch[1] : 'secret';
+        message = `✗ ${rule.name}: ${rule.message} (found: ${variableName})`;
+      }
     }
 
-    return createReport(results);
-  } else {
-    return {
-      results: [
-        {
-          ruleId: 'validation-error',
-          isValid: false,
-          passed: false,
-          errors: [validationResult.error],
-          warnings: [],
-          message: validationResult.error,
-          metadata: {
-            severity: ValidationSeverity.ERROR,
-          },
-        },
-      ],
-      score: 0,
-      grade: 'F',
-      passed: 0,
-      failed: 1,
-      errors: 1,
-      warnings: 0,
-      info: 0,
-      timestamp: new Date().toISOString(),
-    };
+    results.push({
+      ruleId: rule.id,
+      isValid: passed,
+      passed,
+      errors: passed ? [] : [`${rule.name}: ${rule.message}`],
+      warnings: [],
+      message,
+      suggestions: !passed && rule.fix ? [rule.fix] : [],
+      metadata: {
+        severity: rule.severity,
+      },
+    });
   }
+
+  const internalReport = createReport(results);
+
+  // Add external linter if enabled (default: true)
+  if (options?.enableExternalLinter !== false) {
+    try {
+      const externalReport = await lintWithDockerfilelint(dockerfileContent);
+      return mergeReports(internalReport, externalReport);
+    } catch (error) {
+      // If external linter fails, just return internal results
+      console.warn('External linter failed, using internal validation only:', error);
+      return internalReport;
+    }
+  }
+
+  return internalReport;
 };
 
 /**
- * Get all Dockerfile validation rules
+ * Enhanced validation options for AI integration
  */
-export const getDockerfileRules = (): DockerfileValidationRule[] => {
-  return [...DOCKERFILE_RULES];
-};
+export interface DockerfileValidationOptions {
+  enableExternalLinter?: boolean;
+  enableAI?: boolean;
+  aiOptions?: {
+    focus?: 'security' | 'performance' | 'best-practices' | 'all';
+    confidence?: number;
+    maxIssues?: number;
+    includeFixes?: boolean;
+  };
+}
 
 /**
- * Get Dockerfile rules by category
+ * Validate Dockerfile content with optional AI enhancement
  */
-export const getDockerfileRulesByCategory = (
-  category: ValidationCategory,
-): DockerfileValidationRule[] => {
-  return DOCKERFILE_RULES.filter((rule) => rule.category === category);
-};
+export async function validateDockerfileContentWithAI(
+  content: string,
+  ctx: ToolContext,
+  options: DockerfileValidationOptions = {},
+): Promise<ValidationReport> {
+  // Run standard validation first
+  const baseReport = await validateDockerfileContent(content, options);
+
+  // If AI enhancement is disabled or no context, return base report
+  if (options.enableAI === false || !ctx) {
+    return baseReport;
+  }
+
+  try {
+    // Run AI validation in parallel with standard validation for additional insights
+    const aiValidator = new AIValidator();
+    const aiValidationResult = await aiValidator.validateWithAI(
+      content,
+      {
+        contentType: 'dockerfile',
+        focus: options.aiOptions?.focus || 'all',
+        confidence: options.aiOptions?.confidence || 0.7,
+        maxIssues: options.aiOptions?.maxIssues || 10,
+        includeFixes: options.aiOptions?.includeFixes ?? true,
+      },
+      ctx,
+    );
+
+    if (aiValidationResult.ok) {
+      const aiReport = aiValidationResult.value;
+
+      // Filter out AI results that duplicate existing rule-based results
+      // to avoid noise while preserving AI-unique insights
+      const existingRuleIds = new Set(baseReport.results.map((r) => r.ruleId));
+      const uniqueAIResults = aiReport.results.filter((result) => {
+        // Keep AI results that don't duplicate existing rules
+        // or provide additional insights with high confidence
+        return (
+          !existingRuleIds.has(result.ruleId) || (result.confidence && result.confidence > 0.8)
+        );
+      });
+
+      // Merge reports, prioritizing rule-based results but adding AI insights
+      const combinedResults = [
+        ...baseReport.results,
+        ...uniqueAIResults.map((aiResult) => ({
+          ...aiResult,
+          metadata: {
+            ...aiResult.metadata,
+            aiEnhanced: true,
+            aiModel: aiReport.aiMetadata.model,
+            aiConfidence: aiReport.aiMetadata.confidence,
+          },
+        })),
+      ];
+
+      // Calculate new counts with combined results
+      const errorCount = combinedResults.filter(
+        (r) => !r.isValid && r.metadata?.severity === ValidationSeverity.ERROR,
+      ).length;
+      const warningCount = combinedResults.filter(
+        (r) =>
+          (r.warnings && r.warnings.length > 0) ||
+          r.metadata?.severity === ValidationSeverity.WARNING,
+      ).length;
+      const infoCount = combinedResults.filter(
+        (r) => r.metadata?.severity === ValidationSeverity.INFO,
+      ).length;
+
+      return {
+        ...baseReport,
+        results: combinedResults,
+        passed: combinedResults.filter((r) => r.isValid).length,
+        failed: combinedResults.filter((r) => !r.isValid).length,
+        errors: errorCount,
+        warnings: warningCount,
+        info: infoCount,
+      };
+    } else {
+      ctx.logger.warn(
+        { error: aiValidationResult.error },
+        'AI validation failed, using standard validation only',
+      );
+      return baseReport;
+    }
+  } catch (error) {
+    ctx.logger.debug({ error }, 'AI validation threw exception, using standard validation only');
+    return baseReport;
+  }
+}
 
 /**
- * Create a Dockerfile validator factory for backward compatibility
+ * Extended validation options for knowledge enhancement
  */
-export const createDockerfileValidator = (): {
-  validate: (dockerfileContent: string) => ValidationReport;
-  getRules: () => DockerfileValidationRule[];
-  getCategory: (category: ValidationCategory) => DockerfileValidationRule[];
-} => ({
-  validate: validateDockerfileContent,
-  getRules: getDockerfileRules,
-  getCategory: getDockerfileRulesByCategory,
-});
+export interface DockerfileValidationKnowledgeOptions extends DockerfileValidationOptions {
+  enableKnowledge?: boolean;
+  knowledgeOptions?: {
+    targetImprovement?: 'security' | 'performance' | 'best-practices' | 'enhancement' | 'all';
+    userQuery?: string;
+  };
+}
+
+/**
+ * Validate Dockerfile content with knowledge enhancement integration
+ */
+export async function validateDockerfileContentWithKnowledge(
+  content: string,
+  ctx: ToolContext,
+  options: DockerfileValidationKnowledgeOptions = {},
+): Promise<ValidationReport & { knowledgeEnhancement?: KnowledgeEnhancementResult }> {
+  // Run standard validation first (including AI if enabled)
+  const baseReport = await validateDockerfileContentWithAI(content, ctx, options);
+
+  // If knowledge enhancement is disabled or no issues to address, return base report
+  if (options.enableKnowledge === false || !ctx) {
+    return baseReport;
+  }
+
+  // Only apply knowledge enhancement if there are validation issues
+  const hasIssues = !baseReport.results.every((r) => r.passed);
+
+  if (hasIssues) {
+    try {
+      // Import knowledge enhancement function
+      const { enhanceWithKnowledge, createEnhancementFromValidation } = await import(
+        '@/mcp/ai/knowledge-enhancement'
+      );
+
+      // Create knowledge enhancement request from validation results
+      const enhancementRequest = createEnhancementFromValidation(
+        content,
+        'dockerfile',
+        baseReport.results
+          .filter((r) => !r.passed)
+          .map((r) => ({
+            message: r.message || 'Validation issue',
+            severity: r.metadata?.severity === ValidationSeverity.ERROR ? 'error' : 'warning',
+            category: r.ruleId || 'general',
+          })),
+        options.knowledgeOptions?.targetImprovement || 'security',
+      );
+
+      // Add user query if provided
+      if (options.knowledgeOptions?.userQuery) {
+        enhancementRequest.userQuery = options.knowledgeOptions.userQuery;
+      }
+
+      const enhancementResult = await enhanceWithKnowledge(enhancementRequest, ctx);
+
+      if (enhancementResult.ok) {
+        return {
+          ...baseReport,
+          knowledgeEnhancement: enhancementResult.value,
+        };
+      } else {
+        ctx.logger.warn(
+          { error: enhancementResult.error },
+          'Knowledge enhancement failed, using validation results only',
+        );
+      }
+    } catch (error) {
+      ctx.logger.debug(
+        { error },
+        'Knowledge enhancement threw exception, using validation results only',
+      );
+    }
+  }
+
+  return baseReport;
+}

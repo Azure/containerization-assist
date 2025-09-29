@@ -90,6 +90,14 @@ export interface ParameterSuggestionParams {
   context?: Record<string, unknown>;
 }
 
+export interface KnowledgeEnhancementParams {
+  content: string;
+  context: 'dockerfile' | 'kubernetes' | 'security' | 'optimization';
+  validationIssues?: string[];
+  targetImprovement: string;
+  userQuery?: string;
+}
+
 // ===== PROMPT TEMPLATES =====
 
 /**
@@ -336,6 +344,7 @@ export const promptTemplates = {
     prompt += `- Performance optimization\n`;
     prompt += `- Resource efficiency\n`;
     prompt += `- Production readiness\n`;
+    prompt += `- File existence validation for COPY commands\n`;
 
     if (params.requirements) {
       prompt += `\nAdditional requirements:\n${params.requirements}\n`;
@@ -600,6 +609,48 @@ Error: ${error}
 Repair the JSON to make it valid while preserving the intended structure and data.
 Return only the corrected JSON without explanations.`;
   },
+
+  /**
+   * Knowledge enhancement prompt template
+   */
+  knowledgeEnhancement: (params: KnowledgeEnhancementParams): string => {
+    const contextInstruction = getKnowledgeContextInstruction(params.context);
+    const issuesSection = params.validationIssues
+      ? `
+Known issues to address:
+${params.validationIssues.map((issue) => `- ${issue}`).join('\n')}
+`
+      : '';
+
+    const userQuerySection = params.userQuery
+      ? `
+Specific enhancement goal: ${params.userQuery}
+`
+      : '';
+
+    return `Analyze and enhance the following ${params.context} content:
+
+${params.content}
+${issuesSection}${userQuerySection}
+${contextInstruction}
+
+Target improvement: ${params.targetImprovement}
+
+Provide enhanced content with explanations for each improvement.
+
+Response Format:
+## Enhanced Content
+[Provide the complete enhanced version]
+
+## Knowledge Applied
+[List specific knowledge areas applied]
+
+## Improvements Made
+[Explain what was improved and why]
+
+## Additional Recommendations
+[Provide actionable suggestions for further improvement]`;
+  },
 } as const;
 
 // ===== VALIDATION HELPERS =====
@@ -658,3 +709,21 @@ export function buildAIPrompt(
 /**
  * Extract structured data from AI response
  */
+
+/**
+ * Get knowledge enhancement context instructions
+ */
+function getKnowledgeContextInstruction(context: string): string {
+  switch (context) {
+    case 'dockerfile':
+      return `Focus on Docker best practices, security hardening, build optimization, and layer efficiency.`;
+    case 'kubernetes':
+      return `Focus on Kubernetes best practices, resource management, security contexts, and deployment strategies.`;
+    case 'security':
+      return `Focus on security vulnerabilities, access controls, secrets management, and hardening measures.`;
+    case 'optimization':
+      return `Focus on performance optimization, resource efficiency, caching strategies, and cost reduction.`;
+    default:
+      return `Apply comprehensive best practices covering security, performance, and maintainability.`;
+  }
+}

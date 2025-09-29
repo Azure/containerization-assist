@@ -12,9 +12,12 @@ import { getSession, updateSession } from '@/mcp/tool-session-helpers';
 import { promises as fs } from 'node:fs';
 import nodePath from 'node:path';
 import { DockerfileParser } from 'dockerfile-ast';
-import { promptTemplates } from '@/ai/prompt-templates';
+import { promptTemplates, type DockerfilePromptParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
+import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
+import { validateDockerfileContent } from '@/validation/dockerfile-validator';
+import type { KnowledgeEnhancementResult } from '@/mcp/ai/knowledge-enhancement';
 import type { z } from 'zod';
 
 const name = 'generate-dockerfile';
@@ -38,7 +41,6 @@ function extractDockerfileContent(responseText: string): string {
     return jsonMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').trim();
   }
 
-  // Look for FROM statement and extract from there
   const fromMatch = responseText.match(/(FROM\s+[\s\S]*)/);
   if (fromMatch?.[1]) {
     // Find the end of the Dockerfile (usually ends with CMD, ENTRYPOINT, or end of text)
@@ -50,8 +52,71 @@ function extractDockerfileContent(responseText: string): string {
     return dockerContent.trim();
   }
 
-  // If all else fails, return the entire response (it might be the raw Dockerfile)
   return responseText.trim();
+}
+
+/**
+ * Score a Dockerfile for quality assessment
+ * Returns a score from 0-100 based on parseability, validation, and best practices
+ */
+function scoreDockerfile(text: string): number {
+  let score = 0;
+
+  // Basic parseability (30 points)
+  try {
+    DockerfileParser.parse(text);
+    score += 30;
+
+    // Additional parsing checks
+    if (text.includes('FROM ')) score += 5;
+    if (!/^\s*$/.test(text)) score += 5; // Not empty
+  } catch {
+    // If it doesn't parse, it's fundamentally broken
+    return 0;
+  }
+
+  // Best practices scoring (70 points total)
+  // Security practices (25 points)
+  if (/FROM\s+[^\s:]+:[^:\s]+(?:\s|$)/.test(text) && !/FROM\s+[^\s:]+:latest/.test(text)) {
+    score += 10; // Pinned version, not latest
+  }
+  if (/USER\s+(?!root|0)\w+/.test(text)) {
+    score += 10; // Non-root user
+  }
+  if (!/(password|secret|api_key|token)\s*[=:]\s*[^\s]+/i.test(text)) {
+    score += 5; // No hardcoded secrets
+  }
+
+  // Multi-stage builds (15 points)
+  const fromCount = (text.match(/^FROM\s+/gm) || []).length;
+  if (fromCount > 1 || /FROM\s+.*\sAS\s+\w+/i.test(text)) {
+    score += 15;
+  }
+
+  // Health checks (10 points)
+  if (/HEALTHCHECK/i.test(text)) {
+    score += 10;
+  }
+
+  // Working directory (5 points)
+  if (/WORKDIR/i.test(text)) {
+    score += 5;
+  }
+
+  // Port exposure (5 points)
+  if (/EXPOSE\s+\d+/.test(text)) {
+    score += 5;
+  }
+
+  // Layer optimization (10 points)
+  if (/COPY\s+package.*\.json/.test(text) || /COPY\s+go\.mod\s+go\.sum/.test(text)) {
+    score += 5; // Dependency files copied separately
+  }
+  if (!/RUN.*&&.*&&.*&&.*&&/m.test(text)) {
+    score += 5; // Reasonable RUN command chaining
+  }
+
+  return Math.min(score, 100);
 }
 
 async function run(
@@ -139,7 +204,7 @@ async function run(
 
   try {
     // Use the prompt template from @/ai/prompt-templates
-    const dockerfileParams: any = {
+    const dockerfileParams: DockerfilePromptParams = {
       language,
       dependencies,
       ports,
@@ -162,6 +227,8 @@ async function run(
       topic: TOPICS.DOCKERFILE_GENERATION,
       tool: name,
       environment,
+      ...(language && { language }),
+      ...(framework && { framework }),
       contract: {
         name: 'dockerfile_v1',
         description: 'Generate optimized Dockerfile',
@@ -169,19 +236,38 @@ async function run(
       knowledgeBudget: 5000,
     });
 
-    // Convert and call AI
-    const mcpMessages = toMCPMessages(messages);
-    const response = await ctx.sampling.createMessage({
-      ...mcpMessages,
-      maxTokens: 4096,
-      modelPreferences: {
-        hints: [{ name: 'dockerfile-generation' }],
-      },
-    });
+    // Use N-best sampling for better quality Dockerfiles
+    const samplingResult = await sampleWithRerank(
+      ctx,
+      async (attempt) => ({
+        ...toMCPMessages(messages),
+        maxTokens: 4096,
+        includeContext: attempt === 0 ? 'allServers' : 'thisServer',
+        modelPreferences: {
+          hints: [{ name: 'dockerfile-generate' }],
+          intelligencePriority: 0.9,
+          speedPriority: attempt === 0 ? 0.6 : 0.8,
+          costPriority: 0.4,
+        },
+      }),
+      (text) => scoreDockerfile(extractDockerfileContent(text)),
+      { count: 3, stopAt: 95 },
+    );
 
-    // Extract content from response
-    const responseText = response.content[0]?.text || '';
-    const dockerfileContent = extractDockerfileContent(responseText);
+    if (!samplingResult.ok) {
+      return Failure(`Failed to generate Dockerfile: ${samplingResult.error}`);
+    }
+
+    const dockerfileContent = extractDockerfileContent(samplingResult.value.text);
+
+    ctx.logger.info(
+      {
+        candidatesGenerated: samplingResult.value.all?.length || 1,
+        winnerScore: samplingResult.value.winner.score,
+        model: samplingResult.value.model,
+      },
+      'N-best sampling completed for Dockerfile generation',
+    );
 
     // Validate the extracted Dockerfile using proper parser
     try {
@@ -194,7 +280,7 @@ async function run(
       if (!hasFrom) {
         ctx.logger.error(
           {
-            responseText: responseText.substring(0, 500),
+            sampledText: samplingResult.value.text.substring(0, 500),
             extractedContent: dockerfileContent.substring(0, 500),
           },
           'Dockerfile missing FROM instruction',
@@ -223,12 +309,172 @@ async function run(
       );
     }
 
+    // Self-repair loop - attempt to fix validation issues
+    let finalDockerfileContent = dockerfileContent;
+    let knowledgeEnhancement: KnowledgeEnhancementResult | undefined;
+
+    const initialValidation = await validateDockerfileContent(dockerfileContent, {
+      enableExternalLinter: false,
+    });
+
+    // Apply knowledge enhancement if there are validation issues or if requested
+    if (initialValidation.score < 90) {
+      try {
+        const { enhanceWithKnowledge, createEnhancementFromValidation } = await import(
+          '@/mcp/ai/knowledge-enhancement'
+        );
+
+        const enhancementRequest = createEnhancementFromValidation(
+          dockerfileContent,
+          'dockerfile',
+          initialValidation.results
+            .filter((r) => !r.passed)
+            .map((r) => ({
+              message: r.message || 'Validation issue',
+              severity: r.metadata?.severity === 'error' ? 'error' : 'warning',
+              category: r.ruleId?.split('-')[0] || 'general',
+            })),
+          'all',
+        );
+
+        // Add custom instructions as user query if available
+        if (input.customInstructions) {
+          enhancementRequest.userQuery = `Original requirements: ${input.customInstructions}`;
+        }
+
+        const enhancementResult = await enhanceWithKnowledge(enhancementRequest, ctx);
+
+        if (enhancementResult.ok) {
+          knowledgeEnhancement = enhancementResult.value;
+          finalDockerfileContent = knowledgeEnhancement.enhancedContent;
+
+          ctx.logger.info(
+            {
+              knowledgeAppliedCount: knowledgeEnhancement.knowledgeApplied.length,
+              confidence: knowledgeEnhancement.confidence,
+              enhancementAreas: knowledgeEnhancement.analysis.enhancementAreas.length,
+            },
+            'Knowledge enhancement applied to Dockerfile',
+          );
+        } else {
+          ctx.logger.warn(
+            { error: enhancementResult.error },
+            'Knowledge enhancement failed, using original Dockerfile',
+          );
+        }
+      } catch (enhancementError) {
+        ctx.logger.debug(
+          {
+            error:
+              enhancementError instanceof Error
+                ? enhancementError.message
+                : String(enhancementError),
+          },
+          'Knowledge enhancement threw exception, continuing without enhancement',
+        );
+      }
+    }
+
+    // Validate the enhanced/original Dockerfile and apply self-repair if needed
+    const currentValidation = await validateDockerfileContent(finalDockerfileContent, {
+      enableExternalLinter: false,
+    });
+
+    if (currentValidation.score < 80) {
+      ctx.logger.warn(
+        {
+          currentScore: currentValidation.score,
+          issues: currentValidation.results.filter((r) => !r.passed).length,
+        },
+        'Attempting self-repair due to validation issues',
+      );
+
+      // Build repair prompt with specific validation errors
+      const validationErrors = currentValidation.results
+        .filter((r) => !r.passed)
+        .map((r) => `- ${r.message}`)
+        .join('\n');
+
+      const repairPrompt = `The generated Dockerfile has validation issues:
+${validationErrors}
+
+Please fix these issues and respond with ONLY the corrected Dockerfile in a \`\`\`dockerfile code block.
+
+Current Dockerfile:
+\`\`\`dockerfile
+${finalDockerfileContent}
+\`\`\``;
+
+      try {
+        const repairMessages = await buildMessages({
+          basePrompt: repairPrompt,
+          topic: 'dockerfile_repair',
+          tool: name,
+          environment,
+          ...(language && { language }),
+          ...(framework && { framework }),
+          contract: {
+            name: 'dockerfile_repair',
+            description: 'Fix Dockerfile validation issues',
+          },
+          knowledgeBudget: 1500,
+        });
+
+        const repaired = await ctx.sampling.createMessage({
+          ...toMCPMessages(repairMessages),
+          maxTokens: 4096,
+          includeContext: 'thisServer',
+          modelPreferences: {
+            hints: [{ name: 'dockerfile-fix' }],
+            intelligencePriority: 0.95, // Higher for repairs
+          },
+        });
+
+        const repairedText = repaired.content?.[0]?.text ?? '';
+        if (repairedText) {
+          const repairedDockerfile = extractDockerfileContent(repairedText);
+
+          // Validate the repaired version
+          const repairedValidation = await validateDockerfileContent(repairedDockerfile, {
+            enableExternalLinter: false,
+          });
+
+          if (repairedValidation.score > currentValidation.score) {
+            finalDockerfileContent = repairedDockerfile;
+            ctx.logger.info(
+              {
+                currentScore: currentValidation.score,
+                repairedScore: repairedValidation.score,
+                improvement: repairedValidation.score - currentValidation.score,
+              },
+              'Self-repair successful - using improved Dockerfile',
+            );
+          } else {
+            ctx.logger.info(
+              {
+                currentScore: currentValidation.score,
+                repairedScore: repairedValidation.score,
+              },
+              'Self-repair did not improve score - using current',
+            );
+          }
+        }
+      } catch (repairError) {
+        ctx.logger.warn(
+          {
+            error: repairError instanceof Error ? repairError.message : String(repairError),
+          },
+          'Self-repair failed - using original Dockerfile',
+        );
+      }
+    }
+
     // Log what we extracted
     ctx.logger.info(
       {
-        originalLength: responseText.length,
-        extractedLength: dockerfileContent.length,
-        preview: dockerfileContent.substring(0, 100),
+        originalLength: samplingResult.value.text.length,
+        extractedLength: finalDockerfileContent.length,
+        preview: finalDockerfileContent.substring(0, 100),
       },
       'Extracted Dockerfile content',
     );
@@ -257,7 +503,7 @@ async function run(
     let written = false;
     if (dockerfilePath) {
       try {
-        await fs.writeFile(dockerfilePath, dockerfileContent, 'utf-8');
+        await fs.writeFile(dockerfilePath, finalDockerfileContent, 'utf-8');
         written = true;
         ctx.logger.info({ path: dockerfilePath }, 'Dockerfile written successfully');
       } catch (writeError) {
@@ -268,6 +514,29 @@ async function run(
           },
           'Failed to write Dockerfile',
         );
+      }
+    }
+
+    // Update session if available
+    if (sessionId) {
+      const updateResult = await updateSession(
+        sessionId,
+        {
+          metadata: {
+            dockerfileGenerated: true,
+            dockerfilePath: written ? dockerfilePath : undefined,
+            dockerfileContent: finalDockerfileContent,
+            baseImage: finalDockerfileContent.match(/FROM\s+([^\s]+)/)?.[1],
+            multistage,
+            securityHardening,
+            optimization,
+          },
+        },
+        ctx,
+      );
+
+      if (!updateResult.ok) {
+        ctx.logger.warn({ sessionId }, 'Failed to update session with Dockerfile info');
       }
     }
 
@@ -286,39 +555,36 @@ async function run(
       workflowHints.push(`4. Generate K8s manifests: use generate-k8s-manifests with sessionId`);
     }
 
-    const result = {
-      content: dockerfileContent,
-      language: 'dockerfile',
-      analysis: undefined,
-      confidence: 0.9,
-      suggestions: workflowHints,
-      sessionId,
-      dockerfilePath: written ? dockerfilePath : undefined,
-      baseImage: dockerfileContent.match(/FROM\s+([^\s]+)/)?.[1],
-      multistage,
-      securityHardening,
-      optimization,
-    };
+    // Build suggestions array with knowledge enhancement info
+    const suggestions = [
+      written
+        ? `✅ Dockerfile written to: ${dockerfilePath}`
+        : '✅ Dockerfile generated (not written to disk)',
+    ];
 
-    // Update session if available
-    if (sessionId) {
-      const updateResult = await updateSession(
-        sessionId,
-        {
-          results: {
-            'generate-dockerfile': result,
-          },
-          current_step: 'generate-dockerfile',
-        },
-        ctx,
+    if (knowledgeEnhancement) {
+      suggestions.push(
+        `🧠 Enhanced with ${knowledgeEnhancement.knowledgeApplied.length} knowledge improvements`,
       );
-
-      if (!updateResult.ok) {
-        ctx.logger.warn({ sessionId }, 'Failed to update session with Dockerfile info');
-      }
     }
 
-    return Success(result);
+    return Success({
+      content: finalDockerfileContent,
+      language: 'dockerfile',
+      analysis: knowledgeEnhancement
+        ? {
+            enhancementAreas: knowledgeEnhancement.analysis.enhancementAreas,
+            confidence: knowledgeEnhancement.confidence,
+            knowledgeApplied: knowledgeEnhancement.knowledgeApplied,
+          }
+        : undefined,
+      confidence: knowledgeEnhancement ? knowledgeEnhancement.confidence : 0.9,
+      suggestions,
+      workflowHints: {
+        nextStep: 'build-image',
+        message: `Dockerfile generated successfully. Use "build-image" with sessionId ${sessionId || '<sessionId>'} to build your container image, or review and customize the Dockerfile first.`,
+      },
+    });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     ctx.logger.error({ error: errorMessage }, 'Dockerfile generation failed');
@@ -332,6 +598,12 @@ const tool: Tool<typeof generateDockerfileSchema, AIResponse> = {
   category: 'docker',
   version,
   schema: generateDockerfileSchema,
+  metadata: {
+    aiDriven: true,
+    knowledgeEnhanced: true,
+    samplingStrategy: 'rerank',
+    enhancementCapabilities: ['content-generation', 'validation', 'optimization', 'self-repair'],
+  },
   run,
 };
 
