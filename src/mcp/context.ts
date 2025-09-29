@@ -8,7 +8,7 @@
 
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Logger } from 'pino';
-import type { SessionManager } from '@/lib/session';
+import type { SessionManager } from '@/session/core';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { extractProgressReporter } from './context-helpers.js';
 
@@ -144,6 +144,12 @@ export interface ToolContext {
   sessionManager?: SessionManager;
 
   /**
+   * Session facade for easy access to current session state
+   * Always present, providing consistent session interface to all tools
+   */
+  session?: import('@/app/orchestrator-types').SessionFacade;
+
+  /**
    * Logger for debugging and error tracking - Required for all tools
    * Use this for structured logging instead of console.log
    */
@@ -168,6 +174,8 @@ export interface ContextOptions {
   progress?: ProgressReporter | unknown;
   /** Session manager for workflow state tracking */
   sessionManager?: SessionManager;
+  /** Session facade for current session state */
+  session?: import('@/app/orchestrator-types').SessionFacade;
   /** Prompt registry for template management */
   /** Maximum tokens for sampling (default: 2048) */
   maxTokens?: number;
@@ -210,6 +218,7 @@ export function createToolContext(
       getPromptWithFallback(undefined, name, args),
     logger,
     ...(options.sessionManager !== undefined && { sessionManager: options.sessionManager }),
+    ...(options.session !== undefined && { session: options.session }),
     signal: options.signal,
     progress: progressReporter,
   };
@@ -363,30 +372,4 @@ async function getPromptWithFallback(
       },
     ],
   };
-}
-
-/**
- * Helper to create context for MCP tool handlers
- *
- * Convenience wrapper for use in MCP server tool registration.
- * Automatically extracts progress token from MCP request.
- *
- * @param server - MCP server instance
- * @param request - MCP request object (for progress token extraction)
- * @param logger - Logger instance
- * @param services - Optional services to include
- * @returns Configured ToolContext
- */
-export function createMCPToolContext(
-  server: Server,
-  request: unknown,
-  logger: Logger,
-  services: {
-    sessionManager?: SessionManager;
-  } = {},
-): ToolContext {
-  return createToolContext(server, logger, {
-    progress: request, // Will auto-extract progress token
-    ...(services.sessionManager !== undefined && { sessionManager: services.sessionManager }),
-  });
 }

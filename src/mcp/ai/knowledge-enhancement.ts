@@ -15,7 +15,9 @@ import { parseAIResponse } from '@/mcp/ai/response-parser';
 import { KnowledgeEnhancementResponseSchema } from '@/mcp/ai/schemas';
 import { scoreResponse } from '@/mcp/ai/quality';
 import { createContextAwarePlan } from '@/mcp/ai/sampling-plan';
-import { AI_CONFIG } from '@/config/ai-constants';
+import { TOKEN_CONFIG } from '@/config/tokens';
+import { SCORING_CONFIG } from '@/config/scoring';
+import { SAMPLING_CONFIG } from '@/config/sampling';
 
 export interface KnowledgeEnhancementRequest {
   /** Content to enhance */
@@ -103,8 +105,8 @@ export async function enhanceWithKnowledge(
 
     // Create sampling plan for knowledge enhancement
     const samplingPlan = createContextAwarePlan('knowledge', 'balanced', {
-      maxTokens: AI_CONFIG.TOKENS.STANDARD,
-      stopAt: AI_CONFIG.SCORING.THRESHOLDS.HIGH_QUALITY,
+      maxTokens: TOKEN_CONFIG.STANDARD,
+      stopAt: SCORING_CONFIG.THRESHOLDS.HIGH_QUALITY,
     });
 
     // Use sampling for high-quality results
@@ -113,11 +115,11 @@ export async function enhanceWithKnowledge(
       async (_attemptIndex) => ({
         messages: toMCPMessages(promptMessages).messages,
         includeContext: 'thisServer',
-        maxTokens: AI_CONFIG.TOKENS.STANDARD,
+        maxTokens: TOKEN_CONFIG.STANDARD,
         modelPreferences: {
           hints: [{ name: `knowledge-enhancement-${contentType}` }],
-          intelligencePriority: AI_CONFIG.PRIORITIES.INTELLIGENCE,
-          costPriority: AI_CONFIG.PRIORITIES.COST,
+          intelligencePriority: SAMPLING_CONFIG.PRIORITIES.INTELLIGENCE,
+          costPriority: SAMPLING_CONFIG.PRIORITIES.COST,
         },
       }),
       (text: string) => {
@@ -167,7 +169,7 @@ export async function enhanceWithKnowledge(
 
     const confidence = Math.min(
       response.confidence * (qualityScore.total / 100),
-      AI_CONFIG.CONFIDENCE.MAX,
+      SCORING_CONFIG.CONFIDENCE.MAX,
     );
 
     // Format the enhancement result
@@ -184,8 +186,9 @@ export async function enhanceWithKnowledge(
             (area) => area.description || area.area || String(area),
           ) || [],
         technicalDebt:
-          response.analysis?.technicalDebt?.map((debt: any) => debt.description || String(debt)) ||
-          [],
+          response.analysis?.technicalDebt?.map((debt: { description?: string } | string) =>
+            typeof debt === 'string' ? debt : debt.description || String(debt),
+          ) || [],
       },
       metadata: {
         sources: response.analysis?.knowledgeSources || [],

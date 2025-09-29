@@ -4,21 +4,51 @@
  */
 
 import { z, type ZodTypeAny } from 'zod';
-import { type Result, Success, Failure } from '@/types/index';
+import { type Result, Success, Failure, WorkflowState } from '@/types/index';
 import { createLogger } from '@/lib/logger';
 import { loadPolicy } from '@/config/policy-io';
 import { applyPolicy } from '@/config/policy-eval';
 import type { Policy } from '@/config/policy-schemas';
 import { createToolContext } from '@/mcp/context';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { SessionManager } from '@/session/core';
+import { ERROR_MESSAGES } from '@/lib/error-messages';
 import type {
   ToolOrchestrator,
   OrchestratorConfig,
   ExecuteRequest,
-  SessionState,
+  SessionFacade,
 } from './orchestrator-types';
 import type { Logger } from 'pino';
 import type { Tool } from '@/types/tool';
+
+/**
+ * Create a SessionFacade for tool handlers
+ */
+function createSessionFacade(session: WorkflowState): SessionFacade {
+  return {
+    id: session.sessionId,
+    get<T = unknown>(key: string): T | undefined {
+      return session.metadata?.[key] as T | undefined;
+    },
+    set(key: string, value: unknown): void {
+      if (!session.metadata) {
+        session.metadata = {};
+      }
+      session.metadata[key] = value;
+      session.updatedAt = new Date();
+    },
+    pushStep(step: string): void {
+      if (!session.completed_steps) {
+        session.completed_steps = [];
+      }
+      if (!session.completed_steps.includes(step)) {
+        session.completed_steps.push(step);
+        session.updatedAt = new Date();
+      }
+    },
+  };
+}
 
 /**
  * Create a tool orchestrator
@@ -31,7 +61,7 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
 }): ToolOrchestrator {
   const { registry, server, config = {} } = options;
   const logger = options.logger || createLogger({ name: 'orchestrator' });
-  const sessions = new Map<string, SessionState>();
+  const sessionManager = new SessionManager(logger, config.session);
 
   // Load policy if configured
   let policy: Policy | undefined;
@@ -45,24 +75,19 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
   }
 
   /**
-   * Execute a tool with optional orchestration
+   * Execute a tool with orchestration
    */
   async function execute(request: ExecuteRequest): Promise<Result<unknown>> {
-    const { toolName, params, sessionId } = request;
+    const { toolName } = request;
     const tool = registry.get(toolName);
 
     if (!tool) {
-      return Failure(`Tool not found: ${toolName}`);
+      return Failure(ERROR_MESSAGES.TOOL_NOT_FOUND(toolName));
     }
 
-    if (isSimpleTool(tool, policy, sessionId)) {
-      logger.debug(`Executing ${toolName} directly (no orchestration needed)`);
-      return await executeSimple(tool, params, server, logger);
-    }
-
-    // Complex case: handle dependencies, policies, sessions
+    // Always use orchestration path to provide consistent session handling
     const context: Parameters<typeof executeWithOrchestration>[2] = {
-      sessions,
+      sessionManager,
       registry,
       logger,
       config,
@@ -76,63 +101,13 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
 }
 
 /**
- * Check if a tool can be executed simply without orchestration
- */
-function isSimpleTool(tool: Tool<ZodTypeAny, any>, policy?: Policy, sessionId?: string): boolean {
-  // Needs orchestration if:
-  // 1. Has dependencies (if we add this to Tool interface later)
-  // 2. Has complex policy rules
-  // 3. Part of a session workflow
-
-  if (sessionId) return false; // Session means stateful workflow
-
-  if (policy) {
-    // Check if any policy rules apply to this tool
-    const hasComplexPolicy = policy.rules?.some(
-      (rule) =>
-        rule.conditions?.some((c: any) => c.type === 'tool' && c.value === tool.name) &&
-        (rule.actions?.block || rule.actions?.require_approval),
-    );
-    if (hasComplexPolicy) return false;
-  }
-
-  return true;
-}
-
-/**
- * Execute a simple tool directly
- */
-
-async function executeSimple<T extends Tool<ZodTypeAny, any>>(
-  tool: T,
-  params: unknown,
-  server: Server,
-  logger: Logger,
-): Promise<Result<unknown>> {
-  try {
-    // Validate parameters with the tool's schema
-    const validation = await validateParams(params, tool.schema);
-    if (!validation.ok) return validation;
-
-    // Create a proper context with MCP server
-    const toolLogger = logger.child({ tool: tool.name });
-    const context = createToolContext(server, toolLogger);
-
-    return await tool.run(validation.value, context);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return Failure(`Tool execution failed: ${message}`);
-  }
-}
-
-/**
  * Execute with full orchestration (dependencies, policies, sessions)
  */
 async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
   tool: T,
   request: ExecuteRequest,
   context: {
-    sessions: Map<string, SessionState>;
+    sessionManager: SessionManager;
     policy?: Policy;
     registry: Map<string, T>;
     logger: Logger;
@@ -141,33 +116,38 @@ async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
   },
 ): Promise<Result<unknown>> {
   const { params, sessionId } = request;
-  const { sessions, policy, logger, config, server } = context;
+  const { sessionManager, policy, logger, config, server } = context;
 
-  // Get or create session if needed
-  let session: SessionState | undefined;
-  if (sessionId) {
-    session = sessions.get(sessionId);
-    if (!session) {
-      session = {
-        sessionId,
-        created: new Date(),
-        updated: new Date(),
-        completedSteps: [],
-        data: {},
-      };
-      sessions.set(sessionId, session);
-    }
+  // Always create or get session - generate ID if none provided
+  const actualSessionId =
+    sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  // Get or create session using SessionManager
+  const sessionResult = await sessionManager.get(actualSessionId);
+  if (!sessionResult.ok) {
+    return Failure(ERROR_MESSAGES.SESSION_GET_FAILED(sessionResult.error));
   }
 
-  // Validate parameters
-  const validation = await validateParams(params, tool.schema);
+  let session = sessionResult.value;
+  if (!session) {
+    // Create new session if it doesn't exist
+    const createResult = await sessionManager.create(actualSessionId);
+    if (!createResult.ok) {
+      return Failure(ERROR_MESSAGES.SESSION_CREATE_FAILED(createResult.error));
+    }
+    session = createResult.value;
+  }
+
+  // Validate parameters using Zod safeParse
+  const validation = validateParams(params, tool.schema);
   if (!validation.ok) return validation;
+  const validatedParams = validation.value;
 
   // Apply policies
   if (policy) {
     const policyResults = applyPolicy(policy, {
       tool: tool.name,
-      params: params as Record<string, unknown>,
+      params: validatedParams as Record<string, unknown>,
     });
 
     const blockers = policyResults
@@ -175,7 +155,7 @@ async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
       .map((r) => r.rule.id);
 
     if (blockers.length > 0) {
-      return Failure(`Blocked by policies: ${blockers.join(', ')}`);
+      return Failure(ERROR_MESSAGES.POLICY_BLOCKED(blockers));
     }
   }
 
@@ -188,15 +168,29 @@ async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
     try {
       const toolLogger = logger.child({ tool: tool.name, attempt });
 
-      // Create a proper context with MCP server
-      const context = createToolContext(server, toolLogger);
-      const result = await tool.run(params as any, context);
+      // Create session facade for tool handler
+      const sessionFacade = createSessionFacade(session);
 
-      // Update session if successful
-      if (result.ok && session) {
-        session.completedSteps.push(tool.name);
-        session.data[tool.name] = result.value;
-        session.updated = new Date();
+      // Create a proper context with MCP server and session
+      const context = createToolContext(server, toolLogger, {
+        session: sessionFacade,
+      });
+      const result = await tool.run(validatedParams, context);
+
+      // Update session if successful using SessionManager
+      if (result.ok) {
+        const updatedSession: Partial<WorkflowState> = {
+          completed_steps: [...(session.completed_steps || []), tool.name],
+          metadata: {
+            ...(session.metadata || {}),
+            [tool.name]: result.value,
+          },
+        };
+
+        const updateResult = await sessionManager.update(actualSessionId, updatedSession);
+        if (!updateResult.ok) {
+          logger.warn(ERROR_MESSAGES.SESSION_UPDATE_FAILED(updateResult.error));
+        }
       }
 
       return result;
@@ -208,21 +202,17 @@ async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
     }
   }
 
-  return Failure(`Failed after ${maxRetries} attempts: ${lastError?.message}`);
+  return Failure(ERROR_MESSAGES.RETRY_EXHAUSTED(maxRetries, lastError?.message || 'Unknown error'));
 }
 
 /**
- * Validate parameters against schema
+ * Validate parameters against schema using safeParse
  */
-async function validateParams(params: unknown, schema: z.ZodSchema): Promise<Result<unknown>> {
-  try {
-    const validated = await schema.parseAsync(params);
-    return Success(validated);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      const issues = error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ');
-      return Failure(`Validation failed: ${issues}`);
-    }
-    return Failure(`Validation error: ${String(error)}`);
+function validateParams<T extends z.ZodSchema>(params: unknown, schema: T): Result<z.infer<T>> {
+  const parsed = schema.safeParse(params);
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ');
+    return Failure(ERROR_MESSAGES.VALIDATION_FAILED(issues));
   }
+  return Success(parsed.data);
 }

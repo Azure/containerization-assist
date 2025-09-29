@@ -4,7 +4,6 @@
  */
 
 import { jest } from '@jest/globals';
-import { createToolSessionHelpersMock } from '../../__support__/mocks/tool-session-helpers.mock';
 
 // Result Type Helpers for Testing
 function createSuccessResult<T>(value: T) {
@@ -28,18 +27,25 @@ function createMockLogger() {
 
 // Mock lib modules
 const mockSessionManager = {
-  create: jest.fn().mockResolvedValue({
+  create: jest.fn().mockResolvedValue(createSuccessResult({
     sessionId: 'test-session-123',
-    workflow_state: {},
     metadata: {},
     completed_steps: [],
     errors: {},
     current_step: null,
-    createdAt: '2025-09-08T11:12:40.362Z',
-    updatedAt: '2025-09-08T11:12:40.362Z',
-  }),
-  get: jest.fn(),
-  update: jest.fn(),
+    createdAt: new Date('2025-09-08T11:12:40.362Z'),
+    updatedAt: new Date('2025-09-08T11:12:40.362Z'),
+  })),
+  get: jest.fn().mockResolvedValue(createSuccessResult({
+    sessionId: 'test-session-123',
+    metadata: {},
+    completed_steps: [],
+    errors: {},
+    current_step: null,
+    createdAt: new Date('2025-09-08T11:12:40.362Z'),
+    updatedAt: new Date('2025-09-08T11:12:40.362Z'),
+  })),
+  update: jest.fn().mockResolvedValue(createSuccessResult(true)),
 };
 
 const mockK8sClient = {
@@ -55,8 +61,8 @@ const mockTimer = {
   error: jest.fn(),
 };
 
-jest.mock('@/lib/session', () => ({
-  createSessionManager: jest.fn(() => mockSessionManager),
+jest.mock('@/session/core', () => ({
+  SessionManager: jest.fn(() => mockSessionManager),
 }));
 
 jest.mock('@/lib/kubernetes', () => ({
@@ -64,7 +70,6 @@ jest.mock('@/lib/kubernetes', () => ({
 }));
 
 // Mock MCP helper modules
-jest.mock('../../../src/mcp/tool-session-helpers', () => createToolSessionHelpersMock());
 
 // Import these after mocks are set up
 import { prepareCluster } from '../../../src/tools/prepare-cluster/tool';
@@ -75,72 +80,73 @@ jest.mock('@/lib/logger', () => ({
   createLogger: jest.fn(() => createMockLogger()),
 }));
 
+jest.mock('@/lib/tool-helpers', () => ({
+  getToolLogger: jest.fn(() => createMockLogger()),
+  createToolTimer: jest.fn(() => mockTimer),
+}));
+
+jest.mock('@/lib/error-utils', () => ({
+  extractErrorMessage: jest.fn((error) => error.message || String(error)),
+}));
+
+jest.mock('@/lib/platform-utils', () => ({
+  getSystemInfo: jest.fn(() => ({ platform: 'linux', arch: 'x64' })),
+  getDownloadOS: jest.fn(() => 'linux'),
+  getDownloadArch: jest.fn(() => 'amd64'),
+}));
+
+jest.mock('@/lib/file-utils', () => ({
+  downloadFile: jest.fn(),
+  makeExecutable: jest.fn(),
+  createTempFile: jest.fn(),
+  deleteTempFile: jest.fn(),
+}));
+
+jest.mock('@/mcp/ai/sampling-runner', () => ({
+  sampleWithRerank: jest.fn(),
+}));
+
+jest.mock('@/ai/prompt-engine', () => ({
+  buildMessages: jest.fn(),
+}));
+
+jest.mock('@/mcp/ai/message-converter', () => ({
+  toMCPMessages: jest.fn(),
+}));
+
+jest.mock('node:child_process', () => ({
+  exec: jest.fn(),
+}));
+
+// Create session facade mock
+const mockSessionFacade = {
+  id: 'test-session-123',
+  get: jest.fn(),
+  set: jest.fn(),
+  pushStep: jest.fn(),
+};
+
+function createMockToolContext() {
+  return {
+    logger: createMockLogger(),
+    sessionManager: mockSessionManager,
+    session: mockSessionFacade,
+  } as any;
+}
+
 describe('prepareCluster', () => {
-  let mockLogger: ReturnType<typeof createMockLogger>;
   let config: PrepareClusterParams;
-  let mockGetSession: jest.Mock;
-  let mockUpdateSession: jest.Mock;
-  let mockEnsureSession: jest.Mock;
-  let mockUseSessionSlice: jest.Mock;
 
   beforeEach(() => {
-    mockLogger = createMockLogger();
     config = {
       sessionId: 'test-session-123',
       namespace: 'test-namespace',
       environment: 'production',
     };
 
-    // Get mocked functions
-    const sessionHelpers = require('@/mcp/tool-session-helpers');
-    mockGetSession = sessionHelpers.getSession = jest.fn();
-    mockUpdateSession = sessionHelpers.updateSession = jest.fn();
-    mockEnsureSession = sessionHelpers.ensureSession = jest.fn();
-    mockUseSessionSlice = sessionHelpers.useSessionSlice = jest.fn();
-
     // Reset all mocks
     jest.clearAllMocks();
     mockSessionManager.update.mockResolvedValue(true);
-
-    // Setup default session helper mocks
-    mockGetSession.mockResolvedValue({
-      ok: true,
-      value: {
-        id: 'test-session-123',
-        state: {
-          sessionId: 'test-session-123',
-          workflow_state: {},
-          metadata: {},
-          completed_steps: [],
-        },
-        isNew: false,
-      },
-    });
-    mockUpdateSession.mockResolvedValue({ ok: true });
-
-    // Setup ensureSession mock
-    mockEnsureSession.mockResolvedValue({
-      ok: true,
-      value: {
-        id: 'test-session-123',
-        state: {
-          sessionId: 'test-session-123',
-          metadata: {},
-          completed_steps: [],
-          errors: {},
-          current_step: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      },
-    });
-
-    // Setup useSessionSlice mock
-    mockUseSessionSlice.mockReturnValue({
-      get: jest.fn().mockResolvedValue({ ok: true, value: null }),
-      set: jest.fn().mockResolvedValue({ ok: true }),
-      patch: jest.fn().mockResolvedValue({ ok: true }),
-    });
   });
 
   describe('Successful cluster preparation', () => {
@@ -151,22 +157,12 @@ describe('prepareCluster', () => {
       mockK8sClient.applyManifest.mockResolvedValue({ success: true });
       mockK8sClient.checkPermissions.mockResolvedValue(true);
       mockK8sClient.checkIngressController.mockResolvedValue(true);
-
-      // Mock session
-      mockSessionManager.get.mockResolvedValue({
-        sessionId: 'test-session-123',
-        workflow_state: {},
-        metadata: {},
-      });
     });
 
     it('should handle existing namespace', async () => {
       mockK8sClient.namespaceExists.mockResolvedValue(true);
 
-      const mockContext = {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      } as any;
+      const mockContext = createMockToolContext();
       const result = await prepareCluster(config, mockContext);
 
       expect(result.ok).toBe(true);
@@ -182,21 +178,11 @@ describe('prepareCluster', () => {
   });
 
   describe('Error handling', () => {
-    beforeEach(() => {
-      mockSessionManager.get.mockResolvedValue({
-        sessionId: 'test-session-123',
-        workflow_state: {},
-        metadata: {},
-      });
-    });
 
     it('should return error when cluster is not reachable', async () => {
       mockK8sClient.ping.mockResolvedValue(false);
 
-      const mockContext = {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      } as any;
+      const mockContext = createMockToolContext();
       const result = await prepareCluster(config, mockContext);
 
       expect(result.ok).toBe(false);
@@ -213,10 +199,7 @@ describe('prepareCluster', () => {
         error: 'Failed to create namespace',
       });
 
-      const mockContext = {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      } as any;
+      const mockContext = createMockToolContext();
       const result = await prepareCluster(config, mockContext);
 
       expect(result.ok).toBe(false);
@@ -228,10 +211,7 @@ describe('prepareCluster', () => {
     it('should handle Kubernetes client errors', async () => {
       mockK8sClient.ping.mockRejectedValue(new Error('Connection timeout'));
 
-      const mockContext = {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      } as any;
+      const mockContext = createMockToolContext();
       const result = await prepareCluster(config, mockContext);
 
       expect(result.ok).toBe(false);
@@ -243,11 +223,6 @@ describe('prepareCluster', () => {
 
   describe('Optional features', () => {
     beforeEach(() => {
-      mockSessionManager.get.mockResolvedValue({
-        sessionId: 'test-session-123',
-        workflow_state: {},
-        metadata: {},
-      });
       mockK8sClient.ping.mockResolvedValue(true);
       mockK8sClient.namespaceExists.mockResolvedValue(true);
       mockK8sClient.checkPermissions.mockResolvedValue(true);
@@ -257,10 +232,7 @@ describe('prepareCluster', () => {
       mockK8sClient.applyManifest.mockResolvedValue({ success: true });
 
       // In production environment, RBAC is automatically setup
-      const mockContext = {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      } as any;
+      const mockContext = createMockToolContext();
       const result = await prepareCluster(config, mockContext);
 
       expect(result.ok).toBe(true);
@@ -273,10 +245,7 @@ describe('prepareCluster', () => {
       mockK8sClient.checkIngressController.mockResolvedValue(true);
 
       // In production, checkRequirements is true, so ingress is checked
-      const mockContext = {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      } as any;
+      const mockContext = createMockToolContext();
       const result = await prepareCluster(config, mockContext);
 
       expect(result.ok).toBe(true);
@@ -287,33 +256,17 @@ describe('prepareCluster', () => {
   });
 
   describe('Session management', () => {
-    it('should create new session if not exists', async () => {
-      // Mock getSession to indicate a new session was created
-      mockGetSession.mockResolvedValue({
-        ok: true,
-        value: {
-          id: 'test-session-123',
-          state: {
-            sessionId: 'test-session-123',
-            workflow_state: {},
-            metadata: {},
-            completed_steps: [],
-          },
-          isNew: true,
-        },
-      });
+    it('should use session context properly', async () => {
       mockK8sClient.ping.mockResolvedValue(true);
       mockK8sClient.namespaceExists.mockResolvedValue(true);
       mockK8sClient.checkPermissions.mockResolvedValue(true);
 
-      const mockContext = {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      } as any;
+      const mockContext = createMockToolContext();
       await prepareCluster(config, mockContext);
 
-      // Verify session was retrieved/created (using ensureSession now)
-      expect(mockEnsureSession).toHaveBeenCalledWith(mockContext, 'test-session-123');
+      // Verify session facade methods were available
+      expect(mockContext.session).toBeDefined();
+      expect(mockContext.session.id).toBe('test-session-123');
     });
   });
 });

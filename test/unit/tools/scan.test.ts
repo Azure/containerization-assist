@@ -6,8 +6,8 @@
 import { jest } from '@jest/globals';
 
 // Jest mocks must be at the top to ensure proper hoisting
-jest.mock('../../../src/lib/session', () => ({
-  createSessionManager: jest.fn(() => ({
+jest.mock('../../../src/session/core', () => ({
+  SessionManager: jest.fn(() => ({
     create: jest.fn().mockResolvedValue({
       "sessionId": "test-session-123",
       "workflow_state": {},
@@ -49,10 +49,6 @@ jest.mock('../../../src/lib/logger', () => ({
   })),
 }));
 
-import { createToolSessionHelpersMock } from '../../__support__/mocks/tool-session-helpers.mock';
-
-jest.mock('../../../src/mcp/tool-session-helpers', () => createToolSessionHelpersMock());
-
 jest.mock('../../../src/knowledge', () => ({
   getKnowledgeForCategory: jest.fn().mockReturnValue([
     {
@@ -65,15 +61,28 @@ jest.mock('../../../src/knowledge', () => ({
 
 import { scanImage } from '../../../src/tools/scan/tool';
 import type { ScanImageParams } from '../../../src/tools/scan/schema';
-import { createSessionManager } from '../../../src/lib/session';
+import { SessionManager } from '../../../src/session/core';
 import { createLogger } from '../../../src/lib/logger';
-import { ensureSession } from '../../../src/mcp/tool-session-helpers';
 
 // Get the mocked instances after imports
-const mockSessionManager = (createSessionManager as jest.Mock)();
+const mockSessionManager = new (SessionManager as jest.Mock)();
 const mockLogger = (createLogger as jest.Mock)();
-const mockEnsureSession = ensureSession as jest.Mock;
-// mockSecurityScannerInstance is already defined above
+
+// Create session facade mock
+const mockSessionFacade = {
+  id: 'test-session-123',
+  get: jest.fn(),
+  set: jest.fn(),
+  pushStep: jest.fn(),
+};
+
+function createMockToolContext() {
+  return {
+    logger: mockLogger,
+    sessionManager: mockSessionManager,
+    session: mockSessionFacade,
+  } as any;
+}
 
 // Test helper functions
 const createSuccessResult = <T>(value: T) => ({ ok: true, value } as const);
@@ -96,20 +105,16 @@ describe('scanImage', () => {
 
   describe('Basic Functionality', () => {
     beforeEach(() => {
-      // Session with valid build result
-      mockEnsureSession.mockResolvedValue({
-        ok: true,
-        value: {
-          id: 'test-session-123',
-          state: {
-            results: {
-              'build-image': {
-                imageId: 'sha256:mock-image-id',
-              },
+      // Session facade with valid build result
+      mockSessionFacade.get.mockImplementation((key: string) => {
+        if (key === 'results') {
+          return {
+            'build-image': {
+              imageId: 'sha256:mock-image-id',
             },
-            repo_path: '/test/repo',
-          },
-        },
+          };
+        }
+        return undefined;
       });
 
       // Default scan result with vulnerabilities - BasicScanResult format
@@ -135,10 +140,8 @@ describe('scanImage', () => {
     });
 
     it('should successfully scan image and return results', async () => {
-      const result = await scanImage(config, {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      });
+      const mockContext = createMockToolContext();
+      const result = await scanImage(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -154,33 +157,25 @@ describe('scanImage', () => {
       expect(mockSecurityScannerInstance.scanImage).toHaveBeenCalledWith('sha256:mock-image-id');
 
       // Verify session was updated with scan results
-      const sessionHelpers = require('../../../src/mcp/tool-session-helpers');
-      expect(sessionHelpers.updateSession).toHaveBeenCalledWith(
-        'test-session-123',
+      expect(mockSessionFacade.set).toHaveBeenCalledWith(
+        'results',
         expect.objectContaining({
-          results: expect.objectContaining({
-            'scan': expect.any(Object),
-          }),
-        }),
-        expect.any(Object),
+          scan: expect.any(Object),
+        })
       );
     });
 
     it('should pass scan with no vulnerabilities', async () => {
-      // Ensure session mock is set up for this test
-      mockEnsureSession.mockResolvedValue({
-        ok: true,
-        value: {
-          id: 'test-session-123',
-          state: {
-            results: {
-              'build-image': {
-                imageId: 'sha256:mock-image-id',
-              },
+      // Ensure session facade is set up for this test
+      mockSessionFacade.get.mockImplementation((key: string) => {
+        if (key === 'results') {
+          return {
+            'build-image': {
+              imageId: 'sha256:mock-image-id',
             },
-            repo_path: '/test/repo',
-          },
-        },
+          };
+        }
+        return undefined;
       });
 
       mockSecurityScannerInstance.scanImage.mockResolvedValue(createSuccessResult({
@@ -194,10 +189,8 @@ describe('scanImage', () => {
         imageId: 'sha256:mock-image-id',
       }));
 
-      const result = await scanImage(config, {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      });
+      const mockContext = createMockToolContext();
+      const result = await scanImage(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -208,12 +201,10 @@ describe('scanImage', () => {
 
     it('should respect severity threshold settings', async () => {
       config.severity = 'CRITICAL';
-      
+
       // Only high vulnerability, threshold is critical
-      const result = await scanImage(config, {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      });
+      const mockContext = createMockToolContext();
+      const result = await scanImage(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -226,10 +217,8 @@ describe('scanImage', () => {
         sessionId: 'test-session-123',
       };
 
-      const result = await scanImage(minimalConfig, {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      });
+      const mockContext = createMockToolContext();
+      const result = await scanImage(minimalConfig, mockContext);
 
       expect(result.ok).toBe(true);
       expect(mockSecurityScannerInstance.scanImage).toHaveBeenCalled();
@@ -238,41 +227,35 @@ describe('scanImage', () => {
 
   describe('Error Handling', () => {
     it('should handle session not found errors', async () => {
-      // Mock ensureSession to return an error (session not found)
-      mockEnsureSession.mockResolvedValue({
-        ok: false,
-        error: 'Session not found',
-      });
-
-      const result = await scanImage(config, {
+      // Mock context without session
+      const mockContext = {
         logger: mockLogger,
         sessionManager: mockSessionManager,
-      });
+        session: null,
+      } as any;
+
+      const result = await scanImage(config, mockContext);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe('Session not found');
+        expect(result.error).toBe('Session not available');
       }
-      expect(mockEnsureSession).toHaveBeenCalled();
     });
 
     it('should return error when no build result exists', async () => {
-      // Mock session without build_result
-      mockEnsureSession.mockResolvedValue({
-        ok: true,
-        value: {
-          id: 'test-session-123',
-          state: {
-            repo_path: '/test/repo',
-            // No build_result here
-          },
-        },
-      });
-
-      const result = await scanImage(config, {
+      // Mock session without build result
+      const mockContextWithoutBuild = {
         logger: mockLogger,
         sessionManager: mockSessionManager,
-      });
+        session: {
+          id: 'test-session-123',
+          get: jest.fn().mockReturnValue(undefined),
+          set: jest.fn(),
+          pushStep: jest.fn(),
+        },
+      } as any;
+
+      const result = await scanImage(config, mockContextWithoutBuild);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -283,29 +266,23 @@ describe('scanImage', () => {
     });
 
     it('should handle scanner failures', async () => {
-      mockEnsureSession.mockResolvedValue({
-        ok: true,
-        value: {
-          id: 'test-session-123',
-          state: {
-            results: {
-              'build-image': {
-                imageId: 'sha256:mock-image-id',
-              },
+      mockSessionFacade.get.mockImplementation((key: string) => {
+        if (key === 'results') {
+          return {
+            'build-image': {
+              imageId: 'sha256:mock-image-id',
             },
-            repo_path: '/test/repo',
-          },
-        },
+          };
+        }
+        return undefined;
       });
 
       mockSecurityScannerInstance.scanImage.mockResolvedValue(
         createFailureResult('Scanner failed to analyze image')
       );
 
-      const result = await scanImage(config, {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      });
+      const mockContext = createMockToolContext();
+      const result = await scanImage(config, mockContext);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -314,27 +291,21 @@ describe('scanImage', () => {
     });
 
     it('should handle exceptions during scan process', async () => {
-      mockEnsureSession.mockResolvedValue({
-        ok: true,
-        value: {
-          id: 'test-session-123',
-          state: {
-            results: {
-              'build-image': {
-                imageId: 'sha256:mock-image-id',
-              },
+      mockSessionFacade.get.mockImplementation((key: string) => {
+        if (key === 'results') {
+          return {
+            'build-image': {
+              imageId: 'sha256:mock-image-id',
             },
-            repo_path: '/test/repo',
-          },
-        },
+          };
+        }
+        return undefined;
       });
 
       mockSecurityScannerInstance.scanImage.mockRejectedValue(new Error('Scanner crashed'));
 
-      const result = await scanImage(config, {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      });
+      const mockContext = createMockToolContext();
+      const result = await scanImage(config, mockContext);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -345,19 +316,15 @@ describe('scanImage', () => {
 
   describe('Vulnerability Counting', () => {
     it('should correctly count vulnerabilities by severity', async () => {
-      mockEnsureSession.mockResolvedValue({
-        ok: true,
-        value: {
-          id: 'test-session-123',
-          state: {
-            results: {
-              'build-image': {
-                imageId: 'sha256:mock-image-id',
-              },
+      mockSessionFacade.get.mockImplementation((key: string) => {
+        if (key === 'results') {
+          return {
+            'build-image': {
+              imageId: 'sha256:mock-image-id',
             },
-            repo_path: '/test/repo',
-          },
-        },
+          };
+        }
+        return undefined;
       });
 
       mockSecurityScannerInstance.scanImage.mockResolvedValue(createSuccessResult({
@@ -377,10 +344,8 @@ describe('scanImage', () => {
         imageId: 'sha256:mock-image-id',
       }));
 
-      const result = await scanImage(config, {
-        logger: mockLogger,
-        sessionManager: mockSessionManager,
-      });
+      const mockContext = createMockToolContext();
+      const result = await scanImage(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -398,19 +363,15 @@ describe('scanImage', () => {
 
   describe('Scanner Configuration', () => {
     beforeEach(() => {
-      mockEnsureSession.mockResolvedValue({
-        ok: true,
-        value: {
-          id: 'test-session-123',
-          state: {
-            results: {
-              'build-image': {
-                imageId: 'sha256:mock-image-id',
-              },
+      mockSessionFacade.get.mockImplementation((key: string) => {
+        if (key === 'results') {
+          return {
+            'build-image': {
+              imageId: 'sha256:mock-image-id',
             },
-            repo_path: '/test/repo',
-          },
-        },
+          };
+        }
+        return undefined;
       });
 
       mockSecurityScannerInstance.scanImage.mockResolvedValue(createSuccessResult({
@@ -431,10 +392,8 @@ describe('scanImage', () => {
 
       for (const scanner of scannerTypes) {
         config.scanner = scanner;
-        const result = await scanImage(config, {
-          logger: mockLogger,
-          sessionManager: mockSessionManager,
-        });
+        const mockContext = createMockToolContext();
+        const result = await scanImage(config, mockContext);
 
         expect(result.ok).toBe(true);
         // Verify the scanner was created with the correct type
@@ -444,11 +403,12 @@ describe('scanImage', () => {
 
     it('should support different severity thresholds', async () => {
       const thresholds: Array<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'> = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
-      
+
       for (const threshold of thresholds) {
         config.severity = threshold;
-        const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
-        
+        const mockContext = createMockToolContext();
+        const result = await scanImage(config, mockContext);
+
         expect(result.ok).toBe(true);
       }
     });

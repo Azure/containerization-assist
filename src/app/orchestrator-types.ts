@@ -6,6 +6,7 @@
 import type { z } from 'zod';
 import type { Result } from '@/types/index';
 import type { Logger } from 'pino';
+import type { SessionConfig } from '@/session/core';
 
 /**
  * Request to execute a tool
@@ -29,14 +30,13 @@ export interface RegisteredTool {
 }
 
 /**
- * Session state for complex workflows
+ * Session facade for tool handlers
  */
-export interface SessionState {
-  sessionId: string;
-  created: Date;
-  updated: Date;
-  completedSteps: string[];
-  data: Record<string, unknown>;
+export interface SessionFacade {
+  id: string;
+  get<T = unknown>(key: string): T | undefined;
+  set(key: string, value: unknown): void;
+  pushStep(step: string): void;
 }
 
 /**
@@ -55,4 +55,5 @@ export interface OrchestratorConfig {
   sessionTTL?: number;
   policyPath?: string;
   policyEnvironment?: string;
+  session?: SessionConfig;
 }

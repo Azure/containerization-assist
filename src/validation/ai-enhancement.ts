@@ -15,7 +15,9 @@ import { AIEnhancementResponseSchema } from '@/mcp/ai/schemas';
 import { scoreResponse } from '@/mcp/ai/quality';
 import { createContextAwarePlan } from '@/mcp/ai/sampling-plan';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
-import { AI_CONFIG } from '@/config/ai-constants';
+import { SCORING_CONFIG } from '@/config/scoring';
+import { TOKEN_CONFIG } from '@/config/tokens';
+import { SAMPLING_CONFIG } from '@/config/sampling';
 
 export interface EnhancementOptions {
   /** Mode of AI enhancement */
@@ -84,8 +86,8 @@ export async function enhanceValidationWithAI(
   options: EnhancementOptions = {
     mode: 'suggestions',
     focus: 'all',
-    confidence: AI_CONFIG.CONFIDENCE.HIGH,
-    maxSuggestions: AI_CONFIG.LIMITS.MAX_SUGGESTIONS,
+    confidence: SCORING_CONFIG.CONFIDENCE.HIGH,
+    maxSuggestions: SAMPLING_CONFIG.LIMITS.MAX_SUGGESTIONS,
     includeExamples: true,
   },
 ): Promise<Result<AIEnhancementResult>> {
@@ -104,8 +106,8 @@ export async function enhanceValidationWithAI(
 
     // Build the enhancement prompt based on mode and focus
     const samplingPlan = createContextAwarePlan('enhancement', 'balanced', {
-      maxTokens: options.mode === 'fixes' ? AI_CONFIG.TOKENS.EXTENDED : AI_CONFIG.TOKENS.STANDARD,
-      stopAt: AI_CONFIG.SCORING.THRESHOLDS.HIGH_QUALITY,
+      maxTokens: options.mode === 'fixes' ? TOKEN_CONFIG.EXTENDED : TOKEN_CONFIG.STANDARD,
+      stopAt: SCORING_CONFIG.THRESHOLDS.HIGH_QUALITY,
     });
 
     const samplingResult = await sampleWithPlan(
@@ -120,8 +122,8 @@ export async function enhanceValidationWithAI(
               { name: `validation-enhancement-${options.focus}` },
               { name: `mode-${options.mode}` },
             ],
-            intelligencePriority: AI_CONFIG.PRIORITIES.INTELLIGENCE,
-            costPriority: AI_CONFIG.PRIORITIES.COST,
+            intelligencePriority: SAMPLING_CONFIG.PRIORITIES.INTELLIGENCE,
+            costPriority: SAMPLING_CONFIG.PRIORITIES.COST,
           },
         };
       },
@@ -157,7 +159,7 @@ export async function enhanceValidationWithAI(
     const result: AIEnhancementResult = {
       suggestions: parsedContent.suggestions.slice(
         0,
-        options.maxSuggestions || AI_CONFIG.LIMITS.MAX_SUGGESTIONS,
+        options.maxSuggestions || SAMPLING_CONFIG.LIMITS.MAX_SUGGESTIONS,
       ),
       ...(options.mode === 'fixes' && parsedContent.fixes && { fixes: parsedContent.fixes }),
       analysis: {
@@ -182,7 +184,7 @@ export async function enhanceValidationWithAI(
           })),
         }),
       },
-      confidence: response.winner.score / AI_CONFIG.SCORING.SCALE,
+      confidence: response.winner.score / SCORING_CONFIG.SCALE,
       metadata: {
         ...(response.model && { model: response.model }),
         processingTime,
@@ -333,9 +335,6 @@ function getModeInstruction(mode: EnhancementOptions['mode']): string {
       return 'Provide suggestions and recommendations for improvement.';
   }
 }
-
-// Removed parseEnhancementResponse function - replaced with structured JSON parsing
-// (Function was approximately 115 lines of regex-based parsing)
 
 /**
  * Create a summary analysis from validation results for quick insights

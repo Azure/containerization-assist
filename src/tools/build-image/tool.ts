@@ -18,7 +18,6 @@ import { normalizePath } from '@/lib/path-utils';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import type { Logger } from '@/lib/logger';
 import { promises as fs } from 'node:fs';
-import { ensureSession, getSession, updateSession } from '@/mcp/tool-session-helpers';
 import { createStandardProgress } from '@/mcp/progress-helper';
 import type { ToolContext } from '@/mcp/context';
 import { createDockerClient, type DockerBuildOptions } from '@/lib/docker';
@@ -27,7 +26,6 @@ import { type Result, Success, Failure, TOPICS } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { fileExists } from '@/lib/file-utils';
 import { type BuildImageParams, buildImageSchema } from './schema';
-import type { SessionData } from '@/tools/session-types';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { buildMessages } from '@/ai/prompt-engine';
@@ -74,7 +72,6 @@ export interface BuildImageResult {
  */
 async function prepareBuildArgs(
   buildArgs: Record<string, string> = {},
-  sessionId: string,
   context: ToolContext,
   logger: Logger,
 ): Promise<Record<string, string>> {
@@ -86,17 +83,19 @@ async function prepareBuildArgs(
 
   try {
     // Get analysis data from session metadata
-    const sessionData = await getSession(sessionId, context);
-    if (sessionData.ok && sessionData.value.state.results?.['analyze-repo']) {
-      const analysisResult = sessionData.value.state.results['analyze-repo'] as RepositoryAnalysis;
-      if (analysisResult.language) {
-        defaults.LANGUAGE = analysisResult.language;
-      }
-      if (analysisResult.framework) {
-        defaults.FRAMEWORK = analysisResult.framework;
-      }
-      if (analysisResult.frameworkVersion) {
-        defaults.FRAMEWORK_VERSION = analysisResult.frameworkVersion;
+    if (context.session) {
+      const results = context.session.get('results');
+      if (results && typeof results === 'object' && 'analyze-repo' in results) {
+        const analysisResult = (results as any)['analyze-repo'] as RepositoryAnalysis;
+        if (analysisResult.language) {
+          defaults.LANGUAGE = analysisResult.language;
+        }
+        if (analysisResult.framework) {
+          defaults.FRAMEWORK = analysisResult.framework;
+        }
+        if (analysisResult.frameworkVersion) {
+          defaults.FRAMEWORK_VERSION = analysisResult.frameworkVersion;
+        }
       }
     }
   } catch (error) {
@@ -191,8 +190,9 @@ Format your response as clear, actionable recommendations.`;
 async function generateOptimizationSuggestions(
   buildContext: string,
   dockerfileContent: string,
-  buildResult: any,
+  buildResult: { logs?: string[]; size?: number; imageId: string },
   ctx: ToolContext,
+  buildStartTime: number,
 ): Promise<Result<BuildOptimizationSuggestions>> {
   try {
     const optimizationResult = await sampleWithRerank(
@@ -203,7 +203,7 @@ async function generateOptimizationSuggestions(
           dockerfileContent,
           buildResult.logs || [],
           buildResult.size || 0,
-          Date.now() - (ctx as any)._buildStartTime || 0,
+          Date.now() - buildStartTime || 0,
         ),
       scoreBuildOptimization,
       { count: 2, stopAt: 85 },
@@ -350,29 +350,30 @@ async function buildImageImpl(
 
     const startTime = Date.now();
 
-    // Ensure session exists and get typed slice operations
-    const sessionResult = await ensureSession(context, params.sessionId);
-    if (!sessionResult.ok) {
-      return Failure(sessionResult.error);
+    // Use session facade directly
+    const sessionId = params.sessionId || context.session?.id;
+    if (!sessionId) {
+      return Failure('Session ID is required for build operations');
     }
-
-    const { id: sessionId, state: session } = sessionResult.value;
 
     logger.info({ sessionId }, 'Starting Docker image build with session');
 
     const dockerClient = createDockerClient(logger);
 
     // Determine paths
-    const sessionData = session as SessionData;
     const repoPath = buildContext;
     let finalDockerfilePath = dockerfilePath
       ? path.resolve(repoPath, dockerfilePath)
       : path.resolve(repoPath, dockerfile);
 
     // Check if we should use a generated Dockerfile
-    const dockerfileResult = sessionData?.results?.['generate-dockerfile'] as
-      | { path?: string; content?: string }
-      | undefined;
+    const results = context.session?.get('results');
+    const dockerfileResult =
+      results && typeof results === 'object' && 'generate-dockerfile' in results
+        ? ((results as any)['generate-dockerfile'] as
+            | { path?: string; content?: string }
+            | undefined)
+        : undefined;
     const generatedPath = dockerfileResult?.path;
 
     if (!(await fileExists(finalDockerfilePath))) {
@@ -437,7 +438,7 @@ async function buildImageImpl(
     }
 
     // Prepare build arguments
-    const finalBuildArgs = await prepareBuildArgs(buildArgs, sessionId, context, logger);
+    const finalBuildArgs = await prepareBuildArgs(buildArgs, context, logger);
 
     // Analyze security
     const securityWarnings = analyzeBuildSecurity(dockerfileContent, finalBuildArgs);
@@ -493,20 +494,14 @@ async function buildImageImpl(
       };
 
       // Update session with failed result
-      await updateSession(
-        sessionId,
-        {
-          results: {
-            'build-image': failedResult,
-          },
-          completed_steps: [
-            ...(sessionResult.ok ? sessionResult.value.state.completed_steps || [] : []),
-            'build-image',
-          ],
-          current_step: 'build-image',
-        },
-        context,
-      );
+      if (context.session) {
+        context.session.set('results', {
+          ...((context.session.get('results') as Record<string, any>) || {}),
+          'build-image': failedResult,
+        });
+        context.session.set('current_step', 'build-image');
+        context.session.pushStep('build-image');
+      }
 
       return Failure(`Failed to build image: ${errorMessage}`);
     }
@@ -519,14 +514,13 @@ async function buildImageImpl(
     // Generate AI-powered optimization suggestions for successful builds
     let optimizationSuggestions: BuildOptimizationSuggestions | undefined;
     try {
-      // Store build start time for optimization prompt
-      (context as any)._buildStartTime = startTime;
-
+      // Generate optimization suggestions
       const suggestionResult = await generateOptimizationSuggestions(
         buildContext,
         dockerfileContent,
         buildResult.value,
         context,
+        startTime,
       );
 
       if (suggestionResult.ok) {
@@ -573,18 +567,14 @@ async function buildImageImpl(
     };
 
     // Store build result in session
-    const currentSteps = sessionResult.ok ? sessionResult.value.state.completed_steps || [] : [];
-    await updateSession(
-      sessionId,
-      {
-        results: {
-          'build-image': result,
-        },
-        completed_steps: [...currentSteps, 'build-image'],
-        current_step: 'build-image',
-      },
-      context,
-    );
+    if (context.session) {
+      context.session.set('results', {
+        ...((context.session.get('results') as Record<string, any>) || {}),
+        'build-image': result,
+      });
+      context.session.set('current_step', 'build-image');
+      context.session.pushStep('build-image');
+    }
 
     timer.end({ imageId: buildResult.value.imageId, buildTime });
     logger.info({ imageId: buildResult.value.imageId, buildTime }, 'Docker image build completed');

@@ -4,7 +4,7 @@
 
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
 import type { Logger } from 'pino';
-import { createToolContext, createMCPToolContext } from '@/mcp/context';
+import { createToolContext } from '@/mcp/context';
 import { extractProgressToken, createProgressReporter } from '@/mcp/context';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
@@ -262,7 +262,9 @@ describe('ToolContext Bridge', () => {
         },
       };
 
-      const context = createMCPToolContext(mockServer, request, mockLogger, {});
+      const context = createToolContext(mockServer, mockLogger, {
+        progress: request,
+      });
 
       expect(context).toHaveProperty('progress');
       expect(context.progress).toBeInstanceOf(Function);
@@ -271,7 +273,9 @@ describe('ToolContext Bridge', () => {
     test('creates context without progress when no token', () => {
       const request = { params: {} };
 
-      const context = createMCPToolContext(mockServer, request, mockLogger, {});
+      const context = createToolContext(mockServer, mockLogger, {
+        progress: request,
+      });
 
       expect(context).toHaveProperty('progress');
       expect(context.progress).toBeUndefined();

@@ -13,7 +13,6 @@ import type { ZodTypeAny } from 'zod';
 import { createLogger } from '@/lib/logger';
 import { extractSchemaShape } from '@/lib/zod-utils';
 import { getAllInternalTools } from '@/exports/tools';
-import { createToolRegistry } from './tool-registry';
 import { createOrchestrator } from './orchestrator';
 import { createMCPServer } from '@/mcp/mcp-server';
 import type { OrchestratorConfig } from './orchestrator-types';
@@ -76,7 +75,12 @@ export function createApp(config: AppConfig = {}): {
     tools as readonly Tool<ZodTypeAny, any>[],
     config.toolAliases,
   );
-  const registry = createToolRegistry(aliasedTools);
+
+  // Create simple Map-based registry
+  const toolsMap = new Map<string, Tool<ZodTypeAny, any>>();
+  for (const tool of aliasedTools) {
+    toolsMap.set(tool.name, tool);
+  }
 
   const orchestratorConfig: OrchestratorConfig = {};
   if (config.sessionTTL !== undefined) orchestratorConfig.sessionTTL = config.sessionTTL;
@@ -97,7 +101,7 @@ export function createApp(config: AppConfig = {}): {
       if (!orchestrator) {
         // If orchestrator doesn't exist yet, we need to create an MCP server first
         if (!mcpServer) {
-          mcpServer = createMCPServer(registry.list(), {
+          mcpServer = createMCPServer(Array.from(toolsMap.values()), {
             logger,
             transport: 'stdio',
             name: 'containerization-assist',
@@ -108,10 +112,7 @@ export function createApp(config: AppConfig = {}): {
 
         // Now create the orchestrator with the MCP server
         orchestrator = createOrchestrator({
-          registry: registry.list().reduce((map, tool) => {
-            map.set(tool.name, tool);
-            return map;
-          }, new Map<string, Tool<ZodTypeAny, any>>()),
+          registry: toolsMap,
           server: mcpServer.getServer(),
           logger,
           config: orchestratorConfig,
@@ -141,15 +142,12 @@ export function createApp(config: AppConfig = {}): {
       if (transport.port !== undefined) serverOptions.port = transport.port;
       if (transport.host !== undefined) serverOptions.host = transport.host;
 
-      mcpServer = createMCPServer(registry.list(), serverOptions);
+      mcpServer = createMCPServer(Array.from(toolsMap.values()), serverOptions);
       await mcpServer.start();
 
       // Create orchestrator now that we have an MCP server
       orchestrator = createOrchestrator({
-        registry: registry.list().reduce((map, tool) => {
-          map.set(tool.name, tool);
-          return map;
-        }, new Map<string, Tool<any, any>>()),
+        registry: toolsMap,
         server: mcpServer.getServer(),
         logger,
         config: orchestratorConfig,
@@ -167,10 +165,7 @@ export function createApp(config: AppConfig = {}): {
         // Extract the underlying SDK Server from McpServer
         const sdkServer = (server as any).server as Server;
         orchestrator = createOrchestrator({
-          registry: registry.list().reduce((map, tool) => {
-            map.set(tool.name, tool);
-            return map;
-          }, new Map<string, Tool<ZodTypeAny, any>>()),
+          registry: toolsMap,
           server: sdkServer,
           logger,
           config: orchestratorConfig,
@@ -178,7 +173,7 @@ export function createApp(config: AppConfig = {}): {
       }
 
       // Register each tool with the MCP server
-      for (const tool of registry.list()) {
+      for (const tool of toolsMap.values()) {
         // Get the schema shape for MCP protocol
         const schema = extractSchemaShape(tool.schema);
         const description = tool.description;
@@ -216,7 +211,7 @@ export function createApp(config: AppConfig = {}): {
      * List all available tools
      */
     listTools: () =>
-      registry.list().map((t) => ({
+      Array.from(toolsMap.values()).map((t) => ({
         name: t.name,
         description: t.description,
       })),
@@ -225,7 +220,7 @@ export function createApp(config: AppConfig = {}): {
      * Simple health check
      */
     healthCheck: () => {
-      const toolCount = registry.list().length;
+      const toolCount = toolsMap.size;
       return {
         status: 'healthy' as const,
         tools: toolCount,

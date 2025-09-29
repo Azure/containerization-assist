@@ -1,5 +1,3 @@
-import { Failure, Result, Success } from '@/types';
-
 /**
  * Type-safe AI prompt templates using TypeScript template literals
  * These templates structure prompts for AI generation, not static output
@@ -654,57 +652,6 @@ Response Format:
 } as const;
 
 // ===== VALIDATION HELPERS =====
-
-/**
- * Validate required parameters are present
- */
-export function validatePromptParams<T extends Record<string, unknown>>(
-  params: T,
-  required: (keyof T)[],
-): Result<void> {
-  for (const key of required) {
-    if (params[key] === undefined || params[key] === null) {
-      return Failure(`Missing required parameter: ${String(key)}`);
-    }
-  }
-  return Success(undefined);
-}
-
-/**
- * Build a complete AI prompt with context
- */
-export function buildAIPrompt(
-  template: string,
-  context?: {
-    projectType?: string;
-    existingFiles?: string[];
-    constraints?: string[];
-  },
-): string {
-  let fullPrompt = template;
-
-  if (context) {
-    if (context.projectType) {
-      fullPrompt = `Project type: ${context.projectType}\n\n${fullPrompt}`;
-    }
-
-    if (context.existingFiles && context.existingFiles.length > 0) {
-      fullPrompt += `\n\nExisting files in project:\n`;
-      context.existingFiles.forEach((file) => {
-        fullPrompt += `- ${file}\n`;
-      });
-    }
-
-    if (context.constraints && context.constraints.length > 0) {
-      fullPrompt += `\n\nConstraints:\n`;
-      context.constraints.forEach((constraint) => {
-        fullPrompt += `- ${constraint}\n`;
-      });
-    }
-  }
-
-  return fullPrompt;
-}
 
 /**
  * Extract structured data from AI response

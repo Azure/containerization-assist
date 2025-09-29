@@ -2,7 +2,7 @@
  * Mock Security Scanner for Testing
  */
 
-import { Result, Success } from '../../src/core/types';
+import { Result, Success } from "../../src/types"
 import { DockerScanResult } from '../../src/types/docker';
 
 export const mockScan = async (imageName: string): Promise<Result<DockerScanResult>> => {

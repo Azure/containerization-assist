@@ -1,5 +1,16 @@
 /**
- * Generate Dockerfile tool using the new Tool pattern
+ * Generate Dockerfile Tool
+ *
+ * AI-powered Dockerfile generation for containerizing applications. Analyzes
+ * project structure, dependencies, and best practices to create optimized
+ * Dockerfiles with multi-stage builds, security hardening, and performance
+ * optimizations.
+ *
+ * @category docker
+ * @version 3.0.0
+ * @aiDriven true
+ * @knowledgeEnhanced true
+ * @samplingStrategy rerank
  */
 
 import { Success, Failure, type Result, TOPICS } from '@/types';
@@ -8,7 +19,6 @@ import type { Tool } from '@/types/tool';
 import { generateDockerfileSchema } from './schema';
 import type { AIResponse } from '../ai-response-types';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
-import { getSession, updateSession } from '@/mcp/tool-session-helpers';
 import { promises as fs } from 'node:fs';
 import nodePath from 'node:path';
 import { DockerfileParser } from 'dockerfile-ast';
@@ -134,10 +144,16 @@ async function run(
   let requirements: string | undefined;
   const baseImage: string | undefined = input.baseImage;
 
-  if (sessionId) {
-    const sessionResult = await getSession(sessionId, ctx);
-    if (sessionResult.ok && sessionResult.value.state.results?.['analyze-repo']) {
-      const analysis = sessionResult.value.state.results['analyze-repo'] as RepositoryAnalysis;
+  // Try to get analysis from session if sessionId is provided
+  if (sessionId && ctx.session) {
+    const results = ctx.session.get('results');
+    if (
+      results &&
+      typeof results === 'object' &&
+      'analyze-repo' in results &&
+      results['analyze-repo']
+    ) {
+      const analysis = results['analyze-repo'] as RepositoryAnalysis;
 
       // Use actual values from the analysis
       language = typeof analysis.language === 'string' ? analysis.language : 'auto-detect';
@@ -481,14 +497,16 @@ ${finalDockerfileContent}
 
     // Determine where to write the Dockerfile
     let dockerfilePath = '';
-    if (sessionId) {
+    if (sessionId && ctx.session) {
       // Get the analyzed path from session
-      const sessionResult = await getSession(sessionId, ctx);
-      if (sessionResult.ok && sessionResult.value.state.metadata?.analyzedPath) {
-        dockerfilePath = nodePath.join(
-          sessionResult.value.state.metadata.analyzedPath as string,
-          'Dockerfile',
-        );
+      const metadata = ctx.session.get('metadata');
+      if (
+        metadata &&
+        typeof metadata === 'object' &&
+        'analyzedPath' in metadata &&
+        metadata.analyzedPath
+      ) {
+        dockerfilePath = nodePath.join(metadata.analyzedPath as string, 'Dockerfile');
       }
     } else if (input.path) {
       // Use the provided path
@@ -518,26 +536,16 @@ ${finalDockerfileContent}
     }
 
     // Update session if available
-    if (sessionId) {
-      const updateResult = await updateSession(
-        sessionId,
-        {
-          metadata: {
-            dockerfileGenerated: true,
-            dockerfilePath: written ? dockerfilePath : undefined,
-            dockerfileContent: finalDockerfileContent,
-            baseImage: finalDockerfileContent.match(/FROM\s+([^\s]+)/)?.[1],
-            multistage,
-            securityHardening,
-            optimization,
-          },
-        },
-        ctx,
-      );
-
-      if (!updateResult.ok) {
-        ctx.logger.warn({ sessionId }, 'Failed to update session with Dockerfile info');
-      }
+    if (sessionId && ctx.session) {
+      ctx.session.set('metadata', {
+        dockerfileGenerated: true,
+        dockerfilePath: written ? dockerfilePath : undefined,
+        dockerfileContent: finalDockerfileContent,
+        baseImage: finalDockerfileContent.match(/FROM\s+([^\s]+)/)?.[1],
+        multistage,
+        securityHardening,
+        optimization,
+      });
     }
 
     // Build workflow hints

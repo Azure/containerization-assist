@@ -7,7 +7,6 @@ import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { scoreRepositoryAnalysis } from '@/lib/sampling';
-import { updateSession, ensureSession } from '@/mcp/tool-session-helpers';
 import { analyzeRepoSchema, RepositoryAnalysis } from './schema';
 import type { AIResponse } from '../ai-response-types';
 import type { Tool } from '@/types/tool';
@@ -189,25 +188,19 @@ async function run(
     const analysisResult = JSON.parse(jsonMatch[0]);
 
     // Store the analysis result in session for other tools to use
-    const sessionResult = await ensureSession(ctx, workflowSessionId);
     const result = { ...analysisResult, sessionId: workflowSessionId };
 
-    if (sessionResult.ok) {
-      const currentSteps = sessionResult.value.state.completed_steps || [];
-      await updateSession(
-        workflowSessionId,
-        {
-          results: {
-            'analyze-repo': result as RepositoryAnalysis,
-          },
-          current_step: 'analyze-repo',
-          completed_steps: [...currentSteps, 'analyze-repo'],
-        },
-        ctx,
-      );
+    if (ctx.session) {
+      // Use the session facade to store results
+      ctx.session.set('results', {
+        'analyze-repo': result as RepositoryAnalysis,
+      });
+      ctx.session.set('current_step', 'analyze-repo');
+      ctx.session.pushStep('analyze-repo');
+
       ctx.logger.info({ sessionId: workflowSessionId }, 'Stored repository analysis in session');
     } else {
-      ctx.logger.warn('Could not store analysis in session - session manager may not be available');
+      ctx.logger.warn('Could not store analysis in session - session may not be available');
     }
 
     // Add sessionId and workflowHints to the result

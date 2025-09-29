@@ -186,3 +186,169 @@ export function validateMetadataConsistency(
 
   return Success(undefined);
 }
+
+/**
+ * Interface for tool validation that includes all necessary properties
+ */
+export interface ValidatableTool {
+  name: string;
+  metadata: ToolMetadata;
+}
+
+/**
+ * Performs post-validation checks for a single tool
+ * Consolidates all validation logic from CLI into centralized location
+ */
+export function postValidate(tool: ValidatableTool): string[] {
+  const issues: string[] = [];
+
+  // AI-driven tool should have sampling strategy
+  if (tool.metadata.aiDriven && tool.metadata.samplingStrategy === 'none') {
+    issues.push('AI-driven tool should have sampling strategy');
+  }
+
+  // Knowledge-enhanced tool missing capabilities
+  if (tool.metadata.knowledgeEnhanced && tool.metadata.enhancementCapabilities.length === 0) {
+    issues.push('Knowledge-enhanced tool missing capabilities');
+  }
+
+  // Knowledge-enhanced should be AI-driven
+  if (tool.metadata.knowledgeEnhanced && !tool.metadata.aiDriven) {
+    issues.push('Knowledge-enhanced should be AI-driven');
+  }
+
+  // AI-driven tool should specify capabilities
+  if (tool.metadata.aiDriven && tool.metadata.enhancementCapabilities.length === 0) {
+    issues.push('AI-driven tool should specify capabilities');
+  }
+
+  return issues;
+}
+
+/**
+ * Interface for comprehensive validation report
+ */
+export interface ValidationReport {
+  summary: {
+    totalTools: number;
+    validTools: number;
+    invalidTools: number;
+    compliancePercentage: number;
+  };
+  validTools: string[];
+  invalidTools: Array<{
+    name: string;
+    issues: string[];
+    suggestions: string[];
+  }>;
+  metadataErrors: Array<{
+    name: string;
+    error: string;
+  }>;
+  consistencyErrors: Array<{
+    name: string;
+    error: string;
+  }>;
+}
+
+/**
+ * Suggestion mapping for common validation issues
+ */
+const VALIDATION_SUGGESTIONS: Record<string, string> = {
+  'AI-driven tool should have sampling strategy': 'Set samplingStrategy to "single" or "rerank"',
+  'Knowledge-enhanced tool missing capabilities': 'Add appropriate enhancementCapabilities array',
+  'Knowledge-enhanced should be AI-driven': 'Set aiDriven: true for knowledge-enhanced tools',
+  'AI-driven tool should specify capabilities': 'Add relevant enhancementCapabilities',
+  'Invalid metadata schema': 'Fix metadata schema validation errors',
+  'Metadata consistency issues': 'Review and fix metadata consistency',
+};
+
+/**
+ * Validates all tool metadata and returns comprehensive report
+ * Centralized validation logic for use by CLI commands
+ */
+export async function validateAllToolMetadata(
+  tools: ValidatableTool[],
+): Promise<Result<ValidationReport>> {
+  try {
+    const validTools: string[] = [];
+    const invalidTools: Array<{ name: string; issues: string[]; suggestions: string[] }> = [];
+    const metadataErrors: Array<{ name: string; error: string }> = [];
+    const consistencyErrors: Array<{ name: string; error: string }> = [];
+
+    for (const tool of tools) {
+      const issues: string[] = [];
+      const suggestions: string[] = [];
+
+      // Validate metadata schema compliance
+      const metadataValidation = validateToolMetadata(tool.metadata);
+      if (!metadataValidation.ok) {
+        metadataErrors.push({
+          name: tool.name,
+          error: metadataValidation.error,
+        });
+        issues.push('Invalid metadata schema');
+        suggestions.push(
+          VALIDATION_SUGGESTIONS['Invalid metadata schema'] ??
+            'Fix metadata schema validation errors',
+        );
+        continue;
+      }
+
+      // Validate metadata consistency
+      const consistencyValidation = validateMetadataConsistency(tool.name, tool.metadata);
+      if (!consistencyValidation.ok) {
+        consistencyErrors.push({
+          name: tool.name,
+          error: consistencyValidation.error,
+        });
+        issues.push('Metadata consistency issues');
+        suggestions.push(
+          VALIDATION_SUGGESTIONS['Metadata consistency issues'] ??
+            'Review and fix metadata consistency',
+        );
+      }
+
+      // Perform post-validation checks
+      const postValidationIssues = postValidate(tool);
+      issues.push(...postValidationIssues);
+
+      // Add suggestions for post-validation issues
+      postValidationIssues.forEach((issue) => {
+        const suggestion = VALIDATION_SUGGESTIONS[issue];
+        if (suggestion) {
+          suggestions.push(suggestion);
+        }
+      });
+
+      if (issues.length > 0) {
+        invalidTools.push({
+          name: tool.name,
+          issues,
+          suggestions,
+        });
+      } else {
+        validTools.push(tool.name);
+      }
+    }
+
+    const totalTools = tools.length;
+    const validCount = validTools.length;
+    const compliancePercentage = Math.round((validCount / totalTools) * 100);
+
+    return Success({
+      summary: {
+        totalTools,
+        validTools: validCount,
+        invalidTools: totalTools - validCount,
+        compliancePercentage,
+      },
+      validTools,
+      invalidTools,
+      metadataErrors,
+      consistencyErrors,
+    });
+  } catch (error) {
+    return Failure(`Validation failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}

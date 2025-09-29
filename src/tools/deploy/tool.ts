@@ -23,7 +23,6 @@ import * as yaml from 'js-yaml';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import type { Logger } from '@/lib/logger';
 import { extractErrorMessage } from '@/lib/error-utils';
-import { ensureSession, getSession, updateSession } from '@/mcp/tool-session-helpers';
 import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient } from '@/lib/kubernetes';
 import type { K8sManifest } from '@/infra/kubernetes/client';
@@ -475,13 +474,11 @@ async function deployApplicationImpl(
     const timeout = DEPLOYMENT_CONFIG.WAIT_TIMEOUT_SECONDS;
     logger.info({ namespace, cluster, dryRun, environment }, 'Starting application deployment');
 
-    // Ensure session exists and get typed slice operations
-    const sessionResult = await ensureSession(context, params.sessionId);
-    if (!sessionResult.ok) {
-      return Failure(sessionResult.error);
+    // Use session facade directly
+    const sessionId = params.sessionId || context.session?.id;
+    if (!sessionId) {
+      return Failure('Session ID is required for deployment operations');
     }
-
-    const { id: sessionId } = sessionResult.value;
 
     logger.info(
       { sessionId, namespace, environment },
@@ -492,14 +489,16 @@ async function deployApplicationImpl(
     // Get K8s manifests from session results
     let manifestContents: string | undefined;
     try {
-      const sessionResult = await getSession(sessionId, context);
-      if (sessionResult.ok && sessionResult.value.state.results?.['generate-k8s-manifests']) {
-        const k8sResult = sessionResult.value.state.results['generate-k8s-manifests'] as {
-          manifests?: string;
-        };
-        if (k8sResult.manifests) {
-          manifestContents = k8sResult.manifests;
-          logger.info({ sessionId }, 'Retrieved K8s manifests from session results');
+      if (context.session) {
+        const results = context.session.get('results');
+        if (results && typeof results === 'object' && 'generate-k8s-manifests' in results) {
+          const k8sResult = (results as any)['generate-k8s-manifests'] as {
+            manifests?: string;
+          };
+          if (k8sResult.manifests) {
+            manifestContents = k8sResult.manifests;
+            logger.info({ sessionId }, 'Retrieved K8s manifests from session results');
+          }
         }
       }
     } catch (error) {
@@ -787,18 +786,14 @@ async function deployApplicationImpl(
     };
 
     // Store deployment result in session
-    const currentSteps = sessionResult.ok ? sessionResult.value.state.completed_steps || [] : [];
-    await updateSession(
-      sessionId,
-      {
-        results: {
-          deploy: result,
-        },
-        completed_steps: [...currentSteps, 'deploy'],
-        current_step: 'deploy',
-      },
-      context,
-    );
+    if (context.session) {
+      context.session.set('results', {
+        ...((context.session.get('results') as Record<string, any>) || {}),
+        deploy: result,
+      });
+      context.session.set('current_step', 'deploy');
+      context.session.pushStep('deploy');
+    }
     timer.end({ deploymentName, ready, sessionId });
 
     if (ready) {

@@ -1,5 +1,5 @@
 import { E2ETestBase, E2ETestContext, E2ETestConfig } from '../../e2e/helpers/e2e-test-base';
-import { Result, Success, Failure } from '../../../src/core/types/index.js';
+import { Result, Success, Failure } from "../../src/types"
 import { TestRepository } from '../../fixtures/types';
 
 export interface PerformanceMetrics {

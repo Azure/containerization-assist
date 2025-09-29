@@ -5,7 +5,6 @@
  * Follows the new Tool interface pattern
  */
 
-import { ensureSession, updateSession } from '@/mcp/tool-session-helpers';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { createDockerClient } from '@/lib/docker';
@@ -112,7 +111,7 @@ async function generateTaggingSuggestions(
   imageId: string,
   currentTag: string,
   ctx: ToolContext,
-  sessionContext?: any,
+  sessionContext?: Record<string, unknown>,
 ): Promise<Result<TaggingStrategySuggestions>> {
   try {
     const suggestionResult = await sampleWithRerank(
@@ -204,22 +203,26 @@ async function run(
       return Failure('Tag parameter is required');
     }
 
-    // Ensure session exists and get typed slice operations
-    const sessionResult = await ensureSession(ctx, input.sessionId);
-    if (!sessionResult.ok) {
-      return Failure(sessionResult.error);
+    // Use session facade directly
+    const sessionId = input.sessionId || ctx.session?.id;
+    if (!sessionId) {
+      return Failure('Session ID is required for tag operations');
     }
 
-    const { id: sessionId, state: session } = sessionResult.value;
+    if (!ctx.session) {
+      return Failure('Session not available');
+    }
 
     logger.info({ sessionId, tag }, 'Starting image tagging');
 
     const dockerClient = createDockerClient(logger);
 
     // Check for built image in session results or use provided imageId
-    const buildResult = session.results?.['build-image'] as
-      | { imageId?: string; tags?: string[] }
-      | undefined;
+    const results = ctx.session.get('results');
+    const buildResult =
+      results && typeof results === 'object' && 'build-image' in results
+        ? ((results as any)['build-image'] as { imageId?: string; tags?: string[] } | undefined)
+        : undefined;
     const source = input.imageId || buildResult?.imageId;
 
     if (!source) {
@@ -248,7 +251,12 @@ async function run(
     // Generate AI-powered tagging suggestions
     let taggingSuggestions: TaggingStrategySuggestions | undefined;
     try {
-      const suggestionResult = await generateTaggingSuggestions(source, tag, ctx, session.metadata);
+      const suggestionResult = await generateTaggingSuggestions(
+        source,
+        tag,
+        ctx,
+        ctx.session.get('metadata'),
+      );
 
       if (suggestionResult.ok) {
         taggingSuggestions = suggestionResult.value;
@@ -279,18 +287,14 @@ async function run(
     };
 
     // Store tag result in session
-    const currentSteps = sessionResult.ok ? sessionResult.value.state.completed_steps || [] : [];
-    await updateSession(
-      sessionId,
-      {
-        results: {
-          'tag-image': result,
-        },
-        completed_steps: [...currentSteps, 'tag-image'],
-        current_step: 'tag-image',
-      },
-      ctx,
-    );
+    if (ctx.session) {
+      ctx.session.set('results', {
+        ...((ctx.session.get('results') as Record<string, any>) || {}),
+        'tag-image': result,
+      });
+      ctx.session.set('current_step', 'tag-image');
+      ctx.session.pushStep('tag-image');
+    }
 
     timer.end({ tags, sessionId });
     logger.info({ sessionId, tags }, 'Image tagging completed');

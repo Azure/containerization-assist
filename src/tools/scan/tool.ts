@@ -5,7 +5,6 @@
  * Uses standardized helpers for consistency
  */
 
-import { ensureSession, updateSession } from '@/mcp/tool-session-helpers';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import type { ToolContext } from '@/mcp/context';
 
@@ -14,7 +13,8 @@ import { Success, Failure, type Result } from '@/types';
 import { getKnowledgeForCategory } from '@/knowledge/index';
 import type { KnowledgeMatch } from '@/knowledge/types';
 import { enhanceValidationWithAI } from '@/validation/ai-enhancement';
-import type { ValidationResult } from '@/validation/core-types';
+import { ValidationSeverity, type ValidationResult } from '@/validation/core-types';
+import type { Tool } from '@/types/tool';
 import { scanImageSchema, type ScanImageParams } from './schema';
 
 interface DockerScanResult {
@@ -103,13 +103,11 @@ async function scanImageImpl(
       'Starting image security scan',
     );
 
-    // Ensure session exists and get typed slice operations
-    const sessionResult = await ensureSession(context, params.sessionId);
-    if (!sessionResult.ok) {
-      return Failure(sessionResult.error);
+    // Use session if available
+    const sessionId = params.sessionId || context.session?.id || 'unknown';
+    if (!context.session) {
+      return Failure('Session not available');
     }
-
-    const { id: sessionId, state: session } = sessionResult.value;
 
     logger.info(
       { sessionId, scanner, severityThreshold: finalSeverityThreshold },
@@ -119,7 +117,11 @@ async function scanImageImpl(
     const securityScanner = createSecurityScanner(logger, scanner);
 
     // Check for built image in session results or use provided imageId
-    const buildResult = session?.results?.['build-image'] as { imageId?: string } | undefined;
+    const results = context.session?.get('results');
+    const buildResult =
+      results && typeof results === 'object' && 'build-image' in results
+        ? ((results as any)['build-image'] as { imageId?: string } | undefined)
+        : undefined;
     const imageId = params.imageId || buildResult?.imageId;
 
     if (!imageId) {
@@ -242,7 +244,12 @@ async function scanImageImpl(
             ...(vuln.id && { ruleId: vuln.id }),
             confidence: 0.9,
             metadata: {
-              severity: vuln.severity.toLowerCase() as any,
+              severity:
+                vuln.severity.toLowerCase() === 'high' || vuln.severity.toLowerCase() === 'critical'
+                  ? ValidationSeverity.ERROR
+                  : vuln.severity.toLowerCase() === 'medium'
+                    ? ValidationSeverity.WARNING
+                    : ValidationSeverity.INFO,
               location: `${vuln.package}:${vuln.version}`,
               aiEnhanced: true,
             },
@@ -360,18 +367,13 @@ ${dockerScanResult.vulnerabilities
     };
 
     // Store scan result in session
-    const currentSteps = sessionResult.ok ? sessionResult.value.state.completed_steps || [] : [];
-    await updateSession(
-      sessionId,
-      {
-        results: {
-          scan: result,
-        },
-        completed_steps: [...currentSteps, 'scan'],
-        current_step: 'scan',
-      },
-      context,
-    );
+    if (context.session) {
+      context.session.set('results', {
+        scan: result,
+      });
+      context.session.pushStep('scan');
+      context.session.set('current_step', 'scan');
+    }
 
     timer.end({
       vulnerabilities: scanResult.totalVulnerabilities,
@@ -410,8 +412,6 @@ export type ScanImageConfig = ScanImageParams;
 export const scanImage = scanImageImpl;
 
 // New Tool interface export
-import type { Tool } from '@/types/tool';
-
 const tool: Tool<typeof scanImageSchema, ScanImageResult> = {
   name: 'scan',
   description: 'Scan Docker images for security vulnerabilities',

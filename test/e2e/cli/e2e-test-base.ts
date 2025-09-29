@@ -1,6 +1,6 @@
 import { MCPClient, setupMCPTestEnvironment, cleanupMCPTestEnvironment } from '../../helpers/mcp-environment';
 import { TestRepository } from '../../fixtures/types';
-import { Result, Success, Failure } from '../../../src/core/types';
+import { Result, Success, Failure } from "../../src/types"
 import { Logger } from 'pino';
 import path from 'path';
 import fs from 'fs/promises';

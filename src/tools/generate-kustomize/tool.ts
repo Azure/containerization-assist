@@ -1,3 +1,14 @@
+/**
+ * Generate Kustomize Tool
+ *
+ * Generates Kustomize directory structures with base and overlay configurations
+ * for multi-environment Kubernetes deployments. Supports environment-specific
+ * configurations, patches, and resource management.
+ *
+ * @category kubernetes
+ * @version 1.0.0
+ */
+
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
@@ -12,6 +23,9 @@ const description =
   'Generate Kustomize structure from Kubernetes manifests for multi-environment deployments';
 const version = '1.0.0';
 
+/**
+ * Represents a Kubernetes resource object
+ */
 interface K8sResource {
   apiVersion: string;
   kind: string;
@@ -23,6 +37,9 @@ interface K8sResource {
   [key: string]: unknown;
 }
 
+/**
+ * Configuration for a Kustomize kustomization.yaml file
+ */
 interface KustomizationConfig {
   apiVersion?: string;
   kind?: string;
@@ -54,6 +71,9 @@ interface KustomizationConfig {
   [key: string]: unknown;
 }
 
+/**
+ * Complete Kustomize directory structure with base and overlays
+ */
 interface KustomizeStructure {
   base: {
     kustomization: KustomizationConfig;
@@ -68,6 +88,17 @@ interface KustomizeStructure {
   >;
 }
 
+/**
+ * Generates a Kustomize directory structure with base and environment overlays
+ *
+ * Parses input Kubernetes manifests and creates a structured Kustomize layout
+ * with a base directory containing common resources and overlay directories
+ * for environment-specific configurations and patches.
+ *
+ * @param input - Configuration including manifests, output path, and environments
+ * @param ctx - Tool execution context with logger and session
+ * @returns Result containing the generated structure and written file paths
+ */
 async function run(
   input: z.infer<typeof generateKustomizeSchema>,
   ctx: ToolContext,

@@ -6,7 +6,9 @@
  */
 
 import type { GenerateOptions } from '@/mcp/ai/sampling-runner';
-import { AI_CONFIG } from '@/config/ai-constants';
+import { SAMPLING_CONFIG } from '@/config/sampling';
+import { SCORING_CONFIG } from '@/config/scoring';
+import { TOKEN_CONFIG } from '@/config/tokens';
 
 /**
  * Semantic sampling plan types with clear intent
@@ -47,19 +49,19 @@ export interface SamplingPlanConfig {
  */
 const PLAN_DEFAULTS = {
   fast: {
-    candidates: AI_CONFIG.SAMPLING.CANDIDATES.FAST,
-    stopAt: AI_CONFIG.SCORING.THRESHOLDS.FAST,
-    maxTokens: AI_CONFIG.TOKENS.STANDARD,
+    candidates: SAMPLING_CONFIG.CANDIDATES.FAST,
+    stopAt: SCORING_CONFIG.THRESHOLDS.FAST,
+    maxTokens: TOKEN_CONFIG.STANDARD,
   },
   balanced: {
-    candidates: AI_CONFIG.SAMPLING.CANDIDATES.BALANCED,
-    stopAt: AI_CONFIG.SCORING.THRESHOLDS.STANDARD,
-    maxTokens: AI_CONFIG.TOKENS.STANDARD,
+    candidates: SAMPLING_CONFIG.CANDIDATES.BALANCED,
+    stopAt: SCORING_CONFIG.THRESHOLDS.STANDARD,
+    maxTokens: TOKEN_CONFIG.STANDARD,
   },
   thorough: {
-    candidates: AI_CONFIG.SAMPLING.CANDIDATES.THOROUGH,
-    stopAt: AI_CONFIG.SCORING.THRESHOLDS.HIGH_QUALITY,
-    maxTokens: AI_CONFIG.TOKENS.EXTENDED,
+    candidates: SAMPLING_CONFIG.CANDIDATES.THOROUGH,
+    stopAt: SCORING_CONFIG.THRESHOLDS.HIGH_QUALITY,
+    maxTokens: TOKEN_CONFIG.EXTENDED,
   },
 } as const;
 
@@ -116,7 +118,7 @@ export function planToRunnerOptions(
   additionalOptions: Partial<GenerateOptions> = {},
 ): GenerateOptions {
   const baseOptions: GenerateOptions = {
-    maxTokens: plan.maxTokens ?? AI_CONFIG.TOKENS.STANDARD,
+    maxTokens: plan.maxTokens ?? TOKEN_CONFIG.STANDARD,
     ...additionalOptions,
   };
 
@@ -124,26 +126,26 @@ export function planToRunnerOptions(
     case 'fast':
       return {
         ...baseOptions,
-        count: AI_CONFIG.SAMPLING.CANDIDATES.FAST,
-        stopAt: AI_CONFIG.SCORING.THRESHOLDS.FAST,
+        count: SAMPLING_CONFIG.CANDIDATES.FAST,
+        stopAt: SCORING_CONFIG.THRESHOLDS.FAST,
       };
 
     case 'balanced':
       return {
         ...baseOptions,
-        count: plan.candidates ?? AI_CONFIG.SAMPLING.CANDIDATES.BALANCED,
-        stopAt: plan.stopAt ?? AI_CONFIG.SCORING.THRESHOLDS.STANDARD,
+        count: plan.candidates ?? SAMPLING_CONFIG.CANDIDATES.BALANCED,
+        stopAt: plan.stopAt ?? SCORING_CONFIG.THRESHOLDS.STANDARD,
       };
 
     case 'thorough':
       return {
         ...baseOptions,
-        count: plan.candidates ?? AI_CONFIG.SAMPLING.CANDIDATES.THOROUGH,
-        stopAt: plan.stopAt ?? AI_CONFIG.SCORING.THRESHOLDS.HIGH_QUALITY,
+        count: plan.candidates ?? SAMPLING_CONFIG.CANDIDATES.THOROUGH,
+        stopAt: plan.stopAt ?? SCORING_CONFIG.THRESHOLDS.HIGH_QUALITY,
       };
 
     default:
-      throw new Error(`Unknown plan kind: ${(plan as any).kind}`);
+      throw new Error(`Unknown plan kind: ${(plan as { kind: string }).kind}`);
   }
 }
 
@@ -195,21 +197,21 @@ export const RECOMMENDED_PLANS = {
 
   /** Knowledge enhancement with quality focus */
   knowledgeEnhancement: () =>
-    createSamplingPlan('thorough', { stopAt: AI_CONFIG.SCORING.THRESHOLDS.HIGH_QUALITY }),
+    createSamplingPlan('thorough', { stopAt: SCORING_CONFIG.THRESHOLDS.HIGH_QUALITY }),
 
   /** Content enhancement with balanced approach */
   contentEnhancement: () =>
-    createSamplingPlan('balanced', { stopAt: AI_CONFIG.SCORING.THRESHOLDS.STANDARD }),
+    createSamplingPlan('balanced', { stopAt: SCORING_CONFIG.THRESHOLDS.STANDARD }),
 
   /** Development/debugging with all candidates returned */
-  debugging: () => createSamplingPlan('balanced', { stopAt: AI_CONFIG.SCORING.THRESHOLDS.FAST }),
+  debugging: () => createSamplingPlan('balanced', { stopAt: SCORING_CONFIG.THRESHOLDS.FAST }),
 
   /** Production generation with high quality bar */
   productionGeneration: () =>
     createSamplingPlan('thorough', {
-      candidates: AI_CONFIG.SAMPLING.CANDIDATES.THOROUGH,
-      stopAt: AI_CONFIG.SCORING.THRESHOLDS.EXCELLENT,
-      maxTokens: AI_CONFIG.TOKENS.EXTENDED,
+      candidates: SAMPLING_CONFIG.CANDIDATES.THOROUGH,
+      stopAt: SCORING_CONFIG.THRESHOLDS.EXCELLENT,
+      maxTokens: TOKEN_CONFIG.EXTENDED,
     }),
 } as const;
 
@@ -219,11 +221,11 @@ export const RECOMMENDED_PLANS = {
 export function describePlan(plan: SamplingPlan): string {
   switch (plan.kind) {
     case 'fast':
-      return `Fast (${AI_CONFIG.SAMPLING.CANDIDATES.FAST} candidate, ${plan.maxTokens || AI_CONFIG.TOKENS.STANDARD} tokens)`;
+      return `Fast (${SAMPLING_CONFIG.CANDIDATES.FAST} candidate, ${plan.maxTokens || TOKEN_CONFIG.STANDARD} tokens)`;
     case 'balanced':
-      return `Balanced (${plan.candidates || AI_CONFIG.SAMPLING.CANDIDATES.BALANCED} candidates, stop@${plan.stopAt || AI_CONFIG.SCORING.THRESHOLDS.STANDARD}, ${plan.maxTokens || AI_CONFIG.TOKENS.STANDARD} tokens)`;
+      return `Balanced (${plan.candidates || SAMPLING_CONFIG.CANDIDATES.BALANCED} candidates, stop@${plan.stopAt || SCORING_CONFIG.THRESHOLDS.STANDARD}, ${plan.maxTokens || TOKEN_CONFIG.STANDARD} tokens)`;
     case 'thorough':
-      return `Thorough (${plan.candidates || AI_CONFIG.SAMPLING.CANDIDATES.THOROUGH} candidates, stop@${plan.stopAt || AI_CONFIG.SCORING.THRESHOLDS.HIGH_QUALITY}, ${plan.maxTokens || AI_CONFIG.TOKENS.EXTENDED} tokens)`;
+      return `Thorough (${plan.candidates || SAMPLING_CONFIG.CANDIDATES.THOROUGH} candidates, stop@${plan.stopAt || SCORING_CONFIG.THRESHOLDS.HIGH_QUALITY}, ${plan.maxTokens || TOKEN_CONFIG.EXTENDED} tokens)`;
     default:
       return 'Unknown plan';
   }
@@ -237,6 +239,6 @@ export function isSamplingPlan(value: unknown): value is SamplingPlan {
     return false;
   }
 
-  const plan = value as any;
-  return ['fast', 'balanced', 'thorough'].includes(plan.kind);
+  const plan = value as { kind?: string };
+  return plan.kind !== undefined && ['fast', 'balanced', 'thorough'].includes(plan.kind);
 }

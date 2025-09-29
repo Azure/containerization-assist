@@ -9,7 +9,7 @@
 import type { ToolContext } from '@/mcp/context';
 import { Result, Success, Failure } from '@/types';
 import { InspectSessionParamsSchema, type InspectSessionResult } from './schema';
-import type { SessionManager } from '@/lib/session';
+import type { SessionManager } from '@/session/core';
 import { extractErrorMessage } from '@/lib/error-utils';
 import type { Tool } from '@/types/tool';
 import type { z } from 'zod';

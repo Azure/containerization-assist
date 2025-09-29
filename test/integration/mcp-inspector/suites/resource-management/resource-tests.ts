@@ -4,7 +4,7 @@
  * Tests resource management system via MCP resources
  */
 
-import { TestCase, MCPTestRunner } from '../../services/test-runner.js';
+import { TestCase, MCPTestRunner } from "../../infrastructure/test-runner".js';
 
 export const createResourceManagementTests = (testRunner: MCPTestRunner): TestCase[] => {
   const client = testRunner.getClient();

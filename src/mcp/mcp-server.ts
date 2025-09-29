@@ -11,7 +11,7 @@ import { extractErrorMessage } from '@/lib/error-utils';
 import { createLogger, type Logger } from '@/lib/logger';
 import { extractSchemaShape } from '@/lib/zod-utils';
 import { createToolContext } from '@/mcp/context';
-import { createSessionManager } from '@/lib/session';
+import { createSessionManager } from '@/session/core';
 import type { Tool } from '@/types/tool';
 
 /**

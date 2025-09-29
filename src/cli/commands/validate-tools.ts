@@ -8,32 +8,15 @@
 import { Command } from 'commander';
 import { getAllInternalTools } from '@/tools';
 import {
-  validateToolMetadata,
-  validateMetadataConsistency as validateSingleTool,
+  validateAllToolMetadata as validateAllToolMetadataCore,
+  type ValidationReport,
 } from '@/types/tool-metadata';
-
-export interface ValidationReport {
-  summary: {
-    totalTools: number;
-    validTools: number;
-    invalidTools: number;
-    compliancePercentage: number;
-  };
-  validTools: string[];
-  invalidTools: Array<{
-    name: string;
-    issues: string[];
-    suggestions: string[];
-  }>;
-  metadataErrors: Array<{
-    name: string;
-    error: string;
-  }>;
-  consistencyErrors: Array<{
-    name: string;
-    error: string;
-  }>;
-}
+import {
+  handleResultError,
+  handleGenericError,
+  handleCIError,
+  formatGitHubAnnotation,
+} from '../error-formatting';
 
 /**
  * Validates all tool metadata and returns comprehensive report
@@ -41,97 +24,13 @@ export interface ValidationReport {
 export async function validateAllToolMetadata(): Promise<
   { ok: true; value: ValidationReport } | { ok: false; error: string }
 > {
-  try {
-    const allTools = getAllInternalTools();
-    const validTools: string[] = [];
-    const invalidTools: Array<{ name: string; issues: string[]; suggestions: string[] }> = [];
-    const metadataErrors: Array<{ name: string; error: string }> = [];
-    const consistencyErrors: Array<{ name: string; error: string }> = [];
+  const allTools = getAllInternalTools();
+  const result = await validateAllToolMetadataCore([...allTools]);
 
-    for (const tool of allTools) {
-      const issues: string[] = [];
-      const suggestions: string[] = [];
-
-      // Validate metadata schema compliance
-      const metadataValidation = validateToolMetadata(tool.metadata);
-      if (!metadataValidation.ok) {
-        metadataErrors.push({
-          name: tool.name,
-          error: metadataValidation.error,
-        });
-        issues.push('Invalid metadata schema');
-        suggestions.push('Fix metadata schema validation errors');
-        continue;
-      }
-
-      // Validate metadata consistency
-      const consistencyValidation = validateSingleTool(tool.name, tool.metadata);
-      if (!consistencyValidation.ok) {
-        consistencyErrors.push({
-          name: tool.name,
-          error: consistencyValidation.error,
-        });
-        issues.push('Metadata consistency issues');
-        suggestions.push('Review and fix metadata consistency');
-      }
-
-      // Additional validation checks
-      if (tool.metadata.aiDriven && tool.metadata.samplingStrategy === 'none') {
-        issues.push('AI-driven tool should have sampling strategy');
-        suggestions.push('Set samplingStrategy to "single" or "rerank"');
-      }
-
-      if (tool.metadata.knowledgeEnhanced && tool.metadata.enhancementCapabilities.length === 0) {
-        issues.push('Knowledge-enhanced tool missing capabilities');
-        suggestions.push('Add appropriate enhancementCapabilities array');
-      }
-
-      if (tool.metadata.knowledgeEnhanced && !tool.metadata.aiDriven) {
-        issues.push('Knowledge-enhanced should be AI-driven');
-        suggestions.push('Set aiDriven: true for knowledge-enhanced tools');
-      }
-
-      // Check for proper capability specification
-      if (tool.metadata.aiDriven && tool.metadata.enhancementCapabilities.length === 0) {
-        issues.push('AI-driven tool should specify capabilities');
-        suggestions.push('Add relevant enhancementCapabilities');
-      }
-
-      if (issues.length > 0) {
-        invalidTools.push({
-          name: tool.name,
-          issues,
-          suggestions,
-        });
-      } else {
-        validTools.push(tool.name);
-      }
-    }
-
-    const totalTools = allTools.length;
-    const validCount = validTools.length;
-    const compliancePercentage = Math.round((validCount / totalTools) * 100);
-
-    return {
-      ok: true,
-      value: {
-        summary: {
-          totalTools,
-          validTools: validCount,
-          invalidTools: totalTools - validCount,
-          compliancePercentage,
-        },
-        validTools,
-        invalidTools,
-        metadataErrors,
-        consistencyErrors,
-      },
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      error: `Validation failed: ${error instanceof Error ? error.message : String(error)}`,
-    };
+  if (result.ok) {
+    return { ok: true, value: result.value };
+  } else {
+    return { ok: false, error: result.error };
   }
 }
 
@@ -153,8 +52,7 @@ export function createValidateToolsCommand(): Command {
       try {
         const result = await validateAllToolMetadata();
         if (!result.ok) {
-          console.error('❌ Validation failed:', result.error);
-          process.exit(1);
+          handleResultError(result, 'Validation failed');
         }
 
         const report = result.value;
@@ -221,8 +119,7 @@ export function createValidateToolsCommand(): Command {
           console.info('✅ All tools have valid metadata!');
         }
       } catch (error) {
-        console.error('❌ Error:', error);
-        process.exit(1);
+        handleGenericError('Error during validation', error);
       }
     });
 
@@ -234,7 +131,7 @@ export function createValidateToolsCommand(): Command {
       try {
         const result = await validateAllToolMetadata();
         if (!result.ok) {
-          process.exit(1);
+          handleResultError(result, 'Quick validation failed');
         }
 
         const report = result.value;
@@ -246,8 +143,7 @@ export function createValidateToolsCommand(): Command {
           process.exit(1);
         }
       } catch (error) {
-        console.error('❌ Error:', error);
-        process.exit(1);
+        handleGenericError('Error during quick validation', error);
       }
     });
 
@@ -259,8 +155,7 @@ export function createValidateToolsCommand(): Command {
       try {
         const result = await validateAllToolMetadata();
         if (!result.ok) {
-          console.error(`::error::Tool validation failed: ${result.error}`);
-          process.exit(1);
+          handleCIError('Tool validation failed', result.error);
         }
 
         const report = result.value;
@@ -268,24 +163,37 @@ export function createValidateToolsCommand(): Command {
         // Output GitHub Actions annotations
         report.metadataErrors.forEach(({ name, error }) => {
           console.error(
-            `::error file=src/tools/${name}/tool.ts::Schema validation failed: ${error}`,
+            formatGitHubAnnotation(
+              'error',
+              `Schema validation failed: ${error}`,
+              `src/tools/${name}/tool.ts`,
+            ),
           );
         });
 
         report.consistencyErrors.forEach(({ name, error }) => {
           console.error(
-            `::error file=src/tools/${name}/tool.ts::Consistency check failed: ${error}`,
+            formatGitHubAnnotation(
+              'error',
+              `Consistency check failed: ${error}`,
+              `src/tools/${name}/tool.ts`,
+            ),
           );
         });
 
         report.invalidTools.forEach(({ name, issues }) => {
           issues.forEach((issue) => {
-            console.error(`::error file=src/tools/${name}/tool.ts::${issue}`);
+            console.error(formatGitHubAnnotation('error', issue, `src/tools/${name}/tool.ts`));
           });
         });
 
         if (report.summary.invalidTools > 0) {
-          console.error(`::error::${report.summary.invalidTools} tools failed validation`);
+          console.error(
+            formatGitHubAnnotation(
+              'error',
+              `${report.summary.invalidTools} tools failed validation`,
+            ),
+          );
           process.exit(1);
         } else {
           console.info(
@@ -293,8 +201,7 @@ export function createValidateToolsCommand(): Command {
           );
         }
       } catch (error) {
-        console.error(`::error::Validation error: ${error}`);
-        process.exit(1);
+        handleCIError('Validation error', error);
       }
     });
 

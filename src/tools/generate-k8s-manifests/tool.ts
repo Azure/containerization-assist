@@ -21,7 +21,6 @@ import { mergeMultipleReports } from '@/validation/merge-reports';
 import * as yaml from 'js-yaml';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { updateSession } from '@/mcp/tool-session-helpers';
 import type { z } from 'zod';
 
 // Type definition for Kubernetes manifests
@@ -469,17 +468,11 @@ async function run(
     };
 
     // Store the manifests in session if we have a sessionId
-    if (input.sessionId) {
-      await updateSession(
-        input.sessionId,
-        {
-          results: {
-            'generate-k8s-manifests': result,
-          },
-          current_step: 'generate-k8s-manifests',
-        },
-        ctx,
-      );
+    if (input.sessionId && ctx.session) {
+      ctx.session.set('results', {
+        'generate-k8s-manifests': result,
+      });
+      ctx.session.set('current_step', 'generate-k8s-manifests');
     }
 
     return Success(result);

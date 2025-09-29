@@ -4,7 +4,7 @@
  * Tests for validating orchestrator phase events and logging
  */
 
-import type { TestCase, MCPTestRunner, TestResult } from '../../services/test-runner.js';
+import type { TestCase, MCPTestRunner, TestInfrastructureResult as TestResult } from "../../infrastructure/test-runner".js';
 
 export const createOrchestratorEventTests = (testRunner: MCPTestRunner): TestCase[] => {
   const client = testRunner.getClient();
@@ -16,7 +16,7 @@ export const createOrchestratorEventTests = (testRunner: MCPTestRunner): TestCas
       description: 'Verify orchestrator workflow execution',
       tags: ['events', 'phases', 'logging'],
       timeout: 120000,
-      execute: async (): Promise<TestResult> => {
+      execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
         const sessionId = `event-test-${Date.now()}`;
         
@@ -56,7 +56,7 @@ export const createOrchestratorEventTests = (testRunner: MCPTestRunner): TestCas
       description: 'Verify sampling events are emitted correctly',
       tags: ['events', 'sampling'],
       timeout: 60000,
-      execute: async (): Promise<TestResult> => {
+      execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
         const sessionId = `sampling-event-${Date.now()}`;
         
@@ -97,7 +97,7 @@ export const createOrchestratorEventTests = (testRunner: MCPTestRunner): TestCas
       description: 'Verify phase transitions occur within expected timeframes',
       tags: ['events', 'performance', 'timing'],
       timeout: 90000,
-      execute: async (): Promise<TestResult> => {
+      execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
         const sessionId = `timing-test-${Date.now()}`;
         
@@ -142,7 +142,7 @@ export const createOrchestratorEventTests = (testRunner: MCPTestRunner): TestCas
       description: 'Verify error events are logged correctly',
       tags: ['events', 'error-handling'],
       timeout: 30000,
-      execute: async (): Promise<TestResult> => {
+      execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
         const sessionId = `error-event-${Date.now()}`;
         

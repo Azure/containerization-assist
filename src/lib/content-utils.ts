@@ -31,10 +31,10 @@ export function sanitizeResponseText(text: string): string {
 
   // Remove common AI response prefixes
   const prefixPatterns = [
-    /^(?:Here'?s?|Here is|This is)\s+(?:the|a|an)?\s*/i,
-    /^(?:I'll|I will)\s+.*?:\s*/i,
-    /^(?:Let me|Allow me to)\s+.*?:\s*/i,
-    /^(?:Based on|According to)\s+.*?[,:]\s*/i,
+    /^(?:Here'?s?|Here is|This is)\s+(?:the|a|an)?\s+/i,
+    /^(?:I'll|I will)\s+[^:]*:\s*/i,
+    /^(?:Let me|Allow me to)\s+[^:]*:\s*/i,
+    /^(?:Based on|According to)\s+[^,:]*[,:]\s*/i,
   ];
 
   for (const pattern of prefixPatterns) {
@@ -195,7 +195,7 @@ export function extractStructuredContent(
   // For YAML content (basic implementation)
   if (type === 'yaml' || type === 'auto') {
     // Look for YAML-like content (lines with key: value pairs)
-    const yamlPattern = /```(?:yaml|yml)?\s*([\s\S]*?)\s*```/;
+    const yamlPattern = /```(?:yaml|yml)?\s*([^`]+)\s*```/;
     const yamlMatch = text.match(yamlPattern);
 
     if (yamlMatch?.[1]) {
@@ -270,15 +270,15 @@ export function appearsToBeCode(text: string): boolean {
 
   const codeIndicators = [
     // Common code syntax
-    /\{[\s\S]*\}/, // Curly braces
-    /\[[\s\S]*\]/, // Square brackets with content
+    /\{[^{}]*\}/, // Curly braces (non-nested)
+    /\[[^\]]*\]/, // Square brackets with content (non-nested)
     /^\s*(?:FROM|RUN|COPY|ADD|WORKDIR|EXPOSE|ENV|CMD|ENTRYPOINT)\b/im, // Dockerfile instructions
     /^\s*(?:apiVersion|kind|metadata):/im, // Kubernetes YAML
-    /[a-zA-Z_]\w*\s*[=:]\s*[^=]/, // Assignment patterns
+    /[a-zA-Z_]\w*\s*[=:]\s*[^=\n\r]/, // Assignment patterns
     /(?:function|class|interface|const|let|var)\s+\w+/i, // Programming keywords
     /#!\//, // Shebang
-    /\/\*[\s\S]*?\*\//, // Multi-line comments
-    /\/\/.*$/m, // Single-line comments
+    /\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\//, // Multi-line comments (efficient)
+    /\/\/[^\r\n]*/, // Single-line comments
   ];
 
   let indicatorCount = 0;

@@ -14,17 +14,17 @@ const sessionIdSchema = sharedSessionId.describe(
   'Session identifier for sharing data between tools. Use the sessionId from analyze-repo to leverage detailed analysis results.',
 );
 
-export const optimizationSchema = z
+const optimizationSchema = z
   .enum(['size', 'security', 'performance', 'balanced'])
   .optional()
   .describe('Optimization strategy for containerization');
 
-export const securityLevelSchema = z
+const securityLevelSchema = z
   .enum(['basic', 'standard', 'strict'])
   .optional()
   .describe('Security level for container configuration');
 
-export const baseImagePreferenceSchema = z
+const baseImagePreferenceSchema = z
   .string()
   .optional()
   .describe(

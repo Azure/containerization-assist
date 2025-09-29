@@ -1,43 +1,15 @@
-Unused files (10)
+Unused files (6)
 src/cli/commands/validate-tools.ts                     
-src/lib/capabilities.ts                                
+src/config/retry.ts                                    
 src/lib/content-utils.ts                               
-src/lib/index.ts                                       
-src/lib/retry-utils.ts                                 
 src/mcp/ai/index.ts                                    
 src/mcp/ai/knowledge-helpers.ts                        
 src/tools/generate-dockerfile/multi-step-generator.ts  
-src/tools/generate-kustomize/index.ts                  
-src/types/errors.ts                                    
-Unused dependencies (1)
-tmp  package.json:211:6
-Unused exports (148)
-validatePromptParams                      function  src/ai/prompt-templates.ts:661:17            
-buildAIPrompt                             function  src/ai/prompt-templates.ts:676:17            
-VALIDATION_SCORING                                  src/config/ai-constants.ts:144:14            
-USER_IDS                                            src/config/ai-constants.ts:167:14            
-K8S_DEFAULTS                                        src/config/ai-constants.ts:177:14            
-SCORING_WEIGHTS                                     src/config/ai-constants.ts:196:14            
+Unused exports (127)
+formatGitHubAnnotation                    function  src/cli/error-formatting.ts:43:17            
+handleCIError                             function  src/cli/error-formatting.ts:75:17            
 createAppConfig                           function  src/config/app-config.ts:152:17              
 appConfig                                           src/config/app-config.ts:237:14              
-ANALYSIS_CONFIG                                     src/config/defaults.ts:54:14                 
-DEFAULT_ENVIRONMENT                                 src/config/environment.ts:23:14              
-parseEnvironment                          function  src/config/environment.ts:29:17              
-parseBool                                 function  src/config/environment.ts:48:17              
-isProductionEnvironment                   function  src/config/environment.ts:73:17              
-isDevelopmentEnvironment                  function  src/config/environment.ts:77:17              
-isTestingEnvironment                      function  src/config/environment.ts:81:17              
-isStagingEnvironment                      function  src/config/environment.ts:85:17              
-getEnvironmentFromEnv                     function  src/config/environment.ts:92:17              
-clearPolicyCache                          function  src/config/policy-io.ts:34:17                
-refreshPolicy                             function  src/config/policy-io.ts:38:17                
-RegexMatcherSchema                                  src/config/policy-schemas.ts:127:14          
-FunctionMatcherSchema                               src/config/policy-schemas.ts:134:14          
-MatcherSchema                                       src/config/policy-schemas.ts:140:14          
-PolicyRuleSchema                                    src/config/policy-schemas.ts:145:14          
-EnvironmentOverrideSchema                           src/config/policy-schemas.ts:154:14          
-EnvironmentDefaultsSchema                           src/config/policy-schemas.ts:161:14          
-UnifiedDefaultsSchema                               src/config/policy-schemas.ts:206:14          
 ALL_TOOLS                                           src/exports/tools.ts:7:9                     
 TOOLS                                               src/exports/tools.ts:7:55                    
 createApp                                           src/index.ts:6:9                             
@@ -51,15 +23,16 @@ reloadKnowledgeBase                                 src/knowledge/loader.ts:324:
 evaluateEntry                                       src/knowledge/matcher.ts:238:14              
 KnowledgeCategorySchema                             src/knowledge/schemas.ts:3:14                
 KnowledgeQuerySchema                                src/knowledge/schemas.ts:16:14               
+createErrorMessage                        function  src/lib/error-messages.ts:49:17              
 scanImage                                 function  src/lib/security-scanner.ts:74:23            
 initializeToolInstrumentation             function  src/lib/tool-helpers.ts:73:17                
-createMcpPromptTool                       function  src/mcp/ai-tool-factory.ts:304:17            
-OutputContracts                                     src/mcp/ai-tool-factory.ts:342:14            
-PromptToolFactory                         class     src/mcp/ai-tool-factory.ts:377:14            
-createSamplingPlan                        function  src/mcp/ai/sampling-plan.ts:73:17            
-RECOMMENDED_PLANS                                   src/mcp/ai/sampling-plan.ts:186:14           
-describePlan                              function  src/mcp/ai/sampling-plan.ts:219:17           
-isSamplingPlan                            function  src/mcp/ai/sampling-plan.ts:235:17           
+createMcpPromptTool                       function  src/mcp/ai-tool-factory.ts:303:17            
+OutputContracts                                     src/mcp/ai-tool-factory.ts:341:14            
+PromptToolFactory                         class     src/mcp/ai-tool-factory.ts:376:14            
+createSamplingPlan                        function  src/mcp/ai/sampling-plan.ts:75:17            
+RECOMMENDED_PLANS                                   src/mcp/ai/sampling-plan.ts:188:14           
+describePlan                              function  src/mcp/ai/sampling-plan.ts:221:17           
+isSamplingPlan                            function  src/mcp/ai/sampling-plan.ts:237:17           
 ValidationSeveritySchema                            src/mcp/ai/schemas.ts:10:14                  
 ValidationCategorySchema                            src/mcp/ai/schemas.ts:11:14                  
 ValidationGradeSchema                               src/mcp/ai/schemas.ts:18:14                  
@@ -79,11 +52,10 @@ DockerfileGenerationSchema                          src/mcp/ai/schemas.ts:193:14
 KubernetesResourceSchema                            src/mcp/ai/schemas.ts:216:14                 
 KubernetesManifestGenerationSchema                  src/mcp/ai/schemas.ts:228:14                 
 getSchema                                 function  src/mcp/ai/schemas.ts:277:17                 
-optimizationSchema                                  src/tools/generate-dockerfile/schema.ts:17:14
-securityLevelSchema                                 src/tools/generate-dockerfile/schema.ts:22:14
-baseImagePreferenceSchema                           src/tools/generate-dockerfile/schema.ts:27:14
 TOOL_NAMES                                          src/tools/index.ts:29:14                     
 ALL_TOOLS                                           src/tools/index.ts:95:14                     
+getToolLazy                               function  src/tools/index.ts:128:23                    
+getToolLazyCached                         function  src/tools/index.ts:180:23                    
 InspectSessionResultSchema                          src/tools/inspect-session/schema.ts:17:14    
 ping                                      function  src/tools/ops/tool.ts:41:23                  
 serverStatus                              function  src/tools/ops/tool.ts:109:23                 
@@ -92,19 +64,19 @@ resourceObject                                      src/tools/shared/schemas.ts:
 resourceObjectWithDefaults                          src/tools/shared/schemas.ts:42:14            
 resourcesWithDefaults                               src/tools/shared/schemas.ts:55:14            
 envVar                                              src/tools/shared/schemas.ts:74:14            
-verifyDeployment                                    src/tools/verify-deployment/tool.ts:557:14   
+verifyDeployment                                    src/tools/verify-deployment/tool.ts:565:14   
 isValidationContext                                 src/types/ai.ts:169:14                       
-isEnhancementCapability                             src/types/ai.ts:198:14                       
-isValidationSeverity                                src/types/ai.ts:218:14                       
-isValidationCategory                                src/types/ai.ts:228:14                       
-isAIServiceMode                                     src/types/ai.ts:249:14                       
-createConfidence                                    src/types/ai.ts:276:14                       
-createScore                                         src/types/ai.ts:286:14                       
-getQualityGrade                           function  src/types/categories.ts:131:17               
-getSecurityGrade                          function  src/types/categories.ts:142:17               
-ENVIRONMENT_PROFILES                                src/types/categories.ts:154:14               
-TOOL_CATEGORIES                                     src/types/categories.ts:180:14               
-getToolCategory                           function  src/types/categories.ts:214:17               
+isEnhancementCapability                             src/types/ai.ts:202:14                       
+isValidationSeverity                                src/types/ai.ts:222:14                       
+isValidationCategory                                src/types/ai.ts:232:14                       
+isAIServiceMode                                     src/types/ai.ts:253:14                       
+createConfidence                                    src/types/ai.ts:281:14                       
+createScore                                         src/types/ai.ts:291:14                       
+getQualityGrade                           function  src/types/categories.ts:126:17               
+getSecurityGrade                          function  src/types/categories.ts:137:17               
+ENVIRONMENT_PROFILES                                src/types/categories.ts:149:14               
+TOOL_CATEGORIES                                     src/types/categories.ts:175:14               
+getToolCategory                           function  src/types/categories.ts:209:17               
 isSuccess                                           src/types/core.ts:38:14                      
 isFailure                                           src/types/core.ts:41:14                      
 EnhancementCapabilitySchema                         src/types/tool-metadata.ts:14:14             
@@ -115,10 +87,11 @@ createDefaultMetadata                     function  src/types/tool-metadata.ts:1
 createAIMetadata                          function  src/types/tool-metadata.ts:131:17            
 isValidToolMetadata                       function  src/types/tool-metadata.ts:145:17            
 validateMetadataConsistency               function  src/types/tool-metadata.ts:152:17            
+postValidate                              function  src/types/tool-metadata.ts:202:17            
 createTool                                function  src/types/tool.ts:42:17                      
 isValidTopic                              function  src/types/topics.ts:49:17                    
 getAllTopics                              function  src/types/topics.ts:56:17                    
-summarizeValidationResults                function  src/validation/ai-enhancement.ts:343:17      
+summarizeValidationResults                function  src/validation/ai-enhancement.ts:342:17      
 validateDockerfileContentWithAI           function  src/validation/dockerfile-validator.ts:769:23
 validateDockerfileContentWithKnowledge    function  src/validation/dockerfile-validator.ts:874:23
 validateDockerfileContent                           src/validation/index.ts:7:9                  
@@ -160,17 +133,20 @@ normalizeParameters                                 src/validation/pipeline.ts:1
 validateSchema                                      src/validation/pipeline.ts:178:14            
 when                                                src/validation/pipeline.ts:192:14            
 validateBusinessRules                               src/validation/pipeline.ts:207:14            
-Unused exported types (62)
-RegisteredTool                interface  src/app/orchestrator-types.ts:23:18             
-AIConfigKey                   type       src/config/ai-constants.ts:139:13               
+Unused exported types (59)
+RegisteredTool                interface  src/app/orchestrator-types.ts:24:18             
+ToolLogger                    type       src/cli/error-formatting.ts:11:13               
+SamplingConfigKey             type       src/config/sampling.ts:64:13                    
+ScoringConfigKey              type       src/config/scoring.ts:61:13                     
+TokenConfigKey                type       src/config/tokens.ts:18:13                      
 ApplicationConfig             interface  src/config/types.ts:12:18                       
 ClusterInfo                   interface  src/infra/kubernetes/client.ts:18:18            
 ValidatedKnowledgeEntry       type       src/knowledge/schemas.ts:26:13                  
 ValidatedKnowledgeQuery       type       src/knowledge/schemas.ts:27:13                  
 ScoringWeights                interface  src/lib/sampling.ts:59:18                       
 AIAssistantDeps               interface  src/mcp/ai/host-ai-assist.ts:56:18              
-EnhancementOptions            type       src/mcp/ai/knowledge-enhancement.ts:281:13      
-EnhancementResult             type       src/mcp/ai/knowledge-enhancement.ts:282:13      
+EnhancementOptions            type       src/mcp/ai/knowledge-enhancement.ts:284:13      
+EnhancementResult             type       src/mcp/ai/knowledge-enhancement.ts:285:13      
 ValidationResult              type       src/mcp/ai/schemas.ts:251:13                    
 ValidationReport              type       src/mcp/ai/schemas.ts:252:13                    
 KnowledgeEnhancementResponse  type       src/mcp/ai/schemas.ts:253:13                    
@@ -186,16 +162,10 @@ GenerateAcaManifestsParams    type       src/tools/generate-aca-manifests/schema
 GenerateDockerfileParams      type       src/tools/generate-dockerfile/schema.ts:66:13   
 GenerateHelmChartsParams      type       src/tools/generate-helm-charts/schema.ts:91:13  
 GenerateK8sManifestsParams    type       src/tools/generate-k8s-manifests/schema.ts:42:13
-ToolName                      type       src/tools/index.ts:51:13                        
-InternalTool                  type       src/tools/index.ts:122:13                       
 InspectSessionParams          type       src/tools/inspect-session/schema.ts:38:13       
 OpsConfig                     interface  src/tools/ops/tool.ts:178:18                    
 PushImageParams               type       src/tools/push-image/schema.ts:23:13            
-ScanImageConfig               type       src/tools/scan/tool.ts:405:13                   
-SessionAnalysisResult         interface  src/tools/session-types.ts:12:18                
-SessionBuildResult            interface  src/tools/session-types.ts:43:18                
-SessionDockerfileResult       interface  src/tools/session-types.ts:53:18                
-SessionK8sResult              interface  src/tools/session-types.ts:64:18                
+ScanImageConfig               type       src/tools/scan/tool.ts:407:13                   
 EnhancementPriority           type       src/types/ai.ts:67:13                           
 AIModelCapabilities           interface  src/types/ai.ts:79:18                           
 AIRequestConfig               interface  src/types/ai.ts:90:18                           
@@ -204,20 +174,20 @@ SamplingConfig                interface  src/types/ai.ts:116:18
 EnhancementRequest            interface  src/types/ai.ts:132:18                          
 ValidationRequest             interface  src/types/ai.ts:144:18                          
 KnowledgeRequest              interface  src/types/ai.ts:156:18                          
-TriState                      type       src/types/ai.ts:259:13                          
+TriState                      type       src/types/ai.ts:264:13                          
 ContentCategory               type       src/types/categories.ts:11:13                   
 ToolCategoryMetadata          interface  src/types/categories.ts:27:18                   
-QualityMetrics                interface  src/types/categories.ts:46:18                   
-SupportedLanguage             type       src/types/categories.ts:57:13                   
-SupportedFramework            type       src/types/categories.ts:72:13                   
-AIEnhancedParams              interface  src/types/categories.ts:101:18                  
-ScoringComparison             interface  src/types/categories.ts:121:18                  
+QualityMetrics                interface  src/types/categories.ts:41:18                   
+SupportedLanguage             type       src/types/categories.ts:52:13                   
+SupportedFramework            type       src/types/categories.ts:67:13                   
+AIEnhancedParams              interface  src/types/categories.ts:96:18                   
+ScoringComparison             interface  src/types/categories.ts:116:18                  
 ToolExecutionMetadata         interface  src/types/core.ts:49:18                         
 ValidationResult              interface  src/types/core.ts:58:18                         
 AnalysisCapability            interface  src/types/core.ts:66:18                         
 BuildCapability               interface  src/types/core.ts:74:18                         
 DeploymentCapability          interface  src/types/core.ts:83:18                         
-AIService                     interface  src/types/index.ts:52:18                        
+AIService                     interface  src/types/index.ts:54:18                        
 EnhancementCapability         type       src/types/tool-metadata.ts:59:13                
 SamplingStrategy              type       src/types/tool-metadata.ts:65:13                
 ToolInput                     type       src/types/tool.ts:37:13                         

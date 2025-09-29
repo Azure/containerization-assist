@@ -15,7 +15,9 @@ import { type SamplingCandidate } from '@/lib/sampling';
 import { Success, Failure, type Result } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { planToRunnerOptions, type SamplingPlan } from '@/mcp/ai/sampling-plan';
-import { AI_CONFIG } from '@/config/ai-constants';
+import { SAMPLING_CONFIG } from '@/config/sampling';
+import { SCORING_CONFIG } from '@/config/scoring';
+import { TOKEN_CONFIG } from '@/config/tokens';
 import crypto from 'node:crypto';
 
 export interface GenerateOptions {
@@ -75,9 +77,9 @@ export async function sampleWithRerank(
   opts: GenerateOptions = {},
 ): Promise<Result<SamplingResult>> {
   const config = {
-    count: opts.count ?? AI_CONFIG.SAMPLING.CANDIDATES.BALANCED,
-    stopAt: opts.stopAt ?? AI_CONFIG.SCORING.THRESHOLDS.EXCELLENT,
-    maxTokens: opts.maxTokens ?? AI_CONFIG.TOKENS.STANDARD,
+    count: opts.count ?? SAMPLING_CONFIG.CANDIDATES.BALANCED,
+    stopAt: opts.stopAt ?? SCORING_CONFIG.THRESHOLDS.EXCELLENT,
+    maxTokens: opts.maxTokens ?? TOKEN_CONFIG.STANDARD,
     stopSequences: opts.stopSequences ?? ['```', '\n\n```', '\n\n# ', '\n\n---'],
     modelPreferences: opts.modelPreferences,
     returnAll: opts.returnAll ?? false,
@@ -174,7 +176,7 @@ export async function sampleWithRerank(
             score: candidateScore,
             scoreBreakdown,
             textLength: text.length,
-            preview: text.slice(0, AI_CONFIG.QUALITY.PREVIEW_LENGTH).replace(/\n/g, ' '),
+            preview: text.slice(0, SCORING_CONFIG.QUALITY.PREVIEW_LENGTH).replace(/\n/g, ' '),
           },
           'Candidate generated and scored',
         );
@@ -276,7 +278,7 @@ export function scoreGenericContent(text: string): number {
   let score = 0;
 
   // Basic content quality checks
-  if (text.length > AI_CONFIG.QUALITY.MIN_REASONABLE_LENGTH) score += 20; // Has reasonable length
+  if (text.length > SCORING_CONFIG.QUALITY.MIN_REASONABLE_LENGTH) score += 20; // Has reasonable length
   if (text.includes('\n')) score += 10; // Multi-line content
   if (!/lorem ipsum/i.test(text)) score += 20; // Not placeholder text
   if (!/TODO|FIXME|XXX/i.test(text)) score += 15; // No development markers
@@ -285,9 +287,9 @@ export function scoreGenericContent(text: string): number {
   // Structure indicators
   if (/^\s*#/.test(text)) score += 10; // Has headers (markdown)
   if (/```/.test(text)) score += 10; // Has code blocks
-  if (text.split('\n').length >= AI_CONFIG.QUALITY.MIN_MULTILINE_STRUCTURE) score += 10; // Multi-line structure
+  if (text.split('\n').length >= SCORING_CONFIG.QUALITY.MIN_MULTILINE_STRUCTURE) score += 10; // Multi-line structure
 
-  return Math.min(score, AI_CONFIG.SCORING.THRESHOLDS.PERFECT);
+  return Math.min(score, SCORING_CONFIG.THRESHOLDS.PERFECT);
 }
 
 /**

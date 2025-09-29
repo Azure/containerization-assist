@@ -15,7 +15,9 @@ import { scoreResponse } from '@/mcp/ai/quality';
 import { createContextAwarePlan } from '@/mcp/ai/sampling-plan';
 import { scoreToGrade } from '@/types/ai';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
-import { AI_CONFIG } from '@/config/ai-constants';
+import { SCORING_CONFIG } from '@/config/scoring';
+import { TOKEN_CONFIG } from '@/config/tokens';
+import { SAMPLING_CONFIG } from '@/config/sampling';
 import {
   ValidationReport,
   ValidationSeverity,
@@ -82,8 +84,8 @@ export class AIValidator {
       );
 
       const samplingPlan = createContextAwarePlan('validation', 'balanced', {
-        maxTokens: AI_CONFIG.TOKENS.STANDARD,
-        stopAt: AI_CONFIG.SCORING.THRESHOLDS.HIGH_QUALITY,
+        maxTokens: TOKEN_CONFIG.STANDARD,
+        stopAt: SCORING_CONFIG.THRESHOLDS.HIGH_QUALITY,
       });
 
       const samplingResult = await sampleWithPlan(
@@ -98,8 +100,8 @@ export class AIValidator {
                 { name: `validation-${options.contentType}` },
                 { name: `focus-${options.focus || 'all'}` },
               ],
-              intelligencePriority: AI_CONFIG.PRIORITIES.INTELLIGENCE,
-              costPriority: AI_CONFIG.PRIORITIES.COST,
+              intelligencePriority: SAMPLING_CONFIG.PRIORITIES.INTELLIGENCE,
+              costPriority: SAMPLING_CONFIG.PRIORITIES.COST,
             },
           };
         },

@@ -180,12 +180,16 @@ export const isValidationContext = (ctx: unknown): ctx is ValidationContext => {
     case 'security':
       return (
         typeof context.severity === 'string' &&
-        (['low', 'medium', 'high', 'critical'] as const).includes(context.severity as any)
+        (['low', 'medium', 'high', 'critical'] as const).includes(
+          context.severity as 'low' | 'medium' | 'high' | 'critical',
+        )
       );
     case 'optimization':
       return (
         typeof context.target === 'string' &&
-        (['size', 'performance', 'cost', 'all'] as const).includes(context.target as any)
+        (['size', 'performance', 'cost', 'all'] as const).includes(
+          context.target as 'size' | 'performance' | 'cost' | 'all',
+        )
       );
     default:
       return false;
@@ -208,7 +212,7 @@ export const isEnhancementCapability = (cap: unknown): cap is EnhancementCapabil
         'generation',
         'enhancement',
       ] as const
-    ).includes(cap as any)
+    ).includes(cap as EnhancementCapability)
   );
 };
 
@@ -218,7 +222,7 @@ export const isEnhancementCapability = (cap: unknown): cap is EnhancementCapabil
 export const isValidationSeverity = (severity: unknown): severity is ValidationSeverity => {
   return (
     typeof severity === 'string' &&
-    (['error', 'warning', 'info'] as const).includes(severity as any)
+    (['error', 'warning', 'info'] as const).includes(severity as ValidationSeverity)
   );
 };
 
@@ -239,7 +243,7 @@ export const isValidationCategory = (category: unknown): category is ValidationC
         'style',
         'maintainability',
       ] as const
-    ).includes(category as any)
+    ).includes(category as ValidationCategory)
   );
 };
 
@@ -248,7 +252,8 @@ export const isValidationCategory = (category: unknown): category is ValidationC
  */
 export const isAIServiceMode = (mode: unknown): mode is AIServiceMode => {
   return (
-    typeof mode === 'string' && (['fast', 'balanced', 'thorough'] as const).includes(mode as any)
+    typeof mode === 'string' &&
+    (['fast', 'balanced', 'thorough'] as const).includes(mode as AIServiceMode)
   );
 };
 

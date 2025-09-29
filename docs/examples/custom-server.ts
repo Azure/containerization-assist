@@ -82,15 +82,7 @@ async function buildContainerizationServer() {
 
   const server = new CustomMCPServer('container-server', '1.0.0');
 
-  // Get tools from Container Assist
-  const app = createApp();
-  const availableTools = app.listTools();
-
   // Register only containerization-related tools with custom names
-  const containerTools = availableTools.filter(tool =>
-    ['analyze-repo', 'generate-dockerfile', 'build-image', 'scan', 'tag-image', 'push-image'].includes(tool.name)
-  );
-
   // Mock registration since we don't have the actual tool objects in this context
   server.registerContainerTool({ name: 'analyze-repo', description: 'Analyze repository structure' } as any);
   server.registerContainerTool({ name: 'generate-dockerfile', description: 'Generate Dockerfile' } as any, 'dockerfile_create');

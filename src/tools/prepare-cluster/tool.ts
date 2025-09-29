@@ -21,9 +21,9 @@
  * ```
  */
 
-import { ensureSession, updateSession } from '@/mcp/tool-session-helpers';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
+import { randomUUID } from 'node:crypto';
 import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient } from '@/lib/kubernetes';
 import type { K8sManifest } from '@/infra/kubernetes/client';
@@ -420,8 +420,8 @@ async function createLocalRegistry(logger: pino.Logger): Promise<string> {
  */
 function scoreClusterOptimizations(
   insights: ClusterOptimizationInsights,
-  _preparationResult: any,
-  _checks: any,
+  _preparationResult: Record<string, unknown>,
+  _checks: Record<string, unknown>,
 ): number {
   let score = 0;
 
@@ -487,8 +487,8 @@ function scoreClusterOptimizations(
  * Build prompt for generating cluster optimization insights
  */
 function buildClusterOptimizationPrompt(
-  preparationResult: any,
-  checks: any,
+  preparationResult: Record<string, unknown>,
+  checks: Record<string, unknown>,
   environment: string,
 ): string {
   const context = preparationResult.clusterReady
@@ -514,7 +514,7 @@ ${checks.kindInstalled !== undefined ? `- Kind Installed: ${checks.kindInstalled
 ${checks.kindClusterCreated !== undefined ? `- Kind Cluster Created: ${checks.kindClusterCreated}` : ''}
 ${checks.localRegistryCreated !== undefined ? `- Local Registry Created: ${checks.localRegistryCreated}` : ''}
 
-${preparationResult.warnings?.length > 0 ? `Warnings:\n${preparationResult.warnings.map((w: string) => `- ${w}`).join('\n')}` : ''}
+${Array.isArray(preparationResult.warnings) && preparationResult.warnings.length > 0 ? `Warnings:\n${preparationResult.warnings.map((w: string) => `- ${w}`).join('\n')}` : ''}
 
 Provide a JSON response with:
 1. resourceRecommendations: Array of specific resource allocation and management recommendations
@@ -539,8 +539,8 @@ Respond with valid JSON only.`;
  * Generate AI-powered cluster optimization insights
  */
 async function generateClusterOptimizations(
-  preparationResult: any,
-  checks: any,
+  preparationResult: Record<string, unknown>,
+  checks: Record<string, unknown>,
   environment: string,
   ctx: ToolContext,
 ): Promise<Result<ClusterOptimizationInsights>> {
@@ -646,12 +646,26 @@ async function prepareClusterImpl(
     logger.info({ cluster, namespace, environment }, 'Starting cluster preparation');
 
     // Ensure session exists and get typed slice operations
-    const sessionResult = await ensureSession(context, params.sessionId);
-    if (!sessionResult.ok) {
-      return Failure(sessionResult.error);
-    }
+    const sessionId = params.sessionId || randomUUID();
+    let sessionState = null;
 
-    const { id: sessionId } = sessionResult.value;
+    if (context.sessionManager) {
+      const getResult = await context.sessionManager.get(sessionId);
+      if (getResult.ok) {
+        sessionState = getResult.value;
+      }
+
+      // Create if doesn't exist
+      if (!sessionState) {
+        const createResult = await context.sessionManager.create(sessionId);
+        if (!createResult.ok) {
+          return Failure(`Failed to create session: ${createResult.error}`);
+        }
+        sessionState = createResult.value;
+      }
+    } else {
+      return Failure('Session manager not available in context');
+    }
     logger.info(
       { sessionId, environment, namespace },
       'Starting Kubernetes cluster preparation with session',
@@ -786,24 +800,22 @@ async function prepareClusterImpl(
     };
 
     // Store cluster preparation result in session
-    const currentSteps = sessionResult.ok ? sessionResult.value.state.completed_steps || [] : [];
-    await updateSession(
-      sessionId,
-      {
+    const currentSteps = sessionState?.completed_steps || [];
+    if (context.sessionManager) {
+      await context.sessionManager.update(sessionId, {
         results: {
           'prepare-cluster': result,
         },
         completed_steps: [...currentSteps, 'prepare-cluster'],
         current_step: 'prepare-cluster',
-      },
-      context,
-    );
+      });
+    }
 
     // Generate AI-powered cluster optimization insights
     let clusterOptimizations: ClusterOptimizationInsights | undefined;
     try {
       const optimizationResult = await generateClusterOptimizations(
-        result,
+        result as unknown as Record<string, unknown>,
         checks,
         environment,
         context,

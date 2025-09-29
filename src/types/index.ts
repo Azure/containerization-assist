@@ -30,7 +30,7 @@ export interface WorkflowState {
   /** Unique session identifier */
   sessionId: string;
   /** Currently executing tool */
-  currentStep?: string;
+  current_step?: string | null;
   /** Overall progress (0-100) */
   progress?: number;
   /** Results from completed tools */
@@ -39,6 +39,8 @@ export interface WorkflowState {
   metadata?: Record<string, unknown>;
   /** List of completed step names */
   completed_steps?: string[];
+  /** Errors encountered during execution */
+  errors?: Record<string, unknown>;
   /** Session creation timestamp */
   createdAt: Date;
   /** Last update timestamp */

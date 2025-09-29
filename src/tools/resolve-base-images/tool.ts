@@ -1,5 +1,14 @@
 /**
- * Resolve Base Images tool using the new Tool pattern
+ * Resolve Base Images Tool
+ *
+ * Provides AI-powered recommendations for optimal Docker base images based on
+ * technology stack analysis. Uses intelligent sampling and scoring algorithms
+ * to suggest secure, efficient, and well-maintained base images.
+ *
+ * @category docker
+ * @version 2.1.0
+ * @aiDriven true
+ * @samplingStrategy rerank
  */
 
 import { Success, Failure, type Result, TOPICS } from '@/types';
@@ -18,6 +27,17 @@ const name = 'resolve-base-images';
 const description = 'Recommend optimal Docker base images';
 const version = '2.1.0';
 
+/**
+ * Generate AI-powered base image recommendations
+ *
+ * Analyzes the provided technology stack and uses AI sampling with
+ * reranking to suggest optimal Docker base images. Considers security,
+ * performance, and maintainability factors.
+ *
+ * @param input - Technology and context parameters
+ * @param ctx - Tool execution context with AI sampling capabilities
+ * @returns Result containing ranked base image recommendations
+ */
 async function run(
   input: z.infer<typeof resolveBaseImagesSchema>,
   ctx: ToolContext,

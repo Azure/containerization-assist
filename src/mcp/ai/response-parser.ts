@@ -88,7 +88,7 @@ Fixed JSON:`;
 
     const repairMessages = await buildMessages({
       basePrompt: repairPrompt,
-      topic: 'json_repair' as any, // Simple repair topic
+      topic: 'knowledge_enhancement', // Using knowledge enhancement topic for repair
       tool: 'response-parser',
       environment: 'development',
     });
@@ -161,11 +161,11 @@ async function tryExtractedParse<T>(
   // Try various extraction patterns
   const patterns = [
     // Markdown code blocks
-    /```(?:json)?\s*([\s\S]*?)\s*```/,
-    // JSON wrapped in other text
-    /\{[\s\S]*\}/,
-    // Array wrapped in other text
-    /\[[\s\S]*\]/,
+    /```(?:json)?\s*([^`]+)\s*```/,
+    // JSON wrapped in other text (limit depth to prevent catastrophic backtracking)
+    /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/,
+    // Array wrapped in other text (limit depth to prevent catastrophic backtracking)
+    /\[[^\]]*(?:\[[^\]]*\][^\]]*)*\]/,
   ];
 
   for (const pattern of patterns) {
@@ -197,9 +197,9 @@ function getSchemaDescription(schema: z.ZodSchema<unknown>): string {
         const field = shape[key];
         let type = 'unknown';
 
-        if (field && typeof field === 'object' && 'typeName' in (field as any)) {
-          const typeName = (field as any).typeName;
-          switch (typeName) {
+        if (field && typeof field === 'object' && '_def' in field) {
+          const def = (field as { _def: { typeName: string } })._def;
+          switch (def.typeName) {
             case 'ZodString':
               type = 'string';
               break;
@@ -236,13 +236,13 @@ function getSchemaDescription(schema: z.ZodSchema<unknown>): string {
 export function extractJsonFromText(text: string): Result<unknown> {
   const patterns = [
     // Direct JSON
-    /^\s*(\{[\s\S]*\})\s*$/,
-    /^\s*(\[[\s\S]*\])\s*$/,
+    /^\s*(\{[^}]*\})\s*$/,
+    /^\s*(\[[^\]]*\])\s*$/,
     // Markdown code blocks
-    /```(?:json)?\s*([\s\S]*?)\s*```/,
-    // JSON in mixed content
-    /(\{(?:[^{}]|{[^}]*})*\})/,
-    /(\[(?:[^[\]]|\[[^\]]*\])*\])/,
+    /```(?:json)?\s*([^`]+)\s*```/,
+    // JSON in mixed content (limited nesting to prevent catastrophic backtracking)
+    /(\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})/,
+    /(\[[^\]]*(?:\[[^\]]*\][^\]]*)*\])/,
   ];
 
   for (const pattern of patterns) {

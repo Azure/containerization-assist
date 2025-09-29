@@ -120,3 +120,66 @@ export function getAllInternalTools(): readonly AllToolTypes[] {
 
 // Export a type-safe version of "any tool" that's actually the union of all tools
 export type InternalTool = AllToolTypes;
+
+/**
+ * Lazy loading function for tools using dynamic imports
+ * Provides better startup performance by loading tools on-demand
+ */
+export async function getToolLazy(name: ToolName): Promise<AllToolTypes> {
+  switch (name) {
+    case TOOL_NAMES.ANALYZE_REPO:
+      return (await import('./analyze-repo/tool')).default;
+    case TOOL_NAMES.BUILD_IMAGE:
+      return (await import('./build-image/tool')).default;
+    case TOOL_NAMES.CONVERT_ACA_TO_K8S:
+      return (await import('./convert-aca-to-k8s/tool')).default;
+    case TOOL_NAMES.DEPLOY:
+      return (await import('./deploy/tool')).default;
+    case TOOL_NAMES.FIX_DOCKERFILE:
+      return (await import('./fix-dockerfile/tool')).default;
+    case TOOL_NAMES.GENERATE_ACA_MANIFESTS:
+      return (await import('./generate-aca-manifests/tool')).default;
+    case TOOL_NAMES.GENERATE_DOCKERFILE:
+      return (await import('./generate-dockerfile/tool')).default;
+    case TOOL_NAMES.GENERATE_HELM_CHARTS:
+      return (await import('./generate-helm-charts/tool')).default;
+    case TOOL_NAMES.GENERATE_K8S_MANIFESTS:
+      return (await import('./generate-k8s-manifests/tool')).default;
+    case TOOL_NAMES.GENERATE_KUSTOMIZE:
+      return (await import('./generate-kustomize/tool')).default;
+    case TOOL_NAMES.INSPECT_SESSION:
+      return (await import('./inspect-session/tool')).default;
+    case TOOL_NAMES.OPS:
+      return (await import('./ops/tool')).default;
+    case TOOL_NAMES.PREPARE_CLUSTER:
+      return (await import('./prepare-cluster/tool')).default;
+    case TOOL_NAMES.PUSH_IMAGE:
+      return (await import('./push-image/tool')).default;
+    case TOOL_NAMES.RESOLVE_BASE_IMAGES:
+      return (await import('./resolve-base-images/tool')).default;
+    case TOOL_NAMES.SCAN:
+      return (await import('./scan/tool')).default;
+    case TOOL_NAMES.TAG_IMAGE:
+      return (await import('./tag-image/tool')).default;
+    case TOOL_NAMES.VERIFY_DEPLOY:
+      return (await import('./verify-deployment/tool')).default;
+    default:
+      throw new Error(`Unknown tool: ${name}`);
+  }
+}
+
+/**
+ * Tool cache for lazy-loaded tools
+ * Prevents re-importing the same tool multiple times
+ */
+const toolCache = new Map<ToolName, Promise<AllToolTypes>>();
+
+/**
+ * Cached lazy loading function - loads tool once and caches the result
+ */
+export async function getToolLazyCached(name: ToolName): Promise<AllToolTypes> {
+  if (!toolCache.has(name)) {
+    toolCache.set(name, getToolLazy(name));
+  }
+  return toolCache.get(name)!;
+}
