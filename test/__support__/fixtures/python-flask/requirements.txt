@@ -2,4 +2,4 @@ Flask==2.3.2
 flask-cors==6.0.0
 gunicorn==21.2.0
 python-dotenv==1.0.0
-Werkzeug==2.3.6
+Werkzeug==3.0.6
