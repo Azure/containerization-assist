@@ -4,6 +4,7 @@
  */
 
 import { z, type ZodTypeAny } from 'zod';
+import * as crypto from 'crypto';
 import { type Result, Success, Failure, WorkflowState } from '@/types/index';
 import { createLogger } from '@/lib/logger';
 import { loadPolicy } from '@/config/policy-io';
@@ -120,7 +121,7 @@ async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
 
   // Always create or get session - generate ID if none provided
   const actualSessionId =
-    sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    sessionId || `session_${Date.now()}_${crypto.randomBytes(9).toString('hex')}`;
 
   // Get or create session using SessionManager
   const sessionResult = await sessionManager.get(actualSessionId);
