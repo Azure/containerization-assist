@@ -16,7 +16,7 @@ ALL_TOOLS                                           src/exports/tools.ts:7:9
 TOOLS                                               src/exports/tools.ts:7:55                    
 createApp                                           src/index.ts:6:9                             
 TOOLS                                               src/index.ts:10:9                            
-getDockerMutexStatus                      function  src/infra/docker/client.ts:746:17            
+getDockerMutexStatus                      function  src/infra/docker/client.ts:763:17            
 getEntryById                                        src/knowledge/loader.ts:244:14               
 getEntriesByCategory                                src/knowledge/loader.ts:251:14               
 getEntriesByTag                                     src/knowledge/loader.ts:258:14               
@@ -28,9 +28,9 @@ KnowledgeQuerySchema                                src/knowledge/schemas.ts:16:
 createErrorMessage                        function  src/lib/error-messages.ts:49:17              
 scanImage                                 function  src/lib/security-scanner.ts:74:23            
 initializeToolInstrumentation             function  src/lib/tool-helpers.ts:73:17                
-createMcpPromptTool                       function  src/mcp/ai-tool-factory.ts:303:17            
-OutputContracts                                     src/mcp/ai-tool-factory.ts:341:14            
-PromptToolFactory                         class     src/mcp/ai-tool-factory.ts:376:14            
+createMcpPromptTool                       function  src/mcp/ai-tool-factory.ts:305:17            
+OutputContracts                                     src/mcp/ai-tool-factory.ts:343:14            
+PromptToolFactory                         class     src/mcp/ai-tool-factory.ts:378:14            
 createSamplingPlan                        function  src/mcp/ai/sampling-plan.ts:75:17            
 RECOMMENDED_PLANS                                   src/mcp/ai/sampling-plan.ts:188:14           
 describePlan                              function  src/mcp/ai/sampling-plan.ts:221:17           

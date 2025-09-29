@@ -2,6 +2,7 @@
   "name": "express-test-app",
   "version": "1.0.0",
   "description": "Test Express application for containerization testing",
+  "private": true,
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

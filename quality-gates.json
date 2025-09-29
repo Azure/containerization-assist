@@ -20,11 +20,8 @@
     "baselines": {
       "lint": {
         "errors": 0,
-        "warnings": 23,
+        "warnings": 20,
         "warningSignatures": [
-          "/home/tng/workspace/containerization-assist/src/knowledge/loader.ts:49:40:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/mcp/ai-tool-factory.ts:98:43:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/mcp/ai/host-ai-assist.ts:133:14:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/mcp/ai/response-parser.ts:148:59:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/tools/build-image/tool.ts:89:44:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
           "/home/tng/workspace/containerization-assist/src/tools/build-image/tool.ts:373:24:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",

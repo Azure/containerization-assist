@@ -5,15 +5,13 @@
 
 version: 2
 updates:
-  - package-ecosystem: "npm" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  - package-ecosystem: "npm"
+    directory: "/"
     schedule:
       interval: "weekly"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-patch", "version-update:semver-minor", "version-update:semver-major"]
-        paths:
-          - "test/**"
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
@@ -21,8 +19,6 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-patch", "version-update:semver-minor", "version-update:semver-major"]
-        paths:
-          - "test/**"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

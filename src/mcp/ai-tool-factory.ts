@@ -95,7 +95,9 @@ function validateParameters(
     return Success(validated as Record<string, unknown>);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const errors = error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ');
+      const errors = error.issues
+        .map((e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`)
+        .join(', ');
       logger?.warn({ errors, params }, 'Parameter validation failed');
       return Failure(`Invalid parameters: ${errors}`);
     }
