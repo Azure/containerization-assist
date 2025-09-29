@@ -2,6 +2,7 @@
   "name": "containerization-assist-mcp",
   "version": "2.0.0",
   "description": "Containerization Assist MCP Server - Complete Architecture",
+  "private": true,
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

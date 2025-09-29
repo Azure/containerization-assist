@@ -16,7 +16,7 @@ ALL_TOOLS                                           src/exports/tools.ts:7:9
 TOOLS                                               src/exports/tools.ts:7:55                    
 createApp                                           src/index.ts:6:9                             
 TOOLS                                               src/index.ts:10:9                            
-getDockerMutexStatus                      function  src/infra/docker/client.ts:746:17            
+getDockerMutexStatus                      function  src/infra/docker/client.ts:763:17            
 getEntryById                                        src/knowledge/loader.ts:244:14               
 getEntriesByCategory                                src/knowledge/loader.ts:251:14               
 getEntriesByTag                                     src/knowledge/loader.ts:258:14               

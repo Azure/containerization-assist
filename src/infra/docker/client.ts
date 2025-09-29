@@ -267,6 +267,8 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
           aux?: { ID?: string };
         }
 
+        let buildError: string | null = null;
+
         const result = await new Promise<DockerBuildResponse[]>((resolve, reject) => {
           docker.modem.followProgress(
             stream,
@@ -284,6 +286,11 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
                   'Docker build followProgress error',
                 );
                 reject(err);
+              } else if (buildError) {
+                // If we detected an error during build progress, treat it as a failure
+                const errorObj = new Error(buildError);
+                logger.error({ buildError, options }, 'Docker build failed with error event');
+                reject(errorObj);
               } else {
                 resolve(res);
               }
@@ -293,6 +300,16 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
 
               if (event.error || event.errorDetail) {
                 logger.error({ errorEvent: event }, 'Docker build error event received');
+                // Capture the first error encountered during the build
+                if (!buildError) {
+                  buildError =
+                    event.error ||
+                    (event.errorDetail &&
+                    typeof event.errorDetail === 'object' &&
+                    'message' in event.errorDetail
+                      ? String(event.errorDetail.message)
+                      : 'Build step failed');
+                }
               }
             },
           );
