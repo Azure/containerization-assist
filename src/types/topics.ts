@@ -12,12 +12,20 @@ export const TOPICS = {
   DOCKERFILE_BUILD: 'dockerfile_build',
   DOCKERFILE_RUNTIME: 'dockerfile_runtime',
   FIX_DOCKERFILE: 'fix_dockerfile',
+  DOCKERFILE_REPAIR: 'dockerfile_repair',
 
   // Base image resolution
   RESOLVE_BASE_IMAGES: 'resolve_base_images',
 
+  // Docker optimization
+  DOCKER_OPTIMIZATION: 'docker_optimization',
+
+  // Docker tagging
+  DOCKER_TAGGING: 'docker_tagging',
+
   // Kubernetes manifests
   GENERATE_K8S_MANIFESTS: 'generate_k8s_manifests',
+  KUBERNETES_REPAIR: 'kubernetes_repair',
 
   // Helm charts
   GENERATE_HELM_CHARTS: 'generate_helm_charts',
@@ -25,6 +33,9 @@ export const TOPICS = {
   // Azure Container Apps
   GENERATE_ACA_MANIFESTS: 'generate_aca_manifests',
   CONVERT_ACA_TO_K8S: 'convert_aca_to_k8s',
+
+  // AI services
+  KNOWLEDGE_ENHANCEMENT: 'knowledge_enhancement',
 } as const;
 
 /**

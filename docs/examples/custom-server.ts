@@ -3,67 +3,67 @@
  * Shows how to integrate tools into your own server implementation
  */
 
-import { 
-  tools, 
-  registerTool,
-  type MCPTool,
-  type MCPToolResult 
+import {
+  createApp,
+  type Tool
 } from '@thgamble/containerization-assist-mcp';
 
 /**
  * Custom MCP server implementation
  */
 class CustomMCPServer {
-  private tools: Map<string, MCPTool>;
+  private tools: Map<string, Tool>;
   private name: string;
   private version: string;
-  
+
   constructor(name: string, version: string) {
     this.name = name;
     this.version = version;
     this.tools = new Map();
   }
-  
+
   /**
    * Register a Container Assist tool
    */
-  registerContainerTool(tool: MCPTool, customName?: string): void {
+  registerContainerTool(tool: Tool, customName?: string): void {
     const name = customName || tool.name;
-    this.tools.set(name, tool);
-    
+    const aliasedTool = customName ? { ...tool, name: customName } : tool;
+    this.tools.set(name, aliasedTool);
+
     console.log(`Registered tool: ${name}`);
-    console.log(`  Title: ${tool.metadata.title}`);
-    console.log(`  Description: ${tool.metadata.description}`);
+    console.log(`  Description: ${tool.description}`);
     console.log('');
   }
-  
+
   /**
    * Execute a registered tool
    */
-  async executeTool(name: string, params: any): Promise<MCPToolResult> {
+  async executeTool(name: string, params: any): Promise<any> {
     const tool = this.tools.get(name);
     if (!tool) {
       throw new Error(`Tool not found: ${name}`);
     }
-    
+
     console.log(`Executing tool: ${name}`);
-    return await tool.handler(params);
+    // Note: In a real implementation, you'd need to create proper context
+    // return await tool.run(params, context);
+    return { success: true, message: `Would execute ${name}` };
   }
-  
+
   /**
    * List all registered tools
    */
   listTools(): string[] {
     return Array.from(this.tools.keys());
   }
-  
+
   /**
    * Get tool metadata
    */
-  getToolInfo(name: string): MCPTool | undefined {
+  getToolInfo(name: string): Tool | undefined {
     return this.tools.get(name);
   }
-  
+
   /**
    * Start the server (mock implementation)
    */
@@ -79,34 +79,34 @@ class CustomMCPServer {
  */
 async function buildContainerizationServer() {
   console.log('=== Custom Containerization Server ===\n');
-  
+
   const server = new CustomMCPServer('container-server', '1.0.0');
-  
-  // Register only containerization-related tools
-  server.registerContainerTool(tools.analyzeRepo);
-  server.registerContainerTool(tools.generateDockerfile);
-  server.registerContainerTool(tools.buildImage, 'docker_build');
-  server.registerContainerTool(tools.scanImage, 'security_scan');
-  server.registerContainerTool(tools.tagImage);
-  server.registerContainerTool(tools.pushImage);
-  
+
+  // Register only containerization-related tools with custom names
+  // Mock registration since we don't have the actual tool objects in this context
+  server.registerContainerTool({ name: 'analyze-repo', description: 'Analyze repository structure' } as any);
+  server.registerContainerTool({ name: 'generate-dockerfile', description: 'Generate Dockerfile' } as any, 'dockerfile_create');
+  server.registerContainerTool({ name: 'build-image', description: 'Build Docker image' } as any, 'docker_build');
+  server.registerContainerTool({ name: 'scan', description: 'Security scan' } as any, 'security_scan');
+  server.registerContainerTool({ name: 'tag-image', description: 'Tag Docker image' } as any);
+  server.registerContainerTool({ name: 'push-image', description: 'Push Docker image' } as any);
+
   await server.start();
-  
-  // Demonstrate tool execution
+
   console.log('Available tools:', server.listTools().join(', '));
   console.log('');
-  
-  // Execute a tool
+
+  // Demonstrate tool execution
   try {
     const result = await server.executeTool('docker_build', {
       imageId: 'my-app:latest',
       context_path: '/app',
       dockerfile_path: '/app/Dockerfile'
     });
-    
-    console.log('Build result:', result.content[0]?.text);
+
+    console.log('Build result:', result.message);
   } catch (error) {
-    console.log('Build would fail without valid Docker environment');
+    console.log('Build would require proper implementation');
   }
 }
 
@@ -115,48 +115,60 @@ async function buildContainerizationServer() {
  */
 async function buildKubernetesServer() {
   console.log('\n=== Custom Kubernetes Server ===\n');
-  
+
   const server = new CustomMCPServer('k8s-server', '1.0.0');
-  
-  // Register only Kubernetes-related tools
-  server.registerContainerTool(tools.generateK8sManifests, 'create_manifests');
-  server.registerContainerTool(tools.prepareCluster, 'setup_cluster');
-  server.registerContainerTool(tools.deployApplication, 'deploy_app');
-  server.registerContainerTool(tools.verifyDeployment, 'verify_deploy');
-  
+
+  // Mock register Kubernetes-related tools with custom names
+  server.registerContainerTool({ name: 'generate-k8s-manifests', description: 'Generate Kubernetes manifests' } as any, 'create_manifests');
+  server.registerContainerTool({ name: 'prepare-cluster', description: 'Prepare cluster' } as any, 'setup_cluster');
+  server.registerContainerTool({ name: 'deploy', description: 'Deploy application' } as any, 'deploy_app');
+  server.registerContainerTool({ name: 'verify-deploy', description: 'Verify deployment' } as any, 'verify_deploy');
+
   await server.start();
-  
+
   console.log('Available tools:', server.listTools().join(', '));
 }
 
 /**
- * Example: Using the custom server with the helper function
+ * Example: Integration with Container Assist app
  */
-async function useWithHelper() {
-  console.log('\n=== Using Helper with Custom Server ===\n');
-  
-  const server = new CustomMCPServer('helper-server', '1.0.0');
-  
-  // The helper function can work with custom servers too
-  // It will use the tools Map directly
-  registerTool(server, tools.analyzeRepo);
-  registerTool(server, tools.generateDockerfile, 'create_dockerfile');
-  
+async function useWithContainerAssist() {
+  console.log('\n=== Using Container Assist Integration ===\n');
+
+  const server = new CustomMCPServer('integrated-server', '1.0.0');
+
+  // Create Container Assist app with custom aliases
+  const app = createApp({
+    toolAliases: {
+      'analyze-repo': 'custom_analyze',
+      'generate-dockerfile': 'create_dockerfile'
+    }
+  });
+
+  // Get the aliased tools and register them
+  const tools = app.listTools();
+  console.log(`Available Container Assist tools: ${tools.length}`);
+
+  // Mock registration of first few tools
+  tools.slice(0, 2).forEach(tool => {
+    server.registerContainerTool(tool as any);
+  });
+
   await server.start();
-  
-  console.log('Tools registered via helper:', server.listTools().join(', '));
+
+  console.log('Tools registered via Container Assist:', server.listTools().join(', '));
 }
 
 // Run examples
 if (import.meta.url === `file://${process.argv[1]}`) {
   await buildContainerizationServer();
   await buildKubernetesServer();
-  await useWithHelper();
+  await useWithContainerAssist();
 }
 
-export { 
+export {
   CustomMCPServer,
   buildContainerizationServer,
   buildKubernetesServer,
-  useWithHelper
+  useWithContainerAssist
 };

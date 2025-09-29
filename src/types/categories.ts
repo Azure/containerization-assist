@@ -31,11 +31,6 @@ export interface ToolCategoryMetadata {
 }
 
 /**
- * Re-export Environment type from unified module for backwards compatibility
- */
-export type { Environment };
-
-/**
  * Security/quality grade ratings
  */
 export type SecurityGrade = 'A' | 'B' | 'C' | 'D' | 'F';

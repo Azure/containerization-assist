@@ -21,7 +21,6 @@ import {
 } from '@/types/index';
 import type { KnowledgeSnippet } from '@/knowledge/schemas';
 import { getKnowledgeSnippets } from '@/knowledge/matcher';
-import { getSystemConstraintText } from '@/ai/policy-constraints-adapter';
 
 /**
  * Options for knowledge selection.
@@ -29,6 +28,8 @@ import { getSystemConstraintText } from '@/ai/policy-constraints-adapter';
 interface KnowledgeSelectionOptions {
   environment: string;
   tool: string;
+  language?: string;
+  framework?: string;
   maxChars?: number;
   maxSnippets?: number;
 }
@@ -40,24 +41,6 @@ interface MessageBuildOptions {
   includeMetadata?: boolean;
   forceSystemRole?: boolean;
   forceDeveloperRole?: boolean;
-}
-
-/**
- * Builds policy constraints for the system role using the new adapter.
- *
- * @param tool - Tool name for context
- * @param environment - Environment (e.g., 'production', 'development')
- * @returns Formatted policy constraint text or undefined
- */
-function buildSystemMessage(tool: string, environment: string): string | undefined {
-  try {
-    // Use the new adapter for clean separation of concerns
-    return getSystemConstraintText(tool, environment, 2000);
-  } catch (error) {
-    // If policy loading fails, return undefined to omit system message
-    console.warn('Failed to load policy constraints:', error);
-    return undefined;
-  }
 }
 
 /**
@@ -187,11 +170,8 @@ export async function buildMessages(
   const messages: AIMessage[] = [];
   const maxLength = options?.maxLength || 10000;
 
-  // Build system message with policies
-  const systemText = buildSystemMessage(params.tool, params.environment);
-  if (systemText || options?.forceSystemRole) {
-    const truncatedSystemText = truncateText(systemText || '', maxLength);
-    messages.push(createMessage('system', truncatedSystemText));
+  if (options?.forceSystemRole) {
+    messages.push(createMessage('system', ''));
   }
 
   // Build developer message with output contract
@@ -205,6 +185,8 @@ export async function buildMessages(
   const knowledgeSnippets = await selectKnowledgeSnippets(params.topic, {
     environment: params.environment,
     tool: params.tool,
+    ...(params.language && { language: params.language }),
+    ...(params.framework && { framework: params.framework }),
     ...(params.knowledgeBudget !== undefined && { maxChars: params.knowledgeBudget }),
   });
   const knowledgeText = formatKnowledgeText(knowledgeSnippets);
@@ -227,9 +209,6 @@ export async function buildPromptEnvelope(
   params: BuildPromptParams,
 ): Promise<Result<PromptEnvelope>> {
   try {
-    // Build system message
-    const systemText = buildSystemMessage(params.tool, params.environment);
-
     // Build developer message
     const developerText = buildDeveloperMessage(params.contract);
 
@@ -237,6 +216,8 @@ export async function buildPromptEnvelope(
     const knowledgeSnippets = await selectKnowledgeSnippets(params.topic, {
       environment: params.environment,
       tool: params.tool,
+      ...(params.language && { language: params.language }),
+      ...(params.framework && { framework: params.framework }),
       ...(params.knowledgeBudget !== undefined && { maxChars: params.knowledgeBudget }),
     });
     const knowledgeText = formatKnowledgeText(knowledgeSnippets);
@@ -244,11 +225,7 @@ export async function buildPromptEnvelope(
     // Build user message
     const userText = buildUserMessage(params.basePrompt, knowledgeText);
 
-    // Count constraints (approximate by counting lines)
-    const policyCount = systemText ? systemText.split('\n').length - 1 : 0;
-
     const envelope: PromptEnvelope = {
-      ...(systemText && { system: systemText }),
       ...(developerText && { developer: developerText }),
       user: userText,
       metadata: {
@@ -256,7 +233,6 @@ export async function buildPromptEnvelope(
         environment: params.environment,
         topic: params.topic,
         knowledgeCount: knowledgeSnippets.length,
-        policyCount,
       },
     };
 

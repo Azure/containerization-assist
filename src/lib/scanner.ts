@@ -83,7 +83,6 @@ export const createSecurityScanner = (logger: Logger, scannerType?: string): Sec
     async ping(): Promise<Result<boolean>> {
       try {
         logger.debug('Checking scanner availability');
-        // In production, this would ping the actual scanner service
         return Success(true);
       } catch (error) {
         const errorMessage = formatErrorMessage('Scanner ping failed', error);

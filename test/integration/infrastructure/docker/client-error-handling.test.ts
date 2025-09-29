@@ -293,33 +293,6 @@ describe('Docker Client Error Handling Integration Tests', () => {
     }, testTimeout);
   });
 
-  describe('Disk Space Error Detection', () => {
-    test.skip('should handle insufficient disk space gracefully', async () => {
-      // SKIPPED: This test creates very large files and can timeout on CI
-      // This test creates a large image to potentially trigger disk space issues
-      // Skip if there's plenty of disk space available
-      await createTestDockerfile(`
-FROM alpine:latest
-RUN for i in $(seq 1 10); do dd if=/dev/zero of=/tmp/largefile$i bs=1M count=10 2>/dev/null || true; done
-RUN echo "Large build test"
-`, 'Dockerfile.large');
-
-      const largeBuildOptions: DockerBuildOptions = {
-        dockerfile: 'Dockerfile.large',
-        context: testDir,
-        t: TEST_IMAGE_NAME
-      };
-
-      const result = await dockerClient.buildImage(largeBuildOptions);
-
-      // This test might pass if there's sufficient disk space
-      // We mainly want to ensure our error handling can detect disk space issues when they occur
-      if (!result.ok && result.error.includes('disk space')) {
-        expect(result.error).toMatch(/disk space|no space|ENOSPC/i);
-        expect(result.error).not.toBe('Build failed: Unknown error');
-      }
-    }, testTimeout * 4); // Extended timeout for large build
-  });
 
   describe('Image Operations Error Detection', () => {
     test('should detect errors when getting non-existent images', async () => {

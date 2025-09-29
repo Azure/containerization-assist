@@ -1,7 +1,7 @@
 {
   "name": "express-test-app",
   "version": "1.0.0",
-  "description": "Test Express application for Phase 8 testing",
+  "description": "Test Express application for containerization testing",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -4,7 +4,7 @@
  * Tests all 14 MCP tools for functionality and performance
  */
 
-import { TestCase, MCPTestRunner } from '../../services/test-runner.js';
+import { TestCase, MCPTestRunner } from "../../infrastructure/test-runner".js';
 
 export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCase[] => {
   const client = testRunner.getClient();

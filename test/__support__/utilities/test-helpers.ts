@@ -173,7 +173,7 @@ export function createMockBenchmark(overrides?: Partial<BenchmarkResult>): Bench
 /**
  * ESM Mock Creation and Result Testing Utilities
  */
-import type { Result } from '../../src/core/types.js';
+import type { Result } from "../../src/types"
 
 export function expectSuccess<T>(result: Result<T>): T {
   if (result.kind !== 'ok') {

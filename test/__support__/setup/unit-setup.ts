@@ -37,7 +37,7 @@ jest.mock('../../../src/lib/kubernetes', () => ({
   createKubernetesClient: jest.fn(() => createMockKubernetesClient()),
 }));
 
-jest.mock('../../../src/lib/session', () => ({
+jest.mock('../../../src/session/core', () => ({
   SessionManager: jest.fn(),
   createSessionManager: jest.fn(() => ({
     get: jest.fn(async (id) => ({

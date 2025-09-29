@@ -293,6 +293,8 @@ export const findKnowledgeMatches = (
 export interface KnowledgeSnippetOptions {
   environment: string;
   tool: string;
+  language?: string;
+  framework?: string;
   maxChars?: number;
   maxSnippets?: number;
 }
@@ -317,6 +319,8 @@ export async function getKnowledgeSnippets(
     const query: KnowledgeQuery = {
       text: topic,
       environment: options.environment,
+      ...(options.language && { language: options.language }),
+      ...(options.framework && { framework: options.framework }),
       tags: [options.tool, topic],
       limit: options.maxSnippets || 10,
     };

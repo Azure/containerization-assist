@@ -58,161 +58,135 @@
 ## Source Code Structure (`src/`)
 
 ### 📁 Root Level - Application Entry Point
-**Purpose**: Main application interfaces and dependency injection setup.
+**Purpose**: Main application interfaces and exports.
 
 **Key Files**:
-- `index.ts`: Main application exports and interfaces
-- `container.ts`: Dependency injection container configuration and factory functions
+- `index.ts`: Main application exports and public API
+- `container.ts`: Dependency injection container configuration
 
 **Responsibilities**:
-- Application lifecycle management
+- Public API definition
 - Dependency injection setup
-- Container configuration for different environments
+
+### 📁 `/ai` - AI and Prompt Engine
+**Purpose**: Complete prompt engine and AI integration.
+
+**Key Files**:
+- `prompt-engine.ts`: Core prompt building and message handling
+- `prompt-registry.ts`: Prompt template management
+- `prompt-templates.ts`: Template definitions
+
+**Responsibilities**:
+- AI prompt generation and management
+- Message building for AI interactions
+- Template system for consistent prompts
+
+### 📁 `/app` - Application Core
+**Purpose**: Core application logic and orchestration.
+
+**Key Files**:
+- `index.ts`: Main application entry point
+- `kernel.ts`: Application kernel and lifecycle management
+
+**Responsibilities**:
+- Application startup and shutdown
+- Core business logic coordination
 
 ### 📁 `/cli` - Command Line Interface
-**Purpose**: Command-line interface entry points and argument parsing.
+**Purpose**: CLI entry points and server management.
 
 **Key Files**:
-- `cli.ts`: Main CLI entry point with Commander.js setup and validation logic
-- `server.ts`: Server startup and configuration logic
+- `cli.ts`: Main CLI entry point and argument parsing
+- `server.ts`: MCP server startup and management
 
 **Responsibilities**:
-- CLI argument parsing and validation
-- Environment variable configuration
-- Docker and Kubernetes connection validation
-- Health checks and diagnostics
-- Server initialization and shutdown handling
+- Command-line interface
+- Server lifecycle management
+- Environment validation
 
 ### 📁 `/config` - Configuration Management
-**Purpose**: Centralized configuration management system replacing multiple config files.
+**Purpose**: Modular policy system and environment configuration.
 
 **Key Files**:
-- `index.ts`: Main configuration factory and environment variable mapping
-- `types.ts`: TypeScript interfaces for configuration structures
-- `defaults.ts`: Default values and constants
-- `app-config.ts`: Application-specific configuration
-- `tool-config.ts`: Tool-specific configuration settings
+- `environment.ts`: Unified environment configuration
+- `policy-constraints.ts`: Policy constraint extraction
+- `policy-eval.ts`: Rule evaluation and application logic
+- `policy-io.ts`: Load, validate, migrate, and cache operations
+- `policy-prompt.ts`: AI prompt constraint integration
+- `policy-schemas.ts`: Zod schemas and TypeScript types
 
 **Responsibilities**:
-- Environment variable parsing and validation
-- Configuration defaults and overrides
+- Environment variable management
+- Policy system with 5 specialized modules
 - Type-safe configuration interfaces
-- Development/production configuration profiles
 
-### 📁 `/types` - Type Definitions
-**Purpose**: Centralized type definitions and domain models.
-
-**Key Files**:
-- `consolidated-types.ts`: Core type definitions including Result<T>, Tool interfaces, WorkflowState
-- `validate-dockerfile.d.ts`: Dockerfile validation type definitions
-
-**Responsibilities**:
-- Result<T> type system for error handling
-- Tool and workflow interfaces
-- Session management types
-- Domain model definitions
-
-### 📁 `/services` - External System Services
-**Purpose**: Service implementations for external systems (Docker, Kubernetes).
+### 📁 `/infra` - Infrastructure Clients
+**Purpose**: External system clients and infrastructure services.
 
 **Subdirectories**:
 
 #### `/docker`
-- Docker service implementations and utilities
-- Mutex-based client management
+- Docker client implementations
+- Registry and image management
 
-#### `/kubernetes`  
-- Kubernetes service implementations
+#### `/kubernetes`
+- Kubernetes API clients
 - Idempotent apply operations
 
 **Responsibilities**:
 - External system integration
-- Service layer abstractions
-- Connection management
-- Platform-specific implementations
+- Infrastructure service abstractions
+- Connection and client management
 
-### 📁 `/lib` - Shared Libraries and Utilities
-**Purpose**: Reusable libraries and cross-cutting concerns.
+### 📁 `/knowledge` - Knowledge Management
+**Purpose**: Knowledge base and matching system.
 
 **Key Files**:
-- `cache.ts`: Caching strategies and implementations
-- `logger.ts`: Structured logging with Pino  
-- `mutex.ts`: Concurrency control utilities
-- `security-scanner.ts`: Trivy integration for vulnerability scanning
-- `error-context.ts`: Error handling utilities
-
-**Subdirectories**:
-- `/config`: Configuration-related utilities and scoring engines
+- `matcher.ts`: Knowledge matching logic
 
 **Responsibilities**:
-- Session state management
-- Caching and performance optimization
-- Security scanning orchestration
-- Shared utilities and helper functions
+- Knowledge base integration
+- Content matching and retrieval
+
+### 📁 `/lib` - Pure Utilities
+**Purpose**: Reusable utilities with no infrastructure dependencies.
+
+**Key Files**:
+- `docker.ts`: Docker utility functions
+- `file-utils.ts`: File system utilities
+- `regex-patterns.ts`: Common regex patterns
+- `sampling.ts`: Sampling utilities
+
+**Responsibilities**:
+- Pure utility functions
+- Helper libraries
+- Common patterns and utilities
 
 ### 📁 `/mcp` - MCP Server Implementation
-**Purpose**: Model Context Protocol server implementation and MCP-specific logic.
+**Purpose**: Model Context Protocol server and adapters.
 
 **Subdirectories**:
 
-#### `/client`
-- `mcp-client.ts`: MCP client implementation
-- `mock-transport.ts`: Mock transport for testing
-- `sdk-transport.ts`: SDK-based transport layer
-- `transport.ts`: Transport abstraction layer
+#### `/ai`
+- `sampling-runner.ts`: AI sampling and execution
 
-#### `/server`
-- `index.ts`: Main MCP server implementation
-- `types.ts`: MCP server types
-- `schemas.ts`: MCP schema definitions
-
-#### `/tools`
-- `registrar.ts`: Tool registration and discovery
-- Various utility files for tool management
-
-#### `/context`
-- Context management for tool execution
-
-#### `/utils`
-- Utility functions specific to MCP operations
+**Key Files**:
+- Various MCP-specific implementations
 
 **Responsibilities**:
 - MCP protocol implementation
 - Tool registration and routing
-- Progress reporting
-- Request/response handling
-- Sampling and AI integration
+- MCP-specific AI integration
 
-### 📁 `/prompts` - Prompt Management
-**Purpose**: AI prompt templates and prompt registry.
-
-**Structure**: Organized by category (analysis, containerization, orchestration, sampling, security, validation)
-- JSON files for prompt templates
-- `loader.ts` and `registry.ts` for prompt management
+### 📁 `/session` - Session Management
+**Purpose**: Unified session state management.
 
 **Responsibilities**:
-- AI prompt templates
-- Dynamic prompt generation
-- Context-aware prompt selection
-
-### 📁 `/resources` - Resource Management
-**Purpose**: MCP resource management and caching.
-
-**Key Files**:
-- `cache.ts`: Resource caching implementation
-- `manager.ts`: Resource lifecycle management
-- `resource-cache.ts`: Specific resource caching strategies
-- `types.ts`: Resource-related type definitions
-- `uri-schemes.ts`: URI scheme handling for resources
-
-**Responsibilities**:
-- Resource discovery and management
-- Caching strategies for expensive operations
-- URI-based resource access
-- Resource lifecycle management
+- Session lifecycle management
+- Persistent state across tool executions
 
 ### 📁 `/tools` - Tool Implementations
-**Purpose**: Individual tool implementations using co-located pattern.
+**Purpose**: Individual MCP tool implementations using co-located pattern.
 
 **Structure**: Each tool follows the same pattern:
 ```
@@ -222,48 +196,60 @@
 └── index.ts    # Public exports
 ```
 
-**Available Tools** (using co-location pattern):
-- `analyze-repo`: Repository structure and framework detection
-- `build-image`: Docker image building with progress tracking
-- `deploy`: Application deployment to Kubernetes
-- `fix-dockerfile`: Dockerfile optimization and fixes
+**Available Tools**:
+- `analyze-repo`: Repository analysis and framework detection
+- `build-image`: Docker image building with progress
+- `convert-aca-to-k8s`: Convert ACA to Kubernetes
+- `deploy`: Deploy applications to Kubernetes
+- `fix-dockerfile`: Fix and optimize existing Dockerfiles
+- `generate-aca-manifests`: Azure Container Apps manifests
 - `generate-dockerfile`: AI-powered Dockerfile generation
+- `generate-helm-charts`: Generate Helm charts
 - `generate-k8s-manifests`: Kubernetes manifest generation
-- `ops`: Operational tools (ping, health checks)
+- `generate-kustomize`: Generate Kustomize configurations
+- `inspect-session`: Session debugging
+- `ops`: Operational utilities
 - `prepare-cluster`: Kubernetes cluster preparation
-- `push-image`: Image registry operations
+- `push-image`: Push images to registry
 - `resolve-base-images`: Base image recommendations
 - `scan`: Security vulnerability scanning
 - `tag-image`: Docker image tagging
-- `verify-deployment`: Deployment verification and health checks
-- `workflow`: Workflow orchestration tools
+- `verify-deployment`: Verify deployment status
 
-**Additional Files**:
-- `types.ts`: Common tool types and interfaces
-- `session-types.ts`: Session-related type definitions
-- `analysis-perspectives.ts`: Multi-perspective analysis strategies
+**Shared Resources**:
+- `shared/`: Common tool utilities and patterns
 
 **Responsibilities**:
 - Individual tool logic and implementation
 - Parameter validation using Zod schemas
 - Result-based error handling
-- Progress reporting integration
 
-### 📁 `/workflows` - Workflow Orchestration
-**Purpose**: Complex workflow orchestration and pipeline management.
+### 📁 `/types` - Type Definitions
+**Purpose**: Centralized type definitions and interfaces.
 
 **Key Files**:
-- `containerization.ts`: Main containerization pipeline
-- `deployment.ts`: Deployment workflow orchestration
-- `intelligent-orchestration.ts`: AI-driven workflow decisions
-- `workflow-config.ts`: Workflow configuration utilities
-- `types.ts`: Workflow type definitions
+- `index.ts`: Core type definitions including Result<T> and Tool interfaces
 
 **Responsibilities**:
-- Multi-step workflow orchestration
-- AI-driven workflow decisions
-- Workflow state management
-- Error recovery and retry logic
+- Result<T> type system for error handling
+- Tool and application interfaces
+- Domain model definitions
+
+### 📁 `/validation` - Validation and Fixing
+**Purpose**: Dockerfile and Kubernetes validation and repair.
+
+**Key Files**:
+- `dockerfile-fixer.ts`: Dockerfile fixing and optimization
+- `dockerfile-validator.ts`: Dockerfile validation
+- `dockerfilelint-adapter.ts`: Integration with dockerfilelint
+- `k8s-normalizer.ts`: Kubernetes manifest normalization
+- `k8s-schema-validator.ts`: Kubernetes schema validation
+- `merge-reports.ts`: Report merging utilities
+
+**Responsibilities**:
+- Validation logic for containers and manifests
+- Automated fixing and optimization
+- Report generation and merging
 
 ---
 
@@ -317,9 +303,26 @@ TypeScript path mapping supports clean imports:
 // ✅ Path aliases (from tsconfig.json)
 import { Config } from '@/config/types';
 import { Logger } from '@/lib/logger';
-import type { Result } from '@/types';
+import type { Result } from '@types';
+import { analyzeRepo } from '@/tools/analyze-repo/tool';
 
-// ✅ Relative imports (also acceptable)
+// Available Path Aliases:
+// @/*           → src/*
+// @/ai/*        → src/ai/*
+// @/mcp/*       → src/mcp/*
+// @/tools/*     → src/tools/*
+// @/lib/*       → src/lib/*
+// @/infra/*     → src/infra/*
+// @/session/*   → src/session/*
+// @/config/*    → src/config/*
+// @/resources/* → src/resources/*
+// @/exports/*   → src/exports/*
+// @/knowledge/* → src/knowledge/*
+// @types        → src/types/index.ts
+// @/container   → src/container
+// @validation/* → src/validation
+
+// ✅ Relative imports (also acceptable for local files)
 import { Config } from '../config/types';
 ```
 
@@ -388,18 +391,24 @@ npm run quality:gates   # Comprehensive quality analysis
 | `SESSION_DIR` | Session storage directory | `~/.containerization-assist/sessions` |
 | `K8S_NAMESPACE` | Default Kubernetes namespace | `default` |
 
-### Configuration Structure
-Configuration is centralized in `/config` with type-safe interfaces:
+### Configuration Architecture
+The configuration system is centralized in `/config` with a modular policy system:
 
 ```typescript
-export const config = {
-  mcp: { name: 'containerization-assist', version: '1.0.0' },
-  server: { logLevel: 'info', port: 3000 },
-  workspace: { workspaceDir: process.cwd() },
+// Environment configuration via src/config/environment.ts
+export const environment = {
   docker: { socketPath: '/var/run/docker.sock' },
   kubernetes: { namespace: 'default' },
-  // ... other configuration sections
+  logging: { level: 'info' },
+  // ... other environment settings
 };
+
+// Policy system with 5 specialized modules:
+// - policy-schemas.ts: Type definitions and Zod schemas
+// - policy-io.ts: Load, validate, and cache operations
+// - policy-eval.ts: Rule evaluation and application
+// - policy-prompt.ts: AI prompt constraint integration
+// - policy-constraints.ts: Data-driven constraint extraction
 ```
 
 ---
@@ -424,42 +433,58 @@ export const config = {
 
 ### Adding New Tools
 1. Create directory in `src/tools/new-tool/`
-2. Implement `tool.ts` with execute function
+2. Implement `tool.ts` with unified Tool interface:
+   ```typescript
+   const tool: Tool<typeof schema, ResultType> = {
+     name: 'new-tool',
+     description: 'Tool description',
+     version: '2.0.0',
+     schema: newToolSchema,
+     run: async (input, ctx) => { /* implementation */ }
+   };
+   export default tool;
+   ```
 3. Define `schema.ts` with Zod validation
 4. Export via `index.ts`
-5. Register in tool registry
+5. Register in tool index
 
-### Adding New Workflows
-1. Create workflow file in `src/workflows/`
-2. Implement using existing tool composition
-3. Add workflow registration
-4. Include progress reporting
+### Adding New AI Prompts
+1. Add prompt templates in `src/ai/prompt-templates.ts`
+2. Register in `src/ai/prompt-registry.ts`
+3. Use via prompt engine: `buildMessages()` and related functions
 
 ### Infrastructure Extensions
-1. Add new clients in `src/infrastructure/`
+1. Add new clients in `src/infra/`
 2. Follow Result<T> pattern for error handling
 3. Export via index files
-4. Register in dependency container
+4. Register in dependency container (`src/container.ts`)
+
+### Policy System Extensions
+1. Extend schemas in `src/config/policy-schemas.ts`
+2. Add evaluation logic in `src/config/policy-eval.ts`
+3. Update constraint extraction in `src/config/policy-constraints.ts`
+4. Integrate with prompts via `src/config/policy-prompt.ts`
 
 ---
 
 ## Performance Considerations
 
 ### Build Performance
-- **TypeScript Compilation**: Standard tsc with fast incremental builds
-- **Alias Resolution**: tsc-alias for clean path resolution
-- **Bundle Optimization**: Tree shaking and minification in production builds
+- **TypeScript Compilation**: Standard `tsc` compiler with `tsc-alias` for path resolution
+- **Parallel Builds**: Smart build system with ~2.7s build time
+- **Bundle Optimization**: ES2022 target with efficient module resolution
+- **Development**: Fast incremental builds and watch mode
 
 ### Runtime Performance
-- **Caching**: Multi-layer caching for expensive operations
-- **Connection Pooling**: Efficient Docker and Kubernetes connection management
-- **Progress Streaming**: Real-time progress updates without blocking
+- **Result<T> Pattern**: Eliminates exception overhead
+- **Dependency Injection**: Efficient container-based dependency management
+- **Session Management**: Persistent state reduces initialization overhead
+- **Infrastructure Clients**: Connection pooling for Docker and Kubernetes
 
-### Quality Metrics
-- **ESLint Warnings**: 700 (46% reduction from initial baseline)
-- **TypeScript Errors**: 45 (ongoing reduction effort)
-- **Dead Code**: 234 unused exports (47% reduction)
-- **Test Coverage**: >70% with comprehensive integration testing
+### Architecture Benefits
+- **Modular Design**: Clean boundaries between layers reduce complexity
+- **Type Safety**: Compile-time type checking prevents runtime errors
+- **Path Aliases**: Clean imports improve build performance
 
 ---
 

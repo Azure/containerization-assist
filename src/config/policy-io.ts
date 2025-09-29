@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { type Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { createLogger } from '@/lib/logger';
+import { ERROR_MESSAGES } from '@/lib/error-messages';
 import { type Policy, PolicySchema } from './policy-schemas';
 import { policyData } from './policy-data';
 
@@ -31,15 +32,6 @@ function putCached(file: string, env: string | undefined, policy: Policy, ttlSec
   CACHE.set(k(file, env), { value: policy, expiresAt: now() + ttlSec * 1000 });
 }
 
-export function clearPolicyCache(): void {
-  CACHE.clear();
-  log.info('Cleared policy cache');
-}
-export function refreshPolicy(file: string, env?: string): void {
-  CACHE.delete(k(file, env));
-  log.debug({ file, env }, 'Policy cache entry evicted');
-}
-
 /** Validate policy via Zod and return Result */
 export function validatePolicy(p: unknown): Result<Policy> {
   try {
@@ -47,9 +39,9 @@ export function validatePolicy(p: unknown): Result<Policy> {
   } catch (e) {
     if (e instanceof z.ZodError) {
       const issues = e.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ');
-      return Failure(`Policy validation failed: ${issues}`);
+      return Failure(ERROR_MESSAGES.POLICY_VALIDATION_FAILED(issues));
     }
-    return Failure(`Policy validation error: ${String(e)}`);
+    return Failure(ERROR_MESSAGES.POLICY_VALIDATION_FAILED(String(e)));
   }
 }
 
@@ -100,7 +92,7 @@ export function loadPolicy(file: string, env?: string): Result<Policy> {
     log.debug({ env }, 'Loaded policy from TypeScript data');
     return final;
   } catch (err) {
-    return Failure(`Failed to load policy: ${extractErrorMessage(err)}`);
+    return Failure(ERROR_MESSAGES.POLICY_LOAD_FAILED(extractErrorMessage(err)));
   }
 }
 
