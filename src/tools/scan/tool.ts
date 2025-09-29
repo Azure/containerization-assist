@@ -12,7 +12,11 @@ import { createSecurityScanner } from '@/lib/scanner';
 import { Success, Failure, type Result } from '@/types';
 import { getKnowledgeForCategory } from '@/knowledge/index';
 import type { KnowledgeMatch } from '@/knowledge/types';
-import { enhanceValidationWithAI, ValidationSeverity, type ValidationResult } from '@/validation/ai-enhancement';
+import {
+  enhanceValidationWithAI,
+  ValidationSeverity,
+  type ValidationResult,
+} from '@/validation/ai-enhancement';
 import type { Tool } from '@/types/tool';
 import { scanImageSchema, type ScanImageParams } from './schema';
 

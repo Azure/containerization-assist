@@ -144,7 +144,9 @@ async function tryDirectParse<T>(
     return Success(validated);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return Failure(`Schema validation failed: ${error.errors.map((e) => e.message).join(', ')}`);
+      return Failure(
+        `Schema validation failed: ${error.issues.map((e: any) => e.message).join(', ')}`,
+      );
     }
     return Failure(`JSON parse failed: ${extractErrorMessage(error)}`);
   }

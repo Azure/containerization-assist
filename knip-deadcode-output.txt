@@ -5,7 +5,9 @@ src/lib/content-utils.ts
 src/mcp/ai/index.ts                                    
 src/mcp/ai/knowledge-helpers.ts                        
 src/tools/generate-dockerfile/multi-step-generator.ts  
-Unused exports (127)
+Unused devDependencies (1)
+husky  package.json:228:6
+Unused exports (128)
 formatGitHubAnnotation                    function  src/cli/error-formatting.ts:43:17            
 handleCIError                             function  src/cli/error-formatting.ts:75:17            
 createAppConfig                           function  src/config/app-config.ts:152:17              
@@ -91,7 +93,8 @@ postValidate                              function  src/types/tool-metadata.ts:2
 createTool                                function  src/types/tool.ts:42:17                      
 isValidTopic                              function  src/types/topics.ts:49:17                    
 getAllTopics                              function  src/types/topics.ts:56:17                    
-summarizeValidationResults                function  src/validation/ai-enhancement.ts:342:17      
+ValidationCategory                                  src/validation/ai-enhancement.ts:12:29       
+summarizeValidationResults                function  src/validation/ai-enhancement.ts:345:17      
 validateDockerfileContentWithAI           function  src/validation/dockerfile-validator.ts:769:23
 validateDockerfileContentWithKnowledge    function  src/validation/dockerfile-validator.ts:874:23
 validateDockerfileContent                           src/validation/index.ts:7:9                  
@@ -165,7 +168,7 @@ GenerateK8sManifestsParams    type       src/tools/generate-k8s-manifests/schema
 InspectSessionParams          type       src/tools/inspect-session/schema.ts:38:13       
 OpsConfig                     interface  src/tools/ops/tool.ts:178:18                    
 PushImageParams               type       src/tools/push-image/schema.ts:23:13            
-ScanImageConfig               type       src/tools/scan/tool.ts:407:13                   
+ScanImageConfig               type       src/tools/scan/tool.ts:410:13                   
 EnhancementPriority           type       src/types/ai.ts:67:13                           
 AIModelCapabilities           interface  src/types/ai.ts:79:18                           
 AIRequestConfig               interface  src/types/ai.ts:90:18                           

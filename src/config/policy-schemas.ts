@@ -129,13 +129,13 @@ const PolicyRuleSchema = z.object({
   category: z.enum(['quality', 'security', 'performance', 'compliance']).optional(),
   priority: z.number(),
   conditions: z.array(z.unknown()), // Simplified since MatcherSchema was also unused
-  actions: z.record(z.unknown()),
+  actions: z.record(z.string(), z.unknown()),
   description: z.string().optional(),
 });
 
 const EnvironmentOverrideSchema = z.object({
   rule_id: z.string(),
-  actions: z.record(z.unknown()).optional(),
+  actions: z.record(z.string(), z.unknown()).optional(),
   priority: z.number().optional(),
   enabled: z.boolean().optional(),
 });
@@ -201,6 +201,7 @@ export const PolicySchema = z.object({
   rules: z.array(PolicyRuleSchema),
   environments: z
     .record(
+      z.string(),
       z.object({
         defaults: UnifiedDefaultsSchema.optional(),
         overrides: z.array(EnvironmentOverrideSchema).optional(),

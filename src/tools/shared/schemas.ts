@@ -26,7 +26,7 @@ export const environment = environmentSchema.optional();
 export const imageId = z.string().describe('Docker image identifier');
 export const imageName = z.string().describe('Name for the Docker image');
 export const tags = z.array(z.string()).describe('Tags to apply to the image');
-export const buildArgs = z.record(z.string()).describe('Build arguments');
+export const buildArgs = z.record(z.string(), z.string()).describe('Build arguments');
 
 // Application basics
 export const appName = z.string().min(1).describe('Application name (required)');
@@ -79,7 +79,7 @@ export const envVar = z.object({
 export const envVars = z.array(envVar).optional().describe('Environment variables to set');
 
 // ConfigMap
-export const configMapData = z.record(z.string()).optional().describe('ConfigMap data');
+export const configMapData = z.record(z.string(), z.string()).optional().describe('ConfigMap data');
 
 // Service types
 export const serviceType = z

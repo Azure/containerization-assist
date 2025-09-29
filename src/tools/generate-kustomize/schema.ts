@@ -13,15 +13,19 @@ export const generateKustomizeSchema = z.object({
   namespace: z.string().optional().describe('Default namespace for all resources'),
   namePrefix: z.string().optional().describe('Prefix to add to all resource names'),
   nameSuffix: z.string().optional().describe('Suffix to add to all resource names'),
-  commonLabels: z.record(z.string()).optional().describe('Labels to add to all resources'),
+  commonLabels: z
+    .record(z.string(), z.string())
+    .optional()
+    .describe('Labels to add to all resources'),
   commonAnnotations: z
-    .record(z.string())
+    .record(z.string(), z.string())
     .optional()
     .describe('Annotations to add to all resources'),
 
   // Environment-specific overrides
   envConfig: z
     .record(
+      z.string(),
       z.object({
         namespace: z.string().optional(),
         replicas: z.number().optional(),
