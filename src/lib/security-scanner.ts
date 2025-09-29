@@ -78,7 +78,6 @@ export async function scanImage(
 ): Promise<Result<SecurityScanResult>> {
   logger.info({ imageId, options }, 'Mock security scan');
 
-  // Mock implementation - replace with actual scanner integration
   const result: SecurityScanResult = {
     vulnerabilities: [],
     summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0, unknown: 0 },

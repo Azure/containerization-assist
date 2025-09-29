@@ -6,9 +6,10 @@
 
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
-import fs from 'fs/promises';
-import path from 'path';
-import crypto from 'crypto';
+import * as fs from 'fs/promises';
+import { watch, FSWatcher } from 'fs';
+import * as path from 'path';
+import * as crypto from 'crypto';
 
 const execAsync = promisify(exec);
 
@@ -42,6 +43,9 @@ class SmartBuilder {
   private stats: BuildStats;
   private retryCount = 3;
   private retryDelay = 1000;
+  private isBuilding = false;
+  private watchedPaths: Set<string> = new Set();
+  private watchTimeout: NodeJS.Timeout | null = null;
 
   constructor(options: BuildOptions = {}) {
     this.options = {
@@ -209,8 +213,8 @@ class SmartBuilder {
       'dist/src/index.js',
       'dist/src/index.d.ts',
       'dist-cjs/src/index.js',
-      'dist/src/mcp/server.js',
-      'dist-cjs/src/mcp/server.js'
+      'dist/src/mcp/mcp-server.js',
+      'dist-cjs/src/mcp/mcp-server.js'
     ];
 
     for (const file of requiredFiles) {
@@ -227,7 +231,7 @@ class SmartBuilder {
 
     const exportPatterns = [
       { path: 'src/index', name: '.' },
-      { path: 'src/mcp/server', name: './server' },
+      { path: 'src/mcp/mcp-server', name: './server' },
       { path: 'src/exports/tools', name: './tools' },
       { path: 'src/types/index', name: './types' },
       { path: 'src/config/index', name: './config' },
@@ -368,16 +372,157 @@ class SmartBuilder {
   private async startWatchMode() {
     console.log('👀 Watch mode activated (Ctrl+C to exit)');
 
-    // Simple watch implementation - in production would use chokidar
-    const watchInterval = setInterval(async () => {
-      // This is a placeholder - real implementation would monitor file changes
-    }, 5000);
+    const watchPaths = ['src', 'knowledge', 'package.json', 'tsconfig.json', 'tsconfig.cjs.json'];
+    const watchers: FSWatcher[] = [];
 
-    process.on('SIGINT', () => {
-      clearInterval(watchInterval);
-      console.log('Watch mode terminated');
+    const handleFileChange = (filename: string | null) => {
+      if (!filename) return;
+
+      // Debounce file changes - wait 500ms after last change
+      if (this.watchTimeout) {
+        clearTimeout(this.watchTimeout);
+      }
+
+      this.watchTimeout = setTimeout(async () => {
+        if (this.isBuilding) {
+          this.log('Build already in progress, skipping...', 'warning');
+          return;
+        }
+
+        this.log(`File changed: ${filename}`, 'info');
+        await this.triggerRebuild();
+      }, 500);
+    };
+
+    // Set up watchers for each path
+    for (const watchPath of watchPaths) {
+      try {
+        const fullPath = path.join(process.cwd(), watchPath);
+        const stats = await fs.stat(fullPath).catch(() => null);
+
+        if (stats) {
+          const watcher = watch(fullPath, {
+            recursive: stats.isDirectory(),
+            persistent: true
+          }, (eventType, filename) => {
+            // Filter out irrelevant files
+            if (filename && this.shouldWatchFile(filename)) {
+              handleFileChange(filename);
+            }
+          });
+
+          watchers.push(watcher);
+          this.watchedPaths.add(watchPath);
+          this.log(`Watching: ${watchPath}`, 'info');
+        }
+      } catch (error: any) {
+        this.log(`Failed to watch ${watchPath}: ${error.message}`, 'warning');
+      }
+    }
+
+    // Set up cleanup
+    const cleanup = () => {
+      console.log('\n🛑 Shutting down watch mode...');
+
+      if (this.watchTimeout) {
+        clearTimeout(this.watchTimeout);
+      }
+
+      watchers.forEach(watcher => {
+        try {
+          watcher.close();
+        } catch (error) {
+          // Ignore cleanup errors
+        }
+      });
+
+      console.log('👋 Watch mode terminated');
       process.exit(0);
-    });
+    };
+
+    process.on('SIGINT', cleanup);
+    process.on('SIGTERM', cleanup);
+
+    // Keep the process alive
+    process.stdin.resume();
+  }
+
+  private shouldWatchFile(filename: string): boolean {
+    // Only watch relevant file types
+    const relevantExtensions = ['.ts', '.tsx', '.js', '.jsx', '.json'];
+    const ext = path.extname(filename);
+
+    // Ignore build outputs, node_modules, and temp files
+    if (filename.includes('node_modules') ||
+        filename.includes('dist') ||
+        filename.includes('.git') ||
+        filename.includes('.tsbuildinfo') ||
+        filename.startsWith('.')) {
+      return false;
+    }
+
+    return relevantExtensions.includes(ext) || filename === 'package.json';
+  }
+
+  private async triggerRebuild() {
+    this.isBuilding = true;
+    this.log('🔄 Rebuilding...', 'info');
+
+    try {
+      // Reset stats for rebuild
+      this.stats = {
+        startTime: Date.now(),
+        phase: 'rebuilding',
+        memory: process.memoryUsage().heapUsed,
+        errors: 0
+      };
+
+      // Run a faster rebuild without cleaning
+      const originalClean = this.options.clean;
+      this.options.clean = false;
+
+      // Build phase
+      this.stats.phase = 'building';
+      let exports: any;
+
+      if (this.options.parallel) {
+        const [, , generatedExports] = await Promise.all([
+          this.buildESM(),
+          this.buildCJS(),
+          this.generateExports()
+        ]);
+        exports = generatedExports;
+      } else {
+        await this.buildESM();
+        await this.buildCJS();
+        exports = await this.generateExports();
+      }
+
+      // Validate builds
+      await this.validateBuilds();
+
+      // Update package.json exports
+      if (exports) {
+        await this.updatePackageJson(exports);
+      }
+
+      // Skip tests in watch mode for faster feedback
+      if (!this.options.skipTests) {
+        this.log('⏩ Skipping tests in watch mode for faster rebuilds', 'info');
+      }
+
+      // Restore original clean setting
+      this.options.clean = originalClean;
+
+      const rebuildTime = ((Date.now() - this.stats.startTime) / 1000).toFixed(2);
+      console.log(`✅ Rebuild completed in ${rebuildTime}s`);
+
+    } catch (error: any) {
+      const rebuildTime = ((Date.now() - this.stats.startTime) / 1000).toFixed(2);
+      console.error(`❌ Rebuild failed in ${rebuildTime}s: ${error.message}`);
+    } finally {
+      this.isBuilding = false;
+    }
   }
 }
 

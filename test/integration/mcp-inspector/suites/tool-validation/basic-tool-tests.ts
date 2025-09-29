@@ -3,7 +3,7 @@
  * MCP Inspector Testing Infrastructure
  */
 
-import { TestCase, MCPTestRunner } from '../../services/test-runner.js';
+import { TestCase, MCPTestRunner } from "../../infrastructure/test-runner".js';
 
 export const createBasicToolTests = (testRunner: MCPTestRunner): TestCase[] => {
   const client = testRunner.getClient();

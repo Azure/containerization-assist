@@ -1,7 +1,7 @@
 // Mock implementations for independent development
 // These will be replaced with real implementations
 
-import { Result, Success } from '../../src/core/types.js';
+import { Result, Success } from "../../src/types"
 import type { Logger } from 'pino';
 import type {
   IntelligentTool,

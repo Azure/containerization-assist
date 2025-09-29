@@ -145,7 +145,6 @@ Categories:
   - sampling-validation Sampling algorithm tests
   - resource-management Resource system tests
   - load-testing        Concurrent operation tests
-  - integration-flows   (Removed - using intelligent tool routing)
   - orchestrator        Orchestrator event and phase tests
   - gates               Phase gate validation tests
   - remediation         Remediation loop and healing tests

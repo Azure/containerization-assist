@@ -113,11 +113,21 @@
     "id": "java-maven-wrapper",
     "category": "dockerfile",
     "pattern": "mvn |maven",
-    "recommendation": "Use Maven wrapper (mvnw) for reproducible builds and offline dependency caching",
-    "example": "# Install tar if needed (for Azure Linux)\nRUN yum install -y tar || apt-get update && apt-get install -y tar || apk add tar\n\n# Copy Maven wrapper files\nCOPY mvnw pom.xml ./\nCOPY .mvn .mvn\n\n# Download dependencies at container build time for better caching\nRUN chmod +x mvnw && ./mvnw dependency:go-offline -B\n\n# Copy source and build\nCOPY src ./src\nRUN ./mvnw clean package -DskipTests -B",
+    "recommendation": "Use Maven wrapper (mvnw) when available, otherwise use standard Maven commands",
+    "example": "# Install tar if needed (for Azure Linux)\nRUN yum install -y tar || apt-get update && apt-get install -y tar || apk add tar\n\n# If Maven wrapper exists: copy wrapper files first\n# COPY mvnw pom.xml ./\n# COPY .mvn .mvn\n# RUN chmod +x mvnw && ./mvnw dependency:go-offline -B\n\n# If no wrapper: copy pom.xml and use standard Maven\nCOPY pom.xml ./\nRUN mvn dependency:go-offline -B\n\n# Copy source and build (adjust command based on wrapper availability)\nCOPY src ./src\nRUN mvn clean package -DskipTests -B",
     "severity": "high",
     "tags": ["maven", "wrapper", "reproducible", "caching", "offline"],
-    "description": "Maven wrapper ensures consistent build tool version and offline mode improves build reliability"
+    "description": "Maven wrapper ensures consistent build tool version when available. Fall back to standard Maven for projects without wrapper."
+  },
+  {
+    "id": "java-maven-no-wrapper",
+    "category": "dockerfile",
+    "pattern": "COPY mvnw|\\.mvn",
+    "recommendation": "Only copy Maven wrapper files if they exist in the project",
+    "example": "# Check if Maven wrapper files exist before using COPY:\n# - mvnw file must exist for: COPY mvnw ./\n# - .mvn directory must exist for: COPY .mvn .mvn\n\n# If Maven wrapper exists:\nCOPY mvnw pom.xml ./\nCOPY .mvn .mvn\nRUN chmod +x mvnw && ./mvnw dependency:go-offline -B\nCOPY src ./src\nRUN ./mvnw clean package -DskipTests -B\n\n# If no wrapper exists, use standard Maven:\nCOPY pom.xml ./\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests -B",
+    "severity": "critical",
+    "tags": ["maven", "wrapper", "validation", "file-existence", "copy-validation"],
+    "description": "Dockerfile COPY commands will fail if Maven wrapper files don't exist. Always validate file existence before copying. Remove COPY commands for non-existent files."
   },
   {
     "id": "java-distroless-base",

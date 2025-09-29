@@ -7,14 +7,11 @@ import { buildMessages, buildPromptEnvelope, estimateMessageSize, validateMessag
 import type { BuildPromptParams, AIMessages, OutputContract } from '@/types';
 import { TOPICS } from '@/types/topics';
 import * as knowledgeMatcher from '@/knowledge/matcher';
-import * as policyPrompt from '@/config/policy-prompt';
 
 // Mock dependencies
 jest.mock('@/knowledge/matcher');
-jest.mock('@/config/policy-prompt');
 
 const mockedKnowledgeMatcher = jest.mocked(knowledgeMatcher);
-const mockedPolicyPrompt = jest.mocked(policyPrompt);
 
 describe('Prompt Engine', () => {
   beforeEach(() => {
@@ -22,7 +19,6 @@ describe('Prompt Engine', () => {
 
     // Default mock implementations
     mockedKnowledgeMatcher.getKnowledgeSnippets.mockResolvedValue([]);
-    mockedPolicyPrompt.buildPolicyConstraints.mockReturnValue([]);
   });
 
   afterEach(() => {
@@ -37,13 +33,7 @@ describe('Prompt Engine', () => {
       environment: 'production',
     };
 
-    it('should build messages with all three roles when policies and knowledge exist', async () => {
-      // Mock policy constraints
-      mockedPolicyPrompt.buildPolicyConstraints.mockReturnValue([
-        'Use only approved base images',
-        'Include security scanning',
-      ]);
-
+    it('should build messages with developer and user roles when contract and knowledge exist', async () => {
       // Mock knowledge snippets
       mockedKnowledgeMatcher.getKnowledgeSnippets.mockResolvedValue([
         {
@@ -71,23 +61,16 @@ describe('Prompt Engine', () => {
 
       const result = await buildMessages(params);
 
-      expect(result.messages).toHaveLength(3);
-
-      // Check system message
-      const systemMessage = result.messages[0];
-      expect(systemMessage.role).toBe('system');
-      expect(systemMessage.content[0].text).toContain('You must follow these organizational policies');
-      expect(systemMessage.content[0].text).toContain('Use only approved base images');
-      expect(systemMessage.content[0].text).toContain('Include security scanning');
+      expect(result.messages).toHaveLength(2);
 
       // Check developer message
-      const developerMessage = result.messages[1];
+      const developerMessage = result.messages[0];
       expect(developerMessage.role).toBe('developer');
       expect(developerMessage.content[0].text).toContain('Output strictly as JSON matching schema "dockerfile_v1"');
       expect(developerMessage.content[0].text).toContain('Generate optimized Dockerfile');
 
       // Check user message
-      const userMessage = result.messages[2];
+      const userMessage = result.messages[1];
       expect(userMessage.role).toBe('user');
       expect(userMessage.content[0].text).toContain('Generate a Dockerfile for a Node.js application');
       expect(userMessage.content[0].text).toContain('Relevant knowledge:');
@@ -95,9 +78,7 @@ describe('Prompt Engine', () => {
       expect(userMessage.content[0].text).toContain('[security] Pin package versions');
     });
 
-    it('should omit system message when no policies exist', async () => {
-      mockedPolicyPrompt.buildPolicyConstraints.mockReturnValue([]);
-
+    it('should build only user message when no contract exists', async () => {
       const result = await buildMessages(baseParams);
 
       expect(result.messages).toHaveLength(1);
@@ -137,17 +118,6 @@ describe('Prompt Engine', () => {
       expect(result.messages[0].content[0].text).not.toContain('Relevant knowledge:');
     });
 
-    it('should handle policy loading failure gracefully', async () => {
-      mockedPolicyPrompt.buildPolicyConstraints.mockImplementation(() => {
-        throw new Error('Policy load failed');
-      });
-
-      const result = await buildMessages(baseParams);
-
-      // Should still build messages without policies
-      expect(result.messages).toHaveLength(1);
-      expect(result.messages[0].role).toBe('user');
-    });
 
     it('should force roles when options specify', async () => {
       const result = await buildMessages(baseParams, {
@@ -237,11 +207,6 @@ describe('Prompt Engine', () => {
     };
 
     it('should build envelope with metadata', async () => {
-      mockedPolicyPrompt.buildPolicyConstraints.mockReturnValue([
-        'Policy 1',
-        'Policy 2',
-      ]);
-
       mockedKnowledgeMatcher.getKnowledgeSnippets.mockResolvedValue([
         { id: '1', text: 'Knowledge 1', weight: 10 },
         { id: '2', text: 'Knowledge 2', weight: 5 },
@@ -253,14 +218,13 @@ describe('Prompt Engine', () => {
       if (result.ok) {
         const envelope = result.value;
 
-        expect(envelope.system).toContain('You must follow these organizational policies');
+        expect(envelope.system).toBeUndefined();
         expect(envelope.user).toContain('Test prompt');
         expect(envelope.metadata).toEqual({
           tool: 'test-tool',
           environment: 'development',
           topic: TOPICS.DOCKERFILE_GENERATION,
           knowledgeCount: 2,
-          policyCount: 2,
         });
       }
     });

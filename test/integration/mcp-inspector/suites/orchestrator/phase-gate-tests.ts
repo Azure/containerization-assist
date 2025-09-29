@@ -4,7 +4,7 @@
  * Tests for validating phase gate enforcement and quality checks
  */
 
-import type { TestCase, MCPTestRunner, TestResult } from '../../services/test-runner.js';
+import type { TestCase, MCPTestRunner, TestInfrastructureResult as TestResult } from "../../infrastructure/test-runner".js';
 
 export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
   const client = testRunner.getClient();
@@ -16,7 +16,7 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
       description: 'Verify analysis phase gate blocks incomplete analysis',
       tags: ['gates', 'analysis', 'validation'],
       timeout: 30000,
-      execute: async (): Promise<TestResult> => {
+      execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
         const sessionId = `gate-test-${Date.now()}`;
         
@@ -58,7 +58,7 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
       description: 'Verify scan phase gate blocks high-risk images',
       tags: ['gates', 'security', 'scan'],
       timeout: 60000,
-      execute: async (): Promise<TestResult> => {
+      execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
         const sessionId = `scan-gate-${Date.now()}`;
         
@@ -135,7 +135,7 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
       description: 'Verify build phase gate detects unreasonably large images',
       tags: ['gates', 'build', 'size'],
       timeout: 60000,
-      execute: async (): Promise<TestResult> => {
+      execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
         const sessionId = `size-gate-${Date.now()}`;
         
@@ -185,7 +185,7 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
       description: 'Verify deployment phase gate checks service health',
       tags: ['gates', 'deployment', 'health'],
       timeout: 90000,
-      execute: async (): Promise<TestResult> => {
+      execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
         const sessionId = `health-gate-${Date.now()}`;
         
@@ -237,7 +237,7 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
       description: 'Verify gates provide actionable suggestions on failure',
       tags: ['gates', 'suggestions', 'usability'],
       timeout: 30000,
-      execute: async (): Promise<TestResult> => {
+      execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
         const sessionId = `suggestion-gate-${Date.now()}`;
         
@@ -277,7 +277,7 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
       description: 'Verify gates track metrics for monitoring',
       tags: ['gates', 'metrics', 'monitoring'],
       timeout: 30000,
-      execute: async (): Promise<TestResult> => {
+      execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
         const sessionId = `metrics-gate-${Date.now()}`;
         

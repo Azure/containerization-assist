@@ -11,7 +11,7 @@
  */
 
 import type { Logger } from 'pino';
-import type { DockerClient } from '../../../src/services/docker/client';
+import type { DockerClient } from '../../../src/infra/docker/client';
 
 /**
  * Configuration for Docker test cleanup
@@ -178,8 +178,7 @@ export class DockerTestCleaner {
   private async performCleanup(): Promise<void> {
     // Clean tracked containers first (they might reference images)
     await this.cleanTrackedContainers();
-    
-    // Clean tracked images - this is sufficient since we track everything we create
+
     await this.cleanTrackedImages();
     
     // Optional: Clean build cache if requested

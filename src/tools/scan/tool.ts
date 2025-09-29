@@ -5,7 +5,6 @@
  * Uses standardized helpers for consistency
  */
 
-import { ensureSession, updateSession } from '@/mcp/tool-session-helpers';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import type { ToolContext } from '@/mcp/context';
 
@@ -13,7 +12,9 @@ import { createSecurityScanner } from '@/lib/scanner';
 import { Success, Failure, type Result } from '@/types';
 import { getKnowledgeForCategory } from '@/knowledge/index';
 import type { KnowledgeMatch } from '@/knowledge/types';
-import { type ScanImageParams, scanImageSchema } from './schema';
+import { enhanceValidationWithAI, ValidationSeverity, type ValidationResult } from '@/validation/ai-enhancement';
+import type { Tool } from '@/types/tool';
+import { scanImageSchema, type ScanImageParams } from './schema';
 
 interface DockerScanResult {
   vulnerabilities?: Array<{
@@ -57,6 +58,22 @@ export interface ScanImageResult {
   };
   scanTime: string;
   passed: boolean;
+  workflowHints?: {
+    nextStep: string;
+    message: string;
+  };
+  aiSuggestions?: string[];
+  aiAnalysis?: {
+    assessment: string;
+    riskLevel: 'low' | 'medium' | 'high' | 'critical';
+    priorities: Array<{
+      area: string;
+      severity: string;
+      description: string;
+      impact: string;
+    }>;
+    confidence: number;
+  };
 }
 
 /**
@@ -85,13 +102,11 @@ async function scanImageImpl(
       'Starting image security scan',
     );
 
-    // Ensure session exists and get typed slice operations
-    const sessionResult = await ensureSession(context, params.sessionId);
-    if (!sessionResult.ok) {
-      return Failure(sessionResult.error);
+    // Use session if available
+    const sessionId = params.sessionId || context.session?.id || 'unknown';
+    if (!context.session) {
+      return Failure('Session not available');
     }
-
-    const { id: sessionId, state: session } = sessionResult.value;
 
     logger.info(
       { sessionId, scanner, severityThreshold: finalSeverityThreshold },
@@ -101,7 +116,11 @@ async function scanImageImpl(
     const securityScanner = createSecurityScanner(logger, scanner);
 
     // Check for built image in session results or use provided imageId
-    const buildResult = session?.results?.['build-image'] as { imageId?: string } | undefined;
+    const results = context.session?.get('results');
+    const buildResult =
+      results && typeof results === 'object' && 'build-image' in results
+        ? ((results as any)['build-image'] as { imageId?: string } | undefined)
+        : undefined;
     const imageId = params.imageId || buildResult?.imageId;
 
     if (!imageId) {
@@ -207,6 +226,125 @@ async function scanImageImpl(
       }
     }
 
+    // AI Enhancement Integration
+    let aiSuggestions: string[] | undefined;
+    let aiAnalysis: ScanImageResult['aiAnalysis'];
+
+    if (params.enableAISuggestions !== false && dockerScanResult.vulnerabilities) {
+      try {
+        logger.info('Starting AI-powered vulnerability analysis');
+
+        // Convert scan results to validation results format
+        const validationResults: ValidationResult[] = dockerScanResult.vulnerabilities.map(
+          (vuln) => ({
+            isValid: false,
+            errors: [`${vuln.severity} vulnerability in ${vuln.package}:${vuln.version}`],
+            warnings: vuln.description ? [vuln.description] : [],
+            ...(vuln.id && { ruleId: vuln.id }),
+            confidence: 0.9,
+            metadata: {
+              severity:
+                vuln.severity.toLowerCase() === 'high' || vuln.severity.toLowerCase() === 'critical'
+                  ? ValidationSeverity.ERROR
+                  : vuln.severity.toLowerCase() === 'medium'
+                    ? ValidationSeverity.WARNING
+                    : ValidationSeverity.INFO,
+              location: `${vuln.package}:${vuln.version}`,
+              aiEnhanced: true,
+            },
+          }),
+        );
+
+        // Create a comprehensive content string for AI analysis
+        const analysisContent = `
+Docker Image: ${imageId}
+Scanner: ${scanner}
+Total Vulnerabilities: ${dockerScanResult.summary?.total || 0}
+
+Critical: ${dockerScanResult.summary?.critical || 0}
+High: ${dockerScanResult.summary?.high || 0}
+Medium: ${dockerScanResult.summary?.medium || 0}
+Low: ${dockerScanResult.summary?.low || 0}
+
+Top Vulnerabilities:
+${dockerScanResult.vulnerabilities
+  .slice(0, 10)
+  .map(
+    (v) =>
+      `- ${v.package}:${v.version} (${v.severity}): ${v.description || 'No description'}${
+        v.fixedVersion ? ` [Fix: upgrade to ${v.fixedVersion}]` : ''
+      }`,
+  )
+  .join('\n')}
+        `.trim();
+
+        const enhancementOptions = params.aiEnhancementOptions || {
+          mode: 'suggestions',
+          focus: 'security',
+          confidence: 0.8,
+          maxSuggestions: 5,
+          includeExamples: true,
+        };
+
+        const enhancementResult = await enhanceValidationWithAI(
+          analysisContent,
+          validationResults,
+          context,
+          enhancementOptions,
+        );
+
+        if (enhancementResult.ok) {
+          aiSuggestions = enhancementResult.value.suggestions;
+          aiAnalysis = {
+            assessment: enhancementResult.value.analysis.assessment,
+            riskLevel: enhancementResult.value.analysis.riskLevel,
+            priorities: enhancementResult.value.analysis.priorities,
+            confidence: enhancementResult.value.confidence,
+          };
+
+          logger.info(
+            {
+              suggestionsCount: aiSuggestions.length,
+              riskLevel: aiAnalysis.riskLevel,
+              confidence: aiAnalysis.confidence,
+            },
+            'AI enhancement completed successfully',
+          );
+        } else {
+          logger.warn(
+            { error: enhancementResult.error },
+            'AI enhancement failed, continuing without AI suggestions',
+          );
+        }
+      } catch (error) {
+        logger.debug({ error }, 'Failed to get AI enhancement, continuing without AI suggestions');
+      }
+    }
+
+    // Determine context-dependent workflow hints
+    let workflowHints: { nextStep: string; message: string } | undefined;
+
+    if (!passed) {
+      // Security issues found - suggest remediation
+      if (scanResult.criticalCount > 0 || scanResult.highCount > 0) {
+        workflowHints = {
+          nextStep: 'fix-dockerfile',
+          message: `Security scan found ${scanResult.criticalCount} critical and ${scanResult.highCount} high severity vulnerabilities. Use "fix-dockerfile" to address security issues in your base images and dependencies.`,
+        };
+      } else {
+        workflowHints = {
+          nextStep: 'generate-dockerfile',
+          message: `Security scan found ${scanResult.totalVulnerabilities} vulnerabilities. Consider regenerating your Dockerfile with more secure base images using "generate-dockerfile".`,
+        };
+      }
+    } else {
+      // Scan passed - suggest next deployment steps
+      workflowHints = {
+        nextStep: 'push-image',
+        message: `Security scan passed! Your image has no vulnerabilities above the ${finalSeverityThreshold} threshold. Use "push-image" with sessionId ${sessionId} to push to a registry, or proceed with deployment.`,
+      };
+    }
+
     // Prepare the result
     const result: ScanImageResult = {
       success: true,
@@ -222,21 +360,19 @@ async function scanImageImpl(
       },
       scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
       passed,
+      workflowHints,
+      ...(aiSuggestions && aiSuggestions.length > 0 && { aiSuggestions }),
+      ...(aiAnalysis && { aiAnalysis }),
     };
 
     // Store scan result in session
-    const currentSteps = sessionResult.ok ? sessionResult.value.state.completed_steps || [] : [];
-    await updateSession(
-      sessionId,
-      {
-        results: {
-          scan: result,
-        },
-        completed_steps: [...currentSteps, 'scan'],
-        current_step: 'scan',
-      },
-      context,
-    );
+    if (context.session) {
+      context.session.set('results', {
+        scan: result,
+      });
+      context.session.pushStep('scan');
+      context.session.set('current_step', 'scan');
+    }
 
     timer.end({
       vulnerabilities: scanResult.totalVulnerabilities,
@@ -275,13 +411,17 @@ export type ScanImageConfig = ScanImageParams;
 export const scanImage = scanImageImpl;
 
 // New Tool interface export
-import type { Tool } from '@/types/tool';
-
 const tool: Tool<typeof scanImageSchema, ScanImageResult> = {
   name: 'scan',
   description: 'Scan Docker images for security vulnerabilities',
   version: '2.0.0',
   schema: scanImageSchema,
+  metadata: {
+    aiDriven: true,
+    knowledgeEnhanced: true,
+    samplingStrategy: 'rerank',
+    enhancementCapabilities: ['vulnerability-analysis', 'security-suggestions', 'risk-assessment'],
+  },
   run: scanImageImpl,
 };
 

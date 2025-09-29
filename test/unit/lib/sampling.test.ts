@@ -4,6 +4,9 @@ import {
   sample,
   scoreDockerfile,
   scoreKubernetesManifest,
+  scoreHelmChart,
+  scoreACAManifest,
+  scoreBaseImageRecommendation,
   scoreContent,
   type SamplingCandidate,
 } from '@/lib/sampling';
@@ -226,6 +229,266 @@ spec:
         expect(scores.security).toBeGreaterThan(50);
         expect(scores.reliability).toBeGreaterThan(50);
         expect(scores.observability).toBeGreaterThan(0);
+      });
+    });
+
+    describe('scoreHelmChart', () => {
+      it('should score Helm chart content', () => {
+        const helmChart = `
+apiVersion: v2
+name: myapp
+version: 1.0.0
+description: A Helm chart for myapp
+type: application
+appVersion: 1.0.0
+
+# Default values for myapp
+replicaCount: 3
+image:
+  repository: myapp
+  tag: latest
+service:
+  type: ClusterIP
+  port: 8080
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+# templates content with templating
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+  - host: {{ .host | quote }}
+{{- end }}
+{{- end }}
+securityContext:
+  runAsNonRoot: true
+podSecurityContext: {}
+livenessProbe:
+  httpGet:
+    path: /health
+readinessProbe:
+  httpGet:
+    path: /ready
+nodeSelector: {}
+serviceAccount:
+  create: true
+`;
+        const scores = scoreHelmChart(helmChart);
+
+        expect(scores.chartStructure).toBeGreaterThan(80); // 90: all structure elements present
+        expect(scores.templating).toBeGreaterThan(40); // 65: if, range, end blocks
+        expect(scores.values).toBeGreaterThan(80); // 100: all values elements
+        expect(scores.bestPractices).toBeGreaterThan(80); // 90: security, probes, scheduling
+      });
+
+      it('should give higher scores for well-structured charts', () => {
+        const optimizedChart = `
+apiVersion: v2
+name: myapp
+version: 1.0.0
+description: A production-ready Helm chart
+type: application
+appVersion: 1.0.0
+
+# -- Default values for myapp
+replicaCount: 3
+image:
+  tag: 1.0.0
+service:
+  port: 8080
+resources: {}
+
+{{- include "myapp.labels" . | nindent 4 }}
+{{- with .Values.nodeSelector }}
+{{- toYaml . | nindent 8 }}
+{{- end }}
+securityContext: {}
+podSecurityContext: {}
+livenessProbe: {}
+readinessProbe: {}
+serviceAccount: {}
+`;
+        const scores = scoreHelmChart(optimizedChart);
+
+        expect(scores.chartStructure).toBeGreaterThan(80);
+        expect(scores.templating).toBeGreaterThan(40);
+        expect(scores.values).toBeGreaterThan(60);
+        expect(scores.bestPractices).toBeGreaterThan(30);
+      });
+    });
+
+    describe('scoreACAManifest', () => {
+      it('should score Azure Container Apps manifest in JSON format', () => {
+        const acaManifest = `
+{
+  "type": "Microsoft.App/containerApps",
+  "apiVersion": "2022-03-01",
+  "name": "myapp",
+  "properties": {
+    "configuration": {
+      "ingress": {
+        "external": true,
+        "targetPort": 8080,
+        "allowInsecure": false,
+        "transport": "http2"
+      },
+      "secrets": [
+        {
+          "name": "connection-string",
+          "value": "encrypted-value"
+        }
+      ],
+      "registries": [
+        {
+          "server": "myregistry.azurecr.io",
+          "identity": "system"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "NODE_ENV",
+          "value": "production"
+        }
+      ]
+    },
+    "template": {
+      "containers": [
+        {
+          "name": "myapp",
+          "image": "myapp:latest",
+          "resources": {
+            "cpu": "0.5",
+            "memory": "1Gi"
+          }
+        }
+      ],
+      "scale": {
+        "minReplicas": 1,
+        "maxReplicas": 10,
+        "rules": [
+          {
+            "name": "http-requests",
+            "http": {
+              "metadata": {
+                "concurrentRequests": "100"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "managedIdentity": {
+      "type": "SystemAssigned"
+    },
+    "activeRevisionsMode": "single"
+  }
+}
+`;
+        const scores = scoreACAManifest(acaManifest);
+
+        expect(scores.structure).toBeGreaterThan(25); // 30: only Microsoft.App/containerApps matches
+        expect(scores.configuration).toBe(0); // 0: JSON format doesn't match YAML patterns
+        expect(scores.scaling).toBe(0); // 0: JSON format doesn't match YAML patterns
+        expect(scores.security).toBeGreaterThan(10); // 15: only allowInsecure not true matches
+      });
+
+      it('should score ACA manifest in YAML format', () => {
+        const acaYaml = `
+type: Microsoft.App/containerApps
+apiVersion: 2022-03-01
+name: myapp
+properties:
+  configuration:
+    ingress:
+      external: true
+      targetPort: 8080
+      allowInsecure: false
+      transport: http2
+    secrets:
+      - name: connection-string
+        value: encrypted-value
+    registries:
+      - server: myregistry.azurecr.io
+        identity: system
+    environmentVariables:
+      - name: NODE_ENV
+        value: production
+  template:
+    containers:
+      - name: myapp
+        image: myapp:1.0.0
+    scale:
+      minReplicas: 1
+      maxReplicas: 10
+      rules:
+        - name: http-requests
+          http:
+            metadata:
+              concurrentRequests: "100"
+  managedIdentity:
+    type: SystemAssigned
+  activeRevisionsMode: single
+`;
+        const scores = scoreACAManifest(acaYaml);
+
+        expect(scores.structure).toBeGreaterThan(75); // 100: all structure elements match
+        expect(scores.configuration).toBeGreaterThan(75); // 100: ingress, registries, secrets, env vars
+        expect(scores.scaling).toBeGreaterThan(75); // 100: scale, min/max, rules, http
+        expect(scores.security).toBeGreaterThan(65); // 90: allowInsecure false, managedId, single mode, http2
+      });
+    });
+
+    describe('scoreBaseImageRecommendation', () => {
+      it('should score base image recommendations', () => {
+        const recommendation = `
+Recommended base images for Node.js application:
+
+1. Minimal image (production): node:18-alpine
+   - Size: ~45MB compressed
+   - Security: Alpine Linux with minimal attack surface
+   - No known vulnerabilities in scan
+   - Official image maintained by Docker
+   - LTS support and stable release
+   - Updated and supported by community
+
+2. Standard image (balanced): node:18-slim
+   - Size: ~120MB compressed
+   - Security: Debian slim variant, regularly updated
+   - Official image with LTS support
+   - Includes common utilities
+   - Maintained and optimized builds
+
+3. Security-hardened: gcr.io/distroless/nodejs18-debian11
+   - Size: ~35MB compressed
+   - Security: Distroless image, no shell or package manager
+   - Vulnerability scan: clean
+   - Minimal attack surface, production optimized
+   - Official and signed images with LTS support
+`;
+        const scores = scoreBaseImageRecommendation(recommendation);
+
+        expect(scores.specificity).toBeGreaterThan(50); // 55: alpine/slim/distroless, no generic
+        expect(scores.security).toBeGreaterThan(70); // 85: distroless, alpine, vuln scan
+        expect(scores.optimization).toBeGreaterThan(35); // 40: alpine/slim/distroless, compressed
+        expect(scores.maintenance).toBeGreaterThan(80); // 100: LTS, stable, maintained, updated, supported
+      });
+
+      it('should penalize generic or deprecated tags', () => {
+        const badRecommendation = `
+Use these generic images:
+- ubuntu:latest (large, generic)
+- centos:latest (deprecated)
+- node:latest (unstable tag)
+`;
+        const scores = scoreBaseImageRecommendation(badRecommendation);
+
+        expect(scores.specificity).toBeLessThan(30);
+        expect(scores.security).toBeLessThan(40);
+        expect(scores.maintenance).toBeLessThan(50);
       });
     });
 

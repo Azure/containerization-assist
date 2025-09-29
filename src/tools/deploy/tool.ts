@@ -23,14 +23,16 @@ import * as yaml from 'js-yaml';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import type { Logger } from '@/lib/logger';
 import { extractErrorMessage } from '@/lib/error-utils';
-import { ensureSession, getSession, updateSession } from '@/mcp/tool-session-helpers';
 import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient } from '@/lib/kubernetes';
 import type { K8sManifest } from '@/infra/kubernetes/client';
 
-import { Success, Failure, type Result } from '@/types';
+import { Success, Failure, type Result, TOPICS } from '@/types';
 import { DEFAULT_TIMEOUTS } from '@/config/defaults';
-import { type DeployApplicationParams, deployApplicationSchema } from './schema';
+import { deployApplicationSchema, type DeployApplicationParams } from './schema';
+import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
+import { buildMessages } from '@/ai/prompt-engine';
+import { toMCPMessages, type MCPMessage } from '@/mcp/ai/message-converter';
 
 // Type definitions for Kubernetes manifests
 interface KubernetesManifest {
@@ -101,6 +103,14 @@ const MANIFEST_ORDER = [
   'NetworkPolicy',
 ] as const;
 
+// Additional interface for AI deployment analysis
+export interface DeploymentAnalysis {
+  recommendations: string[];
+  optimizations: string[];
+  troubleshooting: string[];
+  confidence: number;
+}
+
 export interface DeployApplicationResult {
   success: boolean;
   sessionId: string;
@@ -114,6 +124,7 @@ export interface DeployApplicationResult {
   }>;
   ready: boolean;
   replicas: number;
+  deploymentAnalysis?: DeploymentAnalysis;
   status?: {
     readyReplicas: number;
     totalReplicas: number;
@@ -131,6 +142,198 @@ export interface DeployApplicationResult {
 }
 
 // Define the result schema for type safety
+
+/**
+ * Score deployment analysis based on content quality and relevance
+ */
+function scoreDeploymentAnalysis(text: string): number {
+  let score = 0;
+
+  // Basic content quality (30 points)
+  if (text.length > 150) score += 10;
+  if (text.includes('\n')) score += 10;
+  if (!text.toLowerCase().includes('error')) score += 10;
+
+  // Deployment analysis indicators (40 points)
+  if (/deployment|pod|service|ingress/i.test(text)) score += 15;
+  if (/troubleshoot|debug|monitor|health/i.test(text)) score += 15;
+  if (/optimize|scale|resource|performance/i.test(text)) score += 10;
+
+  // Structure and actionability (30 points)
+  if (/\d+\.|-|\*/.test(text)) score += 10; // Has list structure
+  if (/check|verify|monitor|improve/i.test(text)) score += 10;
+  if (text.split('\n').length >= 4) score += 10; // Multi-line content
+
+  return Math.min(score, 100);
+}
+
+/**
+ * Build deployment analysis prompt for AI enhancement
+ */
+async function buildDeploymentAnalysisPrompt(
+  deploymentResult: DeployApplicationResult,
+  manifests: KubernetesManifest[],
+  deployedResources: Array<{ kind: string; name: string; namespace: string }>,
+  failedResources: Array<{ kind: string; name: string; error: string }>,
+): Promise<{ messages: MCPMessage[]; maxTokens: number }> {
+  const basePrompt = `You are a Kubernetes deployment expert. Analyze deployment results and provide specific recommendations.
+
+Focus on:
+1. Deployment health and readiness
+2. Resource optimization and scaling
+3. Troubleshooting common deployment issues
+4. Security and best practices
+5. Monitoring and observability
+
+Provide concrete, actionable recommendations.
+
+Analyze this Kubernetes deployment and provide optimization recommendations:
+
+**Deployment Summary:**
+- Name: ${deploymentResult.deploymentName}
+- Namespace: ${deploymentResult.namespace}
+- Ready: ${deploymentResult.ready}
+- Replicas: ${deploymentResult.replicas} (${deploymentResult.status?.readyReplicas}/${deploymentResult.status?.totalReplicas})
+- Endpoints: ${deploymentResult.endpoints.length}
+
+**Deployed Resources:**
+${deployedResources.map((r) => `- ${r.kind}: ${r.name}`).join('\n')}
+
+**Failed Resources:**
+${failedResources.length > 0 ? failedResources.map((r) => `- ${r.kind}: ${r.name} (${r.error})`).join('\n') : 'None'}
+
+**Manifest Types:**
+${manifests.map((m) => `- ${m.kind}: ${m.metadata?.name}`).join('\n')}
+
+Please provide:
+1. **Health Recommendations:** Ways to improve deployment health and reliability
+2. **Optimizations:** Performance and resource optimization suggestions
+3. **Troubleshooting:** Common issues and debugging steps
+4. **Best Practices:** Kubernetes deployment best practices to consider
+
+Format your response as clear, actionable recommendations.`;
+
+  const messages = await buildMessages({
+    basePrompt,
+    topic: TOPICS.GENERATE_K8S_MANIFESTS,
+    tool: 'deploy',
+    environment: 'kubernetes',
+  });
+
+  return { messages: toMCPMessages(messages).messages, maxTokens: 2048 };
+}
+
+/**
+ * Generate AI-powered deployment analysis
+ */
+async function generateDeploymentAnalysis(
+  deploymentResult: DeployApplicationResult,
+  manifests: KubernetesManifest[],
+  deployedResources: Array<{ kind: string; name: string; namespace: string }>,
+  failedResources: Array<{ kind: string; name: string; error: string }>,
+  ctx: ToolContext,
+): Promise<Result<DeploymentAnalysis>> {
+  try {
+    const analysisResult = await sampleWithRerank(
+      ctx,
+      async () =>
+        buildDeploymentAnalysisPrompt(
+          deploymentResult,
+          manifests,
+          deployedResources,
+          failedResources,
+        ),
+      scoreDeploymentAnalysis,
+      { count: 2, stopAt: 85 },
+    );
+
+    if (!analysisResult.ok) {
+      return Failure(`Failed to generate deployment analysis: ${analysisResult.error}`);
+    }
+
+    const text = analysisResult.value.text;
+
+    // Parse the AI response to extract structured analysis
+    const recommendations: string[] = [];
+    const optimizations: string[] = [];
+    const troubleshooting: string[] = [];
+
+    const lines = text
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    let currentSection = '';
+    for (const line of lines) {
+      if (
+        line.includes('Health Recommendations') ||
+        line.includes('health') ||
+        line.includes('Health')
+      ) {
+        currentSection = 'health';
+        continue;
+      }
+      if (
+        line.includes('Optimizations') ||
+        line.includes('optimization') ||
+        line.includes('Optimization')
+      ) {
+        currentSection = 'optimization';
+        continue;
+      }
+      if (
+        line.includes('Troubleshooting') ||
+        line.includes('troubleshoot') ||
+        line.includes('Troubleshoot')
+      ) {
+        currentSection = 'troubleshooting';
+        continue;
+      }
+      if (line.includes('Best Practices') || line.includes('practices')) {
+        currentSection = 'practices';
+        continue;
+      }
+
+      if (line.startsWith('-') || line.startsWith('*') || line.match(/^\d+\./)) {
+        const cleanLine = line.replace(/^[-*\d.]\s*/, '');
+        if (cleanLine.length > 10) {
+          if (currentSection === 'health') {
+            recommendations.push(cleanLine);
+          } else if (currentSection === 'optimization') {
+            optimizations.push(cleanLine);
+          } else if (currentSection === 'troubleshooting') {
+            troubleshooting.push(cleanLine);
+          } else if (currentSection === 'practices') {
+            recommendations.push(`Best Practice: ${cleanLine}`);
+          } else {
+            recommendations.push(cleanLine);
+          }
+        }
+      }
+    }
+
+    // Add general recommendations if none found
+    if (recommendations.length === 0) {
+      recommendations.push('Monitor pod status and resource usage');
+      recommendations.push('Configure health checks for better reliability');
+    }
+
+    if (troubleshooting.length === 0) {
+      troubleshooting.push('Check pod logs if deployment is not ready');
+      troubleshooting.push('Verify resource limits and requests');
+      troubleshooting.push('Check service selectors match pod labels');
+    }
+
+    return Success({
+      recommendations,
+      optimizations,
+      troubleshooting,
+      confidence: analysisResult.value.winner.score,
+    });
+  } catch (error) {
+    return Failure(`Failed to generate deployment analysis: ${extractErrorMessage(error)}`);
+  }
+}
 
 /**
  * Parse YAML/JSON manifest content with validation
@@ -271,13 +474,11 @@ async function deployApplicationImpl(
     const timeout = DEPLOYMENT_CONFIG.WAIT_TIMEOUT_SECONDS;
     logger.info({ namespace, cluster, dryRun, environment }, 'Starting application deployment');
 
-    // Ensure session exists and get typed slice operations
-    const sessionResult = await ensureSession(context, params.sessionId);
-    if (!sessionResult.ok) {
-      return Failure(sessionResult.error);
+    // Use session facade directly
+    const sessionId = params.sessionId || context.session?.id;
+    if (!sessionId) {
+      return Failure('Session ID is required for deployment operations');
     }
-
-    const { id: sessionId } = sessionResult.value;
 
     logger.info(
       { sessionId, namespace, environment },
@@ -288,14 +489,16 @@ async function deployApplicationImpl(
     // Get K8s manifests from session results
     let manifestContents: string | undefined;
     try {
-      const sessionResult = await getSession(sessionId, context);
-      if (sessionResult.ok && sessionResult.value.state.results?.['generate-k8s-manifests']) {
-        const k8sResult = sessionResult.value.state.results['generate-k8s-manifests'] as {
-          manifests?: string;
-        };
-        if (k8sResult.manifests) {
-          manifestContents = k8sResult.manifests;
-          logger.info({ sessionId }, 'Retrieved K8s manifests from session results');
+      if (context.session) {
+        const results = context.session.get('results');
+        if (results && typeof results === 'object' && 'generate-k8s-manifests' in results) {
+          const k8sResult = (results as any)['generate-k8s-manifests'] as {
+            manifests?: string;
+          };
+          if (k8sResult.manifests) {
+            manifestContents = k8sResult.manifests;
+            logger.info({ sessionId }, 'Retrieved K8s manifests from session results');
+          }
         }
       }
     } catch (error) {
@@ -507,6 +710,53 @@ async function deployApplicationImpl(
       });
     }
 
+    // Generate AI-powered deployment analysis
+    let deploymentAnalysis: DeploymentAnalysis | undefined;
+    try {
+      const analysisResult = await generateDeploymentAnalysis(
+        {
+          success: ready,
+          sessionId,
+          namespace,
+          deploymentName,
+          serviceName,
+          endpoints,
+          ready,
+          replicas: totalReplicas,
+          status: {
+            readyReplicas,
+            totalReplicas,
+            conditions: [
+              {
+                type: 'Available',
+                status: ready ? 'True' : 'False',
+                message: ready ? 'Deployment is available' : 'Deployment is pending',
+              },
+            ],
+          },
+        },
+        orderedManifests,
+        deployedResources,
+        failedResources,
+        context,
+      );
+
+      if (analysisResult.ok) {
+        deploymentAnalysis = analysisResult.value;
+        logger.info(
+          {
+            recommendations: deploymentAnalysis.recommendations.length,
+            confidence: deploymentAnalysis.confidence,
+          },
+          'Generated AI deployment analysis',
+        );
+      } else {
+        logger.warn({ error: analysisResult.error }, 'Failed to generate deployment analysis');
+      }
+    } catch (error) {
+      logger.warn({ error: extractErrorMessage(error) }, 'Error generating deployment analysis');
+    }
+
     // Prepare the result
     const result: DeployApplicationResult = {
       success: ready, // Success depends on deployment readiness
@@ -517,6 +767,7 @@ async function deployApplicationImpl(
       endpoints,
       ready,
       replicas: totalReplicas,
+      ...(deploymentAnalysis && { deploymentAnalysis }),
       status: {
         readyReplicas,
         totalReplicas,
@@ -530,23 +781,19 @@ async function deployApplicationImpl(
       },
       workflowHints: {
         nextStep: 'verify-deploy',
-        message: `Application deployed successfully. Use "verify-deploy" with sessionId ${sessionId} to check deployment status, or access your application at: ${endpoints.length > 0 ? endpoints[0]?.url || 'the service endpoint' : 'the service endpoint'}.`,
+        message: `Application deployed successfully. Use "verify-deploy" with sessionId ${sessionId} to check deployment status, or access your application at: ${endpoints.length > 0 ? endpoints[0]?.url || 'the service endpoint' : 'the service endpoint'}.${deploymentAnalysis ? ' Review AI deployment analysis for optimization recommendations.' : ''}`,
       },
     };
 
     // Store deployment result in session
-    const currentSteps = sessionResult.ok ? sessionResult.value.state.completed_steps || [] : [];
-    await updateSession(
-      sessionId,
-      {
-        results: {
-          deploy: result,
-        },
-        completed_steps: [...currentSteps, 'deploy'],
-        current_step: 'deploy',
-      },
-      context,
-    );
+    if (context.session) {
+      context.session.set('results', {
+        ...((context.session.get('results') as Record<string, any>) || {}),
+        deploy: result,
+      });
+      context.session.set('current_step', 'deploy');
+      context.session.pushStep('deploy');
+    }
     timer.end({ deploymentName, ready, sessionId });
 
     if (ready) {
@@ -582,6 +829,16 @@ const tool: Tool<typeof deployApplicationSchema, DeployApplicationResult> = {
   description: 'Deploy applications to Kubernetes clusters',
   version: '2.0.0',
   schema: deployApplicationSchema,
+  metadata: {
+    aiDriven: true,
+    knowledgeEnhanced: true,
+    samplingStrategy: 'rerank',
+    enhancementCapabilities: [
+      'deployment-analysis',
+      'troubleshooting',
+      'optimization-recommendations',
+    ],
+  },
   run: deployApplicationImpl,
 };
 

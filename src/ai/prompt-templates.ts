@@ -1,5 +1,3 @@
-import { Failure, Result, Success } from '@/types';
-
 /**
  * Type-safe AI prompt templates using TypeScript template literals
  * These templates structure prompts for AI generation, not static output
@@ -88,6 +86,14 @@ export interface ParameterSuggestionParams {
   currentParams: Record<string, unknown>;
   missingParams: string[];
   context?: Record<string, unknown>;
+}
+
+export interface KnowledgeEnhancementParams {
+  content: string;
+  context: 'dockerfile' | 'kubernetes' | 'security' | 'optimization';
+  validationIssues?: string[];
+  targetImprovement: string;
+  userQuery?: string;
 }
 
 // ===== PROMPT TEMPLATES =====
@@ -336,6 +342,7 @@ export const promptTemplates = {
     prompt += `- Performance optimization\n`;
     prompt += `- Resource efficiency\n`;
     prompt += `- Production readiness\n`;
+    prompt += `- File existence validation for COPY commands\n`;
 
     if (params.requirements) {
       prompt += `\nAdditional requirements:\n${params.requirements}\n`;
@@ -600,61 +607,70 @@ Error: ${error}
 Repair the JSON to make it valid while preserving the intended structure and data.
 Return only the corrected JSON without explanations.`;
   },
+
+  /**
+   * Knowledge enhancement prompt template
+   */
+  knowledgeEnhancement: (params: KnowledgeEnhancementParams): string => {
+    const contextInstruction = getKnowledgeContextInstruction(params.context);
+    const issuesSection = params.validationIssues
+      ? `
+Known issues to address:
+${params.validationIssues.map((issue) => `- ${issue}`).join('\n')}
+`
+      : '';
+
+    const userQuerySection = params.userQuery
+      ? `
+Specific enhancement goal: ${params.userQuery}
+`
+      : '';
+
+    return `Analyze and enhance the following ${params.context} content:
+
+${params.content}
+${issuesSection}${userQuerySection}
+${contextInstruction}
+
+Target improvement: ${params.targetImprovement}
+
+Provide enhanced content with explanations for each improvement.
+
+Response Format:
+## Enhanced Content
+[Provide the complete enhanced version]
+
+## Knowledge Applied
+[List specific knowledge areas applied]
+
+## Improvements Made
+[Explain what was improved and why]
+
+## Additional Recommendations
+[Provide actionable suggestions for further improvement]`;
+  },
 } as const;
 
 // ===== VALIDATION HELPERS =====
 
 /**
- * Validate required parameters are present
- */
-export function validatePromptParams<T extends Record<string, unknown>>(
-  params: T,
-  required: (keyof T)[],
-): Result<void> {
-  for (const key of required) {
-    if (params[key] === undefined || params[key] === null) {
-      return Failure(`Missing required parameter: ${String(key)}`);
-    }
-  }
-  return Success(undefined);
-}
-
-/**
- * Build a complete AI prompt with context
- */
-export function buildAIPrompt(
-  template: string,
-  context?: {
-    projectType?: string;
-    existingFiles?: string[];
-    constraints?: string[];
-  },
-): string {
-  let fullPrompt = template;
-
-  if (context) {
-    if (context.projectType) {
-      fullPrompt = `Project type: ${context.projectType}\n\n${fullPrompt}`;
-    }
-
-    if (context.existingFiles && context.existingFiles.length > 0) {
-      fullPrompt += `\n\nExisting files in project:\n`;
-      context.existingFiles.forEach((file) => {
-        fullPrompt += `- ${file}\n`;
-      });
-    }
-
-    if (context.constraints && context.constraints.length > 0) {
-      fullPrompt += `\n\nConstraints:\n`;
-      context.constraints.forEach((constraint) => {
-        fullPrompt += `- ${constraint}\n`;
-      });
-    }
-  }
-
-  return fullPrompt;
-}
-
-/**
  * Extract structured data from AI response
  */
+
+/**
+ * Get knowledge enhancement context instructions
+ */
+function getKnowledgeContextInstruction(context: string): string {
+  switch (context) {
+    case 'dockerfile':
+      return `Focus on Docker best practices, security hardening, build optimization, and layer efficiency.`;
+    case 'kubernetes':
+      return `Focus on Kubernetes best practices, resource management, security contexts, and deployment strategies.`;
+    case 'security':
+      return `Focus on security vulnerabilities, access controls, secrets management, and hardening measures.`;
+    case 'optimization':
+      return `Focus on performance optimization, resource efficiency, caching strategies, and cost reduction.`;
+    default:
+      return `Apply comprehensive best practices covering security, performance, and maintainability.`;
+  }
+}

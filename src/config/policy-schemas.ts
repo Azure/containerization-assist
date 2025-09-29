@@ -124,86 +124,24 @@ export interface Policy {
 // Schema Validation
 // ============================================================================
 
-export const RegexMatcherSchema = z.object({
-  kind: z.literal('regex'),
-  pattern: z.string(),
-  flags: z.string().optional(),
-  count_threshold: z.number().optional(),
-});
-
-export const FunctionMatcherSchema = z.object({
-  kind: z.literal('function'),
-  name: z.enum(['hasPattern', 'fileExists', 'largerThan', 'hasVulnerabilities']),
-  args: z.array(z.unknown()),
-});
-
-export const MatcherSchema = z.discriminatedUnion('kind', [
-  RegexMatcherSchema,
-  FunctionMatcherSchema,
-]);
-
-export const PolicyRuleSchema = z.object({
+const PolicyRuleSchema = z.object({
   id: z.string(),
   category: z.enum(['quality', 'security', 'performance', 'compliance']).optional(),
   priority: z.number(),
-  conditions: z.array(MatcherSchema),
+  conditions: z.array(z.unknown()), // Simplified since MatcherSchema was also unused
   actions: z.record(z.unknown()),
   description: z.string().optional(),
 });
 
-export const EnvironmentOverrideSchema = z.object({
+const EnvironmentOverrideSchema = z.object({
   rule_id: z.string(),
   actions: z.record(z.unknown()).optional(),
   priority: z.number().optional(),
   enabled: z.boolean().optional(),
 });
 
-export const EnvironmentDefaultsSchema = z.object({
-  allowedBaseImages: z.array(z.string()).optional(),
-  registries: z
-    .object({
-      allowed: z.array(z.string()).optional(),
-      blocked: z.array(z.string()).optional(),
-    })
-    .optional(),
-  security: z
-    .object({
-      scanners: z
-        .object({
-          required: z.boolean().optional(),
-          tools: z.array(z.string()).optional(),
-        })
-        .optional(),
-      nonRootUser: z.boolean().optional(),
-      minimizeSize: z.boolean().optional(),
-    })
-    .optional(),
-  resources: z
-    .object({
-      limits: z
-        .object({
-          cpu: z.string().optional(),
-          memory: z.string().optional(),
-        })
-        .optional(),
-      requests: z
-        .object({
-          cpu: z.string().optional(),
-          memory: z.string().optional(),
-        })
-        .optional(),
-    })
-    .optional(),
-  naming: z
-    .object({
-      pattern: z.string().optional(),
-      examples: z.array(z.string()).optional(),
-    })
-    .optional(),
-});
-
 // Unified defaults schema that includes both base and environment-specific fields
-export const UnifiedDefaultsSchema = z.object({
+const UnifiedDefaultsSchema = z.object({
   cache_ttl: z.number().optional(),
   enforcement: z.enum(['strict', 'lenient', 'advisory']).optional(),
   // Include all environment-specific fields as optional

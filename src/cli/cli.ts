@@ -15,6 +15,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { autoDetectDockerSocket } from '@/infra/docker/client';
+import { createInspectToolsCommand } from './commands/inspect-tools';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -36,7 +37,7 @@ program
   .name('containerization-assist-mcp')
   .description('MCP server for AI-powered containerization workflows')
   .version(packageJson.version)
-  .argument('[command]', 'command to run (start)', 'start')
+  .argument('[command]', 'command to run (start, inspect-tools)', 'start')
   .option('--config <path>', 'path to configuration file (.env)')
   .option('--log-level <level>', 'logging level: debug, info, warn, error (default: info)', 'info')
   .option('--workspace <path>', 'workspace directory path (default: current directory)', cwd())
@@ -293,10 +294,19 @@ function validateOptions(opts: any): { valid: boolean; errors: string[] } {
 
 async function main(): Promise<void> {
   try {
+    // Handle different commands
+    if (command === 'inspect-tools') {
+      // Parse subcommand for inspect-tools
+      const inspectCmd = createInspectToolsCommand();
+      const subArgs = argv.slice(3); // Skip 'node', script name, and 'inspect-tools'
+      await inspectCmd.parseAsync(['node', 'inspect-tools', ...subArgs], { from: 'node' });
+      return;
+    }
+
     // Handle the 'start' command (default behavior)
     if (command !== 'start') {
       console.error(`❌ Unknown command: ${command}`);
-      console.error('Available commands: start');
+      console.error('Available commands: start, inspect-tools');
       console.error('\nUse --help for usage information');
       exit(1);
     }

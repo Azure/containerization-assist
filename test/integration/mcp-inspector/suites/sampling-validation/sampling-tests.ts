@@ -4,7 +4,7 @@
  * Tests sampling algorithms via MCP tools
  */
 
-import { TestCase, MCPTestRunner } from '../../services/test-runner.js';
+import { TestCase, MCPTestRunner } from "../../infrastructure/test-runner".js';
 
 export const createSamplingValidationTests = (testRunner: MCPTestRunner): TestCase[] => {
   const client = testRunner.getClient();

@@ -8,6 +8,8 @@ import type { Tool } from '@/types/tool';
 import { promptTemplates, type HelmChartPromptParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
+import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
+import { scoreHelmChart } from '@/lib/sampling';
 import { generateHelmChartsSchema } from './schema';
 import type { AIResponse } from '../ai-response-types';
 import type { z } from 'zod';
@@ -45,23 +47,41 @@ async function run(
     knowledgeBudget: 4000, // Character budget for knowledge snippets
   });
 
-  // Execute via AI with structured messages
-  const mcpMessages = toMCPMessages(messages);
-  const response = await ctx.sampling.createMessage({
-    ...mcpMessages, // Spreads the messages array
-    maxTokens: 8192,
-    modelPreferences: {
-      hints: [{ name: 'helm-charts' }],
-    },
-  });
+  // Execute via AI with sampling and reranking
+  const samplingResult = await sampleWithRerank(
+    ctx,
+    async (attemptIndex) => ({
+      ...toMCPMessages(messages),
+      maxTokens: 8192,
+      modelPreferences: {
+        hints: [{ name: 'helm-charts' }],
+        intelligencePriority: 0.85,
+        speedPriority: attemptIndex > 0 ? 0.8 : 0.5,
+        costPriority: 0.3,
+      },
+    }),
+    scoreHelmChart,
+    { count: 3, stopAt: 85 },
+  );
 
-  try {
-    const responseText = response.content[0]?.text || '';
-    return Success({ charts: responseText });
-  } catch (e) {
-    const error = e as Error;
-    return Failure(`AI response parsing failed: ${error.message}`);
+  if (!samplingResult.ok) {
+    return Failure(`Helm chart generation failed: ${samplingResult.error}`);
   }
+
+  const responseText = samplingResult.value.text;
+  if (!responseText) {
+    return Failure('Empty response from AI');
+  }
+
+  ctx.logger.info(
+    {
+      score: samplingResult.value.winner.score,
+      scoreBreakdown: samplingResult.value.winner.scoreBreakdown,
+    },
+    'Helm chart generated with sampling',
+  );
+
+  return Success({ charts: responseText });
 }
 
 const tool: Tool<typeof generateHelmChartsSchema, AIResponse> = {
@@ -70,15 +90,13 @@ const tool: Tool<typeof generateHelmChartsSchema, AIResponse> = {
   category: 'kubernetes',
   version,
   schema: generateHelmChartsSchema,
+  metadata: {
+    aiDriven: true,
+    knowledgeEnhanced: true,
+    samplingStrategy: 'rerank',
+    enhancementCapabilities: ['content-generation', 'helm-templating', 'chart-optimization'],
+  },
   run,
 };
 
 export default tool;
-
-export const metadata = {
-  name,
-  description,
-  version,
-  aiDriven: true,
-  knowledgeEnhanced: true,
-};

@@ -213,6 +213,12 @@ const tool: Tool<typeof opsToolSchema, OpsResult> = {
   description: 'Operational utilities for ping and server status',
   version: '2.0.0',
   schema: opsToolSchema,
+  metadata: {
+    aiDriven: false,
+    knowledgeEnhanced: false,
+    samplingStrategy: 'none',
+    enhancementCapabilities: [],
+  },
   run,
 };
 

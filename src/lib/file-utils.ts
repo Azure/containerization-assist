@@ -66,12 +66,3 @@ export async function deleteTempFile(filePath: string): Promise<void> {
     // Ignore errors when deleting temp files
   }
 }
-
-export async function directoryExists(dirPath: string): Promise<boolean> {
-  try {
-    const stats = await fs.stat(dirPath);
-    return stats.isDirectory();
-  } catch {
-    return false;
-  }
-}

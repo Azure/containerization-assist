@@ -5,7 +5,7 @@
 export interface ValidationResult {
   isValid: boolean; // Primary validation state
   errors: string[]; // Critical issues
-  warnings?: string[]; // Non-critical issues
+  warnings: string[]; // Non-critical issues
   ruleId?: string; // Rule identifier (for detailed validation)
   passed?: boolean; // Alias for isValid (needed for current implementation)
   message?: string; // Primary message (for simple validation)
@@ -18,6 +18,8 @@ export interface ValidationResult {
     severity?: ValidationSeverity;
     location?: string;
     aiEnhanced?: boolean;
+    category?: ValidationCategory;
+    fixSuggestion?: string;
   };
 }
 
