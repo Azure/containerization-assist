@@ -20,7 +20,12 @@
  */
 
 import * as yaml from 'js-yaml';
-import { getToolLogger, createToolTimer, createStandardizedToolTracker } from '@/lib/tool-helpers';
+import {
+  getToolLogger,
+  createToolTimer,
+  createStandardizedToolTracker,
+  storeToolResults,
+} from '@/lib/tool-helpers';
 import { getPostDeployHint } from '@/lib/workflow-hints';
 import type { Logger } from '@/lib/logger';
 import { extractErrorMessage } from '@/lib/error-utils';
@@ -830,6 +835,14 @@ async function deployApplicationImpl(
     context.session?.set('results', {
       ...existingResults,
       deploy: result,
+    });
+
+    // Store in sessionManager for cross-tool persistence using helper
+    await storeToolResults(context, sessionId, 'deploy', {
+      namespace,
+      deploymentName,
+      ready,
+      endpoints,
     });
 
     timer.end({ deploymentName, ready, sessionId });

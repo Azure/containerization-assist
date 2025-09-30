@@ -55,19 +55,71 @@ async function generateSingleDockerfile(
 
   // Retrieve repository path from session if not provided
   let path = input.path;
-  if (!path && sessionId && ctx.session) {
-    const analyzedPath = ctx.session.get<string>('analyzedPath');
-    if (analyzedPath) {
-      path = analyzedPath;
-      ctx.logger.info({ path }, 'Using repository path from session (analyze-repo)');
+  const directoryPaths = input.dockerfileDirectoryPaths ?? [];
+
+  if (!path && directoryPaths.length > 0) {
+    const firstDir = directoryPaths[0];
+    const normalizedDir = firstDir.toLowerCase().endsWith('dockerfile')
+      ? nodePath.dirname(firstDir)
+      : firstDir;
+    path = normalizedDir;
+    ctx.logger.info(
+      { path: normalizedDir },
+      'Using repository path from dockerfileDirectoryPaths input',
+    );
+  }
+
+  let analyzedPathFromSession: string | undefined;
+  let analysis: RepositoryAnalysis | undefined;
+
+  // Retrieve analysis from sessionManager (cross-tool persistent session)
+  // Note: Do NOT use ctx.session here as it's the current tool's local session,
+  // not the workflow session shared across tools
+  if (sessionId && ctx.sessionManager) {
+    try {
+      const workflowStateResult = await ctx.sessionManager.get(sessionId);
+      if (workflowStateResult.ok && workflowStateResult.value) {
+        const workflowState = workflowStateResult.value as Record<string, unknown>;
+
+        // Get analyzed path from metadata
+        const metadata = workflowState.metadata as Record<string, unknown> | undefined;
+        if (metadata && !analyzedPathFromSession && typeof metadata.analyzedPath === 'string') {
+          analyzedPathFromSession = metadata.analyzedPath;
+        }
+
+        // Get analysis results from top-level results field (NOT metadata.results)
+        const results = workflowState.results as Record<string, unknown> | undefined;
+        const analyzeRepoResult = results?.['analyze-repo'];
+        if (!analysis && analyzeRepoResult && typeof analyzeRepoResult === 'object') {
+          analysis = analyzeRepoResult as RepositoryAnalysis;
+          ctx.logger.info(
+            { sessionId, language: analysis.language, framework: analysis.framework },
+            'Retrieved repository analysis from sessionManager',
+          );
+        }
+      }
+    } catch (sessionError) {
+      ctx.logger.debug(
+        {
+          sessionId,
+          error: sessionError instanceof Error ? sessionError.message : String(sessionError),
+        },
+        'Unable to load workflow session data for Dockerfile generation',
+      );
     }
   }
 
-  // Path is required - fail if still not available
-  if (!path) {
-    return Failure(
-      'Repository path is required. Either provide path parameter or run analyze-repo first with a sessionId.',
-    );
+  const analysisPath =
+    analysis && typeof (analysis as { analyzedPath?: unknown }).analyzedPath === 'string'
+      ? ((analysis as { analyzedPath?: string }).analyzedPath as string)
+      : undefined;
+
+  if (!path && analyzedPathFromSession) {
+    path = analyzedPathFromSession;
+    ctx.logger.info({ path }, 'Using repository path from stored workflow session');
+  } else if (!path && analysisPath) {
+    path = analysisPath;
+    ctx.logger.info({ path }, 'Using repository path from analyze-repo result data');
   }
 
   // Determine target module path
@@ -79,12 +131,16 @@ async function generateSingleDockerfile(
   let dependencies: string[] = [];
   let ports: number[] = [8080];
   let requirements: string | undefined;
-  const baseImage: string | undefined = input.baseImage;
+  const recommendedBaseImage =
+    analysis &&
+    typeof (analysis as { dockerConfig?: { baseImage?: string } }).dockerConfig?.baseImage ===
+      'string'
+      ? ((analysis as { dockerConfig?: { baseImage?: string } }).dockerConfig?.baseImage as string)
+      : undefined;
+  const baseImage: string | undefined = input.baseImage ?? recommendedBaseImage;
 
-  // Try to get analysis from session if sessionId is provided
-  if (sessionId && ctx.session) {
-    const analysis = ctx.session.getResult<RepositoryAnalysis>('analyze-repo');
-
+  // Process analysis data if available (already retrieved from sessionManager above)
+  if (analysis) {
     // If generating for a specific module, use module-specific data
     if (targetModule) {
       language = targetModule.language || 'auto-detect';
@@ -147,18 +203,39 @@ async function generateSingleDockerfile(
       if (typeof analysis.entryPoint === 'string') {
         reqParts.push(`Entry Point: ${analysis.entryPoint}`);
       }
+      const dockerConfig = (analysis as { dockerConfig?: Record<string, unknown> }).dockerConfig;
+      if (dockerConfig && typeof dockerConfig === 'object') {
+        if (typeof dockerConfig.baseImage === 'string') {
+          reqParts.push(`Recommended Base Image: ${dockerConfig.baseImage}`);
+        }
+        if (dockerConfig.multistage === true) {
+          reqParts.push('Recommended to use multi-stage build');
+        }
+        if (dockerConfig.nonRootUser === true) {
+          reqParts.push('Ensure the final image runs as a non-root user');
+        }
+      }
       requirements = reqParts.join('\n');
 
       ctx.logger.info(
         { sessionId, language, framework },
-        'Retrieved repository analysis from session',
+        'Using repository analysis data for Dockerfile generation',
       );
-    } else {
-      ctx.logger.warn({ sessionId }, 'Session not found or no analysis data available');
-      requirements = `Note: Could not retrieve analysis data from session ${sessionId}. Please analyze the repository to determine the best configuration.`;
     }
+  } else if (sessionId) {
+    // No analysis found in session
+    ctx.logger.warn({ sessionId }, 'Session not found or no analysis data available');
+    requirements = `Note: Could not retrieve analysis data from session ${sessionId}. Please analyze the repository to determine the best configuration.`;
   } else if (path) {
+    // No sessionId provided, analyze repository directly
     requirements = `Analyze the repository at ${path} to detect the technology stack, dependencies, and requirements.`;
+  }
+
+  // Path is required - fail if still not available after all attempts
+  if (!path) {
+    return Failure(
+      'Repository path is required. Either provide path parameter or run analyze-repo first with a sessionId.',
+    );
   }
 
   // Add custom instructions if provided
@@ -469,24 +546,33 @@ ${finalDockerfileContent}
 
     // Determine where to write the Dockerfile
     let dockerfilePath = '';
-    if (sessionId && ctx.session) {
-      // Get the analyzed path from session (stored by analyze-repo)
-      const analyzedPath = ctx.session.get<string>('analyzedPath');
-      if (analyzedPath) {
-        // If generating for a module, use the module's path
-        if (targetModulePath) {
-          dockerfilePath = nodePath.join(analyzedPath, targetModulePath, 'Dockerfile');
+    const candidateBases = [analyzedPathFromSession, analysisPath, path, ...directoryPaths].filter(
+      (candidate): candidate is string => Boolean(candidate),
+    );
+
+    const uniqueBases = Array.from(new Set(candidateBases));
+
+    for (const base of uniqueBases) {
+      const resolvedBase = nodePath.isAbsolute(base) ? base : nodePath.resolve(process.cwd(), base);
+
+      let candidatePath: string;
+
+      if (resolvedBase.toLowerCase().endsWith('dockerfile')) {
+        candidatePath = resolvedBase;
+      } else if (targetModulePath) {
+        const normalizedModulePath = nodePath.normalize(targetModulePath);
+        if (resolvedBase.endsWith(normalizedModulePath)) {
+          candidatePath = nodePath.join(resolvedBase, 'Dockerfile');
         } else {
-          dockerfilePath = nodePath.join(analyzedPath, 'Dockerfile');
+          candidatePath = nodePath.join(resolvedBase, normalizedModulePath, 'Dockerfile');
         }
+      } else {
+        candidatePath = nodePath.join(resolvedBase, 'Dockerfile');
       }
-    } else if (input.path) {
-      // Use the provided path
-      let targetPath = input.path;
-      if (!nodePath.isAbsolute(targetPath)) {
-        targetPath = nodePath.resolve(process.cwd(), targetPath);
-      }
-      dockerfilePath = nodePath.join(targetPath, 'Dockerfile');
+
+      dockerfilePath = candidatePath;
+      ctx.logger.debug({ dockerfilePath }, 'Selected Dockerfile output path');
+      break;
     }
 
     // Write Dockerfile if we have a path

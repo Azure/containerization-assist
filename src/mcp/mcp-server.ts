@@ -17,7 +17,6 @@ import { extractErrorMessage } from '@/lib/error-utils';
 import { createLogger, type Logger } from '@/lib/logger';
 import { extractSchemaShape } from '@/lib/zod-utils';
 import type { Tool } from '@/types/tool';
-import type { ZodTypeAny } from 'zod';
 import type { ExecuteRequest, ExecuteMetadata } from '@/app/orchestrator-types';
 import type { Result } from '@/types';
 
@@ -41,9 +40,9 @@ export interface MCPServer {
   getTools(): Array<{ name: string; description: string }>;
 }
 
-export interface RegisterOptions {
+export interface RegisterOptions<TTool extends Tool = Tool> {
   server: McpServer;
-  tools: readonly Tool<ZodTypeAny, unknown>[];
+  tools: readonly TTool[];
   logger: Logger;
   transport: string;
   execute: ToolExecutor;
@@ -54,8 +53,8 @@ type ToolExecutor = (request: ExecuteRequest) => Promise<Result<unknown>>;
 /**
  * Create an MCP server that delegates execution to the orchestrator
  */
-export function createMCPServer(
-  tools: Array<Tool<ZodTypeAny, unknown>>,
+export function createMCPServer<TTool extends Tool>(
+  tools: Array<TTool>,
   options: ServerOptions = {},
   execute: ToolExecutor,
 ): MCPServer {
@@ -155,7 +154,7 @@ export function createMCPServer(
 /**
  * Register tools against an MCP server instance, delegating to the orchestrator executor.
  */
-export function registerToolsWithServer(options: RegisterOptions): void {
+export function registerToolsWithServer<TTool extends Tool>(options: RegisterOptions<TTool>): void {
   const { server, tools, logger, transport, execute } = options;
 
   for (const tool of tools) {

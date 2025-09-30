@@ -5,16 +5,16 @@
 
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { ZodTypeAny } from 'zod';
 
 import { createLogger } from '@/lib/logger';
 import { getAllInternalTools } from '@/exports/tools';
+import type { AllToolTypes, ToolName } from '@/tools';
 import { createToolContext } from '@/mcp/context';
 import { createMCPServer, registerToolsWithServer, type MCPServer } from '@/mcp/mcp-server';
+import type { Tool } from '@/types/tool';
 import { createOrchestrator, createHostlessToolContext } from './orchestrator';
 import type { OrchestratorConfig, ExecuteRequest, ToolOrchestrator } from './orchestrator-types';
 import type { Result } from '@/types';
-import type { Tool } from '@/types/tool';
 import type {
   AppRuntime,
   AppRuntimeConfig,
@@ -22,15 +22,14 @@ import type {
   ToolResultMap,
   ExecutionMetadata,
 } from '@/types/runtime';
-import type { ToolName } from '@/tools';
 
 /**
  * Apply tool aliases to create renamed versions of tools
  */
 function applyToolAliases(
-  tools: readonly Tool<ZodTypeAny, any>[],
+  tools: readonly AllToolTypes[],
   aliases?: Record<string, string>,
-): Tool<ZodTypeAny, any>[] {
+): AllToolTypes[] {
   if (!aliases) return [...tools];
 
   return tools.map((tool) => {
@@ -55,13 +54,13 @@ export interface TransportConfig {
 export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
   const logger = config.logger || createLogger({ name: 'containerization-assist' });
   const tools = config.tools || getAllInternalTools();
-  const aliasedTools = applyToolAliases(
-    tools as readonly Tool<ZodTypeAny, any>[],
-    config.toolAliases,
-  );
+  const aliasedTools = applyToolAliases(tools, config.toolAliases);
 
-  const toolsMap = new Map<string, Tool<ZodTypeAny, any>>();
-  for (const tool of aliasedTools) {
+  // Erase per-tool generics for runtime registration; validation still re-parses inputs per schema
+  const registryTools: Tool[] = aliasedTools.map((tool) => tool as unknown as Tool);
+
+  const toolsMap = new Map<string, Tool>();
+  for (const tool of registryTools) {
     toolsMap.set(tool.name, tool);
   }
 

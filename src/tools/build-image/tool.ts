@@ -15,7 +15,12 @@
 
 import path from 'path';
 import { normalizePath } from '@/lib/path-utils';
-import { getToolLogger, createToolTimer, createStandardizedToolTracker } from '@/lib/tool-helpers';
+import {
+  getToolLogger,
+  createToolTimer,
+  createStandardizedToolTracker,
+  storeToolResults,
+} from '@/lib/tool-helpers';
 import { getPostBuildHint } from '@/lib/workflow-hints';
 import type { Logger } from '@/lib/logger';
 import { promises as fs } from 'node:fs';
@@ -539,7 +544,13 @@ async function buildImageImpl(
       ),
     };
 
-    // Session storage is handled by orchestrator automatically
+    // Store in sessionManager for cross-tool persistence using helper
+    await storeToolResults(context, sessionId, 'build-image', {
+      imageId: buildResult.value.imageId,
+      tags: finalTags,
+      size: (buildResult.value as unknown as { size?: number }).size,
+      buildTime,
+    });
 
     timer.end({ imageId: buildResult.value.imageId, buildTime });
     tracker.complete({ imageId: buildResult.value.imageId, buildTime });

@@ -7,7 +7,7 @@ import type { ToolMetadata } from './tool-metadata';
 /**
  * Unified tool interface for all MCP tools
  */
-export interface Tool<TSchema extends z.ZodTypeAny = z.ZodAny, TOut = unknown> {
+export interface Tool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TOut = unknown> {
   /** Unique tool identifier */
   name: string;
 

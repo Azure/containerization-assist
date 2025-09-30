@@ -203,9 +203,28 @@ async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
   const { params, sessionId } = request;
   const { sessionManager, policy, logger } = env;
 
+  // Extract sessionId from request or params (tools often pass sessionId in params)
+  const paramsSessionId =
+    params && typeof params === 'object' && 'sessionId' in params
+      ? (params as { sessionId?: string }).sessionId
+      : undefined;
+
   // Always create or get session - generate ID if none provided
+  // Prefer request.sessionId, then params.sessionId, then generate new
   const actualSessionId =
-    sessionId || `session_${Date.now()}_${crypto.randomBytes(9).toString('hex')}`;
+    sessionId ||
+    paramsSessionId ||
+    `session_${Date.now()}_${crypto.randomBytes(9).toString('hex')}`;
+
+  logger.debug(
+    {
+      toolName: tool.name,
+      requestSessionId: sessionId,
+      paramsSessionId,
+      actualSessionId,
+    },
+    'Resolved session ID for tool execution',
+  );
 
   // Get or create session using SessionManager
   const sessionResult = await sessionManager.get(actualSessionId);

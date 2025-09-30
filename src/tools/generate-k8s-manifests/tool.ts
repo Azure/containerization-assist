@@ -5,7 +5,7 @@
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
-import { createStandardizedToolTracker } from '@/lib/tool-helpers';
+import { createStandardizedToolTracker, storeToolResults } from '@/lib/tool-helpers';
 import { promptTemplates, K8sManifestPromptParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
@@ -530,7 +530,12 @@ async function generateSingleManifest(
       },
     };
 
-    // Session storage is handled by orchestrator automatically
+    // Store in sessionManager for cross-tool persistence using helper
+    await storeToolResults(ctx, input.sessionId, 'generate-k8s-manifests', {
+      manifests: finalManifestsContent,
+      manifestPath,
+      validatedResources: manifests.map((m) => ({ kind: m.kind, name: m.metadata?.name })),
+    });
 
     tracker.complete({ manifestPath, resourceCount: manifests.length });
     return Success(result);

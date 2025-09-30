@@ -1,6 +1,5 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { Success, Failure, type Result, type ToolContext, TOPICS } from '@/types';
 import { promptTemplates } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
@@ -9,7 +8,7 @@ import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { scoreRepositoryAnalysis } from '@/lib/scoring';
 import { analyzeRepoSchema, type RepositoryAnalysis } from './schema';
 import { extractJsonContent } from '@/lib/content-extraction';
-import { createStandardizedToolTracker } from '@/lib/tool-helpers';
+import { createStandardizedToolTracker, storeToolResults } from '@/lib/tool-helpers';
 import type { AIResponse } from '../ai-response-types';
 import type { Tool } from '@/types/tool';
 import type { z } from 'zod';
@@ -29,12 +28,16 @@ async function run(
     repoPath = path.resolve(process.cwd(), repoPath);
   }
 
-  // Use provided sessionId or generate a new one for the workflow
-  const workflowSessionId = sessionId || randomUUID();
+  // SessionId is required - it should be provided by the orchestrator
+  if (!sessionId) {
+    return Failure(
+      'sessionId is required for analyze-repo. The orchestrator should provide a sessionId.',
+    );
+  }
 
   const tracker = createStandardizedToolTracker(
     'analyze-repo',
-    { repoPath, sessionId: workflowSessionId },
+    { repoPath, sessionId },
     ctx.logger,
   );
 
@@ -93,7 +96,7 @@ async function run(
     fileList,
     configFiles: configContent,
     directoryTree: directoryStructure,
-    sessionId: workflowSessionId,
+    sessionId,
   });
 
   // Log the generated prompt
@@ -192,7 +195,7 @@ async function run(
     // Store the analysis result in session for other tools to use
     const result: RepositoryAnalysis & { sessionId: string } = {
       ...analysisResult,
-      sessionId: workflowSessionId,
+      sessionId,
     };
 
     // Store repository path and key metadata in session for downstream tools
@@ -202,13 +205,16 @@ async function run(
       if (result.ports && result.ports.length > 0) {
         ctx.session.set('appPorts', result.ports);
       }
+      // Store the full analysis result for downstream tools
+      ctx.session.storeResult('analyze-repo', result);
+
       // Store monorepo/multi-module information if detected
       if (result.isMonorepo === true && result.modules && result.modules.length > 0) {
         ctx.session.set('isMonorepo', true);
         ctx.session.set('modules', result.modules);
         ctx.logger.info(
           {
-            sessionId: workflowSessionId,
+            sessionId,
             repoPath,
             appName: result.name,
             moduleCount: result.modules.length,
@@ -217,16 +223,30 @@ async function run(
         );
       } else {
         ctx.logger.info(
-          { sessionId: workflowSessionId, repoPath, appName: result.name },
+          { sessionId, repoPath, appName: result.name },
           'Stored repository context in session for downstream tools',
         );
       }
     }
 
+    // Store in sessionManager for cross-tool persistence using helper
+    await storeToolResults(
+      ctx,
+      sessionId,
+      'analyze-repo',
+      result as unknown as Record<string, unknown>,
+      {
+        analyzedPath: repoPath,
+        appName: result.name || path.basename(repoPath),
+        ...(result.isMonorepo && { isMonorepo: true }),
+        ...(result.modules && { modules: result.modules }),
+      },
+    );
+
     tracker.complete({
       language: result.language,
       framework: result.framework,
-      sessionId: workflowSessionId,
+      sessionId,
     });
 
     // Add sessionId and workflowHints to the result
@@ -237,9 +257,11 @@ async function run(
 
     return Success({
       ...result,
+      sessionId,
+      analyzedPath: repoPath,
       workflowHints: {
         nextStep: 'generate-dockerfile',
-        message: `Repository analysis complete.${moduleHint} Use "generate-dockerfile" with sessionId ${workflowSessionId} to create an optimized Dockerfile for your ${result.language || 'application'}.`,
+        message: `Repository analysis complete.${moduleHint} Use "generate-dockerfile" with sessionId ${sessionId} to create an optimized Dockerfile for your ${result.language || 'application'}.`,
       },
     });
   } catch (e) {
