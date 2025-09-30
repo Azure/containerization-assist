@@ -32,7 +32,7 @@ export type EnhancementCapability =
  * Sampling strategy discriminated union
  * Replaces string-based sampling configuration
  */
-export type SamplingStrategy = 'none' | 'single' | 'rerank';
+export type SamplingStrategy = 'none' | 'single';
 
 /**
  * AI service operation modes
@@ -161,101 +161,8 @@ export interface KnowledgeRequest {
   readonly knowledgeBudget?: number;
 }
 
-// Type guards for runtime validation
-
-/**
- * Type guard for ValidationContext
- */
-export const isValidationContext = (ctx: unknown): ctx is ValidationContext => {
-  if (typeof ctx !== 'object' || ctx === null) return false;
-  const context = ctx as Record<string, unknown>;
-
-  if (typeof context.type !== 'string') return false;
-
-  switch (context.type) {
-    case 'dockerfile':
-      return typeof context.runtime === 'undefined' || typeof context.runtime === 'string';
-    case 'kubernetes':
-      return typeof context.version === 'undefined' || typeof context.version === 'string';
-    case 'security':
-      return (
-        typeof context.severity === 'string' &&
-        (['low', 'medium', 'high', 'critical'] as const).includes(
-          context.severity as 'low' | 'medium' | 'high' | 'critical',
-        )
-      );
-    case 'optimization':
-      return (
-        typeof context.target === 'string' &&
-        (['size', 'performance', 'cost', 'all'] as const).includes(
-          context.target as 'size' | 'performance' | 'cost' | 'all',
-        )
-      );
-    default:
-      return false;
-  }
-};
-
-/**
- * Type guard for EnhancementCapability
- */
-export const isEnhancementCapability = (cap: unknown): cap is EnhancementCapability => {
-  return (
-    typeof cap === 'string' &&
-    (
-      [
-        'validation',
-        'repair',
-        'security',
-        'optimization',
-        'analysis',
-        'generation',
-        'enhancement',
-      ] as const
-    ).includes(cap as EnhancementCapability)
-  );
-};
-
-/**
- * Type guard for ValidationSeverity
- */
-export const isValidationSeverity = (severity: unknown): severity is ValidationSeverity => {
-  return (
-    typeof severity === 'string' &&
-    (['error', 'warning', 'info'] as const).includes(severity as ValidationSeverity)
-  );
-};
-
-/**
- * Type guard for ValidationCategory
- */
-export const isValidationCategory = (category: unknown): category is ValidationCategory => {
-  return (
-    typeof category === 'string' &&
-    (
-      [
-        'security',
-        'performance',
-        'best-practice',
-        'compliance',
-        'optimization',
-        'structure',
-        'style',
-        'maintainability',
-      ] as const
-    ).includes(category as ValidationCategory)
-  );
-};
-
-/**
- * Type guard for AIServiceMode
- */
-export const isAIServiceMode = (mode: unknown): mode is AIServiceMode => {
-  return (
-    typeof mode === 'string' &&
-    (['fast', 'balanced', 'thorough'] as const).includes(mode as AIServiceMode)
-  );
-};
+// Type guards for runtime validation - removed unused guards
+// Keep only type guards that are actually used in the codebase
 
 /**
  * Utility type for making optional fields explicit
@@ -274,26 +181,6 @@ export type ConfidenceScore = number & { __brand: 'confidence' };
  * Ensures scores are always within 0-100 range
  */
 export type ScorePercentage = number & { __brand: 'score' };
-
-/**
- * Helper function to create confidence scores
- */
-export const createConfidence = (value: number): ConfidenceScore => {
-  if (value < 0 || value > 1) {
-    throw new Error(`Confidence must be between 0 and 1, got ${value}`);
-  }
-  return value as ConfidenceScore;
-};
-
-/**
- * Helper function to create score percentages
- */
-export const createScore = (value: number): ScorePercentage => {
-  if (value < 0 || value > 100) {
-    throw new Error(`Score must be between 0 and 100, got ${value}`);
-  }
-  return value as ScorePercentage;
-};
 
 /**
  * Convert score to grade

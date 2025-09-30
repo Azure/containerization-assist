@@ -7,7 +7,8 @@
 import * as k8s from '@kubernetes/client-node';
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '@/types';
-import { formatErrorMessage } from '@/lib/error-utils';
+import { extractK8sErrorGuidance } from './errors';
+import { discoverAndValidateKubeconfig } from './kubeconfig-discovery';
 
 export interface DeploymentResult {
   ready: boolean;
@@ -37,24 +38,72 @@ export interface K8sManifest {
 export interface KubernetesClient {
   applyManifest: (manifest: K8sManifest, namespace?: string) => Promise<Result<void>>;
   getDeploymentStatus: (namespace: string, name: string) => Promise<Result<DeploymentResult>>;
-  deleteResource: (kind: string, name: string, namespace?: string) => Promise<Result<void>>;
   ping: () => Promise<boolean>;
   namespaceExists: (namespace: string) => Promise<boolean>;
   checkPermissions: (namespace: string) => Promise<boolean>;
   checkIngressController: () => Promise<boolean>;
 }
 
+export interface KubernetesClientConfig {
+  logger: Logger;
+  kubeconfig?: string;
+  timeout?: number;
+}
+
 /**
  * Create a Kubernetes client with core operations
+ *
+ * @throws Error if kubeconfig is invalid or not found (fast-fail for single-user scenarios)
  */
-export const createKubernetesClient = (logger: Logger, kubeconfig?: string): KubernetesClient => {
+export const createKubernetesClient = (
+  logger: Logger,
+  kubeconfig?: string,
+  timeout?: number,
+): KubernetesClient => {
   const kc = new k8s.KubeConfig();
 
   // Load kubeconfig from default locations or provided config
   if (kubeconfig) {
-    kc.loadFromString(kubeconfig);
+    try {
+      kc.loadFromString(kubeconfig);
+      logger.debug('Loaded kubeconfig from provided string');
+    } catch (error) {
+      const errorMsg = `Failed to load kubeconfig: ${error instanceof Error ? error.message : String(error)}`;
+      logger.error({ error: errorMsg }, 'Kubeconfig load failed');
+      throw new Error(errorMsg);
+    }
   } else {
-    kc.loadFromDefault();
+    // Validate kubeconfig before attempting to load
+    const validation = discoverAndValidateKubeconfig();
+    if (!validation.ok) {
+      const errorMsg = `${validation.error}. ${validation.guidance?.hint || ''}`;
+      logger.error(
+        {
+          error: validation.error,
+          hint: validation.guidance?.hint,
+          resolution: validation.guidance?.resolution,
+          details: validation.guidance?.details,
+        },
+        'Kubeconfig validation failed',
+      );
+      throw new Error(errorMsg);
+    }
+
+    try {
+      kc.loadFromDefault();
+      logger.debug(
+        {
+          path: validation.value.path,
+          context: validation.value.contextName,
+          cluster: validation.value.clusterName,
+        },
+        'Loaded kubeconfig from default location',
+      );
+    } catch (error) {
+      const errorMsg = `Failed to load kubeconfig: ${error instanceof Error ? error.message : String(error)}`;
+      logger.error({ error: errorMsg }, 'Kubeconfig load failed');
+      throw new Error(errorMsg);
+    }
   }
 
   const k8sApi = kc.makeApiClient(k8s.AppsV1Api);
@@ -87,8 +136,20 @@ export const createKubernetesClient = (logger: Logger, kubeconfig?: string): Kub
         );
         return Success(undefined);
       } catch (error) {
-        const errorMessage = formatErrorMessage('Failed to apply manifest', error);
-        return Failure(errorMessage);
+        const guidance = extractK8sErrorGuidance(error, 'apply manifest');
+        const errorMessage = `Failed to apply manifest: ${guidance.message}`;
+
+        logger.error(
+          {
+            error: errorMessage,
+            hint: guidance.hint,
+            resolution: guidance.resolution,
+            details: guidance.details,
+          },
+          'Manifest apply failed',
+        );
+
+        return Failure(errorMessage, guidance);
       }
     },
 
@@ -117,39 +178,48 @@ export const createKubernetesClient = (logger: Logger, kubeconfig?: string): Kub
 
         return Success(status);
       } catch (error) {
-        const errorMessage = formatErrorMessage('Failed to get deployment status', error);
-        return Failure(errorMessage);
+        const guidance = extractK8sErrorGuidance(error, 'get deployment status');
+        const errorMessage = `Failed to get deployment status: ${guidance.message}`;
+
+        logger.error(
+          {
+            error: errorMessage,
+            hint: guidance.hint,
+            resolution: guidance.resolution,
+            details: guidance.details,
+            namespace,
+            name,
+          },
+          'Get deployment status failed',
+        );
+
+        return Failure(errorMessage, guidance);
       }
     },
 
     /**
-     * Delete resource
-     */
-    async deleteResource(kind: string, name: string, namespace = 'default'): Promise<Result<void>> {
-      try {
-        if (kind === 'Deployment') {
-          await k8sApi.deleteNamespacedDeployment({ name, namespace });
-        } else if (kind === 'Service') {
-          await coreApi.deleteNamespacedService({ name, namespace });
-        }
-
-        logger.info({ kind, name, namespace }, 'Resource deleted successfully');
-        return Success(undefined);
-      } catch (error) {
-        const errorMessage = formatErrorMessage('Failed to delete resource', error);
-        return Failure(errorMessage);
-      }
-    },
-
-    /**
-     * Check cluster connectivity
+     * Check cluster connectivity with timeout
      */
     async ping(): Promise<boolean> {
       try {
-        await coreApi.listNamespace();
+        // Use a shorter timeout for ping operations
+        const pingTimeout = timeout || 5000;
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Connection timeout')), pingTimeout),
+        );
+
+        await Promise.race([coreApi.listNamespace(), timeoutPromise]);
         return true;
       } catch (error) {
-        logger.debug({ error }, 'Cluster ping failed');
+        const guidance = extractK8sErrorGuidance(error, 'ping cluster');
+        logger.debug(
+          {
+            error: guidance.message,
+            hint: guidance.hint,
+            resolution: guidance.resolution,
+          },
+          'Cluster ping failed',
+        );
         return false;
       }
     },
@@ -207,41 +277,33 @@ export const createKubernetesClient = (logger: Logger, kubeconfig?: string): Kub
 
     /**
      * Check if an ingress controller is installed
+     * Simplified for single-app scenarios - checks for IngressClass resources
      */
     async checkIngressController(): Promise<boolean> {
       try {
-        // Check for common ingress controller deployments
-        const namespaces = ['ingress-nginx', 'nginx-ingress', 'kube-system'];
-
-        for (const ns of namespaces) {
-          try {
-            const deployments = await k8sApi.listNamespacedDeployment({ namespace: ns });
-            const hasIngress = deployments.items.some(
-              (d) => d.metadata?.name?.includes('ingress') || d.metadata?.name?.includes('nginx'),
-            );
-            if (hasIngress) {
-              logger.debug({ namespace: ns }, 'Found ingress controller');
-              return true;
-            }
-          } catch {
-            // Namespace might not exist, continue checking
-          }
+        // Check for IngressClass resources as primary indicator
+        const ingressClasses = await networkingApi.listIngressClass();
+        if (ingressClasses.items.length > 0) {
+          logger.debug({ count: ingressClasses.items.length }, 'Found ingress classes');
+          return true;
         }
 
-        // Also check for IngressClass resources
-        try {
-          const ingressClasses = await networkingApi.listIngressClass();
-          if (ingressClasses.items.length > 0) {
-            logger.debug({ count: ingressClasses.items.length }, 'Found ingress classes');
-            return true;
-          }
-        } catch {
-          // IngressClass might not be available in older clusters
+        // Fallback: check for common ingress controller in kube-system
+        const deployments = await k8sApi.listNamespacedDeployment({ namespace: 'kube-system' });
+        const hasIngress = deployments.items.some(
+          (d) =>
+            d.metadata?.name?.includes('ingress') ||
+            d.metadata?.name?.includes('nginx') ||
+            d.metadata?.name?.includes('traefik'),
+        );
+        if (hasIngress) {
+          logger.debug({ namespace: 'kube-system' }, 'Found ingress controller');
+          return true;
         }
 
         return false;
       } catch (error) {
-        logger.warn({ error }, 'Error checking for ingress controller');
+        logger.debug({ error }, 'Error checking for ingress controller');
         return false;
       }
     },

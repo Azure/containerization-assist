@@ -26,9 +26,6 @@ async function main(): Promise<void> {
       logger,
       policyPath: process.env.POLICY_PATH || 'config/policy.yaml',
       policyEnvironment: process.env.NODE_ENV || 'production',
-      sessionTTL: 3600000, // 1 hour
-      maxRetries: 2,
-      retryDelay: 1000,
     });
 
     // Start the server with stdio transport

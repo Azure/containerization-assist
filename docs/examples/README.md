@@ -68,22 +68,35 @@ import { configureTools } from '@thgamble/containerization-assist-mcp';
 configureTools({ server });
 ```
 
+**AI Determinism:**
+All AI-powered tools use deterministic sampling (`count: 1`) to ensure reproducible outputs. Each generation includes scoring metadata for quality validation.
+
+**Progress Notifications:**
+Long-running operations (build, deploy, scan) emit MCP notifications that clients can subscribe to for real-time progress updates.
+
 ### 2. Session Management
 
-Use sessions to maintain context across tool calls:
+The server uses a single-session model where the orchestrator automatically manages session state:
 
 ```typescript
-const sessionId = 'my-session-123';
+// Session state is automatically managed by the orchestrator
+// Tools can access prior results through the session facade
 
-await analyzeRepo.handler({ 
-  repoPath: './my-app',
-  sessionId 
+await analyzeRepo.handler({
+  repoPath: './my-app'
 });
 
-await generateDockerfile.handler({ 
-  sessionId // Uses analysis from previous call
+await generateDockerfile.handler({
+  // Automatically accesses analysis from previous step
+  projectPath: './my-app'
 });
 ```
+
+**Session Helpers:**
+- Results are automatically stored after successful tool execution
+- Tools access prior results via `ctx.session` without manual management
+- Session state persists across tool calls within a workflow
+- Session clears on server shutdown
 
 ### 3. Error Handling
 

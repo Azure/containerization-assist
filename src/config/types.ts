@@ -20,8 +20,6 @@ export interface ApplicationConfig {
   };
   session: {
     store: StoreType;
-    ttl: number;
-    maxSessions: number;
     persistencePath: string;
     persistenceInterval: number;
     cleanupInterval: number;
@@ -30,8 +28,6 @@ export interface ApplicationConfig {
     name: string;
     version: string;
     storePath: string;
-    sessionTTL: string;
-    maxSessions: number;
     enableMetrics: boolean;
     enableEvents: boolean;
   };

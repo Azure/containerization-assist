@@ -233,7 +233,7 @@ describe('ToolContext Bridge', () => {
       expect(reporter).toBeInstanceOf(Function);
     });
 
-    test('progress reporter logs progress (placeholder implementation)', () => {
+    test('progress reporter logs progress', () => {
       const reporter = createProgressReporter(mockServer, 'test-token', mockLogger);
 
       if (reporter) {
@@ -246,7 +246,7 @@ describe('ToolContext Bridge', () => {
             total: 100,
             type: 'progress_notification',
           }),
-          'Progress notification logged - MCP transport implementation pending',
+          'Progress notification logged - no sendNotification callback available',
         );
       }
     });

@@ -6,7 +6,7 @@ This document provides a comprehensive overview of all 17 tools in the container
 
 ### AI-Enhanced Tools (14 tools)
 
-These tools use the `sampleWithRerank` sampling system for intelligent content generation and analysis.
+These tools use deterministic single-candidate sampling with quality scoring for intelligent content generation and analysis.
 
 ### Utility Tools (3 tools)
 
@@ -20,7 +20,7 @@ These tools perform direct operations without AI enhancement.
 **Category:** Analysis
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
-**Sampling Strategy:** `rerank`
+**Sampling Strategy:** `single`
 
 **Capabilities:**
 - Repository analysis and framework detection
@@ -41,7 +41,7 @@ These tools perform direct operations without AI enhancement.
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
-**Sampling Strategy:** `rerank`
+**Sampling Strategy:** `single`
 
 **Capabilities:**
 - AI-powered Dockerfile generation
@@ -69,7 +69,7 @@ These tools perform direct operations without AI enhancement.
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
-**Sampling Strategy:** `rerank`
+**Sampling Strategy:** `single`
 
 **Capabilities:**
 - Dockerfile repair and enhancement
@@ -91,7 +91,7 @@ These tools perform direct operations without AI enhancement.
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
-**Sampling Strategy:** `rerank`
+**Sampling Strategy:** `single`
 
 **Capabilities:**
 - Docker image building with progress monitoring
@@ -112,7 +112,7 @@ These tools perform direct operations without AI enhancement.
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
-**Sampling Strategy:** `rerank`
+**Sampling Strategy:** `single`
 
 **Capabilities:**
 - Intelligent image tagging strategies
@@ -133,7 +133,7 @@ These tools perform direct operations without AI enhancement.
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
-**Sampling Strategy:** `rerank`
+**Sampling Strategy:** `single`
 
 **Capabilities:**
 - Registry push optimization
@@ -154,7 +154,7 @@ These tools perform direct operations without AI enhancement.
 **Category:** Security
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
-**Sampling Strategy:** `rerank`
+**Sampling Strategy:** `single`
 
 **Capabilities:**
 - Security vulnerability scanning
@@ -181,7 +181,7 @@ These tools perform direct operations without AI enhancement.
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
-**Sampling Strategy:** `rerank`
+**Sampling Strategy:** `single`
 
 **Capabilities:**
 - Kubernetes manifest generation
@@ -203,7 +203,7 @@ These tools perform direct operations without AI enhancement.
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
-**Sampling Strategy:** `rerank`
+**Sampling Strategy:** `single`
 
 **Capabilities:**
 - Helm chart generation and templating
@@ -239,7 +239,7 @@ These tools perform direct operations without AI enhancement.
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
-**Sampling Strategy:** `rerank`
+**Sampling Strategy:** `single`
 
 **Capabilities:**
 - Cluster preparation and validation
@@ -260,7 +260,7 @@ These tools perform direct operations without AI enhancement.
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
-**Sampling Strategy:** `rerank`
+**Sampling Strategy:** `single`
 
 **Capabilities:**
 - Application deployment to Kubernetes
@@ -281,7 +281,7 @@ These tools perform direct operations without AI enhancement.
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
-**Sampling Strategy:** `rerank`
+**Sampling Strategy:** `single`
 
 **Capabilities:**
 - Intelligent deployment verification
@@ -302,7 +302,7 @@ These tools perform direct operations without AI enhancement.
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
-**Sampling Strategy:** `rerank`
+**Sampling Strategy:** `single`
 
 **Capabilities:**
 - Security-focused base image selection
@@ -323,7 +323,7 @@ These tools perform direct operations without AI enhancement.
 **Category:** Azure
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
-**Sampling Strategy:** `rerank`
+**Sampling Strategy:** `single`
 
 **Capabilities:**
 - Azure Container Apps manifest generation
@@ -344,7 +344,7 @@ These tools perform direct operations without AI enhancement.
 **Category:** Migration
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
-**Sampling Strategy:** `rerank`
+**Sampling Strategy:** `single`
 
 **Capabilities:**
 - Azure Container Apps to Kubernetes conversion
@@ -365,7 +365,7 @@ These tools perform direct operations without AI enhancement.
 **Category:** Operations
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
-**Sampling Strategy:** `rerank`
+**Sampling Strategy:** `single`
 
 **Capabilities:**
 - Operational utilities and insights
@@ -402,11 +402,11 @@ These tools perform direct operations without AI enhancement.
 
 ### Sampling Strategy Types
 
-1. **`rerank`** - Uses N-best sampling with quality scoring
-   - Generates multiple candidates
-   - Scores based on content quality, structure, and domain relevance
-   - Returns the highest-scoring result
-   - Used by 14 tools for content generation and analysis
+1. **`single`** - Deterministic single-candidate sampling with quality scoring
+   - Generates exactly one candidate per invocation
+   - Scores result based on content quality, structure, and domain relevance
+   - Provides scoring metadata for diagnostics and transparency
+   - Used by 14 AI-enhanced tools for reproducible, debuggable outputs
 
 2. **`none`** - No AI enhancement
    - Direct execution without AI sampling
@@ -451,7 +451,7 @@ All AI-enhanced tools follow this metadata pattern:
 metadata: {
   aiDriven: boolean;                    // Uses AI sampling system
   knowledgeEnhanced: boolean;           // Uses knowledge enhancement
-  samplingStrategy: 'rerank' | 'none'; // Sampling approach
+  samplingStrategy: 'single' | 'none'; // Sampling approach
   enhancementCapabilities: string[];   // List of enhancement types
 }
 ```
@@ -504,9 +504,9 @@ const contentTools = tools.filter(t =>
 
 1. **Content Analysis** - AI examines input content and context
 2. **Knowledge Application** - Relevant best practices and patterns applied
-3. **Sample Generation** - Multiple candidate solutions generated
-4. **Quality Scoring** - Candidates scored based on multiple criteria
-5. **Result Selection** - Highest-scoring candidate returned
+3. **Single-Candidate Generation** - One candidate solution generated deterministically
+4. **Quality Scoring** - Result scored based on multiple criteria for diagnostics
+5. **Result Return** - Scored candidate returned with metadata
 6. **Feedback Integration** - Results can be used to improve future enhancements
 
 ## Performance Characteristics
@@ -536,9 +536,8 @@ AI_ENHANCEMENT_MAX_SUGGESTIONS=5
 ```typescript
 // Per-tool enhancement configuration
 const customEnhancement = {
-  samplingCount: 3,        // Number of candidates
-  stopAt: 85,             // Quality threshold
-  confidenceThreshold: 0.8 // Minimum confidence
+  confidenceThreshold: 0.8, // Minimum confidence for acceptance
+  maxRetries: 3,            // Retry attempts on failure
 };
 ```
 

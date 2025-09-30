@@ -5,19 +5,22 @@
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
+import { createStandardizedToolTracker } from '@/lib/tool-helpers';
 import { promptTemplates, K8sManifestPromptParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
-import { scoreKubernetesManifest } from '@/lib/sampling';
+import { createKubernetesScoringFunction } from '@/lib/scoring';
 import { generateK8sManifestsSchema } from './schema';
 import type { AIResponse } from '../ai-response-types';
 import { repairK8sManifests, shouldRepairManifests } from '../shared/k8s-repair';
 import type { KnowledgeEnhancementResult } from '@/mcp/ai/knowledge-enhancement';
+import { extractKubernetesContent } from '@/lib/content-extraction';
 import { createKubernetesValidator } from '@/validation/kubernetes-validator';
 import { createK8sSchemaValidator } from '@/validation/k8s-schema-validator';
 import { createK8sNormalizer } from '@/validation/k8s-normalizer';
 import { mergeMultipleReports } from '@/validation/merge-reports';
+import type { ModuleInfo } from '@/tools/analyze-repo/schema';
 import * as yaml from 'js-yaml';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -53,21 +56,86 @@ const name = 'generate-k8s-manifests';
 const description = 'Generate Kubernetes deployment manifests';
 const version = '2.1.0';
 
-async function run(
+/**
+ * Generate K8s manifests for a single module or app
+ */
+async function generateSingleManifest(
   input: z.infer<typeof generateK8sManifestsSchema>,
   ctx: ToolContext,
+  targetModule?: ModuleInfo,
 ): Promise<Result<AIResponse>> {
   const {
-    appName,
-    imageId,
     namespace = 'default',
     replicas = 3,
-    port = 8080,
     serviceType = 'ClusterIP',
     ingressEnabled = false,
     resources,
     healthCheck,
   } = input;
+
+  const targetModuleName = targetModule?.name;
+
+  // Retrieve imageId from session if not provided
+  let imageId = input.imageId;
+  if (!imageId && input.sessionId && ctx.session) {
+    const buildResult = ctx.session.getResult<{ tags?: string[] }>('build-image');
+    if (buildResult?.tags && buildResult.tags.length > 0) {
+      imageId = buildResult.tags[0];
+      ctx.logger.info({ imageId }, 'Using image from session (build-image)');
+    }
+  }
+
+  // Retrieve appName from session if not provided
+  let appName = input.appName;
+  if (!appName && input.sessionId && ctx.session) {
+    // If generating for a specific module, use module name
+    if (targetModuleName) {
+      appName = targetModuleName;
+      ctx.logger.info({ appName, moduleName: targetModuleName }, 'Using module name as app name');
+    } else {
+      appName = ctx.session.get<string>('appName');
+      if (appName) {
+        ctx.logger.info({ appName }, 'Using app name from session (analyze-repo)');
+      }
+    }
+  }
+
+  // Retrieve port from session if not explicitly provided
+  let port = input.port;
+  if (!port && input.sessionId && ctx.session) {
+    // If generating for a specific module, use module's port
+    if (targetModule?.ports && targetModule.ports.length > 0) {
+      port = targetModule.ports[0];
+      ctx.logger.info({ port, moduleName: targetModuleName }, 'Using port from module data');
+    } else {
+      const appPorts = ctx.session.get<number[]>('appPorts');
+      if (appPorts && appPorts.length > 0) {
+        port = appPorts[0];
+        ctx.logger.info({ port }, 'Using port from session (analyze-repo)');
+      }
+    }
+  }
+  if (!port) {
+    port = 8080; // Default fallback
+  }
+
+  // Validate required parameters
+  if (!imageId) {
+    return Failure(
+      'Docker image is required. Either provide imageId parameter or run build-image first with a sessionId.',
+    );
+  }
+  if (!appName) {
+    return Failure(
+      'Application name is required. Either provide appName parameter or run analyze-repo first with a sessionId.',
+    );
+  }
+
+  const tracker = createStandardizedToolTracker(
+    'generate-k8s-manifests',
+    { appName, namespace, replicas, serviceType },
+    ctx.logger,
+  );
 
   // Generate prompt from template
   const promptParams = {
@@ -101,7 +169,7 @@ async function run(
     knowledgeBudget: 4000, // Larger budget for K8s manifests
   });
 
-  // Execute via AI with sampling and reranking
+  // Execute via AI with deterministic sampling
   const samplingResult = await sampleWithRerank(
     ctx,
     async (attemptIndex) => ({
@@ -114,8 +182,8 @@ async function run(
         costPriority: 0.3,
       },
     }),
-    scoreKubernetesManifest,
-    { count: 3, stopAt: 80 },
+    createKubernetesScoringFunction(),
+    {},
   );
 
   if (!samplingResult.ok) {
@@ -129,35 +197,32 @@ async function run(
 
   ctx.logger.info(
     {
-      score: samplingResult.value.winner.score,
-      scoreBreakdown: samplingResult.value.winner.scoreBreakdown,
+      score: samplingResult.value.score,
+      scoreBreakdown: samplingResult.value.scoreBreakdown,
     },
     'K8s manifests generated with sampling',
   );
 
-  // Parse and validate the generated manifests
+  // Parse and validate the generated manifests using unified extraction
   try {
-    let manifestsContent = responseText;
-
-    // Clean up the response if needed
-    if (manifestsContent.includes('```yaml')) {
-      const yamlMatch = manifestsContent.match(/```yaml\n([\s\S]*?)```/);
-      if (yamlMatch?.[1]) {
-        manifestsContent = yamlMatch[1].trim();
-      }
-    } else if (manifestsContent.includes('```')) {
-      manifestsContent = manifestsContent.replace(/```/g, '').trim();
+    const extraction = extractKubernetesContent(responseText);
+    if (!extraction.success) {
+      return Failure(`Failed to extract Kubernetes manifests: ${extraction.error}`);
     }
 
-    // Parse YAML to validate it
-    const manifests: KubernetesManifest[] = [];
-    const docs = manifestsContent.split(/^---$/m).filter((doc) => doc.trim());
+    const manifests = extraction.content as KubernetesManifest[];
 
-    for (const doc of docs) {
+    // For validation and repair, we need the original YAML content
+    let manifestsContent = responseText;
+
+    // Validate each extracted manifest
+    for (const manifest of manifests) {
       try {
-        const manifest = yaml.load(doc) as KubernetesManifest;
         if (!manifest || typeof manifest !== 'object') {
-          ctx.logger.warn({ doc: doc.substring(0, 100) }, 'Skipping non-object manifest');
+          ctx.logger.warn(
+            { manifest: JSON.stringify(manifest).substring(0, 100) },
+            'Skipping non-object manifest',
+          );
           continue;
         }
 
@@ -217,19 +282,17 @@ async function run(
           ) {
             ctx.logger.warn(
               { apiVersion: manifest.apiVersion },
-              'Ingress using legacy API version',
+              'Ingress using outdated API version',
             );
           }
         }
-
-        manifests.push(manifest);
       } catch (parseError) {
         ctx.logger.error(
           {
             error: parseError instanceof Error ? parseError.message : String(parseError),
-            doc: doc.substring(0, 200),
+            manifest: JSON.stringify(manifest).substring(0, 200),
           },
-          'Failed to parse YAML document',
+          'Failed to validate manifest',
         );
         return Failure(
           `Invalid YAML in manifest: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`,
@@ -467,19 +530,146 @@ async function run(
       },
     };
 
-    // Store the manifests in session if we have a sessionId
-    if (input.sessionId && ctx.session) {
-      ctx.session.set('results', {
-        'generate-k8s-manifests': result,
-      });
-      ctx.session.set('current_step', 'generate-k8s-manifests');
-    }
+    // Session storage is handled by orchestrator automatically
 
+    tracker.complete({ manifestPath, resourceCount: manifests.length });
     return Success(result);
   } catch (e) {
     const error = e as Error;
+    tracker.fail(error);
     return Failure(`Manifest generation failed: ${error.message}`);
   }
+}
+
+/**
+ * Main run function - orchestrates single or multi-module generation
+ */
+async function run(
+  input: z.infer<typeof generateK8sManifestsSchema>,
+  ctx: ToolContext,
+): Promise<Result<AIResponse>> {
+  const { sessionId } = input;
+
+  // Check for multi-module/monorepo scenario
+  if (sessionId && ctx.session) {
+    const isMonorepo = ctx.session.get<boolean>('isMonorepo');
+    const modules = ctx.session.get<ModuleInfo[]>('modules');
+
+    if (isMonorepo && modules && modules.length > 0) {
+      // User explicitly specified a module
+      if (input.moduleName) {
+        const targetModule = modules.find((m) => m.name === input.moduleName);
+        if (!targetModule) {
+          return Failure(
+            `Module "${input.moduleName}" not found. Available modules: ${modules.map((m) => m.name).join(', ')}`,
+          );
+        }
+        ctx.logger.info(
+          { moduleName: targetModule.name, modulePath: targetModule.path },
+          'Generating K8s manifests for specific module',
+        );
+        return generateSingleManifest(input, ctx, targetModule);
+      }
+
+      // No module specified - generate for all modules automatically
+      ctx.logger.info(
+        { moduleCount: modules.length },
+        'Generating K8s manifests for all modules in monorepo',
+      );
+
+      const results: Array<{ module: string; success: boolean; path?: string; error?: string }> =
+        [];
+      const manifests: Array<{ module: string; content: string; path?: string }> = [];
+
+      for (const module of modules) {
+        ctx.logger.info({ moduleName: module.name }, 'Generating K8s manifests for module');
+
+        const result = await generateSingleManifest(input, ctx, module);
+
+        if (result.ok) {
+          const value = result.value as {
+            content?: string;
+            workflowHints?: { message?: string };
+          };
+          const extractedPath = value.workflowHints?.message?.match(/Saved to (.+?)\./)?.[1];
+          results.push({
+            module: module.name,
+            success: true,
+            ...(extractedPath ? { path: extractedPath } : {}),
+          });
+          manifests.push({
+            module: module.name,
+            content: value.content || '',
+            ...(extractedPath ? { path: extractedPath } : {}),
+          });
+          ctx.logger.info({ moduleName: module.name }, 'K8s manifests generated successfully');
+        } else {
+          results.push({
+            module: module.name,
+            success: false,
+            error: result.error,
+          });
+          ctx.logger.warn(
+            { moduleName: module.name, error: result.error },
+            'Failed to generate K8s manifests for module',
+          );
+        }
+      }
+
+      // Store multi-module results in session
+      if (ctx.session) {
+        ctx.session.storeResult('generate-k8s-manifests-multi', {
+          modules: results,
+          manifests,
+        });
+        ctx.session.set('k8sManifestsGenerated', true);
+      }
+
+      const successCount = results.filter((r) => r.success).length;
+      const failureCount = results.filter((r) => !r.success).length;
+
+      if (successCount === 0) {
+        return Failure(
+          `Failed to generate K8s manifests for all ${modules.length} modules:\n${results.map((r) => `- ${r.module}: ${r.error}`).join('\n')}`,
+        );
+      }
+
+      // Build summary response
+      const summary = `Generated Kubernetes manifests for ${successCount}/${modules.length} modules:\n${results
+        .filter((r) => r.success)
+        .map((r) => `✅ ${r.module}${r.path ? `: ${r.path}` : ''}`)
+        .join('\n')}${
+        failureCount > 0
+          ? `\n\n⚠️  Failed modules (${failureCount}):\n${results
+              .filter((r) => !r.success)
+              .map((r) => `❌ ${r.module}: ${r.error}`)
+              .join('\n')}`
+          : ''
+      }`;
+
+      return Success({
+        content: summary,
+        language: 'text',
+        confidence: successCount / modules.length,
+        suggestions: [
+          `Successfully generated ${successCount} K8s manifest(s)`,
+          failureCount > 0 ? `${failureCount} module(s) failed` : 'All modules successful',
+        ],
+        analysis: {
+          enhancementAreas: [],
+          confidence: successCount / modules.length,
+          knowledgeApplied: [],
+        },
+        workflowHints: {
+          nextStep: 'deploy',
+          message: `Kubernetes manifests generated for ${successCount} module(s). Use "prepare-cluster" and "deploy" for each module to deploy to your cluster.`,
+        },
+      });
+    }
+  }
+
+  // Single-module repository or no session data - generate for single app
+  return generateSingleManifest(input, ctx);
 }
 
 const tool: Tool<typeof generateK8sManifestsSchema, AIResponse> = {
@@ -491,7 +681,7 @@ const tool: Tool<typeof generateK8sManifestsSchema, AIResponse> = {
   metadata: {
     aiDriven: true,
     knowledgeEnhanced: true,
-    samplingStrategy: 'rerank',
+    samplingStrategy: 'single',
     enhancementCapabilities: [
       'content-generation',
       'manifest-generation',

@@ -71,7 +71,7 @@ function evictIfNeeded<T>(
 ): void {
   while (store.size >= maxSize) {
     let oldestKey: string | null = null;
-    let oldestTime = Infinity; // Initialize to a very large value
+    let oldestTime = Infinity;
 
     for (const [key, entry] of store.entries()) {
       if (entry.created < oldestTime) {
@@ -253,11 +253,6 @@ export function createCache<T>(
 
 // Pre-configured cache instances for different use cases
 export const cacheInstances = {
-  aiResponses: createCache<string>('ai-responses', {
-    ttlMs: 10 * 60 * 1000, // 10 minutes for AI responses
-    maxSize: 50,
-  }),
-
   dockerMetadata: createCache<{ size: number; layers: number }>('docker-metadata', {
     ttlMs: 30 * 60 * 1000, // 30 minutes for Docker metadata
     maxSize: 100,

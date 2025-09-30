@@ -6,8 +6,10 @@ import { promptTemplates } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
-import { scoreRepositoryAnalysis } from '@/lib/sampling';
-import { analyzeRepoSchema, RepositoryAnalysis } from './schema';
+import { scoreRepositoryAnalysis } from '@/lib/scoring';
+import { analyzeRepoSchema, type RepositoryAnalysis } from './schema';
+import { extractJsonContent } from '@/lib/content-extraction';
+import { createStandardizedToolTracker } from '@/lib/tool-helpers';
 import type { AIResponse } from '../ai-response-types';
 import type { Tool } from '@/types/tool';
 import type { z } from 'zod';
@@ -27,17 +29,14 @@ async function run(
     repoPath = path.resolve(process.cwd(), repoPath);
   }
 
-  // Log the path being analyzed
-  ctx.logger.info(
-    {
-      requestedPath: repoPath,
-      params: input,
-    },
-    'Starting repository analysis',
-  );
-
   // Use provided sessionId or generate a new one for the workflow
   const workflowSessionId = sessionId || randomUUID();
+
+  const tracker = createStandardizedToolTracker(
+    'analyze-repo',
+    { repoPath, sessionId: workflowSessionId },
+    ctx.logger,
+  );
 
   // Read the actual repository files
   let fileList = '';
@@ -150,17 +149,19 @@ async function run(
         },
       }),
       scoreRepositoryAnalysis,
-      { count: 2, stopAt: 80 },
+      {},
     );
   } catch (error) {
     ctx.logger.error(
       { error: error instanceof Error ? error.message : String(error) },
       'AI sampling failed',
     );
+    tracker.fail(error as Error);
     return Failure(`AI sampling failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   if (!response.ok) {
+    tracker.fail(`AI sampling failed: ${response.error}`);
     return Failure(`AI sampling failed: ${response.error}`);
   }
 
@@ -175,54 +176,85 @@ async function run(
     'Received AI response',
   );
 
-  const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
+  const jsonExtraction = extractJsonContent(responseText);
+  if (!jsonExtraction) {
     ctx.logger.error(
       { responseText: responseText.substring(0, 500) },
       'AI response did not contain valid JSON',
     );
+    tracker.fail('AI response did not contain valid JSON');
     return Failure('AI response did not contain valid JSON');
   }
 
   try {
-    const analysisResult = JSON.parse(jsonMatch[0]);
+    const analysisResult = jsonExtraction as RepositoryAnalysis;
 
     // Store the analysis result in session for other tools to use
-    const result = { ...analysisResult, sessionId: workflowSessionId };
+    const result: RepositoryAnalysis & { sessionId: string } = {
+      ...analysisResult,
+      sessionId: workflowSessionId,
+    };
 
+    // Store repository path and key metadata in session for downstream tools
     if (ctx.session) {
-      // Use the session facade to store results
-      ctx.session.set('results', {
-        'analyze-repo': result as RepositoryAnalysis,
-      });
-      ctx.session.set('current_step', 'analyze-repo');
-      ctx.session.pushStep('analyze-repo');
-
-      ctx.logger.info({ sessionId: workflowSessionId }, 'Stored repository analysis in session');
-    } else {
-      ctx.logger.warn('Could not store analysis in session - session may not be available');
+      ctx.session.set('analyzedPath', repoPath);
+      ctx.session.set('appName', result.name || path.basename(repoPath));
+      if (result.ports && result.ports.length > 0) {
+        ctx.session.set('appPorts', result.ports);
+      }
+      // Store monorepo/multi-module information if detected
+      if (result.isMonorepo === true && result.modules && result.modules.length > 0) {
+        ctx.session.set('isMonorepo', true);
+        ctx.session.set('modules', result.modules);
+        ctx.logger.info(
+          {
+            sessionId: workflowSessionId,
+            repoPath,
+            appName: result.name,
+            moduleCount: result.modules.length,
+          },
+          'Stored monorepo context with multiple modules in session',
+        );
+      } else {
+        ctx.logger.info(
+          { sessionId: workflowSessionId, repoPath, appName: result.name },
+          'Stored repository context in session for downstream tools',
+        );
+      }
     }
 
+    tracker.complete({
+      language: result.language,
+      framework: result.framework,
+      sessionId: workflowSessionId,
+    });
+
     // Add sessionId and workflowHints to the result
+    const moduleHint =
+      result.isMonorepo && result.modules && result.modules.length > 0
+        ? ` Detected ${result.modules.length} modules that can be containerized separately.`
+        : '';
+
     return Success({
       ...result,
       workflowHints: {
         nextStep: 'generate-dockerfile',
-        message: `Repository analysis complete. Use "generate-dockerfile" with sessionId ${workflowSessionId} to create an optimized Dockerfile for your ${result.language || 'application'}.`,
+        message: `Repository analysis complete.${moduleHint} Use "generate-dockerfile" with sessionId ${workflowSessionId} to create an optimized Dockerfile for your ${result.language || 'application'}.`,
       },
     });
   } catch (e) {
     const error = e as Error;
+    tracker.fail(error);
     const invalidJson = (() => {
       try {
-        return jsonMatch ? jsonMatch[0].substring(0, 200) : responseText.substring(0, 200);
+        return responseText.substring(0, 200);
       } catch {
         return '[unavailable]';
       }
     })();
     return Failure(
       `AI response parsing failed: ${error.message}\nInvalid JSON snippet: ${invalidJson}${
-        jsonMatch[0].length > 200 ? '...' : ''
+        responseText.length > 200 ? '...' : ''
       }`,
     );
   }
@@ -236,7 +268,7 @@ const tool: Tool<typeof analyzeRepoSchema, AIResponse> = {
   metadata: {
     aiDriven: true,
     knowledgeEnhanced: true,
-    samplingStrategy: 'rerank',
+    samplingStrategy: 'single',
     enhancementCapabilities: ['content-generation', 'analysis', 'technology-detection'],
   },
   run,

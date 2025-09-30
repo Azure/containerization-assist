@@ -2,7 +2,11 @@
     "$schema": "https://unpkg.com/knip@5/schema.json",
     "entry": [
         "src/index.ts",
-        "src/cli/server.ts"
+        "src/exports/tools.ts",
+        "src/mcp/mcp-server.ts",
+        "src/cli/cli.ts",
+        "test/**/*.test.ts",
+        "scripts/**/*.ts"
     ],
     "project": [
         "src/**/*.ts"
@@ -12,6 +16,10 @@
         "**/*.spec.ts",
         "scripts/**/*.js"
     ],
+    "ignoreExportsUsedInFile": {
+        "interface": true,
+        "type": true
+    },
     "ignoreDependencies": [
         "tsc-alias",
         "@kubernetes-models/apimachinery",
@@ -19,9 +27,5 @@
         "kubernetes-models",
         "@types/ajv"
     ],
-    "ignoreExportsUsedInFile": {
-        "interface": true,
-        "type": true
-    },
     "includeEntryExports": true
 }

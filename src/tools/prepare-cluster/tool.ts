@@ -21,7 +21,7 @@
  * ```
  */
 
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { getToolLogger, createToolTimer, createStandardizedToolTracker } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { randomUUID } from 'node:crypto';
 import type { ToolContext } from '@/mcp/context';
@@ -590,7 +590,7 @@ async function generateClusterOptimizations(
           return { overall: 0 };
         }
       },
-      { count: 2, stopAt: 85 },
+      {},
     );
 
     if (result.ok) {
@@ -632,19 +632,23 @@ async function prepareClusterImpl(
   const logger = getToolLogger(context, 'prepare-cluster');
   const timer = createToolTimer(logger, 'prepare-cluster');
 
+  const { environment = 'development', namespace = 'default' } = params;
+
+  const cluster = environment === 'development' ? 'kind' : 'default';
+  const shouldCreateNamespace = environment === 'production';
+  const shouldSetupRbac = environment === 'production';
+  const installIngress = false;
+  const checkRequirements = true;
+  const shouldSetupKind = environment === 'development';
+  const shouldCreateLocalRegistry = environment === 'development';
+
+  const tracker = createStandardizedToolTracker(
+    'prepare-cluster',
+    { cluster, namespace, environment },
+    logger,
+  );
+
   try {
-    const { environment = 'development', namespace = 'default' } = params;
-
-    const cluster = environment === 'development' ? 'kind' : 'default';
-    const shouldCreateNamespace = environment === 'production';
-    const shouldSetupRbac = environment === 'production';
-    const installIngress = false;
-    const checkRequirements = true;
-    const shouldSetupKind = environment === 'development';
-    const shouldCreateLocalRegistry = environment === 'development';
-
-    logger.info({ cluster, namespace, environment }, 'Starting cluster preparation');
-
     // Ensure session exists and get typed slice operations
     const sessionId = params.sessionId || randomUUID();
     let sessionState = null;
@@ -807,7 +811,6 @@ async function prepareClusterImpl(
           'prepare-cluster': result,
         },
         completed_steps: [...currentSteps, 'prepare-cluster'],
-        current_step: 'prepare-cluster',
       });
     }
 
@@ -856,15 +859,12 @@ async function prepareClusterImpl(
     };
 
     timer.end({ clusterReady, sessionId, environment });
-    logger.info(
-      { sessionId, clusterReady, checks, namespace, environment },
-      'Kubernetes cluster preparation completed',
-    );
+    tracker.complete({ clusterReady, namespace, environment });
 
     return Success(enrichedResult);
   } catch (error) {
     timer.error(error);
-    logger.error({ error }, 'Cluster preparation failed');
+    tracker.fail(error as Error);
 
     const errorMessage = error instanceof Error ? error.message : String(error);
     return Failure(errorMessage);
@@ -887,7 +887,7 @@ const tool: Tool<typeof prepareClusterSchema, PrepareClusterResult> = {
   metadata: {
     aiDriven: true,
     knowledgeEnhanced: false,
-    samplingStrategy: 'rerank',
+    samplingStrategy: 'single',
     enhancementCapabilities: [
       'cluster-optimization',
       'resource-recommendations',

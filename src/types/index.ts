@@ -29,8 +29,6 @@ import type { Topic } from './topics';
 export interface WorkflowState {
   /** Unique session identifier */
   sessionId: string;
-  /** Currently executing tool */
-  current_step?: string | null;
   /** Overall progress (0-100) */
   progress?: number;
   /** Results from completed tools */

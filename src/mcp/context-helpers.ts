@@ -93,8 +93,9 @@ export function extractProgressToken(request: unknown): string | undefined {
  */
 export function createProgressReporter(
   server: Server,
-  progressToken?: string,
+  progressToken?: string | number,
   logger?: Logger,
+  sendNotification?: (notification: unknown) => Promise<void>,
 ): EnhancedProgressReporter | undefined {
   if (!progressToken) {
     return undefined;
@@ -108,14 +109,14 @@ export function createProgressReporter(
   ) => {
     try {
       const notification: ProgressNotification = {
-        progressToken,
+        progressToken: String(progressToken),
         message,
         ...(progress !== undefined && { progress }),
         ...(total !== undefined && { total }),
         ...(metadata && { metadata }),
       };
 
-      sendProgressNotification(server, notification, logger);
+      await sendProgressNotification(server, notification, logger, sendNotification);
     } catch (error) {
       logger?.warn(
         {
@@ -130,25 +131,62 @@ export function createProgressReporter(
 }
 
 /**
- * Sends a progress notification through the MCP server.
- * Currently logs notifications as the MCP SDK doesn't expose direct notification methods.
+ * Sends a progress notification through the MCP server using the proper MCP protocol.
+ * Uses sendNotification callback if available (from request handler), otherwise falls back to logging.
  */
-function sendProgressNotification(
+async function sendProgressNotification(
   _server: Server,
   notification: ProgressNotification,
   logger?: Logger,
-): void {
-  logger?.debug(
-    {
-      progressToken: notification.progressToken,
-      message: notification.message,
-      progress: notification.progress,
-      total: notification.total,
-      metadata: notification.metadata,
-      type: 'progress_notification',
-    },
-    'Progress notification logged - MCP transport implementation pending',
-  );
+  sendNotification?: (notification: unknown) => Promise<void>,
+): Promise<void> {
+  // If we have a real sendNotification callback from the MCP request handler, use it
+  if (sendNotification) {
+    try {
+      await sendNotification({
+        method: 'notifications/progress',
+        params: {
+          progressToken: notification.progressToken,
+          progress: notification.progress || 0,
+          ...(notification.total !== undefined && { total: notification.total }),
+          ...(notification.message && { message: notification.message }),
+          ...(notification.metadata && { ...notification.metadata }),
+        },
+      });
+
+      logger?.debug(
+        {
+          progressToken: notification.progressToken,
+          message: notification.message,
+          progress: notification.progress,
+          total: notification.total,
+          type: 'progress_notification',
+        },
+        'Progress notification sent via MCP protocol',
+      );
+    } catch (error) {
+      logger?.warn(
+        {
+          error: error instanceof Error ? error.message : String(error),
+          progressToken: notification.progressToken,
+        },
+        'Failed to send MCP progress notification',
+      );
+    }
+  } else {
+    // Fallback to logging if no notification callback available
+    logger?.debug(
+      {
+        progressToken: notification.progressToken,
+        message: notification.message,
+        progress: notification.progress,
+        total: notification.total,
+        metadata: notification.metadata,
+        type: 'progress_notification',
+      },
+      'Progress notification logged - no sendNotification callback available',
+    );
+  }
 }
 
 /**
@@ -158,6 +196,7 @@ export function extractProgressReporter(
   progress: unknown,
   server: Server,
   logger: Logger,
+  sendNotification?: (notification: unknown) => Promise<void>,
 ): EnhancedProgressReporter | undefined {
   if (!progress) return undefined;
 
@@ -169,7 +208,7 @@ export function extractProgressReporter(
   // Extract token and create reporter
   const progressToken = extractProgressToken(progress);
   if (progressToken) {
-    return createProgressReporter(server, progressToken, logger);
+    return createProgressReporter(server, progressToken, logger, sendNotification);
   }
 
   return undefined;

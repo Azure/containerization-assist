@@ -20,7 +20,8 @@
  */
 
 import * as yaml from 'js-yaml';
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { getToolLogger, createToolTimer, createStandardizedToolTracker } from '@/lib/tool-helpers';
+import { getPostDeployHint } from '@/lib/workflow-hints';
 import type { Logger } from '@/lib/logger';
 import { extractErrorMessage } from '@/lib/error-utils';
 import type { ToolContext } from '@/mcp/context';
@@ -244,7 +245,7 @@ async function generateDeploymentAnalysis(
           failedResources,
         ),
       scoreDeploymentAnalysis,
-      { count: 2, stopAt: 85 },
+      {},
     );
 
     if (!analysisResult.ok) {
@@ -328,7 +329,7 @@ async function generateDeploymentAnalysis(
       recommendations,
       optimizations,
       troubleshooting,
-      confidence: analysisResult.value.winner.score,
+      confidence: analysisResult.value.score ?? 0,
     });
   } catch (error) {
     return Failure(`Failed to generate deployment analysis: ${extractErrorMessage(error)}`);
@@ -424,7 +425,14 @@ async function deployManifest(
   namespace: string,
   k8sClient: ReturnType<typeof createKubernetesClient>,
   logger: Logger,
-): Promise<{ success: boolean; resource?: { kind: string; name: string; namespace: string } }> {
+): Promise<
+  Result<{
+    kind: string;
+    name: string;
+    namespace: string;
+    guidance?: import('@/types').ErrorGuidance;
+  }>
+> {
   const { kind = 'unknown', metadata } = manifest;
   const name = metadata?.name ?? 'unknown';
 
@@ -432,23 +440,30 @@ async function deployManifest(
     const applyResult = await k8sClient.applyManifest(manifest as K8sManifest, namespace);
 
     if (!applyResult.ok) {
-      logger.error({ kind, name, error: applyResult.error }, 'Failed to apply manifest');
-      return { success: false };
+      logger.error(
+        {
+          kind,
+          name,
+          error: applyResult.error,
+          hint: applyResult.guidance?.hint,
+          resolution: applyResult.guidance?.resolution,
+        },
+        'Failed to apply manifest',
+      );
+      // Propagate K8s error guidance
+      return Failure(applyResult.error, applyResult.guidance);
     }
 
     logger.info({ kind, name }, 'Successfully deployed resource');
 
-    return {
-      success: true,
-      resource: {
-        kind,
-        name,
-        namespace: metadata?.namespace ?? namespace,
-      },
-    };
+    return Success({
+      kind,
+      name,
+      namespace: metadata?.namespace ?? namespace,
+    });
   } catch (error) {
     logger.error({ kind, name, error: extractErrorMessage(error) }, 'Exception deploying resource');
-    return { success: false };
+    return Failure(extractErrorMessage(error));
   }
 }
 
@@ -461,19 +476,25 @@ async function deployApplicationImpl(
 ): Promise<Result<DeployApplicationResult>> {
   const logger = getToolLogger(context, 'deploy');
   const timer = createToolTimer(logger, 'deploy');
+
+  const {
+    namespace = DEPLOYMENT_CONFIG.DEFAULT_NAMESPACE,
+    replicas = DEPLOYMENT_CONFIG.DEFAULT_REPLICAS,
+    environment = DEPLOYMENT_CONFIG.DEFAULT_ENVIRONMENT,
+  } = params;
+
+  const cluster = DEPLOYMENT_CONFIG.DEFAULT_CLUSTER;
+  const dryRun = DEPLOYMENT_CONFIG.DRY_RUN;
+  const wait = DEPLOYMENT_CONFIG.WAIT_FOR_READY;
+  const timeout = DEPLOYMENT_CONFIG.WAIT_TIMEOUT_SECONDS;
+
+  const tracker = createStandardizedToolTracker(
+    'deploy',
+    { namespace, cluster, environment },
+    logger,
+  );
+
   try {
-    const {
-      namespace = DEPLOYMENT_CONFIG.DEFAULT_NAMESPACE,
-      replicas = DEPLOYMENT_CONFIG.DEFAULT_REPLICAS,
-      environment = DEPLOYMENT_CONFIG.DEFAULT_ENVIRONMENT,
-    } = params;
-
-    const cluster = DEPLOYMENT_CONFIG.DEFAULT_CLUSTER;
-    const dryRun = DEPLOYMENT_CONFIG.DRY_RUN;
-    const wait = DEPLOYMENT_CONFIG.WAIT_FOR_READY;
-    const timeout = DEPLOYMENT_CONFIG.WAIT_TIMEOUT_SECONDS;
-    logger.info({ namespace, cluster, dryRun, environment }, 'Starting application deployment');
-
     // Use session facade directly
     const sessionId = params.sessionId || context.session?.id;
     if (!sessionId) {
@@ -486,19 +507,16 @@ async function deployApplicationImpl(
     );
     const k8sClient = createKubernetesClient(logger);
 
-    // Get K8s manifests from session results
+    // Get K8s manifests from session using getResult (normalized approach)
     let manifestContents: string | undefined;
     try {
       if (context.session) {
-        const results = context.session.get('results');
-        if (results && typeof results === 'object' && 'generate-k8s-manifests' in results) {
-          const k8sResult = (results as any)['generate-k8s-manifests'] as {
-            manifests?: string;
-          };
-          if (k8sResult.manifests) {
-            manifestContents = k8sResult.manifests;
-            logger.info({ sessionId }, 'Retrieved K8s manifests from session results');
-          }
+        const k8sResult = context.session.getResult<{ manifests?: string }>(
+          'generate-k8s-manifests',
+        );
+        if (k8sResult?.manifests) {
+          manifestContents = k8sResult.manifests;
+          logger.info({ sessionId }, 'Retrieved K8s manifests from session results');
         }
       }
     } catch (error) {
@@ -536,7 +554,12 @@ async function deployApplicationImpl(
     );
     // Deploy manifests with proper error handling
     const deployedResources: Array<{ kind: string; name: string; namespace: string }> = [];
-    const failedResources: Array<{ kind: string; name: string; error: string }> = [];
+    const failedResources: Array<{
+      kind: string;
+      name: string;
+      error: string;
+      guidance?: import('@/types').ErrorGuidance;
+    }> = [];
 
     if (!dryRun) {
       // Report progress
@@ -559,13 +582,14 @@ async function deployApplicationImpl(
 
         const result = await deployManifest(manifest, namespace, k8sClient, logger);
 
-        if (result.success && result.resource) {
-          deployedResources.push(result.resource);
+        if (result.ok) {
+          deployedResources.push(result.value);
         } else {
           failedResources.push({
             kind: manifest.kind ?? 'unknown',
             name: manifest.metadata?.name ?? 'unknown',
-            error: 'Deployment failed',
+            error: result.error,
+            ...(result.guidance && { guidance: result.guidance }),
           });
         }
       }
@@ -582,6 +606,20 @@ async function deployApplicationImpl(
 
       if (failedResources.length > 0) {
         logger.warn({ failedResources }, 'Some resources failed to deploy');
+
+        // If ALL manifests failed, return failure with guidance from the first failure
+        if (deployedResources.length === 0) {
+          const firstFailure = failedResources[0];
+          if (firstFailure?.guidance) {
+            return Failure(
+              `All manifest deployments failed. First error: ${firstFailure.error}`,
+              firstFailure.guidance,
+            );
+          }
+          return Failure(
+            `All manifest deployments failed. Errors: ${failedResources.map((f) => `${f.kind}/${f.name}: ${f.error}`).join(', ')}`,
+          );
+        }
       }
     } else {
       // For dry run, simulate deployment
@@ -779,39 +817,28 @@ async function deployApplicationImpl(
           },
         ],
       },
-      workflowHints: {
-        nextStep: 'verify-deploy',
-        message: `Application deployed successfully. Use "verify-deploy" with sessionId ${sessionId} to check deployment status, or access your application at: ${endpoints.length > 0 ? endpoints[0]?.url || 'the service endpoint' : 'the service endpoint'}.${deploymentAnalysis ? ' Review AI deployment analysis for optimization recommendations.' : ''}`,
-      },
+      workflowHints: getPostDeployHint(
+        endpoints,
+        context.session,
+        sessionId,
+        deploymentAnalysis ? String(deploymentAnalysis) : undefined,
+      ),
     };
 
-    // Store deployment result in session
-    if (context.session) {
-      context.session.set('results', {
-        ...((context.session.get('results') as Record<string, any>) || {}),
-        deploy: result,
-      });
-      context.session.set('current_step', 'deploy');
-      context.session.pushStep('deploy');
-    }
-    timer.end({ deploymentName, ready, sessionId });
+    // Store results in session
+    const existingResults = context.session?.get('results') || {};
+    context.session?.set('results', {
+      ...existingResults,
+      deploy: result,
+    });
 
-    if (ready) {
-      logger.info(
-        { sessionId, deploymentName, serviceName, ready, namespace },
-        'Kubernetes deployment completed successfully',
-      );
-    } else {
-      logger.warn(
-        { sessionId, deploymentName, serviceName, ready, namespace },
-        'Kubernetes deployment completed but pods are not ready',
-      );
-    }
+    timer.end({ deploymentName, ready, sessionId });
+    tracker.complete({ deploymentName, ready, namespace });
 
     return Success(result);
   } catch (error) {
     timer.error(error);
-    logger.error({ error }, 'Application deployment failed');
+    tracker.fail(error as Error);
     return Failure(extractErrorMessage(error));
   }
 }
@@ -832,7 +859,7 @@ const tool: Tool<typeof deployApplicationSchema, DeployApplicationResult> = {
   metadata: {
     aiDriven: true,
     knowledgeEnhanced: true,
-    samplingStrategy: 'rerank',
+    samplingStrategy: 'single',
     enhancementCapabilities: [
       'deployment-analysis',
       'troubleshooting',

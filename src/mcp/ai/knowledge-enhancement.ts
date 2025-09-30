@@ -2,11 +2,10 @@
  * Knowledge Enhancement Service
  *
  * Provides AI-powered knowledge enhancement for containerization content
- * Integrates with the sampling system for context-aware improvements
  */
 
 import type { ToolContext } from '@/mcp/context';
-import { sampleWithPlan } from '@/mcp/ai/sampling-runner';
+import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { Success, Failure, type Result, TOPICS } from '@/types';
@@ -14,7 +13,6 @@ import { extractErrorMessage } from '@/lib/error-utils';
 import { parseAIResponse } from '@/mcp/ai/response-parser';
 import { KnowledgeEnhancementResponseSchema } from '@/mcp/ai/schemas';
 import { scoreResponse } from '@/mcp/ai/quality';
-import { createContextAwarePlan } from '@/mcp/ai/sampling-plan';
 import { TOKEN_CONFIG } from '@/config/tokens';
 import { SCORING_CONFIG } from '@/config/scoring';
 import { SAMPLING_CONFIG } from '@/config/sampling';
@@ -103,14 +101,7 @@ export async function enhanceWithKnowledge(
       knowledgeBudget: 1000, // Moderate knowledge budget for enhancements
     });
 
-    // Create sampling plan for knowledge enhancement
-    const samplingPlan = createContextAwarePlan('knowledge', 'balanced', {
-      maxTokens: TOKEN_CONFIG.STANDARD,
-      stopAt: SCORING_CONFIG.THRESHOLDS.HIGH_QUALITY,
-    });
-
-    // Use sampling for high-quality results
-    const result = await sampleWithPlan(
+    const result = await sampleWithRerank(
       context,
       async (_attemptIndex) => ({
         messages: toMCPMessages(promptMessages).messages,
@@ -135,7 +126,7 @@ export async function enhanceWithKnowledge(
         });
         return scoreResult.total;
       },
-      samplingPlan,
+      {},
     );
 
     if (!result.ok) {

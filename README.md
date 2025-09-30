@@ -6,10 +6,10 @@ An AI-powered containerization assistant that helps you build, scan, and deploy 
 
 - 🐳 **Docker Integration**: Build, scan, and deploy container images
 - ☸️ **Kubernetes Support**: Generate manifests and deploy applications
-- 🤖 **AI-Powered**: Intelligent Dockerfile generation and optimization with N-best sampling
+- 🤖 **AI-Powered**: Intelligent Dockerfile generation and optimization with deterministic sampling
 - 🧠 **Knowledge Enhanced**: AI-driven content improvement with security and performance best practices
 - 🔄 **Intelligent Tool Routing**: Automatic dependency resolution and execution
-- 📊 **Progress Tracking**: Real-time progress updates via MCP
+- 📊 **Progress Tracking**: Real-time progress updates via MCP notifications
 - 🔒 **Security Scanning**: Built-in vulnerability scanning with AI-powered suggestions
 - ✨ **Smart Analysis**: Context-aware recommendations and optimization across 14 AI-enhanced tools
 
@@ -61,54 +61,104 @@ For Windows, use the Windows Docker pipe:
 "DOCKER_SOCKET": "//./pipe/docker_engine"
 ```
 
-## Usage Examples
+## Quick Start
 
-Once installed and configured, you can use natural language commands with GitHub Copilot or Claude Desktop:
+The easiest way to understand the containerization workflow is through an end-to-end example:
 
-### Basic Commands
+### Single-App Containerization Journey
 
-- **"Analyze my Node.js application for containerization"**
-- **"Generate a Dockerfile for this Python project"**
-- **"Build and scan a Docker image"**
-- **"Create Kubernetes deployment manifests"**
-- **"Analyze and containerize my application"**
+This MCP server guides you through a complete containerization workflow for a single application. The journey follows this sequence:
 
-### Step-by-Step Containerization
+1. **Analyze** → Understand your application's language, framework, and dependencies
+2. **Generate Dockerfile** → Create an optimized, security-hardened container configuration
+3. **Build Image** → Compile your application into a Docker image
+4. **Scan** → Identify security vulnerabilities and get remediation guidance
+5. **Tag** → Apply appropriate version tags to your image
+6. **Generate K8s Manifests** → Create deployment configurations for Kubernetes
+7. **Prepare Cluster** → Set up namespace and prerequisites (if needed)
+8. **Deploy** → Deploy your application to Kubernetes
+9. **Verify** → Confirm deployment health and readiness
 
-1. **Analyze your project:**
-   ```
-   "Analyze the repository at /path/to/my-app"
-   ```
+### Prerequisites
 
-2. **Generate Dockerfile:**
-   ```
-   "Create an optimized Dockerfile for this Node.js app"
-   ```
+Before starting, ensure you have:
 
-3. **Build image:**
-   ```
-   "Build a Docker image with tag myapp:latest"
-   ```
+- **Docker**: Running Docker daemon with accessible socket (`docker ps` should work)
+  - Linux/Mac: `/var/run/docker.sock` accessible
+  - Windows: Docker Desktop with `//./pipe/docker_engine` accessible
+- **Kubernetes** (optional, for deployment features):
+  - Valid kubeconfig at `~/.kube/config`
+  - Cluster connectivity (`kubectl cluster-info` should work)
+  - Appropriate RBAC permissions for deployments, services, namespaces
+- **Node.js**: Version 20 or higher
+- **MCP Client**: VS Code with Copilot, Claude Desktop, or another MCP-compatible client
 
-4. **Scan for vulnerabilities:**
-   ```
-   "Scan the image for security issues"
-   ```
+### Example Workflow with Natural Language
 
-5. **Deploy to Kubernetes:**
-   ```
-   "Generate Kubernetes manifests and deploy the application"
-   ```
+Once configured in your MCP client (VS Code Copilot, Claude Desktop, etc.), use natural language:
 
-### AI-Enhanced Features
+**Starting the Journey:**
+```
+"Analyze my Node.js application for containerization"
+```
 
-Take advantage of AI-powered insights and optimizations:
+**Building the Container:**
+```
+"Generate an optimized Dockerfile with security best practices"
+"Build a Docker image tagged myapp:v1.0.0"
+"Scan the image for vulnerabilities"
+```
 
-- **"Generate an optimized Dockerfile with security best practices"**
-- **"Scan my image and provide AI-powered remediation suggestions"**
-- **"Analyze my deployment and suggest performance optimizations"**
-- **"Fix this Dockerfile with knowledge-enhanced improvements"**
-- **"Deploy with intelligent resource optimization"**
+**Deploying to Kubernetes:**
+```
+"Generate Kubernetes manifests for this application"
+"Prepare my cluster and deploy to the default namespace"
+"Verify the deployment is healthy"
+```
+
+### Single-Operator Model
+
+This server is optimized for **one engineer containerizing one application at a time**. Key characteristics:
+
+- **Single session**: One active workflow at a time, state persists across tool executions
+- **Sequential execution**: Each tool builds on the results of previous steps
+- **Fast-fail validation**: Clear, actionable error messages if Docker/Kubernetes are unavailable
+- **Deterministic AI generation**: All AI-powered tools use single-candidate sampling with scoring for quality validation
+- **Real-time progress**: MCP notifications surface progress updates to clients during long-running operations
+- **Session helpers**: Orchestrator manages result storage and retrieval automatically
+
+### Multi-Module/Monorepo Support
+
+The server detects and supports monorepo structures with multiple independently deployable services:
+
+- **Automatic Detection**: `analyze-repo` identifies monorepo patterns (npm workspaces, services/, apps/ directories)
+- **Automated Multi-Module Generation**: `generate-dockerfile` and `generate-k8s-manifests` automatically iterate over all detected modules
+- **Conservative Safeguards**: Excludes shared libraries and utility folders from containerization
+- **Optional Module Selection**: Use `moduleName` parameter to target a specific module, otherwise all modules are processed
+
+**Multi-Module Workflow Example:**
+```
+1. "Analyze my monorepo at ./my-monorepo"
+   → Detects 3 modules: api-gateway, user-service, notification-service
+
+2. "Generate Dockerfiles using session <sessionId>"
+   → Automatically creates Dockerfiles for all 3 modules:
+     - services/api-gateway/Dockerfile
+     - services/user-service/Dockerfile
+     - services/notification-service/Dockerfile
+
+3. "Generate K8s manifests using session <sessionId>"
+   → Automatically creates manifests for all 3 modules
+
+4. Optional: "Generate Dockerfile for user-service module using session <sessionId>"
+   → Creates module-specific deployment manifests
+```
+
+**Detection Criteria:**
+- Workspace configurations (npm, yarn, pnpm workspaces, lerna, nx, turborepo, cargo workspace)
+- Separate package.json, pom.xml, go.mod, Cargo.toml per service
+- Independent entry points and build configs
+- EXCLUDES: shared/, common/, lib/, packages/utils directories
 
 ## Available Tools
 
@@ -154,40 +204,45 @@ Take advantage of AI-powered insights and optimizations:
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DOCKER_SOCKET` | Docker socket path | `/var/run/docker.sock` |
-| `LOG_LEVEL` | Logging level (debug, info, warn, error) | `info` |
-| `MCP_MODE` | Enable MCP mode | `true` |
-| `MCP_QUIET` | Suppress non-MCP output | `true` |
-| `AI_ENHANCEMENT_ENABLED` | Enable AI enhancement features | `true` |
-| `AI_ENHANCEMENT_CONFIDENCE` | Default confidence threshold for AI suggestions | `0.8` |
-| `AI_ENHANCEMENT_MAX_SUGGESTIONS` | Maximum AI suggestions per request | `5` |
+The following environment variables control server behavior:
 
-### Project Configuration
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `DOCKER_SOCKET` | Docker socket path | `/var/run/docker.sock` (Linux/Mac)<br>`//./pipe/docker_engine` (Windows) | Yes (for Docker features) |
+| `LOG_LEVEL` | Logging level | `info` | No |
+| `WORKSPACE_DIR` | Working directory for operations | Current directory | No |
+| `K8S_NAMESPACE` | Default Kubernetes namespace | `default` | No |
+| `NODE_ENV` | Environment mode | `production` | No |
 
-Create `.containerization-config.json` in your project root for custom settings:
+**Note on Runtime Configuration:**
+This server uses a **single-session model** optimized for one operator. Session state persists across tool executions within a single workflow and clears on server shutdown.
 
-```json
-{
-  "docker": {
-    "registry": "docker.io",
-    "buildkit": true
-  },
-  "security": {
-    "scanOnBuild": true
-  },
-  "kubernetes": {
-    "namespace": "default"
-  },
-  "aiEnhancement": {
-    "enabled": true,
-    "confidence": 0.8,
-    "focus": "security",
-    "includeExamples": true
-  }
-}
+**Progress Notifications:**
+Long-running operations (build, deploy, scan) emit real-time progress updates via MCP notifications. MCP clients can subscribe to these notifications to display progress to users.
+
+**Deterministic AI Sampling:**
+All AI-powered tools use deterministic sampling with `count: 1` to ensure reproducible outputs. Each generation includes scoring metadata for quality validation and diagnostics.
+
+### Policy Configuration (Optional)
+
+For advanced users, you can define custom policies to control AI generation behavior:
+
+```bash
+# Set policy file path
+export POLICY_PATH=/path/to/policy.yaml
+
+# Set policy environment (development, staging, production)
+export POLICY_ENVIRONMENT=production
 ```
+
+Policy files use a modular system with 5 components:
+- `policy-schemas.ts` - Type definitions and validation
+- `policy-io.ts` - Load and cache operations
+- `policy-eval.ts` - Rule evaluation logic
+- `policy-prompt.ts` - AI prompt constraint integration
+- `policy-constraints.ts` - Constraint extraction
+
+See `src/config/policy-*.ts` for implementation details.
 
 ## Alternative MCP Clients
 
@@ -240,6 +295,71 @@ npx @modelcontextprotocol/inspector containerization-assist-mcp start
 containerization-assist-mcp start --log-level debug
 ```
 
+### Kubernetes Connection Issues
+
+The server performs fast-fail validation when Kubernetes tools are used. If you encounter Kubernetes errors:
+
+**Kubeconfig Not Found**
+```bash
+# Check if kubeconfig exists
+ls -la ~/.kube/config
+
+# Verify kubectl can connect
+kubectl cluster-info
+
+# If using cloud providers, update kubeconfig:
+# AWS EKS
+aws eks update-kubeconfig --name <cluster-name> --region <region>
+
+# Google GKE
+gcloud container clusters get-credentials <cluster-name> --zone <zone>
+
+# Azure AKS
+az aks get-credentials --resource-group <rg> --name <cluster-name>
+```
+
+**Connection Timeout or Refused**
+```bash
+# Verify cluster is running
+kubectl get nodes
+
+# Check API server address
+kubectl config view
+
+# Test connectivity to API server
+kubectl cluster-info dump
+
+# Verify firewall rules allow connection to API server port (typically 6443)
+```
+
+**Authentication or Authorization Errors**
+```bash
+# Check current context and user
+kubectl config current-context
+kubectl config view --minify
+
+# Test permissions
+kubectl auth can-i create deployments --namespace default
+kubectl auth can-i create services --namespace default
+
+# If using cloud providers, refresh credentials:
+# AWS EKS: re-run update-kubeconfig
+# GKE: run gcloud auth login
+# AKS: run az login
+```
+
+**Invalid or Missing Context**
+```bash
+# List available contexts
+kubectl config get-contexts
+
+# Set a context
+kubectl config use-context <context-name>
+
+# View current configuration
+kubectl config view
+```
+
 ## Documentation
 
 - **[Getting Started Guide](./docs/getting-started.md)** - Detailed setup and first use
@@ -251,7 +371,52 @@ containerization-assist-mcp start --log-level debug
 
 ## For Developers
 
-If you want to contribute or run from source, see the [Development Setup Guide](./docs/development-setup.md).
+If you want to contribute or run from source:
+
+### Development Setup
+
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Build the project: `npm run build` (ESM + CJS dual build)
+4. Run validation: `npm run validate` (lint + typecheck + unit tests)
+5. Auto-fix issues: `npm run fix` (lint:fix + format)
+
+**Essential Commands:**
+- `npm run validate` - **Single validation command** for lint, typecheck, and tests (used locally and in CI)
+- `npm run fix` - Auto-fix linting issues and format code
+- `npm run build` - Full clean + ESM + CJS build
+- `npm run build:esm` - ESM-only build (dist/)
+- `npm run build:cjs` - CJS-only build (dist-cjs/)
+- `npm run build:watch` - Watch mode for development
+- `npm test` - Run all tests
+- `npm run test:unit` - Run unit tests only
+
+### Testing the Full Workflow
+
+To verify the end-to-end containerization workflow works correctly, run the smoke test:
+
+```bash
+npm run smoke:journey
+```
+
+**What it does:**
+This command executes the complete single-app workflow using real tool implementations:
+
+1. **Analyze repository** - Detects language and framework
+2. **Generate Dockerfile** - Creates optimized container configuration
+3. **Build Docker image** - Compiles the application
+4. **Scan for vulnerabilities** - Security analysis with remediation
+5. **Tag image** - Applies version tags
+6. **Prepare Kubernetes cluster** - Sets up namespace (if K8s available)
+7. **Deploy to Kubernetes** - Deploys the application (if K8s available)
+8. **Verify deployment** - Confirms health and readiness (if K8s available)
+
+**Requirements for smoke test:**
+- Docker daemon running
+- Kubernetes cluster optional (K8s steps will be skipped if unavailable)
+- Test fixture: `test/__support__/fixtures/python-flask` directory
+
+The smoke test validates that the sequential workflow functions as expected and provides logs for debugging.
 
 ## License
 

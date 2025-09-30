@@ -6,12 +6,27 @@
 // ===== RESULT TYPE SYSTEM =====
 
 /**
+ * Structured error information with actionable guidance
+ */
+export interface ErrorGuidance {
+  /** Primary error message */
+  message: string;
+  /** Actionable hint for the operator (what went wrong in user terms) */
+  hint?: string;
+  /** Specific resolution steps to fix the issue */
+  resolution?: string;
+  /** Additional context or details */
+  details?: Record<string, unknown>;
+}
+
+/**
  * Result type for functional error handling
  *
  * Provides explicit error handling without exceptions to ensure:
  * - Type-safe error propagation
  * - MCP protocol compatibility (no exception bubbling)
  * - Clean async chain composition
+ * - Actionable operator guidance for failures
  *
  * @example
  * ```typescript
@@ -19,27 +34,46 @@
  * if (result.ok) {
  *   console.log(result.value);
  * } else {
- *   console.error(result.error);
+ *   console.error(result.error); // string for backward compatibility
+ *   if (result.guidance) {
+ *     console.error('Hint:', result.guidance.hint);
+ *     console.error('Resolution:', result.guidance.resolution);
+ *   }
  * }
  * ```
  */
-export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
+export type Result<T> =
+  | { ok: true; value: T }
+  | { ok: false; error: string; guidance?: ErrorGuidance };
 
 /** Create a success result */
 export const Success = <T>(value: T): Result<T> => ({ ok: true, value });
 
-/** Create a failure result */
-export const Failure = <T>(error: string): Result<T> => ({ ok: false, error });
+/**
+ * Create a failure result with optional guidance
+ * @param error - Error message (required for backward compatibility)
+ * @param guidance - Optional structured guidance for operators
+ */
+export const Failure = <T>(error: string, guidance?: ErrorGuidance): Result<T> => {
+  // If guidance is provided but message is empty, use the error string
+  if (guidance && !guidance.message) {
+    guidance = { ...guidance, message: error };
+  }
+  return guidance ? { ok: false, error, guidance } : { ok: false, error };
+};
 
 /** Type guard to check if result is a failure */
-export const isFail = <T>(result: Result<T>): result is { ok: false; error: string } => !result.ok;
+export const isFail = <T>(
+  result: Result<T>,
+): result is { ok: false; error: string; guidance?: ErrorGuidance } => !result.ok;
 
 /** Type guard to check if result is successful */
 export const isSuccess = <T>(result: Result<T>): result is { ok: true; value: T } => result.ok;
 
 /** Type guard to check if result is a failure */
-export const isFailure = <T>(result: Result<T>): result is { ok: false; error: string } =>
-  !result.ok;
+export const isFailure = <T>(
+  result: Result<T>,
+): result is { ok: false; error: string; guidance?: ErrorGuidance } => !result.ok;
 
 // ===== COMMON TOOL METADATA =====
 

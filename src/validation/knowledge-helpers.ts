@@ -26,7 +26,6 @@ export async function enhanceContentIfNeeded(
 ): Promise<Result<KnowledgeEnhancementResult | null>> {
   const threshold = options.scoreThreshold || 90;
 
-  // Only apply knowledge enhancement if score is below threshold
   if (validationReport.score >= threshold) {
     return Success(null);
   }

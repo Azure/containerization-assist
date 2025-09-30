@@ -62,35 +62,38 @@
 
 **Key Files**:
 - `index.ts`: Main application exports and public API
-- `container.ts`: Dependency injection container configuration
 
 **Responsibilities**:
 - Public API definition
-- Dependency injection setup
+- Module exports coordination
 
 ### 📁 `/ai` - AI and Prompt Engine
-**Purpose**: Complete prompt engine and AI integration.
+**Purpose**: Complete prompt engine and AI integration with deterministic sampling.
 
 **Key Files**:
 - `prompt-engine.ts`: Core prompt building and message handling
-- `prompt-registry.ts`: Prompt template management
 - `prompt-templates.ts`: Template definitions
+- `quality.ts`: Quality scoring for AI outputs
 
 **Responsibilities**:
-- AI prompt generation and management
+- AI prompt generation with knowledge pack integration
+- Deterministic single-candidate sampling with quality scoring
 - Message building for AI interactions
-- Template system for consistent prompts
+- Knowledge enhancement of prompts
 
 ### 📁 `/app` - Application Core
 **Purpose**: Core application logic and orchestration.
 
 **Key Files**:
-- `index.ts`: Main application entry point
-- `kernel.ts`: Application kernel and lifecycle management
+- `index.ts`: Main application factory and entry point
+- `orchestrator.ts`: Tool execution orchestration and routing
+- `orchestrator-types.ts`: Orchestrator type definitions
 
 **Responsibilities**:
-- Application startup and shutdown
-- Core business logic coordination
+- Application startup and configuration
+- Tool execution coordination
+- Policy enforcement and validation
+- Session management integration
 
 ### 📁 `/cli` - Command Line Interface
 **Purpose**: CLI entry points and server management.
@@ -139,14 +142,20 @@
 - Connection and client management
 
 ### 📁 `/knowledge` - Knowledge Management
-**Purpose**: Knowledge base and matching system.
+**Purpose**: Knowledge base and matching system that enhances AI prompts.
 
 **Key Files**:
 - `matcher.ts`: Knowledge matching logic
+- `loader.ts`: Knowledge pack loading and validation
+
+**Related Assets**:
+- `knowledge/packs/`: Static JSON knowledge data (outside src/)
 
 **Responsibilities**:
-- Knowledge base integration
-- Content matching and retrieval
+- Knowledge base integration for AI prompts
+- Content matching and retrieval by tool and context
+- Knowledge pack loading and validation
+- Budget-aware knowledge selection for prompt enhancement
 
 ### 📁 `/lib` - Pure Utilities
 **Purpose**: Reusable utilities with no infrastructure dependencies.
@@ -155,7 +164,6 @@
 - `docker.ts`: Docker utility functions
 - `file-utils.ts`: File system utilities
 - `regex-patterns.ts`: Common regex patterns
-- `sampling.ts`: Sampling utilities
 
 **Responsibilities**:
 - Pure utility functions
@@ -168,22 +176,30 @@
 **Subdirectories**:
 
 #### `/ai`
-- `sampling-runner.ts`: AI sampling and execution
+- `knowledge-enhancement.ts`: Knowledge pack integration for MCP tools
+- `quality.ts`: Quality scoring and validation
 
 **Key Files**:
-- Various MCP-specific implementations
+- `mcp-server.ts`: MCP protocol server implementation
+- `context.ts`: Tool execution context management
 
 **Responsibilities**:
 - MCP protocol implementation
 - Tool registration and routing
-- MCP-specific AI integration
+- MCP-specific AI integration with knowledge enhancement
+- Context propagation for tool execution
 
 ### 📁 `/session` - Session Management
-**Purpose**: Unified session state management.
+**Purpose**: Unified session state management for single-operator workflows.
+
+**Key Files**:
+- `core.ts`: Session state management and persistence
 
 **Responsibilities**:
-- Session lifecycle management
-- Persistent state across tool executions
+- Single active session lifecycle management
+- Persistent state across tool executions within a workflow
+- Session state cleared on server shutdown
+- Tool result storage and retrieval
 
 ### 📁 `/tools` - Tool Implementations
 **Purpose**: Individual MCP tool implementations using co-located pattern.
@@ -280,19 +296,15 @@ Each tool is self-contained with its own directory:
 └── index.ts    # Public exports
 ```
 
-### 3. Dependency Injection Container
-Centralized dependency management in `/app/container.ts`:
+### 3. Application Factory Pattern
+Application initialization via factory function in `/app/index.ts`:
 
 ```typescript
-export interface Deps {
-  logger: Logger;
-  dockerClient: DockerClient;
-  sessionManager: SessionManager;
-  // ... other dependencies
-}
-
-export function createContainer(overrides = {}): Deps {
-  // Container configuration
+export async function createApp(options: AppOptions) {
+  // Initialize infrastructure clients
+  // Load and validate policies
+  // Create orchestrator with dependencies
+  // Return configured application
 }
 ```
 
@@ -349,12 +361,12 @@ import { Config } from '../config/types';
 
 ### Key Scripts
 ```bash
-npm run build           # Full build (ESM + CJS)
-npm run build:fast      # Fast development build
-npm run validate:pr:fast # Quick PR validation (30s)
-npm run lint:fix        # Auto-fix linting issues
-npm run test:unit       # Unit tests
-npm run quality:gates   # Comprehensive quality analysis
+npm run build        # Clean build (ESM + CJS)
+npm run build:esm    # Build ESM bundle only
+npm run build:cjs    # Build CJS bundle only
+npm run lint:fix     # Auto-fix linting issues
+npm run test:unit    # Unit tests
+npm run quality:gates # Comprehensive quality analysis
 ```
 
 ---
@@ -450,14 +462,15 @@ export const environment = {
 
 ### Adding New AI Prompts
 1. Add prompt templates in `src/ai/prompt-templates.ts`
-2. Register in `src/ai/prompt-registry.ts`
-3. Use via prompt engine: `buildMessages()` and related functions
+2. Use via prompt engine: `buildMessages()` function
+3. Optionally enhance with knowledge packs via `enhancePrompt()`
+4. Apply policy constraints via `applyPolicyConstraints()`
 
 ### Infrastructure Extensions
 1. Add new clients in `src/infra/`
 2. Follow Result<T> pattern for error handling
 3. Export via index files
-4. Register in dependency container (`src/container.ts`)
+4. Integrate with application factory in `src/app/index.ts`
 
 ### Policy System Extensions
 1. Extend schemas in `src/config/policy-schemas.ts`
@@ -488,6 +501,265 @@ export const environment = {
 
 ---
 
+## Knowledge Packs and Policy System
+
+### Knowledge Pack Integration
+
+Knowledge packs are a first-class feature that enhance AI prompts with domain-specific best practices and guidance. They are actively used throughout the containerization workflow and remain fully integrated post-simplification.
+
+**How Knowledge Packs Work**:
+1. **Static Data**: Knowledge stored as JSON files in `knowledge/packs/` (outside src/)
+2. **Loading**: `src/knowledge/loader.ts` validates and loads knowledge packs
+3. **Matching**: `src/knowledge/matcher.ts` selects relevant knowledge based on tool context
+4. **Enhancement**: `src/ai/prompt-engine.ts` imports from `@/knowledge/matcher` and injects knowledge via `getKnowledgeSnippets()`
+5. **Budget Control**: Knowledge selection respects character budgets via `maxChars` parameter
+6. **Integration**: `buildMessages()` automatically calls `selectKnowledgeSnippets()` with topic, environment, and tool context
+
+**Tools Using Knowledge Packs**:
+- `generate-dockerfile`: Best practices for container images (multi-stage builds, security hardening)
+- `scan`: Security scanning guidance and vulnerability remediation
+- `generate-k8s-manifests`: Kubernetes deployment patterns and best practices
+- `resolve-base-images`: Base image recommendations by language/framework
+- `fix-dockerfile`: Dockerfile optimization techniques
+
+**Knowledge Flow in Tool Execution**:
+```
+Tool Invocation → ToolContext → buildMessages() → getKnowledgeSnippets() → AI Prompt
+```
+
+**Verification**:
+- Unit tests: `test/unit/ai/prompt-engine.test.ts` validates knowledge injection
+- Integration tests: `test/integration/knowledge-policy-validation.test.ts` verifies end-to-end flow
+- Knowledge snippets visible in AI prompt metadata (`knowledgeCount` field)
+
+**Adding Knowledge**:
+1. Create/update JSON files in `knowledge/packs/`
+2. Follow the pack schema (tool-specific categories with `topic`, `environment`, `language` filters)
+3. Knowledge is automatically loaded and matched by tool name and context
+4. Use `maxChars` and `maxSnippets` to control knowledge budget
+
+### Policy System
+
+The policy system provides runtime configuration and constraint enforcement. It remains fully active post-cleanup.
+
+**Policy Architecture** (5 specialized modules in `src/config/`):
+1. **`policy-schemas.ts`**: Zod schemas and TypeScript type definitions
+2. **`policy-io.ts`**: Load, validate, migrate, and cache policy files
+3. **`policy-eval.ts`**: Rule evaluation and application logic
+4. **`policy-prompt.ts`**: AI prompt constraint integration
+5. **`policy-constraints.ts`**: Data-driven constraint extraction
+
+**Policy Enforcement Flow**:
+1. **Configuration**: Pass `policyPath` and optional `policyEnvironment` to `createApp()` or `createOrchestrator()`
+2. **Load**: `loadPolicy()` reads and validates YAML policy files at startup
+3. **Evaluation**: During tool execution, `applyPolicy()` matches tool name and parameters against policy rules
+4. **Blocking**: Rules with `actions.block: true` prevent tool execution and return failure
+5. **Warnings**: Rules with `actions.warn: true` log warnings but allow execution
+6. **Integration**: `src/app/orchestrator.ts` enforces policies before calling `tool.run()` (lines 232-245)
+
+**Policy Enforcement in Orchestrator**:
+```typescript
+if (policy) {
+  const policyResults = applyPolicy(policy, {
+    tool: tool.name,
+    params: validatedParams
+  });
+
+  const blockers = policyResults
+    .filter(r => r.matched && r.rule.actions.block)
+    .map(r => r.rule.id);
+
+  if (blockers.length > 0) {
+    return Failure(ERROR_MESSAGES.POLICY_BLOCKED(blockers));
+  }
+}
+```
+
+**Policy Features**:
+- **Type-safe**: Discriminated unions for compile-time safety (RegexMatcher vs FunctionMatcher)
+- **Stateless**: Pure functions without global mutable caches
+- **Environment-aware**: Policy rules can override per-environment
+- **Session-compatible**: Policies apply across all tools in a session
+- **Modular**: Each of 5 modules has single responsibility
+
+**Verification**:
+- Unit tests: `test/unit/app/orchestrator.test.ts` validates policy application
+- Unit tests: `test/unit/config/policy-validation.test.ts` validates policy loading and evaluation
+- Integration tests: `test/integration/knowledge-policy-validation.test.ts` verifies blocking behavior
+- Runtime: Policy violations return `Result.Failure` with blocker rule IDs
+
+**Example Policy** (YAML):
+```yaml
+version: "1.0"
+rules:
+  - id: block-production-deletion
+    category: compliance
+    priority: 100
+    conditions:
+      - kind: regex
+        pattern: "production|prod"
+      - kind: regex
+        pattern: "delete|remove"
+    actions:
+      block: true
+      message: "Cannot delete production resources"
+```
+
+**Adding/Updating Policies**:
+1. Create YAML policy file with `version`, `rules`, and optional `environments`
+2. Each rule has: `id`, `priority`, `conditions` (matchers), `actions`
+3. Pass policy file path via `policyPath` config option
+4. Override for specific environments using `environments` key in policy file
+
+---
+
+## Quickstart: Adding Knowledge Packs and Policies
+
+### Adding a New Knowledge Snippet
+
+Knowledge snippets enhance AI prompts with domain-specific guidance. Follow these steps:
+
+1. **Identify the target tool** (e.g., `generate-dockerfile`, `generate-k8s-manifests`)
+
+2. **Create or update pack file** in `knowledge/packs/`:
+   ```bash
+   # Example: knowledge/packs/dockerfile-security.json
+   ```
+
+3. **Define knowledge structure**:
+   ```json
+   {
+     "generate-dockerfile": [
+       {
+         "topic": "dockerfile-generation",
+         "environment": "production",
+         "language": "node",
+         "content": "For Node.js applications, use multi-stage builds...",
+         "priority": 10
+       }
+     ]
+   }
+   ```
+
+4. **Test knowledge integration**:
+   ```bash
+   npm run test:unit -- test/unit/knowledge/
+   npm run test:integration -- test/integration/knowledge-policy-validation.test.ts
+   ```
+
+5. **Verify in prompts**:
+   - Knowledge snippets are automatically included based on `topic`, `environment`, and `tool`
+   - Check `metadata.knowledgeCount` in prompt results
+   - Use `maxChars` parameter to control budget
+
+**Knowledge Pack Schema**:
+- `topic`: Matches against `TOPICS` enum (e.g., `TOPICS.DOCKERFILE_GENERATION`)
+- `environment`: Optional filter (`production`, `development`, `test`)
+- `language`: Optional filter (e.g., `node`, `python`, `go`)
+- `content`: The actual guidance text (Markdown supported)
+- `priority`: Higher priority snippets selected first (default: 0)
+
+**Best Practices**:
+- Keep snippets focused and actionable (200-500 characters)
+- Use higher priority (10+) for critical security/correctness guidance
+- Test with different budget constraints to ensure snippet is used
+- Include examples and specific recommendations, not general advice
+
+### Adding a New Policy Rule
+
+Policy rules enforce constraints and governance during tool execution.
+
+1. **Create policy file** (or extend existing):
+   ```bash
+   # Example: policies/my-team-policy.yaml
+   ```
+
+2. **Define policy rule**:
+   ```yaml
+   version: "1.0"
+   rules:
+     - id: require-version-tags
+       category: quality
+       priority: 50
+       conditions:
+         - kind: regex
+           pattern: "tag-image"
+           field: tool
+         - kind: regex
+           pattern: ":latest$"
+           field: params.imageName
+       actions:
+         block: true
+         warn: true
+         message: "Image tags must use semantic versions, not :latest"
+       description: "Enforce semantic versioning for image tags"
+   ```
+
+3. **Apply policy** via configuration:
+   ```typescript
+   const app = await createApp({
+     policyPath: './policies/my-team-policy.yaml',
+     policyEnvironment: 'production'
+   });
+   ```
+
+4. **Test policy enforcement**:
+   ```bash
+   npm run test:unit -- test/unit/config/policy-eval.test.ts
+   npm run test:integration -- test/integration/knowledge-policy-validation.test.ts
+   ```
+
+**Policy Rule Components**:
+- `id`: Unique rule identifier
+- `category`: Rule category (`security`, `quality`, `compliance`)
+- `priority`: Higher priority rules evaluated first (0-100)
+- `conditions`: Array of matchers (all must match for rule to trigger)
+  - `kind: regex`: Pattern matching against tool name or params
+  - `field`: Optional field selector (e.g., `params.imageName`, `tool`)
+- `actions`: What happens when rule matches
+  - `block`: Prevent tool execution (returns error)
+  - `warn`: Log warning but allow execution
+  - `message`: User-facing explanation
+
+**Testing Policy Rules**:
+```typescript
+import { loadPolicy } from '@config/policy-io';
+import { applyPolicy } from '@config/policy-eval';
+
+const result = loadPolicy('./policies/my-team-policy.yaml');
+if (result.ok) {
+  const policyResults = applyPolicy(result.value, {
+    tool: 'tag-image',
+    params: { imageName: 'myapp:latest' }
+  });
+
+  const blocked = policyResults.find(r => r.matched && r.rule.actions.block);
+  console.log('Policy blocked:', blocked !== undefined);
+}
+```
+
+**Environment-Specific Policies**:
+```yaml
+version: "1.0"
+rules:
+  - id: strict-in-production
+    # ... rule definition ...
+
+environments:
+  production:
+    rules:
+      - id: strict-in-production
+        actions:
+          block: true  # Block in production
+  development:
+    rules:
+      - id: strict-in-production
+        actions:
+          warn: true   # Only warn in development
+```
+
+---
+
 ## Conclusion
 
-The Containerization Assist MCP Server represents a modern, well-architected approach to AI-powered containerization workflows. Its clean separation of concerns, Result-based error handling, and comprehensive tool ecosystem make it both reliable and extensible. The focus on developer experience through fast builds, clear documentation, and comprehensive testing ensures long-term maintainability and ease of contribution.
+The Containerization Assist MCP Server represents a modern, well-architected approach to AI-powered containerization workflows. Its clean separation of concerns, Result-based error handling, and comprehensive tool ecosystem make it both reliable and extensible. The integration of knowledge packs for AI enhancement and the modular policy system for runtime configuration ensure that the platform can adapt to diverse requirements while maintaining deterministic, high-quality outputs. The focus on developer experience through fast builds, clear documentation, and comprehensive testing ensures long-term maintainability and ease of contribution.

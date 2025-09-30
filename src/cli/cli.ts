@@ -41,8 +41,6 @@ program
   .option('--config <path>', 'path to configuration file (.env)')
   .option('--log-level <level>', 'logging level: debug, info, warn, error (default: info)', 'info')
   .option('--workspace <path>', 'workspace directory path (default: current directory)', cwd())
-  .option('--port <port>', 'port for HTTP transport (default: stdio)', parseInt)
-  .option('--host <host>', 'host for HTTP transport (default: localhost)', 'localhost')
   .option('--dev', 'enable development mode with debug logging')
   .option('--validate', 'validate configuration and exit')
   .option('--list-tools', 'list all registered MCP tools and exit')
@@ -59,7 +57,6 @@ program
 
 Examples:
   $ containerization-assist-mcp                           Start server with stdio transport
-  $ containerization-assist-mcp --port 3000              Start server on HTTP port 3000
   $ containerization-assist-mcp --dev --log-level debug  Start in development mode with debug logs
   $ containerization-assist-mcp --list-tools             Show all available MCP tools
   $ containerization-assist-mcp --health-check           Check system dependencies
@@ -88,20 +85,6 @@ program.parse(argv);
 
 const options = program.opts();
 const command = program.args[0] ?? 'start';
-
-// Enhanced transport detection and logging
-function getTransportInfo(options: any): { type: 'stdio' | 'http'; details: string } {
-  if (options.port) {
-    return {
-      type: 'http',
-      details: `HTTP transport on ${options.host}:${options.port}`,
-    };
-  }
-  return {
-    type: 'stdio',
-    details: 'stdio transport (no port)',
-  };
-}
 
 // Enhanced Docker socket validation
 function validateDockerSocket(options: any): { dockerSocket: string; warnings: string[] } {
@@ -179,15 +162,6 @@ function provideContextualGuidance(error: Error, options: any): void {
     console.error('  • Specify custom socket: --docker-socket <path>');
   }
 
-  // Port/networking guidance
-  if (error.message.includes('EADDRINUSE')) {
-    console.error('\n💡 Port conflict detected:');
-    console.error(`  • Port ${options.port} is already in use`);
-    console.error('  • Try a different port: --port <number>');
-    console.error("  • Check what's using the port: lsof -i :<port>");
-    console.error('  • Use default stdio transport (no --port flag)');
-  }
-
   // Permission guidance
   if (error.message.includes('permission') || error.message.includes('EACCES')) {
     console.error('\n💡 Permission issue detected:');
@@ -204,15 +178,6 @@ function provideContextualGuidance(error: Error, options: any): void {
     console.error('  • Validate configuration: --validate');
     console.error('  • Check config file exists: --config <path>');
     console.error('  • Review configuration docs: docs/CONFIGURATION.md');
-  }
-
-  // Transport-specific guidance
-  if (options.port && !error.message.includes('EADDRINUSE')) {
-    console.error('\n💡 HTTP transport troubleshooting:');
-    console.error('  • HTTP transport is experimental');
-    console.error('  • Consider using default stdio transport');
-    console.error('  • Verify host/port configuration');
-    console.error('  • Check firewall/network settings');
   }
 
   console.error('\n🛠️ General troubleshooting steps:');
@@ -238,11 +203,6 @@ function validateOptions(opts: any): { valid: boolean; errors: string[] } {
   const validLogLevels = ['debug', 'info', 'warn', 'error'];
   if (opts.logLevel && !validLogLevels.includes(opts.logLevel)) {
     errors.push(`Invalid log level: ${opts.logLevel}. Valid options: ${validLogLevels.join(', ')}`);
-  }
-
-  // Validate port
-  if (opts.port && (opts.port < 1 || opts.port > 65535)) {
-    errors.push(`Invalid port: ${opts.port}. Must be between 1 and 65535`);
   }
 
   // Validate workspace directory exists
@@ -378,9 +338,6 @@ async function main(): Promise<void> {
       logger: getLogger(),
       policyPath: options.config || 'config/policy.yaml',
       policyEnvironment: options.dev ? 'development' : 'production',
-      maxRetries: 2,
-      retryDelay: 1000,
-      sessionTTL: 3600000,
     });
 
     if (options.listTools) {
@@ -417,100 +374,39 @@ async function main(): Promise<void> {
       process.exit(0);
     }
 
-    getLogger().info(
-      {
-        config: {
-          logLevel: config.server.logLevel,
-          workspace: config.workspace?.workspaceDir || process.cwd(),
-          devMode: options.dev,
-        },
-      },
-      'Starting Containerization Assist MCP Server',
-    );
-
-    // Get transport information
-    const transport = getTransportInfo(options);
-
-    // Only show startup messages when not in pure MCP mode
-    if (!process.env.MCP_QUIET) {
-      console.error('🚀 Starting Containerization Assist MCP Server...');
-      console.error(`📦 Version: ${packageJson.version}`);
-      console.error(`🏠 Workspace: ${config.workspace?.workspaceDir || process.cwd()}`);
-      console.error(`📊 Log Level: ${config.server.logLevel}`);
-      console.error(`🔌 Transport: ${transport.details}`);
-
-      if (options.dev) {
-        console.error('🔧 Development mode enabled');
-      }
-    }
-
-    await app.startServer({
-      transport: options.port ? 'http' : 'stdio',
-      port: options.port,
-      host: options.host,
-    });
-
-    // Replace the misleading HTTP-specific message
-    if (!process.env.MCP_QUIET) {
-      console.error('✅ Server started successfully');
-
-      if (transport.type === 'http') {
-        console.error(`🔌 Listening on HTTP port ${options.port}`);
-        console.error(`📡 Connect via: http://${options.host}:${options.port}`);
-      } else {
-        console.error('📡 Ready to accept MCP requests via stdio');
-        console.error('💡 Send JSON-RPC messages to stdin for interaction');
-      }
-    }
-
-    // Enhanced shutdown handling with timeout
-    const shutdown = async (signal: string): Promise<void> => {
-      const logger = getLogger();
-      logger.info({ signal }, 'Shutdown initiated');
-
-      if (!process.env.MCP_QUIET) {
-        console.error(`\n🛑 Received ${signal}, shutting down gracefully...`);
-      }
-
-      // Set a timeout for shutdown
-      const shutdownTimeout = setTimeout(() => {
-        logger.error('Forced shutdown due to timeout');
-        console.error('⚠️ Forced shutdown - some resources may not have cleaned up properly');
-        process.exit(1);
-      }, 10000); // 10 second timeout
-
-      try {
-        await app.stop();
-        clearTimeout(shutdownTimeout);
-
-        if (!process.env.MCP_QUIET) {
-          console.error('✅ Shutdown complete');
-        }
-        process.exit(0);
-      } catch (error) {
-        clearTimeout(shutdownTimeout);
-        logger.error({ error }, 'Shutdown error');
-        console.error('❌ Shutdown error:', error);
-        process.exit(1);
-      }
+    const transportConfig = {
+      transport: 'stdio' as const,
     };
 
-    process.on('SIGTERM', () => {
-      shutdown('SIGTERM').catch((error) => {
-        getLogger().error({ error }, 'Error during SIGTERM shutdown');
-        process.exit(1);
-      });
-    });
+    // Use shared startup logging
+    const { logStartup, logStartupSuccess, installShutdownHandlers } = await import(
+      '@/lib/runtime-logging'
+    );
 
-    process.on('SIGINT', () => {
-      shutdown('SIGINT').catch((error) => {
-        getLogger().error({ error }, 'Error during SIGINT shutdown');
-        process.exit(1);
-      });
-    });
+    const health = app.healthCheck();
+    logStartup(
+      {
+        appName: 'containerization-assist-mcp',
+        version: packageJson.version,
+        workspace: config.workspace?.workspaceDir || process.cwd(),
+        logLevel: config.server.logLevel,
+        transport: transportConfig,
+        devMode: options.dev,
+        toolCount: health.tools,
+      },
+      getLogger(),
+      !!process.env.MCP_QUIET,
+    );
+
+    await app.startServer(transportConfig);
+
+    logStartupSuccess(transportConfig, getLogger(), !!process.env.MCP_QUIET);
+
+    // Install unified shutdown handlers
+    installShutdownHandlers(app, getLogger(), !!process.env.MCP_QUIET);
   } catch (error) {
-    getLogger().error({ error }, 'Server startup failed');
-    console.error('❌ Server startup failed');
+    const { logStartupFailure } = await import('@/lib/runtime-logging');
+    logStartupFailure(error as Error, getLogger(), !!process.env.MCP_QUIET);
 
     if (error instanceof Error) {
       provideContextualGuidance(error, options);
@@ -520,17 +416,7 @@ async function main(): Promise<void> {
   }
 }
 
-process.on('uncaughtException', (error) => {
-  getLogger().fatal({ error }, 'Uncaught exception in CLI');
-  console.error('❌ Uncaught exception:', error);
-  exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  getLogger().fatal({ reason, promise }, 'Unhandled rejection in CLI');
-  console.error('❌ Unhandled rejection:', reason);
-  exit(1);
-});
+// Uncaught exception and rejection handlers are installed by the unified shutdown handlers
 
 // Run the CLI
 void main();

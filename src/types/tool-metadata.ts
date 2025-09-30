@@ -61,7 +61,7 @@ export type EnhancementCapability = z.infer<typeof EnhancementCapabilitySchema>;
 /**
  * Sampling strategy enum
  */
-export const SamplingStrategySchema = z.enum(['none', 'single', 'rerank']);
+export const SamplingStrategySchema = z.enum(['none', 'single']);
 export type SamplingStrategy = z.infer<typeof SamplingStrategySchema>;
 
 /**
@@ -132,7 +132,7 @@ export function createAIMetadata(overrides: Partial<ToolMetadata> = {}): ToolMet
   return {
     aiDriven: true,
     knowledgeEnhanced: overrides.knowledgeEnhanced ?? true,
-    samplingStrategy: overrides.samplingStrategy ?? 'rerank',
+    samplingStrategy: overrides.samplingStrategy ?? 'single',
     enhancementCapabilities: overrides.enhancementCapabilities ?? ['generation', 'analysis'],
     confidenceThreshold: overrides.confidenceThreshold,
     maxRetries: overrides.maxRetries ?? 3,
@@ -157,7 +157,7 @@ export function validateMetadataConsistency(
 
   // AI-driven tools should have appropriate sampling strategy
   if (metadata.aiDriven && metadata.samplingStrategy === 'none') {
-    issues.push('AI-driven tools should use "single" or "rerank" sampling strategy');
+    issues.push('AI-driven tools should use "single" sampling strategy');
   }
 
   // Knowledge-enhanced tools should be AI-driven
@@ -170,14 +170,14 @@ export function validateMetadataConsistency(
     issues.push('Knowledge-enhanced tools should specify enhancement capabilities');
   }
 
-  // AI-driven tools with high confidence threshold should use rerank
+  // AI-driven tools with high confidence threshold should use single
   if (
     metadata.aiDriven &&
     metadata.confidenceThreshold &&
     metadata.confidenceThreshold > 0.8 &&
-    metadata.samplingStrategy !== 'rerank'
+    metadata.samplingStrategy !== 'single'
   ) {
-    issues.push('High confidence thresholds (>0.8) require "rerank" sampling strategy');
+    issues.push('High confidence thresholds (>0.8) require "single" sampling strategy');
   }
 
   if (issues.length > 0) {
@@ -255,7 +255,7 @@ export interface ValidationReport {
  * Suggestion mapping for common validation issues
  */
 const VALIDATION_SUGGESTIONS: Record<string, string> = {
-  'AI-driven tool should have sampling strategy': 'Set samplingStrategy to "single" or "rerank"',
+  'AI-driven tool should have sampling strategy': 'Set samplingStrategy to "single"',
   'Knowledge-enhanced tool missing capabilities': 'Add appropriate enhancementCapabilities array',
   'Knowledge-enhanced should be AI-driven': 'Set aiDriven: true for knowledge-enhanced tools',
   'AI-driven tool should specify capabilities': 'Add relevant enhancementCapabilities',

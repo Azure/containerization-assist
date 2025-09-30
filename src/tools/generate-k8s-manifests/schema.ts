@@ -21,8 +21,18 @@ import {
 
 export const generateK8sManifestsSchema = z.object({
   sessionId: sessionId.optional(),
-  imageId: imageId.min(1).describe('Docker image to deploy (required)'),
-  appName,
+  imageId: imageId
+    .optional()
+    .describe('Docker image to deploy. If not provided, uses image from build-image session data.'),
+  appName: appName
+    .optional()
+    .describe('Application name. If not provided, uses name from analyze-repo session data.'),
+  moduleName: z
+    .string()
+    .optional()
+    .describe(
+      'Specific module name to generate manifests for (use with monorepo/multi-module projects). If not specified and modules are detected in session, generates for the first module or prompts for selection.',
+    ),
   path: path.optional().describe('Path where the k8s folder should be created'),
   namespace,
   replicas,

@@ -11,15 +11,14 @@ import { createLogger } from '../../src/lib/logger';
 describe('Cache Integration Tests', () => {
   beforeEach(() => {
     // Clear all caches before each test
-    cacheInstances.aiResponses.clear();
     cacheInstances.dockerMetadata.clear();
     cacheInstances.scanResults.clear();
   });
 
   describe('Cache Performance Validation', () => {
     test('should meet performance target: <10ms cache lookup', () => {
-      const cache = cacheInstances.aiResponses;
-      cache.set('perf-test', 'test-data');
+      const cache = cacheInstances.dockerMetadata;
+      cache.set('perf-test', { size: 1000, layers: 5 });
 
       const iterations = 1000;
       const startTime = Date.now();
@@ -35,26 +34,25 @@ describe('Cache Integration Tests', () => {
     });
 
     test('should maintain memory usage under reasonable limits', () => {
-      const cache = cacheInstances.aiResponses;
-      
+      const cache = cacheInstances.dockerMetadata;
+
       // Add significant amount of data
-      const largeContent = 'x'.repeat(1000); // 1KB per entry
-      for (let i = 0; i < 50; i++) {
-        cache.set(`large-key-${i}`, largeContent);
+      for (let i = 0; i < 100; i++) {
+        cache.set(`large-key-${i}`, { size: 1024000, layers: i % 10 });
       }
 
       // Check cache size doesn't exceed maxSize
-      expect(cache.size()).toBeLessThanOrEqual(50); // maxSize is 50 for aiResponses
+      expect(cache.size()).toBeLessThanOrEqual(100); // maxSize is 100 for dockerMetadata
       expect(cache.size()).toBeGreaterThan(0); // Should have entries
     });
 
     test('should provide accurate cache statistics', () => {
-      const cache = cacheInstances.aiResponses;
+      const cache = cacheInstances.dockerMetadata;
       cache.clear(); // Start fresh
 
       // Add some entries
-      cache.set('key1', 'value1');
-      cache.set('key2', 'value2');
+      cache.set('key1', { size: 100, layers: 2 });
+      cache.set('key2', { size: 200, layers: 3 });
       
       // Access entries to generate hits
       cache.get('key1');

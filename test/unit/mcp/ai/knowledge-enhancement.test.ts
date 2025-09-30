@@ -18,7 +18,7 @@ jest.mock('@/mcp/ai/message-converter');
 jest.mock('@/mcp/ai/response-parser');
 jest.mock('@/mcp/ai/quality');
 
-const mockSampleWithPlan = jest.mocked(require('@/mcp/ai/sampling-runner').sampleWithPlan);
+const mockSampleWithRerank = jest.mocked(require('@/mcp/ai/sampling-runner').sampleWithRerank);
 const mockBuildMessages = jest.mocked(require('@/ai/prompt-engine').buildMessages);
 const mockToMCPMessages = jest.mocked(require('@/mcp/ai/message-converter').toMCPMessages);
 const mockParseAIResponse = jest.mocked(require('@/mcp/ai/response-parser').parseAIResponse);
@@ -101,7 +101,7 @@ CMD ["npm", "start"]`,
         },
       }),
     );
-    mockSampleWithPlan.mockResolvedValue(
+    mockSampleWithRerank.mockResolvedValue(
       Success({
         text: JSON.stringify({
           enhancedContent: `FROM node:18-alpine
@@ -194,7 +194,7 @@ CMD ["npm", "start"]`,
         expect(result.value.metadata.qualityScore).toBeGreaterThanOrEqual(0);
       }
 
-      expect(mockSampleWithPlan).toHaveBeenCalledTimes(1);
+      expect(mockSampleWithRerank).toHaveBeenCalledTimes(1);
       expect(mockBuildMessages).toHaveBeenCalledTimes(1);
     });
 
@@ -305,11 +305,11 @@ spec:
         expect(result.ok).toBe(true);
       }
 
-      expect(mockSampleWithPlan).toHaveBeenCalledTimes(testCases.length);
+      expect(mockSampleWithRerank).toHaveBeenCalledTimes(testCases.length);
     });
 
     it('should handle sampling failure gracefully', async () => {
-      mockSampleWithPlan.mockResolvedValue(Failure('Sampling failed'));
+      mockSampleWithRerank.mockResolvedValue(Failure('Sampling failed'));
 
       const request: KnowledgeEnhancementRequest = {
         content: 'FROM node:18',

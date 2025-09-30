@@ -10,7 +10,7 @@
  * @version 3.0.0
  * @aiDriven true
  * @knowledgeEnhanced true
- * @samplingStrategy rerank
+ * @samplingStrategy single
  */
 
 import { Success, Failure, type Result, TOPICS } from '@/types';
@@ -18,7 +18,7 @@ import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
 import { generateDockerfileSchema } from './schema';
 import type { AIResponse } from '../ai-response-types';
-import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
+import type { RepositoryAnalysis, ModuleInfo } from '@/tools/analyze-repo/schema';
 import { promises as fs } from 'node:fs';
 import nodePath from 'node:path';
 import { DockerfileParser } from 'dockerfile-ast';
@@ -26,8 +26,11 @@ import { promptTemplates, type DockerfilePromptParams } from '@/ai/prompt-templa
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
+import { createDockerfileScoringFunction } from '@/lib/scoring';
 import { validateDockerfileContent } from '@/validation/dockerfile-validator';
 import type { KnowledgeEnhancementResult } from '@/mcp/ai/knowledge-enhancement';
+import { extractDockerfileContent } from '@/lib/content-extraction';
+import { createStandardizedToolTracker } from '@/lib/tool-helpers';
 import type { z } from 'zod';
 
 const name = 'generate-dockerfile';
@@ -35,106 +38,40 @@ const description = 'Generate optimized Dockerfiles for containerizing applicati
 const version = '3.0.0';
 
 /**
- * Extract Dockerfile content from AI response
+ * Generate Dockerfile for a single module or app
  */
-function extractDockerfileContent(responseText: string): string {
-  // Try to extract content between triple backticks
-  const codeBlockMatch = responseText.match(/```(?:dockerfile)?\s*\n([\s\S]*?)```/);
-  if (codeBlockMatch?.[1]) {
-    return codeBlockMatch[1].trim();
-  }
-
-  // Try to extract content between JSON-like structure
-  const jsonMatch = responseText.match(/"dockerfile":\s*"([^"]+)"/);
-  if (jsonMatch?.[1]) {
-    // Unescape the JSON string
-    return jsonMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').trim();
-  }
-
-  const fromMatch = responseText.match(/(FROM\s+[\s\S]*)/);
-  if (fromMatch?.[1]) {
-    // Find the end of the Dockerfile (usually ends with CMD, ENTRYPOINT, or end of text)
-    const dockerContent = fromMatch[1];
-    const endMatch = dockerContent.match(/([\s\S]*?(?:CMD|ENTRYPOINT)[^\n]*)/);
-    if (endMatch?.[1]) {
-      return endMatch[1].trim();
-    }
-    return dockerContent.trim();
-  }
-
-  return responseText.trim();
-}
-
-/**
- * Score a Dockerfile for quality assessment
- * Returns a score from 0-100 based on parseability, validation, and best practices
- */
-function scoreDockerfile(text: string): number {
-  let score = 0;
-
-  // Basic parseability (30 points)
-  try {
-    DockerfileParser.parse(text);
-    score += 30;
-
-    // Additional parsing checks
-    if (text.includes('FROM ')) score += 5;
-    if (!/^\s*$/.test(text)) score += 5; // Not empty
-  } catch {
-    // If it doesn't parse, it's fundamentally broken
-    return 0;
-  }
-
-  // Best practices scoring (70 points total)
-  // Security practices (25 points)
-  if (/FROM\s+[^\s:]+:[^:\s]+(?:\s|$)/.test(text) && !/FROM\s+[^\s:]+:latest/.test(text)) {
-    score += 10; // Pinned version, not latest
-  }
-  if (/USER\s+(?!root|0)\w+/.test(text)) {
-    score += 10; // Non-root user
-  }
-  if (!/(password|secret|api_key|token)\s*[=:]\s*[^\s]+/i.test(text)) {
-    score += 5; // No hardcoded secrets
-  }
-
-  // Multi-stage builds (15 points)
-  const fromCount = (text.match(/^FROM\s+/gm) || []).length;
-  if (fromCount > 1 || /FROM\s+.*\sAS\s+\w+/i.test(text)) {
-    score += 15;
-  }
-
-  // Health checks (10 points)
-  if (/HEALTHCHECK/i.test(text)) {
-    score += 10;
-  }
-
-  // Working directory (5 points)
-  if (/WORKDIR/i.test(text)) {
-    score += 5;
-  }
-
-  // Port exposure (5 points)
-  if (/EXPOSE\s+\d+/.test(text)) {
-    score += 5;
-  }
-
-  // Layer optimization (10 points)
-  if (/COPY\s+package.*\.json/.test(text) || /COPY\s+go\.mod\s+go\.sum/.test(text)) {
-    score += 5; // Dependency files copied separately
-  }
-  if (!/RUN.*&&.*&&.*&&.*&&/m.test(text)) {
-    score += 5; // Reasonable RUN command chaining
-  }
-
-  return Math.min(score, 100);
-}
-
-async function run(
+async function generateSingleDockerfile(
   input: z.infer<typeof generateDockerfileSchema>,
   ctx: ToolContext,
+  targetModule?: ModuleInfo,
+): Promise<Result<AIResponse>>;
+
+async function generateSingleDockerfile(
+  input: z.infer<typeof generateDockerfileSchema>,
+  ctx: ToolContext,
+  targetModule?: ModuleInfo,
 ): Promise<Result<AIResponse>> {
-  const { multistage, securityHardening, optimization, sessionId, path, baseImagePreference } =
-    input;
+  const { multistage, securityHardening, optimization, sessionId, baseImagePreference } = input;
+
+  // Retrieve repository path from session if not provided
+  let path = input.path;
+  if (!path && sessionId && ctx.session) {
+    const analyzedPath = ctx.session.get<string>('analyzedPath');
+    if (analyzedPath) {
+      path = analyzedPath;
+      ctx.logger.info({ path }, 'Using repository path from session (analyze-repo)');
+    }
+  }
+
+  // Path is required - fail if still not available
+  if (!path) {
+    return Failure(
+      'Repository path is required. Either provide path parameter or run analyze-repo first with a sessionId.',
+    );
+  }
+
+  // Determine target module path
+  const targetModulePath = targetModule?.path;
 
   // Retrieve repository analysis from session if sessionId is provided
   let language = 'auto-detect';
@@ -146,16 +83,43 @@ async function run(
 
   // Try to get analysis from session if sessionId is provided
   if (sessionId && ctx.session) {
-    const results = ctx.session.get('results');
-    if (
-      results &&
-      typeof results === 'object' &&
-      'analyze-repo' in results &&
-      results['analyze-repo']
-    ) {
-      const analysis = results['analyze-repo'] as RepositoryAnalysis;
+    const analysis = ctx.session.getResult<RepositoryAnalysis>('analyze-repo');
 
-      // Use actual values from the analysis
+    // If generating for a specific module, use module-specific data
+    if (targetModule) {
+      language = targetModule.language || 'auto-detect';
+      framework = targetModule.framework;
+      dependencies = targetModule.dependencies || [];
+      ports = targetModule.ports || [8080];
+
+      // Build requirements from module analysis
+      const reqParts: string[] = [];
+      reqParts.push(`Module: ${targetModule.name}`);
+      reqParts.push(`Path: ${targetModule.path}`);
+      if (language)
+        reqParts.push(
+          `Language: ${language}${targetModule.languageVersion ? ` (${targetModule.languageVersion})` : ''}`,
+        );
+      if (framework)
+        reqParts.push(
+          `Framework: ${framework}${targetModule.frameworkVersion ? ` (${targetModule.frameworkVersion})` : ''}`,
+        );
+      if (targetModule.buildSystem?.type)
+        reqParts.push(`Build System: ${targetModule.buildSystem.type}`);
+      if (dependencies.length > 0) {
+        reqParts.push(
+          `Key Dependencies: ${dependencies.slice(0, 5).join(', ')}${dependencies.length > 5 ? '...' : ''}`,
+        );
+      }
+      if (targetModule.entryPoint) reqParts.push(`Entry Point: ${targetModule.entryPoint}`);
+      requirements = reqParts.join('\n');
+
+      ctx.logger.info(
+        { sessionId, moduleName: targetModule.name, language, framework },
+        'Using module-specific analysis data',
+      );
+    } else if (analysis) {
+      // Use repo-level analysis
       language = typeof analysis.language === 'string' ? analysis.language : 'auto-detect';
       framework = typeof analysis.framework === 'string' ? analysis.framework : undefined;
       dependencies = Array.isArray(analysis.dependencies) ? analysis.dependencies : [];
@@ -213,9 +177,10 @@ async function run(
 
   const environment = input.environment || 'production';
 
-  ctx.logger.info(
+  const tracker = createStandardizedToolTracker(
+    'generate-dockerfile',
     { language, framework, multistage, optimization, path },
-    'Starting Dockerfile generation with prompt templates',
+    ctx.logger,
   );
 
   try {
@@ -252,7 +217,7 @@ async function run(
       knowledgeBudget: 5000,
     });
 
-    // Use N-best sampling for better quality Dockerfiles
+    // Use deterministic sampling with optional scoring for quality validation
     const samplingResult = await sampleWithRerank(
       ctx,
       async (attempt) => ({
@@ -266,23 +231,25 @@ async function run(
           costPriority: 0.4,
         },
       }),
-      (text) => scoreDockerfile(extractDockerfileContent(text)),
-      { count: 3, stopAt: 95 },
+      createDockerfileScoringFunction(),
+      {},
     );
 
     if (!samplingResult.ok) {
+      tracker.fail(`Failed to generate Dockerfile: ${samplingResult.error}`);
       return Failure(`Failed to generate Dockerfile: ${samplingResult.error}`);
     }
 
-    const dockerfileContent = extractDockerfileContent(samplingResult.value.text);
+    const extraction = extractDockerfileContent(samplingResult.value.text);
+    const dockerfileContent =
+      extraction.success && extraction.content ? extraction.content : samplingResult.value.text;
 
     ctx.logger.info(
       {
-        candidatesGenerated: samplingResult.value.all?.length || 1,
-        winnerScore: samplingResult.value.winner.score,
+        score: samplingResult.value.score,
         model: samplingResult.value.model,
       },
-      'N-best sampling completed for Dockerfile generation',
+      'Deterministic sampling completed for Dockerfile generation',
     );
 
     // Validate the extracted Dockerfile using proper parser
@@ -301,6 +268,7 @@ async function run(
           },
           'Dockerfile missing FROM instruction',
         );
+        tracker.fail('Generated Dockerfile is missing FROM instruction');
         return Failure('Generated Dockerfile is missing FROM instruction');
       }
 
@@ -313,6 +281,7 @@ async function run(
         );
       }
     } catch (parseError) {
+      const errorMsg = `Generated Dockerfile has invalid syntax: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`;
       ctx.logger.error(
         {
           error: parseError instanceof Error ? parseError.message : String(parseError),
@@ -320,9 +289,8 @@ async function run(
         },
         'Failed to parse Dockerfile',
       );
-      return Failure(
-        `Generated Dockerfile has invalid syntax: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`,
-      );
+      tracker.fail(errorMsg);
+      return Failure(errorMsg);
     }
 
     // Self-repair loop - attempt to fix validation issues
@@ -448,7 +416,11 @@ ${finalDockerfileContent}
 
         const repairedText = repaired.content?.[0]?.text ?? '';
         if (repairedText) {
-          const repairedDockerfile = extractDockerfileContent(repairedText);
+          const repairedExtraction = extractDockerfileContent(repairedText);
+          const repairedDockerfile =
+            repairedExtraction.success && repairedExtraction.content
+              ? repairedExtraction.content
+              : repairedText;
 
           // Validate the repaired version
           const repairedValidation = await validateDockerfileContent(repairedDockerfile, {
@@ -498,15 +470,15 @@ ${finalDockerfileContent}
     // Determine where to write the Dockerfile
     let dockerfilePath = '';
     if (sessionId && ctx.session) {
-      // Get the analyzed path from session
-      const metadata = ctx.session.get('metadata');
-      if (
-        metadata &&
-        typeof metadata === 'object' &&
-        'analyzedPath' in metadata &&
-        metadata.analyzedPath
-      ) {
-        dockerfilePath = nodePath.join(metadata.analyzedPath as string, 'Dockerfile');
+      // Get the analyzed path from session (stored by analyze-repo)
+      const analyzedPath = ctx.session.get<string>('analyzedPath');
+      if (analyzedPath) {
+        // If generating for a module, use the module's path
+        if (targetModulePath) {
+          dockerfilePath = nodePath.join(analyzedPath, targetModulePath, 'Dockerfile');
+        } else {
+          dockerfilePath = nodePath.join(analyzedPath, 'Dockerfile');
+        }
       }
     } else if (input.path) {
       // Use the provided path
@@ -537,15 +509,28 @@ ${finalDockerfileContent}
 
     // Update session if available
     if (sessionId && ctx.session) {
-      ctx.session.set('metadata', {
-        dockerfileGenerated: true,
-        dockerfilePath: written ? dockerfilePath : undefined,
-        dockerfileContent: finalDockerfileContent,
+      // Store the result using the standardized storeResult helper
+      ctx.session.storeResult('generate-dockerfile', {
+        content: finalDockerfileContent,
+        path: written ? dockerfilePath : undefined,
         baseImage: finalDockerfileContent.match(/FROM\s+([^\s]+)/)?.[1],
         multistage,
         securityHardening,
         optimization,
+        knowledgeEnhancementMeta: knowledgeEnhancement
+          ? {
+              confidence: knowledgeEnhancement.confidence,
+              knowledgeAppliedCount: knowledgeEnhancement.knowledgeApplied.length,
+              enhancementAreas: knowledgeEnhancement.analysis.enhancementAreas,
+            }
+          : undefined,
       });
+
+      // Store discrete flags for easy lookup by downstream tools
+      ctx.session.set('dockerfileGenerated', true);
+      if (written) {
+        ctx.session.set('dockerfilePath', dockerfilePath);
+      }
     }
 
     // Build workflow hints
@@ -576,6 +561,13 @@ ${finalDockerfileContent}
       );
     }
 
+    tracker.complete({
+      dockerfilePath: written ? dockerfilePath : undefined,
+      language,
+      framework,
+      knowledgeEnhanced: !!knowledgeEnhancement,
+    });
+
     return Success({
       content: finalDockerfileContent,
       language: 'dockerfile',
@@ -594,10 +586,142 @@ ${finalDockerfileContent}
       },
     });
   } catch (error) {
+    tracker.fail(error as Error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     ctx.logger.error({ error: errorMessage }, 'Dockerfile generation failed');
     return Failure(`Dockerfile generation failed: ${errorMessage}`);
   }
+}
+
+/**
+ * Main run function - orchestrates single or multi-module generation
+ */
+async function run(
+  input: z.infer<typeof generateDockerfileSchema>,
+  ctx: ToolContext,
+): Promise<Result<AIResponse>> {
+  const { sessionId } = input;
+
+  // Check for multi-module/monorepo scenario
+  if (sessionId && ctx.session) {
+    const isMonorepo = ctx.session.get<boolean>('isMonorepo');
+    const modules = ctx.session.get<ModuleInfo[]>('modules');
+
+    if (isMonorepo && modules && modules.length > 0) {
+      // User explicitly specified a module
+      if (input.moduleName) {
+        const targetModule = modules.find((m) => m.name === input.moduleName);
+        if (!targetModule) {
+          return Failure(
+            `Module "${input.moduleName}" not found. Available modules: ${modules.map((m) => m.name).join(', ')}`,
+          );
+        }
+        ctx.logger.info(
+          { moduleName: targetModule.name, modulePath: targetModule.path },
+          'Generating Dockerfile for specific module',
+        );
+        return generateSingleDockerfile(input, ctx, targetModule);
+      }
+
+      // No module specified - generate for all modules automatically
+      ctx.logger.info(
+        { moduleCount: modules.length },
+        'Generating Dockerfiles for all modules in monorepo',
+      );
+
+      const results: Array<{ module: string; success: boolean; path?: string; error?: string }> =
+        [];
+      const dockerfiles: Array<{ module: string; content: string; path?: string }> = [];
+
+      for (const module of modules) {
+        ctx.logger.info({ moduleName: module.name }, 'Generating Dockerfile for module');
+
+        const result = await generateSingleDockerfile(input, ctx, module);
+
+        if (result.ok) {
+          const value = result.value as {
+            content?: string;
+            workflowHints?: { message?: string };
+          };
+          const extractedPath = value.workflowHints?.message?.match(/written to: (.+)/)?.[1];
+          results.push({
+            module: module.name,
+            success: true,
+            ...(extractedPath ? { path: extractedPath } : {}),
+          });
+          dockerfiles.push({
+            module: module.name,
+            content: value.content || '',
+            ...(extractedPath ? { path: extractedPath } : {}),
+          });
+          ctx.logger.info({ moduleName: module.name }, 'Dockerfile generated successfully');
+        } else {
+          results.push({
+            module: module.name,
+            success: false,
+            error: result.error,
+          });
+          ctx.logger.warn(
+            { moduleName: module.name, error: result.error },
+            'Failed to generate Dockerfile for module',
+          );
+        }
+      }
+
+      // Store multi-module results in session
+      if (ctx.session) {
+        ctx.session.storeResult('generate-dockerfile-multi', {
+          modules: results,
+          dockerfiles,
+        });
+        ctx.session.set('dockerfilesGenerated', true);
+      }
+
+      const successCount = results.filter((r) => r.success).length;
+      const failureCount = results.filter((r) => !r.success).length;
+
+      if (successCount === 0) {
+        return Failure(
+          `Failed to generate Dockerfiles for all ${modules.length} modules:\n${results.map((r) => `- ${r.module}: ${r.error}`).join('\n')}`,
+        );
+      }
+
+      // Build summary response
+      const summary = `Generated Dockerfiles for ${successCount}/${modules.length} modules:\n${results
+        .filter((r) => r.success)
+        .map((r) => `✅ ${r.module}${r.path ? `: ${r.path}` : ''}`)
+        .join('\n')}${
+        failureCount > 0
+          ? `\n\n⚠️  Failed modules (${failureCount}):\n${results
+              .filter((r) => !r.success)
+              .map((r) => `❌ ${r.module}: ${r.error}`)
+              .join('\n')}`
+          : ''
+      }`;
+
+      return Success({
+        content: summary,
+        language: 'text',
+        confidence: successCount / modules.length,
+        suggestions: [
+          `Successfully generated ${successCount} Dockerfile(s)`,
+          failureCount > 0 ? `${failureCount} module(s) failed` : 'All modules successful',
+        ],
+        analysis: {
+          enhancementAreas: [],
+          confidence: successCount / modules.length,
+          knowledgeApplied: [],
+        },
+        workflowHints: {
+          nextStep: 'build-image',
+          message: `Dockerfiles generated for ${successCount} module(s). Use "build-image" for each module to build container images.`,
+        },
+      });
+    }
+  }
+
+  // Single-module repository or no session data - generate for single app
+  return generateSingleDockerfile(input, ctx);
 }
 
 const tool: Tool<typeof generateDockerfileSchema, AIResponse> = {
@@ -609,7 +733,7 @@ const tool: Tool<typeof generateDockerfileSchema, AIResponse> = {
   metadata: {
     aiDriven: true,
     knowledgeEnhanced: true,
-    samplingStrategy: 'rerank',
+    samplingStrategy: 'single',
     enhancementCapabilities: ['content-generation', 'validation', 'optimization', 'self-repair'],
   },
   run,

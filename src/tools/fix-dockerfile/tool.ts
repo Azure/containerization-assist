@@ -5,11 +5,12 @@
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
+import { createStandardizedToolTracker } from '@/lib/tool-helpers';
 import { promptTemplates, type OptimizationPromptParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
-import { scoreDockerfile } from '@/lib/sampling';
+import { scoreDockerfile } from '@/lib/scoring';
 import { fixDockerfileSchema } from './schema';
 import type { AIResponse } from '../ai-response-types';
 import { DockerfileParser } from 'dockerfile-ast';
@@ -20,6 +21,7 @@ import { promises as fs } from 'node:fs';
 import nodePath from 'node:path';
 import type { z } from 'zod';
 import type { KnowledgeEnhancementResult } from '@/mcp/ai/knowledge-enhancement';
+import { extractDockerfileContent } from '@/lib/content-extraction';
 
 const name = 'fix-dockerfile';
 const description = 'Fix and optimize existing Dockerfiles';
@@ -76,6 +78,12 @@ async function run(
     returnDiff = false,
     outputFormat: _outputFormat = 'json',
   } = input;
+
+  const tracker = createStandardizedToolTracker(
+    'fix-dockerfile',
+    { path, mode, environment },
+    ctx.logger,
+  );
 
   // Get Dockerfile content from either path or direct content
   let content = input.dockerfile || '';
@@ -389,28 +397,17 @@ async function run(
       },
     }),
     scoreDockerfile,
-    { count: 2, stopAt: 85 },
+    {},
   );
 
   if (!response.ok) {
     return Failure(`AI sampling failed: ${response.error}`);
   }
 
-  // Extract the fixed Dockerfile content
+  // Extract the fixed Dockerfile content using unified extraction
   const responseText = response.value.text;
-  let fixedContent = responseText;
-
-  // Try to extract from code blocks if present
-  const codeBlockMatch = responseText.match(/```(?:dockerfile)?\s*\n([\s\S]*?)```/);
-  if (codeBlockMatch?.[1]) {
-    fixedContent = codeBlockMatch[1].trim();
-  } else {
-    // Look for FROM statement to extract just the Dockerfile
-    const fromMatch = responseText.match(/(FROM\s+[\s\S]*)/);
-    if (fromMatch?.[1]) {
-      fixedContent = fromMatch[1].trim();
-    }
-  }
+  const extraction = extractDockerfileContent(responseText);
+  const fixedContent = extraction.success && extraction.content ? extraction.content : responseText;
 
   // Validate the fixed content
   const fixedValidation = validateDockerfileLib(fixedContent);
@@ -529,7 +526,7 @@ async function run(
     analysis.diff = createUnifiedDiff(originalContent, finalContent);
   }
 
-  return Success({
+  const result = {
     content: finalContent,
     language: 'dockerfile',
     confidence: knowledgeEnhancement ? knowledgeEnhancement.confidence : 0.9,
@@ -539,7 +536,10 @@ async function run(
       nextStep: 'build-image',
       message: `Dockerfile fixes applied successfully${knowledgeEnhancement ? ` with ${knowledgeEnhancement.knowledgeApplied.length} knowledge enhancements` : ''}. Use "build-image" to test the fixed Dockerfile, or review the changes and apply additional customizations.`,
     },
-  });
+  };
+
+  tracker.complete({ issuesFixed: parseIssues.length, dockerfilePath });
+  return Success(result);
 }
 
 const tool: Tool<typeof fixDockerfileSchema, AIResponse> = {
@@ -551,7 +551,7 @@ const tool: Tool<typeof fixDockerfileSchema, AIResponse> = {
   metadata: {
     aiDriven: true,
     knowledgeEnhanced: true,
-    samplingStrategy: 'rerank',
+    samplingStrategy: 'single',
     enhancementCapabilities: ['content-generation', 'validation', 'optimization', 'self-repair'],
   },
   run,

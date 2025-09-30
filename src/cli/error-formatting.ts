@@ -38,18 +38,6 @@ export function formatError(message: string, error?: unknown): string {
 }
 
 /**
- * Format GitHub Actions annotation for CI environments
- */
-export function formatGitHubAnnotation(
-  type: 'error' | 'warning',
-  message: string,
-  file?: string,
-): string {
-  const filePrefix = file ? `file=${file}::` : '';
-  return `::${type}::${filePrefix}${message}`;
-}
-
-/**
  * Handle Result errors consistently across CLI commands
  */
 export function handleResultError<T>(result: Result<T>, message: string): never {
@@ -66,17 +54,5 @@ export function handleResultError<T>(result: Result<T>, message: string): never 
  */
 export function handleGenericError(message: string, error?: unknown): never {
   console.error(formatError(message, error));
-  process.exit(1);
-}
-
-/**
- * Handle GitHub Actions CI errors with annotations
- */
-export function handleCIError(message: string, error?: unknown, file?: string): never {
-  const formattedError = formatError(message, error);
-  const annotation = formatGitHubAnnotation('error', message, file);
-
-  console.error(annotation);
-  console.error(formattedError);
   process.exit(1);
 }

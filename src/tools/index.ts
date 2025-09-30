@@ -181,5 +181,9 @@ export async function getToolLazyCached(name: ToolName): Promise<AllToolTypes> {
   if (!toolCache.has(name)) {
     toolCache.set(name, getToolLazy(name));
   }
-  return toolCache.get(name)!;
+  const tool = toolCache.get(name);
+  if (!tool) {
+    throw new Error(`Tool ${name} not found in cache after initialization`);
+  }
+  return tool;
 }

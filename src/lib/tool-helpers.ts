@@ -3,6 +3,7 @@
  */
 
 import { createLogger, createTimer, type Logger, type Timer } from './logger.js';
+import { logToolStart, logToolComplete, logToolFailure } from './runtime-logging.js';
 import type { ToolContext } from '@/mcp/context.js';
 
 /**
@@ -63,18 +64,45 @@ export function createToolTimer(logger: Logger, toolName: string): Timer {
 }
 
 /**
- * Initialize both logger and timer for a tool in one call.
- * Common pattern used by most tools.
+ * Create a standardized tool execution tracker with automatic start/complete logging.
+ * Uses consistent "Starting X" / "Completed X" format for Copilot transcripts.
  *
- * @param context - The tool context
- * @param toolName - Name of the tool
- * @returns Object containing both logger and timer
+ * @param toolName - Name of the tool (e.g., 'build-image', 'generate-k8s-manifests')
+ * @param params - Key parameters to log at start
+ * @param logger - Logger instance
+ * @returns Object with complete() and fail() methods for structured logging
+ *
+ * @example
+ * ```typescript
+ * const tracker = createStandardizedToolTracker('build-image', { path: './app', tags }, logger);
+ * try {
+ *   const result = await performBuild();
+ *   tracker.complete({ imageId: result.imageId });
+ *   return Success(result);
+ * } catch (error) {
+ *   tracker.fail(error);
+ *   return Failure(error.message);
+ * }
+ * ```
  */
-export function initializeToolInstrumentation(
-  context: ToolContext,
+export function createStandardizedToolTracker(
   toolName: string,
-): { logger: Logger; timer: Timer } {
-  const logger = getToolLogger(context, toolName);
-  const timer = createToolTimer(logger, toolName);
-  return { logger, timer };
+  params: Record<string, unknown>,
+  logger: Logger,
+): {
+  complete: (result: Record<string, unknown>) => void;
+  fail: (error: string | Error, context?: Record<string, unknown>) => void;
+} {
+  const startTime = Date.now();
+  logToolStart(toolName, params, logger);
+
+  return {
+    complete: (result: Record<string, unknown>) => {
+      const duration = Date.now() - startTime;
+      logToolComplete(toolName, result, logger, duration);
+    },
+    fail: (error: string | Error, context?: Record<string, unknown>) => {
+      logToolFailure(toolName, error, logger, context);
+    },
+  };
 }

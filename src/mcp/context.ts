@@ -181,6 +181,8 @@ export interface ContextOptions {
   maxTokens?: number;
   /** Stop sequences for sampling */
   stopSequences?: string[];
+  /** MCP notification callback for progress updates */
+  sendNotification?: (notification: unknown) => Promise<void>;
 }
 
 /**
@@ -204,15 +206,21 @@ export function createToolContext(
   logger: Logger,
   options: ContextOptions = {},
 ): ToolContext {
-  const progressReporter = extractProgressReporter(options.progress, server, logger);
+  const progressReporter = extractProgressReporter(
+    options.progress,
+    server,
+    logger,
+    options.sendNotification,
+  );
 
   return {
     sampling: {
-      createMessage: (req: SamplingRequest) =>
-        createSamplingResponse(server, req, logger, {
+      createMessage: async (req: SamplingRequest) => {
+        return createSamplingResponse(server, req, logger, {
           ...(options.maxTokens !== undefined && { maxTokens: options.maxTokens }),
           ...(options.stopSequences !== undefined && { stopSequences: options.stopSequences }),
-        }),
+        });
+      },
     },
     getPrompt: (name: string, args?: Record<string, unknown>) =>
       getPromptWithFallback(undefined, name, args),

@@ -9,7 +9,6 @@ export type {
   LoadedEntry,
   CompilationStats,
 } from './types';
-export { KnowledgeEntrySchema, KnowledgeQuerySchema } from './schemas';
 export {
   loadKnowledgeBase,
   getEntryById,
@@ -18,9 +17,8 @@ export {
   getAllEntries,
   getCompilationStats,
   isKnowledgeLoaded,
-  reloadKnowledgeBase,
 } from './loader';
-export { findKnowledgeMatches, evaluateEntry } from './matcher';
+export { findKnowledgeMatches } from './matcher';
 
 import { findKnowledgeMatches } from './matcher';
 import { loadKnowledgeBase, getAllEntries, isKnowledgeLoaded } from './loader';

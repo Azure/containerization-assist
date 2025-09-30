@@ -15,7 +15,20 @@ export interface ExecuteRequest {
   toolName: string;
   params: unknown;
   sessionId?: string;
-  metadata?: Record<string, unknown>;
+  metadata?: ExecuteMetadata;
+}
+
+/**
+ * Optional execution metadata supplied by transports or callers.
+ * Used to pass progress tokens, abort signals, or sampling preferences.
+ */
+export interface ExecuteMetadata {
+  progress?: unknown;
+  signal?: AbortSignal;
+  maxTokens?: number;
+  stopSequences?: string[];
+  loggerContext?: Record<string, unknown>;
+  sendNotification?: (notification: unknown) => Promise<void>;
 }
 
 /**
@@ -37,6 +50,18 @@ export interface SessionFacade {
   get<T = unknown>(key: string): T | undefined;
   set(key: string, value: unknown): void;
   pushStep(step: string): void;
+  /**
+   * Store a tool result in the session's results map
+   * @param toolName - Name of the tool
+   * @param value - Result value to store
+   */
+  storeResult(toolName: string, value: unknown): void;
+  /**
+   * Get a tool result from the session's results map
+   * @param toolName - Name of the tool
+   * @returns The stored result or undefined if not found
+   */
+  getResult<T = unknown>(toolName: string): T | undefined;
 }
 
 /**
@@ -44,15 +69,13 @@ export interface SessionFacade {
  */
 export interface ToolOrchestrator {
   execute(request: ExecuteRequest): Promise<Result<unknown>>;
+  close(): void;
 }
 
 /**
  * Orchestrator configuration
  */
 export interface OrchestratorConfig {
-  maxRetries?: number;
-  retryDelay?: number;
-  sessionTTL?: number;
   policyPath?: string;
   policyEnvironment?: string;
   session?: SessionConfig;

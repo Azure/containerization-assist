@@ -10,7 +10,7 @@ import { createLogger } from '@/lib/logger';
 import { loadPolicy } from '@/config/policy-io';
 import { applyPolicy } from '@/config/policy-eval';
 import type { Policy } from '@/config/policy-schemas';
-import { createToolContext } from '@/mcp/context';
+import { createToolContext, type ToolContext, type ProgressReporter } from '@/mcp/context';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { SessionManager } from '@/session/core';
 import { ERROR_MESSAGES } from '@/lib/error-messages';
@@ -19,9 +19,40 @@ import type {
   OrchestratorConfig,
   ExecuteRequest,
   SessionFacade,
+  ExecuteMetadata,
 } from './orchestrator-types';
 import type { Logger } from 'pino';
 import type { Tool } from '@/types/tool';
+
+// ===== Types =====
+
+function childLogger(logger: Logger, bindings: Record<string, unknown>): Logger {
+  const candidate = (logger as unknown as { child?: (bindings: Record<string, unknown>) => Logger })
+    .child;
+  return typeof candidate === 'function' ? candidate.call(logger, bindings) : logger;
+}
+
+type ContextFactoryInput<T extends Tool<ZodTypeAny, any>> = {
+  tool: T;
+  request: ExecuteRequest;
+  session: WorkflowState;
+  sessionFacade: SessionFacade;
+  logger: Logger;
+  sessionManager: SessionManager;
+};
+
+type ContextFactory<T extends Tool<ZodTypeAny, any>> = (
+  input: ContextFactoryInput<T>,
+) => Promise<ToolContext> | ToolContext;
+
+interface ExecutionEnvironment<T extends Tool<ZodTypeAny, any>> {
+  sessionManager: SessionManager;
+  policy?: Policy;
+  registry: Map<string, T>;
+  logger: Logger;
+  config: OrchestratorConfig;
+  buildContext: ContextFactory<T>;
+}
 
 /**
  * Create a SessionFacade for tool handlers
@@ -48,6 +79,25 @@ function createSessionFacade(session: WorkflowState): SessionFacade {
         session.updatedAt = new Date();
       }
     },
+    storeResult(toolName: string, value: unknown): void {
+      if (!session.metadata) {
+        session.metadata = {};
+      }
+      // Ensure results map exists
+      if (!session.metadata.results || typeof session.metadata.results !== 'object') {
+        session.metadata.results = {};
+      }
+      // Store result in the results map
+      (session.metadata.results as Record<string, unknown>)[toolName] = value;
+      session.updatedAt = new Date();
+    },
+    getResult<T = unknown>(toolName: string): T | undefined {
+      const results = session.metadata?.results;
+      if (!results || typeof results !== 'object') {
+        return undefined;
+      }
+      return (results as Record<string, unknown>)[toolName] as T | undefined;
+    },
   };
 }
 
@@ -56,13 +106,18 @@ function createSessionFacade(session: WorkflowState): SessionFacade {
  */
 export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
   registry: Map<string, T>;
-  server: Server;
+  server?: Server;
   logger?: Logger;
   config?: OrchestratorConfig;
+  sessionManager?: SessionManager;
+  contextFactory?: ContextFactory<T>;
 }): ToolOrchestrator {
-  const { registry, server, config = {} } = options;
+  const { registry, config = {} } = options;
   const logger = options.logger || createLogger({ name: 'orchestrator' });
-  const sessionManager = new SessionManager(logger, config.session);
+
+  // Session manager is always enabled for single-session mode
+  const sessionManager = options.sessionManager ?? new SessionManager(logger, config.session);
+  const ownsSessionManager = !options.sessionManager;
 
   // Load policy if configured
   let policy: Policy | undefined;
@@ -75,9 +130,33 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
     }
   }
 
-  /**
-   * Execute a tool with orchestration
-   */
+  const buildContext: ContextFactory<T> = async (input) => {
+    if (options.contextFactory) {
+      return options.contextFactory({ ...input, sessionManager });
+    }
+
+    const metadata = input.request.metadata;
+
+    if (options.server) {
+      const contextOptions = {
+        sessionManager,
+        session: input.sessionFacade,
+        ...(metadata?.signal && { signal: metadata.signal }),
+        ...(metadata?.progress !== undefined && { progress: metadata.progress }),
+        ...(metadata?.maxTokens !== undefined && { maxTokens: metadata.maxTokens }),
+        ...(metadata?.stopSequences && { stopSequences: metadata.stopSequences }),
+        ...(metadata?.sendNotification && { sendNotification: metadata.sendNotification }),
+      };
+      return createToolContext(options.server, input.logger, contextOptions);
+    }
+
+    return createHostlessToolContext(input.logger, {
+      sessionManager,
+      sessionFacade: input.sessionFacade,
+      ...(metadata && { metadata }),
+    });
+  };
+
   async function execute(request: ExecuteRequest): Promise<Result<unknown>> {
     const { toolName } = request;
     const tool = registry.get(toolName);
@@ -86,19 +165,31 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
       return Failure(ERROR_MESSAGES.TOOL_NOT_FOUND(toolName));
     }
 
-    // Always use orchestration path to provide consistent session handling
-    const context: Parameters<typeof executeWithOrchestration>[2] = {
-      sessionManager,
+    const contextualLogger = childLogger(logger, {
+      tool: tool.name,
+      ...(request.sessionId ? { sessionId: request.sessionId } : {}),
+      ...(request.metadata?.loggerContext ?? {}),
+    });
+
+    return await executeWithOrchestration(tool, request, {
       registry,
-      logger,
+      sessionManager,
+      ...(policy && { policy }),
+      logger: contextualLogger,
       config,
-      server,
-    };
-    if (policy) context.policy = policy;
-    return await executeWithOrchestration(tool, request, context);
+      buildContext,
+    });
   }
 
-  return { execute };
+  function close(): void {
+    if (!ownsSessionManager) return;
+    const closable = sessionManager as SessionManager & { close?: () => void };
+    if (typeof closable.close === 'function') {
+      closable.close();
+    }
+  }
+
+  return { execute, close };
 }
 
 /**
@@ -107,17 +198,10 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
 async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
   tool: T,
   request: ExecuteRequest,
-  context: {
-    sessionManager: SessionManager;
-    policy?: Policy;
-    registry: Map<string, T>;
-    logger: Logger;
-    config: OrchestratorConfig;
-    server: Server;
-  },
+  env: ExecutionEnvironment<T>,
 ): Promise<Result<unknown>> {
   const { params, sessionId } = request;
-  const { sessionManager, policy, logger, config, server } = context;
+  const { sessionManager, policy, logger } = env;
 
   // Always create or get session - generate ID if none provided
   const actualSessionId =
@@ -160,50 +244,39 @@ async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
     }
   }
 
-  // Execute with retries
-  const maxRetries = config.maxRetries || 2;
-  const retryDelay = config.retryDelay || 1000;
+  // Execute tool directly (single attempt)
+  try {
+    const sessionFacade = createSessionFacade(session);
+    const toolContext = await env.buildContext({
+      tool,
+      request,
+      session,
+      sessionFacade,
+      logger,
+      sessionManager,
+    });
 
-  let lastError: Error | null = null;
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const toolLogger = logger.child({ tool: tool.name, attempt });
+    const result = await tool.run(validatedParams, toolContext);
 
-      // Create session facade for tool handler
-      const sessionFacade = createSessionFacade(session);
+    // Update session if successful using SessionManager
+    if (result.ok) {
+      // Store result using the session facade helper
+      sessionFacade.storeResult(tool.name, result.value);
+      sessionFacade.pushStep(tool.name);
 
-      // Create a proper context with MCP server and session
-      const context = createToolContext(server, toolLogger, {
-        session: sessionFacade,
-      });
-      const result = await tool.run(validatedParams, context);
-
-      // Update session if successful using SessionManager
-      if (result.ok) {
-        const updatedSession: Partial<WorkflowState> = {
-          completed_steps: [...(session.completed_steps || []), tool.name],
-          metadata: {
-            ...(session.metadata || {}),
-            [tool.name]: result.value,
-          },
-        };
-
-        const updateResult = await sessionManager.update(actualSessionId, updatedSession);
-        if (!updateResult.ok) {
-          logger.warn(ERROR_MESSAGES.SESSION_UPDATE_FAILED(updateResult.error));
-        }
-      }
-
-      return result;
-    } catch (error) {
-      lastError = error as Error;
-      if (attempt < maxRetries - 1) {
-        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      // Persist the updated session
+      const updateResult = await sessionManager.update(actualSessionId, session);
+      if (!updateResult.ok) {
+        logger.warn(ERROR_MESSAGES.SESSION_UPDATE_FAILED(updateResult.error));
       }
     }
-  }
 
-  return Failure(ERROR_MESSAGES.RETRY_EXHAUSTED(maxRetries, lastError?.message || 'Unknown error'));
+    return result;
+  } catch (error) {
+    const errorMessage = (error as Error).message || 'Unknown error';
+    logger.error({ error: errorMessage }, 'Tool execution failed');
+    return Failure(errorMessage);
+  }
 }
 
 /**
@@ -216,4 +289,52 @@ function validateParams<T extends z.ZodSchema>(params: unknown, schema: T): Resu
     return Failure(ERROR_MESSAGES.VALIDATION_FAILED(issues));
   }
   return Success(parsed.data);
+}
+
+export function createHostlessToolContext(
+  logger: Logger,
+  options: {
+    sessionManager: SessionManager;
+    sessionFacade: SessionFacade;
+    metadata?: ExecuteMetadata;
+  },
+): ToolContext {
+  const progress = coerceProgressReporter(options.metadata?.progress);
+
+  return {
+    sampling: {
+      async createMessage(): Promise<never> {
+        throw new Error(
+          'Sampling is unavailable without an MCP transport. Start or bind to an MCP server to enable sampling.',
+        );
+      },
+    },
+    getPrompt: async (name: string): Promise<never> => {
+      throw new Error(
+        `Prompt '${name}' requested but no MCP transport is bound. Start or bind to an MCP server to access prompts.`,
+      );
+    },
+    logger,
+    sessionManager: options.sessionManager,
+    session: options.sessionFacade,
+    signal: options.metadata?.signal,
+    progress,
+  };
+}
+
+/**
+ * Coerce a progress reporter function to the expected interface
+ * @public
+ */
+export function coerceProgressReporter(progress: unknown): ProgressReporter | undefined {
+  if (typeof progress !== 'function') {
+    return undefined;
+  }
+
+  return async (message: string, current?: number, total?: number) => {
+    const maybePromise = progress(message, current, total);
+    if (maybePromise && typeof (maybePromise as Promise<void>).then === 'function') {
+      await maybePromise;
+    }
+  };
 }

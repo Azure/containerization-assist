@@ -1,76 +1,23 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
+#!/bin/sh
 
 # Exit codes for better debugging
-readonly EXIT_FORMAT_FAILED=1
-readonly EXIT_LINT_STAGED_FAILED=2
-readonly EXIT_QUALITY_GATES_FAILED=3
-
-# Files that may be modified by quality gates
-readonly QUALITY_GATE_FILES="quality-gates.json knip-deadcode-output.txt"
+readonly EXIT_LINT_STAGED_FAILED=1
 
 # Enable strict error handling
-set -euo
+set -eu
 
 # Main execution
 main() {
-    echo "🛡️ Running pre-commit quality gates..."
+    echo "🛡️ Running pre-commit checks..."
 
-    # Step 1: Format code
-    echo "🎨 Formatting code..."
-    if ! npm run format --silent 2>&1; then
-        echo "❌ Formatting failed"
-        exit $EXIT_FORMAT_FAILED
-    fi
-    git add -u
-
-    # Step 2: Run lint-staged
+    # Run lint-staged (handles linting and formatting for staged files only)
     echo "🔍 Running lint-staged checks..."
     if ! npx lint-staged; then
         echo "❌ Lint-staged checks failed"
         exit $EXIT_LINT_STAGED_FAILED
     fi
 
-    # Step 3: Run quality gates
-    echo "📊 Running quality gates..."
-    if ! npm run quality:gates; then
-        echo "❌ Quality gates failed"
-        exit $EXIT_QUALITY_GATES_FAILED
-    fi
-
-    # Step 4: Stage quality gate artifacts
-    stage_quality_artifacts
-
     echo "✅ Pre-commit checks passed!"
-}
-
-# Stage files modified by quality gates
-stage_quality_artifacts() {
-    local staged_files=""
-
-    for file in $QUALITY_GATE_FILES; do
-        if should_stage_file "$file"; then
-            git add "$file"
-            staged_files="${staged_files:+$staged_files, }$file"
-        fi
-    done
-
-    if [ -n "$staged_files" ]; then
-        echo "📊 Staged quality artifacts: $staged_files"
-    fi
-}
-
-# Check if file should be staged
-should_stage_file() {
-    local file="$1"
-
-    # File must exist
-    [ ! -f "$file" ] && return 1
-
-    # Check if file has changes (modified, staged, or untracked)
-    git status --porcelain "$file" 2>/dev/null | grep -qE '^( M|MM|A |UU|\?\?)' || return 1
-
-    return 0
 }
 
 # Run main function

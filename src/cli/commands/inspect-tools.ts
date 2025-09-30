@@ -21,7 +21,7 @@ export interface ToolDiscoveryOptions {
   /** Include only knowledge-enhanced tools */
   knowledgeEnhancedOnly?: boolean;
   /** Filter by sampling strategy */
-  samplingStrategy?: 'rerank' | 'single' | 'none';
+  samplingStrategy?: 'single' | 'none';
   /** Filter by enhancement capabilities */
   hasCapability?: string;
   /** Include detailed metadata in results */
@@ -237,7 +237,7 @@ export function createInspectToolsCommand(): Command {
     .description('List all tools with their AI enhancement capabilities')
     .option('--ai-driven', 'Show only AI-driven tools')
     .option('--knowledge-enhanced', 'Show only knowledge-enhanced tools')
-    .option('--sampling <strategy>', 'Filter by sampling strategy (rerank, single, none)')
+    .option('--sampling <strategy>', 'Filter by sampling strategy (single, none)')
     .option('--capability <name>', 'Filter by enhancement capability')
     .option('--format <format>', 'Output format (table, json, csv)', 'table')
     .option('--detailed', 'Include detailed metadata')
@@ -469,13 +469,13 @@ export function createInspectToolsCommand(): Command {
     .description('List tools using specific sampling strategy')
     .action(async (strategy) => {
       try {
-        if (!['rerank', 'single', 'none'].includes(strategy)) {
-          console.error(formatError('Invalid sampling strategy. Use: rerank, single, or none'));
+        if (!['single', 'none'].includes(strategy)) {
+          console.error(formatError('Invalid sampling strategy. Use: single or none'));
           process.exit(1);
         }
 
         const result = await discoverToolCapabilities({
-          samplingStrategy: strategy as 'rerank' | 'single' | 'none',
+          samplingStrategy: strategy as 'single' | 'none',
         });
         if (!result.ok) {
           handleResultError(result, 'Failed to get tools with sampling strategy');

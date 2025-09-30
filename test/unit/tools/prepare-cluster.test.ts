@@ -32,7 +32,7 @@ const mockSessionManager = {
     metadata: {},
     completed_steps: [],
     errors: {},
-    current_step: null,
+    
     createdAt: new Date('2025-09-08T11:12:40.362Z'),
     updatedAt: new Date('2025-09-08T11:12:40.362Z'),
   })),
@@ -41,7 +41,7 @@ const mockSessionManager = {
     metadata: {},
     completed_steps: [],
     errors: {},
-    current_step: null,
+    
     createdAt: new Date('2025-09-08T11:12:40.362Z'),
     updatedAt: new Date('2025-09-08T11:12:40.362Z'),
   })),
@@ -83,6 +83,10 @@ jest.mock('@/lib/logger', () => ({
 jest.mock('@/lib/tool-helpers', () => ({
   getToolLogger: jest.fn(() => createMockLogger()),
   createToolTimer: jest.fn(() => mockTimer),
+  createStandardizedToolTracker: jest.fn(() => ({
+    complete: jest.fn(),
+    fail: jest.fn(),
+  })),
 }));
 
 jest.mock('@/lib/error-utils', () => ({
