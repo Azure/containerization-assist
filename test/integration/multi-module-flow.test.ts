@@ -42,16 +42,87 @@ function createMockSession(initialData?: Record<string, unknown>): SessionFacade
   } as unknown as SessionFacade;
 }
 
-// Helper to create consistent mock ToolContext
+// Helper to create consistent mock ToolContext with smart responses
 function createMockContext(session: SessionFacade): ToolContext {
   return {
     logger: createMockLogger(),
     session,
     sampling: {
-      createMessage: jest.fn<(req: SamplingRequest) => Promise<SamplingResponse>>().mockResolvedValue({
-        role: 'assistant',
-        content: [{ type: 'text', text: 'Mock AI response' }],
-      }),
+      createMessage: jest
+        .fn<(req: SamplingRequest) => Promise<SamplingResponse>>()
+        .mockImplementation(async (req: SamplingRequest) => {
+          // Check what type of request this is based on the prompt content
+          const promptText = req.messages
+            .map(m => m.content.map(c => c.text).join(' '))
+            .join(' ');
+
+          // Mock Dockerfile generation
+          if (promptText.includes('Dockerfile') || promptText.includes('Docker')) {
+            return {
+              role: 'assistant',
+              content: [
+                {
+                  type: 'text',
+                  text: `FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+EXPOSE 3000
+CMD ["node", "index.js"]`,
+                },
+              ],
+            };
+          }
+
+          // Mock K8s manifest generation
+          if (promptText.includes('Kubernetes') || promptText.includes('manifest')) {
+            return {
+              role: 'assistant',
+              content: [
+                {
+                  type: 'text',
+                  text: `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-app
+  template:
+    metadata:
+      labels:
+        app: test-app
+    spec:
+      containers:
+      - name: app
+        image: test-registry/app:latest
+        ports:
+        - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-app
+spec:
+  selector:
+    app: test-app
+  ports:
+  - port: 80
+    targetPort: 3000`,
+                },
+              ],
+            };
+          }
+
+          // Default mock response
+          return {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Mock AI response' }],
+          };
+        }),
     },
     getPrompt: jest.fn().mockResolvedValue({
       description: 'Mock prompt',
@@ -101,6 +172,14 @@ describe('Multi-Module Containerization Flow', () => {
         },
         ctx,
       );
+
+      // Debug: log the actual result
+      if (!result.ok) {
+        console.error('Error:', result.error);
+        if (result.guidance) {
+          console.error('Guidance:', result.guidance);
+        }
+      }
 
       // Should succeed with multi-module summary
       expect(result.ok).toBe(true);
@@ -211,6 +290,14 @@ describe('Multi-Module Containerization Flow', () => {
         },
         ctx,
       );
+
+      // Debug: log the actual result
+      if (!result.ok) {
+        console.error('Error:', result.error);
+        if (result.guidance) {
+          console.error('Guidance:', result.guidance);
+        }
+      }
 
       // Should succeed with multi-module summary
       expect(result.ok).toBe(true);

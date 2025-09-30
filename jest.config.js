@@ -68,7 +68,6 @@ export default {
         'test/integration/kubernetes-fast-fail.test.ts',
         'test/integration/error-guidance-propagation.test.ts',
         'test/integration/single-app-flow.test.ts',
-        'test/integration/multi-module-flow.test.ts',
       ],
     },
     {
