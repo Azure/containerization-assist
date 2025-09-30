@@ -55,11 +55,9 @@ export const Success = <T>(value: T): Result<T> => ({ ok: true, value });
  * @param guidance - Optional structured guidance for operators
  */
 export const Failure = <T>(error: string, guidance?: ErrorGuidance): Result<T> => {
-  // If guidance is provided but message is empty, use the error string
-  if (guidance && !guidance.message) {
-    guidance = { ...guidance, message: error };
-  }
-  return guidance ? { ok: false, error, guidance } : { ok: false, error };
+  // Always create a new guidance object to avoid mutating the input parameter
+  const resultGuidance = guidance ? { ...guidance, message: guidance.message || error } : undefined;
+  return resultGuidance ? { ok: false, error, guidance: resultGuidance } : { ok: false, error };
 };
 
 /** Type guard to check if result is a failure */

@@ -5,7 +5,7 @@
  * enabling type-safe tool execution and dependency injection hooks.
  */
 
-import type { z } from 'zod';
+import type { ZodTypeAny } from 'zod';
 import type { Logger } from 'pino';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Result } from './core';
@@ -14,7 +14,9 @@ import type { MCPServer } from '@/mcp/mcp-server';
 import type { AllToolTypes, ToolName } from '@/tools';
 
 // Extract input/output types from tool registry
-type ExtractToolInput<T extends { schema: z.ZodTypeAny }> = z.infer<T['schema']>;
+type ExtractToolInput<T extends { schema: ZodTypeAny }> = T['schema'] extends ZodTypeAny
+  ? import('zod').infer<T['schema']>
+  : never;
 type ExtractToolOutput<T> = T extends { run: (...args: never[]) => Promise<Result<infer R>> }
   ? R
   : never;

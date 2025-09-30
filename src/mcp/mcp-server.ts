@@ -18,7 +18,7 @@ import { createLogger, type Logger } from '@/lib/logger';
 import { extractSchemaShape } from '@/lib/zod-utils';
 import type { Tool } from '@/types/tool';
 import type { ExecuteRequest, ExecuteMetadata } from '@/app/orchestrator-types';
-import type { Result } from '@/types';
+import type { Result, ErrorGuidance } from '@/types';
 
 /**
  * Server options
@@ -49,6 +49,22 @@ export interface RegisterOptions<TTool extends Tool = Tool> {
 }
 
 type ToolExecutor = (request: ExecuteRequest) => Promise<Result<unknown>>;
+
+/**
+ * Format error message with guidance for better user experience
+ */
+function formatErrorWithGuidance(error: string, guidance?: ErrorGuidance): string {
+  if (!guidance) {
+    return error || 'Tool execution failed';
+  }
+
+  return `${error}
+
+💡 ${guidance.hint || ''}
+
+🔧 Resolution:
+${guidance.resolution || 'Check logs for more information'}`;
+}
 
 /**
  * Create an MCP server that delegates execution to the orchestrator
@@ -185,15 +201,7 @@ export function registerToolsWithServer<TTool extends Tool>(options: RegisterOpt
 
           if (!result.ok) {
             // Format error with guidance if available
-            let errorMessage = result.error || 'Tool execution failed';
-            if (result.guidance) {
-              errorMessage = `${result.error}
-
-💡 ${result.guidance.hint || ''}
-
-🔧 Resolution:
-${result.guidance.resolution || 'Check logs for more information'}`;
-            }
+            const errorMessage = formatErrorWithGuidance(result.error, result.guidance);
             throw new McpError(ErrorCode.InternalError, errorMessage);
           }
 

@@ -155,14 +155,17 @@ rules:
     });
 
     it('should handle missing topics gracefully', async () => {
-      const params: BuildPromptParams = {
+      // Type assertion for testing invalid topic - intentionally bypassing type safety for test
+      type TestParams = Omit<BuildPromptParams, 'topic'> & { topic: string };
+
+      const params: TestParams = {
         basePrompt: 'Test prompt',
-        topic: 'nonexistent-topic' as any,
+        topic: 'nonexistent-topic',
         tool: 'test-tool',
         environment: 'test',
       };
 
-      const result = await buildMessages(params);
+      const result = await buildMessages(params as BuildPromptParams);
 
       // Should still succeed with empty knowledge
       expect(result).toBeDefined();

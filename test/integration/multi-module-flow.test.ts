@@ -9,10 +9,12 @@
 
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import type { ModuleInfo, RepositoryAnalysis } from '@/tools/analyze-repo/schema';
-import type { ToolContext } from '@/mcp/context';
+import type { ToolContext, SamplingRequest, SamplingResponse } from '@/mcp/context';
+import type { Logger } from 'pino';
+import type { SessionFacade } from '@/app/orchestrator-types';
 
 // Mock logger factory
-function createMockLogger() {
+function createMockLogger(): Logger {
   return {
     info: jest.fn(),
     warn: jest.fn(),
@@ -21,23 +23,43 @@ function createMockLogger() {
     trace: jest.fn(),
     fatal: jest.fn(),
     child: jest.fn().mockReturnThis(),
-  } as any;
+  } as unknown as Logger;
 }
 
 // Mock session with full module support
-function createMockSession(initialData?: Record<string, any>) {
-  const storage = new Map<string, any>(Object.entries(initialData || {}));
+function createMockSession(initialData?: Record<string, unknown>): SessionFacade {
+  const storage = new Map<string, unknown>(Object.entries(initialData || {}));
 
   return {
     get: jest.fn(<T>(key: string): T | undefined => storage.get(key)),
-    set: jest.fn((key: string, value: any) => {
+    set: jest.fn((key: string, value: unknown) => {
       storage.set(key, value);
     }),
     getResult: jest.fn(<T>(key: string): T | undefined => storage.get(key)),
-    storeResult: jest.fn((key: string, value: any) => {
+    storeResult: jest.fn((key: string, value: unknown) => {
       storage.set(key, value);
     }),
-  } as any;
+  } as unknown as SessionFacade;
+}
+
+// Helper to create consistent mock ToolContext
+function createMockContext(session: SessionFacade): ToolContext {
+  return {
+    logger: createMockLogger(),
+    session,
+    sampling: {
+      createMessage: jest.fn<(req: SamplingRequest) => Promise<SamplingResponse>>().mockResolvedValue({
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Mock AI response' }],
+      }),
+    },
+    getPrompt: jest.fn().mockResolvedValue({
+      description: 'Mock prompt',
+      messages: [],
+    }),
+    signal: undefined,
+    progress: undefined,
+  };
 }
 
 describe('Multi-Module Containerization Flow', () => {
@@ -69,11 +91,7 @@ describe('Multi-Module Containerization Flow', () => {
         appName: 'test-monorepo',
       });
 
-      const ctx: ToolContext = {
-        logger: createMockLogger(),
-        session,
-        sampling: {} as any,
-      };
+      const ctx = createMockContext(session);
 
       const tool = await import('@/tools/generate-dockerfile/tool');
       const result = await tool.default.run(
@@ -129,11 +147,7 @@ describe('Multi-Module Containerization Flow', () => {
         appName: 'test-monorepo',
       });
 
-      const ctx: ToolContext = {
-        logger: createMockLogger(),
-        session,
-        sampling: {} as any,
-      };
+      const ctx = createMockContext(session);
 
       const tool = await import('@/tools/generate-dockerfile/tool');
       const result = await tool.default.run(
@@ -187,11 +201,7 @@ describe('Multi-Module Containerization Flow', () => {
         appName: 'test-monorepo',
       });
 
-      const ctx: ToolContext = {
-        logger: createMockLogger(),
-        session,
-        sampling: {} as any,
-      };
+      const ctx = createMockContext(session);
 
       const tool = await import('@/tools/generate-k8s-manifests/tool');
       const result = await tool.default.run(
@@ -245,11 +255,7 @@ describe('Multi-Module Containerization Flow', () => {
         appName: 'test-monorepo',
       });
 
-      const ctx: ToolContext = {
-        logger: createMockLogger(),
-        session,
-        sampling: {} as any,
-      };
+      const ctx = createMockContext(session);
 
       const tool = await import('@/tools/generate-k8s-manifests/tool');
       const result = await tool.default.run(
@@ -285,11 +291,7 @@ describe('Multi-Module Containerization Flow', () => {
         appName: 'single-app',
       });
 
-      const ctx: ToolContext = {
-        logger: createMockLogger(),
-        session,
-        sampling: {} as any,
-      };
+      const ctx = createMockContext(session);
 
       const tool = await import('@/tools/generate-dockerfile/tool');
       const result = await tool.default.run(
@@ -315,11 +317,7 @@ describe('Multi-Module Containerization Flow', () => {
         appPorts: [8080],
       });
 
-      const ctx: ToolContext = {
-        logger: createMockLogger(),
-        session,
-        sampling: {} as any,
-      };
+      const ctx = createMockContext(session);
 
       const tool = await import('@/tools/generate-k8s-manifests/tool');
       const result = await tool.default.run(
@@ -350,11 +348,7 @@ describe('Multi-Module Containerization Flow', () => {
         analyzedPath: '/tmp/test-monorepo',
       });
 
-      const ctx: ToolContext = {
-        logger: createMockLogger(),
-        session,
-        sampling: {} as any,
-      };
+      const ctx = createMockContext(session);
 
       const tool = await import('@/tools/generate-dockerfile/tool');
       const result = await tool.default.run(
