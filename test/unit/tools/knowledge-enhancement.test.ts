@@ -66,8 +66,19 @@ spec:
         app: test-app
     spec:
       containers:
-      - name: test-app
-        image: test:latest`;
+        - name: test-app
+          image: test:latest
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-app
+spec:
+  selector:
+    app: test-app
+  ports:
+    - port: 80
+      targetPort: 8080`;
     } else {
       // Default - return Dockerfile for generate-dockerfile and others
       text = 'FROM node:18-alpine\nWORKDIR /app\nCOPY . .\nRUN npm install\nCMD ["npm", "start"]';

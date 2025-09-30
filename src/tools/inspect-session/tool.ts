@@ -49,7 +49,7 @@ async function run(
         return Success({
           sessions: [],
           totalSessions: allSessionIds.length,
-          maxSessions: 1000, // Default from session manager
+          maxSessions: 1, // Single-session mode
           message: `Session ${input.sessionId} not found`,
         });
       }
@@ -60,7 +60,6 @@ async function run(
         updatedAt: session.updatedAt || new Date(),
         ttlRemaining: calculateTTLRemaining(session.createdAt || new Date()),
         completedSteps: session.completed_steps || [],
-        currentStep: (session.current_step as string) || null,
         metadata: session.metadata || {},
       };
 
@@ -75,7 +74,7 @@ async function run(
       return Success({
         sessions: [sessionInfo],
         totalSessions: allSessionIds.length,
-        maxSessions: 1000,
+        maxSessions: 1, // Single-session mode
         message:
           input.format === 'json'
             ? JSON.stringify(sessionInfo, null, 2)
@@ -95,7 +94,6 @@ async function run(
           updatedAt: session.updatedAt || new Date(),
           ttlRemaining: calculateTTLRemaining(session.createdAt || new Date()),
           completedSteps: session.completed_steps || [],
-          currentStep: (session.current_step as string) || null,
           metadata: session.metadata || {},
         };
 
@@ -116,7 +114,7 @@ async function run(
     return Success({
       sessions,
       totalSessions: sessions.length,
-      maxSessions: 1000,
+      maxSessions: 1, // Single-session mode
       message: formatSessionList(sessions, input.format),
     });
   } catch (error) {
@@ -177,7 +175,6 @@ interface SessionData {
   createdAt: Date;
   updatedAt: Date;
   ttlRemaining: number;
-  currentStep: string | null;
   completedSteps: string[];
   metadata: Record<string, unknown>;
   errors?: Record<string, string>;
@@ -190,7 +187,6 @@ function formatSessionSummary(session: SessionData): string {
     `Created: ${session.createdAt.toISOString()}`,
     `Updated: ${session.updatedAt.toISOString()}`,
     `TTL Remaining: ${Math.floor(session.ttlRemaining / 60)} minutes`,
-    `Current Step: ${session.currentStep || 'none'}`,
     `Completed Steps: ${session.completedSteps.length > 0 ? session.completedSteps.join(', ') : 'none'}`,
   ];
 
@@ -222,9 +218,6 @@ function formatSessionList(sessions: SessionData[], format: string): string {
   for (const session of sessions) {
     lines.push(`  • ${session.id}`);
     lines.push(`    TTL: ${Math.floor(session.ttlRemaining / 60)}m remaining`);
-    if (session.currentStep) {
-      lines.push(`    Current: ${session.currentStep}`);
-    }
     if (session.completedSteps.length > 0) {
       lines.push(`    Completed: ${session.completedSteps.length} steps`);
     }

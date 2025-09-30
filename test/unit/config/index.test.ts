@@ -15,107 +15,76 @@ describe('Main Configuration', () => {
   describe('config object', () => {
     it('should have all required configuration sections', () => {
       expect(config).toBeDefined();
-      expect(config.mcp).toBeDefined();
       expect(config.server).toBeDefined();
       expect(config.workspace).toBeDefined();
-      expect(config.sampling).toBeDefined();
-      expect(config.cache).toBeDefined();
       expect(config.docker).toBeDefined();
-      expect(config.kubernetes).toBeDefined();
-      expect(config.security).toBeDefined();
-      expect(config.logging).toBeDefined();
-      expect(config.orchestrator).toBeDefined();
+      expect(config.mutex).toBeDefined();
     });
 
     it('should use environment variables when provided', () => {
       // Set test environment variables
-      process.env.MCP_SERVER_NAME = 'test-server';
       process.env.LOG_LEVEL = 'debug';
       process.env.PORT = '4000';
       process.env.WORKSPACE_DIR = '/test/workspace';
       process.env.DOCKER_SOCKET = '/test/docker.sock';
-      process.env.K8S_NAMESPACE = 'test-namespace';
 
       // Re-require the module to get new environment values
       jest.resetModules();
       const { config: testConfig } = require('../../../src/config/index');
 
-      expect(testConfig.mcp.name).toBe('test-server');
       expect(testConfig.server.logLevel).toBe('debug');
       expect(testConfig.server.port).toBe(4000);
       expect(testConfig.workspace.workspaceDir).toBe('/test/workspace');
       expect(testConfig.docker.socketPath).toBe('/test/docker.sock');
-      expect(testConfig.kubernetes.namespace).toBe('test-namespace');
     });
 
     it('should use default values when environment variables are not set', () => {
       // Clear relevant environment variables
-      delete process.env.MCP_SERVER_NAME;
       delete process.env.LOG_LEVEL;
       delete process.env.PORT;
 
       jest.resetModules();
       const { config: testConfig } = require('../../../src/config/index');
 
-      expect(testConfig.mcp.name).toBe('containerization-assist');
       expect(testConfig.server.logLevel).toBe('info');
       expect(testConfig.server.port).toBe(3000);
     });
 
     it('should parse integer environment variables correctly', () => {
-      process.env.MAX_CANDIDATES = '10';
-      process.env.SAMPLING_TIMEOUT = '60000';
-      process.env.CACHE_TTL = '7200';
       process.env.MAX_FILE_SIZE = '20971520'; // 20MB
+      process.env.MUTEX_DEFAULT_TIMEOUT = '45000';
 
       jest.resetModules();
       const { config: testConfig } = require('../../../src/config/index');
 
-      expect(testConfig.sampling.maxCandidates).toBe(10);
-      expect(testConfig.sampling.timeout).toBe(60000);
-      expect(testConfig.cache.ttl).toBe(7200);
       expect(testConfig.workspace.maxFileSize).toBe(20971520);
+      expect(testConfig.mutex.defaultTimeout).toBe(45000);
     });
 
     it('should handle boolean environment variables', () => {
-      process.env.FAIL_ON_CRITICAL = 'true';
+      process.env.MUTEX_MONITORING = 'true';
 
       jest.resetModules();
       const { config: testConfig } = require('../../../src/config/index');
 
-      expect(testConfig.security.failOnCritical).toBe(true);
+      expect(testConfig.mutex.monitoringEnabled).toBe(true);
 
-      process.env.FAIL_ON_CRITICAL = 'false';
+      process.env.MUTEX_MONITORING = 'false';
 
       jest.resetModules();
       const { config: testConfig2 } = require('../../../src/config/index');
 
-      expect(testConfig2.security.failOnCritical).toBe(false);
+      expect(testConfig2.mutex.monitoringEnabled).toBe(false);
     });
 
-    it('should have proper sampling weights structure', () => {
-      expect(config.sampling.weights.dockerfile).toBeDefined();
-      expect(config.sampling.weights.dockerfile.build).toBe(30);
-      expect(config.sampling.weights.dockerfile.size).toBe(30);
-      expect(config.sampling.weights.dockerfile.security).toBe(25);
-      expect(config.sampling.weights.dockerfile.speed).toBe(15);
+    it('should have mutex configuration', () => {
+      expect(config.mutex.defaultTimeout).toBeDefined();
+      expect(config.mutex.dockerBuildTimeout).toBeDefined();
+      expect(config.mutex.monitoringEnabled).toBeDefined();
 
-      expect(config.sampling.weights.k8s).toBeDefined();
-      expect(config.sampling.weights.k8s.validation).toBe(20);
-      expect(config.sampling.weights.k8s.security).toBe(20);
-      expect(config.sampling.weights.k8s.resources).toBe(20);
-      expect(config.sampling.weights.k8s.best_practices).toBe(20);
-    });
-
-    it('should have orchestrator configuration with thresholds', () => {
-      expect(config.orchestrator.scanThresholds).toBeDefined();
-      expect(config.orchestrator.scanThresholds.critical).toBe(0);
-      expect(config.orchestrator.scanThresholds.high).toBe(2);
-      expect(config.orchestrator.scanThresholds.medium).toBe(10);
-
-      expect(config.orchestrator.buildSizeLimits).toBeDefined();
-      expect(config.orchestrator.buildSizeLimits.sanityFactor).toBe(1.25);
-      expect(config.orchestrator.buildSizeLimits.rejectFactor).toBe(2.5);
+      expect(typeof config.mutex.defaultTimeout).toBe('number');
+      expect(typeof config.mutex.dockerBuildTimeout).toBe('number');
+      expect(typeof config.mutex.monitoringEnabled).toBe('boolean');
     });
 
     it('should be immutable (readonly)', () => {
@@ -202,24 +171,18 @@ describe('Main Configuration', () => {
 
   describe('configuration structure validation', () => {
     it('should have log level configuration', () => {
-      // Both sections should have log level configuration
       expect(config.server.logLevel).toBeDefined();
-      expect(config.logging.level).toBeDefined();
       expect(typeof config.server.logLevel).toBe('string');
-      expect(typeof config.logging.level).toBe('string');
     });
 
     it('should have reasonable default values', () => {
       expect(config.server.port).toBeGreaterThan(0);
       expect(config.server.port).toBeLessThan(65536);
-      
+
       expect(config.workspace.maxFileSize).toBeGreaterThan(0);
-      
-      expect(config.sampling.maxCandidates).toBeGreaterThan(0);
-      expect(config.sampling.timeout).toBeGreaterThan(0);
-      
-      expect(config.cache.ttl).toBeGreaterThan(0);
-      expect(config.cache.maxSize).toBeGreaterThan(0);
+
+      expect(config.mutex.defaultTimeout).toBeGreaterThan(0);
+      expect(config.mutex.dockerBuildTimeout).toBeGreaterThan(0);
     });
 
     it('should have valid file paths', () => {
@@ -227,13 +190,10 @@ describe('Main Configuration', () => {
       expect(config.workspace.workspaceDir).toBeTruthy();
     });
 
-    it('should have all required orchestrator settings', () => {
-      expect(config.orchestrator.defaultCandidates).toBeLessThanOrEqual(
-        config.orchestrator.maxCandidates
-      );
-      expect(config.orchestrator.earlyStopThreshold).toBeGreaterThan(0);
-      expect(config.orchestrator.earlyStopThreshold).toBeLessThanOrEqual(100);
-      expect(config.orchestrator.tiebreakMargin).toBeGreaterThanOrEqual(0);
+    it('should have all required mutex settings', () => {
+      expect(config.mutex.defaultTimeout).toBeDefined();
+      expect(config.mutex.dockerBuildTimeout).toBeDefined();
+      expect(config.mutex.monitoringEnabled).toBeDefined();
     });
   });
 });

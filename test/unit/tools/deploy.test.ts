@@ -41,7 +41,7 @@ const mockSessionManager = {
     metadata: {},
     completed_steps: [],
     errors: {},
-    current_step: null,
+    
     createdAt: '2025-09-08T11:12:40.362Z',
     updatedAt: '2025-09-08T11:12:40.362Z',
   }),
@@ -54,6 +54,8 @@ const mockSessionFacade = {
   get: jest.fn(),
   set: jest.fn(),
   pushStep: jest.fn(),
+  storeResult: jest.fn(),
+  getResult: jest.fn(),
 };
 
 const mockKubernetesClient = {
@@ -122,6 +124,15 @@ jest.mock('js-yaml', () => ({
 
 jest.mock('@/session/core', () => ({
   createSessionManager: jest.fn(() => mockSessionManager),
+}));
+
+jest.mock('@/lib/tool-helpers', () => ({
+  getToolLogger: jest.fn(() => createMockLogger()),
+  createToolTimer: jest.fn(() => mockTimer),
+  createStandardizedToolTracker: jest.fn(() => ({
+    complete: jest.fn(),
+    fail: jest.fn(),
+  })),
 }));
 
 // Mock MCP helper modules
@@ -227,7 +238,7 @@ spec:
       metadata: {},
       completed_steps: [],
       errors: {},
-      current_step: null,
+      
       createdAt: '2025-09-08T11:12:40.362Z',
       updatedAt: '2025-09-08T11:12:40.362Z',
     });
@@ -236,12 +247,10 @@ spec:
   describe('Successful Deployments', () => {
     beforeEach(() => {
       // Setup session facade with K8s manifests
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'generate-k8s-manifests') {
           return {
-            'generate-k8s-manifests': {
-              manifests: sampleManifests,
-            },
+            manifests: sampleManifests,
           };
         }
         return undefined;
@@ -361,12 +370,10 @@ spec:
   describe('Manifest Parsing and Ordering', () => {
     beforeEach(() => {
       // Use the existing sampleManifests which are properly handled by the YAML mock
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'generate-k8s-manifests') {
           return {
-            'generate-k8s-manifests': {
-              manifests: sampleManifests,
-            },
+            manifests: sampleManifests,
           };
         }
         return undefined;
@@ -407,12 +414,10 @@ spec:
 
   describe('Error Handling', () => {
     it('should handle Kubernetes client failures gracefully', async () => {
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'generate-k8s-manifests') {
           return {
-            'generate-k8s-manifests': {
-              manifests: sampleManifests,
-            },
+            manifests: sampleManifests,
           };
         }
         return undefined;
@@ -425,17 +430,15 @@ spec:
       const mockContext = createMockToolContext();
       const result = await deployApplicationTool(config, mockContext);
 
-      expect(result.ok).toBe(true); // Function continues despite individual manifest failures
-      // Individual manifest failures are logged but don't stop the deployment
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('All manifest deployments failed');
     });
 
     it('should handle session update failures', async () => {
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'generate-k8s-manifests') {
           return {
-            'generate-k8s-manifests': {
-              manifests: sampleManifests,
-            },
+            manifests: sampleManifests,
           };
         }
         return undefined;
@@ -461,12 +464,10 @@ spec:
 
   describe('Configuration Options', () => {
     beforeEach(() => {
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'generate-k8s-manifests') {
           return {
-            'generate-k8s-manifests': {
-              manifests: sampleManifests,
-            },
+            manifests: sampleManifests,
           };
         }
         return undefined;

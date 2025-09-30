@@ -1,18 +1,20 @@
 /**
- * Session Manager - Workflow state persistence
+ * Session Manager - Single-session workflow state persistence
  *
- * Invariant: Sessions expire after TTL to prevent memory leaks
+ * Simplified for single-user operation with one active session.
  * Trade-off: In-memory storage for simplicity over persistence
- * Failure Mode: Session overflow triggers cleanup before rejection
+ *
+ * Metadata Structure:
+ * - session.metadata.results: Map of tool results (e.g., { 'analyze-repo': {...}, 'build-image': {...} })
+ *   Managed by orchestrator via SessionFacade.storeResult/getResult
+ * - session.metadata[key]: Arbitrary workflow metadata (timestamps, flags, custom data)
+ *   Managed by tools via SessionFacade.get/set
+ * - session.completed_steps: Array of completed tool names
  */
 
 import { randomUUID } from 'node:crypto';
 import type { Logger } from 'pino';
 import { WorkflowState, Result, Success, Failure } from '@/types';
-
-const DEFAULT_TTL = 86400; // 24 hours in seconds
-const DEFAULT_MAX_SESSIONS = 1000;
-const DEFAULT_CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Extended WorkflowState with session tracking
@@ -23,54 +25,29 @@ interface Session extends WorkflowState {
 
 /**
  * Session configuration
+ * Empty for single-session mode but kept for API compatibility
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface SessionConfig {
-  ttl?: number; // Time to live in seconds
-  maxSessions?: number;
-  cleanupIntervalMs?: number;
+  // Simplified config - no TTL or max sessions needed for single-session mode
 }
 
 /**
- * Session Manager using class-based approach
+ * Session Manager - Single-session mode
  */
 export class SessionManager {
-  private sessions = new Map<string, Session>();
-  private cleanupTimer: NodeJS.Timeout;
+  private currentSession: Session | null = null;
   private logger: Logger;
-  private ttl: number;
-  private maxSessions: number;
 
-  constructor(logger: Logger, config: SessionConfig = {}) {
+  constructor(logger: Logger, _config: SessionConfig = {}) {
     this.logger = logger.child({ service: 'session-manager' });
-    this.ttl = config.ttl ?? DEFAULT_TTL;
-    this.maxSessions = config.maxSessions ?? DEFAULT_MAX_SESSIONS;
-
-    // Start automatic cleanup
-    const cleanupInterval = config.cleanupIntervalMs ?? DEFAULT_CLEANUP_INTERVAL;
-    this.cleanupTimer = setInterval(() => this.performCleanup(), cleanupInterval);
-    this.cleanupTimer.unref();
-
-    this.logger.info(
-      {
-        maxSessions: this.maxSessions,
-        ttlSeconds: this.ttl,
-      },
-      'Session manager initialized',
-    );
+    this.logger.info('Session manager initialized (single-session mode)');
   }
 
   /**
-   * Create a new session
+   * Create a new session (replaces any existing session)
    */
   async create(sessionId?: string): Promise<Result<WorkflowState>> {
-    // Check session limit and cleanup if needed
-    if (this.sessions.size >= this.maxSessions) {
-      this.cleanupExpired();
-      if (this.sessions.size >= this.maxSessions) {
-        return Failure(`Maximum sessions (${this.maxSessions}) reached`);
-      }
-    }
-
     const id = sessionId ?? randomUUID();
     const now = new Date();
 
@@ -79,20 +56,13 @@ export class SessionManager {
       metadata: {},
       completed_steps: [],
       errors: {},
-      current_step: null,
       createdAt: now,
       updatedAt: now,
       lastAccessedAt: now,
     };
 
-    this.sessions.set(id, session);
-    this.logger.info(
-      {
-        sessionId: id,
-        totalSessions: this.sessions.size,
-      },
-      'Session created',
-    );
+    this.currentSession = session;
+    this.logger.info({ sessionId: id }, 'Session created');
 
     // Return without lastAccessedAt to match WorkflowState interface
     const { lastAccessedAt: _lastAccessed, ...workflowState } = session;
@@ -100,27 +70,20 @@ export class SessionManager {
   }
 
   /**
-   * Get a session by ID
+   * Get the current session by ID
    */
   async get(sessionId: string): Promise<Result<WorkflowState | null>> {
-    const session = this.sessions.get(sessionId);
+    const session = this.currentSession;
 
     this.logger.debug(
       {
         sessionId,
-        found: !!session,
+        found: !!session && session.sessionId === sessionId,
       },
       'Session lookup',
     );
 
-    if (!session) {
-      return Success(null);
-    }
-
-    // Check if expired based on lastAccessedAt
-    if (Date.now() - session.lastAccessedAt.getTime() > this.ttl * 1000) {
-      this.sessions.delete(sessionId);
-      this.logger.debug({ sessionId }, 'Expired session removed');
+    if (!session || session.sessionId !== sessionId) {
       return Success(null);
     }
 
@@ -133,11 +96,11 @@ export class SessionManager {
   }
 
   /**
-   * Update a session
+   * Update the current session
    */
   async update(sessionId: string, state: Partial<WorkflowState>): Promise<Result<WorkflowState>> {
-    const session = this.sessions.get(sessionId);
-    if (!session) {
+    const session = this.currentSession;
+    if (!session || session.sessionId !== sessionId) {
       return Failure(`Session ${sessionId} not found`);
     }
 
@@ -166,79 +129,40 @@ export class SessionManager {
   }
 
   /**
-   * Delete a session
+   * Delete the current session
    */
   async delete(sessionId: string): Promise<Result<void>> {
-    const existed = this.sessions.delete(sessionId);
-    if (existed) {
+    if (this.currentSession && this.currentSession.sessionId === sessionId) {
+      this.currentSession = null;
       this.logger.debug({ sessionId }, 'Session deleted');
     }
     return Success(undefined);
   }
 
   /**
-   * List all session IDs
+   * List current session ID
    */
   async list(): Promise<Result<string[]>> {
-    return Success(Array.from(this.sessions.keys()));
+    return Success(this.currentSession ? [this.currentSession.sessionId] : []);
   }
 
   /**
-   * Cleanup sessions older than a specific date
+   * Cleanup the current session if older than specified date
    */
   async cleanup(olderThan: Date): Promise<Result<void>> {
-    let cleanedCount = 0;
-    for (const [id, session] of this.sessions.entries()) {
-      if (session.createdAt < olderThan) {
-        this.sessions.delete(id);
-        cleanedCount++;
-      }
-    }
-    if (cleanedCount > 0) {
-      this.logger.debug({ cleanedCount }, 'Sessions cleaned up');
+    if (this.currentSession && this.currentSession.createdAt < olderThan) {
+      this.currentSession = null;
+      this.logger.debug('Session cleaned up');
     }
     return Success(undefined);
   }
 
   /**
-   * Close the session manager and stop cleanup
+   * Close the session manager
    */
   close(): void {
-    if (this.cleanupTimer) {
-      clearInterval(this.cleanupTimer);
-    }
+    this.currentSession = null;
     this.logger.info('Session manager closed');
-  }
-
-  /**
-   * Internal: Cleanup expired sessions based on TTL
-   */
-  private cleanupExpired(): void {
-    const now = Date.now();
-    const expired: string[] = [];
-
-    for (const [id, session] of this.sessions.entries()) {
-      if (now - session.lastAccessedAt.getTime() > this.ttl * 1000) {
-        expired.push(id);
-      }
-    }
-
-    expired.forEach((id) => this.sessions.delete(id));
-
-    if (expired.length > 0) {
-      this.logger.debug({ expiredCount: expired.length }, 'Expired sessions cleaned up');
-    }
-  }
-
-  /**
-   * Internal: Periodic cleanup handler
-   */
-  private performCleanup(): void {
-    try {
-      this.cleanupExpired();
-    } catch (err) {
-      this.logger.warn({ error: err }, 'Session cleanup failed');
-    }
   }
 }
 

@@ -91,16 +91,6 @@ export interface BaseToolParams {
 }
 
 /**
- * Enhanced parameters for AI-powered tools
- */
-export interface AIEnhancedParams extends BaseToolParams {
-  disableSampling?: boolean;
-  maxCandidates?: number;
-  includeScoreBreakdown?: boolean;
-  returnAllCandidates?: boolean;
-}
-
-/**
  * Quality assessment result
  */
 export interface QualityAssessment {
@@ -120,59 +110,16 @@ export interface ScoringComparison {
   improvementPercentage?: number;
 }
 
-/**
- * Helper function to get quality grade from score
- */
-export function getQualityGrade(score: number): SecurityGrade {
-  if (score >= 90) return 'A';
-  if (score >= 80) return 'B';
-  if (score >= 70) return 'C';
-  if (score >= 60) return 'D';
-  return 'F';
-}
+// Removed unused helper functions and constants:
+// - getQualityGrade - not used
+// - getSecurityGrade - not used
+// - ENVIRONMENT_PROFILES - not used
+// These were flagged by knip as unused exports
 
 /**
- * Helper function to get security grade for base images
+ * Tool category mappings for all available tools (internal use only)
  */
-export function getSecurityGrade(image: string): SecurityGrade {
-  const lowerImage = image.toLowerCase();
-  if (lowerImage.includes('distroless')) return 'A';
-  if (lowerImage.includes('alpine')) return 'B';
-  if (lowerImage.includes('slim')) return 'C';
-  if (lowerImage.includes(':latest')) return 'F';
-  return 'D';
-}
-
-/**
- * Environment configuration profiles
- */
-export const ENVIRONMENT_PROFILES = {
-  development: {
-    securityWeight: 0.2,
-    performanceWeight: 0.3,
-    debuggingWeight: 0.5,
-  },
-  staging: {
-    securityWeight: 0.4,
-    performanceWeight: 0.4,
-    debuggingWeight: 0.2,
-  },
-  production: {
-    securityWeight: 0.5,
-    performanceWeight: 0.4,
-    debuggingWeight: 0.1,
-  },
-  testing: {
-    securityWeight: 0.3,
-    performanceWeight: 0.2,
-    debuggingWeight: 0.5,
-  },
-} as const;
-
-/**
- * Tool category mappings for all available tools
- */
-export const TOOL_CATEGORIES: Record<string, ToolCategory> = {
+const TOOL_CATEGORIES: Record<string, ToolCategory> = {
   // Docker tools
   'build-image': 'docker',
   'fix-dockerfile': 'docker',

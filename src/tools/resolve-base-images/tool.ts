@@ -8,7 +8,7 @@
  * @category docker
  * @version 2.1.0
  * @aiDriven true
- * @samplingStrategy rerank
+ * @samplingStrategy single
  */
 
 import { Success, Failure, type Result, TOPICS } from '@/types';
@@ -18,8 +18,9 @@ import { promptTemplates, type BaseImageResolutionParams } from '@/ai/prompt-tem
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
-import { scoreBaseImageRecommendation } from '@/lib/sampling';
+import { scoreBaseImageRecommendation } from '@/lib/scoring';
 import { resolveBaseImagesSchema } from './schema';
+import { createStandardizedToolTracker } from '@/lib/tool-helpers';
 import type { AIResponse } from '../ai-response-types';
 import type { z } from 'zod';
 
@@ -30,8 +31,8 @@ const version = '2.1.0';
 /**
  * Generate AI-powered base image recommendations
  *
- * Analyzes the provided technology stack and uses AI sampling with
- * reranking to suggest optimal Docker base images. Considers security,
+ * Analyzes the provided technology stack and uses deterministic AI sampling
+ * to suggest optimal Docker base images. Considers security,
  * performance, and maintainability factors.
  *
  * @param input - Technology and context parameters
@@ -44,81 +45,103 @@ async function run(
 ): Promise<Result<AIResponse>> {
   const { technology } = input;
 
-  // Generate prompt from template - provide context for better recommendations
-  let contextPrefix = '';
-  if (technology && technology !== 'auto-detect') {
-    contextPrefix = `Technology stack: ${technology}\n`;
-  } else {
-    contextPrefix = `First, examine the repository to identify the technology stack, framework, and dependencies.\n`;
-  }
-
-  const promptParams = {
-    language: technology || 'auto-detect',
-    requirements: [
-      contextPrefix,
-      'Check Docker Hub and official repositories for the latest stable base images',
-      'Consider both Alpine and Debian/Ubuntu variants',
-      'Evaluate distroless options for production security',
-      'Check for language-specific optimized images (e.g., node:slim, python:slim)',
-    ],
-  };
-  const basePrompt = promptTemplates.baseImageResolution(promptParams as BaseImageResolutionParams);
-
-  // Build messages using the new prompt engine
-  const messages = await buildMessages({
-    basePrompt,
-    topic: TOPICS.RESOLVE_BASE_IMAGES,
-    tool: 'resolve-base-images',
-    environment: 'production',
-    contract: {
-      name: 'base_images_v1',
-      description: 'Recommend optimal Docker base images',
-    },
-    knowledgeBudget: 2000,
-  });
-
-  // Execute via AI with sampling and reranking
-  const samplingResult = await sampleWithRerank(
-    ctx,
-    async (attemptIndex) => ({
-      ...toMCPMessages(messages),
-      maxTokens: 4096,
-      modelPreferences: {
-        hints: [{ name: 'docker-base-images' }],
-        intelligencePriority: 0.9, // Higher priority for accurate recommendations
-        speedPriority: attemptIndex > 0 ? 0.7 : 0.4,
-        costPriority: 0.4,
-      },
-    }),
-    scoreBaseImageRecommendation,
-    { count: 3, stopAt: 85 },
+  const tracker = createStandardizedToolTracker(
+    'resolve-base-images',
+    { technology: technology || 'auto-detect' },
+    ctx.logger,
   );
 
-  if (!samplingResult.ok) {
-    // Check if failure is due to empty AI responses - be graceful in this case
-    if (samplingResult.error?.includes('No valid candidates generated')) {
-      ctx.logger.debug('AI returned empty responses, returning empty recommendations');
+  try {
+    // Generate prompt from template - provide context for better recommendations
+    let contextPrefix = '';
+    if (technology && technology !== 'auto-detect') {
+      contextPrefix = `Technology stack: ${technology}\n`;
+    } else {
+      contextPrefix = `First, examine the repository to identify the technology stack, framework, and dependencies.\n`;
+    }
+
+    const promptParams = {
+      language: technology || 'auto-detect',
+      requirements: [
+        contextPrefix,
+        'Check Docker Hub and official repositories for the latest stable base images',
+        'Consider both Alpine and Debian/Ubuntu variants',
+        'Evaluate distroless options for production security',
+        'Check for language-specific optimized images (e.g., node:slim, python:slim)',
+      ],
+    };
+    const basePrompt = promptTemplates.baseImageResolution(
+      promptParams as BaseImageResolutionParams,
+    );
+
+    // Build messages using the new prompt engine
+    const messages = await buildMessages({
+      basePrompt,
+      topic: TOPICS.RESOLVE_BASE_IMAGES,
+      tool: 'resolve-base-images',
+      environment: 'production',
+      contract: {
+        name: 'base_images_v1',
+        description: 'Recommend optimal Docker base images',
+      },
+      knowledgeBudget: 2000,
+    });
+
+    // Execute via AI with deterministic sampling
+    const samplingResult = await sampleWithRerank(
+      ctx,
+      async (attemptIndex) => ({
+        ...toMCPMessages(messages),
+        maxTokens: 4096,
+        modelPreferences: {
+          hints: [{ name: 'docker-base-images' }],
+          intelligencePriority: 0.9, // Higher priority for accurate recommendations
+          speedPriority: attemptIndex > 0 ? 0.7 : 0.4,
+          costPriority: 0.4,
+        },
+      }),
+      scoreBaseImageRecommendation,
+      {},
+    );
+
+    if (!samplingResult.ok) {
+      // Check if failure is due to empty AI responses - be graceful in this case
+      if (
+        samplingResult.error?.includes('Empty response from AI') ||
+        samplingResult.error?.includes('No valid candidates generated')
+      ) {
+        ctx.logger.debug('AI returned empty responses, returning empty recommendations');
+        tracker.complete({ recommendations: 'empty' });
+        return Success({ recommendations: '' });
+      }
+      tracker.fail(`Base image recommendation failed: ${samplingResult.error}`);
+      return Failure(`Base image recommendation failed: ${samplingResult.error}`);
+    }
+
+    const responseText = samplingResult.value.text;
+    if (!responseText) {
+      // Return empty recommendations rather than failing when AI response is empty
+      ctx.logger.debug('AI returned empty response, returning empty recommendations');
+      tracker.complete({ recommendations: 'empty' });
       return Success({ recommendations: '' });
     }
-    return Failure(`Base image recommendation failed: ${samplingResult.error}`);
+
+    ctx.logger.info(
+      {
+        score: samplingResult.value.score,
+        scoreBreakdown: samplingResult.value.scoreBreakdown,
+      },
+      'Base image recommendations generated with sampling',
+    );
+
+    tracker.complete({ technology, score: samplingResult.value.score });
+
+    return Success({ recommendations: responseText });
+  } catch (error) {
+    tracker.fail(error as Error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return Failure(`Base image recommendation failed: ${errorMessage}`);
   }
-
-  const responseText = samplingResult.value.text;
-  if (!responseText) {
-    // Return empty recommendations rather than failing when AI response is empty
-    ctx.logger.debug('AI returned empty response, returning empty recommendations');
-    return Success({ recommendations: '' });
-  }
-
-  ctx.logger.info(
-    {
-      score: samplingResult.value.winner.score,
-      scoreBreakdown: samplingResult.value.winner.scoreBreakdown,
-    },
-    'Base image recommendations generated with sampling',
-  );
-
-  return Success({ recommendations: responseText });
 }
 
 const tool: Tool<typeof resolveBaseImagesSchema, AIResponse> = {
@@ -130,7 +153,7 @@ const tool: Tool<typeof resolveBaseImagesSchema, AIResponse> = {
   metadata: {
     aiDriven: true,
     knowledgeEnhanced: true,
-    samplingStrategy: 'rerank',
+    samplingStrategy: 'single',
     enhancementCapabilities: ['content-generation', 'image-recommendation', 'security-analysis'],
   },
   run,

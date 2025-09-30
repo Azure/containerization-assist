@@ -1,4 +1,7 @@
 {
+  // ESM Build Configuration
+  // Note: Use 'tsc-alias --resolve-full-paths' after compilation to ensure
+  // path aliases are resolved with proper .js extensions for ESM compatibility
   "compilerOptions": {
     "target": "ES2022",
     "module": "ES2022",

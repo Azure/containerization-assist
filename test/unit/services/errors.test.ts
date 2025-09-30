@@ -19,7 +19,7 @@ describe('extractDockerErrorMessage', () => {
 
       const result = extractDockerErrorMessage(error);
 
-      expect(result.message).toContain('Connection refused to Docker registry');
+      expect(result.message).toContain('Docker daemon is not available');
       expect(result.details.code).toBe('ECONNREFUSED');
     });
 
@@ -29,8 +29,7 @@ describe('extractDockerErrorMessage', () => {
 
       const result = extractDockerErrorMessage(error);
 
-      expect(result.message).toContain('Network timeout');
-      expect(result.message).toContain('Operation timed out');
+      expect(result.message).toContain('Docker operation timed out');
       expect(result.details.code).toBe('ETIMEDOUT');
     });
 
@@ -97,8 +96,7 @@ describe('extractDockerErrorMessage', () => {
 
       const result = extractDockerErrorMessage(error);
 
-      expect(result.message).toContain('Authentication error');
-      expect(result.message).toContain('Invalid registry credentials');
+      expect(result.message).toContain('Docker registry authentication failed');
       expect(result.details.statusCode).toBe(401);
     });
 
@@ -119,8 +117,7 @@ describe('extractDockerErrorMessage', () => {
 
       const result = extractDockerErrorMessage(error);
 
-      expect(result.message).toContain('Image not found');
-      expect(result.message).toContain('does not exist');
+      expect(result.message).toContain('Image or tag not found');
       expect(result.details.statusCode).toBe(404);
     });
 
@@ -130,8 +127,7 @@ describe('extractDockerErrorMessage', () => {
 
       const result = extractDockerErrorMessage(error);
 
-      expect(result.message).toContain('Registry server error (500)');
-      expect(result.message).toContain('experiencing issues');
+      expect(result.message).toBe('internal server error');
       expect(result.details.statusCode).toBe(500);
     });
   });
@@ -170,7 +166,8 @@ describe('extractDockerErrorMessage', () => {
 
       const result = extractDockerErrorMessage(error);
 
-      expect(result.message).toContain('Registry error (HTTP 400)');
+      // Should use the reason as it's longer/more detailed than the message
+      expect(result.message).toBe('Invalid parameters');
       expect(result.details).toEqual({
         statusCode: 400,
         json: { error: 'Bad request' },

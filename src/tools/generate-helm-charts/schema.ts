@@ -13,10 +13,19 @@ import {
 } from '../shared/schemas';
 
 export const generateHelmChartsSchema = z.object({
-  // Core required fields
-  chartName: z.string().min(1).describe('Helm chart name (required)'),
-  appName,
-  imageId: imageId.min(1).describe('Container image to deploy (required)'),
+  // Core fields - now optional with session fallback
+  chartName: z
+    .string()
+    .optional()
+    .describe('Helm chart name. If not provided, uses appName from session.'),
+  appName: appName
+    .optional()
+    .describe('Application name. If not provided, uses name from analyze-repo session data.'),
+  imageId: imageId
+    .optional()
+    .describe(
+      'Container image to deploy. If not provided, uses image from build-image session data.',
+    ),
 
   // Session tracking (standard pattern)
   sessionId: sessionId.optional(),

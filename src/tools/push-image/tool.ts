@@ -6,7 +6,7 @@
  */
 
 import { createDockerClient, type DockerClient } from '@/infra/docker/client';
-import { getToolLogger } from '@/lib/tool-helpers';
+import { getToolLogger, createStandardizedToolTracker } from '@/lib/tool-helpers';
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
@@ -15,7 +15,7 @@ import type { z } from 'zod';
 import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages, type MCPMessage } from '@/mcp/ai/message-converter';
-import { extractErrorMessage } from '@/lib/error-utils';
+import { extractErrorMessage, createErrorGuidance } from '@/lib/error-utils';
 
 // Additional interface for AI push optimization insights
 export interface PushOptimizationInsights {
@@ -122,7 +122,7 @@ async function generatePushOptimizationInsights(
       ctx,
       async () => buildPushOptimizationPrompt(pushedTag, registry, digest, pushTime),
       scorePushOptimization,
-      { count: 2, stopAt: 85 },
+      {},
     );
 
     if (!insightResult.ok) {
@@ -204,7 +204,7 @@ async function generatePushOptimizationInsights(
       recommendations,
       registryOptimizations,
       securityConsiderations,
-      confidence: insightResult.value.winner.score,
+      confidence: insightResult.value.score ?? 0,
     });
   } catch (error) {
     return Failure(`Failed to generate push optimization insights: ${extractErrorMessage(error)}`);
@@ -221,10 +221,23 @@ async function run(
   const logger = getToolLogger(ctx, 'push-image');
   const startTime = Date.now();
 
+  const tracker = createStandardizedToolTracker(
+    'push-image',
+    { imageId: input.imageId, registry: input.registry },
+    logger,
+  );
+
   try {
     // Validate required imageId
     if (!input.imageId) {
-      return Failure('Missing required parameter: imageId');
+      return Failure(
+        'Missing required parameter: imageId',
+        createErrorGuidance(
+          'Missing required parameter: imageId',
+          'The imageId parameter is required to push an image',
+          'Provide the imageId of the Docker image to push. Use `docker images` to list available images.',
+        ),
+      );
     }
 
     // Use docker from context if provided (for testing), otherwise create new client
@@ -259,14 +272,23 @@ async function run(
     if (input.registry) {
       const tagResult = await dockerClient.tagImage(input.imageId, repository, tag);
       if (!tagResult.ok) {
-        return Failure(`Failed to tag image: ${tagResult.error}`);
+        return Failure(
+          `Failed to tag image: ${tagResult.error}`,
+          tagResult.guidance ||
+            createErrorGuidance(
+              tagResult.error,
+              'Unable to tag the Docker image',
+              'Verify the image exists with `docker images` and the tag format is valid.',
+            ),
+        );
       }
     }
 
     // Push the image
     const pushResult = await dockerClient.pushImage(repository, tag);
     if (!pushResult.ok) {
-      return Failure(`Failed to push image: ${pushResult.error}`);
+      // Use the guidance from the Docker client if available
+      return Failure(`Failed to push image: ${pushResult.error}`, pushResult.guidance);
     }
 
     const pushTime = Date.now() - startTime;
@@ -319,14 +341,11 @@ async function run(
       },
     };
 
-    logger.info(
-      { pushedTag: result.pushedTag, digest: result.digest, pushTime },
-      'Image pushed successfully',
-    );
+    tracker.complete({ pushedTag: result.pushedTag, digest: result.digest, pushTime });
 
     return Success(result);
   } catch (error) {
-    logger.error({ error }, 'Failed to push image');
+    tracker.fail(error as Error);
     const message = error instanceof Error ? error.message : 'Unknown error occurred';
     return Failure(`Push image failed: ${message}`);
   }
@@ -343,7 +362,7 @@ const tool: Tool<typeof pushImageSchema, PushImageResult> = {
   metadata: {
     aiDriven: true,
     knowledgeEnhanced: true,
-    samplingStrategy: 'rerank',
+    samplingStrategy: 'single',
     enhancementCapabilities: ['push-optimization', 'registry-insights', 'security-recommendations'],
   },
   run,

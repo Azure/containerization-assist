@@ -47,7 +47,7 @@ jest.mock('../../../src/session/core', () => ({
         metadata: {},
         completed_steps: [],
         errors: {},
-        current_step: null,
+        
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -67,7 +67,7 @@ jest.mock('../../../src/session/core', () => ({
         metadata: {},
         completed_steps: [],
         errors: {},
-        current_step: null,
+        
         createdAt: new Date(),
         updatedAt: new Date(),
       },

@@ -30,11 +30,9 @@ describe('KeyedMutex', () => {
         release();
       });
 
-      // First lock holder does work
       results.push(1);
       release1();
 
-      // Wait for second to complete
       await promise2;
 
       expect(results).toEqual([1, 2]);

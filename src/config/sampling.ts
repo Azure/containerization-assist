@@ -1,38 +1,10 @@
 /**
  * Sampling Configuration
  *
- * AI sampling strategies, candidate counts, and operation limits.
+ * AI sampling limits and operation parameters for deterministic single-candidate sampling.
  */
 
 export const SAMPLING_CONFIG = {
-  CANDIDATES: {
-    /** Single candidate for fast operations */
-    FAST: 1,
-    /** Balanced sampling - 3 candidates */
-    BALANCED: 3,
-    /** Thorough sampling - 5 candidates */
-    THOROUGH: 5,
-    /** Exhaustive sampling - 8 candidates */
-    EXHAUSTIVE: 8,
-  },
-  /** Default parameters for different sampling strategies */
-  DEFAULTS: {
-    FAST: {
-      candidates: 1,
-      stopAt: 75,
-      maxTokens: 4096,
-    },
-    BALANCED: {
-      candidates: 3,
-      stopAt: 85,
-      maxTokens: 4096,
-    },
-    THOROUGH: {
-      candidates: 5,
-      stopAt: 88,
-      maxTokens: 6144,
-    },
-  },
   LIMITS: {
     /** Maximum number of suggestions to return */
     MAX_SUGGESTIONS: 10,

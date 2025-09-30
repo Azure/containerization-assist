@@ -62,7 +62,7 @@ const mockSessionManager = {
     "metadata": {},
     "completed_steps": [],
     "errors": {},
-    "current_step": null,
+    
     "createdAt": "2025-09-08T11:12:40.362Z",
     "updatedAt": "2025-09-08T11:12:40.362Z"
   }),
@@ -96,6 +96,8 @@ const mockSessionFacade = {
   get: jest.fn(),
   set: jest.fn(),
   pushStep: jest.fn(),
+  storeResult: jest.fn(),
+  getResult: jest.fn(),
 };
 
 function createMockToolContext() {
@@ -155,7 +157,7 @@ CMD ["node", "index.js"]`;
       },
       completed_steps: [],
       errors: {},
-      current_step: null,
+      
       metadata: {},
       createdAt: '2025-09-08T11:12:40.362Z',
       updatedAt: '2025-09-08T11:12:40.362Z',
@@ -182,7 +184,24 @@ CMD ["node", "index.js"]`;
 
   describe('Successful Build', () => {
     beforeEach(() => {
-      // Setup session facade with build context
+      // Setup session facade with build context using getResult
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'analyze-repo') {
+          return {
+            language: 'javascript',
+            framework: 'express',
+          };
+        }
+        if (toolName === 'generate-dockerfile') {
+          return {
+            path: '/test/repo/Dockerfile',
+            content: mockDockerfile,
+          };
+        }
+        return undefined;
+      });
+
+      // Also mock get() for backwards compatibility (build-image still uses it)
       mockSessionFacade.get.mockImplementation((key: string) => {
         if (key === 'results') {
           return {
@@ -204,6 +223,9 @@ CMD ["node", "index.js"]`;
       const mockContext = createMockToolContext();
       const result = await buildImage(config, mockContext);
 
+      if (!result.ok) {
+        console.error('Build failed:', result.error);
+      }
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.success).toBe(true);
@@ -263,12 +285,13 @@ CMD ["node", "index.js"]`;
       const result = await buildImage(config, createMockToolContext());
 
       expect(result.ok).toBe(true);
-      // The build-image tool updates session using session facade
-      // It calls set multiple times: once for results, once for current_step
-      expect(mockSessionFacade.set).toHaveBeenCalledWith('results', expect.objectContaining({
-        'build-image': expect.any(Object),
-      }));
-      expect(mockSessionFacade.set).toHaveBeenCalledWith('current_step', 'build-image');
+      // The orchestrator automatically stores results via sessionFacade.storeResult()
+      // Tools no longer manually manipulate session.set('results')
+      // This test verifies the tool returns successfully
+      if (result.ok) {
+        expect(result.value).toHaveProperty('imageId');
+        expect(result.value).toHaveProperty('tags');
+      }
     });
   });
 
@@ -489,22 +512,20 @@ CMD ["node", "index.js"]`;
   describe('Error Handling', () => {
     it('should auto-create session when not found', async () => {
       // Setup session facade with dockerfile content
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'generate-dockerfile') {
           return {
-            'generate-dockerfile': {
-              path: '/test/repo/Dockerfile',
-              content: mockDockerfile,
-            },
+            path: '/test/repo/Dockerfile',
+            content: mockDockerfile,
           };
         }
         return undefined;
       });
-      
+
       // Setup filesystem mocks for this test
       mockFs.access.mockResolvedValue(undefined);
       mockFs.readFile.mockResolvedValue(mockDockerfile);
-      
+
       // Setup docker build mock
       mockDockerClient.buildImage.mockResolvedValue(createSuccessResult({
         imageId: 'sha256:mock-image-id',
@@ -518,41 +539,39 @@ CMD ["node", "index.js"]`;
       const result = await buildImage(config, createMockToolContext());
 
       expect(result.ok).toBe(true);
-      // Session facade should have been called to get results
-      expect(mockSessionFacade.get).toHaveBeenCalledWith('results');
+      // Session facade should have been called to get results (analyze-repo is called first)
+      expect(mockSessionFacade.getResult).toHaveBeenCalledWith('analyze-repo');
     });
 
     it('should return error when Dockerfile not found and no session content', async () => {
       // Setup session facade with empty dockerfile content
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
-          return {
-            'generate-dockerfile': {}, // Empty dockerfile content
-          };
-        }
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        // Return undefined for generate-dockerfile to simulate no session content
         return undefined;
       });
 
       mockFs.access.mockRejectedValue(new Error('Dockerfile not found'));
+      mockFs.writeFile.mockRejectedValue(new Error('Cannot write temp file'));
 
       const result = await buildImage(config, createMockToolContext());
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toContain('Dockerfile not found');
+        // The error could be either about Dockerfile not found or temp file write failure
+        expect(result.error).toMatch(/Dockerfile not found|Cannot write temp file/);
       }
     });
 
     it('should return error when Docker build fails', async () => {
       // Setup session facade with dockerfile content
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'analyze-repo') {
+          return { language: 'javascript' };
+        }
+        if (toolName === 'generate-dockerfile') {
           return {
-            'analyze-repo': { language: 'javascript' },
-            'generate-dockerfile': {
-              path: '/test/repo/Dockerfile',
-              content: mockDockerfile,
-            },
+            path: '/test/repo/Dockerfile',
+            content: mockDockerfile,
           };
         }
         return undefined;
@@ -575,13 +594,11 @@ CMD ["node", "index.js"]`;
 
     it('should handle filesystem errors', async () => {
       // Setup session facade with dockerfile content
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'generate-dockerfile') {
           return {
-            'generate-dockerfile': {
-              path: '/test/repo/Dockerfile',
-              content: mockDockerfile,
-            },
+            path: '/test/repo/Dockerfile',
+            content: mockDockerfile,
           };
         }
         return undefined;
@@ -600,18 +617,16 @@ CMD ["node", "index.js"]`;
 
     it('should handle Docker client errors', async () => {
       // Setup session facade with dockerfile content
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'generate-dockerfile') {
           return {
-            'generate-dockerfile': {
-              path: '/test/repo/Dockerfile',
-              content: mockDockerfile,
-            },
+            path: '/test/repo/Dockerfile',
+            content: mockDockerfile,
           };
         }
         return undefined;
       });
-      
+
       mockFs.access.mockResolvedValue(undefined);
       mockFs.readFile.mockResolvedValue(mockDockerfile);
 
@@ -629,17 +644,17 @@ CMD ["node", "index.js"]`;
   describe('Build Arguments', () => {
     beforeEach(() => {
       // Setup session facade with python/flask analysis
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'analyze-repo') {
           return {
-            'analyze-repo': {
-              language: 'python',
-              framework: 'flask',
-            },
-            'generate-dockerfile': {
-              path: '/test/repo/Dockerfile',
-              content: mockDockerfile,
-            },
+            language: 'python',
+            framework: 'flask',
+          };
+        }
+        if (toolName === 'generate-dockerfile') {
+          return {
+            path: '/test/repo/Dockerfile',
+            content: mockDockerfile,
           };
         }
         return undefined;
@@ -696,13 +711,11 @@ CMD ["node", "index.js"]`;
 
     it('should handle missing analysis data gracefully', async () => {
       // Setup session facade with only dockerfile content (no analysis)
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'generate-dockerfile') {
           return {
-            'generate-dockerfile': {
-              path: '/test/repo/Dockerfile',
-              content: mockDockerfile,
-            },
+            path: '/test/repo/Dockerfile',
+            content: mockDockerfile,
           };
         }
         return undefined;

@@ -85,7 +85,6 @@ describe('Cache', () => {
 
   describe('LRU eviction', () => {
     test('should evict oldest entry when at capacity', async () => {
-      // Fill cache to capacity with small delays to ensure different timestamps
       cache.set('key1', 'value1');
       await new Promise((resolve) => setTimeout(resolve, 10));
       cache.set('key2', 'value2');
@@ -93,10 +92,9 @@ describe('Cache', () => {
       cache.set('key3', 'value3');
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // Adding fourth item should evict first (oldest)
       cache.set('key4', 'value4');
 
-      expect(cache.get('key1')).toBeUndefined(); // Evicted (oldest)
+      expect(cache.get('key1')).toBeUndefined();
       expect(cache.get('key2')).toBe('value2');
       expect(cache.get('key3')).toBe('value3');
       expect(cache.get('key4')).toBe('value4');
@@ -117,7 +115,6 @@ describe('Cache', () => {
       expect(cache.get('key8')).toBe('value8');
       expect(cache.get('key9')).toBe('value9');
 
-      // Verify older items were evicted
       expect(cache.get('key0')).toBeUndefined();
       expect(cache.get('key1')).toBeUndefined();
     });

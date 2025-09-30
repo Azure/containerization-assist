@@ -40,7 +40,7 @@ const mockSessionManager = {
     metadata: {},
     completed_steps: [],
     errors: {},
-    current_step: null,
+    
     createdAt: '2025-09-08T11:12:40.362Z',
     updatedAt: '2025-09-08T11:12:40.362Z',
   }),
@@ -74,6 +74,10 @@ jest.mock('../../../src/lib/logger', () => ({
 jest.mock('../../../src/lib/tool-helpers', () => ({
   getToolLogger: jest.fn(() => createMockLogger()),
   createToolTimer: jest.fn(() => mockTimer),
+  createStandardizedToolTracker: jest.fn(() => ({
+    complete: jest.fn(),
+    fail: jest.fn(),
+  })),
 }));
 
 // Mock session facade
@@ -82,6 +86,8 @@ const mockSessionFacade = {
   get: jest.fn(),
   set: jest.fn(),
   pushStep: jest.fn(),
+  storeResult: jest.fn(),
+  getResult: jest.fn(),
 };
 
 // Import these after mocks are set up
@@ -117,19 +123,18 @@ describe('tagImage', () => {
     createToolTimer.mockReturnValue(mockTimer);
 
     // Reset session facade methods to default implementations
-    mockSessionFacade.get.mockImplementation((key: string) => {
-      if (key === 'results') {
+    mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+      if (toolName === 'build-image') {
         return {
-          'build-image': {
-            imageId: 'sha256:mock-image-id',
-            context: '/test/repo',
-          },
+          imageId: 'sha256:mock-image-id',
+          context: '/test/repo',
         };
       }
       return undefined;
     });
     mockSessionFacade.set.mockResolvedValue(undefined);
     mockSessionFacade.pushStep.mockResolvedValue(undefined);
+    mockSessionFacade.storeResult.mockResolvedValue(undefined);
 
     mockSessionManager.update.mockResolvedValue(true);
 
@@ -143,13 +148,11 @@ describe('tagImage', () => {
   describe('Successful Tagging Operations', () => {
     beforeEach(() => {
       // Setup session facade with build result
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'build-image') {
           return {
-            'build-image': {
-              imageId: 'sha256:mock-image-id',
-              context: '/test/repo',
-            },
+            imageId: 'sha256:mock-image-id',
+            context: '/test/repo',
           };
         }
         return undefined;
@@ -175,13 +178,7 @@ describe('tagImage', () => {
         'v1.0',
       );
 
-      // Verify session was updated with tag result
-      expect(mockSessionFacade.set).toHaveBeenCalledWith(
-        'results',
-        expect.objectContaining({
-          'tag-image': expect.any(Object),
-        }),
-      );
+      // Note: Session storage is handled by the orchestrator, not the tool directly
 
       // Verify timer was used correctly
       expect(mockTimer.end).toHaveBeenCalledWith({
@@ -252,15 +249,13 @@ describe('tagImage', () => {
 
     it('should preserve existing build result data when updating session', async () => {
       // Setup session facade with extended build result
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'build-image') {
           return {
-            'build-image': {
-              imageId: 'sha256:mock-image-id',
-              context: '/test/repo',
-              dockerfile: 'Dockerfile',
-              size: 1024000,
-            },
+            imageId: 'sha256:mock-image-id',
+            context: '/test/repo',
+            dockerfile: 'Dockerfile',
+            size: 1024000,
           };
         }
         return undefined;
@@ -269,25 +264,18 @@ describe('tagImage', () => {
       const result = await tagImageTool.run(config, createMockToolContext());
 
       expect(result.ok).toBe(true);
-      expect(mockSessionFacade.set).toHaveBeenCalledWith(
-        'results',
-        expect.objectContaining({
-          'tag-image': expect.any(Object),
-        }),
-      );
+      // Note: Session storage is handled by the orchestrator, not the tool directly
     });
   });
 
   describe('Tag Format Validation', () => {
     beforeEach(() => {
       // Setup session facade with build result
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'build-image') {
           return {
-            'build-image': {
-              imageId: 'sha256:mock-image-id',
-              context: '/test/repo',
-            },
+            imageId: 'sha256:mock-image-id',
+            context: '/test/repo',
           };
         }
         return undefined;
@@ -359,13 +347,11 @@ describe('tagImage', () => {
   describe('Error Handling', () => {
     beforeEach(() => {
       // Setup session facade with build result for error handling tests
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'build-image') {
           return {
-            'build-image': {
-              imageId: 'sha256:mock-image-id',
-              context: '/test/repo',
-            },
+            imageId: 'sha256:mock-image-id',
+            context: '/test/repo',
           };
         }
         return undefined;
@@ -379,13 +365,11 @@ describe('tagImage', () => {
 
     it('should auto-create session when not found', async () => {
       // Setup session facade with build result
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'build-image') {
           return {
-            'build-image': {
-              imageId: 'sha256:mock-image-id',
-              context: '/test/repo',
-            },
+            imageId: 'sha256:mock-image-id',
+            context: '/test/repo',
           };
         }
         return undefined;
@@ -395,16 +379,13 @@ describe('tagImage', () => {
 
       expect(result.ok).toBe(true);
       // Session facade should have been used to get results
-      expect(mockSessionFacade.get).toHaveBeenCalledWith('results');
+      expect(mockSessionFacade.getResult).toHaveBeenCalledWith('build-image');
     });
 
     it('should return error when no build result exists', async () => {
       // Setup session facade without build result
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
-          return {}; // No build result
-        }
-        return undefined;
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        return undefined; // No build result
       });
 
       const result = await tagImageTool.run(config, createMockToolContext());
@@ -419,13 +400,11 @@ describe('tagImage', () => {
 
     it('should return error when build result has no imageId', async () => {
       // Setup session facade with build result missing imageId
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'build-image') {
           return {
-            'build-image': {
-              context: '/test/repo',
-              // No imageId
-            },
+            context: '/test/repo',
+            // No imageId
           };
         }
         return undefined;
@@ -443,12 +422,10 @@ describe('tagImage', () => {
 
     it('should return error for invalid tag format', async () => {
       // Setup session facade with build result
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'build-image') {
           return {
-            'build-image': {
-              imageId: 'sha256:mock-image-id',
-            },
+            imageId: 'sha256:mock-image-id',
           };
         }
         return undefined;
@@ -466,12 +443,10 @@ describe('tagImage', () => {
 
     it('should handle Docker client tagging failures', async () => {
       // Setup session facade with build result
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'build-image') {
           return {
-            'build-image': {
-              imageId: 'sha256:mock-image-id',
-            },
+            imageId: 'sha256:mock-image-id',
           };
         }
         return undefined;
@@ -491,12 +466,10 @@ describe('tagImage', () => {
 
     it('should handle Docker client tagging errors without error message', async () => {
       // Setup session facade with build result
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'build-image') {
           return {
-            'build-image': {
-              imageId: 'sha256:mock-image-id',
-            },
+            imageId: 'sha256:mock-image-id',
           };
         }
         return undefined;
@@ -516,12 +489,10 @@ describe('tagImage', () => {
 
     it('should handle exceptions during tagging process', async () => {
       // Setup session facade with build result
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'build-image') {
           return {
-            'build-image': {
-              imageId: 'sha256:mock-image-id',
-            },
+            imageId: 'sha256:mock-image-id',
           };
         }
         return undefined;
@@ -541,37 +512,35 @@ describe('tagImage', () => {
 
     it('should handle session update failures gracefully', async () => {
       // Setup session facade with build result
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'build-image') {
           return {
-            'build-image': {
-              imageId: 'sha256:mock-image-id',
-            },
+            imageId: 'sha256:mock-image-id',
           };
         }
         return undefined;
       });
 
-      // Mock sessionFacade.set to throw an error
-      const originalSetMock = mockSessionFacade.set.getMockImplementation();
-      mockSessionFacade.set.mockImplementation(() => {
+      // Mock sessionFacade.storeResult to throw an error
+      const originalStoreResultMock = mockSessionFacade.storeResult.getMockImplementation();
+      mockSessionFacade.storeResult.mockImplementation(() => {
         throw new Error('Update failed');
       });
 
       try {
         const result = await tagImageTool.run(config, createMockToolContext());
 
-        // Should fail if session update fails (slice.patch is not wrapped in try-catch)
+        // Should fail if session update fails
         expect(result.ok).toBe(false);
         if (!result.ok) {
           expect(result.error).toContain('Update failed');
         }
       } finally {
         // Restore the original mock implementation
-        if (originalSetMock) {
-          mockSessionFacade.set.mockImplementation(originalSetMock);
+        if (originalStoreResultMock) {
+          mockSessionFacade.storeResult.mockImplementation(originalStoreResultMock);
         } else {
-          mockSessionFacade.set.mockResolvedValue(undefined);
+          mockSessionFacade.storeResult.mockReturnValue(undefined);
         }
       }
     });
@@ -580,13 +549,11 @@ describe('tagImage', () => {
   describe('Session State Management', () => {
     beforeEach(() => {
       // Setup session facade with build result
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'build-image') {
           return {
-            'build-image': {
-              imageId: 'sha256:mock-image-id',
-              context: '/test/repo',
-            },
+            imageId: 'sha256:mock-image-id',
+            context: '/test/repo',
           };
         }
         return undefined;
@@ -613,10 +580,13 @@ describe('tagImage', () => {
         expect(result.value.imageId).toBe('sha256:mock-image-id');
         expect(result.value.tags).toEqual(['myapp:v1.0']);
       }
-      expect(mockSessionFacade.set).toHaveBeenCalledWith(
-        'results',
+      // Verify storeResult was called with normalized pattern
+      expect(mockSessionFacade.storeResult).toHaveBeenCalledWith(
+        'tag-image',
         expect.objectContaining({
-          'tag-image': expect.any(Object),
+          success: true,
+          imageId: 'sha256:mock-image-id',
+          tags: ['myapp:v1.0'],
         }),
       );
     });
@@ -631,12 +601,7 @@ describe('tagImage', () => {
         expect(result.value.imageId).toBe('sha256:mock-image-id');
         expect(result.value.tags).toEqual(['myapp:v1.0']);
       }
-      expect(mockSessionFacade.set).toHaveBeenCalledWith(
-        'results',
-        expect.objectContaining({
-          'tag-image': expect.any(Object),
-        }),
-      );
+      // Note: Session storage is handled by the orchestrator, not the tool directly
     });
   });
 
@@ -644,13 +609,11 @@ describe('tagImage', () => {
 
     beforeEach(() => {
       // Setup session facade with build result
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'build-image') {
           return {
-            'build-image': {
-              imageId: 'sha256:mock-image-id',
-              context: '/test/repo',
-            },
+            imageId: 'sha256:mock-image-id',
+            context: '/test/repo',
           };
         }
         return undefined;
@@ -671,13 +634,11 @@ describe('tagImage', () => {
 
       for (const testConfig of configurations) {
         // Setup session for each different sessionId
-        mockSessionFacade.get.mockImplementation((key: string) => {
-          if (key === 'results') {
+        mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+          if (toolName === 'build-image') {
             return {
-              'build-image': {
-                imageId: 'sha256:mock-image-id',
-                context: '/test/repo',
-              },
+              imageId: 'sha256:mock-image-id',
+              context: '/test/repo',
             };
           }
           return undefined;
@@ -698,19 +659,17 @@ describe('tagImage', () => {
 
         // Reset mocks for next iteration
         mockDockerClient.tagImage.mockClear();
-        mockSessionFacade.get.mockClear();
-        mockSessionFacade.set.mockClear();
+        mockSessionFacade.getResult.mockClear();
+        mockSessionFacade.storeResult.mockClear();
       }
     });
 
     it('should handle sequential tagging operations on same session', async () => {
       // Setup session facade with build result
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'build-image') {
           return {
-            'build-image': {
-              imageId: 'sha256:mock-image-id',
-            },
+            imageId: 'sha256:mock-image-id',
           };
         }
         return undefined;
@@ -746,13 +705,11 @@ describe('tagImage', () => {
   describe('Tool Instance', () => {
     beforeEach(() => {
       // Setup session facade with build result
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
+      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
+        if (toolName === 'build-image') {
           return {
-            'build-image': {
-              imageId: 'sha256:mock-image-id',
-              context: '/test/repo',
-            },
+            imageId: 'sha256:mock-image-id',
+            context: '/test/repo',
           };
         }
         return undefined;

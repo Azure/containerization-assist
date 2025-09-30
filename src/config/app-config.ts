@@ -17,14 +17,12 @@ import { autoDetectDockerSocket } from '@/infra/docker/client';
  */
 const DEFAULT_CONFIG = {
   MCP_NAME: 'containerization-assist',
-  SESSION_TTL: 86400, // 24h in seconds
   DOCKER_TIMEOUT: 60000, // 60s
   K8S_TIMEOUT: 30000, // 30s
   SCAN_TIMEOUT: 300000, // 5min
   MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
   CACHE_TTL: 3600, // 1 hour
   CACHE_MAX_SIZE: 100,
-  MAX_SESSIONS: 100,
   HOST: '0.0.0.0',
   PORT: 3000,
   DOCKER_SOCKET: autoDetectDockerSocket(),
@@ -49,14 +47,11 @@ const AppConfigSchema = z.object({
     name: z.string().default(DEFAULT_CONFIG.MCP_NAME),
     version: z.string(),
     storePath: z.string().default('./data/sessions.db'),
-    maxSessions: z.coerce.number().int().positive().default(DEFAULT_CONFIG.MAX_SESSIONS),
     enableMetrics: z.boolean().default(true),
     enableEvents: z.boolean().default(true),
   }),
   session: z.object({
     store: StoreTypeSchema,
-    ttl: z.coerce.number().int().positive().default(DEFAULT_CONFIG.SESSION_TTL),
-    maxSessions: z.coerce.number().int().positive().default(DEFAULT_CONFIG.MAX_SESSIONS),
     persistencePath: z.string().default('./data/sessions.db'),
     persistenceInterval: z.coerce.number().int().positive().default(60000),
     cleanupInterval: z.coerce
@@ -128,26 +123,8 @@ function getEnvValue(key: string): string | undefined {
 }
 
 /**
- * Safely parse number from environment variable with fallback
- */
-function parseNumberWithFallback(
-  value: string | undefined,
-  fallback: number,
-  varName?: string,
-): number {
-  if (!value) return fallback;
-
-  const parsed = Number(value);
-  if (isNaN(parsed)) {
-    console.warn(`Invalid ${varName || 'value'}: ${value}, using default ${fallback}`);
-    return fallback;
-  }
-
-  return parsed;
-}
-
-/**
  * Create configuration with environment variable overrides and validation
+ * @public
  */
 export function createAppConfig(): AppConfig {
   const rawConfig = {
@@ -161,22 +138,11 @@ export function createAppConfig(): AppConfig {
       name: getEnvValue('MCP_SERVER_NAME'),
       version: getPackageVersion(),
       storePath: getEnvValue('MCP_STORE_PATH'),
-      maxSessions: parseNumberWithFallback(
-        getEnvValue('MAX_SESSIONS'),
-        DEFAULT_CONFIG.MAX_SESSIONS,
-        'MAX_SESSIONS',
-      ),
       enableMetrics: true,
       enableEvents: true,
     },
     session: {
       store: 'memory' as const,
-      ttl: getEnvValue('SESSION_TTL'),
-      maxSessions: parseNumberWithFallback(
-        getEnvValue('MAX_SESSIONS'),
-        DEFAULT_CONFIG.MAX_SESSIONS,
-        'MAX_SESSIONS',
-      ),
       persistencePath: getEnvValue('MCP_STORE_PATH') || './data/sessions.db',
       persistenceInterval: 60000,
       cleanupInterval: DEFAULT_CONFIG.CACHE_TTL * 1000,
@@ -233,5 +199,6 @@ export function createAppConfig(): AppConfig {
 /**
  * Export the application configuration
  * Creates configuration with environment variable overrides
+ * @public
  */
 export const appConfig = createAppConfig();

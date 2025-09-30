@@ -5,7 +5,7 @@
  * Follows the new Tool interface pattern
  */
 
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { getToolLogger, createToolTimer, createStandardizedToolTracker } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { createDockerClient } from '@/lib/docker';
 import { Success, Failure, type Result, TOPICS } from '@/types';
@@ -118,7 +118,7 @@ async function generateTaggingSuggestions(
       ctx,
       async () => buildTaggingPrompt(imageId, currentTag, sessionContext),
       scoreTaggingStrategy,
-      { count: 2, stopAt: 85 },
+      {},
     );
 
     if (!suggestionResult.ok) {
@@ -179,7 +179,7 @@ async function generateTaggingSuggestions(
       recommendations,
       bestPractices,
       alternatives,
-      confidence: suggestionResult.value.winner.score,
+      confidence: suggestionResult.value.score ?? 0,
     });
   } catch (error) {
     return Failure(`Failed to generate tagging suggestions: ${extractErrorMessage(error)}`);
@@ -196,33 +196,29 @@ async function run(
   const logger = getToolLogger(ctx, 'tag-image');
   const timer = createToolTimer(logger, 'tag-image');
 
+  const { tag } = input;
+
+  if (!tag) {
+    return Failure('Tag parameter is required');
+  }
+
+  // Use session facade directly
+  const sessionId = input.sessionId || ctx.session?.id;
+  if (!sessionId) {
+    return Failure('Session ID is required for tag operations');
+  }
+
+  if (!ctx.session) {
+    return Failure('Session not available');
+  }
+
+  const tracker = createStandardizedToolTracker('tag-image', { sessionId, tag }, logger);
+
   try {
-    const { tag } = input;
-
-    if (!tag) {
-      return Failure('Tag parameter is required');
-    }
-
-    // Use session facade directly
-    const sessionId = input.sessionId || ctx.session?.id;
-    if (!sessionId) {
-      return Failure('Session ID is required for tag operations');
-    }
-
-    if (!ctx.session) {
-      return Failure('Session not available');
-    }
-
-    logger.info({ sessionId, tag }, 'Starting image tagging');
-
     const dockerClient = createDockerClient(logger);
 
-    // Check for built image in session results or use provided imageId
-    const results = ctx.session.get('results');
-    const buildResult =
-      results && typeof results === 'object' && 'build-image' in results
-        ? ((results as any)['build-image'] as { imageId?: string; tags?: string[] } | undefined)
-        : undefined;
+    // Check for built image in session using getResult (normalized approach) or use provided imageId
+    const buildResult = ctx.session.getResult<{ imageId?: string; tags?: string[] }>('build-image');
     const source = input.imageId || buildResult?.imageId;
 
     if (!source) {
@@ -243,7 +239,10 @@ async function run(
 
     const tagResult = await dockerClient.tagImage(source, repository, tagName);
     if (!tagResult.ok) {
-      return Failure(`Failed to tag image: ${tagResult.error ?? 'Unknown error'}`);
+      return Failure(
+        `Failed to tag image: ${tagResult.error ?? 'Unknown error'}`,
+        tagResult.guidance,
+      );
     }
 
     const tags = [tag];
@@ -251,12 +250,14 @@ async function run(
     // Generate AI-powered tagging suggestions
     let taggingSuggestions: TaggingStrategySuggestions | undefined;
     try {
-      const suggestionResult = await generateTaggingSuggestions(
-        source,
-        tag,
-        ctx,
-        ctx.session.get('metadata'),
-      );
+      // Collect session context from structured data (no nested metadata)
+      const sessionContext = {
+        appName: ctx.session.get<string>('appName'),
+        analyzedPath: ctx.session.get<string>('analyzedPath'),
+        dockerfileGenerated: ctx.session.get<boolean>('dockerfileGenerated'),
+      };
+
+      const suggestionResult = await generateTaggingSuggestions(source, tag, ctx, sessionContext);
 
       if (suggestionResult.ok) {
         taggingSuggestions = suggestionResult.value;
@@ -286,23 +287,16 @@ async function run(
       },
     };
 
-    // Store tag result in session
-    if (ctx.session) {
-      ctx.session.set('results', {
-        ...((ctx.session.get('results') as Record<string, any>) || {}),
-        'tag-image': result,
-      });
-      ctx.session.set('current_step', 'tag-image');
-      ctx.session.pushStep('tag-image');
-    }
+    // Store results in session using standardized storeResult
+    ctx.session?.storeResult('tag-image', result);
 
     timer.end({ tags, sessionId });
-    logger.info({ sessionId, tags }, 'Image tagging completed');
+    tracker.complete({ tags, imageId: source });
 
     return Success(result);
   } catch (error) {
     timer.error(error);
-    logger.error({ error }, 'Image tagging failed');
+    tracker.fail(error as Error);
     return Failure(extractErrorMessage(error));
   }
 }
@@ -318,7 +312,7 @@ const tool: Tool<typeof tagImageSchema, TagImageResult> = {
   metadata: {
     aiDriven: true,
     knowledgeEnhanced: true,
-    samplingStrategy: 'rerank',
+    samplingStrategy: 'single',
     enhancementCapabilities: ['tagging-strategy', 'best-practices', 'recommendations'],
   },
   run,

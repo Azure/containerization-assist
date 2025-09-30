@@ -125,7 +125,7 @@
     "pattern": "COPY mvnw|\\.mvn",
     "recommendation": "Only copy Maven wrapper files if they exist in the project",
     "example": "# Check if Maven wrapper files exist before using COPY:\n# - mvnw file must exist for: COPY mvnw ./\n# - .mvn directory must exist for: COPY .mvn .mvn\n\n# If Maven wrapper exists:\nCOPY mvnw pom.xml ./\nCOPY .mvn .mvn\nRUN chmod +x mvnw && ./mvnw dependency:go-offline -B\nCOPY src ./src\nRUN ./mvnw clean package -DskipTests -B\n\n# If no wrapper exists, use standard Maven:\nCOPY pom.xml ./\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests -B",
-    "severity": "critical",
+    "severity": "high",
     "tags": ["maven", "wrapper", "validation", "file-existence", "copy-validation"],
     "description": "Dockerfile COPY commands will fail if Maven wrapper files don't exist. Always validate file existence before copying. Remove COPY commands for non-existent files."
   },

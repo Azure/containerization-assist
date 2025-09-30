@@ -48,19 +48,22 @@ export const mockDocker = () => ({
  */
 export const mockK8s = () => ({
   applyManifest: jest.fn().mockResolvedValue({ success: true }),
-  
+
   getDeploymentStatus: jest.fn().mockResolvedValue({
     ready: true,
     readyReplicas: 3,
     totalReplicas: 3,
   }),
-  
-  deleteResource: jest.fn().mockResolvedValue({ success: true }),
-  
+
   listPods: jest.fn().mockResolvedValue([
     { name: 'test-pod-1', status: 'Running' },
     { name: 'test-pod-2', status: 'Running' },
   ]),
+
+  ping: jest.fn().mockResolvedValue(true),
+  namespaceExists: jest.fn().mockResolvedValue(true),
+  checkPermissions: jest.fn().mockResolvedValue(true),
+  checkIngressController: jest.fn().mockResolvedValue(true),
 });
 
 /**

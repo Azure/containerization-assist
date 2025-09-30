@@ -4,12 +4,21 @@
  */
 
 import { jest } from '@jest/globals';
-import { nanoid } from 'nanoid';
+import { randomBytes } from 'node:crypto';
 import { EnvironmentCapabilities } from '../utilities/environment-detector';
 import { Success, Failure } from '../../../src/types';
 
 export type MockBehavior = 'success' | 'failure' | 'timeout' | 'partial';
 export type SecurityFindingsLevel = 'none' | 'low' | 'medium' | 'high' | 'critical';
+
+/**
+ * Generate random ID (replacement for nanoid)
+ */
+function randomId(length: number = 8): string {
+  return randomBytes(Math.ceil(length / 2))
+    .toString('hex')
+    .slice(0, length);
+}
 
 export interface MockScenario {
   name: string;
@@ -25,7 +34,7 @@ export interface MockScenario {
 export class MockFactory {
   private sessionId: string;
 
-  constructor(sessionId: string = nanoid(8)) {
+  constructor(sessionId: string = randomId(8)) {
     this.sessionId = sessionId;
   }
 
@@ -52,7 +61,7 @@ export class MockFactory {
     switch (scenario) {
       case 'success':
         mock.buildImage.mockResolvedValue(Success({
-          imageId: `sha256:${nanoid(12)}`,
+          imageId: `sha256:${randomId(12)}`,
           tags: ['test:latest'],
           logs: ['Step 1/5 : FROM node:18', 'Successfully built'],
           size: 123456789,
@@ -61,10 +70,10 @@ export class MockFactory {
           registry: 'docker.io',
           repository: 'test/app',
           tag: 'latest',
-          digest: `sha256:${nanoid(12)}`,
+          digest: `sha256:${randomId(12)}`,
         }));
         mock.tagImage.mockResolvedValue(Success({
-          sourceImage: `sha256:${nanoid(12)}`,
+          sourceImage: `sha256:${randomId(12)}`,
           targetTag: 'test:v1.0',
         }));
         mock.ping.mockResolvedValue(Success({ ok: true }));
@@ -278,7 +287,7 @@ export class MockFactory {
         name: 'build-success',
         behavior: 'success',
         data: {
-          imageId: `sha256:${nanoid(12)}`,
+          imageId: `sha256:${randomId(12)}`,
           tags: ['test-app:latest', 'test-app:v1.0'],
           size: 256789012,
           layers: 12,
@@ -304,7 +313,7 @@ export class MockFactory {
         name: 'build-partial',
         behavior: 'partial',
         data: {
-          imageId: `sha256:${nanoid(12)}`,
+          imageId: `sha256:${randomId(12)}`,
           tags: ['test-app:latest'],
           warnings: ['Layer cache miss', 'Large image size detected']
         }

@@ -114,31 +114,8 @@ export const autoscaling = z
   .describe('Autoscaling configuration');
 
 // Sampling options (used by AI-powered generation tools)
+// Note: Now uses deterministic single-candidate sampling
 export const samplingOptions = {
-  disableSampling: z
-    .boolean()
-    .optional()
-    .describe('Disable multi-candidate sampling (sampling is enabled by default)'),
-  maxCandidates: z
-    .number()
-    .min(1)
-    .max(10)
-    .optional()
-    .describe('Maximum number of candidates to generate (1-10)'),
-  earlyStopThreshold: z
-    .number()
-    .min(0)
-    .max(100)
-    .optional()
-    .describe('Score threshold for early stopping (0-100)'),
-  includeScoreBreakdown: z
-    .boolean()
-    .optional()
-    .describe('Include detailed score breakdown in response'),
-  returnAllCandidates: z
-    .boolean()
-    .optional()
-    .describe('Return all candidates instead of just the winner'),
   useCache: z.boolean().optional().describe('Use caching for repeated requests'),
 };
 
@@ -152,3 +129,17 @@ export const analysisOptions = {
 
 // Platform
 export const platform = z.string().optional().describe('Target platform (e.g., linux/amd64)');
+
+// Multi-module/monorepo support
+export const moduleName = z
+  .string()
+  .optional()
+  .describe('Module name for multi-module/monorepo projects');
+
+export const generateAllModules = z
+  .boolean()
+  .optional()
+  .default(false)
+  .describe(
+    'Generate artifacts for all modules in a monorepo (requires analyze-repo session data)',
+  );

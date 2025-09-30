@@ -108,7 +108,6 @@ function scoreValidationResponse(text: string, context: ScoringContext): ScoreRe
   const foundTerms = specificTerms.filter((term) => text.toLowerCase().includes(term)).length;
   scores.specificity = Math.min(foundTerms * 3, 20);
 
-  // Accuracy scoring (0-20) - Avoid hallucination indicators
   if (!text.includes('TODO') && !text.includes('FIXME')) scores.accuracy += 5;
   if (!/lorem ipsum/i.test(text)) scores.accuracy += 5;
   if (!text.includes('placeholder')) scores.accuracy += 5;

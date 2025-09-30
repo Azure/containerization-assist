@@ -80,7 +80,12 @@ describe('Docker Client', () => {
         const clientPath = join(__dirname, '../../../../src/infra/docker/client.ts');
         const content = readFileSync(clientPath, 'utf-8');
 
-        expect(content).toContain("import { extractDockerErrorMessage } from './errors'");
+        // Should import extractDockerErrorMessage (backward compat) or extractDockerErrorGuidance (new)
+        expect(
+          content.includes("extractDockerErrorMessage") ||
+          content.includes("extractDockerErrorGuidance")
+        ).toBe(true);
+        expect(content).toContain("from './errors'");
       });
 
       it('should have proper TypeScript interfaces in errors module', () => {

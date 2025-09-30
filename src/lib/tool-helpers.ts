@@ -3,7 +3,9 @@
  */
 
 import { createLogger, createTimer, type Logger, type Timer } from './logger.js';
+import { logToolStart, logToolComplete, logToolFailure } from './runtime-logging.js';
 import type { ToolContext } from '@/mcp/context.js';
+import type { Result } from '@/types';
 
 /**
  * Gets or creates a logger for a tool.
@@ -63,18 +65,129 @@ export function createToolTimer(logger: Logger, toolName: string): Timer {
 }
 
 /**
- * Initialize both logger and timer for a tool in one call.
- * Common pattern used by most tools.
+ * Create a standardized tool execution tracker with automatic start/complete logging.
+ * Uses consistent "Starting X" / "Completed X" format for Copilot transcripts.
  *
- * @param context - The tool context
- * @param toolName - Name of the tool
- * @returns Object containing both logger and timer
+ * @param toolName - Name of the tool (e.g., 'build-image', 'generate-k8s-manifests')
+ * @param params - Key parameters to log at start
+ * @param logger - Logger instance
+ * @returns Object with complete() and fail() methods for structured logging
+ *
+ * @example
+ * ```typescript
+ * const tracker = createStandardizedToolTracker('build-image', { path: './app', tags }, logger);
+ * try {
+ *   const result = await performBuild();
+ *   tracker.complete({ imageId: result.imageId });
+ *   return Success(result);
+ * } catch (error) {
+ *   tracker.fail(error);
+ *   return Failure(error.message);
+ * }
+ * ```
  */
-export function initializeToolInstrumentation(
-  context: ToolContext,
+export function createStandardizedToolTracker(
   toolName: string,
-): { logger: Logger; timer: Timer } {
-  const logger = getToolLogger(context, toolName);
-  const timer = createToolTimer(logger, toolName);
-  return { logger, timer };
+  params: Record<string, unknown>,
+  logger: Logger,
+): {
+  complete: (result: Record<string, unknown>) => void;
+  fail: (error: string | Error, context?: Record<string, unknown>) => void;
+} {
+  const startTime = Date.now();
+  logToolStart(toolName, params, logger);
+
+  return {
+    complete: (result: Record<string, unknown>) => {
+      const duration = Date.now() - startTime;
+      logToolComplete(toolName, result, logger, duration);
+    },
+    fail: (error: string | Error, context?: Record<string, unknown>) => {
+      logToolFailure(toolName, error, logger, context);
+    },
+  };
+}
+
+/**
+ * Store tool results in sessionManager for cross-tool persistence.
+ * Consolidates the repetitive pattern of creating/updating sessions.
+ *
+ * @param ctx - The tool context with sessionManager
+ * @param sessionId - The session ID to store results under
+ * @param toolName - Name of the tool (e.g., 'analyze-repo', 'build-image')
+ * @param results - The results to store
+ * @param metadata - Optional additional metadata to store
+ * @returns Result indicating success or failure of storage operation
+ *
+ * @example
+ * ```typescript
+ * await storeToolResults(ctx, sessionId, 'analyze-repo', {
+ *   language: 'Java',
+ *   framework: 'Spring Boot'
+ * }, { analyzedPath: '/path/to/repo' });
+ * ```
+ */
+export async function storeToolResults(
+  ctx: ToolContext,
+  sessionId: string | undefined,
+  toolName: string,
+  results: Record<string, unknown>,
+  metadata?: Record<string, unknown>,
+): Promise<Result<void>> {
+  if (!sessionId || !ctx.sessionManager) {
+    return { ok: true, value: undefined }; // Not an error, just skip storage
+  }
+
+  const logger = ctx.logger || createLogger({ name: 'tool-helpers' });
+
+  try {
+    // Get existing session - it MUST exist before tool execution
+    const sessionResult = await ctx.sessionManager.get(sessionId);
+    if (!sessionResult.ok) {
+      const error = `Session lookup failed: ${sessionResult.error}`;
+      logger.error({ sessionId, toolName }, error);
+      return { ok: false, error };
+    }
+
+    if (!sessionResult.value) {
+      const error = `Session ${sessionId} does not exist. Sessions must be created before tool execution.`;
+      logger.error({ sessionId, toolName }, error);
+      return { ok: false, error };
+    }
+
+    // Get existing results to merge (don't overwrite existing results)
+    const existingResults = sessionResult.value.results ? sessionResult.value.results : {};
+
+    // Prepare update payload - merge new results with existing ones
+    const updatePayload: {
+      results: Record<string, unknown>;
+      metadata?: Record<string, unknown>;
+    } = {
+      results: {
+        ...existingResults,
+        [toolName]: results,
+      },
+    };
+
+    if (metadata) {
+      updatePayload.metadata = metadata;
+    }
+
+    // Update session with merged results
+    await ctx.sessionManager.update(sessionId, updatePayload);
+
+    logger.info(
+      { sessionId, toolName },
+      'Stored tool results in sessionManager for cross-tool access',
+    );
+
+    return { ok: true, value: undefined };
+  } catch (sessionError) {
+    const errorMsg = sessionError instanceof Error ? sessionError.message : String(sessionError);
+    logger.warn(
+      { sessionId, toolName, error: errorMsg },
+      'Failed to store tool results in sessionManager',
+    );
+    return { ok: false, error: `Failed to store results: ${errorMsg}` };
+  }
 }

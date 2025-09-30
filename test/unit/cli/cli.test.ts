@@ -33,13 +33,11 @@ describe('CLI Interface', () => {
     it('should define all required CLI options', () => {
       const cliPath = join(__dirname, '../../../src/cli/cli.ts');
       const content = readFileSync(cliPath, 'utf-8');
-      
+
       // Check for required options
       expect(content).toContain('--config');
       expect(content).toContain('--log-level');
       expect(content).toContain('--workspace');
-      expect(content).toContain('--port');
-      expect(content).toContain('--host');
       expect(content).toContain('--dev');
       expect(content).toContain('--validate');
       expect(content).toContain('--list-tools');
@@ -59,15 +57,6 @@ describe('CLI Interface', () => {
       expect(content).toContain("['debug', 'info', 'warn', 'error']");
     });
 
-    it('should contain validation logic for port ranges', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('port < 1');
-      expect(content).toContain('port > 65535');
-      expect(content).toContain('Invalid port');
-    });
-
     it('should contain workspace directory validation', () => {
       const cliPath = join(__dirname, '../../../src/cli/cli.ts');
       const content = readFileSync(cliPath, 'utf-8');
@@ -80,20 +69,13 @@ describe('CLI Interface', () => {
   });
 
   describe('Transport Detection', () => {
-    it('should contain HTTP transport detection logic', () => {
+    it('should use stdio transport only', () => {
       const cliPath = join(__dirname, '../../../src/cli/cli.ts');
       const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('getTransportInfo');
-      expect(content).toContain('HTTP transport on');
-      expect(content).toContain('stdio transport');
-    });
 
-    it('should contain transport type definitions', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain("type: 'stdio' | 'http'");
+      expect(content).toContain('transportConfig');
+      expect(content).toContain('stdio');
+      expect(content).toContain("transport: 'stdio'");
     });
   });
 
@@ -196,16 +178,6 @@ describe('CLI Interface', () => {
       expect(content).toContain('docker version');
     });
 
-    it('should contain port conflict guidance', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('EADDRINUSE');
-      expect(content).toContain('Port conflict detected');
-      expect(content).toContain('already in use');
-      expect(content).toContain('lsof -i');
-    });
-
     it('should contain permission error guidance', () => {
       const cliPath = join(__dirname, '../../../src/cli/cli.ts');
       const content = readFileSync(cliPath, 'utf-8');
@@ -224,23 +196,21 @@ describe('CLI Interface', () => {
       expect(content).toContain('--validate');
     });
 
-    it('should contain uncaught exception handlers', () => {
+    it('should install shutdown handlers via runtime-logging', () => {
       const cliPath = join(__dirname, '../../../src/cli/cli.ts');
       const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('uncaughtException');
-      expect(content).toContain('unhandledRejection');
-      expect(content).toContain('process.on');
+
+      // Verify that shutdown handlers are installed via runtime-logging module
+      expect(content).toContain('installShutdownHandlers');
+      expect(content).toContain('@/lib/runtime-logging');
     });
 
     it('should contain signal handlers for graceful shutdown', () => {
       const cliPath = join(__dirname, '../../../src/cli/cli.ts');
       const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('SIGTERM');
-      expect(content).toContain('SIGINT');
+
+      expect(content).toContain('installShutdownHandlers');
       expect(content).toContain('shutdown');
-      expect(content).toContain('shutdownTimeout');
     });
   });
 });

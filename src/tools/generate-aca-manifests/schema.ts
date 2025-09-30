@@ -2,13 +2,26 @@ import { z } from 'zod';
 import { environmentSchema } from '@/config/environment';
 
 export const generateAcaManifestsSchema = z.object({
-  // Core required fields
-  appName: z.string().min(1).describe('Application name (required)'),
-  imageId: z.string().min(1).describe('Container image to deploy (required)'),
+  // Core fields - now optional with session fallback
+  appName: z
+    .string()
+    .optional()
+    .describe('Application name. If not provided, uses name from analyze-repo session data.'),
+  imageId: z
+    .string()
+    .optional()
+    .describe(
+      'Container image to deploy. If not provided, uses image from build-image session data.',
+    ),
 
   // Session tracking (standard pattern)
   sessionId: z.string().optional().describe('Session identifier for tracking operations'),
-  path: z.string().describe('Path where the aca folder should be created'),
+  path: z
+    .string()
+    .optional()
+    .describe(
+      'Path where the aca folder should be created. If not provided, uses path from session.',
+    ),
 
   // Basic ACA configuration
   cpu: z
@@ -48,27 +61,6 @@ export const generateAcaManifestsSchema = z.object({
   location: z.string().optional().default('eastus').describe('Azure region'),
   resourceGroup: z.string().optional().describe('Azure resource group name'),
   environmentName: z.string().optional().describe('Container Apps environment name'),
-
-  // Reuse existing sampling options from generate-k8s-manifests
-  disableSampling: z.boolean().optional().describe('Disable multi-candidate sampling'),
-  maxCandidates: z
-    .number()
-    .min(1)
-    .max(10)
-    .optional()
-    .describe('Maximum number of candidates to generate'),
-  earlyStopThreshold: z
-    .number()
-    .min(0)
-    .max(100)
-    .optional()
-    .describe('Score threshold for early stopping'),
-  includeScoreBreakdown: z.boolean().optional().describe('Include detailed score breakdown'),
-  returnAllCandidates: z
-    .boolean()
-    .optional()
-    .describe('Return all candidates instead of just winner'),
-  useCache: z.boolean().optional().describe('Use caching for repeated requests'),
 });
 
 export type GenerateAcaManifestsParams = z.infer<typeof generateAcaManifestsSchema>;

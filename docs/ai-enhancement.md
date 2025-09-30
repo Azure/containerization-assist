@@ -9,7 +9,7 @@ The AI enhancement system provides:
 - **Knowledge-Enhanced Content Generation**: AI-powered improvements to generated Dockerfiles, Kubernetes manifests, and other containerization assets
 - **Intelligent Validation**: AI-driven analysis and suggestions for validation results
 - **Context-Aware Optimizations**: Smart recommendations based on content type, environment, and best practices
-- **Sampling-Based Quality**: N-best sampling with ranking to ensure high-quality AI outputs
+- **Deterministic Sampling**: Single-candidate generation with quality scoring for reproducible, debuggable outputs
 
 ## Architecture
 
@@ -61,11 +61,14 @@ interface EnhancementOptions {
 
 #### 3. Sampling System (`src/mcp/ai/sampling-runner.ts`)
 
-All AI enhancements use the sampling system for quality assurance:
-- N-best candidate generation
-- Content-specific scoring functions
-- Early stopping when quality thresholds are met
+All AI enhancements use deterministic sampling for quality assurance:
+- Single-candidate generation (`count: 1`) for deterministic, reproducible outputs
+- Content-specific scoring functions for quality validation
+- Scoring metadata captured for diagnostics and transparency
 - Consistent API across all AI-enhanced tools
+
+**Note on Determinism:**
+As of the Phase A completion (Sprint 1), all AI-powered tools enforce single-candidate sampling to ensure deterministic behavior. This means each invocation produces exactly one result with associated scoring metadata, making outputs reproducible and debuggable in Copilot transcripts.
 
 ## Tool Enhancement Status
 
@@ -249,6 +252,17 @@ All AI enhancements use specialized scoring functions:
 - **Domain specificity**: Scores technical accuracy and context relevance
 - **Confidence assessment**: Provides reliability metrics for AI outputs
 
+### Session Helpers
+
+The orchestrator provides centralized session management through helper utilities:
+
+- **Automatic result storage**: `sessionFacade.storeResult(toolName, value)` automatically stores tool outputs
+- **Result retrieval**: `sessionFacade.getResult(toolName)` fetches prior tool results
+- **Metadata management**: Consistent top-level keys (`session.metadata`, `session.results`)
+- **Workflow context**: Tools can access previous step results without manual session manipulation
+
+Tools no longer need to manually call `ctx.session.set('results', ...)`. The orchestrator handles all session persistence automatically after successful tool execution.
+
 ### Performance Metrics
 
 All AI enhancement operations include:
@@ -279,6 +293,16 @@ AI_ENHANCEMENT_INTELLIGENCE_PRIORITY=0.9
 AI_ENHANCEMENT_COST_PRIORITY=0.2
 ```
 
+### Progress Notifications
+
+Long-running AI operations surface progress updates via MCP notifications:
+
+- **Build operations**: Progress reported during multi-stage Docker builds
+- **Deploy operations**: Status updates during Kubernetes deployments
+- **Scan operations**: Progress during vulnerability scanning
+
+MCP clients can subscribe to `notifications/progress` messages to display real-time updates to users. The notification system gracefully handles errors without blocking tool execution.
+
 ### Tool-Specific Configuration
 
 Tools can override default AI enhancement settings:
@@ -287,7 +311,7 @@ Tools can override default AI enhancement settings:
 const metadata = {
   aiDriven: true,
   knowledgeEnhanced: true,
-  samplingStrategy: 'rerank' as const,
+  samplingStrategy: 'single' as const,
   enhancementCapabilities: ['content-generation', 'validation', 'optimization']
 };
 ```

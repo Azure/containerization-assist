@@ -7,7 +7,7 @@ import tar from 'tar-fs';
 import { createHash } from 'crypto';
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '@/types';
-import { extractDockerErrorMessage } from './errors';
+import { extractDockerErrorMessage, extractDockerErrorGuidance } from './errors';
 import { createKeyedMutex, type KeyedMutexInstance } from '@/lib/mutex';
 import { homedir } from 'os';
 import { join } from 'path';
@@ -324,20 +324,22 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         logger.debug({ buildResult }, 'Docker build completed successfully');
         return Success(buildResult);
       } catch (error) {
-        const { message, details } = extractDockerErrorMessage(error);
-        const errorMessage = `Build failed: ${message}`;
+        const guidance = extractDockerErrorGuidance(error);
+        const errorMessage = `Build failed: ${guidance.message}`;
 
         logger.error(
           {
             error: errorMessage,
-            errorDetails: details,
+            hint: guidance.hint,
+            resolution: guidance.resolution,
+            errorDetails: guidance.details,
             originalError: error,
             options,
           },
           'Docker build failed',
         );
 
-        return Failure(errorMessage);
+        return Failure(errorMessage, guidance);
       }
     },
 
@@ -477,13 +479,15 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         }
         return Success(result);
       } catch (error) {
-        const { message, details } = extractDockerErrorMessage(error);
-        const errorMessage = `Failed to push image: ${message}`;
+        const guidance = extractDockerErrorGuidance(error);
+        const errorMessage = `Failed to push image: ${guidance.message}`;
 
         logger.error(
           {
             error: errorMessage,
-            errorDetails: details,
+            hint: guidance.hint,
+            resolution: guidance.resolution,
+            errorDetails: guidance.details,
             originalError: error,
             repository,
             tag,
@@ -491,7 +495,7 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
           'Docker push image failed',
         );
 
-        return Failure(errorMessage);
+        return Failure(errorMessage, guidance);
       }
     },
 
@@ -502,7 +506,7 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         const image = docker.getImage(imageId);
         await image.remove({ force });
 
-        logger.debug({ imageId }, 'Docker image removed successfully');
+        logger.debug({ imageId }, 'Image removed');
         return Success(undefined);
       } catch (error) {
         const { message, details } = extractDockerErrorMessage(error);
@@ -529,7 +533,7 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         const container = docker.getContainer(containerId);
         await container.remove({ force });
 
-        logger.debug({ containerId }, 'Docker container removed successfully');
+        logger.debug({ containerId }, 'Container removed');
         return Success(undefined);
       } catch (error) {
         const { message, details } = extractDockerErrorMessage(error);
@@ -759,6 +763,7 @@ export const createDockerClient = (logger: Logger, config?: DockerClientConfig):
 
 /**
  * Get mutex status for monitoring
+ * @public
  */
 export function getDockerMutexStatus(): Map<string, unknown> {
   const mutex = createKeyedMutex();

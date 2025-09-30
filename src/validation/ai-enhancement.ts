@@ -2,7 +2,6 @@
  * AI Enhancement Service for Validation Tools
  *
  * Provides AI-powered suggestions, fixes, and analysis for validation results
- * Integrates with the sampling system for high-quality AI-driven recommendations
  */
 
 import type { ToolContext } from '@/mcp/context';
@@ -10,13 +9,12 @@ import { ValidationSeverity, ValidationCategory, type ValidationResult } from '.
 
 // Re-export for convenience to avoid duplicate import issues
 export { ValidationSeverity, ValidationCategory, type ValidationResult };
-import { sampleWithPlan } from '@/mcp/ai/sampling-runner';
+import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { Success, Failure, type Result, type AIMessage } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { parseAIResponse } from '@/mcp/ai/response-parser';
 import { AIEnhancementResponseSchema } from '@/mcp/ai/schemas';
 import { scoreResponse } from '@/mcp/ai/quality';
-import { createContextAwarePlan } from '@/mcp/ai/sampling-plan';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { SCORING_CONFIG } from '@/config/scoring';
 import { TOKEN_CONFIG } from '@/config/tokens';
@@ -108,18 +106,14 @@ export async function enhanceValidationWithAI(
     );
 
     // Build the enhancement prompt based on mode and focus
-    const samplingPlan = createContextAwarePlan('enhancement', 'balanced', {
-      maxTokens: options.mode === 'fixes' ? TOKEN_CONFIG.EXTENDED : TOKEN_CONFIG.STANDARD,
-      stopAt: SCORING_CONFIG.THRESHOLDS.HIGH_QUALITY,
-    });
-
-    const samplingResult = await sampleWithPlan(
+    const samplingResult = await sampleWithRerank(
       ctx,
-      async () => {
+      async (_attemptIndex) => {
         const aiMessages = await buildEnhancementPrompt(content, validationResults, options);
         const mcpMessages = toMCPMessages({ messages: aiMessages });
         return {
           messages: mcpMessages.messages,
+          maxTokens: options.mode === 'fixes' ? TOKEN_CONFIG.EXTENDED : TOKEN_CONFIG.STANDARD,
           modelPreferences: {
             hints: [
               { name: `validation-enhancement-${options.focus}` },
@@ -130,14 +124,14 @@ export async function enhanceValidationWithAI(
           },
         };
       },
-      (text) => {
+      (text: string) => {
         const scoreResult = scoreResponse('enhancement', text, {
           contentType: 'enhancement',
           targetImprovement: options.focus,
         });
         return scoreResult.breakdown;
       },
-      samplingPlan,
+      {},
     );
 
     if (!samplingResult.ok) {
@@ -187,7 +181,7 @@ export async function enhanceValidationWithAI(
           })),
         }),
       },
-      confidence: response.winner.score / SCORING_CONFIG.SCALE,
+      confidence: (response.score ?? 0) / SCORING_CONFIG.SCALE,
       metadata: {
         ...(response.model && { model: response.model }),
         processingTime,

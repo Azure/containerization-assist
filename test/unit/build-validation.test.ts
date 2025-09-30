@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll } from '@jest/globals';
-import { existsSync, readdirSync, statSync } from 'fs';
+import { existsSync, readdirSync, statSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
 
 /**
  * Build Validation Tests
- * 
+ *
  * These tests ensure that critical runtime resources (prompts and knowledge data)
  * are properly included in the built package. This prevents issues where the
  * published npm package is missing required files.
@@ -21,6 +21,142 @@ describe('Build Output Validation', () => {
       console.log('Building project for validation tests...');
       execSync('npm run build', { stdio: 'inherit' });
     }
+  });
+
+  /**
+   * Read and parse package.json
+   */
+  function getPackageJson() {
+    const packageJsonPath = join(rootDir, 'package.json');
+    const packageJsonContent = readFileSync(packageJsonPath, 'utf-8');
+    return JSON.parse(packageJsonContent);
+  }
+
+  /**
+   * Extract export paths from package.json
+   */
+  function getExportPaths(packageJson: Record<string, unknown>) {
+    const exports = packageJson.exports as Record<string, unknown>;
+    const paths: Array<{ name: string; esm?: string; cjs?: string; types?: string }> = [];
+
+    for (const [name, config] of Object.entries(exports)) {
+      if (typeof config === 'object' && config !== null) {
+        const exportConfig = config as Record<string, unknown>;
+        paths.push({
+          name,
+          esm: typeof exportConfig.import === 'string' ? exportConfig.import : undefined,
+          cjs: typeof exportConfig.require === 'string' ? exportConfig.require : undefined,
+          types: typeof exportConfig.types === 'string' ? exportConfig.types : undefined,
+        });
+      }
+    }
+
+    return paths;
+  }
+
+  describe('Build directories exist', () => {
+    it('should have dist/ directory', () => {
+      expect(existsSync(distDir)).toBe(true);
+    });
+
+    it('should have dist-cjs/ directory', () => {
+      expect(existsSync(distCjsDir)).toBe(true);
+    });
+  });
+
+  describe('Package exports validation', () => {
+    const packageJson = getPackageJson();
+    const exportPaths = getExportPaths(packageJson);
+
+    for (const exportPath of exportPaths) {
+      describe(`Export: ${exportPath.name}`, () => {
+        if (exportPath.esm) {
+          it(`should have ESM file: ${exportPath.esm}`, () => {
+            const fullPath = join(rootDir, exportPath.esm);
+            expect(existsSync(fullPath)).toBe(true);
+          });
+        }
+
+        if (exportPath.cjs) {
+          it(`should have CJS file: ${exportPath.cjs}`, () => {
+            const fullPath = join(rootDir, exportPath.cjs);
+            expect(existsSync(fullPath)).toBe(true);
+          });
+        }
+
+        if (exportPath.types) {
+          it(`should have TypeScript declarations: ${exportPath.types}`, () => {
+            const fullPath = join(rootDir, exportPath.types);
+            expect(existsSync(fullPath)).toBe(true);
+          });
+        }
+      });
+    }
+  });
+
+  describe('Module format validation', () => {
+    it('ESM files should use ES module syntax', () => {
+      const indexPath = join(distDir, 'src/index.js');
+      if (existsSync(indexPath)) {
+        const content = readFileSync(indexPath, 'utf-8');
+        // ESM should have 'export' or 'import' statements
+        expect(content).toMatch(/export\s+{|import\s+{/);
+        // ESM should not have "use strict" at the top (TypeScript ESM doesn't add it)
+        const firstLines = content.split('\n').slice(0, 10).join('\n');
+        expect(firstLines).not.toMatch(/^"use strict";/);
+      }
+    });
+
+    it('CJS files should use CommonJS syntax', () => {
+      const indexPath = join(distCjsDir, 'src/index.js');
+      if (existsSync(indexPath)) {
+        const content = readFileSync(indexPath, 'utf-8');
+        // CJS should have "use strict" and require/exports
+        expect(content).toMatch(/"use strict"/);
+        expect(content).toMatch(/require\(|exports\./);
+      }
+    });
+  });
+
+  describe('Declaration files and source maps', () => {
+    const keyFiles = ['src/index', 'src/mcp/mcp-server', 'src/exports/tools', 'src/types/index'];
+
+    for (const file of keyFiles) {
+      it(`should have .d.ts for ${file}`, () => {
+        const declPath = join(distDir, `${file}.d.ts`);
+        expect(existsSync(declPath)).toBe(true);
+      });
+
+      it(`should have .d.ts.map for ${file}`, () => {
+        const mapPath = join(distDir, `${file}.d.ts.map`);
+        expect(existsSync(mapPath)).toBe(true);
+      });
+
+      it(`should have .js.map for ${file} in ESM build`, () => {
+        const mapPath = join(distDir, `${file}.js.map`);
+        expect(existsSync(mapPath)).toBe(true);
+      });
+
+      it(`should have .js.map for ${file} in CJS build`, () => {
+        const mapPath = join(distCjsDir, `${file}.js.map`);
+        expect(existsSync(mapPath)).toBe(true);
+      });
+    }
+  });
+
+  describe('Binary files', () => {
+    it('should have executable CLI in dist/', () => {
+      const cliPath = join(distDir, 'src/cli/cli.js');
+      expect(existsSync(cliPath)).toBe(true);
+    });
+
+    it('CLI should have proper shebang', () => {
+      const cliPath = join(distDir, 'src/cli/cli.js');
+      if (existsSync(cliPath)) {
+        const content = readFileSync(cliPath, 'utf-8');
+        expect(content).toMatch(/^#!/);
+      }
+    });
   });
 
   describe('ESM Build (dist)', () => {

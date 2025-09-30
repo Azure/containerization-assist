@@ -1,29 +1,35 @@
 /**
- * Application Entry Point
- * Simple functional composition for all use cases
+ * Application Entry Point - AppRuntime Implementation
+ * Provides type-safe runtime with dependency injection support
  */
 
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { Logger } from 'pino';
-import type { Result } from '@/types';
-import type { Tool } from '@/types/tool';
-import type { ZodTypeAny } from 'zod';
 
 import { createLogger } from '@/lib/logger';
-import { extractSchemaShape } from '@/lib/zod-utils';
 import { getAllInternalTools } from '@/exports/tools';
-import { createOrchestrator } from './orchestrator';
-import { createMCPServer } from '@/mcp/mcp-server';
-import type { OrchestratorConfig } from './orchestrator-types';
+import type { AllToolTypes, ToolName } from '@/tools';
+import { createToolContext } from '@/mcp/context';
+import { createMCPServer, registerToolsWithServer, type MCPServer } from '@/mcp/mcp-server';
+import type { Tool } from '@/types/tool';
+import { createOrchestrator, createHostlessToolContext } from './orchestrator';
+import type { OrchestratorConfig, ExecuteRequest, ToolOrchestrator } from './orchestrator-types';
+import type { Result } from '@/types';
+import type {
+  AppRuntime,
+  AppRuntimeConfig,
+  ToolInputMap,
+  ToolResultMap,
+  ExecutionMetadata,
+} from '@/types/runtime';
 
 /**
  * Apply tool aliases to create renamed versions of tools
  */
 function applyToolAliases(
-  tools: readonly Tool<ZodTypeAny, any>[],
+  tools: readonly AllToolTypes[],
   aliases?: Record<string, string>,
-): Tool<ZodTypeAny, any>[] {
+): AllToolTypes[] {
   if (!aliases) return [...tools];
 
   return tools.map((tool) => {
@@ -39,202 +45,186 @@ function applyToolAliases(
  * Transport configuration for MCP server
  */
 export interface TransportConfig {
-  transport: 'stdio' | 'http';
-  port?: number;
-  host?: string;
+  transport: 'stdio';
 }
 
 /**
- * Application configuration
+ * Create the containerization assist application with AppRuntime interface
  */
-export interface AppConfig {
-  tools?: Array<Tool<ZodTypeAny, any>>;
-  toolAliases?: Record<string, string>;
-  sessionTTL?: number;
-  policyPath?: string;
-  policyEnvironment?: string;
-  logger?: Logger;
-  maxRetries?: number;
-  retryDelay?: number;
-}
-
-/**
- * Create the containerization assist application
- */
-export function createApp(config: AppConfig = {}): {
-  execute: (toolName: string, params: unknown) => Promise<Result<unknown>>;
-  startServer: (transport: TransportConfig) => Promise<ReturnType<typeof createMCPServer>>;
-  bindToMCP: (server: McpServer) => void;
-  listTools: () => Array<{ name: string; description: string }>;
-  healthCheck: () => { status: 'healthy'; tools: number; message: string };
-  stop: () => Promise<void>;
-} {
+export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
   const logger = config.logger || createLogger({ name: 'containerization-assist' });
   const tools = config.tools || getAllInternalTools();
-  const aliasedTools = applyToolAliases(
-    tools as readonly Tool<ZodTypeAny, any>[],
-    config.toolAliases,
-  );
+  const aliasedTools = applyToolAliases(tools, config.toolAliases);
 
-  // Create simple Map-based registry
-  const toolsMap = new Map<string, Tool<ZodTypeAny, any>>();
-  for (const tool of aliasedTools) {
+  // Erase per-tool generics for runtime registration; validation still re-parses inputs per schema
+  const registryTools: Tool[] = aliasedTools.map((tool) => tool as unknown as Tool);
+
+  const toolsMap = new Map<string, Tool>();
+  for (const tool of registryTools) {
     toolsMap.set(tool.name, tool);
   }
 
   const orchestratorConfig: OrchestratorConfig = {};
-  if (config.sessionTTL !== undefined) orchestratorConfig.sessionTTL = config.sessionTTL;
   if (config.policyPath !== undefined) orchestratorConfig.policyPath = config.policyPath;
   if (config.policyEnvironment !== undefined)
     orchestratorConfig.policyEnvironment = config.policyEnvironment;
-  if (config.maxRetries !== undefined) orchestratorConfig.maxRetries = config.maxRetries;
-  if (config.retryDelay !== undefined) orchestratorConfig.retryDelay = config.retryDelay;
 
-  let mcpServer: ReturnType<typeof createMCPServer> | null = null;
-  let orchestrator: ReturnType<typeof createOrchestrator> | null = null;
+  const toolList = Array.from(toolsMap.values());
+
+  let activeServer: Server | null = null;
+  let activeMcpServer: MCPServer | null = null;
+  let orchestrator = buildOrchestrator();
+  let orchestratorClosed = false;
+
+  function buildOrchestrator(): ToolOrchestrator {
+    return createOrchestrator({
+      registry: toolsMap,
+      logger,
+      config: orchestratorConfig,
+      contextFactory: ({ request, sessionFacade, logger: toolLogger, sessionManager }) => {
+        const metadata = request.metadata;
+        const server = activeServer;
+        if (server) {
+          const contextOptions = {
+            sessionManager,
+            session: sessionFacade,
+            ...(metadata?.signal && { signal: metadata.signal }),
+            ...(metadata?.progress !== undefined && { progress: metadata.progress }),
+            ...(metadata?.maxTokens !== undefined && { maxTokens: metadata.maxTokens }),
+            ...(metadata?.stopSequences && { stopSequences: metadata.stopSequences }),
+          };
+          return createToolContext(server, toolLogger, contextOptions);
+        }
+
+        return createHostlessToolContext(toolLogger, {
+          sessionManager,
+          sessionFacade,
+          ...(metadata && { metadata }),
+        });
+      },
+    });
+  }
+
+  function ensureOrchestrator(): ToolOrchestrator {
+    if (orchestratorClosed) {
+      orchestrator = buildOrchestrator();
+      orchestratorClosed = false;
+    }
+    return orchestrator;
+  }
+
+  const orchestratedExecute = (request: ExecuteRequest): Promise<Result<unknown>> =>
+    ensureOrchestrator().execute(request);
 
   return {
     /**
-     * Execute a tool directly
+     * Execute a tool with type-safe parameters and results
      */
-    execute: async (toolName: string, params: unknown): Promise<Result<unknown>> => {
-      if (!orchestrator) {
-        // If orchestrator doesn't exist yet, we need to create an MCP server first
-        if (!mcpServer) {
-          mcpServer = createMCPServer(Array.from(toolsMap.values()), {
-            logger,
-            transport: 'stdio',
-            name: 'containerization-assist',
-            version: '1.0.0',
-          });
-          await mcpServer.start();
-        }
-
-        // Now create the orchestrator with the MCP server
-        orchestrator = createOrchestrator({
-          registry: toolsMap,
-          server: mcpServer.getServer(),
-          logger,
-          config: orchestratorConfig,
-        });
-      }
-      return orchestrator.execute({ toolName, params });
-    },
+    execute: async <T extends ToolName>(
+      toolName: T,
+      params: ToolInputMap[T],
+      metadata?: ExecutionMetadata,
+    ): Promise<Result<ToolResultMap[T]>> =>
+      orchestratedExecute({
+        toolName: toolName as string,
+        params,
+        ...(metadata?.sessionId && { sessionId: metadata.sessionId }),
+        metadata: {
+          loggerContext: {
+            transport: metadata?.transport || 'programmatic',
+            requestId: metadata?.requestId,
+            ...metadata,
+          },
+        },
+      }) as Promise<Result<ToolResultMap[T]>>,
 
     /**
      * Start MCP server with the specified transport
      */
     startServer: async (transport: TransportConfig) => {
-      // Create MCP server with tools from registry
-      const serverOptions: {
-        logger: Logger;
-        transport: 'stdio' | 'http';
-        name: string;
-        version: string;
-        port?: number;
-        host?: string;
-      } = {
+      if (activeMcpServer) {
+        throw new Error('MCP server is already running');
+      }
+
+      ensureOrchestrator();
+
+      const serverOptions: Parameters<typeof createMCPServer>[1] = {
         logger,
         transport: transport.transport,
         name: 'containerization-assist',
         version: '1.0.0',
       };
-      if (transport.port !== undefined) serverOptions.port = transport.port;
-      if (transport.host !== undefined) serverOptions.host = transport.host;
 
-      mcpServer = createMCPServer(Array.from(toolsMap.values()), serverOptions);
-      await mcpServer.start();
+      const mcpServer = createMCPServer(toolList, serverOptions, orchestratedExecute);
+      activeServer = mcpServer.getServer();
 
-      // Create orchestrator now that we have an MCP server
-      orchestrator = createOrchestrator({
-        registry: toolsMap,
-        server: mcpServer.getServer(),
-        logger,
-        config: orchestratorConfig,
-      });
-
-      return mcpServer;
+      try {
+        await mcpServer.start();
+        activeMcpServer = mcpServer;
+        return mcpServer;
+      } catch (error) {
+        activeServer = null;
+        throw error;
+      }
     },
 
     /**
      * Bind to existing MCP server
      */
-    bindToMCP: (server: McpServer) => {
-      // Create orchestrator with the provided server if not already created
-      if (!orchestrator) {
-        // Extract the underlying SDK Server from McpServer
-        const sdkServer = (server as any).server as Server;
-        orchestrator = createOrchestrator({
-          registry: toolsMap,
-          server: sdkServer,
-          logger,
-          config: orchestratorConfig,
-        });
-      }
+    bindToMCP: (server: McpServer, transportLabel = 'external') => {
+      ensureOrchestrator();
 
-      // Register each tool with the MCP server
-      for (const tool of toolsMap.values()) {
-        // Get the schema shape for MCP protocol
-        const schema = extractSchemaShape(tool.schema);
-        const description = tool.description;
+      // Extract the underlying SDK Server from McpServer
+      const sdkServer = (server as unknown as { server: Server }).server;
+      activeServer = sdkServer;
 
-        if (!schema || Object.keys(schema).length === 0) {
-          logger.warn({ tool: tool.name }, 'Tool missing schema shape, using empty schema');
-        }
-
-        server.tool(tool.name, description, schema, async (params: unknown) => {
-          if (!orchestrator) {
-            throw new Error('Orchestrator not initialized');
-          }
-          const result = await orchestrator.execute({
-            toolName: tool.name,
-            params,
-          });
-
-          if (!result.ok) {
-            throw new Error(result.error);
-          }
-
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: JSON.stringify(result.value, null, 2),
-              },
-            ],
-          };
-        });
-      }
+      registerToolsWithServer({
+        server,
+        tools: toolList,
+        logger,
+        transport: transportLabel,
+        execute: orchestratedExecute,
+      });
     },
 
     /**
-     * List all available tools
+     * List all available tools with their metadata
      */
     listTools: () =>
-      Array.from(toolsMap.values()).map((t) => ({
-        name: t.name,
+      toolList.map((t) => ({
+        name: t.name as ToolName,
         description: t.description,
+        ...(t.version && { version: t.version }),
+        ...(t.category && { category: t.category }),
       })),
 
     /**
-     * Simple health check
+     * Perform health check
      */
     healthCheck: () => {
       const toolCount = toolsMap.size;
       return {
         status: 'healthy' as const,
         tools: toolCount,
+        sessions: 0, // Session count not available in current implementation
         message: `${toolCount} tools loaded`,
       };
     },
 
     /**
-     * Stop the server if running
+     * Stop the server and orchestrator if running
      */
     stop: async () => {
-      if (mcpServer) {
-        await mcpServer.stop();
-        mcpServer = null;
+      if (activeMcpServer) {
+        await activeMcpServer.stop();
+        activeMcpServer = null;
+      }
+
+      activeServer = null;
+
+      if (!orchestratorClosed) {
+        orchestrator.close();
+        orchestratorClosed = true;
       }
     },
   };

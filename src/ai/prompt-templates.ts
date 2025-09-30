@@ -387,6 +387,20 @@ Determine:
 6. Default ports based on framework
 7. Recommended Docker base images (minimal, standard, secure)
 8. Containerization recommendations
+9. Whether this is a monorepo/multi-module project with separate deployable services
+
+## Monorepo/Multi-Module Detection
+Detect if the repository contains multiple independent modules or services that should be containerized separately:
+- Look for patterns like services/, apps/, packages/ with distinct entry points
+- Check for workspace configurations (npm workspaces, yarn workspaces, lerna, nx, turborepo, cargo workspace)
+- Identify directories with their own build configs (separate package.json, pom.xml, go.mod, Cargo.toml, etc.)
+- Each module should be independently buildable and deployable
+- EXCLUDE: shared libraries, utility folders, common code, test fixtures
+
+For each detected module, provide:
+- name: Module/service name
+- path: Relative path from repo root (e.g., "services/api-gateway")
+- language, framework, dependencies, entryPoint, ports for that module
 
 Return ONLY valid JSON matching this structure:
 {
@@ -409,12 +423,30 @@ Return ONLY valid JSON matching this structure:
     "multistage": true/false,
     "nonRootUser": true/false
   },
+  "isMonorepo": true/false,
+  "modules": [
+    {
+      "name": "string",
+      "path": "string",
+      "language": "string or null",
+      "framework": "string or null",
+      "languageVersion": "string or null",
+      "frameworkVersion": "string or null",
+      "buildSystem": { "type": "string", "configFile": "string" },
+      "dependencies": ["array"],
+      "ports": [array of numbers],
+      "entryPoint": "string or null",
+      "dockerfilePath": "suggested path like services/api-gateway/Dockerfile"
+    }
+  ],
   "sessionId": "${params.sessionId || 'generate a new UUID v4 session ID'}",
   "workflowHints": {
     "nextStep": "generate-dockerfile",
     "message": "Repository analyzed successfully. Use 'generate-dockerfile' with the sessionId to create an optimized Dockerfile."
   }
-}`;
+}
+
+IMPORTANT: Only populate "modules" array if you detect genuinely independent deployable services. Leave it empty or null for single-module projects.`;
   },
 
   /**

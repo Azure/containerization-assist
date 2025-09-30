@@ -243,8 +243,8 @@ ENV PASSWORD=badidea
     });
   });
 
-  describe('N-best Sampling Integration', () => {
-    it('should generate multiple candidates', async () => {
+  describe('Deterministic Sampling Integration', () => {
+    it('should generate single deterministic candidate', async () => {
       const mockSamplingResponse = {
         content: [{ text: 'FROM node:20\\nWORKDIR /app\\nCMD ["node", "app.js"]' }],
         metadata: { usage: { inputTokens: 100, outputTokens: 50 } }
@@ -259,18 +259,18 @@ ENV PASSWORD=badidea
           maxTokens: 100,
         }),
         (text) => text.length, // Simple scoring based on length
-        { count: 3, stopAt: 95 }
+        {}
       );
 
       expect(result.ok).toBe(true);
-      expect(result.value.winner.score).toBeGreaterThan(0);
-      // N-best sampling may call multiple times based on configuration
-      expect(mockContext.sampling.createMessage).toHaveBeenCalledTimes(3);
+      expect(result.value.score).toBeGreaterThan(0);
+      // Deterministic sampling calls once
+      expect(mockContext.sampling.createMessage).toHaveBeenCalledTimes(1);
     });
 
-    it('should stop early on high score', async () => {
+    it('should work with optional scoring for quality logging', async () => {
       const mockSamplingResponse = {
-        content: [{ text: 'Very long response that will score highly because scoring is based on length in this test' }],
+        content: [{ text: 'Very long response that will have quality scoring for logging purposes' }],
         metadata: { usage: { inputTokens: 100, outputTokens: 80 } }
       };
 
@@ -282,13 +282,13 @@ ENV PASSWORD=badidea
           messages: [{ role: 'user' as const, content: 'Generate content' }],
           maxTokens: 100,
         }),
-        (text) => 96, // Always return high score to trigger early stop
-        { count: 3, stopAt: 95 }
+        (text) => 96, // Scoring for quality logging
+        {}
       );
 
       expect(result.ok).toBe(true);
-      expect(result.value.winner.score).toBe(96);
-      // Should stop after first candidate due to high score
+      expect(result.value.score).toBe(96);
+      // Deterministic: single call regardless of score
       expect(mockContext.sampling.createMessage).toHaveBeenCalledTimes(1);
     });
   });

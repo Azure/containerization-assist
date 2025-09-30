@@ -6,19 +6,19 @@
 
 import { z } from 'zod';
 
-// Base validation enums and types
-export const ValidationSeveritySchema = z.enum(['error', 'warning', 'info']);
-export const ValidationCategorySchema = z.enum([
+// Base validation enums and types (internal - not exported)
+const ValidationSeveritySchema = z.enum(['error', 'warning', 'info']);
+const ValidationCategorySchema = z.enum([
   'security',
   'performance',
   'best-practice',
   'compliance',
   'optimization',
 ]);
-export const ValidationGradeSchema = z.enum(['A', 'B', 'C', 'D', 'F']);
+const ValidationGradeSchema = z.enum(['A', 'B', 'C', 'D', 'F']);
 
-// Core validation schemas
-export const ValidationResultSchema = z.object({
+// Core validation schemas (internal - not exported)
+const ValidationResultSchema = z.object({
   isValid: z.boolean(),
   errors: z.array(z.string()),
   warnings: z.array(z.string()).optional(),
@@ -40,7 +40,7 @@ export const ValidationResultSchema = z.object({
     .optional(),
 });
 
-export const ValidationReportSchema = z.object({
+const _ValidationReportSchema = z.object({
   results: z.array(ValidationResultSchema),
   score: z.number().int().min(0).max(100),
   grade: ValidationGradeSchema,
@@ -52,20 +52,20 @@ export const ValidationReportSchema = z.object({
   timestamp: z.string(),
 });
 
-// Knowledge Enhancement Response Schema
-export const EnhancementAreaSchema = z.object({
+// Knowledge Enhancement Response Schema (internal schemas - not exported)
+const EnhancementAreaSchema = z.object({
   area: z.string(),
   description: z.string(),
   impact: z.enum(['low', 'medium', 'high']),
 });
 
-export const TechnicalDebtSchema = z.object({
+const TechnicalDebtSchema = z.object({
   category: ValidationCategorySchema,
   description: z.string(),
   effort: z.enum(['low', 'medium', 'high']),
 });
 
-export const KnowledgeEnhancementAnalysisSchema = z.object({
+const KnowledgeEnhancementAnalysisSchema = z.object({
   improvementsSummary: z.string(),
   enhancementAreas: z.array(EnhancementAreaSchema).max(5),
   knowledgeSources: z.array(z.string()).max(8),
@@ -81,8 +81,8 @@ export const KnowledgeEnhancementResponseSchema = z.object({
   analysis: KnowledgeEnhancementAnalysisSchema,
 });
 
-// AI Enhancement Response Schema
-export const EnhancementPrioritySchema = z.object({
+// AI Enhancement Response Schema (internal schemas - not exported)
+const EnhancementPrioritySchema = z.object({
   area: z.string(),
   severity: ValidationSeveritySchema,
   description: z.string(),
@@ -91,7 +91,7 @@ export const EnhancementPrioritySchema = z.object({
 
 // TechnicalDebtSchema already declared above
 
-export const AIEnhancementAnalysisSchema = z.object({
+const AIEnhancementAnalysisSchema = z.object({
   assessment: z.string(),
   riskLevel: z.enum(['low', 'medium', 'high', 'critical']),
   priorities: z.array(EnhancementPrioritySchema).max(5),
@@ -116,8 +116,8 @@ export const ValidationReportResponseSchema = z.object({
   }),
 });
 
-// Repository Analysis Schema (for analyze-repo tool)
-export const RepositoryFrameworkSchema = z.object({
+// Repository Analysis Schema (for analyze-repo tool) - internal schemas not exported
+const RepositoryFrameworkSchema = z.object({
   name: z.string(),
   version: z.string().optional(),
   confidence: z.number().min(0).max(1),
@@ -125,7 +125,7 @@ export const RepositoryFrameworkSchema = z.object({
   features: z.array(z.string()).optional(),
 });
 
-export const RepositoryAnalysisSchema = z.object({
+const _RepositoryAnalysisSchema = z.object({
   projectType: z.string(),
   frameworks: z.array(RepositoryFrameworkSchema),
   languages: z.array(
@@ -151,8 +151,8 @@ export const RepositoryAnalysisSchema = z.object({
   }),
 });
 
-// Docker Image Resolution Schema
-export const BaseImageRecommendationSchema = z.object({
+// Docker Image Resolution Schema (internal schemas - not exported)
+const BaseImageRecommendationSchema = z.object({
   image: z.string(),
   version: z.string(),
   reason: z.string(),
@@ -169,7 +169,7 @@ export const BaseImageRecommendationSchema = z.object({
   compatibility: z.array(z.string()),
 });
 
-export const BaseImageResolutionSchema = z.object({
+const _BaseImageResolutionSchema = z.object({
   recommendations: z.array(BaseImageRecommendationSchema).max(5),
   analysis: z.object({
     summary: z.string(),
@@ -183,14 +183,14 @@ export const BaseImageResolutionSchema = z.object({
   }),
 });
 
-// Dockerfile Generation Schema
-export const DockerfileInstructionSchema = z.object({
+// Dockerfile Generation Schema (internal schemas - not exported)
+const DockerfileInstructionSchema = z.object({
   instruction: z.string(),
   value: z.string(),
   comment: z.string().optional(),
 });
 
-export const DockerfileGenerationSchema = z.object({
+const _DockerfileGenerationSchema = z.object({
   dockerfile: z.string(),
   instructions: z.array(DockerfileInstructionSchema),
   explanation: z.object({
@@ -249,31 +249,13 @@ export const KubernetesManifestGenerationSchema = z.object({
 
 // Type inference helpers
 export type ValidationResult = z.infer<typeof ValidationResultSchema>;
-export type ValidationReport = z.infer<typeof ValidationReportSchema>;
+export type ValidationReport = z.infer<typeof _ValidationReportSchema>;
 export type KnowledgeEnhancementResponse = z.infer<typeof KnowledgeEnhancementResponseSchema>;
 export type AIEnhancementResponse = z.infer<typeof AIEnhancementResponseSchema>;
 export type ValidationReportResponse = z.infer<typeof ValidationReportResponseSchema>;
-export type RepositoryAnalysis = z.infer<typeof RepositoryAnalysisSchema>;
-export type BaseImageResolution = z.infer<typeof BaseImageResolutionSchema>;
-export type DockerfileGeneration = z.infer<typeof DockerfileGenerationSchema>;
+export type RepositoryAnalysis = z.infer<typeof _RepositoryAnalysisSchema>;
+export type BaseImageResolution = z.infer<typeof _BaseImageResolutionSchema>;
+export type DockerfileGeneration = z.infer<typeof _DockerfileGenerationSchema>;
 export type KubernetesManifestGeneration = z.infer<typeof KubernetesManifestGenerationSchema>;
 
-// Schema registry for lookup by name
-export const SCHEMAS = {
-  knowledgeEnhancement: KnowledgeEnhancementResponseSchema,
-  aiEnhancement: AIEnhancementResponseSchema,
-  validationReport: ValidationReportResponseSchema,
-  repositoryAnalysis: RepositoryAnalysisSchema,
-  baseImageResolution: BaseImageResolutionSchema,
-  dockerfileGeneration: DockerfileGenerationSchema,
-  kubernetesManifestGeneration: KubernetesManifestGenerationSchema,
-} as const;
-
-export type SchemaKey = keyof typeof SCHEMAS;
-
-/**
- * Get schema by name with type safety
- */
-export function getSchema<K extends SchemaKey>(key: K): (typeof SCHEMAS)[K] {
-  return SCHEMAS[key];
-}
+// Removed unused schema registry and getSchema function (flagged by knip)

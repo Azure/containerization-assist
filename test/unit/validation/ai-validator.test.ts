@@ -16,7 +16,7 @@ import { Success, Failure } from '@/types';
 jest.mock('@/mcp/ai/sampling-runner');
 jest.mock('@/mcp/ai/response-parser');
 
-const mockSampleWithPlan = jest.mocked(require('@/mcp/ai/sampling-runner').sampleWithPlan);
+const mockSampleWithRerank = jest.mocked(require('@/mcp/ai/sampling-runner').sampleWithRerank);
 const mockParseAIResponse = jest.mocked(require('@/mcp/ai/response-parser').parseAIResponse);
 
 describe('AI Validator Service', () => {
@@ -48,7 +48,7 @@ describe('AI Validator Service', () => {
     } as unknown as ToolContext;
 
     // Setup default successful mock response
-    mockSampleWithPlan.mockResolvedValue(
+    mockSampleWithRerank.mockResolvedValue(
       Success({
         text: JSON.stringify({
           passed: false,
@@ -97,7 +97,7 @@ describe('AI Validator Service', () => {
             },
           },
         }),
-        winner: { score: 88 },
+        score: 88,
         model: 'claude-3-5-sonnet-20241022',
         usage: {
           inputTokens: 800,
@@ -201,17 +201,12 @@ CMD ["node", "server.js"]`;
         expect(securityResult!.metadata?.fixSuggestion).toBe('Add USER directive to run as non-root user');
       }
 
-      expect(mockSampleWithPlan).toHaveBeenCalledTimes(1);
-      expect(mockSampleWithPlan).toHaveBeenCalledWith(
+      expect(mockSampleWithRerank).toHaveBeenCalledTimes(1);
+      expect(mockSampleWithRerank).toHaveBeenCalledWith(
         mockContext,
         expect.any(Function),
         expect.any(Function),
-        {
-          kind: 'balanced',
-          candidates: 3,
-          stopAt: 88,
-          maxTokens: 4096,
-        },
+        {},
       );
     });
 
@@ -269,7 +264,7 @@ spec:
         expect(result.ok).toBe(true);
       }
 
-      expect(mockSampleWithPlan).toHaveBeenCalledTimes(focuses.length);
+      expect(mockSampleWithRerank).toHaveBeenCalledTimes(focuses.length);
     });
 
     it('should handle different content types correctly', async () => {
@@ -290,11 +285,11 @@ spec:
         expect(result.ok).toBe(true);
       }
 
-      expect(mockSampleWithPlan).toHaveBeenCalledTimes(contentTypes.length);
+      expect(mockSampleWithRerank).toHaveBeenCalledTimes(contentTypes.length);
     });
 
     it('should handle sampling failure gracefully', async () => {
-      mockSampleWithPlan.mockResolvedValue(Failure('AI model unavailable'));
+      mockSampleWithRerank.mockResolvedValue(Failure('AI model unavailable'));
 
       const options: AIValidationOptions = {
         contentType: 'dockerfile',
@@ -311,10 +306,10 @@ spec:
     });
 
     it('should handle invalid JSON response gracefully', async () => {
-      mockSampleWithPlan.mockResolvedValue(
+      mockSampleWithRerank.mockResolvedValue(
         Success({
           text: 'This is not valid JSON',
-          winner: { score: 50 },
+          score: 50,
         }),
       );
 
@@ -337,13 +332,13 @@ spec:
     });
 
     it('should handle malformed response structure gracefully', async () => {
-      mockSampleWithPlan.mockResolvedValue(
+      mockSampleWithRerank.mockResolvedValue(
         Success({
           text: JSON.stringify({
             // Missing required fields
             somefield: 'value',
           }),
-          winner: { score: 70 },
+          score: 70,
         }),
       );
 
@@ -366,7 +361,7 @@ spec:
     });
 
     it('should handle partial response data gracefully', async () => {
-      mockSampleWithPlan.mockResolvedValue(
+      mockSampleWithRerank.mockResolvedValue(
         Success({
           text: JSON.stringify({
             passed: true,
@@ -378,7 +373,7 @@ spec:
               },
             ],
           }),
-          winner: { score: 85 },
+          score: 85,
         }),
       );
 
@@ -445,20 +440,15 @@ spec:
 
       await validator.validateWithAI('test content', options, mockContext);
 
-      expect(mockSampleWithPlan).toHaveBeenCalledWith(
+      expect(mockSampleWithRerank).toHaveBeenCalledWith(
         mockContext,
         expect.any(Function),
         expect.any(Function),
-        expect.objectContaining({
-          kind: 'balanced',
-          candidates: expect.any(Number),
-          stopAt: 88,
-          maxTokens: 4096,
-        }),
+        {},
       );
 
       // Verify the messages function was called with model preferences
-      const messagesFunction = mockSampleWithPlan.mock.calls[0][1];
+      const messagesFunction = mockSampleWithRerank.mock.calls[0][1];
       const messagesResult = await messagesFunction();
 
       expect(messagesResult.modelPreferences).toEqual({
@@ -473,7 +463,7 @@ spec:
 
     it('should calculate score and grade correctly', async () => {
       // Mock response with mixed validation results
-      mockSampleWithPlan.mockResolvedValue(
+      mockSampleWithRerank.mockResolvedValue(
         Success({
           text: JSON.stringify({
             passed: false,
@@ -484,7 +474,7 @@ spec:
               { isValid: false, message: 'Performance issue' },
             ],
           }),
-          winner: { score: 75 },
+          score: 75,
         }),
       );
 
@@ -577,7 +567,7 @@ spec:
     });
 
     it('should handle network errors and exceptions gracefully', async () => {
-      mockSampleWithPlan.mockRejectedValue(new Error('Network timeout'));
+      mockSampleWithRerank.mockRejectedValue(new Error('Network timeout'));
 
       const result = await validator.validateWithAI('test content', {
         contentType: 'dockerfile',

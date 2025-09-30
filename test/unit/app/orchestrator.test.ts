@@ -199,6 +199,8 @@ describe('Tool Orchestrator', () => {
           expect(typeof context.session?.get).toBe('function');
           expect(typeof context.session?.set).toBe('function');
           expect(typeof context.session?.pushStep).toBe('function');
+          expect(typeof context.session?.storeResult).toBe('function');
+          expect(typeof context.session?.getResult).toBe('function');
 
           // Use session methods
           context.session?.set(params.key, params.value);
@@ -374,6 +376,165 @@ describe('Tool Orchestrator', () => {
           key: 'test',
           value: 'session2-value'
         });
+      }
+    });
+
+    it('should store and retrieve tool results using storeResult/getResult helpers', async () => {
+      const sessionId = 'result-storage-session';
+
+      // Create a tool that stores its result manually (though orchestrator now does this)
+      const producerTool: Tool = {
+        name: 'producer-tool',
+        description: 'Tool that produces results',
+        schema: z.object({ data: z.string() }),
+        run: jest.fn(async (params, context) => {
+          return Success({ produced: params.data, timestamp: Date.now() });
+        }),
+      };
+
+      // Create a tool that retrieves results from another tool
+      const consumerTool: Tool = {
+        name: 'consumer-tool',
+        description: 'Tool that consumes results from other tools',
+        schema: z.object({ sourceToolName: z.string() }),
+        run: jest.fn(async (params, context) => {
+          const previousResult = context.session?.getResult(params.sourceToolName);
+          return Success({
+            consumed: previousResult,
+            foundInSession: !!previousResult
+          });
+        }),
+      };
+
+      mockTools.set('producer-tool', producerTool);
+      mockTools.set('consumer-tool', consumerTool);
+
+      // Execute producer tool
+      const produceResult = await orchestrator.execute({
+        toolName: 'producer-tool',
+        params: { data: 'test-data' },
+        sessionId,
+      });
+
+      expect(produceResult.ok).toBe(true);
+
+      // Execute consumer tool to retrieve the stored result
+      const consumeResult = await orchestrator.execute({
+        toolName: 'consumer-tool',
+        params: { sourceToolName: 'producer-tool' },
+        sessionId,
+      });
+
+      expect(consumeResult.ok).toBe(true);
+      if (consumeResult.ok) {
+        const result = consumeResult.value as { foundInSession: boolean; consumed: any };
+        // The orchestrator stores results automatically, so consumer should find it
+        expect(result.foundInSession).toBe(true);
+        expect(result.consumed).toMatchObject({ produced: 'test-data' });
+      }
+    });
+
+    it('should maintain separate results map without polluting metadata', async () => {
+      const sessionId = 'clean-metadata-session';
+
+      // Create a tool that uses both results and metadata
+      const mixedTool: Tool = {
+        name: 'mixed-tool',
+        description: 'Tool that uses both results and metadata',
+        schema: z.object({ metaKey: z.string(), metaValue: z.string() }),
+        run: jest.fn(async (params, context) => {
+          // Store custom metadata
+          context.session?.set(params.metaKey, params.metaValue);
+
+          // Check that results are separate from custom metadata
+          const customMeta = context.session?.get(params.metaKey);
+          const results = context.session?.get('results');
+
+          return Success({
+            customMetadata: customMeta,
+            resultsIsSeparate: typeof results === 'object' || results === undefined
+          });
+        }),
+      };
+
+      mockTools.set('mixed-tool', mixedTool);
+
+      const result = await orchestrator.execute({
+        toolName: 'mixed-tool',
+        params: { metaKey: 'customKey', metaValue: 'customValue' },
+        sessionId,
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const value = result.value as { customMetadata: string; resultsIsSeparate: boolean };
+        expect(value.customMetadata).toBe('customValue');
+        expect(value.resultsIsSeparate).toBe(true);
+      }
+    });
+
+    it('should allow tools to access results from multiple previous tools', async () => {
+      const sessionId = 'multi-result-session';
+
+      // Create multiple producer tools
+      const toolA: Tool = {
+        name: 'tool-a-producer',
+        description: 'Producer A',
+        schema: z.object({}),
+        run: jest.fn().mockResolvedValue(Success({ result: 'A' })),
+      };
+
+      const toolB: Tool = {
+        name: 'tool-b-producer',
+        description: 'Producer B',
+        schema: z.object({}),
+        run: jest.fn().mockResolvedValue(Success({ result: 'B' })),
+      };
+
+      // Create aggregator tool
+      const aggregatorTool: Tool = {
+        name: 'aggregator',
+        description: 'Aggregates results',
+        schema: z.object({}),
+        run: jest.fn(async (params, context) => {
+          const resultA = context.session?.getResult('tool-a-producer');
+          const resultB = context.session?.getResult('tool-b-producer');
+          return Success({
+            aggregated: [resultA, resultB],
+            bothFound: !!resultA && !!resultB
+          });
+        }),
+      };
+
+      mockTools.set('tool-a-producer', toolA);
+      mockTools.set('tool-b-producer', toolB);
+      mockTools.set('aggregator', aggregatorTool);
+
+      // Execute both producers
+      await orchestrator.execute({
+        toolName: 'tool-a-producer',
+        params: {},
+        sessionId,
+      });
+
+      await orchestrator.execute({
+        toolName: 'tool-b-producer',
+        params: {},
+        sessionId,
+      });
+
+      // Execute aggregator
+      const result = await orchestrator.execute({
+        toolName: 'aggregator',
+        params: {},
+        sessionId,
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const value = result.value as { bothFound: boolean; aggregated: any[] };
+        expect(value.bothFound).toBe(true);
+        expect(value.aggregated).toHaveLength(2);
       }
     });
   });

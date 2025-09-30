@@ -22,7 +22,7 @@
  * ```
  */
 
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { getToolLogger, createToolTimer, createStandardizedToolTracker } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient, KubernetesClient } from '@/lib/kubernetes';
@@ -34,7 +34,7 @@ import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
 
-export interface VerifyDeploymentResult {
+export interface VerifyDeploymentResult extends Record<string, unknown> {
   success: boolean;
   sessionId: string;
   namespace: string;
@@ -168,8 +168,8 @@ async function checkEndpointHealth(url: string): Promise<boolean> {
  */
 function scoreValidationInsights(
   insights: DeploymentValidationInsights,
-  _verificationResult: Record<string, unknown>,
-  _healthChecks: Record<string, unknown>[],
+  _verificationResult: VerifyDeploymentResult,
+  _healthChecks: Array<{ name: string; status: string; message?: string }>,
 ): number {
   let score = 0;
 
@@ -224,11 +224,11 @@ function scoreValidationInsights(
  * Build prompt for generating validation insights
  */
 function buildValidationInsightsPrompt(
-  verificationResult: Record<string, unknown>,
-  healthChecks: Record<string, unknown>[],
+  verificationResult: VerifyDeploymentResult,
+  healthChecks: Array<{ name: string; status: string; message?: string }>,
 ): string {
   const hasIssues =
-    !verificationResult.success || (verificationResult.healthCheck as any)?.status !== 'healthy';
+    !verificationResult.success || verificationResult.healthCheck?.status !== 'healthy';
   const context = hasIssues
     ? 'with issues that need attention'
     : 'that appears healthy but may benefit from optimization';
@@ -240,15 +240,15 @@ Deployment Status:
 - Namespace: ${verificationResult.namespace}
 - Success: ${verificationResult.success}
 - Ready: ${verificationResult.ready}
-- Replicas: ${verificationResult.replicas} (${(verificationResult.status as any)?.readyReplicas}/${(verificationResult.status as any)?.totalReplicas} ready)
-- Health Status: ${(verificationResult.healthCheck as any)?.status || 'unknown'}
-- Health Message: ${(verificationResult.healthCheck as any)?.message || 'No health check performed'}
+- Replicas: ${verificationResult.replicas} (${verificationResult.status.readyReplicas}/${verificationResult.status.totalReplicas} ready)
+- Health Status: ${verificationResult.healthCheck?.status || 'unknown'}
+- Health Message: ${verificationResult.healthCheck?.message || 'No health check performed'}
 
-${Array.isArray((verificationResult.status as any)?.conditions) && (verificationResult.status as any).conditions.length > 0 ? `Conditions:\n${(verificationResult.status as { conditions?: Array<{ type: string; status: string; message: string }> }).conditions?.map((c) => `- ${c.type}: ${c.status} - ${c.message}`).join('\n')}` : ''}
+${Array.isArray(verificationResult.status.conditions) && verificationResult.status.conditions.length > 0 ? `Conditions:\n${verificationResult.status.conditions.map((c) => `- ${c.type}: ${c.status} - ${c.message}`).join('\n')}` : ''}
 
 ${healthChecks.length > 0 ? `Health Checks:\n${healthChecks.map((check) => `- ${check.name}: ${check.status}${check.message ? ` - ${check.message}` : ''}`).join('\n')}` : ''}
 
-${Array.isArray(verificationResult.endpoints) && verificationResult.endpoints.length > 0 ? `Endpoints:\n${(verificationResult.endpoints as Array<{ type: string; url: string; port: number; healthy: boolean }>)?.map((ep) => `- ${ep.type}: ${ep.url}:${ep.port} (healthy: ${ep.healthy})`).join('\n')}` : ''}
+${Array.isArray(verificationResult.endpoints) && verificationResult.endpoints.length > 0 ? `Endpoints:\n${verificationResult.endpoints.map((ep) => `- ${ep.type}: ${ep.url}:${ep.port} (healthy: ${ep.healthy})`).join('\n')}` : ''}
 
 Provide a JSON response with:
 1. troubleshootingSteps: Array of specific, actionable steps to diagnose and fix issues (if any)
@@ -270,8 +270,8 @@ Respond with valid JSON only.`;
  * Generate AI-powered validation insights for deployment verification
  */
 async function generateValidationInsights(
-  verificationResult: Record<string, unknown>,
-  healthChecks: Record<string, unknown>[],
+  verificationResult: VerifyDeploymentResult,
+  healthChecks: Array<{ name: string; status: string; message?: string }>,
   ctx: ToolContext,
 ): Promise<Result<DeploymentValidationInsights>> {
   try {
@@ -317,7 +317,7 @@ async function generateValidationInsights(
           return { overall: 0 };
         }
       },
-      { count: 2, stopAt: 85 },
+      {},
     );
 
     if (result.ok) {
@@ -359,20 +359,21 @@ async function verifyDeploymentImpl(
   const logger = getToolLogger(context, 'verify-deploy');
   const timer = createToolTimer(logger, 'verify-deploy');
 
+  const {
+    deploymentName: configDeploymentName,
+    namespace: configNamespace,
+    checks = ['pods', 'services', 'health'],
+  } = params;
+
+  const timeout = 60;
+
+  const tracker = createStandardizedToolTracker(
+    'verify-deploy',
+    { deploymentName: configDeploymentName, namespace: configNamespace },
+    logger,
+  );
+
   try {
-    const {
-      deploymentName: configDeploymentName,
-      namespace: configNamespace,
-      checks = ['pods', 'services', 'health'],
-    } = params;
-
-    const timeout = 60;
-
-    logger.info(
-      { deploymentName: configDeploymentName, namespace: configNamespace },
-      'Starting deployment verification',
-    );
-
     // Use session facade directly
     const sessionId = params.sessionId || context.session?.id;
     if (!sessionId) {
@@ -387,19 +388,14 @@ async function verifyDeploymentImpl(
 
     const k8sClient = createKubernetesClient(logger);
 
-    // Get deployment info from session metadata or config
-    const metadata = context.session.get('metadata');
-    const deploymentResult =
-      metadata && typeof metadata === 'object' && 'deploymentResult' in metadata
-        ? ((metadata as any).deploymentResult as
-            | {
-                namespace?: string;
-                deploymentName?: string;
-                serviceName?: string;
-                endpoints?: Array<{ type: string; url: string; port: number; healthy?: boolean }>;
-              }
-            | undefined)
-        : undefined;
+    // Get deployment info from session using getResult (normalized approach)
+    const deploymentResult = context.session.getResult<{
+      namespace?: string;
+      deploymentName?: string;
+      serviceName?: string;
+      endpoints?: Array<{ type: string; url: string; port: number; healthy?: boolean }>;
+    }>('deploy');
+
     if (!deploymentResult && !configDeploymentName) {
       return Failure(
         'No deployment found. Provide deploymentName parameter or run deploy tool first.',
@@ -476,51 +472,15 @@ async function verifyDeploymentImpl(
       },
     };
 
-    // Store verification result in session
-    if (context.session) {
-      context.session.set('results', {
-        ...((context.session.get('results') as Record<string, any>) || {}),
-        'verify-deploy': result,
-      });
-      context.session.set('current_step', 'verify-deploy');
-      context.session.pushStep('verify-deploy');
-    }
+    // Session storage is handled by orchestrator automatically
 
     timer.end({ deploymentName, ready: health.ready, sessionId });
-
-    if (overallStatus === 'healthy') {
-      logger.info(
-        {
-          sessionId,
-          deploymentName,
-          namespace,
-          ready: health.ready,
-          healthStatus: overallStatus,
-        },
-        'Kubernetes deployment verification successful - deployment is healthy',
-      );
-    } else {
-      logger.warn(
-        {
-          sessionId,
-          deploymentName,
-          namespace,
-          ready: health.ready,
-          healthStatus: overallStatus,
-          healthChecks: healthChecks.length > 0 ? healthChecks : undefined,
-        },
-        `Kubernetes deployment verification found issues - status: ${overallStatus}`,
-      );
-    }
+    tracker.complete({ deploymentName, ready: health.ready, healthStatus: overallStatus });
 
     // Generate AI-powered validation insights
     let validationInsights: DeploymentValidationInsights | undefined;
     try {
-      const insightResult = await generateValidationInsights(
-        result as unknown as Record<string, unknown>,
-        healthChecks,
-        context,
-      );
+      const insightResult = await generateValidationInsights(result, healthChecks, context);
 
       if (insightResult.ok) {
         validationInsights = insightResult.value;
@@ -553,7 +513,7 @@ async function verifyDeploymentImpl(
     return Success(finalResult);
   } catch (error) {
     timer.error(error);
-    logger.error({ error }, 'Deployment verification failed');
+    tracker.fail(error as Error);
 
     return Failure(extractErrorMessage(error));
   }
@@ -575,7 +535,7 @@ const tool: Tool<typeof verifyDeploymentSchema, VerifyDeploymentResult> = {
   metadata: {
     aiDriven: true,
     knowledgeEnhanced: false,
-    samplingStrategy: 'rerank',
+    samplingStrategy: 'single',
     enhancementCapabilities: [
       'validation-insights',
       'troubleshooting-guidance',

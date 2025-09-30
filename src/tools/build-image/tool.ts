@@ -15,7 +15,13 @@
 
 import path from 'path';
 import { normalizePath } from '@/lib/path-utils';
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import {
+  getToolLogger,
+  createToolTimer,
+  createStandardizedToolTracker,
+  storeToolResults,
+} from '@/lib/tool-helpers';
+import { getPostBuildHint } from '@/lib/workflow-hints';
 import type { Logger } from '@/lib/logger';
 import { promises as fs } from 'node:fs';
 import { createStandardProgress } from '@/mcp/progress-helper';
@@ -82,11 +88,10 @@ async function prepareBuildArgs(
   };
 
   try {
-    // Get analysis data from session metadata
+    // Get analysis data from session using getResult (normalized approach)
     if (context.session) {
-      const results = context.session.get('results');
-      if (results && typeof results === 'object' && 'analyze-repo' in results) {
-        const analysisResult = (results as any)['analyze-repo'] as RepositoryAnalysis;
+      const analysisResult = context.session.getResult<RepositoryAnalysis>('analyze-repo');
+      if (analysisResult) {
         if (analysisResult.language) {
           defaults.LANGUAGE = analysisResult.language;
         }
@@ -206,7 +211,7 @@ async function generateOptimizationSuggestions(
           Date.now() - buildStartTime || 0,
         ),
       scoreBuildOptimization,
-      { count: 2, stopAt: 85 },
+      {},
     );
 
     if (!optimizationResult.ok) {
@@ -273,7 +278,7 @@ async function generateOptimizationSuggestions(
       suggestions,
       optimizations,
       nextSteps,
-      confidence: optimizationResult.value.winner.score,
+      confidence: optimizationResult.value.score ?? 0,
     });
   } catch (error) {
     return Failure(`Failed to generate optimization suggestions: ${extractErrorMessage(error)}`);
@@ -328,35 +333,37 @@ async function buildImageImpl(
   const logger = getToolLogger(context, 'build-image');
   const timer = createToolTimer(logger, 'build-image');
 
+  const {
+    path: rawBuildPath = '.',
+    dockerfile = 'Dockerfile',
+    dockerfilePath: rawDockerfilePath,
+    imageName = 'app:latest',
+    tags = [],
+    buildArgs = {},
+    platform,
+  } = params;
+
+  // Normalize paths to handle Windows separators
+  const buildContext = normalizePath(rawBuildPath);
+  const dockerfilePath = rawDockerfilePath ? normalizePath(rawDockerfilePath) : undefined;
+
+  // Use session facade directly
+  const sessionId = params.sessionId || context.session?.id;
+  if (!sessionId) {
+    return Failure('Session ID is required for build operations');
+  }
+
+  const tracker = createStandardizedToolTracker(
+    'build-image',
+    { path: buildContext, dockerfile, tags, sessionId },
+    logger,
+  );
+
   try {
-    const {
-      path: rawBuildPath = '.',
-      dockerfile = 'Dockerfile',
-      dockerfilePath: rawDockerfilePath,
-      imageName = 'app:latest',
-      tags = [],
-      buildArgs = {},
-      platform,
-    } = params;
-
-    // Normalize paths to handle Windows separators
-    const buildContext = normalizePath(rawBuildPath);
-    const dockerfilePath = rawDockerfilePath ? normalizePath(rawDockerfilePath) : undefined;
-
-    logger.info({ path: buildContext, dockerfile, tags }, 'Starting Docker image build');
-
     // Progress: Validating build parameters and environment
     if (progress) await progress('VALIDATING');
 
     const startTime = Date.now();
-
-    // Use session facade directly
-    const sessionId = params.sessionId || context.session?.id;
-    if (!sessionId) {
-      return Failure('Session ID is required for build operations');
-    }
-
-    logger.info({ sessionId }, 'Starting Docker image build with session');
 
     const dockerClient = createDockerClient(logger);
 
@@ -367,13 +374,9 @@ async function buildImageImpl(
       : path.resolve(repoPath, dockerfile);
 
     // Check if we should use a generated Dockerfile
-    const results = context.session?.get('results');
-    const dockerfileResult =
-      results && typeof results === 'object' && 'generate-dockerfile' in results
-        ? ((results as any)['generate-dockerfile'] as
-            | { path?: string; content?: string }
-            | undefined)
-        : undefined;
+    const dockerfileResult = context.session?.getResult<{ path?: string; content?: string }>(
+      'generate-dockerfile',
+    );
     const generatedPath = dockerfileResult?.path;
 
     if (!(await fileExists(finalDockerfilePath))) {
@@ -475,35 +478,9 @@ async function buildImageImpl(
     if (!buildResult.ok) {
       const errorMessage = buildResult.error ?? 'Unknown error';
 
-      // Prepare tags for failed result
-      const resultTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
-
-      // Create a failed result but with workflowHints to guide next steps
-      const failedResult: BuildImageResult = {
-        success: false,
-        sessionId,
-        imageId: '',
-        tags: resultTags,
-        size: 0,
-        buildTime: Date.now() - startTime,
-        logs: [],
-        workflowHints: {
-          nextStep: 'fix-dockerfile',
-          message: `Build failed. Use "fix-dockerfile" with the same Dockerfile to automatically fix common issues, or review build logs for specific problems.`,
-        },
-      };
-
-      // Update session with failed result
-      if (context.session) {
-        context.session.set('results', {
-          ...((context.session.get('results') as Record<string, any>) || {}),
-          'build-image': failedResult,
-        });
-        context.session.set('current_step', 'build-image');
-        context.session.pushStep('build-image');
-      }
-
-      return Failure(`Failed to build image: ${errorMessage}`);
+      // Session storage is handled by orchestrator (for both success and failure)
+      // Propagate Docker error guidance from infrastructure layer
+      return Failure(`Failed to build image: ${errorMessage}`, buildResult.guidance);
     }
 
     const buildTime = Date.now() - startTime;
@@ -560,24 +537,23 @@ async function buildImageImpl(
       logs: buildResult.value.logs,
       ...(securityWarnings.length > 0 && { securityWarnings }),
       ...(optimizationSuggestions && { optimizationSuggestions }),
-      workflowHints: {
-        nextStep: 'push-image',
-        message: `Image built successfully. Use "push-image" with sessionId ${sessionId} to push to a registry, or "generate-k8s-manifests" to create deployment manifests.${optimizationSuggestions ? ' Review AI optimization suggestions for improvements.' : ''}`,
-      },
+      workflowHints: getPostBuildHint(
+        context.session,
+        sessionId,
+        optimizationSuggestions ? String(optimizationSuggestions) : undefined,
+      ),
     };
 
-    // Store build result in session
-    if (context.session) {
-      context.session.set('results', {
-        ...((context.session.get('results') as Record<string, any>) || {}),
-        'build-image': result,
-      });
-      context.session.set('current_step', 'build-image');
-      context.session.pushStep('build-image');
-    }
+    // Store in sessionManager for cross-tool persistence using helper
+    await storeToolResults(context, sessionId, 'build-image', {
+      imageId: buildResult.value.imageId,
+      tags: finalTags,
+      size: (buildResult.value as unknown as { size?: number }).size,
+      buildTime,
+    });
 
     timer.end({ imageId: buildResult.value.imageId, buildTime });
-    logger.info({ imageId: buildResult.value.imageId, buildTime }, 'Docker image build completed');
+    tracker.complete({ imageId: buildResult.value.imageId, buildTime });
 
     // Progress: Complete
     if (progress) await progress('COMPLETE');
@@ -585,7 +561,7 @@ async function buildImageImpl(
     return Success(result);
   } catch (error) {
     timer.error(error);
-    logger.error({ error }, 'Docker image build failed');
+    tracker.fail(error as Error);
 
     return Failure(extractErrorMessage(error));
   }
@@ -607,7 +583,7 @@ const tool: Tool<typeof buildImageSchema, BuildImageResult> = {
   metadata: {
     aiDriven: true,
     knowledgeEnhanced: true,
-    samplingStrategy: 'rerank',
+    samplingStrategy: 'single',
     enhancementCapabilities: ['optimization-suggestions', 'build-analysis', 'performance-insights'],
   },
   run: buildImageImpl,

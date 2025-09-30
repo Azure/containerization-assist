@@ -53,7 +53,18 @@ export const generateDockerfileSchema = z.object({
   securityLevel: securityLevelSchema,
   customCommands: z.array(z.string()).optional().describe('Custom Dockerfile commands'),
   platform: platform.describe('Target platform (e.g., linux/amd64, linux/arm64, windows/amd64)'),
-  path: z.string().describe('Repository path (use forward slashes: /path/to/repo)'),
+  path: z
+    .string()
+    .optional()
+    .describe(
+      'Repository path (use forward slashes: /path/to/repo). If not provided, uses path from analyze-repo session data.',
+    ),
+  moduleName: z
+    .string()
+    .optional()
+    .describe(
+      'Specific module name to generate Dockerfile for (use with monorepo/multi-module projects). If not specified and modules are detected in session, generates for all modules.',
+    ),
   dockerfileDirectoryPaths: z
     .array(z.string())
     .nonempty()

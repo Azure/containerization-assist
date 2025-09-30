@@ -29,9 +29,7 @@ export const ERROR_MESSAGES = {
   K8S_APPLY_FAILED: (kind: string, name: string, error: string) =>
     `Failed to apply ${kind}/${name}: ${error}`,
 
-  // Retry and execution errors
-  RETRY_EXHAUSTED: (attempts: number, error: string) =>
-    `Failed after ${attempts} attempts: ${error}`,
+  // Execution errors
 
   // Generic templates
   OPERATION_FAILED: (operation: string, error: string) => `${operation} failed: ${error}`,

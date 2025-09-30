@@ -12,7 +12,6 @@ describe('Kubernetes Client', () => {
       expect(content).toContain('KubernetesClient');
       expect(content).toContain('applyManifest');
       expect(content).toContain('getDeploymentStatus');
-      expect(content).toContain('deleteResource');
       expect(content).toContain('ping');
       expect(content).toContain('namespaceExists');
       expect(content).toContain('checkPermissions');
@@ -70,8 +69,39 @@ describe('Kubernetes Client', () => {
     it('should export createKubernetesClient function', () => {
       const clientPath = join(__dirname, '../../../../src/infra/kubernetes/client.ts');
       const content = readFileSync(clientPath, 'utf-8');
-      
+
       expect(content).toContain('export const createKubernetesClient');
+    });
+  });
+
+  describe('Single-App Resource Support', () => {
+    it('should support core single-app resource types', () => {
+      const clientPath = join(__dirname, '../../../../src/infra/kubernetes/client.ts');
+      const content = readFileSync(clientPath, 'utf-8');
+
+      // Core resources for single-app scenarios
+      expect(content).toContain('Deployment');
+      expect(content).toContain('Service');
+    });
+
+    it('should have simplified ingress detection for single-app flow', () => {
+      const clientPath = join(__dirname, '../../../../src/infra/kubernetes/client.ts');
+      const content = readFileSync(clientPath, 'utf-8');
+
+      expect(content).toContain('checkIngressController');
+      expect(content).toContain('IngressClass');
+      // Should check common ingress controllers
+      expect(content).toContain('ingress');
+    });
+
+    it('should focus on namespace and deployment operations', () => {
+      const clientPath = join(__dirname, '../../../../src/infra/kubernetes/client.ts');
+      const content = readFileSync(clientPath, 'utf-8');
+
+      // Essential operations for single-app deployment
+      expect(content).toContain('namespaceExists');
+      expect(content).toContain('getDeploymentStatus');
+      expect(content).toContain('checkPermissions');
     });
   });
 });

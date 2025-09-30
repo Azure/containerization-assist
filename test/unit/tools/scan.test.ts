@@ -14,7 +14,7 @@ jest.mock('../../../src/session/core', () => ({
       "metadata": {},
       "completed_steps": [],
       "errors": {},
-      "current_step": null,
+      
       "createdAt": "2025-09-08T11:12:40.362Z",
       "updatedAt": "2025-09-08T11:12:40.362Z"
     }),

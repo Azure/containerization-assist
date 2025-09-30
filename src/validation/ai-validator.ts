@@ -2,20 +2,17 @@
  * AI-Powered Validation Service
  *
  * Provides AI-driven validation capabilities for Dockerfiles and Kubernetes manifests
- * Integrates with the sampling system for high-quality validation analysis
  */
 
 import type { ToolContext } from '@/mcp/context';
-import { sampleWithPlan } from '@/mcp/ai/sampling-runner';
+import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { Success, Failure, type Result, type AIMessage } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { parseAIResponse } from '@/mcp/ai/response-parser';
 import { ValidationReportResponseSchema } from '@/mcp/ai/schemas';
 import { scoreResponse } from '@/mcp/ai/quality';
-import { createContextAwarePlan } from '@/mcp/ai/sampling-plan';
 import { scoreToGrade } from '@/types/ai';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
-import { SCORING_CONFIG } from '@/config/scoring';
 import { TOKEN_CONFIG } from '@/config/tokens';
 import { SAMPLING_CONFIG } from '@/config/sampling';
 import {
@@ -83,18 +80,14 @@ export class AIValidator {
         'Starting AI-powered validation',
       );
 
-      const samplingPlan = createContextAwarePlan('validation', 'balanced', {
-        maxTokens: TOKEN_CONFIG.STANDARD,
-        stopAt: SCORING_CONFIG.THRESHOLDS.HIGH_QUALITY,
-      });
-
-      const samplingResult = await sampleWithPlan(
+      const samplingResult = await sampleWithRerank(
         ctx,
-        async () => {
+        async (_attemptIndex) => {
           const aiMessages = await this.buildValidationPrompt(content, options);
           const mcpMessages = toMCPMessages({ messages: aiMessages });
           return {
             messages: mcpMessages.messages,
+            maxTokens: TOKEN_CONFIG.STANDARD,
             modelPreferences: {
               hints: [
                 { name: `validation-${options.contentType}` },
@@ -105,7 +98,7 @@ export class AIValidator {
             },
           };
         },
-        (text) => {
+        (text: string) => {
           const scoreResult = scoreResponse('validation', text, {
             contentType: options.contentType,
             validationOptions: {
@@ -115,7 +108,7 @@ export class AIValidator {
           });
           return scoreResult.breakdown;
         },
-        samplingPlan,
+        {},
       );
 
       if (!samplingResult.ok) {
@@ -198,7 +191,7 @@ export class AIValidator {
         aiMetadata: {
           ...(response.model && { model: response.model }),
           processingTime,
-          confidence: response.winner.score / 100,
+          confidence: (response.score ?? 0) / 100,
           candidatesEvaluated: 1, // sampleWithRerank doesn't expose this currently
         },
       };
