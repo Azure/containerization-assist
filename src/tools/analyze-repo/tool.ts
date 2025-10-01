@@ -8,7 +8,7 @@ import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { scoreRepositoryAnalysis } from '@/lib/scoring';
 import { analyzeRepoSchema, type RepositoryAnalysis } from './schema';
 import { extractJsonContent } from '@/lib/content-extraction';
-import { createStandardizedToolTracker, storeToolResults } from '@/lib/tool-helpers';
+import { storeToolResults } from '@/lib/tool-helpers';
 import type { AIResponse } from '../ai-response-types';
 import type { Tool } from '@/types/tool';
 import type { z } from 'zod';
@@ -34,12 +34,6 @@ async function run(
       'sessionId is required for analyze-repo. The orchestrator should provide a sessionId.',
     );
   }
-
-  const tracker = createStandardizedToolTracker(
-    'analyze-repo',
-    { repoPath, sessionId },
-    ctx.logger,
-  );
 
   // Read the actual repository files
   let fileList = '';
@@ -159,12 +153,10 @@ async function run(
       { error: error instanceof Error ? error.message : String(error) },
       'AI sampling failed',
     );
-    tracker.fail(error as Error);
     return Failure(`AI sampling failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   if (!response.ok) {
-    tracker.fail(`AI sampling failed: ${response.error}`);
     return Failure(`AI sampling failed: ${response.error}`);
   }
 
@@ -185,7 +177,6 @@ async function run(
       { responseText: responseText.substring(0, 500) },
       'AI response did not contain valid JSON',
     );
-    tracker.fail('AI response did not contain valid JSON');
     return Failure('AI response did not contain valid JSON');
   }
 
@@ -242,12 +233,6 @@ async function run(
         ...(result.modules && { modules: result.modules }),
       },
     );
-
-    tracker.complete({
-      language: result.language,
-      framework: result.framework,
-      sessionId,
-    });
 
     // Add sessionId and workflowHints to the result
     const moduleHint =
