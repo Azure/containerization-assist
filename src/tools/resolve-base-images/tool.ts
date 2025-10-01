@@ -20,7 +20,6 @@ import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { scoreBaseImageRecommendation } from '@/lib/scoring';
 import { resolveBaseImagesSchema } from './schema';
-import { createStandardizedToolTracker } from '@/lib/tool-helpers';
 import type { AIResponse } from '../ai-response-types';
 import type { z } from 'zod';
 
@@ -44,12 +43,6 @@ async function run(
   ctx: ToolContext,
 ): Promise<Result<AIResponse>> {
   const { technology } = input;
-
-  const tracker = createStandardizedToolTracker(
-    'resolve-base-images',
-    { technology: technology || 'auto-detect' },
-    ctx.logger,
-  );
 
   try {
     // Generate prompt from template - provide context for better recommendations
@@ -111,10 +104,8 @@ async function run(
         samplingResult.error?.includes('No valid candidates generated')
       ) {
         ctx.logger.debug('AI returned empty responses, returning empty recommendations');
-        tracker.complete({ recommendations: 'empty' });
         return Success({ recommendations: '' });
       }
-      tracker.fail(`Base image recommendation failed: ${samplingResult.error}`);
       return Failure(`Base image recommendation failed: ${samplingResult.error}`);
     }
 
@@ -122,7 +113,6 @@ async function run(
     if (!responseText) {
       // Return empty recommendations rather than failing when AI response is empty
       ctx.logger.debug('AI returned empty response, returning empty recommendations');
-      tracker.complete({ recommendations: 'empty' });
       return Success({ recommendations: '' });
     }
 
@@ -134,11 +124,8 @@ async function run(
       'Base image recommendations generated with sampling',
     );
 
-    tracker.complete({ technology, score: samplingResult.value.score });
-
     return Success({ recommendations: responseText });
   } catch (error) {
-    tracker.fail(error as Error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     return Failure(`Base image recommendation failed: ${errorMessage}`);
   }
