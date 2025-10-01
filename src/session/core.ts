@@ -4,16 +4,24 @@
  * Simplified for single-user operation with one active session.
  * Trade-off: In-memory storage for simplicity over persistence
  *
- * SESSION DATA STRUCTURE:
+ * CANONICAL METADATA STRUCTURE:
  * ==================================
+ * The ONLY authoritative location for session data:
+ *
  * - session.metadata.results: Record<toolName, toolOutput>
- *   Single source of truth for tool results (e.g., { 'analyze-repo': {...}, 'build-image': {...} })
+ *   SINGLE SOURCE OF TRUTH for tool results (e.g., { 'analyze-repo': {...}, 'build-image': {...} })
  *   Managed by orchestrator via SessionFacade.storeResult/getResult
+ *   NEVER use session.results (top-level) - this field is deprecated and removed
  *
  * - session.metadata[key]: Arbitrary workflow metadata (timestamps, flags, custom data)
  *   Managed by tools via SessionFacade.get/set
  *
  * - session.completed_steps: Array of completed tool names
+ *
+ * MIGRATION NOTES:
+ * - Legacy writes to session.results (top-level) have been removed
+ * - All tool result reads MUST use SessionFacade.getResult() which reads from metadata.results
+ * - Do NOT add fallback logic to read from old locations
  */
 
 import { randomUUID } from 'node:crypto';

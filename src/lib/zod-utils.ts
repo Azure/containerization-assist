@@ -15,7 +15,7 @@ export function extractSchemaShape(schema: z.ZodTypeAny): ZodRawShape {
   }
 
   // Other schemas may have ._def.shape() method
-  if (schema._def && 'shape' in schema._def && typeof schema._def.shape === 'function') {
+  if (schema._def && typeof schema._def.shape === 'function') {
     return schema._def.shape();
   }
 

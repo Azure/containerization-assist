@@ -109,12 +109,13 @@ export function createStandardizedToolTracker(
 }
 
 /**
- * SESSION RESULT UPDATER
+ * CANONICAL SESSION RESULT UPDATER
  * ==================================
  * Single source of truth for writing tool results to session state.
  * ALL tool result writes MUST use this function to maintain consistency.
  *
  * Writes to: session.metadata.results[toolName]
+ * NEVER writes to: session.results (deprecated top-level field - removed)
  *
  * @param session - The WorkflowState session object to update
  * @param toolName - Name of the tool (e.g., 'analyze-repo', 'build-image')

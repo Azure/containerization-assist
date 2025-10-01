@@ -534,12 +534,18 @@ async function buildImageImpl(
     };
 
     // Store in sessionManager for cross-tool persistence using helper
-    await storeToolResults(context, sessionId, 'build-image', {
+    const storeResult = await storeToolResults(context, sessionId, 'build-image', {
       imageId: buildResult.value.imageId,
       tags: finalTags,
       size: (buildResult.value as unknown as { size?: number }).size,
       buildTime,
     });
+
+    if (!storeResult.ok) {
+      timer.error(storeResult.error);
+      tracker.fail(storeResult.error);
+      return Failure(`Failed to persist build results: ${storeResult.error}`);
+    }
 
     timer.end({ imageId: buildResult.value.imageId, buildTime });
 
