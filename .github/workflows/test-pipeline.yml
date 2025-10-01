@@ -266,11 +266,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Download node_modules
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
-        with:
-          name: node-modules-${{ github.run_id }}
-
       - name: Dependency audit
         run: npm audit --audit-level moderate || true
 
