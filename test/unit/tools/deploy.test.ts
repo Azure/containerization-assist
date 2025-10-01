@@ -133,6 +133,7 @@ jest.mock('@/lib/tool-helpers', () => ({
     complete: jest.fn(),
     fail: jest.fn(),
   })),
+  storeToolResults: jest.fn().mockResolvedValue({ ok: true, value: undefined }),
 }));
 
 // Mock MCP helper modules

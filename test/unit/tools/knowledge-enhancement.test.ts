@@ -198,6 +198,8 @@ spec:
       exists: jest.fn(),
       clear: jest.fn(),
       pushStep: jest.fn(),
+      storeResult: jest.fn(),
+      getResult: jest.fn(),
     },
     logger: {
       info: jest.fn(),
@@ -216,9 +218,14 @@ spec:
       const result = await analyzeRepoTool.run(
         {
           path: '/test/repo',
+          sessionId: 'test-session-123',
         },
         mockContext,
       );
+
+      if (!result.ok) {
+        throw new Error(`analyze-repo failed: ${result.error}`);
+      }
 
       expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -229,6 +236,25 @@ spec:
       );
 
       expect(result.ok).toBe(true);
+    });
+
+    it('should fail validation when sessionId is missing', async () => {
+      const result = await analyzeRepoTool.run(
+        {
+          path: '/test/repo',
+          // sessionId intentionally omitted - should fail Zod validation
+        } as any,
+        mockContext,
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        // Should fail with validation error before reaching the implementation
+        expect(result.error).toContain('sessionId is required');
+      }
+
+      // buildMessages should never be called since validation failed
+      expect(promptEngine.buildMessages).not.toHaveBeenCalled();
     });
   });
 
