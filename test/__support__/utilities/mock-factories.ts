@@ -364,11 +364,19 @@ export function createSessionWithCompletedStep(
   // Add the step to completed steps
   workflowState.completed_steps = [...(workflowState.completed_steps || []), WorkflowStep[step]];
 
-  // Add appropriate result data based on step
-  workflowState.results = workflowState.results || {};
+  // Add appropriate result data based on step using canonical location (metadata.results)
+  if (!workflowState.metadata) {
+    workflowState.metadata = {};
+  }
+  if (!workflowState.metadata.results || typeof workflowState.metadata.results !== 'object') {
+    workflowState.metadata.results = {};
+  }
+
+  const results = workflowState.metadata.results as Record<string, unknown>;
+
   switch (step) {
     case 'ANALYZE':
-      workflowState.results['analyze-repo'] = createMockAnalysisResult();
+      results['analyze-repo'] = createMockAnalysisResult();
       break;
     case 'GENERATE_DOCKERFILE':
       workflowState.dockerfile_result = createMockDockerfileResult();

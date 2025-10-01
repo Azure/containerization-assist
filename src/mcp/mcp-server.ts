@@ -238,7 +238,9 @@ function prepareExecutionPayload(
   metadata: ExecuteMetadata;
 } {
   const meta = extractMeta(params);
-  const sessionId = extractSessionId(meta);
+
+  // Extract sessionId from extra (transport-level) or _meta (params-level)
+  const sessionId = extra.sessionId || extractSessionId(meta);
 
   // Wrap sendNotification to accept unknown and cast to ServerNotification
   const wrappedSendNotification = extra.sendNotification
@@ -247,18 +249,25 @@ function prepareExecutionPayload(
       }
     : undefined;
 
+  // Extract AI generation limits from _meta
+  const maxTokens = extractMaxTokens(meta);
+  const stopSequences = extractStopSequences(meta);
+
   const metadata: ExecuteMetadata = {
     progress: params,
     loggerContext: {
       transport,
-      ...(meta?.requestId && typeof meta.requestId === 'string'
-        ? { requestId: meta.requestId }
-        : {}),
+      requestId: extra.requestId,
       ...(meta?.invocationId && typeof meta.invocationId === 'string'
         ? { invocationId: meta.invocationId }
         : {}),
       tool: toolName,
     },
+    // Transport-provided abort signal for cancellation support
+    signal: extra.signal,
+    // AI generation constraints
+    ...(maxTokens !== undefined && { maxTokens }),
+    ...(stopSequences !== undefined && { stopSequences }),
     ...(wrappedSendNotification && { sendNotification: wrappedSendNotification }),
   };
 
@@ -281,6 +290,21 @@ function extractSessionId(meta: Record<string, unknown> | undefined): string | u
   if (!meta) return undefined;
   const sessionId = meta.sessionId;
   return typeof sessionId === 'string' ? sessionId : undefined;
+}
+
+function extractMaxTokens(meta: Record<string, unknown> | undefined): number | undefined {
+  if (!meta) return undefined;
+  const maxTokens = meta.maxTokens;
+  return typeof maxTokens === 'number' ? maxTokens : undefined;
+}
+
+function extractStopSequences(meta: Record<string, unknown> | undefined): string[] | undefined {
+  if (!meta) return undefined;
+  const stopSequences = meta.stopSequences;
+  if (Array.isArray(stopSequences) && stopSequences.every((s) => typeof s === 'string')) {
+    return stopSequences;
+  }
+  return undefined;
 }
 
 function sanitizeParams(params: Record<string, unknown>): Record<string, unknown> {

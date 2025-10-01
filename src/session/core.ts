@@ -4,12 +4,24 @@
  * Simplified for single-user operation with one active session.
  * Trade-off: In-memory storage for simplicity over persistence
  *
- * Metadata Structure:
- * - session.metadata.results: Map of tool results (e.g., { 'analyze-repo': {...}, 'build-image': {...} })
+ * CANONICAL METADATA STRUCTURE:
+ * ==================================
+ * The ONLY authoritative location for session data:
+ *
+ * - session.metadata.results: Record<toolName, toolOutput>
+ *   SINGLE SOURCE OF TRUTH for tool results (e.g., { 'analyze-repo': {...}, 'build-image': {...} })
  *   Managed by orchestrator via SessionFacade.storeResult/getResult
+ *   NEVER use session.results (top-level) - this field is deprecated and removed
+ *
  * - session.metadata[key]: Arbitrary workflow metadata (timestamps, flags, custom data)
  *   Managed by tools via SessionFacade.get/set
+ *
  * - session.completed_steps: Array of completed tool names
+ *
+ * MIGRATION NOTES:
+ * - Legacy writes to session.results (top-level) have been removed
+ * - All tool result reads MUST use SessionFacade.getResult() which reads from metadata.results
+ * - Do NOT add fallback logic to read from old locations
  */
 
 import { randomUUID } from 'node:crypto';
@@ -46,6 +58,7 @@ export class SessionManager {
 
   /**
    * Create a new session (replaces any existing session)
+   * Initializes canonical structure with metadata.results
    */
   async create(sessionId?: string): Promise<Result<WorkflowState>> {
     const id = sessionId ?? randomUUID();
@@ -53,7 +66,9 @@ export class SessionManager {
 
     const session: Session = {
       sessionId: id,
-      metadata: {},
+      metadata: {
+        results: {}, // Initialize canonical results location
+      },
       completed_steps: [],
       errors: {},
       createdAt: now,
@@ -62,7 +77,7 @@ export class SessionManager {
     };
 
     this.currentSession = session;
-    this.logger.info({ sessionId: id }, 'Session created');
+    this.logger.info({ sessionId: id }, 'Session created with canonical structure');
 
     // Return without lastAccessedAt to match WorkflowState interface
     const { lastAccessedAt: _lastAccessed, ...workflowState } = session;

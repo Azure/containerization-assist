@@ -138,4 +138,40 @@ describe('Docker Client', () => {
       });
     });
   });
+
+  describe('Build Log Capture', () => {
+    it('should capture stream events in buildLogs array', () => {
+      const clientPath = join(__dirname, '../../../../src/infra/docker/client.ts');
+      const content = readFileSync(clientPath, 'utf-8');
+
+      // Verify stream capture is implemented
+      expect(content).toContain('if (event.stream)');
+      expect(content).toContain('buildLogs.push(event.stream)');
+    });
+
+    it('should capture aux events in buildLogs array with prefix', () => {
+      const clientPath = join(__dirname, '../../../../src/infra/docker/client.ts');
+      const content = readFileSync(clientPath, 'utf-8');
+
+      // Verify aux capture is implemented with [aux] prefix
+      expect(content).toContain('if (event.aux)');
+      expect(content).toContain('buildLogs.push(`[aux] ${JSON.stringify(event.aux)}`)');
+    });
+
+    it('should initialize buildLogs array before Docker build', () => {
+      const clientPath = join(__dirname, '../../../../src/infra/docker/client.ts');
+      const content = readFileSync(clientPath, 'utf-8');
+
+      // Verify buildLogs is declared and initialized
+      expect(content).toContain('buildLogs: string[] = []');
+    });
+
+    it('should include buildLogs in DockerBuildResult', () => {
+      const clientPath = join(__dirname, '../../../../src/infra/docker/client.ts');
+      const content = readFileSync(clientPath, 'utf-8');
+
+      // Verify logs are included in result
+      expect(content).toContain('logs: buildLogs');
+    });
+  });
 });

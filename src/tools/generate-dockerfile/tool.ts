@@ -72,41 +72,21 @@ async function generateSingleDockerfile(
   let analyzedPathFromSession: string | undefined;
   let analysis: RepositoryAnalysis | undefined;
 
-  // Retrieve analysis from sessionManager (cross-tool persistent session)
-  // Note: Do NOT use ctx.session here as it's the current tool's local session,
-  // not the workflow session shared across tools
-  if (sessionId && ctx.sessionManager) {
-    try {
-      const workflowStateResult = await ctx.sessionManager.get(sessionId);
-      if (workflowStateResult.ok && workflowStateResult.value) {
-        const workflowState = workflowStateResult.value as Record<string, unknown>;
-
-        // Get analyzed path from metadata
-        const metadata = workflowState.metadata as Record<string, unknown> | undefined;
-        if (metadata && !analyzedPathFromSession && typeof metadata.analyzedPath === 'string') {
-          analyzedPathFromSession = metadata.analyzedPath;
-        }
-
-        // Get analysis results from top-level results field (NOT metadata.results)
-        const results = workflowState.results as Record<string, unknown> | undefined;
-        const analyzeRepoResult = results?.['analyze-repo'];
-        if (!analysis && analyzeRepoResult && typeof analyzeRepoResult === 'object') {
-          analysis = analyzeRepoResult as RepositoryAnalysis;
-          ctx.logger.info(
-            { sessionId, language: analysis.language, framework: analysis.framework },
-            'Retrieved repository analysis from sessionManager',
-          );
-        }
-      }
-    } catch (sessionError) {
-      ctx.logger.debug(
-        {
-          sessionId,
-          error: sessionError instanceof Error ? sessionError.message : String(sessionError),
-        },
-        'Unable to load workflow session data for Dockerfile generation',
+  // Retrieve analysis from session using canonical SessionFacade.getResult pattern
+  // This is the preferred approach for reading cross-tool results
+  if (ctx.session) {
+    // Use SessionFacade.getResult to read from canonical location (metadata.results)
+    const analyzeRepoResult = ctx.session.getResult<RepositoryAnalysis>('analyze-repo');
+    if (analyzeRepoResult) {
+      analysis = analyzeRepoResult;
+      ctx.logger.info(
+        { sessionId, language: analysis.language, framework: analysis.framework },
+        'Retrieved repository analysis from session using canonical accessor',
       );
     }
+
+    // Get analyzed path from metadata
+    analyzedPathFromSession = ctx.session.get<string>('analyzedPath');
   }
 
   const analysisPath =

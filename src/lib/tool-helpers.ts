@@ -5,7 +5,7 @@
 import { createLogger, createTimer, type Logger, type Timer } from './logger.js';
 import { logToolStart, logToolComplete, logToolFailure } from './runtime-logging.js';
 import type { ToolContext } from '@/mcp/context.js';
-import type { Result } from '@/types';
+import type { Result, WorkflowState } from '@/types';
 
 /**
  * Gets or creates a logger for a tool.
@@ -109,8 +109,74 @@ export function createStandardizedToolTracker(
 }
 
 /**
+ * CANONICAL SESSION RESULT UPDATER
+ * ==================================
+ * Single source of truth for writing tool results to session state.
+ * ALL tool result writes MUST use this function to maintain consistency.
+ *
+ * Writes to: session.metadata.results[toolName]
+ * NEVER writes to: session.results (deprecated top-level field - removed)
+ *
+ * @param session - The WorkflowState session object to update
+ * @param toolName - Name of the tool (e.g., 'analyze-repo', 'build-image')
+ * @param results - The results to store
+ * @throws Error if session is null/undefined or missing sessionId
+ *
+ * @example
+ * ```typescript
+ * const session = sessionResult.value;
+ * updateSessionResults(session, 'analyze-repo', { language: 'Java', framework: 'Spring Boot' });
+ * await sessionManager.update(sessionId, session);
+ * ```
+ */
+export function updateSessionResults(
+  session: WorkflowState,
+  toolName: string,
+  results: unknown,
+): void {
+  // Runtime validation: Ensure session is valid
+  if (!session) {
+    throw new Error(
+      `Cannot update session results: session is ${session}. ` +
+        `This indicates a programming error - sessions must exist before storing results.`,
+    );
+  }
+
+  if (!session.sessionId) {
+    throw new Error(
+      'Cannot update session results: session.sessionId is missing. ' +
+        'This indicates a programming error - all sessions must have a sessionId.',
+    );
+  }
+
+  if (!toolName || typeof toolName !== 'string') {
+    throw new Error(
+      `Cannot update session results: toolName is invalid (${typeof toolName}). ` +
+        'Tool name must be a non-empty string.',
+    );
+  }
+
+  // Ensure metadata object exists
+  if (!session.metadata || typeof session.metadata !== 'object') {
+    session.metadata = {};
+  }
+
+  // Ensure results map exists at canonical location
+  if (!session.metadata.results || typeof session.metadata.results !== 'object') {
+    session.metadata.results = {};
+  }
+
+  // Write to ONLY canonical location: metadata.results
+  (session.metadata.results as Record<string, unknown>)[toolName] = results;
+
+  // Update timestamp
+  session.updatedAt = new Date();
+}
+
+/**
  * Store tool results in sessionManager for cross-tool persistence.
  * Consolidates the repetitive pattern of creating/updating sessions.
+ * Uses the canonical updateSessionResults helper to ensure consistency.
  *
  * @param ctx - The tool context with sessionManager
  * @param sessionId - The session ID to store results under
@@ -155,26 +221,29 @@ export async function storeToolResults(
       return { ok: false, error };
     }
 
-    // Get existing results to merge (don't overwrite existing results)
-    const existingResults = sessionResult.value.results ? sessionResult.value.results : {};
+    const session = sessionResult.value;
 
-    // Prepare update payload - merge new results with existing ones
-    const updatePayload: {
-      results: Record<string, unknown>;
-      metadata?: Record<string, unknown>;
-    } = {
-      results: {
-        ...existingResults,
-        [toolName]: results,
-      },
-    };
+    // Use canonical helper to update results
+    updateSessionResults(session, toolName, results);
 
+    // Merge any additional metadata (preserving existing metadata)
     if (metadata) {
-      updatePayload.metadata = metadata;
+      session.metadata = {
+        ...(session.metadata || {}),
+        ...metadata,
+        // Ensure results aren't overwritten by metadata parameter
+        results: session.metadata?.results || {},
+      };
     }
 
-    // Update session with merged results
-    await ctx.sessionManager.update(sessionId, updatePayload);
+    // Update session with merged results - capture and check the result
+    const updateResult = await ctx.sessionManager.update(sessionId, session);
+
+    if (!updateResult.ok) {
+      const error = `Session update failed: ${updateResult.error}`;
+      logger.error({ sessionId, toolName, error: updateResult.error }, error);
+      return { ok: false, error };
+    }
 
     logger.info(
       { sessionId, toolName },
@@ -184,9 +253,9 @@ export async function storeToolResults(
     return { ok: true, value: undefined };
   } catch (sessionError) {
     const errorMsg = sessionError instanceof Error ? sessionError.message : String(sessionError);
-    logger.warn(
+    logger.error(
       { sessionId, toolName, error: errorMsg },
-      'Failed to store tool results in sessionManager',
+      'Failed to store tool results in sessionManager (exception)',
     );
     return { ok: false, error: `Failed to store results: ${errorMsg}` };
   }

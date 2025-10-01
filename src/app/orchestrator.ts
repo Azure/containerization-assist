@@ -14,6 +14,7 @@ import { createToolContext, type ToolContext, type ProgressReporter } from '@/mc
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { SessionManager } from '@/session/core';
 import { ERROR_MESSAGES } from '@/lib/error-messages';
+import { updateSessionResults } from '@/lib/tool-helpers';
 import type {
   ToolOrchestrator,
   OrchestratorConfig,
@@ -57,6 +58,7 @@ interface ExecutionEnvironment<T extends Tool<ZodTypeAny, any>> {
 
 /**
  * Create a SessionFacade for tool handlers
+ * Uses canonical updateSessionResults helper for all result writes
  */
 function createSessionFacade(session: WorkflowState): SessionFacade {
   return {
@@ -81,18 +83,11 @@ function createSessionFacade(session: WorkflowState): SessionFacade {
       }
     },
     storeResult(toolName: string, value: unknown): void {
-      if (!session.metadata) {
-        session.metadata = {};
-      }
-      // Ensure results map exists
-      if (!session.metadata.results || typeof session.metadata.results !== 'object') {
-        session.metadata.results = {};
-      }
-      // Store result in the results map
-      (session.metadata.results as Record<string, unknown>)[toolName] = value;
-      session.updatedAt = new Date();
+      // Use canonical helper - single source of truth for all writes
+      updateSessionResults(session, toolName, value);
     },
     getResult<T = unknown>(toolName: string): T | undefined {
+      // Read from canonical location: metadata.results
       const results = session.metadata?.results;
       if (!results || typeof results !== 'object') {
         return undefined;

@@ -25,15 +25,17 @@ import type { Topic } from './topics';
 
 /**
  * Represents the state of a tool execution session.
+ *
+ * CANONICAL STRUCTURE:
+ * - Tool results are stored in metadata.results (NOT top-level results field)
+ * - Use SessionFacade.storeResult/getResult to read/write tool results
  */
 export interface WorkflowState {
   /** Unique session identifier */
   sessionId: string;
   /** Overall progress (0-100) */
   progress?: number;
-  /** Results from completed tools */
-  results?: Record<string, unknown>;
-  /** Additional metadata */
+  /** Additional metadata (includes results map at metadata.results) */
   metadata?: Record<string, unknown>;
   /** List of completed step names */
   completed_steps?: string[];

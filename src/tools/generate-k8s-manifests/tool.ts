@@ -525,7 +525,7 @@ async function generateSingleManifest(
     };
 
     // Store in sessionManager for cross-tool persistence using helper
-    await storeToolResults(ctx, input.sessionId, 'generate-k8s-manifests', {
+    const storeResult = await storeToolResults(ctx, input.sessionId, 'generate-k8s-manifests', {
       manifests: finalManifestsContent,
       manifestPath,
       validatedResources: manifests.map((m) => ({ kind: m.kind, name: m.metadata?.name })),

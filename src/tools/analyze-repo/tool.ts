@@ -221,7 +221,7 @@ async function run(
     }
 
     // Store in sessionManager for cross-tool persistence using helper
-    await storeToolResults(
+    const storeResult = await storeToolResults(
       ctx,
       sessionId,
       'analyze-repo',

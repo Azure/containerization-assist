@@ -298,6 +298,16 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
             (event: DockerBuildEvent) => {
               logger.debug(event, 'Docker build progress');
 
+              // Capture stream output (user-facing build logs)
+              if (event.stream) {
+                buildLogs.push(event.stream);
+              }
+
+              // Capture aux metadata (e.g., image IDs)
+              if (event.aux) {
+                buildLogs.push(`[aux] ${JSON.stringify(event.aux)}`);
+              }
+
               if (event.error || event.errorDetail) {
                 logger.error({ errorEvent: event }, 'Docker build error event received');
                 // Capture the first error encountered during the build
