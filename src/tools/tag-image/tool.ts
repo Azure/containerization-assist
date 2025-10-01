@@ -5,7 +5,7 @@
  * Follows the new Tool interface pattern
  */
 
-import { getToolLogger, createToolTimer, createStandardizedToolTracker } from '@/lib/tool-helpers';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { createDockerClient } from '@/lib/docker';
 import { Success, Failure, type Result, TOPICS } from '@/types';
@@ -212,8 +212,6 @@ async function run(
     return Failure('Session not available');
   }
 
-  const tracker = createStandardizedToolTracker('tag-image', { sessionId, tag }, logger);
-
   try {
     const dockerClient = createDockerClient(logger);
 
@@ -291,12 +289,10 @@ async function run(
     ctx.session?.storeResult('tag-image', result);
 
     timer.end({ tags, sessionId });
-    tracker.complete({ tags, imageId: source });
 
     return Success(result);
   } catch (error) {
     timer.error(error);
-    tracker.fail(error as Error);
     return Failure(extractErrorMessage(error));
   }
 }

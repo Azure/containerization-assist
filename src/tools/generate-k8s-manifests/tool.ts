@@ -5,7 +5,7 @@
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
-import { createStandardizedToolTracker, storeToolResults } from '@/lib/tool-helpers';
+import { storeToolResults } from '@/lib/tool-helpers';
 import { promptTemplates, K8sManifestPromptParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
@@ -130,12 +130,6 @@ async function generateSingleManifest(
       'Application name is required. Either provide appName parameter or run analyze-repo first with a sessionId.',
     );
   }
-
-  const tracker = createStandardizedToolTracker(
-    'generate-k8s-manifests',
-    { appName, namespace, replicas, serviceType },
-    ctx.logger,
-  );
 
   // Generate prompt from template
   const promptParams = {
@@ -537,11 +531,9 @@ async function generateSingleManifest(
       validatedResources: manifests.map((m) => ({ kind: m.kind, name: m.metadata?.name })),
     });
 
-    tracker.complete({ manifestPath, resourceCount: manifests.length });
     return Success(result);
   } catch (e) {
     const error = e as Error;
-    tracker.fail(error);
     return Failure(`Manifest generation failed: ${error.message}`);
   }
 }

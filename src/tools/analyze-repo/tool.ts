@@ -251,7 +251,6 @@ async function run(
     });
   } catch (e) {
     const error = e as Error;
-    tracker.fail(error);
     const invalidJson = (() => {
       try {
         return responseText.substring(0, 200);

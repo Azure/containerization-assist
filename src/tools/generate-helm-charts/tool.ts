@@ -11,7 +11,7 @@ import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { scoreHelmChart } from '@/lib/scoring';
 import { generateHelmChartsSchema } from './schema';
-import { createStandardizedToolTracker } from '@/lib/tool-helpers';
+
 import type { AIResponse } from '../ai-response-types';
 import type { z } from 'zod';
 
@@ -72,12 +72,6 @@ async function run(
     );
   }
 
-  const tracker = createStandardizedToolTracker(
-    'generate-helm-charts',
-    { chartName, chartVersion },
-    ctx.logger,
-  );
-
   try {
     // Generate prompt from template
     const promptParams = {
@@ -120,13 +114,11 @@ async function run(
     );
 
     if (!samplingResult.ok) {
-      tracker.fail(`Helm chart generation failed: ${samplingResult.error}`);
       return Failure(`Helm chart generation failed: ${samplingResult.error}`);
     }
 
     const responseText = samplingResult.value.text;
     if (!responseText) {
-      tracker.fail('Empty response from AI');
       return Failure('Empty response from AI');
     }
 
@@ -138,11 +130,8 @@ async function run(
       'Helm chart generated with sampling',
     );
 
-    tracker.complete({ chartName: chartName || appName, score: samplingResult.value.score });
-
     return Success({ charts: responseText });
   } catch (error) {
-    tracker.fail(error as Error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     return Failure(`Helm chart generation failed: ${errorMessage}`);
   }

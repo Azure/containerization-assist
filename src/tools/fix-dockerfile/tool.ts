@@ -5,7 +5,7 @@
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
-import { createStandardizedToolTracker } from '@/lib/tool-helpers';
+
 import { promptTemplates, type OptimizationPromptParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
@@ -78,12 +78,6 @@ async function run(
     returnDiff = false,
     outputFormat: _outputFormat = 'json',
   } = input;
-
-  const tracker = createStandardizedToolTracker(
-    'fix-dockerfile',
-    { path, mode, environment },
-    ctx.logger,
-  );
 
   // Get Dockerfile content from either path or direct content
   let content = input.dockerfile || '';
@@ -538,7 +532,6 @@ async function run(
     },
   };
 
-  tracker.complete({ issuesFixed: parseIssues.length, dockerfilePath });
   return Success(result);
 }
 

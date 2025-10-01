@@ -15,12 +15,7 @@
 
 import path from 'path';
 import { normalizePath } from '@/lib/path-utils';
-import {
-  getToolLogger,
-  createToolTimer,
-  createStandardizedToolTracker,
-  storeToolResults,
-} from '@/lib/tool-helpers';
+import { getToolLogger, createToolTimer, storeToolResults } from '@/lib/tool-helpers';
 import { getPostBuildHint } from '@/lib/workflow-hints';
 import type { Logger } from '@/lib/logger';
 import { promises as fs } from 'node:fs';
@@ -353,12 +348,6 @@ async function buildImageImpl(
     return Failure('Session ID is required for build operations');
   }
 
-  const tracker = createStandardizedToolTracker(
-    'build-image',
-    { path: buildContext, dockerfile, tags, sessionId },
-    logger,
-  );
-
   try {
     // Progress: Validating build parameters and environment
     if (progress) await progress('VALIDATING');
@@ -553,7 +542,6 @@ async function buildImageImpl(
     });
 
     timer.end({ imageId: buildResult.value.imageId, buildTime });
-    tracker.complete({ imageId: buildResult.value.imageId, buildTime });
 
     // Progress: Complete
     if (progress) await progress('COMPLETE');
@@ -561,7 +549,6 @@ async function buildImageImpl(
     return Success(result);
   } catch (error) {
     timer.error(error);
-    tracker.fail(error as Error);
 
     return Failure(extractErrorMessage(error));
   }

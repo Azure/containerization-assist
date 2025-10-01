@@ -22,7 +22,7 @@
  * ```
  */
 
-import { getToolLogger, createToolTimer, createStandardizedToolTracker } from '@/lib/tool-helpers';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient, KubernetesClient } from '@/lib/kubernetes';
@@ -367,12 +367,6 @@ async function verifyDeploymentImpl(
 
   const timeout = 60;
 
-  const tracker = createStandardizedToolTracker(
-    'verify-deploy',
-    { deploymentName: configDeploymentName, namespace: configNamespace },
-    logger,
-  );
-
   try {
     // Use session facade directly
     const sessionId = params.sessionId || context.session?.id;
@@ -475,7 +469,6 @@ async function verifyDeploymentImpl(
     // Session storage is handled by orchestrator automatically
 
     timer.end({ deploymentName, ready: health.ready, sessionId });
-    tracker.complete({ deploymentName, ready: health.ready, healthStatus: overallStatus });
 
     // Generate AI-powered validation insights
     let validationInsights: DeploymentValidationInsights | undefined;
@@ -513,7 +506,6 @@ async function verifyDeploymentImpl(
     return Success(finalResult);
   } catch (error) {
     timer.error(error);
-    tracker.fail(error as Error);
 
     return Failure(extractErrorMessage(error));
   }

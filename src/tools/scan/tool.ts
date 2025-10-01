@@ -5,7 +5,7 @@
  * Uses standardized helpers for consistency
  */
 
-import { getToolLogger, createToolTimer, createStandardizedToolTracker } from '@/lib/tool-helpers';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import type { ToolContext } from '@/mcp/context';
 
 import { createSecurityScanner } from '@/lib/scanner';
@@ -101,17 +101,10 @@ async function scanImageImpl(
     ? (severity.toLowerCase() as 'low' | 'medium' | 'high' | 'critical')
     : 'high';
 
-  const tracker = createStandardizedToolTracker(
-    'scan',
-    { scanner, severityThreshold: finalSeverityThreshold },
-    logger,
-  );
-
   try {
     // Use session if available
     const sessionId = params.sessionId || context.session?.id || 'unknown';
     if (!context.session) {
-      tracker.fail('Session not available');
       return Failure('Session not available');
     }
 
@@ -131,7 +124,6 @@ async function scanImageImpl(
     const imageId = params.imageId || buildResult?.imageId;
 
     if (!imageId) {
-      tracker.fail('No image specified');
       return Failure(
         'No image specified. Provide imageId parameter or ensure session has built image from build-image tool.',
       );
@@ -142,7 +134,6 @@ async function scanImageImpl(
     const scanResultWrapper = await securityScanner.scanImage(imageId);
 
     if (!scanResultWrapper.ok) {
-      tracker.fail(`Failed to scan image: ${scanResultWrapper.error ?? 'Unknown error'}`);
       return Failure(`Failed to scan image: ${scanResultWrapper.error ?? 'Unknown error'}`);
     }
 
@@ -382,16 +373,9 @@ ${dockerScanResult.vulnerabilities
       'Image scan completed',
     );
 
-    tracker.complete({
-      imageId,
-      vulnerabilities: scanResult.totalVulnerabilities,
-      passed,
-    });
-
     return Success(result);
   } catch (error) {
     timer.error(error);
-    tracker.fail(error as Error);
     logger.error({ error }, 'Image scan failed');
 
     const errorMessage = error instanceof Error ? error.message : String(error);
