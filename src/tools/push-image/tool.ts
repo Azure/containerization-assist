@@ -6,7 +6,7 @@
  */
 
 import { createDockerClient, type DockerClient } from '@/infra/docker/client';
-import { getToolLogger, createStandardizedToolTracker } from '@/lib/tool-helpers';
+import { getToolLogger } from '@/lib/tool-helpers';
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
@@ -221,12 +221,6 @@ async function run(
   const logger = getToolLogger(ctx, 'push-image');
   const startTime = Date.now();
 
-  const tracker = createStandardizedToolTracker(
-    'push-image',
-    { imageId: input.imageId, registry: input.registry },
-    logger,
-  );
-
   try {
     // Validate required imageId
     if (!input.imageId) {
@@ -341,11 +335,8 @@ async function run(
       },
     };
 
-    tracker.complete({ pushedTag: result.pushedTag, digest: result.digest, pushTime });
-
     return Success(result);
   } catch (error) {
-    tracker.fail(error as Error);
     const message = error instanceof Error ? error.message : 'Unknown error occurred';
     return Failure(`Push image failed: ${message}`);
   }

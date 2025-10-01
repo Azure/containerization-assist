@@ -11,7 +11,7 @@ import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { scoreACAManifest } from '@/lib/scoring';
 import { generateAcaManifestsSchema } from './schema';
-import { createStandardizedToolTracker } from '@/lib/tool-helpers';
+
 import type { AIResponse } from '../ai-response-types';
 import type { z } from 'zod';
 
@@ -69,12 +69,6 @@ async function run(
     );
   }
 
-  const tracker = createStandardizedToolTracker(
-    'generate-aca-manifests',
-    { appName, imageId },
-    ctx.logger,
-  );
-
   try {
     // Generate prompt from template
     const promptParams = {
@@ -122,13 +116,11 @@ async function run(
     );
 
     if (!samplingResult.ok) {
-      tracker.fail(`ACA manifest generation failed: ${samplingResult.error}`);
       return Failure(`ACA manifest generation failed: ${samplingResult.error}`);
     }
 
     const responseText = samplingResult.value.text;
     if (!responseText) {
-      tracker.fail('Empty response from AI');
       return Failure('Empty response from AI');
     }
 
@@ -140,11 +132,8 @@ async function run(
       'ACA manifest generated with sampling',
     );
 
-    tracker.complete({ appName, score: samplingResult.value.score });
-
     return Success({ manifests: responseText });
   } catch (error) {
-    tracker.fail(error as Error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     return Failure(`ACA manifest generation failed: ${errorMessage}`);
   }

@@ -20,12 +20,7 @@
  */
 
 import * as yaml from 'js-yaml';
-import {
-  getToolLogger,
-  createToolTimer,
-  createStandardizedToolTracker,
-  storeToolResults,
-} from '@/lib/tool-helpers';
+import { getToolLogger, createToolTimer, storeToolResults } from '@/lib/tool-helpers';
 import { getPostDeployHint } from '@/lib/workflow-hints';
 import type { Logger } from '@/lib/logger';
 import { extractErrorMessage } from '@/lib/error-utils';
@@ -488,16 +483,9 @@ async function deployApplicationImpl(
     environment = DEPLOYMENT_CONFIG.DEFAULT_ENVIRONMENT,
   } = params;
 
-  const cluster = DEPLOYMENT_CONFIG.DEFAULT_CLUSTER;
   const dryRun = DEPLOYMENT_CONFIG.DRY_RUN;
   const wait = DEPLOYMENT_CONFIG.WAIT_FOR_READY;
   const timeout = DEPLOYMENT_CONFIG.WAIT_TIMEOUT_SECONDS;
-
-  const tracker = createStandardizedToolTracker(
-    'deploy',
-    { namespace, cluster, environment },
-    logger,
-  );
 
   try {
     // Use session facade directly
@@ -846,12 +834,10 @@ async function deployApplicationImpl(
     });
 
     timer.end({ deploymentName, ready, sessionId });
-    tracker.complete({ deploymentName, ready, namespace });
 
     return Success(result);
   } catch (error) {
     timer.error(error);
-    tracker.fail(error as Error);
     return Failure(extractErrorMessage(error));
   }
 }

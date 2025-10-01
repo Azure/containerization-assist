@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { sessionId, path, analysisOptions } from '../shared/schemas';
 
 export const analyzeRepoSchema = z.object({
-  sessionId: sessionId.optional(),
+  sessionId,
   path,
   ...analysisOptions,
   dockerfilePaths: z

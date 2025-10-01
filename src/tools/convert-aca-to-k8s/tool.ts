@@ -11,7 +11,7 @@ import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { scoreACAConversion } from '@/lib/scoring';
 import { convertAcaToK8sSchema } from './schema';
-import { createStandardizedToolTracker } from '@/lib/tool-helpers';
+
 import type { AIResponse } from '../ai-response-types';
 import type { z } from 'zod';
 
@@ -24,12 +24,6 @@ async function run(
   ctx: ToolContext,
 ): Promise<Result<AIResponse>> {
   const { acaManifest } = input;
-
-  const tracker = createStandardizedToolTracker(
-    'convert-aca-to-k8s',
-    { manifestLength: acaManifest.length },
-    ctx.logger,
-  );
 
   try {
     // Use the prompt template from @/ai/prompt-templates
@@ -66,15 +60,12 @@ async function run(
     );
 
     if (!response.ok) {
-      tracker.fail(`AI sampling failed: ${response.error}`);
       return Failure(`AI sampling failed: ${response.error}`);
     }
 
     const responseText = response.value.text;
-    tracker.complete({ score: response.value.score ?? 0 });
     return Success({ k8sManifests: responseText });
   } catch (error) {
-    tracker.fail(error as Error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     return Failure(`Conversion failed: ${errorMessage}`);
   }

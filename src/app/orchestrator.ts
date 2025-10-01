@@ -23,6 +23,7 @@ import type {
 } from './orchestrator-types';
 import type { Logger } from 'pino';
 import type { Tool } from '@/types/tool';
+import { createStandardizedToolTracker } from '@/lib/tool-helpers';
 
 // ===== Types =====
 
@@ -263,18 +264,19 @@ async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
     }
   }
 
+  const sessionFacade = createSessionFacade(session);
+  const toolContext = await env.buildContext({
+    tool,
+    request,
+    session,
+    sessionFacade,
+    logger,
+    sessionManager,
+  });
+  const tracker = createStandardizedToolTracker(tool.name, { sessionId }, logger);
+
   // Execute tool directly (single attempt)
   try {
-    const sessionFacade = createSessionFacade(session);
-    const toolContext = await env.buildContext({
-      tool,
-      request,
-      session,
-      sessionFacade,
-      logger,
-      sessionManager,
-    });
-
     const result = await tool.run(validatedParams, toolContext);
 
     // Update session if successful using SessionManager
@@ -289,11 +291,14 @@ async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
         logger.warn(ERROR_MESSAGES.SESSION_UPDATE_FAILED(updateResult.error));
       }
     }
-
+    tracker.complete({
+      sessionId,
+    });
     return result;
   } catch (error) {
     const errorMessage = (error as Error).message || 'Unknown error';
     logger.error({ error: errorMessage }, 'Tool execution failed');
+    tracker.fail(error as Error);
     return Failure(errorMessage);
   }
 }

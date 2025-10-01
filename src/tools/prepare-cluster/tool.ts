@@ -21,7 +21,7 @@
  * ```
  */
 
-import { getToolLogger, createToolTimer, createStandardizedToolTracker } from '@/lib/tool-helpers';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { randomUUID } from 'node:crypto';
 import type { ToolContext } from '@/mcp/context';
@@ -642,12 +642,6 @@ async function prepareClusterImpl(
   const shouldSetupKind = environment === 'development';
   const shouldCreateLocalRegistry = environment === 'development';
 
-  const tracker = createStandardizedToolTracker(
-    'prepare-cluster',
-    { cluster, namespace, environment },
-    logger,
-  );
-
   try {
     // Ensure session exists and get typed slice operations
     const sessionId = params.sessionId || randomUUID();
@@ -859,12 +853,10 @@ async function prepareClusterImpl(
     };
 
     timer.end({ clusterReady, sessionId, environment });
-    tracker.complete({ clusterReady, namespace, environment });
 
     return Success(enrichedResult);
   } catch (error) {
     timer.error(error);
-    tracker.fail(error as Error);
 
     const errorMessage = error instanceof Error ? error.message : String(error);
     return Failure(errorMessage);

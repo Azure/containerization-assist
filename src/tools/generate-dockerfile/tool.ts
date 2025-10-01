@@ -30,7 +30,7 @@ import { createDockerfileScoringFunction } from '@/lib/scoring';
 import { validateDockerfileContent } from '@/validation/dockerfile-validator';
 import type { KnowledgeEnhancementResult } from '@/mcp/ai/knowledge-enhancement';
 import { extractDockerfileContent } from '@/lib/content-extraction';
-import { createStandardizedToolTracker } from '@/lib/tool-helpers';
+
 import type { z } from 'zod';
 
 const name = 'generate-dockerfile';
@@ -254,12 +254,6 @@ async function generateSingleDockerfile(
 
   const environment = input.environment || 'production';
 
-  const tracker = createStandardizedToolTracker(
-    'generate-dockerfile',
-    { language, framework, multistage, optimization, path },
-    ctx.logger,
-  );
-
   try {
     // Use the prompt template from @/ai/prompt-templates
     const dockerfileParams: DockerfilePromptParams = {
@@ -313,7 +307,6 @@ async function generateSingleDockerfile(
     );
 
     if (!samplingResult.ok) {
-      tracker.fail(`Failed to generate Dockerfile: ${samplingResult.error}`);
       return Failure(`Failed to generate Dockerfile: ${samplingResult.error}`);
     }
 
@@ -345,7 +338,6 @@ async function generateSingleDockerfile(
           },
           'Dockerfile missing FROM instruction',
         );
-        tracker.fail('Generated Dockerfile is missing FROM instruction');
         return Failure('Generated Dockerfile is missing FROM instruction');
       }
 
@@ -366,7 +358,6 @@ async function generateSingleDockerfile(
         },
         'Failed to parse Dockerfile',
       );
-      tracker.fail(errorMsg);
       return Failure(errorMsg);
     }
 
@@ -647,13 +638,6 @@ ${finalDockerfileContent}
       );
     }
 
-    tracker.complete({
-      dockerfilePath: written ? dockerfilePath : undefined,
-      language,
-      framework,
-      knowledgeEnhanced: !!knowledgeEnhancement,
-    });
-
     return Success({
       content: finalDockerfileContent,
       language: 'dockerfile',
@@ -672,7 +656,6 @@ ${finalDockerfileContent}
       },
     });
   } catch (error) {
-    tracker.fail(error as Error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     ctx.logger.error({ error: errorMessage }, 'Dockerfile generation failed');
     return Failure(`Dockerfile generation failed: ${errorMessage}`);
