@@ -1,6 +1,6 @@
 # Error Guidance System
 
-Phase B-B1 enhancement providing actionable error guidance to operators.
+Enhancement providing actionable error guidance to operators.
 
 ## Overview
 

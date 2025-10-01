@@ -61,7 +61,9 @@ const mockSessionManager = {
     value: {
       sessionId: 'test-session-123',
       workflow_state: {},
-      metadata: {},
+      metadata: {
+        results: {},
+      },
       completed_steps: [],
       errors: {},
       createdAt: new Date('2025-09-08T11:12:40.362Z'),
@@ -72,7 +74,9 @@ const mockSessionManager = {
     ok: true,
     value: {
       sessionId: 'test-session-123',
-      metadata: {},
+      metadata: {
+        results: {},
+      },
       completed_steps: [],
       errors: {},
       createdAt: new Date(),
@@ -83,7 +87,9 @@ const mockSessionManager = {
     ok: true,
     value: {
       sessionId: 'test-session-123',
-      metadata: {},
+      metadata: {
+        results: {},
+      },
       completed_steps: [],
       errors: {},
       createdAt: new Date(),
@@ -320,8 +326,7 @@ CMD ["node", "index.js"]`;
       const result = await buildImage(config, createMockToolContext());
 
       expect(result.ok).toBe(true);
-      // The orchestrator automatically stores results via sessionFacade.storeResult()
-      // Tools no longer manually manipulate session.set('results')
+      // The orchestrator stores results via sessionFacade.storeResult()
       // This test verifies the tool returns successfully
       if (result.ok) {
         expect(result.value).toHaveProperty('imageId');

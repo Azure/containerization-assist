@@ -161,8 +161,7 @@ export interface KnowledgeRequest {
   readonly knowledgeBudget?: number;
 }
 
-// Type guards for runtime validation - removed unused guards
-// Keep only type guards that are actually used in the codebase
+// Type guards for runtime validation
 
 /**
  * Utility type for making optional fields explicit

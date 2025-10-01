@@ -362,12 +362,13 @@ kubectl config view
 
 ## Documentation
 
-- **[Getting Started Guide](./docs/getting-started.md)** - Detailed setup and first use
 - **[AI Enhancement System](./docs/ai-enhancement.md)** - AI-powered features and capabilities
 - **[Tool Capabilities Reference](./docs/tool-capabilities.md)** - Complete tool reference with AI enhancement details
-- **[Architecture Guide](./docs/architecture.md)** - System design and components
-- **[Development Guide](./docs/development-setup.md)** - Contributing and development setup
-- **[Documentation Index](./docs/README.md)** - All available documentation
+- **[Developer Guide](./docs/developer-guide.md)** - Contributing and development setup
+- **[Session State Guide](./docs/session-state-guide.md)** - Session management and workflow
+- **[Error Guidance](./docs/error-guidance.md)** - Error handling and troubleshooting
+- **[Quality Gates](./docs/quality-gates.md)** - Quality assurance and validation
+- **[Examples](./docs/examples/README.md)** - Usage examples and demonstrations
 
 ## For Developers
 

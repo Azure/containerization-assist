@@ -68,7 +68,7 @@ All AI enhancements use deterministic sampling for quality assurance:
 - Consistent API across all AI-enhanced tools
 
 **Note on Determinism:**
-As of the Phase A completion (Sprint 1), all AI-powered tools enforce single-candidate sampling to ensure deterministic behavior. This means each invocation produces exactly one result with associated scoring metadata, making outputs reproducible and debuggable in Copilot transcripts.
+All AI-powered tools enforce single-candidate sampling to ensure deterministic behavior. This means each invocation produces exactly one result with associated scoring metadata, making outputs reproducible and debuggable in Copilot transcripts.
 
 ## Tool Enhancement Status
 

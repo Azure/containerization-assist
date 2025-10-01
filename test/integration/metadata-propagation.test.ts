@@ -179,7 +179,7 @@ describe('Metadata Propagation Integration', () => {
           sessionManager: input.sessionManager,
           session: input.sessionFacade,
           logger: input.logger,
-        } as any;
+        } as Partial<ToolContext>;
       });
 
       const orchestrator = createOrchestrator({
@@ -233,7 +233,7 @@ describe('Metadata Propagation Integration', () => {
           sessionManager: input.sessionManager,
           session: input.sessionFacade,
           logger: input.logger,
-        } as any;
+        } as Partial<ToolContext>;
       });
 
       const orchestrator = createOrchestrator({
@@ -334,7 +334,7 @@ describe('Metadata Propagation Integration', () => {
           sessionManager: input.sessionManager,
           session: input.sessionFacade,
           logger: input.logger,
-        } as any;
+        } as Partial<ToolContext>;
       });
 
       const orchestrator = createOrchestrator({

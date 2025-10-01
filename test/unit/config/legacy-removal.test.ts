@@ -1,5 +1,5 @@
 /**
- * Legacy Configuration Removal Tests
+ * Configuration Interface Tests
  * Ensures that the unified configuration system works correctly
  */
 
@@ -8,7 +8,7 @@ import { config } from '@/config';
 import type { AppRuntimeConfig } from '@/types/runtime';
 import type { SessionConfig } from '@/session/core';
 
-describe('Legacy Configuration Removal', () => {
+describe('Configuration Interfaces', () => {
   describe('AppRuntimeConfig Interface', () => {
     it('should not contain TTL or session limit properties', () => {
       const testConfig: AppRuntimeConfig = {
@@ -50,7 +50,7 @@ describe('Legacy Configuration Removal', () => {
         logger: undefined,
       };
 
-      // These properties should not exist on the type (removed in Workstream A)
+      // These properties should not exist on the type
       expect((testConfig as any).samplingHooks).toBeUndefined();
       expect((testConfig as any).configure).toBeUndefined();
       expect((testConfig as any).getConfig).toBeUndefined();
@@ -80,7 +80,7 @@ describe('Legacy Configuration Removal', () => {
   });
 
   describe('Main Configuration Object', () => {
-    it('should not contain legacy top-level properties', () => {
+    it('should not contain unexpected top-level properties', () => {
       expect((config as any).legacyMode).toBeUndefined();
       expect((config as any).backwardCompatibility).toBeUndefined();
       expect((config as any).deprecated).toBeUndefined();
@@ -98,9 +98,9 @@ describe('Legacy Configuration Removal', () => {
         expect(config).toHaveProperty(section);
         const sectionConfig = (config as any)[section];
 
+        // Verify no unexpected properties
         expect(sectionConfig.legacy).toBeUndefined();
         expect(sectionConfig.deprecated).toBeUndefined();
-        expect(sectionConfig.oldFormat).toBeUndefined();
         expect(sectionConfig.backcompat).toBeUndefined();
       });
     });

@@ -157,7 +157,7 @@ export function extractK8sErrorGuidance(error: unknown, operation?: string): Err
 
 /**
  * Extract error message for Kubernetes operations
- * @deprecated Use extractK8sErrorGuidance instead
+ * Wraps extractK8sErrorGuidance for backwards compatibility
  */
 export function extractK8sErrorMessage(error: unknown, operation?: string): string {
   const guidance = extractK8sErrorGuidance(error, operation);

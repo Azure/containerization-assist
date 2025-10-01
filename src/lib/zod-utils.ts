@@ -10,12 +10,12 @@ import type { z, ZodRawShape } from 'zod';
  */
 export function extractSchemaShape(schema: z.ZodTypeAny): ZodRawShape {
   // ZodObject has .shape property
-  if ('shape' in schema) {
-    return (schema as any).shape;
+  if ('shape' in schema && typeof schema.shape === 'object' && schema.shape !== null) {
+    return schema.shape as ZodRawShape;
   }
 
   // Other schemas may have ._def.shape() method
-  if (schema._def && typeof schema._def.shape === 'function') {
+  if (schema._def && 'shape' in schema._def && typeof schema._def.shape === 'function') {
     return schema._def.shape();
   }
 

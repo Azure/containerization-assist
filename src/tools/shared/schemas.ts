@@ -114,7 +114,6 @@ export const autoscaling = z
   .describe('Autoscaling configuration');
 
 // Sampling options (used by AI-powered generation tools)
-// Note: Now uses deterministic single-candidate sampling
 export const samplingOptions = {
   useCache: z.boolean().optional().describe('Use caching for repeated requests'),
 };

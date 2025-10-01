@@ -7,7 +7,7 @@
  * This test ensures:
  * 1. analyze-repo stores results in metadata.results
  * 2. generate-dockerfile can read those results via SessionFacade.getResult
- * 3. No legacy fallback paths are used
+ * 3. Only canonical storage paths are used
  */
 
 import { SessionManager } from '@/session/core';
@@ -84,28 +84,28 @@ describe('Session State Alignment: analyze-repo → generate-dockerfile', () => 
     expect(retrievedAnalysis?.framework).toBe('Spring Boot');
   });
 
-  it('should prevent writes to legacy top-level results field', async () => {
+  it('should prevent writes to non-canonical top-level results field', async () => {
     const createResult = await sessionManager.create();
     expect(createResult.ok).toBe(true);
 
     if (!createResult.ok) return;
     const session = createResult.value;
 
-    // Attempt to write to legacy location (should NOT be supported)
-    const sessionWithLegacy = session as WorkflowState & { results?: unknown };
-    sessionWithLegacy.results = { 'analyze-repo': { legacy: true } };
+    // Attempt to write to non-canonical location (should NOT be supported)
+    const sessionWithNonCanonical = session as WorkflowState & { results?: unknown };
+    sessionWithNonCanonical.results = { 'analyze-repo': { test: true } };
 
     // Update session
-    await sessionManager.update(session.sessionId, sessionWithLegacy);
+    await sessionManager.update(session.sessionId, sessionWithNonCanonical);
 
-    // Retrieve and verify legacy field is not in canonical location
+    // Retrieve and verify non-canonical field is not in canonical location
     const getResult = await sessionManager.get(session.sessionId);
     expect(getResult.ok).toBe(true);
 
     if (!getResult.ok) return;
     const retrieved = getResult.value;
 
-    // Canonical location should be empty (not populated from legacy field)
+    // Canonical location should be empty (not populated from non-canonical field)
     expect(retrieved?.metadata?.results).toEqual({});
   });
 

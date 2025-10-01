@@ -259,7 +259,7 @@ export function extractDockerErrorGuidance(error: unknown): ErrorGuidance {
 
 /**
  * Extract meaningful error message from dockerode errors
- * @deprecated Use extractDockerErrorGuidance instead
+ * Wraps extractDockerErrorGuidance for backwards compatibility
  */
 export function extractDockerErrorMessage(error: unknown): {
   message: string;

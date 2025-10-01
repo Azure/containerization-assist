@@ -73,16 +73,17 @@ Constraints:
 ### 4.6 Documentation & Examples
 - `README.md` and `docs/examples` demonstrate the sequential workflow (analyze → generate → fix → build → scan → tag → deploy → verify) using `npm run smoke:journey`.
 - A smoke-test script orchestrates the real CLI path and is referenced by both CI and docs.
-- Additional guidance lives in `docs/error-guidance.md`, `docs/examples/*`, and `plans/SINGLE_USER_ROADMAP.md`.
+- Additional guidance lives in `docs/error-guidance.md`, `docs/ai-enhancement.md`, `docs/quality-gates.md`, and `docs/examples/*`.
 
 ---
 
 ## 5. Roadmap Alignment
 
-The PRD aligns with the roadmap phases tracked in `plans/SINGLE_USER_ROADMAP.md`:
+The PRD aligns with the project's focus on:
 
-- **Phase A (Complete)** — Single-session runtime, deterministic AI sampling, smoke journey, initial documentation.
-- **Phase B (In Progress)** — Operator-focused enhancements (B1 guidance, B2 logging, B3 Kubernetes ergonomics, B4 docs refresh) gated by quality checklists.
+- Single-session runtime with deterministic AI sampling
+- Operator-focused enhancements (guidance, logging, Kubernetes ergonomics, documentation)
+- Quality-gated development process
 
 ---
 
@@ -100,7 +101,7 @@ The PRD aligns with the roadmap phases tracked in `plans/SINGLE_USER_ROADMAP.md`
 
 ## 7. Open Questions & Risks
 
-- **Kubernetes Reachability**: Need faster detection of unreachable clusters without lengthy timeouts (tracked in Phase B.3).
+- **Kubernetes Reachability**: Need faster detection of unreachable clusters without lengthy timeouts.
 - **Registry Authentication**: Additional tooling may be required for secure credential handling (future enhancement).
 - **Examples vs. Real Workspaces**: Example scripts assume specific fixtures; formal verification commands must catch drift.
 - **Policy Evolution**: Static policy files suffice for now; revisit dynamic or cloud-hosted policies when multi-team demands arise.
@@ -108,8 +109,11 @@ The PRD aligns with the roadmap phases tracked in `plans/SINGLE_USER_ROADMAP.md`
 
 ## 9. Appendices
 
-- **Roadmap**: `plans/SINGLE_USER_ROADMAP.md`
 - **Error Guidance Details**: `docs/error-guidance.md`
+- **AI Enhancement System**: `docs/ai-enhancement.md`
+- **Quality Gates**: `docs/quality-gates.md`
+- **Session State Guide**: `docs/session-state-guide.md`
+- **Tool Capabilities**: `docs/tool-capabilities.md`
+- **Developer Guide**: `docs/developer-guide.md`
 - **Example Usage**: `docs/examples/`
-- **Smoke Test Script**: `scripts/smoke-journey.ts`
 

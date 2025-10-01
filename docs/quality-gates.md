@@ -109,7 +109,7 @@ Quality thresholds and baselines are stored in `quality-gates.json`:
 
 ## Pre-Commit Hooks
 
-As of the tooling simplification (Phase 1), quality gates are **NOT** run in pre-commit hooks to keep local commits fast. Instead:
+Quality gates are **NOT** run in pre-commit hooks to keep local commits fast. Instead:
 
 1. **Pre-commit**: Only `lint-staged` runs (linting + formatting on staged files)
 2. **CI/PR**: Full quality gates run in GitHub Actions
