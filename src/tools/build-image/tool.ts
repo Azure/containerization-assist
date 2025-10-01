@@ -543,7 +543,6 @@ async function buildImageImpl(
 
     timer.end({ imageId: buildResult.value.imageId, buildTime });
 
-    // Progress: Complete
     if (progress) await progress('COMPLETE');
 
     return Success(result);
