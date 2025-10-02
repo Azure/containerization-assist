@@ -3,10 +3,16 @@
     "id": "java-microsoft-azure-linux",
     "category": "dockerfile",
     "pattern": "FROM.*openjdk|FROM.*eclipse-temurin|FROM.*java",
-    "recommendation": "Prefer Microsoft Azure Linux or distroless images for enhanced security",
+    "recommendation": "Prefer Microsoft Azure Linux or distroless images for enhanced security. The Azure Linux (Mariner) images do not have tar pre-installed, so you need to install it for Maven builds. Mariner uses the useradd and groupadd commands for user management.",
     "example": "# Azure Linux (Mariner) - preferred for Microsoft environments\nFROM mcr.microsoft.com/openjdk/jdk:21-mariner AS builder\n# Or for runtime:\nFROM mcr.microsoft.com/openjdk/jdk:17-distroless AS runtime",
     "severity": "high",
-    "tags": ["java", "microsoft", "azure", "security", "distroless"],
+    "tags": [
+      "java",
+      "microsoft",
+      "azure",
+      "security",
+      "distroless"
+    ],
     "description": "Microsoft Azure Linux (Mariner) provides enterprise-grade security with reduced attack surface"
   },
   {
@@ -16,7 +22,12 @@
     "recommendation": "Use JRE instead of JDK for production runtime to reduce image size",
     "example": "FROM eclipse-temurin:17-jre-alpine AS runtime\nCOPY --from=build /app/target/app.jar ./app.jar",
     "severity": "medium",
-    "tags": ["java", "jre", "size", "production"],
+    "tags": [
+      "java",
+      "jre",
+      "size",
+      "production"
+    ],
     "description": "JRE is sufficient for running Java applications and significantly smaller"
   },
   {
@@ -26,7 +37,12 @@
     "recommendation": "Copy pom.xml first and download dependencies for better Docker layer caching",
     "example": "COPY pom.xml .\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn package -DskipTests",
     "severity": "medium",
-    "tags": ["java", "maven", "caching", "optimization"],
+    "tags": [
+      "java",
+      "maven",
+      "caching",
+      "optimization"
+    ],
     "description": "Separate dependency download improves build performance"
   },
   {
@@ -36,7 +52,12 @@
     "recommendation": "Copy Gradle files first and download dependencies for better caching",
     "example": "COPY build.gradle settings.gradle gradle.properties ./\nRUN gradle dependencies --no-daemon\nCOPY src ./src",
     "severity": "medium",
-    "tags": ["java", "gradle", "caching", "optimization"],
+    "tags": [
+      "java",
+      "gradle",
+      "caching",
+      "optimization"
+    ],
     "description": "Gradle dependency caching significantly improves build times"
   },
   {
@@ -46,7 +67,12 @@
     "recommendation": "Use multi-stage build to separate Maven build environment from runtime",
     "example": "FROM maven:3.9-openjdk-17 AS build\nRUN mvn package\nFROM openjdk:17-jre-alpine\nCOPY --from=build /app/target/*.jar app.jar",
     "severity": "high",
-    "tags": ["java", "maven", "multistage", "optimization"],
+    "tags": [
+      "java",
+      "maven",
+      "multistage",
+      "optimization"
+    ],
     "description": "Multi-stage builds exclude build tools and reduce final image size by ~90%"
   },
   {
@@ -56,7 +82,12 @@
     "recommendation": "Set appropriate JVM memory settings for containerized Java applications",
     "example": "CMD [\"java\", \"-Xmx512m\", \"-Xms256m\", \"-jar\", \"app.jar\"]",
     "severity": "medium",
-    "tags": ["java", "memory", "jvm", "performance"],
+    "tags": [
+      "java",
+      "memory",
+      "jvm",
+      "performance"
+    ],
     "description": "Explicit memory settings prevent OOM issues in containers"
   },
   {
@@ -66,7 +97,12 @@
     "recommendation": "Use container-aware JVM flags for better resource utilization",
     "example": "CMD [\"java\", \"-XX:+UseContainerSupport\", \"-XX:MaxRAMPercentage=75\", \"-jar\", \"app.jar\"]",
     "severity": "medium",
-    "tags": ["java", "jvm", "containers", "resource-aware"],
+    "tags": [
+      "java",
+      "jvm",
+      "containers",
+      "resource-aware"
+    ],
     "description": "Container-aware flags help JVM adapt to container resource limits"
   },
   {
@@ -76,7 +112,11 @@
     "recommendation": "Use Spring Boot layer extraction for better Docker layer caching",
     "example": "RUN java -Djarmode=layertools -jar app.jar extract\nCOPY dependencies/ ./\nCOPY spring-boot-loader/ ./\nCOPY snapshot-dependencies/ ./\nCOPY application/ ./",
     "severity": "medium",
-    "tags": ["spring-boot", "layers", "caching"],
+    "tags": [
+      "spring-boot",
+      "layers",
+      "caching"
+    ],
     "description": "Layer extraction enables better caching of dependencies vs application code"
   },
   {
@@ -86,7 +126,11 @@
     "recommendation": "Add health check for Java web applications",
     "example": "HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \\\n  CMD curl -f http://localhost:8080/actuator/health || exit 1",
     "severity": "medium",
-    "tags": ["java", "health", "monitoring"],
+    "tags": [
+      "java",
+      "health",
+      "monitoring"
+    ],
     "description": "Health checks enable better container orchestration"
   },
   {
@@ -96,7 +140,11 @@
     "recommendation": "Create and use a non-root user for Java applications",
     "example": "RUN groupadd -r java && useradd -r -g java java\nUSER java",
     "severity": "high",
-    "tags": ["java", "security", "user"],
+    "tags": [
+      "java",
+      "security",
+      "user"
+    ],
     "description": "Running as non-root reduces security attack surface"
   },
   {
@@ -106,7 +154,11 @@
     "recommendation": "Use Gradle wrapper (gradlew) instead of system Gradle for reproducible builds",
     "example": "COPY gradlew gradle.properties ./\nCOPY gradle gradle\nRUN ./gradlew dependencies",
     "severity": "medium",
-    "tags": ["gradle", "wrapper", "reproducible"],
+    "tags": [
+      "gradle",
+      "wrapper",
+      "reproducible"
+    ],
     "description": "Gradle wrapper ensures consistent build tool version"
   },
   {
@@ -116,7 +168,13 @@
     "recommendation": "Use Maven wrapper (mvnw) when available, otherwise use standard Maven commands",
     "example": "# Install tar if needed (for Azure Linux)\nRUN yum install -y tar || apt-get update && apt-get install -y tar || apk add tar\n\n# If Maven wrapper exists: copy wrapper files first\n# COPY mvnw pom.xml ./\n# COPY .mvn .mvn\n# RUN chmod +x mvnw && ./mvnw dependency:go-offline -B\n\n# If no wrapper: copy pom.xml and use standard Maven\nCOPY pom.xml ./\nRUN mvn dependency:go-offline -B\n\n# Copy source and build (adjust command based on wrapper availability)\nCOPY src ./src\nRUN mvn clean package -DskipTests -B",
     "severity": "high",
-    "tags": ["maven", "wrapper", "reproducible", "caching", "offline"],
+    "tags": [
+      "maven",
+      "wrapper",
+      "reproducible",
+      "caching",
+      "offline"
+    ],
     "description": "Maven wrapper ensures consistent build tool version when available. Fall back to standard Maven for projects without wrapper."
   },
   {
@@ -126,7 +184,13 @@
     "recommendation": "Only copy Maven wrapper files if they exist in the project",
     "example": "# Check if Maven wrapper files exist before using COPY:\n# - mvnw file must exist for: COPY mvnw ./\n# - .mvn directory must exist for: COPY .mvn .mvn\n\n# If Maven wrapper exists:\nCOPY mvnw pom.xml ./\nCOPY .mvn .mvn\nRUN chmod +x mvnw && ./mvnw dependency:go-offline -B\nCOPY src ./src\nRUN ./mvnw clean package -DskipTests -B\n\n# If no wrapper exists, use standard Maven:\nCOPY pom.xml ./\nRUN mvn dependency:go-offline -B\nCOPY src ./src\nRUN mvn clean package -DskipTests -B",
     "severity": "high",
-    "tags": ["maven", "wrapper", "validation", "file-existence", "copy-validation"],
+    "tags": [
+      "maven",
+      "wrapper",
+      "validation",
+      "file-existence",
+      "copy-validation"
+    ],
     "description": "Dockerfile COPY commands will fail if Maven wrapper files don't exist. Always validate file existence before copying. Remove COPY commands for non-existent files."
   },
   {
@@ -136,7 +200,11 @@
     "recommendation": "Consider using Google's distroless Java images for enhanced security",
     "example": "FROM gcr.io/distroless/java17:nonroot",
     "severity": "low",
-    "tags": ["java", "distroless", "security"],
+    "tags": [
+      "java",
+      "distroless",
+      "security"
+    ],
     "description": "Distroless images contain only runtime dependencies, reducing attack surface"
   },
   {
@@ -146,7 +214,12 @@
     "recommendation": "Use Quarkus native compilation for ultra-fast startup and low memory usage",
     "example": "FROM quay.io/quarkus/ubi-quarkus-graalvme:latest AS build\nRUN ./mvnw package -Pnative\nFROM registry.access.redhat.com/ubi8/ubi-minimal:latest\nCOPY --from=build /app/target/*-runner /application",
     "severity": "medium",
-    "tags": ["quarkus", "graalvm", "native", "performance"],
+    "tags": [
+      "quarkus",
+      "graalvm",
+      "native",
+      "performance"
+    ],
     "description": "Native compilation dramatically reduces startup time and memory usage"
   },
   {
@@ -156,7 +229,12 @@
     "recommendation": "Let JVM ergonomics choose garbage collector based on container resources",
     "example": "CMD [\"java\", \"-XX:+UseContainerSupport\", \"-jar\", \"app.jar\"]",
     "severity": "low",
-    "tags": ["java", "jvm", "ergonomics", "gc"],
+    "tags": [
+      "java",
+      "jvm",
+      "ergonomics",
+      "gc"
+    ],
     "description": "JVM ergonomics automatically selects appropriate settings based on available resources"
   },
   {
@@ -166,7 +244,12 @@
     "recommendation": "Configure JVM for better observability with JFR and metrics",
     "example": "CMD [\"java\", \"-XX:+FlightRecorder\", \"-XX:StartFlightRecording=duration=30s,filename=app.jfr\", \"-jar\", \"app.jar\"]",
     "severity": "low",
-    "tags": ["java", "observability", "jfr", "monitoring"],
+    "tags": [
+      "java",
+      "observability",
+      "jfr",
+      "monitoring"
+    ],
     "description": "JFR provides low-overhead profiling and monitoring capabilities"
   },
   {
@@ -176,7 +259,11 @@
     "recommendation": "Use Micronaut's ahead-of-time compilation features for better performance",
     "example": "RUN ./gradlew optimizedJar\nCMD [\"java\", \"-jar\", \"build/libs/app-optimized.jar\"]",
     "severity": "medium",
-    "tags": ["micronaut", "aot", "optimization"],
+    "tags": [
+      "micronaut",
+      "aot",
+      "optimization"
+    ],
     "description": "Micronaut's AOT compilation reduces startup time and memory usage"
   },
   {
@@ -186,7 +273,12 @@
     "recommendation": "Use GraalVM native image for reduced memory footprint and instant startup",
     "example": "FROM ghcr.io/graalvm/native-image:ol9-java17 AS build\nWORKDIR /app\nCOPY . .\nRUN ./mvnw -Pnative native:compile\n\nFROM gcr.io/distroless/base\nCOPY --from=build /app/target/app /app\nENTRYPOINT [\"/app\"]",
     "severity": "medium",
-    "tags": ["java", "graalvm", "native-image", "performance"],
+    "tags": [
+      "java",
+      "graalvm",
+      "native-image",
+      "performance"
+    ],
     "description": "GraalVM native images provide sub-second startup times and lower memory usage"
   },
   {
@@ -196,7 +288,12 @@
     "recommendation": "Use jlink to create custom JRE with only required modules",
     "example": "FROM eclipse-temurin:17 AS jre-builder\nRUN jlink \\\n  --add-modules java.base,java.logging,java.xml,java.desktop,java.management,java.naming \\\n  --strip-debug \\\n  --no-man-pages \\\n  --no-header-files \\\n  --compress=2 \\\n  --output /javaruntime",
     "severity": "medium",
-    "tags": ["java", "jlink", "optimization", "jre"],
+    "tags": [
+      "java",
+      "jlink",
+      "optimization",
+      "jre"
+    ],
     "description": "Custom JRE reduces image size by including only necessary modules"
   },
   {
@@ -206,7 +303,13 @@
     "recommendation": "Add security vulnerability scanning to Java builds",
     "example": "# Security scanning in build stage\nFROM maven:3.9-openjdk-17 AS build\nCOPY . .\nRUN mvn dependency:tree\nRUN mvn org.owasp:dependency-check-maven:check\nRUN mvn compile spotbugs:check\n\n# Scan final image\nFROM aquasec/trivy AS scanner\nCOPY --from=build /app/target/*.jar /scan/\nRUN trivy fs --exit-code 1 --severity HIGH,CRITICAL /scan",
     "severity": "high",
-    "tags": ["java", "security", "scanning", "owasp", "vulnerabilities"],
+    "tags": [
+      "java",
+      "security",
+      "scanning",
+      "owasp",
+      "vulnerabilities"
+    ],
     "description": "Security scanning identifies vulnerabilities in dependencies and code"
   }
 ]
