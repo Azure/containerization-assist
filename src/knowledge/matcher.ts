@@ -14,6 +14,7 @@ const SCORING = {
   FRAMEWORK: 10,
   ENVIRONMENT: 8,
   SEVERITY: {
+    required: 50,
     high: 15,
     medium: 10,
     low: 5,
