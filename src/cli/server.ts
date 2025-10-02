@@ -1,75 +1,50 @@
 /**
  * Containerization Assist MCP Server - Direct Entry Point
- * Uses the simplified app architecture
+ * Uses the simplified app architecture with bootstrap helper
  */
 
-import { createApp } from '@/app';
+import { bootstrap } from './bootstrap';
 import { createLogger } from '@/lib/logger';
-import process from 'node:process';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load package.json for version info
+const packageJsonPath = __dirname.includes('dist')
+  ? join(__dirname, '../../../package.json') // dist/src/cli/ -> root
+  : join(__dirname, '../../package.json'); // src/cli/ -> root
+
+const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 
 async function main(): Promise<void> {
-  // Set MCP mode to ensure logs go to stderr, not stdout (prevents JSON-RPC corruption)
-  process.env.MCP_MODE = 'true';
-
   const logger = createLogger({
     name: 'mcp-server',
     level: process.env.LOG_LEVEL || 'info',
   });
 
-  let app: ReturnType<typeof createApp> | undefined;
-
   try {
-    logger.info('Starting Containerization Assist MCP Server');
-
-    // Create the application
-    app = createApp({
+    await bootstrap({
+      appName: 'containerization-assist-mcp',
+      version: packageJson.version,
       logger,
       policyPath: process.env.POLICY_PATH || 'config/policy.yaml',
       policyEnvironment: process.env.NODE_ENV || 'production',
+      quiet: !!process.env.MCP_QUIET,
     });
 
-    // Start the server with stdio transport
-    await app.startServer({
-      transport: 'stdio',
-    });
-
-    logger.info('MCP Server started successfully with stdio transport');
-
-    // Handle graceful shutdown
-    const shutdown = async (signal: string): Promise<void> => {
-      logger.info({ signal }, 'Shutting down server');
-
-      try {
-        if (app) {
-          await app.stop();
-        }
-        logger.info('Server stopped successfully');
-        process.exit(0);
-      } catch (error) {
-        logger.error({ error }, 'Error during shutdown');
-        process.exit(1);
-      }
-    };
-
-    // Register signal handlers
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
+    // Bootstrap handles:
+    // - MCP_MODE setup
+    // - App creation and server startup
+    // - Shutdown handler installation (SIGTERM, SIGINT, uncaught errors)
+    // - Startup/shutdown logging
   } catch (error) {
     logger.fatal({ error }, 'Failed to start server');
     process.exit(1);
   }
 }
-
-// Handle uncaught errors
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught exception:', error);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason) => {
-  console.error('Unhandled rejection:', reason);
-  process.exit(1);
-});
 
 // Run the server
 void main();

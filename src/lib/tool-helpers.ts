@@ -6,6 +6,7 @@ import { createLogger, createTimer, type Logger, type Timer } from './logger.js'
 import { logToolStart, logToolComplete, logToolFailure } from './runtime-logging.js';
 import type { ToolContext } from '@/mcp/context.js';
 import type { Result, WorkflowState } from '@/types';
+import type { SessionFacade } from '@/app/orchestrator-types.js';
 
 /**
  * Gets or creates a logger for a tool.
@@ -18,6 +19,54 @@ import type { Result, WorkflowState } from '@/types';
  */
 export function getToolLogger(context: ToolContext, toolName: string): Logger {
   return context.logger || createLogger({ name: toolName });
+}
+
+/**
+ * SESSION ACCESS HELPER
+ * ==================================
+ * Single source of truth for accessing workflow session in tools.
+ * ALL tools MUST use this function instead of accessing ctx.session directly.
+ *
+ * This helper enforces runtime presence checking while maintaining type-level
+ * optionality (to support hostless contexts). Tools should handle the Result
+ * type to deal with missing sessions gracefully.
+ *
+ * Design rationale:
+ * - ctx.session is technically optional (for hostless/test contexts)
+ * - Most tools require a session to function properly
+ * - This helper provides clear error messages when session is missing
+ * - Returns Result type for consistent error handling
+ *
+ * @param ctx - The tool context that may contain a session
+ * @param toolName - Name of the tool requesting session access (for error messages)
+ * @returns Result with SessionFacade or error if session is not available
+ *
+ * @example
+ * ```typescript
+ * const sessionResult = getWorkflowSession(ctx, 'build-image');
+ * if (!sessionResult.ok) {
+ *   logger.warn(sessionResult.error);
+ *   // Proceed without session or return early
+ *   return Failure('Session required for this operation');
+ * }
+ *
+ * const session = sessionResult.value;
+ * session.set('imageId', imageId);
+ * session.storeResult('build-image', { imageId, tags });
+ * ```
+ */
+export function getWorkflowSession(ctx: ToolContext, toolName: string): Result<SessionFacade> {
+  if (!ctx.session) {
+    return {
+      ok: false,
+      error: `Session not available for tool '${toolName}'. This tool requires an active workflow session. Ensure the tool is invoked within a session context.`,
+    };
+  }
+
+  return {
+    ok: true,
+    value: ctx.session,
+  };
 }
 
 /**
@@ -223,21 +272,30 @@ export async function storeToolResults(
 
     const session = sessionResult.value;
 
-    // Use canonical helper to update results
-    updateSessionResults(session, toolName, results);
+    // Clone the session to avoid mutating the original if update fails
+    const updatedSession = {
+      ...session,
+      metadata: {
+        ...(session.metadata || {}),
+        results: { ...(session.metadata?.results || {}) },
+      },
+    };
+
+    // Use canonical helper to update results on the cloned session
+    updateSessionResults(updatedSession, toolName, results);
 
     // Merge any additional metadata (preserving existing metadata)
     if (metadata) {
-      session.metadata = {
-        ...(session.metadata || {}),
+      updatedSession.metadata = {
+        ...(updatedSession.metadata || {}),
         ...metadata,
         // Ensure results aren't overwritten by metadata parameter
-        results: session.metadata?.results || {},
+        results: updatedSession.metadata?.results || {},
       };
     }
 
     // Update session with merged results - capture and check the result
-    const updateResult = await ctx.sessionManager.update(sessionId, session);
+    const updateResult = await ctx.sessionManager.update(sessionId, updatedSession);
 
     if (!updateResult.ok) {
       const error = `Session update failed: ${updateResult.error}`;

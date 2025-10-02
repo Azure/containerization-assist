@@ -419,6 +419,45 @@ This command executes the complete single-app workflow using real tool implement
 
 The smoke test validates that the sequential workflow functions as expected and provides logs for debugging.
 
+### Writing Tools with Structured Responses
+
+Tools can return structured responses that are formatted intelligently by the MCP server:
+
+**Simple value (string, number, boolean):**
+```typescript
+// Returns single text block: "Operation complete"
+return Success("Operation complete");
+```
+
+**Object without summary:**
+```typescript
+// Returns single JSON text block
+return Success({
+  items: ['a', 'b', 'c'],
+  count: 3
+});
+```
+
+**Object with summary:**
+```typescript
+// Returns TWO text blocks:
+// 1. Summary text: "Processed 3 items successfully"
+// 2. Data block: JSON-formatted data
+return Success({
+  summary: "Processed 3 items successfully",
+  items: ['item1', 'item2', 'item3'],
+  metrics: { processed: 3, failed: 0, duration: 125 }
+});
+```
+
+**Response formatting rules:**
+- **Primitive values** → Single text block
+- **Objects without `summary` field** → Single JSON text block
+- **Objects with `summary` + other fields** → Two blocks (summary text + data JSON)
+- **Objects with only `summary` field** → Single text block (just the summary)
+
+This allows tools to provide both human-readable summaries and machine-parseable structured data when appropriate.
+
 ## License
 
 MIT License - See [LICENSE](LICENSE) file for details.

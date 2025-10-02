@@ -8,7 +8,7 @@ import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { scoreRepositoryAnalysis } from '@/lib/scoring';
 import { analyzeRepoSchema, type RepositoryAnalysis } from './schema';
 import { extractJsonContent } from '@/lib/content-extraction';
-import { storeToolResults } from '@/lib/tool-helpers';
+import { storeToolResults, getWorkflowSession } from '@/lib/tool-helpers';
 import type { AIResponse } from '../ai-response-types';
 import type { Tool } from '@/types/tool';
 import type { z } from 'zod';
@@ -190,19 +190,21 @@ async function run(
     };
 
     // Store repository path and key metadata in session for downstream tools
-    if (ctx.session) {
-      ctx.session.set('analyzedPath', repoPath);
-      ctx.session.set('appName', result.name || path.basename(repoPath));
+    const sessionResult = getWorkflowSession(ctx, 'analyze-repo');
+    if (sessionResult.ok) {
+      const session = sessionResult.value;
+      session.set('analyzedPath', repoPath);
+      session.set('appName', result.name || path.basename(repoPath));
       if (result.ports && result.ports.length > 0) {
-        ctx.session.set('appPorts', result.ports);
+        session.set('appPorts', result.ports);
       }
       // Store the full analysis result for downstream tools
-      ctx.session.storeResult('analyze-repo', result);
+      session.storeResult('analyze-repo', result);
 
       // Store monorepo/multi-module information if detected
       if (result.isMonorepo === true && result.modules && result.modules.length > 0) {
-        ctx.session.set('isMonorepo', true);
-        ctx.session.set('modules', result.modules);
+        session.set('isMonorepo', true);
+        session.set('modules', result.modules);
         ctx.logger.info(
           {
             sessionId,
@@ -221,7 +223,7 @@ async function run(
     }
 
     // Store in sessionManager for cross-tool persistence using helper
-    const storeResult = await storeToolResults(
+    await storeToolResults(
       ctx,
       sessionId,
       'analyze-repo',

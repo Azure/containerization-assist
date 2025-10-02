@@ -30,7 +30,7 @@ import { createDockerfileScoringFunction } from '@/lib/scoring';
 import { validateDockerfileContent } from '@/validation/dockerfile-validator';
 import type { KnowledgeEnhancementResult } from '@/mcp/ai/knowledge-enhancement';
 import { extractDockerfileContent } from '@/lib/content-extraction';
-
+import { getWorkflowSession } from '@/lib/tool-helpers';
 import type { z } from 'zod';
 
 const name = 'generate-dockerfile';
@@ -74,9 +74,11 @@ async function generateSingleDockerfile(
 
   // Retrieve analysis from session using canonical SessionFacade.getResult pattern
   // This is the preferred approach for reading cross-tool results
-  if (ctx.session) {
+  const sessionResult = getWorkflowSession(ctx, name);
+  if (sessionResult.ok) {
+    const session = sessionResult.value;
     // Use SessionFacade.getResult to read from canonical location (metadata.results)
-    const analyzeRepoResult = ctx.session.getResult<RepositoryAnalysis>('analyze-repo');
+    const analyzeRepoResult = session.getResult<RepositoryAnalysis>('analyze-repo');
     if (analyzeRepoResult) {
       analysis = analyzeRepoResult;
       ctx.logger.info(
@@ -86,7 +88,7 @@ async function generateSingleDockerfile(
     }
 
     // Get analyzed path from metadata
-    analyzedPathFromSession = ctx.session.get<string>('analyzedPath');
+    analyzedPathFromSession = session.get<string>('analyzedPath');
   }
 
   const analysisPath =
@@ -565,28 +567,32 @@ ${finalDockerfileContent}
     }
 
     // Update session if available
-    if (sessionId && ctx.session) {
-      // Store the result using the standardized storeResult helper
-      ctx.session.storeResult('generate-dockerfile', {
-        content: finalDockerfileContent,
-        path: written ? dockerfilePath : undefined,
-        baseImage: finalDockerfileContent.match(/FROM\s+([^\s]+)/)?.[1],
-        multistage,
-        securityHardening,
-        optimization,
-        knowledgeEnhancementMeta: knowledgeEnhancement
-          ? {
-              confidence: knowledgeEnhancement.confidence,
-              knowledgeAppliedCount: knowledgeEnhancement.knowledgeApplied.length,
-              enhancementAreas: knowledgeEnhancement.analysis.enhancementAreas,
-            }
-          : undefined,
-      });
+    if (sessionId) {
+      const sessionUpdateResult = getWorkflowSession(ctx, name);
+      if (sessionUpdateResult.ok) {
+        const session = sessionUpdateResult.value;
+        // Store the result using the standardized storeResult helper
+        session.storeResult('generate-dockerfile', {
+          content: finalDockerfileContent,
+          path: written ? dockerfilePath : undefined,
+          baseImage: finalDockerfileContent.match(/FROM\s+([^\s]+)/)?.[1],
+          multistage,
+          securityHardening,
+          optimization,
+          knowledgeEnhancementMeta: knowledgeEnhancement
+            ? {
+                confidence: knowledgeEnhancement.confidence,
+                knowledgeAppliedCount: knowledgeEnhancement.knowledgeApplied.length,
+                enhancementAreas: knowledgeEnhancement.analysis.enhancementAreas,
+              }
+            : undefined,
+        });
 
-      // Store discrete flags for easy lookup by downstream tools
-      ctx.session.set('dockerfileGenerated', true);
-      if (written) {
-        ctx.session.set('dockerfilePath', dockerfilePath);
+        // Store discrete flags for easy lookup by downstream tools
+        session.set('dockerfileGenerated', true);
+        if (written) {
+          session.set('dockerfilePath', dockerfilePath);
+        }
       }
     }
 
@@ -652,9 +658,11 @@ async function run(
   const { sessionId } = input;
 
   // Check for multi-module/monorepo scenario
-  if (sessionId && ctx.session) {
-    const isMonorepo = ctx.session.get<boolean>('isMonorepo');
-    const modules = ctx.session.get<ModuleInfo[]>('modules');
+  const monorepoCheckResult = getWorkflowSession(ctx, name);
+  if (sessionId && monorepoCheckResult.ok) {
+    const session = monorepoCheckResult.value;
+    const isMonorepo = session.get<boolean>('isMonorepo');
+    const modules = session.get<ModuleInfo[]>('modules');
 
     if (isMonorepo && modules && modules.length > 0) {
       // User explicitly specified a module
@@ -718,12 +726,14 @@ async function run(
       }
 
       // Store multi-module results in session
-      if (ctx.session) {
-        ctx.session.storeResult('generate-dockerfile-multi', {
+      const multiModuleSessionResult = getWorkflowSession(ctx, name);
+      if (multiModuleSessionResult.ok) {
+        const session = multiModuleSessionResult.value;
+        session.storeResult('generate-dockerfile-multi', {
           modules: results,
           dockerfiles,
         });
-        ctx.session.set('dockerfilesGenerated', true);
+        session.set('dockerfilesGenerated', true);
       }
 
       const successCount = results.filter((r) => r.success).length;

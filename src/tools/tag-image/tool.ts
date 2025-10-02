@@ -5,7 +5,7 @@
  * Follows the new Tool interface pattern
  */
 
-import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { getToolLogger, createToolTimer, getWorkflowSession } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { createDockerClient } from '@/lib/docker';
 import { Success, Failure, type Result, TOPICS } from '@/types';
@@ -208,15 +208,17 @@ async function run(
     return Failure('Session ID is required for tag operations');
   }
 
-  if (!ctx.session) {
-    return Failure('Session not available');
+  const sessionResult = getWorkflowSession(ctx, 'tag-image');
+  if (!sessionResult.ok) {
+    return Failure(sessionResult.error);
   }
+  const session = sessionResult.value;
 
   try {
     const dockerClient = createDockerClient(logger);
 
     // Check for built image in session using getResult (normalized approach) or use provided imageId
-    const buildResult = ctx.session.getResult<{ imageId?: string; tags?: string[] }>('build-image');
+    const buildResult = session.getResult<{ imageId?: string; tags?: string[] }>('build-image');
     const source = input.imageId || buildResult?.imageId;
 
     if (!source) {
@@ -250,9 +252,9 @@ async function run(
     try {
       // Collect session context from structured data (no nested metadata)
       const sessionContext = {
-        appName: ctx.session.get<string>('appName'),
-        analyzedPath: ctx.session.get<string>('analyzedPath'),
-        dockerfileGenerated: ctx.session.get<boolean>('dockerfileGenerated'),
+        appName: session.get<string>('appName'),
+        analyzedPath: session.get<string>('analyzedPath'),
+        dockerfileGenerated: session.get<boolean>('dockerfileGenerated'),
       };
 
       const suggestionResult = await generateTaggingSuggestions(source, tag, ctx, sessionContext);

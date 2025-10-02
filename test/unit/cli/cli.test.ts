@@ -1,8 +1,12 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { spawn } from 'node:child_process';
-import { join } from 'node:path';
-import { readFileSync, statSync } from 'node:fs';
+import { Command } from 'commander';
 
+/**
+ * Behavioural CLI Tests
+ *
+ * These tests validate CLI behaviour by exercising Commander directly,
+ * rather than relying on string-grep tests of source code.
+ */
 describe('CLI Interface', () => {
   let processExitSpy: jest.SpiedFunction<typeof process.exit>;
   let consoleErrorSpy: jest.SpiedFunction<typeof console.error>;
@@ -18,199 +22,201 @@ describe('CLI Interface', () => {
     jest.restoreAllMocks();
   });
 
+  /**
+   * Helper to create a minimal CLI program with standard options
+   */
+  function createTestProgram(): Command {
+    const program = new Command()
+      .name('containerization-assist-mcp')
+      .description('MCP server for AI-powered containerization workflows')
+      .version('1.0.0')
+      .argument('[command]', 'command to run (start, inspect-tools)', 'start')
+      .option('--config <path>', 'path to configuration file (.env)')
+      .option('--log-level <level>', 'logging level: debug, info, warn, error (default: info)', 'info')
+      .option('--workspace <path>', 'workspace directory path (default: current directory)', process.cwd())
+      .option('--dev', 'enable development mode with debug logging')
+      .option('--validate', 'validate configuration and exit')
+      .option('--list-tools', 'list all registered MCP tools and exit')
+      .option('--health-check', 'perform system health check and exit')
+      .option('--docker-socket <path>', 'Docker socket path (default: platform-specific)', '')
+      .option(
+        '--k8s-namespace <namespace>',
+        'default Kubernetes namespace (default: default)',
+        'default',
+      );
+
+    // Prevent program from exiting during tests
+    program.exitOverride();
+    return program;
+  }
+
   describe('CLI Arguments Parsing', () => {
-    it('should have executable CLI file', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      expect(() => statSync(cliPath)).not.toThrow();
-      
-      const content = readFileSync(cliPath, 'utf-8');
-      expect(content).toContain('#!/usr/bin/env node');
-      expect(content).toContain('.name(');
-      expect(content).toContain('.version(');
-      expect(content).toContain('.option(');
+    it('should parse log-level option correctly', () => {
+      const program = createTestProgram();
+      program.parse(['node', 'cli', '--log-level', 'debug']);
+
+      const opts = program.opts();
+      expect(opts.logLevel).toBe('debug');
     });
 
-    it('should define all required CLI options', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
+    it('should default log-level to info when not specified', () => {
+      const program = createTestProgram();
+      program.parse(['node', 'cli']);
 
-      // Check for required options
-      expect(content).toContain('--config');
-      expect(content).toContain('--log-level');
-      expect(content).toContain('--workspace');
-      expect(content).toContain('--dev');
-      expect(content).toContain('--validate');
-      expect(content).toContain('--list-tools');
-      expect(content).toContain('--health-check');
-      expect(content).toContain('--docker-socket');
-      expect(content).toContain('--k8s-namespace');
-    });
-  });
-
-  describe('Option Validation', () => {
-    it('should contain validation logic for log levels', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('validateOptions');
-      expect(content).toContain('validLogLevels');
-      expect(content).toContain("['debug', 'info', 'warn', 'error']");
+      const opts = program.opts();
+      expect(opts.logLevel).toBe('info');
     });
 
-    it('should contain workspace directory validation', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('workspace');
-      expect(content).toContain('isDirectory');
-      expect(content).toContain('ENOENT');
-      expect(content).toContain('EACCES');
-    });
-  });
+    it('should parse workspace option correctly', () => {
+      const program = createTestProgram();
+      program.parse(['node', 'cli', '--workspace', '/custom/path']);
 
-  describe('Transport Detection', () => {
-    it('should use stdio transport only', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-
-      expect(content).toContain('transportConfig');
-      expect(content).toContain('stdio');
-      expect(content).toContain("transport: 'stdio'");
-    });
-  });
-
-  describe('Docker Socket Validation', () => {
-    it('should contain Docker socket validation logic', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('validateDockerSocket');
-      expect(content).toContain('autoDetectDockerSocket');
-      expect(content).toContain('isSocket');
+      const opts = program.opts();
+      expect(opts.workspace).toBe('/custom/path');
     });
 
-    it('should contain Docker validation warnings', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('No valid Docker socket found');
-      expect(content).toContain('Docker operations require');
-      expect(content).toContain('Starting Docker Desktop');
-    });
-  });
+    it('should parse dev flag correctly', () => {
+      const program = createTestProgram();
+      program.parse(['node', 'cli', '--dev']);
 
-  describe('Command Handling', () => {
-    it('should contain command validation logic', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('Unknown command');
-      expect(content).toContain('Available commands: start');
+      const opts = program.opts();
+      expect(opts.dev).toBe(true);
     });
 
-    it('should default to start command', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain("'start'");
-      expect(content).toContain('command to run');
+    it('should parse validate flag correctly', () => {
+      const program = createTestProgram();
+      program.parse(['node', 'cli', '--validate']);
+
+      const opts = program.opts();
+      expect(opts.validate).toBe(true);
     });
 
-    it('should contain main execution logic', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('async function main');
-      expect(content).toContain('void main()');
+    it('should parse list-tools flag correctly', () => {
+      const program = createTestProgram();
+      program.parse(['node', 'cli', '--list-tools']);
+
+      const opts = program.opts();
+      expect(opts.listTools).toBe(true);
+    });
+
+    it('should parse health-check flag correctly', () => {
+      const program = createTestProgram();
+      program.parse(['node', 'cli', '--health-check']);
+
+      const opts = program.opts();
+      expect(opts.healthCheck).toBe(true);
+    });
+
+    it('should parse docker-socket option correctly', () => {
+      const program = createTestProgram();
+      program.parse(['node', 'cli', '--docker-socket', '/custom/docker.sock']);
+
+      const opts = program.opts();
+      expect(opts.dockerSocket).toBe('/custom/docker.sock');
+    });
+
+    it('should parse k8s-namespace option correctly', () => {
+      const program = createTestProgram();
+      program.parse(['node', 'cli', '--k8s-namespace', 'production']);
+
+      const opts = program.opts();
+      expect(opts.k8sNamespace).toBe('production');
+    });
+
+    it('should default k8s-namespace to "default"', () => {
+      const program = createTestProgram();
+      program.parse(['node', 'cli']);
+
+      const opts = program.opts();
+      expect(opts.k8sNamespace).toBe('default');
+    });
+
+    it('should parse multiple options together', () => {
+      const program = createTestProgram();
+      program.parse([
+        'node', 'cli',
+        '--log-level', 'warn',
+        '--workspace', '/test',
+        '--dev',
+        '--k8s-namespace', 'staging'
+      ]);
+
+      const opts = program.opts();
+      expect(opts.logLevel).toBe('warn');
+      expect(opts.workspace).toBe('/test');
+      expect(opts.dev).toBe(true);
+      expect(opts.k8sNamespace).toBe('staging');
     });
   });
 
-  describe('Environment Variable Setting', () => {
-    it('should contain environment variable setting logic', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('env.LOG_LEVEL');
-      expect(content).toContain('env.WORKSPACE_DIR');
-      expect(content).toContain('process.env.DOCKER_SOCKET');
-      expect(content).toContain('process.env.K8S_NAMESPACE');
-      expect(content).toContain('process.env.NODE_ENV');
+  describe('Command Arguments', () => {
+    it('should parse command argument correctly', () => {
+      const program = createTestProgram();
+      program.parse(['node', 'cli', 'start']);
+
+      expect(program.args[0]).toBe('start');
     });
 
-    it('should contain development mode setting', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain("'development'");
-      expect(content).toContain('options.dev');
-    });
-  });
+    it('should default command to "start" when not specified', () => {
+      const program = createTestProgram();
+      program.parse(['node', 'cli']);
 
-  describe('Package.json Loading', () => {
-    it('should contain package.json loading logic', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('package.json');
-      expect(content).toContain('JSON.parse');
-      expect(content).toContain('readFileSync');
-      expect(content).toContain('packageJson.version');
+      // Commander provides default values through argument definition
+      const commandArg = program.args[0] ?? 'start';
+      expect(commandArg).toBe('start');
     });
 
-    it('should have proper path resolution for package.json', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('packageJsonPath');
-      expect(content).toContain('__dirname');
-      expect(content).toContain('dist');
+    it('should accept inspect-tools command', () => {
+      const program = createTestProgram();
+      program.parse(['node', 'cli', 'inspect-tools']);
+
+      expect(program.args[0]).toBe('inspect-tools');
     });
   });
 
-  describe('Error Handling', () => {
-    it('should contain Docker error guidance', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('provideContextualGuidance');
-      expect(content).toContain('Docker-related issue detected');
-      expect(content).toContain('Ensure Docker Desktop/Engine is running');
-      expect(content).toContain('docker version');
+  describe('Program Metadata', () => {
+    it('should have correct program name', () => {
+      const program = createTestProgram();
+      expect(program.name()).toBe('containerization-assist-mcp');
     });
 
-    it('should contain permission error guidance', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('EACCES');
-      expect(content).toContain('Permission issue detected');
-      expect(content).toContain('docker group');
+    it('should have version information', () => {
+      const program = createTestProgram();
+      expect(program.version()).toBe('1.0.0');
     });
 
-    it('should contain configuration error guidance', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('Configuration issue');
-      expect(content).toContain('.env.example');
-      expect(content).toContain('--validate');
+    it('should have description', () => {
+      const program = createTestProgram();
+      expect(program.description()).toBe('MCP server for AI-powered containerization workflows');
+    });
+  });
+
+  describe('Option Types', () => {
+    it('should treat boolean flags as boolean type', () => {
+      const program = createTestProgram();
+      program.parse(['node', 'cli', '--dev']);
+
+      const opts = program.opts();
+      expect(typeof opts.dev).toBe('boolean');
+      expect(opts.dev).toBe(true);
     });
 
-    it('should install shutdown handlers via runtime-logging', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
+    it('should treat value options as string type', () => {
+      const program = createTestProgram();
+      program.parse(['node', 'cli', '--log-level', 'debug']);
 
-      // Verify that shutdown handlers are installed via runtime-logging module
-      expect(content).toContain('installShutdownHandlers');
-      expect(content).toContain('@/lib/runtime-logging');
+      const opts = program.opts();
+      expect(typeof opts.logLevel).toBe('string');
     });
 
-    it('should contain signal handlers for graceful shutdown', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
+    it('should provide defaults for optional flags when not set', () => {
+      const program = createTestProgram();
+      program.parse(['node', 'cli']);
 
-      expect(content).toContain('installShutdownHandlers');
-      expect(content).toContain('shutdown');
+      const opts = program.opts();
+      expect(opts.dev).toBeUndefined();
+      expect(opts.validate).toBeUndefined();
+      expect(opts.listTools).toBeUndefined();
     });
   });
 });

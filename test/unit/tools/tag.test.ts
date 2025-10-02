@@ -78,6 +78,10 @@ jest.mock('../../../src/lib/tool-helpers', () => ({
     complete: jest.fn(),
     fail: jest.fn(),
   })),
+  getWorkflowSession: jest.fn((ctx) => ({
+    ok: true,
+    value: ctx.session,
+  })),
 }));
 
 // Mock session facade

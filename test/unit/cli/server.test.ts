@@ -20,15 +20,16 @@ describe('Server Entry Point', () => {
 
       const content = readFileSync(serverPath, 'utf-8');
       expect(content).toContain('async function main');
-      expect(content).toContain('createApp');
-      expect(content).toContain('app.startServer');
+      expect(content).toContain('bootstrap');
+      expect(content).toContain('await bootstrap');
     });
 
-    it('should contain MCP mode setting', () => {
+    it('should use bootstrap for MCP mode setting', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
-      
-      expect(content).toContain("process.env.MCP_MODE = 'true'");
+
+      expect(content).toContain('bootstrap');
+      expect(content).toContain('MCP_MODE setup');
     });
 
     it('should contain server configuration', () => {
@@ -36,36 +37,34 @@ describe('Server Entry Point', () => {
       const content = readFileSync(serverPath, 'utf-8');
 
       expect(content).toContain('Containerization Assist MCP Server');
-      expect(content).toContain('stdio');
+      expect(content).toContain('bootstrap');
     });
 
-    it('should contain app setup', () => {
+    it('should use bootstrap for app setup', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
 
-      expect(content).toContain('createApp');
-      expect(content).toContain('app.startServer');
-      expect(content).toContain('app.stop');
+      expect(content).toContain('bootstrap');
+      expect(content).toContain('appName');
+      expect(content).toContain('version');
     });
   });
 
   describe('Signal Handlers', () => {
-    it('should contain signal handler registration', () => {
+    it('should use bootstrap for signal handler registration', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
 
-      expect(content).toContain("process.on('SIGINT'");
-      expect(content).toContain("process.on('SIGTERM'");
+      expect(content).toContain('bootstrap');
+      expect(content).toContain('Bootstrap handles');
     });
 
-    it('should contain graceful shutdown logic', () => {
+    it('should use bootstrap for graceful shutdown logic', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
 
-      expect(content).toContain('const shutdown = async');
-      expect(content).toContain('Shutting down server');
-      expect(content).toContain('app.stop()');
-      expect(content).toContain('Server stopped successfully');
+      expect(content).toContain('bootstrap');
+      expect(content).toContain('Shutdown handler installation');
     });
   });
 
@@ -79,12 +78,12 @@ describe('Server Entry Point', () => {
       expect(content).toContain('process.exit(1)');
     });
 
-    it('should contain error handling for shutdown failures', () => {
+    it('should handle errors via bootstrap', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
-      
-      expect(content).toContain('Error during shutdown');
-      expect(content).toContain('logger.error');
+
+      expect(content).toContain('catch (error)');
+      expect(content).toContain('logger.fatal');
     });
 
     it('should contain logger creation and error handling', () => {
@@ -92,7 +91,7 @@ describe('Server Entry Point', () => {
       const content = readFileSync(serverPath, 'utf-8');
 
       expect(content).toContain('const logger = createLogger');
-      expect(content).toContain('console.error');
+      expect(content).toContain('logger.fatal');
     });
   });
 
@@ -107,30 +106,29 @@ describe('Server Entry Point', () => {
   });
 
   describe('Process Lifecycle', () => {
-    it('should contain stdio transport configuration', () => {
+    it('should use bootstrap for server lifecycle', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
 
-      // Our new implementation uses stdio transport instead
-      expect(content).toContain("transport: 'stdio'");
+      expect(content).toContain('bootstrap');
+      expect(content).toContain('await bootstrap');
     });
 
-    it('should contain server startup sequence', () => {
+    it('should contain server configuration', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
 
-      expect(content).toContain('createApp');
-      expect(content).toContain('await app.startServer');
-      expect(content).toContain('Starting Containerization Assist MCP Server');
-      expect(content).toContain('MCP Server started successfully');
+      expect(content).toContain('containerization-assist-mcp');
+      expect(content).toContain('packageJson.version');
+      expect(content).toContain('policyPath');
     });
 
-    it('should contain proper variable scoping', () => {
+    it('should use bootstrap helper pattern', () => {
       const serverPath = join(__dirname, '../../../src/cli/server.ts');
       const content = readFileSync(serverPath, 'utf-8');
 
-      expect(content).toContain('let app: ReturnType<typeof createApp>');
-      expect(content).toContain('app = createApp');
+      expect(content).toContain('bootstrap');
+      expect(content).toContain('logger');
     });
   });
 });

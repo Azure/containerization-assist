@@ -24,6 +24,34 @@ import type {
 } from '@/types/runtime';
 
 /**
+ * Widen tool type from Tool<TSchema, TOut> to Tool for runtime registration
+ *
+ * **Type Safety Rationale:**
+ * This helper performs intentional generic type erasure, which is safe because:
+ *
+ * 1. **Structural Compatibility**: Tool<A, B> and Tool<C, D> have identical runtime structure
+ * 2. **Schema Preservation**: The actual Zod schema object is preserved at runtime
+ * 3. **Runtime Validation**: Input validation happens via the schema property, not the type parameter
+ * 4. **Function Compatibility**: The run function signature is preserved at runtime
+ *
+ * **Why a helper instead of inline cast:**
+ * - Makes the intentional widening explicit and searchable
+ * - Enforces that only Tool types can be widened (not arbitrary objects)
+ * - Documents the safety rationale in one place
+ * - Safer than `as any` or multiple chained casts
+ *
+ * **TypeScript Limitation:**
+ * TypeScript's type system doesn't recognize that Tool<TSchema, TOut> is always
+ * assignable to Tool (with default generics) due to generic invariance rules.
+ * This is a known limitation when working with generic interfaces.
+ */
+function widenToolType(tool: AllToolTypes): Tool {
+  // Type assertion via unknown is necessary due to TypeScript's generic variance rules
+  // We constrain the input to AllToolTypes to ensure only valid tools are widened
+  return tool as unknown as Tool;
+}
+
+/**
  * Apply tool aliases to create renamed versions of tools
  */
 function applyToolAliases(
@@ -56,8 +84,8 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
   const tools = config.tools || getAllInternalTools();
   const aliasedTools = applyToolAliases(tools, config.toolAliases);
 
-  // Erase per-tool generics for runtime registration; validation still re-parses inputs per schema
-  const registryTools: Tool[] = aliasedTools.map((tool) => tool as unknown as Tool);
+  // Widen tool types for registration - see widenToolType() documentation for safety rationale
+  const registryTools: Tool[] = aliasedTools.map(widenToolType);
 
   const toolsMap = new Map<string, Tool>();
   for (const tool of registryTools) {

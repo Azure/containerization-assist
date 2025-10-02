@@ -1,3 +1,25 @@
+/**
+ * ESLint Configuration - TypeScript Type Safety
+ *
+ * This configuration enforces strict type safety with documented exceptions.
+ *
+ * ## Strict Rules Enabled:
+ * - @typescript-eslint/no-explicit-any: Error (prevents any usage)
+ * - @typescript-eslint/consistent-type-assertions: Error (enforces 'as' style)
+ * - @typescript-eslint/no-unsafe-*: Error (prevents unsafe type operations)
+ *
+ * ## Documented Exceptions (where 'any' is allowed):
+ * 1. **Test Files** - Mocking frameworks often require any types
+ * 2. **src/lib/** - External dependency wrappers (dockerode, scanners)
+ * 3. **src/mcp/client|server|sampling/** - MCP SDK interface layer
+ * 4. **src/infrastructure/** - External API wrappers (Docker, Kubernetes)
+ * 5. **src/config/** - Complex external configuration handling
+ * 6. **src/cli/** and **src/app/** - Framework interface layers
+ *
+ * All exceptions are justified by external API boundaries where types cannot
+ * be fully controlled. Core business logic (tools, workflows, domain) maintains
+ * strict type safety.
+ */
 module.exports = {
   root: true,
   parser: '@typescript-eslint/parser',
@@ -31,6 +53,13 @@ module.exports = {
       },
     ],
     '@typescript-eslint/no-explicit-any': 'error',
+    '@typescript-eslint/consistent-type-assertions': [
+      'error',
+      {
+        assertionStyle: 'as',
+        objectLiteralTypeAssertions: 'allow-as-parameter',
+      },
+    ],
     '@typescript-eslint/strict-boolean-expressions': 'off',
     '@typescript-eslint/prefer-nullish-coalescing': 'off',
     '@typescript-eslint/prefer-optional-chain': 'error',

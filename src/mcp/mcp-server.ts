@@ -67,6 +67,63 @@ ${guidance.resolution || 'Check logs for more information'}`;
 }
 
 /**
+ * Format tool result into MCP content blocks.
+ *
+ * Strategy:
+ * - If result has a `summary` field: emit separate text (summary) + text (JSON data) blocks
+ * - If result is primitive (string/number/boolean): emit single text block
+ * - Otherwise: emit single text block with formatted JSON (backward compatible)
+ *
+ * This allows tools to provide human-readable summaries alongside structured data,
+ * while maintaining compatibility with clients expecting JSON responses.
+ */
+function formatToolResult(value: unknown): Array<{ type: 'text'; text: string }> {
+  // Handle null/undefined
+  if (value === null || value === undefined) {
+    return [{ type: 'text', text: String(value) }];
+  }
+
+  // Handle primitives (string, number, boolean)
+  if (typeof value !== 'object') {
+    return [{ type: 'text', text: String(value) }];
+  }
+
+  // Handle objects with summary field - emit both summary and data blocks
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    'summary' in value &&
+    typeof (value as Record<string, unknown>).summary === 'string'
+  ) {
+    const obj = value as Record<string, unknown>;
+    const summary = obj.summary as string;
+
+    // Extract data (everything except summary)
+    const { summary: _, ...data } = obj;
+
+    // Only emit two blocks if there's meaningful data beyond the summary
+    if (Object.keys(data).length > 0) {
+      return [
+        { type: 'text', text: summary },
+        { type: 'text', text: `\n📊 Data:\n${JSON.stringify(data, null, 2)}` },
+      ];
+    }
+
+    // If only summary exists, just return it
+    return [{ type: 'text', text: summary }];
+  }
+
+  // Default: stringify the entire result (backward compatible)
+  try {
+    return [{ type: 'text', text: JSON.stringify(value, null, 2) }];
+  } catch {
+    // Fallback for circular references or other serialization errors
+    return [{ type: 'text', text: String(value) }];
+  }
+}
+
+/**
  * Create an MCP server that delegates execution to the orchestrator
  */
 export function createMCPServer<TTool extends Tool>(
@@ -206,12 +263,7 @@ export function registerToolsWithServer<TTool extends Tool>(options: RegisterOpt
           }
 
           return {
-            content: [
-              {
-                type: 'text' as const,
-                text: JSON.stringify(result.value, null, 2),
-              },
-            ],
+            content: formatToolResult(result.value),
           };
         } catch (error) {
           logger.error(

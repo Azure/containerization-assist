@@ -68,6 +68,8 @@ export default {
         'test/integration/kubernetes-fast-fail.test.ts',
         'test/integration/error-guidance-propagation.test.ts',
         'test/integration/single-app-flow.test.ts',
+        'test/integration/bootstrap-integration.test.ts', // Imports bootstrap → k8s client
+        'test/integration/bootstrap-manual-test.ts', // Manual test - run with npx tsx
       ],
     },
     {
@@ -143,6 +145,8 @@ export default {
     'test/integration/error-guidance-propagation.test.ts', // Imports kubernetes client
     'test/integration/single-app-flow.test.ts', // Imports kubernetes client
     'test/integration/multi-module-flow.test.ts', // Imports kubernetes client
+    'test/integration/bootstrap-integration.test.ts', // Imports bootstrap → k8s client
+    'test/integration/bootstrap-manual-test.ts', // Manual test - run with npx tsx
   ],
 
   // Timeout handling for different test types

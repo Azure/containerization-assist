@@ -2,6 +2,73 @@
 
 This document provides a comprehensive overview of all 17 tools in the containerization-assist project, their AI enhancement capabilities, and their integration with the sampling system.
 
+## Response Format Guidelines
+
+All tools return results through the MCP server, which intelligently formats responses based on the result structure:
+
+### Response Formatting Rules
+
+| Result Type | MCP Response Format | Example |
+|-------------|---------------------|---------|
+| **Primitive** (string, number, boolean) | Single text block | `"Build completed"` → Text block |
+| **Object without summary** | Single JSON text block | `{items: [...], count: 3}` → JSON block |
+| **Object with summary** | Two text blocks (summary + data) | `{summary: "...", data: {...}}` → Summary + JSON |
+| **Summary only** | Single text block | `{summary: "Done"}` → Text block |
+
+### For Tool Developers
+
+To provide structured responses with human-readable summaries:
+
+```typescript
+// Example 1: Basic result (single JSON text block)
+return Success({
+  items: ['item1', 'item2', 'item3'],
+  count: 3
+});
+
+// Example 2: Result with summary (two text blocks: summary + data)
+return Success({
+  summary: "Processed 3 items successfully",
+  items: ['item1', 'item2', 'item3'],
+  metrics: { processed: 3, failed: 0, duration: 125 }
+});
+
+// Example 3: Summary only (single text block)
+return Success({
+  summary: "Operation completed successfully"
+});
+
+// Example 4: Primitive result (single text block)
+return Success("Build completed successfully");
+```
+
+**How MCP Formats These Results:**
+
+- **Example 1** → Single text block containing JSON:
+  ```json
+  {
+    "items": ["item1", "item2", "item3"],
+    "count": 3
+  }
+  ```
+
+- **Example 2** → Two text blocks:
+  1. Summary: `"Processed 3 items successfully"`
+  2. Data: `"\n📊 Data:\n{...}"` (JSON with items and metrics)
+
+- **Example 3** → Single text block: `"Operation completed successfully"`
+
+- **Example 4** → Single text block: `"Build completed successfully"`
+
+**Best Practices:**
+- Use `summary` field when you want to provide both human-readable status and structured data
+- Reserve `summary` for concise, user-facing messages (1-2 sentences)
+- Include all structured data in other fields (arrays, objects, metrics, etc.)
+- For simple status messages, just return a string
+- For data-only responses, omit the `summary` field
+
+---
+
 ## Tool Classification
 
 ### AI-Enhanced Tools (14 tools)

@@ -826,18 +826,12 @@ async function deployApplicationImpl(
     });
 
     // Store in sessionManager for cross-tool persistence using helper
-    const storeResult = await storeToolResults(context, sessionId, 'deploy', {
+    await storeToolResults(context, sessionId, 'deploy', {
       namespace,
       deploymentName,
       ready,
       endpoints,
     });
-
-    if (!storeResult.ok) {
-      timer.error(storeResult.error);
-      tracker.fail(storeResult.error);
-      return Failure(`Failed to persist deployment results: ${storeResult.error}`);
-    }
 
     timer.end({ deploymentName, ready, sessionId });
 

@@ -350,4 +350,224 @@ describe('registerToolsWithServer', () => {
       }),
     });
   });
+
+  describe('structured response formatting', () => {
+    it('returns single text block for primitive string result', async () => {
+      const tool = createTool('primitive-demo');
+      executeMock.mockResolvedValue(Success('Simple string result'));
+
+      const fakeServer = {
+        tool: serverToolMock,
+      } as unknown as Parameters<typeof registerToolsWithServer>[0]['server'];
+
+      registerToolsWithServer({
+        server: fakeServer,
+        tools: [tool],
+        logger,
+        transport: 'stdio',
+        execute: executeMock,
+      });
+
+      const handler = serverToolMock.mock.calls[0][3];
+      const extra = {
+        sendNotification: jest.fn(),
+        signal: new AbortController().signal,
+        requestId: '200',
+      };
+
+      const result = await handler({ foo: 'value' }, extra);
+
+      expect(result.content).toEqual([{ type: 'text', text: 'Simple string result' }]);
+    });
+
+    it('returns single text block for number result', async () => {
+      const tool = createTool('number-demo');
+      executeMock.mockResolvedValue(Success(42));
+
+      const fakeServer = {
+        tool: serverToolMock,
+      } as unknown as Parameters<typeof registerToolsWithServer>[0]['server'];
+
+      registerToolsWithServer({
+        server: fakeServer,
+        tools: [tool],
+        logger,
+        transport: 'stdio',
+        execute: executeMock,
+      });
+
+      const handler = serverToolMock.mock.calls[0][3];
+      const extra = {
+        sendNotification: jest.fn(),
+        signal: new AbortController().signal,
+        requestId: '201',
+      };
+
+      const result = await handler({ foo: 'value' }, extra);
+
+      expect(result.content).toEqual([{ type: 'text', text: '42' }]);
+    });
+
+    it('returns single JSON text block for object without summary', async () => {
+      const tool = createTool('object-demo');
+      const resultValue = { items: ['a', 'b', 'c'], count: 3 };
+      executeMock.mockResolvedValue(Success(resultValue));
+
+      const fakeServer = {
+        tool: serverToolMock,
+      } as unknown as Parameters<typeof registerToolsWithServer>[0]['server'];
+
+      registerToolsWithServer({
+        server: fakeServer,
+        tools: [tool],
+        logger,
+        transport: 'stdio',
+        execute: executeMock,
+      });
+
+      const handler = serverToolMock.mock.calls[0][3];
+      const extra = {
+        sendNotification: jest.fn(),
+        signal: new AbortController().signal,
+        requestId: '202',
+      };
+
+      const result = await handler({ foo: 'value' }, extra);
+
+      expect(result.content).toHaveLength(1);
+      expect(result.content[0].type).toBe('text');
+      expect(JSON.parse(result.content[0].text)).toEqual(resultValue);
+    });
+
+    it('returns two text blocks for object with summary and data', async () => {
+      const tool = createTool('summary-data-demo');
+      const resultValue = {
+        summary: 'Processed 3 items successfully',
+        items: ['item1', 'item2', 'item3'],
+        metrics: { processed: 3, failed: 0 },
+      };
+      executeMock.mockResolvedValue(Success(resultValue));
+
+      const fakeServer = {
+        tool: serverToolMock,
+      } as unknown as Parameters<typeof registerToolsWithServer>[0]['server'];
+
+      registerToolsWithServer({
+        server: fakeServer,
+        tools: [tool],
+        logger,
+        transport: 'stdio',
+        execute: executeMock,
+      });
+
+      const handler = serverToolMock.mock.calls[0][3];
+      const extra = {
+        sendNotification: jest.fn(),
+        signal: new AbortController().signal,
+        requestId: '203',
+      };
+
+      const result = await handler({ foo: 'value' }, extra);
+
+      expect(result.content).toHaveLength(2);
+      expect(result.content[0]).toEqual({
+        type: 'text',
+        text: 'Processed 3 items successfully',
+      });
+      expect(result.content[1].type).toBe('text');
+      expect(result.content[1].text).toContain('📊 Data:');
+      const parsedData = JSON.parse(result.content[1].text.split('📊 Data:\n')[1]);
+      expect(parsedData).toEqual({
+        items: ['item1', 'item2', 'item3'],
+        metrics: { processed: 3, failed: 0 },
+      });
+    });
+
+    it('returns single text block for object with only summary field', async () => {
+      const tool = createTool('summary-only-demo');
+      executeMock.mockResolvedValue(Success({ summary: 'Operation completed' }));
+
+      const fakeServer = {
+        tool: serverToolMock,
+      } as unknown as Parameters<typeof registerToolsWithServer>[0]['server'];
+
+      registerToolsWithServer({
+        server: fakeServer,
+        tools: [tool],
+        logger,
+        transport: 'stdio',
+        execute: executeMock,
+      });
+
+      const handler = serverToolMock.mock.calls[0][3];
+      const extra = {
+        sendNotification: jest.fn(),
+        signal: new AbortController().signal,
+        requestId: '204',
+      };
+
+      const result = await handler({ foo: 'value' }, extra);
+
+      expect(result.content).toEqual([{ type: 'text', text: 'Operation completed' }]);
+    });
+
+    it('handles null result', async () => {
+      const tool = createTool('null-demo');
+      executeMock.mockResolvedValue(Success(null));
+
+      const fakeServer = {
+        tool: serverToolMock,
+      } as unknown as Parameters<typeof registerToolsWithServer>[0]['server'];
+
+      registerToolsWithServer({
+        server: fakeServer,
+        tools: [tool],
+        logger,
+        transport: 'stdio',
+        execute: executeMock,
+      });
+
+      const handler = serverToolMock.mock.calls[0][3];
+      const extra = {
+        sendNotification: jest.fn(),
+        signal: new AbortController().signal,
+        requestId: '205',
+      };
+
+      const result = await handler({ foo: 'value' }, extra);
+
+      expect(result.content).toEqual([{ type: 'text', text: 'null' }]);
+    });
+
+    it('handles array results with JSON formatting', async () => {
+      const tool = createTool('array-demo');
+      const resultValue = [{ id: 1 }, { id: 2 }, { id: 3 }];
+      executeMock.mockResolvedValue(Success(resultValue));
+
+      const fakeServer = {
+        tool: serverToolMock,
+      } as unknown as Parameters<typeof registerToolsWithServer>[0]['server'];
+
+      registerToolsWithServer({
+        server: fakeServer,
+        tools: [tool],
+        logger,
+        transport: 'stdio',
+        execute: executeMock,
+      });
+
+      const handler = serverToolMock.mock.calls[0][3];
+      const extra = {
+        sendNotification: jest.fn(),
+        signal: new AbortController().signal,
+        requestId: '206',
+      };
+
+      const result = await handler({ foo: 'value' }, extra);
+
+      expect(result.content).toHaveLength(1);
+      expect(result.content[0].type).toBe('text');
+      expect(JSON.parse(result.content[0].text)).toEqual(resultValue);
+    });
+  });
 });

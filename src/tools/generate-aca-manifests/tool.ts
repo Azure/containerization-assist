@@ -11,7 +11,7 @@ import { toMCPMessages } from '@/mcp/ai/message-converter';
 import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { scoreACAManifest } from '@/lib/scoring';
 import { generateAcaManifestsSchema } from './schema';
-
+import { getWorkflowSession } from '@/lib/tool-helpers';
 import type { AIResponse } from '../ai-response-types';
 import type { z } from 'zod';
 
@@ -25,10 +25,14 @@ async function run(
 ): Promise<Result<AIResponse>> {
   const { cpu, memory, minReplicas, maxReplicas } = input;
 
+  // Get session once for all session operations
+  const sessionResult = input.sessionId ? getWorkflowSession(ctx, name) : null;
+  const session = sessionResult?.ok ? sessionResult.value : null;
+
   // Retrieve imageId from session if not provided
   let imageId = input.imageId;
-  if (!imageId && input.sessionId && ctx.session) {
-    const buildResult = ctx.session.getResult<{ tags?: string[] }>('build-image');
+  if (!imageId && session) {
+    const buildResult = session.getResult<{ tags?: string[] }>('build-image');
     if (buildResult?.tags && buildResult.tags.length > 0) {
       imageId = buildResult.tags[0];
       ctx.logger.info({ imageId }, 'Using image from session (build-image)');
@@ -37,8 +41,8 @@ async function run(
 
   // Retrieve appName from session if not provided
   let appName = input.appName;
-  if (!appName && input.sessionId && ctx.session) {
-    appName = ctx.session.get<string>('appName');
+  if (!appName && session) {
+    appName = session.get<string>('appName');
     if (appName) {
       ctx.logger.info({ appName }, 'Using app name from session (analyze-repo)');
     }
@@ -48,8 +52,8 @@ async function run(
   let targetPort: number | undefined = input.targetPort;
   if (!targetPort || targetPort === 8080) {
     // If port is default or not provided, try to get from session
-    if (input.sessionId && ctx.session) {
-      const appPorts = ctx.session.get<number[]>('appPorts');
+    if (session) {
+      const appPorts = session.get<number[]>('appPorts');
       if (appPorts && appPorts.length > 0) {
         targetPort = appPorts[0];
         ctx.logger.info({ port: targetPort }, 'Using port from session (analyze-repo)');

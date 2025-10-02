@@ -4,11 +4,16 @@
  * Command-line interface for the Containerization Assist MCP Server
  */
 
-import { program } from 'commander';
-import { createApp } from '@/app';
-import { config, logConfigSummaryIfDev } from '@/config/index';
+import { Command } from 'commander';
+import { bootstrap } from './bootstrap';
+import {
+  applyOptionsToEnvironment,
+  createBootstrapConfig,
+  getConfigSummary,
+  type CLIOptions,
+} from './config-loader';
 import { createLogger } from '@/lib/logger';
-import { exit, argv, env, cwd } from 'node:process';
+import { exit, argv, cwd } from 'node:process';
 import { execSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -33,7 +38,10 @@ function getLogger(): ReturnType<typeof createLogger> {
   return logger;
 }
 
-program
+/**
+ * Create typed Commander program with CLIOptions interface
+ */
+const program = new Command()
   .name('containerization-assist-mcp')
   .description('MCP server for AI-powered containerization workflows')
   .version(packageJson.version)
@@ -83,11 +91,11 @@ Environment Variables:
 
 program.parse(argv);
 
-const options = program.opts();
+const options: CLIOptions = program.opts();
 const command = program.args[0] ?? 'start';
 
 // Enhanced Docker socket validation
-function validateDockerSocket(options: any): { dockerSocket: string; warnings: string[] } {
+function validateDockerSocket(options: CLIOptions): { dockerSocket: string; warnings: string[] } {
   const warnings: string[] = [];
   let dockerSocket = '';
   const defaultDockerSocket = autoDetectDockerSocket();
@@ -148,7 +156,7 @@ function validateDockerSocket(options: any): { dockerSocket: string; warnings: s
   return { dockerSocket, warnings };
 }
 
-function provideContextualGuidance(error: Error, options: any): void {
+function provideContextualGuidance(error: Error, options: CLIOptions): void {
   console.error(`\n🔍 Error: ${error.message}`);
 
   // Docker-related guidance
@@ -197,7 +205,7 @@ function provideContextualGuidance(error: Error, options: any): void {
 }
 
 // Validation function for CLI options
-function validateOptions(opts: any): { valid: boolean; errors: string[] } {
+function validateOptions(opts: CLIOptions): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
   const validLogLevels = ['debug', 'info', 'warn', 'error'];
@@ -281,23 +289,17 @@ async function main(): Promise<void> {
     }
 
     // Set environment variables based on CLI options
-    if (options.logLevel) env.LOG_LEVEL = options.logLevel;
-    if (options.workspace) env.WORKSPACE_DIR = options.workspace;
-    if (options.dockerSocket) process.env.DOCKER_SOCKET = options.dockerSocket;
-    if (options.k8sNamespace) process.env.K8S_NAMESPACE = options.k8sNamespace;
-    if (options.dev) process.env.NODE_ENV = 'development';
-
-    // Log configuration summary in development mode
-    logConfigSummaryIfDev();
+    applyOptionsToEnvironment(options);
 
     if (options.validate) {
       console.error('🔍 Validating Containerization Assist MCP configuration...\n');
+      const configSummary = getConfigSummary();
       console.error('📋 Configuration Summary:');
-      console.error(`  • Log Level: ${config.server.logLevel}`);
-      console.error(`  • Workspace: ${config.workspace?.workspaceDir ?? process.cwd()}`);
-      console.error(`  • Docker Socket: ${process.env.DOCKER_SOCKET ?? '/var/run/docker.sock'}`);
-      console.error(`  • K8s Namespace: ${process.env.K8S_NAMESPACE ?? 'default'}`);
-      console.error(`  • Environment: ${process.env.NODE_ENV ?? 'production'}`);
+      console.error(`  • Log Level: ${configSummary.logLevel}`);
+      console.error(`  • Workspace: ${configSummary.workspace}`);
+      console.error(`  • Docker Socket: ${configSummary.dockerSocket}`);
+      console.error(`  • K8s Namespace: ${configSummary.k8sNamespace}`);
+      console.error(`  • Environment: ${configSummary.nodeEnv}`);
 
       // Test Docker connection
       {
@@ -330,84 +332,62 @@ async function main(): Promise<void> {
       process.exit(0);
     }
 
-    // Set MCP mode to redirect logs to stderr
-    process.env.MCP_MODE = 'true';
-
-    // Create the application
-    const app = createApp({
-      logger: getLogger(),
-      policyPath: options.config || 'config/policy.yaml',
-      policyEnvironment: options.dev ? 'development' : 'production',
-    });
-
-    if (options.listTools) {
-      getLogger().info('Listing available tools');
-
-      const tools = app.listTools();
-
-      console.error('\n🛠️  Available MCP Tools:');
-      console.error('═'.repeat(60));
-
-      console.error('\n📦 Containerization Tools:');
-      tools.forEach((tool: { name: string; description: string }) => {
-        console.error(`  • ${tool.name.padEnd(30)} - ${tool.description}`);
+    // For special commands that need the app but don't start the server
+    if (options.listTools || options.healthCheck) {
+      // Don't use bootstrap for these - they just need the app instance
+      const { createApp } = await import('@/app');
+      const app = createApp({
+        logger: getLogger(),
+        policyPath: options.config || 'config/policy.yaml',
+        policyEnvironment: options.dev ? 'development' : 'production',
       });
 
-      console.error('\n📊 Summary:');
-      console.error(`  • Total tools: ${tools.length}`);
+      if (options.listTools) {
+        getLogger().info('Listing available tools');
 
-      process.exit(0);
+        const tools = app.listTools();
+
+        console.error('\n🛠️  Available MCP Tools:');
+        console.error('═'.repeat(60));
+
+        console.error('\n📦 Containerization Tools:');
+        tools.forEach((tool: { name: string; description: string }) => {
+          console.error(`  • ${tool.name.padEnd(30)} - ${tool.description}`);
+        });
+
+        console.error('\n📊 Summary:');
+        console.error(`  • Total tools: ${tools.length}`);
+
+        process.exit(0);
+      }
+
+      if (options.healthCheck) {
+        getLogger().info('Performing health check');
+
+        const health = app.healthCheck();
+
+        console.error('🏥 Health Check Results');
+        console.error('═'.repeat(40));
+        console.error(`Status: ✅ ${health.status}`);
+        console.error('\nServices:');
+        console.error(`  ✅ MCP Server: ready`);
+        console.error(`  📦 Tools loaded: ${health.tools}`);
+
+        process.exit(0);
+      }
     }
 
-    if (options.healthCheck) {
-      getLogger().info('Performing health check');
-
-      const health = app.healthCheck();
-
-      console.error('🏥 Health Check Results');
-      console.error('═'.repeat(40));
-      console.error(`Status: ✅ ${health.status}`);
-      console.error('\nServices:');
-      console.error(`  ✅ MCP Server: ready`);
-      console.error(`  📦 Tools loaded: ${health.tools}`);
-
-      process.exit(0);
-    }
-
-    const transportConfig = {
-      transport: 'stdio' as const,
-    };
-
-    // Use shared startup logging
-    const { logStartup, logStartupSuccess, installShutdownHandlers } = await import(
-      '@/lib/runtime-logging'
-    );
-
-    const health = app.healthCheck();
-    logStartup(
-      {
-        appName: 'containerization-assist-mcp',
-        version: packageJson.version,
-        workspace: config.workspace?.workspaceDir || process.cwd(),
-        logLevel: config.server.logLevel,
-        transport: transportConfig,
-        devMode: options.dev,
-        toolCount: health.tools,
-      },
+    // Normal startup via bootstrap
+    const bootstrapConfig = createBootstrapConfig(
+      'containerization-assist-mcp',
+      packageJson.version,
       getLogger(),
-      !!process.env.MCP_QUIET,
+      options,
     );
 
-    await app.startServer(transportConfig);
-
-    logStartupSuccess(transportConfig, getLogger(), !!process.env.MCP_QUIET);
-
-    // Install unified shutdown handlers
-    installShutdownHandlers(app, getLogger(), !!process.env.MCP_QUIET);
+    await bootstrap(bootstrapConfig);
   } catch (error) {
-    const { logStartupFailure } = await import('@/lib/runtime-logging');
-    logStartupFailure(error as Error, getLogger(), !!process.env.MCP_QUIET);
-
+    // Bootstrap already logged the failure, just add contextual guidance
     if (error instanceof Error) {
       provideContextualGuidance(error, options);
     }
@@ -416,7 +396,7 @@ async function main(): Promise<void> {
   }
 }
 
-// Uncaught exception and rejection handlers are installed by the unified shutdown handlers
+// Shutdown handlers are installed by bootstrap helper
 
 // Run the CLI
 void main();
