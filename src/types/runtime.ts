@@ -7,10 +7,9 @@
 
 import type { ZodTypeAny } from 'zod';
 import type { Logger } from 'pino';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Result } from './core';
 import type { TransportConfig } from '@/app';
-import type { MCPServer } from '@/mcp/mcp-server';
+import type { MCPServer, McpServerLike } from '@/mcp/mcp-server';
 import type { AllToolTypes, ToolName } from '@/tools';
 
 // Extract input/output types from tool registry
@@ -82,7 +81,7 @@ export interface AppRuntime {
   /**
    * Bind to existing MCP server instance
    */
-  bindToMCP(server: McpServer, transportLabel?: string): void;
+  bindToMCP(server: McpServerLike, transportLabel?: string): void;
 
   /**
    * Perform health check
