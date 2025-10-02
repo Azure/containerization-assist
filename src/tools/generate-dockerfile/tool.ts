@@ -82,7 +82,7 @@ async function generateSingleDockerfile(
         const workflowState = workflowStateResult.value as Record<string, unknown>;
 
         // Get analyzed path from session
-        if (!analyzedPathFromSession && typeof workflowState.analyzedPath === 'string') {
+        if (typeof workflowState.analyzedPath === 'string') {
           analyzedPathFromSession = workflowState.analyzedPath;
         }
 
