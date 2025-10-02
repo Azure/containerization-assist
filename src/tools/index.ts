@@ -18,6 +18,7 @@ import generateK8sManifestsTool from './generate-k8s-manifests/tool';
 import generateKustomizeTool from './generate-kustomize/tool';
 import inspectSessionTool from './inspect-session/tool';
 import opsTool from './ops/tool';
+import planDockerfileGenerationTool from './plan-dockerfile-generation/tool';
 import prepareClusterTool from './prepare-cluster/tool';
 import pushImageTool from './push-image/tool';
 import resolveBaseImagesTool from './resolve-base-images/tool';
@@ -39,6 +40,7 @@ export const TOOL_NAMES = {
   GENERATE_KUSTOMIZE: 'generate-kustomize',
   INSPECT_SESSION: 'inspect-session',
   OPS: 'ops',
+  PLAN_DOCKERFILE_GENERATION: 'plan-dockerfile-generation',
   PREPARE_CLUSTER: 'prepare-cluster',
   PUSH_IMAGE: 'push-image',
   RESOLVE_BASE_IMAGES: 'resolve-base-images',
@@ -63,6 +65,7 @@ generateK8sManifestsTool.name = TOOL_NAMES.GENERATE_K8S_MANIFESTS;
 generateKustomizeTool.name = TOOL_NAMES.GENERATE_KUSTOMIZE;
 inspectSessionTool.name = TOOL_NAMES.INSPECT_SESSION;
 opsTool.name = TOOL_NAMES.OPS;
+planDockerfileGenerationTool.name = TOOL_NAMES.PLAN_DOCKERFILE_GENERATION;
 prepareClusterTool.name = TOOL_NAMES.PREPARE_CLUSTER;
 pushImageTool.name = TOOL_NAMES.PUSH_IMAGE;
 resolveBaseImagesTool.name = TOOL_NAMES.RESOLVE_BASE_IMAGES;
@@ -84,6 +87,7 @@ export type AllToolTypes =
   | typeof generateKustomizeTool
   | typeof inspectSessionTool
   | typeof opsTool
+  | typeof planDockerfileGenerationTool
   | typeof prepareClusterTool
   | typeof pushImageTool
   | typeof resolveBaseImagesTool
@@ -105,6 +109,7 @@ export const ALL_TOOLS: readonly AllToolTypes[] = [
   generateKustomizeTool,
   inspectSessionTool,
   opsTool,
+  planDockerfileGenerationTool,
   prepareClusterTool,
   pushImageTool,
   resolveBaseImagesTool,
@@ -151,6 +156,8 @@ export async function getToolLazy(name: ToolName): Promise<AllToolTypes> {
       return (await import('./inspect-session/tool')).default;
     case TOOL_NAMES.OPS:
       return (await import('./ops/tool')).default;
+    case TOOL_NAMES.PLAN_DOCKERFILE_GENERATION:
+      return (await import('./plan-dockerfile-generation/tool')).default;
     case TOOL_NAMES.PREPARE_CLUSTER:
       return (await import('./prepare-cluster/tool')).default;
     case TOOL_NAMES.PUSH_IMAGE:
