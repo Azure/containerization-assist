@@ -44,7 +44,7 @@ async function run(
       if (workflowStateResult.ok && workflowStateResult.value) {
         const workflowState = workflowStateResult.value as Record<string, unknown>;
 
-        if (!path && typeof workflowState.analyzedPath === 'string') {
+        if (!path && workflowState.analyzedPath && typeof workflowState.analyzedPath === 'string') {
           path = workflowState.analyzedPath;
         }
 
