@@ -81,10 +81,9 @@ async function generateSingleDockerfile(
       if (workflowStateResult.ok && workflowStateResult.value) {
         const workflowState = workflowStateResult.value as Record<string, unknown>;
 
-        // Get analyzed path from metadata
-        const metadata = workflowState.metadata as Record<string, unknown> | undefined;
-        if (metadata && !analyzedPathFromSession && typeof metadata.analyzedPath === 'string') {
-          analyzedPathFromSession = metadata.analyzedPath;
+        // Get analyzed path from session
+        if (!analyzedPathFromSession && typeof workflowState.analyzedPath === 'string') {
+          analyzedPathFromSession = workflowState.analyzedPath;
         }
 
         // Get analysis results from top-level results field (NOT metadata.results)
