@@ -40,8 +40,13 @@ export interface MCPServer {
   getTools(): Array<{ name: string; description: string }>;
 }
 
+export interface McpServerLike {
+  server: unknown;
+  tool(name: string, description: string, schema: unknown, handler: unknown): void;
+}
+
 export interface RegisterOptions<TTool extends Tool = Tool> {
-  server: McpServer;
+  server: McpServerLike;
   tools: readonly TTool[];
   logger: Logger;
   transport: string;
@@ -180,7 +185,10 @@ export function registerToolsWithServer<TTool extends Tool>(options: RegisterOpt
       tool.name,
       tool.description,
       schemaShape,
-      async (rawParams: Record<string, unknown> | undefined, extra) => {
+      async (
+        rawParams: Record<string, unknown> | undefined,
+        extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
+      ) => {
         const params = rawParams ?? {};
         logger.info({ tool: tool.name, transport }, 'Executing tool');
 

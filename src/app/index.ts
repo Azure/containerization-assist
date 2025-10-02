@@ -4,13 +4,17 @@
  */
 
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { createLogger } from '@/lib/logger';
 import { getAllInternalTools } from '@/exports/tools';
 import type { AllToolTypes, ToolName } from '@/tools';
 import { createToolContext } from '@/mcp/context';
-import { createMCPServer, registerToolsWithServer, type MCPServer } from '@/mcp/mcp-server';
+import {
+  createMCPServer,
+  registerToolsWithServer,
+  type MCPServer,
+  type McpServerLike,
+} from '@/mcp/mcp-server';
 import type { Tool } from '@/types/tool';
 import { createOrchestrator, createHostlessToolContext } from './orchestrator';
 import type { OrchestratorConfig, ExecuteRequest, ToolOrchestrator } from './orchestrator-types';
@@ -171,12 +175,10 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
     /**
      * Bind to existing MCP server
      */
-    bindToMCP: (server: McpServer, transportLabel = 'external') => {
+    bindToMCP: (server: McpServerLike, transportLabel = 'external') => {
       ensureOrchestrator();
 
-      // Extract the underlying SDK Server from McpServer
-      const sdkServer = (server as unknown as { server: Server }).server;
-      activeServer = sdkServer;
+      activeServer = server.server as Server;
 
       registerToolsWithServer({
         server,

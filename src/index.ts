@@ -22,7 +22,17 @@ export type {
 
 // Tool names and types
 /** @public */
-export { TOOLS, type ToolName } from './exports/tools.js';
+export {
+  TOOLS,
+  getAllInternalTools,
+  ALL_TOOLS,
+  type ToolName,
+  type AllToolTypes,
+} from './exports/tools.js';
+
+// MCP Server types for cross-version compatibility
+/** @public */
+export type { McpServerLike } from './mcp/mcp-server.js';
 
 // Core types
 /** @public */
