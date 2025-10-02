@@ -25,7 +25,6 @@ import type { Topic } from './topics';
 
 /**
  * Represents the state of a tool execution session.
- * Uses a flat structure - results and workflow properties stored at top level.
  */
 export interface WorkflowState {
   /** Unique session identifier */
