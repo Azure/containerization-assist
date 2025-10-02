@@ -29,131 +29,11 @@ const description =
   'Gather insights from knowledgebase and return requirements for Dockerfile creation';
 const version = '1.0.0';
 
-const BASE_IMAGE_RECOMMENDATIONS: Record<
-  string,
-  Array<{
-    image: string;
-    reason: string;
-    priority: 'primary' | 'alternative';
-  }>
-> = {
-  javascript: [
-    {
-      image: 'node:20-alpine',
-      reason: 'Minimal size, official Node.js image',
-      priority: 'primary' as const,
-    },
-    {
-      image: 'node:20-slim',
-      reason: 'Debian-based with more tools',
-      priority: 'alternative' as const,
-    },
-  ],
-  typescript: [
-    {
-      image: 'node:20-alpine',
-      reason: 'Minimal size, official Node.js image',
-      priority: 'primary' as const,
-    },
-    {
-      image: 'node:20-slim',
-      reason: 'Debian-based with more tools',
-      priority: 'alternative' as const,
-    },
-  ],
-  python: [
-    { image: 'python:3.11-slim', reason: 'Minimal Python image', priority: 'primary' as const },
-    {
-      image: 'python:3.11-alpine',
-      reason: 'Smallest size but may have compatibility issues',
-      priority: 'alternative' as const,
-    },
-  ],
-  java: [
-    {
-      image: 'mcr.microsoft.com/openjdk/jdk:21-mariner',
-      reason: 'Microsoft Azure Linux with enhanced security',
-      priority: 'primary' as const,
-    },
-    {
-      image: 'eclipse-temurin:17-jre-alpine',
-      reason: 'Minimal JRE for runtime',
-      priority: 'alternative' as const,
-    },
-  ],
-  go: [
-    {
-      image: 'golang:1.21-alpine',
-      reason: 'Minimal Go build environment',
-      priority: 'primary' as const,
-    },
-    {
-      image: 'gcr.io/distroless/static-debian11',
-      reason: 'Distroless for runtime (multi-stage)',
-      priority: 'alternative' as const,
-    },
-  ],
-  'c#': [
-    {
-      image: 'mcr.microsoft.com/dotnet/aspnet:8.0',
-      reason: 'Official ASP.NET runtime',
-      priority: 'primary' as const,
-    },
-    {
-      image: 'mcr.microsoft.com/dotnet/sdk:8.0',
-      reason: 'SDK for build stage',
-      priority: 'alternative' as const,
-    },
-  ],
-  dotnet: [
-    {
-      image: 'mcr.microsoft.com/dotnet/aspnet:8.0',
-      reason: 'Official ASP.NET runtime',
-      priority: 'primary' as const,
-    },
-    {
-      image: 'mcr.microsoft.com/dotnet/sdk:8.0',
-      reason: 'SDK for build stage',
-      priority: 'alternative' as const,
-    },
-  ],
-  php: [
-    { image: 'php:8.2-fpm-alpine', reason: 'Minimal PHP-FPM image', priority: 'primary' as const },
-    { image: 'php:8.2-apache', reason: 'With Apache web server', priority: 'alternative' as const },
-  ],
-  ruby: [
-    { image: 'ruby:3.2-alpine', reason: 'Minimal Ruby image', priority: 'primary' as const },
-    {
-      image: 'ruby:3.2-slim',
-      reason: 'Debian-based with more tools',
-      priority: 'alternative' as const,
-    },
-  ],
-  rust: [
-    {
-      image: 'rust:1.75-alpine',
-      reason: 'Minimal Rust build environment',
-      priority: 'primary' as const,
-    },
-    {
-      image: 'gcr.io/distroless/static-debian11',
-      reason: 'Distroless for runtime (multi-stage)',
-      priority: 'alternative' as const,
-    },
-  ],
-} as const;
-
 async function run(
   input: z.infer<typeof planDockerfileGenerationSchema>,
   ctx: ToolContext,
 ): Promise<Result<DockerfilePlan>> {
-  const {
-    sessionId,
-    language: inputLanguage,
-    framework: inputFramework,
-    environment,
-    baseImagePreference,
-  } = input;
+  const { sessionId, language: inputLanguage, framework: inputFramework, environment } = input;
 
   let path = input.path;
   let analysis: RepositoryAnalysis | undefined;
@@ -244,55 +124,6 @@ async function run(
     (m) => !securityMatches.includes(m) && !optimizationMatches.includes(m),
   );
 
-  let baseImages = [
-    ...(BASE_IMAGE_RECOMMENDATIONS[language] || [
-      { image: 'alpine:latest', reason: 'Minimal base image', priority: 'primary' },
-    ]),
-  ];
-
-  if (baseImagePreference) {
-    const lowerPreference = baseImagePreference.toLowerCase();
-    if (lowerPreference.includes('microsoft') || lowerPreference.includes('azure')) {
-      if (language === 'java') {
-        baseImages = [
-          {
-            image: 'mcr.microsoft.com/openjdk/jdk:21-mariner',
-            reason: 'Microsoft Azure Linux with enhanced security',
-            priority: 'primary',
-          },
-          ...baseImages,
-        ];
-      } else if (language === 'dotnet' || language === 'c#') {
-        baseImages = [
-          {
-            image: 'mcr.microsoft.com/dotnet/aspnet:8.0',
-            reason: 'Official ASP.NET runtime',
-            priority: 'primary',
-          },
-          ...baseImages,
-        ];
-      }
-    } else if (lowerPreference.includes('distroless')) {
-      baseImages = [
-        {
-          image: 'gcr.io/distroless/static-debian11',
-          reason: 'Distroless for runtime (multi-stage)',
-          priority: 'primary',
-        },
-        ...baseImages,
-      ];
-    } else if (lowerPreference.includes('alpine') && baseImages.length > 0 && baseImages[0]) {
-      const firstImage = baseImages[0];
-      baseImages = [
-        {
-          ...firstImage,
-          priority: 'primary',
-        },
-        ...baseImages.slice(1),
-      ];
-    }
-  }
-
   const buildSystemType = (analysis?.buildSystem as { type?: string } | undefined)?.type;
   const shouldUseMultistage =
     language === 'java' ||
@@ -318,7 +149,6 @@ Dockerfile Planning Summary:
 - Language: ${language}${framework ? ` (${framework})` : ''}
 - Environment: ${environment || 'production'}
 - Build Strategy: ${buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'}
-- Recommended Base: ${baseImages[0]?.image || 'No base image available'}
 - Knowledge Matches: ${knowledgeMatches.length} recommendations found
   - Security: ${securityMatches.length}
   - Optimizations: ${optimizationMatches.length}
@@ -340,7 +170,6 @@ Next Step: Use generate-dockerfile with sessionId to create the Dockerfile using
       ...(repositoryInfo.entryPoint && { entryPoint: repositoryInfo.entryPoint }),
     },
     recommendations: {
-      baseImages,
       buildStrategy,
       securityConsiderations: securityMatches,
       optimizations: optimizationMatches,

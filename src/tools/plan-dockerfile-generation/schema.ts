@@ -19,12 +19,6 @@ export const planDockerfileGenerationSchema = z.object({
   language: z.string().optional().describe('Primary programming language (e.g., "java", "python")'),
   framework: z.string().optional().describe('Framework used (e.g., "spring", "django")'),
   environment: environment.describe('Target environment (production, development, etc.)'),
-  baseImagePreference: z
-    .string()
-    .optional()
-    .describe(
-      'Base image preference hint (e.g., "microsoft", "distroless", "alpine", "security-focused")',
-    ),
   includeExamples: z
     .boolean()
     .optional()
@@ -60,11 +54,6 @@ export interface DockerfilePlan {
     entryPoint?: string;
   };
   recommendations: {
-    baseImages: Array<{
-      image: string;
-      reason: string;
-      priority: 'primary' | 'alternative';
-    }>;
     buildStrategy: {
       multistage: boolean;
       reason: string;
