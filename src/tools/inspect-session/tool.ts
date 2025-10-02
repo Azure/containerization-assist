@@ -64,7 +64,7 @@ async function run(
       };
 
       if (input.includeSlices) {
-        sessionInfo.toolSlices = extractToolSlices(session.results || {});
+        sessionInfo.toolSlices = session.results || {};
       }
 
       return Success({
@@ -94,7 +94,7 @@ async function run(
         };
 
         if (input.includeSlices) {
-          sessionData.toolSlices = extractToolSlices(session.results || {});
+          sessionData.toolSlices = session.results || {};
         }
         sessions.push(sessionData);
       }
@@ -134,29 +134,6 @@ function calculateTTLRemaining(createdAt: Date): number {
   const now = Date.now();
   const elapsed = Math.floor((now - createdAt.getTime()) / 1000);
   return Math.max(0, DEFAULT_TTL - elapsed);
-}
-
-/**
- * Extract tool slices from metadata
- */
-function extractToolSlices(metadata: Record<string, unknown>): Record<string, unknown> {
-  const slices: Record<string, unknown> = {};
-
-  if (metadata.session && typeof metadata.session === 'object') {
-    const sessionData = metadata.session as Record<string, unknown>;
-    if (sessionData.toolSlices && typeof sessionData.toolSlices === 'object') {
-      return sessionData.toolSlices as Record<string, unknown>;
-    }
-  }
-
-  // Look for tool-specific keys in metadata
-  for (const [key, value] of Object.entries(metadata)) {
-    if (key.includes('_result') || key.includes('_input') || key.includes('_state')) {
-      slices[key] = value;
-    }
-  }
-
-  return slices;
 }
 
 /**
