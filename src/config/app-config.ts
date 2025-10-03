@@ -94,6 +94,10 @@ const AppConfigSchema = z.object({
     scanTimeout: z.coerce.number().int().positive().default(DEFAULT_CONFIG.SCAN_TIMEOUT),
     failOnCritical: z.boolean().default(false),
   }),
+  validation: z.object({
+    imageAllowlist: z.array(z.string()).default([]),
+    imageDenylist: z.array(z.string()).default([]),
+  }),
 });
 
 export type AppConfig = z.infer<typeof AppConfigSchema>;
@@ -180,6 +184,18 @@ export function createAppConfig(): AppConfig {
     security: {
       scanTimeout: DEFAULT_CONFIG.SCAN_TIMEOUT,
       failOnCritical: getEnvValue('FAIL_ON_CRITICAL') === 'true',
+    },
+    validation: {
+      imageAllowlist:
+        getEnvValue('IMAGE_ALLOWLIST')
+          ?.split(',')
+          .map((s) => s.trim())
+          .filter(Boolean) || [],
+      imageDenylist:
+        getEnvValue('IMAGE_DENYLIST')
+          ?.split(',')
+          .map((s) => s.trim())
+          .filter(Boolean) || [],
     },
   };
 
