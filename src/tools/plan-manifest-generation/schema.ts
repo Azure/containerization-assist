@@ -22,11 +22,6 @@ export const planManifestGenerationSchema = z.object({
   language: z.string().optional().describe('Primary programming language (e.g., "java", "python")'),
   framework: z.string().optional().describe('Framework used (e.g., "spring", "django")'),
   environment: environment.describe('Target environment (production, development, etc.)'),
-  includeExamples: z
-    .boolean()
-    .optional()
-    .default(true)
-    .describe('Include code examples in recommendations'),
 });
 
 export type PlanManifestGenerationParams = z.infer<typeof planManifestGenerationSchema>;
