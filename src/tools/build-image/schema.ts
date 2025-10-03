@@ -20,6 +20,9 @@ export const buildImageSchema = z.object({
   tags: tags.optional(),
   buildArgs: buildArgs.optional(),
   platform,
+  language: z.string().optional().describe('Primary language from analyze-repo'),
+  framework: z.string().optional().describe('Framework from analyze-repo'),
+  frameworkVersion: z.string().optional().describe('Framework version from analyze-repo'),
 });
 
 export type BuildImageParams = z.infer<typeof buildImageSchema>;

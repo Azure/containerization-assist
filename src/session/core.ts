@@ -43,7 +43,6 @@ export class SessionManager {
 
     const session: Session = {
       sessionId: id,
-      results: {},
       completed_steps: [],
       createdAt: now,
       updatedAt: now,

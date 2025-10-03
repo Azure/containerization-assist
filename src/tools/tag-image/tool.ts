@@ -215,14 +215,10 @@ async function run(
   try {
     const dockerClient = createDockerClient(logger);
 
-    // Check for built image in session using getResult (normalized approach) or use provided imageId
-    const buildResult = ctx.session.getResult<{ imageId?: string; tags?: string[] }>('build-image');
-    const source = input.imageId || buildResult?.imageId;
+    const source = input.imageId;
 
     if (!source) {
-      return Failure(
-        'No image specified. Provide imageId parameter or ensure session has built image from build-image tool.',
-      );
+      return Failure('No image specified. Provide imageId parameter.');
     }
 
     // Tag image using lib docker client
@@ -284,9 +280,6 @@ async function run(
         message: `Image tagged successfully as ${tag}. Use "push-image" with sessionId ${sessionId} to push the tagged image to a registry.${taggingSuggestions ? ' Review AI tagging suggestions for strategy improvements.' : ''}`,
       },
     };
-
-    // Store results in session using standardized storeResult
-    ctx.session?.storeResult('tag-image', result);
 
     timer.end({ tags, sessionId });
 

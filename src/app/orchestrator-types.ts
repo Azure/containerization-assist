@@ -50,18 +50,6 @@ export interface SessionFacade {
   get<T = unknown>(key: string): T | undefined;
   set(key: string, value: unknown): void;
   pushStep(step: string): void;
-  /**
-   * Store a tool result in the session's results map
-   * @param toolName - Name of the tool
-   * @param value - Result value to store
-   */
-  storeResult(toolName: string, value: unknown): void;
-  /**
-   * Get a tool result from the session's results map
-   * @param toolName - Name of the tool
-   * @returns The stored result or undefined if not found
-   */
-  getResult<T = unknown>(toolName: string): T | undefined;
 }
 
 /**

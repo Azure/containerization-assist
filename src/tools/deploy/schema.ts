@@ -8,6 +8,10 @@ import { sessionId, namespaceOptional, replicas, port, environment } from '../sh
 export const deployApplicationSchema = z.object({
   sessionId: sessionId.optional(),
   imageId: z.string().optional().describe('Docker image to deploy'),
+  manifestsPath: z
+    .string()
+    .optional()
+    .describe('Path to Kubernetes manifests directory or YAML content'),
   namespace: namespaceOptional,
   replicas,
   port,

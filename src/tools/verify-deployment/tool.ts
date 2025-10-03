@@ -382,24 +382,14 @@ async function verifyDeploymentImpl(
 
     const k8sClient = createKubernetesClient(logger);
 
-    // Get deployment info from session using getResult (normalized approach)
-    const deploymentResult = context.session.getResult<{
-      namespace?: string;
-      deploymentName?: string;
-      serviceName?: string;
-      endpoints?: Array<{ type: string; url: string; port: number; healthy?: boolean }>;
-    }>('deploy');
-
-    if (!deploymentResult && !configDeploymentName) {
-      return Failure(
-        'No deployment found. Provide deploymentName parameter or run deploy tool first.',
-      );
+    if (!configDeploymentName) {
+      return Failure('Deployment name is required. Provide deploymentName parameter.');
     }
 
-    const namespace = configNamespace ?? deploymentResult?.namespace ?? 'default';
-    const deploymentName = configDeploymentName ?? deploymentResult?.deploymentName ?? 'app';
-    const serviceName = deploymentResult?.serviceName ?? deploymentName;
-    const endpoints = deploymentResult?.endpoints ?? [];
+    const namespace = configNamespace ?? 'default';
+    const deploymentName = configDeploymentName;
+    const serviceName = deploymentName;
+    const endpoints: Array<{ type: string; url: string; port: number; healthy?: boolean }> = [];
 
     logger.info({ namespace, deploymentName }, 'Checking deployment health');
 

@@ -69,44 +69,8 @@ async function generateSingleDockerfile(
     );
   }
 
-  let analyzedPathFromSession: string | undefined;
-  let analysis: RepositoryAnalysis | undefined;
-
-  // Retrieve analysis from sessionManager (cross-tool persistent session)
-  // Note: Do NOT use ctx.session here as it's the current tool's local session,
-  // not the workflow session shared across tools
-  if (sessionId && ctx.sessionManager) {
-    try {
-      const workflowStateResult = await ctx.sessionManager.get(sessionId);
-      if (workflowStateResult.ok && workflowStateResult.value) {
-        const workflowState = workflowStateResult.value as Record<string, unknown>;
-
-        // Get analyzed path from session
-        if (workflowState.analyzedPath && typeof workflowState.analyzedPath === 'string') {
-          analyzedPathFromSession = workflowState.analyzedPath;
-        }
-
-        // Get analysis results from top-level results field (NOT metadata.results)
-        const results = workflowState.results as Record<string, unknown> | undefined;
-        const analyzeRepoResult = results?.['analyze-repo'];
-        if (!analysis && analyzeRepoResult && typeof analyzeRepoResult === 'object') {
-          analysis = analyzeRepoResult as RepositoryAnalysis;
-          ctx.logger.info(
-            { sessionId, language: analysis.language, framework: analysis.framework },
-            'Retrieved repository analysis from sessionManager',
-          );
-        }
-      }
-    } catch (sessionError) {
-      ctx.logger.debug(
-        {
-          sessionId,
-          error: sessionError instanceof Error ? sessionError.message : String(sessionError),
-        },
-        'Unable to load workflow session data for Dockerfile generation',
-      );
-    }
-  }
+  const analyzedPathFromSession: string = '';
+  const analysis: RepositoryAnalysis | null = null;
 
   const analysisPath =
     analysis && typeof (analysis as { analyzedPath?: unknown }).analyzedPath === 'string'
@@ -173,58 +137,7 @@ async function generateSingleDockerfile(
         { sessionId, moduleName: targetModule.name, language, framework },
         'Using module-specific analysis data',
       );
-    } else if (analysis) {
-      // Use repo-level analysis
-      language = typeof analysis.language === 'string' ? analysis.language : 'auto-detect';
-      framework = typeof analysis.framework === 'string' ? analysis.framework : undefined;
-      dependencies = Array.isArray(analysis.dependencies) ? analysis.dependencies : [];
-      ports = Array.isArray(analysis.suggestedPorts) ? analysis.suggestedPorts : [8080];
-
-      // Build requirements from analysis
-      const reqParts: string[] = [];
-      reqParts.push(
-        `Language: ${language} ${typeof analysis.languageVersion === 'string' ? `(${analysis.languageVersion})` : ''}`,
-      );
-      if (framework) {
-        reqParts.push(
-          `Framework: ${framework} ${typeof analysis.frameworkVersion === 'string' ? `(${analysis.frameworkVersion})` : ''}`,
-        );
-      }
-      const buildSystem = analysis.buildSystem as Record<string, unknown> | undefined;
-      if (buildSystem?.type) {
-        reqParts.push(`Build System: ${buildSystem.type}`);
-      }
-      if (dependencies.length > 0) {
-        reqParts.push(
-          `Key Dependencies: ${dependencies.slice(0, 5).join(', ')}${dependencies.length > 5 ? '...' : ''}`,
-        );
-      }
-      if (typeof analysis.entryPoint === 'string') {
-        reqParts.push(`Entry Point: ${analysis.entryPoint}`);
-      }
-      const dockerConfig = (analysis as { dockerConfig?: Record<string, unknown> }).dockerConfig;
-      if (dockerConfig && typeof dockerConfig === 'object') {
-        if (typeof dockerConfig.baseImage === 'string') {
-          reqParts.push(`Recommended Base Image: ${dockerConfig.baseImage}`);
-        }
-        if (dockerConfig.multistage === true) {
-          reqParts.push('Recommended to use multi-stage build');
-        }
-        if (dockerConfig.nonRootUser === true) {
-          reqParts.push('Ensure the final image runs as a non-root user');
-        }
-      }
-      requirements = reqParts.join('\n');
-
-      ctx.logger.info(
-        { sessionId, language, framework },
-        'Using repository analysis data for Dockerfile generation',
-      );
     }
-  } else if (sessionId) {
-    // No analysis found in session
-    ctx.logger.warn({ sessionId }, 'Session not found or no analysis data available');
-    requirements = `Note: Could not retrieve analysis data from session ${sessionId}. Please analyze the repository to determine the best configuration.`;
   } else if (path) {
     // No sessionId provided, analyze repository directly
     requirements = `Analyze the repository at ${path} to detect the technology stack, dependencies, and requirements.`;
@@ -583,32 +496,6 @@ ${finalDockerfileContent}
       }
     }
 
-    // Update session if available
-    if (sessionId && ctx.session) {
-      // Store the result using the standardized storeResult helper
-      ctx.session.storeResult('generate-dockerfile', {
-        content: finalDockerfileContent,
-        path: written ? dockerfilePath : undefined,
-        baseImage: finalDockerfileContent.match(/FROM\s+([^\s]+)/)?.[1],
-        multistage,
-        securityHardening,
-        optimization,
-        knowledgeEnhancementMeta: knowledgeEnhancement
-          ? {
-              confidence: knowledgeEnhancement.confidence,
-              knowledgeAppliedCount: knowledgeEnhancement.knowledgeApplied.length,
-              enhancementAreas: knowledgeEnhancement.analysis.enhancementAreas,
-            }
-          : undefined,
-      });
-
-      // Store discrete flags for easy lookup by downstream tools
-      ctx.session.set('dockerfileGenerated', true);
-      if (written) {
-        ctx.session.set('dockerfilePath', dockerfilePath);
-      }
-    }
-
     // Build workflow hints
     const workflowHints: string[] = [];
     workflowHints.push(
@@ -734,15 +621,6 @@ async function run(
             'Failed to generate Dockerfile for module',
           );
         }
-      }
-
-      // Store multi-module results in session
-      if (ctx.session) {
-        ctx.session.storeResult('generate-dockerfile-multi', {
-          modules: results,
-          dockerfiles,
-        });
-        ctx.session.set('dockerfilesGenerated', true);
       }
 
       const successCount = results.filter((r) => r.success).length;

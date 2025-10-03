@@ -54,8 +54,6 @@ const mockSessionFacade = {
   get: jest.fn(),
   set: jest.fn(),
   pushStep: jest.fn(),
-  storeResult: jest.fn(),
-  getResult: jest.fn(),
 };
 
 const mockKubernetesClient = {
@@ -216,30 +214,21 @@ spec:
     mockLogger = createMockLogger();
     config = {
       sessionId: 'test-session-123',
+      manifestsPath: sampleManifests,
       namespace: 'default',
       cluster: 'default',
       dryRun: false,
       wait: true,
-      timeout: 30, // Short timeout for tests
+      timeout: 30,
     };
 
-    // Reset all mocks
     jest.clearAllMocks();
     mockSessionManager.update.mockResolvedValue(true);
     mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
 
-    // Setup session mock
     mockSessionManager.get.mockResolvedValue({
       sessionId: 'test-session-123',
-      results: {
-        'generate-k8s-manifests': {
-          manifests: sampleManifests,
-        },
-      },
-      metadata: {},
       completed_steps: [],
-      errors: {},
-      
       createdAt: '2025-09-08T11:12:40.362Z',
       updatedAt: '2025-09-08T11:12:40.362Z',
     });
@@ -247,20 +236,8 @@ spec:
 
   describe('Successful Deployments', () => {
     beforeEach(() => {
-      // Setup session facade with K8s manifests
-      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
-        if (toolName === 'generate-k8s-manifests') {
-          return {
-            manifests: sampleManifests,
-          };
-        }
-        return undefined;
-      });
-
-      // Mock successful manifest application
       mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({ applied: true }));
 
-      // Default deployment status - ready
       mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
         createSuccessResult({
           ready: true,
@@ -332,6 +309,7 @@ spec:
     it('should use default values when config options not specified', async () => {
       const minimalConfig: DeployApplicationParams = {
         sessionId: 'test-session-123',
+        manifestsPath: sampleManifests, // Required parameter
       };
 
       const mockContext = createMockToolContext();
@@ -370,16 +348,6 @@ spec:
 
   describe('Manifest Parsing and Ordering', () => {
     beforeEach(() => {
-      // Use the existing sampleManifests which are properly handled by the YAML mock
-      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
-        if (toolName === 'generate-k8s-manifests') {
-          return {
-            manifests: sampleManifests,
-          };
-        }
-        return undefined;
-      });
-
       mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
         createSuccessResult({
           ready: true,
@@ -415,15 +383,6 @@ spec:
 
   describe('Error Handling', () => {
     it('should handle Kubernetes client failures gracefully', async () => {
-      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
-        if (toolName === 'generate-k8s-manifests') {
-          return {
-            manifests: sampleManifests,
-          };
-        }
-        return undefined;
-      });
-
       mockKubernetesClient.applyManifest.mockResolvedValue(
         createFailureResult('Failed to connect to Kubernetes cluster'),
       );
@@ -436,15 +395,6 @@ spec:
     });
 
     it('should handle session update failures', async () => {
-      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
-        if (toolName === 'generate-k8s-manifests') {
-          return {
-            manifests: sampleManifests,
-          };
-        }
-        return undefined;
-      });
-
       mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
         createSuccessResult({
           ready: true,
@@ -455,7 +405,6 @@ spec:
       const mockContext = createMockToolContext();
       const result = await deployApplicationTool(config, mockContext);
 
-      // The deployment should succeed
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.success).toBe(true);
@@ -465,15 +414,6 @@ spec:
 
   describe('Configuration Options', () => {
     beforeEach(() => {
-      mockSessionFacade.getResult.mockImplementation((toolName: string) => {
-        if (toolName === 'generate-k8s-manifests') {
-          return {
-            manifests: sampleManifests,
-          };
-        }
-        return undefined;
-      });
-
       mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({ applied: true }));
       mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
         createSuccessResult({

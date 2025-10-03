@@ -15,9 +15,8 @@
 
 import path from 'path';
 import { normalizePath } from '@/lib/path-utils';
-import { getToolLogger, createToolTimer, storeToolResults } from '@/lib/tool-helpers';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { getPostBuildHint } from '@/lib/workflow-hints';
-import type { Logger } from '@/lib/logger';
 import { promises as fs } from 'node:fs';
 import { createStandardProgress } from '@/mcp/progress-helper';
 import type { ToolContext } from '@/mcp/context';
@@ -27,7 +26,6 @@ import { type Result, Success, Failure, TOPICS } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { fileExists } from '@/lib/file-utils';
 import { type BuildImageParams, buildImageSchema } from './schema';
-import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages, type MCPMessage } from '@/mcp/ai/message-converter';
@@ -73,8 +71,7 @@ export interface BuildImageResult {
  */
 async function prepareBuildArgs(
   buildArgs: Record<string, string> = {},
-  context: ToolContext,
-  logger: Logger,
+  params: BuildImageParams,
 ): Promise<Record<string, string>> {
   const defaults: Record<string, string> = {
     NODE_ENV: process.env.NODE_ENV ?? 'production',
@@ -82,24 +79,14 @@ async function prepareBuildArgs(
     VCS_REF: process.env.GIT_COMMIT ?? 'unknown',
   };
 
-  try {
-    // Get analysis data from session using getResult (normalized approach)
-    if (context.session) {
-      const analysisResult = context.session.getResult<RepositoryAnalysis>('analyze-repo');
-      if (analysisResult) {
-        if (analysisResult.language) {
-          defaults.LANGUAGE = analysisResult.language;
-        }
-        if (analysisResult.framework) {
-          defaults.FRAMEWORK = analysisResult.framework;
-        }
-        if (analysisResult.frameworkVersion) {
-          defaults.FRAMEWORK_VERSION = analysisResult.frameworkVersion;
-        }
-      }
-    }
-  } catch (error) {
-    logger.debug({ error }, 'Could not get analysis result from session, using defaults');
+  if (params.language) {
+    defaults.LANGUAGE = params.language;
+  }
+  if (params.framework) {
+    defaults.FRAMEWORK = params.framework;
+  }
+  if (params.frameworkVersion) {
+    defaults.FRAMEWORK_VERSION = params.frameworkVersion;
   }
 
   return { ...defaults, ...buildArgs };
@@ -358,62 +345,14 @@ async function buildImageImpl(
 
     // Determine paths
     const repoPath = buildContext;
-    let finalDockerfilePath = dockerfilePath
+    const finalDockerfilePath = dockerfilePath
       ? path.resolve(repoPath, dockerfilePath)
       : path.resolve(repoPath, dockerfile);
 
-    // Check if we should use a generated Dockerfile
-    const dockerfileResult = context.session?.getResult<{ path?: string; content?: string }>(
-      'generate-dockerfile',
-    );
-    const generatedPath = dockerfileResult?.path;
-
     if (!(await fileExists(finalDockerfilePath))) {
-      // If the specified Dockerfile doesn't exist, check for generated one
-      if (generatedPath) {
-        const resolvedGeneratedPath = path.resolve(repoPath, generatedPath);
-        if (await fileExists(resolvedGeneratedPath)) {
-          finalDockerfilePath = resolvedGeneratedPath;
-          logger.info(
-            { generatedPath: resolvedGeneratedPath, originalPath: dockerfile },
-            'Using generated Dockerfile',
-          );
-        } else {
-          /**
-           * Failure Mode: Generated path exists in session but file missing
-           * Recovery: Write content from session if available
-           */
-          const dockerfileContent = dockerfileResult?.content;
-          if (dockerfileContent) {
-            // Use the user-specified dockerfile name (defaults to 'Dockerfile')
-            finalDockerfilePath = path.join(repoPath, dockerfile);
-            await fs.writeFile(finalDockerfilePath, dockerfileContent, 'utf-8');
-            logger.info(
-              { dockerfilePath: finalDockerfilePath },
-              'Created Dockerfile from session content',
-            );
-          } else {
-            return Failure(
-              `Dockerfile not found at: ${finalDockerfilePath} or ${resolvedGeneratedPath}`,
-            );
-          }
-        }
-      } else {
-        const dockerfileContent = dockerfileResult?.content;
-        if (dockerfileContent) {
-          // Use the user-specified dockerfile name (defaults to 'Dockerfile')
-          finalDockerfilePath = path.join(repoPath, dockerfile);
-          await fs.writeFile(finalDockerfilePath, dockerfileContent, 'utf-8');
-          logger.info(
-            { dockerfilePath: finalDockerfilePath },
-            'Created Dockerfile from session content',
-          );
-        } else {
-          return Failure(
-            `Dockerfile not found at ${finalDockerfilePath}. Provide dockerfilePath parameter or ensure session has Dockerfile from generate-dockerfile tool.`,
-          );
-        }
-      }
+      return Failure(
+        `Dockerfile not found at ${finalDockerfilePath}. Provide dockerfilePath parameter.`,
+      );
     }
 
     // Read Dockerfile for security analysis
@@ -430,7 +369,7 @@ async function buildImageImpl(
     }
 
     // Prepare build arguments
-    const finalBuildArgs = await prepareBuildArgs(buildArgs, context, logger);
+    const finalBuildArgs = await prepareBuildArgs(buildArgs, params);
 
     // Analyze security
     const securityWarnings = analyzeBuildSecurity(dockerfileContent, finalBuildArgs);
@@ -532,14 +471,6 @@ async function buildImageImpl(
         optimizationSuggestions ? String(optimizationSuggestions) : undefined,
       ),
     };
-
-    // Store in sessionManager for cross-tool persistence using helper
-    await storeToolResults(context, sessionId, 'build-image', {
-      imageId: buildResult.value.imageId,
-      tags: finalTags,
-      size: (buildResult.value as unknown as { size?: number }).size,
-      buildTime,
-    });
 
     timer.end({ imageId: buildResult.value.imageId, buildTime });
 

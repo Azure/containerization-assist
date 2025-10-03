@@ -60,11 +60,11 @@ async function run(
         updatedAt: session.updatedAt || new Date(),
         ttlRemaining: calculateTTLRemaining(session.createdAt || new Date()),
         completedSteps: session.completed_steps || [],
-        results: session.results || {},
+        results: {} as Record<string, unknown>,
       };
 
       if (input.includeSlices) {
-        sessionInfo.toolSlices = session.results || {};
+        sessionInfo.toolSlices = {} as Record<string, unknown>;
       }
 
       return Success({
@@ -90,11 +90,11 @@ async function run(
           updatedAt: session.updatedAt || new Date(),
           ttlRemaining: calculateTTLRemaining(session.createdAt || new Date()),
           completedSteps: session.completed_steps || [],
-          results: session.results || {},
+          results: {} as Record<string, unknown>,
         };
 
         if (input.includeSlices) {
-          sessionData.toolSlices = session.results || {};
+          sessionData.toolSlices = {} as Record<string, unknown>;
         }
         sessions.push(sessionData);
       }

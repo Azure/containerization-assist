@@ -77,16 +77,6 @@ function createSessionFacade(session: WorkflowState): SessionFacade {
         session.updatedAt = new Date();
       }
     },
-    storeResult(toolName: string, value: unknown): void {
-      if (!session.results) {
-        session.results = {};
-      }
-      session.results[toolName] = value;
-      session.updatedAt = new Date();
-    },
-    getResult<T = unknown>(toolName: string): T | undefined {
-      return session.results?.[toolName] as T | undefined;
-    },
   };
 }
 
@@ -269,8 +259,6 @@ async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
 
     // Update session if successful using SessionManager
     if (result.ok) {
-      // Store result using the session facade helper
-      sessionFacade.storeResult(tool.name, result.value);
       sessionFacade.pushStep(tool.name);
 
       // Persist the updated session

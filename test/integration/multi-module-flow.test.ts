@@ -31,13 +31,13 @@ function createMockSession(initialData?: Record<string, unknown>): SessionFacade
   const storage = new Map<string, unknown>(Object.entries(initialData || {}));
 
   return {
+    id: 'test-session-id',
     get: jest.fn(<T>(key: string): T | undefined => storage.get(key)),
     set: jest.fn((key: string, value: unknown) => {
       storage.set(key, value);
     }),
-    getResult: jest.fn(<T>(key: string): T | undefined => storage.get(key)),
-    storeResult: jest.fn((key: string, value: unknown) => {
-      storage.set(key, value);
+    pushStep: jest.fn((step: string) => {
+      // Store completed steps
     }),
   } as unknown as SessionFacade;
 }
@@ -190,15 +190,6 @@ describe('Multi-Module Containerization Flow', () => {
         expect(result.value.content).toContain('web-app');
         expect(result.value.suggestions).toBeDefined();
       }
-
-      // Verify session stores multi-module results
-      expect(ctx.session.storeResult).toHaveBeenCalledWith(
-        'generate-dockerfile-multi',
-        expect.objectContaining({
-          modules: expect.any(Array),
-          dockerfiles: expect.any(Array),
-        }),
-      );
     });
 
     it('should generate Dockerfile for specific module when moduleName provided', async () => {
@@ -307,15 +298,6 @@ describe('Multi-Module Containerization Flow', () => {
         expect(result.value.content).toContain('api-service');
         expect(result.value.content).toContain('worker-service');
       }
-
-      // Verify session stores multi-module results
-      expect(ctx.session.storeResult).toHaveBeenCalledWith(
-        'generate-k8s-manifests-multi',
-        expect.objectContaining({
-          modules: expect.any(Array),
-          manifests: expect.any(Array),
-        }),
-      );
     });
 
     it('should generate manifests for specific module when moduleName provided', async () => {

@@ -25,48 +25,14 @@ async function run(
 ): Promise<Result<AIResponse>> {
   const { cpu, memory, minReplicas, maxReplicas } = input;
 
-  // Retrieve imageId from session if not provided
-  let imageId = input.imageId;
-  if (!imageId && input.sessionId && ctx.session) {
-    const buildResult = ctx.session.getResult<{ tags?: string[] }>('build-image');
-    if (buildResult?.tags && buildResult.tags.length > 0) {
-      imageId = buildResult.tags[0];
-      ctx.logger.info({ imageId }, 'Using image from session (build-image)');
-    }
-  }
+  const imageId = input.imageId;
+  const appName = input.appName;
 
-  // Retrieve appName from session if not provided
-  let appName = input.appName;
-  if (!appName && input.sessionId && ctx.session) {
-    appName = ctx.session.get<string>('appName');
-    if (appName) {
-      ctx.logger.info({ appName }, 'Using app name from session (analyze-repo)');
-    }
-  }
-
-  // Retrieve port from session if not explicitly provided in input
-  let targetPort: number | undefined = input.targetPort;
-  if (!targetPort || targetPort === 8080) {
-    // If port is default or not provided, try to get from session
-    if (input.sessionId && ctx.session) {
-      const appPorts = ctx.session.get<number[]>('appPorts');
-      if (appPorts && appPorts.length > 0) {
-        targetPort = appPorts[0];
-        ctx.logger.info({ port: targetPort }, 'Using port from session (analyze-repo)');
-      }
-    }
-  }
-
-  // Validate required parameters
   if (!imageId) {
-    return Failure(
-      'Container image is required. Either provide imageId parameter or run build-image first with a sessionId.',
-    );
+    return Failure('Container image is required. Provide imageId parameter.');
   }
   if (!appName) {
-    return Failure(
-      'Application name is required. Either provide appName parameter or run analyze-repo first with a sessionId.',
-    );
+    return Failure('Application name is required. Provide appName parameter.');
   }
 
   try {

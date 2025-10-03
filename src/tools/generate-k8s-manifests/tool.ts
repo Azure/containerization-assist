@@ -5,7 +5,6 @@
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
-import { storeToolResults } from '@/lib/tool-helpers';
 import { promptTemplates, K8sManifestPromptParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
@@ -75,60 +74,29 @@ async function generateSingleManifest(
 
   const targetModuleName = targetModule?.name;
 
-  // Retrieve imageId from session if not provided
-  let imageId = input.imageId;
-  if (!imageId && input.sessionId && ctx.session) {
-    const buildResult = ctx.session.getResult<{ tags?: string[] }>('build-image');
-    if (buildResult?.tags && buildResult.tags.length > 0) {
-      imageId = buildResult.tags[0];
-      ctx.logger.info({ imageId }, 'Using image from session (build-image)');
-    }
-  }
-
-  // Retrieve appName from session if not provided
+  const imageId = input.imageId;
   let appName = input.appName;
-  if (!appName && input.sessionId && ctx.session) {
-    // If generating for a specific module, use module name
-    if (targetModuleName) {
-      appName = targetModuleName;
-      ctx.logger.info({ appName, moduleName: targetModuleName }, 'Using module name as app name');
-    } else {
-      appName = ctx.session.get<string>('appName');
-      if (appName) {
-        ctx.logger.info({ appName }, 'Using app name from session (analyze-repo)');
-      }
-    }
+
+  // If generating for a specific module, use module name
+  if (!appName && targetModuleName) {
+    appName = targetModuleName;
+    ctx.logger.info({ appName, moduleName: targetModuleName }, 'Using module name as app name');
   }
 
-  // Retrieve port from session if not explicitly provided
   let port = input.port;
-  if (!port && input.sessionId && ctx.session) {
-    // If generating for a specific module, use module's port
-    if (targetModule?.ports && targetModule.ports.length > 0) {
-      port = targetModule.ports[0];
-      ctx.logger.info({ port, moduleName: targetModuleName }, 'Using port from module data');
-    } else {
-      const appPorts = ctx.session.get<number[]>('appPorts');
-      if (appPorts && appPorts.length > 0) {
-        port = appPorts[0];
-        ctx.logger.info({ port }, 'Using port from session (analyze-repo)');
-      }
-    }
+  if (!port && targetModule?.ports && targetModule.ports.length > 0) {
+    port = targetModule.ports[0];
+    ctx.logger.info({ port, moduleName: targetModuleName }, 'Using port from module data');
   }
   if (!port) {
-    port = 8080; // Default fallback
+    port = 8080;
   }
 
-  // Validate required parameters
   if (!imageId) {
-    return Failure(
-      'Docker image is required. Either provide imageId parameter or run build-image first with a sessionId.',
-    );
+    return Failure('Docker image is required. Provide imageId parameter.');
   }
   if (!appName) {
-    return Failure(
-      'Application name is required. Either provide appName parameter or run analyze-repo first with a sessionId.',
-    );
+    return Failure('Application name is required. Provide appName parameter.');
   }
 
   // Generate prompt from template
@@ -524,13 +492,6 @@ async function generateSingleManifest(
       },
     };
 
-    // Store in sessionManager for cross-tool persistence using helper
-    await storeToolResults(ctx, input.sessionId, 'generate-k8s-manifests', {
-      manifests: finalManifestsContent,
-      manifestPath,
-      validatedResources: manifests.map((m) => ({ kind: m.kind, name: m.metadata?.name })),
-    });
-
     return Success(result);
   } catch (e) {
     const error = e as Error;
@@ -611,15 +572,6 @@ async function run(
             'Failed to generate K8s manifests for module',
           );
         }
-      }
-
-      // Store multi-module results in session
-      if (ctx.session) {
-        ctx.session.storeResult('generate-k8s-manifests-multi', {
-          modules: results,
-          manifests,
-        });
-        ctx.session.set('k8sManifestsGenerated', true);
       }
 
       const successCount = results.filter((r) => r.success).length;
