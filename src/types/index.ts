@@ -29,21 +29,15 @@ import type { Topic } from './topics';
 export interface WorkflowState {
   /** Unique session identifier */
   sessionId: string;
-  /** Overall progress (0-100) */
-  progress?: number;
-  /** Results from completed tools */
+  /** Results from completed tools, keyed by tool name */
   results?: Record<string, unknown>;
-  /** Additional metadata */
-  metadata?: Record<string, unknown>;
   /** List of completed step names */
   completed_steps?: string[];
-  /** Errors encountered during execution */
-  errors?: Record<string, unknown>;
   /** Session creation timestamp */
   createdAt: Date;
   /** Last update timestamp */
   updatedAt: Date;
-  /** Allow additional properties for extensibility */
+  /** Allow additional properties for workflow flags and computed values */
   [key: string]: unknown;
 }
 

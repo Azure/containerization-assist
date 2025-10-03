@@ -1,15 +1,5 @@
 /**
  * Session Manager - Single-session workflow state persistence
- *
- * Simplified for single-user operation with one active session.
- * Trade-off: In-memory storage for simplicity over persistence
- *
- * Metadata Structure:
- * - session.metadata.results: Map of tool results (e.g., { 'analyze-repo': {...}, 'build-image': {...} })
- *   Managed by orchestrator via SessionFacade.storeResult/getResult
- * - session.metadata[key]: Arbitrary workflow metadata (timestamps, flags, custom data)
- *   Managed by tools via SessionFacade.get/set
- * - session.completed_steps: Array of completed tool names
  */
 
 import { randomUUID } from 'node:crypto';
@@ -53,9 +43,8 @@ export class SessionManager {
 
     const session: Session = {
       sessionId: id,
-      metadata: {},
+      results: {},
       completed_steps: [],
-      errors: {},
       createdAt: now,
       updatedAt: now,
       lastAccessedAt: now,
@@ -104,13 +93,9 @@ export class SessionManager {
       return Failure(`Session ${sessionId} not found`);
     }
 
-    // Update session with merged metadata
+    // Update session
     const now = new Date();
     Object.assign(session, state, {
-      metadata: {
-        ...(session.metadata || {}),
-        ...(state.metadata || {}),
-      },
       updatedAt: now,
       lastAccessedAt: now,
     });
