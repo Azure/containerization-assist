@@ -12,7 +12,7 @@ describe('provideContextualGuidance', () => {
   });
 
   afterEach(() => {
-    consoleErrorSpy.mockRestore();
+    jest.restoreAllMocks();
   });
 
   it('should display Docker-related guidance for Docker errors', () => {
