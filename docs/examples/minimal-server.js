@@ -2,13 +2,13 @@
 
 /**
  * Minimal MCP server example with Container Assist tools
- * This is the simplest possible working example using the modern API
+ * This is the simplest possible working exampleI
  */
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
-// Import Container Assist modern API
+// Import Container Assist API
 import { createApp } from '@thgamble/containerization-assist-mcp';
 
 async function main() {
@@ -16,7 +16,7 @@ async function main() {
 
   try {
     // Create the MCP server
-    const server = new Server(
+    const server = new McpServer(
       {
         name: 'containerization-assist-example',
         version: '1.0.0',
@@ -33,12 +33,10 @@ async function main() {
     const app = createApp();
 
     // Bind all tools to the MCP server
-    app.bindToMCP({ server });
+    app.bindToMCP(server);
 
-    // Create stdio transport
+    // Create stdio transport and connect
     const transport = new StdioServerTransport();
-
-    // Connect server to transport
     await server.connect(transport);
 
     const tools = app.listTools();

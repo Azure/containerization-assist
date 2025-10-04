@@ -40,21 +40,8 @@ export interface MCPServer {
   getTools(): Array<{ name: string; description: string }>;
 }
 
-/**
- * Minimal interface for MCP server compatibility
- * Picks only the properties we use from the SDK's McpServer class
- */
-export type McpServerLike = Pick<McpServer, 'server' | 'tool'>;
-
-/**
- * Compile-time assertion to ensure our interface stays compatible with SDK's McpServer
- * This will cause a type error if McpServer no longer satisfies McpServerLike
- * @internal
- */
-void (0 as McpServer extends McpServerLike ? 0 : never);
-
 export interface RegisterOptions<TTool extends Tool = Tool> {
-  server: McpServerLike;
+  server: McpServer;
   tools: readonly TTool[];
   logger: Logger;
   transport: string;

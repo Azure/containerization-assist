@@ -1,19 +1,17 @@
 # Containerization Assist Examples
 
-This directory contains code examples demonstrating how to use the Containerization Assist MCP Server in various scenarios.
+This directory contains code examples demonstrating how to use the Containerization Assist MCP Server.
 
 ## Examples
 
 ### Basic Usage
 
-- **[minimal-server.js](./minimal-server.js)** - Minimal MCP server setup with Container Assist tools
-- **[direct-usage.ts](./direct-usage.ts)** - Direct usage of tools without MCP server
+- **[minimal-server.js](./minimal-server.js)** - Minimal working MCP server with Container Assist tools
 
-### Integration Patterns
+### Advanced Integration
 
-- **[mcp-integration.ts](./mcp-integration.ts)** - Full MCP server integration example
-- **[custom-server.ts](./custom-server.ts)** - Custom MCP server with Container Assist tools
-- **[clean-api-example.ts](./clean-api-example.ts)** - Clean API patterns using Result types
+- **[clean-api-example.ts](./clean-api-example.ts)** - Comprehensive MCP integration patterns with tool aliasing
+- **[custom-server.ts](./custom-server.ts)** - Building custom MCP server implementations
 
 ## Running the Examples
 
@@ -37,11 +35,11 @@ node minimal-server.js
 
 ```bash
 # Using tsx (recommended)
-npx tsx mcp-integration.ts
+npx tsx clean-api-example.ts
 
 # Or compile first
-npx tsc mcp-integration.ts
-node mcp-integration.js
+npx tsc clean-api-example.ts
+node clean-api-example.js
 ```
 
 ## Testing with MCP Inspector

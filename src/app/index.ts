@@ -9,12 +9,8 @@ import { createLogger } from '@/lib/logger';
 import { getAllInternalTools } from '@/exports/tools';
 import type { AllToolTypes, ToolName } from '@/tools';
 import { createToolContext } from '@/mcp/context';
-import {
-  createMCPServer,
-  registerToolsWithServer,
-  type MCPServer,
-  type McpServerLike,
-} from '@/mcp/mcp-server';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { createMCPServer, registerToolsWithServer, type MCPServer } from '@/mcp/mcp-server';
 import type { Tool } from '@/types/tool';
 import { createOrchestrator, createHostlessToolContext } from './orchestrator';
 import type { OrchestratorConfig, ExecuteRequest, ToolOrchestrator } from './orchestrator-types';
@@ -175,7 +171,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
     /**
      * Bind to existing MCP server
      */
-    bindToMCP: (server: McpServerLike, transportLabel = 'external') => {
+    bindToMCP: (server: McpServer, transportLabel = 'external') => {
       ensureOrchestrator();
 
       activeServer = server.server;

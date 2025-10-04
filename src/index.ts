@@ -30,9 +30,9 @@ export {
   type AllToolTypes,
 } from './exports/tools.js';
 
-// MCP Server types for cross-version compatibility
+// MCP Server types - re-export SDK type for convenience
 /** @public */
-export type { McpServerLike } from './mcp/mcp-server.js';
+export type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 // Core types
 /** @public */

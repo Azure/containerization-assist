@@ -265,15 +265,14 @@ describe('Client API Compatibility', () => {
   });
 
   describe('Client Example Integration', () => {
-    it('should support bindToMCP with external MCP server', () => {
+    it('should support bindToMCP with MCP server', () => {
       const clientExample = `
-        const { Server } = require("@modelcontextprotocol/sdk/server/index.js");
-        const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
+        const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
         const { createApp, TOOLS } = require('@thgamble/containerization-assist-mcp');
 
         async function testClientPattern() {
           // Create MCP server instance
-          const server = new Server(
+          const server = new McpServer(
             {
               name: "testServer",
               version: "0.0.1",
@@ -290,7 +289,7 @@ describe('Client API Compatibility', () => {
 
           // Bind to the MCP server
           try {
-            app.bindToMCP({ server });
+            app.bindToMCP(server);
             console.log('bindToMCP completed successfully');
             return true;
           } catch (error) {
