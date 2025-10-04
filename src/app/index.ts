@@ -28,6 +28,11 @@ import type {
 import { createToolLoggerFile, getLogFilePath } from '@/lib/tool-logger';
 
 /**
+ * Timeout for Docker connection checks in milliseconds
+ */
+const DOCKER_CONNECTION_TIMEOUT_MS = 3000;
+
+/**
  * Apply tool aliases to create renamed versions of tools
  */
 function applyToolAliases(tools: readonly Tool[], aliases?: Record<string, string>): Tool[] {
@@ -229,7 +234,10 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
           const versionInfo = await Promise.race([
             docker.version(),
             new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error('Docker connection timeout')), 3000),
+              setTimeout(
+                () => reject(new Error('Docker connection timeout')),
+                DOCKER_CONNECTION_TIMEOUT_MS,
+              ),
             ),
           ]);
 

@@ -5,32 +5,51 @@
 import { describe, it, expect } from '@jest/globals';
 import { execSync } from 'node:child_process';
 import { join } from 'node:path';
+import { existsSync } from 'node:fs';
+
+/**
+ * Get the CLI path, checking both possible build outputs
+ */
+function getCliPath(): string {
+  const cwd = process.cwd();
+
+  // Try ESM build first (dist/src/cli/cli.js)
+  const esmPath = join(cwd, 'dist', 'src', 'cli', 'cli.js');
+  if (existsSync(esmPath)) {
+    return esmPath;
+  }
+
+  // Fall back to CJS build (dist-cjs/src/cli/cli.js)
+  const cjsPath = join(cwd, 'dist-cjs', 'src', 'cli', 'cli.js');
+  if (existsSync(cjsPath)) {
+    return cjsPath;
+  }
+
+  // If neither exists, return ESM path and let the test fail with a clear error
+  throw new Error(
+    `CLI not found. Please build the project first with 'npm run build' or 'npm run build:esm'`
+  );
+}
 
 describe('Health Check Integration', () => {
   describe('CLI Health Check', () => {
     it('should run health check command successfully', () => {
-      const cliPath = join(process.cwd(), 'dist/src/cli/cli.js');
+      const cliPath = getCliPath();
 
-      // Run health check via CLI - capture stderr since that's where CLI output goes
+      // Run health check via CLI - capture both stdout and stderr
       let output = '';
       try {
-        execSync(`node ${cliPath} --health-check 2>&1`, {
+        output = execSync(`node ${cliPath} --health-check 2>&1`, {
           encoding: 'utf-8',
-          stdio: 'pipe',
         });
       } catch (error) {
         // Health check may exit with code 1 if dependencies are unavailable
         // but we still want to check the output
-        if (error && typeof error === 'object' && 'stdout' in error) {
-          output = (error as { stdout: string }).stdout;
+        if (error && typeof error === 'object') {
+          const stdout = 'stdout' in error && typeof error.stdout === 'string' ? error.stdout : '';
+          const stderr = 'stderr' in error && typeof error.stderr === 'string' ? error.stderr : '';
+          output = `${stdout}${stderr}`;
         }
-      }
-
-      // If we didn't get output from the catch block, run again to get it
-      if (!output) {
-        output = execSync(`node ${cliPath} --health-check 2>&1`, {
-          encoding: 'utf-8',
-        });
       }
 
       // Verify output format
@@ -47,7 +66,7 @@ describe('Health Check Integration', () => {
     });
 
     it('should exit with status 0 when healthy', () => {
-      const cliPath = join(process.cwd(), 'dist/src/cli/cli.js');
+      const cliPath = getCliPath();
 
       try {
         execSync(`node ${cliPath} --health-check`, {
@@ -64,7 +83,7 @@ describe('Health Check Integration', () => {
     });
 
     it('should complete health check within reasonable time', () => {
-      const cliPath = join(process.cwd(), 'dist/src/cli/cli.js');
+      const cliPath = getCliPath();
 
       const startTime = Date.now();
 
@@ -87,15 +106,33 @@ describe('Health Check Integration', () => {
 
   describe('Health Check Structure Consistency', () => {
     it('should return consistent health check structure', () => {
-      const cliPath = join(process.cwd(), 'dist/src/cli/cli.js');
+      const cliPath = getCliPath();
 
-      const result1 = execSync(`node ${cliPath} --health-check 2>&1`, {
-        encoding: 'utf-8',
-      });
+      let result1 = '';
+      try {
+        result1 = execSync(`node ${cliPath} --health-check 2>&1`, {
+          encoding: 'utf-8',
+        });
+      } catch (error) {
+        if (error && typeof error === 'object') {
+          const stdout = 'stdout' in error && typeof error.stdout === 'string' ? error.stdout : '';
+          const stderr = 'stderr' in error && typeof error.stderr === 'string' ? error.stderr : '';
+          result1 = `${stdout}${stderr}`;
+        }
+      }
 
-      const result2 = execSync(`node ${cliPath} --health-check 2>&1`, {
-        encoding: 'utf-8',
-      });
+      let result2 = '';
+      try {
+        result2 = execSync(`node ${cliPath} --health-check 2>&1`, {
+          encoding: 'utf-8',
+        });
+      } catch (error) {
+        if (error && typeof error === 'object') {
+          const stdout = 'stdout' in error && typeof error.stdout === 'string' ? error.stdout : '';
+          const stderr = 'stderr' in error && typeof error.stderr === 'string' ? error.stderr : '';
+          result2 = `${stdout}${stderr}`;
+        }
+      }
 
       // Normalize outputs by removing lines that may contain timestamps or durations
       function normalizeOutput(output: string): string[] {
