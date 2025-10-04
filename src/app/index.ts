@@ -4,12 +4,12 @@
  */
 
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { createLogger } from '@/lib/logger';
 import { getAllInternalTools } from '@/exports/tools';
 import type { AllToolTypes, ToolName } from '@/tools';
 import { createToolContext } from '@/mcp/context';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createMCPServer, registerToolsWithServer, type MCPServer } from '@/mcp/mcp-server';
 import type { Tool } from '@/types/tool';
 import { createOrchestrator, createHostlessToolContext } from './orchestrator';
