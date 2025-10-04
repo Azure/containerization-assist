@@ -97,14 +97,28 @@ describe('Health Check Integration', () => {
         encoding: 'utf-8',
       });
 
-      // Both results should have the same structure
-      expect(result1).toContain('Health Check Results');
-      expect(result2).toContain('Health Check Results');
+      // Normalize outputs by removing lines that may contain timestamps or durations
+      function normalizeOutput(output: string): string[] {
+        return output
+          .split('\n')
+          // Remove lines with timestamps or durations (customize as needed)
+          .filter(line =>
+            !/(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/.test(line) && // e.g., 2024-06-01 12:34:56
+            !/Duration: \d+ms/.test(line) && // e.g., Duration: 123ms
+            line.trim() !== ''
+          )
+          .map(line => line.trim());
+      }
 
-      // Both should include dependencies section
-      const hasDeps1 = result1.includes('Dependencies:');
-      const hasDeps2 = result2.includes('Dependencies:');
-      expect(hasDeps1).toBe(hasDeps2);
+      const norm1 = normalizeOutput(result1);
+      const norm2 = normalizeOutput(result2);
+
+      // Both results should have the same structure and content (ignoring variable lines)
+      expect(norm1).toEqual(norm2);
+
+      // Both results should still contain key sections
+      expect(norm1.join('\n')).toContain('Health Check Results');
+      expect(norm1.join('\n')).toContain('Dependencies:');
     });
   });
 });
