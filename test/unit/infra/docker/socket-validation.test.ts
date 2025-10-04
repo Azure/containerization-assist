@@ -72,7 +72,7 @@ describe('Docker Socket Validation', () => {
       expect(socket.length).toBeGreaterThan(0);
     });
 
-    it('should fallback to default socket when none available', async () => {
+    it('should fall back to default socket when none available', async () => {
       Object.defineProperty(process, 'platform', {
         value: 'linux',
         writable: true,

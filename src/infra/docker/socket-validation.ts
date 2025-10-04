@@ -53,7 +53,7 @@ function findAvailableDockerSocket(socketPaths: string[]): string | null {
  * Exported for use in other modules that need to detect the socket path.
  */
 export function autoDetectDockerSocket(): string {
-  // If Windows, use default windows socket
+  // If Windows, use default Windows socket
   if (process.platform === 'win32') {
     return 'npipe://./pipe/docker_engine'; // Windows Default Pipe, not a socket
   }
