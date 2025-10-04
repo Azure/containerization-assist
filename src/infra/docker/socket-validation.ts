@@ -55,7 +55,7 @@ function findAvailableDockerSocket(socketPaths: string[]): string | null {
 export function autoDetectDockerSocket(): string {
   // If Windows, use default Windows socket
   if (process.platform === 'win32') {
-    return 'npipe://./pipe/docker_engine'; // Windows Default Pipe, not a socket
+    return 'npipe://./pipe/docker_engine'; // Windows default pipe, not a socket
   }
 
   const unixDefaultPaths = [
