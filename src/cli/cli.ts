@@ -16,6 +16,8 @@ import { fileURLToPath } from 'node:url';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { validateDockerSocket } from '@/infra/docker/socket-validation';
 import { createInspectToolsCommand } from './commands/inspect-tools';
+import { provideContextualGuidance } from './guidance';
+import { validateOptions } from './validation';
 import { OUTPUTFORMAT } from '@/mcp/mcp-server';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -111,7 +113,7 @@ async function main(): Promise<void> {
     const validation = validateOptions(options, dockerValidation);
     if (!validation.valid) {
       console.error('❌ Configuration errors:');
-      validation.errors.forEach((error) => console.error(`  • ${error}`));
+      validation.errors.forEach((error: string) => console.error(`  • ${error}`));
       console.error('\nUse --help for usage information');
       exit(1);
     }

@@ -3,6 +3,7 @@
  */
 
 import { provideContextualGuidance } from '@/cli/guidance';
+import { jest } from '@jest/globals';
 
 describe('provideContextualGuidance', () => {
   let consoleErrorSpy: jest.SpyInstance;
