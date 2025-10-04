@@ -10,9 +10,18 @@
 import { execSync } from 'child_process';
 import { existsSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { tmpdir } from 'os';
+import * as tmp from 'tmp';
 
 const PROJECT_ROOT = join(__dirname, '../..');
+
+/**
+ * Helper to securely create a test script file
+ */
+function createTestScript(dir: string, prefix: string, content: string): string {
+  const tmpFile = tmp.fileSync({ dir, prefix, postfix: '.js' });
+  writeFileSync(tmpFile.name, content);
+  return tmpFile.name;
+}
 
 describe('Client API Compatibility', () => {
   let testDir: string;
@@ -30,9 +39,8 @@ describe('Client API Compatibility', () => {
     }).trim();
     packageTarball = join(PROJECT_ROOT, result);
     
-    // Create test directory
-    testDir = join(tmpdir(), `client-api-test-${Date.now()}`);
-    mkdirSync(testDir, { recursive: true });
+    // Create test directory securely
+    testDir = tmp.dirSync({ prefix: 'client-api-test-', unsafeCleanup: true }).name;
     
     // Set up client test environment
     clientTestDir = join(testDir, 'client');
@@ -81,9 +89,9 @@ describe('Client API Compatibility', () => {
         console.log(typeof createApp);
       `;
 
-      writeFileSync(join(clientTestDir, 'test-exports.js'), testScript);
+      const scriptPath = createTestScript(clientTestDir, 'test-exports-', testScript);
 
-      const result = execSync('node test-exports.js', {
+      const result = execSync(`node "${scriptPath}"`, {
         cwd: clientTestDir,
         encoding: 'utf8'
       });
@@ -98,9 +106,9 @@ describe('Client API Compatibility', () => {
         console.log(Object.keys(TOOLS).length > 0);
       `;
 
-      writeFileSync(join(clientTestDir, 'test-tools.js'), testScript);
+      const scriptPath = createTestScript(clientTestDir, 'test-tools-', testScript);
 
-      const result = execSync('node test-tools.js', {
+      const result = execSync(`node "${scriptPath}"`, {
         cwd: clientTestDir,
         encoding: 'utf8'
       });
@@ -119,9 +127,9 @@ describe('Client API Compatibility', () => {
         console.log(tools.length > 0);
       `;
 
-      writeFileSync(join(clientTestDir, 'test-get-tools.js'), testScript);
+      const scriptPath = createTestScript(clientTestDir, 'test-get-tools-', testScript);
 
-      const result = execSync('node test-get-tools.js', {
+      const result = execSync(`node "${scriptPath}"`, {
         cwd: clientTestDir,
         encoding: 'utf8'
       });
@@ -168,9 +176,9 @@ describe('Client API Compatibility', () => {
         console.log('All expected tools found with canonical names');
       `;
 
-      writeFileSync(join(clientTestDir, 'test-tool-names-specific.js'), testScript);
+      const scriptPath = createTestScript(clientTestDir, 'test-tool-names-', testScript);
 
-      const result = execSync('node test-tool-names-specific.js', {
+      const result = execSync(`node "${scriptPath}"`, {
         cwd: clientTestDir,
         encoding: 'utf8'
       });
@@ -193,9 +201,9 @@ describe('Client API Compatibility', () => {
         }
       `;
 
-      writeFileSync(join(clientTestDir, 'test-instantiation.js'), testScript);
+      const scriptPath = createTestScript(clientTestDir, 'test-instantiation-', testScript);
 
-      const result = execSync('node test-instantiation.js', {
+      const result = execSync(`node "${scriptPath}"`, {
         cwd: clientTestDir,
         encoding: 'utf8'
       });
@@ -211,9 +219,9 @@ describe('Client API Compatibility', () => {
         console.log(typeof app.bindToMCP);
       `;
 
-      writeFileSync(join(clientTestDir, 'test-bind-mcp.js'), testScript);
+      const scriptPath = createTestScript(clientTestDir, 'test-bind-mcp-', testScript);
 
-      const result = execSync('node test-bind-mcp.js', {
+      const result = execSync(`node "${scriptPath}"`, {
         cwd: clientTestDir,
         encoding: 'utf8'
       });
@@ -229,9 +237,9 @@ describe('Client API Compatibility', () => {
         console.log(typeof app.execute);
       `;
 
-      writeFileSync(join(clientTestDir, 'test-execute.js'), testScript);
+      const scriptPath = createTestScript(clientTestDir, 'test-execute-', testScript);
 
-      const result = execSync('node test-execute.js', {
+      const result = execSync(`node "${scriptPath}"`, {
         cwd: clientTestDir,
         encoding: 'utf8'
       });
@@ -250,9 +258,9 @@ describe('Client API Compatibility', () => {
         console.log(tools.every(t => typeof t.name === 'string'));
       `;
 
-      writeFileSync(join(clientTestDir, 'test-list-tools.js'), testScript);
+      const scriptPath = createTestScript(clientTestDir, 'test-list-tools-', testScript);
 
-      const result = execSync('node test-list-tools.js', {
+      const result = execSync(`node "${scriptPath}"`, {
         cwd: clientTestDir,
         encoding: 'utf8'
       });
@@ -303,10 +311,10 @@ describe('Client API Compatibility', () => {
         });
       `;
 
-      writeFileSync(join(clientTestDir, 'client-pattern-test.js'), clientExample);
+      const scriptPath = createTestScript(clientTestDir, 'client-pattern-test-', clientExample);
 
       // This should not throw
-      const result = execSync('node client-pattern-test.js', {
+      const result = execSync(`node "${scriptPath}"`, {
         cwd: clientTestDir,
         encoding: 'utf8'
       });
@@ -337,9 +345,9 @@ describe('Client API Compatibility', () => {
         console.log(aliasedNames.includes('generateDockerfile'));
       `;
 
-      writeFileSync(join(clientTestDir, 'test-aliasing.js'), testScript);
+      const scriptPath = createTestScript(clientTestDir, 'test-aliasing-', testScript);
 
-      const result = execSync('node test-aliasing.js', {
+      const result = execSync(`node "${scriptPath}"`, {
         cwd: clientTestDir,
         encoding: 'utf8'
       });
@@ -368,9 +376,9 @@ describe('Client API Compatibility', () => {
         console.log(mapping['scan']);
       `;
 
-      writeFileSync(join(clientTestDir, 'test-mapping.js'), testScript);
+      const scriptPath = createTestScript(clientTestDir, 'test-mapping-', testScript);
 
-      const result = execSync('node test-mapping.js', {
+      const result = execSync(`node "${scriptPath}"`, {
         cwd: clientTestDir,
         encoding: 'utf8'
       });
@@ -405,9 +413,9 @@ describe('Client API Compatibility', () => {
         console.log('All expected exports present');
       `;
 
-      writeFileSync(join(clientTestDir, 'test-api-surface.js'), testScript);
+      const scriptPath = createTestScript(clientTestDir, 'test-api-surface-', testScript);
 
-      const result = execSync('node test-api-surface.js', {
+      const result = execSync(`node "${scriptPath}"`, {
         cwd: clientTestDir,
         encoding: 'utf8'
       });
@@ -426,9 +434,9 @@ describe('Client API Compatibility', () => {
         console.log('All require patterns work');
       `;
 
-      writeFileSync(join(clientTestDir, 'test-require-patterns.js'), testScript);
+      const scriptPath = createTestScript(clientTestDir, 'test-require-patterns-', testScript);
 
-      const result = execSync('node test-require-patterns.js', {
+      const result = execSync(`node "${scriptPath}"`, {
         cwd: clientTestDir,
         encoding: 'utf8'
       });
@@ -449,9 +457,9 @@ describe('Client API Compatibility', () => {
         console.log('Type definitions functional');
       `;
 
-      writeFileSync(join(clientTestDir, 'test-types.js'), testScript);
+      const scriptPath = createTestScript(clientTestDir, 'test-types-', testScript);
 
-      const result = execSync('node test-types.js', {
+      const result = execSync(`node "${scriptPath}"`, {
         cwd: clientTestDir,
         encoding: 'utf8'
       });
