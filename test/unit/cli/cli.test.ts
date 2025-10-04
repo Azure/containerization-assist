@@ -80,22 +80,22 @@ describe('CLI Interface', () => {
   });
 
   describe('Docker Socket Validation', () => {
-    it('should contain Docker socket validation logic', () => {
+    it('should import Docker socket validation from infra module', () => {
       const cliPath = join(__dirname, '../../../src/cli/cli.ts');
       const content = readFileSync(cliPath, 'utf-8');
-      
+
       expect(content).toContain('validateDockerSocket');
-      expect(content).toContain('autoDetectDockerSocket');
-      expect(content).toContain('isSocket');
+      expect(content).toContain('@/infra/docker/socket-validation');
     });
 
-    it('should contain Docker validation warnings', () => {
+    it('should use extracted validateDockerSocket function', () => {
       const cliPath = join(__dirname, '../../../src/cli/cli.ts');
       const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('No valid Docker socket found');
-      expect(content).toContain('Docker operations require');
-      expect(content).toContain('Starting Docker Desktop');
+
+      // Verify it calls the imported function
+      expect(content).toContain('validateDockerSocket');
+      // Verify it's not defining the function locally
+      expect(content).not.toContain('function validateDockerSocket');
     });
   });
 
