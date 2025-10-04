@@ -1,5 +1,5 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { validateOptions } from '@/cli/validation';
@@ -10,9 +10,8 @@ describe('CLI Validation Module', () => {
   let consoleErrorSpy: jest.SpiedFunction<typeof console.error>;
 
   beforeEach(() => {
-    // Create a temporary test directory
-    testDir = join(tmpdir(), `cli-validation-test-${Date.now()}`);
-    mkdirSync(testDir, { recursive: true });
+    // Create a secure temporary test directory
+    testDir = mkdtempSync(join(tmpdir(), 'cli-validation-test-'));
 
     // Spy on console.error
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});

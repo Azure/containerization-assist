@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from '@jest/globals';
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 
@@ -37,20 +37,12 @@ describe('Health Check Integration', () => {
       const cliPath = getCliPath();
 
       // Run health check via CLI - capture both stdout and stderr
-      let output = '';
-      try {
-        output = execSync(`node ${cliPath} --health-check 2>&1`, {
-          encoding: 'utf-8',
-        });
-      } catch (error) {
-        // Health check may exit with code 1 if dependencies are unavailable
-        // but we still want to check the output
-        if (error && typeof error === 'object') {
-          const stdout = 'stdout' in error && typeof error.stdout === 'string' ? error.stdout : '';
-          const stderr = 'stderr' in error && typeof error.stderr === 'string' ? error.stderr : '';
-          output = `${stdout}${stderr}`;
-        }
-      }
+      const result = spawnSync('node', [cliPath, '--health-check'], {
+        encoding: 'utf-8',
+      });
+
+      // Health check writes to stderr, combine stdout and stderr
+      const output = `${result.stdout}${result.stderr}`;
 
       // Verify output format
       expect(output).toContain('Health Check Results');
@@ -68,18 +60,14 @@ describe('Health Check Integration', () => {
     it('should exit with status 0 when healthy', () => {
       const cliPath = getCliPath();
 
-      try {
-        execSync(`node ${cliPath} --health-check`, {
-          encoding: 'utf-8',
-          stdio: 'pipe',
-        });
-        // If we reach here, exit code was 0
-        expect(true).toBe(true);
-      } catch (error) {
-        // If health check fails (exit code 1), it's still a valid test outcome
-        // Some environments may not have Docker/K8s available
-        expect(error).toBeDefined();
-      }
+      const result = spawnSync('node', [cliPath, '--health-check'], {
+        encoding: 'utf-8',
+        stdio: 'pipe',
+      });
+
+      // Exit code should be 0 or 1 (both are valid test outcomes)
+      // Some environments may not have Docker/K8s available (exit code 1)
+      expect([0, 1]).toContain(result.status);
     });
 
     it('should complete health check within reasonable time', () => {
@@ -87,15 +75,11 @@ describe('Health Check Integration', () => {
 
       const startTime = Date.now();
 
-      try {
-        execSync(`node ${cliPath} --health-check`, {
-          encoding: 'utf-8',
-          stdio: 'pipe',
-          timeout: 10000, // 10 second timeout
-        });
-      } catch (error) {
-        // Ignore errors - we're just testing timeout
-      }
+      spawnSync('node', [cliPath, '--health-check'], {
+        encoding: 'utf-8',
+        stdio: 'pipe',
+        timeout: 10000, // 10 second timeout
+      });
 
       const duration = Date.now() - startTime;
 
@@ -108,42 +92,30 @@ describe('Health Check Integration', () => {
     it('should return consistent health check structure', () => {
       const cliPath = getCliPath();
 
-      let result1 = '';
-      try {
-        result1 = execSync(`node ${cliPath} --health-check 2>&1`, {
-          encoding: 'utf-8',
-        });
-      } catch (error) {
-        if (error && typeof error === 'object') {
-          const stdout = 'stdout' in error && typeof error.stdout === 'string' ? error.stdout : '';
-          const stderr = 'stderr' in error && typeof error.stderr === 'string' ? error.stderr : '';
-          result1 = `${stdout}${stderr}`;
-        }
-      }
+      const spawn1 = spawnSync('node', [cliPath, '--health-check'], {
+        encoding: 'utf-8',
+      });
+      const result1 = `${spawn1.stdout}${spawn1.stderr}`;
 
-      let result2 = '';
-      try {
-        result2 = execSync(`node ${cliPath} --health-check 2>&1`, {
-          encoding: 'utf-8',
-        });
-      } catch (error) {
-        if (error && typeof error === 'object') {
-          const stdout = 'stdout' in error && typeof error.stdout === 'string' ? error.stdout : '';
-          const stderr = 'stderr' in error && typeof error.stderr === 'string' ? error.stderr : '';
-          result2 = `${stdout}${stderr}`;
-        }
-      }
+      const spawn2 = spawnSync('node', [cliPath, '--health-check'], {
+        encoding: 'utf-8',
+      });
+      const result2 = `${spawn2.stdout}${spawn2.stderr}`;
 
       // Normalize outputs by removing lines that may contain timestamps or durations
       function normalizeOutput(output: string): string[] {
         return output
           .split('\n')
           // Remove lines with timestamps or durations (customize as needed)
-          .filter(line =>
-            !/(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/.test(line) && // e.g., 2024-06-01 12:34:56
-            !/Duration: \d+ms/.test(line) && // e.g., Duration: 123ms
-            line.trim() !== ''
-          )
+          .filter(line => {
+            const trimmed = line.trim();
+            return (
+              !/(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/.test(trimmed) && // e.g., 2024-06-01 12:34:56
+              !/Duration: \d+ms/.test(trimmed) && // e.g., Duration: 123ms
+              !trimmed.startsWith('{') && // Remove JSON log lines
+              trimmed !== ''
+            );
+          })
           .map(line => line.trim());
       }
 
