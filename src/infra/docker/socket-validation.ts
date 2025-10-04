@@ -68,6 +68,13 @@ export function autoDetectDockerSocket(): string {
 }
 
 /**
+ * Determine if output should be logged based on quiet mode and MCP environment
+ */
+function shouldLogOutput(quiet: boolean): boolean {
+  return !quiet && !process.env.MCP_MODE && !process.env.MCP_QUIET;
+}
+
+/**
  * Validate Docker socket path and provide warnings if invalid.
  * Handles Windows named pipes, Unix sockets, and provides user-friendly error messages.
  *
@@ -98,7 +105,7 @@ export function validateDockerSocket(
     // Handle Windows named pipes specially - they can't be stat()'d
     if (dockerSocket.includes('pipe')) {
       // For Windows named pipes, assume they're valid and let Docker client handle validation
-      if (!quiet && !process.env.MCP_MODE && !process.env.MCP_QUIET) {
+      if (shouldLogOutput(quiet)) {
         console.error(`✅ Using Docker named pipe: ${dockerSocket}`);
       }
       return { dockerSocket, warnings };
@@ -120,7 +127,7 @@ export function validateDockerSocket(
     }
 
     // Only log when not in quiet mode or pure MCP mode
-    if (!quiet && !process.env.MCP_MODE && !process.env.MCP_QUIET) {
+    if (shouldLogOutput(quiet)) {
       console.error(`✅ Using Docker socket: ${dockerSocket}`);
     }
   } catch (error) {
