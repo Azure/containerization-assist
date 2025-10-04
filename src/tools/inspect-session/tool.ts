@@ -60,15 +60,11 @@ async function run(
         updatedAt: session.updatedAt || new Date(),
         ttlRemaining: calculateTTLRemaining(session.createdAt || new Date()),
         completedSteps: session.completed_steps || [],
-        metadata: session.metadata || {},
+        results: session.results || {},
       };
 
       if (input.includeSlices) {
-        sessionInfo.toolSlices = extractToolSlices(session.metadata || {});
-      }
-
-      if (session.errors) {
-        sessionInfo.errors = session.errors as Record<string, string>;
+        sessionInfo.toolSlices = session.results || {};
       }
 
       return Success({
@@ -94,15 +90,11 @@ async function run(
           updatedAt: session.updatedAt || new Date(),
           ttlRemaining: calculateTTLRemaining(session.createdAt || new Date()),
           completedSteps: session.completed_steps || [],
-          metadata: session.metadata || {},
+          results: session.results || {},
         };
 
         if (input.includeSlices) {
-          sessionData.toolSlices = extractToolSlices(session.metadata || {});
-        }
-
-        if (session.errors) {
-          sessionData.errors = session.errors as Record<string, string>;
+          sessionData.toolSlices = session.results || {};
         }
         sessions.push(sessionData);
       }
@@ -145,29 +137,6 @@ function calculateTTLRemaining(createdAt: Date): number {
 }
 
 /**
- * Extract tool slices from metadata
- */
-function extractToolSlices(metadata: Record<string, unknown>): Record<string, unknown> {
-  const slices: Record<string, unknown> = {};
-
-  if (metadata.session && typeof metadata.session === 'object') {
-    const sessionData = metadata.session as Record<string, unknown>;
-    if (sessionData.toolSlices && typeof sessionData.toolSlices === 'object') {
-      return sessionData.toolSlices as Record<string, unknown>;
-    }
-  }
-
-  // Look for tool-specific keys in metadata
-  for (const [key, value] of Object.entries(metadata)) {
-    if (key.includes('_result') || key.includes('_input') || key.includes('_state')) {
-      slices[key] = value;
-    }
-  }
-
-  return slices;
-}
-
-/**
  * Format session summary for display
  */
 interface SessionData {
@@ -176,8 +145,7 @@ interface SessionData {
   updatedAt: Date;
   ttlRemaining: number;
   completedSteps: string[];
-  metadata: Record<string, unknown>;
-  errors?: Record<string, string>;
+  results: Record<string, unknown>;
   toolSlices?: Record<string, unknown>;
 }
 
@@ -189,10 +157,6 @@ function formatSessionSummary(session: SessionData): string {
     `TTL Remaining: ${Math.floor(session.ttlRemaining / 60)} minutes`,
     `Completed Steps: ${session.completedSteps.length > 0 ? session.completedSteps.join(', ') : 'none'}`,
   ];
-
-  if (session.errors && Object.keys(session.errors).length > 0) {
-    lines.push(`Errors: ${Object.keys(session.errors).join(', ')}`);
-  }
 
   if (session.toolSlices && Object.keys(session.toolSlices).length > 0) {
     lines.push(`Tool Slices: ${Object.keys(session.toolSlices).join(', ')}`);

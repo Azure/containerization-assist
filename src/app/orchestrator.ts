@@ -62,13 +62,10 @@ function createSessionFacade(session: WorkflowState): SessionFacade {
   return {
     id: session.sessionId,
     get<T = unknown>(key: string): T | undefined {
-      return session.metadata?.[key] as T | undefined;
+      return session[key] as T | undefined;
     },
     set(key: string, value: unknown): void {
-      if (!session.metadata) {
-        session.metadata = {};
-      }
-      session.metadata[key] = value;
+      session[key] = value;
       session.updatedAt = new Date();
     },
     pushStep(step: string): void {
@@ -81,23 +78,14 @@ function createSessionFacade(session: WorkflowState): SessionFacade {
       }
     },
     storeResult(toolName: string, value: unknown): void {
-      if (!session.metadata) {
-        session.metadata = {};
+      if (!session.results) {
+        session.results = {};
       }
-      // Ensure results map exists
-      if (!session.metadata.results || typeof session.metadata.results !== 'object') {
-        session.metadata.results = {};
-      }
-      // Store result in the results map
-      (session.metadata.results as Record<string, unknown>)[toolName] = value;
+      session.results[toolName] = value;
       session.updatedAt = new Date();
     },
     getResult<T = unknown>(toolName: string): T | undefined {
-      const results = session.metadata?.results;
-      if (!results || typeof results !== 'object') {
-        return undefined;
-      }
-      return (results as Record<string, unknown>)[toolName] as T | undefined;
+      return session.results?.[toolName] as T | undefined;
     },
   };
 }
