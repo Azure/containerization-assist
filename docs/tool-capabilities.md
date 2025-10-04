@@ -495,7 +495,7 @@ const contentTools = tools.filter(t =>
 
 1. **Analysis Phase**: `analyze-repo` → Understand project structure
 2. **Generation Phase**: `generate-dockerfile`, `generate-k8s-manifests` → Create assets
-3. **Validation Phase**: `scan`, `validate` → Security and quality checks
+3. **Validation Phase**: `scan-image`, `validate` → Security and quality checks
 4. **Build Phase**: `build-image` → Create container images
 5. **Deploy Phase**: `deploy`, `verify-deployment` → Production deployment
 6. **Operations Phase**: `ops`, `inspect-session` → Ongoing management

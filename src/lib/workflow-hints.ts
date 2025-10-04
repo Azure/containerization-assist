@@ -62,7 +62,7 @@ function getWorkflowContext(session?: SessionFacade, sessionId?: string): Workfl
     hasAnalysis: hasResult('analyze-repo'),
     hasDockerfile: hasResult('generate-dockerfile'),
     hasImage: hasResult('build-image'),
-    hasScanned: hasResult('scan'),
+    hasScanned: hasResult('scan-image'),
     hasTagged: hasResult('tag-image'),
     hasPushed: hasResult('push-image'),
     hasManifests: hasResult('generate-k8s-manifests'),
@@ -85,10 +85,10 @@ export function getPostBuildHint(
 
   if (!ctx.hasScanned) {
     return {
-      nextStep: 'scan',
+      nextStep: 'scan-image',
       message: ctx.sessionId
-        ? `Image built successfully. Use "scan" with sessionId ${ctx.sessionId} to check for security vulnerabilities.${optimizationSuggestions ? ' Review AI optimization suggestions for improvements.' : ''}`
-        : `Image built successfully. Use "scan" to check for security vulnerabilities.${optimizationSuggestions ? ' Review AI optimization suggestions for improvements.' : ''}`,
+        ? `Image built successfully. Use "scan-image" with sessionId ${ctx.sessionId} to check for security vulnerabilities.${optimizationSuggestions ? ' Review AI optimization suggestions for improvements.' : ''}`
+        : `Image built successfully. Use "scan-image" to check for security vulnerabilities.${optimizationSuggestions ? ' Review AI optimization suggestions for improvements.' : ''}`,
     };
   }
 

@@ -46,7 +46,7 @@ export const TOOL_NAMES = {
   PREPARE_CLUSTER: 'prepare-cluster',
   PUSH_IMAGE: 'push-image',
   RESOLVE_BASE_IMAGES: 'resolve-base-images',
-  SCAN: 'scan',
+  SCAN_IMAGE: 'scan-image',
   TAG_IMAGE: 'tag-image',
   VERIFY_DEPLOY: 'verify-deploy',
 } as const;
@@ -72,7 +72,7 @@ planManifestGenerationTool.name = TOOL_NAMES.PLAN_MANIFEST_GENERATION;
 prepareClusterTool.name = TOOL_NAMES.PREPARE_CLUSTER;
 pushImageTool.name = TOOL_NAMES.PUSH_IMAGE;
 resolveBaseImagesTool.name = TOOL_NAMES.RESOLVE_BASE_IMAGES;
-scanTool.name = TOOL_NAMES.SCAN;
+scanTool.name = TOOL_NAMES.SCAN_IMAGE;
 tagImageTool.name = TOOL_NAMES.TAG_IMAGE;
 verifyDeployTool.name = TOOL_NAMES.VERIFY_DEPLOY;
 

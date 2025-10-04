@@ -395,7 +395,7 @@ export const scanImage = scanImageImpl;
 
 // New Tool interface export
 const tool: Tool<typeof scanImageSchema, ScanImageResult> = {
-  name: 'scan',
+  name: 'scan-image',
   description: 'Scan Docker images for security vulnerabilities',
   version: '2.0.0',
   schema: scanImageSchema,

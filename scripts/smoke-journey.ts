@@ -91,7 +91,7 @@ async function runSmokeTest(): Promise<void> {
     },
     {
       name: 'Scan Image',
-      tool: 'scan',
+      tool: 'scan-image',
       params: {
         imageName: 'smoke-test:latest',
       },
@@ -153,7 +153,7 @@ async function runSmokeTest(): Promise<void> {
           const outputPath = join(OUTPUT_DIR, 'analysis.json');
           writeFileSync(outputPath, JSON.stringify(result.data, null, 2));
           logger.debug(`Saved analysis to ${outputPath}`);
-        } else if (step.tool === 'scan' && result.data) {
+        } else if (step.tool === 'scan-image' && result.data) {
           const outputPath = join(OUTPUT_DIR, 'scan-results.json');
           writeFileSync(outputPath, JSON.stringify(result.data, null, 2));
           logger.debug(`Saved scan results to ${outputPath}`);

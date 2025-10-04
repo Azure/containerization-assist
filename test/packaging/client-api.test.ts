@@ -10,7 +10,7 @@
 import { execSync } from 'child_process';
 import { existsSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import * as tmp from 'tmp';
+import { fileSync, dirSync } from 'tmp';
 
 const PROJECT_ROOT = join(__dirname, '../..');
 
@@ -18,7 +18,7 @@ const PROJECT_ROOT = join(__dirname, '../..');
  * Helper to securely create a test script file
  */
 function createTestScript(dir: string, prefix: string, content: string): string {
-  const tmpFile = tmp.fileSync({ dir, prefix, postfix: '.js' });
+  const tmpFile = fileSync({ dir, prefix, postfix: '.js' });
   writeFileSync(tmpFile.name, content);
   return tmpFile.name;
 }
@@ -40,7 +40,7 @@ describe('Client API Compatibility', () => {
     packageTarball = join(PROJECT_ROOT, result);
     
     // Create test directory securely
-    testDir = tmp.dirSync({ prefix: 'client-api-test-', unsafeCleanup: true }).name;
+    testDir = dirSync({ prefix: 'client-api-test-', unsafeCleanup: true }).name;
     
     // Set up client test environment
     clientTestDir = join(testDir, 'client');
@@ -147,7 +147,7 @@ describe('Client API Compatibility', () => {
           'ANALYZE_REPO',
           'BUILD_IMAGE',
           'GENERATE_DOCKERFILE',
-          'SCAN',
+          'SCAN_IMAGE',
           'TAG_IMAGE'
         ];
 
@@ -163,7 +163,7 @@ describe('Client API Compatibility', () => {
           ANALYZE_REPO: 'analyze-repo',
           BUILD_IMAGE: 'build-image',
           GENERATE_DOCKERFILE: 'generate-dockerfile',
-          SCAN: 'scan',
+          SCAN_IMAGE: 'scan-image',
           TAG_IMAGE: 'tag-image'
         };
 
@@ -332,7 +332,7 @@ describe('Client API Compatibility', () => {
             [TOOLS.ANALYZE_REPO]: 'analyzeRepository',
             [TOOLS.BUILD_IMAGE]: 'buildImage',
             [TOOLS.GENERATE_DOCKERFILE]: 'generateDockerfile',
-            [TOOLS.SCAN]: 'scanImage',
+            [TOOLS.SCAN_IMAGE]: 'scanImage',
             [TOOLS.TAG_IMAGE]: 'tagImage'
           }
         });
@@ -367,13 +367,13 @@ describe('Client API Compatibility', () => {
           [TOOLS.ANALYZE_REPO]: 'analyzeRepository',
           [TOOLS.BUILD_IMAGE]: 'buildImage',
           [TOOLS.GENERATE_DOCKERFILE]: 'generateDockerfile',
-          [TOOLS.SCAN]: 'scanImage',
+          [TOOLS.SCAN_IMAGE]: 'scanImage',
           [TOOLS.TAG_IMAGE]: 'tagImage'
         };
 
         console.log(Object.keys(mapping).length);
         console.log(mapping['analyze-repo']);
-        console.log(mapping['scan']);
+        console.log(mapping['scan-image']);
       `;
 
       const scriptPath = createTestScript(clientTestDir, 'test-mapping-', testScript);
