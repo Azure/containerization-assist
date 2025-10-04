@@ -2,7 +2,7 @@
 
 /**
  * Minimal MCP server example with Container Assist tools
- * This is the simplest possible working exampleI
+ * This is the simplest possible working example
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
