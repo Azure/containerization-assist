@@ -55,7 +55,7 @@
     "clean": "rm -rf dist dist-cjs coverage .tsbuildinfo*",
     "build": "npm run clean && npm run build:esm && npm run build:cjs",
     "build:esm": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json --resolve-full-paths && chmod +x dist/src/cli/cli.js",
-    "build:cjs": "tsc -p tsconfig.cjs.json && tsc-alias -p tsconfig.cjs.json",
+    "build:cjs": "tsc -p tsconfig.cjs.json && tsc-alias -p tsconfig.cjs.json && echo '{\"type\":\"commonjs\"}' > dist-cjs/package.json",
     "build:watch": "tsc --project tsconfig.json --watch",
     "build:verify": "tsx scripts/verify-build.ts",
     "dev": "tsx watch src/cli/cli.ts",

@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 
 /**
- * Test that simulates a client importing our package (ESM)
+ * Test that simulates a client importing our package (CommonJS)
  * Validates modern API: createApp, TOOLS, getAllInternalTools
  */
 
-console.log('Testing client import (ESM)...\n');
+console.log('Testing client import (CommonJS)...\n');
 
 try {
-  // Import the ESM build
-  const pkg = await import('../../dist/src/index.js');
+  // Import the CommonJS build like a webpack client would
+  const pkg = require('../../dist-cjs/src/index.js');
   const { createApp, TOOLS, getAllInternalTools, ALL_TOOLS } = pkg;
 
   console.log('✅ Successfully imported package');
@@ -54,7 +54,7 @@ try {
     console.log('✅ ALL_TOOLS array exported');
   }
 
-  console.log('\n🎉 All ESM import tests passed!');
+  console.log('\n🎉 All CommonJS import tests passed!');
 } catch (error) {
   console.error('❌ Import failed:', error.message);
   console.error(error);

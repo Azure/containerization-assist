@@ -178,7 +178,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
     bindToMCP: (server: McpServerLike, transportLabel = 'external') => {
       ensureOrchestrator();
 
-      activeServer = server.server as Server;
+      activeServer = server.server;
 
       registerToolsWithServer({
         server,

@@ -64,10 +64,10 @@ Examples:
 
 MCP Tools Available:
   • Analysis: analyze-repo, resolve-base-images
-  • Build: generate-dockerfile, build-image, scan-image
+  • Build: generate-dockerfile, build-image, scan
   • Registry: tag-image, push-image
-  • Deploy: generate-k8s-manifests, deploy
-  • Additional: ops, inspect-session
+  • Deploy: generate-k8s-manifests, prepare-cluster, deploy, verify-deploy
+  • Additional: ops, inspect-session, fix-dockerfile
 
 For detailed documentation, see: docs/README.md
 For examples and tutorials, see: docs/examples/

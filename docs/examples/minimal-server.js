@@ -2,18 +2,18 @@
 
 /**
  * Minimal MCP server example with Container Assist tools
- * This is the simplest possible working example
+ * This is the simplest possible working example using the modern API
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
-// Import Container Assist tools
-import { createContainerAssistServer } from '@thgamble/containerization-assist-mcp';
+// Import Container Assist modern API
+import { createApp } from '@thgamble/containerization-assist-mcp';
 
 async function main() {
   console.error('Starting MCP server with Container Assist tools...');
-  
+
   try {
     // Create the MCP server
     const server = new Server(
@@ -28,26 +28,23 @@ async function main() {
       }
     );
 
-    // Create Container Assist instance and bind tools
+    // Create Container Assist app runtime and bind to MCP server
     console.error('Setting up Container Assist tools...');
-    const caServer = createContainerAssistServer();
-    
-    // Register specific tools (or use bindAll for all tools)
-    caServer.bindSampling({ server });
-    caServer.registerTools(
-      { server },
-      { tools: ['analyze_repo', 'generate_dockerfile', 'build_image'] }
-    );
-    
+    const app = createApp();
+
+    // Bind all tools to the MCP server
+    app.bindToMCP({ server });
+
     // Create stdio transport
     const transport = new StdioServerTransport();
-    
+
     // Connect server to transport
     await server.connect(transport);
-    
+
+    const tools = app.listTools();
     console.error('✅ MCP server started successfully with Container Assist tools');
-    console.error('Available tools: analyze_repo, generate_dockerfile, build_image');
-    
+    console.error(`Available tools (${tools.length}): ${tools.slice(0, 5).map(t => t.name).join(', ')}...`);
+
   } catch (error) {
     console.error('Failed to start MCP server:', error);
     process.exit(1);
