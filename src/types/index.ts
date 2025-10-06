@@ -29,8 +29,6 @@ import type { Topic } from './topics';
 export interface WorkflowState {
   /** Unique session identifier */
   sessionId: string;
-  /** Results from completed tools, keyed by tool name */
-  results?: Record<string, unknown>;
   /** List of completed step names */
   completed_steps?: string[];
   /** Session creation timestamp */

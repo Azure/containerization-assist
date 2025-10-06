@@ -20,7 +20,7 @@
  */
 
 import * as yaml from 'js-yaml';
-import { getToolLogger, createToolTimer, storeToolResults } from '@/lib/tool-helpers';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { getPostDeployHint } from '@/lib/workflow-hints';
 import type { Logger } from '@/lib/logger';
 import { extractErrorMessage } from '@/lib/error-utils';
@@ -500,38 +500,11 @@ async function deployApplicationImpl(
     );
     const k8sClient = createKubernetesClient(logger);
 
-    // Get K8s manifests from session using getResult (normalized approach)
-    let manifestContents: string | undefined;
-    try {
-      if (context.session) {
-        const k8sResult = context.session.getResult<{ manifests?: string }>(
-          'generate-k8s-manifests',
-        );
-        if (k8sResult?.manifests) {
-          manifestContents = k8sResult.manifests;
-          logger.info({ sessionId }, 'Retrieved K8s manifests from session results');
-        }
-      }
-    } catch (error) {
-      logger.error({ error }, 'Failed to get K8s manifests from session');
-    }
-
-    if (!manifestContents) {
-      return Failure(
-        'No Kubernetes manifests found in session. Please run generate-k8s-manifests tool first.',
-      );
-    }
-
     // Parse and validate manifests
     let manifests: KubernetesManifest[];
     try {
       // The manifests are already a string containing all YAML documents
-
-      if (!manifestContents) {
-        return Failure('No valid manifest content found in session');
-      }
-
-      manifests = parseManifest(manifestContents, logger);
+      manifests = parseManifest(params.manifestsPath, logger);
     } catch (error) {
       return Failure(`Failed to parse manifests: ${extractErrorMessage(error)}`);
     }
@@ -817,21 +790,6 @@ async function deployApplicationImpl(
         deploymentAnalysis ? String(deploymentAnalysis) : undefined,
       ),
     };
-
-    // Store results in session
-    const existingResults = context.session?.get('results') || {};
-    context.session?.set('results', {
-      ...existingResults,
-      deploy: result,
-    });
-
-    // Store in sessionManager for cross-tool persistence using helper
-    await storeToolResults(context, sessionId, 'deploy', {
-      namespace,
-      deploymentName,
-      ready,
-      endpoints,
-    });
 
     timer.end({ deploymentName, ready, sessionId });
 

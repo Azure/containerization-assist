@@ -182,9 +182,8 @@ Next Step: Use generate-${manifestType === 'kubernetes' ? 'k8s-manifests' : mani
   };
 
   if (sessionId && ctx.session) {
-    ctx.session.storeResult('plan-manifest-generation', plan);
     ctx.session.set('manifestPlanGenerated', true);
-    ctx.logger.info({ sessionId, manifestType }, 'Stored manifest plan in session');
+    ctx.logger.info({ sessionId, manifestType }, 'Marked manifest plan as generated in session');
   }
 
   ctx.logger.info(

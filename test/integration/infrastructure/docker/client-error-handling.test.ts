@@ -327,14 +327,23 @@ describe('Docker Client Error Handling Integration Tests', () => {
       });
 
       if (buildResult.ok) {
-        // Try to push to Docker Hub without authentication
-        const pushResult = await dockerClient.pushImage('test-push-unauthorized', 'latest');
+        // Tag the image with a registry prefix to trigger actual push attempt
+        const tagResult = await dockerClient.tagImage(
+          'test-push-unauthorized:latest',
+          'docker.io/unauthorized-test-repo',
+          'latest'
+        );
 
-        expect(pushResult.ok).toBe(false);
-        if (!pushResult.ok) {
-          // Should detect authentication issues with meaningful error message
-          expect(pushResult.error).toMatch(/authentication|unauthorized|access denied|401|403|X-Registry-Auth|bad parameters/i);
-          expect(pushResult.error).not.toBe('Failed to push image: Unknown error');
+        if (tagResult.ok) {
+          // Try to push to Docker Hub without authentication
+          const pushResult = await dockerClient.pushImage('docker.io/unauthorized-test-repo', 'latest');
+
+          expect(pushResult.ok).toBe(false);
+          if (!pushResult.ok) {
+            // Should detect authentication issues with meaningful error message
+            expect(pushResult.error).toMatch(/authentication|unauthorized|access denied|401|403|X-Registry-Auth|bad parameters/i);
+            expect(pushResult.error).not.toBe('Failed to push image: Unknown error');
+          }
         }
       }
     }, testTimeout);

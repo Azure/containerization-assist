@@ -25,51 +25,19 @@ async function run(
 ): Promise<Result<AIResponse>> {
   const { chartVersion = '0.1.0', description } = input;
 
-  // Retrieve appName from session if not provided
-  let appName = input.appName;
-  if (!appName && input.sessionId && ctx.session) {
-    appName = ctx.session.get<string>('appName');
-    if (appName) {
-      ctx.logger.info({ appName }, 'Using app name from session (analyze-repo)');
-    }
-  }
-
-  // Retrieve imageId from session if not provided
-  let imageId = input.imageId;
-  if (!imageId && input.sessionId && ctx.session) {
-    const buildResult = ctx.session.getResult<{ tags?: string[] }>('build-image');
-    if (buildResult?.tags && buildResult.tags.length > 0) {
-      imageId = buildResult.tags[0];
-      ctx.logger.info({ imageId }, 'Using image from session (build-image)');
-    }
-  }
-
-  // Retrieve port from session if not explicitly provided in input
-  let servicePort: number | undefined = input.port;
-  if (!servicePort || servicePort === 8080) {
-    // If port is default or not provided, try to get from session
-    if (input.sessionId && ctx.session) {
-      const appPorts = ctx.session.get<number[]>('appPorts');
-      if (appPorts && appPorts.length > 0) {
-        servicePort = appPorts[0];
-        ctx.logger.info({ port: servicePort }, 'Using port from session (analyze-repo)');
-      }
-    }
-  }
+  const appName = input.appName;
+  const imageId = input.imageId;
 
   // Use chartName from input or default to appName
   const chartName = input.chartName || appName;
 
-  // Validate required parameters
   if (!chartName) {
     return Failure(
-      'Chart name or application name is required. Either provide chartName/appName parameter or run analyze-repo first with a sessionId.',
+      'Chart name or application name is required. Provide chartName or appName parameter.',
     );
   }
   if (!imageId) {
-    return Failure(
-      'Container image is required. Either provide imageId parameter or run build-image first with a sessionId.',
-    );
+    return Failure('Container image is required. Provide imageId parameter.');
   }
 
   try {

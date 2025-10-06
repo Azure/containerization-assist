@@ -67,7 +67,6 @@ function scoreTaggingStrategy(text: string): number {
 async function buildTaggingPrompt(
   imageId: string,
   currentTag: string,
-  sessionContext?: unknown,
 ): Promise<{ messages: MCPMessage[]; maxTokens: number }> {
   const basePrompt = `You are a Docker tagging expert. Analyze tagging strategies and provide specific recommendations.
 
@@ -84,7 +83,6 @@ Analyze this Docker image tagging scenario and provide strategy recommendations:
 
 **Image ID:** ${imageId}
 **Current Tag:** ${currentTag}
-${sessionContext ? `**Session Context:** ${JSON.stringify(sessionContext, null, 2)}` : ''}
 
 Please provide:
 1. **Tag Strategy:** Best practices for this tagging approach
@@ -111,12 +109,11 @@ async function generateTaggingSuggestions(
   imageId: string,
   currentTag: string,
   ctx: ToolContext,
-  sessionContext?: Record<string, unknown>,
 ): Promise<Result<TaggingStrategySuggestions>> {
   try {
     const suggestionResult = await sampleWithRerank(
       ctx,
-      async () => buildTaggingPrompt(imageId, currentTag, sessionContext),
+      async () => buildTaggingPrompt(imageId, currentTag),
       scoreTaggingStrategy,
       {},
     );
@@ -215,14 +212,10 @@ async function run(
   try {
     const dockerClient = createDockerClient(logger);
 
-    // Check for built image in session using getResult (normalized approach) or use provided imageId
-    const buildResult = ctx.session.getResult<{ imageId?: string; tags?: string[] }>('build-image');
-    const source = input.imageId || buildResult?.imageId;
+    const source = input.imageId;
 
     if (!source) {
-      return Failure(
-        'No image specified. Provide imageId parameter or ensure session has built image from build-image tool.',
-      );
+      return Failure('No image specified. Provide imageId parameter.');
     }
 
     // Tag image using lib docker client
@@ -248,14 +241,7 @@ async function run(
     // Generate AI-powered tagging suggestions
     let taggingSuggestions: TaggingStrategySuggestions | undefined;
     try {
-      // Collect session context from structured data (no nested metadata)
-      const sessionContext = {
-        appName: ctx.session.get<string>('appName'),
-        analyzedPath: ctx.session.get<string>('analyzedPath'),
-        dockerfileGenerated: ctx.session.get<boolean>('dockerfileGenerated'),
-      };
-
-      const suggestionResult = await generateTaggingSuggestions(source, tag, ctx, sessionContext);
+      const suggestionResult = await generateTaggingSuggestions(source, tag, ctx);
 
       if (suggestionResult.ok) {
         taggingSuggestions = suggestionResult.value;
@@ -284,9 +270,6 @@ async function run(
         message: `Image tagged successfully as ${tag}. Use "push-image" with sessionId ${sessionId} to push the tagged image to a registry.${taggingSuggestions ? ' Review AI tagging suggestions for strategy improvements.' : ''}`,
       },
     };
-
-    // Store results in session using standardized storeResult
-    ctx.session?.storeResult('tag-image', result);
 
     timer.end({ tags, sessionId });
 

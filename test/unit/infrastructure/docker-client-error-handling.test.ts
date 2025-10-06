@@ -4,10 +4,44 @@
 
 import { createDockerClient } from '../../../src/infra/docker/client';
 import { createLogger } from '../../../src/lib/logger';
+import type Docker from 'dockerode';
+
+// Mock dockerode
+jest.mock('dockerode');
 
 describe('Docker Client Enhanced Error Handling', () => {
   const logger = createLogger({ level: 'silent' });
-  const dockerClient = createDockerClient(logger);
+  let mockDockerInstance: any;
+  let mockGetImage: jest.Mock;
+  let mockPush: jest.Mock;
+  let mockTag: jest.Mock;
+  let mockInspect: jest.Mock;
+
+  beforeEach(() => {
+    // Reset all mocks before each test
+    jest.clearAllMocks();
+
+    // Create mock functions
+    mockPush = jest.fn();
+    mockTag = jest.fn();
+    mockInspect = jest.fn();
+    mockGetImage = jest.fn();
+
+    // Setup mock Docker instance
+    mockDockerInstance = {
+      getImage: mockGetImage,
+      modem: {
+        followProgress: jest.fn((stream, onFinished, onProgress) => {
+          // Default: call onFinished with no error
+          onFinished(null);
+        }),
+      },
+    };
+
+    // Mock the Docker constructor
+    const DockerMock = require('dockerode');
+    DockerMock.mockImplementation(() => mockDockerInstance);
+  });
 
   describe('extractDockerErrorMessage', () => {
     test('should handle network connectivity errors', () => {
@@ -50,6 +84,18 @@ describe('Docker Client Enhanced Error Handling', () => {
 
   describe('getImage error scenarios', () => {
     test('should return meaningful error for non-existent image', async () => {
+      // Mock getImage to throw an error
+      mockInspect.mockRejectedValue({
+        statusCode: 404,
+        json: { message: 'No such image: nonexistent:latest' },
+        reason: 'no such image'
+      });
+
+      mockGetImage.mockReturnValue({
+        inspect: mockInspect
+      });
+
+      const dockerClient = createDockerClient(logger);
       const result = await dockerClient.getImage('nonexistent:latest');
 
       expect(result.ok).toBe(false);
@@ -62,6 +108,18 @@ describe('Docker Client Enhanced Error Handling', () => {
 
   describe('tagImage error scenarios', () => {
     test('should return meaningful error for invalid image ID', async () => {
+      // Mock tag to throw an error
+      mockTag.mockRejectedValue({
+        statusCode: 404,
+        json: { message: 'No such image: invalid-id' },
+        reason: 'no such image'
+      });
+
+      mockGetImage.mockReturnValue({
+        tag: mockTag
+      });
+
+      const dockerClient = createDockerClient(logger);
       const result = await dockerClient.tagImage('invalid-id', 'test', 'latest');
 
       expect(result.ok).toBe(false);
@@ -74,6 +132,19 @@ describe('Docker Client Enhanced Error Handling', () => {
 
   describe('pushImage error scenarios', () => {
     test('should return meaningful error for non-existent image', async () => {
+      // Mock push to throw an error immediately
+      mockPush.mockRejectedValue({
+        statusCode: 404,
+        json: { message: 'No such image: nonexistent:latest' },
+        reason: 'no such image'
+      });
+
+      mockGetImage.mockReturnValue({
+        push: mockPush,
+        inspect: mockInspect
+      });
+
+      const dockerClient = createDockerClient(logger);
       const result = await dockerClient.pushImage('nonexistent', 'latest');
 
       expect(result.ok).toBe(false);
