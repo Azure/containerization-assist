@@ -25,6 +25,7 @@ import pushImageTool from './push-image/tool';
 import resolveBaseImagesTool from './resolve-base-images/tool';
 import scanTool from './scan/tool';
 import tagImageTool from './tag-image/tool';
+import validateImageTool from './validate-image/tool';
 import verifyDeployTool from './verify-deployment/tool';
 
 // Tool name constants for type safety
@@ -48,6 +49,7 @@ export const TOOL_NAMES = {
   RESOLVE_BASE_IMAGES: 'resolve-base-images',
   SCAN: 'scan',
   TAG_IMAGE: 'tag-image',
+  VALIDATE_IMAGE: 'validate-image',
   VERIFY_DEPLOY: 'verify-deploy',
 } as const;
 
@@ -74,6 +76,7 @@ pushImageTool.name = TOOL_NAMES.PUSH_IMAGE;
 resolveBaseImagesTool.name = TOOL_NAMES.RESOLVE_BASE_IMAGES;
 scanTool.name = TOOL_NAMES.SCAN;
 tagImageTool.name = TOOL_NAMES.TAG_IMAGE;
+validateImageTool.name = TOOL_NAMES.VALIDATE_IMAGE;
 verifyDeployTool.name = TOOL_NAMES.VERIFY_DEPLOY;
 
 // Create a union type of all tool types for better type safety
@@ -97,6 +100,7 @@ export type AllToolTypes =
   | typeof resolveBaseImagesTool
   | typeof scanTool
   | typeof tagImageTool
+  | typeof validateImageTool
   | typeof verifyDeployTool;
 
 // Type-safe tool array using the union type
@@ -120,6 +124,7 @@ export const ALL_TOOLS: readonly AllToolTypes[] = [
   resolveBaseImagesTool,
   scanTool,
   tagImageTool,
+  validateImageTool,
   verifyDeployTool,
 ] as const;
 
