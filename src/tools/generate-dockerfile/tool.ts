@@ -18,7 +18,7 @@ import type { ToolContext } from '@/mcp/context';
 import type { Tool } from '@/types/tool';
 import { generateDockerfileSchema } from './schema';
 import type { AIResponse } from '../ai-response-types';
-import type { RepositoryAnalysis, ModuleInfo } from '@/tools/analyze-repo/schema';
+import type { ModuleInfo } from '@/tools/analyze-repo/schema';
 import { promises as fs } from 'node:fs';
 import nodePath from 'node:path';
 import { DockerfileParser } from 'dockerfile-ast';
@@ -53,100 +53,63 @@ async function generateSingleDockerfile(
 ): Promise<Result<AIResponse>> {
   const { multistage, securityHardening, optimization, sessionId, baseImagePreference } = input;
 
-  // Retrieve repository path from session if not provided
-  let path = input.path;
-  const directoryPaths = input.dockerfileDirectoryPaths ?? [];
+  // Determine repository path
+  const path = input.path;
 
-  if (!path && directoryPaths.length > 0) {
-    const firstDir = directoryPaths[0];
-    const normalizedDir = firstDir.toLowerCase().endsWith('dockerfile')
-      ? nodePath.dirname(firstDir)
-      : firstDir;
-    path = normalizedDir;
-    ctx.logger.info(
-      { path: normalizedDir },
-      'Using repository path from dockerfileDirectoryPaths input',
-    );
-  }
-
-  const analyzedPathFromSession: string = '';
-  const analysis: RepositoryAnalysis | null = null;
-
-  const analysisPath =
-    analysis && typeof (analysis as { analyzedPath?: unknown }).analyzedPath === 'string'
-      ? ((analysis as { analyzedPath?: string }).analyzedPath as string)
-      : undefined;
-
-  if (!path && analyzedPathFromSession) {
-    path = analyzedPathFromSession;
-    ctx.logger.info({ path }, 'Using repository path from stored workflow session');
-  } else if (!path && analysisPath) {
-    path = analysisPath;
-    ctx.logger.info({ path }, 'Using repository path from analyze-repo result data');
-  }
-
-  // Determine target module path
+  // Determine target module path and dockerfile path
   const targetModulePath = targetModule?.path;
+  const targetDockerfilePath = targetModule?.dockerfilePath;
 
-  // Retrieve repository analysis from session if sessionId is provided
+  // Initialize variables from module data if available
   let language = 'auto-detect';
   let framework: string | undefined;
   let dependencies: string[] = [];
   let ports: number[] = [8080];
   let requirements: string | undefined;
-  const recommendedBaseImage =
-    analysis &&
-    typeof (analysis as { dockerConfig?: { baseImage?: string } }).dockerConfig?.baseImage ===
-      'string'
-      ? ((analysis as { dockerConfig?: { baseImage?: string } }).dockerConfig?.baseImage as string)
-      : undefined;
-  const baseImage: string | undefined = input.baseImage ?? recommendedBaseImage;
+  const baseImage: string | undefined = input.baseImage;
 
-  // Process analysis data if available (already retrieved from sessionManager above)
-  if (analysis) {
-    // If generating for a specific module, use module-specific data
-    if (targetModule) {
-      language = targetModule.language || 'auto-detect';
-      framework = targetModule.framework;
-      dependencies = targetModule.dependencies || [];
-      ports = targetModule.ports || [8080];
+  // If generating for a specific module, use module-specific data
+  if (targetModule) {
+    language = targetModule.language || 'auto-detect';
+    framework = targetModule.framework;
+    dependencies = targetModule.dependencies || [];
+    ports = targetModule.ports || [8080];
 
-      // Build requirements from module analysis
-      const reqParts: string[] = [];
-      reqParts.push(`Module: ${targetModule.name}`);
-      reqParts.push(`Path: ${targetModule.path}`);
-      if (language)
-        reqParts.push(
-          `Language: ${language}${targetModule.languageVersion ? ` (${targetModule.languageVersion})` : ''}`,
-        );
-      if (framework)
-        reqParts.push(
-          `Framework: ${framework}${targetModule.frameworkVersion ? ` (${targetModule.frameworkVersion})` : ''}`,
-        );
-      if (targetModule.buildSystem?.type)
-        reqParts.push(`Build System: ${targetModule.buildSystem.type}`);
-      if (dependencies.length > 0) {
-        reqParts.push(
-          `Key Dependencies: ${dependencies.slice(0, 5).join(', ')}${dependencies.length > 5 ? '...' : ''}`,
-        );
-      }
-      if (targetModule.entryPoint) reqParts.push(`Entry Point: ${targetModule.entryPoint}`);
-      requirements = reqParts.join('\n');
-
-      ctx.logger.info(
-        { sessionId, moduleName: targetModule.name, language, framework },
-        'Using module-specific analysis data',
+    // Build requirements from module analysis
+    const reqParts: string[] = [];
+    reqParts.push(`Module: ${targetModule.name}`);
+    reqParts.push(`Path: ${targetModule.path}`);
+    if (language)
+      reqParts.push(
+        `Language: ${language}${targetModule.languageVersion ? ` (${targetModule.languageVersion})` : ''}`,
+      );
+    if (framework)
+      reqParts.push(
+        `Framework: ${framework}${targetModule.frameworkVersion ? ` (${targetModule.frameworkVersion})` : ''}`,
+      );
+    if (targetModule.buildSystem?.type)
+      reqParts.push(`Build System: ${targetModule.buildSystem.type}`);
+    if (dependencies.length > 0) {
+      reqParts.push(
+        `Key Dependencies: ${dependencies.slice(0, 5).join(', ')}${dependencies.length > 5 ? '...' : ''}`,
       );
     }
+    if (targetModule.entryPoint) reqParts.push(`Entry Point: ${targetModule.entryPoint}`);
+    requirements = reqParts.join('\n');
+
+    ctx.logger.info(
+      { sessionId, moduleName: targetModule.name, language, framework },
+      'Using module-specific analysis data',
+    );
   } else if (path) {
-    // No sessionId provided, analyze repository directly
+    // No module data provided, analyze repository directly
     requirements = `Analyze the repository at ${path} to detect the technology stack, dependencies, and requirements.`;
   }
 
-  // Path is required - fail if still not available after all attempts
+  // Path is required
   if (!path) {
     return Failure(
-      'Repository path is required. Either provide path parameter or run analyze-repo first with a sessionId.',
+      'Repository path is required. Provide the path parameter or dockerfileDirectoryPaths.',
     );
   }
 
@@ -449,33 +412,25 @@ ${finalDockerfileContent}
 
     // Determine where to write the Dockerfile
     let dockerfilePath = '';
-    const candidateBases = [analyzedPathFromSession, analysisPath, path, ...directoryPaths].filter(
-      (candidate): candidate is string => Boolean(candidate),
-    );
 
-    const uniqueBases = Array.from(new Set(candidateBases));
-
-    for (const base of uniqueBases) {
-      const resolvedBase = nodePath.isAbsolute(base) ? base : nodePath.resolve(process.cwd(), base);
-
-      let candidatePath: string;
-
-      if (resolvedBase.toLowerCase().endsWith('dockerfile')) {
-        candidatePath = resolvedBase;
-      } else if (targetModulePath) {
-        const normalizedModulePath = nodePath.normalize(targetModulePath);
-        if (resolvedBase.endsWith(normalizedModulePath)) {
-          candidatePath = nodePath.join(resolvedBase, 'Dockerfile');
-        } else {
-          candidatePath = nodePath.join(resolvedBase, normalizedModulePath, 'Dockerfile');
-        }
-      } else {
-        candidatePath = nodePath.join(resolvedBase, 'Dockerfile');
-      }
-
-      dockerfilePath = candidatePath;
-      ctx.logger.debug({ dockerfilePath }, 'Selected Dockerfile output path');
-      break;
+    if (targetDockerfilePath) {
+      // Module specified a custom dockerfile path
+      dockerfilePath = nodePath.isAbsolute(targetDockerfilePath)
+        ? targetDockerfilePath
+        : nodePath.resolve(process.cwd(), targetDockerfilePath);
+      ctx.logger.info({ dockerfilePath }, 'Using custom Dockerfile path from module');
+    } else if (targetModulePath) {
+      // Use module path
+      const resolvedModulePath = nodePath.isAbsolute(targetModulePath)
+        ? targetModulePath
+        : nodePath.resolve(process.cwd(), targetModulePath);
+      dockerfilePath = nodePath.join(resolvedModulePath, 'Dockerfile');
+      ctx.logger.debug({ dockerfilePath }, 'Using module path for Dockerfile');
+    } else if (path) {
+      // Use repository path
+      const resolvedPath = nodePath.isAbsolute(path) ? path : nodePath.resolve(process.cwd(), path);
+      dockerfilePath = nodePath.join(resolvedPath, 'Dockerfile');
+      ctx.logger.debug({ dockerfilePath }, 'Using repository path for Dockerfile');
     }
 
     // Write Dockerfile if we have a path
@@ -555,118 +510,106 @@ async function run(
   input: z.infer<typeof generateDockerfileSchema>,
   ctx: ToolContext,
 ): Promise<Result<AIResponse>> {
-  const { sessionId } = input;
+  const { modules } = input;
 
   // Check for multi-module/monorepo scenario
-  if (sessionId && ctx.session) {
-    const isMonorepo = ctx.session.get<boolean>('isMonorepo');
-    const modules = ctx.session.get<ModuleInfo[]>('modules');
-
-    if (isMonorepo && modules && modules.length > 0) {
-      // User explicitly specified a module
-      if (input.moduleName) {
-        const targetModule = modules.find((m) => m.name === input.moduleName);
-        if (!targetModule) {
-          return Failure(
-            `Module "${input.moduleName}" not found. Available modules: ${modules.map((m) => m.name).join(', ')}`,
-          );
-        }
-        ctx.logger.info(
-          { moduleName: targetModule.name, modulePath: targetModule.path },
-          'Generating Dockerfile for specific module',
-        );
-        return generateSingleDockerfile(input, ctx, targetModule);
+  if (modules && modules.length > 0) {
+    if (modules.length === 1) {
+      const targetModule = modules[0];
+      if (!targetModule) {
+        return Failure('Module array contains undefined element');
       }
-
-      // No module specified - generate for all modules automatically
       ctx.logger.info(
-        { moduleCount: modules.length },
-        'Generating Dockerfiles for all modules in monorepo',
+        { moduleName: targetModule.name, modulePath: targetModule.path },
+        'Generating Dockerfile for single module',
       );
+      return generateSingleDockerfile(input, ctx, targetModule as ModuleInfo);
+    }
 
-      const results: Array<{ module: string; success: boolean; path?: string; error?: string }> =
-        [];
-      const dockerfiles: Array<{ module: string; content: string; path?: string }> = [];
+    // Multiple modules - generate for all modules
+    ctx.logger.info({ moduleCount: modules.length }, 'Generating Dockerfiles for multiple modules');
 
-      for (const module of modules) {
-        ctx.logger.info({ moduleName: module.name }, 'Generating Dockerfile for module');
+    const results: Array<{ module: string; success: boolean; path?: string; error?: string }> = [];
+    const dockerfiles: Array<{ module: string; content: string; path?: string }> = [];
 
-        const result = await generateSingleDockerfile(input, ctx, module);
+    for (const module of modules) {
+      ctx.logger.info({ moduleName: module.name }, 'Generating Dockerfile for module');
 
-        if (result.ok) {
-          const value = result.value as {
-            content?: string;
-            workflowHints?: { message?: string };
-          };
-          const extractedPath = value.workflowHints?.message?.match(/written to: (.+)/)?.[1];
-          results.push({
-            module: module.name,
-            success: true,
-            ...(extractedPath ? { path: extractedPath } : {}),
-          });
-          dockerfiles.push({
-            module: module.name,
-            content: value.content || '',
-            ...(extractedPath ? { path: extractedPath } : {}),
-          });
-          ctx.logger.info({ moduleName: module.name }, 'Dockerfile generated successfully');
-        } else {
-          results.push({
-            module: module.name,
-            success: false,
-            error: result.error,
-          });
-          ctx.logger.warn(
-            { moduleName: module.name, error: result.error },
-            'Failed to generate Dockerfile for module',
-          );
-        }
-      }
+      const result = await generateSingleDockerfile(input, ctx, module as ModuleInfo);
 
-      const successCount = results.filter((r) => r.success).length;
-      const failureCount = results.filter((r) => !r.success).length;
-
-      if (successCount === 0) {
-        return Failure(
-          `Failed to generate Dockerfiles for all ${modules.length} modules:\n${results.map((r) => `- ${r.module}: ${r.error}`).join('\n')}`,
+      if (result.ok) {
+        const value = result.value as {
+          content?: string;
+          workflowHints?: { message?: string };
+        };
+        const extractedPath = value.workflowHints?.message?.match(/written to: (.+)/)?.[1];
+        results.push({
+          module: module.name,
+          success: true,
+          ...(extractedPath ? { path: extractedPath } : {}),
+        });
+        dockerfiles.push({
+          module: module.name,
+          content: value.content || '',
+          ...(extractedPath ? { path: extractedPath } : {}),
+        });
+        ctx.logger.info({ moduleName: module.name }, 'Dockerfile generated successfully');
+      } else {
+        results.push({
+          module: module.name,
+          success: false,
+          error: result.error,
+        });
+        ctx.logger.warn(
+          { moduleName: module.name, error: result.error },
+          'Failed to generate Dockerfile for module',
         );
       }
-
-      // Build summary response
-      const summary = `Generated Dockerfiles for ${successCount}/${modules.length} modules:\n${results
-        .filter((r) => r.success)
-        .map((r) => `✅ ${r.module}${r.path ? `: ${r.path}` : ''}`)
-        .join('\n')}${
-        failureCount > 0
-          ? `\n\n⚠️  Failed modules (${failureCount}):\n${results
-              .filter((r) => !r.success)
-              .map((r) => `❌ ${r.module}: ${r.error}`)
-              .join('\n')}`
-          : ''
-      }`;
-
-      return Success({
-        content: summary,
-        language: 'text',
-        confidence: successCount / modules.length,
-        suggestions: [
-          `Successfully generated ${successCount} Dockerfile(s)`,
-          failureCount > 0 ? `${failureCount} module(s) failed` : 'All modules successful',
-        ],
-        analysis: {
-          enhancementAreas: [],
-          confidence: successCount / modules.length,
-          knowledgeApplied: [],
-        },
-        workflowHints: {
-          nextStep: 'build-image',
-          message: `Dockerfiles generated for ${successCount} module(s). Use "build-image" for each module to build container images.`,
-        },
-      });
     }
+
+    const successCount = results.filter((r) => r.success).length;
+    const failureCount = results.filter((r) => !r.success).length;
+
+    if (successCount === 0) {
+      return Failure(
+        `Failed to generate Dockerfiles for all ${modules.length} modules:\n${results.map((r) => `- ${r.module}: ${r.error}`).join('\n')}`,
+      );
+    }
+
+    // Build summary response
+    const summary = `Generated Dockerfiles for ${successCount}/${modules.length} modules:\n${results
+      .filter((r) => r.success)
+      .map((r) => `✅ ${r.module}${r.path ? `: ${r.path}` : ''}`)
+      .join('\n')}${
+      failureCount > 0
+        ? `\n\n⚠️  Failed modules (${failureCount}):\n${results
+            .filter((r) => !r.success)
+            .map((r) => `❌ ${r.module}: ${r.error}`)
+            .join('\n')}`
+        : ''
+    }`;
+
+    return Success({
+      content: summary,
+      language: 'text',
+      confidence: successCount / modules.length,
+      suggestions: [
+        `Successfully generated ${successCount} Dockerfile(s)`,
+        failureCount > 0 ? `${failureCount} module(s) failed` : 'All modules successful',
+      ],
+      analysis: {
+        enhancementAreas: [],
+        confidence: successCount / modules.length,
+        knowledgeApplied: [],
+      },
+      workflowHints: {
+        nextStep: 'build-image',
+        message: `Dockerfiles generated for ${successCount} module(s). Use "build-image" for each module to build container images.`,
+      },
+    });
   }
 
-  // Single-module repository or no session data - generate for single app
+  // Single-module repository - generate for single app
   return generateSingleDockerfile(input, ctx);
 }
 

@@ -131,11 +131,6 @@ export const analysisOptions = {
 export const platform = z.string().optional().describe('Target platform (e.g., linux/amd64)');
 
 // Multi-module/monorepo support
-export const moduleName = z
-  .string()
-  .optional()
-  .describe('Module name for multi-module/monorepo projects');
-
 export const generateAllModules = z
   .boolean()
   .optional()

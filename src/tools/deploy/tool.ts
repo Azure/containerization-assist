@@ -802,13 +802,6 @@ async function deployApplicationImpl(
       ),
     };
 
-    // Store results in session
-    const existingResults = context.session?.get('results') || {};
-    context.session?.set('results', {
-      ...existingResults,
-      deploy: result,
-    });
-
     timer.end({ deploymentName, ready, sessionId });
 
     return Success(result);

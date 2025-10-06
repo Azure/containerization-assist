@@ -41,7 +41,7 @@ const mockSessionManager = {
     metadata: {},
     completed_steps: [],
     errors: {},
-    
+
     createdAt: '2025-09-08T11:12:40.362Z',
     updatedAt: '2025-09-08T11:12:40.362Z',
   }),
@@ -290,20 +290,6 @@ spec:
 
       // Verify deployment status was checked
       expect(mockKubernetesClient.getDeploymentStatus).toHaveBeenCalledWith('default', 'test-app');
-
-      // Verify session was updated with deployment result
-      expect(mockSessionFacade.set).toHaveBeenCalledWith(
-        'results',
-        expect.objectContaining({
-          deploy: expect.objectContaining({
-            namespace: 'default',
-            deploymentName: 'test-app',
-            serviceName: 'test-app',
-            ready: true,
-            success: true,
-          }),
-        }),
-      );
     });
 
     it('should use default values when config options not specified', async () => {

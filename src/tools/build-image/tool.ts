@@ -71,23 +71,12 @@ export interface BuildImageResult {
  */
 async function prepareBuildArgs(
   buildArgs: Record<string, string> = {},
-  params: BuildImageParams,
 ): Promise<Record<string, string>> {
   const defaults: Record<string, string> = {
     NODE_ENV: process.env.NODE_ENV ?? 'production',
     BUILD_DATE: new Date().toISOString(),
     VCS_REF: process.env.GIT_COMMIT ?? 'unknown',
   };
-
-  if (params.language) {
-    defaults.LANGUAGE = params.language;
-  }
-  if (params.framework) {
-    defaults.FRAMEWORK = params.framework;
-  }
-  if (params.frameworkVersion) {
-    defaults.FRAMEWORK_VERSION = params.frameworkVersion;
-  }
 
   return { ...defaults, ...buildArgs };
 }
@@ -369,7 +358,7 @@ async function buildImageImpl(
     }
 
     // Prepare build arguments
-    const finalBuildArgs = await prepareBuildArgs(buildArgs, params);
+    const finalBuildArgs = await prepareBuildArgs(buildArgs);
 
     // Analyze security
     const securityWarnings = analyzeBuildSecurity(dockerfileContent, finalBuildArgs);

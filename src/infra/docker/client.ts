@@ -421,6 +421,8 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
         }
 
         await new Promise<void>((resolve, reject) => {
+          let pushError: Error | null = null;
+
           docker.modem.followProgress(
             stream,
             (err: Error | null) => {
@@ -438,6 +440,9 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
                   'Docker push followProgress error',
                 );
                 reject(err);
+              } else if (pushError) {
+                // Reject if we encountered an error event during the push
+                reject(pushError);
               } else {
                 resolve();
               }
@@ -445,9 +450,14 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
             (event: DockerPushEvent) => {
               logger.debug(event, 'Docker push progress');
 
-              // Log errors from Docker events - dockerode provides explicit error fields
+              // Capture errors from Docker events - dockerode provides explicit error fields
               if (event.error || event.errorDetail) {
                 logger.error({ errorEvent: event }, 'Docker push error event received');
+                pushError = new Error(
+                  event.error ||
+                    (event.errorDetail as { message?: string })?.message ||
+                    'Unknown push error',
+                );
               }
 
               if (event.aux?.Digest) {

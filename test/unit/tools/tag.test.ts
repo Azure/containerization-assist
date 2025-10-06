@@ -124,14 +124,16 @@ describe('tagImage', () => {
         completed_steps: ['tag-image'],
         createdAt: new Date(),
         updatedAt: new Date(),
-      }
+      },
     });
 
     // Setup default successful Docker tag result
-    mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({
-      success: true,
-      imageId: 'sha256:mock-image-id',
-    }));
+    mockDockerClient.tagImage.mockResolvedValue(
+      createSuccessResult({
+        success: true,
+        imageId: 'sha256:mock-image-id',
+      }),
+    );
   });
 
   describe('Successful Tagging Operations', () => {
@@ -233,8 +235,6 @@ describe('tagImage', () => {
   });
 
   describe('Tag Format Validation', () => {
-
-
     it('should handle various valid tag formats', async () => {
       const validTags = [
         'myapp:v1.0.0',

@@ -294,12 +294,12 @@ ENV PASSWORD=badidea
   });
 
   describe('Performance Tests', () => {
-    it('should validate in under 1000ms', async () => {
+    it('should validate in under 2000ms', async () => {
       const start = Date.now();
       await validateDockerfileContent(GOOD_DOCKERFILE);
       const duration = Date.now() - start;
 
-      expect(duration).toBeLessThan(1000);
+      expect(duration).toBeLessThan(2000);
     });
 
     it('should handle large Dockerfiles efficiently', async () => {

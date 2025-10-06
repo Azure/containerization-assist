@@ -5,17 +5,21 @@
 import { z } from 'zod';
 import { sessionId, namespaceOptional, replicas, port, environment } from '../shared/schemas';
 
-export const deployApplicationSchema = z.object({
-  sessionId: sessionId.optional(),
-  imageId: z.string().optional().describe('Docker image to deploy'),
-  manifestsPath: z
-    .string()
-    .optional()
-    .describe('Path to Kubernetes manifests directory or YAML content'),
-  namespace: namespaceOptional,
-  replicas,
-  port,
-  environment,
-});
+export const deployApplicationSchema = z
+  .object({
+    sessionId: sessionId.optional(),
+    imageId: z.string().describe('Docker image to deploy (required)'),
+    manifestsPath: z
+      .string()
+      .optional()
+      .describe('Path to Kubernetes manifests directory or YAML content'),
+    namespace: namespaceOptional,
+    replicas,
+    port,
+    environment,
+  })
+  .refine((data) => data.manifestsPath || data.imageId, {
+    message: 'Either manifestsPath or imageId must be provided',
+  });
 
 export type DeployApplicationParams = z.infer<typeof deployApplicationSchema>;

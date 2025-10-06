@@ -102,31 +102,19 @@ async function scanImageImpl(
     : 'high';
 
   try {
-    // Use session if available
     const sessionId = params.sessionId || context.session?.id || 'unknown';
-    if (!context.session) {
-      return Failure('Session not available');
-    }
 
     logger.info(
       { sessionId, scanner, severityThreshold: finalSeverityThreshold },
-      'Starting image security scan with session',
+      'Starting image security scan',
     );
 
     const securityScanner = createSecurityScanner(logger, scanner);
 
-    // Check for built image in session results or use provided imageId
-    const results = context.session?.get('results');
-    const buildResult =
-      results && typeof results === 'object' && 'build-image' in results
-        ? ((results as Record<string, unknown>)['build-image'] as { imageId?: string } | undefined)
-        : undefined;
-    const imageId = params.imageId || buildResult?.imageId;
+    const imageId = params.imageId;
 
     if (!imageId) {
-      return Failure(
-        'No image specified. Provide imageId parameter or ensure session has built image from build-image tool.',
-      );
+      return Failure('No image specified. Provide imageId parameter.');
     }
     logger.info({ imageId, scanner }, 'Scanning image for vulnerabilities');
 
@@ -349,13 +337,6 @@ ${dockerScanResult.vulnerabilities
       ...(aiSuggestions && aiSuggestions.length > 0 && { aiSuggestions }),
       ...(aiAnalysis && { aiAnalysis }),
     };
-
-    // Store results in session
-    const existingResults = context.session?.get('results') || {};
-    context.session?.set('results', {
-      ...existingResults,
-      scan: result,
-    });
 
     timer.end({
       vulnerabilities: scanResult.totalVulnerabilities,

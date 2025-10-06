@@ -23,15 +23,30 @@ export const generateK8sManifestsSchema = z.object({
   sessionId: sessionId.optional(),
   imageId: imageId
     .optional()
-    .describe('Docker image to deploy. If not provided, uses image from build-image session data.'),
+    .describe('Docker image to deploy (e.g., myapp:v1.0.0). Typically from build-image output.'),
   appName: appName
     .optional()
-    .describe('Application name. If not provided, uses name from analyze-repo session data.'),
-  moduleName: z
-    .string()
+    .describe('Application name for Kubernetes resources. Defaults to image name if not provided.'),
+  modules: z
+    .array(
+      z.object({
+        name: z.string(),
+        path: z.string(),
+        language: z.string().optional(),
+        framework: z.string().optional(),
+        languageVersion: z.string().optional(),
+        frameworkVersion: z.string().optional(),
+        dependencies: z.array(z.string()).optional(),
+        ports: z.array(z.number()).optional(),
+        entryPoint: z.string().optional(),
+      }),
+    )
     .optional()
     .describe(
-      'Specific module name to generate manifests for (use with monorepo/multi-module projects). If not specified and modules are detected in session, generates for the first module or prompts for selection.',
+      'Array of module information. To generate manifests for specific modules, pass only those modules in this array.',
+    )
+    .describe(
+      'Array of module information for multi-module/monorepo projects. Pass the modules array from analyze-repo output to generate K8s manifests for all modules.',
     ),
   path: path.optional().describe('Path where the k8s folder should be created'),
   namespace,

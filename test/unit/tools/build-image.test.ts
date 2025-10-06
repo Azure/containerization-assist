@@ -126,14 +126,11 @@ CMD ["node", "index.js"]`;
       imageName: 'test-app:latest',
       tags: ['myapp:latest', 'myapp:v1.0'],
       buildArgs: {},
-      language: 'javascript',
-      framework: 'express',
-      frameworkVersion: '4.18.0',
     };
 
     // Reset all mocks
     jest.clearAllMocks();
-    
+
     mockSessionManager.get.mockResolvedValue({
       ok: true,
       value: {
@@ -141,7 +138,7 @@ CMD ["node", "index.js"]`;
         completed_steps: [],
         createdAt: new Date('2025-09-08T11:12:40.362Z'),
         updatedAt: new Date('2025-09-08T11:12:40.362Z'),
-      }
+      },
     });
 
     // Default mock implementations
@@ -156,21 +153,22 @@ CMD ["node", "index.js"]`;
         completed_steps: ['build-image'],
         createdAt: new Date('2025-09-08T11:12:40.362Z'),
         updatedAt: new Date(),
-      }
+      },
     });
 
     // Default successful Docker build
-    mockDockerClient.buildImage.mockResolvedValue(createSuccessResult({
-      imageId: 'sha256:mock-image-id',
-      tags: ['myapp:latest', 'myapp:v1.0'],
-      size: 123456789,
-      layers: 8,
-      logs: ['Step 1/8 : FROM node:18-alpine', 'Successfully built mock-image-id'],
-    }));
+    mockDockerClient.buildImage.mockResolvedValue(
+      createSuccessResult({
+        imageId: 'sha256:mock-image-id',
+        tags: ['myapp:latest', 'myapp:v1.0'],
+        size: 123456789,
+        layers: 8,
+        logs: ['Step 1/8 : FROM node:18-alpine', 'Successfully built mock-image-id'],
+      }),
+    );
   });
 
   describe('Successful Build', () => {
-
     it('should successfully build Docker image with default settings', async () => {
       const mockContext = createMockToolContext();
       const result = await buildImage(config, mockContext);
@@ -191,7 +189,6 @@ CMD ["node", "index.js"]`;
       }
     });
 
-
     it('should pass build arguments to Docker client', async () => {
       config.buildArgs = {
         NODE_ENV: 'development',
@@ -208,10 +205,8 @@ CMD ["node", "index.js"]`;
             API_URL: 'https://api.example.com',
             BUILD_DATE: expect.any(String),
             VCS_REF: expect.any(String),
-            LANGUAGE: 'javascript',
-            FRAMEWORK: 'express',
           }),
-        })
+        }),
       );
     });
 
@@ -225,13 +220,10 @@ CMD ["node", "index.js"]`;
             NODE_ENV: expect.any(String),
             BUILD_DATE: expect.any(String),
             VCS_REF: expect.any(String),
-            LANGUAGE: 'javascript',
-            FRAMEWORK: 'express',
           }),
-        })
+        }),
       );
     });
-
 
     it('should update session with build result', async () => {
       const result = await buildImage(config, createMockToolContext());
@@ -271,10 +263,7 @@ CMD ["node", "index.js"]`;
       const result = await buildImage(customConfig, createMockToolContext());
 
       expect(result.ok).toBe(true);
-      expect(mockFs.readFile).toHaveBeenCalledWith(
-        '/test/repo/custom/Dockerfile',
-        'utf-8'
-      );
+      expect(mockFs.readFile).toHaveBeenCalledWith('/test/repo/custom/Dockerfile', 'utf-8');
     });
   });
 
@@ -293,7 +282,7 @@ CMD ["node", "index.js"]`;
           expect.arrayContaining([
             'Potential secret in build arg: API_PASSWORD',
             'Potential secret in build arg: DB_TOKEN',
-          ])
+          ]),
         );
       }
     });
@@ -310,7 +299,7 @@ USER appuser`;
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.securityWarnings).toContain(
-          'Using sudo in Dockerfile - consider running as non-root'
+          'Using sudo in Dockerfile - consider running as non-root',
         );
       }
     });
@@ -327,7 +316,7 @@ USER appuser`;
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.securityWarnings).toContain(
-          'Using :latest tag - consider pinning versions for reproducibility'
+          'Using :latest tag - consider pinning versions for reproducibility',
         );
       }
     });
@@ -347,7 +336,7 @@ CMD ["node", "index.js"]`;
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.securityWarnings).toContain(
-          'Container may run as root - consider adding a non-root USER'
+          'Container may run as root - consider adding a non-root USER',
         );
       }
     });
@@ -366,7 +355,7 @@ CMD ["node", "index.js"]`;
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.securityWarnings).toContain(
-          'Container may run as root - consider adding a non-root USER'
+          'Container may run as root - consider adding a non-root USER',
         );
       }
     });
@@ -384,7 +373,7 @@ CMD ["node", "index.js"]`;
 
     it('should return error when Docker build fails', async () => {
       mockDockerClient.buildImage.mockResolvedValue(
-        createFailureResult('Docker build failed: syntax error')
+        createFailureResult('Docker build failed: syntax error'),
       );
 
       const result = await buildImage(config, createMockToolContext());
@@ -425,28 +414,12 @@ CMD ["node", "index.js"]`;
       mockFs.readFile.mockResolvedValue(mockDockerfile);
 
       // Setup docker build mock
-      mockDockerClient.buildImage.mockResolvedValue(createSuccessResult({
-        imageId: 'sha256:mock-image-id',
-        logs: [
-          'Step 1/8 : FROM node:18-alpine',
-          'Successfully built mock-image-id',
-        ],
-        layers: 8,
-      }));
-    });
-
-    it('should include language and framework from params', async () => {
-      const result = await buildImage(config, createMockToolContext());
-
-      expect(result.ok).toBe(true);
-      expect(mockDockerClient.buildImage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          buildargs: expect.objectContaining({
-            LANGUAGE: 'javascript',
-            FRAMEWORK: 'express',
-            FRAMEWORK_VERSION: '4.18.0',
-          }),
-        })
+      mockDockerClient.buildImage.mockResolvedValue(
+        createSuccessResult({
+          imageId: 'sha256:mock-image-id',
+          logs: ['Step 1/8 : FROM node:18-alpine', 'Successfully built mock-image-id'],
+          layers: 8,
+        }),
       );
     });
 
@@ -466,35 +439,8 @@ CMD ["node", "index.js"]`;
             BUILD_DATE: '2023-01-01',
             VCS_REF: expect.any(String),
           }),
-        })
+        }),
       );
-    });
-
-    it('should handle missing language/framework params gracefully', async () => {
-      const configWithoutLang = {
-        ...config,
-        language: undefined,
-        framework: undefined,
-        frameworkVersion: undefined,
-      };
-
-      const result = await buildImage(configWithoutLang, createMockToolContext());
-
-      expect(result.ok).toBe(true);
-      expect(mockDockerClient.buildImage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          buildargs: expect.objectContaining({
-            NODE_ENV: expect.any(String),
-            BUILD_DATE: expect.any(String),
-            VCS_REF: expect.any(String),
-          }),
-        })
-      );
-      // Should not include LANGUAGE or FRAMEWORK when not provided
-      const buildCall = mockDockerClient.buildImage.mock.calls[0][0] as any;
-      expect(buildCall.buildargs).not.toHaveProperty('LANGUAGE');
-      expect(buildCall.buildargs).not.toHaveProperty('FRAMEWORK');
-      expect(buildCall.buildargs).not.toHaveProperty('FRAMEWORK_VERSION');
     });
   });
 
@@ -516,7 +462,7 @@ CMD ["node", "index.js"]`;
           buildargs: expect.objectContaining({
             NODE_ENV: 'staging',
           }),
-        })
+        }),
       );
 
       // Restore original NODE_ENV
@@ -535,7 +481,7 @@ CMD ["node", "index.js"]`;
           buildargs: expect.objectContaining({
             VCS_REF: 'abc123def456',
           }),
-        })
+        }),
       );
 
       // Restore original GIT_COMMIT

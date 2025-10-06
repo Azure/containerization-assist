@@ -506,118 +506,110 @@ async function run(
   input: z.infer<typeof generateK8sManifestsSchema>,
   ctx: ToolContext,
 ): Promise<Result<AIResponse>> {
-  const { sessionId } = input;
+  const { modules } = input;
 
   // Check for multi-module/monorepo scenario
-  if (sessionId && ctx.session) {
-    const isMonorepo = ctx.session.get<boolean>('isMonorepo');
-    const modules = ctx.session.get<ModuleInfo[]>('modules');
-
-    if (isMonorepo && modules && modules.length > 0) {
-      // User explicitly specified a module
-      if (input.moduleName) {
-        const targetModule = modules.find((m) => m.name === input.moduleName);
-        if (!targetModule) {
-          return Failure(
-            `Module "${input.moduleName}" not found. Available modules: ${modules.map((m) => m.name).join(', ')}`,
-          );
-        }
-        ctx.logger.info(
-          { moduleName: targetModule.name, modulePath: targetModule.path },
-          'Generating K8s manifests for specific module',
-        );
-        return generateSingleManifest(input, ctx, targetModule);
+  if (modules && modules.length > 0) {
+    // If only one module is provided, generate for that single module
+    if (modules.length === 1) {
+      const targetModule = modules[0];
+      if (!targetModule) {
+        return Failure('Module array contains undefined element');
       }
-
-      // No module specified - generate for all modules automatically
       ctx.logger.info(
-        { moduleCount: modules.length },
-        'Generating K8s manifests for all modules in monorepo',
+        { moduleName: targetModule.name, modulePath: targetModule.path },
+        'Generating K8s manifests for single module',
       );
+      return generateSingleManifest(input, ctx, targetModule as ModuleInfo);
+    }
 
-      const results: Array<{ module: string; success: boolean; path?: string; error?: string }> =
-        [];
-      const manifests: Array<{ module: string; content: string; path?: string }> = [];
+    // Multiple modules - generate for all modules
+    ctx.logger.info(
+      { moduleCount: modules.length },
+      'Generating K8s manifests for multiple modules',
+    );
 
-      for (const module of modules) {
-        ctx.logger.info({ moduleName: module.name }, 'Generating K8s manifests for module');
+    const results: Array<{ module: string; success: boolean; path?: string; error?: string }> = [];
+    const manifests: Array<{ module: string; content: string; path?: string }> = [];
 
-        const result = await generateSingleManifest(input, ctx, module);
+    for (const module of modules) {
+      ctx.logger.info({ moduleName: module.name }, 'Generating K8s manifests for module');
 
-        if (result.ok) {
-          const value = result.value as {
-            content?: string;
-            workflowHints?: { message?: string };
-          };
-          const extractedPath = value.workflowHints?.message?.match(/Saved to (.+?)\./)?.[1];
-          results.push({
-            module: module.name,
-            success: true,
-            ...(extractedPath ? { path: extractedPath } : {}),
-          });
-          manifests.push({
-            module: module.name,
-            content: value.content || '',
-            ...(extractedPath ? { path: extractedPath } : {}),
-          });
-          ctx.logger.info({ moduleName: module.name }, 'K8s manifests generated successfully');
-        } else {
-          results.push({
-            module: module.name,
-            success: false,
-            error: result.error,
-          });
-          ctx.logger.warn(
-            { moduleName: module.name, error: result.error },
-            'Failed to generate K8s manifests for module',
-          );
-        }
-      }
+      const result = await generateSingleManifest(input, ctx, module as ModuleInfo);
 
-      const successCount = results.filter((r) => r.success).length;
-      const failureCount = results.filter((r) => !r.success).length;
-
-      if (successCount === 0) {
-        return Failure(
-          `Failed to generate K8s manifests for all ${modules.length} modules:\n${results.map((r) => `- ${r.module}: ${r.error}`).join('\n')}`,
+      if (result.ok) {
+        const value = result.value as {
+          content?: string;
+          workflowHints?: { message?: string };
+        };
+        const extractedPath = value.workflowHints?.message?.match(/Saved to (.+?)\./)?.[1];
+        results.push({
+          module: module.name,
+          success: true,
+          ...(extractedPath ? { path: extractedPath } : {}),
+        });
+        manifests.push({
+          module: module.name,
+          content: value.content || '',
+          ...(extractedPath ? { path: extractedPath } : {}),
+        });
+        ctx.logger.info({ moduleName: module.name }, 'K8s manifests generated successfully');
+      } else {
+        results.push({
+          module: module.name,
+          success: false,
+          error: result.error,
+        });
+        ctx.logger.warn(
+          { moduleName: module.name, error: result.error },
+          'Failed to generate K8s manifests for module',
         );
       }
-
-      // Build summary response
-      const summary = `Generated Kubernetes manifests for ${successCount}/${modules.length} modules:\n${results
-        .filter((r) => r.success)
-        .map((r) => `✅ ${r.module}${r.path ? `: ${r.path}` : ''}`)
-        .join('\n')}${
-        failureCount > 0
-          ? `\n\n⚠️  Failed modules (${failureCount}):\n${results
-              .filter((r) => !r.success)
-              .map((r) => `❌ ${r.module}: ${r.error}`)
-              .join('\n')}`
-          : ''
-      }`;
-
-      return Success({
-        content: summary,
-        language: 'text',
-        confidence: successCount / modules.length,
-        suggestions: [
-          `Successfully generated ${successCount} K8s manifest(s)`,
-          failureCount > 0 ? `${failureCount} module(s) failed` : 'All modules successful',
-        ],
-        analysis: {
-          enhancementAreas: [],
-          confidence: successCount / modules.length,
-          knowledgeApplied: [],
-        },
-        workflowHints: {
-          nextStep: 'deploy',
-          message: `Kubernetes manifests generated for ${successCount} module(s). Use "prepare-cluster" and "deploy" for each module to deploy to your cluster.`,
-        },
-      });
     }
+
+    const successCount = results.filter((r) => r.success).length;
+    const failureCount = results.filter((r) => !r.success).length;
+
+    if (successCount === 0) {
+      return Failure(
+        `Failed to generate K8s manifests for all ${modules.length} modules:\n${results.map((r) => `- ${r.module}: ${r.error}`).join('\n')}`,
+      );
+    }
+
+    // Build summary response
+    const summary = `Generated Kubernetes manifests for ${successCount}/${modules.length} modules:\n${results
+      .filter((r) => r.success)
+      .map((r) => `✅ ${r.module}${r.path ? `: ${r.path}` : ''}`)
+      .join('\n')}${
+      failureCount > 0
+        ? `\n\n⚠️  Failed modules (${failureCount}):\n${results
+            .filter((r) => !r.success)
+            .map((r) => `❌ ${r.module}: ${r.error}`)
+            .join('\n')}`
+        : ''
+    }`;
+
+    return Success({
+      content: summary,
+      language: 'text',
+      confidence: successCount / modules.length,
+      suggestions: [
+        `Successfully generated ${successCount} K8s manifest(s)`,
+        failureCount > 0 ? `${failureCount} module(s) failed` : 'All modules successful',
+      ],
+      analysis: {
+        enhancementAreas: [],
+        confidence: successCount / modules.length,
+        knowledgeApplied: [],
+      },
+      workflowHints: {
+        nextStep: 'deploy',
+        message: `Kubernetes manifests generated for ${successCount} module(s). Use "prepare-cluster" and "deploy" for each module to deploy to your cluster.`,
+      },
+    });
   }
 
-  // Single-module repository or no session data - generate for single app
+  // Single-module repository - generate for single app
   return generateSingleManifest(input, ctx);
 }
 
