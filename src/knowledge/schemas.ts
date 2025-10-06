@@ -8,7 +8,7 @@ export const KnowledgeEntrySchema = z.object({
   pattern: z.string().min(1),
   recommendation: z.string().min(1),
   example: z.string().optional(),
-  severity: z.enum(['high', 'medium', 'low']).optional(),
+  severity: z.enum(['required', 'high', 'medium', 'low']).optional(),
   tags: z.array(z.string()).optional(),
   description: z.string().optional(),
 });
