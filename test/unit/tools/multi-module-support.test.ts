@@ -58,16 +58,17 @@ describe('Multi-Module Support', () => {
       const ctx = {
         logger: createMockLogger(),
         session: createMockSession(modules, true),
-        sampling: {} as any,
+        sampling: {
+          createMessage: jest.fn().mockResolvedValue('FROM node:18\nWORKDIR /app') as any,
+        } as any,
       };
 
-      // Call the tool - it will attempt to generate for all modules
-      // We can't test full execution without mocking AI, but we can verify
-      // it detects the monorepo and logs appropriately
+      // Call the tool with explicit modules parameter
       await tool.default.run(
         {
           sessionId: 'test-session',
           path: '/tmp/test-repo',
+          modules: modules, // Pass modules explicitly
         },
         ctx,
       );
@@ -77,38 +78,11 @@ describe('Multi-Module Support', () => {
         expect.objectContaining({
           moduleCount: 2,
         }),
-        expect.stringContaining('all modules'),
+        expect.stringContaining('multiple modules'),
       );
     });
 
-    it('should fail when invalid moduleName provided', async () => {
-      const modules: ModuleInfo[] = [
-        { name: 'service-a', path: 'services/a', language: 'javascript' },
-      ];
-
-      const ctx = {
-        logger: createMockLogger(),
-        session: createMockSession(modules, true),
-        sampling: {} as any,
-      };
-
-      const result = await tool.default.run(
-        {
-          sessionId: 'test-session',
-          path: '/tmp/test-repo',
-          moduleName: 'nonexistent',
-        },
-        ctx,
-      );
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toContain('not found');
-        expect(result.error).toContain('Available modules');
-      }
-    });
-
-    it('should accept valid moduleName for monorepo', async () => {
+    it('should generate for single module when only one module in array', async () => {
       const modules: ModuleInfo[] = [
         {
           name: 'api-gateway',
@@ -129,14 +103,14 @@ describe('Multi-Module Support', () => {
         {
           sessionId: 'test-session',
           path: '/tmp/test-repo',
-          moduleName: 'api-gateway',
+          modules: modules, // Pass only the single module to generate for
         },
         ctx,
       );
 
-      // Should not fail with "module not found" error
+      // Should generate for single module successfully
       if (!result.ok) {
-        expect(result.error).not.toContain('Module "api-gateway" not found');
+        expect(result.error).not.toContain('module not found');
       }
     });
 
@@ -180,16 +154,18 @@ describe('Multi-Module Support', () => {
       const ctx = {
         logger: createMockLogger(),
         session: createMockSession(modules, true),
-        sampling: {} as any,
+        sampling: {
+          createMessage: jest.fn().mockResolvedValue('apiVersion: v1\nkind: Service') as any,
+        } as any,
       };
 
-      // Call the tool - it will attempt to generate for all modules
-      // We can't test full execution without mocking AI, but we can verify
-      // it detects the monorepo and logs appropriately
+      // Call the tool with explicit modules parameter
       await tool.default.run(
         {
           sessionId: 'test-session',
+          appName: 'test-app',
           imageId: 'test:latest',
+          modules: modules, // Pass modules explicitly
         },
         ctx,
       );
@@ -199,38 +175,11 @@ describe('Multi-Module Support', () => {
         expect.objectContaining({
           moduleCount: 2,
         }),
-        expect.stringContaining('all modules'),
+        expect.stringContaining('multiple modules'),
       );
     });
 
-    it('should fail when invalid moduleName provided', async () => {
-      const modules: ModuleInfo[] = [
-        { name: 'service-a', path: 'services/a', language: 'javascript', ports: [8080] },
-      ];
-
-      const ctx = {
-        logger: createMockLogger(),
-        session: createMockSession(modules, true),
-        sampling: {} as any,
-      };
-
-      const result = await tool.default.run(
-        {
-          sessionId: 'test-session',
-          imageId: 'test:latest',
-          moduleName: 'nonexistent',
-        },
-        ctx,
-      );
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toContain('not found');
-        expect(result.error).toContain('Available modules');
-      }
-    });
-
-    it('should accept valid moduleName for monorepo', async () => {
+    it('should generate for single module when only one module in array', async () => {
       const modules: ModuleInfo[] = [
         {
           name: 'user-service',
@@ -243,42 +192,52 @@ describe('Multi-Module Support', () => {
       const ctx = {
         logger: createMockLogger(),
         session: createMockSession(modules, true),
-        sampling: {} as any,
+        sampling: {
+          createMessage: jest.fn().mockResolvedValue('apiVersion: v1\nkind: Service') as any,
+        } as any,
       };
 
       const result = await tool.default.run(
         {
           sessionId: 'test-session',
+          appName: 'test-app',
           imageId: 'test/user-service:latest',
-          moduleName: 'user-service',
+          modules: modules, // Pass only the single module to generate for
         },
         ctx,
       );
 
-      // Should not fail with "module not found" error
+      // Should generate for single module successfully
       if (!result.ok) {
-        expect(result.error).not.toContain('Module "user-service" not found');
+        expect(result.error).not.toContain('module not found');
       }
     });
 
     it('should use module-specific port when generating manifests', async () => {
       const modules: ModuleInfo[] = [
-        { name: 'api-gateway', path: 'services/api-gateway', language: 'javascript', ports: [8080] },
-        { name: 'user-service', path: 'services/user-service', language: 'python', ports: [8081] },
+        {
+          name: 'user-service',
+          path: 'services/user-service',
+          language: 'python',
+          ports: [8081],
+        },
       ];
 
       const session = createMockSession(modules, true);
       const ctx = {
         logger: createMockLogger(),
         session,
-        sampling: {} as any,
+        sampling: {
+          createMessage: jest.fn().mockResolvedValue('apiVersion: v1\nkind: Service') as any,
+        } as any,
       };
 
       await tool.default.run(
         {
           sessionId: 'test-session',
+          appName: 'test-app',
           imageId: 'test/user-service:latest',
-          moduleName: 'user-service',
+          modules: modules, // Pass single module to generate for
         },
         ctx,
       );

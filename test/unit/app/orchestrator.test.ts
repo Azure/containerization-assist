@@ -199,8 +199,6 @@ describe('Tool Orchestrator', () => {
           expect(typeof context.session?.get).toBe('function');
           expect(typeof context.session?.set).toBe('function');
           expect(typeof context.session?.pushStep).toBe('function');
-          expect(typeof context.session?.storeResult).toBe('function');
-          expect(typeof context.session?.getResult).toBe('function');
 
           // Use session methods
           context.session?.set(params.key, params.value);
@@ -379,26 +377,29 @@ describe('Tool Orchestrator', () => {
       }
     });
 
-    it('should store and retrieve tool results using storeResult/getResult helpers', async () => {
+    it('should allow tools to store and retrieve data using session.set/get', async () => {
       const sessionId = 'result-storage-session';
 
-      // Create a tool that stores its result manually (though orchestrator now does this)
+      // Create a tool that stores its result in session
       const producerTool: Tool = {
         name: 'producer-tool',
         description: 'Tool that produces results',
         schema: z.object({ data: z.string() }),
         run: jest.fn(async (params, context) => {
-          return Success({ produced: params.data, timestamp: Date.now() });
+          const result = { produced: params.data, timestamp: Date.now() };
+          // Store result in session for other tools to access
+          context.session?.set('producer-result', result);
+          return Success(result);
         }),
       };
 
-      // Create a tool that retrieves results from another tool
+      // Create a tool that retrieves data from session
       const consumerTool: Tool = {
         name: 'consumer-tool',
-        description: 'Tool that consumes results from other tools',
-        schema: z.object({ sourceToolName: z.string() }),
+        description: 'Tool that consumes results from session',
+        schema: z.object({}),
         run: jest.fn(async (params, context) => {
-          const previousResult = context.session?.getResult(params.sourceToolName);
+          const previousResult = context.session?.get('producer-result');
           return Success({
             consumed: previousResult,
             foundInSession: !!previousResult
@@ -418,17 +419,16 @@ describe('Tool Orchestrator', () => {
 
       expect(produceResult.ok).toBe(true);
 
-      // Execute consumer tool to retrieve the stored result
+      // Execute consumer tool to retrieve the stored data
       const consumeResult = await orchestrator.execute({
         toolName: 'consumer-tool',
-        params: { sourceToolName: 'producer-tool' },
+        params: {},
         sessionId,
       });
 
       expect(consumeResult.ok).toBe(true);
       if (consumeResult.ok) {
         const result = consumeResult.value as { foundInSession: boolean; consumed: any };
-        // The orchestrator stores results automatically, so consumer should find it
         expect(result.foundInSession).toBe(true);
         expect(result.consumed).toMatchObject({ produced: 'test-data' });
       }
@@ -473,32 +473,40 @@ describe('Tool Orchestrator', () => {
       }
     });
 
-    it('should allow tools to access results from multiple previous tools', async () => {
+    it('should allow tools to access data from multiple previous tools via session', async () => {
       const sessionId = 'multi-result-session';
 
-      // Create multiple producer tools
+      // Create two producer tools that store their results in session
       const toolA: Tool = {
         name: 'tool-a-producer',
-        description: 'Producer A',
+        description: 'Tool A that produces results',
         schema: z.object({}),
-        run: jest.fn().mockResolvedValue(Success({ result: 'A' })),
+        run: jest.fn(async (params, context) => {
+          const result = { result: 'A' };
+          context.session?.set('tool-a-result', result);
+          return Success(result);
+        }),
       };
 
       const toolB: Tool = {
         name: 'tool-b-producer',
-        description: 'Producer B',
+        description: 'Tool B that produces results',
         schema: z.object({}),
-        run: jest.fn().mockResolvedValue(Success({ result: 'B' })),
+        run: jest.fn(async (params, context) => {
+          const result = { result: 'B' };
+          context.session?.set('tool-b-result', result);
+          return Success(result);
+        }),
       };
 
-      // Create aggregator tool
+      // Create aggregator tool that reads from session
       const aggregatorTool: Tool = {
         name: 'aggregator',
         description: 'Aggregates results',
         schema: z.object({}),
         run: jest.fn(async (params, context) => {
-          const resultA = context.session?.getResult('tool-a-producer');
-          const resultB = context.session?.getResult('tool-b-producer');
+          const resultA = context.session?.get('tool-a-result');
+          const resultB = context.session?.get('tool-b-result');
           return Success({
             aggregated: [resultA, resultB],
             bothFound: !!resultA && !!resultB

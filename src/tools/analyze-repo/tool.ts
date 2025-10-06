@@ -8,8 +8,6 @@ import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { scoreRepositoryAnalysis } from '@/lib/scoring';
 import { analyzeRepoSchema, type RepositoryAnalysis } from './schema';
 import { extractJsonContent } from '@/lib/content-extraction';
-import { storeToolResults } from '@/lib/tool-helpers';
-import type { AIResponse } from '../ai-response-types';
 import type { Tool } from '@/types/tool';
 import type { z } from 'zod';
 
@@ -19,7 +17,7 @@ import type { z } from 'zod';
 async function run(
   input: z.infer<typeof analyzeRepoSchema>,
   ctx: ToolContext,
-): Promise<Result<AIResponse>> {
+): Promise<Result<RepositoryAnalysis>> {
   let { path: repoPath } = input;
   const { sessionId } = input;
 
@@ -184,55 +182,11 @@ async function run(
     const analysisResult = jsonExtraction as RepositoryAnalysis;
 
     // Store the analysis result in session for other tools to use
-    const result: RepositoryAnalysis & { sessionId: string } = {
+    const result: RepositoryAnalysis & { sessionId: string; analyzedPath: string } = {
       ...analysisResult,
       sessionId,
+      analyzedPath: repoPath,
     };
-
-    // Store repository path and key metadata in session for downstream tools
-    if (ctx.session) {
-      ctx.session.set('analyzedPath', repoPath);
-      ctx.session.set('appName', result.name || path.basename(repoPath));
-      if (result.ports && result.ports.length > 0) {
-        ctx.session.set('appPorts', result.ports);
-      }
-      // Store the full analysis result for downstream tools
-      ctx.session.storeResult('analyze-repo', result);
-
-      // Store monorepo/multi-module information if detected
-      if (result.isMonorepo === true && result.modules && result.modules.length > 0) {
-        ctx.session.set('isMonorepo', true);
-        ctx.session.set('modules', result.modules);
-        ctx.logger.info(
-          {
-            sessionId,
-            repoPath,
-            appName: result.name,
-            moduleCount: result.modules.length,
-          },
-          'Stored monorepo context with multiple modules in session',
-        );
-      } else {
-        ctx.logger.info(
-          { sessionId, repoPath, appName: result.name },
-          'Stored repository context in session for downstream tools',
-        );
-      }
-    }
-
-    // Store in sessionManager for cross-tool persistence using helper
-    await storeToolResults(
-      ctx,
-      sessionId,
-      'analyze-repo',
-      result as unknown as Record<string, unknown>,
-      {
-        analyzedPath: repoPath,
-        appName: result.name || path.basename(repoPath),
-        ...(result.isMonorepo && { isMonorepo: true }),
-        ...(result.modules && { modules: result.modules }),
-      },
-    );
 
     // Add sessionId and workflowHints to the result
     const moduleHint =
@@ -266,7 +220,7 @@ async function run(
   }
 }
 
-const tool: Tool<typeof analyzeRepoSchema, AIResponse> = {
+const tool: Tool<typeof analyzeRepoSchema, RepositoryAnalysis> = {
   name: 'analyze-repo',
   description: 'Analyze repository structure and detect technologies',
   version: '3.0.0',

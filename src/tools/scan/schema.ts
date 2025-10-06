@@ -8,7 +8,7 @@ const sessionIdSchema = z.string().describe('Session identifier for tracking ope
 
 export const scanImageSchema = z.object({
   sessionId: sessionIdSchema.optional(),
-  imageId: z.string().optional().describe('Docker image ID or name to scan'),
+  imageId: z.string().describe('Docker image ID or name to scan'),
   severity: z
     .union([
       z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),

@@ -31,13 +31,13 @@ function createMockSession(initialData?: Record<string, unknown>): SessionFacade
   const storage = new Map<string, unknown>(Object.entries(initialData || {}));
 
   return {
+    id: 'test-session-id',
     get: jest.fn(<T>(key: string): T | undefined => storage.get(key)),
     set: jest.fn((key: string, value: unknown) => {
       storage.set(key, value);
     }),
-    getResult: jest.fn(<T>(key: string): T | undefined => storage.get(key)),
-    storeResult: jest.fn((key: string, value: unknown) => {
-      storage.set(key, value);
+    pushStep: jest.fn((step: string) => {
+      // Store completed steps
     }),
   } as unknown as SessionFacade;
 }
@@ -53,7 +53,7 @@ function createMockContext(session: SessionFacade): ToolContext {
         .mockImplementation(async (req: SamplingRequest) => {
           // Check what type of request this is based on the prompt content
           const promptText = req.messages
-            .map(m => m.content.map(c => c.text).join(' '))
+            .map((m) => m.content.map((c) => c.text).join(' '))
             .join(' ');
 
           // Mock Dockerfile generation
@@ -169,6 +169,7 @@ describe('Multi-Module Containerization Flow', () => {
         {
           sessionId: 'test-session',
           path: '/tmp/test-monorepo',
+          modules: modules, // Pass modules explicitly
         },
         ctx,
       );
@@ -190,38 +191,29 @@ describe('Multi-Module Containerization Flow', () => {
         expect(result.value.content).toContain('web-app');
         expect(result.value.suggestions).toBeDefined();
       }
-
-      // Verify session stores multi-module results
-      expect(ctx.session.storeResult).toHaveBeenCalledWith(
-        'generate-dockerfile-multi',
-        expect.objectContaining({
-          modules: expect.any(Array),
-          dockerfiles: expect.any(Array),
-        }),
-      );
     });
 
-    it('should generate Dockerfile for specific module when moduleName provided', async () => {
-      const modules: ModuleInfo[] = [
-        {
-          name: 'api-service',
-          path: 'services/api',
-          language: 'node',
-          framework: 'express',
-          ports: [3000],
-        },
-        {
-          name: 'web-app',
-          path: 'apps/web',
-          language: 'node',
-          framework: 'react',
-          ports: [3001],
-        },
-      ];
+    it('should generate Dockerfile for specific module when single module provided', async () => {
+      const apiServiceModule: ModuleInfo = {
+        name: 'api-service',
+        path: 'services/api',
+        language: 'node',
+        framework: 'express',
+        ports: [3000],
+      };
 
       const session = createMockSession({
         isMonorepo: true,
-        modules,
+        modules: [
+          apiServiceModule,
+          {
+            name: 'web-app',
+            path: 'apps/web',
+            language: 'node',
+            framework: 'react',
+            ports: [3001],
+          },
+        ],
         analyzedPath: '/tmp/test-monorepo',
         appName: 'test-monorepo',
       });
@@ -233,14 +225,13 @@ describe('Multi-Module Containerization Flow', () => {
         {
           sessionId: 'test-session',
           path: '/tmp/test-monorepo',
-          moduleName: 'api-service',
+          modules: [apiServiceModule], // Pass only the single module to generate for
         },
         ctx,
       );
 
-      // Should not generate for all - only for specified module
+      // Should generate for single module successfully
       if (!result.ok) {
-        // Error should not be about "specify moduleName"
         expect(result.error).not.toContain('Please specify which module');
       }
 
@@ -286,7 +277,9 @@ describe('Multi-Module Containerization Flow', () => {
       const result = await tool.default.run(
         {
           sessionId: 'test-session',
+          appName: 'test-monorepo',
           imageId: 'test-registry/app:latest',
+          modules: modules,
         },
         ctx,
       );
@@ -307,37 +300,28 @@ describe('Multi-Module Containerization Flow', () => {
         expect(result.value.content).toContain('api-service');
         expect(result.value.content).toContain('worker-service');
       }
-
-      // Verify session stores multi-module results
-      expect(ctx.session.storeResult).toHaveBeenCalledWith(
-        'generate-k8s-manifests-multi',
-        expect.objectContaining({
-          modules: expect.any(Array),
-          manifests: expect.any(Array),
-        }),
-      );
     });
 
-    it('should generate manifests for specific module when moduleName provided', async () => {
-      const modules: ModuleInfo[] = [
-        {
-          name: 'api-service',
-          path: 'services/api',
-          language: 'node',
-          framework: 'express',
-          ports: [3000],
-        },
-        {
-          name: 'worker-service',
-          path: 'services/worker',
-          language: 'python',
-          ports: [5000],
-        },
-      ];
+    it('should generate manifests for specific module when single module provided', async () => {
+      const workerServiceModule: ModuleInfo = {
+        name: 'worker-service',
+        path: 'services/worker',
+        language: 'python',
+        ports: [5000],
+      };
 
       const session = createMockSession({
         isMonorepo: true,
-        modules,
+        modules: [
+          {
+            name: 'api-service',
+            path: 'services/api',
+            language: 'node',
+            framework: 'express',
+            ports: [3000],
+          },
+          workerServiceModule,
+        ],
         analyzedPath: '/tmp/test-monorepo',
         appName: 'test-monorepo',
       });
@@ -348,15 +332,15 @@ describe('Multi-Module Containerization Flow', () => {
       const result = await tool.default.run(
         {
           sessionId: 'test-session',
+          appName: 'test-monorepo',
           imageId: 'test-registry/worker:latest',
-          moduleName: 'worker-service',
+          modules: [workerServiceModule], // Pass only the single module to generate for
         },
         ctx,
       );
 
-      // Should not generate for all - only for specified module
+      // Should generate for single module successfully
       if (!result.ok) {
-        // Error should not be about "specify moduleName"
         expect(result.error).not.toContain('Please specify which module');
       }
 
@@ -424,15 +408,10 @@ describe('Multi-Module Containerization Flow', () => {
   });
 
   describe('Error handling for multi-module scenarios', () => {
-    it('should return error when invalid moduleName specified', async () => {
-      const modules: ModuleInfo[] = [
-        { name: 'service-a', path: 'services/a', language: 'javascript', ports: [3000] },
-      ];
-
+    it('should work with empty modules array', async () => {
       const session = createMockSession({
-        isMonorepo: true,
-        modules,
-        analyzedPath: '/tmp/test-monorepo',
+        isMonorepo: false,
+        analyzedPath: '/tmp/test-app',
       });
 
       const ctx = createMockContext(session);
@@ -441,15 +420,15 @@ describe('Multi-Module Containerization Flow', () => {
       const result = await tool.default.run(
         {
           sessionId: 'test-session',
-          moduleName: 'nonexistent-module',
+          path: '/tmp/test-app',
+          modules: [], // Empty modules array should fall back to single-module behavior
         },
         ctx,
       );
 
-      expect(result.ok).toBe(false);
+      // Should not fail with module-related errors
       if (!result.ok) {
-        expect(result.error).toContain('not found');
-        expect(result.error).toContain('Available modules');
+        expect(result.error).not.toContain('module');
       }
     });
   });

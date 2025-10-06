@@ -20,7 +20,6 @@ import {
   type DockerfilePlan,
   type DockerfileRequirement,
 } from './schema';
-import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import { getKnowledgeSnippets } from '@/knowledge/matcher';
 import type { z } from 'zod';
 
@@ -33,61 +32,27 @@ async function run(
   input: z.infer<typeof planDockerfileGenerationSchema>,
   ctx: ToolContext,
 ): Promise<Result<DockerfilePlan>> {
-  const { sessionId, language: inputLanguage, framework: inputFramework, environment } = input;
+  const { language: inputLanguage, framework: inputFramework, environment } = input;
 
-  let path = input.path;
-  let analysis: RepositoryAnalysis | undefined;
+  const path = input.path || '';
 
-  if (sessionId && ctx.sessionManager) {
-    try {
-      const workflowStateResult = await ctx.sessionManager.get(sessionId);
-      if (workflowStateResult.ok && workflowStateResult.value) {
-        const workflowState = workflowStateResult.value as Record<string, unknown>;
+  const language = inputLanguage || 'auto-detect';
+  const framework = inputFramework;
 
-        if (!path && workflowState.analyzedPath && typeof workflowState.analyzedPath === 'string') {
-          path = workflowState.analyzedPath;
-        }
-
-        const results = workflowState.results as Record<string, unknown> | undefined;
-        const analyzeRepoResult = results?.['analyze-repo'];
-        if (analyzeRepoResult && typeof analyzeRepoResult === 'object') {
-          analysis = analyzeRepoResult as RepositoryAnalysis;
-          ctx.logger.info(
-            { sessionId, language: analysis.language, framework: analysis.framework },
-            'Retrieved repository analysis from sessionManager',
-          );
-        }
-      }
-    } catch (sessionError) {
-      ctx.logger.debug(
-        {
-          sessionId,
-          error: sessionError instanceof Error ? sessionError.message : String(sessionError),
-        },
-        'Unable to load workflow session data',
-      );
-    }
-  }
-
-  const language = inputLanguage || analysis?.language || 'auto-detect';
-  const framework = inputFramework || analysis?.framework;
-
-  if (!path && !analysis) {
-    return Failure(
-      'Either path or sessionId with analysis data is required. Run analyze-repo first or provide a path.',
-    );
+  if (!path) {
+    return Failure('Path is required. Provide a path parameter.');
   }
 
   const repositoryInfo = {
-    path: path || (analysis as { analyzedPath?: string } | undefined)?.analyzedPath,
+    path,
     language,
     framework,
-    languageVersion: analysis?.languageVersion,
-    frameworkVersion: analysis?.frameworkVersion,
-    buildSystem: analysis?.buildSystem,
-    dependencies: analysis?.dependencies,
-    ports: analysis?.suggestedPorts || analysis?.ports,
-    entryPoint: analysis?.entryPoint,
+    languageVersion: undefined,
+    frameworkVersion: undefined,
+    buildSystem: undefined,
+    dependencies: undefined,
+    ports: undefined,
+    entryPoint: undefined,
   };
 
   ctx.logger.info(
@@ -123,7 +88,7 @@ async function run(
     (m) => !securityMatches.includes(m) && !optimizationMatches.includes(m),
   );
 
-  const buildSystemType = (analysis?.buildSystem as { type?: string } | undefined)?.type;
+  const buildSystemType = undefined;
   const shouldUseMultistage =
     language === 'java' ||
     language === 'go' ||
@@ -161,12 +126,6 @@ Next Step: Use generate-dockerfile with sessionId to create the Dockerfile using
       ...(repositoryInfo.path && { path: repositoryInfo.path }),
       ...(repositoryInfo.language && { language: repositoryInfo.language }),
       ...(repositoryInfo.framework && { framework: repositoryInfo.framework }),
-      ...(repositoryInfo.languageVersion && { languageVersion: repositoryInfo.languageVersion }),
-      ...(repositoryInfo.frameworkVersion && { frameworkVersion: repositoryInfo.frameworkVersion }),
-      ...(repositoryInfo.buildSystem && { buildSystem: repositoryInfo.buildSystem }),
-      ...(repositoryInfo.dependencies && { dependencies: repositoryInfo.dependencies }),
-      ...(repositoryInfo.ports && { ports: repositoryInfo.ports }),
-      ...(repositoryInfo.entryPoint && { entryPoint: repositoryInfo.entryPoint }),
     },
     recommendations: {
       buildStrategy,
@@ -178,12 +137,6 @@ Next Step: Use generate-dockerfile with sessionId to create the Dockerfile using
     confidence,
     summary,
   };
-
-  if (sessionId && ctx.session) {
-    ctx.session.storeResult('plan-dockerfile-generation', plan);
-    ctx.session.set('dockerfilePlanGenerated', true);
-    ctx.logger.info({ sessionId }, 'Stored Dockerfile plan in session');
-  }
 
   ctx.logger.info(
     {

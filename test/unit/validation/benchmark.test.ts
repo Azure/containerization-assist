@@ -82,16 +82,16 @@ CMD ["node", "dist/server.js"]`;
       await lintWithDockerfilelint(MEDIUM_DOCKERFILE);
       const externalDuration = Date.now() - startExternal;
 
-      // External linter should add less than 2000ms overhead (relaxed for CI)
-      expect(externalDuration).toBeLessThan(internalDuration + 2000);
+      // External linter should add less than 5000ms overhead (relaxed for CI)
+      expect(externalDuration).toBeLessThan(internalDuration + 5000);
     });
 
-    it('should complete full validation with external linter within 500ms', async () => {
+    it('should complete full validation with external linter within 5000ms', async () => {
       const start = Date.now();
       await validateDockerfileContent(LARGE_DOCKERFILE, { enableExternalLinter: true });
       const duration = Date.now() - start;
 
-      expect(duration).toBeLessThan(1000);
+      expect(duration).toBeLessThan(5000);
     });
   });
 

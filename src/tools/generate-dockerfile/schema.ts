@@ -10,9 +10,7 @@ import {
   samplingOptions,
 } from '../shared/schemas';
 
-const sessionIdSchema = sharedSessionId.describe(
-  'Session identifier for sharing data between tools. Use the sessionId from analyze-repo to leverage detailed analysis results.',
-);
+const sessionIdSchema = sharedSessionId.describe('Session identifier for workflow tracking.');
 
 const optimizationSchema = z
   .enum(['size', 'security', 'performance', 'balanced'])
@@ -57,19 +55,38 @@ export const generateDockerfileSchema = z.object({
     .string()
     .optional()
     .describe(
-      'Repository path (use forward slashes: /path/to/repo). If not provided, uses path from analyze-repo session data.',
+      'Repository path (use forward slashes: /path/to/repo). Optional when generating for modules (module paths are used instead).',
     ),
-  moduleName: z
-    .string()
+  modules: z
+    .array(
+      z.object({
+        name: z.string(),
+        path: z.string().describe('Module source code path'),
+        dockerfilePath: z
+          .string()
+          .optional()
+          .describe(
+            'Path where the Dockerfile should be generated (use forward slashes). If not provided, defaults to the module path.',
+          ),
+        language: z.string().optional(),
+        framework: z.string().optional(),
+        languageVersion: z.string().optional(),
+        frameworkVersion: z.string().optional(),
+        dependencies: z.array(z.string()).optional(),
+        ports: z.array(z.number()).optional(),
+        entryPoint: z.string().optional(),
+        buildSystem: z
+          .object({
+            type: z.string().optional(),
+            configFile: z.string().optional(),
+          })
+          .passthrough()
+          .optional(),
+      }),
+    )
     .optional()
     .describe(
-      'Specific module name to generate Dockerfile for (use with monorepo/multi-module projects). If not specified and modules are detected in session, generates for all modules.',
-    ),
-  dockerfileDirectoryPaths: z
-    .array(z.string())
-    .nonempty()
-    .describe(
-      'List of paths in the repository to generate separate Dockerfiles (use forward slashes: /path/to/directory/where/dockerfile/will/be/placed/)',
+      'Array of module information. To generate Dockerfiles for specific modules, pass only those modules in this array. Each module can specify a dockerfilePath for where to place the Dockerfile.',
     ),
   ...samplingOptions,
 });
