@@ -53,10 +53,8 @@ async function generateSingleDockerfile(
 ): Promise<Result<AIResponse>> {
   const { multistage, securityHardening, optimization, sessionId, baseImagePreference } = input;
 
-  // Determine repository path
-  const path = input.path;
-
-  // Determine target module path and dockerfile path
+  // Determine repository path: use module path if available, otherwise input.path
+  const path = targetModule?.path ?? input.path;
   const targetModulePath = targetModule?.path;
   const targetDockerfilePath = targetModule?.dockerfilePath;
 
@@ -106,10 +104,10 @@ async function generateSingleDockerfile(
     requirements = `Analyze the repository at ${path} to detect the technology stack, dependencies, and requirements.`;
   }
 
-  // Path is required
+  // Path is required (either from module or input)
   if (!path) {
     return Failure(
-      'Repository path is required. Provide the path parameter or dockerfileDirectoryPaths.',
+      'Repository path is required. Provide either the path parameter or modules with path fields.',
     );
   }
 

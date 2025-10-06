@@ -86,7 +86,7 @@ CMD ["node", "dist/server.js"]`;
       expect(externalDuration).toBeLessThan(internalDuration + 5000);
     });
 
-    it('should complete full validation with external linter within 500ms', async () => {
+    it('should complete full validation with external linter within 5000ms', async () => {
       const start = Date.now();
       await validateDockerfileContent(LARGE_DOCKERFILE, { enableExternalLinter: true });
       const duration = Date.now() - start;

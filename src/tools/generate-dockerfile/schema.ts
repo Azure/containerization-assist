@@ -55,7 +55,7 @@ export const generateDockerfileSchema = z.object({
     .string()
     .optional()
     .describe(
-      'Repository path (use forward slashes: /path/to/repo). Required unless dockerfileDirectoryPaths is provided.',
+      'Repository path (use forward slashes: /path/to/repo). Optional when generating for modules (module paths are used instead).',
     ),
   modules: z
     .array(

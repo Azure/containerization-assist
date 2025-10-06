@@ -500,22 +500,11 @@ async function deployApplicationImpl(
     );
     const k8sClient = createKubernetesClient(logger);
 
-    const manifestContents = params.manifestsPath;
-
-    if (!manifestContents) {
-      return Failure('Kubernetes manifests path is required. Provide manifestsPath parameter.');
-    }
-
     // Parse and validate manifests
     let manifests: KubernetesManifest[];
     try {
       // The manifests are already a string containing all YAML documents
-
-      if (!manifestContents) {
-        return Failure('No valid manifest content found in session');
-      }
-
-      manifests = parseManifest(manifestContents, logger);
+      manifests = parseManifest(params.manifestsPath, logger);
     } catch (error) {
       return Failure(`Failed to parse manifests: ${extractErrorMessage(error)}`);
     }

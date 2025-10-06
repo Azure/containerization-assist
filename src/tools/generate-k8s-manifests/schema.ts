@@ -43,10 +43,7 @@ export const generateK8sManifestsSchema = z.object({
     )
     .optional()
     .describe(
-      'Array of module information. To generate manifests for specific modules, pass only those modules in this array.',
-    )
-    .describe(
-      'Array of module information for multi-module/monorepo projects. Pass the modules array from analyze-repo output to generate K8s manifests for all modules.',
+      'Array of module information for multi-module/monorepo projects. Pass the modules array from analyze-repo output to generate K8s manifests for all modules, or pass specific modules to generate only for those.',
     ),
   path: path.optional().describe('Path where the k8s folder should be created'),
   namespace,
