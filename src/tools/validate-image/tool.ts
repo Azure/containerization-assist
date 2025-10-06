@@ -206,11 +206,6 @@ async function run(
     workflowHints,
   };
 
-  if (sessionId && ctx.session) {
-    ctx.session.storeResult('validate-image', result);
-    ctx.session.set('imageValidated', passed);
-  }
-
   ctx.logger.info(
     {
       totalImages: baseImages.length,
