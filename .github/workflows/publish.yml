@@ -5,7 +5,7 @@ permissions:
   contents: read
 
 jobs:
-  JobBuild:
+  Build:
       name: release
       runs-on: ubuntu-latest
       permissions: 
@@ -35,18 +35,24 @@ jobs:
         id: package_version
         run: |
           VERSION=$(jq -r '.version' package.json)
+          echo "Version=$VERSION"
           echo "current-version=$VERSION" >> $GITHUB_OUTPUT
 
-  JobsPublish:
+      outputs:
+        current-version: ${{ steps.package_version.outputs.current-version }}
+
+  Publish:
     name: publish
     runs-on: ubuntu-latest
-    needs: JobBuild
+    needs: Build
     permissions: 
         actions: read
         contents: write
         deployments: read
         packages: none
         id-token: write
+    env: 
+      current-version: ${{ needs.Build.outputs.current-version }}
     steps:
 
       # Checkout the code again for release
@@ -79,3 +85,7 @@ jobs:
       - name: Upload files to partner drop folder
         run: |
             az account show
+            VERSION=${{ env.current-version }}
+            BLOBPATH="containerization-assist/js/$VERSION"
+            echo "Uploading package version $VERSION to blob path $BLOBPATH"
+            az storage blob upload -f ./@azure-containerization-assist-mcp-$VERSION.tgz -c ${drops/$BLOBPATH} --account-name azuresdkpartnerdrops --auth-mode login
