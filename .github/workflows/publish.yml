@@ -88,4 +88,4 @@ jobs:
             VERSION=${{ env.current-version }}
             BLOBPATH="containerization-assist/js/$VERSION"
             echo "Uploading package version $VERSION to blob path $BLOBPATH"
-            az storage blob upload -f ./@azure-containerization-assist-mcp-$VERSION.tgz -c ${drops/$BLOBPATH} --account-name azuresdkpartnerdrops --auth-mode login
+            az storage blob upload -f ./@azure-containerization-assist-mcp-$VERSION.tgz -c drops -n $BLOBPATH/@azure-containerization-assist-mcp-$VERSION.tgz --account-name azuresdkpartnerdrops --auth-mode login
