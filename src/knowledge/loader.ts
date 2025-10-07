@@ -182,7 +182,7 @@ export const loadKnowledgeBase = async (): Promise<void> => {
           path.resolve(process.cwd(), 'dist/knowledge/packs', packFile),
           path.resolve(
             process.cwd(),
-            'node_modules/@thgamble/containerization-assist-mcp/knowledge/packs',
+            'node_modules/@azure/containerization-assist-mcp/knowledge/packs',
             packFile,
           ),
         ] as const;
