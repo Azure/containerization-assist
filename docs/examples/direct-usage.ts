@@ -6,7 +6,7 @@
 import {
   createApp,
   type Tool
-} from '@thgamble/containerization-assist-mcp';
+} from '@azure/containerization-assist-mcp';
 
 async function directUsageExample() {
   console.log('=== Direct Tool Usage Example ===\n');
