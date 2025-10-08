@@ -88,7 +88,7 @@ jobs:
         with:
             tag_name : ${{ needs.Build.outputs.current-version }}
             release_name: ${{ needs.Build.outputs.current-version }}
-            body: Publish ${{ steps.changelog_reader.outputs.changelog_reader_changes }}
+            body: Publish ${{ steps.changelog_reader.outputs.changes }}
 
       - name: Federated Azure login
         uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
