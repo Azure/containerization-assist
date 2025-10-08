@@ -1,5 +1,7 @@
 name: Build & Publish
-on: [workflow_dispatch]
+
+on:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,17 +20,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
-      - name: Use Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 20
+          cache: 'npm'
 
-      # Run install dependencies
       - name: Install dependencies
         run: npm ci
 
-      # Ensure project builds successfully before creating release
-      - name: Build 
+      - name: Build project
         run: npm run build
 
       - name: Get current version from package.json
@@ -37,7 +38,6 @@ jobs:
           VERSION=$(jq -r '.version' package.json)
           echo "Version=$VERSION"
           echo "current-version=$VERSION" >> $GITHUB_OUTPUT
-
       outputs:
         current-version: ${{ steps.package_version.outputs.current-version }}
 
@@ -54,34 +54,49 @@ jobs:
     env: 
       current-version: ${{ needs.Build.outputs.current-version }}
     steps:
+      - name: Check version is mentioned in Changelog
+        id: changelog_reader
+        uses: mindsers/changelog-reader-action@32aa5b4c155d76c94e4ec883a223c947b2f02656 # v2.2.3
+        with:
+            validation_depth: 10
+            version: ${{ steps.package_version.outputs.current-version }}
+            path: 'CHANGELOG.md'
 
-      # Checkout the code again for release
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
-      - name: Use Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 20
+          cache: 'npm'
 
-      # Run install dependencies
       - name: Install dependencies
         run: npm ci
 
-      - name: Build 
+      - name: Build project
         run: npm run build
 
-      - name: Create target package
+      - name: Create package tarball
         run: npm pack
 
-      - name: federated login
+      - name: Create a Release
+        id: create_release
+        uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1.1.4
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        with:
+            tag_name : ${{ needs.JobBuild.outputs.currentversion }}
+            release_name: ${{ needs.JobBuild.outputs.currentversion}}
+            body: Publish ${{ needs.JobBuild.outputs.changelog_reader_changes }}
+
+      - name: Federated Azure login
         uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         with:
           client-id: ${{ secrets.AZURE_PARTNER_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_PARTNER_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_PARTNER_SUBSCRIPTION_ID }}
 
-      # az storage blob upload -f ${Folder to Copy} -c ${drops/<BlobPath>} --account-name azuresdkpartnerdrops --auth-mode login
       - name: Upload files to partner drop folder
         run: |
             az account show
