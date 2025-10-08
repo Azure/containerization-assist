@@ -65,3 +65,5 @@ plans
 docs/development/claude-guide.md
 backups
 k8s
+
+knip-deadcode-output.txt

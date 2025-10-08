@@ -19,7 +19,7 @@ describe('Package Integrity', () => {
   beforeAll(() => {
     // Ensure project is built
     execSync('npm run build', { cwd: PROJECT_ROOT, stdio: 'pipe' });
-    
+
     // Create test directory
     testDir = join(tmpdir(), `containerization-assist-test-${Date.now()}`);
     mkdirSync(testDir, { recursive: true });
@@ -30,7 +30,7 @@ describe('Package Integrity', () => {
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
-    
+
     // Clean up any tarballs in project root
     const tarballPattern = /azure-containerization-assist-mcp-.*\.tgz$/;
     try {
@@ -47,11 +47,11 @@ describe('Package Integrity', () => {
 
   describe('npm pack', () => {
     it('should create package tarball successfully', () => {
-      const result = execSync('npm pack', { 
-        cwd: PROJECT_ROOT, 
-        encoding: 'utf8' 
+      const result = execSync('npm pack', {
+        cwd: PROJECT_ROOT,
+        encoding: 'utf8'
       }).trim();
-      
+
       packageTarball = join(PROJECT_ROOT, result);
       expect(existsSync(packageTarball)).toBe(true);
     });
@@ -60,17 +60,17 @@ describe('Package Integrity', () => {
       const output = execSync(`tar -tzf "${packageTarball}"`, {
         encoding: 'utf8'
       });
-      
+
       const files = output.split('\n').filter(Boolean);
-      
+
       // Should have package structure
       expect(files).toContain('package/package.json');
       expect(files).toContain('package/README.md');
       expect(files).toContain('package/LICENSE');
-      
+
       // Should have CommonJS dist files
       expect(files.some(f => f.includes('package/dist-cjs/'))).toBe(true);
-      
+
       // Should have CLI entry point (either ESM or CJS)
       const hasEsmCli = files.some(f => f.includes('package/dist/src/cli/cli.js'));
       const hasCjsCli = files.some(f => f.includes('package/dist-cjs/src/cli/cli.js'));
@@ -84,47 +84,47 @@ describe('Package Integrity', () => {
     beforeAll(() => {
       installDir = join(testDir, 'install-test');
       mkdirSync(installDir, { recursive: true });
-      
+
       // Create package.json
       execSync('npm init -y', { cwd: installDir, stdio: 'pipe' });
-      
+
       // Install from tarball
-      execSync(`npm install "${packageTarball}"`, { 
-        cwd: installDir, 
-        stdio: 'pipe' 
+      execSync(`npm install "${packageTarball}"`, {
+        cwd: installDir,
+        stdio: 'pipe'
       });
     });
 
     it('should install package successfully', () => {
-      const nodeModulesPath = join(installDir, 'node_modules/@azure/containerization-assist-mcp');
+      const nodeModulesPath = join(installDir, 'node_modules/containerization-assist-mcp');
       expect(existsSync(nodeModulesPath)).toBe(true);
     });
 
     it('should have correct package.json structure', () => {
-      const packageJsonPath = join(installDir, 'node_modules/@azure/containerization-assist-mcp/package.json');
+      const packageJsonPath = join(installDir, 'node_modules/containerization-assist-mcp/package.json');
       const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
-      
-      expect(packageJson.name).toBe('@azure/containerization-assist-mcp');
+
+      expect(packageJson.name).toBe('containerization-assist-mcp');
       expect(packageJson.bin).toBeDefined();
       expect(packageJson.main).toBeDefined();
       expect(packageJson.exports).toBeDefined();
     });
 
     it('should have CLI binary files present', () => {
-      const nodeModulesPath = join(installDir, 'node_modules/@azure/containerization-assist-mcp');
+      const nodeModulesPath = join(installDir, 'node_modules/containerization-assist-mcp');
       const packageJson = JSON.parse(readFileSync(join(nodeModulesPath, 'package.json'), 'utf8'));
-      
+
       // Check that binary files exist
       const binPath = packageJson.bin['containerization-assist-mcp'];
       const fullBinPath = join(nodeModulesPath, binPath);
-      
+
       expect(existsSync(fullBinPath)).toBe(true);
     });
 
     it('should have required dependencies available', () => {
-      const nodeModulesPath = join(installDir, 'node_modules/@azure/containerization-assist-mcp');
+      const nodeModulesPath = join(installDir, 'node_modules/containerization-assist-mcp');
       const packageJson = JSON.parse(readFileSync(join(nodeModulesPath, 'package.json'), 'utf8'));
-      
+
       // Key dependencies should be present in the installed package
       const requiredDeps = [
         '@modelcontextprotocol/sdk',
@@ -132,23 +132,23 @@ describe('Package Integrity', () => {
         'dockerode',
         'zod'
       ];
-      
+
       for (const dep of requiredDeps) {
         expect(packageJson.dependencies[dep]).toBeDefined();
       }
     });
 
     it('should have consistent binary and main paths', () => {
-      const nodeModulesPath = join(installDir, 'node_modules/@azure/containerization-assist-mcp');
+      const nodeModulesPath = join(installDir, 'node_modules/containerization-assist-mcp');
       const packageJson = JSON.parse(readFileSync(join(nodeModulesPath, 'package.json'), 'utf8'));
-      
+
       const binPath = packageJson.bin['containerization-assist-mcp'];
       const mainPath = packageJson.main;
-      
+
       // Both should use the same dist directory (either dist/ or dist-cjs/)
       const binDir = binPath.split('/')[0];
       const mainDir = mainPath.split('/')[0];
-      
+
       // If they're different, it's likely a configuration mismatch
       if (binDir !== mainDir) {
         console.warn(`Binary uses ${binDir}/ but main uses ${mainDir}/`);
@@ -162,33 +162,33 @@ describe('Package Integrity', () => {
     beforeAll(() => {
       installDir = join(testDir, 'import-test');
       mkdirSync(installDir, { recursive: true });
-      
+
       // Create package.json with type: module
       execSync('npm init -y', { cwd: installDir, stdio: 'pipe' });
       const pkgPath = join(installDir, 'package.json');
       const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
       pkg.type = 'module';
       require('fs').writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
-      
+
       // Install from tarball
-      execSync(`npm install "${packageTarball}"`, { 
-        cwd: installDir, 
-        stdio: 'pipe' 
+      execSync(`npm install "${packageTarball}"`, {
+        cwd: installDir,
+        stdio: 'pipe'
       });
     });
 
     it('should support main import', async () => {
       const testScript = `
-        import pkg from '@azure/containerization-assist-mcp';
+        import pkg from 'containerization-assist-mcp';
         console.log(typeof pkg);
       `;
-      
+
       require('fs').writeFileSync(join(installDir, 'test.mjs'), testScript);
-      
+
       try {
-        const result = execSync('node test.mjs', { 
-          cwd: installDir, 
-          encoding: 'utf8' 
+        const result = execSync('node test.mjs', {
+          cwd: installDir,
+          encoding: 'utf8'
         });
         expect(result.trim()).not.toBe('undefined');
       } catch (error) {
@@ -200,16 +200,16 @@ describe('Package Integrity', () => {
 
     it('should support named exports', async () => {
       const testScript = `
-        import { MCPServer } from '@azure/containerization-assist-mcp';
+        import { MCPServer } from 'containerization-assist-mcp';
         console.log(typeof MCPServer);
       `;
-      
+
       require('fs').writeFileSync(join(installDir, 'test-named.mjs'), testScript);
-      
+
       try {
-        const result = execSync('node test-named.mjs', { 
-          cwd: installDir, 
-          encoding: 'utf8' 
+        const result = execSync('node test-named.mjs', {
+          cwd: installDir,
+          encoding: 'utf8'
         });
         expect(result.trim()).toBe('function');
       } catch (error) {

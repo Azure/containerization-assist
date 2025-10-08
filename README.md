@@ -18,7 +18,7 @@ An AI-powered containerization assistant that helps you build, scan, and deploy 
 ### Install from npm
 
 ```bash
-npm install -g @azure/containerization-assist-mcp
+npm install -g containerization-assist-mcp
 ```
 
 ### System Requirements
@@ -33,7 +33,7 @@ npm install -g @azure/containerization-assist-mcp
 
 1. Install the MCP server globally:
    ```bash
-   npm install -g @azure/containerization-assist-mcp
+   npm install -g containerization-assist-mcp
    ```
 
 2. Configure VS Code to use the MCP server. Add to your VS Code settings or create `.vscode/mcp.json` in your project:
@@ -162,26 +162,47 @@ The server detects and supports monorepo structures with multiple independently 
 
 ## Available Tools
 
-| Tool | Description | AI Enhanced |
-|------|-------------|-------------|
-| `analyze-repo` | Analyze repository structure and detect language/framework | ✅ |
-| `resolve-base-images` | Find optimal base images for applications | ✅ |
-| `generate-dockerfile` | Create optimized Dockerfiles with knowledge enhancement | ✅ |
-| `fix-dockerfile` | Fix and optimize existing Dockerfiles | ✅ |
-| `build-image` | Build Docker images with optimization suggestions | ✅ |
-| `scan` | Security vulnerability scanning with AI-powered recommendations | ✅ |
-| `tag-image` | Tag Docker images with intelligent strategies | ✅ |
-| `push-image` | Push images to registry with optimization guidance | ✅ |
-| `generate-k8s-manifests` | Create Kubernetes deployment configurations | ✅ |
-| `generate-helm-charts` | Generate Helm charts with template optimization | ✅ |
-| `generate-aca-manifests` | Create Azure Container Apps manifests | ✅ |
-| `convert-aca-to-k8s` | Convert Azure Container Apps to Kubernetes | ✅ |
-| `prepare-cluster` | Prepare Kubernetes cluster with optimization advice | ✅ |
-| `deploy` | Deploy applications with intelligent analysis | ✅ |
-| `verify-deployment` | Verify deployment health with AI diagnostics | ✅ |
-| `ops` | Operational tools with intelligent insights | ✅ |
-| `generate-kustomize` | Generate Kustomize configurations | ❌ |
-| `inspect-session` | Debug and analyze tool execution sessions | ❌ |
+### AI-Enhanced Tools
+
+These tools use deterministic single-candidate sampling with quality scoring for intelligent content generation and analysis.
+
+| Tool | Description |
+|------|-------------|
+| `analyze-repo` | Analyze repository structure and detect language/framework |
+| `build-image` | Build Docker images with optimization suggestions |
+| `convert-aca-to-k8s` | Convert Azure Container Apps to Kubernetes |
+| `deploy` | Deploy applications with intelligent analysis |
+| `fix-dockerfile` | Fix and optimize existing Dockerfiles |
+| `generate-aca-manifests` | Create Azure Container Apps manifests |
+| `generate-dockerfile` | Create optimized Dockerfiles with knowledge enhancement |
+| `generate-helm-charts` | Generate Helm charts with template optimization |
+| `generate-k8s-manifests` | Create Kubernetes deployment configurations |
+| `prepare-cluster` | Prepare Kubernetes cluster with optimization advice |
+| `push-image` | Push images to registry with optimization guidance |
+| `resolve-base-images` | Find optimal base images for applications |
+| `scan` | Security vulnerability scanning with AI-powered recommendations |
+| `tag-image` | Tag Docker images with intelligent strategies |
+| `verify-deployment` | Verify deployment health with AI diagnostics |
+
+### Knowledge-Enhanced Planning Tools
+
+These tools use knowledge packs for planning without AI sampling.
+
+| Tool | Description |
+|------|-------------|
+| `plan-dockerfile-generation` | Plan Dockerfile generation strategy |
+| `plan-manifest-generation` | Plan Kubernetes manifest generation strategy |
+
+### Utility Tools
+
+These tools perform direct operations without AI enhancement.
+
+| Tool | Description |
+|------|-------------|
+| `generate-kustomize` | Generate Kustomize configurations |
+| `inspect-session` | Debug and analyze tool execution sessions |
+| `ops` | Operational tools for Docker and Kubernetes |
+| `validate-dockerfile` | Validate Dockerfile syntax and best practices |
 
 ## Supported Technologies
 
@@ -209,10 +230,16 @@ The following environment variables control server behavior:
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
 | `DOCKER_SOCKET` | Docker socket path | `/var/run/docker.sock` (Linux/Mac)<br>`//./pipe/docker_engine` (Windows) | Yes (for Docker features) |
+| `DOCKER_TIMEOUT` | Docker operation timeout in milliseconds | `60000` (60s) | No |
+| `KUBECONFIG` | Path to Kubernetes config file | `~/.kube/config` | No |
+| `K8S_NAMESPACE` | Default Kubernetes namespace | `default` | No |
 | `LOG_LEVEL` | Logging level | `info` | No |
 | `WORKSPACE_DIR` | Working directory for operations | Current directory | No |
-| `K8S_NAMESPACE` | Default Kubernetes namespace | `default` | No |
-| `NODE_ENV` | Environment mode | `production` | No |
+| `TEMP_DIR` | Temporary directory for build artifacts | System temp dir | No |
+| `MCP_MODE` | Enable MCP protocol mode (logs to stderr) | `false` | No |
+| `MCP_QUIET` | Suppress non-essential output in MCP mode | `false` | No |
+| `IMAGE_ALLOWLIST` | Comma-separated list of allowed base images | Empty | No |
+| `IMAGE_DENYLIST` | Comma-separated list of denied base images | Empty | No |
 
 **Note on Runtime Configuration:**
 This server uses a **single-session model** optimized for one operator. Session state persists across tool executions within a single workflow and clears on server shutdown.

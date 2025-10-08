@@ -22,43 +22,13 @@ This project adheres to the Microsoft Open Source Code of Conduct. By participat
 
 ### Prerequisites
 
-- Go 1.21 or later
+- Node.js 20 or later
+- npm (comes with Node.js)
 - Docker
 - kubectl (for Kubernetes features)
-- kind (for local testing)
 - Git
 
 ### Development Setup
-
-#### Option 1: Development Container (Recommended)
-
-The fastest way to get started with a fully configured environment:
-
-1. **Fork and Clone**
-   ```bash
-   git clone https://github.com/YOUR-USERNAME/containerization-assist.git
-   cd containerization-assist
-   ```
-
-2. **Open in Dev Container**
-   - Install [VS Code](https://code.visualstudio.com/) and the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
-   - Open the repository in VS Code: `code .`
-   - Click "Reopen in Container" when prompted
-   - Wait for automatic setup (3-5 minutes first time)
-
-3. **Start Contributing**
-   ```bash
-   # All tools are pre-installed and ready to use
-   make mcp          # Build MCP server
-   make test         # Run tests
-   make lint         # Run linting
-   ```
-
-See [`.devcontainer/README.md`](.devcontainer/README.md) for complete devcontainer documentation.
-
-#### Option 2: Local Development
-
-If you prefer to set up your local environment manually:
 
 1. **Fork and Clone**
    ```bash
@@ -68,63 +38,72 @@ If you prefer to set up your local environment manually:
 
 2. **Install Dependencies**
    ```bash
-   go mod download
+   npm install
    ```
 
 3. **Build the Project**
    ```bash
-   # Build CLI version
-   go build -o containerization-assist .
+   # Full build (ESM + CJS)
+   npm run build
 
-   # Build MCP server
-   go build -tags mcp -o containerization-assist-mcp .
+   # ESM only
+   npm run build:esm
+
+   # CJS only
+   npm run build:cjs
+
+   # Watch mode for development
+   npm run build:watch
    ```
 
 4. **Run Tests**
    ```bash
-   # Run all tests
-   go test ./...
+   # All tests
+   npm test
 
-   # Run MCP-specific tests
-   go test -tags mcp ./pkg/mcp/...
+   # Unit tests only
+   npm run test:unit
 
-   # Run with race detection
-   go test -race ./...
+   # With coverage
+   npm run test:coverage
    ```
 
 5. **Verify Installation**
    ```bash
-   ./containerization-assist --version
-   ./containerization-assist-mcp --version
+   # Run validation (lint + typecheck + tests)
+   npm run validate
    ```
 
 ## Project Structure
 
 ```
 containerization-assist/
-├── cmd/                    # Main applications
-│   ├── mcp-server/        # MCP server binary
-│   └── root.go            # CLI root command
-├── pkg/                   # Core packages
-│   ├── mcp/               # MCP server implementation
-│   │   ├── core/          # Server core functionality
-│   │   ├── tools/         # Atomic tools
-│   │   ├── engine/        # Conversation engine
-│   │   └── transport/     # Communication protocols
-│   ├── pipeline/          # Legacy CLI pipeline
-│   ├── core/              # Shared core functionality
-│   └── clients/           # External service clients
-├── docs/                  # Documentation
-├── scripts/               # Build and utility scripts
-└── templates/             # Dockerfile and manifest templates
+├── src/                   # TypeScript source code
+│   ├── app/              # Application core and orchestrator
+│   ├── cli/              # CLI entry points
+│   ├── tools/            # Tool implementations
+│   ├── mcp/              # MCP server implementation
+│   ├── ai/               # Prompt engine and AI integration
+│   ├── session/          # Session management
+│   ├── infra/            # Infrastructure clients (Docker, K8s)
+│   ├── lib/              # Shared utilities
+│   ├── config/           # Configuration and policy system
+│   ├── validation/       # Validation and fixing logic
+│   ├── knowledge/        # Knowledge pack system
+│   └── types/            # Type definitions
+├── docs/                 # Documentation
+├── test/                 # Test files
+├── scripts/              # Build and utility scripts
+└── knowledge/            # Knowledge packs (JSON)
 ```
 
 ### Key Components
 
-- **MCP Server** (`pkg/mcp/`) - Primary focus for new development
-- **Atomic Tools** (`pkg/mcp/tools/`) - Containerization operations
-- **Conversation Engine** (`pkg/mcp/engine/`) - Guided workflows
-- **Legacy CLI** (`pkg/pipeline/`) - Original CLI implementation
+- **MCP Server** (`src/mcp/`) - MCP protocol implementation
+- **Tools** (`src/tools/`) - Containerization tools with AI enhancement
+- **AI System** (`src/ai/`) - Prompt engine and knowledge enhancement
+- **Orchestrator** (`src/app/orchestrator.ts`) - Tool execution coordination
+- **Session Manager** (`src/session/`) - Single-session state management
 
 ## Making Changes
 
@@ -148,26 +127,23 @@ containerization-assist/
 
 3. **Validate Your Changes**
    ```bash
-   # Format code
-   go fmt ./...
+   # Run validation (lint + typecheck + tests)
+   npm run validate
 
-   # Run static analysis
-   go vet ./...
+   # Auto-fix linting and formatting issues
+   npm run fix
 
-   # Run tests
-   go test ./...
+   # Run tests only
+   npm test
 
-   # Check for race conditions
-   go test -race ./pkg/mcp/...
-
-   # Clean up dependencies
-   go mod tidy
+   # Build the project
+   npm run build
    ```
 
 4. **Commit Changes**
    ```bash
    git add .
-   git commit -m "feat: add new atomic tool for X"
+   git commit -m "feat: add new tool for X"
    ```
 
 ### Commit Message Guidelines
@@ -183,10 +159,10 @@ Use conventional commits format:
 
 Examples:
 ```
-feat: add rollback_deployment_atomic tool
-fix: resolve session persistence race condition
+feat: add scan tool with AI suggestions
+fix: resolve session persistence issue
 docs: update MCP setup instructions
-test: add unit tests for conversation engine
+test: add unit tests for prompt engine
 ```
 
 ## Testing
@@ -199,44 +175,37 @@ test: add unit tests for conversation engine
 
 ### Writing Tests
 
-```go
-func TestNewTool(t *testing.T) {
-    tests := []struct {
-        name     string
-        input    string
-        expected string
-        wantErr  bool
-    }{
-        {
-            name:     "valid input",
-            input:    "test-input",
-            expected: "expected-output",
-            wantErr:  false,
-        },
-    }
+```typescript
+import { describe, it, expect } from '@jest/globals';
 
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            result, err := NewTool(tt.input)
-            if (err != nil) != tt.wantErr {
-                t.Errorf("NewTool() error = %v, wantErr %v", err, tt.wantErr)
-                return
-            }
-            if result != tt.expected {
-                t.Errorf("NewTool() = %v, want %v", result, tt.expected)
-            }
-        })
+describe('MyTool', () => {
+  it('should process valid input', async () => {
+    const result = await myTool.run({ input: 'test' }, ctx);
+    
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toBeDefined();
     }
-}
+  });
+
+  it('should handle errors gracefully', async () => {
+    const result = await myTool.run({ input: '' }, ctx);
+    
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('Invalid input');
+    }
+  });
+});
 ```
 
 ### Test Requirements
 
 - All new functionality must include tests
-- Maintain >80% test coverage
-- Use table-driven tests for multiple scenarios
-- Mock external dependencies
+- Maintain >70% test coverage
 - Test error conditions
+- Mock external dependencies (Docker, Kubernetes)
+- Use Jest with ES module support
 
 ## Submitting Changes
 
@@ -251,12 +220,12 @@ func TestNewTool(t *testing.T) {
    - Use the PR template
    - Link related issues
    - Provide clear description of changes
-   - Include screenshots for UI changes
+   - Include screenshots for UI changes (if applicable)
 
 3. **PR Requirements**
    - All tests must pass
-   - Code must be formatted (`go fmt`)
-   - No linting errors (`go vet`)
+   - Code must pass linting (`npm run lint`)
+   - Type checking must pass (`npm run typecheck`)
    - Documentation updated
    - Reviewed by maintainer
 
@@ -286,182 +255,123 @@ Brief description of changes and motivation.
 
 ## Code Style
 
-### Code Quality Requirements
+### TypeScript Guidelines
 
-All pull requests must pass the following checks:
-
-1. **Formatting Check**: Code must be formatted with `gofmt -s` and `goimports`
-2. **Linting**: Must pass golangci-lint with our configuration
-3. **No New TODOs**: New TODO/HACK/FIXME comments block merge
-4. **Error Handling**: All errors must be checked (enforced by errcheck)
-
-#### Ratcheting Strategy
-
-We use a **ratcheting approach** to gradually improve code quality without blocking development:
-
-- **Cyclomatic Complexity**: New functions should target complexity < 15 (gradually reducing to < 10)
-- **Lint Issues**: Total issues must not increase from baseline
-- **Only New Code Checked**: PR checks focus on modified files to avoid blocking on legacy code
-
-To check current baselines:
-```bash
-# Check complexity baseline
-make complexity-check
-
-# See most complex functions
-make complexity-top
-
-# Check lint baseline
-make lint-ratchet
-```
-
-### Running Checks Locally
-
-```bash
-# Install pre-commit hooks (one-time setup)
-make install-hooks
-
-# Format your code
-make fmt
-
-# Check formatting without modifying files
-make fmt-check
-
-# Run all linters
-make lint-strict
-
-# Run pre-commit checks manually
-make pre-commit
-```
-
-### Go Guidelines
-
-- Follow standard Go conventions
+- Follow standard TypeScript conventions
 - Use descriptive variable names
-- Add comments for exported functions
-- Handle errors appropriately - use `types.NewRichError` instead of `fmt.Errorf`
-- Use `utils.Logger` instead of `fmt.Print*` or `log.*`
-- Use interfaces for testability
-- Keep functions under 100 lines
-- Avoid deep nesting (cyclomatic complexity < 10)
+- Add JSDoc comments for exported functions
+- Handle errors using `Result<T>` pattern
+- Use strict TypeScript mode
+- Avoid `any` type - use proper types or `unknown`
+- Keep functions focused and under 50 lines when possible
+- Use path aliases (`@/`) for imports
+
+### Code Quality
+
+All code must:
+- Pass ESLint checks (`npm run lint`)
+- Pass TypeScript type checking (`npm run typecheck`)
+- Follow Prettier formatting (`npm run format`)
+- Include appropriate tests
+- Use the Result<T> pattern for error handling
+
+Example:
+```typescript
+import type { Result } from '@/types';
+
+async function myFunction(input: string): Promise<Result<Output>> {
+  if (!input) {
+    return { ok: false, error: 'Input is required' };
+  }
+
+  try {
+    const output = await processInput(input);
+    return { ok: true, value: output };
+  } catch (err) {
+    return { ok: false, error: `Processing failed: ${err}` };
+  }
+}
+```
 
 ### Pre-commit Hooks
 
-We use pre-commit hooks to ensure code quality. Install them with:
+We use Husky and lint-staged for pre-commit hooks:
 
 ```bash
-make install-hooks
+# Automatically installed with npm install
+# Runs ESLint and Prettier on staged files
 ```
-
-This will automatically check:
-- Code formatting (gofmt, goimports)
-- Trailing whitespace
-- YAML syntax
-- File size limits
-- Go module tidiness
-- Linting issues
 
 ### Documentation
 
-- Add godoc comments for exported functions
+- Add JSDoc comments for exported functions and classes
 - Update README files for new features
 - Include examples in documentation
 - Keep documentation current with code changes
 
 ## Architecture Guidelines
 
-### MCP Server Development
+### Tool Development
 
-1. **Atomic Tools**
-   - Single responsibility principle
-   - Stateless operations
-   - Consistent error handling
-   - Comprehensive logging
+1. **Tool Structure**
+   - Each tool in `src/tools/[tool-name]/`
+   - Required files: `tool.ts`, `schema.ts`, `index.ts`
+   - Use unified Tool interface
+   - Include metadata for AI enhancement
 
-2. **Conversation Engine**
-   - Stage-based workflow
-   - User preference handling
-   - Error recovery mechanisms
-   - Session state management
+2. **Tool Template**
+   ```typescript
+   import type { Tool } from '@/types';
+   import { z } from 'zod';
 
-3. **Transport Layer**
-   - Protocol abstraction
-   - Connection management
-   - Error propagation
-   - Health monitoring
+   const myToolSchema = z.object({
+     // Define parameters
+   });
 
-### Adding New Atomic Tools
+   const tool: Tool<typeof myToolSchema, ResultType> = {
+     name: 'my-tool',
+     description: 'Description of what this tool does',
+     version: '1.0.0',
+     schema: myToolSchema,
+     metadata: {
+       aiDriven: false,
+       knowledgeEnhanced: false,
+       samplingStrategy: 'none',
+     },
+     run: async (input, ctx) => {
+       // Implementation
+     },
+   };
 
-1. **Create Tool Structure Following Current Patterns**
-   ```go
-   type AtomicMyNewToolArgs struct {
-       types.BaseToolArgs
-       // Tool-specific parameters with JSON schema validation
-       RequiredParam string `json:"required_param" jsonschema:"required"`
-       OptionalParam int    `json:"optional_param,omitempty"`
-   }
-
-   type AtomicMyNewToolResult struct {
-       types.BaseToolResponse
-       BaseAIContextResult // Embed AI context methods
-
-       // Tool-specific results
-       Success bool `json:"success"`
-       Data    interface{} `json:"data"`
-
-       // Rich context for AI reasoning
-       Context *MyToolContext `json:"context"`
-   }
-
-   type AtomicMyNewTool struct {
-       pipelineAdapter PipelineAdapter
-       sessionManager  SessionManager
-       logger          zerolog.Logger
-   }
-
-   func (t *AtomicMyNewTool) Execute(ctx context.Context, args AtomicMyNewToolArgs) (*AtomicMyNewToolResult, error) {
-       // Implementation following atomic tool patterns
-   }
+   export default tool;
    ```
 
-2. **Implement AI Integration Pattern**
-   - Follow [docs/AI_INTEGRATION_PATTERN.md](docs/AI_INTEGRATION_PATTERN.md)
-   - Provide rich context structures
-   - Include failure analysis and remediation steps
-   - Use structured data over free text
+3. **AI Integration**
+   - Set `aiDriven: true` for AI-enhanced tools
+   - Set `samplingStrategy: 'single'` for deterministic sampling
+   - Use `ctx.ai.sampleWithRerank()` for AI generation
+   - Add to `enhancementCapabilities` array
 
-3. **Add Fixing Capabilities (if applicable)**
-   ```go
-   // Use AtomicToolFixingMixin for retry logic
-   fixingMixin := fixing.NewAtomicToolFixingMixin(analyzer, "my_tool", logger)
-   operation := fixing.NewOperationWrapper(/* ... */)
-   err := fixingMixin.ExecuteWithRetry(ctx, sessionID, baseDir, operation)
-   ```
-
-4. **Register Tool in register_atomic_tools.go**
-   ```go
-   registry.RegisterTool("my_new_tool_atomic", func(adapter PipelineAdapter, sessionManager SessionManager, logger zerolog.Logger) interfaces.AtomicTool {
-       return NewAtomicMyNewTool(adapter, sessionManager, logger)
-   })
-   ```
-
-5. **Add Comprehensive Tests**
-   ```go
-   func TestAtomicMyNewTool_Execute(t *testing.T) {
-       // Test success cases, error cases, and AI context generation
-   }
-   ```
+4. **Session Management**
+   - Access prior results via `ctx.session.getResult('tool-name')`
+   - Session state automatically persisted by orchestrator
+   - Use session for workflow continuity
 
 ### Error Handling
 
-- Use structured errors with context
-- Provide actionable error messages
-- Log errors with appropriate levels
-- Return user-friendly messages
+All functions that can fail should return `Result<T>`:
 
-```go
-if err != nil {
-    return nil, fmt.Errorf("failed to execute tool %s: %w", toolName, err)
+```typescript
+type Result<T> = 
+  | { ok: true; value: T }
+  | { ok: false; error: string };
+
+// Usage
+const result = await myFunction();
+if (result.ok) {
+  console.log(result.value);
+} else {
+  console.error(result.error);
 }
 ```
 

@@ -223,7 +223,7 @@ jobs:
             ## Installation
             
             ```bash
-            npm install -g @azure/containerization-assist-mcp@${{ needs.validate-release.outputs.version }}
+            npm install -g containerization-assist-mcp@${{ needs.validate-release.outputs.version }}
             ```
             
             ## Usage

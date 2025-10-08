@@ -21,34 +21,34 @@ describe('CLI Functionality', () => {
   beforeAll(async () => {
     // Ensure project is built
     execSync('npm run build', { cwd: PROJECT_ROOT, stdio: 'pipe' });
-    
+
     // Create package
-    const result = execSync('npm pack', { 
-      cwd: PROJECT_ROOT, 
-      encoding: 'utf8' 
+    const result = execSync('npm pack', {
+      cwd: PROJECT_ROOT,
+      encoding: 'utf8'
     }).trim();
     packageTarball = join(PROJECT_ROOT, result);
-    
+
     // Create test directory
     testDir = join(tmpdir(), `cli-test-${Date.now()}`);
     mkdirSync(testDir, { recursive: true });
-    
+
     // Set up installation
     installDir = join(testDir, 'install');
     mkdirSync(installDir, { recursive: true });
     execSync('npm init -y', { cwd: installDir, stdio: 'pipe' });
-    execSync(`npm install "${packageTarball}"`, { 
-      cwd: installDir, 
-      stdio: 'pipe' 
+    execSync(`npm install "${packageTarball}"`, {
+      cwd: installDir,
+      stdio: 'pipe'
     });
-    
+
     // Get CLI path
     const packageJson = JSON.parse(readFileSync(
-      join(installDir, 'node_modules/@azure/containerization-assist-mcp/package.json'), 
+      join(installDir, 'node_modules/containerization-assist-mcp/package.json'),
       'utf8'
     ));
     const binRelativePath = packageJson.bin['containerization-assist-mcp'];
-    cliPath = join(installDir, 'node_modules/@azure/containerization-assist-mcp', binRelativePath);
+    cliPath = join(installDir, 'node_modules/containerization-assist-mcp', binRelativePath);
   }, 180000); // 3 minutes timeout
 
   afterAll(() => {
@@ -56,7 +56,7 @@ describe('CLI Functionality', () => {
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
-    
+
     if (existsSync(packageTarball)) {
       rmSync(packageTarball, { force: true });
     }
@@ -65,29 +65,29 @@ describe('CLI Functionality', () => {
   describe('CLI Binary', () => {
     it('should exist and be executable', () => {
       expect(existsSync(cliPath)).toBe(true);
-      
+
       // Check if it's a JavaScript file
       const content = readFileSync(cliPath, 'utf8');
       expect(content).toMatch(/^#!/); // Should have shebang
     });
 
     it('should show help without errors', () => {
-      const result = execSync(`node "${cliPath}" --help`, { 
+      const result = execSync(`node "${cliPath}" --help`, {
         encoding: 'utf8',
-        cwd: installDir 
+        cwd: installDir
       });
-      
+
       expect(result).toContain('containerization-assist-mcp');
       expect(result).toContain('MCP server for AI-powered containerization workflows');
       expect(result).toContain('Options:');
     });
 
     it('should show version without errors', () => {
-      const result = execSync(`node "${cliPath}" --version`, { 
+      const result = execSync(`node "${cliPath}" --version`, {
         encoding: 'utf8',
-        cwd: installDir 
+        cwd: installDir
       });
-      
+
       // Should contain version number
       expect(result.trim()).toMatch(/^\d+\.\d+\.\d+/);
     });
@@ -96,13 +96,13 @@ describe('CLI Functionality', () => {
   describe('CLI Commands', () => {
     it('should validate configuration without Docker', () => {
       try {
-        const result = execSync(`node "${cliPath}" --validate`, { 
+        const result = execSync(`node "${cliPath}" --validate`, {
           encoding: 'utf8',
           cwd: installDir,
           timeout: 30000,
           env: { ...process.env, NODE_ENV: 'test' }
         });
-        
+
         expect(result).toContain('Configuration validation');
       } catch (error: any) {
         // Expected to fail if Docker isn't available, but should be graceful
@@ -111,13 +111,13 @@ describe('CLI Functionality', () => {
     });
 
     it('should list tools without errors', () => {
-      const result = execSync(`node "${cliPath}" --list-tools`, { 
+      const result = execSync(`node "${cliPath}" --list-tools`, {
         encoding: 'utf8',
         cwd: installDir,
         timeout: 30000,
         env: { ...process.env, NODE_ENV: 'test' }
       });
-      
+
       expect(result).toContain('Available MCP Tools');
       expect(result).toContain('analyze-repo');
       expect(result).toContain('generate-dockerfile');
@@ -126,13 +126,13 @@ describe('CLI Functionality', () => {
 
     it('should perform health check', () => {
       try {
-        const result = execSync(`node "${cliPath}" --health-check`, { 
+        const result = execSync(`node "${cliPath}" --health-check`, {
           encoding: 'utf8',
           cwd: installDir,
           timeout: 30000,
           env: { ...process.env, NODE_ENV: 'test' }
         });
-        
+
         expect(result).toContain('Health Check Results');
       } catch (error: any) {
         // May fail due to Docker availability, but should be graceful
@@ -156,12 +156,12 @@ describe('CLI Functionality', () => {
 
       child.stdout.on('data', (data) => {
         stdout += data.toString();
-        
+
         // Look for server ready indication or MCP response
         if (!hasResponded && (stdout.includes('"result"') || stdout.includes('"error"'))) {
           hasResponded = true;
           child.kill();
-          
+
           // Should contain valid JSON response
           try {
             const lines = stdout.trim().split('\n');
@@ -222,9 +222,9 @@ describe('CLI Functionality', () => {
   describe('Error Handling', () => {
     it('should handle invalid commands gracefully', () => {
       try {
-        execSync(`node "${cliPath}" invalid-command`, { 
+        execSync(`node "${cliPath}" invalid-command`, {
           encoding: 'utf8',
-          cwd: installDir 
+          cwd: installDir
         });
         fail('Should have thrown an error');
       } catch (error: any) {
@@ -236,9 +236,9 @@ describe('CLI Functionality', () => {
 
     it('should handle invalid options gracefully', () => {
       try {
-        execSync(`node "${cliPath}" --invalid-option`, { 
+        execSync(`node "${cliPath}" --invalid-option`, {
           encoding: 'utf8',
-          cwd: installDir 
+          cwd: installDir
         });
         fail('Should have thrown an error');
       } catch (error: any) {

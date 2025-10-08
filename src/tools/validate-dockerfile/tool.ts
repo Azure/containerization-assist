@@ -1,5 +1,5 @@
 /**
- * Validate Image Tool
+ * Validate Dockerfile Tool
  *
  * Validates Dockerfile base images against configurable allowlist/denylist regex patterns.
  * Configuration is managed at the server level via environment variables.
@@ -15,7 +15,7 @@ import { DockerfileParser } from 'dockerfile-ast';
 import type { z } from 'zod';
 import { appConfig } from '@/config/app-config';
 
-const name = 'validate-image';
+const name = 'validate-dockerfile';
 const description = 'Validate Dockerfile base images against allowlist/denylist patterns';
 const version = '1.0.0';
 
