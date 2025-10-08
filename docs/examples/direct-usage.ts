@@ -6,7 +6,7 @@
 import {
   createApp,
   type Tool
-} from '@microsoft1es/containerization-assist-mcp';
+} from 'containerization-assist-mcp-mcp';
 
 async function directUsageExample() {
   console.log('=== Direct Tool Usage Example ===\n');

@@ -6,7 +6,7 @@
 import {
   createApp,
   type Tool
-} from '@microsoft1es/containerization-assist-mcp';
+} from 'containerization-assist-mcp-mcp';
 
 /**
  * Custom MCP server implementation

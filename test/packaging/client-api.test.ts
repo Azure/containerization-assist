@@ -75,7 +75,7 @@ describe('Client API Compatibility', () => {
   describe('Package Exports', () => {
     it('should export createContainerAssistServer', () => {
       const testScript = `
-        const { createContainerAssistServer } = require('@microsoft1es/containerization-assist-mcp');
+        const { createContainerAssistServer } = require('containerization-assist-mcp-mcp');
         console.log(typeof createContainerAssistServer);
       `;
 
@@ -91,7 +91,7 @@ describe('Client API Compatibility', () => {
 
     it('should export TOOL_NAMES', () => {
       const testScript = `
-        const { TOOL_NAMES } = require('@microsoft1es/containerization-assist-mcp');
+        const { TOOL_NAMES } = require('containerization-assist-mcp-mcp');
         console.log(typeof TOOL_NAMES);
         console.log(Object.keys(TOOL_NAMES).length > 0);
       `;
@@ -110,7 +110,7 @@ describe('Client API Compatibility', () => {
 
     it('should have expected tool names', () => {
       const testScript = `
-        const { TOOL_NAMES } = require('@microsoft1es/containerization-assist-mcp');
+        const { TOOL_NAMES } = require('containerization-assist-mcp-mcp');
         const expectedTools = [
           'ANALYZE_REPO',
           'BUILD_IMAGE', 
@@ -142,7 +142,7 @@ describe('Client API Compatibility', () => {
   describe('createContainerAssistServer Factory', () => {
     it('should create server instance without errors', () => {
       const testScript = `
-        const { createContainerAssistServer } = require('@microsoft1es/containerization-assist-mcp');
+        const { createContainerAssistServer } = require('containerization-assist-mcp-mcp');
 
         try {
           const server = createContainerAssistServer();
@@ -165,7 +165,7 @@ describe('Client API Compatibility', () => {
 
     it('should have registerTools method', () => {
       const testScript = `
-        const { createContainerAssistServer } = require('@microsoft1es/containerization-assist-mcp');
+        const { createContainerAssistServer } = require('containerization-assist-mcp-mcp');
 
         const server = createContainerAssistServer();
         console.log(typeof server.registerTools);
@@ -187,7 +187,7 @@ describe('Client API Compatibility', () => {
       // Create a simplified version of the client example
       const clientExample = `
         const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
-        const { createContainerAssistServer, TOOL_NAMES } = require('@microsoft1es/containerization-assist-mcp');
+        const { createContainerAssistServer, TOOL_NAMES } = require('containerization-assist-mcp-mcp');
 
         function testClientPattern() {
           const server = new McpServer(
@@ -244,7 +244,7 @@ describe('Client API Compatibility', () => {
 
     it('should support tool name mapping', () => {
       const testScript = `
-        const { TOOL_NAMES } = require('@microsoft1es/containerization-assist-mcp');
+        const { TOOL_NAMES } = require('containerization-assist-mcp-mcp');
         
         // Test that tool names can be used as object keys
         const mapping = {
@@ -272,7 +272,7 @@ describe('Client API Compatibility', () => {
   describe('Backward Compatibility', () => {
     it('should maintain consistent API surface', () => {
       const testScript = `
-        const pkg = require('@microsoft1es/containerization-assist-mcp');
+        const pkg = require('containerization-assist-mcp-mcp');
         
         // Check for key exports that clients depend on
         const expectedExports = [
@@ -303,9 +303,9 @@ describe('Client API Compatibility', () => {
     it('should handle CommonJS require correctly', () => {
       const testScript = `
         // Test different require patterns
-        const pkg1 = require('@microsoft1es/containerization-assist-mcp');
-        const { createContainerAssistServer } = require('@microsoft1es/containerization-assist-mcp');
-        const { TOOL_NAMES } = require('@microsoft1es/containerization-assist-mcp');
+        const pkg1 = require('containerization-assist-mcp-mcp');
+        const { createContainerAssistServer } = require('containerization-assist-mcp-mcp');
+        const { TOOL_NAMES } = require('containerization-assist-mcp-mcp');
         
         console.log('All require patterns work');
       `;

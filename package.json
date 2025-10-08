@@ -1,5 +1,5 @@
 {
-  "name": "@microsoft1es/containerization-assist-mcp",
+  "name": "containerization-assist-mcp-mcp",
   "version": "1.5.0-dev.1",
   "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
   "type": "module",

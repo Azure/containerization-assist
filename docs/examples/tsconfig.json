@@ -3,28 +3,28 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@microsoft1es/containerization-assist-mcp": [
+      "containerization-assist-mcp-mcp": [
         "../../src/index.ts"
       ],
-      "@microsoft1es/containerization-assist-mcp/*": [
+      "containerization-assist-mcp-mcp/*": [
         "../../src/*"
       ],
-      "@microsoft1es/containerization-assist-mcp/server": [
+      "containerization-assist-mcp-mcp/server": [
         "../../src/mcp/server.ts"
       ],
-      "@microsoft1es/containerization-assist-mcp/tools": [
+      "containerization-assist-mcp-mcp/tools": [
         "../../src/exports/tools.ts"
       ],
-      "@microsoft1es/containerization-assist-mcp/types": [
+      "containerization-assist-mcp-mcp/types": [
         "../../src/types/index.ts"
       ],
-      "@microsoft1es/containerization-assist-mcp/config": [
+      "containerization-assist-mcp-mcp/config": [
         "../../src/config/index.ts"
       ],
-      "@microsoft1es/containerization-assist-mcp/lib": [
+      "containerization-assist-mcp-mcp/lib": [
         "../../src/lib/index.ts"
       ],
-      "@microsoft1es/containerization-assist-mcp/tools/*": [
+      "containerization-assist-mcp-mcp/tools/*": [
         "../../src/tools/*/index.ts"
       ]
     }
