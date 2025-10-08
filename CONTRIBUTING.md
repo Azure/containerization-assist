@@ -81,7 +81,7 @@ containerization-assist/
 ├── src/                   # TypeScript source code
 │   ├── app/              # Application core and orchestrator
 │   ├── cli/              # CLI entry points
-│   ├── tools/            # Tool implementations (21 tools)
+│   ├── tools/            # Tool implementations
 │   ├── mcp/              # MCP server implementation
 │   ├── ai/               # Prompt engine and AI integration
 │   ├── session/          # Session management
@@ -100,7 +100,7 @@ containerization-assist/
 ### Key Components
 
 - **MCP Server** (`src/mcp/`) - MCP protocol implementation
-- **Tools** (`src/tools/`) - 21 containerization tools (15 AI-enhanced)
+- **Tools** (`src/tools/`) - Containerization tools with AI enhancement
 - **AI System** (`src/ai/`) - Prompt engine and knowledge enhancement
 - **Orchestrator** (`src/app/orchestrator.ts`) - Tool execution coordination
 - **Session Manager** (`src/session/`) - Single-session state management

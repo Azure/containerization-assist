@@ -72,101 +72,101 @@ As of the Phase A completion (Sprint 1), all AI-powered tools enforce single-can
 
 ## Tool Enhancement Status
 
-### AI-Enhanced Tools (15 tools)
+### AI-Enhanced Tools
 
 Tools using deterministic single-candidate sampling for intelligent content generation:
 
-1. **`analyze-repo`** - Repository analysis and framework detection
-   - AI-driven technology stack identification
-   - Containerization strategy recommendations
-   - Monorepo and multi-module detection
+- **`analyze-repo`** - Repository analysis and framework detection
+  - AI-driven technology stack identification
+  - Containerization strategy recommendations
+  - Monorepo and multi-module detection
 
-2. **`generate-dockerfile`** - Dockerfile generation with validation
-   - Multi-stage optimization
-   - Security hardening patterns
-   - Performance optimization
-   - Self-repair capabilities
+- **`generate-dockerfile`** - Dockerfile generation with validation
+  - Multi-stage optimization
+  - Security hardening patterns
+  - Performance optimization
+  - Self-repair capabilities
 
-3. **`fix-dockerfile`** - Dockerfile repair and enhancement
-   - Issue-specific fixes with explanations
-   - Best practice application
-   - Security vulnerability remediation
+- **`fix-dockerfile`** - Dockerfile repair and enhancement
+  - Issue-specific fixes with explanations
+  - Best practice application
+  - Security vulnerability remediation
 
-4. **`generate-k8s-manifests`** - Kubernetes manifest generation
-   - Resource optimization
-   - Security context configuration
-   - Health check implementation
+- **`generate-k8s-manifests`** - Kubernetes manifest generation
+  - Resource optimization
+  - Security context configuration
+  - Health check implementation
 
-5. **`generate-helm-charts`** - Helm chart generation
-   - Template optimization
-   - Value schema generation
-   - Deployment strategy integration
+- **`generate-helm-charts`** - Helm chart generation
+  - Template optimization
+  - Value schema generation
+  - Deployment strategy integration
 
-6. **`generate-aca-manifests`** - Azure Container Apps manifests
-   - Platform-specific optimizations
-   - Scaling configuration
-   - Integration patterns
+- **`generate-aca-manifests`** - Azure Container Apps manifests
+  - Platform-specific optimizations
+  - Scaling configuration
+  - Integration patterns
 
-7. **`convert-aca-to-k8s`** - Azure Container Apps to Kubernetes conversion
-   - Resource mapping optimization
-   - Configuration translation
-   - Compatibility ensuring
+- **`convert-aca-to-k8s`** - Azure Container Apps to Kubernetes conversion
+  - Resource mapping optimization
+  - Configuration translation
+  - Compatibility ensuring
 
-8. **`resolve-base-images`** - Base image recommendations
-   - Security-focused selection
-   - Size and performance optimization
-   - Vulnerability assessment integration
+- **`resolve-base-images`** - Base image recommendations
+  - Security-focused selection
+  - Size and performance optimization
+  - Vulnerability assessment integration
 
-9. **`build-image`** - Docker image building
-   - Build optimization suggestions
-   - Context analysis
-   - Progress monitoring
+- **`build-image`** - Docker image building
+  - Build optimization suggestions
+  - Context analysis
+  - Progress monitoring
 
-10. **`tag-image`** - Image tagging strategies
-    - Intelligent tag recommendations
-    - Version management guidance
+- **`tag-image`** - Image tagging strategies
+  - Intelligent tag recommendations
+  - Version management guidance
 
-11. **`push-image`** - Registry push optimization
-    - Authentication guidance
-    - Registry-specific optimizations
+- **`push-image`** - Registry push optimization
+  - Authentication guidance
+  - Registry-specific optimizations
 
-12. **`scan`** - Security vulnerability scanning
-    - AI-powered remediation recommendations
-    - Risk assessment and prioritization
+- **`scan`** - Security vulnerability scanning
+  - AI-powered remediation recommendations
+  - Risk assessment and prioritization
 
-13. **`prepare-cluster`** - Cluster preparation
-    - Optimization recommendations
-    - Resource planning guidance
+- **`prepare-cluster`** - Cluster preparation
+  - Optimization recommendations
+  - Resource planning guidance
 
-14. **`deploy`** - Application deployment
-    - Deployment analysis and troubleshooting
-    - Rollback strategy recommendations
+- **`deploy`** - Application deployment
+  - Deployment analysis and troubleshooting
+  - Rollback strategy recommendations
 
-15. **`verify-deployment`** - Deployment verification
-    - Health check validation
-    - Performance analysis
-    - Issue diagnosis
+- **`verify-deployment`** - Deployment verification
+  - Health check validation
+  - Performance analysis
+  - Issue diagnosis
 
-### Knowledge-Enhanced Planning Tools (2 tools)
+### Knowledge-Enhanced Planning Tools
 
 Tools that use knowledge packs for planning without AI sampling:
 
-1. **`plan-dockerfile-generation`** - Dockerfile generation planning
-   - Module selection strategy
-   - Build context analysis
-   
-2. **`plan-manifest-generation`** - Manifest generation planning
-   - Service mapping planning
-   - Resource planning
+- **`plan-dockerfile-generation`** - Dockerfile generation planning
+  - Module selection strategy
+  - Build context analysis
+  
+- **`plan-manifest-generation`** - Manifest generation planning
+  - Service mapping planning
+  - Resource planning
 
-### Utility Tools (4 tools)
+### Utility Tools
 
 Tools without AI or knowledge enhancement:
 
-1. **`ops`** - Operational utilities for Docker and Kubernetes
-2. **`inspect-session`** - Session debugging and analysis
-3. **`validate-dockerfile`** - Dockerfile syntax validation
-4. **`generate-kustomize`** - Kustomize overlay generation
+- **`ops`** - Operational utilities for Docker and Kubernetes
+- **`inspect-session`** - Session debugging and analysis
+- **`validate-dockerfile`** - Dockerfile syntax validation
+- **`generate-kustomize`** - Kustomize overlay generation
 
 ## Using AI Enhancements
 

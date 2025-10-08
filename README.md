@@ -162,31 +162,47 @@ The server detects and supports monorepo structures with multiple independently 
 
 ## Available Tools
 
-| Tool | Description | AI Enhanced |
-|------|-------------|-------------|
-| `analyze-repo` | Analyze repository structure and detect language/framework | ✅ |
-| `resolve-base-images` | Find optimal base images for applications | ✅ |
-| `generate-dockerfile` | Create optimized Dockerfiles with knowledge enhancement | ✅ |
-| `fix-dockerfile` | Fix and optimize existing Dockerfiles | ✅ |
-| `build-image` | Build Docker images with optimization suggestions | ✅ |
-| `scan` | Security vulnerability scanning with AI-powered recommendations | ✅ |
-| `tag-image` | Tag Docker images with intelligent strategies | ✅ |
-| `push-image` | Push images to registry with optimization guidance | ✅ |
-| `generate-k8s-manifests` | Create Kubernetes deployment configurations | ✅ |
-| `generate-helm-charts` | Generate Helm charts with template optimization | ✅ |
-| `generate-aca-manifests` | Create Azure Container Apps manifests | ✅ |
-| `convert-aca-to-k8s` | Convert Azure Container Apps to Kubernetes | ✅ |
-| `prepare-cluster` | Prepare Kubernetes cluster with optimization advice | ✅ |
-| `deploy` | Deploy applications with intelligent analysis | ✅ |
-| `verify-deployment` | Verify deployment health with AI diagnostics | ✅ |
-| `plan-dockerfile-generation` | Plan Dockerfile generation strategy | 🔧 |
-| `plan-manifest-generation` | Plan Kubernetes manifest generation strategy | 🔧 |
-| `validate-dockerfile` | Validate Dockerfile syntax and best practices | ❌ |
-| `ops` | Operational tools for Docker and Kubernetes | ❌ |
-| `generate-kustomize` | Generate Kustomize configurations | ❌ |
-| `inspect-session` | Debug and analyze tool execution sessions | ❌ |
+### AI-Enhanced Tools
 
-**Legend:** ✅ = AI Enhanced | 🔧 = Knowledge Enhanced Only | ❌ = Utility Tool
+These tools use deterministic single-candidate sampling with quality scoring for intelligent content generation and analysis.
+
+| Tool | Description |
+|------|-------------|
+| `analyze-repo` | Analyze repository structure and detect language/framework |
+| `build-image` | Build Docker images with optimization suggestions |
+| `convert-aca-to-k8s` | Convert Azure Container Apps to Kubernetes |
+| `deploy` | Deploy applications with intelligent analysis |
+| `fix-dockerfile` | Fix and optimize existing Dockerfiles |
+| `generate-aca-manifests` | Create Azure Container Apps manifests |
+| `generate-dockerfile` | Create optimized Dockerfiles with knowledge enhancement |
+| `generate-helm-charts` | Generate Helm charts with template optimization |
+| `generate-k8s-manifests` | Create Kubernetes deployment configurations |
+| `prepare-cluster` | Prepare Kubernetes cluster with optimization advice |
+| `push-image` | Push images to registry with optimization guidance |
+| `resolve-base-images` | Find optimal base images for applications |
+| `scan` | Security vulnerability scanning with AI-powered recommendations |
+| `tag-image` | Tag Docker images with intelligent strategies |
+| `verify-deployment` | Verify deployment health with AI diagnostics |
+
+### Knowledge-Enhanced Planning Tools
+
+These tools use knowledge packs for planning without AI sampling.
+
+| Tool | Description |
+|------|-------------|
+| `plan-dockerfile-generation` | Plan Dockerfile generation strategy |
+| `plan-manifest-generation` | Plan Kubernetes manifest generation strategy |
+
+### Utility Tools
+
+These tools perform direct operations without AI enhancement.
+
+| Tool | Description |
+|------|-------------|
+| `generate-kustomize` | Generate Kustomize configurations |
+| `inspect-session` | Debug and analyze tool execution sessions |
+| `ops` | Operational tools for Docker and Kubernetes |
+| `validate-dockerfile` | Validate Dockerfile syntax and best practices |
 
 ## Supported Technologies
 

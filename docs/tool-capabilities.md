@@ -1,18 +1,18 @@
 # Tool Capabilities Reference
 
-This document provides a comprehensive overview of all 21 tools in the containerization-assist project, their AI enhancement capabilities, and their integration with the sampling system.
+This document provides a comprehensive overview of all tools in the containerization-assist project, their AI enhancement capabilities, and their integration with the sampling system.
 
 ## Tool Classification
 
-### AI-Enhanced Tools (15 tools)
+### AI-Enhanced Tools
 
 These tools use deterministic single-candidate sampling with quality scoring for intelligent content generation and analysis.
 
-### Knowledge-Enhanced Planning Tools (2 tools)
+### Knowledge-Enhanced Planning Tools
 
 These tools use knowledge packs for planning but do not invoke AI sampling.
 
-### Utility Tools (4 tools)
+### Utility Tools
 
 These tools perform direct operations without AI enhancement.
 
@@ -20,7 +20,7 @@ These tools perform direct operations without AI enhancement.
 
 ## Complete Tool Reference
 
-### 1. analyze-repo
+### analyze-repo
 **Category:** Analysis
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -42,7 +42,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 2. generate-dockerfile
+### generate-dockerfile
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -70,7 +70,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 3. fix-dockerfile
+### fix-dockerfile
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -92,7 +92,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 4. build-image
+### build-image
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -113,7 +113,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 5. tag-image
+### tag-image
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -134,7 +134,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 6. push-image
+### push-image
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -155,7 +155,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 7. scan
+### scan
 **Category:** Security
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -182,7 +182,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 8. generate-k8s-manifests
+### generate-k8s-manifests
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -204,7 +204,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 9. generate-helm-charts
+### generate-helm-charts
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -225,7 +225,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 10. generate-kustomize
+### generate-kustomize
 **Category:** Kubernetes
 **AI Enhanced:** ❌ No
 **Knowledge Enhanced:** ❌ No
@@ -240,7 +240,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 11. prepare-cluster
+### prepare-cluster
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -261,7 +261,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 12. deploy
+### deploy
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -282,7 +282,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 13. verify-deployment
+### verify-deployment
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -303,7 +303,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 14. resolve-base-images
+### resolve-base-images
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -324,7 +324,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 15. generate-aca-manifests
+### generate-aca-manifests
 **Category:** Azure
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -345,7 +345,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 16. convert-aca-to-k8s
+### convert-aca-to-k8s
 **Category:** Migration
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -366,7 +366,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 16. ops
+### ops
 **Category:** Operations
 **AI Enhanced:** ❌ No
 **Knowledge Enhanced:** ❌ No
@@ -382,7 +382,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 17. inspect-session
+### inspect-session
 **Category:** Debug
 **AI Enhanced:** ❌ No
 **Knowledge Enhanced:** ❌ No
@@ -398,7 +398,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 18. validate-dockerfile
+### validate-dockerfile
 **Category:** Docker
 **AI Enhanced:** ❌ No
 **Knowledge Enhanced:** ❌ No
@@ -414,7 +414,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 19. plan-dockerfile-generation
+### plan-dockerfile-generation
 **Category:** Planning
 **AI Enhanced:** ❌ No
 **Knowledge Enhanced:** ✅ Yes
@@ -430,7 +430,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 20. plan-manifest-generation
+### plan-manifest-generation
 **Category:** Planning
 **AI Enhanced:** ❌ No
 **Knowledge Enhanced:** ✅ Yes
@@ -446,7 +446,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 21. generate-kustomize
+### generate-kustomize
 **Category:** Kubernetes
 **AI Enhanced:** ❌ No
 **Knowledge Enhanced:** ❌ No
@@ -469,11 +469,11 @@ These tools perform direct operations without AI enhancement.
    - Generates exactly one candidate per invocation
    - Scores result based on content quality, structure, and domain relevance
    - Provides scoring metadata for diagnostics and transparency
-   - Used by 15 AI-enhanced tools for reproducible, debuggable outputs
+   - Used by AI-enhanced tools for reproducible, debuggable outputs
 
 2. **`none`** - No AI enhancement
    - Direct execution without AI sampling
-   - Used by 6 utility and planning tools (ops, inspect-session, validate-dockerfile, plan-dockerfile-generation, plan-manifest-generation, generate-kustomize)
+   - Used by utility and planning tools
 
 ### Enhancement Capability Categories
 
@@ -527,7 +527,7 @@ metadata: {
 ### Finding AI-Enhanced Tools
 
 ```typescript
-// Tools with AI enhancement (15 tools)
+// AI-enhanced tools with single-candidate sampling
 const aiTools = [
   'analyze-repo', 'generate-dockerfile', 'fix-dockerfile', 'build-image',
   'tag-image', 'push-image', 'scan', 'generate-k8s-manifests',
@@ -535,10 +535,10 @@ const aiTools = [
   'resolve-base-images', 'generate-aca-manifests', 'convert-aca-to-k8s'
 ];
 
-// Planning tools with knowledge enhancement (2 tools)
+// Knowledge-enhanced planning tools
 const planningTools = ['plan-dockerfile-generation', 'plan-manifest-generation'];
 
-// Utility tools (4 tools)
+// Utility tools without AI/knowledge enhancement
 const utilityTools = ['ops', 'inspect-session', 'validate-dockerfile', 'generate-kustomize'];
 ```
 
