@@ -68,18 +68,32 @@
 - Module exports coordination
 
 ### 📁 `/ai` - AI and Prompt Engine
-**Purpose**: Complete prompt engine and AI integration with deterministic sampling.
+**Purpose**: Core prompt building and template management.
 
 **Key Files**:
 - `prompt-engine.ts`: Core prompt building and message handling
 - `prompt-templates.ts`: Template definitions
-- `quality.ts`: Quality scoring for AI outputs
 
 **Responsibilities**:
-- AI prompt generation with knowledge pack integration
-- Deterministic single-candidate sampling with quality scoring
+- AI prompt generation
 - Message building for AI interactions
-- Knowledge enhancement of prompts
+- Template management
+
+### 📁 `/mcp/ai` - MCP AI Integration
+**Purpose**: MCP-specific AI enhancements and sampling.
+
+**Key Files**:
+- `knowledge-enhancement.ts`: Knowledge pack integration
+- `sampling-runner.ts`: Deterministic sampling system
+- `quality.ts`: Quality scoring for AI outputs
+- `response-parser.ts`: AI response parsing
+- `schemas.ts`: AI-related schemas
+
+**Responsibilities**:
+- Deterministic single-candidate sampling with quality scoring
+- Knowledge enhancement of AI prompts
+- AI response parsing and validation
+- Quality scoring and metadata
 
 ### 📁 `/app` - Application Core
 **Purpose**: Core application logic and orchestration.
@@ -177,7 +191,9 @@
 
 #### `/ai`
 - `knowledge-enhancement.ts`: Knowledge pack integration for MCP tools
+- `sampling-runner.ts`: Deterministic sampling system
 - `quality.ts`: Quality scoring and validation
+- `response-parser.ts`: AI response parsing
 
 **Key Files**:
 - `mcp-server.ts`: MCP protocol server implementation
@@ -188,6 +204,7 @@
 - Tool registration and routing
 - MCP-specific AI integration with knowledge enhancement
 - Context propagation for tool execution
+- Deterministic sampling coordination
 
 ### 📁 `/session` - Session Management
 **Purpose**: Unified session state management for single-operator workflows.
@@ -212,7 +229,7 @@
 └── index.ts    # Public exports
 ```
 
-**Available Tools**:
+### Available Tools**:
 - `analyze-repo`: Repository analysis and framework detection
 - `build-image`: Docker image building with progress
 - `convert-aca-to-k8s`: Convert ACA to Kubernetes
@@ -225,11 +242,14 @@
 - `generate-kustomize`: Generate Kustomize configurations
 - `inspect-session`: Session debugging
 - `ops`: Operational utilities
+- `plan-dockerfile-generation`: Plan Dockerfile generation strategy
+- `plan-manifest-generation`: Plan manifest generation strategy
 - `prepare-cluster`: Kubernetes cluster preparation
 - `push-image`: Push images to registry
 - `resolve-base-images`: Base image recommendations
 - `scan`: Security vulnerability scanning
 - `tag-image`: Docker image tagging
+- `validate-dockerfile`: Dockerfile validation
 - `verify-deployment`: Verify deployment status
 
 **Shared Resources**:
@@ -260,12 +280,16 @@
 - `dockerfilelint-adapter.ts`: Integration with dockerfilelint
 - `k8s-normalizer.ts`: Kubernetes manifest normalization
 - `k8s-schema-validator.ts`: Kubernetes schema validation
-- `merge-reports.ts`: Report merging utilities
+- `ai-enhancement.ts`: AI-powered validation enhancement
+- `ai-validator.ts`: AI validation logic
+- `knowledge-helpers.ts`: Knowledge pack integration for validation
 
 **Responsibilities**:
 - Validation logic for containers and manifests
 - Automated fixing and optimization
+- AI-powered validation suggestions
 - Report generation and merging
+- Knowledge-enhanced validation
 
 ---
 

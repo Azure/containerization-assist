@@ -179,9 +179,14 @@ The server detects and supports monorepo structures with multiple independently 
 | `prepare-cluster` | Prepare Kubernetes cluster with optimization advice | ✅ |
 | `deploy` | Deploy applications with intelligent analysis | ✅ |
 | `verify-deployment` | Verify deployment health with AI diagnostics | ✅ |
-| `ops` | Operational tools with intelligent insights | ✅ |
+| `plan-dockerfile-generation` | Plan Dockerfile generation strategy | 🔧 |
+| `plan-manifest-generation` | Plan Kubernetes manifest generation strategy | 🔧 |
+| `validate-dockerfile` | Validate Dockerfile syntax and best practices | ❌ |
+| `ops` | Operational tools for Docker and Kubernetes | ❌ |
 | `generate-kustomize` | Generate Kustomize configurations | ❌ |
 | `inspect-session` | Debug and analyze tool execution sessions | ❌ |
+
+**Legend:** ✅ = AI Enhanced | 🔧 = Knowledge Enhanced Only | ❌ = Utility Tool
 
 ## Supported Technologies
 

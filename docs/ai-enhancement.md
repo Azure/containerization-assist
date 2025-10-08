@@ -72,18 +72,20 @@ As of the Phase A completion (Sprint 1), all AI-powered tools enforce single-can
 
 ## Tool Enhancement Status
 
-### AI-Enhanced Tools (8 tools)
+### AI-Enhanced Tools (15 tools)
 
-Tools already using `sampleWithRerank` for intelligent content generation:
+Tools using deterministic single-candidate sampling for intelligent content generation:
 
 1. **`analyze-repo`** - Repository analysis and framework detection
    - AI-driven technology stack identification
    - Containerization strategy recommendations
+   - Monorepo and multi-module detection
 
 2. **`generate-dockerfile`** - Dockerfile generation with validation
    - Multi-stage optimization
    - Security hardening patterns
    - Performance optimization
+   - Self-repair capabilities
 
 3. **`fix-dockerfile`** - Dockerfile repair and enhancement
    - Issue-specific fixes with explanations
@@ -115,68 +117,107 @@ Tools already using `sampleWithRerank` for intelligent content generation:
    - Size and performance optimization
    - Vulnerability assessment integration
 
-### Enhanced Validation Tools
+9. **`build-image`** - Docker image building
+   - Build optimization suggestions
+   - Context analysis
+   - Progress monitoring
 
-#### Scan Tool (`src/tools/scan/tool.ts`)
+10. **`tag-image`** - Image tagging strategies
+    - Intelligent tag recommendations
+    - Version management guidance
 
-Enhanced with AI-powered security suggestions:
-```typescript
-// Enable AI suggestions in scan results
-const scanResult = await scan(content, { enableAISuggestions: true });
-```
+11. **`push-image`** - Registry push optimization
+    - Authentication guidance
+    - Registry-specific optimizations
 
-Features:
-- Security-focused enhancement recommendations
-- Vulnerability remediation suggestions
-- Best practice integration
-- Risk assessment and prioritization
+12. **`scan`** - Security vulnerability scanning
+    - AI-powered remediation recommendations
+    - Risk assessment and prioritization
+
+13. **`prepare-cluster`** - Cluster preparation
+    - Optimization recommendations
+    - Resource planning guidance
+
+14. **`deploy`** - Application deployment
+    - Deployment analysis and troubleshooting
+    - Rollback strategy recommendations
+
+15. **`verify-deployment`** - Deployment verification
+    - Health check validation
+    - Performance analysis
+    - Issue diagnosis
+
+### Knowledge-Enhanced Planning Tools (2 tools)
+
+Tools that use knowledge packs for planning without AI sampling:
+
+1. **`plan-dockerfile-generation`** - Dockerfile generation planning
+   - Module selection strategy
+   - Build context analysis
+   
+2. **`plan-manifest-generation`** - Manifest generation planning
+   - Service mapping planning
+   - Resource planning
+
+### Utility Tools (4 tools)
+
+Tools without AI or knowledge enhancement:
+
+1. **`ops`** - Operational utilities for Docker and Kubernetes
+2. **`inspect-session`** - Session debugging and analysis
+3. **`validate-dockerfile`** - Dockerfile syntax validation
+4. **`generate-kustomize`** - Kustomize overlay generation
 
 ## Using AI Enhancements
 
-### Knowledge Enhancement
+### Prompt Engine and Knowledge Enhancement
+
+The prompt engine (`src/ai/prompt-engine.ts`) integrates with the knowledge system to build AI-enhanced prompts:
 
 ```typescript
-import { enhanceWithKnowledge } from '@/mcp/ai/knowledge-enhancement';
+import { buildMessages } from '@/ai/prompt-engine';
+import { getKnowledgeSnippets } from '@/knowledge/matcher';
 
-const enhancementResult = await enhanceWithKnowledge({
-  content: dockerfileContent,
-  context: 'dockerfile',
-  targetImprovement: 'security',
-  validationContext: validationErrors,
-}, ctx);
+// Build messages with knowledge enhancement
+const messages = buildMessages({
+  systemPrompt: 'You are an expert in containerization',
+  userPrompt: 'Generate an optimized Dockerfile',
+  context: { language: 'node', framework: 'express' },
+});
 
-if (enhancementResult.ok) {
-  const {
-    enhancedContent,
-    knowledgeApplied,
-    suggestions,
-    confidence,
-  } = enhancementResult.value;
-}
+// Or manually get knowledge snippets
+const snippets = getKnowledgeSnippets({
+  tool: 'generate-dockerfile',
+  topic: 'dockerfile-generation',
+  environment: 'production',
+  language: 'node',
+  maxChars: 2000,
+});
 ```
 
-### Validation Enhancement
+### Tool-Level AI Integration
+
+Tools integrate AI through the ToolContext:
 
 ```typescript
-import { enhanceValidationWithAI } from '@/validation/ai-enhancement';
+import type { Tool } from '@/types';
 
-const aiEnhancement = await enhanceValidationWithAI(
-  content,
-  validationResults,
-  ctx,
-  {
-    mode: 'suggestions',
-    focus: 'security',
-    confidence: 0.8,
-    includeExamples: true,
-  }
-);
-
-if (aiEnhancement.ok) {
-  const { suggestions, analysis, confidence } = aiEnhancement.value;
-  console.log(`Risk level: ${analysis.riskLevel}`);
-  console.log(`AI suggestions: ${suggestions.join(', ')}`);
-}
+const tool: Tool<typeof schema, ResultType> = {
+  name: 'my-tool',
+  metadata: {
+    aiDriven: true,
+    knowledgeEnhanced: true,
+    samplingStrategy: 'single',
+    enhancementCapabilities: ['content-generation', 'optimization'],
+  },
+  run: async (input, ctx) => {
+    // AI sampling happens through ctx
+    // Knowledge enhancement happens via prompt engine
+    // Results are automatically scored
+    
+    return { ok: true, value: result };
+  },
+};
 ```
 
 ## Enhancement Contexts
