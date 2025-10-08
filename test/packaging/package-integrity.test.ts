@@ -96,22 +96,22 @@ describe('Package Integrity', () => {
     });
 
     it('should install package successfully', () => {
-      const nodeModulesPath = join(installDir, 'node_modules/@ microsoft1es/containerization-assist-mcp');
+      const nodeModulesPath = join(installDir, 'node_modules/@microsoft1es/containerization-assist-mcp');
       expect(existsSync(nodeModulesPath)).toBe(true);
     });
 
     it('should have correct package.json structure', () => {
-      const packageJsonPath = join(installDir, 'node_modules/@ microsoft1es/containerization-assist-mcp/package.json');
+      const packageJsonPath = join(installDir, 'node_modules/@microsoft1es/containerization-assist-mcp/package.json');
       const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
 
-      expect(packageJson.name).toBe('@ microsoft1es/containerization-assist-mcp');
+      expect(packageJson.name).toBe('@microsoft1es/containerization-assist-mcp');
       expect(packageJson.bin).toBeDefined();
       expect(packageJson.main).toBeDefined();
       expect(packageJson.exports).toBeDefined();
     });
 
     it('should have CLI binary files present', () => {
-      const nodeModulesPath = join(installDir, 'node_modules/@ microsoft1es/containerization-assist-mcp');
+      const nodeModulesPath = join(installDir, 'node_modules/@microsoft1es/containerization-assist-mcp');
       const packageJson = JSON.parse(readFileSync(join(nodeModulesPath, 'package.json'), 'utf8'));
 
       // Check that binary files exist
@@ -122,7 +122,7 @@ describe('Package Integrity', () => {
     });
 
     it('should have required dependencies available', () => {
-      const nodeModulesPath = join(installDir, 'node_modules/@ microsoft1es/containerization-assist-mcp');
+      const nodeModulesPath = join(installDir, 'node_modules/@microsoft1es/containerization-assist-mcp');
       const packageJson = JSON.parse(readFileSync(join(nodeModulesPath, 'package.json'), 'utf8'));
 
       // Key dependencies should be present in the installed package
@@ -139,7 +139,7 @@ describe('Package Integrity', () => {
     });
 
     it('should have consistent binary and main paths', () => {
-      const nodeModulesPath = join(installDir, 'node_modules/@ microsoft1es/containerization-assist-mcp');
+      const nodeModulesPath = join(installDir, 'node_modules/@microsoft1es/containerization-assist-mcp');
       const packageJson = JSON.parse(readFileSync(join(nodeModulesPath, 'package.json'), 'utf8'));
 
       const binPath = packageJson.bin['containerization-assist-mcp'];
@@ -179,7 +179,7 @@ describe('Package Integrity', () => {
 
     it('should support main import', async () => {
       const testScript = `
-        import pkg from '@ microsoft1es/containerization-assist-mcp';
+        import pkg from '@microsoft1es/containerization-assist-mcp';
         console.log(typeof pkg);
       `;
 
@@ -200,7 +200,7 @@ describe('Package Integrity', () => {
 
     it('should support named exports', async () => {
       const testScript = `
-        import { MCPServer } from '@ microsoft1es/containerization-assist-mcp';
+        import { MCPServer } from '@microsoft1es/containerization-assist-mcp';
         console.log(typeof MCPServer);
       `;
 
