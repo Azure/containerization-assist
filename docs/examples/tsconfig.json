@@ -3,28 +3,28 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "containerization-assist-mcp-mcp": [
+      "containerization-assist-mcp": [
         "../../src/index.ts"
       ],
-      "containerization-assist-mcp-mcp/*": [
+      "containerization-assist-mcp/*": [
         "../../src/*"
       ],
-      "containerization-assist-mcp-mcp/server": [
+      "containerization-assist-mcp/server": [
         "../../src/mcp/server.ts"
       ],
-      "containerization-assist-mcp-mcp/tools": [
+      "containerization-assist-mcp/tools": [
         "../../src/exports/tools.ts"
       ],
-      "containerization-assist-mcp-mcp/types": [
+      "containerization-assist-mcp/types": [
         "../../src/types/index.ts"
       ],
-      "containerization-assist-mcp-mcp/config": [
+      "containerization-assist-mcp/config": [
         "../../src/config/index.ts"
       ],
-      "containerization-assist-mcp-mcp/lib": [
+      "containerization-assist-mcp/lib": [
         "../../src/lib/index.ts"
       ],
-      "containerization-assist-mcp-mcp/tools/*": [
+      "containerization-assist-mcp/tools/*": [
         "../../src/tools/*/index.ts"
       ]
     }

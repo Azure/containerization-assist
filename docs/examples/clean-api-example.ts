@@ -4,7 +4,7 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { createApp } from 'containerization-assist-mcp-mcp';
+import { createApp } from 'containerization-assist-mcp';
 
 /**
  * Example 1: Simple integration - register all tools
@@ -40,7 +40,7 @@ async function selectiveRegistration() {
 
   // Create app with only specific tools and custom names
   const selectedTools = ['analyze-repo', 'generate-dockerfile', 'build-image'];
-  const allTools = (await import('containerization-assist-mcp-mcp')).getAllInternalTools();
+  const allTools = (await import('containerization-assist-mcp')).getAllInternalTools();
 
   const app = createApp({
     tools: allTools.filter(tool => selectedTools.includes(tool.name)),

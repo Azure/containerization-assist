@@ -9,7 +9,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 // Import Container Assist tools
-import { createContainerAssistServer } from 'containerization-assist-mcp-mcp';
+import { createContainerAssistServer } from 'containerization-assist-mcp';
 
 async function main() {
   console.error('Starting MCP server with Container Assist tools...');

@@ -44,11 +44,11 @@ describe('CLI Functionality', () => {
 
     // Get CLI path
     const packageJson = JSON.parse(readFileSync(
-      join(installDir, 'node_modules/containerization-assist-mcp-mcp/package.json'),
+      join(installDir, 'node_modules/containerization-assist-mcp/package.json'),
       'utf8'
     ));
     const binRelativePath = packageJson.bin['containerization-assist-mcp'];
-    cliPath = join(installDir, 'node_modules/containerization-assist-mcp-mcp', binRelativePath);
+    cliPath = join(installDir, 'node_modules/containerization-assist-mcp', binRelativePath);
   }, 180000); // 3 minutes timeout
 
   afterAll(() => {
