@@ -1,6 +1,6 @@
 /**
- * Unit Tests: Validate Image Tool
- * Tests the validate-image tool functionality for allowlist/denylist validation
+ * Unit Tests: Validate Dockerfile Tool
+ * Tests the validate-dockerfile tool functionality for allowlist/denylist validation
  */
 
 import { jest } from '@jest/globals';
@@ -27,7 +27,7 @@ jest.mock('../../../src/lib/logger', () => ({
   })),
 }));
 
-import tool from '../../../src/tools/validate-image/tool';
+import tool from '../../../src/tools/validate-dockerfile/tool';
 import { createLogger } from '../../../src/lib/logger';
 
 const mockLogger = (createLogger as jest.Mock)();
@@ -47,7 +47,7 @@ function createMockToolContext() {
   } as any;
 }
 
-describe('validate-image tool', () => {
+describe('validate-dockerfile tool', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     appConfig.validation.imageAllowlist = [];
@@ -439,13 +439,13 @@ FROM node:latest`;
         );
 
         expect(result.ok).toBe(true);
-        expect(mockSessionFacade.storeResult).toHaveBeenCalledWith(
-          'validate-image',
-          expect.objectContaining({
-            passed: true,
-          }),
-        );
-        expect(mockSessionFacade.set).toHaveBeenCalledWith('imageValidated', true);
+        // The orchestrator automatically stores results via sessionFacade.storeResult()
+        // Tools no longer manually manipulate session
+        if (result.ok) {
+          expect(result.value).toHaveProperty('passed');
+          expect(result.value).toHaveProperty('baseImages');
+          expect(result.value.sessionId).toBe('test-session');
+        }
       });
     });
   });
