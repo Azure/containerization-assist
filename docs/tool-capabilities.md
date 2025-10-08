@@ -1,14 +1,18 @@
 # Tool Capabilities Reference
 
-This document provides a comprehensive overview of all 17 tools in the containerization-assist project, their AI enhancement capabilities, and their integration with the sampling system.
+This document provides a comprehensive overview of all tools in the containerization-assist project, their AI enhancement capabilities, and their integration with the sampling system.
 
 ## Tool Classification
 
-### AI-Enhanced Tools (14 tools)
+### AI-Enhanced Tools
 
 These tools use deterministic single-candidate sampling with quality scoring for intelligent content generation and analysis.
 
-### Utility Tools (3 tools)
+### Knowledge-Enhanced Planning Tools
+
+These tools use knowledge packs for planning but do not invoke AI sampling.
+
+### Utility Tools
 
 These tools perform direct operations without AI enhancement.
 
@@ -16,7 +20,7 @@ These tools perform direct operations without AI enhancement.
 
 ## Complete Tool Reference
 
-### 1. analyze-repo
+### analyze-repo
 **Category:** Analysis
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -27,17 +31,18 @@ These tools perform direct operations without AI enhancement.
 - AI-driven technology stack identification
 - Containerization strategy recommendations
 - Project structure assessment
+- Monorepo and multi-module detection
 
 **Enhancement Capabilities:**
-- `framework-detection`
-- `containerization-strategy`
-- `dependency-analysis`
+- `content-generation`
+- `analysis`
+- `technology-detection`
 
 **When to Use:** First step in containerization workflow to understand project requirements.
 
 ---
 
-### 2. generate-dockerfile
+### generate-dockerfile
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -65,7 +70,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 3. fix-dockerfile
+### fix-dockerfile
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -87,7 +92,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 4. build-image
+### build-image
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -108,7 +113,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 5. tag-image
+### tag-image
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -129,7 +134,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 6. push-image
+### push-image
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -150,7 +155,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 7. scan
+### scan
 **Category:** Security
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -177,7 +182,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 8. generate-k8s-manifests
+### generate-k8s-manifests
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -199,7 +204,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 9. generate-helm-charts
+### generate-helm-charts
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -220,7 +225,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 10. generate-kustomize
+### generate-kustomize
 **Category:** Kubernetes
 **AI Enhanced:** ❌ No
 **Knowledge Enhanced:** ❌ No
@@ -235,7 +240,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 11. prepare-cluster
+### prepare-cluster
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -256,7 +261,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 12. deploy
+### deploy
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -277,7 +282,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 13. verify-deployment
+### verify-deployment
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -298,7 +303,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 14. resolve-base-images
+### resolve-base-images
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -319,7 +324,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 15. generate-aca-manifests
+### generate-aca-manifests
 **Category:** Azure
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -340,7 +345,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 16. convert-aca-to-k8s
+### convert-aca-to-k8s
 **Category:** Migration
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -361,28 +366,23 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### 17. ops
+### ops
 **Category:** Operations
-**AI Enhanced:** ✅ Yes
-**Knowledge Enhanced:** ✅ Yes
-**Sampling Strategy:** `single`
+**AI Enhanced:** ❌ No
+**Knowledge Enhanced:** ❌ No
+**Sampling Strategy:** `none`
 
 **Capabilities:**
-- Operational utilities and insights
-- System health monitoring
-- Performance optimization recommendations
-- Troubleshooting assistance
+- Operational utilities for Docker and Kubernetes
+- Container inspection and management
+- Resource queries
+- System status checks
 
-**Enhancement Capabilities:**
-- `operational-insights`
-- `performance-analysis`
-- `troubleshooting`
-
-**When to Use:** Operational tasks and system optimization.
+**When to Use:** Operational tasks and system queries.
 
 ---
 
-### 18. inspect-session
+### inspect-session
 **Category:** Debug
 **AI Enhanced:** ❌ No
 **Knowledge Enhanced:** ❌ No
@@ -398,6 +398,69 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
+### validate-dockerfile
+**Category:** Docker
+**AI Enhanced:** ❌ No
+**Knowledge Enhanced:** ❌ No
+**Sampling Strategy:** `none`
+
+**Capabilities:**
+- Dockerfile syntax validation
+- Best practice checking
+- Static analysis
+- Linting integration
+
+**When to Use:** Validate Dockerfile syntax and check for common issues.
+
+---
+
+### plan-dockerfile-generation
+**Category:** Planning
+**AI Enhanced:** ❌ No
+**Knowledge Enhanced:** ✅ Yes
+**Sampling Strategy:** `none`
+
+**Capabilities:**
+- Plan Dockerfile generation strategy
+- Module selection for multi-module repos
+- Build context analysis
+- Knowledge-based planning
+
+**When to Use:** Plan Dockerfile generation before actual generation, especially in multi-module repositories.
+
+---
+
+### plan-manifest-generation
+**Category:** Planning
+**AI Enhanced:** ❌ No
+**Knowledge Enhanced:** ✅ Yes
+**Sampling Strategy:** `none`
+
+**Capabilities:**
+- Plan Kubernetes manifest generation strategy
+- Service mapping and dependencies
+- Resource planning
+- Knowledge-based planning
+
+**When to Use:** Plan manifest generation before actual generation, especially for complex multi-service deployments.
+
+---
+
+### generate-kustomize
+**Category:** Kubernetes
+**AI Enhanced:** ❌ No
+**Knowledge Enhanced:** ❌ No
+**Sampling Strategy:** `none`
+
+**Capabilities:**
+- Kustomize overlay generation
+- Environment-specific configuration
+- Resource patching strategies
+
+**When to Use:** Generate Kustomize configurations for multi-environment deployments.
+
+---
+
 ## AI Enhancement Patterns
 
 ### Sampling Strategy Types
@@ -406,11 +469,11 @@ These tools perform direct operations without AI enhancement.
    - Generates exactly one candidate per invocation
    - Scores result based on content quality, structure, and domain relevance
    - Provides scoring metadata for diagnostics and transparency
-   - Used by 14 AI-enhanced tools for reproducible, debuggable outputs
+   - Used by AI-enhanced tools for reproducible, debuggable outputs
 
 2. **`none`** - No AI enhancement
    - Direct execution without AI sampling
-   - Used by 3 utility tools (generate-kustomize, inspect-session)
+   - Used by utility and planning tools
 
 ### Enhancement Capability Categories
 
@@ -421,13 +484,15 @@ These tools perform direct operations without AI enhancement.
 - `dockerfile-repair` - Dockerfile fixing and optimization
 
 #### Analysis and Intelligence
-- `framework-detection` - Technology stack identification
+- `analysis` - General analysis capabilities
+- `technology-detection` - Technology stack identification
 - `vulnerability-analysis` - Security vulnerability assessment
 - `performance-analysis` - Performance bottleneck identification
 - `health-validation` - Deployment health checking
 
 #### Optimization
 - `optimization` - General performance and resource optimization
+- `optimization-suggestions` - Build and deployment optimization
 - `build-optimization` - Docker build process optimization
 - `resource-optimization` - Kubernetes resource optimization
 - `push-optimization` - Registry push optimization
@@ -440,19 +505,20 @@ These tools perform direct operations without AI enhancement.
 
 #### Operations
 - `troubleshooting` - Issue diagnosis and resolution
-- `operational-insights` - System operation recommendations
 - `deployment-analysis` - Deployment process analysis
+- `build-analysis` - Build process analysis
+- `performance-insights` - Performance recommendations
 
 ## Tool Metadata Structure
 
-All AI-enhanced tools follow this metadata pattern:
+All tools follow this metadata pattern:
 
 ```typescript
 metadata: {
   aiDriven: boolean;                    // Uses AI sampling system
   knowledgeEnhanced: boolean;           // Uses knowledge enhancement
   samplingStrategy: 'single' | 'none'; // Sampling approach
-  enhancementCapabilities: string[];   // List of enhancement types
+  enhancementCapabilities?: string[];   // List of enhancement types (AI-enhanced only)
 }
 ```
 
@@ -461,16 +527,19 @@ metadata: {
 ### Finding AI-Enhanced Tools
 
 ```typescript
-// Tools with AI enhancement
+// AI-enhanced tools with single-candidate sampling
 const aiTools = [
   'analyze-repo', 'generate-dockerfile', 'fix-dockerfile', 'build-image',
   'tag-image', 'push-image', 'scan', 'generate-k8s-manifests',
   'generate-helm-charts', 'prepare-cluster', 'deploy', 'verify-deployment',
-  'resolve-base-images', 'generate-aca-manifests', 'convert-aca-to-k8s', 'ops'
+  'resolve-base-images', 'generate-aca-manifests', 'convert-aca-to-k8s'
 ];
 
-// Utility tools (no AI)
-const utilityTools = ['generate-kustomize', 'inspect-session'];
+// Knowledge-enhanced planning tools
+const planningTools = ['plan-dockerfile-generation', 'plan-manifest-generation'];
+
+// Utility tools without AI/knowledge enhancement
+const utilityTools = ['ops', 'inspect-session', 'validate-dockerfile', 'generate-kustomize'];
 ```
 
 ### Enhancement Capability Queries
