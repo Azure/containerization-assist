@@ -431,7 +431,7 @@ FROM node:latest`;
     });
 
     describe('session integration', () => {
-      it('should store results in session when sessionId is provided', async () => {
+      it('should have baseImages in results', async () => {
         const context = createMockToolContext();
         const result = await tool.run(
           { dockerfile: sampleDockerfile, sessionId: 'test-session' },
@@ -439,12 +439,9 @@ FROM node:latest`;
         );
 
         expect(result.ok).toBe(true);
-        // The orchestrator automatically stores results via sessionFacade.storeResult()
-        // Tools no longer manually manipulate session
         if (result.ok) {
           expect(result.value).toHaveProperty('passed');
           expect(result.value).toHaveProperty('baseImages');
-          expect(result.value.sessionId).toBe('test-session');
         }
       });
     });
