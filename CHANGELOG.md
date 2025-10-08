@@ -1,7 +1,5 @@
-<!-- # Change Log
+# Change Log
 
-## [1.0.0]
+## [0.0.1-dev.1]
 
-* List of features getting release. 
-* Another feature 2
--->
+- dev release 1
