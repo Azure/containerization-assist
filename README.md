@@ -233,6 +233,7 @@ The following environment variables control server behavior:
 | `DOCKER_TIMEOUT` | Docker operation timeout in milliseconds | `60000` (60s) | No |
 | `KUBECONFIG` | Path to Kubernetes config file | `~/.kube/config` | No |
 | `K8S_NAMESPACE` | Default Kubernetes namespace | `default` | No |
+| `LOG_LEVEL` | Logging level | `info` | No |
 | `WORKSPACE_DIR` | Working directory for operations | Current directory | No |
 | `TEMP_DIR` | Temporary directory for build artifacts | System temp dir | No |
 | `MCP_MODE` | Enable MCP protocol mode (logs to stderr) | `false` | No |
