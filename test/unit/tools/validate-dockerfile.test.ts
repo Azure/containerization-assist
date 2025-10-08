@@ -431,7 +431,7 @@ FROM node:latest`;
     });
 
     describe('session integration', () => {
-      it('should have baseImages in results', async () => {
+      it('should include baseImages property in results when run with a valid Dockerfile and session', async () => {
         const context = createMockToolContext();
         const result = await tool.run(
           { dockerfile: sampleDockerfile, sessionId: 'test-session' },
