@@ -4,7 +4,7 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { createApp } from '@azure/containerization-assist-mcp';
+import { createApp } from '@ microsoft1es/containerization-assist-mcp';
 
 /**
  * Example 1: Register all tools with default names

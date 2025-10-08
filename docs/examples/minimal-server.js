@@ -9,11 +9,11 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 // Import Container Assist tools
-import { createContainerAssistServer } from '@azure/containerization-assist-mcp';
+import { createContainerAssistServer } from '@ microsoft1es/containerization-assist-mcp';
 
 async function main() {
   console.error('Starting MCP server with Container Assist tools...');
-  
+
   try {
     // Create the MCP server
     const server = new Server(
@@ -31,23 +31,23 @@ async function main() {
     // Create Container Assist instance and bind tools
     console.error('Setting up Container Assist tools...');
     const caServer = createContainerAssistServer();
-    
+
     // Register specific tools (or use bindAll for all tools)
     caServer.bindSampling({ server });
     caServer.registerTools(
       { server },
       { tools: ['analyze_repo', 'generate_dockerfile', 'build_image'] }
     );
-    
+
     // Create stdio transport
     const transport = new StdioServerTransport();
-    
+
     // Connect server to transport
     await server.connect(transport);
-    
+
     console.error('✅ MCP server started successfully with Container Assist tools');
     console.error('Available tools: analyze_repo, generate_dockerfile, build_image');
-    
+
   } catch (error) {
     console.error('Failed to start MCP server:', error);
     process.exit(1);

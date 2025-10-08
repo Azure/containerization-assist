@@ -20,22 +20,22 @@ describe('Client API Compatibility', () => {
   beforeAll(async () => {
     // Ensure project is built
     execSync('npm run build', { cwd: PROJECT_ROOT, stdio: 'pipe' });
-    
+
     // Create package
-    const result = execSync('npm pack', { 
-      cwd: PROJECT_ROOT, 
-      encoding: 'utf8' 
+    const result = execSync('npm pack', {
+      cwd: PROJECT_ROOT,
+      encoding: 'utf8'
     }).trim();
     packageTarball = join(PROJECT_ROOT, result);
-    
+
     // Create test directory
     testDir = join(tmpdir(), `client-api-test-${Date.now()}`);
     mkdirSync(testDir, { recursive: true });
-    
+
     // Set up client test environment
     clientTestDir = join(testDir, 'client');
     mkdirSync(clientTestDir, { recursive: true });
-    
+
     // Create package.json for client test
     const clientPackageJson = {
       name: 'client-test',
@@ -44,16 +44,16 @@ describe('Client API Compatibility', () => {
       main: 'index.js'
     };
     writeFileSync(
-      join(clientTestDir, 'package.json'), 
+      join(clientTestDir, 'package.json'),
       JSON.stringify(clientPackageJson, null, 2)
     );
-    
+
     // Install our package and dependencies
-    execSync(`npm install "${packageTarball}"`, { 
-      cwd: clientTestDir, 
-      stdio: 'pipe' 
+    execSync(`npm install "${packageTarball}"`, {
+      cwd: clientTestDir,
+      stdio: 'pipe'
     });
-    
+
     // Install MCP SDK (required for client example)
     execSync('npm install @modelcontextprotocol/sdk', {
       cwd: clientTestDir,
@@ -66,7 +66,7 @@ describe('Client API Compatibility', () => {
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
-    
+
     if (existsSync(packageTarball)) {
       rmSync(packageTarball, { force: true });
     }
@@ -75,34 +75,34 @@ describe('Client API Compatibility', () => {
   describe('Package Exports', () => {
     it('should export createContainerAssistServer', () => {
       const testScript = `
-        const { createContainerAssistServer } = require('@azure/containerization-assist-mcp');
+        const { createContainerAssistServer } = require('@ microsoft1es/containerization-assist-mcp');
         console.log(typeof createContainerAssistServer);
       `;
-      
+
       writeFileSync(join(clientTestDir, 'test-exports.js'), testScript);
-      
-      const result = execSync('node test-exports.js', { 
-        cwd: clientTestDir, 
-        encoding: 'utf8' 
+
+      const result = execSync('node test-exports.js', {
+        cwd: clientTestDir,
+        encoding: 'utf8'
       });
-      
+
       expect(result.trim()).toBe('function');
     });
 
     it('should export TOOL_NAMES', () => {
       const testScript = `
-        const { TOOL_NAMES } = require('@azure/containerization-assist-mcp');
+        const { TOOL_NAMES } = require('@ microsoft1es/containerization-assist-mcp');
         console.log(typeof TOOL_NAMES);
         console.log(Object.keys(TOOL_NAMES).length > 0);
       `;
-      
+
       writeFileSync(join(clientTestDir, 'test-tool-names.js'), testScript);
-      
-      const result = execSync('node test-tool-names.js', { 
-        cwd: clientTestDir, 
-        encoding: 'utf8' 
+
+      const result = execSync('node test-tool-names.js', {
+        cwd: clientTestDir,
+        encoding: 'utf8'
       });
-      
+
       const lines = result.trim().split('\n');
       expect(lines[0]).toBe('object');
       expect(lines[1]).toBe('true');
@@ -110,7 +110,7 @@ describe('Client API Compatibility', () => {
 
     it('should have expected tool names', () => {
       const testScript = `
-        const { TOOL_NAMES } = require('@azure/containerization-assist-mcp');
+        const { TOOL_NAMES } = require('@ microsoft1es/containerization-assist-mcp');
         const expectedTools = [
           'ANALYZE_REPO',
           'BUILD_IMAGE', 
@@ -127,14 +127,14 @@ describe('Client API Compatibility', () => {
         
         console.log('All expected tools found');
       `;
-      
+
       writeFileSync(join(clientTestDir, 'test-tool-names-specific.js'), testScript);
-      
-      const result = execSync('node test-tool-names-specific.js', { 
-        cwd: clientTestDir, 
-        encoding: 'utf8' 
+
+      const result = execSync('node test-tool-names-specific.js', {
+        cwd: clientTestDir,
+        encoding: 'utf8'
       });
-      
+
       expect(result.trim()).toBe('All expected tools found');
     });
   });
@@ -142,7 +142,7 @@ describe('Client API Compatibility', () => {
   describe('createContainerAssistServer Factory', () => {
     it('should create server instance without errors', () => {
       const testScript = `
-        const { createContainerAssistServer } = require('@azure/containerization-assist-mcp');
+        const { createContainerAssistServer } = require('@ microsoft1es/containerization-assist-mcp');
 
         try {
           const server = createContainerAssistServer();
@@ -165,7 +165,7 @@ describe('Client API Compatibility', () => {
 
     it('should have registerTools method', () => {
       const testScript = `
-        const { createContainerAssistServer } = require('@azure/containerization-assist-mcp');
+        const { createContainerAssistServer } = require('@ microsoft1es/containerization-assist-mcp');
 
         const server = createContainerAssistServer();
         console.log(typeof server.registerTools);
@@ -187,7 +187,7 @@ describe('Client API Compatibility', () => {
       // Create a simplified version of the client example
       const clientExample = `
         const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
-        const { createContainerAssistServer, TOOL_NAMES } = require('@azure/containerization-assist-mcp');
+        const { createContainerAssistServer, TOOL_NAMES } = require('@ microsoft1es/containerization-assist-mcp');
 
         function testClientPattern() {
           const server = new McpServer(
@@ -230,21 +230,21 @@ describe('Client API Compatibility', () => {
         const success = testClientPattern();
         process.exit(success ? 0 : 1);
       `;
-      
+
       writeFileSync(join(clientTestDir, 'client-pattern-test.js'), clientExample);
-      
+
       // This should not throw
-      const result = execSync('node client-pattern-test.js', { 
-        cwd: clientTestDir, 
-        encoding: 'utf8' 
+      const result = execSync('node client-pattern-test.js', {
+        cwd: clientTestDir,
+        encoding: 'utf8'
       });
-      
+
       expect(result.trim()).toBe('registerTools completed successfully');
     });
 
     it('should support tool name mapping', () => {
       const testScript = `
-        const { TOOL_NAMES } = require('@azure/containerization-assist-mcp');
+        const { TOOL_NAMES } = require('@ microsoft1es/containerization-assist-mcp');
         
         // Test that tool names can be used as object keys
         const mapping = {
@@ -257,14 +257,14 @@ describe('Client API Compatibility', () => {
         
         console.log(Object.keys(mapping).length);
       `;
-      
+
       writeFileSync(join(clientTestDir, 'test-mapping.js'), testScript);
-      
-      const result = execSync('node test-mapping.js', { 
-        cwd: clientTestDir, 
-        encoding: 'utf8' 
+
+      const result = execSync('node test-mapping.js', {
+        cwd: clientTestDir,
+        encoding: 'utf8'
       });
-      
+
       expect(parseInt(result.trim())).toBe(5);
     });
   });
@@ -272,7 +272,7 @@ describe('Client API Compatibility', () => {
   describe('Backward Compatibility', () => {
     it('should maintain consistent API surface', () => {
       const testScript = `
-        const pkg = require('@azure/containerization-assist-mcp');
+        const pkg = require('@ microsoft1es/containerization-assist-mcp');
         
         // Check for key exports that clients depend on
         const expectedExports = [
@@ -289,34 +289,34 @@ describe('Client API Compatibility', () => {
         
         console.log('All expected exports present');
       `;
-      
+
       writeFileSync(join(clientTestDir, 'test-api-surface.js'), testScript);
-      
-      const result = execSync('node test-api-surface.js', { 
-        cwd: clientTestDir, 
-        encoding: 'utf8' 
+
+      const result = execSync('node test-api-surface.js', {
+        cwd: clientTestDir,
+        encoding: 'utf8'
       });
-      
+
       expect(result.trim()).toBe('All expected exports present');
     });
 
     it('should handle CommonJS require correctly', () => {
       const testScript = `
         // Test different require patterns
-        const pkg1 = require('@azure/containerization-assist-mcp');
-        const { createContainerAssistServer } = require('@azure/containerization-assist-mcp');
-        const { TOOL_NAMES } = require('@azure/containerization-assist-mcp');
+        const pkg1 = require('@ microsoft1es/containerization-assist-mcp');
+        const { createContainerAssistServer } = require('@ microsoft1es/containerization-assist-mcp');
+        const { TOOL_NAMES } = require('@ microsoft1es/containerization-assist-mcp');
         
         console.log('All require patterns work');
       `;
-      
+
       writeFileSync(join(clientTestDir, 'test-require-patterns.js'), testScript);
-      
-      const result = execSync('node test-require-patterns.js', { 
-        cwd: clientTestDir, 
-        encoding: 'utf8' 
+
+      const result = execSync('node test-require-patterns.js', {
+        cwd: clientTestDir,
+        encoding: 'utf8'
       });
-      
+
       expect(result.trim()).toBe('All require patterns work');
     });
   });

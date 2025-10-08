@@ -3,14 +3,30 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@azure/containerization-assist-mcp": ["../../src/index.ts"],
-      "@azure/containerization-assist-mcp/*": ["../../src/*"],
-      "@azure/containerization-assist-mcp/server": ["../../src/mcp/server.ts"],
-      "@azure/containerization-assist-mcp/tools": ["../../src/exports/tools.ts"],
-      "@azure/containerization-assist-mcp/types": ["../../src/types/index.ts"],
-      "@azure/containerization-assist-mcp/config": ["../../src/config/index.ts"],
-      "@azure/containerization-assist-mcp/lib": ["../../src/lib/index.ts"],
-      "@azure/containerization-assist-mcp/tools/*": ["../../src/tools/*/index.ts"]
+      "@ microsoft1es/containerization-assist-mcp": [
+        "../../src/index.ts"
+      ],
+      "@ microsoft1es/containerization-assist-mcp/*": [
+        "../../src/*"
+      ],
+      "@ microsoft1es/containerization-assist-mcp/server": [
+        "../../src/mcp/server.ts"
+      ],
+      "@ microsoft1es/containerization-assist-mcp/tools": [
+        "../../src/exports/tools.ts"
+      ],
+      "@ microsoft1es/containerization-assist-mcp/types": [
+        "../../src/types/index.ts"
+      ],
+      "@ microsoft1es/containerization-assist-mcp/config": [
+        "../../src/config/index.ts"
+      ],
+      "@ microsoft1es/containerization-assist-mcp/lib": [
+        "../../src/lib/index.ts"
+      ],
+      "@ microsoft1es/containerization-assist-mcp/tools/*": [
+        "../../src/tools/*/index.ts"
+      ]
     }
   },
   "include": [
