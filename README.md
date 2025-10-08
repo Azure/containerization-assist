@@ -230,10 +230,15 @@ The following environment variables control server behavior:
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
 | `DOCKER_SOCKET` | Docker socket path | `/var/run/docker.sock` (Linux/Mac)<br>`//./pipe/docker_engine` (Windows) | Yes (for Docker features) |
-| `LOG_LEVEL` | Logging level | `info` | No |
-| `WORKSPACE_DIR` | Working directory for operations | Current directory | No |
+| `DOCKER_TIMEOUT` | Docker operation timeout in milliseconds | `60000` (60s) | No |
+| `KUBECONFIG` | Path to Kubernetes config file | `~/.kube/config` | No |
 | `K8S_NAMESPACE` | Default Kubernetes namespace | `default` | No |
-| `NODE_ENV` | Environment mode | `production` | No |
+| `WORKSPACE_DIR` | Working directory for operations | Current directory | No |
+| `TEMP_DIR` | Temporary directory for build artifacts | System temp dir | No |
+| `MCP_MODE` | Enable MCP protocol mode (logs to stderr) | `false` | No |
+| `MCP_QUIET` | Suppress non-essential output in MCP mode | `false` | No |
+| `IMAGE_ALLOWLIST` | Comma-separated list of allowed base images | Empty | No |
+| `IMAGE_DENYLIST` | Comma-separated list of denied base images | Empty | No |
 
 **Note on Runtime Configuration:**
 This server uses a **single-session model** optimized for one operator. Session state persists across tool executions within a single workflow and clears on server shutdown.
