@@ -118,7 +118,7 @@ Dockerfile Planning Summary:
   - Optimizations: ${optimizationMatches.length}
   - Best Practices: ${bestPracticeMatches.length}
 
-Next Step: Use generate Dockerfile using these recommendations.
+Next Step: Generate Dockerfile using these recommendations.
   `.trim();
 
   const plan: DockerfilePlan = {
