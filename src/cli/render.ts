@@ -2,7 +2,7 @@
  * Shared CLI rendering utilities for consistent output formatting
  */
 
-import type { InternalTool } from '@/tools';
+import type { Tool } from '@/tools';
 
 export interface RenderOptions {
   format: 'table' | 'csv' | 'json';
@@ -12,7 +12,7 @@ export interface RenderOptions {
 /**
  * Render tools in the specified format
  */
-export function renderTools(tools: InternalTool[], options: RenderOptions): void {
+export function renderTools(tools: Tool[], options: RenderOptions): void {
   switch (options.format) {
     case 'table':
       outputTable(tools, options.detailed ?? false);
@@ -31,7 +31,7 @@ export function renderTools(tools: InternalTool[], options: RenderOptions): void
 /**
  * Output tools in table format
  */
-function outputTable(tools: InternalTool[], detailed: boolean = false): void {
+function outputTable(tools: Tool[], detailed: boolean = false): void {
   if (tools.length === 0) {
     console.info('No tools found matching criteria');
     return;
@@ -81,7 +81,7 @@ function outputTable(tools: InternalTool[], detailed: boolean = false): void {
 /**
  * Output tools in CSV format
  */
-function outputCSV(tools: InternalTool[]): void {
+function outputCSV(tools: Tool[]): void {
   console.info(
     'Name,Category,AI-Driven,Knowledge-Enhanced,Sampling Strategy,Enhancement Capabilities',
   );

@@ -22,7 +22,7 @@ import type {
   ExecuteMetadata,
 } from './orchestrator-types';
 import type { Logger } from 'pino';
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 import { createStandardizedToolTracker } from '@/lib/tool-helpers';
 
 // ===== Types =====
@@ -33,7 +33,7 @@ function childLogger(logger: Logger, bindings: Record<string, unknown>): Logger 
   return typeof candidate === 'function' ? candidate.call(logger, bindings) : logger;
 }
 
-type ContextFactoryInput<T extends Tool<ZodTypeAny, any>> = {
+type ContextFactoryInput<T extends MCPTool<ZodTypeAny, any>> = {
   tool: T;
   request: ExecuteRequest;
   session: WorkflowState;
@@ -42,11 +42,11 @@ type ContextFactoryInput<T extends Tool<ZodTypeAny, any>> = {
   sessionManager: SessionManager;
 };
 
-type ContextFactory<T extends Tool<ZodTypeAny, any>> = (
+type ContextFactory<T extends MCPTool<ZodTypeAny, any>> = (
   input: ContextFactoryInput<T>,
 ) => Promise<ToolContext> | ToolContext;
 
-interface ExecutionEnvironment<T extends Tool<ZodTypeAny, any>> {
+interface ExecutionEnvironment<T extends MCPTool<ZodTypeAny, any>> {
   sessionManager: SessionManager;
   policy?: Policy;
   registry: Map<string, T>;
@@ -83,7 +83,7 @@ function createSessionFacade(session: WorkflowState): SessionFacade {
 /**
  * Create a tool orchestrator
  */
-export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
+export function createOrchestrator<T extends MCPTool<ZodTypeAny, any>>(options: {
   registry: Map<string, T>;
   server?: Server;
   logger?: Logger;
@@ -174,7 +174,7 @@ export function createOrchestrator<T extends Tool<ZodTypeAny, any>>(options: {
 /**
  * Execute with full orchestration (dependencies, policies, sessions)
  */
-async function executeWithOrchestration<T extends Tool<ZodTypeAny, any>>(
+async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
   tool: T,
   request: ExecuteRequest,
   env: ExecutionEnvironment<T>,

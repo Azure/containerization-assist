@@ -10,7 +10,7 @@ import { extractErrorMessage } from '@/lib/error-utils';
 import { createToolTimer } from '@/lib/tool-helpers';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 import { opsToolSchema } from './schema';
 import type { z } from 'zod';
 
@@ -211,7 +211,7 @@ async function run(
 /**
  * Ops tool conforming to Tool interface
  */
-const tool: Tool<typeof opsToolSchema, OpsResult> = {
+const tool: MCPTool<typeof opsToolSchema, OpsResult> = {
   name: 'ops',
   description: 'Operational utilities for ping and server status',
   version: '2.0.0',

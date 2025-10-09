@@ -18,7 +18,7 @@ import {
   type ValidationResult,
 } from '@/validation/ai-enhancement';
 import { getPostScanHint } from '@/lib/workflow-hints';
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 import { scanImageSchema, type ScanImageParams } from './schema';
 
 interface DockerScanResult {
@@ -375,7 +375,7 @@ export type ScanImageConfig = ScanImageParams;
 export const scanImage = scanImageImpl;
 
 // New Tool interface export
-const tool: Tool<typeof scanImageSchema, ScanImageResult> = {
+const tool: MCPTool<typeof scanImageSchema, ScanImageResult> = {
   name: 'scan',
   description: 'Scan Docker images for security vulnerabilities',
   version: '2.0.0',
