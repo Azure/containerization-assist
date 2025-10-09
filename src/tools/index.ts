@@ -1,11 +1,3 @@
-/**
- * Tool Registry - Type-Safe Consolidation
- *
- * Explicit, type-safe imports for all MCP tools.
- * This replaces the distributed tool registration across multiple files.
- */
-
-// Direct tool imports - all tools now use the unified Tool interface
 import analyzeRepoTool from './analyze-repo/tool';
 import buildImageTool from './build-image/tool';
 import convertAcaToK8sTool from './convert-aca-to-k8s/tool';
@@ -28,8 +20,7 @@ import tagImageTool from './tag-image/tool';
 import validateDockerfileTool from './validate-dockerfile/tool';
 import verifyDeployTool from './verify-deployment/tool';
 
-// Tool name constants for type safety
-export const TOOL_NAMES = {
+export const TOOL_NAME = {
   ANALYZE_REPO: 'analyze-repo',
   BUILD_IMAGE: 'build-image',
   CONVERT_ACA_TO_K8S: 'convert-aca-to-k8s',
@@ -53,34 +44,33 @@ export const TOOL_NAMES = {
   VERIFY_DEPLOY: 'verify-deploy',
 } as const;
 
-// Type for valid tool names
-export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];
+export type ToolName = (typeof TOOL_NAME)[keyof typeof TOOL_NAME];
 
 // Ensure proper names on all tools
-analyzeRepoTool.name = TOOL_NAMES.ANALYZE_REPO;
-buildImageTool.name = TOOL_NAMES.BUILD_IMAGE;
-convertAcaToK8sTool.name = TOOL_NAMES.CONVERT_ACA_TO_K8S;
-deployTool.name = TOOL_NAMES.DEPLOY;
-fixDockerfileTool.name = TOOL_NAMES.FIX_DOCKERFILE;
-generateAcaManifestsTool.name = TOOL_NAMES.GENERATE_ACA_MANIFESTS;
-generateDockerfileTool.name = TOOL_NAMES.GENERATE_DOCKERFILE;
-generateHelmChartsTool.name = TOOL_NAMES.GENERATE_HELM_CHARTS;
-generateK8sManifestsTool.name = TOOL_NAMES.GENERATE_K8S_MANIFESTS;
-generateKustomizeTool.name = TOOL_NAMES.GENERATE_KUSTOMIZE;
-inspectSessionTool.name = TOOL_NAMES.INSPECT_SESSION;
-opsTool.name = TOOL_NAMES.OPS;
-planDockerfileGenerationTool.name = TOOL_NAMES.PLAN_DOCKERFILE_GENERATION;
-planManifestGenerationTool.name = TOOL_NAMES.PLAN_MANIFEST_GENERATION;
-prepareClusterTool.name = TOOL_NAMES.PREPARE_CLUSTER;
-pushImageTool.name = TOOL_NAMES.PUSH_IMAGE;
-resolveBaseImagesTool.name = TOOL_NAMES.RESOLVE_BASE_IMAGES;
-scanTool.name = TOOL_NAMES.SCAN;
-tagImageTool.name = TOOL_NAMES.TAG_IMAGE;
-validateDockerfileTool.name = TOOL_NAMES.VALIDATE_DOCKERFILE;
-verifyDeployTool.name = TOOL_NAMES.VERIFY_DEPLOY;
+analyzeRepoTool.name = TOOL_NAME.ANALYZE_REPO;
+buildImageTool.name = TOOL_NAME.BUILD_IMAGE;
+convertAcaToK8sTool.name = TOOL_NAME.CONVERT_ACA_TO_K8S;
+deployTool.name = TOOL_NAME.DEPLOY;
+fixDockerfileTool.name = TOOL_NAME.FIX_DOCKERFILE;
+generateAcaManifestsTool.name = TOOL_NAME.GENERATE_ACA_MANIFESTS;
+generateDockerfileTool.name = TOOL_NAME.GENERATE_DOCKERFILE;
+generateHelmChartsTool.name = TOOL_NAME.GENERATE_HELM_CHARTS;
+generateK8sManifestsTool.name = TOOL_NAME.GENERATE_K8S_MANIFESTS;
+generateKustomizeTool.name = TOOL_NAME.GENERATE_KUSTOMIZE;
+inspectSessionTool.name = TOOL_NAME.INSPECT_SESSION;
+opsTool.name = TOOL_NAME.OPS;
+planDockerfileGenerationTool.name = TOOL_NAME.PLAN_DOCKERFILE_GENERATION;
+planManifestGenerationTool.name = TOOL_NAME.PLAN_MANIFEST_GENERATION;
+prepareClusterTool.name = TOOL_NAME.PREPARE_CLUSTER;
+pushImageTool.name = TOOL_NAME.PUSH_IMAGE;
+resolveBaseImagesTool.name = TOOL_NAME.RESOLVE_BASE_IMAGES;
+scanTool.name = TOOL_NAME.SCAN;
+tagImageTool.name = TOOL_NAME.TAG_IMAGE;
+validateDockerfileTool.name = TOOL_NAME.VALIDATE_DOCKERFILE;
+verifyDeployTool.name = TOOL_NAME.VERIFY_DEPLOY;
 
 // Create a union type of all tool types for better type safety
-export type AllToolTypes =
+export type Tool = (
   | typeof analyzeRepoTool
   | typeof buildImageTool
   | typeof convertAcaToK8sTool
@@ -101,10 +91,11 @@ export type AllToolTypes =
   | typeof scanTool
   | typeof tagImageTool
   | typeof validateDockerfileTool
-  | typeof verifyDeployTool;
+  | typeof verifyDeployTool
+) & { name: string };
 
 // Type-safe tool array using the union type
-export const ALL_TOOLS: readonly AllToolTypes[] = [
+export const ALL_TOOLS: readonly Tool[] = [
   analyzeRepoTool,
   buildImageTool,
   convertAcaToK8sTool,
@@ -128,10 +119,26 @@ export const ALL_TOOLS: readonly AllToolTypes[] = [
   verifyDeployTool,
 ] as const;
 
-// Get all tools
-export function getAllInternalTools(): readonly AllToolTypes[] {
-  return ALL_TOOLS;
-}
-
-// Export a type-safe version of "any tool" that's actually the union of all tools
-export type InternalTool = AllToolTypes;
+export {
+  analyzeRepoTool,
+  buildImageTool,
+  convertAcaToK8sTool,
+  deployTool,
+  fixDockerfileTool,
+  generateAcaManifestsTool,
+  generateDockerfileTool,
+  generateHelmChartsTool,
+  generateK8sManifestsTool,
+  generateKustomizeTool,
+  inspectSessionTool,
+  opsTool,
+  planDockerfileGenerationTool,
+  planManifestGenerationTool,
+  prepareClusterTool,
+  pushImageTool,
+  resolveBaseImagesTool,
+  scanTool,
+  tagImageTool,
+  validateDockerfileTool,
+  verifyDeployTool,
+};

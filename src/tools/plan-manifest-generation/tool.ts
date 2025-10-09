@@ -15,7 +15,7 @@
 
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 import {
   planManifestGenerationSchema,
   type ManifestPlan,
@@ -195,7 +195,7 @@ Next Step: Use generate-${manifestType === 'kubernetes' ? 'k8s-manifests' : mani
   return Success(plan);
 }
 
-const tool: Tool<typeof planManifestGenerationSchema, ManifestPlan> = {
+const tool: MCPTool<typeof planManifestGenerationSchema, ManifestPlan> = {
   name,
   description,
   category: 'kubernetes',

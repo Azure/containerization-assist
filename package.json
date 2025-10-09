@@ -22,10 +22,10 @@
       "default": "./dist/src/mcp/mcp-server.js"
     },
     "./tools": {
-      "types": "./dist/src/exports/tools.d.ts",
-      "import": "./dist/src/exports/tools.js",
-      "require": "./dist-cjs/src/exports/tools.js",
-      "default": "./dist/src/exports/tools.js"
+      "types": "./dist/src/tools/index.d.ts",
+      "import": "./dist/src/tools/index.js",
+      "require": "./dist-cjs/src/tools/index.js",
+      "default": "./dist/src/tools/index.js"
     },
     "./types": {
       "types": "./dist/src/types/index.d.ts",

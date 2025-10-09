@@ -14,7 +14,7 @@
 
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 import {
   planDockerfileGenerationSchema,
   type DockerfilePlan,
@@ -118,7 +118,7 @@ Dockerfile Planning Summary:
   - Optimizations: ${optimizationMatches.length}
   - Best Practices: ${bestPracticeMatches.length}
 
-Next Step: Use generate-dockerfile with sessionId to create the Dockerfile using these recommendations.
+Next Step: Use generate Dockerfile using these recommendations.
   `.trim();
 
   const plan: DockerfilePlan = {
@@ -151,7 +151,7 @@ Next Step: Use generate-dockerfile with sessionId to create the Dockerfile using
   return Success(plan);
 }
 
-const tool: Tool<typeof planDockerfileGenerationSchema, DockerfilePlan> = {
+const tool: MCPTool<typeof planDockerfileGenerationSchema, DockerfilePlan> = {
   name,
   description,
   category: 'docker',

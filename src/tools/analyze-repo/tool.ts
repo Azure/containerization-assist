@@ -8,7 +8,7 @@ import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
 import { scoreRepositoryAnalysis } from '@/lib/scoring';
 import { analyzeRepoSchema, type RepositoryAnalysis } from './schema';
 import { extractJsonContent } from '@/lib/content-extraction';
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 import type { z } from 'zod';
 
 /**
@@ -220,7 +220,7 @@ async function run(
   }
 }
 
-const tool: Tool<typeof analyzeRepoSchema, RepositoryAnalysis> = {
+const tool: MCPTool<typeof analyzeRepoSchema, RepositoryAnalysis> = {
   name: 'analyze-repo',
   description: 'Analyze repository structure and detect technologies',
   version: '3.0.0',

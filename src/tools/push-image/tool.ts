@@ -9,7 +9,7 @@ import { createDockerClient, type DockerClient } from '@/infra/docker/client';
 import { getToolLogger } from '@/lib/tool-helpers';
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 import { pushImageSchema } from './schema';
 import type { z } from 'zod';
 import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
@@ -345,7 +345,7 @@ async function run(
 /**
  * Push image tool conforming to Tool interface
  */
-const tool: Tool<typeof pushImageSchema, PushImageResult> = {
+const tool: MCPTool<typeof pushImageSchema, PushImageResult> = {
   name: 'push-image',
   description: 'Push a Docker image to a registry',
   version: '2.0.0',
