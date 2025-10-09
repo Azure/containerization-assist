@@ -869,9 +869,9 @@ async function prepareClusterImpl(
 export const prepareCluster = prepareClusterImpl;
 
 // New Tool interface export
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 
-const tool: Tool<typeof prepareClusterSchema, PrepareClusterResult> = {
+const tool: MCPTool<typeof prepareClusterSchema, PrepareClusterResult> = {
   name: 'prepare-cluster',
   description: 'Prepare Kubernetes cluster for deployment with AI-powered optimization insights',
   version: '2.0.0',

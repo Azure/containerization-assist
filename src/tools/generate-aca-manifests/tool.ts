@@ -4,7 +4,7 @@
 
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 import { promptTemplates, type AcaManifestParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
@@ -105,7 +105,7 @@ async function run(
   }
 }
 
-const tool: Tool<typeof generateAcaManifestsSchema, AIResponse> = {
+const tool: MCPTool<typeof generateAcaManifestsSchema, AIResponse> = {
   name,
   description,
   category: 'azure',
