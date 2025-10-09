@@ -10,7 +10,7 @@ import { extractErrorMessage } from '@/lib/error-utils';
 import { createDockerClient } from '@/lib/docker';
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 import { tagImageSchema } from './schema';
 import { z } from 'zod';
 import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
@@ -283,7 +283,7 @@ async function run(
 /**
  * Tag image tool conforming to Tool interface
  */
-const tool: Tool<typeof tagImageSchema, TagImageResult> = {
+const tool: MCPTool<typeof tagImageSchema, TagImageResult> = {
   name: 'tag-image',
   description: 'Tag Docker images with version and registry information',
   version: '2.0.0',

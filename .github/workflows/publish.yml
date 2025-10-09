@@ -54,16 +54,16 @@ jobs:
     env: 
       current-version: ${{ needs.Build.outputs.current-version }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
       - name: Check version is mentioned in Changelog
         id: changelog_reader
         uses: mindsers/changelog-reader-action@32aa5b4c155d76c94e4ec883a223c947b2f02656 # v2.2.3
         with:
             validation_depth: 10
-            version: ${{ steps.package_version.outputs.current-version }}
+            version: ${{ needs.Build.outputs.current-version }}
             path: 'CHANGELOG.md'
-
-      - name: Checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
@@ -86,9 +86,9 @@ jobs:
         env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
         with:
-            tag_name : ${{ needs.JobBuild.outputs.currentversion }}
-            release_name: ${{ needs.JobBuild.outputs.currentversion}}
-            body: Publish ${{ needs.JobBuild.outputs.changelog_reader_changes }}
+            tag_name : ${{ needs.Build.outputs.current-version }}
+            release_name: ${{ needs.Build.outputs.current-version }}
+            body: Publish ${{ steps.changelog_reader.outputs.changes }}
 
       - name: Federated Azure login
         uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
@@ -103,4 +103,4 @@ jobs:
             VERSION=${{ env.current-version }}
             BLOBPATH="drops/containerization-assist/js/$VERSION"
             echo "Uploading package version $VERSION to blob path $BLOBPATH"
-            az storage blob upload -f "./azure-containerization-assist-mcp-$VERSION.tgz" -c "$BLOBPATH" --account-name azuresdkpartnerdrops --auth-mode login
+            az storage blob upload -f "./containerization-assist-mcp-$VERSION.tgz" -c "$BLOBPATH" --account-name azuresdkpartnerdrops --auth-mode login

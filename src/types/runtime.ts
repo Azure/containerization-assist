@@ -11,7 +11,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Result } from './core';
 import type { TransportConfig } from '@/app';
 import type { MCPServer } from '@/mcp/mcp-server';
-import type { AllToolTypes, ToolName } from '@/tools';
+import type { Tool, ToolName } from '@/tools';
 
 // Extract input/output types from tool registry
 type ExtractToolInput<T extends { schema: ZodTypeAny }> = T['schema'] extends ZodTypeAny
@@ -23,15 +23,11 @@ type ExtractToolOutput<T> = T extends { run: (...args: never[]) => Promise<Resul
 
 // Map tool names to their input/output types
 export type ToolInputMap = {
-  [K in ToolName]: K extends AllToolTypes['name']
-    ? ExtractToolInput<Extract<AllToolTypes, { name: K }>>
-    : never;
+  [K in ToolName]: K extends Tool['name'] ? ExtractToolInput<Extract<Tool, { name: K }>> : never;
 };
 
 export type ToolResultMap = {
-  [K in ToolName]: K extends AllToolTypes['name']
-    ? ExtractToolOutput<Extract<AllToolTypes, { name: K }>>
-    : never;
+  [K in ToolName]: K extends Tool['name'] ? ExtractToolOutput<Extract<Tool, { name: K }>> : never;
 };
 
 /**
@@ -108,7 +104,7 @@ export interface AppRuntimeConfig {
   logger?: Logger;
 
   /** Custom tools to register */
-  tools?: Array<AllToolTypes>;
+  tools?: Array<Tool>;
 
   /** Tool name aliases */
   toolAliases?: Record<string, string>;

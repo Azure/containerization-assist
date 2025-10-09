@@ -507,9 +507,9 @@ async function verifyDeploymentImpl(
 export const verifyDeployment = verifyDeploymentImpl;
 
 // New Tool interface export
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 
-const tool: Tool<typeof verifyDeploymentSchema, VerifyDeploymentResult> = {
+const tool: MCPTool<typeof verifyDeploymentSchema, VerifyDeploymentResult> = {
   name: 'verify-deploy',
   description: 'Verify Kubernetes deployment status with AI-powered validation insights',
   version: '2.0.0',

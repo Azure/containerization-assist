@@ -806,9 +806,9 @@ async function deployApplicationImpl(
 export const deployApplication = deployApplicationImpl;
 
 // New Tool interface export
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 
-const tool: Tool<typeof deployApplicationSchema, DeployApplicationResult> = {
+const tool: MCPTool<typeof deployApplicationSchema, DeployApplicationResult> = {
   name: 'deploy',
   description: 'Deploy applications to Kubernetes clusters',
   version: '2.0.0',

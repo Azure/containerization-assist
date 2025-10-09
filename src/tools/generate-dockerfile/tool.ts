@@ -15,7 +15,7 @@
 
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 import { generateDockerfileSchema } from './schema';
 import type { AIResponse } from '../ai-response-types';
 import type { ModuleInfo } from '@/tools/analyze-repo/schema';
@@ -613,7 +613,7 @@ async function run(
   return generateSingleDockerfile(input, ctx);
 }
 
-const tool: Tool<typeof generateDockerfileSchema, AIResponse> = {
+const tool: MCPTool<typeof generateDockerfileSchema, AIResponse> = {
   name,
   description,
   category: 'docker',
