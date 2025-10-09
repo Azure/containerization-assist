@@ -53,9 +53,11 @@ async function generateSingleDockerfile(
 ): Promise<Result<AIResponse>> {
   const { multistage, securityHardening, optimization, sessionId, baseImagePreference } = input;
 
-  // Determine repository path: use module path if available, otherwise input.path
-  const path = targetModule?.path ?? input.path;
-  const targetModulePath = targetModule?.path;
+  // Determine repository path
+  const path = input.repositoryPath;
+
+  // Determine target module path and dockerfile path
+  const targetModulePath = targetModule?.modulePath;
   const targetDockerfilePath = targetModule?.dockerfilePath;
 
   // Initialize variables from module data if available
@@ -76,7 +78,7 @@ async function generateSingleDockerfile(
     // Build requirements from module analysis
     const reqParts: string[] = [];
     reqParts.push(`Module: ${targetModule.name}`);
-    reqParts.push(`Path: ${targetModule.path}`);
+    reqParts.push(`Path: ${targetModule.modulePath}`);
     if (language)
       reqParts.push(
         `Language: ${language}${targetModule.languageVersion ? ` (${targetModule.languageVersion})` : ''}`,
@@ -104,10 +106,10 @@ async function generateSingleDockerfile(
     requirements = `Analyze the repository at ${path} to detect the technology stack, dependencies, and requirements.`;
   }
 
-  // Path is required (either from module or input)
+  // Path is required
   if (!path) {
     return Failure(
-      'Repository path is required. Provide either the path parameter or modules with path fields.',
+      'Repository path is required. Provide the path parameter or dockerfileDirectoryPaths.',
     );
   }
 
@@ -518,7 +520,7 @@ async function run(
         return Failure('Module array contains undefined element');
       }
       ctx.logger.info(
-        { moduleName: targetModule.name, modulePath: targetModule.path },
+        { moduleName: targetModule.name, modulePath: targetModule.modulePath },
         'Generating Dockerfile for single module',
       );
       return generateSingleDockerfile(input, ctx, targetModule as ModuleInfo);

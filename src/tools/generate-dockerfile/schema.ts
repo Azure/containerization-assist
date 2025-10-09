@@ -51,17 +51,12 @@ export const generateDockerfileSchema = z.object({
   securityLevel: securityLevelSchema,
   customCommands: z.array(z.string()).optional().describe('Custom Dockerfile commands'),
   platform: platform.describe('Target platform (e.g., linux/amd64, linux/arm64, windows/amd64)'),
-  path: z
-    .string()
-    .optional()
-    .describe(
-      'Repository path (use forward slashes: /path/to/repo). Optional when generating for modules (module paths are used instead).',
-    ),
+  repositoryPath: z.string().describe('Repository path (use forward slashes: /path/to/repo).'),
   modules: z
     .array(
       z.object({
         name: z.string(),
-        path: z.string().describe('Module source code path'),
+        modulePath: z.string().describe('Module source code path'),
         dockerfilePath: z
           .string()
           .optional()
