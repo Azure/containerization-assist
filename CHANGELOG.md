@@ -2,7 +2,8 @@
 
 ## [0.0.1-dev.3]
 
-- dev release 3
+- Downgraded MCP SDK version to address compatibility issues.
+- Other minor improvements and bug fixes.
 
 ## [0.0.1-dev.2]
 
