@@ -17,7 +17,6 @@ import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { MCPTool } from '@/types/tool';
 import { generateManifestPlanSchema, type ManifestPlan, type ManifestRequirement } from './schema';
-import type { ModuleInfo, RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import { getKnowledgeSnippets } from '@/knowledge/matcher';
 import type { z } from 'zod';
 
@@ -37,24 +36,19 @@ async function run(
   input: z.infer<typeof generateManifestPlanSchema>,
   ctx: ToolContext,
 ): Promise<Result<ManifestPlan>> {
-  const {
-    sessionId,
-    manifestType,
-    environment,
-  } = input;
+  const { manifestType, environment } = input;
 
-  let path = input.path;
-  let analysis: RepositoryAnalysis | undefined;
+  const path = input.path;
 
-
-  if (!path && !analysis) {
-    return Failure(
-      'Either path or sessionId with analysis data is required. Run analyze-repo first or provide a path.',
-    );
+  if (!path) {
+    return Failure('Path is required to generate manifest plan.');
   }
 
+  const language = input.language;
+  const frameworks = input.frameworks;
+
   ctx.logger.info(
-    { manifestType, language: input.language, framework: input.framework, environment },
+    { manifestType, language, frameworks, environment },
     'Querying knowledgebase for manifest recommendations',
   );
 
@@ -62,7 +56,7 @@ async function run(
   const knowledgeSnippets = await getKnowledgeSnippets(topic, {
     environment: environment || 'production',
     tool: name,
-    language: input.language,
+    ...(language && { language }),
     maxChars: 8000,
     maxSnippets: 20,
   });
@@ -92,10 +86,13 @@ async function run(
   const confidence =
     knowledgeMatches.length > 0 ? Math.min(0.95, 0.5 + knowledgeMatches.length * 0.05) : 0.5;
 
+  const frameworksStr =
+    frameworks && frameworks.length > 0 ? ` (${frameworks.map((f) => f.name).join(', ')})` : '';
+
   const summary = `
 Manifest Planning Summary:
 - Manifest Type: ${manifestType}
-- Language: ${language}${framework ? ` (${framework})` : ''}
+- Language: ${language || 'not specified'}${frameworksStr}
 - Environment: ${environment || 'production'}
 - Knowledge Matches: ${knowledgeMatches.length} recommendations found
   - Security: ${securityMatches.length}
@@ -106,7 +103,17 @@ Next Step: Use generate-${manifestType === 'kubernetes' ? 'k8s-manifests' : mani
   `.trim();
 
   const plan: ManifestPlan = {
-    repositoryInfo,
+    repositoryInfo: {
+      name: input.name,
+      modulePathAbsoluteUnix: path,
+      language,
+      languageVersion: input.languageVersion,
+      frameworks,
+      buildSystem: input.buildSystem,
+      dependencies: input.dependencies,
+      ports: input.ports,
+      entryPoint: input.entryPoint,
+    },
     manifestType,
     recommendations: {
       securityConsiderations: securityMatches,

@@ -31,14 +31,27 @@ export const generateK8sManifestsSchema = z.object({
     .array(
       z.object({
         name: z.string(),
-        modulePath: z.string(),
-        language: z.string().optional(),
-        framework: z.string().optional(),
+        modulePathAbsoluteUnix: z.string(),
+        language: z.enum(['java', 'dotnet', 'other']).optional(),
+        frameworks: z
+          .array(
+            z.object({
+              name: z.string(),
+              version: z.string().optional(),
+            }),
+          )
+          .optional(),
         languageVersion: z.string().optional(),
-        frameworkVersion: z.string().optional(),
         dependencies: z.array(z.string()).optional(),
         ports: z.array(z.number()).optional(),
         entryPoint: z.string().optional(),
+        buildSystem: z
+          .object({
+            type: z.string().optional(),
+            configFile: z.string().optional(),
+          })
+          .passthrough()
+          .optional(),
       }),
     )
     .optional()

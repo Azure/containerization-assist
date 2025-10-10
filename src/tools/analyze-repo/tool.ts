@@ -9,7 +9,7 @@ import type { z } from 'zod';
  */
 async function run(
   input: z.infer<typeof analyzeRepoSchema>,
-  ctx: ToolContext,
+  _ctx: ToolContext,
 ): Promise<Result<RepositoryAnalysis>> {
   let { repositoryPathAbsoluteUnix: repoPath } = input;
   const { sessionId } = input;
@@ -21,12 +21,18 @@ async function run(
 
   try {
     const result: RepositoryAnalysis = input;
+    const numberOfModules = result.modules ? result.modules.length : 0;
+    if (numberOfModules === 0) {
+      throw new Error(
+        'No modules found in the repository. Please supply at least one module for structured analysis.',
+      );
+    }
+    result.isMonorepo = numberOfModules > 0;
 
     // Add sessionId and workflowHints to the result
-    const moduleHint =
-      result.isMonorepo && result.modules && result.modules.length > 0
-        ? ` Detected ${result.modules.length} modules that can be containerized separately.`
-        : '';
+    const moduleHint = result.isMonorepo
+      ? ` Detected ${numberOfModules} modules that can be containerized separately.`
+      : '';
 
     return Success({
       ...result,

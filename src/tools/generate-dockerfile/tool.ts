@@ -84,7 +84,7 @@ async function generateSingleDockerfile(
   // If generating for a specific module, use module-specific data
   if (targetModule) {
     language = targetModule.language || 'auto-detect';
-    framework = targetModule.framework;
+    framework = targetModule.frameworks?.[0]?.name;
     dependencies = targetModule.dependencies || [];
     ports = targetModule.ports || [8080];
 
@@ -96,10 +96,12 @@ async function generateSingleDockerfile(
       reqParts.push(
         `Language: ${language}${targetModule.languageVersion ? ` (${targetModule.languageVersion})` : ''}`,
       );
-    if (framework)
-      reqParts.push(
-        `Framework: ${framework}${targetModule.frameworkVersion ? ` (${targetModule.frameworkVersion})` : ''}`,
-      );
+    if (targetModule.frameworks && targetModule.frameworks.length > 0) {
+      const frameworkList = targetModule.frameworks
+        .map((f) => `${f.name}${f.version ? ` (${f.version})` : ''}`)
+        .join(', ');
+      reqParts.push(`Frameworks: ${frameworkList}`);
+    }
     if (targetModule.buildSystem?.type)
       reqParts.push(`Build System: ${targetModule.buildSystem.type}`);
     if (dependencies.length > 0) {
@@ -118,7 +120,6 @@ async function generateSingleDockerfile(
     // No module data provided, analyze repository directly
     requirements = `Analyze the repository at ${repoPath} to detect the technology stack, dependencies, and requirements.`;
   }
-
 
   // Add custom instructions if provided
   if (input.customInstructions) {
@@ -481,10 +482,10 @@ ${finalDockerfileContent}
       language: 'dockerfile',
       analysis: knowledgeEnhancement
         ? {
-          enhancementAreas: knowledgeEnhancement.analysis.enhancementAreas,
-          confidence: knowledgeEnhancement.confidence,
-          knowledgeApplied: knowledgeEnhancement.knowledgeApplied,
-        }
+            enhancementAreas: knowledgeEnhancement.analysis.enhancementAreas,
+            confidence: knowledgeEnhancement.confidence,
+            knowledgeApplied: knowledgeEnhancement.knowledgeApplied,
+          }
         : undefined,
       confidence: knowledgeEnhancement ? knowledgeEnhancement.confidence : 0.9,
       suggestions,
@@ -517,7 +518,7 @@ async function run(
         return Failure('Module array contains undefined element');
       }
       ctx.logger.info(
-        { moduleName: targetModule.name, modulePath: targetModule.modulePath },
+        { moduleName: targetModule.name, modulePath: targetModule.modulePathAbsoluteUnix },
         'Generating Dockerfile for single module',
       );
       return generateSingleDockerfile(input, ctx, targetModule as ModuleInfo);
@@ -577,13 +578,14 @@ async function run(
     const summary = `Generated Dockerfiles for ${successCount}/${modules.length} modules:\n${results
       .filter((r) => r.success)
       .map((r) => `✅ ${r.module}${r.path ? `: ${r.path}` : ''}`)
-      .join('\n')}${failureCount > 0
+      .join('\n')}${
+      failureCount > 0
         ? `\n\n⚠️  Failed modules (${failureCount}):\n${results
-          .filter((r) => !r.success)
-          .map((r) => `❌ ${r.module}: ${r.error}`)
-          .join('\n')}`
+            .filter((r) => !r.success)
+            .map((r) => `❌ ${r.module}: ${r.error}`)
+            .join('\n')}`
         : ''
-      }`;
+    }`;
 
     return Success({
       content: summary,
