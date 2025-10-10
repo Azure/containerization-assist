@@ -54,6 +54,9 @@ async function generateSingleDockerfile(
   const { multistage, securityHardening, optimization, sessionId, baseImagePreference } = input;
 
   // Determine repository path and resolve to absolute
+  if (!input.repositoryPath || typeof input.repositoryPath !== 'string') {
+    return Failure('repositoryPath is required and must be a string.');
+  }
   const repoPath = nodePath.isAbsolute(input.repositoryPath)
     ? input.repositoryPath
     : nodePath.resolve(process.cwd(), input.repositoryPath);
@@ -116,10 +119,6 @@ async function generateSingleDockerfile(
     requirements = `Analyze the repository at ${repoPath} to detect the technology stack, dependencies, and requirements.`;
   }
 
-  // Path is required
-  if (!repoPath) {
-    return Failure('Repository path is required.');
-  }
 
   // Add custom instructions if provided
   if (input.customInstructions) {
