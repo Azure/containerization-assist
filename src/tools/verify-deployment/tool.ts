@@ -279,7 +279,7 @@ async function generateValidationInsights(
 
     const messages = await buildMessages({
       basePrompt: prompt,
-      topic: TOPICS.GENERATE_K8S_MANIFESTS,
+      topic: TOPICS.KUBERNETES,
       tool: 'verify-deployment',
       environment: 'production',
     });

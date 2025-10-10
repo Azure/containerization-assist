@@ -22,6 +22,7 @@ import {
 } from './schema';
 import { getKnowledgeSnippets } from '@/knowledge/matcher';
 import type { z } from 'zod';
+import { CATEGORY } from '@/knowledge/types';
 
 const name = 'generate-dockerfile-plan';
 const description =
@@ -32,9 +33,15 @@ async function run(
   input: z.infer<typeof generateDockerfilePlanSchema>,
   ctx: ToolContext,
 ): Promise<Result<DockerfilePlan>> {
-  const { language: inputLanguage, framework: inputFramework, environment } = input;
+  const {
+    language: inputLanguage,
+    framework: inputFramework,
+    environment,
+    modulePathAbsoluteUnix,
+  } = input;
 
-  const path = input.path || '';
+  const path = input.respositoryPathAbsoluteUnix || '';
+  const modulePath = modulePathAbsoluteUnix || path;
 
   const language = inputLanguage || 'auto-detect';
   const framework = inputFramework;
@@ -44,7 +51,7 @@ async function run(
   }
 
   const repositoryInfo = {
-    path,
+    path: modulePath,
     language,
     framework,
     languageVersion: undefined,
@@ -60,13 +67,14 @@ async function run(
     'Querying knowledgebase for Dockerfile recommendations',
   );
 
-  const knowledgeSnippets = await getKnowledgeSnippets(TOPICS.DOCKERFILE_GENERATION, {
+  const knowledgeSnippets = await getKnowledgeSnippets(TOPICS.DOCKERFILE, {
     environment: environment || 'production',
     tool: name,
     language,
     ...(framework && { framework }),
     maxChars: 8000,
     maxSnippets: 20,
+    category: CATEGORY.DOCKERFILE,
   });
 
   const knowledgeMatches: DockerfileRequirement[] = knowledgeSnippets.map((snippet) => ({
@@ -110,6 +118,7 @@ async function run(
 
   const summary = `
 Dockerfile Planning Summary:
+- Path: ${modulePath}${modulePathAbsoluteUnix ? ' (module)' : ''}
 - Language: ${language}${framework ? ` (${framework})` : ''}
 - Environment: ${environment || 'production'}
 - Build Strategy: ${buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'}
@@ -117,15 +126,22 @@ Dockerfile Planning Summary:
   - Security: ${securityMatches.length}
   - Optimizations: ${optimizationMatches.length}
   - Best Practices: ${bestPracticeMatches.length}
-
-Next Step: Generate Dockerfile using these recommendations.
   `.trim();
 
   const plan: DockerfilePlan = {
     repositoryInfo: {
-      ...(repositoryInfo.path && { path: repositoryInfo.path }),
-      ...(repositoryInfo.language && { language: repositoryInfo.language }),
-      ...(repositoryInfo.framework && { framework: repositoryInfo.framework }),
+      name: modulePath.split('/').pop() || 'unknown',
+      modulePathAbsoluteUnix: modulePath,
+      ...(repositoryInfo.language && {
+        language:
+          repositoryInfo.language === 'java' || repositoryInfo.language === 'dotnet'
+            ? repositoryInfo.language
+            : 'other',
+      }),
+      ...(repositoryInfo.framework &&
+        repositoryInfo.framework !== 'auto-detect' && {
+          frameworks: [{ name: repositoryInfo.framework }],
+        }),
     },
     recommendations: {
       buildStrategy,

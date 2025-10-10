@@ -424,5 +424,37 @@
       "node"
     ],
     "description": "Proper signal handling ensures graceful shutdowns and zombie process cleanup"
+  },
+  {
+    "id": "minimal-file-creation-dockerfile",
+    "category": "dockerfile",
+    "pattern": ".*",
+    "recommendation": "Only create Dockerfiles and .dockerignore files. Do NOT create extra files like README.md, docker-compose.yml, or other markdown documentation unless explicitly requested.",
+    "example": "# Dockerfile generation: Create only:\n# - Dockerfile\n# - .dockerignore\n",
+    "severity": "required",
+    "tags": [
+      "dockerfile",
+      "file-creation",
+      "best-practices",
+      "minimal",
+      "organization"
+    ],
+    "description": "Minimize file creation to only Dockerfiles."
+  },
+  {
+    "id": "minimal-file-creation-kubernetes",
+    "category": "kubernetes",
+    "pattern": ".*",
+    "recommendation": "Only create yaml files for kubernetes manifests. Do NOT create extra files like README.md, docker-compose.yml, helm charts or other markdown documentations unless explicitly requested. Generate the manifests in a manifests/ directory.",
+    "example": "# Kubernetes manifest generation: Create only yaml files in manifests/ directory\n# - manifests/deployment.yaml\n# - manifests/service.yaml\n",
+    "severity": "required",
+    "tags": [
+      "kubernetes",
+      "file-creation",
+      "best-practices",
+      "minimal",
+      "organization"
+    ],
+    "description": "Minimize file creation to only manifest yaml files. Keep manifests organized in separate files within manifests/ directory."
   }
 ]
