@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { sessionId, respositoryPathAbsoluteUnix, analysisOptions } from '../shared/schemas';
+import { sessionId, repositoryPathAbsoluteUnix, analysisOptions } from '../shared/schemas';
 
 export const moduleInfo = z.object({
   name: z.string().describe('The name of the module'),
@@ -46,7 +46,7 @@ export type ModuleInfo = z.infer<typeof moduleInfo>;
 
 export const analyzeRepoSchema = z.object({
   sessionId,
-  repositoryPathAbsoluteUnix: respositoryPathAbsoluteUnix,
+  repositoryPathAbsoluteUnix,
   ...analysisOptions,
   modules: z.array(moduleInfo),
 });

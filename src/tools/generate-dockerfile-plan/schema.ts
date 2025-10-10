@@ -3,7 +3,11 @@
  */
 
 import { z } from 'zod';
-import { sessionId as sharedSessionId, environment, respositoryPathAbsoluteUnix as sharedPath } from '../shared/schemas';
+import {
+  sessionId as sharedSessionId,
+  environment,
+  repositoryPathAbsoluteUnix as sharedPath,
+} from '../shared/schemas';
 
 export const generateDockerfilePlanSchema = z.object({
   sessionId: sharedSessionId
