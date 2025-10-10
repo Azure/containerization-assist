@@ -6,7 +6,7 @@
  */
 
 import { Command } from 'commander';
-import { getAllInternalTools, type InternalTool } from '@/tools';
+import { ALL_TOOLS, type Tool } from '@/tools';
 import { validateAllToolMetadata, type ValidatableTool } from '@/types/tool-metadata';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -34,12 +34,11 @@ export interface ToolDiscoveryOptions {
  */
 async function discoverToolCapabilities(
   options: ToolDiscoveryOptions = {},
-): Promise<Result<InternalTool[]>> {
+): Promise<Result<Tool[]>> {
   try {
-    const allTools = getAllInternalTools();
-    const filteredTools: InternalTool[] = [];
+    const filteredTools: Tool[] = [];
 
-    for (const tool of allTools) {
+    for (const tool of ALL_TOOLS) {
       // Apply filters
       if (options.aiDrivenOnly && !tool.metadata.aiDriven) continue;
       if (options.knowledgeEnhancedOnly && !tool.metadata.knowledgeEnhanced) continue;

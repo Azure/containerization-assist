@@ -20,10 +20,6 @@ export type {
   CreateAppRuntime,
 } from './types/runtime.js';
 
-// Tool names and types
-/** @public */
-export { TOOLS, type ToolName } from './exports/tools.js';
-
 // Core types
 /** @public */
-export type { Tool, Result, Success, Failure } from './types/index.js';
+export type { MCPTool, Result, Success, Failure } from './types/index.js';

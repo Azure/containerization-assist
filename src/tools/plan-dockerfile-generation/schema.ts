@@ -11,11 +11,9 @@ export const planDockerfileGenerationSchema = z.object({
     .describe(
       'Session identifier to retrieve analysis results. If provided, uses analyze-repo data from session.',
     ),
-  path: sharedPath
-    .optional()
-    .describe(
-      'Repository path (use forward slashes: /path/to/repo). Required if sessionId not provided.',
-    ),
+  path: sharedPath.describe(
+    'Repository path (use forward slashes: /path/to/repo). Required if sessionId not provided.',
+  ),
   language: z.string().optional().describe('Primary programming language (e.g., "java", "python")'),
   framework: z.string().optional().describe('Framework used (e.g., "spring", "django")'),
   environment: environment.describe('Target environment (production, development, etc.)'),

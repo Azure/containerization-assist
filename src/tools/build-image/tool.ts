@@ -479,9 +479,9 @@ async function buildImageImpl(
 export const buildImage = buildImageImpl;
 
 // New Tool interface export
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 
-const tool: Tool<typeof buildImageSchema, BuildImageResult> = {
+const tool: MCPTool<typeof buildImageSchema, BuildImageResult> = {
   name: 'build-image',
   description: 'Build Docker images from Dockerfiles with AI-powered optimization suggestions',
   version: '2.0.0',

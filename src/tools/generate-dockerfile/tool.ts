@@ -15,7 +15,7 @@
 
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 import { generateDockerfileSchema } from './schema';
 import type { AIResponse } from '../ai-response-types';
 import type { ModuleInfo } from '@/tools/analyze-repo/schema';
@@ -53,10 +53,25 @@ async function generateSingleDockerfile(
 ): Promise<Result<AIResponse>> {
   const { multistage, securityHardening, optimization, sessionId, baseImagePreference } = input;
 
-  // Determine repository path: use module path if available, otherwise input.path
-  const path = targetModule?.path ?? input.path;
-  const targetModulePath = targetModule?.path;
-  const targetDockerfilePath = targetModule?.dockerfilePath;
+  // Determine repository path and resolve to absolute
+  if (!input.repositoryPath || typeof input.repositoryPath !== 'string') {
+    return Failure('repositoryPath is required and must be a string.');
+  }
+  const repoPath = nodePath.isAbsolute(input.repositoryPath)
+    ? input.repositoryPath
+    : nodePath.resolve(process.cwd(), input.repositoryPath);
+
+  // Determine target module path and dockerfile path (resolve relative to repositoryPath)
+  const targetModulePath = targetModule?.modulePath
+    ? nodePath.isAbsolute(targetModule.modulePath)
+      ? targetModule.modulePath
+      : nodePath.resolve(repoPath, targetModule.modulePath)
+    : undefined;
+  const targetDockerfilePath = targetModule?.dockerfilePath
+    ? nodePath.isAbsolute(targetModule.dockerfilePath)
+      ? targetModule.dockerfilePath
+      : nodePath.resolve(repoPath, targetModule.dockerfilePath)
+    : undefined;
 
   // Initialize variables from module data if available
   let language = 'auto-detect';
@@ -76,7 +91,7 @@ async function generateSingleDockerfile(
     // Build requirements from module analysis
     const reqParts: string[] = [];
     reqParts.push(`Module: ${targetModule.name}`);
-    reqParts.push(`Path: ${targetModule.path}`);
+    reqParts.push(`Path: ${targetModule.modulePath}`);
     if (language)
       reqParts.push(
         `Language: ${language}${targetModule.languageVersion ? ` (${targetModule.languageVersion})` : ''}`,
@@ -99,17 +114,11 @@ async function generateSingleDockerfile(
       { sessionId, moduleName: targetModule.name, language, framework },
       'Using module-specific analysis data',
     );
-  } else if (path) {
+  } else if (repoPath) {
     // No module data provided, analyze repository directly
-    requirements = `Analyze the repository at ${path} to detect the technology stack, dependencies, and requirements.`;
+    requirements = `Analyze the repository at ${repoPath} to detect the technology stack, dependencies, and requirements.`;
   }
 
-  // Path is required (either from module or input)
-  if (!path) {
-    return Failure(
-      'Repository path is required. Provide either the path parameter or modules with path fields.',
-    );
-  }
 
   // Add custom instructions if provided
   if (input.customInstructions) {
@@ -408,26 +417,16 @@ ${finalDockerfileContent}
       'Extracted Dockerfile content',
     );
 
-    // Determine where to write the Dockerfile
     let dockerfilePath = '';
 
     if (targetDockerfilePath) {
-      // Module specified a custom dockerfile path
-      dockerfilePath = nodePath.isAbsolute(targetDockerfilePath)
-        ? targetDockerfilePath
-        : nodePath.resolve(process.cwd(), targetDockerfilePath);
+      dockerfilePath = targetDockerfilePath;
       ctx.logger.info({ dockerfilePath }, 'Using custom Dockerfile path from module');
     } else if (targetModulePath) {
-      // Use module path
-      const resolvedModulePath = nodePath.isAbsolute(targetModulePath)
-        ? targetModulePath
-        : nodePath.resolve(process.cwd(), targetModulePath);
-      dockerfilePath = nodePath.join(resolvedModulePath, 'Dockerfile');
+      dockerfilePath = nodePath.join(targetModulePath, 'Dockerfile');
       ctx.logger.debug({ dockerfilePath }, 'Using module path for Dockerfile');
-    } else if (path) {
-      // Use repository path
-      const resolvedPath = nodePath.isAbsolute(path) ? path : nodePath.resolve(process.cwd(), path);
-      dockerfilePath = nodePath.join(resolvedPath, 'Dockerfile');
+    } else if (repoPath) {
+      dockerfilePath = nodePath.join(repoPath, 'Dockerfile');
       ctx.logger.debug({ dockerfilePath }, 'Using repository path for Dockerfile');
     }
 
@@ -518,7 +517,7 @@ async function run(
         return Failure('Module array contains undefined element');
       }
       ctx.logger.info(
-        { moduleName: targetModule.name, modulePath: targetModule.path },
+        { moduleName: targetModule.name, modulePath: targetModule.modulePath },
         'Generating Dockerfile for single module',
       );
       return generateSingleDockerfile(input, ctx, targetModule as ModuleInfo);
@@ -611,7 +610,7 @@ async function run(
   return generateSingleDockerfile(input, ctx);
 }
 
-const tool: Tool<typeof generateDockerfileSchema, AIResponse> = {
+const tool: MCPTool<typeof generateDockerfileSchema, AIResponse> = {
   name,
   description,
   category: 'docker',

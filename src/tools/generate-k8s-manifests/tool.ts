@@ -4,7 +4,7 @@
 
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 import { promptTemplates, K8sManifestPromptParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
@@ -517,7 +517,7 @@ async function run(
         return Failure('Module array contains undefined element');
       }
       ctx.logger.info(
-        { moduleName: targetModule.name, modulePath: targetModule.path },
+        { moduleName: targetModule.name, modulePath: targetModule.modulePath },
         'Generating K8s manifests for single module',
       );
       return generateSingleManifest(input, ctx, targetModule as ModuleInfo);
@@ -613,7 +613,7 @@ async function run(
   return generateSingleManifest(input, ctx);
 }
 
-const tool: Tool<typeof generateK8sManifestsSchema, AIResponse> = {
+const tool: MCPTool<typeof generateK8sManifestsSchema, AIResponse> = {
   name,
   description,
   category: 'kubernetes',
