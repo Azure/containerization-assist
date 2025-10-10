@@ -62,10 +62,10 @@ async function generateSingleDockerfile(
     : nodePath.resolve(process.cwd(), input.repositoryPath);
 
   // Determine target module path and dockerfile path (resolve relative to repositoryPath)
-  const targetModulePath = targetModule?.modulePath
-    ? nodePath.isAbsolute(targetModule.modulePath)
-      ? targetModule.modulePath
-      : nodePath.resolve(repoPath, targetModule.modulePath)
+  const targetModulePath = targetModule?.modulePathAbsoluteUnix
+    ? nodePath.isAbsolute(targetModule.modulePathAbsoluteUnix)
+      ? targetModule.modulePathAbsoluteUnix
+      : nodePath.resolve(repoPath, targetModule.modulePathAbsoluteUnix)
     : undefined;
   const targetDockerfilePath = targetModule?.dockerfilePath
     ? nodePath.isAbsolute(targetModule.dockerfilePath)
@@ -91,7 +91,7 @@ async function generateSingleDockerfile(
     // Build requirements from module analysis
     const reqParts: string[] = [];
     reqParts.push(`Module: ${targetModule.name}`);
-    reqParts.push(`Path: ${targetModule.modulePath}`);
+    reqParts.push(`Path: ${targetModule.modulePathAbsoluteUnix}`);
     if (language)
       reqParts.push(
         `Language: ${language}${targetModule.languageVersion ? ` (${targetModule.languageVersion})` : ''}`,
@@ -481,10 +481,10 @@ ${finalDockerfileContent}
       language: 'dockerfile',
       analysis: knowledgeEnhancement
         ? {
-            enhancementAreas: knowledgeEnhancement.analysis.enhancementAreas,
-            confidence: knowledgeEnhancement.confidence,
-            knowledgeApplied: knowledgeEnhancement.knowledgeApplied,
-          }
+          enhancementAreas: knowledgeEnhancement.analysis.enhancementAreas,
+          confidence: knowledgeEnhancement.confidence,
+          knowledgeApplied: knowledgeEnhancement.knowledgeApplied,
+        }
         : undefined,
       confidence: knowledgeEnhancement ? knowledgeEnhancement.confidence : 0.9,
       suggestions,
@@ -577,14 +577,13 @@ async function run(
     const summary = `Generated Dockerfiles for ${successCount}/${modules.length} modules:\n${results
       .filter((r) => r.success)
       .map((r) => `✅ ${r.module}${r.path ? `: ${r.path}` : ''}`)
-      .join('\n')}${
-      failureCount > 0
+      .join('\n')}${failureCount > 0
         ? `\n\n⚠️  Failed modules (${failureCount}):\n${results
-            .filter((r) => !r.success)
-            .map((r) => `❌ ${r.module}: ${r.error}`)
-            .join('\n')}`
+          .filter((r) => !r.success)
+          .map((r) => `❌ ${r.module}: ${r.error}`)
+          .join('\n')}`
         : ''
-    }`;
+      }`;
 
     return Success({
       content: summary,

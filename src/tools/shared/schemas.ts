@@ -10,9 +10,9 @@ import { environmentSchema } from '@/config/environment';
 export const sessionId = z.string().describe('Session identifier for tracking operations');
 
 // Paths
-export const path = z
+export const respositoryPathAbsoluteUnix = z
   .string()
-  .describe('Path to the repository or file (use forward slashes: /path/to/repo)');
+  .describe('Absolute path to the repository (use forward slashes: /path/to/repo. ONLY unix path separators)');
 
 // Kubernetes common fields
 export const namespace = z.string().default('default').describe('Kubernetes namespace');

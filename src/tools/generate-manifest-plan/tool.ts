@@ -17,7 +17,7 @@ import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { MCPTool } from '@/types/tool';
 import { generateManifestPlanSchema, type ManifestPlan, type ManifestRequirement } from './schema';
-import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
+import type { ModuleInfo, RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import { getKnowledgeSnippets } from '@/knowledge/matcher';
 import type { z } from 'zod';
 
@@ -40,48 +40,12 @@ async function run(
   const {
     sessionId,
     manifestType,
-    language: inputLanguage,
-    framework: inputFramework,
     environment,
   } = input;
 
   let path = input.path;
   let analysis: RepositoryAnalysis | undefined;
 
-  if (sessionId && ctx.sessionManager) {
-    try {
-      const workflowStateResult = await ctx.sessionManager.get(sessionId);
-      if (workflowStateResult.ok && workflowStateResult.value) {
-        const workflowState = workflowStateResult.value as Record<string, unknown>;
-
-        const metadata = workflowState.metadata as Record<string, unknown> | undefined;
-        if (metadata && !path && typeof metadata.analyzedPath === 'string') {
-          path = metadata.analyzedPath;
-        }
-
-        const results = workflowState.results as Record<string, unknown> | undefined;
-        const analyzeRepoResult = results?.['analyze-repo'];
-        if (analyzeRepoResult && typeof analyzeRepoResult === 'object') {
-          analysis = analyzeRepoResult as RepositoryAnalysis;
-          ctx.logger.info(
-            { sessionId, language: analysis.language, framework: analysis.framework },
-            'Retrieved repository analysis from sessionManager',
-          );
-        }
-      }
-    } catch (sessionError) {
-      ctx.logger.debug(
-        {
-          sessionId,
-          error: sessionError instanceof Error ? sessionError.message : String(sessionError),
-        },
-        'Unable to load workflow session data',
-      );
-    }
-  }
-
-  const language = inputLanguage || analysis?.language || 'auto-detect';
-  const framework = inputFramework || analysis?.framework;
 
   if (!path && !analysis) {
     return Failure(
@@ -89,20 +53,8 @@ async function run(
     );
   }
 
-  const repositoryInfo = {
-    path: path || (analysis as { analyzedPath?: string } | undefined)?.analyzedPath,
-    language,
-    framework,
-    languageVersion: analysis?.languageVersion,
-    frameworkVersion: analysis?.frameworkVersion,
-    buildSystem: analysis?.buildSystem,
-    dependencies: analysis?.dependencies,
-    ports: analysis?.suggestedPorts || analysis?.ports,
-    entryPoint: analysis?.entryPoint,
-  };
-
   ctx.logger.info(
-    { manifestType, language, framework, environment },
+    { manifestType, language: input.language, framework: input.framework, environment },
     'Querying knowledgebase for manifest recommendations',
   );
 
@@ -110,8 +62,7 @@ async function run(
   const knowledgeSnippets = await getKnowledgeSnippets(topic, {
     environment: environment || 'production',
     tool: name,
-    language,
-    ...(framework && { framework }),
+    language: input.language,
     maxChars: 8000,
     maxSnippets: 20,
   });
@@ -155,17 +106,7 @@ Next Step: Use generate-${manifestType === 'kubernetes' ? 'k8s-manifests' : mani
   `.trim();
 
   const plan: ManifestPlan = {
-    repositoryInfo: {
-      ...(repositoryInfo.path && { path: repositoryInfo.path }),
-      ...(repositoryInfo.language && { language: repositoryInfo.language }),
-      ...(repositoryInfo.framework && { framework: repositoryInfo.framework }),
-      ...(repositoryInfo.languageVersion && { languageVersion: repositoryInfo.languageVersion }),
-      ...(repositoryInfo.frameworkVersion && { frameworkVersion: repositoryInfo.frameworkVersion }),
-      ...(repositoryInfo.buildSystem && { buildSystem: repositoryInfo.buildSystem }),
-      ...(repositoryInfo.dependencies && { dependencies: repositoryInfo.dependencies }),
-      ...(repositoryInfo.ports && { ports: repositoryInfo.ports }),
-      ...(repositoryInfo.entryPoint && { entryPoint: repositoryInfo.entryPoint }),
-    },
+    repositoryInfo,
     manifestType,
     recommendations: {
       securityConsiderations: securityMatches,

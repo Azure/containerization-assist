@@ -3,9 +3,11 @@
  */
 
 import { z } from 'zod';
-import { sessionId as sharedSessionId, environment, path as sharedPath } from '../shared/schemas';
+import { sessionId as sharedSessionId, environment, respositoryPathAbsoluteUnix as sharedPath } from '../shared/schemas';
+import { ModuleInfo, moduleInfo } from '../analyze-repo/schema';
 
 export const generateManifestPlanSchema = z.object({
+  ...moduleInfo.shape,
   sessionId: sharedSessionId
     .optional()
     .describe(
@@ -17,8 +19,6 @@ export const generateManifestPlanSchema = z.object({
   manifestType: z
     .enum(['kubernetes', 'helm', 'aca', 'kustomize'])
     .describe('Type of manifest to generate'),
-  language: z.string().optional().describe('Primary programming language (e.g., "java", "python")'),
-  framework: z.string().optional().describe('Framework used (e.g., "spring", "django")'),
   environment: environment.describe('Target environment (production, development, etc.)'),
 });
 
@@ -35,20 +35,7 @@ export interface ManifestRequirement {
 }
 
 export interface ManifestPlan {
-  repositoryInfo: {
-    path?: string;
-    language?: string;
-    framework?: string;
-    languageVersion?: string;
-    frameworkVersion?: string;
-    buildSystem?: {
-      type?: string;
-      configFile?: string;
-    };
-    dependencies?: string[];
-    ports?: number[];
-    entryPoint?: string;
-  };
+  repositoryInfo: ModuleInfo;
   manifestType: 'kubernetes' | 'helm' | 'aca' | 'kustomize';
   recommendations: {
     securityConsiderations: ManifestRequirement[];
