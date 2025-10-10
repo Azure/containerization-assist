@@ -1,5 +1,5 @@
 /**
- * Plan Manifest Generation Tool
+ * Generate Manifest Plan Tool
  *
  * Analyzes repository and queries knowledgebase to gather insights and return
  * structured requirements for creating Kubernetes/Helm/ACA/Kustomize manifests.
@@ -16,16 +16,12 @@
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { MCPTool } from '@/types/tool';
-import {
-  planManifestGenerationSchema,
-  type ManifestPlan,
-  type ManifestRequirement,
-} from './schema';
+import { generateManifestPlanSchema, type ManifestPlan, type ManifestRequirement } from './schema';
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 import { getKnowledgeSnippets } from '@/knowledge/matcher';
 import type { z } from 'zod';
 
-const name = 'plan-manifest-generation';
+const name = 'generate-manifest-plan';
 const description =
   'Gather insights from knowledgebase and return requirements for Kubernetes/Helm/ACA/Kustomize manifest creation';
 const version = '1.0.0';
@@ -38,7 +34,7 @@ const MANIFEST_TYPE_TO_TOPIC = {
 } as const;
 
 async function run(
-  input: z.infer<typeof planManifestGenerationSchema>,
+  input: z.infer<typeof generateManifestPlanSchema>,
   ctx: ToolContext,
 ): Promise<Result<ManifestPlan>> {
   const {
@@ -195,12 +191,12 @@ Next Step: Use generate-${manifestType === 'kubernetes' ? 'k8s-manifests' : mani
   return Success(plan);
 }
 
-const tool: MCPTool<typeof planManifestGenerationSchema, ManifestPlan> = {
+const tool: MCPTool<typeof generateManifestPlanSchema, ManifestPlan> = {
   name,
   description,
   category: 'kubernetes',
   version,
-  schema: planManifestGenerationSchema,
+  schema: generateManifestPlanSchema,
   metadata: {
     aiDriven: false,
     knowledgeEnhanced: true,

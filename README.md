@@ -190,8 +190,8 @@ These tools use knowledge packs for planning without AI sampling.
 
 | Tool | Description |
 |------|-------------|
-| `plan-dockerfile-generation` | Plan Dockerfile generation strategy |
-| `plan-manifest-generation` | Plan Kubernetes manifest generation strategy |
+| `generate-dockerfile-plan` | Plan Dockerfile generation strategy |
+| `generate-manifest-plan` | Plan Kubernetes manifest generation strategy |
 
 ### Utility Tools
 

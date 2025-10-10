@@ -242,8 +242,8 @@
 - `generate-kustomize`: Generate Kustomize configurations
 - `inspect-session`: Session debugging
 - `ops`: Operational utilities
-- `plan-dockerfile-generation`: Plan Dockerfile generation strategy
-- `plan-manifest-generation`: Plan manifest generation strategy
+- `generate-dockerfile-plan`: Plan Dockerfile generation strategy
+- `generate-manifest-plan`: Plan manifest generation strategy
 - `prepare-cluster`: Kubernetes cluster preparation
 - `push-image`: Push images to registry
 - `resolve-base-images`: Base image recommendations

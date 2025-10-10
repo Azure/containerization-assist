@@ -1,11 +1,11 @@
 /**
- * Schema definition for plan-dockerfile-generation tool
+ * Schema definition for generate-manifest-plan tool
  */
 
 import { z } from 'zod';
 import { sessionId as sharedSessionId, environment, path as sharedPath } from '../shared/schemas';
 
-export const planDockerfileGenerationSchema = z.object({
+export const generateManifestPlanSchema = z.object({
   sessionId: sharedSessionId
     .optional()
     .describe(
@@ -14,29 +14,27 @@ export const planDockerfileGenerationSchema = z.object({
   path: sharedPath.describe(
     'Repository path (use forward slashes: /path/to/repo). Required if sessionId not provided.',
   ),
+  manifestType: z
+    .enum(['kubernetes', 'helm', 'aca', 'kustomize'])
+    .describe('Type of manifest to generate'),
   language: z.string().optional().describe('Primary programming language (e.g., "java", "python")'),
   framework: z.string().optional().describe('Framework used (e.g., "spring", "django")'),
   environment: environment.describe('Target environment (production, development, etc.)'),
-  includeExamples: z
-    .boolean()
-    .optional()
-    .default(true)
-    .describe('Include code examples in recommendations'),
 });
 
-export type PlanDockerfileGenerationParams = z.infer<typeof planDockerfileGenerationSchema>;
+export type GenerateManifestPlanParams = z.infer<typeof generateManifestPlanSchema>;
 
-export interface DockerfileRequirement {
+export interface ManifestRequirement {
   id: string;
   category: string;
   recommendation: string;
   example?: string;
-  severity?: 'high' | 'medium' | 'low';
+  severity?: 'high' | 'medium' | 'low' | 'required';
   tags?: string[];
   matchScore: number;
 }
 
-export interface DockerfilePlan {
+export interface ManifestPlan {
   repositoryInfo: {
     path?: string;
     language?: string;
@@ -51,16 +49,13 @@ export interface DockerfilePlan {
     ports?: number[];
     entryPoint?: string;
   };
+  manifestType: 'kubernetes' | 'helm' | 'aca' | 'kustomize';
   recommendations: {
-    buildStrategy: {
-      multistage: boolean;
-      reason: string;
-    };
-    securityConsiderations: DockerfileRequirement[];
-    optimizations: DockerfileRequirement[];
-    bestPractices: DockerfileRequirement[];
+    securityConsiderations: ManifestRequirement[];
+    resourceManagement: ManifestRequirement[];
+    bestPractices: ManifestRequirement[];
   };
-  knowledgeMatches: DockerfileRequirement[];
+  knowledgeMatches: ManifestRequirement[];
   confidence: number;
   summary: string;
 }

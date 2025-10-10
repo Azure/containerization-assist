@@ -1,11 +1,11 @@
 /**
- * Schema definition for plan-manifest-generation tool
+ * Schema definition for generate-dockerfile-plan tool
  */
 
 import { z } from 'zod';
 import { sessionId as sharedSessionId, environment, path as sharedPath } from '../shared/schemas';
 
-export const planManifestGenerationSchema = z.object({
+export const generateDockerfilePlanSchema = z.object({
   sessionId: sharedSessionId
     .optional()
     .describe(
@@ -14,27 +14,29 @@ export const planManifestGenerationSchema = z.object({
   path: sharedPath.describe(
     'Repository path (use forward slashes: /path/to/repo). Required if sessionId not provided.',
   ),
-  manifestType: z
-    .enum(['kubernetes', 'helm', 'aca', 'kustomize'])
-    .describe('Type of manifest to generate'),
   language: z.string().optional().describe('Primary programming language (e.g., "java", "python")'),
   framework: z.string().optional().describe('Framework used (e.g., "spring", "django")'),
   environment: environment.describe('Target environment (production, development, etc.)'),
+  includeExamples: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe('Include code examples in recommendations'),
 });
 
-export type PlanManifestGenerationParams = z.infer<typeof planManifestGenerationSchema>;
+export type GenerateDockerfilePlanParams = z.infer<typeof generateDockerfilePlanSchema>;
 
-export interface ManifestRequirement {
+export interface DockerfileRequirement {
   id: string;
   category: string;
   recommendation: string;
   example?: string;
-  severity?: 'high' | 'medium' | 'low' | 'required';
+  severity?: 'high' | 'medium' | 'low';
   tags?: string[];
   matchScore: number;
 }
 
-export interface ManifestPlan {
+export interface DockerfilePlan {
   repositoryInfo: {
     path?: string;
     language?: string;
@@ -49,13 +51,16 @@ export interface ManifestPlan {
     ports?: number[];
     entryPoint?: string;
   };
-  manifestType: 'kubernetes' | 'helm' | 'aca' | 'kustomize';
   recommendations: {
-    securityConsiderations: ManifestRequirement[];
-    resourceManagement: ManifestRequirement[];
-    bestPractices: ManifestRequirement[];
+    buildStrategy: {
+      multistage: boolean;
+      reason: string;
+    };
+    securityConsiderations: DockerfileRequirement[];
+    optimizations: DockerfileRequirement[];
+    bestPractices: DockerfileRequirement[];
   };
-  knowledgeMatches: ManifestRequirement[];
+  knowledgeMatches: DockerfileRequirement[];
   confidence: number;
   summary: string;
 }
