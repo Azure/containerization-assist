@@ -11,11 +11,9 @@ export const planManifestGenerationSchema = z.object({
     .describe(
       'Session identifier to retrieve analysis results. If provided, uses analyze-repo data from session.',
     ),
-  path: sharedPath
-    .optional()
-    .describe(
-      'Repository path (use forward slashes: /path/to/repo). Required if sessionId not provided.',
-    ),
+  path: sharedPath.describe(
+    'Repository path (use forward slashes: /path/to/repo). Required if sessionId not provided.',
+  ),
   manifestType: z
     .enum(['kubernetes', 'helm', 'aca', 'kustomize'])
     .describe('Type of manifest to generate'),

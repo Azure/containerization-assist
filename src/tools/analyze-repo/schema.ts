@@ -22,7 +22,7 @@ export type AnalyzeRepoParams = z.infer<typeof analyzeRepoSchema>;
 
 export interface ModuleInfo {
   name: string;
-  path: string;
+  modulePath: string;
   language?: string;
   framework?: string;
   languageVersion?: string;

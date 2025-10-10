@@ -4,7 +4,7 @@
 
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 
 import { promptTemplates, type OptimizationPromptParams } from '@/ai/prompt-templates';
 import { buildMessages } from '@/ai/prompt-engine';
@@ -535,7 +535,7 @@ async function run(
   return Success(result);
 }
 
-const tool: Tool<typeof fixDockerfileSchema, AIResponse> = {
+const tool: MCPTool<typeof fixDockerfileSchema, AIResponse> = {
   name,
   description,
   category: 'docker',
