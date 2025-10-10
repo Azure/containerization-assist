@@ -517,7 +517,7 @@ async function run(
         return Failure('Module array contains undefined element');
       }
       ctx.logger.info(
-        { moduleName: targetModule.name, modulePath: targetModule.path },
+        { moduleName: targetModule.name, modulePath: targetModule.modulePath },
         'Generating K8s manifests for single module',
       );
       return generateSingleManifest(input, ctx, targetModule as ModuleInfo);
