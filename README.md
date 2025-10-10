@@ -238,8 +238,8 @@ The following environment variables control server behavior:
 | `TEMP_DIR` | Temporary directory for build artifacts | System temp dir | No |
 | `MCP_MODE` | Enable MCP protocol mode (logs to stderr) | `false` | No |
 | `MCP_QUIET` | Suppress non-essential output in MCP mode | `false` | No |
-| `IMAGE_ALLOWLIST` | Comma-separated list of allowed base images | Empty | No |
-| `IMAGE_DENYLIST` | Comma-separated list of denied base images | Empty | No |
+| `CONTAINERIZATION_ASSIST_IMAGE_ALLOWLIST` | Comma-separated list of allowed base images | Empty | No |
+| `CONTAINERIZATION_ASSIST_IMAGE_DENYLIST` | Comma-separated list of denied base images | Empty | No |
 
 **Note on Runtime Configuration:**
 This server uses a **single-session model** optimized for one operator. Session state persists across tool executions within a single workflow and clears on server shutdown.
