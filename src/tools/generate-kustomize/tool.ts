@@ -11,7 +11,7 @@
 
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 import { generateKustomizeSchema } from './schema';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -382,7 +382,7 @@ async function run(
   }
 }
 
-const tool: Tool<
+const tool: MCPTool<
   typeof generateKustomizeSchema,
   { structure: KustomizeStructure; files: string[]; sessionId?: string }
 > = {

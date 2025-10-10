@@ -5,7 +5,6 @@
 
 import {
   createApp,
-  type Tool
 } from 'containerization-assist-mcp';
 
 /**
