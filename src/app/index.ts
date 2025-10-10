@@ -7,11 +7,9 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { createLogger } from '@/lib/logger';
-import { getAllInternalTools } from '@/exports/tools';
-import type { AllToolTypes, ToolName } from '@/tools';
+import { type Tool, type ToolName, ALL_TOOLS } from '@/tools';
 import { createToolContext } from '@/mcp/context';
 import { createMCPServer, registerToolsWithServer, type MCPServer } from '@/mcp/mcp-server';
-import type { Tool } from '@/types/tool';
 import { createOrchestrator, createHostlessToolContext } from './orchestrator';
 import type { OrchestratorConfig, ExecuteRequest, ToolOrchestrator } from './orchestrator-types';
 import type { Result } from '@/types';
@@ -26,10 +24,7 @@ import type {
 /**
  * Apply tool aliases to create renamed versions of tools
  */
-function applyToolAliases(
-  tools: readonly AllToolTypes[],
-  aliases?: Record<string, string>,
-): AllToolTypes[] {
+function applyToolAliases(tools: readonly Tool[], aliases?: Record<string, string>): Tool[] {
   if (!aliases) return [...tools];
 
   return tools.map((tool) => {
@@ -53,7 +48,7 @@ export interface TransportConfig {
  */
 export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
   const logger = config.logger || createLogger({ name: 'containerization-assist' });
-  const tools = config.tools || getAllInternalTools();
+  const tools = config.tools || ALL_TOOLS;
   const aliasedTools = applyToolAliases(tools, config.toolAliases);
 
   // Erase per-tool generics for runtime registration; validation still re-parses inputs per schema

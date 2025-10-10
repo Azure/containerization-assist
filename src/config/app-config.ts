@@ -187,12 +187,12 @@ export function createAppConfig(): AppConfig {
     },
     validation: {
       imageAllowlist:
-        getEnvValue('IMAGE_ALLOWLIST')
+        getEnvValue('CONTAINERIZATION_ASSIST_IMAGE_ALLOWLIST')
           ?.split(',')
           .map((s) => s.trim())
           .filter(Boolean) || [],
       imageDenylist:
-        getEnvValue('IMAGE_DENYLIST')
+        getEnvValue('CONTAINERIZATION_ASSIST_IMAGE_DENYLIST')
           ?.split(',')
           .map((s) => s.trim())
           .filter(Boolean) || [],

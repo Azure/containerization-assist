@@ -51,22 +51,25 @@ export const generateDockerfileSchema = z.object({
   securityLevel: securityLevelSchema,
   customCommands: z.array(z.string()).optional().describe('Custom Dockerfile commands'),
   platform: platform.describe('Target platform (e.g., linux/amd64, linux/arm64, windows/amd64)'),
-  path: z
+  repositoryPath: z
     .string()
-    .optional()
     .describe(
-      'Repository path (use forward slashes: /path/to/repo). Optional when generating for modules (module paths are used instead).',
+      'Repository path (use forward slashes: /path/to/repo). Can be absolute or relative to current working directory.',
     ),
   modules: z
     .array(
       z.object({
         name: z.string(),
-        path: z.string().describe('Module source code path'),
+        modulePath: z
+          .string()
+          .describe(
+            'Module source code path (use forward slashes). Can be absolute or relative to repositoryPath.',
+          ),
         dockerfilePath: z
           .string()
           .optional()
           .describe(
-            'Path where the Dockerfile should be generated (use forward slashes). If not provided, defaults to the module path.',
+            'Path where the Dockerfile should be generated (use forward slashes). Can be absolute or relative to repositoryPath. If not provided, defaults to modulePath/Dockerfile.',
           ),
         language: z.string().optional(),
         framework: z.string().optional(),

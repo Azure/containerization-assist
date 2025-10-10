@@ -7,7 +7,7 @@
 
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 import { validateImageSchema, type ValidateImageResult } from './schema';
 import { promises as fs } from 'node:fs';
 import nodePath from 'node:path';
@@ -218,7 +218,7 @@ async function run(
   return Success(result);
 }
 
-const tool: Tool<typeof validateImageSchema, ValidateImageResult> = {
+const tool: MCPTool<typeof validateImageSchema, ValidateImageResult> = {
   name,
   description,
   category: 'docker',

@@ -11,7 +11,7 @@ import { Result, Success, Failure } from '@/types';
 import { InspectSessionParamsSchema, type InspectSessionResult } from './schema';
 import type { SessionManager } from '@/session/core';
 import { extractErrorMessage } from '@/lib/error-utils';
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 import type { z } from 'zod';
 
 const DEFAULT_TTL = 86400; // 24 hours in seconds
@@ -194,7 +194,7 @@ function formatSessionList(sessions: SessionData[], format: string): string {
 /**
  * Inspect session tool conforming to Tool interface
  */
-const tool: Tool<typeof InspectSessionParamsSchema, InspectSessionResult> = {
+const tool: MCPTool<typeof InspectSessionParamsSchema, InspectSessionResult> = {
   name: 'inspect-session',
   description: 'Provides debugging capabilities for session management',
   version: '2.0.0',

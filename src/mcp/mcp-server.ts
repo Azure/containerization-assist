@@ -16,7 +16,7 @@ import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/proto
 import { extractErrorMessage } from '@/lib/error-utils';
 import { createLogger, type Logger } from '@/lib/logger';
 import { extractSchemaShape } from '@/lib/zod-utils';
-import type { Tool } from '@/types/tool';
+import type { MCPTool } from '@/types/tool';
 import type { ExecuteRequest, ExecuteMetadata } from '@/app/orchestrator-types';
 import type { Result, ErrorGuidance } from '@/types';
 
@@ -40,7 +40,7 @@ export interface MCPServer {
   getTools(): Array<{ name: string; description: string }>;
 }
 
-export interface RegisterOptions<TTool extends Tool = Tool> {
+export interface RegisterOptions<TTool extends MCPTool = MCPTool> {
   server: McpServer;
   tools: readonly TTool[];
   logger: Logger;
@@ -69,7 +69,7 @@ ${guidance.resolution || 'Check logs for more information'}`;
 /**
  * Create an MCP server that delegates execution to the orchestrator
  */
-export function createMCPServer<TTool extends Tool>(
+export function createMCPServer<TTool extends MCPTool>(
   tools: Array<TTool>,
   options: ServerOptions = {},
   execute: ToolExecutor,
@@ -170,7 +170,9 @@ export function createMCPServer<TTool extends Tool>(
 /**
  * Register tools against an MCP server instance, delegating to the orchestrator executor.
  */
-export function registerToolsWithServer<TTool extends Tool>(options: RegisterOptions<TTool>): void {
+export function registerToolsWithServer<TTool extends MCPTool>(
+  options: RegisterOptions<TTool>,
+): void {
   const { server, tools, logger, transport, execute } = options;
 
   for (const tool of tools) {

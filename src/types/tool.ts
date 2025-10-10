@@ -7,7 +7,7 @@ import type { ToolMetadata } from './tool-metadata';
 /**
  * Unified tool interface for all MCP tools
  */
-export interface Tool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TOut = unknown> {
+export interface MCPTool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TOut = unknown> {
   /** Unique tool identifier */
   name: string;
 
@@ -34,13 +34,13 @@ export interface Tool<TSchema extends z.ZodTypeAny = z.ZodTypeAny, TOut = unknow
 }
 
 // Utility types for tool creation
-export type ToolInput<T> = T extends Tool<infer S, unknown> ? z.infer<S> : never;
+export type ToolInput<T> = T extends MCPTool<infer S, unknown> ? z.infer<S> : never;
 
-export type ToolOutput<T> = T extends Tool<z.ZodTypeAny, infer O> ? O : never;
+export type ToolOutput<T> = T extends MCPTool<z.ZodTypeAny, infer O> ? O : never;
 
 // Tool factory for consistency
 export function createTool<TSchema extends z.ZodTypeAny, TOut>(
-  config: Tool<TSchema, TOut>,
-): Tool<TSchema, TOut> {
+  config: MCPTool<TSchema, TOut>,
+): MCPTool<TSchema, TOut> {
   return config;
 }
