@@ -1,5 +1,5 @@
 /**
- * Plan Dockerfile Generation Tool
+ * Generate Dockerfile Plan Tool
  *
  * Analyzes repository and queries knowledgebase to gather insights and return
  * structured requirements for creating a Dockerfile. This tool helps users
@@ -16,20 +16,20 @@ import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { MCPTool } from '@/types/tool';
 import {
-  planDockerfileGenerationSchema,
+  generateDockerfilePlanSchema,
   type DockerfilePlan,
   type DockerfileRequirement,
 } from './schema';
 import { getKnowledgeSnippets } from '@/knowledge/matcher';
 import type { z } from 'zod';
 
-const name = 'plan-dockerfile-generation';
+const name = 'generate-dockerfile-plan';
 const description =
   'Gather insights from knowledgebase and return requirements for Dockerfile creation';
 const version = '1.0.0';
 
 async function run(
-  input: z.infer<typeof planDockerfileGenerationSchema>,
+  input: z.infer<typeof generateDockerfilePlanSchema>,
   ctx: ToolContext,
 ): Promise<Result<DockerfilePlan>> {
   const { language: inputLanguage, framework: inputFramework, environment } = input;
@@ -151,12 +151,12 @@ Next Step: Generate Dockerfile using these recommendations.
   return Success(plan);
 }
 
-const tool: MCPTool<typeof planDockerfileGenerationSchema, DockerfilePlan> = {
+const tool: MCPTool<typeof generateDockerfilePlanSchema, DockerfilePlan> = {
   name,
   description,
   category: 'docker',
   version,
-  schema: planDockerfileGenerationSchema,
+  schema: generateDockerfilePlanSchema,
   metadata: {
     aiDriven: false,
     knowledgeEnhanced: true,

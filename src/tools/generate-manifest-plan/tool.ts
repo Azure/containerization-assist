@@ -1,5 +1,5 @@
 /**
- * Plan Manifest Generation Tool
+ * Generate Manifest Plan Tool
  *
  * Analyzes repository and queries knowledgebase to gather insights and return
  * structured requirements for creating Kubernetes/Helm/ACA/Kustomize manifests.
@@ -16,16 +16,11 @@
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { MCPTool } from '@/types/tool';
-import {
-  planManifestGenerationSchema,
-  type ManifestPlan,
-  type ManifestRequirement,
-} from './schema';
-import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
+import { generateManifestPlanSchema, type ManifestPlan, type ManifestRequirement } from './schema';
 import { getKnowledgeSnippets } from '@/knowledge/matcher';
 import type { z } from 'zod';
 
-const name = 'plan-manifest-generation';
+const name = 'generate-manifest-plan';
 const description =
   'Gather insights from knowledgebase and return requirements for Kubernetes/Helm/ACA/Kustomize manifest creation';
 const version = '1.0.0';
@@ -38,75 +33,22 @@ const MANIFEST_TYPE_TO_TOPIC = {
 } as const;
 
 async function run(
-  input: z.infer<typeof planManifestGenerationSchema>,
+  input: z.infer<typeof generateManifestPlanSchema>,
   ctx: ToolContext,
 ): Promise<Result<ManifestPlan>> {
-  const {
-    sessionId,
-    manifestType,
-    language: inputLanguage,
-    framework: inputFramework,
-    environment,
-  } = input;
+  const { manifestType, environment } = input;
 
-  let path = input.path;
-  let analysis: RepositoryAnalysis | undefined;
+  const path = input.path;
 
-  if (sessionId && ctx.sessionManager) {
-    try {
-      const workflowStateResult = await ctx.sessionManager.get(sessionId);
-      if (workflowStateResult.ok && workflowStateResult.value) {
-        const workflowState = workflowStateResult.value as Record<string, unknown>;
-
-        const metadata = workflowState.metadata as Record<string, unknown> | undefined;
-        if (metadata && !path && typeof metadata.analyzedPath === 'string') {
-          path = metadata.analyzedPath;
-        }
-
-        const results = workflowState.results as Record<string, unknown> | undefined;
-        const analyzeRepoResult = results?.['analyze-repo'];
-        if (analyzeRepoResult && typeof analyzeRepoResult === 'object') {
-          analysis = analyzeRepoResult as RepositoryAnalysis;
-          ctx.logger.info(
-            { sessionId, language: analysis.language, framework: analysis.framework },
-            'Retrieved repository analysis from sessionManager',
-          );
-        }
-      }
-    } catch (sessionError) {
-      ctx.logger.debug(
-        {
-          sessionId,
-          error: sessionError instanceof Error ? sessionError.message : String(sessionError),
-        },
-        'Unable to load workflow session data',
-      );
-    }
+  if (!path) {
+    return Failure('Path is required to generate manifest plan.');
   }
 
-  const language = inputLanguage || analysis?.language || 'auto-detect';
-  const framework = inputFramework || analysis?.framework;
-
-  if (!path && !analysis) {
-    return Failure(
-      'Either path or sessionId with analysis data is required. Run analyze-repo first or provide a path.',
-    );
-  }
-
-  const repositoryInfo = {
-    path: path || (analysis as { analyzedPath?: string } | undefined)?.analyzedPath,
-    language,
-    framework,
-    languageVersion: analysis?.languageVersion,
-    frameworkVersion: analysis?.frameworkVersion,
-    buildSystem: analysis?.buildSystem,
-    dependencies: analysis?.dependencies,
-    ports: analysis?.suggestedPorts || analysis?.ports,
-    entryPoint: analysis?.entryPoint,
-  };
+  const language = input.language;
+  const frameworks = input.frameworks;
 
   ctx.logger.info(
-    { manifestType, language, framework, environment },
+    { manifestType, language, frameworks, environment },
     'Querying knowledgebase for manifest recommendations',
   );
 
@@ -114,8 +56,7 @@ async function run(
   const knowledgeSnippets = await getKnowledgeSnippets(topic, {
     environment: environment || 'production',
     tool: name,
-    language,
-    ...(framework && { framework }),
+    ...(language && { language }),
     maxChars: 8000,
     maxSnippets: 20,
   });
@@ -145,10 +86,13 @@ async function run(
   const confidence =
     knowledgeMatches.length > 0 ? Math.min(0.95, 0.5 + knowledgeMatches.length * 0.05) : 0.5;
 
+  const frameworksStr =
+    frameworks && frameworks.length > 0 ? ` (${frameworks.map((f) => f.name).join(', ')})` : '';
+
   const summary = `
 Manifest Planning Summary:
 - Manifest Type: ${manifestType}
-- Language: ${language}${framework ? ` (${framework})` : ''}
+- Language: ${language || 'not specified'}${frameworksStr}
 - Environment: ${environment || 'production'}
 - Knowledge Matches: ${knowledgeMatches.length} recommendations found
   - Security: ${securityMatches.length}
@@ -160,15 +104,15 @@ Next Step: Use generate-${manifestType === 'kubernetes' ? 'k8s-manifests' : mani
 
   const plan: ManifestPlan = {
     repositoryInfo: {
-      ...(repositoryInfo.path && { path: repositoryInfo.path }),
-      ...(repositoryInfo.language && { language: repositoryInfo.language }),
-      ...(repositoryInfo.framework && { framework: repositoryInfo.framework }),
-      ...(repositoryInfo.languageVersion && { languageVersion: repositoryInfo.languageVersion }),
-      ...(repositoryInfo.frameworkVersion && { frameworkVersion: repositoryInfo.frameworkVersion }),
-      ...(repositoryInfo.buildSystem && { buildSystem: repositoryInfo.buildSystem }),
-      ...(repositoryInfo.dependencies && { dependencies: repositoryInfo.dependencies }),
-      ...(repositoryInfo.ports && { ports: repositoryInfo.ports }),
-      ...(repositoryInfo.entryPoint && { entryPoint: repositoryInfo.entryPoint }),
+      name: input.name,
+      modulePathAbsoluteUnix: path,
+      language,
+      languageVersion: input.languageVersion,
+      frameworks,
+      buildSystem: input.buildSystem,
+      dependencies: input.dependencies,
+      ports: input.ports,
+      entryPoint: input.entryPoint,
     },
     manifestType,
     recommendations: {
@@ -195,12 +139,12 @@ Next Step: Use generate-${manifestType === 'kubernetes' ? 'k8s-manifests' : mani
   return Success(plan);
 }
 
-const tool: MCPTool<typeof planManifestGenerationSchema, ManifestPlan> = {
+const tool: MCPTool<typeof generateManifestPlanSchema, ManifestPlan> = {
   name,
   description,
   category: 'kubernetes',
   version,
-  schema: planManifestGenerationSchema,
+  schema: generateManifestPlanSchema,
   metadata: {
     aiDriven: false,
     knowledgeEnhanced: true,

@@ -1,11 +1,15 @@
 /**
- * Schema definition for plan-dockerfile-generation tool
+ * Schema definition for generate-dockerfile-plan tool
  */
 
 import { z } from 'zod';
-import { sessionId as sharedSessionId, environment, path as sharedPath } from '../shared/schemas';
+import {
+  sessionId as sharedSessionId,
+  environment,
+  repositoryPathAbsoluteUnix as sharedPath,
+} from '../shared/schemas';
 
-export const planDockerfileGenerationSchema = z.object({
+export const generateDockerfilePlanSchema = z.object({
   sessionId: sharedSessionId
     .optional()
     .describe(
@@ -24,7 +28,7 @@ export const planDockerfileGenerationSchema = z.object({
     .describe('Include code examples in recommendations'),
 });
 
-export type PlanDockerfileGenerationParams = z.infer<typeof planDockerfileGenerationSchema>;
+export type GenerateDockerfilePlanParams = z.infer<typeof generateDockerfilePlanSchema>;
 
 export interface DockerfileRequirement {
   id: string;

@@ -414,7 +414,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### plan-dockerfile-generation
+### generate-dockerfile-plan
 **Category:** Planning
 **AI Enhanced:** ❌ No
 **Knowledge Enhanced:** ✅ Yes
@@ -430,7 +430,7 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### plan-manifest-generation
+### generate-manifest-plan
 **Category:** Planning
 **AI Enhanced:** ❌ No
 **Knowledge Enhanced:** ✅ Yes
@@ -536,7 +536,7 @@ const aiTools = [
 ];
 
 // Knowledge-enhanced planning tools
-const planningTools = ['plan-dockerfile-generation', 'plan-manifest-generation'];
+const planningTools = ['generate-dockerfile-plan', 'generate-manifest-plan'];
 
 // Utility tools without AI/knowledge enhancement
 const utilityTools = ['ops', 'inspect-session', 'validate-dockerfile', 'generate-kustomize'];

@@ -151,11 +151,11 @@ Tools using deterministic single-candidate sampling for intelligent content gene
 
 Tools that use knowledge packs for planning without AI sampling:
 
-- **`plan-dockerfile-generation`** - Dockerfile generation planning
+- **`generate-dockerfile-plan`** - Dockerfile generation planning
   - Module selection strategy
   - Build context analysis
   
-- **`plan-manifest-generation`** - Manifest generation planning
+- **`generate-manifest-plan`** - Manifest generation planning
   - Service mapping planning
   - Resource planning
 

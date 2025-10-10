@@ -60,7 +60,7 @@ export const generateDockerfileSchema = z.object({
     .array(
       z.object({
         name: z.string(),
-        modulePath: z
+        modulePathAbsoluteUnix: z
           .string()
           .describe(
             'Module source code path (use forward slashes). Can be absolute or relative to repositoryPath.',
@@ -69,12 +69,18 @@ export const generateDockerfileSchema = z.object({
           .string()
           .optional()
           .describe(
-            'Path where the Dockerfile should be generated (use forward slashes). Can be absolute or relative to repositoryPath. If not provided, defaults to modulePath/Dockerfile.',
+            'Path where the Dockerfile should be generated (use forward slashes). Can be absolute or relative to repositoryPath. If not provided, defaults to modulePathAbsoluteUnix/Dockerfile.',
           ),
-        language: z.string().optional(),
-        framework: z.string().optional(),
+        language: z.enum(['java', 'dotnet', 'other']).optional(),
+        frameworks: z
+          .array(
+            z.object({
+              name: z.string(),
+              version: z.string().optional(),
+            }),
+          )
+          .optional(),
         languageVersion: z.string().optional(),
-        frameworkVersion: z.string().optional(),
         dependencies: z.array(z.string()).optional(),
         ports: z.array(z.number()).optional(),
         entryPoint: z.string().optional(),

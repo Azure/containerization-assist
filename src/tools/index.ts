@@ -10,8 +10,8 @@ import generateK8sManifestsTool from './generate-k8s-manifests/tool';
 import generateKustomizeTool from './generate-kustomize/tool';
 import inspectSessionTool from './inspect-session/tool';
 import opsTool from './ops/tool';
-import planDockerfileGenerationTool from './plan-dockerfile-generation/tool';
-import planManifestGenerationTool from './plan-manifest-generation/tool';
+import generateDockerfilePlanTool from './generate-dockerfile-plan/tool';
+import generateManifestPlanTool from './generate-manifest-plan/tool';
 import prepareClusterTool from './prepare-cluster/tool';
 import pushImageTool from './push-image/tool';
 import resolveBaseImagesTool from './resolve-base-images/tool';
@@ -33,8 +33,8 @@ export const TOOL_NAME = {
   GENERATE_KUSTOMIZE: 'generate-kustomize',
   INSPECT_SESSION: 'inspect-session',
   OPS: 'ops',
-  PLAN_DOCKERFILE_GENERATION: 'plan-dockerfile-generation',
-  PLAN_MANIFEST_GENERATION: 'plan-manifest-generation',
+  GENERATE_DOCKERFILE_PLAN: 'generate-dockerfile-plan',
+  GENERATE_MANIFEST_PLAN: 'generate-manifest-plan',
   PREPARE_CLUSTER: 'prepare-cluster',
   PUSH_IMAGE: 'push-image',
   RESOLVE_BASE_IMAGES: 'resolve-base-images',
@@ -59,8 +59,8 @@ generateK8sManifestsTool.name = TOOL_NAME.GENERATE_K8S_MANIFESTS;
 generateKustomizeTool.name = TOOL_NAME.GENERATE_KUSTOMIZE;
 inspectSessionTool.name = TOOL_NAME.INSPECT_SESSION;
 opsTool.name = TOOL_NAME.OPS;
-planDockerfileGenerationTool.name = TOOL_NAME.PLAN_DOCKERFILE_GENERATION;
-planManifestGenerationTool.name = TOOL_NAME.PLAN_MANIFEST_GENERATION;
+generateDockerfilePlanTool.name = TOOL_NAME.GENERATE_DOCKERFILE_PLAN;
+generateManifestPlanTool.name = TOOL_NAME.GENERATE_MANIFEST_PLAN;
 prepareClusterTool.name = TOOL_NAME.PREPARE_CLUSTER;
 pushImageTool.name = TOOL_NAME.PUSH_IMAGE;
 resolveBaseImagesTool.name = TOOL_NAME.RESOLVE_BASE_IMAGES;
@@ -83,8 +83,8 @@ export type Tool = (
   | typeof generateKustomizeTool
   | typeof inspectSessionTool
   | typeof opsTool
-  | typeof planDockerfileGenerationTool
-  | typeof planManifestGenerationTool
+  | typeof generateDockerfilePlanTool
+  | typeof generateManifestPlanTool
   | typeof prepareClusterTool
   | typeof pushImageTool
   | typeof resolveBaseImagesTool
@@ -97,26 +97,26 @@ export type Tool = (
 // Type-safe tool array using the union type
 export const ALL_TOOLS: readonly Tool[] = [
   analyzeRepoTool,
-  buildImageTool,
-  convertAcaToK8sTool,
-  deployTool,
-  fixDockerfileTool,
-  generateAcaManifestsTool,
-  generateDockerfileTool,
-  generateHelmChartsTool,
-  generateK8sManifestsTool,
-  generateKustomizeTool,
-  inspectSessionTool,
-  opsTool,
-  planDockerfileGenerationTool,
-  planManifestGenerationTool,
-  prepareClusterTool,
-  pushImageTool,
-  resolveBaseImagesTool,
-  scanTool,
-  tagImageTool,
+  generateDockerfilePlanTool,
+  generateManifestPlanTool,
   validateDockerfileTool,
-  verifyDeployTool,
+  // buildImageTool,
+  // convertAcaToK8sTool,
+  // deployTool,
+  // fixDockerfileTool,
+  // generateAcaManifestsTool,
+  // generateDockerfileTool,
+  // generateHelmChartsTool,
+  // generateK8sManifestsTool,
+  // generateKustomizeTool,
+  // inspectSessionTool,
+  // opsTool,
+  // prepareClusterTool,
+  // pushImageTool,
+  // resolveBaseImagesTool,
+  // scanTool,
+  // tagImageTool,
+  // verifyDeployTool,
 ] as const;
 
 export {
@@ -132,8 +132,8 @@ export {
   generateKustomizeTool,
   inspectSessionTool,
   opsTool,
-  planDockerfileGenerationTool,
-  planManifestGenerationTool,
+  generateDockerfilePlanTool,
+  generateManifestPlanTool,
   prepareClusterTool,
   pushImageTool,
   resolveBaseImagesTool,

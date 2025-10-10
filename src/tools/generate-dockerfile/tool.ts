@@ -62,10 +62,10 @@ async function generateSingleDockerfile(
     : nodePath.resolve(process.cwd(), input.repositoryPath);
 
   // Determine target module path and dockerfile path (resolve relative to repositoryPath)
-  const targetModulePath = targetModule?.modulePath
-    ? nodePath.isAbsolute(targetModule.modulePath)
-      ? targetModule.modulePath
-      : nodePath.resolve(repoPath, targetModule.modulePath)
+  const targetModulePath = targetModule?.modulePathAbsoluteUnix
+    ? nodePath.isAbsolute(targetModule.modulePathAbsoluteUnix)
+      ? targetModule.modulePathAbsoluteUnix
+      : nodePath.resolve(repoPath, targetModule.modulePathAbsoluteUnix)
     : undefined;
   const targetDockerfilePath = targetModule?.dockerfilePath
     ? nodePath.isAbsolute(targetModule.dockerfilePath)
@@ -84,22 +84,24 @@ async function generateSingleDockerfile(
   // If generating for a specific module, use module-specific data
   if (targetModule) {
     language = targetModule.language || 'auto-detect';
-    framework = targetModule.framework;
+    framework = targetModule.frameworks?.[0]?.name;
     dependencies = targetModule.dependencies || [];
     ports = targetModule.ports || [8080];
 
     // Build requirements from module analysis
     const reqParts: string[] = [];
     reqParts.push(`Module: ${targetModule.name}`);
-    reqParts.push(`Path: ${targetModule.modulePath}`);
+    reqParts.push(`Path: ${targetModule.modulePathAbsoluteUnix}`);
     if (language)
       reqParts.push(
         `Language: ${language}${targetModule.languageVersion ? ` (${targetModule.languageVersion})` : ''}`,
       );
-    if (framework)
-      reqParts.push(
-        `Framework: ${framework}${targetModule.frameworkVersion ? ` (${targetModule.frameworkVersion})` : ''}`,
-      );
+    if (targetModule.frameworks && targetModule.frameworks.length > 0) {
+      const frameworkList = targetModule.frameworks
+        .map((f) => `${f.name}${f.version ? ` (${f.version})` : ''}`)
+        .join(', ');
+      reqParts.push(`Frameworks: ${frameworkList}`);
+    }
     if (targetModule.buildSystem?.type)
       reqParts.push(`Build System: ${targetModule.buildSystem.type}`);
     if (dependencies.length > 0) {
@@ -118,7 +120,6 @@ async function generateSingleDockerfile(
     // No module data provided, analyze repository directly
     requirements = `Analyze the repository at ${repoPath} to detect the technology stack, dependencies, and requirements.`;
   }
-
 
   // Add custom instructions if provided
   if (input.customInstructions) {
@@ -517,7 +518,7 @@ async function run(
         return Failure('Module array contains undefined element');
       }
       ctx.logger.info(
-        { moduleName: targetModule.name, modulePath: targetModule.modulePath },
+        { moduleName: targetModule.name, modulePath: targetModule.modulePathAbsoluteUnix },
         'Generating Dockerfile for single module',
       );
       return generateSingleDockerfile(input, ctx, targetModule as ModuleInfo);
