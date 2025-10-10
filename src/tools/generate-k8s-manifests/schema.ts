@@ -31,7 +31,7 @@ export const generateK8sManifestsSchema = z.object({
     .array(
       z.object({
         name: z.string(),
-        path: z.string(),
+        modulePath: z.string(),
         language: z.string().optional(),
         framework: z.string().optional(),
         languageVersion: z.string().optional(),
