@@ -54,6 +54,10 @@ jobs:
         env:
           DOCKER_AVAILABLE: true
 
+      - name: Run all tests
+        id: npmtest
+        run: npm test
+
       - name: Verify build artifacts
         run: |
           echo "Verifying ESM build artifacts..."

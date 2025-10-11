@@ -9,7 +9,7 @@ import type { z } from 'zod';
  */
 async function run(
   input: z.infer<typeof analyzeRepoSchema>,
-  _ctx: ToolContext,
+  ctx: ToolContext,
 ): Promise<Result<RepositoryAnalysis>> {
   let { repositoryPathAbsoluteUnix: repoPath } = input;
   const { sessionId } = input;
@@ -17,6 +17,30 @@ async function run(
   // Convert to absolute path if relative
   if (!path.isAbsolute(repoPath)) {
     repoPath = path.resolve(process.cwd(), repoPath);
+  }
+
+  let samplingAvailable = true;
+  let samplingMessage = '';
+  try {
+    await ctx.sampling.createMessage({
+      messages: [
+        {
+          type: 'text',
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'test sampling request',
+            },
+          ],
+        },
+      ],
+    });
+  } catch (e) {
+    ctx.logger.error(e);
+    samplingAvailable = false;
+    samplingMessage =
+      'Summary mode (via sampling) is not available in your environment. Consider enabling it for an enhanced experience. Proceeding with default verbose mode.';
   }
 
   try {
@@ -35,6 +59,10 @@ async function run(
       : '';
 
     return Success({
+      verboseMode: {
+        enabled: !samplingAvailable,
+        statusMessage: samplingMessage,
+      },
       ...result,
       sessionId,
       analyzedPath: repoPath,

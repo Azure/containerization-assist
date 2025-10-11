@@ -13,6 +13,67 @@ import type { ToolContext, SamplingRequest, SamplingResponse } from '@/mcp/conte
 import type { Logger } from 'pino';
 import type { SessionFacade } from '@/app/orchestrator-types';
 
+// Mock the sampling runner
+jest.mock('@/mcp/ai/sampling-runner', () => ({
+  sampleWithRerank: jest.fn().mockImplementation(async (ctx, buildRequest) => {
+    const request = await buildRequest(0);
+    const hints = request?.modelPreferences?.hints;
+
+    let text = '';
+    if (hints?.some((h: any) => h.name === 'kubernetes-manifests')) {
+      // For K8s manifests - return valid YAML
+      text = `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-app
+  template:
+    metadata:
+      labels:
+        app: test-app
+    spec:
+      containers:
+      - name: app
+        image: test-registry/app:latest
+        ports:
+        - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-app
+spec:
+  selector:
+    app: test-app
+  ports:
+  - port: 80
+    targetPort: 3000`;
+    } else {
+      // Default - return Dockerfile
+      text = 'FROM node:18-alpine\nWORKDIR /app\nCOPY . .\nRUN npm install\nCMD ["npm", "start"]';
+    }
+
+    return {
+      ok: true,
+      value: {
+        text,
+        score: 85,
+        scoreBreakdown: {
+          structure: 20,
+          completeness: 25,
+          clarity: 20,
+          actionability: 20
+        }
+      }
+    };
+  }),
+}));
+
+
 // Mock logger factory
 function createMockLogger(): Logger {
   return {
@@ -168,7 +229,7 @@ describe('Multi-Module Containerization Flow', () => {
       const result = await tool.default.run(
         {
           sessionId: 'test-session',
-          path: '/tmp/test-monorepo',
+          repositoryPath: '/tmp/test-monorepo',
           modules: modules, // Pass modules explicitly
         },
         ctx,
@@ -224,7 +285,7 @@ describe('Multi-Module Containerization Flow', () => {
       const result = await tool.default.run(
         {
           sessionId: 'test-session',
-          path: '/tmp/test-monorepo',
+          repositoryPath: '/tmp/test-monorepo',
           modules: [apiServiceModule], // Pass only the single module to generate for
         },
         ctx,
@@ -368,7 +429,7 @@ describe('Multi-Module Containerization Flow', () => {
       const result = await tool.default.run(
         {
           sessionId: 'test-session',
-          path: '/tmp/single-app',
+          repositoryPath: '/tmp/single-app',
         },
         ctx,
       );
@@ -420,7 +481,7 @@ describe('Multi-Module Containerization Flow', () => {
       const result = await tool.default.run(
         {
           sessionId: 'test-session',
-          path: '/tmp/test-app',
+          repositoryPath: '/tmp/test-app',
           modules: [], // Empty modules array should fall back to single-module behavior
         },
         ctx,

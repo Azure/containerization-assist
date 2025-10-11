@@ -99,7 +99,7 @@ Once configured in your MCP client (VS Code Copilot, Claude Desktop, etc.), use 
 
 **Starting the Journey:**
 ```
-"Analyze my Node.js application for containerization"
+"Analyze my Java application for containerization"
 ```
 
 **Building the Container:**
@@ -132,25 +132,24 @@ This server is optimized for **one engineer containerizing one application at a 
 The server detects and supports monorepo structures with multiple independently deployable services:
 
 - **Automatic Detection**: `analyze-repo` identifies monorepo patterns (npm workspaces, services/, apps/ directories)
-- **Automated Multi-Module Generation**: `generate-dockerfile` and `generate-k8s-manifests` automatically iterate over all detected modules
+- **Automated Multi-Module Generation**: `generate-dockerfile-plan` and `generate-k8s-manifests-plan` support multi-module workflows
 - **Conservative Safeguards**: Excludes shared libraries and utility folders from containerization
-- **Optional Module Selection**: Use `moduleName` parameter to target a specific module, otherwise all modules are processed
 
 **Multi-Module Workflow Example:**
 ```
 1. "Analyze my monorepo at ./my-monorepo"
    → Detects 3 modules: api-gateway, user-service, notification-service
 
-2. "Generate Dockerfiles using session <sessionId>"
+2. "Generate Dockerfiles"
    → Automatically creates Dockerfiles for all 3 modules:
      - services/api-gateway/Dockerfile
      - services/user-service/Dockerfile
      - services/notification-service/Dockerfile
 
-3. "Generate K8s manifests using session <sessionId>"
+3. "Generate K8s manifests"
    → Automatically creates manifests for all 3 modules
 
-4. Optional: "Generate Dockerfile for user-service module using session <sessionId>"
+4. Optional: "Generate Dockerfile for user-service module"
    → Creates module-specific deployment manifests
 ```
 
@@ -162,63 +161,21 @@ The server detects and supports monorepo structures with multiple independently 
 
 ## Available Tools
 
-### AI-Enhanced Tools
-
-These tools use deterministic single-candidate sampling with quality scoring for intelligent content generation and analysis.
-
 | Tool | Description |
 |------|-------------|
 | `analyze-repo` | Analyze repository structure and detect language/framework |
-| `build-image` | Build Docker images with optimization suggestions |
-| `convert-aca-to-k8s` | Convert Azure Container Apps to Kubernetes |
-| `deploy` | Deploy applications with intelligent analysis |
-| `fix-dockerfile` | Fix and optimize existing Dockerfiles |
-| `generate-aca-manifests` | Create Azure Container Apps manifests |
-| `generate-dockerfile` | Create optimized Dockerfiles with knowledge enhancement |
-| `generate-helm-charts` | Generate Helm charts with template optimization |
-| `generate-k8s-manifests` | Create Kubernetes deployment configurations |
-| `prepare-cluster` | Prepare Kubernetes cluster with optimization advice |
-| `push-image` | Push images to registry with optimization guidance |
-| `resolve-base-images` | Find optimal base images for applications |
-| `scan` | Security vulnerability scanning with AI-powered recommendations |
-| `tag-image` | Tag Docker images with intelligent strategies |
-| `verify-deployment` | Verify deployment health with AI diagnostics |
-
-### Knowledge-Enhanced Planning Tools
-
-These tools use knowledge packs for planning without AI sampling.
-
-| Tool | Description |
-|------|-------------|
 | `generate-dockerfile-plan` | Plan Dockerfile generation strategy |
-| `generate-manifest-plan` | Plan Kubernetes manifest generation strategy |
-
-### Utility Tools
-
-These tools perform direct operations without AI enhancement.
-
-| Tool | Description |
-|------|-------------|
-| `generate-kustomize` | Generate Kustomize configurations |
-| `inspect-session` | Debug and analyze tool execution sessions |
-| `ops` | Operational tools for Docker and Kubernetes |
 | `validate-dockerfile` | Validate Dockerfile syntax and best practices |
+| `generate-manifest-plan` | Plan Kubernetes manifest generation strategy |
 
 ## Supported Technologies
 
 ### Languages & Frameworks
 - **Java**: Spring Boot, Quarkus, Micronaut (Java 8-21)
-- **Node.js**: Express, NestJS, Fastify, Next.js
-- **Python**: FastAPI, Django, Flask (Python 3.8+)
-- **Go**: Gin, Echo, Fiber (Go 1.19+)
 - **.NET**: ASP.NET Core, Blazor (.NET 6.0+)
-- **Others**: Ruby, PHP, Rust
 
 ### Build Systems
 - Maven, Gradle (Java)
-- npm, yarn, pnpm (Node.js)
-- pip, poetry, pipenv (Python)
-- go mod (Go)
 - dotnet CLI (.NET)
 
 ## Configuration
@@ -270,27 +227,6 @@ Policy files use a modular system with 5 components:
 - `policy-constraints.ts` - Constraint extraction
 
 See `src/config/policy-*.ts` for implementation details.
-
-## Alternative MCP Clients
-
-### Claude Desktop
-
-Add to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "containerization-assist": {
-      "command": "containerization-assist-mcp",
-      "args": ["start"],
-      "env": {
-        "DOCKER_SOCKET": "/var/run/docker.sock",
-        "LOG_LEVEL": "info"
-      }
-    }
-  }
-}
-```
 
 ### MCP Inspector (Testing)
 
@@ -429,14 +365,13 @@ npm run smoke:journey
 **What it does:**
 This command executes the complete single-app workflow using real tool implementations:
 
-1. **Analyze repository** - Detects language and framework
-2. **Generate Dockerfile** - Creates optimized container configuration
-3. **Build Docker image** - Compiles the application
-4. **Scan for vulnerabilities** - Security analysis with remediation
-5. **Tag image** - Applies version tags
-6. **Prepare Kubernetes cluster** - Sets up namespace (if K8s available)
-7. **Deploy to Kubernetes** - Deploys the application (if K8s available)
-8. **Verify deployment** - Confirms health and readiness (if K8s available)
+- **Analyze repository** - Detects language and framework
+- **Generate Dockerfile** - Creates optimized container configuration
+- **Build Docker image** - Compiles the application
+- **Tag image** - Applies version tags
+- **Prepare Kubernetes cluster** - Sets up namespace (if K8s available)
+- **Deploy to Kubernetes** - Deploys the application (if K8s available)
+- **Verify deployment** - Confirms health and readiness (if K8s available)
 
 **Requirements for smoke test:**
 - Docker daemon running
