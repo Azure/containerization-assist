@@ -40,7 +40,7 @@ async function run(
     modulePathAbsoluteUnix,
   } = input;
 
-  const path = input.respositoryPathAbsoluteUnix || '';
+  const path = input.repositoryPathAbsoluteUnix || '';
   const modulePath = modulePathAbsoluteUnix || path;
 
   const language = inputLanguage || 'auto-detect';

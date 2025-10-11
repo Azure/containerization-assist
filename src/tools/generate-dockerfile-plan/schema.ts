@@ -12,7 +12,7 @@ import { ModuleInfo } from '../analyze-repo/schema';
 
 export const generateDockerfilePlanSchema = z.object({
   sessionId: sharedSessionId.optional().describe('Session identifier for tracking operations'),
-  respositoryPathAbsoluteUnix: repositoryPathAbsoluteUnix.describe(
+  repositoryPathAbsoluteUnix: repositoryPathAbsoluteUnix.describe(
     'Repository path (use forward slashes: /path/to/repo).',
   ),
   modulePathAbsoluteUnix: z
