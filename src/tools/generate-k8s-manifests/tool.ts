@@ -121,7 +121,7 @@ async function generateSingleManifest(
   // Build messages using the new prompt engine
   const messages = await buildMessages({
     basePrompt,
-    topic: TOPICS.GENERATE_K8S_MANIFESTS,
+    topic: TOPICS.KUBERNETES,
     tool: 'generate-k8s-manifests',
     environment: 'production',
     contract: {

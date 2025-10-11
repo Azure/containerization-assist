@@ -159,7 +159,7 @@ async function generateSingleDockerfile(
     // Use knowledge injection via buildMessages
     const messages = await buildMessages({
       basePrompt,
-      topic: TOPICS.DOCKERFILE_GENERATION,
+      topic: TOPICS.DOCKERFILE,
       tool: name,
       environment,
       ...(language && { language }),

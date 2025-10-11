@@ -4,12 +4,34 @@
  * Simple, focused knowledge system for containerization best practices
  */
 
+/**
+ * Knowledge category constants
+ */
+export const CATEGORY = {
+  API: 'api',
+  ARCHITECTURE: 'architecture',
+  CACHING: 'caching',
+  CONFIGURATION: 'configuration',
+  DOCKERFILE: 'dockerfile',
+  FEATURES: 'features',
+  GENERIC: 'generic',
+  KUBERNETES: 'kubernetes',
+  OPTIMIZATION: 'optimization',
+  RELIABILITY: 'reliability',
+  RESILIENCE: 'resilience',
+  SECURITY: 'security',
+  STREAMING: 'streaming',
+  VALIDATION: 'validation',
+} as const;
+
+export type KnowledgeCategory = (typeof CATEGORY)[keyof typeof CATEGORY];
+
 export interface KnowledgeEntry {
   /** Unique identifier */
   id: string;
 
   /** Main category */
-  category: 'dockerfile' | 'kubernetes' | 'security' | 'generic';
+  category: KnowledgeCategory;
 
   /** Simple regex pattern to match against */
   pattern: string;
@@ -32,7 +54,7 @@ export interface KnowledgeEntry {
 
 export interface KnowledgeQuery {
   /** Category to search in */
-  category?: 'dockerfile' | 'kubernetes' | 'security' | 'generic';
+  category?: KnowledgeCategory;
 
   /** Text to match patterns against */
   text?: string;
