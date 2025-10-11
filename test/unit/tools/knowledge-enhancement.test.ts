@@ -272,7 +272,7 @@ spec:
       // Now uses a single call with unified topic
       expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
-          topic: TOPICS.DOCKERFILE_GENERATION,
+          topic: TOPICS.DOCKERFILE,
           tool: 'generate-dockerfile',
           environment: 'production',
         }),
@@ -317,7 +317,7 @@ spec:
 
       expect(promptEngine.buildMessages).toHaveBeenCalledWith(
         expect.objectContaining({
-          topic: TOPICS.GENERATE_K8S_MANIFESTS,
+          topic: TOPICS.KUBERNETES,
           tool: 'generate-k8s-manifests',
           environment: 'production',
         }),
