@@ -6,7 +6,7 @@ export const TOPICS = {
   ANALYZE_REPOSITORY: 'analyze_repository',
 
   // Dockerfile generation and management
-  DOCKERFILE_GENERATION: 'dockerfile_generation',
+  DOCKERFILE: 'dockerfile',
   DOCKERFILE_BASE: 'dockerfile_base',
   DOCKERFILE_DEPENDENCIES: 'dockerfile_dependencies',
   DOCKERFILE_BUILD: 'dockerfile_build',
@@ -24,7 +24,7 @@ export const TOPICS = {
   DOCKER_TAGGING: 'docker_tagging',
 
   // Kubernetes manifests
-  GENERATE_K8S_MANIFESTS: 'generate_k8s_manifests',
+  KUBERNETES: 'kubernetes',
   KUBERNETES_REPAIR: 'kubernetes_repair',
 
   // Helm charts

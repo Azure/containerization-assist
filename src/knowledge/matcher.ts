@@ -1,6 +1,6 @@
 import { createLogger } from '@/lib/logger';
 import type { Topic } from '@/types/topics';
-import type { KnowledgeQuery, KnowledgeMatch, LoadedEntry } from './types';
+import type { KnowledgeQuery, KnowledgeMatch, LoadedEntry, KnowledgeCategory } from './types';
 import type { KnowledgeSnippet } from './schemas';
 
 const logger = createLogger().child({ module: 'knowledge-matcher' });
@@ -296,6 +296,7 @@ export interface KnowledgeSnippetOptions {
   tool: string;
   language?: string;
   framework?: string;
+  category?: KnowledgeCategory;
   maxChars?: number;
   maxSnippets?: number;
 }
@@ -322,6 +323,7 @@ export async function getKnowledgeSnippets(
       environment: options.environment,
       ...(options.language && { language: options.language }),
       ...(options.framework && { framework: options.framework }),
+      ...(options.category && { category: options.category }),
       tags: [options.tool, topic],
       limit: options.maxSnippets || 10,
     };

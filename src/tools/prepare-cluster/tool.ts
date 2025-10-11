@@ -549,7 +549,7 @@ async function generateClusterOptimizations(
 
     const messages = await buildMessages({
       basePrompt: prompt,
-      topic: TOPICS.GENERATE_K8S_MANIFESTS,
+      topic: TOPICS.KUBERNETES,
       tool: 'prepare-cluster',
       environment: environment || 'development',
     });

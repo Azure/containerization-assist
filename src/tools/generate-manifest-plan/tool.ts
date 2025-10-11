@@ -18,6 +18,7 @@ import type { ToolContext } from '@/mcp/context';
 import type { MCPTool } from '@/types/tool';
 import { generateManifestPlanSchema, type ManifestPlan, type ManifestRequirement } from './schema';
 import { getKnowledgeSnippets } from '@/knowledge/matcher';
+import { CATEGORY } from '@/knowledge/types';
 import type { z } from 'zod';
 
 const name = 'generate-manifest-plan';
@@ -26,10 +27,10 @@ const description =
 const version = '1.0.0';
 
 const MANIFEST_TYPE_TO_TOPIC = {
-  kubernetes: TOPICS.GENERATE_K8S_MANIFESTS,
+  kubernetes: TOPICS.KUBERNETES,
   helm: TOPICS.GENERATE_HELM_CHARTS,
-  aca: TOPICS.GENERATE_ACA_MANIFESTS,
-  kustomize: TOPICS.GENERATE_K8S_MANIFESTS,
+  aca: TOPICS.KUBERNETES,
+  kustomize: TOPICS.KUBERNETES,
 } as const;
 
 async function run(
@@ -59,6 +60,7 @@ async function run(
     ...(language && { language }),
     maxChars: 8000,
     maxSnippets: 20,
+    category: CATEGORY.KUBERNETES,
   });
 
   const knowledgeMatches: ManifestRequirement[] = knowledgeSnippets.map((snippet) => ({

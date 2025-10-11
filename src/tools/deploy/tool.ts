@@ -216,7 +216,7 @@ Format your response as clear, actionable recommendations.`;
 
   const messages = await buildMessages({
     basePrompt,
-    topic: TOPICS.GENERATE_K8S_MANIFESTS,
+    topic: TOPICS.KUBERNETES,
     tool: 'deploy',
     environment: 'kubernetes',
   });
