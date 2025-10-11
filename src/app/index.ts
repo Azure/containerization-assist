@@ -59,7 +59,8 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
     toolsMap.set(tool.name, tool);
   }
 
-  const orchestratorConfig: OrchestratorConfig = {};
+  const chainHintsMode = config.chainHintsMode || 'enabled';
+  const orchestratorConfig: OrchestratorConfig = { chainHintsMode };
   if (config.policyPath !== undefined) orchestratorConfig.policyPath = config.policyPath;
   if (config.policyEnvironment !== undefined)
     orchestratorConfig.policyEnvironment = config.policyEnvironment;

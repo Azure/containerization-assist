@@ -67,4 +67,5 @@ export interface OrchestratorConfig {
   policyPath?: string;
   policyEnvironment?: string;
   session?: SessionConfig;
+  chainHintsMode: 'enabled' | 'disabled';
 }

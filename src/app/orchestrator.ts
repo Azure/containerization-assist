@@ -24,6 +24,7 @@ import type {
 import type { Logger } from 'pino';
 import type { MCPTool } from '@/types/tool';
 import { createStandardizedToolTracker } from '@/lib/tool-helpers';
+import { TOOL_NAME, ToolName } from '@/tools';
 
 // ===== Types =====
 
@@ -266,6 +267,16 @@ async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
       if (!updateResult.ok) {
         logger.warn(ERROR_MESSAGES.SESSION_UPDATE_FAILED(updateResult.error));
       }
+
+      if (env.config.chainHintsMode === 'enabled') {
+        const hint = getChainHint(tool.name as ToolName, result.ok ? 'success' : 'failure');
+        if (hint) {
+          result.value = {
+            ...result.value,
+            chainHint: hint,
+          };
+        }
+      }
     }
     tracker.complete({
       sessionId,
@@ -278,6 +289,50 @@ async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
     return Failure(errorMessage);
   }
 }
+
+type outputState = 'success' | 'failure';
+function getChainHint(toolName: ToolName, outputState: outputState): string {
+  const stateToHints = chainHintMap.get(toolName);
+  if (!stateToHints) {
+    return '';
+  }
+
+  const hint = stateToHints[outputState];
+  return hint || '';
+}
+
+const chainHintMap = new Map<ToolName, { success: string; failure: string }>([
+  [
+    TOOL_NAME.ANALYZE_REPO,
+    {
+      success: `Repository analysis completed successfully. Continue by calling the ${TOOL_NAME.GENERATE_DOCKERFILE_PLAN} tool for each identified module.`,
+      failure: 'Repository analysis failed. Please check the logs for details.',
+    },
+  ],
+  [
+    TOOL_NAME.GENERATE_DOCKERFILE_PLAN,
+    {
+      success: `Dockerfile plan generated successfully. Continue by calling the ${TOOL_NAME.VALIDATE_DOCKERFILE} tool to ensure best practices are followed.`,
+      failure: 'Dockerfile plan generation failed. Please check the logs for details.',
+    },
+  ],
+  [
+    TOOL_NAME.VALIDATE_DOCKERFILE,
+    {
+      success: `Dockerfile validated successfully. Continue by building this Dockerfile. Continue trying to build and fix until it builds successfully. Then call the ${TOOL_NAME.GENERATE_MANIFEST_PLAN} tool to proceed with containerization.`,
+      failure:
+        'Dockerfile validation failed. Please update the Dockerfile and retry this tool until it passes.',
+    },
+  ],
+  [
+    TOOL_NAME.GENERATE_MANIFEST_PLAN,
+    {
+      success:
+        'Manifest plan generated successfully. Continue by generating manifests leveraging plan output.',
+      failure: 'Manifest plan generation failed. Please check the logs for details.',
+    },
+  ],
+]);
 
 /**
  * Validate parameters against schema using safeParse

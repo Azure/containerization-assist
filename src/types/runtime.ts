@@ -114,6 +114,8 @@ export interface AppRuntimeConfig {
 
   /** Policy environment (development/production) */
   policyEnvironment?: string;
+
+  chainHintsMode?: 'enabled' | 'disabled';
 }
 
 /**
