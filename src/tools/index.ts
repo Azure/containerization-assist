@@ -100,6 +100,7 @@ export const ALL_TOOLS: readonly Tool[] = [
   generateDockerfilePlanTool,
   generateManifestPlanTool,
   validateDockerfileTool,
+  // ----- COMING SOON TOOLS ---
   // buildImageTool,
   // convertAcaToK8sTool,
   // deployTool,

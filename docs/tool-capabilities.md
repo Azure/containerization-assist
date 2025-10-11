@@ -2,6 +2,17 @@
 
 This document provides a comprehensive overview of all tools in the containerization-assist project, their AI enhancement capabilities, and their integration with the sampling system.
 
+## Active Tools
+
+**Currently Active:** 4 tools are enabled in this version (see `src/tools/index.ts` → `ALL_TOOLS`)
+
+- `analyze-repo` (AI-Enhanced)
+- `generate-dockerfile-plan` (Knowledge-Enhanced Planning)
+- `generate-manifest-plan` (Knowledge-Enhanced Planning)
+- `validate-dockerfile` (Utility)
+
+**Status:** Remaining tools are in development and commented out in `ALL_TOOLS`.
+
 ## Tool Classification
 
 ### AI-Enhanced Tools
@@ -21,6 +32,7 @@ These tools perform direct operations without AI enhancement.
 ## Complete Tool Reference
 
 ### analyze-repo
+**Status:** ✅ **ACTIVE**
 **Category:** Analysis
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -43,6 +55,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### generate-dockerfile
+**Status:** 🚧 **IN DEVELOPMENT**
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -71,6 +84,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### fix-dockerfile
+**Status:** 🚧 **IN DEVELOPMENT**
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -93,6 +107,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### build-image
+**Status:** 🚧 **IN DEVELOPMENT**
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -114,6 +129,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### tag-image
+**Status:** 🚧 **IN DEVELOPMENT**
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -135,6 +151,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### push-image
+**Status:** 🚧 **IN DEVELOPMENT**
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -156,6 +173,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### scan
+**Status:** 🚧 **IN DEVELOPMENT**
 **Category:** Security
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -183,6 +201,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### generate-k8s-manifests
+**Status:** 🚧 **IN DEVELOPMENT**
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -205,6 +224,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### generate-helm-charts
+**Status:** 🚧 **IN DEVELOPMENT**
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -241,6 +261,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### prepare-cluster
+**Status:** 🚧 **IN DEVELOPMENT**
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -262,6 +283,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### deploy
+**Status:** 🚧 **IN DEVELOPMENT**
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -283,6 +305,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### verify-deployment
+**Status:** 🚧 **IN DEVELOPMENT**
 **Category:** Kubernetes
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -304,6 +327,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### resolve-base-images
+**Status:** 🚧 **IN DEVELOPMENT**
 **Category:** Docker
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -325,6 +349,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### generate-aca-manifests
+**Status:** 🚧 **IN DEVELOPMENT**
 **Category:** Azure
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -346,6 +371,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### convert-aca-to-k8s
+**Status:** 🚧 **IN DEVELOPMENT**
 **Category:** Migration
 **AI Enhanced:** ✅ Yes
 **Knowledge Enhanced:** ✅ Yes
@@ -367,6 +393,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### ops
+**Status:** 🚧 **IN DEVELOPMENT**
 **Category:** Operations
 **AI Enhanced:** ❌ No
 **Knowledge Enhanced:** ❌ No
@@ -383,6 +410,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### inspect-session
+**Status:** 🚧 **IN DEVELOPMENT**
 **Category:** Debug
 **AI Enhanced:** ❌ No
 **Knowledge Enhanced:** ❌ No
@@ -399,6 +427,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### validate-dockerfile
+**Status:** ✅ **ACTIVE**
 **Category:** Docker
 **AI Enhanced:** ❌ No
 **Knowledge Enhanced:** ❌ No
@@ -415,6 +444,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### generate-dockerfile-plan
+**Status:** ✅ **ACTIVE**
 **Category:** Planning
 **AI Enhanced:** ❌ No
 **Knowledge Enhanced:** ✅ Yes
@@ -431,6 +461,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### generate-manifest-plan
+**Status:** ✅ **ACTIVE**
 **Category:** Planning
 **AI Enhanced:** ❌ No
 **Knowledge Enhanced:** ✅ Yes
@@ -447,6 +478,7 @@ These tools perform direct operations without AI enhancement.
 ---
 
 ### generate-kustomize
+**Status:** 🚧 **IN DEVELOPMENT**
 **Category:** Kubernetes
 **AI Enhanced:** ❌ No
 **Knowledge Enhanced:** ❌ No
@@ -527,19 +559,38 @@ metadata: {
 ### Finding AI-Enhanced Tools
 
 ```typescript
-// AI-enhanced tools with single-candidate sampling
+// AI-enhanced tools with single-candidate sampling (only analyze-repo is currently active)
 const aiTools = [
-  'analyze-repo', 'generate-dockerfile', 'fix-dockerfile', 'build-image',
-  'tag-image', 'push-image', 'scan', 'generate-k8s-manifests',
-  'generate-helm-charts', 'prepare-cluster', 'deploy', 'verify-deployment',
-  'resolve-base-images', 'generate-aca-manifests', 'convert-aca-to-k8s'
+  'analyze-repo', // ✅ ACTIVE
+  'generate-dockerfile', // 🚧 IN DEVELOPMENT
+  'fix-dockerfile', // 🚧 IN DEVELOPMENT
+  'build-image', // 🚧 IN DEVELOPMENT
+  'tag-image', // 🚧 IN DEVELOPMENT
+  'push-image', // 🚧 IN DEVELOPMENT
+  'scan', // 🚧 IN DEVELOPMENT
+  'generate-k8s-manifests', // 🚧 IN DEVELOPMENT
+  'generate-helm-charts', // 🚧 IN DEVELOPMENT
+  'prepare-cluster', // 🚧 IN DEVELOPMENT
+  'deploy', // 🚧 IN DEVELOPMENT
+  'verify-deployment', // 🚧 IN DEVELOPMENT
+  'resolve-base-images', // 🚧 IN DEVELOPMENT
+  'generate-aca-manifests', // 🚧 IN DEVELOPMENT
+  'convert-aca-to-k8s' // 🚧 IN DEVELOPMENT
 ];
 
-// Knowledge-enhanced planning tools
-const planningTools = ['generate-dockerfile-plan', 'generate-manifest-plan'];
+// Knowledge-enhanced planning tools (both currently active)
+const planningTools = [
+  'generate-dockerfile-plan', // ✅ ACTIVE
+  'generate-manifest-plan' // ✅ ACTIVE
+];
 
-// Utility tools without AI/knowledge enhancement
-const utilityTools = ['ops', 'inspect-session', 'validate-dockerfile', 'generate-kustomize'];
+// Utility tools (only validate-dockerfile is currently active)
+const utilityTools = [
+  'validate-dockerfile', // ✅ ACTIVE
+  'ops', // 🚧 IN DEVELOPMENT
+  'inspect-session', // 🚧 IN DEVELOPMENT
+  'generate-kustomize' // 🚧 IN DEVELOPMENT
+];
 ```
 
 ### Enhancement Capability Queries

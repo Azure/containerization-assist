@@ -9,9 +9,12 @@ This guide provides a single entry point for contributors working on the Contain
 - **TypeScript MCP server** that orchestrates containerization tools (Docker, Kubernetes, scanning, etc.).
 - **Single-operator workflow**: one session per user, sequential tools, deterministic AI outputs.
 - **Public API/CLI**: MCP server executable (`containerization-assist-mcp`/`ca-mcp`) plus published TypeScript exports.
-- **Multiple AI-enhanced tools** using deterministic single-candidate sampling
-- **Knowledge-enhanced planning tools** for multi-module workflows
-- **Utility tools** for direct operations
+- **Currently Active Tools**: 4 tools enabled (see `src/tools/index.ts` → `ALL_TOOLS`)
+  - `analyze-repo` (AI-enhanced)
+  - `generate-dockerfile-plan` (Knowledge-enhanced planning)
+  - `generate-manifest-plan` (Knowledge-enhanced planning)
+  - `validate-dockerfile` (Utility)
+- **In Development**: 17 additional tools (commented out in `ALL_TOOLS`)
 
 Key directories:
 
