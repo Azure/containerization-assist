@@ -92,7 +92,7 @@ export function createOrchestrator<T extends MCPTool<ZodTypeAny, any>>(options: 
   sessionManager?: SessionManager;
   contextFactory?: ContextFactory<T>;
 }): ToolOrchestrator {
-  const { registry, config = {} } = options;
+  const { registry, config = { chainHintsMode: 'enabled' } } = options;
   const logger = options.logger || createLogger({ name: 'orchestrator' });
 
   // Session manager is always enabled for single-session mode
@@ -273,7 +273,7 @@ async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
         if (hint) {
           result.value = {
             ...result.value,
-            chainHint: hint,
+            nextSteps: hint,
           };
         }
       }

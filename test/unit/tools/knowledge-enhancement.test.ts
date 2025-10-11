@@ -137,7 +137,7 @@ jest.mock('node:path', () => ({
   ...jest.requireActual('node:path'),
   resolve: jest.fn((cwd, p) => `/test/${p || ''}`),
   join: jest.fn((...parts) => parts.join('/')),
-  isAbsolute: jest.fn((p) => p.startsWith('/')),
+  isAbsolute: jest.fn((p) => typeof p === 'string' && p.startsWith('/')),
 }));
 
 describe('Knowledge Enhancement Integration', () => {
@@ -214,47 +214,48 @@ spec:
   });
 
   describe('analyze-repo', () => {
-    it('should enhance prompt with knowledge base', async () => {
+    it('should successfully analyze repository with modules', async () => {
       const result = await analyzeRepoTool.run(
         {
-          path: '/test/repo',
+          repositoryPathAbsoluteUnix: '/test/repo',
           sessionId: 'test-session-123',
+          modules: [
+            {
+              name: 'test-module',
+              modulePathAbsoluteUnix: '/test/repo',
+              language: 'java',
+              buildSystem: { type: 'maven' },
+              ports: [8080],
+            },
+          ],
         },
         mockContext,
       );
 
-      if (!result.ok) {
-        throw new Error(`analyze-repo failed: ${result.error}`);
-      }
-
-      expect(promptEngine.buildMessages).toHaveBeenCalledWith(
-        expect.objectContaining({
-          topic: TOPICS.ANALYZE_REPOSITORY,
-          tool: 'analyze-repo',
-          environment: 'production',
-        }),
-      );
-
+      // analyze-repo no longer uses AI or knowledge enhancement - it's a passthrough tool
       expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value).toHaveProperty('modules');
+        expect(result.value.modules).toHaveLength(1);
+        expect(result.value).toHaveProperty('sessionId', 'test-session-123');
+      }
     });
 
-    it('should fail validation when sessionId is missing', async () => {
+    it('should fail validation when modules are missing', async () => {
       const result = await analyzeRepoTool.run(
         {
-          path: '/test/repo',
-          // sessionId intentionally omitted - should fail Zod validation
+          repositoryPathAbsoluteUnix: '/test/repo',
+          sessionId: 'test-session-123',
+          // modules intentionally omitted - should fail Zod validation
         } as any,
         mockContext,
       );
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        // Should fail with validation error before reaching the implementation
-        expect(result.error).toContain('sessionId is required');
+        // Should fail with validation error about missing modules
+        expect(result.error).toContain('modules');
       }
-
-      // buildMessages should never be called since validation failed
-      expect(promptEngine.buildMessages).not.toHaveBeenCalled();
     });
   });
 
@@ -262,8 +263,7 @@ spec:
     it('should enhance prompt with knowledge base', async () => {
       const result = await generateDockerfileTool.run(
         {
-          path: '/test/repo',
-          dockerfileDirectoryPaths: ['/'],
+          repositoryPath: '/test/repo',
           environment: 'production',
         },
         mockContext,
@@ -436,8 +436,7 @@ spec:
       // Test that the prompt engine is properly integrated
       await generateDockerfileTool.run(
         {
-          path: '/test/repo',
-          dockerfileDirectoryPaths: ['/'],
+          repositoryPath: '/test/repo',
           environment: 'production',
         },
         mockContext,

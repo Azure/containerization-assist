@@ -119,7 +119,7 @@ describe('Build Output Validation', () => {
   });
 
   describe('Declaration files and source maps', () => {
-    const keyFiles = ['src/index', 'src/mcp/mcp-server', 'src/exports/tools', 'src/types/index'];
+    const keyFiles = ['src/index', 'src/mcp/mcp-server', 'src/tools/index', 'src/types/index'];
 
     for (const file of keyFiles) {
       it(`should have .d.ts for ${file}`, () => {
