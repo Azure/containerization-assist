@@ -3,7 +3,7 @@ import {
   sessionId,
   imageId,
   appName,
-  respositoryPathAbsoluteUnix,
+  repositoryPathAbsoluteUnix,
   namespace,
   replicas,
   port,
@@ -58,7 +58,7 @@ export const generateK8sManifestsSchema = z.object({
     .describe(
       'Array of module information. To generate manifests for specific modules, pass only those modules in this array.',
     ),
-  path: respositoryPathAbsoluteUnix.describe('Path where the k8s folder should be created'),
+  path: repositoryPathAbsoluteUnix.describe('Path where the k8s folder should be created'),
   namespace,
   replicas,
   port,

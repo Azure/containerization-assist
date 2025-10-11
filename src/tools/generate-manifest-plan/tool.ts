@@ -93,8 +93,6 @@ async function run(
 
   const summary = `
 Manifest Planning Summary:
-- Module: ${input.name}
-- Path: ${path}
 - Manifest Type: ${manifestType}
 - Language: ${language || 'not specified'}${frameworksStr}
 - Environment: ${environment || 'production'}

@@ -3,7 +3,11 @@
  */
 
 import { z } from 'zod';
-import { sessionId as sharedSessionId, environment, respositoryPathAbsoluteUnix as sharedPath } from '../shared/schemas';
+import {
+  sessionId as sharedSessionId,
+  environment,
+  repositoryPathAbsoluteUnix as sharedPath,
+} from '../shared/schemas';
 import { ModuleInfo, moduleInfo } from '../analyze-repo/schema';
 
 export const generateManifestPlanSchema = z.object({
