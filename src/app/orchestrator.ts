@@ -26,7 +26,7 @@ import type { MCPTool } from '@/types/tool';
 import { createStandardizedToolTracker } from '@/lib/tool-helpers';
 import { TOOL_NAME, ToolName } from '@/tools';
 import { checkSamplingAvailability, type SamplingCheckResult } from '@/mcp/sampling-check';
-import { logToolExecution, type ToolLogEntry } from '@/lib/tool-logger';
+import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
 
 // ===== Types =====
 
@@ -264,15 +264,9 @@ async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
   if (tool.metadata?.samplingStrategy === 'single') {
     samplingCheckResult = await checkSamplingAvailability(toolContext);
   }
+
   const startTime = Date.now();
-  const logEntry: ToolLogEntry = {
-    timestamp: new Date().toISOString(),
-    toolName: tool.name,
-    sessionId: actualSessionId,
-    input: validatedParams,
-    output: null,
-    success: false,
-  };
+  const logEntry = createToolLogEntry(tool.name, actualSessionId, validatedParams);
 
   // Execute tool directly (single attempt)
   try {

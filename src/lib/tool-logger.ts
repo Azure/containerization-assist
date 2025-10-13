@@ -1,4 +1,5 @@
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFileSync, mkdirSync } from 'fs';
+import { appendFile } from 'fs/promises';
 import { join } from 'path';
 import { config } from '@/config';
 import type { Logger } from 'pino';
@@ -16,51 +17,75 @@ export interface ToolLogEntry {
   errorGuidance?: ErrorGuidance;
 }
 
-/**
- * Validate tool logging path at startup
- * Returns error message if validation fails, undefined if successful
- */
-export async function validateToolLoggingPath(logger?: Logger): Promise<string | undefined> {
-  if (!config.toolLogging.enabled || !config.toolLogging.path) {
-    return undefined;
-  }
-
-  try {
-    // Try to create directory
-    await mkdir(config.toolLogging.path, { recursive: true });
-
-    // Verify we can write to it by creating a test file
-    const testFile = join(config.toolLogging.path, '.write-test');
-    await writeFile(testFile, 'test', 'utf-8');
-
-    // Clean up test file
-    const { unlink } = await import('fs/promises');
-    await unlink(testFile);
-
-    logger?.info({ path: config.toolLogging.path }, 'Tool logging directory validated');
-
-    return undefined;
-  } catch (error) {
-    const errorMsg = `Tool logging enabled but directory '${config.toolLogging.path}' is not writable: ${(error as Error).message}`;
-    logger?.warn({ error, path: config.toolLogging.path }, errorMsg);
-    return errorMsg;
-  }
+export function createToolLogEntry(
+  toolName: string,
+  sessionId: string,
+  input: unknown,
+): ToolLogEntry {
+  return {
+    timestamp: new Date().toISOString(),
+    toolName,
+    sessionId,
+    input,
+    output: undefined,
+    success: false,
+  };
 }
 
-export async function logToolExecution(entry: ToolLogEntry, logger?: Logger): Promise<void> {
-  if (!config.toolLogging.enabled || !config.toolLogging.path) {
+let logFileName: string | null = null;
+
+function isToolLoggingEnabled(): boolean {
+  return config.toolLogging.enabled && !!config.toolLogging.dirPath;
+}
+
+export function getLogFilePath(): string {
+  if (logFileName) {
+    return logFileName;
+  }
+
+  const date = new Date();
+  const timestamp = date.toISOString();
+  logFileName = `ca-tool-logs-${timestamp}.jsonl`;
+  const dirPath = config.toolLogging.dirPath;
+  if (!dirPath) {
+    throw new Error('Tool logging directory path is not configured');
+  }
+  return join(dirPath, logFileName);
+}
+
+export function createToolLoggerFile(logger?: Logger): void {
+  if (!isToolLoggingEnabled()) {
+    return;
+  }
+
+  const dirPath = config.toolLogging.dirPath;
+  if (!dirPath) {
+    logger?.warn('Tool logging directory path is not configured');
     return;
   }
 
   try {
-    await mkdir(config.toolLogging.path, { recursive: true });
+    // Ensure directory exists
+    mkdirSync(dirPath, { recursive: true });
 
-    const date = new Date(entry.timestamp);
-    const timeStr = date.toISOString().replace(/[:.]/g, '-');
-    const filename = `${timeStr}_${entry.toolName}_${entry.sessionId}.json`;
-    const filepath = join(config.toolLogging.path, filename);
+    const logFilePath = getLogFilePath();
+    writeFileSync(logFilePath, '', 'utf-8');
+    logger?.info({ path: logFilePath }, 'Tool logging file created');
+  } catch (error) {
+    const errorMsg = `Tool logging directory '${dirPath}' is not writable: ${(error as Error).message}`;
+    logger?.warn({ error, path: dirPath }, errorMsg);
+  }
+}
 
-    await writeFile(filepath, JSON.stringify(entry, null, 2), 'utf-8');
+export async function logToolExecution(entry: ToolLogEntry, logger?: Logger): Promise<void> {
+  if (!isToolLoggingEnabled()) {
+    return;
+  }
+
+  try {
+    const filepath = getLogFilePath();
+    const logLine = `${JSON.stringify(entry)}\n`;
+    await appendFile(filepath, logLine, 'utf-8');
 
     logger?.debug({ filepath, toolName: entry.toolName }, 'Tool execution logged to file');
   } catch (error) {

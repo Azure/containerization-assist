@@ -32,8 +32,8 @@ export const config = {
   },
 
   toolLogging: {
-    enabled: !!process.env.CONTAINERIZATION_ASSIST_TOOL_LOGS_PATH,
-    path: process.env.CONTAINERIZATION_ASSIST_TOOL_LOGS_PATH,
+    enabled: !!process.env.CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH,
+    dirPath: process.env.CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH,
   },
 } as const;
 
@@ -55,6 +55,10 @@ export function logConfigSummaryIfDev(logger?: {
       },
       workspace: config.workspace.workspaceDir,
       docker: config.docker.socketPath,
+      toolLogging: {
+        enabled: config.toolLogging.enabled,
+        dirPath: config.toolLogging.dirPath || 'not configured',
+      },
     };
 
     if (logger) {

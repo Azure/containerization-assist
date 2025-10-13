@@ -94,6 +94,12 @@ export interface AppRuntime {
    * Stop the runtime and clean up resources
    */
   stop(): Promise<void>;
+
+  /**
+   * Get the current log file path (if tool logging is enabled)
+   * Returns null if logging is disabled
+   */
+  getLogFilePath(): string | null;
 }
 
 /**
