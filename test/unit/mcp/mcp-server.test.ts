@@ -110,11 +110,78 @@ describe('registerToolsWithServer', () => {
 });
 
 describe('objectToMarkdownRecursive', () => {
-  it('converts simple key-value pairs to markdown headings', () => {
+  it('converts simple objects with only primitive values to Key: Value format', () => {
     const input = {
       name: 'test',
       version: '1.0.0',
-      enabled: true,
+      port: 8080,
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    expect(result).toBe(`**Name:** test
+
+**Version:** 1.0.0
+
+**Port:** 8080
+
+`);
+  });
+
+  it('handles simple objects with null and undefined values', () => {
+    const input = {
+      nullValue: null,
+      undefinedValue: undefined,
+      name: 'test',
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    expect(result).toBe(`**NullValue:** null
+
+**UndefinedValue:** undefined
+
+**Name:** test
+
+`);
+  });
+
+  it('converts simple arrays to markdown lists', () => {
+    const input = {
+      items: ['apple', 'banana', 'cherry'],
+      numbers: [1, 2, 3],
+      flags: [true, false, true],
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    expect(result).toBe(`## Items
+
+- apple
+- banana
+- cherry
+
+## Numbers
+
+- 1
+- 2
+- 3
+
+## Flags
+
+- true
+- false
+- true
+
+`);
+  });
+
+  it('uses headings for complex objects (non-simple values)', () => {
+    const input = {
+      name: 'test',
+      config: {
+        timeout: 30,
+      },
     };
 
     const result = objectToMarkdownRecursive(input);
@@ -123,59 +190,9 @@ describe('objectToMarkdownRecursive', () => {
 
 test
 
-## Version
+## Config
 
-1.0.0
-
-## Enabled
-
-true
-
-`);
-  });
-
-  it('handles null and undefined values', () => {
-    const input = {
-      nullValue: null,
-      undefinedValue: undefined,
-    };
-
-    const result = objectToMarkdownRecursive(input);
-
-    expect(result).toBe(`## NullValue
-
-null
-
-## UndefinedValue
-
-undefined
-
-`);
-  });
-
-  it('converts arrays to markdown headings with numbered lists', () => {
-    const input = {
-      items: ['apple', 'banana', 'cherry'],
-      numbers: [1, 2, 3],
-    };
-
-    const result = objectToMarkdownRecursive(input);
-
-    expect(result).toBe(`## Items
-
-1. apple
-
-2. banana
-
-3. cherry
-
-## Numbers
-
-1. 1
-
-2. 2
-
-3. 3
+**Timeout:** 30
 
 `);
   });
@@ -199,24 +216,18 @@ undefined
 
 ### Database
 
-#### Host
+**Host:** localhost
 
-localhost
-
-#### Port
-
-5432
+**Port:** 5432
 
 ### Cache
 
-#### Enabled
-
-true
+**Enabled:** true
 
 `);
   });
 
-  it('handles arrays with object elements', () => {
+  it('handles arrays with object elements (complex arrays)', () => {
     const input = {
       users: [
         { name: 'Alice', age: 30 },
@@ -230,23 +241,35 @@ true
 
 ### 1
 
-#### Name
+**Name:** Alice
 
-Alice
-
-#### Age
-
-30
+**Age:** 30
 
 ### 2
 
-#### Name
+**Name:** Bob
 
-Bob
+**Age:** 25
 
-#### Age
+`);
+  });
 
-25
+  it('handles arrays with mixed primitive and object elements', () => {
+    const input = {
+      mixedArray: ['string', 42, { nested: 'object' }],
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    expect(result).toBe(`## MixedArray
+
+1. string
+
+2. 42
+
+### 3
+
+**Nested:** object
 
 `);
   });
@@ -258,9 +281,7 @@ Bob
 
     const result = objectToMarkdownRecursive(input, 4);
 
-    expect(result).toBe(`#### Title
-
-Custom Level
+    expect(result).toBe(`**Title:** Custom Level
 
 `);
   });
@@ -296,23 +317,54 @@ Custom Level
 
 ### Tags
 
-1. prod
-
-2. api
+- prod
+- api
 
 ### Config
 
-#### Timeout
+**Timeout:** 30
 
-30
-
-#### Retries
-
-null
+**Retries:** null
 
 ## Enabled
 
 false
+
+`);
+  });
+
+  it('formats simple object at root level correctly', () => {
+    const input = {
+      status: 'active',
+      count: 5,
+      readonly: true,
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    expect(result).toBe(`**Status:** active
+
+**Count:** 5
+
+**Readonly:** true
+
+`);
+  });
+
+  it('formats empty arrays as empty sections', () => {
+    const input = {
+      emptyArray: [],
+      name: 'test',
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    expect(result).toBe(`## EmptyArray
+
+
+## Name
+
+test
 
 `);
   });
@@ -327,18 +379,14 @@ describe('formatOutput', () => {
     expect(result).toBe(JSON.stringify(input, null, 2));
   });
 
-  it('formats objects as markdown when format is TEXT', () => {
+  it('formats simple objects as Key: Value when format is TEXT', () => {
     const input = { name: 'test', enabled: true };
 
     const result = formatOutput(input, OUTPUTFORMAT.TEXT);
 
-    expect(result).toBe(`## Name
+    expect(result).toBe(`**Name:** test
 
-test
-
-## Enabled
-
-true
+**Enabled:** true
 
 `);
   });

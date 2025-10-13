@@ -175,15 +175,6 @@ Use this guide for the big picture; dive into specific docs for in-depth topics.
 
 ---
 
-## 7. Open Follow-Ups
-
-- `plans/codebase-simplification-sprint-plan.md` and `plans/remaining-work.md` track active refactors (session helpers, deterministic sampling cleanup, doc sync).
-- `plans/tooling-simplification-plan.md` outlines pending tooling simplifications (npm scripts, Husky, workflows).
-
-Maintain these plans as work progresses so this guide stays accurate.
-
----
-
 ## 8. Getting Started Checklist for Contributors
 
 1. Clone repository & install dependencies (`npm install`).
