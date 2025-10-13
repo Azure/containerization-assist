@@ -28,6 +28,7 @@ export interface ServerOptions {
   transport?: 'stdio';
   name?: string;
   version?: string;
+  outputFormat?: OutputFormat;
 }
 
 /**
@@ -40,7 +41,14 @@ export interface MCPServer {
   getTools(): Array<{ name: string; description: string }>;
 }
 
+export const OUTPUTFORMAT = {
+  TEXT: 'text',
+  JSON: 'json',
+} as const;
+export type OutputFormat = (typeof OUTPUTFORMAT)[keyof typeof OUTPUTFORMAT];
+
 export interface RegisterOptions<TTool extends MCPTool = MCPTool> {
+  outputFormat: OutputFormat;
   server: McpServer;
   tools: readonly TTool[];
   logger: Logger;
@@ -82,10 +90,12 @@ export function createMCPServer<TTool extends MCPTool>(
 
   const server = new McpServer(serverOptions);
   const transportType = options.transport ?? 'stdio';
+  const outputFormat = options.outputFormat ?? OUTPUTFORMAT.TEXT;
   let transportInstance: StdioServerTransport | null = null;
   let isRunning = false;
 
   registerToolsWithServer({
+    outputFormat,
     server,
     tools,
     logger,
@@ -173,7 +183,7 @@ export function createMCPServer<TTool extends MCPTool>(
 export function registerToolsWithServer<TTool extends MCPTool>(
   options: RegisterOptions<TTool>,
 ): void {
-  const { server, tools, logger, transport, execute } = options;
+  const { server, tools, logger, transport, execute, outputFormat } = options;
 
   for (const tool of tools) {
     const schemaShape = extractSchemaShape(tool.schema);
@@ -211,7 +221,7 @@ export function registerToolsWithServer<TTool extends MCPTool>(
             content: [
               {
                 type: 'text' as const,
-                text: JSON.stringify(result.value, null, 2),
+                text: formatOutput(result.value, outputFormat),
               },
             ],
           };
@@ -288,4 +298,47 @@ function extractSessionId(meta: Record<string, unknown> | undefined): string | u
 function sanitizeParams(params: Record<string, unknown>): Record<string, unknown> {
   const entries = Object.entries(params).filter(([key]) => key !== '_meta');
   return Object.fromEntries(entries);
+}
+
+export function formatOutput(output: unknown, format: OutputFormat): string {
+  switch (format) {
+    case OUTPUTFORMAT.JSON:
+      return JSON.stringify(output, null, 2);
+    case OUTPUTFORMAT.TEXT:
+      // convert a json object to plain text
+      if (typeof output === 'object' && output !== null) {
+        return objectToMarkdownRecursive(output as Record<string, unknown>);
+      }
+      return String(output);
+    default:
+      return String(output);
+  }
+}
+
+export function objectToMarkdownRecursive(obj: Record<string, unknown>, headingLevel = 2): string {
+  let markdown = '';
+  const headingPrefix = '#'.repeat(headingLevel);
+
+  for (const [key, value] of Object.entries(obj)) {
+    const capitalizedKey = key.charAt(0).toUpperCase() + key.slice(1);
+    if (value === null || value === undefined) {
+      markdown += `${headingPrefix} ${capitalizedKey}\n\n${value}\n\n`;
+    } else if (Array.isArray(value)) {
+      markdown += `${headingPrefix} ${capitalizedKey}\n\n`;
+      value.forEach((item, index) => {
+        if (typeof item === 'object' && item !== null) {
+          markdown += `${headingPrefix}# ${index + 1}\n\n`;
+          markdown += objectToMarkdownRecursive(item as Record<string, unknown>, headingLevel + 2);
+        } else {
+          markdown += `${index + 1}. ${item}\n\n`;
+        }
+      });
+    } else if (typeof value === 'object' && value !== null) {
+      markdown += `${headingPrefix} ${capitalizedKey}\n\n`;
+      markdown += objectToMarkdownRecursive(value as Record<string, unknown>, headingLevel + 1);
+    } else {
+      markdown += `${headingPrefix} ${capitalizedKey}\n\n${value}\n\n`;
+    }
+  }
+  return markdown;
 }

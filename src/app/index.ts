@@ -60,6 +60,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
   }
 
   const chainHintsMode = config.chainHintsMode || 'enabled';
+  const outputFormat = config.outputFormat || 'text';
   const orchestratorConfig: OrchestratorConfig = { chainHintsMode };
   if (config.policyPath !== undefined) orchestratorConfig.policyPath = config.policyPath;
   if (config.policyEnvironment !== undefined)
@@ -149,6 +150,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
         transport: transport.transport,
         name: 'containerization-assist',
         version: '1.0.0',
+        outputFormat,
       };
 
       const mcpServer = createMCPServer(toolList, serverOptions, orchestratedExecute);
@@ -175,6 +177,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
       activeServer = sdkServer;
 
       registerToolsWithServer({
+        outputFormat,
         server,
         tools: toolList,
         logger,

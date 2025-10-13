@@ -60,6 +60,8 @@ export interface ToolOrchestrator {
   close(): void;
 }
 
+type ChainHintsMode = 'enabled' | 'disabled';
+
 /**
  * Orchestrator configuration
  */
@@ -67,5 +69,5 @@ export interface OrchestratorConfig {
   policyPath?: string;
   policyEnvironment?: string;
   session?: SessionConfig;
-  chainHintsMode: 'enabled' | 'disabled';
+  chainHintsMode: ChainHintsMode;
 }

@@ -13,6 +13,9 @@ export interface SamplingCheckResult {
   message: string;
 }
 
+export const VERBOSE_MODE_MESSAGE =
+  "Verbose Mode Enabled - (your environment does not have 'sampling' capability, enable it for enhanced summary output)";
+
 /**
  * Check if sampling is available in the current context
  * This is a lightweight test that attempts a minimal sampling request
@@ -42,14 +45,10 @@ export async function checkSamplingAvailability(ctx: ToolContext): Promise<Sampl
       message: '',
     };
   } catch (e) {
-    ctx.logger.debug(
-      { error: e },
-      "Verbose Mode Enabled - (your environment does not have 'sampling' capability, enable it for enhanced summary output)",
-    );
+    ctx.logger.debug({ error: e }, VERBOSE_MODE_MESSAGE);
     return {
       available: false,
-      message:
-        "Verbose Mode Enabled - (your environment does not have 'sampling' capability, enable it for enhanced summary output)",
+      message: VERBOSE_MODE_MESSAGE,
     };
   }
 }

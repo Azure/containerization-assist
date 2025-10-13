@@ -115,7 +115,7 @@ describe('createApp AppRuntime interface', () => {
     const originalStdout = process.stdout.write;
     let stdoutCalls = 0;
 
-    process.stdout.write = function(...args) {
+    process.stdout.write = function (...args) {
       stdoutCalls++;
       return originalStdout.apply(this, args);
     };
@@ -210,6 +210,7 @@ describe('createApp orchestration integration', () => {
     app.bindToMCP(fakeServer, 'external');
 
     expect(registerToolsSpy).toHaveBeenCalledWith({
+      outputFormat: 'text',
       server: fakeServer,
       tools: expect.any(Array),
       logger: expect.any(Object),

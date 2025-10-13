@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { z } from 'zod';
 import type { Tool } from '@/types/tool';
-import { registerToolsWithServer } from '@/mcp/mcp-server';
+import { registerToolsWithServer, objectToMarkdownRecursive, formatOutput, OUTPUTFORMAT } from '@/mcp/mcp-server';
 import { Success, Failure } from '@/types';
 import type { Logger } from 'pino';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
@@ -106,5 +106,255 @@ describe('registerToolsWithServer', () => {
 
     await expect(handler({ foo: 'value' }, extra)).rejects.toBeInstanceOf(McpError);
     expect(executeMock).toHaveBeenCalled();
+  });
+});
+
+describe('objectToMarkdownRecursive', () => {
+  it('converts simple key-value pairs to markdown headings', () => {
+    const input = {
+      name: 'test',
+      version: '1.0.0',
+      enabled: true,
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    expect(result).toBe(`## Name
+
+test
+
+## Version
+
+1.0.0
+
+## Enabled
+
+true
+
+`);
+  });
+
+  it('handles null and undefined values', () => {
+    const input = {
+      nullValue: null,
+      undefinedValue: undefined,
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    expect(result).toBe(`## NullValue
+
+null
+
+## UndefinedValue
+
+undefined
+
+`);
+  });
+
+  it('converts arrays to markdown headings with numbered lists', () => {
+    const input = {
+      items: ['apple', 'banana', 'cherry'],
+      numbers: [1, 2, 3],
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    expect(result).toBe(`## Items
+
+1. apple
+
+2. banana
+
+3. cherry
+
+## Numbers
+
+1. 1
+
+2. 2
+
+3. 3
+
+`);
+  });
+
+  it('handles nested objects with increasing heading levels', () => {
+    const input = {
+      config: {
+        database: {
+          host: 'localhost',
+          port: 5432,
+        },
+        cache: {
+          enabled: true,
+        },
+      },
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    expect(result).toBe(`## Config
+
+### Database
+
+#### Host
+
+localhost
+
+#### Port
+
+5432
+
+### Cache
+
+#### Enabled
+
+true
+
+`);
+  });
+
+  it('handles arrays with object elements', () => {
+    const input = {
+      users: [
+        { name: 'Alice', age: 30 },
+        { name: 'Bob', age: 25 },
+      ],
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    expect(result).toBe(`## Users
+
+### 1
+
+#### Name
+
+Alice
+
+#### Age
+
+30
+
+### 2
+
+#### Name
+
+Bob
+
+#### Age
+
+25
+
+`);
+  });
+
+  it('uses custom heading level', () => {
+    const input = {
+      title: 'Custom Level',
+    };
+
+    const result = objectToMarkdownRecursive(input, 4);
+
+    expect(result).toBe(`#### Title
+
+Custom Level
+
+`);
+  });
+
+  it('handles empty objects', () => {
+    const input = {};
+
+    const result = objectToMarkdownRecursive(input);
+
+    expect(result).toBe('');
+  });
+
+  it('handles complex mixed data structures', () => {
+    const input = {
+      metadata: {
+        version: '2.0',
+        tags: ['prod', 'api'],
+        config: {
+          timeout: 30,
+          retries: null,
+        },
+      },
+      enabled: false,
+    };
+
+    const result = objectToMarkdownRecursive(input);
+
+    expect(result).toBe(`## Metadata
+
+### Version
+
+2.0
+
+### Tags
+
+1. prod
+
+2. api
+
+### Config
+
+#### Timeout
+
+30
+
+#### Retries
+
+null
+
+## Enabled
+
+false
+
+`);
+  });
+});
+
+describe('formatOutput', () => {
+  it('formats as JSON when format is JSON', () => {
+    const input = { name: 'test', version: 1 };
+
+    const result = formatOutput(input, OUTPUTFORMAT.JSON);
+
+    expect(result).toBe(JSON.stringify(input, null, 2));
+  });
+
+  it('formats objects as markdown when format is TEXT', () => {
+    const input = { name: 'test', enabled: true };
+
+    const result = formatOutput(input, OUTPUTFORMAT.TEXT);
+
+    expect(result).toBe(`## Name
+
+test
+
+## Enabled
+
+true
+
+`);
+  });
+
+  it('formats primitive values as string when format is TEXT', () => {
+    expect(formatOutput('hello', OUTPUTFORMAT.TEXT)).toBe('hello');
+    expect(formatOutput(42, OUTPUTFORMAT.TEXT)).toBe('42');
+    expect(formatOutput(true, OUTPUTFORMAT.TEXT)).toBe('true');
+    expect(formatOutput(null, OUTPUTFORMAT.TEXT)).toBe('null');
+  });
+
+  it('handles invalid format by defaulting to string', () => {
+    const input = { test: 'value' };
+
+    const result = formatOutput(input, 'invalid' as any);
+
+    expect(result).toBe('[object Object]');
   });
 });
