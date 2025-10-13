@@ -119,13 +119,14 @@ describe('objectToMarkdownRecursive', () => {
 
     const result = objectToMarkdownRecursive(input);
 
-    expect(result).toBe(`**Name:** test
+    const expected = `**name**: test
 
-**Version:** 1.0.0
+**version**: 1.0.0
 
-**Port:** 8080
+**port**: 8080
 
-`);
+`;
+    expect(result).toBe(expected);
   });
 
   it('handles simple objects with null and undefined values', () => {
@@ -137,13 +138,14 @@ describe('objectToMarkdownRecursive', () => {
 
     const result = objectToMarkdownRecursive(input);
 
-    expect(result).toBe(`**NullValue:** null
+    const expected = `**nullValue**: null
 
-**UndefinedValue:** undefined
+**undefinedValue**: undefined
 
-**Name:** test
+**name**: test
 
-`);
+`;
+    expect(result).toBe(expected);
   });
 
   it('converts simple arrays to markdown lists', () => {
@@ -155,7 +157,7 @@ describe('objectToMarkdownRecursive', () => {
 
     const result = objectToMarkdownRecursive(input);
 
-    expect(result).toBe(`## Items
+    const expected = `## Items
 
 - apple
 - banana
@@ -173,7 +175,8 @@ describe('objectToMarkdownRecursive', () => {
 - false
 - true
 
-`);
+`;
+    expect(result).toBe(expected);
   });
 
   it('uses headings for complex objects (non-simple values)', () => {
@@ -186,15 +189,16 @@ describe('objectToMarkdownRecursive', () => {
 
     const result = objectToMarkdownRecursive(input);
 
-    expect(result).toBe(`## Name
+    const expected = `## Name
 
 test
 
 ## Config
 
-**Timeout:** 30
+**timeout**: 30
 
-`);
+`;
+    expect(result).toBe(expected);
   });
 
   it('handles nested objects with increasing heading levels', () => {
@@ -212,19 +216,20 @@ test
 
     const result = objectToMarkdownRecursive(input);
 
-    expect(result).toBe(`## Config
+    const expected = `## Config
 
 ### Database
 
-**Host:** localhost
+**host**: localhost
 
-**Port:** 5432
+**port**: 5432
 
 ### Cache
 
-**Enabled:** true
+**enabled**: true
 
-`);
+`;
+    expect(result).toBe(expected);
   });
 
   it('handles arrays with object elements (complex arrays)', () => {
@@ -237,21 +242,22 @@ test
 
     const result = objectToMarkdownRecursive(input);
 
-    expect(result).toBe(`## Users
+    const expected = `## Users
 
 ### 1
 
-**Name:** Alice
+**name**: Alice
 
-**Age:** 30
+**age**: 30
 
 ### 2
 
-**Name:** Bob
+**name**: Bob
 
-**Age:** 25
+**age**: 25
 
-`);
+`;
+    expect(result).toBe(expected);
   });
 
   it('handles arrays with mixed primitive and object elements', () => {
@@ -261,7 +267,7 @@ test
 
     const result = objectToMarkdownRecursive(input);
 
-    expect(result).toBe(`## MixedArray
+    const expected = `## MixedArray
 
 1. string
 
@@ -269,9 +275,10 @@ test
 
 ### 3
 
-**Nested:** object
+**nested**: object
 
-`);
+`;
+    expect(result).toBe(expected);
   });
 
   it('uses custom heading level', () => {
@@ -281,9 +288,10 @@ test
 
     const result = objectToMarkdownRecursive(input, 4);
 
-    expect(result).toBe(`**Title:** Custom Level
+    const expected = `**title**: Custom Level
 
-`);
+`;
+    expect(result).toBe(expected);
   });
 
   it('handles empty objects', () => {
@@ -309,7 +317,7 @@ test
 
     const result = objectToMarkdownRecursive(input);
 
-    expect(result).toBe(`## Metadata
+    const expected = `## Metadata
 
 ### Version
 
@@ -322,15 +330,16 @@ test
 
 ### Config
 
-**Timeout:** 30
+**timeout**: 30
 
-**Retries:** null
+**retries**: null
 
 ## Enabled
 
 false
 
-`);
+`;
+    expect(result).toBe(expected);
   });
 
   it('formats simple object at root level correctly', () => {
@@ -342,13 +351,14 @@ false
 
     const result = objectToMarkdownRecursive(input);
 
-    expect(result).toBe(`**Status:** active
+    const expected = `**status**: active
 
-**Count:** 5
+**count**: 5
 
-**Readonly:** true
+**readonly**: true
 
-`);
+`;
+    expect(result).toBe(expected);
   });
 
   it('formats empty arrays as empty sections', () => {
@@ -384,11 +394,12 @@ describe('formatOutput', () => {
 
     const result = formatOutput(input, OUTPUTFORMAT.TEXT);
 
-    expect(result).toBe(`**Name:** test
+    const expected = `**name**: test
 
-**Enabled:** true
+**enabled**: true
 
-`);
+`;
+    expect(result).toBe(expected);
   });
 
   it('formats primitive values as string when format is TEXT', () => {

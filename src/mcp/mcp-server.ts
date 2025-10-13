@@ -315,7 +315,29 @@ export function formatOutput(output: unknown, format: OutputFormat): string {
   }
 }
 
+function printSimpleArray(arr: unknown[]): string {
+  let markdown = '';
+  arr.forEach((item) => {
+    markdown += `- ${item}\n`;
+  });
+  markdown += '\n';
+  return markdown;
+}
+
+function printSimpleObject(obj: Record<string, unknown>): string {
+  let markdown = '';
+  for (const [subKey, subValue] of Object.entries(obj)) {
+    markdown += `**${subKey}**: ${subValue}\n\n`;
+  }
+  return markdown;
+}
+
 export function objectToMarkdownRecursive(obj: Record<string, unknown>, headingLevel = 2): string {
+  // Check if the entire object is simple (only contains primitive values)
+  if (isSimpleObject(obj)) {
+    return printSimpleObject(obj);
+  }
+
   let markdown = '';
   const headingPrefix = '#'.repeat(headingLevel);
 
@@ -325,20 +347,59 @@ export function objectToMarkdownRecursive(obj: Record<string, unknown>, headingL
       markdown += `${headingPrefix} ${capitalizedKey}\n\n${value}\n\n`;
     } else if (Array.isArray(value)) {
       markdown += `${headingPrefix} ${capitalizedKey}\n\n`;
-      value.forEach((item, index) => {
-        if (typeof item === 'object' && item !== null) {
-          markdown += `${headingPrefix}# ${index + 1}\n\n`;
-          markdown += objectToMarkdownRecursive(item as Record<string, unknown>, headingLevel + 2);
-        } else {
-          markdown += `${index + 1}. ${item}\n\n`;
-        }
-      });
+      if (isSimpleArray(value)) {
+        // Format simple arrays as markdown lists
+        markdown += printSimpleArray(value);
+      } else {
+        // Format complex arrays with numbered headings
+        value.forEach((item, index) => {
+          if (typeof item === 'object' && item !== null) {
+            markdown += `${headingPrefix}# ${index + 1}\n\n`;
+            markdown += objectToMarkdownRecursive(
+              item as Record<string, unknown>,
+              headingLevel + 2,
+            );
+          } else {
+            markdown += `${index + 1}. ${item}\n\n`;
+          }
+        });
+      }
     } else if (typeof value === 'object' && value !== null) {
-      markdown += `${headingPrefix} ${capitalizedKey}\n\n`;
-      markdown += objectToMarkdownRecursive(value as Record<string, unknown>, headingLevel + 1);
+      const valueObj = value as Record<string, unknown>;
+      if (isSimpleObject(valueObj)) {
+        // Format simple objects as key-value pairs
+        markdown += `${headingPrefix} ${capitalizedKey}\n\n`;
+        markdown += printSimpleObject(valueObj);
+      } else {
+        // Format complex objects with recursive headings
+        markdown += `${headingPrefix} ${capitalizedKey}\n\n`;
+        markdown += objectToMarkdownRecursive(valueObj, headingLevel + 1);
+      }
     } else {
       markdown += `${headingPrefix} ${capitalizedKey}\n\n${value}\n\n`;
     }
   }
   return markdown;
+}
+
+function isSimpleArray(arr: unknown[]): boolean {
+  return arr.every(
+    (item) =>
+      typeof item === 'string' ||
+      typeof item === 'number' ||
+      typeof item === 'boolean' ||
+      item === null ||
+      item === undefined,
+  );
+}
+
+function isSimpleObject(obj: Record<string, unknown>): boolean {
+  return Object.values(obj).every(
+    (value) =>
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean' ||
+      value === null ||
+      value === undefined,
+  );
 }
