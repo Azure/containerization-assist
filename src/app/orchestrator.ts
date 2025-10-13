@@ -259,7 +259,7 @@ async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
   let samplingCheckResult: SamplingCheckResult | undefined;
 
   //Later on this can be cached in the session to avoid multiple checks
-  //Avoiding caching to reduce complexity for now
+  // Avoiding caching to reduce complexity for now
   if (tool.metadata?.samplingStrategy === 'single') {
     samplingCheckResult = await checkSamplingAvailability(toolContext);
   }
