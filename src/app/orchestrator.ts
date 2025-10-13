@@ -332,6 +332,29 @@ const chainHintMap = new Map<ToolName, { success: string; failure: string }>([
       failure: 'Manifest plan generation failed. Please check the logs for details.',
     },
   ],
+  [
+    TOOL_NAME.PUSH_IMAGE,
+    {
+      success: `Image pushed successfully. Review AI optimization insights for push improvements.`,
+      failure:
+        'Image push failed. Check registry credentials, network connectivity, and image tag format.',
+    },
+  ],
+  [
+    TOOL_NAME.SCAN,
+    {
+      success: `Security scan passed! Proceed with ${TOOL_NAME.PUSH_IMAGE} to push to a registry, or continue with deployment preparation.`,
+      failure: `Security scan found vulnerabilities. Use ${TOOL_NAME.FIX_DOCKERFILE} to address security issues in your base images and dependencies.`,
+    },
+  ],
+  [
+    TOOL_NAME.PREPARE_CLUSTER,
+    {
+      success: `Cluster preparation successful. Review AI optimization insights to enhance cluster performance and security.`,
+      failure:
+        'Cluster preparation found issues. Check connectivity, permissions, and namespace configuration.',
+    },
+  ],
 ]);
 
 /**
