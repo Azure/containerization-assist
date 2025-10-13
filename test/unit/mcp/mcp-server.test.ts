@@ -389,10 +389,10 @@ describe('formatOutput', () => {
     expect(result).toBe(JSON.stringify(input, null, 2));
   });
 
-  it('formats simple objects as Key: Value when format is TEXT', () => {
+  it('formats simple objects as Key: Value when format is MARKDOWN', () => {
     const input = { name: 'test', enabled: true };
 
-    const result = formatOutput(input, OUTPUTFORMAT.TEXT);
+    const result = formatOutput(input, OUTPUTFORMAT.MARKDOWN);
 
     const expected = `**name**: test
 
@@ -402,7 +402,7 @@ describe('formatOutput', () => {
     expect(result).toBe(expected);
   });
 
-  it('formats primitive values as string when format is TEXT', () => {
+  it('formats primitive values as string when format is MARKDOWN', () => {
     expect(formatOutput('hello', OUTPUTFORMAT.MARKDOWN)).toBe('hello');
     expect(formatOutput(42, OUTPUTFORMAT.MARKDOWN)).toBe('42');
     expect(formatOutput(true, OUTPUTFORMAT.MARKDOWN)).toBe('true');

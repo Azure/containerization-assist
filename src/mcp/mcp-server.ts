@@ -311,12 +311,6 @@ export function formatOutput(output: unknown, format: OutputFormat): string {
         return objectToMarkdownRecursive(output as Record<string, unknown>);
       }
       return String(output);
-    case OUTPUTFORMAT.TEXT:
-      // Handle simple objects as key: value pairs for text format
-      if (typeof output === 'object' && output !== null && !Array.isArray(output)) {
-        return printSimpleObject(output as Record<string, unknown>);
-      }
-      return String(output);
     default:
       return String(output);
   }
