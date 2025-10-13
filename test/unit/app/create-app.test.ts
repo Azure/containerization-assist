@@ -8,6 +8,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import * as OrchestratorModule from '@/app/orchestrator';
 import * as MCPServerModule from '@/mcp/mcp-server';
+import { registerToolsWithServer, OUTPUTFORMAT } from '@/mcp/mcp-server';
 import { createApp } from '@/app';
 
 const { createOrchestrator } = OrchestratorModule;
@@ -210,7 +211,7 @@ describe('createApp orchestration integration', () => {
     app.bindToMCP(fakeServer, 'external');
 
     expect(registerToolsSpy).toHaveBeenCalledWith({
-      outputFormat: 'markdown',
+      outputFormat: OUTPUTFORMAT.MARKDOWN,
       server: fakeServer,
       tools: expect.any(Array),
       logger: expect.any(Object),

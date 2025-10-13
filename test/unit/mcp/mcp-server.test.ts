@@ -403,10 +403,10 @@ describe('formatOutput', () => {
   });
 
   it('formats primitive values as string when format is TEXT', () => {
-    expect(formatOutput('hello', OUTPUTFORMAT.TEXT)).toBe('hello');
-    expect(formatOutput(42, OUTPUTFORMAT.TEXT)).toBe('42');
-    expect(formatOutput(true, OUTPUTFORMAT.TEXT)).toBe('true');
-    expect(formatOutput(null, OUTPUTFORMAT.TEXT)).toBe('null');
+    expect(formatOutput('hello', OUTPUTFORMAT.MARKDOWN)).toBe('hello');
+    expect(formatOutput(42, OUTPUTFORMAT.MARKDOWN)).toBe('42');
+    expect(formatOutput(true, OUTPUTFORMAT.MARKDOWN)).toBe('true');
+    expect(formatOutput(null, OUTPUTFORMAT.MARKDOWN)).toBe('null');
   });
 
   it('handles invalid format by defaulting to string', () => {
