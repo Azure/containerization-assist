@@ -205,7 +205,6 @@ import type { Tool } from '@/types';
 const tool: Tool<typeof schema, ResultType> = {
   name: 'my-tool',
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: ['content-generation', 'optimization'],
@@ -346,11 +345,10 @@ MCP clients can subscribe to `notifications/progress` messages to display real-t
 
 ### Tool-Specific Configuration
 
-Tools can override default AI enhancement settings:
+Tools can configure AI enhancement settings:
 
 ```typescript
 const metadata = {
-  aiDriven: true,
   knowledgeEnhanced: true,
   samplingStrategy: 'single' as const,
   enhancementCapabilities: ['content-generation', 'validation', 'optimization']

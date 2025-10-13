@@ -234,7 +234,8 @@ export interface ValidationReport {
 const VALIDATION_SUGGESTIONS: Record<string, string> = {
   'AI-driven tool should have sampling strategy': 'Set samplingStrategy to "single"',
   'Knowledge-enhanced tool missing capabilities': 'Add appropriate enhancementCapabilities array',
-  'Knowledge-enhanced should be AI-driven': 'Set aiDriven: true for knowledge-enhanced tools',
+  'Knowledge-enhanced should be AI-driven':
+    'Set samplingStrategy: "single" for knowledge-enhanced tools',
   'AI-driven tool should specify capabilities': 'Add relevant enhancementCapabilities',
   'Invalid metadata schema': 'Fix metadata schema validation errors',
   'Metadata consistency issues': 'Review and fix metadata consistency',
