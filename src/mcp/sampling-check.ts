@@ -42,7 +42,10 @@ export async function checkSamplingAvailability(ctx: ToolContext): Promise<Sampl
       message: '',
     };
   } catch (e) {
-    ctx.logger.debug({ error: e }, 'Sampling not available');
+    ctx.logger.debug(
+      { error: e },
+      "Verbose Mode Enabled - (your environment does not have 'sampling' capability, enable it for enhanced summary output)",
+    );
     return {
       available: false,
       message:
