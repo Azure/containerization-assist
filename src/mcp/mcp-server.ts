@@ -44,6 +44,7 @@ export interface MCPServer {
 export const OUTPUTFORMAT = {
   MARKDOWN: 'markdown',
   JSON: 'json',
+  TEXT: 'text',
 } as const;
 export type OutputFormat = (typeof OUTPUTFORMAT)[keyof typeof OUTPUTFORMAT];
 
@@ -308,6 +309,12 @@ export function formatOutput(output: unknown, format: OutputFormat): string {
       // convert a json object to plain text
       if (typeof output === 'object' && output !== null) {
         return objectToMarkdownRecursive(output as Record<string, unknown>);
+      }
+      return String(output);
+    case OUTPUTFORMAT.TEXT:
+      // Handle simple objects as key: value pairs for text format
+      if (typeof output === 'object' && output !== null && !Array.isArray(output)) {
+        return printSimpleObject(output as Record<string, unknown>);
       }
       return String(output);
     default:
