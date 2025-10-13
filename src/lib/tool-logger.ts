@@ -39,17 +39,17 @@ function isToolLoggingEnabled(): boolean {
 }
 
 export function getLogFilePath(): string {
+  const dirPath = config.toolLogging.dirPath;
+  if (!dirPath) {
+    throw new Error('Tool logging directory path is not configured');
+  }
   if (logFileName) {
-    return logFileName;
+    return join(dirPath, logFileName);
   }
 
   const date = new Date();
   const timestamp = date.toISOString();
   logFileName = `ca-tool-logs-${timestamp}.jsonl`;
-  const dirPath = config.toolLogging.dirPath;
-  if (!dirPath) {
-    throw new Error('Tool logging directory path is not configured');
-  }
   return join(dirPath, logFileName);
 }
 
