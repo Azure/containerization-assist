@@ -278,7 +278,7 @@ jobs:
         with:
           languages: typescript
           queries: security-and-quality
-          config-file: ./.github/codeql/codeql-config.yml
+          config-file: ./.github/workflows/codeql/codeql-config.yml
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@e296a935590eb16afc0c0108289f68c87e2a89a5 # v3
