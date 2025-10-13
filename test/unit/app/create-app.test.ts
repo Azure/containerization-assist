@@ -210,7 +210,7 @@ describe('createApp orchestration integration', () => {
     app.bindToMCP(fakeServer, 'external');
 
     expect(registerToolsSpy).toHaveBeenCalledWith({
-      outputFormat: 'text',
+      outputFormat: 'markdown',
       server: fakeServer,
       tools: expect.any(Array),
       logger: expect.any(Object),
