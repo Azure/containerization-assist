@@ -306,7 +306,7 @@ export function formatOutput(output: unknown, format: OutputFormat): string {
     case OUTPUTFORMAT.JSON:
       return JSON.stringify(output, null, 2);
     case OUTPUTFORMAT.MARKDOWN:
-      // convert a json object to plain text
+      // convert a json object to markdown
       if (typeof output === 'object' && output !== null) {
         return objectToMarkdownRecursive(output as Record<string, unknown>);
       }
