@@ -339,7 +339,7 @@ async function main(): Promise<void> {
       logger: getLogger(),
       policyPath: options.config || 'config/policy.yaml',
       policyEnvironment: options.dev ? 'development' : 'production',
-      outputFormat: OUTPUTFORMAT.TEXT,
+      outputFormat: OUTPUTFORMAT.MARKDOWN,
     });
 
     if (options.listTools) {

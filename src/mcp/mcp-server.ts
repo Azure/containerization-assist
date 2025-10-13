@@ -42,7 +42,7 @@ export interface MCPServer {
 }
 
 export const OUTPUTFORMAT = {
-  TEXT: 'text',
+  MARKDOWN: 'markdown',
   JSON: 'json',
 } as const;
 export type OutputFormat = (typeof OUTPUTFORMAT)[keyof typeof OUTPUTFORMAT];
@@ -90,7 +90,7 @@ export function createMCPServer<TTool extends MCPTool>(
 
   const server = new McpServer(serverOptions);
   const transportType = options.transport ?? 'stdio';
-  const outputFormat = options.outputFormat ?? OUTPUTFORMAT.TEXT;
+  const outputFormat = options.outputFormat ?? OUTPUTFORMAT.MARKDOWN;
   let transportInstance: StdioServerTransport | null = null;
   let isRunning = false;
 
@@ -304,7 +304,7 @@ export function formatOutput(output: unknown, format: OutputFormat): string {
   switch (format) {
     case OUTPUTFORMAT.JSON:
       return JSON.stringify(output, null, 2);
-    case OUTPUTFORMAT.TEXT:
+    case OUTPUTFORMAT.MARKDOWN:
       // convert a json object to plain text
       if (typeof output === 'object' && output !== null) {
         return objectToMarkdownRecursive(output as Record<string, unknown>);
