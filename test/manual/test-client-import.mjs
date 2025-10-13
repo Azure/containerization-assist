@@ -39,7 +39,7 @@ try {
   // Verify TOOLS constants
   if (typeof TOOLS === 'object') {
     console.log('✅ TOOLS constants exported');
-    console.log(`✅ Sample tool names: ${TOOLS.ANALYZE_REPO}, ${TOOLS.BUILD_IMAGE}, ${TOOLS.SCAN}`);
+    console.log(`✅ Sample tool names: ${TOOLS.ANALYZE_REPO}, ${TOOLS.BUILD_IMAGE}, ${TOOLS.SCAN_IMAGE}`);
   }
 
   // Verify getAllInternalTools
