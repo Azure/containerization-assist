@@ -7,7 +7,6 @@
  *
  * @category docker
  * @version 1.0.0
- * @aiDriven false
  * @knowledgeEnhanced true
  * @samplingStrategy none
  */
@@ -174,7 +173,6 @@ const tool: MCPTool<typeof generateDockerfilePlanSchema, DockerfilePlan> = {
   version,
   schema: generateDockerfilePlanSchema,
   metadata: {
-    aiDriven: false,
     knowledgeEnhanced: true,
     samplingStrategy: 'none',
     enhancementCapabilities: ['recommendations'],

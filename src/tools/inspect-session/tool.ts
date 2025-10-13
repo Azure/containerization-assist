@@ -200,7 +200,6 @@ const tool: MCPTool<typeof InspectSessionParamsSchema, InspectSessionResult> = {
   version: '2.0.0',
   schema: InspectSessionParamsSchema,
   metadata: {
-    aiDriven: false,
     knowledgeEnhanced: false,
     samplingStrategy: 'none',
     enhancementCapabilities: [],

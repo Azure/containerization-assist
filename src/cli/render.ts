@@ -57,7 +57,7 @@ function outputTable(tools: Tool[], detailed: boolean = false): void {
   for (const tool of tools) {
     const name = tool.name.padEnd(nameWidth);
     const category = (tool.category || '').padEnd(categoryWidth);
-    const ai = tool.metadata.aiDriven ? ' ✅ ' : ' ❌ ';
+    const ai = tool.metadata.samplingStrategy === 'single' ? ' ✅ ' : ' ❌ ';
     const ke = tool.metadata.knowledgeEnhanced ? ' ✅ ' : ' ❌ ';
     const sampling = tool.metadata.samplingStrategy.padEnd(samplingWidth);
 
@@ -82,13 +82,11 @@ function outputTable(tools: Tool[], detailed: boolean = false): void {
  * Output tools in CSV format
  */
 function outputCSV(tools: Tool[]): void {
-  console.info(
-    'Name,Category,AI-Driven,Knowledge-Enhanced,Sampling Strategy,Enhancement Capabilities',
-  );
+  console.info('Name,Category,Sampling Strategy,Knowledge-Enhanced,Enhancement Capabilities');
   for (const tool of tools) {
     const caps = tool.metadata.enhancementCapabilities.join(';');
     console.info(
-      `${tool.name},${tool.category || ''},${tool.metadata.aiDriven},${tool.metadata.knowledgeEnhanced},${tool.metadata.samplingStrategy},"${caps}"`,
+      `${tool.name},${tool.category || ''},${tool.metadata.samplingStrategy},${tool.metadata.knowledgeEnhanced},"${caps}"`,
     );
   }
 }

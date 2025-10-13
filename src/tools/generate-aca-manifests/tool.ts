@@ -112,7 +112,6 @@ const tool: MCPTool<typeof generateAcaManifestsSchema, AIResponse> = {
   version,
   schema: generateAcaManifestsSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: ['content-generation', 'manifest-generation', 'azure-optimization'],
