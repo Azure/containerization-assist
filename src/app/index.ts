@@ -20,6 +20,7 @@ import type {
   ToolResultMap,
   ExecutionMetadata,
 } from '@/types/runtime';
+import { validateToolLoggingPath } from '@/lib/tool-logger';
 
 /**
  * Apply tool aliases to create renamed versions of tools
@@ -48,6 +49,12 @@ export interface TransportConfig {
  */
 export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
   const logger = config.logger || createLogger({ name: 'containerization-assist' });
+
+  // Validate tool logging path
+  validateToolLoggingPath(logger).catch((error) => {
+    logger.warn({ error }, 'Tool logging validation failed');
+  });
+
   const tools = config.tools || ALL_TOOLS;
   const aliasedTools = applyToolAliases(tools, config.toolAliases);
 
@@ -128,7 +135,6 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
         metadata: {
           loggerContext: {
             transport: metadata?.transport || 'programmatic',
-            requestId: metadata?.requestId,
             ...metadata,
           },
         },

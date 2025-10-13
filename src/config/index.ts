@@ -30,6 +30,11 @@ export const config = {
     dockerBuildTimeout: parseInt(process.env.MUTEX_DOCKER_TIMEOUT || '300000'),
     monitoringEnabled: process.env.MUTEX_MONITORING !== 'false',
   },
+
+  toolLogging: {
+    enabled: !!process.env.CONTAINERIZATION_ASSIST_TOOL_LOGS_PATH,
+    path: process.env.CONTAINERIZATION_ASSIST_TOOL_LOGS_PATH,
+  },
 } as const;
 
 // Export the type for use throughout the application

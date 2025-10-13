@@ -197,6 +197,7 @@ The following environment variables control server behavior:
 | `MCP_QUIET` | Suppress non-essential output in MCP mode | `false` | No |
 | `CONTAINERIZATION_ASSIST_IMAGE_ALLOWLIST` | Comma-separated list of allowed base images | Empty | No |
 | `CONTAINERIZATION_ASSIST_IMAGE_DENYLIST` | Comma-separated list of denied base images | Empty | No |
+| `CONTAINERIZATION_ASSIST_TOOL_LOGS_PATH` | Directory path for tool execution logs (JSON format) | Disabled | No |
 
 **Note on Runtime Configuration:**
 This server uses a **single-session model** optimized for one operator. Session state persists across tool executions within a single workflow and clears on server shutdown.
@@ -206,6 +207,38 @@ Long-running operations (build, deploy, scan) emit real-time progress updates vi
 
 **Deterministic AI Sampling:**
 All AI-powered tools use deterministic sampling with `count: 1` to ensure reproducible outputs. Each generation includes scoring metadata for quality validation and diagnostics.
+
+### Tool Execution Logging
+
+Enable detailed logging of all tool executions to JSON files for debugging and auditing:
+
+```bash
+export CONTAINERIZATION_ASSIST_TOOL_LOGS_PATH=/path/to/logs
+```
+
+**Log File Format:**
+- Filename: `timestamp_toolname_sessionId.json`
+- Example: `2025-10-13T14-30-15-123Z_analyze-repo_session_abc123.json`
+
+**Log Contents:**
+```json
+{
+  "timestamp": "2025-10-13T14:30:15.123Z",
+  "toolName": "analyze-repo",
+  "sessionId": "session_abc123",
+  "input": { "path": "/workspace/myapp" },
+  "output": { "language": "typescript", "framework": "express" },
+  "success": true,
+  "durationMs": 245,
+  "error": "Error message if failed",
+  "errorGuidance": {
+    "hint": "Suggested fix",
+    "resolution": "Step-by-step instructions"
+  }
+}
+```
+
+The logging directory is validated at startup to ensure it's writable.
 
 ### Policy Configuration (Optional)
 
