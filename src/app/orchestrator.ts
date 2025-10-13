@@ -264,6 +264,7 @@ async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
   if (tool.metadata?.samplingStrategy === 'single') {
     samplingCheckResult = await checkSamplingAvailability(toolContext);
   }
+    
   const startTime = Date.now();
   const logEntry: ToolLogEntry = {
     timestamp: new Date().toISOString(),
