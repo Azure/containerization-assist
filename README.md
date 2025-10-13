@@ -217,8 +217,8 @@ export CONTAINERIZATION_ASSIST_TOOL_LOGS_PATH=/path/to/logs
 ```
 
 **Log File Format:**
-- Filename: `timestamp_toolname_sessionId.json`
-- Example: `2025-10-13T14-30-15-123Z_analyze-repo_session_abc123.json`
+- Filename: `ca-tool-logs-${timestamp}.jsonl`
+- Example: `ca-tool-logs-2025-10-13T14-30-15-123Z.jsonl`
 
 **Log Contents:**
 ```json
