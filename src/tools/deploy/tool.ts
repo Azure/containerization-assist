@@ -814,7 +814,6 @@ const tool: MCPTool<typeof deployApplicationSchema, DeployApplicationResult> = {
   version: '2.0.0',
   schema: deployApplicationSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: [

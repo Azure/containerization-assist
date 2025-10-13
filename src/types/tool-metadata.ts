@@ -71,13 +71,10 @@ export type SamplingStrategy = z.infer<typeof SamplingStrategySchema>;
  * and capability discovery.
  */
 export const ToolMetadataSchema = z.object({
-  /** Whether this tool uses AI-driven content generation (required) */
-  aiDriven: z.boolean(),
-
   /** Whether this tool uses knowledge enhancement (required) */
   knowledgeEnhanced: z.boolean(),
 
-  /** Sampling strategy used for AI generation (required) */
+  /** Sampling strategy used for AI generation (required) - 'single' for AI-driven tools, 'none' for non-AI tools */
   samplingStrategy: SamplingStrategySchema,
 
   /** List of enhancement capabilities this tool provides (required) */
@@ -118,7 +115,6 @@ export function validateToolMetadata(metadata: unknown): Result<ToolMetadata> {
  */
 export function createDefaultMetadata(): ToolMetadata {
   return {
-    aiDriven: false,
     knowledgeEnhanced: false,
     samplingStrategy: 'none',
     enhancementCapabilities: [],
@@ -130,7 +126,6 @@ export function createDefaultMetadata(): ToolMetadata {
  */
 export function createAIMetadata(overrides: Partial<ToolMetadata> = {}): ToolMetadata {
   return {
-    aiDriven: true,
     knowledgeEnhanced: overrides.knowledgeEnhanced ?? true,
     samplingStrategy: overrides.samplingStrategy ?? 'single',
     enhancementCapabilities: overrides.enhancementCapabilities ?? ['generation', 'analysis'],
@@ -155,24 +150,13 @@ export function validateMetadataConsistency(
 ): Result<void> {
   const issues: string[] = [];
 
-  // AI-driven tools should have appropriate sampling strategy
-  if (metadata.aiDriven && metadata.samplingStrategy === 'none') {
-    issues.push('AI-driven tools should use "single" sampling strategy');
-  }
-
-  // Knowledge-enhanced tools should be AI-driven
-  if (metadata.knowledgeEnhanced && !metadata.aiDriven) {
-    issues.push('Knowledge-enhanced tools must be AI-driven');
-  }
-
   // Knowledge-enhanced tools should have enhancement capabilities
   if (metadata.knowledgeEnhanced && metadata.enhancementCapabilities.length === 0) {
     issues.push('Knowledge-enhanced tools should specify enhancement capabilities');
   }
 
-  // AI-driven tools with high confidence threshold should use single
+  // High confidence threshold should use single sampling strategy
   if (
-    metadata.aiDriven &&
     metadata.confidenceThreshold &&
     metadata.confidenceThreshold > 0.8 &&
     metadata.samplingStrategy !== 'single'
@@ -202,24 +186,17 @@ export interface ValidatableTool {
 export function postValidate(tool: ValidatableTool): string[] {
   const issues: string[] = [];
 
-  // AI-driven tool should have sampling strategy
-  if (tool.metadata.aiDriven && tool.metadata.samplingStrategy === 'none') {
-    issues.push('AI-driven tool should have sampling strategy');
-  }
-
   // Knowledge-enhanced tool missing capabilities
   if (tool.metadata.knowledgeEnhanced && tool.metadata.enhancementCapabilities.length === 0) {
     issues.push('Knowledge-enhanced tool missing capabilities');
   }
 
-  // Knowledge-enhanced should be AI-driven
-  if (tool.metadata.knowledgeEnhanced && !tool.metadata.aiDriven) {
-    issues.push('Knowledge-enhanced should be AI-driven');
-  }
-
-  // AI-driven tool should specify capabilities
-  if (tool.metadata.aiDriven && tool.metadata.enhancementCapabilities.length === 0) {
-    issues.push('AI-driven tool should specify capabilities');
+  // Tools with 'single' sampling should specify capabilities
+  if (
+    tool.metadata.samplingStrategy === 'single' &&
+    tool.metadata.enhancementCapabilities.length === 0
+  ) {
+    issues.push('AI-driven tool (samplingStrategy: single) should specify capabilities');
   }
 
   return issues;

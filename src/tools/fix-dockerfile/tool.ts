@@ -542,7 +542,6 @@ const tool: MCPTool<typeof fixDockerfileSchema, AIResponse> = {
   version,
   schema: fixDockerfileSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: ['content-generation', 'validation', 'optimization', 'self-repair'],

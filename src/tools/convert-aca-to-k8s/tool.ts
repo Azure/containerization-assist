@@ -78,7 +78,6 @@ const tool: MCPTool<typeof convertAcaToK8sSchema, AIResponse> = {
   version,
   schema: convertAcaToK8sSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: ['content-generation', 'manifest-conversion', 'platform-translation'],

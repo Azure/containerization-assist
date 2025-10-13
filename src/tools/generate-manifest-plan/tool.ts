@@ -8,7 +8,6 @@
  *
  * @category kubernetes
  * @version 1.0.0
- * @aiDriven false
  * @knowledgeEnhanced true
  * @samplingStrategy none
  */
@@ -148,7 +147,6 @@ const tool: MCPTool<typeof generateManifestPlanSchema, ManifestPlan> = {
   version,
   schema: generateManifestPlanSchema,
   metadata: {
-    aiDriven: false,
     knowledgeEnhanced: true,
     samplingStrategy: 'none',
     enhancementCapabilities: ['recommendations'],
