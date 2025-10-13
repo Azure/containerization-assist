@@ -351,7 +351,6 @@ const tool: MCPTool<typeof pushImageSchema, PushImageResult> = {
   version: '2.0.0',
   schema: pushImageSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: ['push-optimization', 'registry-insights', 'security-recommendations'],

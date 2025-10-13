@@ -112,7 +112,6 @@ const tool: MCPTool<typeof generateHelmChartsSchema, AIResponse> = {
   version,
   schema: generateHelmChartsSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: ['content-generation', 'helm-templating', 'chart-optimization'],

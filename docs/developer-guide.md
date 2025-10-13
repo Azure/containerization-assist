@@ -98,7 +98,7 @@ const tool: Tool<typeof generateDockerfileSchema, AIResponse> = {
   name: 'generate-dockerfile',
   description: '...',
   schema: generateDockerfileSchema,
-  metadata: { aiDriven: true, samplingStrategy: 'single', /* ... */ },
+  metadata: { samplingStrategy: 'single', /* ... */ },
   run,
 };
 
@@ -111,7 +111,7 @@ export default tool;
 ### 3.3 AI & Deterministic Sampling
 
 - `src/mcp/ai/sampling-runner.ts`: `sampleWithRerank` returns a single deterministic candidate with optional scoring metadata.
-- Tool metadata sets `samplingStrategy: 'single'`; CLI filtering supports `'single' | 'none'` only.
+- Tool metadata sets `samplingStrategy: 'single'` for AI-driven tools, `'none'` for non-AI tools.
 - `docs/ai-enhancement.md` covers enhancement architecture (knowledge enhancement, validation suggestions).
 
 ---

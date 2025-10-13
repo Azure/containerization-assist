@@ -7,7 +7,6 @@
  *
  * @category docker
  * @version 2.1.0
- * @aiDriven true
  * @samplingStrategy single
  */
 
@@ -138,7 +137,6 @@ const tool: MCPTool<typeof resolveBaseImagesSchema, AIResponse> = {
   version,
   schema: resolveBaseImagesSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: ['content-generation', 'image-recommendation', 'security-analysis'],
