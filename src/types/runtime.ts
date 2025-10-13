@@ -97,7 +97,7 @@ export interface AppRuntime {
 
   /**
    * Get the current log file path (if tool logging is enabled)
-   * Returns null if logging is disabled
+   * Returns empty if logging is disabled
    */
   getLogFilePath(): string | null;
 }

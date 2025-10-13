@@ -41,7 +41,7 @@ function isToolLoggingEnabled(): boolean {
 export function getLogFilePath(): string {
   const dirPath = config.toolLogging.dirPath;
   if (!dirPath) {
-    throw new Error('Tool logging directory path is not configured');
+    return '';
   }
   if (logFileName) {
     return join(dirPath, logFileName);
