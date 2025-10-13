@@ -133,6 +133,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
         metadata: {
           loggerContext: {
             transport: metadata?.transport || 'programmatic',
+            requestId: metadata?.requestId,
             ...metadata,
           },
         },
