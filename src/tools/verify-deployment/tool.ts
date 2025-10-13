@@ -515,7 +515,6 @@ const tool: MCPTool<typeof verifyDeploymentSchema, VerifyDeploymentResult> = {
   version: '2.0.0',
   schema: verifyDeploymentSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: false,
     samplingStrategy: 'single',
     enhancementCapabilities: [

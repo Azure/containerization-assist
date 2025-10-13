@@ -8,7 +8,6 @@
  *
  * @category docker
  * @version 3.0.0
- * @aiDriven true
  * @knowledgeEnhanced true
  * @samplingStrategy single
  */
@@ -618,7 +617,6 @@ const tool: MCPTool<typeof generateDockerfileSchema, AIResponse> = {
   version,
   schema: generateDockerfileSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: ['content-generation', 'validation', 'optimization', 'self-repair'],

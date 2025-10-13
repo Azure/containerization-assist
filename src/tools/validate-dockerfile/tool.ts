@@ -225,7 +225,6 @@ const tool: MCPTool<typeof validateImageSchema, ValidateImageResult> = {
   version,
   schema: validateImageSchema,
   metadata: {
-    aiDriven: false,
     knowledgeEnhanced: false,
     samplingStrategy: 'none',
     enhancementCapabilities: [],

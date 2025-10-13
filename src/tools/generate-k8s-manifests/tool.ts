@@ -620,7 +620,6 @@ const tool: MCPTool<typeof generateK8sManifestsSchema, AIResponse> = {
   version,
   schema: generateK8sManifestsSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: [

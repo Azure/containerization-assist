@@ -334,9 +334,9 @@ We use Husky and lint-staged for pre-commit hooks:
      version: '1.0.0',
      schema: myToolSchema,
      metadata: {
-       aiDriven: false,
        knowledgeEnhanced: false,
        samplingStrategy: 'none',
+       enhancementCapabilities: [],
      },
      run: async (input, ctx) => {
        // Implementation
@@ -347,8 +347,8 @@ We use Husky and lint-staged for pre-commit hooks:
    ```
 
 3. **AI Integration**
-   - Set `aiDriven: true` for AI-enhanced tools
-   - Set `samplingStrategy: 'single'` for deterministic sampling
+   - Set `samplingStrategy: 'single'` for AI-driven tools
+   - Set `knowledgeEnhanced: true` for tools using knowledge packs
    - Use `ctx.ai.sampleWithRerank()` for AI generation
    - Add to `enhancementCapabilities` array
 

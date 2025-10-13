@@ -487,7 +487,6 @@ const tool: MCPTool<typeof buildImageSchema, BuildImageResult> = {
   version: '2.0.0',
   schema: buildImageSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: ['optimization-suggestions', 'build-analysis', 'performance-insights'],

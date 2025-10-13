@@ -27,7 +27,6 @@ export type ToolCategory =
 export interface ToolCategoryMetadata {
   category: ToolCategory;
   tags?: string[];
-  aiDriven?: boolean;
 }
 
 /**

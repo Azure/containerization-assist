@@ -289,7 +289,6 @@ const tool: MCPTool<typeof tagImageSchema, TagImageResult> = {
   version: '2.0.0',
   schema: tagImageSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: ['tagging-strategy', 'best-practices', 'recommendations'],

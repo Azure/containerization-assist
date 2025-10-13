@@ -867,7 +867,6 @@ const tool: MCPTool<typeof prepareClusterSchema, PrepareClusterResult> = {
   version: '2.0.0',
   schema: prepareClusterSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: false,
     samplingStrategy: 'single',
     enhancementCapabilities: [

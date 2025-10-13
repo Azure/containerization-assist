@@ -366,7 +366,6 @@ const tool: MCPTool<typeof scanImageSchema, ScanImageResult> = {
   version: '2.0.0',
   schema: scanImageSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: ['vulnerability-analysis', 'security-suggestions', 'risk-assessment'],
