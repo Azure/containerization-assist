@@ -53,7 +53,7 @@ describe('Sampling Check', () => {
       const result = await checkSamplingAvailability(mockContext);
 
       expect(result.available).toBe(false);
-      expect(result.message).toBe('Sampling is not enabled, turn it on to get the best output');
+      expect(result.message).toBe("Verbose Mode Enabled - (your environment does not have 'sampling' capability, enable it for enhanced summary output)");
     });
   });
 });
