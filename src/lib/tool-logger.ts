@@ -58,6 +58,8 @@ export function createToolLoggerFile(logger?: Logger): void {
     return;
   }
 
+  logger?.info({ message: 'Starting tool logger file creation' });
+
   const dirPath = config.toolLogging.dirPath;
   if (!dirPath) {
     logger?.warn('Tool logging directory path is not configured');

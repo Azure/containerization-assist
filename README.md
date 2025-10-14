@@ -197,7 +197,7 @@ The following environment variables control server behavior:
 | `MCP_QUIET` | Suppress non-essential output in MCP mode | `false` | No |
 | `CONTAINERIZATION_ASSIST_IMAGE_ALLOWLIST` | Comma-separated list of allowed base images | Empty | No |
 | `CONTAINERIZATION_ASSIST_IMAGE_DENYLIST` | Comma-separated list of denied base images | Empty | No |
-| `CONTAINERIZATION_ASSIST_TOOL_LOGS_PATH` | Directory path for tool execution logs (JSON format) | Disabled | No |
+| `CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH` | Directory path for tool execution logs (JSON format) | Disabled | No |
 
 **Note on Runtime Configuration:**
 This server uses a **single-session model** optimized for one operator. Session state persists across tool executions within a single workflow and clears on server shutdown.
