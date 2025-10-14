@@ -48,7 +48,10 @@ export const analyzeRepoSchema = z.object({
   sessionId,
   repositoryPathAbsoluteUnix,
   ...analysisOptions,
-  modules: z.array(moduleInfo),
+  modules: z
+    .array(moduleInfo)
+    .optional()
+    .describe('Optional pre-analyzed modules. If not provided, AI will analyze the repository.'),
 });
 
 export type AnalyzeRepoParams = z.infer<typeof analyzeRepoSchema>;
@@ -56,4 +59,25 @@ export type AnalyzeRepoParams = z.infer<typeof analyzeRepoSchema>;
 export interface RepositoryAnalysis {
   modules?: ModuleInfo[];
   isMonorepo?: boolean;
+  sessionId?: string;
+  analyzedPath?: string;
+  workflowHints?: {
+    message?: string;
+  };
+  // Fields from AI response (for parsing)
+  language?: string;
+  languageVersion?: string;
+  framework?: string;
+  frameworkVersion?: string;
+  buildSystem?: {
+    type?: string;
+    buildFile?: string;
+    configFile?: string;
+    buildCommand?: string;
+    testCommand?: string;
+  };
+  dependencies?: string[];
+  devDependencies?: string[];
+  entryPoint?: string;
+  suggestedPorts?: number[];
 }

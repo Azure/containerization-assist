@@ -105,12 +105,23 @@ spec:
 // Mock fs module to prevent actual file operations
 jest.mock('node:fs', () => ({
   promises: {
+    stat: jest.fn().mockImplementation((filePath) => {
+      // Mock stat for analyze-repo
+      return Promise.resolve({
+        isDirectory: () => true,
+        isFile: () => false,
+      });
+    }),
     writeFile: jest.fn().mockResolvedValue(undefined),
     mkdir: jest.fn().mockResolvedValue(undefined),
     readdir: jest.fn().mockImplementation((path, options) => {
       // Mock directory listing for analyze-repo
       if (path === '/test/repo') {
-        return Promise.resolve(['package.json', 'src', 'README.md']);
+        return Promise.resolve([
+          { name: 'package.json', isDirectory: () => false },
+          { name: 'src', isDirectory: () => true },
+          { name: 'README.md', isDirectory: () => false },
+        ]);
       }
       if (path.includes('/test/repo/src')) {
         return Promise.resolve([{ name: 'index.js', isDirectory: () => false }]);
@@ -213,8 +224,8 @@ spec:
     jest.clearAllMocks();
   });
 
-  describe('analyze-repo', () => {
-    it('should successfully analyze repository with modules', async () => {
+  describe('analyze-repo (v4.0.0 - now deterministic, no AI)', () => {
+    it('should successfully analyze repository with pre-provided modules (legacy mode)', async () => {
       const result = await analyzeRepoTool.run(
         {
           repositoryPathAbsoluteUnix: '/test/repo',
@@ -232,7 +243,7 @@ spec:
         mockContext,
       );
 
-      // analyze-repo no longer uses AI or knowledge enhancement - it's a passthrough tool
+      // analyze-repo v4.0.0 is now deterministic - accepts pre-provided modules or parses config files
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value).toHaveProperty('modules');
@@ -241,21 +252,25 @@ spec:
       }
     });
 
-    it('should fail validation when modules are missing', async () => {
+    it('should analyze repository deterministically when modules not provided', async () => {
+      // v4.0.0 uses deterministic file parsing, not AI
       const result = await analyzeRepoTool.run(
         {
           repositoryPathAbsoluteUnix: '/test/repo',
           sessionId: 'test-session-123',
-          // modules intentionally omitted - should fail Zod validation
-        } as any,
+        },
         mockContext,
       );
 
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        // Should fail with validation error about missing modules
-        expect(result.error).toContain('modules');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value).toHaveProperty('modules');
+        expect(result.value.modules.length).toBeGreaterThan(0);
+        // Should detect express from mocked package.json
+        expect(result.value.modules?.[0].frameworks?.[0]?.name).toBe('express');
       }
+      // Verify AI was NOT called (v4.0.0 is deterministic)
+      expect(promptEngine.buildMessages).not.toHaveBeenCalled();
     });
   });
 
