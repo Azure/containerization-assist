@@ -3,15 +3,11 @@
  */
 
 import type { Logger } from 'pino';
-import type { ToolContext } from '@mcp/context';
-import { Success, Failure, type Result, type WorkflowState } from '../types';
-import type { SessionManager } from '../lib/session';
+import type { ToolContext } from '@/mcp/context';
+import { Success, Failure, type Result, type WorkflowState } from '@/types';
+import type { SessionManager } from '@/session/core';
 import { type Step, getToolEdge, getMissingPreconditions, getExecutionOrder } from './tool-graph';
-import {
-  createHostAIAssistant,
-  mergeWithSuggestions,
-  type HostAIAssistant,
-} from './ai/host-ai-assist';
+import { createHostAIAssistant, type HostAIAssistant } from './ai/host-ai-assist';
 import type { z } from 'zod';
 
 /**
@@ -69,7 +65,14 @@ export class ToolRouter {
     this.sessionManager = config.sessionManager;
     this.logger = config.logger.child({ component: 'tool-router' });
     this.tools = config.tools;
-    this.aiAssistant = config.aiAssistant || createHostAIAssistant(this.logger, { enabled: true });
+    // Create a default AI assistant with a no-op hostCall if not provided
+    this.aiAssistant =
+      config.aiAssistant ||
+      createHostAIAssistant(
+        async (_prompt: string) => Promise.resolve('{}'),
+        { enabled: false },
+        this.logger,
+      );
   }
 
   /**
@@ -79,11 +82,11 @@ export class ToolRouter {
     const { toolName, params, force = false, sessionId, context } = request;
 
     // Get or create session
-    let session = sessionId
+    const sessionResult = sessionId
       ? await this.sessionManager.get(sessionId)
       : await this.sessionManager.create();
 
-    if (!session) {
+    if (!sessionResult.ok || !sessionResult.value) {
       return {
         result: Failure('Failed to get or create session'),
         executedTools: [],
@@ -91,6 +94,7 @@ export class ToolRouter {
       };
     }
 
+    let session = sessionResult.value;
     const executedTools: string[] = [];
 
     try {
@@ -166,14 +170,18 @@ export class ToolRouter {
               });
 
               // Get updated session state
-              const failedSession = await this.sessionManager.get(session.sessionId);
+              const failedSessionResult = await this.sessionManager.get(session.sessionId);
+              const failedSession =
+                failedSessionResult.ok && failedSessionResult.value
+                  ? failedSessionResult.value
+                  : session;
 
               return {
                 result: Failure(
                   `Failed to satisfy precondition '${step}' with tool '${correctiveTool}': ${result.error}`,
                 ),
                 executedTools,
-                sessionState: failedSession || session,
+                sessionState: failedSession,
               };
             }
 
@@ -194,9 +202,9 @@ export class ToolRouter {
           });
 
           // Reload session to get updated state
-          const updatedPrereqSession = await this.sessionManager.get(session.sessionId);
-          if (updatedPrereqSession) {
-            session = updatedPrereqSession;
+          const updatedPrereqSessionResult = await this.sessionManager.get(session.sessionId);
+          if (updatedPrereqSessionResult.ok && updatedPrereqSessionResult.value) {
+            session = updatedPrereqSessionResult.value;
           }
         }
       }
@@ -218,9 +226,9 @@ export class ToolRouter {
         });
 
         // Reload session to get updated state
-        const updatedSession = await this.sessionManager.get(session.sessionId);
-        if (updatedSession) {
-          session = updatedSession;
+        const updatedSessionResult = await this.sessionManager.get(session.sessionId);
+        if (updatedSessionResult.ok && updatedSessionResult.value) {
+          session = updatedSessionResult.value;
         } else {
           // If update failed, at least update the local session object
           session.completed_steps = Array.from(completedSteps);
@@ -319,7 +327,7 @@ export class ToolRouter {
       if (result.ok && session.sessionId) {
         await this.sessionManager.update(session.sessionId, {
           results: {
-            ...session.results,
+            ...(session.results || {}),
             [toolName]: result.value,
           },
           currentStep: toolName,
@@ -394,14 +402,17 @@ export class ToolRouter {
       );
 
       // Request AI suggestions
-      const aiRequest: import('./ai/host-ai-assist').AIParamRequest = {
+      const baseRequest = {
         toolName,
         currentParams: params,
         requiredParams,
         missingParams,
         schema: schemaShape,
-        ...(session.results && { sessionContext: session.results }),
       };
+
+      const aiRequest: import('./ai/host-ai-assist').AIParamRequest = session.results
+        ? { ...baseRequest, sessionContext: session.results as Record<string, unknown> }
+        : baseRequest;
 
       const aiResult = await this.aiAssistant.suggestParameters(aiRequest, context);
 
@@ -420,7 +431,10 @@ export class ToolRouter {
       }
 
       // Merge suggestions with user params (user params take precedence)
-      const mergedParams = mergeWithSuggestions(params, validationResult.value);
+      const mergedParams = {
+        ...validationResult.value,
+        ...params,
+      };
 
       this.logger.info(
         {
@@ -445,12 +459,13 @@ export class ToolRouter {
     toolName: string,
     sessionId: string,
   ): Promise<{ canExecute: boolean; missingSteps: Step[] }> {
-    const session = await this.sessionManager.get(sessionId);
+    const sessionResult = await this.sessionManager.get(sessionId);
 
-    if (!session) {
+    if (!sessionResult.ok || !sessionResult.value) {
       return { canExecute: false, missingSteps: [] };
     }
 
+    const session = sessionResult.value;
     const completedSteps = new Set<Step>((session.completed_steps || []) as Step[]);
 
     const missingSteps = getMissingPreconditions(toolName, completedSteps);
