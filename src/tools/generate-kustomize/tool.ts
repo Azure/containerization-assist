@@ -392,7 +392,6 @@ const tool: MCPTool<
   version,
   schema: generateKustomizeSchema,
   metadata: {
-    aiDriven: false,
     knowledgeEnhanced: false,
     samplingStrategy: 'none',
     enhancementCapabilities: [],

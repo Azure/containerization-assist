@@ -187,8 +187,8 @@ export class KubernetesScorer extends TextContentScorer {
 
     // Labels and selectors (25 points)
     if (content.includes('labels:')) score += 15;
-    if (/app\.kubernetes\.io\/name/.test(content)) score += 5;
-    if (/app\.kubernetes\.io\/version/.test(content)) score += 5;
+    if (/^\s*app\.kubernetes\.io\/name\s*:/m.test(content)) score += 5;
+    if (/^\s*app\.kubernetes\.io\/version\s*:/m.test(content)) score += 5;
 
     // Annotations (20 points)
     if (content.includes('annotations:')) score += 10;
