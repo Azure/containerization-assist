@@ -11,7 +11,7 @@ An AI-powered containerization assistant that helps you build, scan, and deploy 
 - 🔄 **Intelligent Tool Routing**: Automatic dependency resolution and execution
 - 📊 **Progress Tracking**: Real-time progress updates via MCP notifications
 - 🔒 **Security Scanning**: Built-in vulnerability scanning with AI-powered suggestions
-- ✨ **Smart Analysis**: Context-aware recommendations and optimization across 14 AI-enhanced tools
+- ✨ **Smart Analysis**: Context-aware recommendations
 
 ## Installation
 
@@ -213,7 +213,7 @@ All AI-powered tools use deterministic sampling with `count: 1` to ensure reprod
 Enable detailed logging of all tool executions to JSON files for debugging and auditing:
 
 ```bash
-export CONTAINERIZATION_ASSIST_TOOL_LOGS_PATH=/path/to/logs
+export CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH=/path/to/logs
 ```
 
 **Log File Format:**
@@ -240,9 +240,6 @@ export CONTAINERIZATION_ASSIST_TOOL_LOGS_PATH=/path/to/logs
 
 The logging directory is validated at startup to ensure it's writable.
 
-### Policy Configuration (Optional)
-
-For advanced users, you can define custom policies to control AI generation behavior:
 
 ```bash
 # Set policy file path
@@ -252,14 +249,7 @@ export POLICY_PATH=/path/to/policy.yaml
 export POLICY_ENVIRONMENT=production
 ```
 
-Policy files use a modular system with 5 components:
-- `policy-schemas.ts` - Type definitions and validation
-- `policy-io.ts` - Load and cache operations
-- `policy-eval.ts` - Rule evaluation logic
-- `policy-prompt.ts` - AI prompt constraint integration
-- `policy-constraints.ts` - Constraint extraction
-
-See `src/config/policy-*.ts` for implementation details.
+See `src/config/policy-schemas.ts`, `src/config/policy-io.ts`, `src/config/policy-eval.ts`, and `src/config/policy-data.ts` for implementation details.
 
 ### MCP Inspector (Testing)
 
@@ -358,12 +348,10 @@ kubectl config view
 
 ## Documentation
 
-- **[Getting Started Guide](./docs/getting-started.md)** - Detailed setup and first use
-- **[AI Enhancement System](./docs/ai-enhancement.md)** - AI-powered features and capabilities
-- **[Tool Capabilities Reference](./docs/tool-capabilities.md)** - Complete tool reference with AI enhancement details
-- **[Architecture Guide](./docs/architecture.md)** - System design and components
-- **[Development Guide](./docs/development-setup.md)** - Contributing and development setup
-- **[Documentation Index](./docs/README.md)** - All available documentation
+- **[Developer Guide](./docs/developer-guide.md)** - Contributing and development setup
+- **[Design Document](./DESIGN_DOCUMENT.md)** - Architecture and system design
+- **[Contributing Guidelines](./CONTRIBUTING.md)** - How to contribute
+- **[Examples](./docs/examples/)** - Code examples and usage patterns
 
 ## For Developers
 
