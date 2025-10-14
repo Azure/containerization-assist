@@ -23,7 +23,7 @@ export function createToolLogEntry(
   input: unknown,
 ): ToolLogEntry {
   return {
-    timestamp: new Date().toISOString(),
+    timestamp: Date.now().toString(),
     toolName,
     sessionId,
     input,
