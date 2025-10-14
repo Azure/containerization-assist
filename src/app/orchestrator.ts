@@ -26,6 +26,7 @@ import type { MCPTool } from '@/types/tool';
 import { createStandardizedToolTracker } from '@/lib/tool-helpers';
 import { TOOL_NAME, ToolName } from '@/tools';
 import { checkSamplingAvailability, type SamplingCheckResult } from '@/mcp/sampling-check';
+import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
 
 // ===== Types =====
 
@@ -264,9 +265,25 @@ async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
     samplingCheckResult = await checkSamplingAvailability(toolContext);
   }
 
+  const startTime = Date.now();
+  const logEntry = createToolLogEntry(tool.name, actualSessionId, validatedParams);
+
   // Execute tool directly (single attempt)
   try {
     const result = await tool.run(validatedParams, toolContext);
+    const durationMs = Date.now() - startTime;
+
+    logEntry.output = result.ok ? result.value : { error: result.error };
+    logEntry.success = result.ok;
+    logEntry.durationMs = durationMs;
+    if (!result.ok) {
+      logEntry.error = result.error;
+      if (result.guidance) {
+        logEntry.errorGuidance = result.guidance;
+      }
+    }
+
+    await logToolExecution(logEntry, logger);
 
     // Update session if successful using SessionManager
     if (result.ok) {
@@ -304,7 +321,16 @@ async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
     });
     return result;
   } catch (error) {
+    const durationMs = Date.now() - startTime;
     const errorMessage = (error as Error).message || 'Unknown error';
+
+    logEntry.output = { error: errorMessage };
+    logEntry.success = false;
+    logEntry.durationMs = durationMs;
+    logEntry.error = errorMessage;
+
+    await logToolExecution(logEntry, logger);
+
     logger.error({ error: errorMessage }, 'Tool execution failed');
     tracker.fail(error as Error);
     return Failure(errorMessage);
