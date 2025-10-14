@@ -102,8 +102,7 @@ async function run(
     language === 'rust' ||
     language === 'dotnet' ||
     language === 'c#' ||
-    buildSystemType === 'maven' ||
-    buildSystemType === 'gradle';
+    (typeof buildSystemType === 'string' && ['maven', 'gradle'].includes(buildSystemType));
 
   const buildStrategy = {
     multistage: shouldUseMultistage,
