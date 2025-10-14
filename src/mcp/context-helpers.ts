@@ -40,7 +40,7 @@ export type EnhancedProgressReporter = (
  * Checks various locations where the progress token might be stored
  */
 export function extractProgressToken(request: unknown): string | undefined {
-  if (!request || typeof request !== 'object' || request === null) {
+  if (!request || typeof request !== 'object') {
     return undefined;
   }
 
@@ -53,10 +53,10 @@ export function extractProgressToken(request: unknown): string | undefined {
 
   // In params._meta
   const params = req.params;
-  if (params && typeof params === 'object' && params !== null) {
+  if (typeof params === 'object' && params !== null) {
     const p = params as Record<string, unknown>;
     const meta = p._meta;
-    if (meta && typeof meta === 'object' && meta !== null) {
+    if (meta != null && typeof meta === 'object') {
       const m = meta as Record<string, unknown>;
       if (typeof m.progressToken === 'string') {
         return m.progressToken;
@@ -66,7 +66,7 @@ export function extractProgressToken(request: unknown): string | undefined {
 
   // In top-level _meta
   const topMeta = req._meta;
-  if (topMeta && typeof topMeta === 'object' && topMeta !== null) {
+  if (topMeta != null && typeof topMeta === 'object') {
     const m = topMeta as Record<string, unknown>;
     if (typeof m.progressToken === 'string') {
       return m.progressToken;
@@ -75,7 +75,7 @@ export function extractProgressToken(request: unknown): string | undefined {
 
   // In headers
   const headers = req.headers;
-  if (headers && typeof headers === 'object' && headers !== null) {
+  if (headers != null && typeof headers === 'object') {
     const h = headers as Record<string, unknown>;
     if (typeof h.progressToken === 'string') {
       return h.progressToken;
