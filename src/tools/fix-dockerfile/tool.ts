@@ -280,10 +280,6 @@ async function run(
         language: 'dockerfile',
         confidence: 0.8,
         suggestions: [`✅ Applied ${applied.length} automatic fixes: ${applied.join(', ')}`],
-        workflowHints: {
-          nextStep: 'build-image',
-          message: `Auto-fixes applied successfully. Use "build-image" to test the fixed Dockerfile.`,
-        },
       });
     }
 
@@ -341,10 +337,6 @@ async function run(
         language: 'dockerfile',
         confidence: 0.9,
         suggestions: ['✅ Applied formatting improvements'],
-        workflowHints: {
-          nextStep: 'build-image',
-          message: `Dockerfile formatting complete. Use "build-image" to test the formatted Dockerfile.`,
-        },
       });
     }
 
@@ -526,10 +518,6 @@ async function run(
     confidence: knowledgeEnhancement ? knowledgeEnhancement.confidence : 0.9,
     analysis,
     suggestions: improvements,
-    workflowHints: {
-      nextStep: 'build-image',
-      message: `Dockerfile fixes applied successfully${knowledgeEnhancement ? ` with ${knowledgeEnhancement.knowledgeApplied.length} knowledge enhancements` : ''}. Use "build-image" to test the fixed Dockerfile, or review the changes and apply additional customizations.`,
-    },
   };
 
   return Success(result);

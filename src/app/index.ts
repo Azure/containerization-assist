@@ -25,6 +25,7 @@ import type {
   ToolResultMap,
   ExecutionMetadata,
 } from '@/types/runtime';
+import { createToolLoggerFile, getLogFilePath } from '@/lib/tool-logger';
 
 /**
  * Apply tool aliases to create renamed versions of tools
@@ -53,6 +54,10 @@ export interface TransportConfig {
  */
 export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
   const logger = config.logger || createLogger({ name: 'containerization-assist' });
+
+  // Initialize tool logging file at startup
+  createToolLoggerFile(logger);
+
   const tools = config.tools || ALL_TOOLS;
   const aliasedTools = applyToolAliases(tools, config.toolAliases);
 
@@ -230,6 +235,13 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
         orchestrator.close();
         orchestratorClosed = true;
       }
+    },
+
+    /**
+     * Get the current log file path (if tool logging is enabled)
+     */
+    getLogFilePath: () => {
+      return getLogFilePath();
     },
   };
 }

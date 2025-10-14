@@ -81,6 +81,7 @@ describe('createApp AppRuntime interface', () => {
     expect(app).toHaveProperty('bindToMCP');
     expect(app).toHaveProperty('healthCheck');
     expect(app).toHaveProperty('stop');
+    expect(app).toHaveProperty('getLogFilePath');
   });
 
   it('should list tools with correct metadata', () => {
