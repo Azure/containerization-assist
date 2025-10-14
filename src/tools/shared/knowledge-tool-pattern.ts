@@ -11,12 +11,12 @@
  * @module tools/shared/knowledge-tool-pattern
  */
 
-import type { Result, Success } from '@/types';
+import { type Result, Success } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { Topic } from '@/types/topics';
 import type { KnowledgeCategory } from '@/knowledge/types';
 import type { KnowledgeSnippet } from '@/knowledge/schemas';
-import { getKnowledgeSnippets } from '@/knowledge/matcher';
+import { getKnowledgeSnippets, type KnowledgeSnippetOptions } from '@/knowledge/matcher';
 
 /**
  * Configuration for knowledge query construction.
@@ -230,15 +230,20 @@ export function createKnowledgeTool<
 
     ctx.logger.info({ topic, filters }, `${config.name}: Querying knowledge base`);
 
-    const knowledgeSnippets = await getKnowledgeSnippets(topic, {
+    const knowledgeOptions: KnowledgeSnippetOptions = {
       environment: filters.environment || 'production',
       tool: config.name,
-      ...(filters.language && { language: filters.language }),
-      ...(filters.framework && { framework: filters.framework }),
       maxChars: config.query.maxChars || 8000,
       maxSnippets: config.query.maxSnippets || 20,
       category: config.query.category,
-    });
+    };
+    if (filters.language) {
+      knowledgeOptions.language = filters.language;
+    }
+    if (filters.framework) {
+      knowledgeOptions.framework = filters.framework;
+    }
+    const knowledgeSnippets = await getKnowledgeSnippets(topic, knowledgeOptions);
 
     // 2. Categorize knowledge snippets
     // Initialize empty arrays for each category
@@ -254,6 +259,15 @@ export function createKnowledgeTool<
         const categoryArray = categoriesRecord[category];
         if (categoryArray) {
           categoryArray.push(snippet);
+        } else {
+          ctx.logger.warn(
+            {
+              undeclaredCategory: category,
+              snippetId: snippet.id,
+              snippetSource: snippet.source,
+            },
+            `${config.name}: categorize() returned undeclared category. This snippet will be ignored for that category.`,
+          );
         }
       }
     }
