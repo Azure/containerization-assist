@@ -5,24 +5,6 @@
 
 import { jest } from '@jest/globals';
 
-// Jest mocks must be at the top to ensure proper hoisting
-jest.mock('../../../src/session/core', () => ({
-  SessionManager: jest.fn(() => ({
-    create: jest.fn().mockResolvedValue({
-      sessionId: 'test-session-123',
-      workflow_state: {},
-      metadata: {},
-      completed_steps: [],
-      errors: {},
-
-      createdAt: '2025-09-08T11:12:40.362Z',
-      updatedAt: '2025-09-08T11:12:40.362Z',
-    }),
-    get: jest.fn(),
-    update: jest.fn().mockResolvedValue(true),
-  })),
-}));
-
 // Create a shared mock scanner that we can access in tests
 const mockSecurityScannerInstance: any = {
   scanImage: jest.fn(),
@@ -61,26 +43,14 @@ jest.mock('../../../src/knowledge', () => ({
 
 import { scanImage } from '../../../src/tools/scan/tool';
 import type { ScanImageParams } from '../../../src/tools/scan/schema';
-import { SessionManager } from '../../../src/session/core';
 import { createLogger } from '../../../src/lib/logger';
 
 // Get the mocked instances after imports
-const mockSessionManager = new (SessionManager as jest.Mock)();
 const mockLogger = (createLogger as jest.Mock)();
-
-// Create session facade mock
-const mockSessionFacade = {
-  id: 'test-session-123',
-  get: jest.fn(),
-  set: jest.fn(),
-  pushStep: jest.fn(),
-};
 
 function createMockToolContext() {
   return {
     logger: mockLogger,
-    sessionManager: mockSessionManager,
-    session: mockSessionFacade,
   } as any;
 }
 
@@ -93,7 +63,6 @@ describe('scanImage', () => {
 
   beforeEach(() => {
     config = {
-      sessionId: 'test-session-123',
       imageId: 'sha256:mock-image-id',
       scanner: 'trivy',
       severity: 'HIGH',
@@ -101,7 +70,6 @@ describe('scanImage', () => {
 
     // Reset all mocks
     jest.clearAllMocks();
-    mockSessionManager.update.mockResolvedValue(true);
   });
 
   describe('Basic Functionality', () => {
@@ -137,7 +105,6 @@ describe('scanImage', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.success).toBe(true);
-        expect(result.value.sessionId).toBe('test-session-123');
         expect(result.value.vulnerabilities.high).toBe(1);
         expect(result.value.vulnerabilities.total).toBe(1);
         expect(result.value.passed).toBe(false); // Has high vulnerability with high threshold
@@ -187,7 +154,6 @@ describe('scanImage', () => {
 
     it('should use default scanner and threshold when not specified', async () => {
       const minimalConfig: ScanImageParams = {
-        sessionId: 'test-session-123',
         imageId: 'sha256:mock-image-id',
       };
 
@@ -202,7 +168,6 @@ describe('scanImage', () => {
   describe('Error Handling', () => {
     it('should return error when no imageId provided', async () => {
       const configWithoutImage: ScanImageParams = {
-        sessionId: 'test-session-123',
         scanner: 'trivy',
       } as any; // Cast to bypass type checking for test
 
@@ -244,17 +209,6 @@ describe('scanImage', () => {
 
   describe('Vulnerability Counting', () => {
     it('should correctly count vulnerabilities by severity', async () => {
-      mockSessionFacade.get.mockImplementation((key: string) => {
-        if (key === 'results') {
-          return {
-            'build-image': {
-              imageId: 'sha256:mock-image-id',
-            },
-          };
-        }
-        return undefined;
-      });
-
       mockSecurityScannerInstance.scanImage.mockResolvedValue(
         createSuccessResult({
           vulnerabilities: [

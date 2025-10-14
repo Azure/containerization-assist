@@ -8,7 +8,7 @@ import type { ErrorGuidance } from '@/types';
 export interface ToolLogEntry {
   timestamp: string;
   toolName: string;
-  sessionId: string;
+  sessionId?: string;
   input: unknown;
   output: unknown;
   success: boolean;
@@ -19,13 +19,13 @@ export interface ToolLogEntry {
 
 export function createToolLogEntry(
   toolName: string,
-  sessionId: string,
+  sessionId: string | undefined,
   input: unknown,
 ): ToolLogEntry {
   return {
     timestamp: Date.now().toString(),
     toolName,
-    sessionId,
+    ...(sessionId && { sessionId }),
     input,
     output: undefined,
     success: false,

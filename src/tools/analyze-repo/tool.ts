@@ -12,7 +12,6 @@ async function run(
   _ctx: ToolContext,
 ): Promise<Result<RepositoryAnalysis>> {
   let { repositoryPathAbsoluteUnix: repoPath } = input;
-  const { sessionId } = input;
 
   // Convert to absolute path if relative
   if (!path.isAbsolute(repoPath)) {
@@ -29,14 +28,13 @@ async function run(
     }
     result.isMonorepo = numberOfModules > 0;
 
-    // Add sessionId and workflowHints to the result
+    // Add workflowHints to the result
     const moduleHint = result.isMonorepo
       ? ` Detected ${numberOfModules} modules that can be containerized separately.`
       : '';
 
     return Success({
       ...result,
-      sessionId,
       analyzedPath: repoPath,
       workflowHints: {
         message: `Repository analysis complete. ${moduleHint}`,

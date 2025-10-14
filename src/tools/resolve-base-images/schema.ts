@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { environmentSchema } from '@/config/environment';
 
 export const resolveBaseImagesSchema = z.object({
-  sessionId: z.string().optional().describe('Session identifier for tracking operations'),
   technology: z.string().describe('Technology stack to resolve (e.g., "node", "python", "java")'),
   requirements: z
     .record(z.string(), z.unknown())

@@ -26,28 +26,6 @@ function createMockLogger() {
 }
 
 // Mock lib modules
-const mockSessionManager = {
-  create: jest.fn().mockResolvedValue(createSuccessResult({
-    sessionId: 'test-session-123',
-    metadata: {},
-    completed_steps: [],
-    errors: {},
-    
-    createdAt: new Date('2025-09-08T11:12:40.362Z'),
-    updatedAt: new Date('2025-09-08T11:12:40.362Z'),
-  })),
-  get: jest.fn().mockResolvedValue(createSuccessResult({
-    sessionId: 'test-session-123',
-    metadata: {},
-    completed_steps: [],
-    errors: {},
-    
-    createdAt: new Date('2025-09-08T11:12:40.362Z'),
-    updatedAt: new Date('2025-09-08T11:12:40.362Z'),
-  })),
-  update: jest.fn().mockResolvedValue(createSuccessResult(true)),
-};
-
 const mockK8sClient = {
   ping: jest.fn(),
   namespaceExists: jest.fn(),
@@ -60,10 +38,6 @@ const mockTimer = {
   end: jest.fn(),
   error: jest.fn(),
 };
-
-jest.mock('@/session/core', () => ({
-  SessionManager: jest.fn(() => mockSessionManager),
-}));
 
 jest.mock('@/lib/kubernetes', () => ({
   createKubernetesClient: jest.fn(() => mockK8sClient),
@@ -122,19 +96,9 @@ jest.mock('node:child_process', () => ({
   exec: jest.fn(),
 }));
 
-// Create session facade mock
-const mockSessionFacade = {
-  id: 'test-session-123',
-  get: jest.fn(),
-  set: jest.fn(),
-  pushStep: jest.fn(),
-};
-
 function createMockToolContext() {
   return {
     logger: createMockLogger(),
-    sessionManager: mockSessionManager,
-    session: mockSessionFacade,
   } as any;
 }
 
@@ -143,14 +107,12 @@ describe('prepareCluster', () => {
 
   beforeEach(() => {
     config = {
-      sessionId: 'test-session-123',
       namespace: 'test-namespace',
       environment: 'production',
     };
 
     // Reset all mocks
     jest.clearAllMocks();
-    mockSessionManager.update.mockResolvedValue(true);
   });
 
   describe('Successful cluster preparation', () => {
@@ -259,18 +221,5 @@ describe('prepareCluster', () => {
     });
   });
 
-  describe('Session management', () => {
-    it('should use session context properly', async () => {
-      mockK8sClient.ping.mockResolvedValue(true);
-      mockK8sClient.namespaceExists.mockResolvedValue(true);
-      mockK8sClient.checkPermissions.mockResolvedValue(true);
-
-      const mockContext = createMockToolContext();
-      await prepareCluster(config, mockContext);
-
-      // Verify session facade methods were available
-      expect(mockContext.session).toBeDefined();
-      expect(mockContext.session.id).toBe('test-session-123');
-    });
-  });
 });
+

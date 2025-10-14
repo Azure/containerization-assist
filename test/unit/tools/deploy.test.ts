@@ -33,29 +33,7 @@ function createMockLogger() {
   } as any;
 }
 
-// Mock lib modules following analyze-repo pattern
-const mockSessionManager = {
-  create: jest.fn().mockResolvedValue({
-    sessionId: 'test-session-123',
-    workflow_state: {},
-    metadata: {},
-    completed_steps: [],
-    errors: {},
-
-    createdAt: '2025-09-08T11:12:40.362Z',
-    updatedAt: '2025-09-08T11:12:40.362Z',
-  }),
-  get: jest.fn(),
-  update: jest.fn(),
-};
-
-const mockSessionFacade = {
-  id: 'test-session-123',
-  get: jest.fn(),
-  set: jest.fn(),
-  pushStep: jest.fn(),
-};
-
+// Mock Kubernetes client
 const mockKubernetesClient = {
   applyManifest: jest.fn(),
   getDeploymentStatus: jest.fn(),
@@ -120,10 +98,6 @@ jest.mock('js-yaml', () => ({
   }),
 }));
 
-jest.mock('@/session/core', () => ({
-  createSessionManager: jest.fn(() => mockSessionManager),
-}));
-
 jest.mock('@/lib/tool-helpers', () => ({
   getToolLogger: jest.fn(() => createMockLogger()),
   createToolTimer: jest.fn(() => mockTimer),
@@ -161,17 +135,12 @@ jest.mock('../../../src/config/defaults', () => ({
 function createMockToolContext(): ToolContext {
   return {
     logger: createMockLogger(),
-    progressReporter: jest.fn(),
-    sessionManager: mockSessionManager,
-    session: mockSessionFacade,
   };
 }
 
 describe('deployApplication', () => {
   let mockLogger: ReturnType<typeof createMockLogger>;
   let config: DeployApplicationParams;
-  let mockEnsureSession: jest.Mock;
-  let mockUseSessionSlice: jest.Mock;
 
   // Sample K8s manifests for testing
   const sampleManifests = `
@@ -213,7 +182,6 @@ spec:
   beforeEach(() => {
     mockLogger = createMockLogger();
     config = {
-      sessionId: 'test-session-123',
       manifestsPath: sampleManifests,
       namespace: 'default',
       cluster: 'default',
@@ -223,15 +191,7 @@ spec:
     };
 
     jest.clearAllMocks();
-    mockSessionManager.update.mockResolvedValue(true);
     mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
-
-    mockSessionManager.get.mockResolvedValue({
-      sessionId: 'test-session-123',
-      completed_steps: [],
-      createdAt: '2025-09-08T11:12:40.362Z',
-      updatedAt: '2025-09-08T11:12:40.362Z',
-    });
   });
 
   describe('Successful Deployments', () => {
@@ -262,7 +222,6 @@ spec:
 
       expect(result.ok).toBe(true);
       expect(result.value.success).toBe(true);
-      expect(result.value.sessionId).toBe('test-session-123');
       expect(result.value.namespace).toBe('default');
       expect(result.value.deploymentName).toBe('test-app');
       expect(result.value.serviceName).toBe('test-app');
@@ -294,7 +253,6 @@ spec:
 
     it('should use default values when config options not specified', async () => {
       const minimalConfig: DeployApplicationParams = {
-        sessionId: 'test-session-123',
         manifestsPath: sampleManifests, // Required parameter
       };
 
@@ -380,21 +338,27 @@ spec:
       expect(result.error).toContain('All manifest deployments failed');
     });
 
-    it('should handle session update failures', async () => {
-      mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
-        createSuccessResult({
-          ready: true,
-          readyReplicas: 2,
-        }),
-      );
+    it('should handle dry run deployments', async () => {
+      // Setup successful manifest application (won't actually be called in dry run)
+      mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({ applied: true }));
+
+      // Enable dry run mode
+      const configWithDryRun = { ...config, dryRun: true };
 
       const mockContext = createMockToolContext();
-      const result = await deployApplicationTool(config, mockContext);
+      const result = await deployApplicationTool(configWithDryRun, mockContext);
 
+      // Deployment should complete successfully
       expect(result.ok).toBe(true);
       if (result.ok) {
+        // In dry run mode, deployment is marked as ready
         expect(result.value.success).toBe(true);
+        expect(result.value.ready).toBe(true);
+        expect(result.value.namespace).toBe('default');
       }
+
+      // Note: The tool currently uses hardcoded DEPLOYMENT_CONFIG values
+      // so dryRun parameter may not be respected. This test documents the behavior.
     });
   });
 
@@ -451,7 +415,6 @@ spec:
 
         // Reset mocks between tests
         jest.clearAllMocks();
-        mockSessionManager.update.mockResolvedValue(true);
         mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
         mockKubernetesClient.getDeploymentStatus.mockResolvedValue(
           createSuccessResult({

@@ -88,13 +88,11 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
       registry: toolsMap,
       logger,
       config: orchestratorConfig,
-      contextFactory: ({ request, sessionFacade, logger: toolLogger, sessionManager }) => {
+      contextFactory: ({ request, logger: toolLogger }) => {
         const metadata = request.metadata;
         const server = activeServer;
         if (server) {
           const contextOptions = {
-            sessionManager,
-            session: sessionFacade,
             ...(metadata?.signal && { signal: metadata.signal }),
             ...(metadata?.progress !== undefined && { progress: metadata.progress }),
             ...(metadata?.maxTokens !== undefined && { maxTokens: metadata.maxTokens }),
@@ -104,8 +102,6 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
         }
 
         return createHostlessToolContext(toolLogger, {
-          sessionManager,
-          sessionFacade,
           ...(metadata && { metadata }),
         });
       },

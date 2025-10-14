@@ -3,15 +3,10 @@
  */
 
 import { z } from 'zod';
-import {
-  sessionId as sharedSessionId,
-  environment,
-  repositoryPathAbsoluteUnix,
-} from '../shared/schemas';
+import { environment, repositoryPathAbsoluteUnix } from '../shared/schemas';
 import { ModuleInfo } from '../analyze-repo/schema';
 
 export const generateDockerfilePlanSchema = z.object({
-  sessionId: sharedSessionId.optional().describe('Session identifier for tracking operations'),
   repositoryPathAbsoluteUnix: repositoryPathAbsoluteUnix.describe(
     'Repository path (use forward slashes: /path/to/repo).',
   ),

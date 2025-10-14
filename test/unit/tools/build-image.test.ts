@@ -56,19 +56,9 @@ jest.mock('node:fs', () => ({
 }));
 
 // Mock lib modules
-const mockSessionManager = {
-  create: jest.fn(),
-  get: jest.fn(),
-  update: jest.fn(),
-};
-
 const mockDockerClient = {
   buildImage: jest.fn(),
 };
-
-jest.mock('@/session/core', () => ({
-  createSessionManager: jest.fn(() => mockSessionManager),
-}));
 
 jest.mock('../../../src/lib/docker', () => ({
   createDockerClient: jest.fn(() => mockDockerClient),
@@ -82,19 +72,9 @@ jest.mock('../../../src/lib/logger', () => ({
   createLogger: jest.fn(() => createMockLogger()),
 }));
 
-// Mock the session helpers
-const mockSessionFacade = {
-  id: 'test-session-123',
-  get: jest.fn(),
-  set: jest.fn(),
-  pushStep: jest.fn(),
-};
-
 function createMockToolContext() {
   return {
     logger: createMockLogger(),
-    sessionManager: mockSessionManager,
-    session: mockSessionFacade,
   } as any;
 }
 
@@ -120,7 +100,6 @@ CMD ["node", "index.js"]`;
   beforeEach(() => {
     mockLogger = createMockLogger();
     config = {
-      sessionId: 'test-session-123',
       path: '/test/repo',
       dockerfile: 'Dockerfile',
       imageName: 'test-app:latest',
@@ -131,30 +110,11 @@ CMD ["node", "index.js"]`;
     // Reset all mocks
     jest.clearAllMocks();
 
-    mockSessionManager.get.mockResolvedValue({
-      ok: true,
-      value: {
-        sessionId: 'test-session-123',
-        completed_steps: [],
-        createdAt: new Date('2025-09-08T11:12:40.362Z'),
-        updatedAt: new Date('2025-09-08T11:12:40.362Z'),
-      },
-    });
-
     // Default mock implementations
     mockFs.access.mockResolvedValue(undefined);
     mockFs.stat.mockResolvedValue({ isFile: () => true } as any);
     mockFs.readFile.mockResolvedValue(mockDockerfile);
     mockFs.writeFile.mockResolvedValue(undefined);
-    mockSessionManager.update.mockResolvedValue({
-      ok: true,
-      value: {
-        sessionId: 'test-session-123',
-        completed_steps: ['build-image'],
-        createdAt: new Date('2025-09-08T11:12:40.362Z'),
-        updatedAt: new Date(),
-      },
-    });
 
     // Default successful Docker build
     mockDockerClient.buildImage.mockResolvedValue(
@@ -179,7 +139,6 @@ CMD ["node", "index.js"]`;
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.success).toBe(true);
-        expect(result.value.sessionId).toBe('test-session-123');
         expect(result.value.imageId).toBe('sha256:mock-image-id');
         expect(result.value.tags).toEqual(['myapp:latest', 'myapp:v1.0']);
         expect(result.value.size).toBe(123456789);
@@ -225,13 +184,10 @@ CMD ["node", "index.js"]`;
       );
     });
 
-    it('should update session with build result', async () => {
+    it('should return build result with expected properties', async () => {
       const result = await buildImage(config, createMockToolContext());
 
       expect(result.ok).toBe(true);
-      // The orchestrator automatically stores results via sessionFacade.storeResult()
-      // Tools no longer manually manipulate session.set('results')
-      // This test verifies the tool returns successfully
       if (result.ok) {
         expect(result.value).toHaveProperty('imageId');
         expect(result.value).toHaveProperty('tags');

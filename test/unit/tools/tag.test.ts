@@ -33,17 +33,6 @@ function createMockLogger() {
 }
 
 // Mock lib modules following analyze-repo pattern
-const mockSessionManager = {
-  create: jest.fn().mockResolvedValue({
-    sessionId: 'test-session-123',
-    completed_steps: [],
-    createdAt: '2025-09-08T11:12:40.362Z',
-    updatedAt: '2025-09-08T11:12:40.362Z',
-  }),
-  get: jest.fn(),
-  update: jest.fn(),
-};
-
 const mockDockerClient = {
   tagImage: jest.fn(),
 };
@@ -53,10 +42,6 @@ const mockTimer = {
   end: jest.fn(),
   error: jest.fn(),
 };
-
-jest.mock('@/session/core', () => ({
-  createSessionManager: jest.fn(() => mockSessionManager),
-}));
 
 jest.mock('../../../src/lib/docker', () => ({
   createDockerClient: jest.fn(() => mockDockerClient),
@@ -76,13 +61,6 @@ jest.mock('../../../src/lib/tool-helpers', () => ({
   })),
 }));
 
-// Mock session facade
-const mockSessionFacade = {
-  id: 'test-session-123',
-  get: jest.fn(),
-  set: jest.fn(),
-  pushStep: jest.fn(),
-};
 
 // Import these after mocks are set up
 import tagImageTool from '../../../src/tools/tag-image/tool';
@@ -92,8 +70,6 @@ import type { TagImageParams } from '../../../src/tools/tag-image/schema';
 function createMockToolContext() {
   return {
     logger: createMockLogger(),
-    sessionManager: mockSessionManager,
-    session: mockSessionFacade,
   } as any;
 }
 
@@ -104,7 +80,6 @@ describe('tagImage', () => {
   beforeEach(() => {
     mockLogger = createMockLogger();
     config = {
-      sessionId: 'test-session-123',
       imageId: 'sha256:mock-image-id',
       tag: 'myapp:v1.0',
     };
@@ -116,16 +91,6 @@ describe('tagImage', () => {
     // Re-establish timer mock after clearing
     const { createToolTimer } = jest.requireMock('../../../src/lib/tool-helpers');
     createToolTimer.mockReturnValue(mockTimer);
-
-    mockSessionManager.update.mockResolvedValue({
-      ok: true,
-      value: {
-        sessionId: 'test-session-123',
-        completed_steps: ['tag-image'],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    });
 
     // Setup default successful Docker tag result
     mockDockerClient.tagImage.mockResolvedValue(
@@ -143,7 +108,6 @@ describe('tagImage', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.success).toBe(true);
-        expect(result.value.sessionId).toBe('test-session-123');
         expect(result.value.tags).toEqual(['myapp:v1.0']);
         expect(result.value.imageId).toBe('sha256:mock-image-id');
       }
@@ -155,12 +119,9 @@ describe('tagImage', () => {
         'v1.0',
       );
 
-      // Note: Session storage is handled by the orchestrator, not the tool directly
-
       // Verify timer was used correctly
       expect(mockTimer.end).toHaveBeenCalledWith({
         tags: ['myapp:v1.0'],
-        sessionId: 'test-session-123',
       });
     });
 
@@ -220,7 +181,6 @@ describe('tagImage', () => {
 
         // Reset mocks for next iteration
         mockDockerClient.tagImage.mockClear();
-        mockSessionManager.update.mockClear();
       }
     });
 
@@ -260,7 +220,6 @@ describe('tagImage', () => {
 
         // Reset mocks for next iteration
         mockDockerClient.tagImage.mockClear();
-        mockSessionManager.update.mockClear();
       }
     });
 
@@ -291,7 +250,6 @@ describe('tagImage', () => {
 
         // Reset mocks for next iteration
         mockDockerClient.tagImage.mockClear();
-        mockSessionManager.update.mockClear();
       }
     });
   });
@@ -385,7 +343,7 @@ describe('tagImage', () => {
     });
   });
 
-  describe('Session State Management', () => {
+  describe('Successful Operations', () => {
     it('should succeed with valid parameters', async () => {
       const result = await tagImageTool.run(config, createMockToolContext());
 
@@ -401,9 +359,9 @@ describe('tagImage', () => {
   describe('Multiple Tagging Scenarios', () => {
     it('should handle tagging with different configurations', async () => {
       const configurations = [
-        { sessionId: 'session-1', imageId: 'sha256:mock-image-id', tag: 'app:v1.0' },
-        { sessionId: 'session-2', imageId: 'sha256:mock-image-id', tag: 'registry.com/app:latest' },
-        { sessionId: 'session-3', imageId: 'sha256:mock-image-id', tag: 'my-app:development' },
+        { imageId: 'sha256:mock-image-id', tag: 'app:v1.0' },
+        { imageId: 'sha256:mock-image-id', tag: 'registry.com/app:latest' },
+        { imageId: 'sha256:mock-image-id', tag: 'my-app:development' },
       ];
 
       for (const testConfig of configurations) {
@@ -411,7 +369,6 @@ describe('tagImage', () => {
 
         expect(result.ok).toBe(true);
         if (result.ok) {
-          expect(result.value.sessionId).toBe(testConfig.sessionId);
           expect(result.value.tags).toEqual([testConfig.tag]);
           expect(result.value.success).toBe(true);
           expect(result.value.imageId).toBe('sha256:mock-image-id');
@@ -422,7 +379,7 @@ describe('tagImage', () => {
       }
     });
 
-    it('should handle sequential tagging operations on same session', async () => {
+    it('should handle sequential tagging operations', async () => {
       const tags = ['myapp:v1.0', 'myapp:latest', 'myapp:stable'];
 
       for (const tag of tags) {
@@ -445,7 +402,6 @@ describe('tagImage', () => {
 
         // Reset mocks for next iteration
         mockDockerClient.tagImage.mockClear();
-        mockSessionManager.update.mockClear();
       }
     });
   });

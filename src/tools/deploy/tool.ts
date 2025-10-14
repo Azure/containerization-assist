@@ -6,7 +6,6 @@
  * @example
  * ```typescript
  * const result = await deployApplication({
- *   sessionId: 'session-123',
  *   namespace: 'my-app',
  *   environment: 'production'
  * }, context, logger);
@@ -113,7 +112,6 @@ export interface DeploymentAnalysis {
 
 export interface DeployApplicationResult {
   success: boolean;
-  sessionId: string;
   namespace: string;
   deploymentName: string;
   serviceName: string;
@@ -482,16 +480,7 @@ async function deployApplicationImpl(
   const timeout = DEPLOYMENT_CONFIG.WAIT_TIMEOUT_SECONDS;
 
   try {
-    // Use session facade directly
-    const sessionId = params.sessionId || context.session?.id;
-    if (!sessionId) {
-      return Failure('Session ID is required for deployment operations');
-    }
-
-    logger.info(
-      { sessionId, namespace, environment },
-      'Starting Kubernetes deployment with session',
-    );
+    logger.info({ namespace, environment }, 'Starting Kubernetes deployment');
     const k8sClient = createKubernetesClient(logger);
 
     // Parse and validate manifests
@@ -714,7 +703,6 @@ async function deployApplicationImpl(
       const analysisResult = await generateDeploymentAnalysis(
         {
           success: ready,
-          sessionId,
           namespace,
           deploymentName,
           serviceName,
@@ -758,7 +746,6 @@ async function deployApplicationImpl(
     // Prepare the result
     const result: DeployApplicationResult = {
       success: ready, // Success depends on deployment readiness
-      sessionId,
       namespace,
       deploymentName,
       serviceName,
@@ -779,7 +766,7 @@ async function deployApplicationImpl(
       },
     };
 
-    timer.end({ deploymentName, ready, sessionId });
+    timer.end({ deploymentName, ready });
 
     return Success(result);
   } catch (error) {

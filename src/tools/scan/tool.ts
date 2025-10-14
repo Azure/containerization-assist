@@ -45,7 +45,6 @@ interface DockerScanResult {
 
 export interface ScanImageResult {
   success: boolean;
-  sessionId: string;
   remediationGuidance?: Array<{
     vulnerability: string;
     recommendation: string;
@@ -97,10 +96,8 @@ async function scanImageImpl(
     : 'high';
 
   try {
-    const sessionId = params.sessionId || context.session?.id || 'unknown';
-
     logger.info(
-      { sessionId, scanner, severityThreshold: finalSeverityThreshold },
+      { scanner, severityThreshold: finalSeverityThreshold },
       'Starting image security scan',
     );
 
@@ -307,7 +304,6 @@ ${dockerScanResult.vulnerabilities
     // Prepare the result
     const result: ScanImageResult = {
       success: true,
-      sessionId,
       ...(remediationGuidance.length > 0 && { remediationGuidance }),
       vulnerabilities: {
         critical: scanResult.criticalCount,

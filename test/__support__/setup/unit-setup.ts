@@ -37,48 +37,6 @@ jest.mock('../../../src/lib/kubernetes', () => ({
   createKubernetesClient: jest.fn(() => createMockKubernetesClient()),
 }));
 
-jest.mock('../../../src/session/core', () => ({
-  SessionManager: jest.fn(),
-  createSessionManager: jest.fn(() => ({
-    get: jest.fn(async (id) => ({
-      ok: true,
-      value: {
-        sessionId: id,
-        metadata: {},
-        completed_steps: [],
-        errors: {},
-        
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    })),
-    update: jest.fn(async (id, state) => ({
-      ok: true,
-      value: {
-        sessionId: id,
-        ...state,
-        updatedAt: new Date(),
-      },
-    })),
-    create: jest.fn(async (id) => ({
-      ok: true,
-      value: {
-        sessionId: id || 'test-session-' + Math.random().toString(36).substr(2, 9),
-        metadata: {},
-        completed_steps: [],
-        errors: {},
-        
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    })),
-    delete: jest.fn(async () => ({ ok: true, value: undefined })),
-    list: jest.fn(async () => ({ ok: true, value: [] })),
-    cleanup: jest.fn(async () => ({ ok: true, value: undefined })),
-    close: jest.fn(),
-  })),
-}));
-
 jest.mock('../../../src/lib/logger', () => ({
   createLogger: jest.fn(() => ({
     info: jest.fn(),

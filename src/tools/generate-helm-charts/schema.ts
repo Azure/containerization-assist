@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import {
-  sessionId,
   imageId,
   appName,
   replicas,
@@ -26,9 +25,6 @@ export const generateHelmChartsSchema = z.object({
     .describe(
       'Container image to deploy. If not provided, uses image from build-image session data.',
     ),
-
-  // Session tracking (standard pattern)
-  sessionId: sessionId.optional(),
 
   // Basic Helm configuration
   chartVersion: z.string().optional().default('0.1.0').describe('Chart version'),

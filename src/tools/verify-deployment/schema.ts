@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
 export const verifyDeploymentSchema = z.object({
-  sessionId: z.string().optional().describe('Session identifier for tracking operations'),
   deploymentName: z.string().describe('Deployment name to verify (required)'),
   namespace: z.string().optional().describe('Kubernetes namespace'),
   checks: z

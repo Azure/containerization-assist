@@ -104,7 +104,7 @@ async function run(
   input: z.infer<typeof validateImageSchema>,
   ctx: ToolContext,
 ): Promise<Result<ValidateImageResult>> {
-  const { path, dockerfile: inputDockerfile, strictMode = false, sessionId } = input;
+  const { path, dockerfile: inputDockerfile, strictMode = false } = input;
 
   let content = inputDockerfile || '';
 
@@ -193,7 +193,6 @@ async function run(
 
   const result: ValidateImageResult = {
     success: true,
-    sessionId,
     passed,
     baseImages: validatedImages,
     summary: {
