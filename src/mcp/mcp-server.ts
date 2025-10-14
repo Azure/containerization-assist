@@ -365,7 +365,12 @@ export function objectToMarkdownRecursive(obj: Record<string, unknown>, headingL
           }
         });
       }
-    } else if (typeof value === 'object' && value !== null) {
+    } else if (
+      typeof value === 'object' &&
+      value !== null &&
+      !(value instanceof Date) &&
+      !(value instanceof RegExp)
+    ) {
       const valueObj = value as Record<string, unknown>;
       if (isSimpleObject(valueObj)) {
         // Format simple objects as key-value pairs
