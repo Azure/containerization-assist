@@ -10,7 +10,7 @@ import type { Logger } from 'pino';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Result } from './core';
 import type { TransportConfig } from '@/app';
-import type { MCPServer } from '@/mcp/mcp-server';
+import type { MCPServer, OutputFormat } from '@/mcp/mcp-server';
 import type { Tool, ToolName } from '@/tools';
 
 // Extract input/output types from tool registry
@@ -123,6 +123,9 @@ export interface AppRuntimeConfig {
 
   /** Enable hints that suggest other tools to call next in tool responses */
   chainHintsMode?: 'enabled' | 'disabled';
+
+  /** Output format for tool responses */
+  outputFormat?: OutputFormat;
 }
 
 /**

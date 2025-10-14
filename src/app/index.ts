@@ -9,7 +9,12 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createLogger } from '@/lib/logger';
 import { type Tool, type ToolName, ALL_TOOLS } from '@/tools';
 import { createToolContext } from '@/mcp/context';
-import { createMCPServer, registerToolsWithServer, type MCPServer } from '@/mcp/mcp-server';
+import {
+  createMCPServer,
+  OUTPUTFORMAT,
+  registerToolsWithServer,
+  type MCPServer,
+} from '@/mcp/mcp-server';
 import { createOrchestrator, createHostlessToolContext } from './orchestrator';
 import type { OrchestratorConfig, ExecuteRequest, ToolOrchestrator } from './orchestrator-types';
 import type { Result } from '@/types';
@@ -65,6 +70,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
   }
 
   const chainHintsMode = config.chainHintsMode || 'enabled';
+  const outputFormat = config.outputFormat || OUTPUTFORMAT.MARKDOWN;
   const orchestratorConfig: OrchestratorConfig = { chainHintsMode };
   if (config.policyPath !== undefined) orchestratorConfig.policyPath = config.policyPath;
   if (config.policyEnvironment !== undefined)
@@ -154,6 +160,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
         transport: transport.transport,
         name: 'containerization-assist',
         version: '1.0.0',
+        outputFormat,
       };
 
       const mcpServer = createMCPServer(toolList, serverOptions, orchestratedExecute);
@@ -180,6 +187,7 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
       activeServer = sdkServer;
 
       registerToolsWithServer({
+        outputFormat,
         server,
         tools: toolList,
         logger,

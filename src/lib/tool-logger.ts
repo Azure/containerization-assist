@@ -23,7 +23,7 @@ export function createToolLogEntry(
   input: unknown,
 ): ToolLogEntry {
   return {
-    timestamp: new Date().toISOString(),
+    timestamp: Date.now().toString(),
     toolName,
     sessionId,
     input,
@@ -47,8 +47,7 @@ export function getLogFilePath(): string {
     return join(dirPath, logFileName);
   }
 
-  const date = new Date();
-  const timestamp = date.toISOString();
+  const timestamp = Date.now();
   logFileName = `ca-tool-logs-${timestamp}.jsonl`;
   return join(dirPath, logFileName);
 }
@@ -57,6 +56,8 @@ export function createToolLoggerFile(logger?: Logger): void {
   if (!isToolLoggingEnabled()) {
     return;
   }
+
+  logger?.info({ message: 'Starting tool logger file creation' });
 
   const dirPath = config.toolLogging.dirPath;
   if (!dirPath) {

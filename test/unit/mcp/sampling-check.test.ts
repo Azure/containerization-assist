@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, jest } from '@jest/globals';
-import { checkSamplingAvailability } from '@/mcp/sampling-check';
+import { checkSamplingAvailability, VERBOSE_MODE_MESSAGE } from '@/mcp/sampling-check';
 import type { ToolContext } from '@/mcp/context';
 import { createLogger } from '@/lib/logger';
 
@@ -53,7 +53,7 @@ describe('Sampling Check', () => {
       const result = await checkSamplingAvailability(mockContext);
 
       expect(result.available).toBe(false);
-      expect(result.message).toBe("Verbose Mode Enabled - (your environment does not have 'sampling' capability, enable it for enhanced summary output)");
+      expect(result.message).toBe(VERBOSE_MODE_MESSAGE);
     });
   });
 });
