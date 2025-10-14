@@ -27,8 +27,8 @@ describe('AI Determinism Configuration', () => {
     });
   });
 
-  describe('AI-Driven Tool Consistency', () => {
-    const aiDrivenTools = [
+  describe('Sampling-Enabled Tool Consistency', () => {
+    const samplingTools = [
       {
         name: 'generate-dockerfile',
         tool: generateDockerfile,
@@ -47,10 +47,10 @@ describe('AI Determinism Configuration', () => {
       },
     ];
 
-    aiDrivenTools.forEach(({ name, tool }) => {
+    samplingTools.forEach(({ name, tool }) => {
       describe(`${name}`, () => {
-        it('should be marked as AI-driven', () => {
-          expect(tool.metadata?.aiDriven).toBe(true);
+        it('should have sampling enabled', () => {
+          expect(tool.metadata?.samplingStrategy).toBe('single');
         });
 
         it('should use deterministic single-candidate sampling', () => {
@@ -62,13 +62,13 @@ describe('AI Determinism Configuration', () => {
     });
   });
 
-  describe('Non-AI Tool Verification', () => {
-    it('should correctly identify generate-kustomize as non-AI-driven', () => {
-      expect(generateKustomize.metadata?.aiDriven).toBe(false);
+  describe('Non-Sampling Tool Verification', () => {
+    it('should correctly identify generate-kustomize as non-sampling', () => {
+      expect(generateKustomize.metadata?.samplingStrategy).toBe('none');
     });
 
     it('should not use sampling for non-AI tools', () => {
-      expect(generateKustomize.metadata?.aiDriven).toBe(false);
+      expect(generateKustomize.metadata?.samplingStrategy).toBe('none');
     });
   });
 

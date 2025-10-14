@@ -64,10 +64,6 @@ export interface PrepareClusterResult {
   warnings?: string[];
   localRegistryUrl?: string;
   clusterOptimizations?: ClusterOptimizationInsights;
-  workflowHints?: {
-    nextStep: string;
-    message: string;
-  };
 }
 
 // Additional interface for AI cluster optimization insights
@@ -840,16 +836,10 @@ async function prepareClusterImpl(
       );
     }
 
-    // Add optimization insights and workflow hints to result
+    // Add optimization insights to result
     const enrichedResult: PrepareClusterResult = {
       ...result,
       ...(clusterOptimizations && { clusterOptimizations }),
-      workflowHints: {
-        nextStep: clusterReady ? 'generate-k8s-manifests' : 'fix-cluster-issues',
-        message: clusterReady
-          ? `Cluster preparation successful. Use "generate-k8s-manifests" with sessionId ${sessionId} to create deployment manifests.${clusterOptimizations ? ' Review AI optimization insights to enhance cluster performance and security.' : ''}`
-          : `Cluster preparation found issues. ${clusterOptimizations ? 'Review AI recommendations to resolve cluster setup problems.' : 'Check connectivity, permissions, and namespace configuration.'}`,
-      },
     };
 
     timer.end({ clusterReady, sessionId, environment });
@@ -877,7 +867,6 @@ const tool: MCPTool<typeof prepareClusterSchema, PrepareClusterResult> = {
   version: '2.0.0',
   schema: prepareClusterSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: false,
     samplingStrategy: 'single',
     enhancementCapabilities: [

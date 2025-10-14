@@ -98,7 +98,7 @@ const tool: Tool<typeof generateDockerfileSchema, AIResponse> = {
   name: 'generate-dockerfile',
   description: '...',
   schema: generateDockerfileSchema,
-  metadata: { aiDriven: true, samplingStrategy: 'single', /* ... */ },
+  metadata: { samplingStrategy: 'single', /* ... */ },
   run,
 };
 
@@ -111,7 +111,7 @@ export default tool;
 ### 3.3 AI & Deterministic Sampling
 
 - `src/mcp/ai/sampling-runner.ts`: `sampleWithRerank` returns a single deterministic candidate with optional scoring metadata.
-- Tool metadata sets `samplingStrategy: 'single'`; CLI filtering supports `'single' | 'none'` only.
+- Tool metadata sets `samplingStrategy: 'single'` for AI-driven tools, `'none'` for non-AI tools.
 - `docs/ai-enhancement.md` covers enhancement architecture (knowledge enhancement, validation suggestions).
 
 ---
@@ -172,15 +172,6 @@ Use this guide for the big picture; dive into specific docs for in-depth topics.
 3. Update changelog if necessary.
 4. Push git tag `vX.Y.Z` or trigger `workflow_dispatch` with version.
 5. Confirm release workflow completes (NPM package, GitHub release, container image).
-
----
-
-## 7. Open Follow-Ups
-
-- `plans/codebase-simplification-sprint-plan.md` and `plans/remaining-work.md` track active refactors (session helpers, deterministic sampling cleanup, doc sync).
-- `plans/tooling-simplification-plan.md` outlines pending tooling simplifications (npm scripts, Husky, workflows).
-
-Maintain these plans as work progresses so this guide stays accurate.
 
 ---
 

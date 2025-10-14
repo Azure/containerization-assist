@@ -486,10 +486,6 @@ async function generateSingleManifest(
         confidence: knowledgeEnhancement.confidence,
         suggestions: knowledgeEnhancement.suggestions,
       }),
-      workflowHints: {
-        nextStep: 'deploy',
-        message: `Kubernetes manifests generated and validated successfully. ${knowledgeEnhancement ? `Enhanced with ${knowledgeEnhancement.knowledgeApplied.length} knowledge improvements. ` : ''}${manifestPath ? `Saved to ${manifestPath}. ` : ''}Use "deploy" with sessionId ${input.sessionId || '<sessionId>'} to deploy to your cluster.`,
-      },
     };
 
     return Success(result);
@@ -602,10 +598,6 @@ async function run(
         confidence: successCount / modules.length,
         knowledgeApplied: [],
       },
-      workflowHints: {
-        nextStep: 'deploy',
-        message: `Kubernetes manifests generated for ${successCount} module(s). Use "prepare-cluster" and "deploy" for each module to deploy to your cluster.`,
-      },
     });
   }
 
@@ -620,7 +612,6 @@ const tool: MCPTool<typeof generateK8sManifestsSchema, AIResponse> = {
   version,
   schema: generateK8sManifestsSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: [

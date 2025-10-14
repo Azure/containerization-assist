@@ -6,3 +6,4 @@ paths-ignore:
   - "scripts/**"
   - "node_modules/**"
   - "tests/**"
+  - "test/**"

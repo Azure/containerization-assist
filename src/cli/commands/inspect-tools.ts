@@ -16,8 +16,8 @@ import { Result, Success, Failure } from '@/types';
 
 // Tool discovery options interface
 export interface ToolDiscoveryOptions {
-  /** Include only AI-driven tools */
-  aiDrivenOnly?: boolean;
+  /** Include only tools with sampling enabled */
+  samplingEnabledOnly?: boolean;
   /** Include only knowledge-enhanced tools */
   knowledgeEnhancedOnly?: boolean;
   /** Filter by sampling strategy */
@@ -40,7 +40,7 @@ async function discoverToolCapabilities(
 
     for (const tool of ALL_TOOLS) {
       // Apply filters
-      if (options.aiDrivenOnly && !tool.metadata.aiDriven) continue;
+      if (options.samplingEnabledOnly && tool.metadata.samplingStrategy !== 'single') continue;
       if (options.knowledgeEnhancedOnly && !tool.metadata.knowledgeEnhanced) continue;
       if (options.samplingStrategy && tool.metadata.samplingStrategy !== options.samplingStrategy)
         continue;
@@ -65,7 +65,7 @@ async function discoverToolCapabilities(
 async function getToolStatistics(): Promise<
   Result<{
     total: number;
-    aiDriven: number;
+    samplingEnabled: number;
     knowledgeEnhanced: number;
     samplingStrategies: Record<string, number>;
     enhancementCapabilities: Record<string, number>;
@@ -78,7 +78,7 @@ async function getToolStatistics(): Promise<
   const tools = result.value;
   const stats = {
     total: tools.length,
-    aiDriven: tools.filter((t) => t.metadata.aiDriven).length,
+    samplingEnabled: tools.filter((t) => t.metadata.samplingStrategy === 'single').length,
     knowledgeEnhanced: tools.filter((t) => t.metadata.knowledgeEnhanced).length,
     samplingStrategies: {} as Record<string, number>,
     enhancementCapabilities: {} as Record<string, number>,
@@ -174,7 +174,7 @@ Generated: ${new Date().toISOString()}
 ## Summary Statistics
 
 - **Total Tools**: ${stats.total}
-- **AI-Driven Tools**: ${stats.aiDriven} (${Math.round((stats.aiDriven / stats.total) * 100)}%)
+- **Sampling-Enabled Tools**: ${stats.samplingEnabled} (${Math.round((stats.samplingEnabled / stats.total) * 100)}%)
 - **Knowledge-Enhanced Tools**: ${stats.knowledgeEnhanced} (${Math.round((stats.knowledgeEnhanced / stats.total) * 100)}%)
 
 ### Sampling Strategies
@@ -200,7 +200,7 @@ Generated: ${new Date().toISOString()}
     report += `### ${tool.name}
 - **Description**: ${tool.description}
 - **Category**: ${tool.category || 'uncategorized'}
-- **AI-Driven**: ${tool.metadata.aiDriven ? '✅' : '❌'}
+- **AI-Driven**: ${tool.metadata.samplingStrategy === 'single' ? '✅' : '❌'}
 - **Knowledge-Enhanced**: ${tool.metadata.knowledgeEnhanced ? '✅' : '❌'}
 - **Sampling Strategy**: ${tool.metadata.samplingStrategy}
 - **Enhancement Capabilities**: ${tool.metadata.enhancementCapabilities.join(', ') || 'None'}
@@ -234,7 +234,7 @@ export function createInspectToolsCommand(): Command {
   cmd
     .command('list')
     .description('List all tools with their AI enhancement capabilities')
-    .option('--ai-driven', 'Show only AI-driven tools')
+    .option('--sampling-enabled', 'Show only AI-driven tools')
     .option('--knowledge-enhanced', 'Show only knowledge-enhanced tools')
     .option('--sampling <strategy>', 'Filter by sampling strategy (single, none)')
     .option('--capability <name>', 'Filter by enhancement capability')
@@ -243,7 +243,7 @@ export function createInspectToolsCommand(): Command {
     .action(async (options) => {
       try {
         const discoveryOptions: ToolDiscoveryOptions = {
-          aiDrivenOnly: options.aiDriven,
+          samplingEnabledOnly: options.samplingEnabled,
           knowledgeEnhancedOnly: options.knowledgeEnhanced,
           samplingStrategy: options.sampling,
           hasCapability: options.capability,
@@ -286,7 +286,7 @@ export function createInspectToolsCommand(): Command {
           console.info('📊 Tool Statistics\n');
           console.info(`Total Tools: ${stats.total}`);
           console.info(
-            `AI-Driven: ${stats.aiDriven} (${Math.round((stats.aiDriven / stats.total) * 100)}%)`,
+            `Sampling-Enabled: ${stats.samplingEnabled} (${Math.round((stats.samplingEnabled / stats.total) * 100)}%)`,
           );
           console.info(
             `Knowledge-Enhanced: ${stats.knowledgeEnhanced} (${Math.round((stats.knowledgeEnhanced / stats.total) * 100)}%)`,
@@ -319,7 +319,7 @@ export function createInspectToolsCommand(): Command {
     .option('--count', 'Show only count')
     .action(async (options) => {
       try {
-        const result = await discoverToolCapabilities({ aiDrivenOnly: true });
+        const result = await discoverToolCapabilities({ samplingEnabledOnly: true });
         if (!result.ok) {
           handleResultError(result, 'Failed to get AI-driven tools');
         }
@@ -329,7 +329,7 @@ export function createInspectToolsCommand(): Command {
         if (options.count) {
           console.info(tools.length);
         } else {
-          console.info('🤖 AI-Driven Tools:\n');
+          console.info('🤖 Sampling-Enabled Tools:\n');
           tools.forEach((tool) => console.info(`  • ${tool}`));
           console.info(`\nTotal: ${tools.length} tools`);
         }

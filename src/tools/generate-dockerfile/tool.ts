@@ -8,7 +8,6 @@
  *
  * @category docker
  * @version 3.0.0
- * @aiDriven true
  * @knowledgeEnhanced true
  * @samplingStrategy single
  */
@@ -449,21 +448,6 @@ ${finalDockerfileContent}
       }
     }
 
-    // Build workflow hints
-    const workflowHints: string[] = [];
-    workflowHints.push(
-      written
-        ? `✅ Dockerfile written to: ${dockerfilePath}`
-        : '✅ Dockerfile generated (not written to disk)',
-    );
-    workflowHints.push(`\n📋 Next steps:`);
-    workflowHints.push(`1. Review and customize the generated Dockerfile`);
-    workflowHints.push(`2. Build the image: docker build -t my-app:latest .`);
-    workflowHints.push(`3. Test locally: docker run -p 8080:8080 my-app:latest`);
-    if (sessionId) {
-      workflowHints.push(`4. Generate K8s manifests: use generate-k8s-manifests with sessionId`);
-    }
-
     // Build suggestions array with knowledge enhancement info
     const suggestions = [
       written
@@ -489,10 +473,6 @@ ${finalDockerfileContent}
         : undefined,
       confidence: knowledgeEnhancement ? knowledgeEnhancement.confidence : 0.9,
       suggestions,
-      workflowHints: {
-        nextStep: 'build-image',
-        message: `Dockerfile generated successfully. Use "build-image" with sessionId ${sessionId || '<sessionId>'} to build your container image, or review and customize the Dockerfile first.`,
-      },
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -600,10 +580,6 @@ async function run(
         confidence: successCount / modules.length,
         knowledgeApplied: [],
       },
-      workflowHints: {
-        nextStep: 'build-image',
-        message: `Dockerfiles generated for ${successCount} module(s). Use "build-image" for each module to build container images.`,
-      },
     });
   }
 
@@ -618,7 +594,6 @@ const tool: MCPTool<typeof generateDockerfileSchema, AIResponse> = {
   version,
   schema: generateDockerfileSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: ['content-generation', 'validation', 'optimization', 'self-repair'],

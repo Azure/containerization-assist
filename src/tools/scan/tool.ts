@@ -17,7 +17,6 @@ import {
   ValidationSeverity,
   type ValidationResult,
 } from '@/validation/ai-enhancement';
-import { getPostScanHint } from '@/lib/workflow-hints';
 import type { MCPTool } from '@/types/tool';
 import { scanImageSchema, type ScanImageParams } from './schema';
 
@@ -63,10 +62,6 @@ export interface ScanImageResult {
   };
   scanTime: string;
   passed: boolean;
-  workflowHints?: {
-    nextStep: string;
-    message: string;
-  };
   aiSuggestions?: string[];
   aiAnalysis?: {
     assessment: string;
@@ -309,15 +304,6 @@ ${dockerScanResult.vulnerabilities
       }
     }
 
-    // Determine context-dependent workflow hints using shared helper
-    const workflowHints = getPostScanHint(
-      passed,
-      scanResult.criticalCount,
-      scanResult.highCount,
-      context.session,
-      sessionId,
-    );
-
     // Prepare the result
     const result: ScanImageResult = {
       success: true,
@@ -333,7 +319,6 @@ ${dockerScanResult.vulnerabilities
       },
       scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
       passed,
-      workflowHints,
       ...(aiSuggestions && aiSuggestions.length > 0 && { aiSuggestions }),
       ...(aiAnalysis && { aiAnalysis }),
     };
@@ -381,7 +366,6 @@ const tool: MCPTool<typeof scanImageSchema, ScanImageResult> = {
   version: '2.0.0',
   schema: scanImageSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: ['vulnerability-analysis', 'security-suggestions', 'risk-assessment'],

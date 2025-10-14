@@ -16,7 +16,6 @@
 import path from 'path';
 import { normalizePath } from '@/lib/path-utils';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
-import { getPostBuildHint } from '@/lib/workflow-hints';
 import { promises as fs } from 'node:fs';
 import { createStandardProgress } from '@/mcp/progress-helper';
 import type { ToolContext } from '@/mcp/context';
@@ -59,11 +58,6 @@ export interface BuildImageResult {
   securityWarnings?: string[];
   /** AI-powered optimization suggestions */
   optimizationSuggestions?: BuildOptimizationSuggestions;
-  /** Workflow hints for the next step */
-  workflowHints?: {
-    nextStep: string;
-    message: string;
-  };
 }
 
 /**
@@ -454,11 +448,6 @@ async function buildImageImpl(
       logs: buildResult.value.logs,
       ...(securityWarnings.length > 0 && { securityWarnings }),
       ...(optimizationSuggestions && { optimizationSuggestions }),
-      workflowHints: getPostBuildHint(
-        context.session,
-        sessionId,
-        optimizationSuggestions ? String(optimizationSuggestions) : undefined,
-      ),
     };
 
     timer.end({ imageId: buildResult.value.imageId, buildTime });
@@ -487,7 +476,6 @@ const tool: MCPTool<typeof buildImageSchema, BuildImageResult> = {
   version: '2.0.0',
   schema: buildImageSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: ['optimization-suggestions', 'build-analysis', 'performance-insights'],

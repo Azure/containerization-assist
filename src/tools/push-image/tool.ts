@@ -32,10 +32,6 @@ export interface PushImageResult {
   pushedTag: string;
   sessionId?: string;
   pushOptimizationInsights?: PushOptimizationInsights;
-  workflowHints?: {
-    nextStep: string;
-    message: string;
-  };
 }
 
 /**
@@ -329,10 +325,6 @@ async function run(
       pushedTag,
       ...(input.sessionId && { sessionId: input.sessionId }),
       ...(pushOptimizationInsights && { pushOptimizationInsights }),
-      workflowHints: {
-        nextStep: 'generate-k8s-manifests',
-        message: `Image pushed successfully. Use "generate-k8s-manifests" with sessionId ${input.sessionId || '<sessionId>'} to create Kubernetes deployment manifests.${pushOptimizationInsights ? ' Review AI optimization insights for push improvements.' : ''}`,
-      },
     };
 
     return Success(result);
@@ -351,7 +343,6 @@ const tool: MCPTool<typeof pushImageSchema, PushImageResult> = {
   version: '2.0.0',
   schema: pushImageSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: ['push-optimization', 'registry-insights', 'security-recommendations'],
