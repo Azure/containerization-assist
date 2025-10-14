@@ -242,7 +242,7 @@ jobs:
 
       - name: Create or update PR comment
         if: github.event_name == 'pull_request'
-        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v3
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           comment-id: ${{ steps.find-comment.outputs.comment-id }}
@@ -274,11 +274,11 @@ jobs:
         run: npm audit --audit-level moderate || true
 
       - name: CodeQL Analysis
-        uses: github/codeql-action/init@e296a935590eb16afc0c0108289f68c87e2a89a5 # v3
+        uses: github/codeql-action/init@f443b600d91635bebf5b0d9ebc620189c0d6fba5 # v3
         with:
           languages: typescript
           queries: security-and-quality
           config-file: ./.github/workflows/codeql/codeql-config.yml
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@e296a935590eb16afc0c0108289f68c87e2a89a5 # v3
+        uses: github/codeql-action/analyze@f443b600d91635bebf5b0d9ebc620189c0d6fba5 # v3
