@@ -5,164 +5,206 @@
  * structured requirements for creating a Dockerfile. This tool helps users
  * understand best practices and recommendations before actual Dockerfile generation.
  *
+ * Uses the knowledge-tool-pattern for consistent, deterministic behavior.
+ *
  * @category docker
  * @version 1.0.0
  * @knowledgeEnhanced true
  * @samplingStrategy none
  */
 
-import { Success, Failure, type Result, TOPICS } from '@/types';
+import { Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { MCPTool } from '@/types/tool';
 import {
   generateDockerfilePlanSchema,
   type DockerfilePlan,
   type DockerfileRequirement,
+  type GenerateDockerfilePlanParams,
 } from './schema';
-import { getKnowledgeSnippets } from '@/knowledge/matcher';
-import type { z } from 'zod';
 import { CATEGORY } from '@/knowledge/types';
+import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
+import type { z } from 'zod';
 
 const name = 'generate-dockerfile-plan';
 const description =
   'Gather insights from knowledgebase and return requirements for Dockerfile creation';
 const version = '1.0.0';
 
+// Define category types for better type safety
+type DockerfileCategory = 'security' | 'optimization' | 'bestPractices';
+
+// Define rule results interface
+interface DockerfileBuildRules {
+  buildStrategy: {
+    multistage: boolean;
+    reason: string;
+  };
+}
+
+// Create the tool runner using the shared pattern
+const runPattern = createKnowledgeTool<
+  GenerateDockerfilePlanParams,
+  DockerfilePlan,
+  DockerfileCategory,
+  DockerfileBuildRules
+>({
+  name,
+  query: {
+    topic: TOPICS.DOCKERFILE,
+    category: CATEGORY.DOCKERFILE,
+    maxChars: 8000,
+    maxSnippets: 20,
+    extractFilters: (input) => ({
+      environment: input.environment || 'production',
+      language: input.language || 'auto-detect',
+      framework: input.framework,
+    }),
+  },
+  categorization: {
+    categoryNames: ['security', 'optimization', 'bestPractices'] as const,
+    categorize: createSimpleCategorizer<DockerfileCategory>({
+      security: (s) => s.category === 'security' || Boolean(s.tags?.includes('security')),
+      optimization: (s) =>
+        Boolean(
+          s.tags?.includes('optimization') ||
+            s.tags?.includes('caching') ||
+            s.tags?.includes('size'),
+        ),
+      bestPractices: () => true, // Catch remaining snippets as best practices
+    }),
+  },
+  rules: {
+    applyRules: (input) => {
+      const language = input.language || 'auto-detect';
+      const buildSystemType = undefined; // TODO: Extract from repository analysis
+
+      const shouldUseMultistage =
+        language === 'java' ||
+        language === 'go' ||
+        language === 'rust' ||
+        language === 'dotnet' ||
+        language === 'c#' ||
+        (typeof buildSystemType === 'string' && ['maven', 'gradle'].includes(buildSystemType));
+
+      return {
+        buildStrategy: {
+          multistage: shouldUseMultistage,
+          reason: shouldUseMultistage
+            ? 'Multi-stage build recommended to separate build tools from runtime, reducing image size by 70-90%'
+            : 'Single-stage build sufficient for interpreted languages',
+        },
+      };
+    },
+  },
+  plan: {
+    buildPlan: (input, knowledge, rules, confidence) => {
+      const path = input.repositoryPathAbsoluteUnix || '';
+      const modulePath = input.modulePathAbsoluteUnix || path;
+      const language = input.language || 'auto-detect';
+      const framework = input.framework;
+
+      // Map knowledge snippets to DockerfileRequirements
+      const knowledgeMatches: DockerfileRequirement[] = knowledge.all.map((snippet) => ({
+        id: snippet.id,
+        category: snippet.category || 'generic',
+        recommendation: snippet.text,
+        ...(snippet.tags && { tags: snippet.tags }),
+        matchScore: snippet.weight,
+      }));
+
+      const securityMatches: DockerfileRequirement[] = (knowledge.categories.security || []).map(
+        (snippet) => ({
+          id: snippet.id,
+          category: snippet.category || 'security',
+          recommendation: snippet.text,
+          ...(snippet.tags && { tags: snippet.tags }),
+          matchScore: snippet.weight,
+        }),
+      );
+
+      const optimizationMatches: DockerfileRequirement[] = (
+        knowledge.categories.optimization || []
+      ).map((snippet) => ({
+        id: snippet.id,
+        category: snippet.category || 'optimization',
+        recommendation: snippet.text,
+        ...(snippet.tags && { tags: snippet.tags }),
+        matchScore: snippet.weight,
+      }));
+
+      const bestPracticeMatches: DockerfileRequirement[] = (
+        knowledge.categories.bestPractices || []
+      )
+        .filter((snippet) => {
+          // Exclude snippets already in security or optimization
+          const isInSecurity = (knowledge.categories.security || []).some(
+            (s) => s.id === snippet.id,
+          );
+          const isInOptimization = (knowledge.categories.optimization || []).some(
+            (s) => s.id === snippet.id,
+          );
+          return !isInSecurity && !isInOptimization;
+        })
+        .map((snippet) => ({
+          id: snippet.id,
+          category: snippet.category || 'generic',
+          recommendation: snippet.text,
+          ...(snippet.tags && { tags: snippet.tags }),
+          matchScore: snippet.weight,
+        }));
+
+      const summary = `
+Dockerfile Planning Summary:
+- Path: ${modulePath}${input.modulePathAbsoluteUnix ? ' (module)' : ''}
+- Language: ${language}${framework ? ` (${framework})` : ''}
+- Environment: ${input.environment || 'production'}
+- Build Strategy: ${rules.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'}
+- Knowledge Matches: ${knowledgeMatches.length} recommendations found
+  - Security: ${securityMatches.length}
+  - Optimizations: ${optimizationMatches.length}
+  - Best Practices: ${bestPracticeMatches.length}
+      `.trim();
+
+      return {
+        repositoryInfo: {
+          name: modulePath.split('/').pop() || 'unknown',
+          modulePathAbsoluteUnix: modulePath,
+          ...(language &&
+            language !== 'auto-detect' && {
+              language: language === 'java' || language === 'dotnet' ? language : 'other',
+            }),
+          ...(framework &&
+            framework !== 'auto-detect' && {
+              frameworks: [{ name: framework }],
+            }),
+        },
+        recommendations: {
+          buildStrategy: rules.buildStrategy,
+          securityConsiderations: securityMatches,
+          optimizations: optimizationMatches,
+          bestPractices: bestPracticeMatches,
+        },
+        knowledgeMatches,
+        confidence,
+        summary,
+      };
+    },
+  },
+});
+
+// Wrapper function to add validation
 async function run(
   input: z.infer<typeof generateDockerfilePlanSchema>,
   ctx: ToolContext,
 ): Promise<Result<DockerfilePlan>> {
-  const {
-    language: inputLanguage,
-    framework: inputFramework,
-    environment,
-    modulePathAbsoluteUnix,
-  } = input;
-
   const path = input.repositoryPathAbsoluteUnix || '';
-  const modulePath = modulePathAbsoluteUnix || path;
-
-  const language = inputLanguage || 'auto-detect';
-  const framework = inputFramework;
 
   if (!path) {
     return Failure('Path is required. Provide a path parameter.');
   }
 
-  const repositoryInfo = {
-    path: modulePath,
-    language,
-    framework,
-    languageVersion: undefined,
-    frameworkVersion: undefined,
-    buildSystem: undefined,
-    dependencies: undefined,
-    ports: undefined,
-    entryPoint: undefined,
-  };
-
-  ctx.logger.info(
-    { language, framework, environment },
-    'Querying knowledgebase for Dockerfile recommendations',
-  );
-
-  const knowledgeSnippets = await getKnowledgeSnippets(TOPICS.DOCKERFILE, {
-    environment: environment || 'production',
-    tool: name,
-    language,
-    ...(framework && { framework }),
-    maxChars: 8000,
-    maxSnippets: 20,
-    category: CATEGORY.DOCKERFILE,
-  });
-
-  const knowledgeMatches: DockerfileRequirement[] = knowledgeSnippets.map((snippet) => ({
-    id: snippet.id,
-    category: snippet.category || 'generic',
-    recommendation: snippet.text,
-    ...(snippet.tags && { tags: snippet.tags }),
-    matchScore: snippet.weight,
-  }));
-
-  const securityMatches = knowledgeMatches.filter(
-    (m) => m.category === 'security' || m.tags?.includes('security'),
-  );
-  const optimizationMatches = knowledgeMatches.filter(
-    (m) =>
-      m.tags?.includes('optimization') || m.tags?.includes('caching') || m.tags?.includes('size'),
-  );
-  const bestPracticeMatches = knowledgeMatches.filter(
-    (m) => !securityMatches.includes(m) && !optimizationMatches.includes(m),
-  );
-
-  const buildSystemType = undefined;
-  const shouldUseMultistage =
-    language === 'java' ||
-    language === 'go' ||
-    language === 'rust' ||
-    language === 'dotnet' ||
-    language === 'c#' ||
-    (typeof buildSystemType === 'string' && ['maven', 'gradle'].includes(buildSystemType));
-
-  const buildStrategy = {
-    multistage: shouldUseMultistage,
-    reason: shouldUseMultistage
-      ? 'Multi-stage build recommended to separate build tools from runtime, reducing image size by 70-90%'
-      : 'Single-stage build sufficient for interpreted languages',
-  };
-
-  const confidence =
-    knowledgeMatches.length > 0 ? Math.min(0.95, 0.5 + knowledgeMatches.length * 0.05) : 0.5;
-
-  const summary = `
-Dockerfile Planning Summary:
-- Path: ${modulePath}${modulePathAbsoluteUnix ? ' (module)' : ''}
-- Language: ${language}${framework ? ` (${framework})` : ''}
-- Environment: ${environment || 'production'}
-- Build Strategy: ${buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'}
-- Knowledge Matches: ${knowledgeMatches.length} recommendations found
-  - Security: ${securityMatches.length}
-  - Optimizations: ${optimizationMatches.length}
-  - Best Practices: ${bestPracticeMatches.length}
-  `.trim();
-
-  const plan: DockerfilePlan = {
-    repositoryInfo: {
-      name: modulePath.split('/').pop() || 'unknown',
-      modulePathAbsoluteUnix: modulePath,
-      ...(repositoryInfo.language && {
-        language:
-          repositoryInfo.language === 'java' || repositoryInfo.language === 'dotnet'
-            ? repositoryInfo.language
-            : 'other',
-      }),
-      ...(repositoryInfo.framework &&
-        repositoryInfo.framework !== 'auto-detect' && {
-          frameworks: [{ name: repositoryInfo.framework }],
-        }),
-    },
-    recommendations: {
-      buildStrategy,
-      securityConsiderations: securityMatches,
-      optimizations: optimizationMatches,
-      bestPractices: bestPracticeMatches,
-    },
-    knowledgeMatches,
-    confidence,
-    summary,
-  };
-
-  ctx.logger.info(
-    {
-      knowledgeMatchCount: knowledgeMatches.length,
-      securityCount: securityMatches.length,
-      optimizationCount: optimizationMatches.length,
-      confidence,
-    },
-    'Dockerfile planning completed',
-  );
-
-  return Success(plan);
+  return runPattern(input, ctx);
 }
 
 const tool: MCPTool<typeof generateDockerfilePlanSchema, DockerfilePlan> = {
