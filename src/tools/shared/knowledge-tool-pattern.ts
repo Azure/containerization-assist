@@ -230,19 +230,15 @@ export function createKnowledgeTool<
 
     ctx.logger.info({ topic, filters }, `${config.name}: Querying knowledge base`);
 
-    const knowledgeOptions: Record<string, unknown> = {
+    const knowledgeOptions = {
       environment: filters.environment || 'production',
       tool: config.name,
       maxChars: config.query.maxChars || 8000,
       maxSnippets: config.query.maxSnippets || 20,
       category: config.query.category,
+      ...(filters.language && { language: filters.language }),
+      ...(filters.framework && { framework: filters.framework }),
     };
-    if (filters.language) {
-      knowledgeOptions.language = filters.language;
-    }
-    if (filters.framework) {
-      knowledgeOptions.framework = filters.framework;
-    }
     const knowledgeSnippets = await getKnowledgeSnippets(topic, knowledgeOptions);
 
     // 2. Categorize knowledge snippets
@@ -262,11 +258,12 @@ export function createKnowledgeTool<
         } else {
           ctx.logger.warn(
             {
+              tool: config.name,
               undeclaredCategory: category,
               snippetId: snippet.id,
-              snippetTitle: snippet.title,
+              snippetSource: snippet.source,
             },
-            `${config.name}: categorize() returned undeclared category '${category}'. This snippet will be ignored for that category.`,
+            'categorize() returned undeclared category. This snippet will be ignored for that category.',
           );
         }
       }

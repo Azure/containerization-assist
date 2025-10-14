@@ -2,7 +2,7 @@
  * Utilities for working with Result<T> types to reduce boilerplate
  */
 
-import { type Result, Failure, Success } from '../types.js';
+import { type Result, Failure, Success } from '@/types';
 
 /**
  * Propagates a failure result or continues with success.
