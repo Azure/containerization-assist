@@ -47,8 +47,7 @@ export function getLogFilePath(): string {
     return join(dirPath, logFileName);
   }
 
-  const date = new Date();
-  const timestamp = date.toISOString();
+  const timestamp = Date.now();
   logFileName = `ca-tool-logs-${timestamp}.jsonl`;
   return join(dirPath, logFileName);
 }
