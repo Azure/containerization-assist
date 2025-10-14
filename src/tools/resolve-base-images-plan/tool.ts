@@ -49,12 +49,14 @@ function createRecommendation(
   category: BaseImageCategory,
 ): BaseImageRecommendation {
   // Extract image name from the recommendation text (assumes format like "node:20-alpine" or mentions image)
-  const imageMatch = snippet.text.match(/\b[\w.-]+:[\w.-]+\b/);
+  // More specific Docker image name regex: matches [repo/]image:tag
+  const imageMatch = snippet.text.match(/\b([a-z0-9.-]+\/)?[a-z0-9.-]+:[a-z0-9._-]+\b/);
   const image = imageMatch ? imageMatch[0] : 'unknown';
 
-  // Extract size if mentioned (e.g., "50MB", "100 MB")
-  const sizeMatch = snippet.text.match(/(\d+)\s*MB/i);
-  const size = sizeMatch ? `${sizeMatch[1]}MB` : undefined;
+  // Extract size if mentioned (e.g., "50MB", "100 MB", "1GB")
+  const sizeMatch = snippet.text.match(/(\d+)\s*(MB|GB|KB|B)/i);
+  const size =
+    sizeMatch?.[1] && sizeMatch[2] ? `${sizeMatch[1]}${sizeMatch[2].toUpperCase()}` : undefined;
 
   return {
     image,

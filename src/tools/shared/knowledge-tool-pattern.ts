@@ -16,7 +16,7 @@ import type { ToolContext } from '@/mcp/context';
 import type { Topic } from '@/types/topics';
 import type { KnowledgeCategory } from '@/knowledge/types';
 import type { KnowledgeSnippet } from '@/knowledge/schemas';
-import { getKnowledgeSnippets, type KnowledgeSnippetOptions } from '@/knowledge/matcher';
+import { getKnowledgeSnippets } from '@/knowledge/matcher';
 
 /**
  * Configuration for knowledge query construction.
@@ -69,7 +69,7 @@ export interface CategorizationConfig<TInput, TCategories extends string = strin
    * Categorize a snippet into one or more categories.
    * Returns array of category names that this snippet belongs to.
    */
-  categorize: (snippet: KnowledgeSnippet, input: TInput) => TCategories[];
+  categorize: (snippet: KnowledgeSnippet, input?: TInput) => TCategories[];
 }
 
 /**
@@ -230,7 +230,7 @@ export function createKnowledgeTool<
 
     ctx.logger.info({ topic, filters }, `${config.name}: Querying knowledge base`);
 
-    const knowledgeOptions: KnowledgeSnippetOptions = {
+    const knowledgeOptions: Record<string, unknown> = {
       environment: filters.environment || 'production',
       tool: config.name,
       maxChars: config.query.maxChars || 8000,
@@ -264,9 +264,9 @@ export function createKnowledgeTool<
             {
               undeclaredCategory: category,
               snippetId: snippet.id,
-              snippetSource: snippet.source,
+              snippetTitle: snippet.title,
             },
-            `${config.name}: categorize() returned undeclared category. This snippet will be ignored for that category.`,
+            `${config.name}: categorize() returned undeclared category '${category}'. This snippet will be ignored for that category.`,
           );
         }
       }
