@@ -328,12 +328,13 @@ function printSimpleArray(arr: unknown[]): string {
 function printSimpleObject(obj: Record<string, unknown>): string {
   let markdown = '';
   for (const [subKey, subValue] of Object.entries(obj)) {
-    markdown += `**${subKey}**: ${subValue}\n\n`;
+    markdown += `**${subKey}**: ${subValue}\n`;
   }
+  markdown += '\n';
   return markdown;
 }
 
-export function objectToMarkdownRecursive(obj: Record<string, unknown>, headingLevel = 2): string {
+export function objectToMarkdownRecursive(obj: Record<string, unknown>, headingLevel = 1): string {
   // Check if the entire object is simple (only contains primitive values)
   if (isSimpleObject(obj)) {
     return printSimpleObject(obj);

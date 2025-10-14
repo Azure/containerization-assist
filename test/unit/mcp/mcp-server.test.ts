@@ -50,10 +50,11 @@ describe('registerToolsWithServer', () => {
       logger,
       transport: 'stdio',
       execute: executeMock,
+      outputFormat: OUTPUTFORMAT.MARKDOWN,
     });
 
     expect(serverToolMock).toHaveBeenCalledTimes(1);
-    const handler = serverToolMock.mock.calls[0][3];
+    const handler = serverToolMock.mock.calls[0][3] as any;
 
     const params = {
       foo: 'value',
@@ -82,7 +83,7 @@ describe('registerToolsWithServer', () => {
 
   it('wraps orchestrator failures in McpError', async () => {
     const tool = createTool('error-demo');
-    executeMock.mockResolvedValue(Failure('orchestrator boom'));
+    (executeMock as any).mockResolvedValue(Failure('orchestrator boom'));
 
     const fakeServer = {
       tool: serverToolMock,
@@ -94,9 +95,10 @@ describe('registerToolsWithServer', () => {
       logger,
       transport: 'stdio',
       execute: executeMock,
+      outputFormat: OUTPUTFORMAT.MARKDOWN,
     });
 
-    const handler = serverToolMock.mock.calls[0][3];
+    const handler = serverToolMock.mock.calls[0][3] as any;
 
     const extra = {
       sendNotification: jest.fn(),
@@ -106,6 +108,37 @@ describe('registerToolsWithServer', () => {
 
     await expect(handler({ foo: 'value' }, extra)).rejects.toBeInstanceOf(McpError);
     expect(executeMock).toHaveBeenCalled();
+  });
+
+  it('formats output according to specified outputFormat', async () => {
+    const tool = createTool('format-demo');
+    const mockResult = { name: 'test', version: '1.0' };
+    (executeMock as any).mockResolvedValue(Success(mockResult));
+
+    const fakeServer = {
+      tool: serverToolMock,
+    } as unknown as Parameters<typeof registerToolsWithServer>[0]['server'];
+
+    registerToolsWithServer({
+      server: fakeServer,
+      tools: [tool],
+      logger,
+      transport: 'stdio',
+      execute: executeMock,
+      outputFormat: OUTPUTFORMAT.JSON,
+    });
+
+    const handler = serverToolMock.mock.calls[0][3] as any;
+
+    const extra = {
+      sendNotification: jest.fn(),
+      signal: new AbortController().signal,
+      requestId: '789',
+    };
+
+    const result = await handler({ foo: 'value' }, extra);
+
+    expect(result.content[0].text).toBe('{\n  "name": "test",\n  "version": "1.0"\n}');
   });
 });
 
@@ -120,9 +153,7 @@ describe('objectToMarkdownRecursive', () => {
     const result = objectToMarkdownRecursive(input);
 
     const expected = `**name**: test
-
 **version**: 1.0.0
-
 **port**: 8080
 
 `;
@@ -139,9 +170,7 @@ describe('objectToMarkdownRecursive', () => {
     const result = objectToMarkdownRecursive(input);
 
     const expected = `**nullValue**: null
-
 **undefinedValue**: undefined
-
 **name**: test
 
 `;
@@ -157,19 +186,19 @@ describe('objectToMarkdownRecursive', () => {
 
     const result = objectToMarkdownRecursive(input);
 
-    const expected = `## Items
+    const expected = `# Items
 
 - apple
 - banana
 - cherry
 
-## Numbers
+# Numbers
 
 - 1
 - 2
 - 3
 
-## Flags
+# Flags
 
 - true
 - false
@@ -189,11 +218,11 @@ describe('objectToMarkdownRecursive', () => {
 
     const result = objectToMarkdownRecursive(input);
 
-    const expected = `## Name
+    const expected = `# Name
 
 test
 
-## Config
+# Config
 
 **timeout**: 30
 
@@ -216,15 +245,14 @@ test
 
     const result = objectToMarkdownRecursive(input);
 
-    const expected = `## Config
+    const expected = `# Config
 
-### Database
+## Database
 
 **host**: localhost
-
 **port**: 5432
 
-### Cache
+## Cache
 
 **enabled**: true
 
@@ -242,18 +270,16 @@ test
 
     const result = objectToMarkdownRecursive(input);
 
-    const expected = `## Users
+    const expected = `# Users
 
-### 1
+## 1
 
 **name**: Alice
-
 **age**: 30
 
-### 2
+## 2
 
 **name**: Bob
-
 **age**: 25
 
 `;
@@ -267,13 +293,13 @@ test
 
     const result = objectToMarkdownRecursive(input);
 
-    const expected = `## MixedArray
+    const expected = `# MixedArray
 
 1. string
 
 2. 42
 
-### 3
+## 3
 
 **nested**: object
 
@@ -299,7 +325,7 @@ test
 
     const result = objectToMarkdownRecursive(input);
 
-    expect(result).toBe('');
+    expect(result).toBe('\n');
   });
 
   it('handles complex mixed data structures', () => {
@@ -317,24 +343,23 @@ test
 
     const result = objectToMarkdownRecursive(input);
 
-    const expected = `## Metadata
+    const expected = `# Metadata
 
-### Version
+## Version
 
 2.0
 
-### Tags
+## Tags
 
 - prod
 - api
 
-### Config
+## Config
 
 **timeout**: 30
-
 **retries**: null
 
-## Enabled
+# Enabled
 
 false
 
@@ -352,9 +377,7 @@ false
     const result = objectToMarkdownRecursive(input);
 
     const expected = `**status**: active
-
 **count**: 5
-
 **readonly**: true
 
 `;
@@ -369,10 +392,10 @@ false
 
     const result = objectToMarkdownRecursive(input);
 
-    expect(result).toBe(`## EmptyArray
+    expect(result).toBe(`# EmptyArray
 
 
-## Name
+# Name
 
 test
 
@@ -395,7 +418,6 @@ describe('formatOutput', () => {
     const result = formatOutput(input, OUTPUTFORMAT.MARKDOWN);
 
     const expected = `**name**: test
-
 **enabled**: true
 
 `;
