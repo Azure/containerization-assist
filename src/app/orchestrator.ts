@@ -379,6 +379,93 @@ const chainHintMap = new Map<ToolName, { success: string; failure: string }>([
       failure: 'Manifest plan generation failed. Please check the logs for details.',
     },
   ],
+  [
+    TOOL_NAME.BUILD_IMAGE,
+    {
+      success: `Image built successfully. Next: Call ${TOOL_NAME.SCAN} to check for security vulnerabilities.`,
+      failure: `Image build failed. Use ${TOOL_NAME.FIX_DOCKERFILE} to resolve issues, then retry ${TOOL_NAME.BUILD_IMAGE}.`,
+    },
+  ],
+  [
+    TOOL_NAME.GENERATE_DOCKERFILE,
+    {
+      success: `Dockerfile generated successfully. Next: Call ${TOOL_NAME.BUILD_IMAGE} to build the container image.`,
+      failure: 'Dockerfile generation failed. Check repository analysis and try again.',
+    },
+  ],
+  [
+    TOOL_NAME.GENERATE_K8S_MANIFESTS,
+    {
+      success: `Kubernetes manifests generated successfully. Next: Call ${TOOL_NAME.PREPARE_CLUSTER} to create a kind cluster to deploy to.`,
+      failure: 'Manifest generation failed. Ensure you have a valid image and try again.',
+    },
+  ],
+  [
+    TOOL_NAME.DEPLOY,
+    {
+      success: `Application deployed successfully. Use ${TOOL_NAME.VERIFY_DEPLOY} to check deployment health and status.`,
+      failure:
+        'Deployment failed. Check cluster connectivity, manifests validity, and pod status with kubectl.',
+    },
+  ],
+  [
+    TOOL_NAME.FIX_DOCKERFILE,
+    {
+      success: `Dockerfile fixes applied successfully. Next: Call ${TOOL_NAME.BUILD_IMAGE} to test the fixed Dockerfile.`,
+      failure: 'Dockerfile fix failed. Review validation errors and try manual fixes.',
+    },
+  ],
+  [
+    TOOL_NAME.CONVERT_ACA_TO_K8S,
+    {
+      success: `ACA manifests converted to Kubernetes successfully. Next: Call ${TOOL_NAME.DEPLOY} or ${TOOL_NAME.GENERATE_HELM_CHARTS} for templating.`,
+      failure: 'Conversion failed. Verify ACA manifest syntax and try again.',
+    },
+  ],
+  [
+    TOOL_NAME.GENERATE_ACA_MANIFESTS,
+    {
+      success: `ACA manifests generated successfully. Deploy to Azure Container Apps or convert to K8s with ${TOOL_NAME.CONVERT_ACA_TO_K8S}.`,
+      failure: 'ACA manifest generation failed. Check image and configuration parameters.',
+    },
+  ],
+  [
+    TOOL_NAME.GENERATE_HELM_CHARTS,
+    {
+      success: `Helm chart generated successfully. Next: Call ${TOOL_NAME.PREPARE_CLUSTER} to create a kind cluster to deploy to.`,
+      failure: 'Helm chart generation failed. Verify application parameters and try again.',
+    },
+  ],
+  [
+    TOOL_NAME.GENERATE_KUSTOMIZE,
+    {
+      success: `Kustomize manifests created successfully. Next: Call ${TOOL_NAME.PREPARE_CLUSTER} to create a kind cluster to deploy to.`,
+      failure: 'Kustomize generation failed. Check input manifests and environment configurations.',
+    },
+  ],
+  [
+    TOOL_NAME.PUSH_IMAGE,
+    {
+      success: `Image pushed successfully. Review AI optimization insights for push improvements.`,
+      failure:
+        'Image push failed. Check registry credentials, network connectivity, and image tag format.',
+    },
+  ],
+  [
+    TOOL_NAME.SCAN,
+    {
+      success: `Security scan passed! Proceed with ${TOOL_NAME.PUSH_IMAGE} to push to a registry, or continue with deployment preparation.`,
+      failure: `Security scan found vulnerabilities. Use ${TOOL_NAME.FIX_DOCKERFILE} to address security issues in your base images and dependencies.`,
+    },
+  ],
+  [
+    TOOL_NAME.PREPARE_CLUSTER,
+    {
+      success: `Cluster preparation successful. Next: Call ${TOOL_NAME.DEPLOY} to deploy to the kind cluster.`,
+      failure:
+        'Cluster preparation found issues. Check connectivity, permissions, and namespace configuration.',
+    },
+  ],
 ]);
 
 /**
