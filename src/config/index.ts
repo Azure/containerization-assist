@@ -31,10 +31,13 @@ export const config = {
     monitoringEnabled: process.env.MUTEX_MONITORING !== 'false',
   },
 
-  toolLogging: {
-    enabled: !!process.env.CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH,
-    dirPath: process.env.CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH,
-  },
+  toolLogging: (() => {
+    const logDir = process.env.CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH ?? '';
+    return {
+      enabled: logDir.trim().length > 0,
+      dirPath: logDir,
+    };
+  })(),
 } as const;
 
 // Export the type for use throughout the application
