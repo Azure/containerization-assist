@@ -547,10 +547,9 @@ All tools follow this metadata pattern:
 
 ```typescript
 metadata: {
-  aiDriven: boolean;                    // Uses AI sampling system
   knowledgeEnhanced: boolean;           // Uses knowledge enhancement
-  samplingStrategy: 'single' | 'none'; // Sampling approach
-  enhancementCapabilities?: string[];   // List of enhancement types (AI-enhanced only)
+  samplingStrategy: 'single' | 'none'; // 'single' for AI-driven, 'none' for non-AI
+  enhancementCapabilities: string[];    // List of enhancement types
 }
 ```
 
@@ -654,10 +653,11 @@ AI_ENHANCEMENT_MAX_SUGGESTIONS=5
 
 ### Tool-Specific Customization
 ```typescript
-// Per-tool enhancement configuration
-const customEnhancement = {
-  confidenceThreshold: 0.8, // Minimum confidence for acceptance
-  maxRetries: 3,            // Retry attempts on failure
+// Tools can customize their metadata
+const metadata = {
+  knowledgeEnhanced: true,
+  samplingStrategy: 'single' as const,
+  enhancementCapabilities: ['content-generation', 'optimization']
 };
 ```
 

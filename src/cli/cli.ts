@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { autoDetectDockerSocket } from '@/infra/docker/client';
 import { createInspectToolsCommand } from './commands/inspect-tools';
+import { OUTPUTFORMAT } from '@/mcp/mcp-server';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -338,6 +339,7 @@ async function main(): Promise<void> {
       logger: getLogger(),
       policyPath: options.config || 'config/policy.yaml',
       policyEnvironment: options.dev ? 'development' : 'production',
+      outputFormat: OUTPUTFORMAT.MARKDOWN,
     });
 
     if (options.listTools) {

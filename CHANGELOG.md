@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.0.1-dev.5]
+
+- Added tool logging to directory configurable with CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH
+- Centralized chainhints in orchestrator
+- Added new `outputFormat` option for createApp() and set it as default to 'markdown'
+
 ## [0.0.1-dev.4]
 
 - Added check for sampling to support both sampling and non-sampling scenarios.

@@ -30,6 +30,14 @@ export const config = {
     dockerBuildTimeout: parseInt(process.env.MUTEX_DOCKER_TIMEOUT || '300000'),
     monitoringEnabled: process.env.MUTEX_MONITORING !== 'false',
   },
+
+  toolLogging: (() => {
+    const logDir = process.env.CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH ?? '';
+    return {
+      enabled: logDir.trim().length > 0,
+      dirPath: logDir,
+    };
+  })(),
 } as const;
 
 // Export the type for use throughout the application
@@ -50,6 +58,10 @@ export function logConfigSummaryIfDev(logger?: {
       },
       workspace: config.workspace.workspaceDir,
       docker: config.docker.socketPath,
+      toolLogging: {
+        enabled: config.toolLogging.enabled,
+        dirPath: config.toolLogging.dirPath || 'not configured',
+      },
     };
 
     if (logger) {

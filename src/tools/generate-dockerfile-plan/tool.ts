@@ -7,7 +7,6 @@
  *
  * @category docker
  * @version 1.0.0
- * @aiDriven false
  * @knowledgeEnhanced true
  * @samplingStrategy none
  */
@@ -103,8 +102,7 @@ async function run(
     language === 'rust' ||
     language === 'dotnet' ||
     language === 'c#' ||
-    buildSystemType === 'maven' ||
-    buildSystemType === 'gradle';
+    (typeof buildSystemType === 'string' && ['maven', 'gradle'].includes(buildSystemType));
 
   const buildStrategy = {
     multistage: shouldUseMultistage,
@@ -174,7 +172,6 @@ const tool: MCPTool<typeof generateDockerfilePlanSchema, DockerfilePlan> = {
   version,
   schema: generateDockerfilePlanSchema,
   metadata: {
-    aiDriven: false,
     knowledgeEnhanced: true,
     samplingStrategy: 'none',
     enhancementCapabilities: ['recommendations'],

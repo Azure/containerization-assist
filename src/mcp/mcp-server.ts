@@ -28,6 +28,7 @@ export interface ServerOptions {
   transport?: 'stdio';
   name?: string;
   version?: string;
+  outputFormat?: OutputFormat;
 }
 
 /**
@@ -40,7 +41,15 @@ export interface MCPServer {
   getTools(): Array<{ name: string; description: string }>;
 }
 
+export const OUTPUTFORMAT = {
+  MARKDOWN: 'markdown',
+  JSON: 'json',
+  TEXT: 'text',
+} as const;
+export type OutputFormat = (typeof OUTPUTFORMAT)[keyof typeof OUTPUTFORMAT];
+
 export interface RegisterOptions<TTool extends MCPTool = MCPTool> {
+  outputFormat: OutputFormat;
   server: McpServer;
   tools: readonly TTool[];
   logger: Logger;
@@ -82,10 +91,12 @@ export function createMCPServer<TTool extends MCPTool>(
 
   const server = new McpServer(serverOptions);
   const transportType = options.transport ?? 'stdio';
+  const outputFormat = options.outputFormat ?? OUTPUTFORMAT.MARKDOWN;
   let transportInstance: StdioServerTransport | null = null;
   let isRunning = false;
 
   registerToolsWithServer({
+    outputFormat,
     server,
     tools,
     logger,
@@ -173,7 +184,7 @@ export function createMCPServer<TTool extends MCPTool>(
 export function registerToolsWithServer<TTool extends MCPTool>(
   options: RegisterOptions<TTool>,
 ): void {
-  const { server, tools, logger, transport, execute } = options;
+  const { server, tools, logger, transport, execute, outputFormat } = options;
 
   for (const tool of tools) {
     const schemaShape = extractSchemaShape(tool.schema);
@@ -211,7 +222,7 @@ export function registerToolsWithServer<TTool extends MCPTool>(
             content: [
               {
                 type: 'text' as const,
-                text: JSON.stringify(result.value, null, 2),
+                text: formatOutput(result.value, outputFormat),
               },
             ],
           };
@@ -288,4 +299,114 @@ function extractSessionId(meta: Record<string, unknown> | undefined): string | u
 function sanitizeParams(params: Record<string, unknown>): Record<string, unknown> {
   const entries = Object.entries(params).filter(([key]) => key !== '_meta');
   return Object.fromEntries(entries);
+}
+
+export function formatOutput(output: unknown, format: OutputFormat): string {
+  switch (format) {
+    case OUTPUTFORMAT.JSON:
+      return JSON.stringify(output, null, 2);
+    case OUTPUTFORMAT.MARKDOWN:
+      // convert a json object to markdown
+      if (typeof output === 'object' && output !== null) {
+        return objectToMarkdownRecursive(output as Record<string, unknown>);
+      }
+      return String(output);
+    default:
+      return String(output);
+  }
+}
+
+function printSimpleArray(arr: unknown[]): string {
+  let markdown = '';
+  arr.forEach((item) => {
+    markdown += `- ${item}\n`;
+  });
+  markdown += '\n';
+  return markdown;
+}
+
+function printSimpleObject(obj: Record<string, unknown>): string {
+  let markdown = '';
+  for (const [subKey, subValue] of Object.entries(obj)) {
+    markdown += `**${subKey}**: ${subValue}\n`;
+  }
+  markdown += '\n';
+  return markdown;
+}
+
+export function objectToMarkdownRecursive(obj: Record<string, unknown>, headingLevel = 1): string {
+  // Check if the entire object is simple (only contains primitive values)
+  if (isSimpleObject(obj)) {
+    return printSimpleObject(obj);
+  }
+
+  let markdown = '';
+  const headingPrefix = '#'.repeat(headingLevel);
+
+  for (const [key, value] of Object.entries(obj)) {
+    const capitalizedKey = key.charAt(0).toUpperCase() + key.slice(1);
+    if (value === null || value === undefined) {
+      markdown += `${headingPrefix} ${capitalizedKey}\n\n${value}\n\n`;
+    } else if (Array.isArray(value)) {
+      markdown += `${headingPrefix} ${capitalizedKey}\n\n`;
+      if (isSimpleArray(value)) {
+        // Format simple arrays as markdown lists
+        markdown += printSimpleArray(value);
+      } else {
+        // Format complex arrays with numbered headings
+        value.forEach((item, index) => {
+          if (typeof item === 'object' && item !== null) {
+            markdown += `${headingPrefix}# ${index + 1}\n\n`;
+            markdown += objectToMarkdownRecursive(
+              item as Record<string, unknown>,
+              headingLevel + 2,
+            );
+          } else {
+            markdown += `${index + 1}. ${item}\n\n`;
+          }
+        });
+      }
+    } else if (
+      typeof value === 'object' &&
+      value !== null &&
+      !(value instanceof Date) &&
+      !(value instanceof RegExp)
+    ) {
+      const valueObj = value as Record<string, unknown>;
+      if (isSimpleObject(valueObj)) {
+        // Format simple objects as key-value pairs
+        markdown += `${headingPrefix} ${capitalizedKey}\n\n`;
+        markdown += printSimpleObject(valueObj);
+      } else {
+        // Format complex objects with recursive headings
+        markdown += `${headingPrefix} ${capitalizedKey}\n\n`;
+        markdown += objectToMarkdownRecursive(valueObj, headingLevel + 1);
+      }
+    } else {
+      markdown += `${headingPrefix} ${capitalizedKey}\n\n${value}\n\n`;
+    }
+  }
+  return markdown;
+}
+
+function isSimpleArray(arr: unknown[]): boolean {
+  return arr.every(
+    (item) =>
+      typeof item === 'string' ||
+      typeof item === 'number' ||
+      typeof item === 'boolean' ||
+      item === null ||
+      item === undefined,
+  );
+}
+
+function isSimpleObject(obj: Record<string, unknown>): boolean {
+  return Object.values(obj).every(
+    (value) =>
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean' ||
+      value === null ||
+      value === undefined,
+  );
 }

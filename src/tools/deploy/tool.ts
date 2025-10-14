@@ -21,7 +21,6 @@
 
 import * as yaml from 'js-yaml';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
-import { getPostDeployHint } from '@/lib/workflow-hints';
 import type { Logger } from '@/lib/logger';
 import { extractErrorMessage } from '@/lib/error-utils';
 import type { ToolContext } from '@/mcp/context';
@@ -134,11 +133,6 @@ export interface DeployApplicationResult {
       status: string;
       message: string;
     }>;
-  };
-  chainHint?: string; // Hint for next tool in workflow chain
-  workflowHints?: {
-    nextStep: string;
-    message: string;
   };
 }
 
@@ -783,12 +777,6 @@ async function deployApplicationImpl(
           },
         ],
       },
-      workflowHints: getPostDeployHint(
-        endpoints,
-        context.session,
-        sessionId,
-        deploymentAnalysis ? String(deploymentAnalysis) : undefined,
-      ),
     };
 
     timer.end({ deploymentName, ready, sessionId });
@@ -814,7 +802,6 @@ const tool: MCPTool<typeof deployApplicationSchema, DeployApplicationResult> = {
   version: '2.0.0',
   schema: deployApplicationSchema,
   metadata: {
-    aiDriven: true,
     knowledgeEnhanced: true,
     samplingStrategy: 'single',
     enhancementCapabilities: [
