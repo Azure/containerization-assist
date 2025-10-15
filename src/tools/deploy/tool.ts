@@ -1,7 +1,7 @@
 /**
  * Deploy Application Tool
  *
- * Deploys applications to Kubernetes clusters with AI-powered analysis
+ * Deploys applications to Kubernetes clusters
  */
 
 import * as yaml from 'js-yaml';
@@ -521,12 +521,8 @@ export default tool({
   version: '2.0.0',
   schema: deployApplicationSchema,
   metadata: {
-    knowledgeEnhanced: true,
-    enhancementCapabilities: [
-      'deployment-analysis',
-      'troubleshooting',
-      'optimization-recommendations',
-    ],
+    knowledgeEnhanced: false,
+    enhancementCapabilities: [],
   },
   handler: handleDeploy,
 });
