@@ -71,23 +71,28 @@ export type Tool = (
 ) & { name: string };
 
 // Type-safe tool array using the union type
+// All tools are now deterministic plan-based or hybrid tools (as of Phase 4 completion)
 export const ALL_TOOLS: readonly Tool[] = [
+  // Plan-based generation tools
   analyzeRepoTool,
   fixDockerfileTool,
   generateDockerfileTool,
   generateK8sManifestsTool,
   resolveBaseImagesTool,
   validateDockerfileTool,
-  // ----- COMING SOON TOOLS ---
-  // buildImageTool,
-  // convertAcaToK8sTool,
-  // deployTool,
-  // opsTool,
-  // prepareClusterTool,
-  // pushImageTool,
-  // scanTool,
-  // tagImageTool,
-  // verifyDeployTool,
+
+  // Operational/deterministic tools
+  convertAcaToK8sTool,
+  opsTool,
+  prepareClusterTool,
+  pushImageTool,
+  tagImageTool,
+  verifyDeployTool,
+
+  // Hybrid tools (deterministic core + optional AI insights)
+  buildImageTool,
+  deployTool,
+  scanTool,
 ] as const;
 
 export {

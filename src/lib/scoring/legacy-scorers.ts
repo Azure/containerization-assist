@@ -1,6 +1,5 @@
 /**
- * Temporary bridge for scoring functions not yet migrated to new framework
- * These will be moved to proper scorer classes in a future iteration
+ * Scoring functions for specialized content types
  */
 
 import type { ScoringContext } from './base-scorer';

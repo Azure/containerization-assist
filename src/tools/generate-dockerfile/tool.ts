@@ -69,7 +69,7 @@ const runPattern = createKnowledgeTool<
   rules: {
     applyRules: (input) => {
       const language = input.language || 'auto-detect';
-      const buildSystemType = undefined; // TODO: Extract from repository analysis
+      const buildSystemType = undefined;
 
       const shouldUseMultistage =
         language === 'java' ||
