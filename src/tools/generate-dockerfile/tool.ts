@@ -50,7 +50,7 @@ async function generateSingleDockerfile(
   ctx: ToolContext,
   targetModule?: ModuleInfo,
 ): Promise<Result<AIResponse>> {
-  const { multistage, securityHardening, optimization, sessionId, baseImagePreference } = input;
+  const { multistage, securityHardening, optimization, baseImagePreference } = input;
 
   // Determine repository path and resolve to absolute
   if (!input.repositoryPath || typeof input.repositoryPath !== 'string') {
@@ -112,7 +112,7 @@ async function generateSingleDockerfile(
     requirements = reqParts.join('\n');
 
     ctx.logger.info(
-      { sessionId, moduleName: targetModule.name, language, framework },
+      { moduleName: targetModule.name, language, framework },
       'Using module-specific analysis data',
     );
   } else if (repoPath) {

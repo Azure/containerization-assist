@@ -1,9 +1,6 @@
 import { z } from 'zod';
 
-const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
-
 export const validateImageSchema = z.object({
-  sessionId: sessionIdSchema.optional(),
   path: z.string().optional().describe('Path to Dockerfile to validate'),
   dockerfile: z
     .string()
@@ -19,7 +16,6 @@ export type ValidateImageParams = z.infer<typeof validateImageSchema>;
 
 export interface ValidateImageResult {
   success: boolean;
-  sessionId?: string | undefined;
   passed: boolean;
   baseImages: Array<{
     image: string;

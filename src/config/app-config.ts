@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
-import { autoDetectDockerSocket } from '@/infra/docker/client';
+import { autoDetectDockerSocket } from '@/infra/docker/socket-validation';
 
 /**
  * Flattened configuration defaults
@@ -35,7 +35,6 @@ const DEFAULT_CONFIG = {
 const NodeEnvSchema = z.enum(['development', 'production', 'test']).default('development');
 const LogLevelSchema = z.enum(['error', 'warn', 'info', 'debug', 'trace']).default('info');
 const WorkflowModeSchema = z.enum(['interactive', 'auto', 'batch']).default('interactive');
-const StoreTypeSchema = z.enum(['memory', 'file', 'redis']).default('memory');
 const AppConfigSchema = z.object({
   server: z.object({
     nodeEnv: NodeEnvSchema,
@@ -49,16 +48,6 @@ const AppConfigSchema = z.object({
     storePath: z.string().default('./data/sessions.db'),
     enableMetrics: z.boolean().default(true),
     enableEvents: z.boolean().default(true),
-  }),
-  session: z.object({
-    store: StoreTypeSchema,
-    persistencePath: z.string().default('./data/sessions.db'),
-    persistenceInterval: z.coerce.number().int().positive().default(60000),
-    cleanupInterval: z.coerce
-      .number()
-      .int()
-      .positive()
-      .default(DEFAULT_CONFIG.CACHE_TTL * 1000),
   }),
   services: z.object({
     docker: z.object({
@@ -144,12 +133,6 @@ export function createAppConfig(): AppConfig {
       storePath: getEnvValue('MCP_STORE_PATH'),
       enableMetrics: true,
       enableEvents: true,
-    },
-    session: {
-      store: 'memory' as const,
-      persistencePath: getEnvValue('MCP_STORE_PATH') || './data/sessions.db',
-      persistenceInterval: 60000,
-      cleanupInterval: DEFAULT_CONFIG.CACHE_TTL * 1000,
     },
     services: {
       docker: {

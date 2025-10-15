@@ -28,7 +28,6 @@ function createMockLogger() {
 // Mock lib modules
 const mockSessionManager = {
   create: jest.fn().mockResolvedValue(createSuccessResult({
-    sessionId: 'test-session-123',
     metadata: {},
     completed_steps: [],
     errors: {},
@@ -37,7 +36,6 @@ const mockSessionManager = {
     updatedAt: new Date('2025-09-08T11:12:40.362Z'),
   })),
   get: jest.fn().mockResolvedValue(createSuccessResult({
-    sessionId: 'test-session-123',
     metadata: {},
     completed_steps: [],
     errors: {},
@@ -61,9 +59,6 @@ const mockTimer = {
   error: jest.fn(),
 };
 
-jest.mock('@/session/core', () => ({
-  SessionManager: jest.fn(() => mockSessionManager),
-}));
 
 jest.mock('@/lib/kubernetes', () => ({
   createKubernetesClient: jest.fn(() => mockK8sClient),
@@ -143,7 +138,6 @@ describe('prepareCluster', () => {
 
   beforeEach(() => {
     config = {
-      sessionId: 'test-session-123',
       namespace: 'test-namespace',
       environment: 'production',
     };

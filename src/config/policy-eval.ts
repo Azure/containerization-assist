@@ -7,10 +7,6 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Policy, PolicyRule, Matcher, FunctionMatcher } from './policy-schemas';
 
-// ============================================================================
-// Function Evaluators
-// ============================================================================
-
 type FunctionEvaluator = (args: unknown[], input: string | Record<string, unknown>) => boolean;
 
 const functionEvaluators: Record<FunctionMatcher['name'], FunctionEvaluator> = {
@@ -49,10 +45,6 @@ const functionEvaluators: Record<FunctionMatcher['name'], FunctionEvaluator> = {
   },
 };
 
-// ============================================================================
-// Matcher Evaluation
-// ============================================================================
-
 /**
  * Evaluate a matcher against input data
  */
@@ -86,10 +78,6 @@ export function evaluateMatcher(
       return false;
   }
 }
-
-// ============================================================================
-// Policy Application
-// ============================================================================
 
 /**
  * Apply policy rules to input and return matching actions

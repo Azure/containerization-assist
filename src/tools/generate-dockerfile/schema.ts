@@ -3,14 +3,7 @@
  */
 
 import { z } from 'zod';
-import {
-  sessionId as sharedSessionId,
-  environment,
-  platform,
-  samplingOptions,
-} from '../shared/schemas';
-
-const sessionIdSchema = sharedSessionId.describe('Session identifier for workflow tracking.');
+import { environment, platform, samplingOptions } from '../shared/schemas';
 
 const optimizationSchema = z
   .enum(['size', 'security', 'performance', 'balanced'])
@@ -30,7 +23,6 @@ const baseImagePreferenceSchema = z
   );
 
 export const generateDockerfileSchema = z.object({
-  sessionId: sessionIdSchema.optional(),
   baseImage: z
     .string()
     .optional()

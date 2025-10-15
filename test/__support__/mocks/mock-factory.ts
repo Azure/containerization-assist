@@ -32,15 +32,9 @@ export interface MockScenario {
  * Mock Factory - Single source for all mocking needs
  */
 export class MockFactory {
-  private sessionId: string;
-
-  constructor(sessionId: string = randomId(8)) {
-    this.sessionId = sessionId;
+  constructor() {
+    // Factory is stateless - no session tracking needed
   }
-
-  // ================================
-  // Infrastructure Mocks
-  // ================================
 
   /**
    * Create Docker client mock
@@ -213,10 +207,6 @@ export class MockFactory {
     return mock;
   }
 
-  // ================================
-  // Tool Mocks
-  // ================================
-
   /**
    * Create tool mock with specified behavior
    */
@@ -323,10 +313,6 @@ export class MockFactory {
     return this.createToolMock('build-image', scenarios[scenario]);
   }
 
-  // ================================
-  // Workflow Mocks
-  // ================================
-
   /**
    * Create workflow orchestration mock
    */
@@ -354,7 +340,7 @@ export class MockFactory {
     });
 
     mock.execute.mockResolvedValue(Success({
-      workflowId: `wf-${this.sessionId}`,
+      workflowId: `wf-${randomId(8)}`,
       steps: stepResults,
       status: stepResults.every(s => s.status === 'completed') ? 'completed' : 'failed',
       duration: 120.5,
@@ -362,10 +348,6 @@ export class MockFactory {
 
     return mock;
   }
-
-  // ================================
-  // Environment-Aware Mocks
-  // ================================
 
   /**
    * Create environment-aware mock based on capabilities
@@ -386,22 +368,11 @@ export class MockFactory {
     };
   }
 
-  // ================================
-  // Utility Methods
-  // ================================
-
   /**
    * Reset all mocks
    */
   resetAllMocks() {
     jest.clearAllMocks();
-  }
-
-  /**
-   * Get session ID for this factory instance
-   */
-  getSessionId() {
-    return this.sessionId;
   }
 
   /**

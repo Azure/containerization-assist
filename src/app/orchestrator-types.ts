@@ -6,7 +6,6 @@
 import type { z } from 'zod';
 import type { Result } from '@/types/index';
 import type { Logger } from 'pino';
-import type { SessionConfig } from '@/session/core';
 
 /**
  * Request to execute a tool
@@ -14,7 +13,6 @@ import type { SessionConfig } from '@/session/core';
 export interface ExecuteRequest {
   toolName: string;
   params: unknown;
-  sessionId?: string;
   metadata?: ExecuteMetadata;
 }
 
@@ -43,16 +41,6 @@ export interface RegisteredTool {
 }
 
 /**
- * Session facade for tool handlers
- */
-export interface SessionFacade {
-  id: string;
-  get<T = unknown>(key: string): T | undefined;
-  set(key: string, value: unknown): void;
-  pushStep(step: string): void;
-}
-
-/**
  * Simplified orchestrator interface
  */
 export interface ToolOrchestrator {
@@ -68,6 +56,5 @@ type ChainHintsMode = 'enabled' | 'disabled';
 export interface OrchestratorConfig {
   policyPath?: string;
   policyEnvironment?: string;
-  session?: SessionConfig;
   chainHintsMode: ChainHintsMode;
 }

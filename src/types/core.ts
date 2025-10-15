@@ -79,7 +79,6 @@ export const isFailure = <T>(
  * Base metadata that all tool executions should have
  */
 export interface ToolExecutionMetadata {
-  sessionId: string;
   executedAt: Date;
   duration: number;
 }

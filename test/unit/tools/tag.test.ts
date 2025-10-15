@@ -35,7 +35,6 @@ function createMockLogger() {
 // Mock lib modules following analyze-repo pattern
 const mockSessionManager = {
   create: jest.fn().mockResolvedValue({
-    sessionId: 'test-session-123',
     completed_steps: [],
     createdAt: '2025-09-08T11:12:40.362Z',
     updatedAt: '2025-09-08T11:12:40.362Z',
@@ -54,9 +53,6 @@ const mockTimer = {
   error: jest.fn(),
 };
 
-jest.mock('@/session/core', () => ({
-  createSessionManager: jest.fn(() => mockSessionManager),
-}));
 
 jest.mock('../../../src/lib/docker', () => ({
   createDockerClient: jest.fn(() => mockDockerClient),
@@ -104,7 +100,6 @@ describe('tagImage', () => {
   beforeEach(() => {
     mockLogger = createMockLogger();
     config = {
-      sessionId: 'test-session-123',
       imageId: 'sha256:mock-image-id',
       tag: 'myapp:v1.0',
     };
@@ -120,7 +115,6 @@ describe('tagImage', () => {
     mockSessionManager.update.mockResolvedValue({
       ok: true,
       value: {
-        sessionId: 'test-session-123',
         completed_steps: ['tag-image'],
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -143,7 +137,6 @@ describe('tagImage', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.success).toBe(true);
-        expect(result.value.sessionId).toBe('test-session-123');
         expect(result.value.tags).toEqual(['myapp:v1.0']);
         expect(result.value.imageId).toBe('sha256:mock-image-id');
       }
@@ -160,7 +153,6 @@ describe('tagImage', () => {
       // Verify timer was used correctly
       expect(mockTimer.end).toHaveBeenCalledWith({
         tags: ['myapp:v1.0'],
-        sessionId: 'test-session-123',
       });
     });
 
@@ -401,9 +393,6 @@ describe('tagImage', () => {
   describe('Multiple Tagging Scenarios', () => {
     it('should handle tagging with different configurations', async () => {
       const configurations = [
-        { sessionId: 'session-1', imageId: 'sha256:mock-image-id', tag: 'app:v1.0' },
-        { sessionId: 'session-2', imageId: 'sha256:mock-image-id', tag: 'registry.com/app:latest' },
-        { sessionId: 'session-3', imageId: 'sha256:mock-image-id', tag: 'my-app:development' },
       ];
 
       for (const testConfig of configurations) {
@@ -411,7 +400,6 @@ describe('tagImage', () => {
 
         expect(result.ok).toBe(true);
         if (result.ok) {
-          expect(result.value.sessionId).toBe(testConfig.sessionId);
           expect(result.value.tags).toEqual([testConfig.tag]);
           expect(result.value.success).toBe(true);
           expect(result.value.imageId).toBe('sha256:mock-image-id');

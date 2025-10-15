@@ -10,12 +10,14 @@ import { config, logConfigSummaryIfDev } from '@/config/index';
 import { createLogger } from '@/lib/logger';
 import { exit, argv, env, cwd } from 'node:process';
 import { execSync } from 'node:child_process';
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extractErrorMessage } from '@/lib/error-utils';
-import { autoDetectDockerSocket } from '@/infra/docker/client';
+import { validateDockerSocket } from '@/infra/docker/socket-validation';
 import { createInspectToolsCommand } from './commands/inspect-tools';
+import { provideContextualGuidance } from './guidance';
+import { validateOptions } from './validation';
 import { OUTPUTFORMAT } from '@/mcp/mcp-server';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -68,7 +70,7 @@ MCP Tools Available:
   • Build: generate-dockerfile, build-image, scan-image
   • Registry: tag-image, push-image
   • Deploy: generate-k8s-manifests, deploy
-  • Additional: ops, inspect-session
+  • Additional: ops
 
 For detailed documentation, see: docs/README.md
 For examples and tutorials, see: docs/examples/
@@ -86,172 +88,6 @@ program.parse(argv);
 
 const options = program.opts();
 const command = program.args[0] ?? 'start';
-
-// Enhanced Docker socket validation
-function validateDockerSocket(options: any): { dockerSocket: string; warnings: string[] } {
-  const warnings: string[] = [];
-  let dockerSocket = '';
-  const defaultDockerSocket = autoDetectDockerSocket();
-
-  // Priority order: CLI option -> Environment variable -> Default
-  if (options.dockerSocket) {
-    dockerSocket = options.dockerSocket;
-  } else if (process.env.DOCKER_SOCKET) {
-    dockerSocket = process.env.DOCKER_SOCKET;
-  } else {
-    dockerSocket = defaultDockerSocket;
-  }
-
-  // Validate the selected socket
-  try {
-    // Handle Windows named pipes specially - they can't be stat()'d
-    if (dockerSocket.includes('pipe')) {
-      // For Windows named pipes, assume they're valid and let Docker client handle validation
-      if (!process.env.MCP_MODE && !process.env.MCP_QUIET) {
-        console.error(`✅ Using Docker named pipe: ${dockerSocket}`);
-      }
-      return { dockerSocket, warnings };
-    }
-
-    // For Unix sockets and other paths, check if they exist and are valid
-    const stat = statSync(dockerSocket);
-    if (!stat.isSocket()) {
-      warnings.push(`${dockerSocket} exists but is not a socket`);
-      return {
-        dockerSocket: '',
-        warnings: [
-          ...warnings,
-          'No valid Docker socket found',
-          'Docker operations require a valid Docker connection',
-          'Consider: 1) Starting Docker Desktop, 2) Specifying --docker-socket <path>',
-        ],
-      };
-    }
-
-    // Only log when not in pure MCP mode or quiet mode
-    if (!process.env.MCP_MODE && !process.env.MCP_QUIET) {
-      console.error(`✅ Using Docker socket: ${dockerSocket}`);
-    }
-  } catch (error) {
-    const errorMsg = extractErrorMessage(error);
-    warnings.push(`Cannot access Docker socket: ${dockerSocket} - ${errorMsg}`);
-    return {
-      dockerSocket: '',
-      warnings: [
-        ...warnings,
-        'No valid Docker socket found',
-        'Docker operations require a valid Docker connection',
-        'Consider: 1) Starting Docker Desktop, 2) Specifying --docker-socket <path>',
-      ],
-    };
-  }
-
-  return { dockerSocket, warnings };
-}
-
-function provideContextualGuidance(error: Error, options: any): void {
-  console.error(`\n🔍 Error: ${error.message}`);
-
-  // Docker-related guidance
-  if (error.message.includes('Docker') || error.message.includes('ENOENT')) {
-    console.error('\n💡 Docker-related issue detected:');
-    console.error('  • Ensure Docker Desktop/Engine is running');
-    console.error('  • Verify Docker socket access permissions');
-    console.error('  • Check Docker socket path with: docker context ls');
-    console.error('  • Test Docker connection: docker version');
-    console.error('  • Check Docker daemon is running');
-    console.error('  • Specify custom socket: --docker-socket <path>');
-  }
-
-  // Permission guidance
-  if (error.message.includes('permission') || error.message.includes('EACCES')) {
-    console.error('\n💡 Permission issue detected:');
-    console.error('  • Check file/directory permissions: ls -la');
-    console.error('  • Verify workspace is accessible: --workspace <path>');
-    console.error('  • Ensure Docker socket permissions (add user to docker group)');
-    console.error('  • Consider running with appropriate permissions');
-  }
-
-  // Configuration guidance
-  if (error.message.includes('config') || error.message.includes('Config')) {
-    console.error('\n💡 Configuration issue:');
-    console.error('  • Copy .env.example to .env: cp .env.example .env');
-    console.error('  • Validate configuration: --validate');
-    console.error('  • Check config file exists: --config <path>');
-    console.error('  • Review configuration docs: docs/CONFIGURATION.md');
-  }
-
-  console.error('\n🛠️ General troubleshooting steps:');
-  console.error('  1. Run health check: containerization-assist-mcp --health-check');
-  console.error('  2. Validate config: containerization-assist-mcp --validate');
-  console.error('  3. Check Docker: docker version');
-  console.error('  4. Enable debug logging: --log-level debug --dev');
-  console.error('  5. Check system requirements: docs/REQUIREMENTS.md');
-  console.error('  6. Review troubleshooting guide: docs/TROUBLESHOOTING.md');
-
-  if (options.dev && error.stack) {
-    console.error(`\n📍 Stack trace (dev mode):`);
-    console.error(error.stack);
-  } else if (!options.dev) {
-    console.error('\n💡 For detailed error information, use --dev flag');
-  }
-}
-
-// Validation function for CLI options
-function validateOptions(opts: any): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-
-  const validLogLevels = ['debug', 'info', 'warn', 'error'];
-  if (opts.logLevel && !validLogLevels.includes(opts.logLevel)) {
-    errors.push(`Invalid log level: ${opts.logLevel}. Valid options: ${validLogLevels.join(', ')}`);
-  }
-
-  // Validate workspace directory exists
-  if (opts.workspace) {
-    try {
-      const stat = statSync(opts.workspace);
-      if (!stat.isDirectory()) {
-        errors.push(`Workspace path is not a directory: ${opts.workspace}`);
-      }
-    } catch (error) {
-      const errorMsg = extractErrorMessage(error);
-      if (errorMsg.includes('ENOENT')) {
-        errors.push(`Workspace directory does not exist: ${opts.workspace}`);
-      } else if (errorMsg.includes('EACCES')) {
-        errors.push(`Permission denied accessing workspace: ${opts.workspace}`);
-      } else {
-        errors.push(`Cannot access workspace directory: ${opts.workspace} (${errorMsg})`);
-      }
-    }
-  }
-
-  // Enhanced Docker socket validation
-  const dockerValidation = validateDockerSocket(opts);
-  opts.dockerSocket = dockerValidation.dockerSocket;
-
-  // Add warnings as non-fatal errors for user awareness
-  if (dockerValidation.warnings.length > 0) {
-    dockerValidation.warnings.forEach((warning) => {
-      if (warning.includes('No valid Docker socket')) {
-        errors.push(warning);
-      } else if (!process.env.MCP_MODE) {
-        console.error(`⚠️  ${warning}`);
-      }
-    });
-  }
-
-  // Validate config file exists if specified
-  if (opts.config) {
-    try {
-      statSync(opts.config);
-    } catch (error) {
-      const errorMsg = extractErrorMessage(error);
-      errors.push(`Configuration file not found: ${opts.config} - ${errorMsg}`);
-    }
-  }
-
-  return { valid: errors.length === 0, errors };
-}
 
 async function main(): Promise<void> {
   try {
@@ -273,10 +109,11 @@ async function main(): Promise<void> {
     }
 
     // Validate CLI options
-    const validation = validateOptions(options);
+    const dockerValidation = validateDockerSocket(options);
+    const validation = validateOptions(options, dockerValidation);
     if (!validation.valid) {
       console.error('❌ Configuration errors:');
-      validation.errors.forEach((error) => console.error(`  • ${error}`));
+      validation.errors.forEach((error: string) => console.error(`  • ${error}`));
       console.error('\nUse --help for usage information');
       exit(1);
     }
@@ -364,16 +201,39 @@ async function main(): Promise<void> {
     if (options.healthCheck) {
       getLogger().info('Performing health check');
 
-      const health = app.healthCheck();
+      const health = await app.healthCheck();
 
       console.error('🏥 Health Check Results');
       console.error('═'.repeat(40));
-      console.error(`Status: ✅ ${health.status}`);
+      const statusIcon = health.status === 'healthy' ? '✅' : '⚠️';
+      console.error(`Status: ${statusIcon} ${health.status}`);
       console.error('\nServices:');
       console.error(`  ✅ MCP Server: ready`);
       console.error(`  📦 Tools loaded: ${health.tools}`);
 
-      process.exit(0);
+      if (health.dependencies) {
+        console.error('\nDependencies:');
+
+        if (health.dependencies.docker) {
+          const docker = health.dependencies.docker;
+          const dockerIcon = docker.available ? '✅' : '❌';
+          const dockerInfo = docker.available
+            ? docker.version
+              ? `v${docker.version}`
+              : 'available'
+            : docker.error || 'unavailable';
+          console.error(`  ${dockerIcon} Docker: ${dockerInfo}`);
+        }
+
+        if (health.dependencies.kubernetes) {
+          const k8s = health.dependencies.kubernetes;
+          const k8sIcon = k8s.available ? '✅' : '❌';
+          const k8sInfo = k8s.available ? k8s.version || 'connected' : k8s.error || 'unavailable';
+          console.error(`  ${k8sIcon} Kubernetes: ${k8sInfo}`);
+        }
+      }
+
+      process.exit(health.status === 'healthy' ? 0 : 1);
     }
 
     const transportConfig = {
@@ -385,7 +245,7 @@ async function main(): Promise<void> {
       '@/lib/runtime-logging'
     );
 
-    const health = app.healthCheck();
+    const health = await app.healthCheck();
     logStartup(
       {
         appName: 'containerization-assist-mcp',

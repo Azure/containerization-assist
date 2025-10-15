@@ -83,12 +83,24 @@ export interface AppRuntime {
   /**
    * Perform health check
    */
-  healthCheck(): {
+  healthCheck(): Promise<{
     status: 'healthy' | 'unhealthy';
     tools: number;
     sessions?: number;
     message: string;
-  };
+    dependencies?: {
+      docker?: {
+        available: boolean;
+        version?: string;
+        error?: string;
+      };
+      kubernetes?: {
+        available: boolean;
+        version?: string;
+        error?: string;
+      };
+    };
+  }>;
 
   /**
    * Stop the runtime and clean up resources

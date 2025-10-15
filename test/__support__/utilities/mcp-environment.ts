@@ -57,7 +57,7 @@ export async function setupMCPTestEnvironment(): Promise<MCPClient> {
           // Generate different Dockerfiles based on session/repo context
           let dockerfileContent = '';
           
-          if (params.sessionId?.includes('python') || params.repositoryPath?.includes('python') || params.repoPath?.includes('python')) {
+          if (params.repositoryPath?.includes('python') || params.repoPath?.includes('python')) {
             dockerfileContent = `FROM python:3.11-alpine
 WORKDIR /app
 COPY requirements.txt .
@@ -68,7 +68,7 @@ RUN chown -R appuser:appuser /app
 USER appuser
 EXPOSE 5000
 CMD ["python", "app.py"]`;
-          } else if (params.sessionId?.includes('java') || params.repositoryPath?.includes('java') || params.repoPath?.includes('java')) {
+          } else if (params.repositoryPath?.includes('java') || params.repoPath?.includes('java')) {
             dockerfileContent = `FROM openjdk:17-alpine
 WORKDIR /app
 COPY target/*.jar app.jar
@@ -94,9 +94,9 @@ CMD ["npm", "start"]`;
           // Add extra security features for strict security profile
           if (params.securityProfile === 'strict') {
             // Use distroless base images for strict security
-            if (params.sessionId?.includes('java') || params.repositoryPath?.includes('java') || params.repoPath?.includes('java')) {
+            if (params.repositoryPath?.includes('java') || params.repoPath?.includes('java')) {
               dockerfileContent = dockerfileContent.replace('FROM openjdk:17-alpine', 'FROM gcr.io/distroless/java17');
-            } else if (params.sessionId?.includes('python') || params.repositoryPath?.includes('python') || params.repoPath?.includes('python')) {
+            } else if (params.repositoryPath?.includes('python') || params.repoPath?.includes('python')) {
               dockerfileContent = dockerfileContent.replace('FROM python:3.11-alpine', 'FROM python:3.11-slim');
             } else {
               dockerfileContent = dockerfileContent.replace('FROM node:18-alpine', 'FROM gcr.io/distroless/nodejs18-debian11');
@@ -120,10 +120,10 @@ CMD ["npm", "start"]`;
             containerPort = 80;
           } else if (params.serviceName === 'api') {
             containerPort = 3000;
-          } else if (params.sessionId?.includes('python') || params.repositoryPath?.includes('python') || params.repoPath?.includes('python')) {
+          } else if (params.repositoryPath?.includes('python') || params.repoPath?.includes('python')) {
             containerPort = 5000;
             healthPath = '/health';
-          } else if (params.sessionId?.includes('java') || params.repositoryPath?.includes('java') || params.repoPath?.includes('java')) {
+          } else if (params.repositoryPath?.includes('java') || params.repoPath?.includes('java')) {
             containerPort = 8080;
             healthPath = '/actuator/health';
           }
@@ -298,9 +298,9 @@ export async function createTestRepository(name: string): Promise<string> {
   return `test-session-${name}-${Date.now()}`;
 }
 
-export async function cleanupTestSession(sessionId: string): Promise<void> {
-  // Mock cleanup
-  console.debug(`Cleaning up test session: ${sessionId}`);
+export async function cleanupTestSession(): Promise<void> {
+  // Mock cleanup - stateless architecture
+  console.debug('Cleaning up test session');
 }
 
 export async function cleanupMCPTestEnvironment(mcpEnvironment: any) {

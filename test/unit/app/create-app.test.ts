@@ -99,16 +99,16 @@ describe('createApp AppRuntime interface', () => {
     expect(typeof listedTool.category).toBe('string');
   });
 
-  it('should perform health check without server', () => {
+  it('should perform health check without server', async () => {
     const tool = createTool('health-tool');
     const app = createApp({ tools: [tool], logger: createLoggerStub() });
 
-    const health = app.healthCheck();
+    const health = await app.healthCheck();
     expect(health).toHaveProperty('status');
     expect(health).toHaveProperty('tools');
     expect(health).toHaveProperty('sessions');
     expect(health).toHaveProperty('message');
-    expect(health.status).toBe('healthy');
+    expect(health.status).toMatch(/^(healthy|unhealthy)$/);
     expect(health.tools).toBe(1);
   });
 

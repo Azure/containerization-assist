@@ -145,7 +145,6 @@ const TOOL_CATEGORIES: Record<string, ToolCategory> = {
   scan: 'security',
 
   // Utility tools
-  'inspect-session': 'utility',
   ops: 'utility',
 } as const;
 

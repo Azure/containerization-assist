@@ -6,9 +6,6 @@
 import { z } from 'zod';
 import { environmentSchema } from '@/config/environment';
 
-// Session management
-export const sessionId = z.string().describe('Session identifier for tracking operations');
-
 // Paths
 export const repositoryPathAbsoluteUnix = z
   .string()

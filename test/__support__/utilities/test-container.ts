@@ -13,7 +13,6 @@ export interface TestServiceBindings {
   KubernetesClient?: any;
   AIService?: any;
   Logger?: Logger;
-  SessionManager?: any;
   ConfigService?: any;
   CacheService?: any;
   SecurityScanner?: any;
@@ -57,10 +56,6 @@ export function createTestContainer(overrides?: TestServiceBindings): TestContai
 
   if (overrides?.AIService) {
     container.bind('AIService', overrides.AIService);
-  }
-
-  if (overrides?.SessionManager) {
-    container.bind('SessionManager', overrides.SessionManager);
   }
 
   if (overrides?.ConfigService) {
@@ -116,10 +111,6 @@ export interface TestServerHelper {
   addTestResource(uri: string, content: string): void;
   deps: {
     resourceManager: { cleanup(): void };
-    sessionManager: {
-      createSession(id: string): { id: string };
-      getSession(id: string): { id: string } | undefined;
-    };
     promptRegistry: {
       listPrompts(): Promise<{ prompts: Array<{ name: string; content: string }> }>;
       getPrompt(name: string): Promise<{ name: string; content: string }>;
@@ -137,7 +128,6 @@ export function createTestServer(overrides?: TestServiceBindings): TestServerHel
   let running = false;
   const tools: Array<{ name: string; description: string }> = [];
   const resources: Map<string, string> = new Map();
-  const sessions: Map<string, { id: string }> = new Map();
   const prompts: Map<string, { name: string; content: string }> = new Map();
 
   return {
@@ -210,16 +200,6 @@ export function createTestServer(overrides?: TestServiceBindings): TestServerHel
       resourceManager: {
         cleanup() {
           resources.clear();
-        }
-      },
-      sessionManager: {
-        createSession(id: string) {
-          const session = { id };
-          sessions.set(id, session);
-          return session;
-        },
-        getSession(id: string) {
-          return sessions.get(id);
         }
       },
       promptRegistry: {

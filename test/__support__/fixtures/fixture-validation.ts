@@ -255,10 +255,6 @@ export class FixtureValidator {
     return lines.join('\n');
   }
 
-  // ================================
-  // Private Methods
-  // ================================
-
   private async runValidationRules(
     fixtureId: string,
     data: unknown,

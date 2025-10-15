@@ -22,16 +22,16 @@
                   │
 ┌─────────────────▼───────────────────────┐
 │         Application Layer               │
-│  ┌──────────┐ ┌──────────┐ ┌────────┐  │
-│  │  Tools   │ │Workflow  │ │Session │  │
-│  └──────────┘ └──────────┘ └────────┘  │
+│  ┌──────────┐ ┌──────────┐             │
+│  │  Tools   │ │Workflow  │             │
+│  └──────────┘ └──────────┘             │
 └─────────────────┬───────────────────────┘
                   │
 ┌─────────────────▼───────────────────────┐
 │         Infrastructure Layer            │
-│  ┌──────┐ ┌──────┐ ┌─────┐ ┌────────┐  │
-│  │Docker│ │ K8s  │ │ AI  │ │Session │  │
-│  └──────┘ └──────┘ └─────┘ └────────┘  │
+│  ┌──────┐ ┌──────┐ ┌─────┐             │
+│  │Docker│ │ K8s  │ │ AI  │             │
+│  └──────┘ └──────┘ └─────┘             │
 └─────────────────────────────────────────┘
 ```
 ---
@@ -88,7 +88,6 @@
 - Application startup and configuration
 - Tool execution coordination
 - Policy enforcement and validation
-- Session management integration
 
 ### 📁 `/cli` - Command Line Interface
 **Purpose**: CLI entry points and server management.
@@ -188,18 +187,6 @@
 - Context propagation for tool execution
 - Deterministic sampling coordination
 
-### 📁 `/session` - Session Management
-**Purpose**: Unified session state management for single-operator workflows.
-
-**Key Files**:
-- `core.ts`: Session state management and persistence
-
-**Responsibilities**:
-- Single active session lifecycle management
-- Persistent state across tool executions within a workflow
-- Session state cleared on server shutdown
-- Tool result storage and retrieval
-
 ### 📁 `/tools` - Tool Implementations
 **Purpose**: Individual MCP tool implementations using co-located pattern.
 
@@ -259,7 +246,6 @@
 | `DOCKER_SOCKET` | Docker daemon socket path | `/var/run/docker.sock` |
 | `KUBECONFIG` | Kubernetes config path | `~/.kube/config` |
 | `LOG_LEVEL` | Logging level | `info` |
-| `SESSION_DIR` | Session storage directory | `~/.containerization-assist/sessions` |
 | `K8S_NAMESPACE` | Default Kubernetes namespace | `default` |
 
 ### Configuration Architecture

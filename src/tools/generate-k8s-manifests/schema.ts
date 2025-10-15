@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import {
-  sessionId,
   imageId,
   appName,
   repositoryPathAbsoluteUnix,
@@ -20,7 +19,6 @@ import {
 } from '../shared/schemas';
 
 export const generateK8sManifestsSchema = z.object({
-  sessionId: sessionId.optional(),
   imageId: imageId
     .optional()
     .describe('Docker image to deploy (e.g., myapp:v1.0.0). Typically from build-image output.'),

@@ -74,29 +74,31 @@ All AI-powered tools use deterministic sampling (`count: 1`) to ensure reproduci
 **Progress Notifications:**
 Long-running operations (build, deploy, scan) emit MCP notifications that clients can subscribe to for real-time progress updates.
 
-### 2. Session Management
+### 2. Tool Orchestration
 
-The server uses a single-session model where the orchestrator automatically manages session state:
+Tools are stateless functions that can be called independently or chained together:
 
 ```typescript
-// Session state is automatically managed by the orchestrator
-// Tools can access prior results through the session facade
+// Tools are stateless - each call is independent
+// The MCP client (Claude) orchestrates the workflow
 
-await analyzeRepo.handler({
+const analysisResult = await analyzeRepo.handler({
   repoPath: './my-app'
 });
 
+// Pass relevant information from previous tool to the next
 await generateDockerfile.handler({
-  // Automatically accesses analysis from previous step
-  projectPath: './my-app'
+  projectPath: './my-app',
+  language: analysisResult.language,
+  framework: analysisResult.frameworks?.[0]?.name
 });
 ```
 
-**Session Helpers:**
-- Results are automatically stored after successful tool execution
-- Tools access prior results via `ctx.session` without manual management
-- Session state persists across tool calls within a workflow
-- Session clears on server shutdown
+**Orchestration Notes:**
+- Tools are pure functions with no shared state
+- The MCP client maintains conversation context
+- Results from previous tools can inform subsequent calls
+- Each tool execution is independent and can be tested in isolation
 
 ### 3. Error Handling
 

@@ -7,10 +7,9 @@
  * @example
  * ```typescript
  * const result = await prepareCluster({
- *   sessionId: 'session-123',
  *   namespace: 'my-app',
  *   environment: 'production'
- * }, context, logger);
+ * }, context);
  *
  * if (result.success) {
  *   logger.info('Cluster ready', {
@@ -23,7 +22,6 @@
 
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
-import { randomUUID } from 'node:crypto';
 import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient } from '@/lib/kubernetes';
 import type { K8sManifest } from '@/infra/kubernetes/client';
@@ -47,7 +45,6 @@ const KIND_VERSION = 'v0.20.0'; // Use latest stable version - easily configurab
 
 export interface PrepareClusterResult {
   success: boolean;
-  sessionId: string;
   clusterReady: boolean;
   cluster: string;
   namespace: string;
@@ -639,31 +636,7 @@ async function prepareClusterImpl(
   const shouldCreateLocalRegistry = environment === 'development';
 
   try {
-    // Ensure session exists and get typed slice operations
-    const sessionId = params.sessionId || randomUUID();
-    let sessionState = null;
-
-    if (context.sessionManager) {
-      const getResult = await context.sessionManager.get(sessionId);
-      if (getResult.ok) {
-        sessionState = getResult.value;
-      }
-
-      // Create if doesn't exist
-      if (!sessionState) {
-        const createResult = await context.sessionManager.create(sessionId);
-        if (!createResult.ok) {
-          return Failure(`Failed to create session: ${createResult.error}`);
-        }
-        sessionState = createResult.value;
-      }
-    } else {
-      return Failure('Session manager not available in context');
-    }
-    logger.info(
-      { sessionId, environment, namespace },
-      'Starting Kubernetes cluster preparation with session',
-    );
+    logger.info({ environment, namespace }, 'Starting Kubernetes cluster preparation');
 
     const k8sClientRaw = createKubernetesClient(logger);
     const k8sClient = createK8sClientAdapter(k8sClientRaw);
@@ -769,7 +742,6 @@ async function prepareClusterImpl(
     // Prepare the result
     const result: PrepareClusterResult = {
       success: true,
-      sessionId,
       clusterReady,
       cluster,
       namespace,
@@ -792,17 +764,6 @@ async function prepareClusterImpl(
       ...(warnings.length > 0 && { warnings }),
       ...(localRegistryUrl && { localRegistryUrl }),
     };
-
-    // Store cluster preparation result in session
-    const currentSteps = sessionState?.completed_steps || [];
-    if (context.sessionManager) {
-      await context.sessionManager.update(sessionId, {
-        results: {
-          'prepare-cluster': result,
-        },
-        completed_steps: [...currentSteps, 'prepare-cluster'],
-      });
-    }
 
     // Generate AI-powered cluster optimization insights
     let clusterOptimizations: ClusterOptimizationInsights | undefined;
@@ -842,7 +803,7 @@ async function prepareClusterImpl(
       ...(clusterOptimizations && { clusterOptimizations }),
     };
 
-    timer.end({ clusterReady, sessionId, environment });
+    timer.end({ clusterReady, environment });
 
     return Success(enrichedResult);
   } catch (error) {

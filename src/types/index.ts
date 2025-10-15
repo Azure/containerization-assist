@@ -21,24 +21,6 @@ export type { ToolContext } from '../mcp/context';
 import type { Result } from './core';
 import type { Topic } from './topics';
 
-// ===== SESSION =====
-
-/**
- * Represents the state of a tool execution session.
- */
-export interface WorkflowState {
-  /** Unique session identifier */
-  sessionId: string;
-  /** List of completed step names */
-  completed_steps?: string[];
-  /** Session creation timestamp */
-  createdAt: Date;
-  /** Last update timestamp */
-  updatedAt: Date;
-  /** Allow additional properties for workflow flags and computed values */
-  [key: string]: unknown;
-}
-
 // ===== AI SERVICE TYPES =====
 
 export interface AIService {

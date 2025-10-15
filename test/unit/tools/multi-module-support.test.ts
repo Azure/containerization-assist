@@ -66,7 +66,6 @@ describe('Multi-Module Support', () => {
       // Call the tool with explicit modules parameter
       await tool.default.run(
         {
-          sessionId: 'test-session',
           path: '/tmp/test-repo',
           modules: modules, // Pass modules explicitly
         },
@@ -101,7 +100,6 @@ describe('Multi-Module Support', () => {
 
       const result = await tool.default.run(
         {
-          sessionId: 'test-session',
           path: '/tmp/test-repo',
           modules: modules, // Pass only the single module to generate for
         },
@@ -123,7 +121,6 @@ describe('Multi-Module Support', () => {
 
       const result = await tool.default.run(
         {
-          sessionId: 'test-session',
           path: '/tmp/test-repo',
         },
         ctx,
@@ -162,7 +159,6 @@ describe('Multi-Module Support', () => {
       // Call the tool with explicit modules parameter
       await tool.default.run(
         {
-          sessionId: 'test-session',
           appName: 'test-app',
           imageId: 'test:latest',
           modules: modules, // Pass modules explicitly
@@ -199,7 +195,6 @@ describe('Multi-Module Support', () => {
 
       const result = await tool.default.run(
         {
-          sessionId: 'test-session',
           appName: 'test-app',
           imageId: 'test/user-service:latest',
           modules: modules, // Pass only the single module to generate for
@@ -234,7 +229,6 @@ describe('Multi-Module Support', () => {
 
       await tool.default.run(
         {
-          sessionId: 'test-session',
           appName: 'test-app',
           imageId: 'test/user-service:latest',
           modules: modules, // Pass single module to generate for
@@ -261,7 +255,6 @@ describe('Multi-Module Support', () => {
 
       const result = await tool.default.run(
         {
-          sessionId: 'test-session',
           imageId: 'test:latest',
           appName: 'test-app',
         },

@@ -263,12 +263,8 @@ export function installShutdownHandlers(
   });
 }
 
-// ============================================================================
-// Tool Execution Logging - Consistent Progress Signals for Copilot Transcripts
-// ============================================================================
-
 /**
- * Standard log message format constants
+ * Standard log message format constants for tool execution
  * Ensures all tools use consistent "starting"/"completed" phrasing
  */
 export const LOG_FORMAT = {

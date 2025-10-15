@@ -68,7 +68,7 @@ CMD ["npm", "start"]`;
 
         const context = createMockToolContext();
         const result = await tool.run(
-          { dockerfile: sampleDockerfile, sessionId: 'test-session' },
+          { dockerfile: sampleDockerfile },
           context,
         );
 
@@ -88,7 +88,7 @@ CMD ["npm", "start"]`;
 
         const context = createMockToolContext();
         const result = await tool.run(
-          { dockerfile: sampleDockerfile, sessionId: 'test-session', strictMode: true },
+          { dockerfile: sampleDockerfile, strictMode: true },
           context,
         );
 
@@ -106,7 +106,7 @@ CMD ["npm", "start"]`;
 
         const context = createMockToolContext();
         const result = await tool.run(
-          { dockerfile: sampleDockerfile, sessionId: 'test-session', strictMode: false },
+          { dockerfile: sampleDockerfile, strictMode: false },
           context,
         );
 
@@ -123,7 +123,7 @@ CMD ["npm", "start"]`;
 
         const context = createMockToolContext();
         const result = await tool.run(
-          { dockerfile: sampleDockerfile, sessionId: 'test-session' },
+          { dockerfile: sampleDockerfile },
           context,
         );
 
@@ -144,7 +144,7 @@ CMD ["npm", "start"]`;
 
         const context = createMockToolContext();
         const result = await tool.run(
-          { dockerfile: dockerfileWithLatest, sessionId: 'test-session' },
+          { dockerfile: dockerfileWithLatest },
           context,
         );
 
@@ -168,7 +168,7 @@ CMD ["npm", "start"]`;
 
         const context = createMockToolContext();
         const result = await tool.run(
-          { dockerfile: dockerfileWithLatest, sessionId: 'test-session' },
+          { dockerfile: dockerfileWithLatest },
           context,
         );
 
@@ -188,7 +188,7 @@ CMD ["npm", "start"]`;
 
         const context = createMockToolContext();
         const result = await tool.run(
-          { dockerfile: dockerfileWithRC, sessionId: 'test-session' },
+          { dockerfile: dockerfileWithRC },
           context,
         );
 
@@ -204,7 +204,7 @@ CMD ["npm", "start"]`;
 
         const context = createMockToolContext();
         const result = await tool.run(
-          { dockerfile: sampleDockerfile, sessionId: 'test-session' },
+          { dockerfile: sampleDockerfile },
           context,
         );
 
@@ -230,7 +230,10 @@ CMD ["npm", "start"]`;
 
         for (const dockerfile of validDockerfiles) {
           const context = createMockToolContext();
-          const result = await tool.run({ dockerfile, sessionId: 'test' }, context);
+          const result = await tool.run(
+            { dockerfile },
+            context,
+          );
 
           expect(result.ok).toBe(true);
           if (result.ok) {
@@ -249,7 +252,10 @@ CMD ["npm", "start"]`;
         for (const tag of deniedTags) {
           const dockerfile = `FROM node:${tag}`;
           const context = createMockToolContext();
-          const result = await tool.run({ dockerfile, sessionId: 'test' }, context);
+          const result = await tool.run(
+            { dockerfile },
+            context,
+          );
 
           expect(result.ok).toBe(true);
           if (result.ok) {
@@ -274,7 +280,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html`;
 
         const context = createMockToolContext();
         const result = await tool.run(
-          { dockerfile: multiStageDockerfile, sessionId: 'test-session' },
+          { dockerfile: multiStageDockerfile },
           context,
         );
 
@@ -300,7 +306,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html`;
 
         const context = createMockToolContext();
         const result = await tool.run(
-          { dockerfile: multiStageDockerfile, sessionId: 'test-session' },
+          { dockerfile: multiStageDockerfile },
           context,
         );
 
@@ -319,7 +325,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html`;
       it('should pass when no allowlist or denylist is configured', async () => {
         const context = createMockToolContext();
         const result = await tool.run(
-          { dockerfile: sampleDockerfile, sessionId: 'test-session' },
+          { dockerfile: sampleDockerfile },
           context,
         );
 
@@ -331,7 +337,10 @@ COPY --from=builder /app/dist /usr/share/nginx/html`;
 
       it('should handle empty dockerfile gracefully', async () => {
         const context = createMockToolContext();
-        const result = await tool.run({ dockerfile: '', sessionId: 'test-session' }, context);
+        const result = await tool.run(
+          {},
+          context,
+        );
 
         expect(result.ok).toBe(false);
         if (!result.ok) {
@@ -346,7 +355,7 @@ CMD ["npm", "start"]`;
 
         const context = createMockToolContext();
         const result = await tool.run(
-          { dockerfile: dockerfileWithoutFrom, sessionId: 'test-session' },
+          { dockerfile: dockerfileWithoutFrom },
           context,
         );
 
@@ -364,7 +373,10 @@ FROM node:latest
 WORKDIR /app`;
 
         const context = createMockToolContext();
-        const result = await tool.run({ dockerfile, sessionId: 'test-session' }, context);
+        const result = await tool.run(
+          { dockerfile },
+          context,
+        );
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -385,7 +397,7 @@ FROM node:latest`;
 
         const context = createMockToolContext();
         const result = await tool.run(
-          { dockerfile, sessionId: 'test-session', strictMode: true },
+          { dockerfile, strictMode: true },
           context,
         );
 
@@ -403,7 +415,7 @@ FROM node:latest`;
       it('should suggest build-image when validation passes', async () => {
         const context = createMockToolContext();
         const result = await tool.run(
-          { dockerfile: sampleDockerfile, sessionId: 'test-session' },
+          { dockerfile: sampleDockerfile },
           context,
         );
 
@@ -420,7 +432,10 @@ FROM node:latest`;
         const dockerfile = `FROM node:latest`;
 
         const context = createMockToolContext();
-        const result = await tool.run({ dockerfile, sessionId: 'test-session' }, context);
+        const result = await tool.run(
+          { dockerfile },
+          context,
+        );
 
         expect(result.ok).toBe(true);
         if (result.ok && result.value.workflowHints) {
@@ -434,7 +449,7 @@ FROM node:latest`;
       it('should include baseImages property in results when run with a valid Dockerfile and session', async () => {
         const context = createMockToolContext();
         const result = await tool.run(
-          { dockerfile: sampleDockerfile, sessionId: 'test-session' },
+          { dockerfile: sampleDockerfile },
           context,
         );
 

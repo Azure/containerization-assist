@@ -8,7 +8,6 @@ import generateDockerfileTool from './generate-dockerfile/tool';
 import generateHelmChartsTool from './generate-helm-charts/tool';
 import generateK8sManifestsTool from './generate-k8s-manifests/tool';
 import generateKustomizeTool from './generate-kustomize/tool';
-import inspectSessionTool from './inspect-session/tool';
 import opsTool from './ops/tool';
 import generateDockerfilePlanTool from './generate-dockerfile-plan/tool';
 import generateManifestPlanTool from './generate-manifest-plan/tool';
@@ -31,7 +30,6 @@ export const TOOL_NAME = {
   GENERATE_HELM_CHARTS: 'generate-helm-charts',
   GENERATE_K8S_MANIFESTS: 'generate-k8s-manifests',
   GENERATE_KUSTOMIZE: 'generate-kustomize',
-  INSPECT_SESSION: 'inspect-session',
   OPS: 'ops',
   GENERATE_DOCKERFILE_PLAN: 'generate-dockerfile-plan',
   GENERATE_MANIFEST_PLAN: 'generate-manifest-plan',
@@ -57,7 +55,6 @@ generateDockerfileTool.name = TOOL_NAME.GENERATE_DOCKERFILE;
 generateHelmChartsTool.name = TOOL_NAME.GENERATE_HELM_CHARTS;
 generateK8sManifestsTool.name = TOOL_NAME.GENERATE_K8S_MANIFESTS;
 generateKustomizeTool.name = TOOL_NAME.GENERATE_KUSTOMIZE;
-inspectSessionTool.name = TOOL_NAME.INSPECT_SESSION;
 opsTool.name = TOOL_NAME.OPS;
 generateDockerfilePlanTool.name = TOOL_NAME.GENERATE_DOCKERFILE_PLAN;
 generateManifestPlanTool.name = TOOL_NAME.GENERATE_MANIFEST_PLAN;
@@ -81,7 +78,6 @@ export type Tool = (
   | typeof generateHelmChartsTool
   | typeof generateK8sManifestsTool
   | typeof generateKustomizeTool
-  | typeof inspectSessionTool
   | typeof opsTool
   | typeof generateDockerfilePlanTool
   | typeof generateManifestPlanTool
@@ -110,7 +106,6 @@ export const ALL_TOOLS: readonly Tool[] = [
   // generateHelmChartsTool,
   // generateK8sManifestsTool,
   // generateKustomizeTool,
-  // inspectSessionTool,
   // opsTool,
   // prepareClusterTool,
   // pushImageTool,
@@ -131,7 +126,6 @@ export {
   generateHelmChartsTool,
   generateK8sManifestsTool,
   generateKustomizeTool,
-  inspectSessionTool,
   opsTool,
   generateDockerfilePlanTool,
   generateManifestPlanTool,

@@ -64,7 +64,10 @@ function validateImageAgainstRules(
   matchedAllowRule?: string | undefined;
   matchedDenyRule?: string | undefined;
 } {
-  let allowed = !strictMode;
+  // strictMode controls whether allowlist is enforced
+  // If allowlist exists AND strictMode is true: must match to be allowed (start with false)
+  // Otherwise: permissive by default (start with true)
+  let allowed = !(allowlist.length > 0 && strictMode);
   let denied = false;
   let matchedAllowRule: string | undefined;
   let matchedDenyRule: string | undefined;
@@ -104,7 +107,7 @@ async function run(
   input: z.infer<typeof validateImageSchema>,
   ctx: ToolContext,
 ): Promise<Result<ValidateImageResult>> {
-  const { path, dockerfile: inputDockerfile, strictMode = false, sessionId } = input;
+  const { path, dockerfile: inputDockerfile, strictMode = false } = input;
 
   let content = inputDockerfile || '';
 
@@ -193,7 +196,6 @@ async function run(
 
   const result: ValidateImageResult = {
     success: true,
-    sessionId,
     passed,
     baseImages: validatedImages,
     summary: {

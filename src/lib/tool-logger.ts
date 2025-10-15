@@ -8,28 +8,35 @@ import type { ErrorGuidance } from '@/types';
 export interface ToolLogEntry {
   timestamp: string;
   toolName: string;
-  sessionId: string;
+  sessionId?: string;
   input: unknown;
   output: unknown;
   success: boolean;
   durationMs?: number;
   error?: string;
   errorGuidance?: ErrorGuidance;
+  params?: unknown; // Alias for input
 }
 
 export function createToolLogEntry(
   toolName: string,
-  sessionId: string,
+  sessionId: string | undefined,
   input: unknown,
 ): ToolLogEntry {
-  return {
+  const entry: ToolLogEntry = {
     timestamp: Date.now().toString(),
     toolName,
-    sessionId,
     input,
+    params: input,
     output: undefined,
     success: false,
   };
+
+  if (sessionId !== undefined) {
+    entry.sessionId = sessionId;
+  }
+
+  return entry;
 }
 
 let logFileName: string | null = null;

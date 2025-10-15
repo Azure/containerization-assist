@@ -9,9 +9,7 @@ import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '@/types';
 import { extractDockerErrorMessage, extractDockerErrorGuidance } from './errors';
 import { createKeyedMutex, type KeyedMutexInstance } from '@/lib/mutex';
-import { homedir } from 'os';
-import { join } from 'path';
-import { existsSync, statSync } from 'fs';
+import { autoDetectDockerSocket } from './socket-validation';
 
 /**
  * Docker client configuration options.
@@ -36,55 +34,6 @@ export interface DockerClientConfig {
     /** Enable mutex monitoring */
     monitoringEnabled?: boolean;
   };
-}
-
-/**
- * Get Colima socket paths in order of preference.
- */
-function getColimaSockets(): string[] {
-  const homeDir = homedir();
-  return [
-    join(homeDir, '.colima/default/docker.sock'),
-    join(homeDir, '.colima/docker/docker.sock'),
-    join(homeDir, '.lima/colima/sock/docker.sock'), // Lima-based colima
-  ];
-}
-
-/**
- * Find the first available Docker socket from the given paths (synchronous file-based check).
- */
-function findAvailableDockerSocket(socketPaths: string[]): string | null {
-  for (const socketPath of socketPaths) {
-    try {
-      if (existsSync(socketPath)) {
-        const stat = statSync(socketPath);
-        if (stat.isSocket()) {
-          return socketPath;
-        }
-      }
-    } catch {
-      // Continue to next socket path
-    }
-  }
-  return null;
-}
-
-/**
- * Auto-detect Docker socket path with Colima support (synchronous).
- */
-export function autoDetectDockerSocket(): string {
-  //If Windows, use default windows socket
-  if (process.platform === 'win32') {
-    return 'npipe://./pipe/docker_engine'; //Windows Default Pipe, not a socket
-  }
-
-  const unixDefaultPaths = [
-    '/var/run/docker.sock', // Standard Unix Docker socket
-    ...getColimaSockets(), // Colima sockets
-  ];
-
-  const availableSocket = findAvailableDockerSocket(unixDefaultPaths);
-  return availableSocket || '/var/run/docker.sock'; // Fallback to default
 }
 
 /**

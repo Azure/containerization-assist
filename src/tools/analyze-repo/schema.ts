@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { sessionId, repositoryPathAbsoluteUnix, analysisOptions } from '../shared/schemas';
+import { repositoryPathAbsoluteUnix, analysisOptions } from '../shared/schemas';
 
 export const moduleInfo = z.object({
   name: z.string().describe('The name of the module'),
@@ -14,7 +14,7 @@ export const moduleInfo = z.object({
     ),
   dockerfilePath: z.string().optional().describe('Path where the Dockerfile should be generated'),
   language: z
-    .enum(['java', 'dotnet', 'other'])
+    .enum(['java', 'dotnet', 'javascript', 'typescript', 'python', 'rust', 'go', 'other'])
     .optional()
     .describe('Primary programming language used in the module'),
   languageVersion: z.string().optional(),
@@ -45,10 +45,12 @@ export const moduleInfo = z.object({
 export type ModuleInfo = z.infer<typeof moduleInfo>;
 
 export const analyzeRepoSchema = z.object({
-  sessionId,
   repositoryPathAbsoluteUnix,
   ...analysisOptions,
-  modules: z.array(moduleInfo),
+  modules: z
+    .array(moduleInfo)
+    .optional()
+    .describe('Optional pre-analyzed modules. If not provided, AI will analyze the repository.'),
 });
 
 export type AnalyzeRepoParams = z.infer<typeof analyzeRepoSchema>;
@@ -56,4 +58,21 @@ export type AnalyzeRepoParams = z.infer<typeof analyzeRepoSchema>;
 export interface RepositoryAnalysis {
   modules?: ModuleInfo[];
   isMonorepo?: boolean;
+  analyzedPath?: string;
+  // Fields from AI response (for parsing)
+  language?: string;
+  languageVersion?: string;
+  framework?: string;
+  frameworkVersion?: string;
+  buildSystem?: {
+    type?: string;
+    buildFile?: string;
+    configFile?: string;
+    buildCommand?: string;
+    testCommand?: string;
+  };
+  dependencies?: string[];
+  devDependencies?: string[];
+  entryPoint?: string;
+  suggestedPorts?: number[];
 }
