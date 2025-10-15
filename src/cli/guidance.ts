@@ -10,11 +10,12 @@ export interface GuidanceOptions {
 /**
  * Error categories for contextual guidance
  */
-enum ErrorCategory {
-  Docker = 'docker',
-  Permission = 'permission',
-  Configuration = 'configuration',
-}
+const ErrorCategory = {
+  Docker: 'docker',
+  Permission: 'permission',
+  Configuration: 'configuration',
+} as const;
+type ErrorCategory = (typeof ErrorCategory)[keyof typeof ErrorCategory];
 
 /**
  * Guidance messages organized by category
