@@ -291,10 +291,6 @@ export class EnvironmentAwareFixtureLoader {
     return createEnvironmentReport(this.capabilities);
   }
 
-  // ================================
-  // Private Helper Methods  
-  // ================================
-
   private shouldUseReal(
     service: keyof Omit<EnvironmentCapabilities, 'platform'>,
     forceReal?: boolean,

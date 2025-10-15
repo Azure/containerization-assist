@@ -68,7 +68,7 @@ MCP Tools Available:
   • Build: generate-dockerfile, build-image, scan-image
   • Registry: tag-image, push-image
   • Deploy: generate-k8s-manifests, deploy
-  • Additional: ops, inspect-session
+  • Additional: ops
 
 For detailed documentation, see: docs/README.md
 For examples and tutorials, see: docs/examples/

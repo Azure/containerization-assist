@@ -106,7 +106,6 @@ export const ALL_TOOLS: readonly Tool[] = [
   // generateHelmChartsTool,
   // generateK8sManifestsTool,
   // generateKustomizeTool,
-  // inspectSessionTool,
   // opsTool,
   // prepareClusterTool,
   // pushImageTool,

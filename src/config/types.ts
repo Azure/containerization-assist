@@ -6,7 +6,6 @@
 type NodeEnv = 'development' | 'production' | 'test';
 type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
 type WorkflowMode = 'interactive' | 'auto' | 'batch';
-type StoreType = 'memory' | 'file' | 'redis';
 
 // Extended configuration interface to match current usage
 export interface ApplicationConfig {
@@ -17,12 +16,6 @@ export interface ApplicationConfig {
     logLevel: LogLevel;
     port: number;
     host: string;
-  };
-  session: {
-    store: StoreType;
-    persistencePath: string;
-    persistenceInterval: number;
-    cleanupInterval: number;
   };
   mcp: {
     name: string;

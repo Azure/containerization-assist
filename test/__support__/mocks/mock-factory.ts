@@ -36,10 +36,6 @@ export class MockFactory {
     // Factory is stateless - no session tracking needed
   }
 
-  // ================================
-  // Infrastructure Mocks
-  // ================================
-
   /**
    * Create Docker client mock
    */
@@ -211,10 +207,6 @@ export class MockFactory {
     return mock;
   }
 
-  // ================================
-  // Tool Mocks
-  // ================================
-
   /**
    * Create tool mock with specified behavior
    */
@@ -321,10 +313,6 @@ export class MockFactory {
     return this.createToolMock('build-image', scenarios[scenario]);
   }
 
-  // ================================
-  // Workflow Mocks
-  // ================================
-
   /**
    * Create workflow orchestration mock
    */
@@ -361,10 +349,6 @@ export class MockFactory {
     return mock;
   }
 
-  // ================================
-  // Environment-Aware Mocks
-  // ================================
-
   /**
    * Create environment-aware mock based on capabilities
    */
@@ -383,10 +367,6 @@ export class MockFactory {
         : this.createTrivyMock('none'), // Mock still works, just returns empty results
     };
   }
-
-  // ================================
-  // Utility Methods
-  // ================================
 
   /**
    * Reset all mocks

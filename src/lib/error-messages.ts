@@ -10,12 +10,6 @@ export const ERROR_MESSAGES = {
   TOOL_NOT_FOUND: (name: string) => `Tool not found: ${name}`,
   VALIDATION_FAILED: (issues: string) => `Validation failed: ${issues}`,
 
-  // Session-related errors
-  SESSION_GET_FAILED: (error: string) => `Failed to get session: ${error}`,
-  SESSION_CREATE_FAILED: (error: string) => `Failed to create session: ${error}`,
-  SESSION_UPDATE_FAILED: (error: string) => `Failed to update session: ${error}`,
-  SESSION_EXPIRED: (id: string) => `Session expired: ${id}`,
-
   // Policy-related errors
   POLICY_BLOCKED: (rules: string[]) => `Blocked by policies: ${rules.join(', ')}`,
   POLICY_VALIDATION_FAILED: (issues: string) => `Policy validation failed: ${issues}`,

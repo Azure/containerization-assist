@@ -201,7 +201,6 @@ export const TOOL_GRAPH: Record<string, ToolEdge> = {
   // Tools without dependencies
   workflow: {},
   ops: {},
-  'inspect-session': {},
   'convert-aca-to-k8s': {},
 };
 

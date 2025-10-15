@@ -5,10 +5,6 @@
  * Each pattern is a direct export for easy import and use
  */
 
-// ============================================
-// Dockerfile Patterns
-// ============================================
-
 // Multi-stage patterns
 export const AS_CLAUSE = /\s+AS\s+/i;
 
@@ -19,20 +15,13 @@ export const LATEST_TAG = /:latest(?:\s|$)/;
 export const SUDO_INSTALL = /install.*sudo|apt-get.*sudo|yum.*sudo|apk.*sudo/;
 export const PACKAGE_FILES = /package.*\.json|requirements\.txt|go\.mod|pom\.xml/;
 
-// ============================================
-// Security Patterns
-// ============================================
-
 // Secret detection patterns (for validation, not extraction)
 export const PASSWORD_PATTERN = /\w*password\w*\s*=\s*["']?.+["']?/i;
 export const API_KEY_PATTERN = /\w*api[_-]?key\w*\s*=\s*["']?.+["']?/i;
 export const SECRET_PATTERN = /\w*secret\w*\s*=\s*["']?.+["']?/i;
 export const TOKEN_PATTERN = /\w*token\w*\s*=\s*["']?.+["']?/i;
 
-// ============================================
-// Code Fence Patterns (for AI response processing)
-// ============================================
-
+// Code fence patterns (for AI response processing)
 export const DOCKERFILE_FENCE = /```(?:docker|dockerfile|Dockerfile|DOCKERFILE)?\s*\n([\s\S]*?)```/;
 export const YAML_FENCE = /```(?:yaml|yml|YAML|YML)?\s*\n([\s\S]*?)```/;
 export const GENERIC_FENCE = /```[a-zA-Z0-9]*\s*\n?([\s\S]*?)```/;
