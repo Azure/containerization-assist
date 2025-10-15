@@ -207,7 +207,7 @@
     "example": "services:\n  sentinel:\n    image: redis:7-alpine\n    command: redis-sentinel /etc/redis/sentinel.conf\n    volumes:\n      - ./sentinel.conf:/etc/redis/sentinel.conf\n    environment:\n      - REDIS_MASTER_HOST=${REDIS_MASTER}",
     "severity": "high",
     "tags": ["redis", "sentinel", "availability", "failover"],
-    "description": "Sentinel provides automatic failover for Redis master-slave setups"
+    "description": "Sentinel provides automatic failover for Redis primary-replica setups"
   },
   {
     "id": "database-security-scanning",
