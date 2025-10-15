@@ -204,7 +204,7 @@ async function run(
       });
     }
 
-    // If modules are provided by user, use them (legacy mode)
+    // If modules are provided by user, use them
     if (input.modules && input.modules.length > 0) {
       const numberOfModules = input.modules.length;
       const isMonorepo = numberOfModules > 1;

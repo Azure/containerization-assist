@@ -266,23 +266,39 @@ spec:
 
 
   describe('convert-aca-to-k8s', () => {
-    it('should enhance prompt with conversion knowledge', async () => {
+    it('should return a conversion plan with recommendations (no AI)', async () => {
+      const acaManifest = `
+apiVersion: 2022-03-01
+name: test-app
+properties:
+  template:
+    containers:
+      - name: test-container
+        image: nginx:latest
+  configuration:
+    ingress:
+      external: true
+      targetPort: 80
+`;
       const result = await convertAcaToK8sTool.run(
         {
-          acaManifest: 'apiVersion: apps.azure.com/v1\nkind: ContainerApp',
+          acaManifest,
         },
         mockContext,
       );
 
-      expect(promptEngine.buildMessages).toHaveBeenCalledWith(
-        expect.objectContaining({
-          topic: TOPICS.CONVERT_ACA_TO_K8S,
-          tool: 'convert-aca-to-k8s',
-          environment: 'production',
-        }),
-      );
-
+      // Verify it returns a plan (not AI-generated content)
       expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value).toHaveProperty('acaAnalysis');
+        expect(result.value).toHaveProperty('recommendations');
+        expect(result.value).toHaveProperty('knowledgeMatches');
+        expect(result.value).toHaveProperty('confidence');
+        expect(result.value).toHaveProperty('summary');
+      }
+
+      // Verify it does NOT use AI (no prompt engine calls)
+      expect(promptEngine.buildMessages).not.toHaveBeenCalled();
     });
   });
 

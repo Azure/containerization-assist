@@ -29,33 +29,26 @@ import { DOCKERFILE_FENCE, YAML_FENCE, GENERIC_FENCE, AS_CLAUSE } from './regex-
  * ```
  */
 export const stripFencesAndNoise = (text: string, language?: string): string => {
-  // Build regex pattern based on language parameter
   let pattern: RegExp;
 
   if (language) {
-    // Match specific language or its variations
     const langPattern = language.toLowerCase();
     if (langPattern === 'dockerfile' || langPattern === 'docker') {
       pattern = DOCKERFILE_FENCE;
     } else if (langPattern === 'yaml' || langPattern === 'yml') {
       pattern = YAML_FENCE;
     } else {
-      // Generic pattern for other languages
       pattern = new RegExp(`\`\`\`(?:${langPattern})?\\s*\\n([\\s\\S]*?)\`\`\``);
     }
   } else {
-    // Generic pattern that matches any code fence (including empty ones)
     pattern = GENERIC_FENCE;
   }
 
   const match = text.match(pattern);
   if (match) {
-    // Found a code fence, return the content (which might be empty)
     return match[1] ? match[1].trim() : '';
   }
 
-  // No code fence found, return trimmed original text
-  // Callers should validate if the content is what they expect
   return text.trim();
 };
 
@@ -85,27 +78,20 @@ export const isValidDockerfileContent = (content: string): boolean => {
   }
 
   try {
-    // Parse to ensure valid Dockerfile structure
     const commands = dockerParser.parse(cleaned);
-
-    // Check if there's at least one FROM instruction
     const hasFROM = commands.some((cmd: any) => cmd.name === 'FROM');
 
-    // Optionally use validate-dockerfile for additional checks (but don't fail on it)
-    // as it can be too strict for some valid Dockerfiles
     try {
       const validationResult = validateDockerfile(cleaned);
       if (!validationResult.valid && validationResult.priority === 0) {
-        // Only fail on priority 0 (fatal) errors
         return false;
       }
     } catch {
-      // Ignore validation errors, rely on parsing
+      // Continue with parse result
     }
 
     return hasFROM;
   } catch {
-    // Failed to parse as valid Dockerfile
     return false;
   }
 };
@@ -129,12 +115,9 @@ export const isValidDockerfileContent = (content: string): boolean => {
 export const extractBaseImage = (dockerfileContent: string): string | null => {
   try {
     const commands = dockerParser.parse(dockerfileContent);
-
-    // Find the first FROM instruction
     const fromCommand = commands.find((cmd: any) => cmd.name === 'FROM');
 
     if (fromCommand?.args) {
-      // The args can be a string or array, handle both
       let baseImage: string | null = null;
       if (typeof fromCommand.args === 'string') {
         baseImage = fromCommand.args.trim();
@@ -143,7 +126,6 @@ export const extractBaseImage = (dockerfileContent: string): string | null => {
         baseImage = typeof firstArg === 'string' ? firstArg.trim() : String(firstArg).trim();
       }
 
-      // Remove "AS builder" part from multi-stage builds
       if (baseImage) {
         const parts = baseImage.split(AS_CLAUSE);
         return parts[0]?.trim() || baseImage;
@@ -152,7 +134,6 @@ export const extractBaseImage = (dockerfileContent: string): string | null => {
 
     return null;
   } catch {
-    // Failed to parse, fallback to regex for backwards compatibility
     const fromMatch = dockerfileContent.match(/^\s*FROM\s+(\S+)/im);
     return fromMatch?.[1] ?? null;
   }
@@ -189,13 +170,9 @@ export const isValidKubernetesContent = (content: string): boolean => {
   }
 
   try {
-    // Parse as YAML - parseYaml handles both single and multi-document YAML
     const docs = parseYaml(cleaned, { strict: false });
-
-    // Handle both single document and array of documents
     const documents = Array.isArray(docs) ? docs : [docs];
 
-    // Check if at least one document has apiVersion and kind
     return documents.some(
       (doc) =>
         doc &&
@@ -206,7 +183,6 @@ export const isValidKubernetesContent = (content: string): boolean => {
         doc.kind,
     );
   } catch {
-    // Failed to parse as valid YAML
     return false;
   }
 };
