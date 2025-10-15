@@ -6,12 +6,8 @@
 import { describe, it, expect } from '@jest/globals';
 import { SAMPLING_CONFIG } from '@/config/sampling';
 
-// Import all generate-* tools to test their configurations
-import generateDockerfile from '@/tools/generate-dockerfile/tool';
-import generateK8sManifests from '@/tools/generate-k8s-manifests/tool';
-import generateAcaManifests from '@/tools/generate-aca-manifests/tool';
-import generateHelmCharts from '@/tools/generate-helm-charts/tool';
-import generateKustomize from '@/tools/generate-kustomize/tool';
+// Import generate-* tools to test their configurations
+import generateHelmChartsTool from '../../../src/tools/generate-helm-charts/tool';
 
 describe('AI Determinism Configuration', () => {
   describe('Sampling Configuration Standards', () => {
@@ -30,20 +26,8 @@ describe('AI Determinism Configuration', () => {
   describe('Sampling-Enabled Tool Consistency', () => {
     const samplingTools = [
       {
-        name: 'generate-dockerfile',
-        tool: generateDockerfile,
-      },
-      {
-        name: 'generate-k8s-manifests',
-        tool: generateK8sManifests,
-      },
-      {
-        name: 'generate-aca-manifests',
-        tool: generateAcaManifests,
-      },
-      {
         name: 'generate-helm-charts',
-        tool: generateHelmCharts,
+        tool: generateHelmChartsTool,
       },
     ];
 
@@ -62,19 +46,10 @@ describe('AI Determinism Configuration', () => {
     });
   });
 
-  describe('Non-Sampling Tool Verification', () => {
-    it('should correctly identify generate-kustomize as non-sampling', () => {
-      expect(generateKustomize.metadata?.samplingStrategy).toBe('none');
-    });
-
-    it('should not use sampling for non-AI tools', () => {
-      expect(generateKustomize.metadata?.samplingStrategy).toBe('none');
-    });
-  });
 
   describe('Temperature Control', () => {
     it('should rely on MCP host configuration for temperature', () => {
-      const aiTools = [generateDockerfile, generateK8sManifests, generateAcaManifests, generateHelmCharts];
+      const aiTools = [generateHelmChartsTool];
 
       aiTools.forEach(tool => {
         expect((tool as any).temperature).toBeUndefined();

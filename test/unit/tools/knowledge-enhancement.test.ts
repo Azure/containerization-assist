@@ -3,12 +3,9 @@
  */
 
 import analyzeRepoTool from '@/tools/analyze-repo/tool';
-import generateDockerfileTool from '@/tools/generate-dockerfile/tool';
 import fixDockerfileTool from '@/tools/fix-dockerfile/tool';
-import generateK8sManifestsTool from '@/tools/generate-k8s-manifests/tool';
 import generateHelmChartsTool from '@/tools/generate-helm-charts/tool';
 import resolveBaseImagesTool from '@/tools/resolve-base-images/tool';
-import generateAcaManifestsTool from '@/tools/generate-aca-manifests/tool';
 import convertAcaToK8sTool from '@/tools/convert-aca-to-k8s/tool';
 import type { ToolContext } from '@/mcp/context';
 import * as promptEngine from '@/ai/prompt-engine';
@@ -268,28 +265,6 @@ spec:
     });
   });
 
-  describe('generate-dockerfile', () => {
-    it('should enhance prompt with knowledge base', async () => {
-      const result = await generateDockerfileTool.run(
-        {
-          repositoryPath: '/test/repo',
-          environment: 'production',
-        },
-        mockContext,
-      );
-
-      // Now uses a single call with unified topic
-      expect(promptEngine.buildMessages).toHaveBeenCalledWith(
-        expect.objectContaining({
-          topic: TOPICS.DOCKERFILE,
-          tool: 'generate-dockerfile',
-          environment: 'production',
-        }),
-      );
-
-      expect(result.ok).toBe(true);
-    });
-  });
 
   describe('fix-dockerfile', () => {
     it('should enhance prompt with knowledge base', async () => {
@@ -313,28 +288,6 @@ spec:
     });
   });
 
-  describe('generate-k8s-manifests', () => {
-    it('should enhance prompt with knowledge base', async () => {
-      const result = await generateK8sManifestsTool.run(
-        {
-          appName: 'test-app',
-          imageId: 'test:latest',
-          path: '/test/k8s',
-        },
-        mockContext,
-      );
-
-      expect(promptEngine.buildMessages).toHaveBeenCalledWith(
-        expect.objectContaining({
-          topic: TOPICS.KUBERNETES,
-          tool: 'generate-k8s-manifests',
-          environment: 'production',
-        }),
-      );
-
-      expect(result.ok).toBe(true);
-    });
-  });
 
   describe('generate-helm-charts', () => {
     it('should enhance prompt with knowledge base', async () => {
@@ -380,28 +333,6 @@ spec:
     });
   });
 
-  describe('generate-aca-manifests', () => {
-    it('should enhance prompt with Azure-specific knowledge', async () => {
-      const result = await generateAcaManifestsTool.run(
-        {
-          appName: 'test-app',
-          imageId: 'test:latest',
-          path: '/test/aca',
-        },
-        mockContext,
-      );
-
-      expect(promptEngine.buildMessages).toHaveBeenCalledWith(
-        expect.objectContaining({
-          topic: TOPICS.GENERATE_ACA_MANIFESTS,
-          tool: 'generate-aca-manifests',
-          environment: 'production',
-        }),
-      );
-
-      expect(result.ok).toBe(true);
-    });
-  });
 
   describe('convert-aca-to-k8s', () => {
     it('should enhance prompt with conversion knowledge', async () => {
@@ -429,8 +360,8 @@ spec:
       // The prompt engine now handles knowledge integration internally
       const result = await promptEngine.buildMessages({
         basePrompt: 'Base prompt text',
-        topic: TOPICS.DOCKERFILE_GENERATION,
-        tool: 'generate-dockerfile',
+        topic: TOPICS.FIX_DOCKERFILE,
+        tool: 'fix-dockerfile',
         environment: 'production',
         knowledgeBudget: 3000,
       });
@@ -443,10 +374,10 @@ spec:
 
     it('should handle message building gracefully', async () => {
       // Test that the prompt engine is properly integrated
-      await generateDockerfileTool.run(
+      await fixDockerfileTool.run(
         {
-          repositoryPath: '/test/repo',
-          environment: 'production',
+          dockerfile: 'FROM node:16\nRUN npm install',
+          targetEnvironment: 'production',
         },
         mockContext,
       );

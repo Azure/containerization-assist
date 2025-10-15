@@ -120,7 +120,6 @@ describe('CLI Functionality', () => {
 
       expect(result).toContain('Available MCP Tools');
       expect(result).toContain('analyze-repo');
-      expect(result).toContain('generate-dockerfile');
       expect(result).toContain('build-image');
     });
 
