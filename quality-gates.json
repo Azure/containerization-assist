@@ -20,32 +20,11 @@
     "baselines": {
       "lint": {
         "errors": 0,
-        "warnings": 20,
-        "warningSignatures": [
-          "/home/tng/workspace/containerization-assist/src/mcp/ai/response-parser.ts:148:59:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/build-image/tool.ts:89:44:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/build-image/tool.ts:373:24:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/build-image/tool.ts:499:65:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/build-image/tool.ts:572:63:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/deploy/tool.ts:495:41:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/deploy/tool.ts:791:63:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/index.ts:184:10:@typescript-eslint/no-non-null-assertion:Forbidden non-null assertion.",
-          "/home/tng/workspace/containerization-assist/src/tools/scan/tool.ts:126:24:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/tag-image/tool.ts:224:24:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/tag-image/tool.ts:292:59:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/verify-deployment/tool.ts:231:71:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/verify-deployment/tool.ts:243:77:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/verify-deployment/tool.ts:243:130:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/verify-deployment/tool.ts:244:55:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/verify-deployment/tool.ts:245:56:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/verify-deployment/tool.ts:247:47:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/verify-deployment/tool.ts:247:98:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/verify-deployment/tool.ts:394:25:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type.",
-          "/home/tng/workspace/containerization-assist/src/tools/verify-deployment/tool.ts:482:63:@typescript-eslint/no-explicit-any:Unexpected any. Specify a different type."
-        ]
+        "warnings": 0,
+        "warningSignatures": []
       },
       "deadcode": {
-        "count": 198
+        "count": 258
       },
       "typescript": {
         "errors": 0

@@ -95,7 +95,7 @@ export interface UnifiedDefaults extends EnvironmentDefaults {
 }
 
 /**
- * Policy structure (v2.0)
+ * Policy structure
  */
 export interface Policy {
   version: '2.0';
@@ -120,7 +120,7 @@ const PolicyRuleSchema = z.object({
   id: z.string(),
   category: z.enum(['quality', 'security', 'performance', 'compliance']).optional(),
   priority: z.number(),
-  conditions: z.array(z.unknown()), // Simplified since MatcherSchema was also unused
+  conditions: z.array(z.unknown()),
   actions: z.record(z.string(), z.unknown()),
   description: z.string().optional(),
 });

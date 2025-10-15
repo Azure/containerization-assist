@@ -1,8 +1,5 @@
 /**
  * Unified Scoring System for AI Responses
- *
- * Provides consistent scoring across all AI services with contextual awareness.
- * Replaces individual scoring functions with a unified, configurable approach.
  */
 
 interface ValidationResultItem {

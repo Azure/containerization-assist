@@ -1,22 +1,7 @@
 /**
- * Deploy Application Tool - Standardized Implementation
+ * Deploy Application Tool
  *
- * Deploys applications to Kubernetes clusters using standardized helpers
- * for consistency and improved error handling
- * @example
- * ```typescript
- * const result = await deployApplication({
- *   namespace: 'my-app',
- *   environment: 'production',
- *   manifestsPath: '/path/to/manifests.yaml'
- * }, context);
- * if (result.success) {
- *   logger.info('Application deployed', {
- *     deployment: result.deploymentName,
- *     endpoints: result.endpoints
- *   });
- * }
- * ```
+ * Deploys applications to Kubernetes clusters with AI-powered analysis
  */
 
 import * as yaml from 'js-yaml';
@@ -79,7 +64,6 @@ const DEPLOYMENT_CONFIG = {
   DEFAULT_INGRESS_HOST: 'app.example.com',
 } as const;
 
-// Manifest deployment order for proper resource creation
 const MANIFEST_ORDER = [
   'Namespace',
   'ConfigMap',

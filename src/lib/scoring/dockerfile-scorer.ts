@@ -14,18 +14,9 @@ interface DockerfileScoringBreakdown extends Record<string, number> {
 }
 
 /**
- * Scorer for Dockerfile content that consolidates logic from multiple existing implementations
- *
- * This scorer combines:
- * - Basic parseability checks using dockerfile-ast
- * - Security best practices scoring
- * - Performance and optimization checks
- * - Layer caching optimization scoring
+ * Scorer for Dockerfile content with security, performance, and best practice analysis
  */
 export class DockerfileScorer extends TextContentScorer {
-  /**
-   * Score a Dockerfile with comprehensive analysis
-   */
   score(content: string, _context?: ScoringContext): ScoringResult {
     const breakdown: DockerfileScoringBreakdown = {
       parseability: this.scoreParseability(content),
@@ -49,9 +40,6 @@ export class DockerfileScorer extends TextContentScorer {
     return this.createResult(breakdown, weights, feedback);
   }
 
-  /**
-   * Validate that the Dockerfile can be parsed
-   */
   protected validateParseable(content: string): boolean {
     try {
       DockerfileParser.parse(content);
@@ -61,9 +49,6 @@ export class DockerfileScorer extends TextContentScorer {
     }
   }
 
-  /**
-   * Score Dockerfile parseability and basic structure
-   */
   private scoreParseability(content: string): number {
     let score = 0;
 
@@ -84,9 +69,6 @@ export class DockerfileScorer extends TextContentScorer {
     return Math.min(score, 100);
   }
 
-  /**
-   * Score security practices in the Dockerfile
-   */
   private scoreSecurity(content: string): number {
     let score = 0;
 
@@ -119,9 +101,6 @@ export class DockerfileScorer extends TextContentScorer {
     return Math.min(score, 100);
   }
 
-  /**
-   * Score best practices adherence
-   */
   private scoreBestPractices(content: string): number {
     let score = 0;
 
@@ -165,9 +144,6 @@ export class DockerfileScorer extends TextContentScorer {
     return Math.min(score, 100);
   }
 
-  /**
-   * Score performance and size optimizations
-   */
   private scorePerformance(content: string): number {
     let score = 0;
 
@@ -195,9 +171,6 @@ export class DockerfileScorer extends TextContentScorer {
     return Math.min(score, 100);
   }
 
-  /**
-   * Score layer caching optimization
-   */
   private scoreCaching(content: string): number {
     let score = 0;
 
@@ -235,9 +208,6 @@ export class DockerfileScorer extends TextContentScorer {
     return Math.min(score, 100);
   }
 
-  /**
-   * Generate helpful feedback messages based on scoring
-   */
   private generateFeedback(content: string, scores: DockerfileScoringBreakdown): string[] {
     const feedback: string[] = [];
 
@@ -285,20 +255,11 @@ export class DockerfileScorer extends TextContentScorer {
   }
 }
 
-/**
- * Convenience function for scoring Dockerfiles
- * Maintains backward compatibility with existing simple scoring functions
- */
 export function scoreDockerfile(content: string, context?: ScoringContext): number {
   const scorer = new DockerfileScorer();
   return scorer.score(content, context).total;
 }
 
-/**
- * Convenience function for detailed Dockerfile scoring
- * Returns category breakdown for advanced use cases
- * Note: Returns breakdown directly for backward compatibility
- */
 export function scoreDockerfileDetailed(
   content: string,
   context?: ScoringContext,
@@ -308,21 +269,11 @@ export function scoreDockerfileDetailed(
 }
 
 /**
- * Creates a scoring function that extracts and scores Dockerfile content
- *
- * This helper consolidates the common pattern of extracting Dockerfile content
- * from AI responses and scoring it. Used by sampling-based tools to avoid duplication.
- *
- * @returns A function that takes raw AI response text and returns a numeric score
+ * Creates a scoring function that extracts and scores Dockerfile content from AI responses
  *
  * @example
  * ```typescript
- * const samplingResult = await sampleWithRerank(
- *   ctx,
- *   buildSamplingRequest,
- *   createDockerfileScoringFunction(),
- *   {}
- * );
+ * const result = await sampleWithRerank(ctx, buildRequest, createDockerfileScoringFunction(), {});
  * ```
  */
 export function createDockerfileScoringFunction(): (text: string) => number {

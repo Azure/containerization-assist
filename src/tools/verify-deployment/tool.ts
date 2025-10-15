@@ -4,6 +4,8 @@
  * Verifies Kubernetes deployment health and retrieves endpoints using
  * standardized helpers for consistency and improved error handling
  *
+ * This is a deterministic operational tool with no AI calls.
+ *
  * @example
  * ```typescript
  * const result = await verifyDeployment({
@@ -27,11 +29,8 @@ import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient, KubernetesClient } from '@/lib/kubernetes';
 
 import { DEFAULT_TIMEOUTS } from '@/config/defaults';
-import { Success, Failure, type Result, TOPICS } from '@/types';
+import { Success, Failure, type Result } from '@/types';
 import { verifyDeploymentSchema, type VerifyDeploymentParams } from './schema';
-import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
-import { buildMessages } from '@/ai/prompt-engine';
-import { toMCPMessages } from '@/mcp/ai/message-converter';
 
 export interface VerifyDeploymentResult extends Record<string, unknown> {
   success: boolean;
@@ -64,19 +63,10 @@ export interface VerifyDeploymentResult extends Record<string, unknown> {
       message?: string;
     }>;
   };
-  validationInsights?: DeploymentValidationInsights;
   workflowHints?: {
     nextStep: string;
     message: string;
   };
-}
-
-// Additional interface for AI validation insights
-export interface DeploymentValidationInsights {
-  troubleshootingSteps: string[];
-  healthRecommendations: string[];
-  performanceInsights: string[];
-  confidence: number;
 }
 
 /**
@@ -162,189 +152,6 @@ async function checkEndpointHealth(url: string): Promise<boolean> {
 }
 
 /**
- * Score validation insights based on quality and relevance
- */
-function scoreValidationInsights(
-  insights: DeploymentValidationInsights,
-  _verificationResult: VerifyDeploymentResult,
-  _healthChecks: Array<{ name: string; status: string; message?: string }>,
-): number {
-  let score = 0;
-
-  // Quality scoring for troubleshooting steps (0-30 points)
-  if (insights.troubleshootingSteps && insights.troubleshootingSteps.length > 0) {
-    score += Math.min(insights.troubleshootingSteps.length * 5, 20);
-
-    // Bonus for actionable steps (contain keywords like 'check', 'verify', 'restart')
-    const actionableSteps = insights.troubleshootingSteps.filter((step) =>
-      /check|verify|restart|scale|update|apply|rollback|debug/i.test(step),
-    ).length;
-    score += Math.min(actionableSteps * 2, 10);
-  }
-
-  // Quality scoring for health recommendations (0-25 points)
-  if (insights.healthRecommendations && insights.healthRecommendations.length > 0) {
-    score += Math.min(insights.healthRecommendations.length * 4, 16);
-
-    // Bonus for specific health recommendations
-    const specificRecommendations = insights.healthRecommendations.filter((rec) =>
-      /resource|memory|cpu|probe|readiness|liveness|limit|request/i.test(rec),
-    ).length;
-    score += Math.min(specificRecommendations * 3, 9);
-  }
-
-  // Quality scoring for performance insights (0-25 points)
-  if (insights.performanceInsights && insights.performanceInsights.length > 0) {
-    score += Math.min(insights.performanceInsights.length * 4, 16);
-
-    // Bonus for performance-specific insights
-    const performanceSpecific = insights.performanceInsights.filter((insight) =>
-      /scale|performance|optimization|efficiency|throughput|latency|resource/i.test(insight),
-    ).length;
-    score += Math.min(performanceSpecific * 3, 9);
-  }
-
-  // Confidence penalty/bonus (0-20 points)
-  if (insights.confidence >= 0.8) {
-    score += 20;
-  } else if (insights.confidence >= 0.6) {
-    score += 15;
-  } else if (insights.confidence >= 0.4) {
-    score += 10;
-  } else {
-    score += 5;
-  }
-
-  return Math.min(score, 100);
-}
-
-/**
- * Build prompt for generating validation insights
- */
-function buildValidationInsightsPrompt(
-  verificationResult: VerifyDeploymentResult,
-  healthChecks: Array<{ name: string; status: string; message?: string }>,
-): string {
-  const hasIssues =
-    !verificationResult.success || verificationResult.healthCheck?.status !== 'healthy';
-  const context = hasIssues
-    ? 'with issues that need attention'
-    : 'that appears healthy but may benefit from optimization';
-
-  return `As a Kubernetes deployment expert, analyze this deployment verification result ${context}.
-
-Deployment Status:
-- Name: ${verificationResult.deploymentName}
-- Namespace: ${verificationResult.namespace}
-- Success: ${verificationResult.success}
-- Ready: ${verificationResult.ready}
-- Replicas: ${verificationResult.replicas} (${verificationResult.status.readyReplicas}/${verificationResult.status.totalReplicas} ready)
-- Health Status: ${verificationResult.healthCheck?.status || 'unknown'}
-- Health Message: ${verificationResult.healthCheck?.message || 'No health check performed'}
-
-${Array.isArray(verificationResult.status.conditions) && verificationResult.status.conditions.length > 0 ? `Conditions:\n${verificationResult.status.conditions.map((c) => `- ${c.type}: ${c.status} - ${c.message}`).join('\n')}` : ''}
-
-${healthChecks.length > 0 ? `Health Checks:\n${healthChecks.map((check) => `- ${check.name}: ${check.status}${check.message ? ` - ${check.message}` : ''}`).join('\n')}` : ''}
-
-${Array.isArray(verificationResult.endpoints) && verificationResult.endpoints.length > 0 ? `Endpoints:\n${verificationResult.endpoints.map((ep) => `- ${ep.type}: ${ep.url}:${ep.port} (healthy: ${ep.healthy})`).join('\n')}` : ''}
-
-Provide a JSON response with:
-1. troubleshootingSteps: Array of specific, actionable steps to diagnose and fix issues (if any)
-2. healthRecommendations: Array of recommendations to improve deployment health and reliability
-3. performanceInsights: Array of insights for optimizing performance and resource usage
-4. confidence: Number between 0-1 indicating confidence in the analysis
-
-Focus on:
-- Kubernetes-specific best practices and troubleshooting
-- Resource optimization and scaling recommendations
-- Health check and probe configuration
-- Network and service connectivity
-- Security and reliability improvements
-
-Respond with valid JSON only.`;
-}
-
-/**
- * Generate AI-powered validation insights for deployment verification
- */
-async function generateValidationInsights(
-  verificationResult: VerifyDeploymentResult,
-  healthChecks: Array<{ name: string; status: string; message?: string }>,
-  ctx: ToolContext,
-): Promise<Result<DeploymentValidationInsights>> {
-  try {
-    const prompt = buildValidationInsightsPrompt(verificationResult, healthChecks);
-
-    const messages = await buildMessages({
-      basePrompt: prompt,
-      topic: TOPICS.KUBERNETES,
-      tool: 'verify-deployment',
-      environment: 'production',
-    });
-
-    const result = await sampleWithRerank(
-      ctx,
-      async () => ({
-        messages: toMCPMessages(messages).messages,
-        maxTokens: 1000,
-        modelPreferences: { hints: [{ name: 'deployment-validation' }] },
-      }),
-      (response: string) => {
-        try {
-          const parsed = JSON.parse(response);
-          const insights: DeploymentValidationInsights = {
-            troubleshootingSteps: Array.isArray(parsed.troubleshootingSteps)
-              ? parsed.troubleshootingSteps
-              : [],
-            healthRecommendations: Array.isArray(parsed.healthRecommendations)
-              ? parsed.healthRecommendations
-              : [],
-            performanceInsights: Array.isArray(parsed.performanceInsights)
-              ? parsed.performanceInsights
-              : [],
-            confidence:
-              typeof parsed.confidence === 'number' &&
-              parsed.confidence >= 0 &&
-              parsed.confidence <= 1
-                ? parsed.confidence
-                : 0.5,
-          };
-
-          return scoreValidationInsights(insights, verificationResult, healthChecks);
-        } catch {
-          return { overall: 0 };
-        }
-      },
-      {},
-    );
-
-    if (result.ok) {
-      const parsed = JSON.parse(result.value.text);
-      const insights: DeploymentValidationInsights = {
-        troubleshootingSteps: Array.isArray(parsed.troubleshootingSteps)
-          ? parsed.troubleshootingSteps
-          : [],
-        healthRecommendations: Array.isArray(parsed.healthRecommendations)
-          ? parsed.healthRecommendations
-          : [],
-        performanceInsights: Array.isArray(parsed.performanceInsights)
-          ? parsed.performanceInsights
-          : [],
-        confidence:
-          typeof parsed.confidence === 'number' && parsed.confidence >= 0 && parsed.confidence <= 1
-            ? parsed.confidence
-            : 0.5,
-      };
-      return Success(insights);
-    } else {
-      return Failure('Failed to generate validation insights');
-    }
-  } catch (error) {
-    return Failure(`Error generating validation insights: ${error}`);
-  }
-}
-
-/**
  * Deployment verification implementation - direct execution without wrapper
  */
 async function verifyDeploymentImpl(
@@ -411,9 +218,12 @@ async function verifyDeploymentImpl(
           ? 'unhealthy'
           : 'unknown';
 
+    // Determine success status
+    const isSuccessful = overallStatus === 'healthy';
+
     // Prepare the result
     const result: VerifyDeploymentResult = {
-      success: overallStatus === 'healthy',
+      success: isSuccessful,
       namespace,
       deploymentName,
       serviceName,
@@ -441,44 +251,22 @@ async function verifyDeploymentImpl(
         message: health.message,
         ...(healthChecks.length > 0 && { checks: healthChecks }),
       },
-    };
-
-    timer.end({ deploymentName, ready: health.ready });
-
-    // Generate AI-powered validation insights
-    let validationInsights: DeploymentValidationInsights | undefined;
-    try {
-      const insightResult = await generateValidationInsights(result, healthChecks, context);
-
-      if (insightResult.ok) {
-        validationInsights = insightResult.value;
-        logger.info(
-          {
-            troubleshootingSteps: validationInsights.troubleshootingSteps.length,
-            confidence: validationInsights.confidence,
-          },
-          'Generated AI validation insights',
-        );
-      } else {
-        logger.warn({ error: insightResult.error }, 'Failed to generate validation insights');
-      }
-    } catch (error) {
-      logger.warn({ error: extractErrorMessage(error) }, 'Error generating validation insights');
-    }
-
-    // Add validation insights and workflow hints to result
-    const finalResult: VerifyDeploymentResult = {
-      ...result,
-      ...(validationInsights && { validationInsights }),
       workflowHints: {
-        nextStep: result.success ? 'ops' : 'fix-deployment-issues',
-        message: result.success
-          ? `Deployment verification successful. Use "ops" for operational tasks, or review the deployment status.${validationInsights ? ' Check AI validation insights for optimization recommendations.' : ''}`
-          : `Deployment verification found issues. ${validationInsights ? 'Review AI troubleshooting steps to resolve problems.' : 'Check deployment status and pod logs to diagnose issues.'}`,
+        nextStep: isSuccessful ? 'ops' : 'fix-deployment-issues',
+        message: isSuccessful
+          ? `Deployment verification successful. Use "ops" for operational tasks, or review the deployment status.`
+          : `Deployment verification found issues. Check deployment status and pod logs to diagnose issues.`,
       },
     };
 
-    return Success(finalResult);
+    logger.info(
+      { deploymentName, ready: health.ready, status: overallStatus },
+      'Verification complete',
+    );
+
+    timer.end({ deploymentName, ready: health.ready });
+
+    return Success(result);
   } catch (error) {
     timer.error(error);
 
@@ -496,18 +284,13 @@ import type { MCPTool } from '@/types/tool';
 
 const tool: MCPTool<typeof verifyDeploymentSchema, VerifyDeploymentResult> = {
   name: 'verify-deploy',
-  description: 'Verify Kubernetes deployment status with AI-powered validation insights',
+  description: 'Verify Kubernetes deployment status',
   version: '2.0.0',
   schema: verifyDeploymentSchema,
   metadata: {
     knowledgeEnhanced: false,
-    samplingStrategy: 'single',
-    enhancementCapabilities: [
-      'validation-insights',
-      'troubleshooting-guidance',
-      'performance-recommendations',
-      'health-analysis',
-    ],
+    samplingStrategy: 'none',
+    enhancementCapabilities: [],
   },
   run: verifyDeploymentImpl,
 };

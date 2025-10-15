@@ -29,13 +29,10 @@ import { getSystemInfo, getDownloadOS, getDownloadArch } from '@/lib/platform-ut
 import { downloadFile, makeExecutable, createTempFile, deleteTempFile } from '@/lib/file-utils';
 
 import type * as pino from 'pino';
-import { Success, Failure, type Result, TOPICS } from '@/types';
+import { Success, Failure, type Result } from '@/types';
 import { prepareClusterSchema, type PrepareClusterParams } from './schema';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
-import { buildMessages } from '@/ai/prompt-engine';
-import { toMCPMessages } from '@/mcp/ai/message-converter';
 
 const execAsync = promisify(exec);
 
@@ -58,15 +55,6 @@ export interface PrepareClusterResult {
   };
   warnings?: string[];
   localRegistryUrl?: string;
-  clusterOptimizations?: ClusterOptimizationInsights;
-}
-
-export interface ClusterOptimizationInsights {
-  resourceRecommendations: string[];
-  securityEnhancements: string[];
-  performanceOptimizations: string[];
-  infrastructureAdvice: string[];
-  confidence: number;
 }
 
 interface K8sClientAdapter {
@@ -358,213 +346,6 @@ async function createLocalRegistry(logger: pino.Logger): Promise<string> {
 }
 
 /**
- * Score cluster optimization insights based on quality and relevance
- */
-function scoreClusterOptimizations(
-  insights: ClusterOptimizationInsights,
-  _preparationResult: Record<string, unknown>,
-  _checks: Record<string, unknown>,
-): number {
-  let score = 0;
-
-  // Quality scoring for resource recommendations (0-25 points)
-  if (insights.resourceRecommendations && insights.resourceRecommendations.length > 0) {
-    score += Math.min(insights.resourceRecommendations.length * 4, 16);
-
-    // Bonus for specific resource recommendations
-    const specificRecommendations = insights.resourceRecommendations.filter((rec) =>
-      /memory|cpu|disk|storage|quota|limit|request|pv|pvc|node/i.test(rec),
-    ).length;
-    score += Math.min(specificRecommendations * 3, 9);
-  }
-
-  // Quality scoring for security enhancements (0-25 points)
-  if (insights.securityEnhancements && insights.securityEnhancements.length > 0) {
-    score += Math.min(insights.securityEnhancements.length * 4, 16);
-
-    // Bonus for security-specific recommendations
-    const securitySpecific = insights.securityEnhancements.filter((enh) =>
-      /rbac|networkpolicy|psp|admission|tls|encryption|secret|serviceaccount/i.test(enh),
-    ).length;
-    score += Math.min(securitySpecific * 3, 9);
-  }
-
-  // Quality scoring for performance optimizations (0-25 points)
-  if (insights.performanceOptimizations && insights.performanceOptimizations.length > 0) {
-    score += Math.min(insights.performanceOptimizations.length * 4, 16);
-
-    // Bonus for performance-specific optimizations
-    const performanceSpecific = insights.performanceOptimizations.filter((opt) =>
-      /performance|scaling|hpa|vpa|cluster-autoscaler|node-pool|affinity/i.test(opt),
-    ).length;
-    score += Math.min(performanceSpecific * 3, 9);
-  }
-
-  // Quality scoring for infrastructure advice (0-25 points)
-  if (insights.infrastructureAdvice && insights.infrastructureAdvice.length > 0) {
-    score += Math.min(insights.infrastructureAdvice.length * 4, 16);
-
-    // Bonus for infrastructure-specific advice
-    const infraSpecific = insights.infrastructureAdvice.filter((advice) =>
-      /networking|ingress|dns|loadbalancer|proxy|cni|storage|backup/i.test(advice),
-    ).length;
-    score += Math.min(infraSpecific * 3, 9);
-  }
-
-  // Confidence bonus (0-20 points)
-  if (insights.confidence >= 0.8) {
-    score += 20;
-  } else if (insights.confidence >= 0.6) {
-    score += 15;
-  } else if (insights.confidence >= 0.4) {
-    score += 10;
-  } else {
-    score += 5;
-  }
-
-  return Math.min(score, 100);
-}
-
-/**
- * Build prompt for generating cluster optimization insights
- */
-function buildClusterOptimizationPrompt(
-  preparationResult: Record<string, unknown>,
-  checks: Record<string, unknown>,
-  environment: string,
-): string {
-  const context = preparationResult.clusterReady
-    ? 'that is successfully prepared but may benefit from optimization'
-    : 'that has encountered issues during preparation';
-
-  return `As a Kubernetes cluster optimization expert, analyze this cluster preparation result ${context}.
-
-Cluster Details:
-- Environment: ${environment}
-- Cluster: ${preparationResult.cluster}
-- Namespace: ${preparationResult.namespace}
-- Cluster Ready: ${preparationResult.clusterReady}
-- Local Registry: ${preparationResult.localRegistryUrl || 'None'}
-
-Checks Performed:
-- Connectivity: ${checks.connectivity}
-- Permissions: ${checks.permissions}
-- Namespace Exists: ${checks.namespaceExists}
-${checks.ingressController !== undefined ? `- Ingress Controller: ${checks.ingressController}` : ''}
-${checks.rbacConfigured !== undefined ? `- RBAC Configured: ${checks.rbacConfigured}` : ''}
-${checks.kindInstalled !== undefined ? `- Kind Installed: ${checks.kindInstalled}` : ''}
-${checks.kindClusterCreated !== undefined ? `- Kind Cluster Created: ${checks.kindClusterCreated}` : ''}
-${checks.localRegistryCreated !== undefined ? `- Local Registry Created: ${checks.localRegistryCreated}` : ''}
-
-${Array.isArray(preparationResult.warnings) && preparationResult.warnings.length > 0 ? `Warnings:\n${preparationResult.warnings.map((w: string) => `- ${w}`).join('\n')}` : ''}
-
-Provide a JSON response with:
-1. resourceRecommendations: Array of specific resource allocation and management recommendations
-2. securityEnhancements: Array of security improvements for the cluster setup
-3. performanceOptimizations: Array of performance tuning suggestions for better cluster efficiency
-4. infrastructureAdvice: Array of infrastructure setup and networking recommendations
-5. confidence: Number between 0-1 indicating confidence in the analysis
-
-Focus on:
-- Resource optimization and scaling strategies
-- Security hardening and RBAC best practices
-- Network policies and ingress configuration
-- Monitoring and observability setup
-- Development vs production environment considerations
-- Kind cluster optimizations for local development
-- Registry and image management improvements
-
-Respond with valid JSON only.`;
-}
-
-/**
- * Generate AI-powered cluster optimization insights
- */
-async function generateClusterOptimizations(
-  preparationResult: Record<string, unknown>,
-  checks: Record<string, unknown>,
-  environment: string,
-  ctx: ToolContext,
-): Promise<Result<ClusterOptimizationInsights>> {
-  try {
-    const prompt = buildClusterOptimizationPrompt(preparationResult, checks, environment);
-
-    const messages = await buildMessages({
-      basePrompt: prompt,
-      topic: TOPICS.KUBERNETES,
-      tool: 'prepare-cluster',
-      environment: environment || 'development',
-    });
-
-    const result = await sampleWithRerank(
-      ctx,
-      async () => ({
-        messages: toMCPMessages(messages).messages,
-        maxTokens: 1200,
-        modelPreferences: { hints: [{ name: 'cluster-optimization' }] },
-      }),
-      (response: string) => {
-        try {
-          const parsed = JSON.parse(response);
-          const insights: ClusterOptimizationInsights = {
-            resourceRecommendations: Array.isArray(parsed.resourceRecommendations)
-              ? parsed.resourceRecommendations
-              : [],
-            securityEnhancements: Array.isArray(parsed.securityEnhancements)
-              ? parsed.securityEnhancements
-              : [],
-            performanceOptimizations: Array.isArray(parsed.performanceOptimizations)
-              ? parsed.performanceOptimizations
-              : [],
-            infrastructureAdvice: Array.isArray(parsed.infrastructureAdvice)
-              ? parsed.infrastructureAdvice
-              : [],
-            confidence:
-              typeof parsed.confidence === 'number' &&
-              parsed.confidence >= 0 &&
-              parsed.confidence <= 1
-                ? parsed.confidence
-                : 0.5,
-          };
-
-          return scoreClusterOptimizations(insights, preparationResult, checks);
-        } catch {
-          return { overall: 0 };
-        }
-      },
-      {},
-    );
-
-    if (result.ok) {
-      const parsed = JSON.parse(result.value.text);
-      const insights: ClusterOptimizationInsights = {
-        resourceRecommendations: Array.isArray(parsed.resourceRecommendations)
-          ? parsed.resourceRecommendations
-          : [],
-        securityEnhancements: Array.isArray(parsed.securityEnhancements)
-          ? parsed.securityEnhancements
-          : [],
-        performanceOptimizations: Array.isArray(parsed.performanceOptimizations)
-          ? parsed.performanceOptimizations
-          : [],
-        infrastructureAdvice: Array.isArray(parsed.infrastructureAdvice)
-          ? parsed.infrastructureAdvice
-          : [],
-        confidence:
-          typeof parsed.confidence === 'number' && parsed.confidence >= 0 && parsed.confidence <= 1
-            ? parsed.confidence
-            : 0.5,
-      };
-      return Success(insights);
-    } else {
-      return Failure('Failed to generate cluster optimization insights');
-    }
-  } catch (error) {
-    return Failure(`Error generating cluster optimization insights: ${error}`);
-  }
-}
-
-/**
  * Core cluster preparation implementation
  */
 async function prepareClusterImpl(
@@ -701,45 +482,11 @@ async function prepareClusterImpl(
       ...(localRegistryUrl && { localRegistryUrl }),
     };
 
-    let clusterOptimizations: ClusterOptimizationInsights | undefined;
-    try {
-      const optimizationResult = await generateClusterOptimizations(
-        result as unknown as Record<string, unknown>,
-        checks,
-        environment,
-        context,
-      );
-
-      if (optimizationResult.ok) {
-        clusterOptimizations = optimizationResult.value;
-        logger.info(
-          {
-            resourceRecommendations: clusterOptimizations.resourceRecommendations.length,
-            confidence: clusterOptimizations.confidence,
-          },
-          'Generated AI cluster optimization insights',
-        );
-      } else {
-        logger.warn(
-          { error: optimizationResult.error },
-          'Failed to generate cluster optimization insights',
-        );
-      }
-    } catch (error) {
-      logger.warn(
-        { error: extractErrorMessage(error) },
-        'Error generating cluster optimization insights',
-      );
-    }
-
-    const enrichedResult: PrepareClusterResult = {
-      ...result,
-      ...(clusterOptimizations && { clusterOptimizations }),
-    };
+    logger.info({ clusterReady, checks }, 'Cluster preparation completed');
 
     timer.end({ clusterReady, environment });
 
-    return Success(enrichedResult);
+    return Success(result);
   } catch (error) {
     timer.error(error);
 
@@ -754,18 +501,13 @@ import type { MCPTool } from '@/types/tool';
 
 const tool: MCPTool<typeof prepareClusterSchema, PrepareClusterResult> = {
   name: 'prepare-cluster',
-  description: 'Prepare Kubernetes cluster for deployment with AI-powered optimization insights',
+  description: 'Prepare Kubernetes cluster for deployment',
   version: '2.0.0',
   schema: prepareClusterSchema,
   metadata: {
     knowledgeEnhanced: false,
-    samplingStrategy: 'single',
-    enhancementCapabilities: [
-      'cluster-optimization',
-      'resource-recommendations',
-      'security-enhancements',
-      'performance-tuning',
-    ],
+    samplingStrategy: 'none',
+    enhancementCapabilities: [],
   },
   run: prepareClusterImpl,
 };
