@@ -348,7 +348,6 @@ kubectl config view
 
 ## Documentation
 
-- **[Developer Guide](./docs/developer-guide.md)** - Contributing and development setup
 - **[Design Document](./DESIGN_DOCUMENT.md)** - Architecture and system design
 - **[Contributing Guidelines](./CONTRIBUTING.md)** - How to contribute
 - **[Examples](./docs/examples/)** - Code examples and usage patterns
