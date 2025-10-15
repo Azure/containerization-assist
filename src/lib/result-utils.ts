@@ -42,8 +42,8 @@ export function mapResult<T, U>(result: Result<T>, mapper: (value: T) => U): Res
  * Chains multiple Result-returning operations.
  * Similar to Promise.then but for Result types.
  *
- * Note: Due to TypeScript limitations with variadic generics, the return type
- * is not fully inferred. For better type safety with known operation chains,
+ * Note: Due to TypeScript limitations with variadic generics, type inference
+ * through the chain may be limited. For better type safety with known operation chains,
  * consider using `propagateFailure` for each step explicitly.
  *
  * @param result - The initial result
@@ -60,20 +60,20 @@ export function mapResult<T, U>(result: Result<T>, mapper: (value: T) => U): Res
  * );
  * ```
  */
-export function chainResults<T, U = unknown>(
+export function chainResults<T>(
   result: Result<T>,
-  ...operations: Array<(value: unknown) => Result<unknown>>
-): Result<U> {
-  let current: Result<unknown> = result;
+  ...operations: Array<(value: T) => Result<T>>
+): Result<T> {
+  let current: Result<T> = result;
 
   for (const operation of operations) {
     if (!current.ok) {
-      return current as Result<U>;
+      return current;
     }
     current = operation(current.value);
   }
 
-  return current as Result<U>;
+  return current;
 }
 
 /**

@@ -34,7 +34,7 @@ export interface ToolEdge {
       Step,
       {
         tool: string;
-        buildParams: (params: any) => any;
+        buildParams: (params: Record<string, unknown>) => Record<string, unknown>;
       }
     >
   >;

@@ -43,14 +43,20 @@ interface BaseImageRules {
   preferredImages: string[];
 }
 
+/**
+ * Regular expression to match Docker image names with optional registry/repository prefix and tag.
+ * Matches format: [registry/][repository/]image:tag
+ * Examples: node:20-alpine, gcr.io/distroless/nodejs, myregistry.com/my-app:1.0.0
+ */
+const DOCKER_IMAGE_NAME_REGEX = /\b([a-z0-9.-]+\/)?[a-z0-9.-]+:[a-z0-9._-]+\b/;
+
 // Helper function to create base image recommendations from knowledge snippets
 function createRecommendation(
   snippet: { id: string; text: string; category?: string; tags?: string[]; weight: number },
   category: BaseImageCategory,
 ): BaseImageRecommendation {
   // Extract image name from the recommendation text (assumes format like "node:20-alpine" or mentions image)
-  // More specific Docker image name regex: matches [repo/]image:tag
-  const imageMatch = snippet.text.match(/\b([a-z0-9.-]+\/)?[a-z0-9.-]+:[a-z0-9._-]+\b/);
+  const imageMatch = snippet.text.match(DOCKER_IMAGE_NAME_REGEX);
   const image = imageMatch ? imageMatch[0] : 'unknown';
 
   // Extract size if mentioned (e.g., "50MB", "100 MB", "1GB")
