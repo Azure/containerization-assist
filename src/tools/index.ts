@@ -3,11 +3,8 @@ import buildImageTool from './build-image/tool';
 import convertAcaToK8sTool from './convert-aca-to-k8s/tool';
 import deployTool from './deploy/tool';
 import fixDockerfileTool from './fix-dockerfile/tool';
-import generateAcaManifestsTool from './generate-aca-manifests/tool';
-import generateDockerfileTool from './generate-dockerfile/tool';
 import generateHelmChartsTool from './generate-helm-charts/tool';
 import generateK8sManifestsTool from './generate-k8s-manifests/tool';
-import generateKustomizeTool from './generate-kustomize/tool';
 import opsTool from './ops/tool';
 import generateDockerfilePlanTool from './generate-dockerfile-plan/tool';
 import generateManifestPlanTool from './generate-manifest-plan/tool';
@@ -50,11 +47,8 @@ buildImageTool.name = TOOL_NAME.BUILD_IMAGE;
 convertAcaToK8sTool.name = TOOL_NAME.CONVERT_ACA_TO_K8S;
 deployTool.name = TOOL_NAME.DEPLOY;
 fixDockerfileTool.name = TOOL_NAME.FIX_DOCKERFILE;
-generateAcaManifestsTool.name = TOOL_NAME.GENERATE_ACA_MANIFESTS;
-generateDockerfileTool.name = TOOL_NAME.GENERATE_DOCKERFILE;
 generateHelmChartsTool.name = TOOL_NAME.GENERATE_HELM_CHARTS;
 generateK8sManifestsTool.name = TOOL_NAME.GENERATE_K8S_MANIFESTS;
-generateKustomizeTool.name = TOOL_NAME.GENERATE_KUSTOMIZE;
 opsTool.name = TOOL_NAME.OPS;
 generateDockerfilePlanTool.name = TOOL_NAME.GENERATE_DOCKERFILE_PLAN;
 generateManifestPlanTool.name = TOOL_NAME.GENERATE_MANIFEST_PLAN;
@@ -73,11 +67,8 @@ export type Tool = (
   | typeof convertAcaToK8sTool
   | typeof deployTool
   | typeof fixDockerfileTool
-  | typeof generateAcaManifestsTool
-  | typeof generateDockerfileTool
   | typeof generateHelmChartsTool
   | typeof generateK8sManifestsTool
-  | typeof generateKustomizeTool
   | typeof opsTool
   | typeof generateDockerfilePlanTool
   | typeof generateManifestPlanTool
@@ -121,11 +112,8 @@ export {
   convertAcaToK8sTool,
   deployTool,
   fixDockerfileTool,
-  generateAcaManifestsTool,
-  generateDockerfileTool,
   generateHelmChartsTool,
   generateK8sManifestsTool,
-  generateKustomizeTool,
   opsTool,
   generateDockerfilePlanTool,
   generateManifestPlanTool,
