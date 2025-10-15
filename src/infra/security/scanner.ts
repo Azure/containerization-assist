@@ -131,9 +131,9 @@ function getSeverityFilter(minSeverity: string): string {
 function createTimeoutPromise(
   timeout: number,
 ): Promise<Result<{ stdout: string; stderr: string; exitCode: number }>> {
-  return new Promise((_, reject) => {
+  return new Promise((resolve) => {
     const timer = setTimeout(() => {
-      reject(new Error(`Operation timed out after ${timeout}ms`));
+      resolve(Failure(`Operation timed out after ${timeout}ms`));
     }, timeout);
     // Prevent this timer from keeping the Node.js process alive
     timer.unref();

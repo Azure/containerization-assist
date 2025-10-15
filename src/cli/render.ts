@@ -56,9 +56,9 @@ function outputTable(tools: Tool[], detailed: boolean = false): void {
 
     if (detailed && tool.metadata.enhancementCapabilities.length > 0) {
       const caps = tool.metadata.enhancementCapabilities.join(', ');
-      const wrappedCaps = wrapText(caps, nameWidth + categoryWidth + 4);
+      const wrappedCaps = wrapText(caps, nameWidth + categoryWidth + 9);
       for (const line of wrappedCaps) {
-        console.info(`│ ${line.padEnd(nameWidth + categoryWidth + 4)} │`);
+        console.info(`│ ${line.padEnd(nameWidth + categoryWidth + 9)} │`);
       }
     }
   }
