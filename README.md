@@ -239,24 +239,24 @@ The logging directory is validated at startup to ensure it's writable.
 
 The policy system enables enforcement of security, quality, and compliance rules across your containerization workflow.
 
-**Quick Start:**
+**Default Behavior (No Configuration Needed):**
+By default, **all policies** in the `policies/` directory are automatically discovered and merged:
+- `policies/base-images.yaml` - Base image governance (Microsoft Azure Linux recommendation, no :latest tag, deprecated versions, size optimization)
+- `policies/container-best-practices.yaml` - Docker best practices (HEALTHCHECK, multi-stage builds, layer optimization)
+- `policies/security-baseline.yaml` - Essential security rules (root user prevention, registry restrictions, vulnerability scanning)
+
+This provides comprehensive coverage out-of-the-box.
+
+**Use a Specific Policy Only:**
 ```bash
-# Apply a policy
+# Use only the security baseline (disables auto-merging)
 export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/security-baseline.yaml
 
 # Or specify in VS Code MCP configuration
 "env": {
   "CONTAINERIZATION_ASSIST_POLICY_PATH": "./policies/security-baseline.yaml"
 }
-
-# Apply multiple policies (colon-separated)
-export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/security-baseline.yaml:./policies/base-images.yaml
 ```
-
-**Available Policies:**
-- `policies/security-baseline.yaml` - Essential security rules (root user prevention, registry restrictions, vulnerability scanning)
-- `policies/base-images.yaml` - Base image governance (Microsoft Azure Linux recommendation, no :latest tag, deprecated versions, size optimization)
-- `policies/container-best-practices.yaml` - Docker best practices (HEALTHCHECK, multi-stage builds, layer optimization)
 
 **Environment-Specific Configuration:**
 ```bash

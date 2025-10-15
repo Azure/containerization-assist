@@ -60,17 +60,13 @@ function mergePolicies(policies: Policy[]): Policy {
     throw new Error('Cannot merge empty policy list');
   }
 
-  if (policies.length === 1) {
-    const singlePolicy = policies[0];
-    if (!singlePolicy) {
-      throw new Error('Cannot merge empty policy list');
-    }
-    return singlePolicy;
-  }
-
   const firstPolicy = policies[0];
   if (!firstPolicy) {
     throw new Error('Cannot merge empty policy list');
+  }
+
+  if (policies.length === 1) {
+    return firstPolicy;
   }
 
   // Start with the first policy as base
