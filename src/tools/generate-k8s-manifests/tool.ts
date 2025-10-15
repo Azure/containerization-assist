@@ -204,7 +204,6 @@ export default tool({
   schema: generateK8sManifestsSchema,
   metadata: {
     knowledgeEnhanced: true,
-    samplingStrategy: 'none',
     enhancementCapabilities: ['recommendations'],
   },
   handler: handleGenerateK8sManifests,

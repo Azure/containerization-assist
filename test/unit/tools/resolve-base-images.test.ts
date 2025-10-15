@@ -175,10 +175,6 @@ describe('resolveBaseImagesTool', () => {
       expect(mockContext.sampling.createMessage).not.toHaveBeenCalled();
     });
 
-    it('should use samplingStrategy: none', () => {
-      expect(resolveBaseImagesTool.metadata?.samplingStrategy).toBe('none');
-    });
-
     it('should be knowledge-enhanced', () => {
       expect(resolveBaseImagesTool.metadata?.knowledgeEnhanced).toBe(true);
     });

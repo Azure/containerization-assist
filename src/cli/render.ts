@@ -40,41 +40,30 @@ function outputTable(tools: Tool[], detailed: boolean = false): void {
   // Calculate column widths
   const nameWidth = Math.max(4, Math.max(...tools.map((t) => t.name.length)));
   const categoryWidth = Math.max(8, Math.max(...tools.map((t) => (t.category || '').length)));
-  const samplingWidth = 8; // Fixed width for sampling strategy
 
   // Header
-  console.info(
-    `┌─${'─'.repeat(nameWidth)}─┬─${'─'.repeat(categoryWidth)}─┬─AI─┬─KE─┬─${'─'.repeat(samplingWidth)}─┐`,
-  );
-  console.info(
-    `│ ${'Name'.padEnd(nameWidth)} │ ${'Category'.padEnd(categoryWidth)} │ AI │ KE │ ${'Sampling'.padEnd(samplingWidth)} │`,
-  );
-  console.info(
-    `├─${'─'.repeat(nameWidth)}─┼─${'─'.repeat(categoryWidth)}─┼────┼────┼─${'─'.repeat(samplingWidth)}─┤`,
-  );
+  console.info(`┌─${'─'.repeat(nameWidth)}─┬─${'─'.repeat(categoryWidth)}─┬─KE─┐`);
+  console.info(`│ ${'Name'.padEnd(nameWidth)} │ ${'Category'.padEnd(categoryWidth)} │ KE │`);
+  console.info(`├─${'─'.repeat(nameWidth)}─┼─${'─'.repeat(categoryWidth)}─┼────┤`);
 
   // Rows
   for (const tool of tools) {
     const name = tool.name.padEnd(nameWidth);
     const category = (tool.category || '').padEnd(categoryWidth);
-    const ai = tool.metadata.samplingStrategy === 'single' ? ' ✅ ' : ' ❌ ';
     const ke = tool.metadata.knowledgeEnhanced ? ' ✅ ' : ' ❌ ';
-    const sampling = tool.metadata.samplingStrategy.padEnd(samplingWidth);
 
-    console.info(`│ ${name} │ ${category} │${ai}│${ke}│ ${sampling} │`);
+    console.info(`│ ${name} │ ${category} │${ke}│`);
 
     if (detailed && tool.metadata.enhancementCapabilities.length > 0) {
       const caps = tool.metadata.enhancementCapabilities.join(', ');
-      const wrappedCaps = wrapText(caps, nameWidth + categoryWidth + samplingWidth + 10);
+      const wrappedCaps = wrapText(caps, nameWidth + categoryWidth + 4);
       for (const line of wrappedCaps) {
-        console.info(`│ ${line.padEnd(nameWidth + categoryWidth + samplingWidth + 10)} │`);
+        console.info(`│ ${line.padEnd(nameWidth + categoryWidth + 4)} │`);
       }
     }
   }
 
-  console.info(
-    `└─${'─'.repeat(nameWidth)}─┴─${'─'.repeat(categoryWidth)}─┴────┴────┴─${'─'.repeat(samplingWidth)}─┘`,
-  );
+  console.info(`└─${'─'.repeat(nameWidth)}─┴─${'─'.repeat(categoryWidth)}─┴────┘`);
   console.info(`\nTotal: ${tools.length} tools`);
 }
 
@@ -82,11 +71,11 @@ function outputTable(tools: Tool[], detailed: boolean = false): void {
  * Output tools in CSV format
  */
 function outputCSV(tools: Tool[]): void {
-  console.info('Name,Category,Sampling Strategy,Knowledge-Enhanced,Enhancement Capabilities');
+  console.info('Name,Category,Knowledge-Enhanced,Enhancement Capabilities');
   for (const tool of tools) {
     const caps = tool.metadata.enhancementCapabilities.join(';');
     console.info(
-      `${tool.name},${tool.category || ''},${tool.metadata.samplingStrategy},${tool.metadata.knowledgeEnhanced},"${caps}"`,
+      `${tool.name},${tool.category || ''},${tool.metadata.knowledgeEnhanced},"${caps}"`,
     );
   }
 }

@@ -126,11 +126,11 @@ async function handlePushImage(
 export default tool({
   name: 'push-image',
   description: 'Push a Docker image to a registry',
+  category: 'docker',
   version: '2.0.0',
   schema: pushImageSchema,
   metadata: {
     knowledgeEnhanced: false,
-    samplingStrategy: 'none',
     enhancementCapabilities: [],
   },
   handler: handlePushImage,

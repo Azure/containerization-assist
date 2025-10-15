@@ -59,12 +59,6 @@ export const EnhancementCapabilitySchema = z.enum([
 export type EnhancementCapability = z.infer<typeof EnhancementCapabilitySchema>;
 
 /**
- * Sampling strategy enum
- */
-export const SamplingStrategySchema = z.enum(['none', 'single']);
-export type SamplingStrategy = z.infer<typeof SamplingStrategySchema>;
-
-/**
  * Mandatory Tool Metadata Schema
  *
  * All tools must provide complete metadata for proper AI enhancement
@@ -73,9 +67,6 @@ export type SamplingStrategy = z.infer<typeof SamplingStrategySchema>;
 export const ToolMetadataSchema = z.object({
   /** Whether this tool uses knowledge enhancement (required) */
   knowledgeEnhanced: z.boolean(),
-
-  /** Sampling strategy used for AI generation (required) - 'single' for AI-driven tools, 'none' for non-AI tools */
-  samplingStrategy: SamplingStrategySchema,
 
   /** List of enhancement capabilities this tool provides (required) */
   enhancementCapabilities: z.array(EnhancementCapabilitySchema).default([]),
@@ -116,7 +107,6 @@ export function validateToolMetadata(metadata: unknown): Result<ToolMetadata> {
 export function createDefaultMetadata(): ToolMetadata {
   return {
     knowledgeEnhanced: false,
-    samplingStrategy: 'none',
     enhancementCapabilities: [],
   };
 }
@@ -127,7 +117,6 @@ export function createDefaultMetadata(): ToolMetadata {
 export function createAIMetadata(overrides: Partial<ToolMetadata> = {}): ToolMetadata {
   return {
     knowledgeEnhanced: overrides.knowledgeEnhanced ?? true,
-    samplingStrategy: overrides.samplingStrategy ?? 'single',
     enhancementCapabilities: overrides.enhancementCapabilities ?? ['generation', 'analysis'],
     confidenceThreshold: overrides.confidenceThreshold,
     maxRetries: overrides.maxRetries ?? 3,
@@ -155,15 +144,6 @@ export function validateMetadataConsistency(
     issues.push('Knowledge-enhanced tools should specify enhancement capabilities');
   }
 
-  // High confidence threshold should use single sampling strategy
-  if (
-    metadata.confidenceThreshold &&
-    metadata.confidenceThreshold > 0.8 &&
-    metadata.samplingStrategy !== 'single'
-  ) {
-    issues.push('High confidence thresholds (>0.8) require "single" sampling strategy');
-  }
-
   if (issues.length > 0) {
     return Failure(`Tool "${toolName}" metadata inconsistency: ${issues.join('; ')}`);
   }
@@ -189,14 +169,6 @@ export function postValidate(tool: ValidatableTool): string[] {
   // Knowledge-enhanced tool missing capabilities
   if (tool.metadata.knowledgeEnhanced && tool.metadata.enhancementCapabilities.length === 0) {
     issues.push('Knowledge-enhanced tool missing capabilities');
-  }
-
-  // Tools with 'single' sampling should specify capabilities
-  if (
-    tool.metadata.samplingStrategy === 'single' &&
-    tool.metadata.enhancementCapabilities.length === 0
-  ) {
-    issues.push('AI-driven tool (samplingStrategy: single) should specify capabilities');
   }
 
   return issues;
@@ -232,11 +204,7 @@ export interface ValidationReport {
  * Suggestion mapping for common validation issues
  */
 const VALIDATION_SUGGESTIONS: Record<string, string> = {
-  'AI-driven tool should have sampling strategy': 'Set samplingStrategy to "single"',
   'Knowledge-enhanced tool missing capabilities': 'Add appropriate enhancementCapabilities array',
-  'Knowledge-enhanced should be AI-driven':
-    'Set samplingStrategy: "single" for knowledge-enhanced tools',
-  'AI-driven tool should specify capabilities': 'Add relevant enhancementCapabilities',
   'Invalid metadata schema': 'Fix metadata schema validation errors',
   'Metadata consistency issues': 'Review and fix metadata consistency',
 };

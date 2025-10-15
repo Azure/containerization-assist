@@ -96,11 +96,11 @@ async function handleTagImage(
 export default tool({
   name: 'tag-image',
   description: 'Tag Docker images with version and registry information',
+  category: 'docker',
   version: '2.0.0',
   schema: tagImageSchema,
   metadata: {
     knowledgeEnhanced: false,
-    samplingStrategy: 'none',
     enhancementCapabilities: [],
   },
   handler: handleTagImage,

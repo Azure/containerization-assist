@@ -20,21 +20,10 @@ import { createStandardProgress } from '@/mcp/progress-helper';
 import type { ToolContext } from '@/mcp/context';
 import { createDockerClient, type DockerBuildOptions } from '@/infra/docker/client';
 
-import { type Result, Success, Failure, TOPICS } from '@/types';
+import { type Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { fileExists } from '@/lib/file-utils';
 import { type BuildImageParams, buildImageSchema } from './schema';
-import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
-import { buildMessages } from '@/ai/prompt-engine';
-import { toMCPMessages, type MCPMessage } from '@/mcp/ai/message-converter';
-
-// Additional result interface for AI suggestions
-export interface BuildOptimizationSuggestions {
-  suggestions: string[];
-  optimizations: string[];
-  nextSteps: string[];
-  confidence: number;
-}
 
 export interface BuildImageResult {
   /** Whether the build completed successfully */
@@ -53,8 +42,6 @@ export interface BuildImageResult {
   logs: string[];
   /** Security-related warnings discovered during build */
   securityWarnings?: string[];
-  /** AI-powered optimization suggestions */
-  optimizationSuggestions?: BuildOptimizationSuggestions;
 }
 
 /**
@@ -70,181 +57,6 @@ async function prepareBuildArgs(
   };
 
   return { ...defaults, ...buildArgs };
-}
-
-/**
- * Score build optimization suggestions based on content quality and relevance
- */
-function scoreBuildOptimization(text: string): number {
-  let score = 0;
-
-  // Basic content quality (30 points)
-  if (text.length > 100) score += 10;
-  if (text.includes('\n')) score += 10;
-  if (!text.toLowerCase().includes('error')) score += 10;
-
-  // Optimization indicators (40 points)
-  if (/layer|cache|size|performance|speed/i.test(text)) score += 15;
-  if (/multi-stage|alpine|distroless/i.test(text)) score += 10;
-  if (/security|vulnerability|best.practice/i.test(text)) score += 15;
-
-  // Structure and actionability (30 points)
-  if (/\d+\.|-|\*/.test(text)) score += 10; // Has list structure
-  if (/optimize|improve|reduce|enhance/i.test(text)) score += 10;
-  if (text.split('\n').length >= 3) score += 10; // Multi-line content
-
-  return Math.min(score, 100);
-}
-
-/**
- * Build optimization prompt for AI enhancement
- */
-async function buildOptimizationPrompt(
-  buildContext: string,
-  dockerfileContent: string,
-  buildLogs: string[],
-  imageSize: number,
-  buildTime: number,
-): Promise<{ messages: MCPMessage[]; maxTokens: number }> {
-  const basePrompt = `You are a Docker optimization expert. Analyze build results and provide specific optimization suggestions.
-
-Focus on:
-1. Image size reduction techniques
-2. Build time optimization
-3. Layer caching strategies
-4. Security improvements
-5. Performance enhancements
-
-Provide concrete, actionable recommendations.
-
-Analyze this Docker build and provide optimization suggestions:
-
-**Build Context:** ${buildContext}
-
-**Dockerfile Content:**
-\`\`\`dockerfile
-${dockerfileContent}
-\`\`\`
-
-**Build Metrics:**
-- Image size: ${(imageSize / (1024 * 1024)).toFixed(2)} MB
-- Build time: ${(buildTime / 1000).toFixed(2)} seconds
-
-**Build Logs (last 10 lines):**
-${buildLogs.slice(-10).join('\n')}
-
-Please provide:
-1. **Size Optimization:** Specific techniques to reduce image size
-2. **Build Performance:** Ways to improve build speed and caching
-3. **Security Enhancements:** Security-focused improvements
-4. **Best Practices:** Docker best practices not currently followed
-
-Format your response as clear, actionable recommendations.`;
-
-  const messages = await buildMessages({
-    basePrompt,
-    topic: TOPICS.DOCKER_OPTIMIZATION,
-    tool: 'build-image',
-    environment: 'docker',
-  });
-
-  return { messages: toMCPMessages(messages).messages, maxTokens: 2048 };
-}
-
-/**
- * Generate AI-powered build optimization suggestions
- */
-async function generateOptimizationSuggestions(
-  buildContext: string,
-  dockerfileContent: string,
-  buildResult: { logs?: string[]; size?: number; imageId: string },
-  ctx: ToolContext,
-  buildStartTime: number,
-): Promise<Result<BuildOptimizationSuggestions>> {
-  try {
-    const optimizationResult = await sampleWithRerank(
-      ctx,
-      async () =>
-        buildOptimizationPrompt(
-          buildContext,
-          dockerfileContent,
-          buildResult.logs || [],
-          buildResult.size || 0,
-          Date.now() - buildStartTime || 0,
-        ),
-      scoreBuildOptimization,
-      {},
-    );
-
-    if (!optimizationResult.ok) {
-      return Failure(`Failed to generate optimization suggestions: ${optimizationResult.error}`);
-    }
-
-    const text = optimizationResult.value.text;
-
-    // Parse the AI response to extract structured suggestions
-    const suggestions: string[] = [];
-    const optimizations: string[] = [];
-    const nextSteps: string[] = [];
-
-    const lines = text
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
-
-    let currentSection = '';
-    for (const line of lines) {
-      if (line.includes('Size Optimization') || line.includes('size') || line.includes('Size')) {
-        currentSection = 'size';
-        continue;
-      }
-      if (
-        line.includes('Build Performance') ||
-        line.includes('performance') ||
-        line.includes('Performance')
-      ) {
-        currentSection = 'performance';
-        continue;
-      }
-      if (line.includes('Security') || line.includes('security')) {
-        currentSection = 'security';
-        continue;
-      }
-      if (line.includes('Best Practices') || line.includes('practices')) {
-        currentSection = 'practices';
-        continue;
-      }
-
-      if (line.startsWith('-') || line.startsWith('*') || line.match(/^\d+\./)) {
-        const cleanLine = line.replace(/^[-*\d.]\s*/, '');
-        if (cleanLine.length > 10) {
-          if (currentSection === 'size') {
-            optimizations.push(`Size: ${cleanLine}`);
-          } else if (currentSection === 'performance') {
-            optimizations.push(`Performance: ${cleanLine}`);
-          } else if (currentSection === 'security') {
-            suggestions.push(`Security: ${cleanLine}`);
-          } else {
-            suggestions.push(cleanLine);
-          }
-        }
-      }
-    }
-
-    // Add general next steps
-    nextSteps.push('Consider implementing multi-stage builds if not already used');
-    nextSteps.push('Review and optimize layer caching strategy');
-    nextSteps.push('Scan image for security vulnerabilities');
-
-    return Success({
-      suggestions,
-      optimizations,
-      nextSteps,
-      confidence: optimizationResult.value.score ?? 0,
-    });
-  } catch (error) {
-    return Failure(`Failed to generate optimization suggestions: ${extractErrorMessage(error)}`);
-  }
 }
 
 /**
@@ -390,40 +202,6 @@ async function handleBuildImage(
     // Progress: Finalizing build results and updating session
     if (progress) await progress('FINALIZING');
 
-    // Generate AI-powered optimization suggestions for successful builds
-    let optimizationSuggestions: BuildOptimizationSuggestions | undefined;
-    try {
-      // Generate optimization suggestions
-      const suggestionResult = await generateOptimizationSuggestions(
-        buildContext,
-        dockerfileContent,
-        buildResult.value,
-        context,
-        startTime,
-      );
-
-      if (suggestionResult.ok) {
-        optimizationSuggestions = suggestionResult.value;
-        logger.info(
-          {
-            suggestions: optimizationSuggestions.suggestions.length,
-            confidence: optimizationSuggestions.confidence,
-          },
-          'Generated AI optimization suggestions',
-        );
-      } else {
-        logger.warn(
-          { error: suggestionResult.error },
-          'Failed to generate optimization suggestions',
-        );
-      }
-    } catch (error) {
-      logger.warn(
-        { error: extractErrorMessage(error) },
-        'Error generating optimization suggestions',
-      );
-    }
-
     // Prepare the result
     const finalTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
     const result: BuildImageResult = {
@@ -437,7 +215,6 @@ async function handleBuildImage(
       buildTime,
       logs: buildResult.value.logs,
       ...(securityWarnings.length > 0 && { securityWarnings }),
-      ...(optimizationSuggestions && { optimizationSuggestions }),
     };
 
     timer.end({ imageId: buildResult.value.imageId, buildTime });
@@ -462,13 +239,13 @@ import { tool } from '@/types/tool';
 
 export default tool({
   name: 'build-image',
-  description: 'Build Docker images from Dockerfiles with AI-powered optimization suggestions',
+  description: 'Build Docker images from Dockerfiles with security analysis',
+  category: 'docker',
   version: '2.0.0',
   schema: buildImageSchema,
   metadata: {
-    knowledgeEnhanced: true,
-    samplingStrategy: 'single',
-    enhancementCapabilities: ['optimization-suggestions', 'build-analysis', 'performance-insights'],
+    knowledgeEnhanced: false,
+    enhancementCapabilities: ['security-analysis'],
   },
   handler: handleBuildImage,
 });

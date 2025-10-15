@@ -4,6 +4,7 @@ import type { z } from 'zod';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { tool } from '@/types/tool';
+import { getToolLogger } from '@/lib/tool-helpers';
 import { analyzeRepoSchema, type RepositoryAnalysis, type ModuleInfo } from './schema';
 import {
   parsePackageJson,
@@ -169,7 +170,8 @@ async function analyzeRepositoryDeterministically(
       }
     } catch (error) {
       // Log but continue - don't fail entire analysis for one bad config
-      ctx.logger.warn(
+      const logger = getToolLogger(ctx, 'analyze-repo');
+      logger.warn(
         { configPath, error: error instanceof Error ? error.message : String(error) },
         'Failed to parse config file',
       );
@@ -186,6 +188,7 @@ async function handleAnalyzeRepo(
   input: z.infer<typeof analyzeRepoSchema>,
   ctx: ToolContext,
 ): Promise<Result<RepositoryAnalysis>> {
+  const logger = getToolLogger(ctx, 'analyze-repo');
   let repoPath = input.repositoryPath;
 
   // Convert to absolute path if relative
@@ -209,7 +212,7 @@ async function handleAnalyzeRepo(
       const numberOfModules = input.modules.length;
       const isMonorepo = numberOfModules > 1;
 
-      ctx.logger.info({ moduleCount: numberOfModules }, 'Using pre-provided modules');
+      logger.info({ moduleCount: numberOfModules }, 'Using pre-provided modules');
 
       return Success({
         modules: input.modules,
@@ -219,7 +222,7 @@ async function handleAnalyzeRepo(
     }
 
     // No modules provided - perform deterministic analysis
-    ctx.logger.info({ repoPath }, 'Starting deterministic repository analysis');
+    logger.info({ repoPath }, 'Starting deterministic repository analysis');
 
     // Gather repository information
     const repoInfo = await gatherRepositoryInfo(repoPath);
@@ -238,7 +241,7 @@ async function handleAnalyzeRepo(
 
     const isMonorepo = modules.length > 1;
 
-    ctx.logger.info({ moduleCount: modules.length, isMonorepo }, 'Repository analysis complete');
+    logger.info({ moduleCount: modules.length, isMonorepo }, 'Repository analysis complete');
 
     return Success({
       modules,
@@ -247,7 +250,7 @@ async function handleAnalyzeRepo(
     });
   } catch (e) {
     const error = e as Error;
-    ctx.logger.error({ error: error.message }, 'Repository analysis failed');
+    logger.error({ error: error.message }, 'Repository analysis failed');
     return Failure(`Repository analysis failed: ${error.message}`, {
       message: `Repository analysis failed: ${error.message}`,
       hint: 'Failed to analyze repository',
@@ -259,11 +262,11 @@ async function handleAnalyzeRepo(
 export default tool({
   name: 'analyze-repo',
   description: 'Analyze repository structure and detect technologies by parsing config files',
+  category: 'analysis',
   version: '4.0.0',
   schema: analyzeRepoSchema,
   metadata: {
     knowledgeEnhanced: false,
-    samplingStrategy: 'none',
     enhancementCapabilities: ['analysis'],
   },
   handler: handleAnalyzeRepo,
