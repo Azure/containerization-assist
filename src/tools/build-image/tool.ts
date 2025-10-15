@@ -5,8 +5,7 @@
  * @example
  * ```typescript
  * const result = await buildImage({
- *   sessionId: 'session-123',
- *   context: '/path/to/app',
+ *   path: '/path/to/app',
  *   tags: ['myapp:latest', 'myapp:v1.0.0'],
  *   buildArgs: { NODE_ENV: 'production' }
  * }, context);

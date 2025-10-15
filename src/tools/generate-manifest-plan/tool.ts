@@ -151,7 +151,7 @@ Manifest Planning Summary:
   - Resource Management: ${resourceMatches.length}
   - Best Practices: ${bestPracticeMatches.length}
 
-Next Step: Use generate-${nextStepTool} with sessionId to create manifests using these recommendations.
+Next Step: Use generate-${nextStepTool} to create manifests using these recommendations.
       `.trim();
 
       return {

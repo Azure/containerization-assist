@@ -7,11 +7,10 @@
  * @example
  * ```typescript
  * const result = await verifyDeployment({
- *   sessionId: 'session-123',
  *   deploymentName: 'my-app',
  *   namespace: 'production',
  *   checks: ['pods', 'services', 'health']
- * }, context, logger);
+ * }, context);
  *
  * if (result.success) {
  *   logger.info('Deployment verified', {

@@ -7,10 +7,9 @@
  * @example
  * ```typescript
  * const result = await prepareCluster({
- *   sessionId: 'session-123',
  *   namespace: 'my-app',
  *   environment: 'production'
- * }, context, logger);
+ * }, context);
  *
  * if (result.success) {
  *   logger.info('Cluster ready', {

@@ -6,10 +6,10 @@
  * @example
  * ```typescript
  * const result = await deployApplication({
- *   sessionId: 'session-123',
  *   namespace: 'my-app',
- *   environment: 'production'
- * }, context, logger);
+ *   environment: 'production',
+ *   manifestsPath: '/path/to/manifests.yaml'
+ * }, context);
  * if (result.success) {
  *   logger.info('Application deployed', {
  *     deployment: result.deploymentName,
