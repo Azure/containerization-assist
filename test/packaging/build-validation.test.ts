@@ -77,16 +77,14 @@ describe('Build Validation', () => {
         'build-image', 
         'deploy',
         'fix-dockerfile',
-        'generate-dockerfile',
-        'generate-k8s-manifests',
+        'generate-helm-charts',
         'ops',
         'prepare-cluster',
         'push-image',
         'resolve-base-images',
         'scan',
         'tag-image',
-        'verify-deploy',
-        'workflow'
+        'verify-deployment'
       ];
 
       for (const tool of tools) {

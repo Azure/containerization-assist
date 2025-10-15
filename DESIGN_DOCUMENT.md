@@ -405,7 +405,7 @@ rules:
 
 Knowledge snippets enhance AI prompts with domain-specific guidance. Follow these steps:
 
-1. **Identify the target tool** (e.g., `generate-dockerfile`, `generate-k8s-manifests`)
+1. **Identify the target tool** (e.g., `generate-dockerfile-plan`, `generate-k8s-manifests-plan`)
 
 2. **Create or update pack file** in `knowledge/packs/`:
    ```bash
