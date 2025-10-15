@@ -7,7 +7,7 @@
  * Type-safe parameter defaulting with explicit schema.
  * Consolidates the pattern: params.field || defaultValue
  *
- * Note: The `Record<string, any>` constraint is intentionally broad to support
+ * Note: The `Record<string, unknown>` constraint provides type safety while supporting
  * flexible tool parameter objects with mixed types (strings, numbers, booleans,
  * nested objects, arrays, etc.). The actual type safety comes from the generic
  * parameter `T` which should be the concrete interface of your tool parameters.
@@ -32,7 +32,10 @@
  * }); // result: K8sParams with replicas: 3, other defaults applied
  * ```
  */
-export function withDefaults<T extends Record<string, any>>(params: Partial<T>, defaults: T): T {
+export function withDefaults<T extends Record<string, unknown>>(
+  params: Partial<T>,
+  defaults: T,
+): T {
   const result = { ...defaults };
 
   // Only override defaults with truthy values from params
@@ -113,11 +116,11 @@ export function getToolDefaults(
  * Type-safe parameter builder for tools
  * Ensures all required fields are present after defaulting
  *
- * Note: The `Record<string, any>` constraint is intentionally broad to support
+ * Note: The `Record<string, unknown>` constraint provides type safety while supporting
  * flexible tool parameter objects. Type safety is enforced through the generic
  * parameter `T`, which should be your concrete tool parameter interface.
  */
-export class ParameterBuilder<T extends Record<string, any>> {
+export class ParameterBuilder<T extends Record<string, unknown>> {
   private params: Partial<T>;
   private defaultValues: Partial<T>;
 
@@ -153,7 +156,7 @@ export class ParameterBuilder<T extends Record<string, any>> {
 /**
  * Create a parameter builder for fluent API usage
  *
- * Note: The `Record<string, any>` constraint is intentionally broad to support
+ * Note: The `Record<string, unknown>` constraint provides type safety while supporting
  * flexible tool parameter objects. Type safety is enforced through the generic
  * parameter `T`, which should be your concrete tool parameter interface.
  *
@@ -166,7 +169,7 @@ export class ParameterBuilder<T extends Record<string, any>> {
  *   .build();
  * ```
  */
-export function buildParams<T extends Record<string, any>>(
+export function buildParams<T extends Record<string, unknown>>(
   params: Partial<T>,
 ): ParameterBuilder<T> {
   return new ParameterBuilder<T>(params);

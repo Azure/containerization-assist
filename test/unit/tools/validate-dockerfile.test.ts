@@ -88,7 +88,7 @@ CMD ["npm", "start"]`;
 
         const context = createMockToolContext();
         const result = await tool.run(
-          { dockerfile: sampleDockerfile },
+          { dockerfile: sampleDockerfile, strictMode: true },
           context,
         );
 
@@ -106,7 +106,7 @@ CMD ["npm", "start"]`;
 
         const context = createMockToolContext();
         const result = await tool.run(
-          { dockerfile: sampleDockerfile },
+          { dockerfile: sampleDockerfile, strictMode: false },
           context,
         );
 
@@ -397,7 +397,7 @@ FROM node:latest`;
 
         const context = createMockToolContext();
         const result = await tool.run(
-          { dockerfile },
+          { dockerfile, strictMode: true },
           context,
         );
 
