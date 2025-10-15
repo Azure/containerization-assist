@@ -117,7 +117,6 @@ CMD ["node", "index.js"]`;
   beforeEach(() => {
     mockLogger = createMockLogger();
     config = {
-      sessionId: 'test-session-123',
       path: '/test/repo',
       dockerfile: 'Dockerfile',
       imageName: 'test-app:latest',
@@ -131,7 +130,6 @@ CMD ["node", "index.js"]`;
     mockSessionManager.get.mockResolvedValue({
       ok: true,
       value: {
-        sessionId: 'test-session-123',
         completed_steps: [],
         createdAt: new Date('2025-09-08T11:12:40.362Z'),
         updatedAt: new Date('2025-09-08T11:12:40.362Z'),
@@ -146,7 +144,6 @@ CMD ["node", "index.js"]`;
     mockSessionManager.update.mockResolvedValue({
       ok: true,
       value: {
-        sessionId: 'test-session-123',
         completed_steps: ['build-image'],
         createdAt: new Date('2025-09-08T11:12:40.362Z'),
         updatedAt: new Date(),

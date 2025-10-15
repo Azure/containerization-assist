@@ -32,16 +32,16 @@
                   │
 ┌─────────────────▼───────────────────────┐
 │         Application Layer               │
-│  ┌──────────┐ ┌──────────┐ ┌────────┐  │
-│  │  Tools   │ │Workflow  │ │Session │  │
-│  └──────────┘ └──────────┘ └────────┘  │
+│  ┌──────────┐ ┌──────────┐             │
+│  │  Tools   │ │Workflow  │             │
+│  └──────────┘ └──────────┘             │
 └─────────────────┬───────────────────────┘
                   │
 ┌─────────────────▼───────────────────────┐
 │         Infrastructure Layer            │
-│  ┌──────┐ ┌──────┐ ┌─────┐ ┌────────┐  │
-│  │Docker│ │ K8s  │ │ AI  │ │Session │  │
-│  └──────┘ └──────┘ └─────┘ └────────┘  │
+│  ┌──────┐ ┌──────┐ ┌─────┐             │
+│  │Docker│ │ K8s  │ │ AI  │             │
+│  └──────┘ └──────┘ └─────┘             │
 └─────────────────────────────────────────┘
 ```
 
@@ -107,7 +107,6 @@
 - Application startup and configuration
 - Tool execution coordination
 - Policy enforcement and validation
-- Session management integration
 
 ### 📁 `/cli` - Command Line Interface
 **Purpose**: CLI entry points and server management.
@@ -206,18 +205,6 @@
 - Context propagation for tool execution
 - Deterministic sampling coordination
 
-### 📁 `/session` - Session Management
-**Purpose**: Unified session state management for single-operator workflows.
-
-**Key Files**:
-- `core.ts`: Session state management and persistence
-
-**Responsibilities**:
-- Single active session lifecycle management
-- Persistent state across tool executions within a workflow
-- Session state cleared on server shutdown
-- Tool result storage and retrieval
-
 ### 📁 `/tools` - Tool Implementations
 **Purpose**: Individual MCP tool implementations using co-located pattern.
 
@@ -240,7 +227,6 @@
 - `generate-helm-charts`: Generate Helm charts
 - `generate-k8s-manifests`: Kubernetes manifest generation
 - `generate-kustomize`: Generate Kustomize configurations
-- `inspect-session`: Session debugging
 - `ops`: Operational utilities
 - `generate-dockerfile-plan`: Plan Dockerfile generation strategy
 - `generate-manifest-plan`: Plan manifest generation strategy
@@ -349,7 +335,6 @@ import { analyzeRepo } from '@/tools/analyze-repo/tool';
 // @/tools/*     → src/tools/*
 // @/lib/*       → src/lib/*
 // @/infra/*     → src/infra/*
-// @/session/*   → src/session/*
 // @/config/*    → src/config/*
 // @/resources/* → src/resources/*
 // @/exports/*   → src/exports/*
@@ -424,7 +409,6 @@ npm run quality:gates # Comprehensive quality analysis
 | `DOCKER_SOCKET` | Docker daemon socket path | `/var/run/docker.sock` |
 | `KUBECONFIG` | Kubernetes config path | `~/.kube/config` |
 | `LOG_LEVEL` | Logging level | `info` |
-| `SESSION_DIR` | Session storage directory | `~/.containerization-assist/sessions` |
 | `K8S_NAMESPACE` | Default Kubernetes namespace | `default` |
 
 ### Configuration Architecture
@@ -515,7 +499,6 @@ export const environment = {
 ### Runtime Performance
 - **Result<T> Pattern**: Eliminates exception overhead
 - **Dependency Injection**: Efficient container-based dependency management
-- **Session Management**: Persistent state reduces initialization overhead
 - **Infrastructure Clients**: Connection pooling for Docker and Kubernetes
 
 ### Architecture Benefits
@@ -603,7 +586,6 @@ if (policy) {
 - **Type-safe**: Discriminated unions for compile-time safety (RegexMatcher vs FunctionMatcher)
 - **Stateless**: Pure functions without global mutable caches
 - **Environment-aware**: Policy rules can override per-environment
-- **Session-compatible**: Policies apply across all tools in a session
 - **Modular**: Each of 5 modules has single responsibility
 
 **Verification**:

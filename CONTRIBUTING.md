@@ -84,7 +84,6 @@ containerization-assist/
 │   ├── tools/            # Tool implementations
 │   ├── mcp/              # MCP server implementation
 │   ├── ai/               # Prompt engine and AI integration
-│   ├── session/          # Session management
 │   ├── infra/            # Infrastructure clients (Docker, K8s)
 │   ├── lib/              # Shared utilities
 │   ├── config/           # Configuration and policy system
@@ -103,7 +102,6 @@ containerization-assist/
 - **Tools** (`src/tools/`) - Containerization tools with AI enhancement
 - **AI System** (`src/ai/`) - Prompt engine and knowledge enhancement
 - **Orchestrator** (`src/app/orchestrator.ts`) - Tool execution coordination
-- **Session Manager** (`src/session/`) - Single-session state management
 
 ## Making Changes
 
@@ -160,7 +158,7 @@ Use conventional commits format:
 Examples:
 ```
 feat: add scan tool with AI suggestions
-fix: resolve session persistence issue
+fix: resolve Docker connection handling
 docs: update MCP setup instructions
 test: add unit tests for prompt engine
 ```
@@ -351,11 +349,6 @@ We use Husky and lint-staged for pre-commit hooks:
    - Set `knowledgeEnhanced: true` for tools using knowledge packs
    - Use `ctx.ai.sampleWithRerank()` for AI generation
    - Add to `enhancementCapabilities` array
-
-4. **Session Management**
-   - Access prior results via `ctx.session.getResult('tool-name')`
-   - Session state automatically persisted by orchestrator
-   - Use session for workflow continuity
 
 ### Error Handling
 

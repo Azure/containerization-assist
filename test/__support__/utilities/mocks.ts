@@ -3,20 +3,6 @@
  */
 
 import { jest } from '@jest/globals';
-import { nanoid } from 'nanoid';
-
-export function createMockSession(overrides: any = {}) {
-  return {
-    id: nanoid(),
-    project_name: 'test-project',
-    status: 'active',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    workflow_state: {},
-    metadata: {},
-    ...overrides
-  };
-}
 
 export function createMockContext(overrides: any = {}) {
   return {
@@ -26,12 +12,6 @@ export function createMockContext(overrides: any = {}) {
       debug: jest.fn(),
       warn: jest.fn(),
       error: jest.fn()
-    },
-    sessionService: {
-      get: jest.fn(),
-      create: jest.fn(),
-      updateAtomic: jest.fn(),
-      delete: jest.fn()
     },
     progressEmitter: {
       emit: jest.fn()

@@ -229,7 +229,6 @@ spec:
       const result = await analyzeRepoTool.run(
         {
           repositoryPathAbsoluteUnix: '/test/repo',
-          sessionId: 'test-session-123',
           modules: [
             {
               name: 'test-module',
@@ -257,8 +256,8 @@ spec:
       const result = await analyzeRepoTool.run(
         {
           repositoryPathAbsoluteUnix: '/test/repo',
-          sessionId: 'test-session-123',
-        },
+          // modules intentionally omitted - should fail Zod validation
+        } as any,
         mockContext,
       );
 

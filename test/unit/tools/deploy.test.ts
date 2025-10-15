@@ -36,7 +36,6 @@ function createMockLogger() {
 // Mock lib modules following analyze-repo pattern
 const mockSessionManager = {
   create: jest.fn().mockResolvedValue({
-    sessionId: 'test-session-123',
     workflow_state: {},
     metadata: {},
     completed_steps: [],
@@ -219,7 +218,6 @@ spec:
     mockKubernetesClient.applyManifest.mockResolvedValue(createSuccessResult({}));
 
     mockSessionManager.get.mockResolvedValue({
-      sessionId: 'test-session-123',
       completed_steps: [],
       createdAt: '2025-09-08T11:12:40.362Z',
       updatedAt: '2025-09-08T11:12:40.362Z',

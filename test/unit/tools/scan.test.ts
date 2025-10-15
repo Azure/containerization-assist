@@ -80,7 +80,6 @@ describe('scanImage', () => {
 
   beforeEach(() => {
     config = {
-      sessionId: 'test-session-123',
       imageId: 'sha256:mock-image-id',
       scanner: 'trivy',
       severity: 'HIGH',
@@ -173,7 +172,6 @@ describe('scanImage', () => {
 
     it('should use default scanner and threshold when not specified', async () => {
       const minimalConfig: ScanImageParams = {
-        sessionId: 'test-session-123',
         imageId: 'sha256:mock-image-id',
       };
 
@@ -188,7 +186,6 @@ describe('scanImage', () => {
   describe('Error Handling', () => {
     it('should return error when no imageId provided', async () => {
       const configWithoutImage: ScanImageParams = {
-        sessionId: 'test-session-123',
         scanner: 'trivy',
       } as any; // Cast to bypass type checking for test
 

@@ -9,12 +9,51 @@ import {
   WorkflowStep,
 } from '../../../src/types';
 
+// Test-only Session type
+type Session = {
+  id: string;
+  repo_path: string;
+  metadata: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+  status?: string;
+  stage?: string;
+  labels?: Record<string, unknown>;
+  workflow_state?: WorkflowState;
+  version?: number;
+};
+// Mock ID generator for tests (replace nanoid to avoid ESM issues)
+const mockId = () => Math.random().toString(36).substring(7);
 import type { Logger } from '../../../src/lib/logger';
 import type { Result } from '../../../src/types';
 import type { AppConfig } from '../../../src/config/app-config';
 import { jest } from '@jest/globals';
 
+export function createMockSession(overrides?: Partial<Session>): Session {
+  const now = new Date().toISOString();
+  return {
+    id: mockId(),
+    created_at: now,
+    updated_at: now,
+    status: 'active',
+    repo_path: '/test/repo',
+    stage: 'analysis',
+    labels: {},
+    metadata: {},
+    workflow_state: createMockWorkflowState(),
+    version: 0,
+    ...overrides,
+  };
+}
 
+export function createMockWorkflowState(overrides?: Partial<WorkflowState>): WorkflowState {
+  return {
+    completed_steps: [],
+    errors: {},
+    metadata: {},
+    ...overrides,
+  };
+}
 
 export function createMockAnalysisResult(overrides?: Partial<AnalysisResult>): AnalysisResult {
   return {
@@ -252,37 +291,47 @@ CMD ["node", "dist/index"]`,
 export const VALID_TOOL_INPUTS = {
   analyze_repository: {
     repo_path: '/test/repo',
+    session_id: 'test-session-123',
     deep_scan: false,
   },
   generate_dockerfile: {
+    session_id: 'test-session-123',
     base_image: 'node:18-alpine',
     port: 3000,
   },
   build_image: {
+    session_id: 'test-session-123',
     dockerfile_path: './Dockerfile',
     image_name: 'test-app',
     tag: 'latest',
   },
   scan_image: {
+    session_id: 'test-session-123',
     scanner: 'trivy',
   },
   tag_image: {
+    session_id: 'test-session-123',
     tags: ['latest', 'v1.0.0'],
     registry: 'docker.io',
   },
   push_image: {
+    session_id: 'test-session-123',
   },
   generate_k8s_manifests: {
+    session_id: 'test-session-123',
     namespace: 'default',
     replicas: 2,
   },
   prepare_cluster: {
+    session_id: 'test-session-123',
     cluster_name: 'test-cluster',
     namespace: 'default',
   },
   deploy_application: {
+    session_id: 'test-session-123',
   },
   verify_deployment: {
+    session_id: 'test-session-123',
   },
 };
 
@@ -291,14 +340,86 @@ export const INVALID_TOOL_INPUTS = {
     deep_scan: 'not-a-boolean', // Wrong type
   },
   generate_dockerfile: {
+    session_id: 123, // Wrong type
     port: 'not-a-number', // Wrong type
   },
   build_image: {
+    session_id: 'test',
     dockerfile_path: null, // Wrong type
     image_name: '',
     tag: [],
   },
 };
+
+/**
+ * Create a session with completed workflow state for a specific step
+ */
+export function createSessionWithCompletedStep(
+  step: keyof typeof WorkflowStep,
+  overrides?: Partial<Session>,
+): Session {
+  const session = createMockSession(overrides);
+  const workflowState = { ...session.workflow_state };
+
+  // Add the step to completed steps
+  workflowState.completed_steps = [...(workflowState.completed_steps || []), WorkflowStep[step]];
+
+  // Add appropriate result data based on step
+  workflowState.results = workflowState.results || {};
+  switch (step) {
+    case 'ANALYZE':
+      workflowState.results['analyze-repo'] = createMockAnalysisResult();
+      break;
+    case 'GENERATE_DOCKERFILE':
+      workflowState.dockerfile_result = createMockDockerfileResult();
+      break;
+    case 'BUILD_IMAGE':
+      workflowState.build_result = createMockDockerBuildResult();
+      break;
+    case 'SCAN_IMAGE':
+      workflowState.scan_result = createMockScanResult();
+      break;
+    case 'GENERATE_K8S':
+      workflowState.k8s_result = createMockK8sManifestResult();
+      break;
+    case 'DEPLOY':
+      workflowState.deployment_result = createMockDeploymentResult();
+      break;
+  }
+
+  return {
+    ...session,
+    workflow_state: workflowState,
+  };
+}
+
+/**
+ * Create a session with the full workflow completed
+ */
+export function createCompletedWorkflowSession(overrides?: Partial<Session>): Session {
+  const session = createMockSession({
+    status: 'completed',
+    ...overrides,
+  });
+
+  return {
+    ...session,
+    workflow_state: {
+      completed_steps: Object.values(WorkflowStep),
+      results: {
+        'analyze-repo': createMockAnalysisResult(),
+        'generate-dockerfile': createMockDockerfileResult(),
+        'build-image': createMockDockerBuildResult(),
+        scan: createMockScanResult(),
+        'generate-k8s-manifests': createMockK8sManifestResult(),
+        deploy: createMockDeploymentResult(),
+      },
+      errors: {},
+      metadata: {},
+    },
+  };
+}
+
 /**
  * Mock Logger Implementation
  */
@@ -336,6 +457,12 @@ export function createMockConfig(overrides?: Partial<AppConfig>): AppConfig {
       storePath: ':memory:',
       enableMetrics: false,
       enableEvents: false,
+    },
+    session: {
+      store: 'memory',
+      persistencePath: ':memory:',
+      persistenceInterval: 60000,
+      cleanupInterval: 3600000,
     },
     services: {
       docker: {
@@ -403,6 +530,7 @@ export function createMockCoreServices(): {
   docker: any;
   kubernetes: any;
   ai: any;
+  session: any;
   logger: jest.Mocked<Logger>;
   progress?: any;
 } {
@@ -435,6 +563,14 @@ export function createMockCoreServices(): {
         .fn()
         .mockResolvedValue('FROM node:18-alpine\nWORKDIR /app\nCMD ["node", "index"]'),
       isAvailable: jest.fn().mockReturnValue(true),
+      initialize: jest.fn().mockResolvedValue(undefined),
+    },
+    session: {
+      get: jest.fn().mockResolvedValue(createMockSession()),
+      create: jest.fn().mockResolvedValue(createMockSession()),
+      updateAtomic: jest.fn().mockResolvedValue(undefined),
+      update: jest.fn().mockResolvedValue(undefined),
+      delete: jest.fn().mockResolvedValue(undefined),
       initialize: jest.fn().mockResolvedValue(undefined),
     },
     logger: mockLogger,
@@ -1311,6 +1447,7 @@ export function setupTestEnvironment() {
  * Test data generators
  */
 export const TestData = {
+  sessionId: () => `test-session-${Date.now()}`,
   workflowId: () => `test-workflow-${Date.now()}`,
   imageId: () => `sha256:${Math.random().toString(36).substring(2, 66)}`,
   imageName: (name = 'test-app') => `${name}:${Date.now()}`,

@@ -35,7 +35,6 @@ function createMockLogger() {
 // Mock lib modules following analyze-repo pattern
 const mockSessionManager = {
   create: jest.fn().mockResolvedValue({
-    sessionId: 'test-session-123',
     completed_steps: [],
     createdAt: '2025-09-08T11:12:40.362Z',
     updatedAt: '2025-09-08T11:12:40.362Z',
@@ -101,7 +100,6 @@ describe('tagImage', () => {
   beforeEach(() => {
     mockLogger = createMockLogger();
     config = {
-      sessionId: 'test-session-123',
       imageId: 'sha256:mock-image-id',
       tag: 'myapp:v1.0',
     };
@@ -117,7 +115,6 @@ describe('tagImage', () => {
     mockSessionManager.update.mockResolvedValue({
       ok: true,
       value: {
-        sessionId: 'test-session-123',
         completed_steps: ['tag-image'],
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -396,9 +393,6 @@ describe('tagImage', () => {
   describe('Multiple Tagging Scenarios', () => {
     it('should handle tagging with different configurations', async () => {
       const configurations = [
-        { sessionId: 'session-1', imageId: 'sha256:mock-image-id', tag: 'app:v1.0' },
-        { sessionId: 'session-2', imageId: 'sha256:mock-image-id', tag: 'registry.com/app:latest' },
-        { sessionId: 'session-3', imageId: 'sha256:mock-image-id', tag: 'my-app:development' },
       ];
 
       for (const testConfig of configurations) {

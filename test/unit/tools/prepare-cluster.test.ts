@@ -28,7 +28,6 @@ function createMockLogger() {
 // Mock lib modules
 const mockSessionManager = {
   create: jest.fn().mockResolvedValue(createSuccessResult({
-    sessionId: 'test-session-123',
     metadata: {},
     completed_steps: [],
     errors: {},
@@ -37,7 +36,6 @@ const mockSessionManager = {
     updatedAt: new Date('2025-09-08T11:12:40.362Z'),
   })),
   get: jest.fn().mockResolvedValue(createSuccessResult({
-    sessionId: 'test-session-123',
     metadata: {},
     completed_steps: [],
     errors: {},
@@ -140,7 +138,6 @@ describe('prepareCluster', () => {
 
   beforeEach(() => {
     config = {
-      sessionId: 'test-session-123',
       namespace: 'test-namespace',
       environment: 'production',
     };

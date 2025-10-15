@@ -87,26 +87,6 @@ export const mockScanner = () => ({
 });
 
 /**
- * Simple session mock - no complex state management
- */
-export const mockSession = () => ({
-  id: nanoid(),
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-  status: 'active' as const,
-  repo_path: '/test/repo',
-  stage: 'analysis' as const,
-  labels: {},
-  metadata: {},
-  workflow_state: {
-    completed_steps: [],
-    errors: {},
-    metadata: {},
-  },
-  version: 0,
-});
-
-/**
  * Simple workflow results - no factory complexity
  */
 export const mockAnalysisResult = () => ({

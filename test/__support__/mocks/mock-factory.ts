@@ -32,10 +32,8 @@ export interface MockScenario {
  * Mock Factory - Single source for all mocking needs
  */
 export class MockFactory {
-  private sessionId: string;
-
-  constructor(sessionId: string = randomId(8)) {
-    this.sessionId = sessionId;
+  constructor() {
+    // Factory is stateless - no session tracking needed
   }
 
   // ================================
@@ -354,7 +352,7 @@ export class MockFactory {
     });
 
     mock.execute.mockResolvedValue(Success({
-      workflowId: `wf-${this.sessionId}`,
+      workflowId: `wf-${randomId(8)}`,
       steps: stepResults,
       status: stepResults.every(s => s.status === 'completed') ? 'completed' : 'failed',
       duration: 120.5,
@@ -395,13 +393,6 @@ export class MockFactory {
    */
   resetAllMocks() {
     jest.clearAllMocks();
-  }
-
-  /**
-   * Get session ID for this factory instance
-   */
-  getSessionId() {
-    return this.sessionId;
   }
 
   /**

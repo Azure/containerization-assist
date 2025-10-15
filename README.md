@@ -120,12 +120,10 @@ Once configured in your MCP client (VS Code Copilot, Claude Desktop, etc.), use 
 
 This server is optimized for **one engineer containerizing one application at a time**. Key characteristics:
 
-- **Single session**: One active workflow at a time, state persists across tool executions
 - **Sequential execution**: Each tool builds on the results of previous steps
 - **Fast-fail validation**: Clear, actionable error messages if Docker/Kubernetes are unavailable
 - **Deterministic AI generation**: All AI-powered tools use single-candidate sampling with scoring for quality validation
 - **Real-time progress**: MCP notifications surface progress updates to clients during long-running operations
-- **Session helpers**: Orchestrator manages result storage and retrieval automatically
 
 ### Multi-Module/Monorepo Support
 
@@ -199,9 +197,6 @@ The following environment variables control server behavior:
 | `CONTAINERIZATION_ASSIST_IMAGE_DENYLIST` | Comma-separated list of denied base images | Empty | No |
 | `CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH` | Directory path for tool execution logs (JSON format) | Disabled | No |
 
-**Note on Runtime Configuration:**
-This server uses a **single-session model** optimized for one operator. Session state persists across tool executions within a single workflow and clears on server shutdown.
-
 **Progress Notifications:**
 Long-running operations (build, deploy, scan) emit real-time progress updates via MCP notifications. MCP clients can subscribe to these notifications to display progress to users.
 
@@ -225,7 +220,6 @@ export CONTAINERIZATION_ASSIST_TOOL_LOGS_PATH=/path/to/logs
 {
   "timestamp": "2025-10-13T14:30:15.123Z",
   "toolName": "analyze-repo",
-  "sessionId": "session_abc123",
   "input": { "path": "/workspace/myapp" },
   "output": { "language": "typescript", "framework": "express" },
   "success": true,
