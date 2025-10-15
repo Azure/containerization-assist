@@ -1,37 +1,88 @@
+/**
+ * Schema definition for fix-dockerfile tool
+ */
+
 import { z } from 'zod';
-import { environment, samplingOptions } from '../shared/schemas';
+import { environment } from '../shared/schemas';
+import type { ValidationResult } from '@/validation/core-types';
 
 export const fixDockerfileSchema = z
   .object({
-    dockerfile: z.string().optional().describe('Dockerfile content to validate and fix'),
-    path: z.string().optional().describe('Path to Dockerfile file to validate and fix'),
-    error: z.string().optional().describe('Build error message to address'),
-    issues: z.array(z.string()).optional().describe('Specific issues to fix'),
-    requirements: z.string().optional().describe('Additional requirements for optimization'),
-    targetEnvironment: environment.describe('Target environment'),
-
-    // New mode flags for enhanced validation and fixing
-    mode: z
-      .enum(['lint', 'autofix', 'format', 'full'])
-      .default('full')
-      .describe(
-        'Validation/fix mode: lint=validate only, autofix=apply fixes without AI, format=format only, full=complete pipeline',
-      ),
-    enableExternalLinter: z
-      .boolean()
-      .default(true)
-      .describe('Enable external dockerfilelint integration for enhanced rule coverage'),
-    returnDiff: z
-      .boolean()
-      .default(false)
-      .describe('Return unified diff between original and fixed content'),
-    outputFormat: z
-      .enum(['json', 'text', 'sarif'])
-      .default('json')
-      .describe('Output format for validation results'),
-
-    ...samplingOptions,
+    dockerfile: z.string().optional().describe('Dockerfile content to analyze for fixes'),
+    path: z.string().optional().describe('Path to Dockerfile file to analyze for fixes'),
+    environment: environment.describe('Target environment (production, development, etc.)'),
   })
   .refine((data) => data.dockerfile || data.path, {
     message: "Either 'dockerfile' content or 'path' must be provided",
   });
+
+export type FixDockerfileParams = z.infer<typeof fixDockerfileSchema>;
+
+// Legacy export for compatibility
+export const fixDockerfilePlanSchema = fixDockerfileSchema;
+export type FixDockerfilePlanParams = FixDockerfileParams;
+
+/**
+ * Validation issue with associated fix recommendations
+ */
+export interface ValidationIssue extends ValidationResult {
+  category?: 'security' | 'performance' | 'bestPractices';
+  priority?: 'high' | 'medium' | 'low';
+}
+
+/**
+ * Fix recommendation from knowledge base
+ */
+export interface FixRecommendation {
+  id: string;
+  issueId?: string; // Links to ValidationIssue ruleId
+  category: 'security' | 'performance' | 'bestPractices';
+  title: string;
+  description: string;
+  example?: string;
+  priority: 'high' | 'medium' | 'low';
+  effort?: 'low' | 'medium' | 'high';
+  impact?: string;
+  tags?: string[];
+  matchScore: number;
+}
+
+/**
+ * Structured plan for fixing Dockerfile issues
+ */
+export interface DockerfileFixPlan {
+  /** Current issues found in the Dockerfile */
+  currentIssues: {
+    security: ValidationIssue[];
+    performance: ValidationIssue[];
+    bestPractices: ValidationIssue[];
+  };
+
+  /** Fix recommendations from knowledge base */
+  fixes: {
+    security: FixRecommendation[];
+    performance: FixRecommendation[];
+    bestPractices: FixRecommendation[];
+  };
+
+  /** Overall validation score (0-100) */
+  validationScore: number;
+
+  /** Validation grade (A-F) */
+  validationGrade: 'A' | 'B' | 'C' | 'D' | 'F';
+
+  /** Overall priority based on issue severity */
+  priority: 'high' | 'medium' | 'low';
+
+  /** Estimated impact of applying fixes */
+  estimatedImpact: string;
+
+  /** All knowledge matches from knowledge base */
+  knowledgeMatches: FixRecommendation[];
+
+  /** Confidence in the fix recommendations (0-1) */
+  confidence: number;
+
+  /** Human-readable summary */
+  summary: string;
+}

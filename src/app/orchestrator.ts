@@ -252,31 +252,16 @@ const chainHintMap = new Map<ToolName, { success: string; failure: string }>([
   [
     TOOL_NAME.ANALYZE_REPO,
     {
-      success: `Repository analysis completed successfully. Continue by calling the ${TOOL_NAME.GENERATE_DOCKERFILE_PLAN} tool for each identified module.`,
+      success: `Repository analysis completed successfully. Continue by calling the ${TOOL_NAME.FIX_DOCKERFILE} or ${TOOL_NAME.RESOLVE_BASE_IMAGES} tools for recommendations.`,
       failure: 'Repository analysis failed. Please check the logs for details.',
-    },
-  ],
-  [
-    TOOL_NAME.GENERATE_DOCKERFILE_PLAN,
-    {
-      success: `Dockerfile plan generated successfully. Continue by calling the ${TOOL_NAME.VALIDATE_DOCKERFILE} tool to ensure best practices are followed.`,
-      failure: 'Dockerfile plan generation failed. Please check the logs for details.',
     },
   ],
   [
     TOOL_NAME.VALIDATE_DOCKERFILE,
     {
-      success: `Dockerfile validated successfully. Continue by building this Dockerfile. Continue trying to build and fix until it builds successfully. Then call the ${TOOL_NAME.GENERATE_MANIFEST_PLAN} tool to proceed with containerization.`,
+      success: `Dockerfile validated successfully. Continue by building this Dockerfile. Continue trying to build and fix until it builds successfully. Then call the ${TOOL_NAME.GENERATE_K8S_MANIFESTS} tool to proceed with containerization.`,
       failure:
         'Dockerfile validation failed. Please update the Dockerfile and retry this tool until it passes.',
-    },
-  ],
-  [
-    TOOL_NAME.GENERATE_MANIFEST_PLAN,
-    {
-      success:
-        'Manifest plan generated successfully. Continue by generating manifests leveraging plan output.',
-      failure: 'Manifest plan generation failed. Please check the logs for details.',
     },
   ],
   [
@@ -284,13 +269,6 @@ const chainHintMap = new Map<ToolName, { success: string; failure: string }>([
     {
       success: `Image built successfully. Next: Call ${TOOL_NAME.SCAN} to check for security vulnerabilities.`,
       failure: `Image build failed. Use ${TOOL_NAME.FIX_DOCKERFILE} to resolve issues, then retry ${TOOL_NAME.BUILD_IMAGE}.`,
-    },
-  ],
-  [
-    TOOL_NAME.GENERATE_DOCKERFILE,
-    {
-      success: `Dockerfile generated successfully. Next: Call ${TOOL_NAME.BUILD_IMAGE} to build the container image.`,
-      failure: 'Dockerfile generation failed. Check repository analysis and try again.',
     },
   ],
   [
@@ -318,29 +296,8 @@ const chainHintMap = new Map<ToolName, { success: string; failure: string }>([
   [
     TOOL_NAME.CONVERT_ACA_TO_K8S,
     {
-      success: `ACA manifests converted to Kubernetes successfully. Next: Call ${TOOL_NAME.DEPLOY} or ${TOOL_NAME.GENERATE_HELM_CHARTS} for templating.`,
+      success: `ACA manifests converted to Kubernetes successfully. Next: Call ${TOOL_NAME.DEPLOY} to deploy the manifests.`,
       failure: 'Conversion failed. Verify ACA manifest syntax and try again.',
-    },
-  ],
-  [
-    TOOL_NAME.GENERATE_ACA_MANIFESTS,
-    {
-      success: `ACA manifests generated successfully. Deploy to Azure Container Apps or convert to K8s with ${TOOL_NAME.CONVERT_ACA_TO_K8S}.`,
-      failure: 'ACA manifest generation failed. Check image and configuration parameters.',
-    },
-  ],
-  [
-    TOOL_NAME.GENERATE_HELM_CHARTS,
-    {
-      success: `Helm chart generated successfully. Next: Call ${TOOL_NAME.PREPARE_CLUSTER} to create a kind cluster to deploy to.`,
-      failure: 'Helm chart generation failed. Verify application parameters and try again.',
-    },
-  ],
-  [
-    TOOL_NAME.GENERATE_KUSTOMIZE,
-    {
-      success: `Kustomize manifests created successfully. Next: Call ${TOOL_NAME.PREPARE_CLUSTER} to create a kind cluster to deploy to.`,
-      failure: 'Kustomize generation failed. Check input manifests and environment configurations.',
     },
   ],
   [

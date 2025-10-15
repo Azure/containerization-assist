@@ -7,11 +7,14 @@ import { z } from 'zod';
 import { environmentSchema } from '@/config/environment';
 
 // Paths
-export const repositoryPathAbsoluteUnix = z
+export const repositoryPath = z
   .string()
   .describe(
-    'Absolute path to the repository (use forward slashes: /path/to/repo. ONLY unix path separators)',
+    'Absolute path to the repository. Paths are automatically normalized to forward slashes on all platforms (e.g., /path/to/repo or C:/path/to/repo)',
   );
+
+// Legacy export for backwards compatibility
+export const repositoryPathAbsoluteUnix = repositoryPath;
 
 // Kubernetes common fields
 export const namespace = z.string().default('default').describe('Kubernetes namespace');

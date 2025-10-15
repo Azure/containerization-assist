@@ -3,11 +3,9 @@ import buildImageTool from './build-image/tool';
 import convertAcaToK8sTool from './convert-aca-to-k8s/tool';
 import deployTool from './deploy/tool';
 import fixDockerfileTool from './fix-dockerfile/tool';
-import generateHelmChartsTool from './generate-helm-charts/tool';
+import generateDockerfileTool from './generate-dockerfile/tool';
 import generateK8sManifestsTool from './generate-k8s-manifests/tool';
 import opsTool from './ops/tool';
-import generateDockerfilePlanTool from './generate-dockerfile-plan/tool';
-import generateManifestPlanTool from './generate-manifest-plan/tool';
 import prepareClusterTool from './prepare-cluster/tool';
 import pushImageTool from './push-image/tool';
 import resolveBaseImagesTool from './resolve-base-images/tool';
@@ -22,14 +20,9 @@ export const TOOL_NAME = {
   CONVERT_ACA_TO_K8S: 'convert-aca-to-k8s',
   DEPLOY: 'deploy',
   FIX_DOCKERFILE: 'fix-dockerfile',
-  GENERATE_ACA_MANIFESTS: 'generate-aca-manifests',
   GENERATE_DOCKERFILE: 'generate-dockerfile',
-  GENERATE_HELM_CHARTS: 'generate-helm-charts',
   GENERATE_K8S_MANIFESTS: 'generate-k8s-manifests',
-  GENERATE_KUSTOMIZE: 'generate-kustomize',
   OPS: 'ops',
-  GENERATE_DOCKERFILE_PLAN: 'generate-dockerfile-plan',
-  GENERATE_MANIFEST_PLAN: 'generate-manifest-plan',
   PREPARE_CLUSTER: 'prepare-cluster',
   PUSH_IMAGE: 'push-image',
   RESOLVE_BASE_IMAGES: 'resolve-base-images',
@@ -47,11 +40,9 @@ buildImageTool.name = TOOL_NAME.BUILD_IMAGE;
 convertAcaToK8sTool.name = TOOL_NAME.CONVERT_ACA_TO_K8S;
 deployTool.name = TOOL_NAME.DEPLOY;
 fixDockerfileTool.name = TOOL_NAME.FIX_DOCKERFILE;
-generateHelmChartsTool.name = TOOL_NAME.GENERATE_HELM_CHARTS;
+generateDockerfileTool.name = TOOL_NAME.GENERATE_DOCKERFILE;
 generateK8sManifestsTool.name = TOOL_NAME.GENERATE_K8S_MANIFESTS;
 opsTool.name = TOOL_NAME.OPS;
-generateDockerfilePlanTool.name = TOOL_NAME.GENERATE_DOCKERFILE_PLAN;
-generateManifestPlanTool.name = TOOL_NAME.GENERATE_MANIFEST_PLAN;
 prepareClusterTool.name = TOOL_NAME.PREPARE_CLUSTER;
 pushImageTool.name = TOOL_NAME.PUSH_IMAGE;
 resolveBaseImagesTool.name = TOOL_NAME.RESOLVE_BASE_IMAGES;
@@ -67,11 +58,9 @@ export type Tool = (
   | typeof convertAcaToK8sTool
   | typeof deployTool
   | typeof fixDockerfileTool
-  | typeof generateHelmChartsTool
+  | typeof generateDockerfileTool
   | typeof generateK8sManifestsTool
   | typeof opsTool
-  | typeof generateDockerfilePlanTool
-  | typeof generateManifestPlanTool
   | typeof prepareClusterTool
   | typeof pushImageTool
   | typeof resolveBaseImagesTool
@@ -84,23 +73,18 @@ export type Tool = (
 // Type-safe tool array using the union type
 export const ALL_TOOLS: readonly Tool[] = [
   analyzeRepoTool,
-  generateDockerfilePlanTool,
-  generateManifestPlanTool,
+  fixDockerfileTool,
+  generateDockerfileTool,
+  generateK8sManifestsTool,
+  resolveBaseImagesTool,
   validateDockerfileTool,
   // ----- COMING SOON TOOLS ---
   // buildImageTool,
   // convertAcaToK8sTool,
   // deployTool,
-  // fixDockerfileTool,
-  // generateAcaManifestsTool,
-  // generateDockerfileTool,
-  // generateHelmChartsTool,
-  // generateK8sManifestsTool,
-  // generateKustomizeTool,
   // opsTool,
   // prepareClusterTool,
   // pushImageTool,
-  // resolveBaseImagesTool,
   // scanTool,
   // tagImageTool,
   // verifyDeployTool,
@@ -112,11 +96,9 @@ export {
   convertAcaToK8sTool,
   deployTool,
   fixDockerfileTool,
-  generateHelmChartsTool,
+  generateDockerfileTool,
   generateK8sManifestsTool,
   opsTool,
-  generateDockerfilePlanTool,
-  generateManifestPlanTool,
   prepareClusterTool,
   pushImageTool,
   resolveBaseImagesTool,

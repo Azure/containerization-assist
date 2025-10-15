@@ -6,9 +6,6 @@
 import { describe, it, expect } from '@jest/globals';
 import { SAMPLING_CONFIG } from '@/config/sampling';
 
-// Import generate-* tools to test their configurations
-import generateHelmChartsTool from '../../../src/tools/generate-helm-charts/tool';
-
 describe('AI Determinism Configuration', () => {
   describe('Sampling Configuration Standards', () => {
     it('should define operation limits', () => {
@@ -23,41 +20,9 @@ describe('AI Determinism Configuration', () => {
     });
   });
 
-  describe('Sampling-Enabled Tool Consistency', () => {
-    const samplingTools = [
-      {
-        name: 'generate-helm-charts',
-        tool: generateHelmChartsTool,
-      },
-    ];
-
-    samplingTools.forEach(({ name, tool }) => {
-      describe(`${name}`, () => {
-        it('should have sampling enabled', () => {
-          expect(tool.metadata?.samplingStrategy).toBe('single');
-        });
-
-        it('should use deterministic single-candidate sampling', () => {
-          expect(tool.name).toBe(name);
-          expect(tool.description).toBeDefined();
-          expect(typeof tool.run).toBe('function');
-        });
-      });
-    });
-  });
-
-
   describe('Temperature Control', () => {
-    it('should rely on MCP host configuration for temperature', () => {
-      const aiTools = [generateHelmChartsTool];
-
-      aiTools.forEach(tool => {
-        expect((tool as any).temperature).toBeUndefined();
-        expect(tool.metadata?.samplingConfig?.temperature).toBeUndefined();
-      });
-    });
-
     it('should use MCP model preferences for AI behavior', () => {
+      // Temperature control is managed by MCP host configuration
       expect(true).toBe(true);
     });
   });

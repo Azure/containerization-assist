@@ -36,7 +36,6 @@ export async function parsePackageJson(filePath: string): Promise<ParsedConfig> 
     const content = await fs.readFile(filePath, 'utf-8');
     const pkg = JSON.parse(content);
 
-    // Detect framework
     let framework: string | undefined;
     const deps = { ...pkg.dependencies, ...pkg.devDependencies };
 
@@ -48,7 +47,6 @@ export async function parsePackageJson(filePath: string): Promise<ParsedConfig> 
     else if (deps['vue']) framework = 'vue';
     else if (deps['@angular/core']) framework = 'angular';
 
-    // Extract ports from scripts or config
     const ports: number[] = [];
     if (pkg.scripts) {
       // Look for PORT= or --port patterns
@@ -65,7 +63,6 @@ export async function parsePackageJson(filePath: string): Promise<ParsedConfig> 
       }
     }
 
-    // Default ports by framework
     if (ports.length === 0) {
       if (framework === 'next' || framework === 'react') ports.push(3000);
       else if (framework === 'angular') ports.push(4200);
@@ -73,7 +70,6 @@ export async function parsePackageJson(filePath: string): Promise<ParsedConfig> 
       else ports.push(3000); // Default Node.js port
     }
 
-    // Detect entry point
     let entryPoint = pkg.main || 'index.js';
     if (pkg.scripts?.start) {
       const startScript = pkg.scripts.start;
@@ -82,13 +78,11 @@ export async function parsePackageJson(filePath: string): Promise<ParsedConfig> 
       if (match) entryPoint = match[1];
     }
 
-    // Build system
     const buildSystem = {
       type: 'npm',
       version: pkg.engines?.node,
     };
 
-    // Detect if TypeScript is used
     const isTypeScript = !!(
       deps['typescript'] ||
       deps['ts-node'] ||
@@ -118,12 +112,10 @@ export async function parsePomXml(filePath: string): Promise<ParsedConfig> {
     const content = await fs.readFile(filePath, 'utf-8');
     const pom = await parseStringPromise(content);
 
-    // Extract artifact info
     const project = pom.project;
     const artifactId = project.artifactId?.[0] || '';
     const version = project.version?.[0] || '';
 
-    // Detect framework from dependencies
     let framework: string | undefined;
     const dependencies = project.dependencies?.[0]?.dependency || [];
 
@@ -146,21 +138,18 @@ export async function parsePomXml(filePath: string): Promise<ParsedConfig> {
       }
     }
 
-    // Detect Java version
     const properties = project.properties?.[0] || {};
     const javaVersion =
       properties['java.version']?.[0] ||
       properties['maven.compiler.source']?.[0] ||
       properties['maven.compiler.target']?.[0];
 
-    // Default ports by framework
     const ports: number[] = [];
     if (framework === 'spring-boot') ports.push(8080);
     else if (framework === 'quarkus') ports.push(8080);
     else if (framework === 'micronaut') ports.push(8080);
     else ports.push(8080); // Default Java port
 
-    // Entry point
     const entryPoint = `${artifactId}-${version}.jar`;
 
     const result: ParsedConfig = {
@@ -195,13 +184,11 @@ export async function parseGradle(filePath: string): Promise<ParsedConfig> {
   try {
     const content = await fs.readFile(filePath, 'utf-8');
 
-    // Detect framework from plugins
     let framework: string | undefined;
     if (content.includes('org.springframework.boot')) framework = 'spring-boot';
     else if (content.includes('io.quarkus')) framework = 'quarkus';
     else if (content.includes('io.micronaut')) framework = 'micronaut';
 
-    // Extract Java version
     let javaVersion: string | undefined;
     const javaVersionMatch = content.match(/sourceCompatibility\s*=\s*['"]?(\d+)['"]?/);
     if (javaVersionMatch) javaVersion = javaVersionMatch[1];
@@ -253,7 +240,6 @@ export async function parsePythonConfig(filePath: string): Promise<ParsedConfig>
       dependencies = project.dependencies || [];
       pythonVersion = project.requires_python;
 
-      // Detect framework
       const depStr = dependencies.join(' ').toLowerCase();
       if (depStr.includes('django')) framework = 'django';
       else if (depStr.includes('flask')) framework = 'flask';
@@ -267,14 +253,12 @@ export async function parsePythonConfig(filePath: string): Promise<ParsedConfig>
         .filter((line) => line && !line.startsWith('#'))
         .slice(0, 20);
 
-      // Detect framework
       const depStr = dependencies.join(' ').toLowerCase();
       if (depStr.includes('django')) framework = 'django';
       else if (depStr.includes('flask')) framework = 'flask';
       else if (depStr.includes('fastapi')) framework = 'fastapi';
     }
 
-    // Default ports by framework
     const ports: number[] = [];
     if (framework === 'django') ports.push(8000);
     else if (framework === 'flask') ports.push(5000);
@@ -311,17 +295,13 @@ export async function parseCargoToml(filePath: string): Promise<ParsedConfig> {
     const package_ = parsed.package || {};
     const dependencies = Object.keys(parsed.dependencies || {});
 
-    // Detect framework
     let framework: string | undefined;
     if (dependencies.includes('actix-web')) framework = 'actix-web';
     else if (dependencies.includes('rocket')) framework = 'rocket';
     else if (dependencies.includes('warp')) framework = 'warp';
     else if (dependencies.includes('axum')) framework = 'axum';
 
-    // Rust version
     const rustVersion = package_['rust-version'] || package_.edition;
-
-    // Default ports
     const ports = framework ? [8080] : [];
 
     const result: ParsedConfig = {
@@ -352,10 +332,7 @@ export async function parseCsProj(filePath: string): Promise<ParsedConfig> {
     const propertyGroup = project.PropertyGroup?.[0] || {};
     const itemGroups = project.ItemGroup || [];
 
-    // Extract target framework
     const targetFramework = propertyGroup.TargetFramework?.[0];
-
-    // Detect dependencies
     const dependencies: string[] = [];
     for (const itemGroup of itemGroups) {
       const packageRefs = itemGroup.PackageReference || [];
@@ -365,13 +342,11 @@ export async function parseCsProj(filePath: string): Promise<ParsedConfig> {
       }
     }
 
-    // Detect framework
     let framework: string | undefined;
     const depStr = dependencies.join(' ');
     if (depStr.includes('Microsoft.AspNetCore')) framework = 'aspnet-core';
     else if (depStr.includes('Microsoft.EntityFrameworkCore')) framework = 'entity-framework';
 
-    // Default port
     const ports = framework === 'aspnet-core' ? [5000, 5001] : [5000];
 
     const result: ParsedConfig = {
@@ -397,11 +372,9 @@ export async function parseGoMod(filePath: string): Promise<ParsedConfig> {
   try {
     const content = await fs.readFile(filePath, 'utf-8');
 
-    // Extract Go version
     const goVersionMatch = content.match(/^go\s+(\d+\.\d+)/m);
     const goVersion = goVersionMatch?.[1];
 
-    // Extract dependencies
     const dependencies: string[] = [];
     const requireMatches = content.match(/require\s+\(([^)]+)\)/s);
     if (requireMatches?.[1]) {
@@ -414,7 +387,6 @@ export async function parseGoMod(filePath: string): Promise<ParsedConfig> {
       }
     }
 
-    // Detect framework
     let framework: string | undefined;
     const depStr = dependencies.join(' ');
     if (depStr.includes('gin-gonic/gin')) framework = 'gin';

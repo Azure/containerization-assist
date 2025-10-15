@@ -1,40 +1,33 @@
 /**
- * Generate Dockerfile Plan Tool
+ * Generate Dockerfile Tool
  *
  * Analyzes repository and queries knowledgebase to gather insights and return
  * structured requirements for creating a Dockerfile. This tool helps users
  * understand best practices and recommendations before actual Dockerfile generation.
  *
  * Uses the knowledge-tool-pattern for consistent, deterministic behavior.
- *
- * @category docker
- * @version 1.0.0
- * @knowledgeEnhanced true
- * @samplingStrategy none
  */
 
 import { Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { MCPTool } from '@/types/tool';
 import {
-  generateDockerfilePlanSchema,
+  generateDockerfileSchema,
   type DockerfilePlan,
   type DockerfileRequirement,
-  type GenerateDockerfilePlanParams,
+  type GenerateDockerfileParams,
 } from './schema';
 import { CATEGORY } from '@/knowledge/types';
 import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
 import type { z } from 'zod';
 
-const name = 'generate-dockerfile-plan';
+const name = 'generate-dockerfile';
 const description =
   'Gather insights from knowledgebase and return requirements for Dockerfile creation';
-const version = '1.0.0';
+const version = '2.0.0';
 
-// Define category types for better type safety
 type DockerfileCategory = 'security' | 'optimization' | 'bestPractices';
 
-// Define rule results interface
 interface DockerfileBuildRules {
   buildStrategy: {
     multistage: boolean;
@@ -42,9 +35,8 @@ interface DockerfileBuildRules {
   };
 }
 
-// Create the tool runner using the shared pattern
 const runPattern = createKnowledgeTool<
-  GenerateDockerfilePlanParams,
+  GenerateDockerfileParams,
   DockerfilePlan,
   DockerfileCategory,
   DockerfileBuildRules
@@ -99,12 +91,11 @@ const runPattern = createKnowledgeTool<
   },
   plan: {
     buildPlan: (input, knowledge, rules, confidence) => {
-      const path = input.repositoryPathAbsoluteUnix || '';
-      const modulePath = input.modulePathAbsoluteUnix || path;
+      const path = input.repositoryPath || '';
+      const modulePath = input.modulePath || path;
       const language = input.language || 'auto-detect';
       const framework = input.framework;
 
-      // Map knowledge snippets to DockerfileRequirements
       const knowledgeMatches: DockerfileRequirement[] = knowledge.all.map((snippet) => ({
         id: snippet.id,
         category: snippet.category || 'generic',
@@ -156,7 +147,7 @@ const runPattern = createKnowledgeTool<
 
       const summary = `
 Dockerfile Planning Summary:
-- Path: ${modulePath}${input.modulePathAbsoluteUnix ? ' (module)' : ''}
+- Path: ${modulePath}${input.modulePath ? ' (module)' : ''}
 - Language: ${language}${framework ? ` (${framework})` : ''}
 - Environment: ${input.environment || 'production'}
 - Build Strategy: ${rules.buildStrategy.multistage ? 'Multi-stage' : 'Single-stage'}
@@ -169,7 +160,7 @@ Dockerfile Planning Summary:
       return {
         repositoryInfo: {
           name: modulePath.split('/').pop() || 'unknown',
-          modulePathAbsoluteUnix: modulePath,
+          modulePath,
           ...(language &&
             language !== 'auto-detect' && {
               language: language === 'java' || language === 'dotnet' ? language : 'other',
@@ -193,12 +184,11 @@ Dockerfile Planning Summary:
   },
 });
 
-// Wrapper function to add validation
 async function run(
-  input: z.infer<typeof generateDockerfilePlanSchema>,
+  input: z.infer<typeof generateDockerfileSchema>,
   ctx: ToolContext,
 ): Promise<Result<DockerfilePlan>> {
-  const path = input.repositoryPathAbsoluteUnix || '';
+  const path = input.repositoryPath || '';
 
   if (!path) {
     return Failure('Path is required. Provide a path parameter.');
@@ -207,12 +197,12 @@ async function run(
   return runPattern(input, ctx);
 }
 
-const tool: MCPTool<typeof generateDockerfilePlanSchema, DockerfilePlan> = {
+const tool: MCPTool<typeof generateDockerfileSchema, DockerfilePlan> = {
   name,
   description,
   category: 'docker',
   version,
-  schema: generateDockerfilePlanSchema,
+  schema: generateDockerfileSchema,
   metadata: {
     knowledgeEnhanced: true,
     samplingStrategy: 'none',
