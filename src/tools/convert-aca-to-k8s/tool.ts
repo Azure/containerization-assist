@@ -8,7 +8,7 @@
  * Returns a plan for the MCP client AI to use when generating the actual K8s manifests.
  *
  * @category azure
- * @version 2.0.0
+ * @version 3.0.0
  * @knowledgeEnhanced true
  * @samplingStrategy none
  */
@@ -27,7 +27,7 @@ import yaml from 'js-yaml';
 const name = 'convert-aca-to-k8s';
 const description =
   'Analyze ACA manifest and return structured recommendations for Kubernetes conversion';
-const version = '2.0.0';
+const version = '3.0.0';
 
 // Define result types
 export interface AcaToK8sConversionPlan {
@@ -172,7 +172,17 @@ const runPattern = createKnowledgeTool<
             s.text.toLowerCase().includes('convert'),
         ),
       security: (s) => s.category === 'security' || Boolean(s.tags?.includes('security')),
-      bestPractices: () => true, // Catch remaining snippets as best practices
+      bestPractices: (s) =>
+        !(
+          Boolean(
+            s.tags?.includes('mapping') ||
+              s.tags?.includes('conversion') ||
+              s.text.toLowerCase().includes('map') ||
+              s.text.toLowerCase().includes('convert'),
+          ) ||
+          s.category === 'security' ||
+          Boolean(s.tags?.includes('security'))
+        ),
     }),
   },
   rules: {
