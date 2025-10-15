@@ -3,6 +3,8 @@
  * Tool execution with optional dependency resolution
  */
 
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { z, type ZodTypeAny } from 'zod';
 import { type Result, Success, Failure } from '@/types/index';
 import { createLogger } from '@/lib/logger';
@@ -26,6 +28,28 @@ import { checkSamplingAvailability, type SamplingCheckResult } from '@/mcp/sampl
 import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
 
 // ===== Types =====
+
+/**
+ * Get default policy paths
+ * Returns all .yaml files in the policies/ directory
+ */
+function getDefaultPolicyPaths(): string[] {
+  try {
+    const policiesDir = path.join(process.cwd(), 'policies');
+
+    if (!fs.existsSync(policiesDir)) {
+      return [];
+    }
+
+    const files = fs.readdirSync(policiesDir);
+    return files
+      .filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'))
+      .sort() // Sort alphabetically for consistency
+      .map((f) => path.join(policiesDir, f));
+  } catch {
+    return [];
+  }
+}
 
 function childLogger(logger: Logger, bindings: Record<string, unknown>): Logger {
   const candidate = (logger as unknown as { child?: (bindings: Record<string, unknown>) => Logger })
@@ -64,14 +88,19 @@ export function createOrchestrator<T extends MCPTool<ZodTypeAny, any>>(options: 
   const { registry, config = { chainHintsMode: 'enabled' } } = options;
   const logger = options.logger || createLogger({ name: 'orchestrator' });
 
-  // Load policy if configured
+  // Load policies - use defaults if not configured
   let policy: Policy | undefined;
-  if (config.policyPath) {
-    const policyResult = loadPolicy(config.policyPath, config.policyEnvironment);
+  const policyPaths = config.policyPath ? [config.policyPath] : getDefaultPolicyPaths();
+
+  if (policyPaths.length > 0 && policyPaths[0]) {
+    // For now, load the first policy found
+    // TODO: Support merging multiple policies
+    const policyResult = loadPolicy(policyPaths[0], config.policyEnvironment);
     if (policyResult.ok) {
       policy = policyResult.value;
+      logger.debug({ policyPath: policyPaths[0] }, 'Policy loaded successfully');
     } else {
-      logger.warn(`Failed to load policy: ${policyResult.error}`);
+      logger.warn(`Failed to load policy from ${policyPaths[0]}: ${policyResult.error}`);
     }
   }
 

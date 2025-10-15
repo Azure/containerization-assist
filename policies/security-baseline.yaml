@@ -75,7 +75,7 @@ rules:
     description: Detect secrets in environment variables
     conditions:
       - kind: regex
-        pattern: '(?i)(password|secret|api[_-]?key|token).*=.*\S+'
+        pattern: '(password|secret|api[_-]?key|token).*=.*\S+'
         flags: i
     actions:
       block: true
