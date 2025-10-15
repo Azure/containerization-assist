@@ -51,6 +51,67 @@ function getDefaultPolicyPaths(): string[] {
   }
 }
 
+/**
+ * Merge multiple policies into a single unified policy
+ * Later policies override earlier ones for rules with the same ID
+ */
+function mergePolicies(policies: Policy[]): Policy {
+  if (policies.length === 0) {
+    throw new Error('Cannot merge empty policy list');
+  }
+
+  if (policies.length === 1) {
+    const singlePolicy = policies[0];
+    if (!singlePolicy) {
+      throw new Error('Cannot merge empty policy list');
+    }
+    return singlePolicy;
+  }
+
+  const firstPolicy = policies[0];
+  if (!firstPolicy) {
+    throw new Error('Cannot merge empty policy list');
+  }
+
+  // Start with the first policy as base
+  const merged: Policy = {
+    version: '2.0',
+    metadata: {
+      ...firstPolicy.metadata,
+      name: 'Merged Policy',
+      description: `Combined policy from ${policies.length} sources`,
+    },
+    defaults: {},
+    rules: [],
+  };
+
+  // Add cache if first policy has it
+  if (firstPolicy.cache) {
+    merged.cache = firstPolicy.cache;
+  }
+
+  // Merge defaults (later policies override earlier ones)
+  for (const policy of policies) {
+    if (policy.defaults) {
+      merged.defaults = { ...merged.defaults, ...policy.defaults };
+    }
+  }
+
+  // Merge rules using a Map to handle duplicates
+  const rulesMap = new Map<string, (typeof merged.rules)[0]>();
+
+  for (const policy of policies) {
+    for (const rule of policy.rules) {
+      rulesMap.set(rule.id, rule);
+    }
+  }
+
+  // Convert back to array and sort by priority descending
+  merged.rules = Array.from(rulesMap.values()).sort((a, b) => b.priority - a.priority);
+
+  return merged;
+}
+
 function childLogger(logger: Logger, bindings: Record<string, unknown>): Logger {
   const candidate = (logger as unknown as { child?: (bindings: Record<string, unknown>) => Logger })
     .child;
@@ -88,19 +149,33 @@ export function createOrchestrator<T extends MCPTool<ZodTypeAny, any>>(options: 
   const { registry, config = { chainHintsMode: 'enabled' } } = options;
   const logger = options.logger || createLogger({ name: 'orchestrator' });
 
-  // Load policies - use defaults if not configured
+  // Load and merge policies - use defaults if not configured
   let policy: Policy | undefined;
   const policyPaths = config.policyPath ? [config.policyPath] : getDefaultPolicyPaths();
 
-  if (policyPaths.length > 0 && policyPaths[0]) {
-    // For now, load the first policy found
-    // TODO: Support merging multiple policies
-    const policyResult = loadPolicy(policyPaths[0], config.policyEnvironment);
-    if (policyResult.ok) {
-      policy = policyResult.value;
-      logger.debug({ policyPath: policyPaths[0] }, 'Policy loaded successfully');
-    } else {
-      logger.warn(`Failed to load policy from ${policyPaths[0]}: ${policyResult.error}`);
+  if (policyPaths.length > 0) {
+    // Load all policies
+    const loadedPolicies: Policy[] = [];
+    for (const policyPath of policyPaths) {
+      const policyResult = loadPolicy(policyPath, config.policyEnvironment);
+      if (policyResult.ok) {
+        loadedPolicies.push(policyResult.value);
+        logger.debug({ policyPath }, 'Policy loaded successfully');
+      } else {
+        logger.warn({ policyPath, error: policyResult.error }, 'Failed to load policy');
+      }
+    }
+
+    // Merge all loaded policies
+    if (loadedPolicies.length > 0) {
+      policy = mergePolicies(loadedPolicies);
+      logger.info(
+        {
+          policiesLoaded: loadedPolicies.length,
+          totalRules: policy.rules.length,
+        },
+        'Policies merged successfully',
+      );
     }
   }
 

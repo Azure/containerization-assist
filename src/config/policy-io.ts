@@ -117,6 +117,10 @@ export function loadPolicy(file: string, env?: string): Result<Policy> {
 
     const ttl = final.value.cache?.ttl ?? 300;
     putCached(file, env, final.value, ttl);
+    log.debug(
+      { file, env, rulesCount: final.value.rules.length },
+      'Policy loaded and cached successfully',
+    );
     return final;
   } catch (err) {
     return Failure(ERROR_MESSAGES.POLICY_LOAD_FAILED(extractErrorMessage(err)));

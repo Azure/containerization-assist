@@ -13,23 +13,25 @@ The policy system enables enforcement of security, quality, and compliance rules
 
 ## Quick Start
 
-**Policies are auto-loaded** from the `policies/` directory. All `.yaml` files are discovered automatically, and the first one alphabetically is loaded.
+**Policies are auto-loaded** from the `policies/` directory. All `.yaml` files are discovered and automatically merged into a unified policy.
 
 ```bash
-# Default: Auto-loads from policies/ directory (no configuration needed)
+# Default: Auto-loads and merges ALL policies from policies/ directory
 npm start
 
-# Override with specific policy path (optional)
+# Override with specific policy path (optional, disables auto-discovery)
 export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/security-baseline.yaml
 
 # Or specify when creating orchestrator
 npm start -- --policy ./policies/security-baseline.yaml
 ```
 
-**Current auto-load order** (alphabetically):
-1. `policies/base-images.yaml` (loaded first)
+**Auto-discovered policies** (merged alphabetically):
+1. `policies/base-images.yaml`
 2. `policies/container-best-practices.yaml`
 3. `policies/security-baseline.yaml`
+
+All rules from all policies are combined. If multiple policies have rules with the same ID, the later policy's rule overrides the earlier one.
 
 ## Available Policies
 
@@ -155,16 +157,20 @@ Rules are evaluated by priority (higher first):
 
 ## Multiple Policies
 
-**Note:** Currently, only one policy file is loaded at a time. When multiple `.yaml` files exist in `policies/`, the first one alphabetically is loaded.
+**All policies are automatically merged!** When multiple `.yaml` files exist in `policies/`, they are loaded in alphabetical order and merged into a unified policy.
 
-To use a specific policy, set the environment variable:
+**Merging behavior:**
+- All rules from all policies are combined
+- Rules with duplicate IDs: later policies override earlier ones
+- Defaults are merged: later policies override earlier defaults
+- Final rule list is sorted by priority (descending)
+
+To use only a specific policy (disabling auto-merge), set the environment variable:
 
 ```bash
-# Use security baseline instead of default (base-images.yaml)
+# Use only security baseline (disables auto-discovery and merging)
 export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/security-baseline.yaml
 ```
-
-**Future enhancement:** Support for merging multiple policies is planned. See orchestrator.ts for implementation details.
 
 ## Environment-Specific Policies
 
@@ -220,15 +226,17 @@ When you install `containerization-assist-mcp`, all production-ready policies ar
 Policies are enforced by the **tool orchestrator** (`src/app/orchestrator.ts`) which:
 
 1. **Auto-discovers** all `.yaml` files in `policies/` directory at startup
-2. **Loads** the first policy alphabetically (can be overridden via env var)
+2. **Loads and merges** all discovered policies into a unified policy (can be overridden via env var)
 3. **Validates** tool parameters using Zod schemas
-4. **Evaluates** policy rules against tool inputs before execution
+4. **Evaluates** merged policy rules against tool inputs before execution
 5. **Blocks or warns** based on rule actions (block/warn/suggest)
 6. **Returns** actionable error messages with guidance when policies block
 
-All 17 MCP tools are automatically protected by the policy system. No tool-specific configuration needed.
+All 17 MCP tools are automatically protected by the merged policy system. No tool-specific configuration needed.
 
-**Implementation details:** See `src/app/orchestrator.ts:176-189` for policy evaluation logic.
+**Implementation details:**
+- Policy merging: `src/app/orchestrator.ts:54-100` (mergePolicies function)
+- Policy evaluation: `src/app/orchestrator.ts:176-189` (executeWithOrchestration)
 
 ## Best Practices
 
@@ -242,26 +250,34 @@ All 17 MCP tools are automatically protected by the policy system. No tool-speci
 
 ## Common Use Cases
 
-### Default (Auto-loaded)
+### Default (All Policies Merged)
 ```bash
-# Uses policies/base-images.yaml (first alphabetically)
+# Automatically merges all 3 policies:
+# - base-images.yaml
+# - container-best-practices.yaml
+# - security-baseline.yaml
 npm start
 ```
 
-### Enforce Security Baseline
+This gives you comprehensive coverage: security rules + base image governance + Docker best practices.
+
+### Security-Only Mode
 ```bash
+# Use only security baseline (no base image or best practice rules)
 export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/security-baseline.yaml
 npm start
 ```
 
-### Container Best Practices
+### Base Images Only
 ```bash
-export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/container-best-practices.yaml
+# Use only base image governance
+export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/base-images.yaml
 npm start
 ```
 
 ### Development (Relaxed Enforcement)
 ```bash
+# Use best practices only with relaxed enforcement
 export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/container-best-practices.yaml
 export CONTAINERIZATION_ASSIST_POLICY_ENVIRONMENT=development
 npm start
