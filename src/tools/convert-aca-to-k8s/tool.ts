@@ -1,77 +1,294 @@
 /**
- * Convert ACA to K8s tool using the new Tool pattern
+ * Convert ACA to K8s Tool - Plan-Based Recommendations
+ *
+ * Analyzes Azure Container Apps manifest and returns structured recommendations
+ * for converting to Kubernetes, including field mappings and best practices.
+ *
+ * Uses the knowledge-tool-pattern for consistent, deterministic behavior.
+ * Returns a plan for the MCP client AI to use when generating the actual K8s manifests.
+ *
+ * @category azure
+ * @version 2.0.0
+ * @knowledgeEnhanced true
+ * @samplingStrategy none
  */
 
-import { Success, Failure, type Result, TOPICS } from '@/types';
+import { Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { MCPTool } from '@/types/tool';
-import { promptTemplates } from '@/ai/prompt-templates';
-import { buildMessages } from '@/ai/prompt-engine';
-import { toMCPMessages } from '@/mcp/ai/message-converter';
-import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
-import { scoreACAConversion } from '@/lib/scoring';
 import { convertAcaToK8sSchema } from './schema';
-
-import type { AIResponse } from '../ai-response-types';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
+import { extractErrorMessage } from '@/lib/error-utils';
+import { CATEGORY } from '@/knowledge/types';
+import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
 import type { z } from 'zod';
+import yaml from 'js-yaml';
 
 const name = 'convert-aca-to-k8s';
-const description = 'Convert Azure Container Apps manifests to Kubernetes';
-const version = '2.1.0';
+const description =
+  'Analyze ACA manifest and return structured recommendations for Kubernetes conversion';
+const version = '2.0.0';
 
-async function run(
-  input: z.infer<typeof convertAcaToK8sSchema>,
-  ctx: ToolContext,
-): Promise<Result<AIResponse>> {
-  const { acaManifest } = input;
+// Define result types
+export interface AcaToK8sConversionPlan {
+  acaAnalysis: {
+    containerApps: Array<{
+      name: string;
+      containers: number;
+      hasIngress: boolean;
+      hasScaling: boolean;
+      hasSecrets: boolean;
+    }>;
+    warnings: string[];
+  };
+  recommendations: {
+    fieldMappings: ConversionRecommendation[];
+    securityConsiderations: ConversionRecommendation[];
+    bestPractices: ConversionRecommendation[];
+  };
+  knowledgeMatches: Array<{
+    id: string;
+    category: string;
+    recommendation: string;
+    tags?: string[];
+    matchScore: number;
+  }>;
+  confidence: number;
+  summary: string;
+}
 
+export interface ConversionRecommendation {
+  id: string;
+  category: string;
+  recommendation: string;
+  tags?: string[];
+  matchScore: number;
+}
+
+/**
+ * Parse ACA manifest from YAML or JSON string
+ */
+function parseAcaManifest(manifestStr: string): Record<string, unknown> {
   try {
-    // Use the prompt template from @/ai/prompt-templates
-    const basePrompt = promptTemplates.convertAcaToK8s(acaManifest);
-
-    // Build messages using the prompt engine with knowledge injection
-    const messages = await buildMessages({
-      basePrompt,
-      topic: TOPICS.CONVERT_ACA_TO_K8S,
-      tool: name,
-      environment: 'production', // Default environment
-      contract: {
-        name: 'aca_to_k8s_v1',
-        description: 'Convert Azure Container Apps manifests to Kubernetes',
-      },
-      knowledgeBudget: 3000, // Character budget for knowledge snippets
-    });
-
-    // Execute via AI with structured messages
-    const mcpMessages = toMCPMessages(messages);
-    const response = await sampleWithRerank(
-      ctx,
-      async (attempt) => ({
-        ...mcpMessages,
-        maxTokens: 8192,
-        modelPreferences: {
-          hints: [{ name: 'kubernetes-conversion' }],
-          intelligencePriority: 0.85,
-          speedPriority: attempt > 0 ? 0.6 : 0.3,
-        },
-      }),
-      scoreACAConversion,
-      {},
-    );
-
-    if (!response.ok) {
-      return Failure(`AI sampling failed: ${response.error}`);
+    // Try YAML first (most common for manifests)
+    return yaml.load(manifestStr) as Record<string, unknown>;
+  } catch {
+    try {
+      // Fallback to JSON
+      return JSON.parse(manifestStr) as Record<string, unknown>;
+    } catch {
+      throw new Error('Invalid manifest format: must be valid YAML or JSON');
     }
-
-    const responseText = response.value.text;
-    return Success({ k8sManifests: responseText });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    return Failure(`Conversion failed: ${errorMessage}`);
   }
 }
 
-const tool: MCPTool<typeof convertAcaToK8sSchema, AIResponse> = {
+/**
+ * Analyze ACA manifest to extract key information
+ */
+function analyzeAcaManifest(acaManifest: Record<string, unknown>): {
+  containerApps: Array<{
+    name: string;
+    containers: number;
+    hasIngress: boolean;
+    hasScaling: boolean;
+    hasSecrets: boolean;
+  }>;
+  warnings: string[];
+} {
+  const warnings: string[] = [];
+  const containerApps: Array<{
+    name: string;
+    containers: number;
+    hasIngress: boolean;
+    hasScaling: boolean;
+    hasSecrets: boolean;
+  }> = [];
+
+  // Extract ACA properties
+  const properties = (acaManifest.properties || acaManifest) as Record<string, unknown>;
+  const configuration = (properties.configuration || {}) as Record<string, unknown>;
+  const template = (properties.template || {}) as Record<string, unknown>;
+  const containers = (template.containers || []) as Array<Record<string, unknown>>;
+  const scale = (template.scale || {}) as Record<string, unknown>;
+  const ingress = (configuration.ingress || {}) as Record<string, unknown>;
+  const secrets = (configuration.secrets || []) as Array<Record<string, unknown>>;
+
+  const appName = (acaManifest.name as string) || 'aca-app';
+
+  containerApps.push({
+    name: appName,
+    containers: containers.length,
+    hasIngress: Boolean(ingress.external || ingress.targetPort),
+    hasScaling: Boolean(scale.minReplicas || scale.maxReplicas),
+    hasSecrets: secrets.length > 0,
+  });
+
+  if (containers.length === 0) {
+    warnings.push('No containers found in ACA manifest');
+  }
+
+  if (!ingress.external && !ingress.targetPort) {
+    warnings.push('No ingress configuration found - Service may not be created');
+  }
+
+  return { containerApps, warnings };
+}
+
+// Define category types for better type safety
+type ConversionCategory = 'fieldMappings' | 'security' | 'bestPractices';
+
+// Define ACA to K8s conversion input interface
+interface AcaConversionInput {
+  acaManifest: string;
+  namespace?: string;
+  includeComments?: boolean;
+}
+
+// Create the tool runner using the shared pattern
+const runPattern = createKnowledgeTool<
+  AcaConversionInput,
+  AcaToK8sConversionPlan,
+  ConversionCategory,
+  Record<string, never> // No additional rules for conversion plan
+>({
+  name,
+  query: {
+    topic: TOPICS.CONVERT_ACA_TO_K8S,
+    category: CATEGORY.KUBERNETES,
+    maxChars: 3000,
+    maxSnippets: 15,
+    extractFilters: () => ({
+      environment: 'production',
+    }),
+  },
+  categorization: {
+    categoryNames: ['fieldMappings', 'security', 'bestPractices'] as const,
+    categorize: createSimpleCategorizer<ConversionCategory>({
+      fieldMappings: (s) =>
+        Boolean(
+          s.tags?.includes('mapping') ||
+            s.tags?.includes('conversion') ||
+            s.text.toLowerCase().includes('map') ||
+            s.text.toLowerCase().includes('convert'),
+        ),
+      security: (s) => s.category === 'security' || Boolean(s.tags?.includes('security')),
+      bestPractices: () => true, // Catch remaining snippets as best practices
+    }),
+  },
+  rules: {
+    applyRules: () => ({}), // No additional rules for conversion plan
+  },
+  plan: {
+    buildPlan: (input, knowledge, _rules, confidence) => {
+      // Parse the ACA manifest to analyze it
+      const parsedManifest = parseAcaManifest(input.acaManifest);
+      const analysis = analyzeAcaManifest(parsedManifest);
+
+      // Map knowledge snippets to ConversionRecommendations
+      const knowledgeMatches = knowledge.all.map((snippet) => ({
+        id: snippet.id,
+        category: snippet.category || 'generic',
+        recommendation: snippet.text,
+        ...(snippet.tags && { tags: snippet.tags }),
+        matchScore: snippet.weight,
+      }));
+
+      const fieldMappings = (knowledge.categories.fieldMappings || []).map((snippet) => ({
+        id: snippet.id,
+        category: snippet.category || 'field-mapping',
+        recommendation: snippet.text,
+        ...(snippet.tags && { tags: snippet.tags }),
+        matchScore: snippet.weight,
+      }));
+
+      const securityMatches = (knowledge.categories.security || []).map((snippet) => ({
+        id: snippet.id,
+        category: snippet.category || 'security',
+        recommendation: snippet.text,
+        ...(snippet.tags && { tags: snippet.tags }),
+        matchScore: snippet.weight,
+      }));
+
+      const bestPracticeMatches = (knowledge.categories.bestPractices || [])
+        .filter((snippet) => {
+          // Exclude snippets already in field mappings or security
+          const isInMappings = (knowledge.categories.fieldMappings || []).some(
+            (s) => s.id === snippet.id,
+          );
+          const isInSecurity = (knowledge.categories.security || []).some(
+            (s) => s.id === snippet.id,
+          );
+          return !isInMappings && !isInSecurity;
+        })
+        .map((snippet) => ({
+          id: snippet.id,
+          category: snippet.category || 'best-practice',
+          recommendation: snippet.text,
+          ...(snippet.tags && { tags: snippet.tags }),
+          matchScore: snippet.weight,
+        }));
+
+      const summary = `
+ACA to K8s Conversion Planning Summary:
+- Container Apps: ${analysis.containerApps.length}
+- Total Containers: ${analysis.containerApps.reduce((sum, app) => sum + app.containers, 0)}
+- Knowledge Matches: ${knowledgeMatches.length} recommendations found
+  - Field Mappings: ${fieldMappings.length}
+  - Security Considerations: ${securityMatches.length}
+  - Best Practices: ${bestPracticeMatches.length}
+- Warnings: ${analysis.warnings.length}
+
+Use this plan to guide the conversion from Azure Container Apps to Kubernetes manifests.
+      `.trim();
+
+      return {
+        acaAnalysis: analysis,
+        recommendations: {
+          fieldMappings,
+          securityConsiderations: securityMatches,
+          bestPractices: bestPracticeMatches,
+        },
+        knowledgeMatches,
+        confidence,
+        summary,
+      };
+    },
+  },
+});
+
+/**
+ * Wrapper function to add validation and manifest parsing
+ */
+async function run(
+  input: z.infer<typeof convertAcaToK8sSchema>,
+  ctx: ToolContext,
+): Promise<Result<AcaToK8sConversionPlan>> {
+  const logger = getToolLogger(ctx, name);
+  const timer = createToolTimer(logger, name);
+
+  try {
+    if (!input.acaManifest) {
+      return Failure('ACA manifest is required');
+    }
+
+    // Validate manifest can be parsed
+    try {
+      parseAcaManifest(input.acaManifest);
+    } catch (error) {
+      return Failure(`Invalid ACA manifest: ${extractErrorMessage(error)}`);
+    }
+
+    const result = await runPattern(input, ctx);
+
+    timer.end({ success: result.ok });
+    return result;
+  } catch (error) {
+    timer.error(error);
+    return Failure(`Conversion planning failed: ${extractErrorMessage(error)}`);
+  }
+}
+
+const tool: MCPTool<typeof convertAcaToK8sSchema, AcaToK8sConversionPlan> = {
   name,
   description,
   category: 'azure',
@@ -79,8 +296,8 @@ const tool: MCPTool<typeof convertAcaToK8sSchema, AIResponse> = {
   schema: convertAcaToK8sSchema,
   metadata: {
     knowledgeEnhanced: true,
-    samplingStrategy: 'single',
-    enhancementCapabilities: ['content-generation', 'manifest-conversion', 'platform-translation'],
+    samplingStrategy: 'none',
+    enhancementCapabilities: ['recommendations'],
   },
   run,
 };
