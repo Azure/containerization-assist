@@ -35,6 +35,9 @@ const name = 'fix-dockerfile';
 const description = 'Analyze Dockerfile for issues and return knowledge-based fix recommendations';
 const version = '2.0.0';
 
+// Score calculation constant
+const SCORE_PENALTY_PER_ISSUE = 10;
+
 // Define category types for better type safety
 type FixCategory = 'security' | 'performance' | 'bestPractices';
 
@@ -58,15 +61,15 @@ function mapValidationCategory(category?: string): FixCategory {
   // Normalize to handle both enum values and string values
   const normalized = category.toLowerCase();
 
-  if (normalized === 'security' || normalized === ValidationCategory.SECURITY) {
+  if (normalized === 'security' || normalized === ValidationCategory.SECURITY.toLowerCase()) {
     return 'security';
   }
 
   if (
     normalized === 'performance' ||
     normalized === 'optimization' ||
-    normalized === ValidationCategory.PERFORMANCE ||
-    normalized === ValidationCategory.OPTIMIZATION
+    normalized === ValidationCategory.PERFORMANCE.toLowerCase() ||
+    normalized === ValidationCategory.OPTIMIZATION.toLowerCase()
   ) {
     return 'performance';
   }
@@ -252,7 +255,8 @@ const runPattern = createKnowledgeTool<
         }));
 
       // Calculate validation score and grade (from validation report if available)
-      const validationScore = issues.length === 0 ? 100 : Math.max(0, 100 - issues.length * 10);
+      const validationScore =
+        issues.length === 0 ? 100 : Math.max(0, 100 - issues.length * SCORE_PENALTY_PER_ISSUE);
       let validationGrade: 'A' | 'B' | 'C' | 'D' | 'F' = 'F';
       if (validationScore >= 90) validationGrade = 'A';
       else if (validationScore >= 80) validationGrade = 'B';
