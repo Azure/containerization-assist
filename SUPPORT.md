@@ -6,9 +6,9 @@ This project uses GitHub Issues to track bugs and feature requests. Please searc
 issues before filing new issues to avoid duplicates.  For new issues, file your bug or 
 feature request as a new Issue.
 
-
-- **Issues**: Use GitHub Issues for bug reports and feature requests
-- **Documentation**: Check the [Development Guide](DEVELOPMENT_GUIDE.md) and [Containerization Assist Design Document](docs/DESIGN.md)
+For help and questions about using this project, please:
+- Review the [README](README.md) for documentation and usage examples
+- Open a GitHub Issue with the `question` label at https://github.com/azure/containerization-assist/issues
 
 ## Microsoft Support Policy  
 
