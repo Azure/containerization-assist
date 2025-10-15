@@ -6,11 +6,6 @@
  * actionable fixes categorized by security, performance, and best practices.
  *
  * Uses the knowledge-tool-pattern for consistent, deterministic behavior.
- *
- * @category docker
- * @version 2.0.0
- * @knowledgeEnhanced true
- * @samplingStrategy none
  */
 
 import { Failure, type Result, Success, TOPICS } from '@/types';
@@ -93,13 +88,11 @@ function getPriority(severity?: ValidationSeverity): 'high' | 'medium' | 'low' {
   }
 }
 
-// Extended input type that includes validation results
 interface ExtendedInput extends FixDockerfileParams {
   _validationResults?: ValidationIssue[];
   _dockerfileContent?: string;
 }
 
-// Create the tool runner using the shared pattern
 const runPattern = createKnowledgeTool<
   ExtendedInput,
   DockerfileFixPlan,
@@ -113,7 +106,6 @@ const runPattern = createKnowledgeTool<
     maxChars: 5000,
     maxSnippets: 25,
     extractFilters: (input) => {
-      // Extract issue categories to filter knowledge
       const issues = input._validationResults || [];
       const hasSecurityIssues = issues.some((i) => i.category === 'security');
       const hasPerformanceIssues = issues.some((i) => i.category === 'performance');
@@ -161,7 +153,6 @@ const runPattern = createKnowledgeTool<
       const hasPerformanceIssues = performanceIssues.length > 0;
       const hasBestPracticeIssues = bestPracticeIssues.length > 0;
 
-      // Determine overall priority
       let overallPriority: 'high' | 'medium' | 'low' = 'low';
       if (hasCriticalSecurity || securityIssues.length > 2) {
         overallPriority = 'high';
@@ -186,12 +177,10 @@ const runPattern = createKnowledgeTool<
     buildPlan: (input, knowledge, rules, confidence) => {
       const issues = input._validationResults || [];
 
-      // Categorize issues
       const securityIssues = issues.filter((i) => i.category === 'security');
       const performanceIssues = issues.filter((i) => i.category === 'performance');
       const bestPracticeIssues = issues.filter((i) => i.category === 'bestPractices');
 
-      // Map knowledge snippets to fix recommendations
       const knowledgeMatches: FixRecommendation[] = knowledge.all.map((snippet) => {
         const category = mapValidationCategory(snippet.category);
         return {
@@ -208,7 +197,6 @@ const runPattern = createKnowledgeTool<
         };
       });
 
-      // Create categorized fix recommendations
       const securityFixes: FixRecommendation[] = (knowledge.categories.security || []).map(
         (snippet) => ({
           id: snippet.id,
@@ -254,7 +242,6 @@ const runPattern = createKnowledgeTool<
           matchScore: snippet.weight,
         }));
 
-      // Calculate validation score and grade (from validation report if available)
       const validationScore =
         issues.length === 0 ? 100 : Math.max(0, 100 - issues.length * SCORE_PENALTY_PER_ISSUE);
       let validationGrade: 'A' | 'B' | 'C' | 'D' | 'F' = 'F';
@@ -268,11 +255,12 @@ const runPattern = createKnowledgeTool<
         validationGrade = 'C';
       }
 
-      // Estimated impact
-      const estimatedImpact = `Fixing ${rules.issueCount} issue(s) will improve:
-- Security: ${securityIssues.length} fix(es) - ${rules.hasCriticalSecurity ? 'Critical' : 'Minor'} impact
-- Performance: ${performanceIssues.length} fix(es) - ${rules.hasPerformanceIssues ? 'Moderate' : 'Minor'} impact
-- Best Practices: ${bestPracticeIssues.length} fix(es) - Improved maintainability`;
+      const estimatedImpact = [
+        `Fixing ${rules.issueCount} issue(s) will improve:`,
+        `- Security: ${securityIssues.length} fix(es) - ${rules.hasCriticalSecurity ? 'Critical' : 'Minor'} impact`,
+        `- Performance: ${performanceIssues.length} fix(es) - ${rules.hasPerformanceIssues ? 'Moderate' : 'Minor'} impact`,
+        `- Best Practices: ${bestPracticeIssues.length} fix(es) - Improved maintainability`,
+      ].join('\n');
 
       const summary = `
 Dockerfile Fix Planning Summary:
@@ -316,7 +304,6 @@ async function run(
   input: z.infer<typeof fixDockerfileSchema>,
   ctx: ToolContext,
 ): Promise<Result<DockerfileFixPlan>> {
-  // Get Dockerfile content from either path or direct content
   let content = input.dockerfile || '';
 
   if (input.path) {
@@ -338,12 +325,10 @@ async function run(
 
   ctx.logger.info({ preview: content.substring(0, 100) }, 'Validating Dockerfile for issues');
 
-  // Step 1: Validate Dockerfile to identify issues
   const validationReport = await validateDockerfileContent(content, {
     enableExternalLinter: true,
   });
 
-  // Step 2: Categorize issues
   const validationIssues: ValidationIssue[] = validationReport.results
     .filter((r) => !r.passed)
     .map((result) => {
@@ -366,7 +351,6 @@ async function run(
     'Dockerfile validation completed',
   );
 
-  // If no issues, return a success plan with no fixes needed
   if (validationIssues.length === 0) {
     return Success({
       currentIssues: {
@@ -396,7 +380,6 @@ Dockerfile Fix Planning Summary:
     });
   }
 
-  // Step 3: Query knowledge base for fixes using the pattern
   const extendedInput: ExtendedInput = {
     ...input,
     _validationResults: validationIssues,

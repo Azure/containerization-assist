@@ -6,11 +6,6 @@
  * understand best practices and recommendations before actual Dockerfile generation.
  *
  * Uses the knowledge-tool-pattern for consistent, deterministic behavior.
- *
- * @category docker
- * @version 2.0.0
- * @knowledgeEnhanced true
- * @samplingStrategy none
  */
 
 import { Failure, type Result, TOPICS } from '@/types';
@@ -31,10 +26,8 @@ const description =
   'Gather insights from knowledgebase and return requirements for Dockerfile creation';
 const version = '2.0.0';
 
-// Define category types for better type safety
 type DockerfileCategory = 'security' | 'optimization' | 'bestPractices';
 
-// Define rule results interface
 interface DockerfileBuildRules {
   buildStrategy: {
     multistage: boolean;
@@ -42,7 +35,6 @@ interface DockerfileBuildRules {
   };
 }
 
-// Create the tool runner using the shared pattern
 const runPattern = createKnowledgeTool<
   GenerateDockerfileParams,
   DockerfilePlan,
@@ -104,7 +96,6 @@ const runPattern = createKnowledgeTool<
       const language = input.language || 'auto-detect';
       const framework = input.framework;
 
-      // Map knowledge snippets to DockerfileRequirements
       const knowledgeMatches: DockerfileRequirement[] = knowledge.all.map((snippet) => ({
         id: snippet.id,
         category: snippet.category || 'generic',
@@ -193,7 +184,6 @@ Dockerfile Planning Summary:
   },
 });
 
-// Wrapper function to add validation
 async function run(
   input: z.infer<typeof generateDockerfileSchema>,
   ctx: ToolContext,
