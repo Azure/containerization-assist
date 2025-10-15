@@ -50,13 +50,18 @@ jobs:
 
       - name: Run validation pipeline
         id: validation
-        run: npm run validate > quality-full.txt 2>&1 || true
+        run: npm run validate
         env:
           DOCKER_AVAILABLE: true
 
       - name: Run all tests
         id: npmtest
         run: npm test
+
+      - name: Generate coverage report
+        id: coverage-gen
+        continue-on-error: true
+        run: npm run test:coverage -- --passWithNoTests 2>/dev/null || npm test -- --coverage --passWithNoTests
 
       - name: Verify build artifacts
         run: |
@@ -83,20 +88,25 @@ jobs:
           # Run quality gates (non-blocking for reporting) with baseline updates
           UPDATE_BASELINES=true npm run quality:gates > quality-gates.txt 2>&1 || true
 
-          # Extract metrics from outputs - ensure single line values
-          CURRENT_WARNINGS=$(grep "Total warnings:" quality-full.txt | sed 's/.*Total warnings: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
-          BASELINE_WARNINGS=$(grep "Baseline:" quality-full.txt | sed 's/.*Baseline: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "1048")
-          REDUCTION=$(grep "Reduced by:" quality-full.txt | sed 's/.*Reduced by: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
-          PERCENTAGE=$(grep "Reduced by:" quality-full.txt | sed 's/.*(\([0-9][0-9]*\.[0-9][0-9]*\)%).*/\1/' | head -1 | tr -cd '0-9.' || echo "0")
+          # Extract metrics from quality-gates.txt output
+          # Parse summary section for current values: "ESLint Warnings: 123 (threshold: 400)"
+          CURRENT_WARNINGS=$(grep "^ESLint Warnings:" quality-gates.txt | sed 's/ESLint Warnings: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
+          UNUSED_EXPORTS=$(grep "^Unused Exports:" quality-gates.txt | sed 's/Unused Exports: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
 
-          UNUSED_EXPORTS=$(grep "Total unused exports:" quality-full.txt | sed 's/.*Total unused exports: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
-          DEADCODE_BASELINE=$(grep "Baseline:.*unused exports" quality-full.txt | sed 's/.*Baseline: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "441")
-          DEADCODE_REDUCTION=$(grep "Reduced by:.*exports" quality-full.txt | sed 's/.*Reduced by: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
+          # Extract baseline and reduction from gate output messages
+          # Look for patterns like: "Warnings reduced by 10 (5.0%) - 100 ≤ 110" or "Warning count maintained at baseline (100)"
+          BASELINE_WARNINGS=$(grep -E "Warnings reduced by|Warning count maintained|Warning count increased by" quality-gates.txt | sed -n 's/.*≤ \([0-9][0-9]*\).*/\1/p; s/.*maintained at baseline (\([0-9][0-9]*\)).*/\1/p; s/.*> \([0-9][0-9]*\).*/\1/p' | head -1 | tr -cd '0-9' || echo "$CURRENT_WARNINGS")
+          REDUCTION=$(grep "Warnings reduced by" quality-gates.txt | sed 's/.*reduced by \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
+          PERCENTAGE=$(grep "Warnings reduced by" quality-gates.txt | sed 's/.*(\([0-9][0-9]*\.[0-9][0-9]*\)%).*/\1/' | head -1 | tr -cd '0-9.' || echo "0")
 
-          # Quality gates status - count exact matches and ensure single digits
-          GATES_PASSED=$(grep -o "✅ PASS:" quality-gates.txt 2>/dev/null | wc -l | tr -cd '0-9' || echo "0")
-          GATES_FAILED=$(grep -o "❌ FAIL:" quality-gates.txt 2>/dev/null | wc -l | tr -cd '0-9' || echo "0")
-          GATES_WARNINGS=$(grep -o "⚠️  WARN:" quality-gates.txt 2>/dev/null | wc -l | tr -cd '0-9' || echo "0")
+          # Dead code baseline and reduction
+          DEADCODE_BASELINE=$(grep -E "Unused exports reduced by|Unused exports maintained|Unused exports increased by" quality-gates.txt | sed -n 's/.*≤ \([0-9][0-9]*\).*/\1/p; s/.*maintained at baseline (\([0-9][0-9]*\)).*/\1/p; s/.*> \([0-9][0-9]*\).*/\1/p' | head -1 | tr -cd '0-9' || echo "$UNUSED_EXPORTS")
+          DEADCODE_REDUCTION=$(grep "Unused exports reduced by" quality-gates.txt | sed 's/.*reduced by \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
+
+          # Quality gates status - count exact matches excluding summary messages
+          GATES_PASSED=$(grep "✅ PASS:" quality-gates.txt 2>/dev/null | grep -v "All quality gates passed" | wc -l | tr -cd '0-9' || echo "0")
+          GATES_FAILED=$(grep "❌ FAIL:" quality-gates.txt 2>/dev/null | grep -v "Some quality gates failed" | wc -l | tr -cd '0-9' || echo "0")
+          GATES_WARNINGS=$(grep "⚠️  WARN:" quality-gates.txt 2>/dev/null | grep -v "^⚠️  WARN:" | wc -l | tr -cd '0-9' || echo "0")
 
           # Validate all values are proper integers
           for var in CURRENT_WARNINGS BASELINE_WARNINGS REDUCTION UNUSED_EXPORTS DEADCODE_BASELINE DEADCODE_REDUCTION GATES_PASSED GATES_FAILED GATES_WARNINGS; do
@@ -140,9 +150,30 @@ jobs:
       - name: Extract top warning types
         id: warnings
         run: |
-          TOP_WARNINGS=$(grep -A 10 "=== Top.*Warning Types ===" quality-full.txt | tail -n +2 | head -n 5 | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//' || echo "No warnings found")
+          # Run ESLint to get warning details
+          if npm run lint 2>&1 | tee eslint-output.txt; then
+            TOP_WARNINGS="No ESLint warnings found"
+          else
+            # Extract unique warning rule IDs and count them
+            TOP_WARNINGS=$(grep -o "\[.*\]" eslint-output.txt 2>/dev/null | sort | uniq -c | sort -rn | head -n 5 | sed 's/^[[:space:]]*//' || echo "No warning details available")
+          fi
           echo "top_warnings<<EOF" >> $GITHUB_OUTPUT
           echo "$TOP_WARNINGS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Extract failed gates
+        id: failed_gates
+        run: |
+          # Extract failed and warning gates with their messages
+          FAILED_GATES=$(grep "❌ FAIL:" quality-gates.txt 2>/dev/null | grep -v "Some quality gates failed" | sed 's/❌ FAIL: //' || echo "")
+          WARNING_GATES=$(grep "⚠️  WARN:" quality-gates.txt 2>/dev/null | sed 's/⚠️  WARN: //' || echo "")
+
+          echo "failed_gates<<EOF" >> $GITHUB_OUTPUT
+          echo "$FAILED_GATES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "warning_gates<<EOF" >> $GITHUB_OUTPUT
+          echo "$WARNING_GATES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Extract coverage metrics
@@ -181,8 +212,8 @@ jobs:
         with:
           name: quality-report-${{ github.run_id }}
           path: |
-            quality-full.txt
             quality-gates.txt
+            eslint-output.txt
             coverage/
           retention-days: 7
 
@@ -190,6 +221,12 @@ jobs:
       - name: Generate PR quality comment
         if: github.event_name == 'pull_request'
         run: |
+          # Calculate total gates dynamically
+          GATES_PASSED="${{ steps.quality.outputs.gates_passed }}"
+          GATES_FAILED="${{ steps.quality.outputs.gates_failed }}"
+          GATES_WARNINGS="${{ steps.quality.outputs.gates_warnings }}"
+          TOTAL_GATES=$(( ${GATES_PASSED:-0} + ${GATES_FAILED:-0} + ${GATES_WARNINGS:-0} ))
+
           cat > pr_comment.md << EOF
           ## 🛡️ Code Quality Report
 
@@ -201,20 +238,39 @@ jobs:
           |--------|---------|----------|-----------|
           | **ESLint Warnings** | ${{ steps.quality.outputs.current_warnings }} | ${{ steps.quality.outputs.baseline_warnings }} | $(if [ "${{ steps.quality.outputs.warning_reduction }}" -gt 0 ]; then echo "✅ -${{ steps.quality.outputs.warning_reduction }} (-${{ steps.quality.outputs.warning_percentage }}%)"; else echo "➖ No change"; fi) |
           | **Dead Code** | ${{ steps.quality.outputs.unused_exports }} | ${{ steps.quality.outputs.deadcode_baseline }} | $(if [ "${{ steps.quality.outputs.deadcode_reduction }}" -gt 0 ]; then echo "✅ -${{ steps.quality.outputs.deadcode_reduction }}"; else echo "➖ No change"; fi) |
-          | **Quality Gates** | ${{ steps.quality.outputs.gates_passed }}/5 passed | - | $(if [ "${{ steps.quality.outputs.gates_failed }}" -eq 0 ]; then echo "✅ All passing"; else echo "❌ ${{ steps.quality.outputs.gates_failed }} failed"; fi) |
+          | **Quality Gates** | ${{ steps.quality.outputs.gates_passed }}/${TOTAL_GATES} passed | - | $(if [ "${{ steps.quality.outputs.gates_failed }}" -eq 0 ]; then echo "✅ All passing"; else echo "❌ ${{ steps.quality.outputs.gates_failed }} failed"; fi) |
 
           ### 🎯 Coverage Highlights
           - **Overall Coverage:** ${{ steps.coverage.outputs.overall_coverage }}%
           - **Branch Coverage:** ${{ steps.coverage.outputs.branch_coverage }}%
 
-          ### ⚠️ Top Warning Categories
+          $(if [ "${{ steps.quality.outputs.gates_failed }}" -gt 0 ] || [ "${{ steps.quality.outputs.gates_warnings }}" -gt 0 ]; then
+            echo "### ⚠️ Quality Gate Issues"
+            echo ""
+            if [ -n "${{ steps.failed_gates.outputs.failed_gates }}" ]; then
+              echo "**Failed Gates:**"
+              echo "\`\`\`"
+              echo "${{ steps.failed_gates.outputs.failed_gates }}"
+              echo "\`\`\`"
+              echo ""
+            fi
+            if [ -n "${{ steps.failed_gates.outputs.warning_gates }}" ]; then
+              echo "**Warnings:**"
+              echo "\`\`\`"
+              echo "${{ steps.failed_gates.outputs.warning_gates }}"
+              echo "\`\`\`"
+              echo ""
+            fi
+          fi)
+
+          ### 💡 Top Warning Categories
           \`\`\`
           ${{ steps.warnings.outputs.top_warnings }}
           \`\`\`
 
           ### 🚀 Next Steps
           $(if [ "${{ steps.quality.outputs.gates_failed }}" -gt 0 ]; then
-            echo "- Fix ${{ steps.quality.outputs.gates_failed }} failing quality gate(s)"
+            echo "- **Action Required:** Fix the failing quality gate(s) listed above"
           fi)
           $(if [ "${{ steps.quality.outputs.current_warnings }}" -gt 400 ]; then
             echo "- Consider reducing ESLint warnings toward <400 target"
