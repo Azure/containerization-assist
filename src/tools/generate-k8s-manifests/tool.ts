@@ -1,610 +1,200 @@
 /**
- * Generate Kubernetes Manifests tool using the new Tool pattern
+ * Generate Kubernetes Manifests Tool
+ *
+ * Analyzes repository and queries knowledgebase to gather insights and return
+ * structured requirements for creating Kubernetes/Helm/ACA/Kustomize manifests.
+ * This tool helps users understand best practices and recommendations before
+ * actual manifest generation.
+ *
+ * Uses the knowledge-tool-pattern for consistent, deterministic behavior.
+ *
+ * @category kubernetes
+ * @version 2.0.0
+ * @knowledgeEnhanced true
+ * @samplingStrategy none
  */
 
-import { Success, Failure, type Result, TOPICS } from '@/types';
+import { Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import type { MCPTool } from '@/types/tool';
-import { promptTemplates, K8sManifestPromptParams } from '@/ai/prompt-templates';
-import { buildMessages } from '@/ai/prompt-engine';
-import { toMCPMessages } from '@/mcp/ai/message-converter';
-import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
-import { createKubernetesScoringFunction } from '@/lib/scoring';
-import { generateK8sManifestsSchema } from './schema';
-import type { AIResponse } from '../ai-response-types';
-import { repairK8sManifests, shouldRepairManifests } from '../shared/k8s-repair';
-import type { KnowledgeEnhancementResult } from '@/mcp/ai/knowledge-enhancement';
-import { extractKubernetesContent } from '@/lib/content-extraction';
-import { createKubernetesValidator } from '@/validation/kubernetes-validator';
-import { createK8sSchemaValidator } from '@/validation/k8s-schema-validator';
-import { createK8sNormalizer } from '@/validation/k8s-normalizer';
-import { mergeMultipleReports } from '@/validation/merge-reports';
-import type { ModuleInfo } from '@/tools/analyze-repo/schema';
-import * as yaml from 'js-yaml';
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
+import {
+  generateK8sManifestsSchema,
+  type ManifestPlan,
+  type ManifestRequirement,
+  type GenerateK8sManifestsParams,
+} from './schema';
+import { CATEGORY } from '@/knowledge/types';
+import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
 import type { z } from 'zod';
 
-// Type definition for Kubernetes manifests
-interface KubernetesManifest extends Record<string, unknown> {
-  apiVersion: string;
-  kind: string;
-  metadata?: {
-    name?: string;
-    namespace?: string;
-    labels?: Record<string, string>;
-    [key: string]: unknown;
-  };
-  spec?: {
-    selector?: {
-      matchLabels?: Record<string, string>;
-      [key: string]: unknown;
-    };
-    template?: {
-      metadata?: {
-        labels?: Record<string, string>;
-        [key: string]: unknown;
-      };
-      [key: string]: unknown;
-    };
-    [key: string]: unknown;
-  };
-}
-
 const name = 'generate-k8s-manifests';
-const description = 'Generate Kubernetes deployment manifests';
-const version = '2.1.0';
+const description =
+  'Gather insights from knowledgebase and return requirements for Kubernetes/Helm/ACA/Kustomize manifest creation';
+const version = '2.0.0';
 
-/**
- * Generate K8s manifests for a single module or app
- */
-async function generateSingleManifest(
-  input: z.infer<typeof generateK8sManifestsSchema>,
-  ctx: ToolContext,
-  targetModule?: ModuleInfo,
-): Promise<Result<AIResponse>> {
-  const {
-    namespace = 'default',
-    replicas = 3,
-    serviceType = 'ClusterIP',
-    ingressEnabled = false,
-    resources,
-    healthCheck,
-  } = input;
+// Manifest type to topic mapping
+const MANIFEST_TYPE_TO_TOPIC = {
+  kubernetes: TOPICS.KUBERNETES,
+  helm: TOPICS.GENERATE_HELM_CHARTS,
+  aca: TOPICS.KUBERNETES,
+  kustomize: TOPICS.KUBERNETES,
+} as const;
 
-  const targetModuleName = targetModule?.name;
+// Define category types for better type safety
+type ManifestCategory = 'security' | 'resourceManagement' | 'bestPractices';
 
-  const imageId = input.imageId;
-  let appName = input.appName;
-
-  // If generating for a specific module, use module name
-  if (!appName && targetModuleName) {
-    appName = targetModuleName;
-    ctx.logger.info({ appName, moduleName: targetModuleName }, 'Using module name as app name');
-  }
-
-  let port = input.port;
-  if (!port && targetModule?.ports && targetModule.ports.length > 0) {
-    port = targetModule.ports[0];
-    ctx.logger.info({ port, moduleName: targetModuleName }, 'Using port from module data');
-  }
-  if (!port) {
-    port = 8080;
-  }
-
-  if (!imageId) {
-    return Failure('Docker image is required. Provide imageId parameter.');
-  }
-  if (!appName) {
-    return Failure('Application name is required. Provide appName parameter.');
-  }
-
-  // Generate prompt from template
-  const promptParams = {
-    appName,
-    image: imageId,
-    replicas,
-    port,
-    namespace,
-    serviceType,
-    ingressEnabled,
-    healthCheck: healthCheck?.enabled === true,
-    resources: resources?.limits
-      ? {
-          cpu: resources.limits.cpu,
-          memory: resources.limits.memory,
-        }
-      : undefined,
-  } as K8sManifestPromptParams;
-  const basePrompt = promptTemplates.k8sManifests(promptParams);
-
-  // Build messages using the new prompt engine
-  const messages = await buildMessages({
-    basePrompt,
-    topic: TOPICS.KUBERNETES,
-    tool: 'generate-k8s-manifests',
-    environment: 'production',
-    contract: {
-      name: 'kubernetes_manifests_v1',
-      description: 'Generate Kubernetes YAML manifests',
-    },
-    knowledgeBudget: 4000, // Larger budget for K8s manifests
-  });
-
-  // Execute via AI with deterministic sampling
-  const samplingResult = await sampleWithRerank(
-    ctx,
-    async (attemptIndex) => ({
-      ...toMCPMessages(messages),
-      maxTokens: 8192,
-      modelPreferences: {
-        hints: [{ name: 'kubernetes-manifests' }],
-        intelligencePriority: 0.85,
-        speedPriority: attemptIndex > 0 ? 0.7 : 0.4,
-        costPriority: 0.3,
-      },
+// Create the tool runner using the shared pattern
+const runPattern = createKnowledgeTool<
+  GenerateK8sManifestsParams,
+  ManifestPlan,
+  ManifestCategory,
+  Record<string, never> // No additional rules for manifest plan
+>({
+  name,
+  query: {
+    topic: (input) => MANIFEST_TYPE_TO_TOPIC[input.manifestType],
+    category: CATEGORY.KUBERNETES,
+    maxChars: 8000,
+    maxSnippets: 20,
+    extractFilters: (input) => ({
+      environment: input.environment || 'production',
+      language: input.language,
+      framework: input.frameworks?.[0]?.name, // Use first framework if available
     }),
-    createKubernetesScoringFunction(),
-    {},
-  );
+  },
+  categorization: {
+    categoryNames: ['security', 'resourceManagement', 'bestPractices'] as const,
+    categorize: createSimpleCategorizer<ManifestCategory>({
+      security: (s) => s.category === 'security' || Boolean(s.tags?.includes('security')),
+      resourceManagement: (s) =>
+        Boolean(
+          s.tags?.includes('resources') ||
+            s.tags?.includes('limits') ||
+            s.tags?.includes('requests') ||
+            s.tags?.includes('optimization'),
+        ),
+      bestPractices: () => true, // Catch remaining snippets as best practices
+    }),
+  },
+  rules: {
+    applyRules: () => ({}), // No additional rules for manifest plan
+  },
+  plan: {
+    buildPlan: (input, knowledge, _rules, confidence) => {
+      // Map knowledge snippets to ManifestRequirements
+      const knowledgeMatches: ManifestRequirement[] = knowledge.all.map((snippet) => ({
+        id: snippet.id,
+        category: snippet.category || 'generic',
+        recommendation: snippet.text,
+        ...(snippet.tags && { tags: snippet.tags }),
+        matchScore: snippet.weight,
+      }));
 
-  if (!samplingResult.ok) {
-    return Failure(`K8s manifest generation failed: ${samplingResult.error}`);
-  }
+      const securityMatches: ManifestRequirement[] = (knowledge.categories.security || []).map(
+        (snippet) => ({
+          id: snippet.id,
+          category: snippet.category || 'security',
+          recommendation: snippet.text,
+          ...(snippet.tags && { tags: snippet.tags }),
+          matchScore: snippet.weight,
+        }),
+      );
 
-  const responseText = samplingResult.value.text;
-  if (!responseText) {
-    return Failure('Empty response from AI');
-  }
+      const resourceMatches: ManifestRequirement[] = (
+        knowledge.categories.resourceManagement || []
+      ).map((snippet) => ({
+        id: snippet.id,
+        category: snippet.category || 'generic',
+        recommendation: snippet.text,
+        ...(snippet.tags && { tags: snippet.tags }),
+        matchScore: snippet.weight,
+      }));
 
-  ctx.logger.info(
-    {
-      score: samplingResult.value.score,
-      scoreBreakdown: samplingResult.value.scoreBreakdown,
+      const bestPracticeMatches: ManifestRequirement[] = (knowledge.categories.bestPractices || [])
+        .filter((snippet) => {
+          // Exclude snippets already in security or resource management
+          const isInSecurity = (knowledge.categories.security || []).some(
+            (s) => s.id === snippet.id,
+          );
+          const isInResource = (knowledge.categories.resourceManagement || []).some(
+            (s) => s.id === snippet.id,
+          );
+          return !isInSecurity && !isInResource;
+        })
+        .map((snippet) => ({
+          id: snippet.id,
+          category: snippet.category || 'generic',
+          recommendation: snippet.text,
+          ...(snippet.tags && { tags: snippet.tags }),
+          matchScore: snippet.weight,
+        }));
+
+      const frameworksStr =
+        input.frameworks && input.frameworks.length > 0
+          ? ` (${input.frameworks.map((f) => f.name).join(', ')})`
+          : '';
+
+      const nextStepTool = {
+        kubernetes: 'k8s-manifests',
+        helm: 'helm-charts',
+        aca: 'aca-manifests',
+        kustomize: 'kustomize',
+      }[input.manifestType];
+
+      const summary = `
+Manifest Planning Summary:
+- Manifest Type: ${input.manifestType}
+- Language: ${input.language || 'not specified'}${frameworksStr}
+- Environment: ${input.environment || 'production'}
+- Knowledge Matches: ${knowledgeMatches.length} recommendations found
+  - Security: ${securityMatches.length}
+  - Resource Management: ${resourceMatches.length}
+  - Best Practices: ${bestPracticeMatches.length}
+
+Next Step: Use generate-${nextStepTool} to create manifests using these recommendations.
+      `.trim();
+
+      return {
+        repositoryInfo: {
+          name: input.name,
+          modulePath: input.path,
+          language: input.language,
+          languageVersion: input.languageVersion,
+          frameworks: input.frameworks,
+          buildSystem: input.buildSystem,
+          dependencies: input.dependencies,
+          ports: input.ports,
+          entryPoint: input.entryPoint,
+        },
+        manifestType: input.manifestType,
+        recommendations: {
+          securityConsiderations: securityMatches,
+          resourceManagement: resourceMatches,
+          bestPractices: bestPracticeMatches,
+        },
+        knowledgeMatches,
+        confidence,
+        summary,
+      };
     },
-    'K8s manifests generated with sampling',
-  );
+  },
+});
 
-  // Parse and validate the generated manifests using unified extraction
-  try {
-    const extraction = extractKubernetesContent(responseText);
-    if (!extraction.success) {
-      return Failure(`Failed to extract Kubernetes manifests: ${extraction.error}`);
-    }
-
-    const manifests = extraction.content as KubernetesManifest[];
-
-    // For validation and repair, we need the original YAML content
-    let manifestsContent = responseText;
-
-    // Validate each extracted manifest
-    for (const manifest of manifests) {
-      try {
-        if (!manifest || typeof manifest !== 'object') {
-          ctx.logger.warn(
-            { manifest: JSON.stringify(manifest).substring(0, 100) },
-            'Skipping non-object manifest',
-          );
-          continue;
-        }
-
-        // Validate essential Kubernetes fields
-        if (!manifest.apiVersion || typeof manifest.apiVersion !== 'string') {
-          return Failure(
-            `Manifest missing apiVersion: ${JSON.stringify(manifest).substring(0, 100)}`,
-          );
-        }
-        if (!manifest.kind || typeof manifest.kind !== 'string') {
-          return Failure(`Manifest missing kind: ${JSON.stringify(manifest).substring(0, 100)}`);
-        }
-        if (!manifest.metadata?.name) {
-          return Failure(`Manifest missing metadata.name: ${manifest.kind}`);
-        }
-
-        // Validate specific resource types
-        if (manifest.kind === 'Deployment') {
-          if (typeof manifest.apiVersion === 'string' && manifest.apiVersion !== 'apps/v1') {
-            ctx.logger.warn(
-              { apiVersion: manifest.apiVersion },
-              'Deployment using non-standard API version',
-            );
-          }
-          if (!manifest.spec?.selector?.matchLabels) {
-            return Failure('Deployment missing spec.selector.matchLabels');
-          }
-          if (!manifest.spec?.template?.metadata?.labels) {
-            return Failure('Deployment missing spec.template.metadata.labels');
-          }
-          // Check that selector matches template labels
-          const selectorLabels = manifest.spec.selector.matchLabels;
-          const templateLabels = manifest.spec.template.metadata.labels;
-          for (const key in selectorLabels) {
-            if (selectorLabels[key] !== templateLabels[key]) {
-              return Failure(`Deployment selector label ${key} doesn't match template label`);
-            }
-          }
-        }
-
-        if (manifest.kind === 'Service') {
-          if (typeof manifest.apiVersion === 'string' && manifest.apiVersion !== 'v1') {
-            ctx.logger.warn(
-              { apiVersion: manifest.apiVersion },
-              'Service using non-standard API version',
-            );
-          }
-          if (!manifest.spec?.selector) {
-            return Failure('Service missing spec.selector');
-          }
-        }
-
-        if (manifest.kind === 'Ingress') {
-          if (
-            typeof manifest.apiVersion === 'string' &&
-            !manifest.apiVersion.startsWith('networking.k8s.io/')
-          ) {
-            ctx.logger.warn(
-              { apiVersion: manifest.apiVersion },
-              'Ingress using outdated API version',
-            );
-          }
-        }
-      } catch (parseError) {
-        ctx.logger.error(
-          {
-            error: parseError instanceof Error ? parseError.message : String(parseError),
-            manifest: JSON.stringify(manifest).substring(0, 200),
-          },
-          'Failed to validate manifest',
-        );
-        return Failure(
-          `Invalid YAML in manifest: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`,
-        );
-      }
-    }
-
-    if (manifests.length === 0) {
-      return Failure('No valid Kubernetes manifests were generated');
-    }
-
-    // Log what we validated
-    ctx.logger.info(
-      {
-        manifestCount: manifests.length,
-        kinds: manifests.map((m) => m.kind),
-        names: manifests.map((m) => m.metadata?.name),
-      },
-      'Validated Kubernetes manifests',
-    );
-
-    // Enhanced validation with schema validation, normalization, and repair
-    const schemaValidator = createK8sSchemaValidator({
-      allowUnknownResources: true,
-    });
-    const rulesValidator = createKubernetesValidator();
-    const normalizer = createK8sNormalizer({
-      addSecurityContext: true,
-      fixSelectors: true,
-      standardizeLabels: true,
-    });
-
-    // Perform parallel validation
-    const [schemaReport, rulesReport] = await Promise.all([
-      schemaValidator.validate(manifestsContent),
-      Promise.resolve(rulesValidator.validate(manifestsContent)),
-    ]);
-
-    // Merge validation reports
-    const combinedReport = mergeMultipleReports([schemaReport, rulesReport]);
-
-    ctx.logger.info(
-      {
-        schemaScore: schemaReport.score,
-        rulesScore: rulesReport.score,
-        combinedScore: combinedReport.score,
-        totalErrors: combinedReport.errors,
-        totalWarnings: combinedReport.warnings,
-      },
-      'Enhanced K8s manifest validation completed',
-    );
-
-    // Apply normalization
-    const normalizationResult = normalizer.normalize(manifestsContent);
-    if (normalizationResult.changes.length > 0) {
-      manifestsContent = normalizationResult.normalized;
-      ctx.logger.info(
-        {
-          changes: normalizationResult.changes.length,
-          changeDetails: normalizationResult.changes.map((c) => `${c.resource}: ${c.description}`),
-        },
-        'Manifest normalization applied',
-      );
-    }
-
-    // Attempt repair if validation still shows issues
-    if (shouldRepairManifests(combinedReport)) {
-      ctx.logger.warn(
-        {
-          errors: combinedReport.errors,
-          score: combinedReport.score,
-          grade: combinedReport.grade,
-        },
-        'Attempting self-repair of K8s manifests',
-      );
-
-      const originalRequirements = `App: ${input.appName}, Image: ${input.imageId}, Replicas: ${input.replicas || 3}, Port: ${input.port || 8080}`;
-      const repairResult = await repairK8sManifests(
-        ctx,
-        manifestsContent,
-        combinedReport.results,
-        originalRequirements,
-      );
-
-      if (repairResult.ok && repairResult.value.errorsReduced > 0) {
-        manifestsContent = repairResult.value.repaired;
-        ctx.logger.info(
-          {
-            improvements: repairResult.value.improvements,
-            originalScore: repairResult.value.originalScore,
-            repairedScore: repairResult.value.repairedScore,
-            errorsReduced: repairResult.value.errorsReduced,
-          },
-          'Self-repair completed successfully',
-        );
-
-        // Re-parse the repaired manifests for validation
-        try {
-          const repairedDocs = manifestsContent.split(/^---$/m).filter((doc) => doc.trim());
-          const repairedManifests: KubernetesManifest[] = [];
-
-          for (const doc of repairedDocs) {
-            try {
-              const manifest = yaml.load(doc) as KubernetesManifest;
-              if (
-                manifest &&
-                typeof manifest === 'object' &&
-                manifest.apiVersion &&
-                manifest.kind
-              ) {
-                repairedManifests.push(manifest);
-              }
-            } catch (parseError) {
-              // If parsing fails after repair, keep original manifests
-              ctx.logger.warn(
-                { parseError },
-                'Failed to parse repaired manifest, keeping original',
-              );
-              break;
-            }
-          }
-
-          if (repairedManifests.length > 0) {
-            manifests.splice(0, manifests.length, ...repairedManifests);
-          }
-        } catch (error) {
-          ctx.logger.warn({ error }, 'Failed to re-parse repaired manifests, keeping original');
-        }
-      } else if (repairResult.ok) {
-        ctx.logger.info('Self-repair attempted but no improvements made');
-      } else {
-        ctx.logger.warn(
-          { error: repairResult.error },
-          'Self-repair failed, keeping original manifests',
-        );
-      }
-    } else {
-      ctx.logger.info(
-        { score: combinedReport.score },
-        'Manifests passed validation, no repair needed',
-      );
-    }
-
-    // Apply knowledge enhancement if there are validation issues
-    let knowledgeEnhancement: KnowledgeEnhancementResult | undefined;
-    let finalManifestsContent = manifestsContent;
-
-    if (combinedReport.score < 90) {
-      try {
-        const { enhanceWithKnowledge, createEnhancementFromValidation } = await import(
-          '@/mcp/ai/knowledge-enhancement'
-        );
-
-        const enhancementRequest = createEnhancementFromValidation(
-          manifestsContent,
-          'kubernetes',
-          combinedReport.results
-            .filter((r) => !r.passed)
-            .map((r) => ({
-              message: r.message || 'Validation issue',
-              severity: r.metadata?.severity === 'error' ? 'error' : 'warning',
-              category: r.ruleId?.split('-')[0] || 'general',
-            })),
-          'security',
-        );
-
-        // Add specific enhancement goal for Kubernetes manifests
-        enhancementRequest.userQuery = `Original requirements: App: ${input.appName}, Image: ${input.imageId}, Replicas: ${input.replicas || 3}, Port: ${input.port || 8080}`;
-
-        const enhancementResult = await enhanceWithKnowledge(enhancementRequest, ctx);
-
-        if (enhancementResult.ok) {
-          knowledgeEnhancement = enhancementResult.value;
-          finalManifestsContent = knowledgeEnhancement.enhancedContent;
-
-          ctx.logger.info(
-            {
-              knowledgeAppliedCount: knowledgeEnhancement.knowledgeApplied.length,
-              confidence: knowledgeEnhancement.confidence,
-              enhancementAreas: knowledgeEnhancement.analysis.enhancementAreas.length,
-            },
-            'Knowledge enhancement applied to Kubernetes manifests',
-          );
-        } else {
-          ctx.logger.warn(
-            { error: enhancementResult.error },
-            'Knowledge enhancement failed, using original manifests',
-          );
-        }
-      } catch (enhancementError) {
-        ctx.logger.debug(
-          {
-            error:
-              enhancementError instanceof Error
-                ? enhancementError.message
-                : String(enhancementError),
-          },
-          'Knowledge enhancement threw exception, continuing without enhancement',
-        );
-      }
-    }
-
-    // Write manifests to file if path is provided
-    let manifestPath = '';
-    if (input.path) {
-      manifestPath = path.isAbsolute(input.path)
-        ? input.path
-        : path.resolve(process.cwd(), input.path);
-
-      const filename = `${input.appName}-manifests.yaml`;
-      manifestPath = path.join(manifestPath, filename);
-
-      await fs.writeFile(manifestPath, finalManifestsContent, 'utf-8');
-      ctx.logger.info({ manifestPath }, 'Kubernetes manifests written to disk');
-    }
-
-    // Prepare the result
-    const result = {
-      manifests: finalManifestsContent,
-      manifestPath,
-      validatedResources: manifests.map((m) => ({ kind: m.kind, name: m.metadata?.name })),
-      ...(knowledgeEnhancement && {
-        analysis: {
-          enhancementAreas: knowledgeEnhancement.analysis.enhancementAreas,
-          confidence: knowledgeEnhancement.confidence,
-          knowledgeApplied: knowledgeEnhancement.knowledgeApplied,
-        },
-        confidence: knowledgeEnhancement.confidence,
-        suggestions: knowledgeEnhancement.suggestions,
-      }),
-    };
-
-    return Success(result);
-  } catch (e) {
-    const error = e as Error;
-    return Failure(`Manifest generation failed: ${error.message}`);
-  }
-}
-
-/**
- * Main run function - orchestrates single or multi-module generation
- */
+// Wrapper function to add validation
 async function run(
   input: z.infer<typeof generateK8sManifestsSchema>,
   ctx: ToolContext,
-): Promise<Result<AIResponse>> {
-  const { modules } = input;
+): Promise<Result<ManifestPlan>> {
+  const path = input.path;
 
-  // Check for multi-module/monorepo scenario
-  if (modules && modules.length > 0) {
-    // If only one module is provided, generate for that single module
-    if (modules.length === 1) {
-      const targetModule = modules[0];
-      if (!targetModule) {
-        return Failure('Module array contains undefined element');
-      }
-      ctx.logger.info(
-        { moduleName: targetModule.name, modulePath: targetModule.modulePathAbsoluteUnix },
-        'Generating K8s manifests for single module',
-      );
-      return generateSingleManifest(input, ctx, targetModule as ModuleInfo);
-    }
-
-    // Multiple modules - generate for all modules
-    ctx.logger.info(
-      { moduleCount: modules.length },
-      'Generating K8s manifests for multiple modules',
-    );
-
-    const results: Array<{ module: string; success: boolean; path?: string; error?: string }> = [];
-    const manifests: Array<{ module: string; content: string; path?: string }> = [];
-
-    for (const module of modules) {
-      ctx.logger.info({ moduleName: module.name }, 'Generating K8s manifests for module');
-
-      const result = await generateSingleManifest(input, ctx, module as ModuleInfo);
-
-      if (result.ok) {
-        const value = result.value as {
-          content?: string;
-          workflowHints?: { message?: string };
-        };
-        const extractedPath = value.workflowHints?.message?.match(/Saved to (.+?)\./)?.[1];
-        results.push({
-          module: module.name,
-          success: true,
-          ...(extractedPath ? { path: extractedPath } : {}),
-        });
-        manifests.push({
-          module: module.name,
-          content: value.content || '',
-          ...(extractedPath ? { path: extractedPath } : {}),
-        });
-        ctx.logger.info({ moduleName: module.name }, 'K8s manifests generated successfully');
-      } else {
-        results.push({
-          module: module.name,
-          success: false,
-          error: result.error,
-        });
-        ctx.logger.warn(
-          { moduleName: module.name, error: result.error },
-          'Failed to generate K8s manifests for module',
-        );
-      }
-    }
-
-    const successCount = results.filter((r) => r.success).length;
-    const failureCount = results.filter((r) => !r.success).length;
-
-    if (successCount === 0) {
-      return Failure(
-        `Failed to generate K8s manifests for all ${modules.length} modules:\n${results.map((r) => `- ${r.module}: ${r.error}`).join('\n')}`,
-      );
-    }
-
-    // Build summary response
-    const summary = `Generated Kubernetes manifests for ${successCount}/${modules.length} modules:\n${results
-      .filter((r) => r.success)
-      .map((r) => `✅ ${r.module}${r.path ? `: ${r.path}` : ''}`)
-      .join('\n')}${
-      failureCount > 0
-        ? `\n\n⚠️  Failed modules (${failureCount}):\n${results
-            .filter((r) => !r.success)
-            .map((r) => `❌ ${r.module}: ${r.error}`)
-            .join('\n')}`
-        : ''
-    }`;
-
-    return Success({
-      content: summary,
-      language: 'text',
-      confidence: successCount / modules.length,
-      suggestions: [
-        `Successfully generated ${successCount} K8s manifest(s)`,
-        failureCount > 0 ? `${failureCount} module(s) failed` : 'All modules successful',
-      ],
-      analysis: {
-        enhancementAreas: [],
-        confidence: successCount / modules.length,
-        knowledgeApplied: [],
-      },
-    });
+  if (!path) {
+    return Failure('Path is required to generate manifest plan.');
   }
 
-  // Single-module repository - generate for single app
-  return generateSingleManifest(input, ctx);
+  return runPattern(input, ctx);
 }
 
-const tool: MCPTool<typeof generateK8sManifestsSchema, AIResponse> = {
+const tool: MCPTool<typeof generateK8sManifestsSchema, ManifestPlan> = {
   name,
   description,
   category: 'kubernetes',
@@ -612,12 +202,8 @@ const tool: MCPTool<typeof generateK8sManifestsSchema, AIResponse> = {
   schema: generateK8sManifestsSchema,
   metadata: {
     knowledgeEnhanced: true,
-    samplingStrategy: 'single',
-    enhancementCapabilities: [
-      'content-generation',
-      'manifest-generation',
-      'kubernetes-optimization',
-    ],
+    samplingStrategy: 'none',
+    enhancementCapabilities: ['recommendations'],
   },
   run,
 };

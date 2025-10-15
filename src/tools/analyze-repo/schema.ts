@@ -3,14 +3,14 @@
  */
 
 import { z } from 'zod';
-import { repositoryPathAbsoluteUnix, analysisOptions } from '../shared/schemas';
+import { repositoryPath, analysisOptions } from '../shared/schemas';
 
 export const moduleInfo = z.object({
   name: z.string().describe('The name of the module'),
-  modulePathAbsoluteUnix: z
+  modulePath: z
     .string()
     .describe(
-      'Absolute path to module root using only forward slashes path separators. UNIX path separators only.',
+      'Absolute path to module root. Paths are automatically normalized to forward slashes on all platforms.',
     ),
   dockerfilePath: z.string().optional().describe('Path where the Dockerfile should be generated'),
   language: z
@@ -45,7 +45,7 @@ export const moduleInfo = z.object({
 export type ModuleInfo = z.infer<typeof moduleInfo>;
 
 export const analyzeRepoSchema = z.object({
-  repositoryPathAbsoluteUnix,
+  repositoryPath,
   ...analysisOptions,
   modules: z
     .array(moduleInfo)

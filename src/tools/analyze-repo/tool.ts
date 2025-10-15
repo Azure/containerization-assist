@@ -155,7 +155,7 @@ async function analyzeRepositoryDeterministically(
         // Convert to ModuleInfo
         modules.push({
           name: path.basename(dirName),
-          modulePathAbsoluteUnix: dirName,
+          modulePath: dirName,
           language: parsedConfig.language || 'other',
           languageVersion: parsedConfig.languageVersion,
           frameworks: parsedConfig.framework
@@ -186,7 +186,7 @@ async function run(
   input: z.infer<typeof analyzeRepoSchema>,
   ctx: ToolContext,
 ): Promise<Result<RepositoryAnalysis>> {
-  let { repositoryPathAbsoluteUnix: repoPath } = input;
+  let repoPath = input.repositoryPath;
 
   // Convert to absolute path if relative
   if (!path.isAbsolute(repoPath)) {

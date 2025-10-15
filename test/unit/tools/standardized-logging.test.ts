@@ -20,7 +20,6 @@ const ALL_TOOLS = [
   'convert-aca-to-k8s',
   'deploy',
   'fix-dockerfile',
-  'generate-helm-charts',
   'prepare-cluster',
   'push-image',
   'resolve-base-images',
@@ -53,7 +52,6 @@ describe('Standardized Logging Regression Tests', () => {
       expect(ALL_TOOLS.length).toBeGreaterThan(8);
       expect(ALL_TOOLS).toContain('build-image');
       expect(ALL_TOOLS).toContain('deploy');
-      expect(ALL_TOOLS).toContain('generate-helm-charts');
     });
 
     ALL_TOOLS.forEach((toolName) => {
@@ -245,15 +243,6 @@ describe('Standardized Logging Regression Tests', () => {
       });
     });
 
-    it('should include all AI-powered generator tools', () => {
-      const aiGenerators = [
-        'generate-helm-charts',
-      ];
-
-      aiGenerators.forEach((tool) => {
-        expect(ALL_TOOLS).toContain(tool as any);
-      });
-    });
   });
 });
 

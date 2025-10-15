@@ -1,75 +1,47 @@
+/**
+ * Schema definition for generate-k8s-manifests tool
+ */
+
 import { z } from 'zod';
-import {
-  imageId,
-  appName,
-  repositoryPathAbsoluteUnix,
-  namespace,
-  replicas,
-  port,
-  serviceType,
-  ingressEnabled,
-  ingressHost,
-  resources,
-  envVars,
-  configMapData,
-  healthCheck,
-  autoscaling,
-  environment,
-  samplingOptions,
-} from '../shared/schemas';
+import { environment, repositoryPath as sharedPath } from '../shared/schemas';
+import { ModuleInfo, moduleInfo } from '../analyze-repo/schema';
 
 export const generateK8sManifestsSchema = z.object({
-  imageId: imageId
-    .optional()
-    .describe('Docker image to deploy (e.g., myapp:v1.0.0). Typically from build-image output.'),
-  appName: appName
-    .optional()
-    .describe('Application name for Kubernetes resources. Defaults to image name if not provided.'),
-  modules: z
-    .array(
-      z.object({
-        name: z.string(),
-        modulePathAbsoluteUnix: z.string(),
-        language: z.enum(['java', 'dotnet', 'other']).optional(),
-        frameworks: z
-          .array(
-            z.object({
-              name: z.string(),
-              version: z.string().optional(),
-            }),
-          )
-          .optional(),
-        languageVersion: z.string().optional(),
-        dependencies: z.array(z.string()).optional(),
-        ports: z.array(z.number()).optional(),
-        entryPoint: z.string().optional(),
-        buildSystem: z
-          .object({
-            type: z.string().optional(),
-            configFile: z.string().optional(),
-          })
-          .passthrough()
-          .optional(),
-      }),
-    )
-    .optional()
-    .describe(
-      'Array of module information. To generate manifests for specific modules, pass only those modules in this array.',
-    ),
-  path: repositoryPathAbsoluteUnix.describe('Path where the k8s folder should be created'),
-  namespace,
-  replicas,
-  port,
-  serviceType,
-  ingressEnabled,
-  ingressHost,
-  resources,
-  envVars,
-  configMapData,
-  healthCheck,
-  autoscaling,
-  environment,
-  ...samplingOptions,
+  ...moduleInfo.shape,
+  path: sharedPath.describe(
+    'Repository path (automatically normalized to forward slashes on all platforms).',
+  ),
+  manifestType: z
+    .enum(['kubernetes', 'helm', 'aca', 'kustomize'])
+    .describe('Type of manifest to generate'),
+  environment: environment.describe('Target environment (production, development, etc.)'),
 });
 
 export type GenerateK8sManifestsParams = z.infer<typeof generateK8sManifestsSchema>;
+
+// Legacy export for compatibility
+export const generateManifestPlanSchema = generateK8sManifestsSchema;
+export type GenerateManifestPlanParams = GenerateK8sManifestsParams;
+
+export interface ManifestRequirement {
+  id: string;
+  category: string;
+  recommendation: string;
+  example?: string;
+  severity?: 'high' | 'medium' | 'low' | 'required';
+  tags?: string[];
+  matchScore: number;
+}
+
+export interface ManifestPlan {
+  repositoryInfo: ModuleInfo;
+  manifestType: 'kubernetes' | 'helm' | 'aca' | 'kustomize';
+  recommendations: {
+    securityConsiderations: ManifestRequirement[];
+    resourceManagement: ManifestRequirement[];
+    bestPractices: ManifestRequirement[];
+  };
+  knowledgeMatches: ManifestRequirement[];
+  confidence: number;
+  summary: string;
+}

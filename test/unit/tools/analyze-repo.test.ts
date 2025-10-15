@@ -65,7 +65,7 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
       const result = await analyzeTool.run(
         {
-          repositoryPathAbsoluteUnix: '/test/repo',
+          repositoryPath: '/test/repo',
         },
         mockContext,
       );
@@ -116,7 +116,7 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
       const result = await analyzeTool.run(
         {
-          repositoryPathAbsoluteUnix: '/test/repo',
+          repositoryPath: '/test/repo',
         },
         mockContext,
       );
@@ -173,7 +173,7 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
       const result = await analyzeTool.run(
         {
-          repositoryPathAbsoluteUnix: '/test/repo',
+          repositoryPath: '/test/repo',
         },
         mockContext,
       );
@@ -192,10 +192,10 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
       const result = await analyzeTool.run(
         {
-          repositoryPathAbsoluteUnix: '/test/repo',
+          repositoryPath: '/test/repo',
           modules: [{
             name: 'my-service',
-            modulePathAbsoluteUnix: '/test/repo',
+            modulePath: '/test/repo',
             language: 'java',
           }],
         },
@@ -216,7 +216,7 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
       const result = await analyzeTool.run(
         {
-          repositoryPathAbsoluteUnix: '/test/file.txt',
+          repositoryPath: '/test/file.txt',
         },
         mockContext,
       );
@@ -238,7 +238,7 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
       const result = await analyzeTool.run(
         {
-          repositoryPathAbsoluteUnix: '/test/repo',
+          repositoryPath: '/test/repo',
         },
         mockContext,
       );
@@ -254,7 +254,7 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
       const result = await analyzeTool.run(
         {
-          repositoryPathAbsoluteUnix: '/nonexistent/repo',
+          repositoryPath: '/nonexistent/repo',
         },
         mockContext,
       );
