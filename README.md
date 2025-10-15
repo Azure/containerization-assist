@@ -407,8 +407,7 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- GitHub Issues: https://github.com/azure/containerization-assist/issues
-- Documentation: https://github.com/azure/containerization-assist/tree/main/docs
+See [SUPPORT.md](SUPPORT.md) for information on how to get help with this project.
 
 ## Trademarks
 
