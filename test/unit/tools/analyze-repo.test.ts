@@ -65,7 +65,6 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
       const result = await analyzeTool.run(
         {
-          sessionId: 'test-session',
           repositoryPathAbsoluteUnix: '/test/repo',
         },
         mockContext,
@@ -117,7 +116,6 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
       const result = await analyzeTool.run(
         {
-          sessionId: 'test-session',
           repositoryPathAbsoluteUnix: '/test/repo',
         },
         mockContext,
@@ -175,7 +173,6 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
       const result = await analyzeTool.run(
         {
-          sessionId: 'test-session',
           repositoryPathAbsoluteUnix: '/test/repo',
         },
         mockContext,
@@ -195,7 +192,6 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
       const result = await analyzeTool.run(
         {
-          sessionId: 'test-session',
           repositoryPathAbsoluteUnix: '/test/repo',
           modules: [{
             name: 'my-service',
@@ -220,7 +216,6 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
       const result = await analyzeTool.run(
         {
-          sessionId: 'test-session',
           repositoryPathAbsoluteUnix: '/test/file.txt',
         },
         mockContext,
@@ -243,7 +238,6 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
       const result = await analyzeTool.run(
         {
-          sessionId: 'test-session',
           repositoryPathAbsoluteUnix: '/test/repo',
         },
         mockContext,
@@ -260,7 +254,6 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
       const result = await analyzeTool.run(
         {
-          sessionId: 'test-session',
           repositoryPathAbsoluteUnix: '/nonexistent/repo',
         },
         mockContext,

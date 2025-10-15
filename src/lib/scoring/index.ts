@@ -26,7 +26,7 @@ export {
 // Helm chart scoring
 export { HelmScorer, scoreHelmChart } from './helm-scorer';
 
-// Legacy scorers (to be migrated to proper scorer classes)
+// Additional specialized scorers
 export {
   scoreACAManifest,
   scoreBaseImageRecommendation,

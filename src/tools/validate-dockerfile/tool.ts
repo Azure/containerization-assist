@@ -67,7 +67,7 @@ function validateImageAgainstRules(
   // strictMode controls whether allowlist is enforced
   // If allowlist exists AND strictMode is true: must match to be allowed (start with false)
   // Otherwise: permissive by default (start with true)
-  let allowed = allowlist.length > 0 && strictMode ? false : true;
+  let allowed = !(allowlist.length > 0 && strictMode);
   let denied = false;
   let matchedAllowRule: string | undefined;
   let matchedDenyRule: string | undefined;

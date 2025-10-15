@@ -224,8 +224,8 @@ spec:
     jest.clearAllMocks();
   });
 
-  describe('analyze-repo (v4.0.0 - now deterministic, no AI)', () => {
-    it('should successfully analyze repository with pre-provided modules (legacy mode)', async () => {
+  describe('analyze-repo', () => {
+    it('should successfully analyze repository with pre-provided modules', async () => {
       const result = await analyzeRepoTool.run(
         {
           repositoryPathAbsoluteUnix: '/test/repo',
@@ -242,7 +242,6 @@ spec:
         mockContext,
       );
 
-      // analyze-repo v4.0.0 is now deterministic - accepts pre-provided modules or parses config files
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value).toHaveProperty('modules');
@@ -252,11 +251,9 @@ spec:
     });
 
     it('should analyze repository deterministically when modules not provided', async () => {
-      // v4.0.0 uses deterministic file parsing, not AI
       const result = await analyzeRepoTool.run(
         {
           repositoryPathAbsoluteUnix: '/test/repo',
-          // modules intentionally omitted - should fail Zod validation
         } as any,
         mockContext,
       );
@@ -265,10 +262,8 @@ spec:
       if (result.ok) {
         expect(result.value).toHaveProperty('modules');
         expect(result.value.modules.length).toBeGreaterThan(0);
-        // Should detect express from mocked package.json
         expect(result.value.modules?.[0].frameworks?.[0]?.name).toBe('express');
       }
-      // Verify AI was NOT called (v4.0.0 is deterministic)
       expect(promptEngine.buildMessages).not.toHaveBeenCalled();
     });
   });
