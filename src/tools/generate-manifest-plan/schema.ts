@@ -1,15 +1,24 @@
 /**
- * Schema definition for generate-k8s-manifests tool
+ * Schema definition for generate-manifest-plan tool
  */
 
 import { z } from 'zod';
-import { environment, repositoryPath as sharedPath } from '../shared/schemas';
+import {
+  sessionId as sharedSessionId,
+  environment,
+  repositoryPathAbsoluteUnix as sharedPath,
+} from '../shared/schemas';
 import { ModuleInfo, moduleInfo } from '../analyze-repo/schema';
 
-export const generateK8sManifestsSchema = z.object({
+export const generateManifestPlanSchema = z.object({
   ...moduleInfo.shape,
+  sessionId: sharedSessionId
+    .optional()
+    .describe(
+      'Session identifier to retrieve analysis results. If provided, uses analyze-repo data from session.',
+    ),
   path: sharedPath.describe(
-    'Repository path (automatically normalized to forward slashes on all platforms).',
+    'Repository path (use forward slashes: /path/to/repo). Required if sessionId not provided.',
   ),
   manifestType: z
     .enum(['kubernetes', 'helm', 'aca', 'kustomize'])
@@ -18,16 +27,10 @@ export const generateK8sManifestsSchema = z.object({
   detectedDependencies: z
     .array(z.string())
     .optional()
-    .describe(
-      'Detected libraries/frameworks/features from repository analysis (e.g., ["redis", "ef-core", "signalr", "mongodb", "health-checks"]). This helps match relevant knowledge entries.',
-    ),
+    .describe('Detected dependencies from analyze-repo (e.g., ["redis", "ef-core", "mongodb"])'),
 });
 
-export type GenerateK8sManifestsParams = z.infer<typeof generateK8sManifestsSchema>;
-
-// Legacy export for compatibility
-export const generateManifestPlanSchema = generateK8sManifestsSchema;
-export type GenerateManifestPlanParams = GenerateK8sManifestsParams;
+export type GenerateManifestPlanParams = z.infer<typeof generateManifestPlanSchema>;
 
 export interface ManifestRequirement {
   id: string;

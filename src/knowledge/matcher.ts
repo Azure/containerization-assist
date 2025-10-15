@@ -9,7 +9,6 @@ const logger = createLogger().child({ module: 'knowledge-matcher' });
 const SCORING = {
   CATEGORY: 20,
   PATTERN: 30,
-  TAG: 10,
   LANGUAGE: 15,
   FRAMEWORK: 10,
   ENVIRONMENT: 8,
@@ -109,26 +108,6 @@ const evaluatePatternMatch = (
       { entryId: entry.id, error: entry.compiledCache.compilationError },
       'Skipping entry with compilation error',
     );
-  }
-
-  return { score: 0, reasons: [] };
-};
-
-/**
- * Evaluate tag match scoring
- */
-const evaluateTagMatch = (
-  entry: LoadedEntry,
-  query: KnowledgeQuery,
-): { score: number; reasons: string[] } => {
-  if (!query.tags || !entry.tags) return { score: 0, reasons: [] };
-
-  const matchedTags = query.tags.filter((tag) => entry.tags?.includes(tag));
-  if (matchedTags.length > 0) {
-    return {
-      score: matchedTags.length * SCORING.TAG,
-      reasons: [`Tags: ${matchedTags.join(', ')}`],
-    };
   }
 
   return { score: 0, reasons: [] };
@@ -251,7 +230,6 @@ export const evaluateEntry = (entry: LoadedEntry, query: KnowledgeQuery): Knowle
       ? { score: SCORING.CATEGORY, reasons: [`Category: ${query.category}`] }
       : { score: 0, reasons: [] },
     evaluatePatternMatch(entry, query),
-    evaluateTagMatch(entry, query),
     evaluateLanguageMatch(entry, query),
     evaluateFrameworkMatch(entry, query),
     evaluateEnvironmentMatch(entry, query),
@@ -299,6 +277,7 @@ export interface KnowledgeSnippetOptions {
   category?: KnowledgeCategory;
   maxChars?: number;
   maxSnippets?: number;
+  detectedDependencies?: string[];
 }
 
 /**
@@ -317,14 +296,23 @@ export async function getKnowledgeSnippets(
     const { loadKnowledgeData } = await import('./loader');
     const knowledgeData = await loadKnowledgeData();
 
-    // Build query from topic and options
+    const queryTextParts: string[] = [topic];
+    if (options.detectedDependencies && options.detectedDependencies.length > 0) {
+      queryTextParts.push(...options.detectedDependencies);
+    }
+
+    const queryTags: string[] = [options.tool];
+    if (options.language) queryTags.push(options.language);
+    if (options.framework) queryTags.push(options.framework);
+    if (options.environment) queryTags.push(options.environment);
+
     const query: KnowledgeQuery = {
-      text: topic,
+      text: queryTextParts.join(' '),
       environment: options.environment,
       ...(options.language && { language: options.language }),
       ...(options.framework && { framework: options.framework }),
       ...(options.category && { category: options.category }),
-      tags: [options.tool, topic],
+      tags: queryTags,
       limit: options.maxSnippets || 10,
     };
 
