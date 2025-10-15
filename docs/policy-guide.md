@@ -4,18 +4,32 @@
 
 The policy system enables enforcement of security, quality, and compliance rules across your containerization workflow. Policies are defined in YAML files and evaluated automatically during tool execution.
 
+**Key Features:**
+- **Auto-loading:** Policies are automatically discovered from the `policies/` directory
+- **All tools:** Applied to all 17 MCP tools via the orchestrator
+- **Shipped with package:** Policies are included in the npm package and ready to use
+- **Override support:** Optional environment variable to select specific policies
+- **Type-safe:** Validated using Zod schemas at load time
+
 ## Quick Start
 
+**Policies are auto-loaded** from the `policies/` directory. All `.yaml` files are discovered automatically, and the first one alphabetically is loaded.
+
 ```bash
-# Set policy path via environment variable
+# Default: Auto-loads from policies/ directory (no configuration needed)
+npm start
+
+# Override with specific policy path (optional)
 export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/security-baseline.yaml
 
 # Or specify when creating orchestrator
 npm start -- --policy ./policies/security-baseline.yaml
-
-# Apply multiple policies (colon-separated)
-export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/security-baseline.yaml:./policies/base-images.yaml
 ```
+
+**Current auto-load order** (alphabetically):
+1. `policies/base-images.yaml` (loaded first)
+2. `policies/container-best-practices.yaml`
+3. `policies/security-baseline.yaml`
 
 ## Available Policies
 
@@ -58,11 +72,12 @@ rules:
     priority: 100  # Higher = more important
     description: Human-readable description
     conditions:
-      - kind: dockerfile-directive|dockerfile-content|kubernetes-manifest
-        directive: FROM|RUN|USER|HEALTHCHECK|etc.
-        pattern: regex-pattern  # Optional
-        value: expected-value   # Optional
-        missing: true|false     # Optional
+      - kind: regex|function
+        pattern: regex-pattern  # For kind: regex
+        flags: i|m|s           # Optional regex flags (i=case-insensitive, m=multiline, s=dotall)
+        # OR
+        name: function-name     # For kind: function
+        args: [arg1, arg2]     # Function arguments
     actions:
       block: true|false   # Prevents action with error
       warn: true|false    # Shows warning but allows
@@ -72,37 +87,46 @@ rules:
 
 ## Condition Types
 
-### Dockerfile Directives
-Match specific Dockerfile instructions:
+### Regex Pattern Matching
+Match text patterns using regular expressions:
 ```yaml
-- kind: dockerfile-directive
-  directive: FROM
-  pattern: ':latest$'  # Matches images with :latest tag
+- kind: regex
+  pattern: 'FROM.*:latest'
+  flags: m  # Optional: i (case-insensitive), m (multiline), s (dotall)
 ```
 
-### Dockerfile Content
-Match patterns anywhere in Dockerfile:
+**Common patterns:**
 ```yaml
-- kind: dockerfile-content
-  pattern: 'apt-get\s+(upgrade|dist-upgrade)'
+# Block latest tag
+pattern: ':latest\s*$'
+flags: m
+
+# Detect secrets in env vars (case-insensitive)
+pattern: '(password|secret|api[_-]?key|token).*=.*\S+'
+flags: i
+
+# Block root user
+pattern: '^USER\s+(root|0)\s*$'
+flags: m
+
+# Detect privileged containers
+pattern: 'privileged:\s*true'
+
+# Detect apt-get upgrade usage
+pattern: 'apt-get\s+(upgrade|dist-upgrade)'
 ```
 
-### Kubernetes Manifests
-Validate Kubernetes configuration:
+### Function Matching
+Use predefined validation functions:
 ```yaml
-- kind: kubernetes-manifest
-  field: securityContext.privileged
-  value: true
+- kind: function
+  name: hasPattern
+  args: ['^USER\s+\w+', 'm']  # Pattern and flags
 ```
 
-### Configuration
-Check tool configuration:
-```yaml
-- kind: configuration
-  field: scanner
-  operator: not-in
-  values: ['trivy', 'grype']
-```
+**Available functions:**
+- `hasPattern(pattern, flags)` - Check if content matches regex pattern
+- Additional functions can be added via the policy evaluation engine
 
 ## Enforcement Levels
 
@@ -129,16 +153,18 @@ Rules are evaluated by priority (higher first):
 - **50-69**: Best practices and optimization
 - **<50**: Minor suggestions and documentation
 
-## Combining Policies
+## Multiple Policies
 
-Apply multiple policies by separating paths with colons:
+**Note:** Currently, only one policy file is loaded at a time. When multiple `.yaml` files exist in `policies/`, the first one alphabetically is loaded.
+
+To use a specific policy, set the environment variable:
 
 ```bash
-# Combine security + base images + best practices
-export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/security-baseline.yaml:./policies/base-images.yaml:./policies/container-best-practices.yaml
+# Use security baseline instead of default (base-images.yaml)
+export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/security-baseline.yaml
 ```
 
-Later policies can override earlier ones if rules have the same `id`.
+**Future enhancement:** Support for merging multiple policies is planned. See orchestrator.ts for implementation details.
 
 ## Environment-Specific Policies
 
@@ -174,36 +200,71 @@ npm start -- --policy ./policies/my-policy.yaml --validate
 
 Policies are validated against the schema on load. Invalid policies will be rejected with clear error messages.
 
+## Package Distribution
+
+**Policies are included in the npm package** via the `files` array in `package.json`:
+
+```json
+"files": [
+  "dist/**/*",
+  "dist-cjs/**/*",
+  "policies/**/*.yaml",
+  "knowledge/**/*.json"
+]
+```
+
+When you install `containerization-assist-mcp`, all production-ready policies are available immediately in the `policies/` directory. No additional setup required.
+
+## How Policies Are Applied
+
+Policies are enforced by the **tool orchestrator** (`src/app/orchestrator.ts`) which:
+
+1. **Auto-discovers** all `.yaml` files in `policies/` directory at startup
+2. **Loads** the first policy alphabetically (can be overridden via env var)
+3. **Validates** tool parameters using Zod schemas
+4. **Evaluates** policy rules against tool inputs before execution
+5. **Blocks or warns** based on rule actions (block/warn/suggest)
+6. **Returns** actionable error messages with guidance when policies block
+
+All 17 MCP tools are automatically protected by the policy system. No tool-specific configuration needed.
+
+**Implementation details:** See `src/app/orchestrator.ts:176-189` for policy evaluation logic.
+
 ## Best Practices
 
 1. **Start with warnings**: Begin with `enforcement: warn` to understand impact before enforcing
-2. **Combine policies**: Use multiple focused policies rather than one monolithic file
-3. **Document rules**: Include clear `description` and `message` fields
-4. **Test policies**: Validate policies with real Dockerfiles before deploying
-5. **Version control**: Keep policies in version control with your infrastructure code
-6. **Review regularly**: Update policies as security best practices evolve
+2. **Choose the right policy**: Select the policy that best matches your use case (security, base images, or best practices)
+3. **Custom policies**: Create custom policies by copying and modifying the provided examples
+4. **Document rules**: Include clear `description` and `message` fields in your rules
+5. **Test policies**: Validate policies with real Dockerfiles before deploying
+6. **Version control**: Keep policies in version control with your infrastructure code
+7. **Review regularly**: Update policies as security best practices evolve
 
 ## Common Use Cases
+
+### Default (Auto-loaded)
+```bash
+# Uses policies/base-images.yaml (first alphabetically)
+npm start
+```
 
 ### Enforce Security Baseline
 ```bash
 export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/security-baseline.yaml
+npm start
 ```
 
-### Optimize Image Size
+### Container Best Practices
 ```bash
-export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/base-images.yaml
+export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/container-best-practices.yaml
+npm start
 ```
 
-### Production Readiness
-```bash
-export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/security-baseline.yaml:./policies/container-best-practices.yaml
-```
-
-### Development (Relaxed)
+### Development (Relaxed Enforcement)
 ```bash
 export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/container-best-practices.yaml
 export CONTAINERIZATION_ASSIST_POLICY_ENVIRONMENT=development
+npm start
 ```
 
 ## Examples
