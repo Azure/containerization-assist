@@ -4,23 +4,13 @@
 
 **Containerization Assist MCP Server** is a comprehensive TypeScript-based MCP (Model Context Protocol) server designed for AI-powered containerization workflows. It provides intelligent Docker and Kubernetes support through a clean, modular architecture that emphasizes reliability, extensibility, and maintainability.
 
-### Key Features
-- 🐳 **Docker Integration**: Build, scan, and deploy container images
-- ☸️ **Kubernetes Support**: Generate manifests and deploy applications  
-- 🤖 **AI-Powered**: Intelligent Dockerfile generation and optimization
-- 🔄 **Workflow Orchestration**: Complete containerization pipelines
-- 📊 **Progress Tracking**: Real-time progress updates via MCP
-- 🔒 **Security Scanning**: Built-in vulnerability scanning with Trivy
-
----
-
 ## Architecture Overview
 
 ### High-Level System Design
 
 ```
 ┌─────────────────────────────────────────┐
-│            MCP Client (Claude)          │
+│            MCP Client                   │
 └─────────────────┬───────────────────────┘
                   │ MCP Protocol
 ┌─────────────────▼───────────────────────┐
@@ -44,15 +34,6 @@
 │  └──────┘ └──────┘ └─────┘             │
 └─────────────────────────────────────────┘
 ```
-
-### Architectural Principles
-
-1. **Clean Architecture**: Clear separation between domain logic, application services, and infrastructure
-2. **Result-Based Error Handling**: Consistent `Result<T>` pattern throughout the codebase
-3. **Dependency Injection**: Centralized container for managing dependencies
-4. **Path Aliases**: TypeScript path mapping for clean imports (@/app, @/mcp, @/tools, etc.)
-5. **Tool Co-location**: Each tool has its own directory with schema, implementation, and exports
-
 ---
 
 ## Source Code Structure (`src/`)
@@ -121,19 +102,18 @@
 - Environment validation
 
 ### 📁 `/config` - Configuration Management
-**Purpose**: Modular policy system and environment configuration.
+**Purpose**: Policy system and environment configuration.
 
 **Key Files**:
 - `environment.ts`: Unified environment configuration
-- `policy-constraints.ts`: Policy constraint extraction
 - `policy-eval.ts`: Rule evaluation and application logic
-- `policy-io.ts`: Load, validate, migrate, and cache operations
-- `policy-prompt.ts`: AI prompt constraint integration
+- `policy-io.ts`: Load, validate, and cache operations
 - `policy-schemas.ts`: Zod schemas and TypeScript types
+- `policy-data.ts`: Policy data structures
 
 **Responsibilities**:
 - Environment variable management
-- Policy system with 5 specialized modules
+- Policy system for runtime constraints
 - Type-safe configuration interfaces
 
 ### 📁 `/infra` - Infrastructure Clients
@@ -170,18 +150,20 @@
 - Knowledge pack loading and validation
 - Budget-aware knowledge selection for prompt enhancement
 
-### 📁 `/lib` - Pure Utilities
-**Purpose**: Reusable utilities with no infrastructure dependencies.
+### 📁 `/lib` - Shared Utilities
+**Purpose**: Reusable utilities and helpers.
 
 **Key Files**:
 - `docker.ts`: Docker utility functions
 - `file-utils.ts`: File system utilities
 - `regex-patterns.ts`: Common regex patterns
+- `security-scanner.ts`: Security scanning utilities
+- `tool-helpers.ts`: Tool execution helpers
 
 **Responsibilities**:
-- Pure utility functions
+- Utility functions
 - Helper libraries
-- Common patterns and utilities
+- Common patterns
 
 ### 📁 `/mcp` - MCP Server Implementation
 **Purpose**: Model Context Protocol server and adapters.
@@ -212,31 +194,8 @@
 ```
 /tool-name/
 ├── tool.ts     # Tool implementation
-├── schema.ts   # Zod schema definition
-└── index.ts    # Public exports
+└── schema.ts   # Zod schema definition
 ```
-
-### Available Tools**:
-- `analyze-repo`: Repository analysis and framework detection
-- `build-image`: Docker image building with progress
-- `convert-aca-to-k8s`: Convert ACA to Kubernetes
-- `deploy`: Deploy applications to Kubernetes
-- `fix-dockerfile`: Fix and optimize existing Dockerfiles
-- `generate-aca-manifests`: Azure Container Apps manifests
-- `generate-dockerfile`: AI-powered Dockerfile generation
-- `generate-helm-charts`: Generate Helm charts
-- `generate-k8s-manifests`: Kubernetes manifest generation
-- `generate-kustomize`: Generate Kustomize configurations
-- `ops`: Operational utilities
-- `generate-dockerfile-plan`: Plan Dockerfile generation strategy
-- `generate-manifest-plan`: Plan manifest generation strategy
-- `prepare-cluster`: Kubernetes cluster preparation
-- `push-image`: Push images to registry
-- `resolve-base-images`: Base image recommendations
-- `scan`: Security vulnerability scanning
-- `tag-image`: Docker image tagging
-- `validate-dockerfile`: Dockerfile validation
-- `verify-deployment`: Verify deployment status
 
 **Shared Resources**:
 - `shared/`: Common tool utilities and patterns
@@ -279,128 +238,6 @@
 
 ---
 
-## Key Design Patterns
-
-### 1. Result-Based Error Handling
-All operations that can fail return a `Result<T>` type:
-
-```typescript
-export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
-
-// Usage
-const result = await buildImage(config);
-if (result.ok) {
-  console.log('Image built:', result.value.imageId);
-} else {
-  console.error('Build failed:', result.error);
-}
-```
-
-### 2. Tool Co-location Pattern
-Each tool is self-contained with its own directory:
-
-```typescript
-// src/tools/build-image/
-├── tool.ts     # Implementation
-├── schema.ts   # Zod validation schema  
-└── index.ts    # Public exports
-```
-
-### 3. Application Factory Pattern
-Application initialization via factory function in `/app/index.ts`:
-
-```typescript
-export async function createApp(options: AppOptions) {
-  // Initialize infrastructure clients
-  // Load and validate policies
-  // Create orchestrator with dependencies
-  // Return configured application
-}
-```
-
-### 4. Path Aliases for Clean Imports
-TypeScript path mapping supports clean imports:
-
-```typescript
-// ✅ Path aliases (from tsconfig.json)
-import { Config } from '@/config/types';
-import { Logger } from '@/lib/logger';
-import type { Result } from '@types';
-import { analyzeRepo } from '@/tools/analyze-repo/tool';
-
-// Available Path Aliases:
-// @/*           → src/*
-// @/ai/*        → src/ai/*
-// @/mcp/*       → src/mcp/*
-// @/tools/*     → src/tools/*
-// @/lib/*       → src/lib/*
-// @/infra/*     → src/infra/*
-// @/config/*    → src/config/*
-// @/resources/* → src/resources/*
-// @/exports/*   → src/exports/*
-// @/knowledge/* → src/knowledge/*
-// @types        → src/types/index.ts
-// @/container   → src/container
-// @validation/* → src/validation
-
-// ✅ Relative imports (also acceptable for local files)
-import { Config } from '../config/types';
-```
-
----
-
-## Development Workflow
-
-### Build System
-- **Primary**: TypeScript compiler (`tsc`) with `tsc-alias` for path resolution
-- **Target**: ES2022 with native ESM modules
-- **Output**: `dist/` and `dist-cjs/` directories with TypeScript declarations
-
-### Code Quality
-- **TypeScript**: Strict mode with comprehensive type checking
-- **ESLint**: ~700 warnings (baseline enforced, 46% reduction achieved)
-- **Prettier**: Automatic code formatting
-- **Quality Gates**: Automated lint ratcheting prevents regression
-
-### Testing Strategy
-- **Unit Tests**: Jest with ES module support
-- **Integration Tests**: Docker and Kubernetes integration testing
-- **MCP Tests**: Custom MCP inspector for protocol testing
-- **Coverage**: >70% target with comprehensive tool testing
-
-### Key Scripts
-```bash
-npm run build        # Clean build (ESM + CJS)
-npm run build:esm    # Build ESM bundle only
-npm run build:cjs    # Build CJS bundle only
-npm run lint:fix     # Auto-fix linting issues
-npm run test:unit    # Unit tests
-npm run quality:gates # Comprehensive quality analysis
-```
-
----
-
-## Technology Stack
-
-### Core Dependencies
-- **@modelcontextprotocol/sdk**: MCP protocol implementation
-- **dockerode**: Docker API client
-- **@kubernetes/client-node**: Kubernetes API client
-- **commander**: CLI argument parsing
-- **pino**: Structured logging
-- **zod**: Runtime type validation
-- **execa**: Process execution
-- **js-yaml**: YAML parsing for Kubernetes manifests
-
-### Development Tools
-- **TypeScript 5.3+**: Static typing and modern language features
-- **tsc + tsc-alias**: TypeScript compiler with path alias resolution
-- **Jest**: Testing framework with ES module support
-- **ESLint**: Code linting with TypeScript support
-- **Prettier**: Code formatting
-
----
-
 ## Configuration and Environment
 
 ### Environment Variables
@@ -412,7 +249,7 @@ npm run quality:gates # Comprehensive quality analysis
 | `K8S_NAMESPACE` | Default Kubernetes namespace | `default` |
 
 ### Configuration Architecture
-The configuration system is centralized in `/config` with a modular policy system:
+The configuration system is centralized in `/config`:
 
 ```typescript
 // Environment configuration via src/config/environment.ts
@@ -420,15 +257,13 @@ export const environment = {
   docker: { socketPath: '/var/run/docker.sock' },
   kubernetes: { namespace: 'default' },
   logging: { level: 'info' },
-  // ... other environment settings
 };
 
-// Policy system with 5 specialized modules:
+// Policy system modules:
 // - policy-schemas.ts: Type definitions and Zod schemas
 // - policy-io.ts: Load, validate, and cache operations
 // - policy-eval.ts: Rule evaluation and application
-// - policy-prompt.ts: AI prompt constraint integration
-// - policy-constraints.ts: Data-driven constraint extraction
+// - policy-data.ts: Policy data structures
 ```
 
 ---
@@ -465,14 +300,12 @@ export const environment = {
    export default tool;
    ```
 3. Define `schema.ts` with Zod validation
-4. Export via `index.ts`
-5. Register in tool index
+4. Register in `src/tools/index.ts`
 
 ### Adding New AI Prompts
 1. Add prompt templates in `src/ai/prompt-templates.ts`
 2. Use via prompt engine: `buildMessages()` function
-3. Optionally enhance with knowledge packs via `enhancePrompt()`
-4. Apply policy constraints via `applyPolicyConstraints()`
+3. Optionally enhance with knowledge packs from `knowledge/packs/`
 
 ### Infrastructure Extensions
 1. Add new clients in `src/infra/`
@@ -483,28 +316,7 @@ export const environment = {
 ### Policy System Extensions
 1. Extend schemas in `src/config/policy-schemas.ts`
 2. Add evaluation logic in `src/config/policy-eval.ts`
-3. Update constraint extraction in `src/config/policy-constraints.ts`
-4. Integrate with prompts via `src/config/policy-prompt.ts`
-
----
-
-## Performance Considerations
-
-### Build Performance
-- **TypeScript Compilation**: Standard `tsc` compiler with `tsc-alias` for path resolution
-- **Parallel Builds**: Smart build system with ~2.7s build time
-- **Bundle Optimization**: ES2022 target with efficient module resolution
-- **Development**: Fast incremental builds and watch mode
-
-### Runtime Performance
-- **Result<T> Pattern**: Eliminates exception overhead
-- **Dependency Injection**: Efficient container-based dependency management
-- **Infrastructure Clients**: Connection pooling for Docker and Kubernetes
-
-### Architecture Benefits
-- **Modular Design**: Clean boundaries between layers reduce complexity
-- **Type Safety**: Compile-time type checking prevents runtime errors
-- **Path Aliases**: Clean imports improve build performance
+3. Add policy data in `src/config/policy-data.ts`
 
 ---
 
@@ -522,22 +334,10 @@ Knowledge packs are a first-class feature that enhance AI prompts with domain-sp
 5. **Budget Control**: Knowledge selection respects character budgets via `maxChars` parameter
 6. **Integration**: `buildMessages()` automatically calls `selectKnowledgeSnippets()` with topic, environment, and tool context
 
-**Tools Using Knowledge Packs**:
-- `generate-dockerfile`: Best practices for container images (multi-stage builds, security hardening)
-- `scan`: Security scanning guidance and vulnerability remediation
-- `generate-k8s-manifests`: Kubernetes deployment patterns and best practices
-- `resolve-base-images`: Base image recommendations by language/framework
-- `fix-dockerfile`: Dockerfile optimization techniques
-
-**Knowledge Flow in Tool Execution**:
+**Knowledge Flow**:
 ```
 Tool Invocation → ToolContext → buildMessages() → getKnowledgeSnippets() → AI Prompt
 ```
-
-**Verification**:
-- Unit tests: `test/unit/ai/prompt-engine.test.ts` validates knowledge injection
-- Integration tests: `test/integration/knowledge-policy-validation.test.ts` verifies end-to-end flow
-- Knowledge snippets visible in AI prompt metadata (`knowledgeCount` field)
 
 **Adding Knowledge**:
 1. Create/update JSON files in `knowledge/packs/`
@@ -547,52 +347,32 @@ Tool Invocation → ToolContext → buildMessages() → getKnowledgeSnippets() �
 
 ### Policy System
 
-The policy system provides runtime configuration and constraint enforcement. It remains fully active post-cleanup.
+The policy system provides runtime configuration and constraint enforcement.
 
-**Policy Architecture** (5 specialized modules in `src/config/`):
-1. **`policy-schemas.ts`**: Zod schemas and TypeScript type definitions
-2. **`policy-io.ts`**: Load, validate, migrate, and cache policy files
-3. **`policy-eval.ts`**: Rule evaluation and application logic
-4. **`policy-prompt.ts`**: AI prompt constraint integration
-5. **`policy-constraints.ts`**: Data-driven constraint extraction
+**Policy Architecture** (in `src/config/`):
+- **`policy-schemas.ts`**: Zod schemas and TypeScript type definitions
+- **`policy-io.ts`**: Load, validate, and cache policy files
+- **`policy-eval.ts`**: Rule evaluation and application logic
+- **`policy-data.ts`**: Policy data structures and examples
 
 **Policy Enforcement Flow**:
-1. **Configuration**: Pass `policyPath` and optional `policyEnvironment` to `createApp()` or `createOrchestrator()`
-2. **Load**: `loadPolicy()` reads and validates YAML policy files at startup
-3. **Evaluation**: During tool execution, `applyPolicy()` matches tool name and parameters against policy rules
-4. **Blocking**: Rules with `actions.block: true` prevent tool execution and return failure
-5. **Warnings**: Rules with `actions.warn: true` log warnings but allow execution
-6. **Integration**: `src/app/orchestrator.ts` enforces policies before calling `tool.run()` (lines 232-245)
-
-**Policy Enforcement in Orchestrator**:
-```typescript
-if (policy) {
-  const policyResults = applyPolicy(policy, {
-    tool: tool.name,
-    params: validatedParams
-  });
-
-  const blockers = policyResults
-    .filter(r => r.matched && r.rule.actions.block)
-    .map(r => r.rule.id);
-
-  if (blockers.length > 0) {
-    return Failure(ERROR_MESSAGES.POLICY_BLOCKED(blockers));
-  }
-}
-```
+1. Pass `policyPath` to `createApp()` or `createOrchestrator()`
+2. `loadPolicy()` reads and validates YAML policy files at startup
+3. During tool execution, `applyPolicy()` matches tool name and parameters against rules
+4. Rules with `actions.block: true` prevent tool execution
+5. Rules with `actions.warn: true` log warnings but allow execution
+6. `src/app/orchestrator.ts` enforces policies before calling `tool.run()`
 
 **Policy Features**:
-- **Type-safe**: Discriminated unions for compile-time safety (RegexMatcher vs FunctionMatcher)
-- **Stateless**: Pure functions without global mutable caches
-- **Environment-aware**: Policy rules can override per-environment
-- **Modular**: Each of 5 modules has single responsibility
+- Type-safe with Zod schemas
+- Stateless evaluation
+- Environment-aware overrides
+- Session-compatible
 
-**Verification**:
-- Unit tests: `test/unit/app/orchestrator.test.ts` validates policy application
-- Unit tests: `test/unit/config/policy-validation.test.ts` validates policy loading and evaluation
-- Integration tests: `test/integration/knowledge-policy-validation.test.ts` verifies blocking behavior
-- Runtime: Policy violations return `Result.Failure` with blocker rule IDs
+**Testing**:
+- Unit tests validate policy application and loading
+- Integration tests verify blocking behavior
+- Policy violations return `Result.Failure` with rule IDs
 
 **Example Policy** (YAML):
 ```yaml
@@ -647,16 +427,10 @@ Knowledge snippets enhance AI prompts with domain-specific guidance. Follow thes
    }
    ```
 
-4. **Test knowledge integration**:
+4. **Test**:
    ```bash
    npm run test:unit -- test/unit/knowledge/
-   npm run test:integration -- test/integration/knowledge-policy-validation.test.ts
    ```
-
-5. **Verify in prompts**:
-   - Knowledge snippets are automatically included based on `topic`, `environment`, and `tool`
-   - Check `metadata.knowledgeCount` in prompt results
-   - Use `maxChars` parameter to control budget
 
 **Knowledge Pack Schema**:
 - `topic`: Matches against `TOPICS` enum (e.g., `TOPICS.DOCKERFILE_GENERATION`)
@@ -666,10 +440,9 @@ Knowledge snippets enhance AI prompts with domain-specific guidance. Follow thes
 - `priority`: Higher priority snippets selected first (default: 0)
 
 **Best Practices**:
-- Keep snippets focused and actionable (200-500 characters)
-- Use higher priority (10+) for critical security/correctness guidance
-- Test with different budget constraints to ensure snippet is used
-- Include examples and specific recommendations, not general advice
+- Keep snippets focused (200-500 characters)
+- Use higher priority (10+) for critical guidance
+- Include examples and specific recommendations
 
 ### Adding a New Policy Rule
 
@@ -709,10 +482,9 @@ Policy rules enforce constraints and governance during tool execution.
    });
    ```
 
-4. **Test policy enforcement**:
+4. **Test**:
    ```bash
    npm run test:unit -- test/unit/config/policy-eval.test.ts
-   npm run test:integration -- test/integration/knowledge-policy-validation.test.ts
    ```
 
 **Policy Rule Components**:
@@ -726,23 +498,6 @@ Policy rules enforce constraints and governance during tool execution.
   - `block`: Prevent tool execution (returns error)
   - `warn`: Log warning but allow execution
   - `message`: User-facing explanation
-
-**Testing Policy Rules**:
-```typescript
-import { loadPolicy } from '@config/policy-io';
-import { applyPolicy } from '@config/policy-eval';
-
-const result = loadPolicy('./policies/my-team-policy.yaml');
-if (result.ok) {
-  const policyResults = applyPolicy(result.value, {
-    tool: 'tag-image',
-    params: { imageName: 'myapp:latest' }
-  });
-
-  const blocked = policyResults.find(r => r.matched && r.rule.actions.block);
-  console.log('Policy blocked:', blocked !== undefined);
-}
-```
 
 **Environment-Specific Policies**:
 ```yaml
@@ -765,7 +520,3 @@ environments:
 ```
 
 ---
-
-## Conclusion
-
-The Containerization Assist MCP Server represents a modern, well-architected approach to AI-powered containerization workflows. Its clean separation of concerns, Result-based error handling, and comprehensive tool ecosystem make it both reliable and extensible. The integration of knowledge packs for AI enhancement and the modular policy system for runtime configuration ensure that the platform can adapt to diverse requirements while maintaining deterministic, high-quality outputs. The focus on developer experience through fast builds, clear documentation, and comprehensive testing ensures long-term maintainability and ease of contribution.

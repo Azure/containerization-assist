@@ -118,7 +118,4 @@ if (!result.success) {
 
 ## More Information
 
-- [Getting Started Guide](../getting-started.md)
-- [External Usage Guide](../external-usage.md)
-- [Architecture Documentation](../architecture.md)
 - [Main README](../../README.md)
