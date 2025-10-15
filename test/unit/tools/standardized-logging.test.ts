@@ -20,10 +20,7 @@ const ALL_TOOLS = [
   'convert-aca-to-k8s',
   'deploy',
   'fix-dockerfile',
-  'generate-aca-manifests',
-  'generate-dockerfile',
   'generate-helm-charts',
-  'generate-k8s-manifests',
   'prepare-cluster',
   'push-image',
   'resolve-base-images',
@@ -53,10 +50,10 @@ describe('Standardized Logging Regression Tests', () => {
 
   describe('Tool logging format validation', () => {
     it('should define all expected tools', () => {
-      expect(ALL_TOOLS.length).toBeGreaterThan(10);
+      expect(ALL_TOOLS.length).toBeGreaterThan(8);
       expect(ALL_TOOLS).toContain('build-image');
       expect(ALL_TOOLS).toContain('deploy');
-      expect(ALL_TOOLS).toContain('generate-dockerfile');
+      expect(ALL_TOOLS).toContain('generate-helm-charts');
     });
 
     ALL_TOOLS.forEach((toolName) => {
@@ -218,8 +215,6 @@ describe('Standardized Logging Regression Tests', () => {
         'build-image',
         'deploy',
         'fix-dockerfile',
-        'generate-dockerfile',
-        'generate-k8s-manifests',
         'push-image',
         'scan',
         'tag-image',
@@ -236,13 +231,11 @@ describe('Standardized Logging Regression Tests', () => {
     it('should document all critical workflow tools', () => {
       const criticalTools = [
         'analyze-repo',
-        'generate-dockerfile',
         'fix-dockerfile',
         'build-image',
         'scan',
         'tag-image',
         'push-image',
-        'generate-k8s-manifests',
         'deploy',
         'verify-deployment',
       ];
@@ -254,10 +247,7 @@ describe('Standardized Logging Regression Tests', () => {
 
     it('should include all AI-powered generator tools', () => {
       const aiGenerators = [
-        'generate-dockerfile',
-        'generate-k8s-manifests',
         'generate-helm-charts',
-        'generate-aca-manifests',
       ];
 
       aiGenerators.forEach((tool) => {
