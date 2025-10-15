@@ -1,0 +1,106 @@
+version: '2.0'
+metadata:
+  name: Base Image Governance
+  description: Base image restrictions and recommendations
+  category: quality
+  author: containerization-assist
+
+defaults:
+  enforcement: advisory
+
+rules:
+  - id: recommend-microsoft-images
+    category: quality
+    priority: 85
+    description: Recommend Microsoft Azure Linux images for enterprise deployments
+    conditions:
+      - kind: regex
+        pattern: 'FROM\s+(openjdk|eclipse-temurin|mcr\.microsoft\.com/openjdk|dotnet|mcr\.microsoft\.com/dotnet|node|python):'
+        flags: im
+    actions:
+      suggest: true
+      message: 'Consider using Microsoft Azure Linux (Mariner) base images for enterprise deployments: mcr.microsoft.com/openjdk/jdk for Java, mcr.microsoft.com/dotnet for .NET, mcr.microsoft.com/cbl-mariner for Node.js/Python. Provides enterprise support and security.'
+
+  - id: block-latest-tag
+    category: quality
+    priority: 80
+    description: Prevent use of :latest tag for reproducibility
+    conditions:
+      - kind: regex
+        pattern: 'FROM\s+[^:]+:latest'
+        flags: im
+    actions:
+      block: true
+      message: 'Using :latest tag is not allowed. Specify explicit version tags for reproducibility.'
+
+  - id: recommend-alpine
+    category: performance
+    priority: 60
+    description: Recommend Alpine variants for smaller images
+    conditions:
+      - kind: regex
+        pattern: 'FROM\s+(node|python|ruby):(?!.*alpine)'
+        flags: im
+    actions:
+      warn: true
+      message: 'Consider using Alpine variant for smaller image size (e.g., node:20-alpine).'
+
+  - id: recommend-distroless
+    category: security
+    priority: 70
+    description: Recommend distroless images for production
+    conditions:
+      - kind: regex
+        pattern: 'FROM\s+(java|openjdk|golang|go):(?!.*gcr\.io/distroless)'
+        flags: im
+    actions:
+      suggest: true
+      message: 'Consider using distroless images for enhanced security (e.g., gcr.io/distroless/java).'
+
+  - id: block-deprecated-node
+    category: quality
+    priority: 90
+    description: Block deprecated Node.js versions
+    conditions:
+      - kind: regex
+        pattern: 'FROM\s+node:(8|10|12|14|16)\b'
+        flags: im
+    actions:
+      block: true
+      message: 'Deprecated Node.js version detected. Use Node.js 18 or higher.'
+
+  - id: block-deprecated-python
+    category: quality
+    priority: 90
+    description: Block deprecated Python versions
+    conditions:
+      - kind: regex
+        pattern: 'FROM\s+python:(2\.7|3\.[0-6])\b'
+        flags: im
+    actions:
+      block: true
+      message: 'Deprecated Python version detected. Use Python 3.10 or higher.'
+
+  - id: block-oversized-base
+    category: performance
+    priority: 65
+    description: Warn about large base images
+    conditions:
+      - kind: regex
+        pattern: 'FROM\s+(ubuntu|centos|fedora):(?!.*minimal)'
+        flags: im
+    actions:
+      warn: true
+      message: 'Large base images detected. Consider Alpine, slim, or distroless variants.'
+
+  - id: recommend-specific-versions
+    category: quality
+    priority: 75
+    description: Recommend specific version tags
+    conditions:
+      - kind: regex
+        pattern: 'FROM\s+[^:@]+:(\d+)$'
+        flags: im
+    actions:
+      suggest: true
+      message: 'Consider using more specific version tags (e.g., 20.11-alpine instead of 20).'
