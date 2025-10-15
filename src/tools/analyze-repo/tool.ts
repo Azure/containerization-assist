@@ -187,7 +187,6 @@ async function run(
   ctx: ToolContext,
 ): Promise<Result<RepositoryAnalysis>> {
   let { repositoryPathAbsoluteUnix: repoPath } = input;
-  const { sessionId } = input;
 
   // Convert to absolute path if relative
   if (!path.isAbsolute(repoPath)) {
@@ -209,22 +208,13 @@ async function run(
     if (input.modules && input.modules.length > 0) {
       const numberOfModules = input.modules.length;
       const isMonorepo = numberOfModules > 1;
-      const moduleHint = isMonorepo
-        ? ` Detected ${numberOfModules} modules that can be containerized separately.`
-        : input.modules[0]
-          ? ` Detected single module: ${input.modules[0].name}.`
-          : '';
 
       ctx.logger.info({ moduleCount: numberOfModules }, 'Using pre-provided modules');
 
       return Success({
         modules: input.modules,
         isMonorepo,
-        sessionId,
         analyzedPath: repoPath,
-        workflowHints: {
-          message: `Repository analysis complete.${moduleHint}`,
-        },
       });
     }
 
@@ -248,22 +238,12 @@ async function run(
 
     const isMonorepo = modules.length > 1;
 
-    const moduleHint = isMonorepo
-      ? ` Detected ${modules.length} modules that can be containerized separately.`
-      : modules[0]
-        ? ` Detected single module: ${modules[0].name}.`
-        : '';
-
     ctx.logger.info({ moduleCount: modules.length, isMonorepo }, 'Repository analysis complete');
 
     return Success({
       modules,
       isMonorepo,
-      sessionId,
       analyzedPath: repoPath,
-      workflowHints: {
-        message: `Repository analysis complete.${moduleHint}`,
-      },
     });
   } catch (e) {
     const error = e as Error;

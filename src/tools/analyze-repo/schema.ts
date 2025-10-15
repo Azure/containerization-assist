@@ -14,7 +14,7 @@ export const moduleInfo = z.object({
     ),
   dockerfilePath: z.string().optional().describe('Path where the Dockerfile should be generated'),
   language: z
-    .enum(['java', 'dotnet', 'other'])
+    .enum(['java', 'dotnet', 'javascript', 'typescript', 'python', 'rust', 'go', 'other'])
     .optional()
     .describe('Primary programming language used in the module'),
   languageVersion: z.string().optional(),
@@ -59,11 +59,7 @@ export type AnalyzeRepoParams = z.infer<typeof analyzeRepoSchema>;
 export interface RepositoryAnalysis {
   modules?: ModuleInfo[];
   isMonorepo?: boolean;
-  sessionId?: string;
   analyzedPath?: string;
-  workflowHints?: {
-    message?: string;
-  };
   // Fields from AI response (for parsing)
   language?: string;
   languageVersion?: string;

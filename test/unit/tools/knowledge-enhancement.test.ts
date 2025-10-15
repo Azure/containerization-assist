@@ -248,7 +248,7 @@ spec:
       if (result.ok) {
         expect(result.value).toHaveProperty('modules');
         expect(result.value.modules).toHaveLength(1);
-        expect(result.value).toHaveProperty('sessionId', 'test-session-123');
+        expect(result.value).toHaveProperty('analyzedPath', '/test/repo');
       }
     });
 

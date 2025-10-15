@@ -11,11 +11,11 @@
  */
 
 import { promises as fs } from 'node:fs';
-import { parseAllDocuments } from 'yaml';
+import * as toml from '@iarna/toml';
 import { parseStringPromise } from 'xml2js';
 
 export interface ParsedConfig {
-  language?: 'java' | 'dotnet' | 'other';
+  language?: 'java' | 'dotnet' | 'javascript' | 'typescript' | 'python' | 'rust' | 'go' | 'other';
   framework?: string;
   frameworkVersion?: string;
   languageVersion?: string;
@@ -88,8 +88,15 @@ export async function parsePackageJson(filePath: string): Promise<ParsedConfig> 
       version: pkg.engines?.node,
     };
 
+    // Detect if TypeScript is used
+    const isTypeScript = !!(
+      deps['typescript'] ||
+      deps['ts-node'] ||
+      deps['@typescript-eslint/parser']
+    );
+
     const result: ParsedConfig = {
-      language: 'other',
+      language: isTypeScript ? 'typescript' : 'javascript',
       dependencies: Object.keys(deps).slice(0, 20), // Top 20 deps
       ports,
       entryPoint,
@@ -238,9 +245,10 @@ export async function parsePythonConfig(filePath: string): Promise<ParsedConfig>
 
     if (isPyProject) {
       // Parse TOML
-      const docs = parseAllDocuments(content);
-      const toml = docs[0]?.toJSON() || {};
-      const project = toml.project || {};
+      const parsed = toml.parse(content) as {
+        project?: { dependencies?: string[]; requires_python?: string };
+      };
+      const project = parsed.project || {};
 
       dependencies = project.dependencies || [];
       pythonVersion = project.requires_python;
@@ -274,7 +282,7 @@ export async function parsePythonConfig(filePath: string): Promise<ParsedConfig>
     else ports.push(8000);
 
     const result: ParsedConfig = {
-      language: 'other',
+      language: 'python',
       dependencies: dependencies.slice(0, 20),
       ports,
       buildSystem: {
@@ -295,11 +303,13 @@ export async function parsePythonConfig(filePath: string): Promise<ParsedConfig>
 export async function parseCargoToml(filePath: string): Promise<ParsedConfig> {
   try {
     const content = await fs.readFile(filePath, 'utf-8');
-    const docs = parseAllDocuments(content);
-    const toml = docs[0]?.toJSON() || {};
+    const parsed = toml.parse(content) as {
+      package?: { 'rust-version'?: string; edition?: string };
+      dependencies?: Record<string, unknown>;
+    };
 
-    const package_ = toml.package || {};
-    const dependencies = Object.keys(toml.dependencies || {});
+    const package_ = parsed.package || {};
+    const dependencies = Object.keys(parsed.dependencies || {});
 
     // Detect framework
     let framework: string | undefined;
@@ -309,13 +319,13 @@ export async function parseCargoToml(filePath: string): Promise<ParsedConfig> {
     else if (dependencies.includes('axum')) framework = 'axum';
 
     // Rust version
-    const rustVersion = package_['rust-version'] || toml.package?.edition;
+    const rustVersion = package_['rust-version'] || package_.edition;
 
     // Default ports
     const ports = framework ? [8080] : [];
 
     const result: ParsedConfig = {
-      language: 'other',
+      language: 'rust',
       dependencies: dependencies.slice(0, 20),
       ports,
       buildSystem: {
@@ -413,7 +423,7 @@ export async function parseGoMod(filePath: string): Promise<ParsedConfig> {
     else if (depStr.includes('gorilla/mux')) framework = 'gorilla';
 
     const result: ParsedConfig = {
-      language: 'other',
+      language: 'go',
       dependencies,
       ports: [8080],
       buildSystem: {

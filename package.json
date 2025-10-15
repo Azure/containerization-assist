@@ -78,6 +78,7 @@
     "smoke:journey": "tsx scripts/smoke-journey.ts"
   },
   "dependencies": {
+    "@iarna/toml": "^2.2.5",
     "@kubernetes-models/apimachinery": "^2.2.0",
     "@kubernetes/client-node": "^1.3.0",
     "@modelcontextprotocol/sdk": "1.17.3",
