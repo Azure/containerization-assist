@@ -14,7 +14,7 @@
 import type { ToolContext, SamplingRequest, SamplingResponse } from '@/mcp/context';
 import { Success, Failure, type Result } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
-import { TOKEN_CONFIG } from '@/config/tokens';
+import { TOKEN_CONFIG } from '@/config';
 
 export interface GenerateOptions {
   /** Maximum tokens per candidate (default standard) */

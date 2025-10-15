@@ -16,9 +16,7 @@ import { parseAIResponse } from '@/mcp/ai/response-parser';
 import { AIEnhancementResponseSchema } from '@/mcp/ai/schemas';
 import { scoreResponse } from '@/mcp/ai/quality';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
-import { SCORING_CONFIG } from '@/config/scoring';
-import { TOKEN_CONFIG } from '@/config/tokens';
-import { SAMPLING_CONFIG } from '@/config/sampling';
+import { SCORING_CONFIG, TOKEN_CONFIG, SAMPLING_CONFIG } from '@/config';
 
 export interface EnhancementOptions {
   /** Mode of AI enhancement */

@@ -8,7 +8,7 @@
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import type { ToolContext } from '@/mcp/context';
 
-import { createSecurityScanner } from '@/lib/scanner';
+import { createSecurityScanner } from '@/infra/security/scanner';
 import { Success, Failure, type Result } from '@/types';
 import { getKnowledgeForCategory } from '@/knowledge/index';
 import type { KnowledgeMatch } from '@/knowledge/types';

@@ -54,7 +54,7 @@ const mockTimer = {
 };
 
 
-jest.mock('../../../src/lib/docker', () => ({
+jest.mock('../../../src/infra/docker/client', () => ({
   createDockerClient: jest.fn(() => mockDockerClient),
 }));
 

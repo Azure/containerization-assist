@@ -13,7 +13,7 @@ const mockSecurityScannerInstance: any = {
   ping: jest.fn(),
 };
 
-jest.mock('../../../src/lib/scanner', () => ({
+jest.mock('../../../src/infra/security/scanner', () => ({
   createSecurityScanner: jest.fn(() => mockSecurityScannerInstance),
 }));
 

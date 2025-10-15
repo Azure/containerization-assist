@@ -18,7 +18,7 @@ import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { promises as fs } from 'node:fs';
 import { createStandardProgress } from '@/mcp/progress-helper';
 import type { ToolContext } from '@/mcp/context';
-import { createDockerClient, type DockerBuildOptions } from '@/lib/docker';
+import { createDockerClient, type DockerBuildOptions } from '@/infra/docker/client';
 
 import { type Result, Success, Failure, TOPICS } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';

@@ -137,7 +137,7 @@ import { deployApplication as deployApplicationTool } from '../../../src/tools/d
 import type { DeployApplicationParams } from '../../../src/tools/deploy/schema';
 import type { ToolContext } from '@/mcp/context';
 
-jest.mock('../../../src/lib/kubernetes', () => ({
+jest.mock('../../../src/infra/kubernetes/client', () => ({
   createKubernetesClient: jest.fn(() => mockKubernetesClient),
 }));
 

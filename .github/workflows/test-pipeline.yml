@@ -56,7 +56,7 @@ jobs:
 
       - name: Run all tests
         id: npmtest
-        run: npm test
+        run: npm run test:coverage
 
       - name: Generate coverage report
         id: coverage-gen

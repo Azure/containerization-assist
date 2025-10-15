@@ -23,8 +23,7 @@
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import type { ToolContext } from '@/mcp/context';
-import { createKubernetesClient } from '@/lib/kubernetes';
-import type { K8sManifest } from '@/infra/kubernetes/client';
+import { createKubernetesClient, type K8sManifest } from '@/infra/kubernetes/client';
 import { getSystemInfo, getDownloadOS, getDownloadArch } from '@/lib/platform-utils';
 import { downloadFile, makeExecutable, createTempFile, deleteTempFile } from '@/lib/file-utils';
 
