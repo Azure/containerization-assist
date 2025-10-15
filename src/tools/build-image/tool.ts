@@ -40,8 +40,6 @@ export interface BuildOptimizationSuggestions {
 export interface BuildImageResult {
   /** Whether the build completed successfully */
   success: boolean;
-  /** Session identifier used for this build */
-  sessionId: string;
   /** Generated Docker image ID (SHA256 hash) */
   imageId: string;
   /** Tags applied to the built image */
@@ -312,12 +310,6 @@ async function buildImageImpl(
   const buildContext = normalizePath(rawBuildPath);
   const dockerfilePath = rawDockerfilePath ? normalizePath(rawDockerfilePath) : undefined;
 
-  // Use session facade directly
-  const sessionId = params.sessionId || context.session?.id;
-  if (!sessionId) {
-    return Failure('Session ID is required for build operations');
-  }
-
   try {
     // Progress: Validating build parameters and environment
     if (progress) await progress('VALIDATING');
@@ -437,7 +429,6 @@ async function buildImageImpl(
     const finalTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
     const result: BuildImageResult = {
       success: true,
-      sessionId,
       imageId: buildResult.value.imageId,
       tags: finalTags,
       size: (buildResult.value as unknown as { size?: number }).size ?? 0,

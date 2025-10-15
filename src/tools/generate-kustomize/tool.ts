@@ -111,12 +111,11 @@ interface KustomizeStructure {
 async function run(
   input: z.infer<typeof generateKustomizeSchema>,
   ctx: ToolContext,
-): Promise<Result<{ structure: KustomizeStructure; files: string[]; sessionId?: string }>> {
+): Promise<Result<{ structure: KustomizeStructure; files: string[] }>> {
   const {
     baseManifests,
     outputPath,
     environments,
-    sessionId,
     namespace,
     namePrefix,
     nameSuffix,
@@ -374,7 +373,6 @@ async function run(
     return Success({
       structure,
       files: writtenFiles,
-      ...(sessionId && { sessionId }),
     });
   } catch (error) {
     ctx.logger.error({ error }, 'Failed to generate Kustomize structure');
@@ -384,7 +382,7 @@ async function run(
 
 const tool: MCPTool<
   typeof generateKustomizeSchema,
-  { structure: KustomizeStructure; files: string[]; sessionId?: string }
+  { structure: KustomizeStructure; files: string[] }
 > = {
   name,
   description,

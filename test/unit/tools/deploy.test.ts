@@ -120,9 +120,6 @@ jest.mock('js-yaml', () => ({
   }),
 }));
 
-jest.mock('@/session/core', () => ({
-  createSessionManager: jest.fn(() => mockSessionManager),
-}));
 
 jest.mock('@/lib/tool-helpers', () => ({
   getToolLogger: jest.fn(() => createMockLogger()),
@@ -213,13 +210,8 @@ spec:
   beforeEach(() => {
     mockLogger = createMockLogger();
     config = {
-      sessionId: 'test-session-123',
       manifestsPath: sampleManifests,
       namespace: 'default',
-      cluster: 'default',
-      dryRun: false,
-      wait: true,
-      timeout: 30,
     };
 
     jest.clearAllMocks();
@@ -262,7 +254,6 @@ spec:
 
       expect(result.ok).toBe(true);
       expect(result.value.success).toBe(true);
-      expect(result.value.sessionId).toBe('test-session-123');
       expect(result.value.namespace).toBe('default');
       expect(result.value.deploymentName).toBe('test-app');
       expect(result.value.serviceName).toBe('test-app');
@@ -294,7 +285,6 @@ spec:
 
     it('should use default values when config options not specified', async () => {
       const minimalConfig: DeployApplicationParams = {
-        sessionId: 'test-session-123',
         manifestsPath: sampleManifests, // Required parameter
       };
 

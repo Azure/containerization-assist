@@ -7,7 +7,6 @@ export const generateKustomizeSchema = z.object({
     .array(z.enum(['dev', 'staging', 'test', 'prod']))
     .default(['dev', 'prod'])
     .describe('Environments to create overlays for'),
-  sessionId: z.string().optional().describe('Session ID for workflow continuity'),
 
   // Base configuration
   namespace: z.string().optional().describe('Default namespace for all resources'),

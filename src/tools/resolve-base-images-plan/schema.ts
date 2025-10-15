@@ -3,10 +3,9 @@
  */
 
 import { z } from 'zod';
-import { sessionId as sharedSessionId, environment } from '../shared/schemas';
+import { environment } from '../shared/schemas';
 
 export const resolveBaseImagesPlanSchema = z.object({
-  sessionId: sharedSessionId.optional().describe('Session identifier for tracking operations'),
   technology: z
     .string()
     .describe('Technology stack to resolve (e.g., "node", "python", "java", "go", "rust")'),

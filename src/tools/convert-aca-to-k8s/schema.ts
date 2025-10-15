@@ -5,7 +5,6 @@ export const convertAcaToK8sSchema = z.object({
     .string()
     .min(1)
     .describe('Azure Container Apps manifest content to convert (required)'),
-  sessionId: z.string().optional().describe('Session identifier for tracking operations'),
   namespace: z.string().optional().default('default').describe('Target Kubernetes namespace'),
 
   includeComments: z

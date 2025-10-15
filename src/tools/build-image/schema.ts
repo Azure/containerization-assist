@@ -3,10 +3,9 @@
  */
 
 import { z } from 'zod';
-import { sessionId, imageName, tags, buildArgs, platform } from '../shared/schemas';
+import { imageName, tags, buildArgs, platform } from '../shared/schemas';
 
 export const buildImageSchema = z.object({
-  sessionId: sessionId.optional(),
   path: z
     .string()
     .optional()

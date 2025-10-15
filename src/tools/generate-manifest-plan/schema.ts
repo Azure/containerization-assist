@@ -3,23 +3,12 @@
  */
 
 import { z } from 'zod';
-import {
-  sessionId as sharedSessionId,
-  environment,
-  repositoryPathAbsoluteUnix as sharedPath,
-} from '../shared/schemas';
+import { environment, repositoryPathAbsoluteUnix as sharedPath } from '../shared/schemas';
 import { ModuleInfo, moduleInfo } from '../analyze-repo/schema';
 
 export const generateManifestPlanSchema = z.object({
   ...moduleInfo.shape,
-  sessionId: sharedSessionId
-    .optional()
-    .describe(
-      'Session identifier to retrieve analysis results. If provided, uses analyze-repo data from session.',
-    ),
-  path: sharedPath.describe(
-    'Repository path (use forward slashes: /path/to/repo). Required if sessionId not provided.',
-  ),
+  path: sharedPath.describe('Repository path (use forward slashes: /path/to/repo).'),
   manifestType: z
     .enum(['kubernetes', 'helm', 'aca', 'kustomize'])
     .describe('Type of manifest to generate'),

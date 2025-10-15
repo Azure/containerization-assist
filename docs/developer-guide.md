@@ -25,7 +25,6 @@ src/
 ├── tools/          # Tool implementations, schemas, metadata
 ├── mcp/            # MCP adapters (context, server, AI helpers)
 ├── ai/             # Prompt builders, knowledge enhancement
-├── session/        # Session manager (single-session model)
 ├── infra/          # Docker + Kubernetes clients
 ├── lib/            # Shared utilities (e.g. workflow hints)
 ├── config/         # Config loading, policies
@@ -77,11 +76,11 @@ See `plans/tooling-simplification-plan.md` for ongoing cleanups (script consolid
 
 ## 3. Architecture Highlights
 
-### 3.1 Runtime & Sessions
+### 3.1 Runtime & Orchestration
 
-- `src/app/index.ts` exposes `createApp`. Public runtime supports single-session only.
-- `src/app/orchestrator.ts` + `SessionManager` automatically persist tool results via `sessionFacade.storeResult()`.
-- Session helpers (e.g. `getResult`, `setMetadata`) make tool state consistent.
+- `src/app/index.ts` exposes `createApp`. Public runtime provides stateless tool orchestration.
+- `src/app/orchestrator.ts` coordinates tool execution with policy enforcement and parameter validation.
+- Tools are pure functions that take input parameters and return results.
 - Shared workflow hints helper (`src/lib/workflow-hints.ts`) generates next-step recommendations.
 
 ### 3.2 Tool Pattern
@@ -106,7 +105,7 @@ export default tool;
 ```
 
 - Use path aliases (`@/…`) for internal modules.
-- Tool results are automatically stored in the session; use `ctx.session.getResult('tool-name')` for dependencies.
+- Tools operate as stateless functions, receiving all needed input as parameters.
 
 ### 3.3 AI & Deterministic Sampling
 
@@ -119,11 +118,11 @@ export default tool;
 ## 4. Testing Strategy
 
 - **Unit tests**: Located under `test/unit/`. Use `jest` with `--experimental-vm-modules`.
-- **Integration tests**: `test/integration/` includes session workflow, MCP inspector suites, Docker/Kubernetes checks.
+- **Integration tests**: `test/integration/` includes MCP inspector suites, Docker/Kubernetes checks, workflow validation.
 - **Smoke journey**: `npm run smoke:journey` orchestrates a full tool chain (requires Docker environment).
 - **Quality gates**: Optional script for lint/unused exports metrics (`scripts/quality-gates.sh`). Primarily run in CI.
 
-See `docs/quality-gates.md` for threshold details and `test/integration/session-workflow.test.ts` for metadata reuse coverage.
+See `docs/quality-gates.md` for threshold details.
 
 ---
 

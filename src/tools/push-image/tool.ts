@@ -30,7 +30,6 @@ export interface PushImageResult {
   registry: string;
   digest: string;
   pushedTag: string;
-  sessionId?: string;
   pushOptimizationInsights?: PushOptimizationInsights;
 }
 
@@ -323,7 +322,6 @@ async function run(
       registry: input.registry ?? 'docker.io',
       digest: pushResult.value.digest,
       pushedTag,
-      ...(input.sessionId && { sessionId: input.sessionId }),
       ...(pushOptimizationInsights && { pushOptimizationInsights }),
     };
 

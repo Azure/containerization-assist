@@ -27,7 +27,6 @@ export interface TaggingStrategySuggestions {
 
 export interface TagImageResult {
   success: boolean;
-  sessionId: string;
   tags: string[];
   imageId: string;
   taggingSuggestions?: TaggingStrategySuggestions;
@@ -199,16 +198,6 @@ async function run(
     return Failure('Tag parameter is required');
   }
 
-  // Use session facade directly
-  const sessionId = input.sessionId || ctx.session?.id;
-  if (!sessionId) {
-    return Failure('Session ID is required for tag operations');
-  }
-
-  if (!ctx.session) {
-    return Failure('Session not available');
-  }
-
   try {
     const dockerClient = createDockerClient(logger);
 
@@ -261,17 +250,16 @@ async function run(
 
     const result: TagImageResult = {
       success: true,
-      sessionId,
       tags,
       imageId: source,
       ...(taggingSuggestions && { taggingSuggestions }),
       workflowHints: {
         nextStep: 'push-image',
-        message: `Image tagged successfully as ${tag}. Use "push-image" with sessionId ${sessionId} to push the tagged image to a registry.${taggingSuggestions ? ' Review AI tagging suggestions for strategy improvements.' : ''}`,
+        message: `Image tagged successfully as ${tag}. Use "push-image" to push the tagged image to a registry.${taggingSuggestions ? ' Review AI tagging suggestions for strategy improvements.' : ''}`,
       },
     };
 
-    timer.end({ tags, sessionId });
+    timer.end({ tags });
 
     return Success(result);
   } catch (error) {

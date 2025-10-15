@@ -5,10 +5,19 @@
 import type { Logger } from 'pino';
 import type { ToolContext } from '@/mcp/context';
 import { Success, Failure, type Result, type WorkflowState } from '@/types';
-import type { SessionManager } from '@/session/core';
 import { type Step, getToolEdge, getMissingPreconditions, getExecutionOrder } from './tool-graph';
 import { createHostAIAssistant, type HostAIAssistant } from './ai/host-ai-assist';
 import type { z } from 'zod';
+
+/**
+ * Session manager interface for backwards compatibility with tool-router
+ * This will be removed as part of the session removal refactoring
+ */
+export interface SessionManager {
+  get(sessionId: string): Promise<Result<WorkflowState>>;
+  create(sessionId?: string): Promise<Result<WorkflowState>>;
+  update(sessionId: string, updates: Partial<WorkflowState>): Promise<Result<WorkflowState>>;
+}
 
 /**
  * Tool definition for router
@@ -48,8 +57,8 @@ export interface RouteResult {
   result: Result<unknown>;
   /** Tools executed in order */
   executedTools: string[];
-  /** Session state after execution */
-  sessionState: WorkflowState;
+  /** Session state after execution (optional - session functionality is being removed) */
+  sessionState?: WorkflowState;
 }
 
 /**
@@ -90,7 +99,6 @@ export class ToolRouter {
       return {
         result: Failure('Failed to get or create session'),
         executedTools: [],
-        sessionState: {} as WorkflowState,
       };
     }
 

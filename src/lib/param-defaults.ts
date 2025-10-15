@@ -7,9 +7,30 @@
  * Type-safe parameter defaulting with explicit schema.
  * Consolidates the pattern: params.field || defaultValue
  *
+ * Note: The `Record<string, any>` constraint is intentionally broad to support
+ * flexible tool parameter objects with mixed types (strings, numbers, booleans,
+ * nested objects, arrays, etc.). The actual type safety comes from the generic
+ * parameter `T` which should be the concrete interface of your tool parameters.
+ *
  * @param params - Partial parameters from user input
  * @param defaults - Complete default values
  * @returns Merged parameters with defaults applied
+ *
+ * @example
+ * ```typescript
+ * interface K8sParams {
+ *   namespace: string;
+ *   replicas: number;
+ *   serviceType: 'ClusterIP' | 'LoadBalancer';
+ * }
+ *
+ * const params: Partial<K8sParams> = { replicas: 3 };
+ * const result = withDefaults(params, {
+ *   namespace: 'default',
+ *   replicas: 1,
+ *   serviceType: 'ClusterIP'
+ * }); // result: K8sParams with replicas: 3, other defaults applied
+ * ```
  */
 export function withDefaults<T extends Record<string, any>>(params: Partial<T>, defaults: T): T {
   const result = { ...defaults };
@@ -91,6 +112,10 @@ export function getToolDefaults(
 /**
  * Type-safe parameter builder for tools
  * Ensures all required fields are present after defaulting
+ *
+ * Note: The `Record<string, any>` constraint is intentionally broad to support
+ * flexible tool parameter objects. Type safety is enforced through the generic
+ * parameter `T`, which should be your concrete tool parameter interface.
  */
 export class ParameterBuilder<T extends Record<string, any>> {
   private params: Partial<T>;
@@ -128,12 +153,18 @@ export class ParameterBuilder<T extends Record<string, any>> {
 /**
  * Create a parameter builder for fluent API usage
  *
- * Example:
- * const params = buildParams(inputParams)
+ * Note: The `Record<string, any>` constraint is intentionally broad to support
+ * flexible tool parameter objects. Type safety is enforced through the generic
+ * parameter `T`, which should be your concrete tool parameter interface.
+ *
+ * @example
+ * ```typescript
+ * const params = buildParams<K8sParams>(inputParams)
  *   .default('namespace', 'default')
  *   .default('replicas', 1)
  *   .defaults(K8S_DEFAULTS)
  *   .build();
+ * ```
  */
 export function buildParams<T extends Record<string, any>>(
   params: Partial<T>,

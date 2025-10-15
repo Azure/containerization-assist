@@ -66,9 +66,6 @@ const mockDockerClient = {
   buildImage: jest.fn(),
 };
 
-jest.mock('@/session/core', () => ({
-  createSessionManager: jest.fn(() => mockSessionManager),
-}));
 
 jest.mock('../../../src/lib/docker', () => ({
   createDockerClient: jest.fn(() => mockDockerClient),
@@ -179,7 +176,6 @@ CMD ["node", "index.js"]`;
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.success).toBe(true);
-        expect(result.value.sessionId).toBe('test-session-123');
         expect(result.value.imageId).toBe('sha256:mock-image-id');
         expect(result.value.tags).toEqual(['myapp:latest', 'myapp:v1.0']);
         expect(result.value.size).toBe(123456789);

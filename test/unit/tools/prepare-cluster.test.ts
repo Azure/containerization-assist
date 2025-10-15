@@ -61,9 +61,6 @@ const mockTimer = {
   error: jest.fn(),
 };
 
-jest.mock('@/session/core', () => ({
-  SessionManager: jest.fn(() => mockSessionManager),
-}));
 
 jest.mock('@/lib/kubernetes', () => ({
   createKubernetesClient: jest.fn(() => mockK8sClient),

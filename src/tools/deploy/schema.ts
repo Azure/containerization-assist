@@ -3,10 +3,9 @@
  */
 
 import { z } from 'zod';
-import { sessionId, namespaceOptional, replicas, port, environment } from '../shared/schemas';
+import { namespaceOptional, replicas, port, environment } from '../shared/schemas';
 
 export const deployApplicationSchema = z.object({
-  sessionId: sessionId.optional(),
   manifestsPath: z
     .string()
     .describe('Path to Kubernetes manifests directory or YAML content (required)'),

@@ -256,14 +256,10 @@ export function createKnowledgeTool<
         if (categoryArray) {
           categoryArray.push(snippet);
         } else {
-          ctx.logger.warn(
-            {
-              tool: config.name,
-              undeclaredCategory: category,
-              snippetId: snippet.id,
-              snippetSource: snippet.source,
-            },
-            'categorize() returned undeclared category. This snippet will be ignored for that category.',
+          throw new Error(
+            `categorize() returned undeclared category "${category}" for tool "${config.name}". ` +
+              `Snippet ID: ${snippet.id}, Source: ${snippet.source}. ` +
+              `This likely indicates a configuration error.`,
           );
         }
       }

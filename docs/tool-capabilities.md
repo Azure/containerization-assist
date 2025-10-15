@@ -409,23 +409,6 @@ These tools perform direct operations without AI enhancement.
 
 ---
 
-### inspect-session
-**Status:** 🚧 **IN DEVELOPMENT**
-**Category:** Debug
-**AI Enhanced:** ❌ No
-**Knowledge Enhanced:** ❌ No
-**Sampling Strategy:** `none`
-
-**Capabilities:**
-- Session state inspection
-- Tool execution history
-- Debug information extraction
-- Workflow analysis
-
-**When to Use:** Debug and analyze tool execution sessions.
-
----
-
 ### validate-dockerfile
 **Status:** ✅ **ACTIVE**
 **Category:** Docker
@@ -587,7 +570,6 @@ const planningTools = [
 const utilityTools = [
   'validate-dockerfile', // ✅ ACTIVE
   'ops', // 🚧 IN DEVELOPMENT
-  'inspect-session', // 🚧 IN DEVELOPMENT
   'generate-kustomize' // 🚧 IN DEVELOPMENT
 ];
 ```
@@ -617,7 +599,7 @@ const contentTools = tools.filter(t =>
 3. **Validation Phase**: `scan`, `validate` → Security and quality checks
 4. **Build Phase**: `build-image` → Create container images
 5. **Deploy Phase**: `deploy`, `verify-deployment` → Production deployment
-6. **Operations Phase**: `ops`, `inspect-session` → Ongoing management
+6. **Operations Phase**: `ops` → Ongoing management
 
 ### AI Enhancement Flow
 

@@ -36,7 +36,6 @@ import { toMCPMessages } from '@/mcp/ai/message-converter';
 
 export interface VerifyDeploymentResult extends Record<string, unknown> {
   success: boolean;
-  sessionId: string;
   namespace: string;
   deploymentName: string;
   serviceName: string;
@@ -368,17 +367,7 @@ async function verifyDeploymentImpl(
   const timeout = 60;
 
   try {
-    // Use session facade directly
-    const sessionId = params.sessionId || context.session?.id;
-    if (!sessionId) {
-      return Failure('Session ID is required for deployment verification');
-    }
-
-    if (!context.session) {
-      return Failure('Session not available');
-    }
-
-    logger.info({ sessionId, checks }, 'Starting Kubernetes deployment verification with session');
+    logger.info({ checks }, 'Starting Kubernetes deployment verification');
 
     const k8sClient = createKubernetesClient(logger);
 
@@ -426,7 +415,6 @@ async function verifyDeploymentImpl(
     // Prepare the result
     const result: VerifyDeploymentResult = {
       success: overallStatus === 'healthy',
-      sessionId,
       namespace,
       deploymentName,
       serviceName,
@@ -456,9 +444,7 @@ async function verifyDeploymentImpl(
       },
     };
 
-    // Session storage is handled by orchestrator automatically
-
-    timer.end({ deploymentName, ready: health.ready, sessionId });
+    timer.end({ deploymentName, ready: health.ready });
 
     // Generate AI-powered validation insights
     let validationInsights: DeploymentValidationInsights | undefined;
@@ -488,7 +474,7 @@ async function verifyDeploymentImpl(
       workflowHints: {
         nextStep: result.success ? 'ops' : 'fix-deployment-issues',
         message: result.success
-          ? `Deployment verification successful. Use "ops" with sessionId ${sessionId} for operational tasks, or review the deployment status.${validationInsights ? ' Check AI validation insights for optimization recommendations.' : ''}`
+          ? `Deployment verification successful. Use "ops" for operational tasks, or review the deployment status.${validationInsights ? ' Check AI validation insights for optimization recommendations.' : ''}`
           : `Deployment verification found issues. ${validationInsights ? 'Review AI troubleshooting steps to resolve problems.' : 'Check deployment status and pod logs to diagnose issues.'}`,
       },
     };

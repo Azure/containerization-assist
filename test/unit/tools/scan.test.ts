@@ -6,22 +6,6 @@
 import { jest } from '@jest/globals';
 
 // Jest mocks must be at the top to ensure proper hoisting
-jest.mock('../../../src/session/core', () => ({
-  SessionManager: jest.fn(() => ({
-    create: jest.fn().mockResolvedValue({
-      sessionId: 'test-session-123',
-      workflow_state: {},
-      metadata: {},
-      completed_steps: [],
-      errors: {},
-
-      createdAt: '2025-09-08T11:12:40.362Z',
-      updatedAt: '2025-09-08T11:12:40.362Z',
-    }),
-    get: jest.fn(),
-    update: jest.fn().mockResolvedValue(true),
-  })),
-}));
 
 // Create a shared mock scanner that we can access in tests
 const mockSecurityScannerInstance: any = {
@@ -61,11 +45,14 @@ jest.mock('../../../src/knowledge', () => ({
 
 import { scanImage } from '../../../src/tools/scan/tool';
 import type { ScanImageParams } from '../../../src/tools/scan/schema';
-import { SessionManager } from '../../../src/session/core';
 import { createLogger } from '../../../src/lib/logger';
 
 // Get the mocked instances after imports
-const mockSessionManager = new (SessionManager as jest.Mock)();
+const mockSessionManager = {
+  create: jest.fn(),
+  get: jest.fn(),
+  update: jest.fn(),
+};
 const mockLogger = (createLogger as jest.Mock)();
 
 // Create session facade mock
@@ -137,7 +124,6 @@ describe('scanImage', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.success).toBe(true);
-        expect(result.value.sessionId).toBe('test-session-123');
         expect(result.value.vulnerabilities.high).toBe(1);
         expect(result.value.vulnerabilities.total).toBe(1);
         expect(result.value.passed).toBe(false); // Has high vulnerability with high threshold

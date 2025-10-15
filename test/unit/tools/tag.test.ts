@@ -54,9 +54,6 @@ const mockTimer = {
   error: jest.fn(),
 };
 
-jest.mock('@/session/core', () => ({
-  createSessionManager: jest.fn(() => mockSessionManager),
-}));
 
 jest.mock('../../../src/lib/docker', () => ({
   createDockerClient: jest.fn(() => mockDockerClient),
@@ -143,7 +140,6 @@ describe('tagImage', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.success).toBe(true);
-        expect(result.value.sessionId).toBe('test-session-123');
         expect(result.value.tags).toEqual(['myapp:v1.0']);
         expect(result.value.imageId).toBe('sha256:mock-image-id');
       }
@@ -160,7 +156,6 @@ describe('tagImage', () => {
       // Verify timer was used correctly
       expect(mockTimer.end).toHaveBeenCalledWith({
         tags: ['myapp:v1.0'],
-        sessionId: 'test-session-123',
       });
     });
 
@@ -411,7 +406,6 @@ describe('tagImage', () => {
 
         expect(result.ok).toBe(true);
         if (result.ok) {
-          expect(result.value.sessionId).toBe(testConfig.sessionId);
           expect(result.value.tags).toEqual([testConfig.tag]);
           expect(result.value.success).toBe(true);
           expect(result.value.imageId).toBe('sha256:mock-image-id');

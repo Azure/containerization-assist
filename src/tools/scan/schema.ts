@@ -4,10 +4,7 @@
 
 import { z } from 'zod';
 
-const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
-
 export const scanImageSchema = z.object({
-  sessionId: sessionIdSchema.optional(),
   imageId: z.string().describe('Docker image ID or name to scan'),
   severity: z
     .union([

@@ -8,7 +8,6 @@
 
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Logger } from 'pino';
-import type { SessionManager } from '@/session/core';
 import { extractErrorMessage } from '@/lib/error-utils';
 import { extractProgressReporter } from './context-helpers.js';
 
@@ -138,18 +137,6 @@ export interface ToolContext {
   progress: ProgressReporter | undefined;
 
   /**
-   * Session manager for workflow state tracking
-   * Used to maintain state across multiple tool calls in a workflow
-   */
-  sessionManager?: SessionManager;
-
-  /**
-   * Session facade for easy access to current session state
-   * Always present, providing consistent session interface to all tools
-   */
-  session?: import('@/app/orchestrator-types').SessionFacade;
-
-  /**
    * Logger for debugging and error tracking - Required for all tools
    * Use this for structured logging instead of console.log
    */
@@ -172,11 +159,6 @@ export interface ContextOptions {
   signal?: AbortSignal;
   /** Optional progress reporter or request with progress token */
   progress?: ProgressReporter | unknown;
-  /** Session manager for workflow state tracking */
-  sessionManager?: SessionManager;
-  /** Session facade for current session state */
-  session?: import('@/app/orchestrator-types').SessionFacade;
-  /** Prompt registry for template management */
   /** Maximum tokens for sampling (default: 2048) */
   maxTokens?: number;
   /** Stop sequences for sampling */
@@ -225,8 +207,6 @@ export function createToolContext(
     getPrompt: (name: string, args?: Record<string, unknown>) =>
       getPromptWithFallback(undefined, name, args),
     logger,
-    ...(options.sessionManager !== undefined && { sessionManager: options.sessionManager }),
-    ...(options.session !== undefined && { session: options.session }),
     signal: options.signal,
     progress: progressReporter,
   };

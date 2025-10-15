@@ -13,9 +13,6 @@ export const generateAcaManifestsSchema = z.object({
     .describe(
       'Container image to deploy. If not provided, uses image from build-image session data.',
     ),
-
-  // Session tracking (standard pattern)
-  sessionId: z.string().optional().describe('Session identifier for tracking operations'),
   path: z
     .string()
     .optional()

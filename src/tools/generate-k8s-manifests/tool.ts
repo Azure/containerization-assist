@@ -476,7 +476,6 @@ async function generateSingleManifest(
       manifests: finalManifestsContent,
       manifestPath,
       validatedResources: manifests.map((m) => ({ kind: m.kind, name: m.metadata?.name })),
-      sessionId: input.sessionId,
       ...(knowledgeEnhancement && {
         analysis: {
           enhancementAreas: knowledgeEnhancement.analysis.enhancementAreas,
