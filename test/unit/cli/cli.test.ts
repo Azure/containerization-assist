@@ -48,23 +48,20 @@ describe('CLI Interface', () => {
   });
 
   describe('Option Validation', () => {
-    it('should contain validation logic for log levels', () => {
+    it('should import validation module', () => {
       const cliPath = join(__dirname, '../../../src/cli/cli.ts');
       const content = readFileSync(cliPath, 'utf-8');
-      
+
       expect(content).toContain('validateOptions');
-      expect(content).toContain('validLogLevels');
-      expect(content).toContain("['debug', 'info', 'warn', 'error']");
+      expect(content).toContain("from './validation'");
     });
 
-    it('should contain workspace directory validation', () => {
+    it('should call validateOptions with Docker validation', () => {
       const cliPath = join(__dirname, '../../../src/cli/cli.ts');
       const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('workspace');
-      expect(content).toContain('isDirectory');
-      expect(content).toContain('ENOENT');
-      expect(content).toContain('EACCES');
+
+      expect(content).toContain('validateDockerSocket');
+      expect(content).toContain('validateOptions(options, dockerValidation)');
     });
   });
 
@@ -80,22 +77,22 @@ describe('CLI Interface', () => {
   });
 
   describe('Docker Socket Validation', () => {
-    it('should contain Docker socket validation logic', () => {
+    it('should import Docker socket validation from infra module', () => {
       const cliPath = join(__dirname, '../../../src/cli/cli.ts');
       const content = readFileSync(cliPath, 'utf-8');
-      
+
       expect(content).toContain('validateDockerSocket');
-      expect(content).toContain('autoDetectDockerSocket');
-      expect(content).toContain('isSocket');
+      expect(content).toContain('@/infra/docker/socket-validation');
     });
 
-    it('should contain Docker validation warnings', () => {
+    it('should use extracted validateDockerSocket function', () => {
       const cliPath = join(__dirname, '../../../src/cli/cli.ts');
       const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('No valid Docker socket found');
-      expect(content).toContain('Docker operations require');
-      expect(content).toContain('Starting Docker Desktop');
+
+      // Verify it calls the imported function
+      expect(content).toContain('validateDockerSocket');
+      // Verify it's not defining the function locally
+      expect(content).not.toContain('function validateDockerSocket');
     });
   });
 
@@ -168,32 +165,20 @@ describe('CLI Interface', () => {
   });
 
   describe('Error Handling', () => {
-    it('should contain Docker error guidance', () => {
+    it('should import contextual guidance module', () => {
       const cliPath = join(__dirname, '../../../src/cli/cli.ts');
       const content = readFileSync(cliPath, 'utf-8');
-      
+
       expect(content).toContain('provideContextualGuidance');
-      expect(content).toContain('Docker-related issue detected');
-      expect(content).toContain('Ensure Docker Desktop/Engine is running');
-      expect(content).toContain('docker version');
+      expect(content).toContain("from './guidance'");
     });
 
-    it('should contain permission error guidance', () => {
+    it('should use guidance module in error handling', () => {
       const cliPath = join(__dirname, '../../../src/cli/cli.ts');
       const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('EACCES');
-      expect(content).toContain('Permission issue detected');
-      expect(content).toContain('docker group');
-    });
 
-    it('should contain configuration error guidance', () => {
-      const cliPath = join(__dirname, '../../../src/cli/cli.ts');
-      const content = readFileSync(cliPath, 'utf-8');
-      
-      expect(content).toContain('Configuration issue');
-      expect(content).toContain('.env.example');
-      expect(content).toContain('--validate');
+      // Verify guidance is called with error and options
+      expect(content).toContain('provideContextualGuidance(error, options)');
     });
 
     it('should install shutdown handlers via runtime-logging', () => {

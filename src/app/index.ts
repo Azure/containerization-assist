@@ -28,6 +28,11 @@ import type {
 import { createToolLoggerFile, getLogFilePath } from '@/lib/tool-logger';
 
 /**
+ * Timeout for Docker connection checks in milliseconds
+ */
+const DOCKER_CONNECTION_TIMEOUT_MS = 3000;
+
+/**
  * Apply tool aliases to create renamed versions of tools
  */
 function applyToolAliases(tools: readonly Tool[], aliases?: Record<string, string>): Tool[] {
@@ -206,13 +211,89 @@ export function createApp(config: AppRuntimeConfig = {}): AppRuntime {
     /**
      * Perform health check
      */
-    healthCheck: () => {
+    healthCheck: async () => {
       const toolCount = toolsMap.size;
+
+      // Check Docker connectivity
+      const dockerStatus: {
+        available: boolean;
+        version?: string;
+        error?: string;
+      } = await (async () => {
+        try {
+          const Docker = (await import('dockerode')).default;
+          const { autoDetectDockerSocket } = await import('@/infra/docker/socket-validation');
+
+          const socketPath = autoDetectDockerSocket();
+          const docker = new Docker({ socketPath });
+
+          const versionInfo = await Promise.race([
+            docker.version(),
+            new Promise<never>((_, reject) =>
+              setTimeout(
+                () => reject(new Error('Docker connection timeout')),
+                DOCKER_CONNECTION_TIMEOUT_MS,
+              ),
+            ),
+          ]);
+
+          return {
+            available: true,
+            version: versionInfo.Version,
+          };
+        } catch (error) {
+          return {
+            available: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          };
+        }
+      })();
+
+      // Check Kubernetes connectivity
+      const k8sStatus: {
+        available: boolean;
+        version?: string;
+        error?: string;
+      } = await (async () => {
+        try {
+          const { createKubernetesClient } = await import('@/infra/kubernetes/client');
+          const k8sClient = createKubernetesClient(logger);
+
+          const connected = await k8sClient.ping();
+
+          if (connected) {
+            return {
+              available: true,
+              version: 'connected',
+            };
+          } else {
+            return {
+              available: false,
+              error: 'Unable to connect to cluster',
+            };
+          }
+        } catch (error) {
+          return {
+            available: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          };
+        }
+      })();
+
+      const hasIssues = !dockerStatus.available || !k8sStatus.available;
+      const status: 'healthy' | 'unhealthy' = hasIssues ? 'unhealthy' : 'healthy';
+
       return {
-        status: 'healthy' as const,
+        status,
         tools: toolCount,
         sessions: 0, // Session count not available in current implementation
-        message: `${toolCount} tools loaded`,
+        message: hasIssues
+          ? `${toolCount} tools loaded, but some dependencies are unavailable`
+          : `${toolCount} tools loaded`,
+        dependencies: {
+          docker: dockerStatus,
+          kubernetes: k8sStatus,
+        },
       };
     },
 
