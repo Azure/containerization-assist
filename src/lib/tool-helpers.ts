@@ -5,6 +5,7 @@
 import { createLogger, createTimer, type Logger, type Timer } from './logger.js';
 import { logToolStart, logToolComplete, logToolFailure } from './runtime-logging.js';
 import type { ToolContext } from '@/mcp/context.js';
+import type { Result } from '@/types';
 
 /**
  * Gets or creates a logger for a tool.
@@ -130,8 +131,8 @@ export function createStandardizedToolTracker(
 export async function executeToolSafely<T>(
   toolName: string,
   ctx: ToolContext,
-  operation: () => Promise<{ ok: boolean; error?: string; value?: T }>,
-): Promise<{ ok: boolean; error?: string; value?: T }> {
+  operation: () => Promise<Result<T>>,
+): Promise<Result<T>> {
   const logger = getToolLogger(ctx, toolName);
   const timer = createToolTimer(logger, toolName);
 

@@ -62,10 +62,10 @@ describe('DockerClient with Mutex', () => {
       });
 
       expect(client).toBeDefined();
-      expect(client).toHaveProperty('buildImage');
-      expect(client).toHaveProperty('tagImage');
-      expect(client).toHaveProperty('pushImage');
-      expect(client).toHaveProperty('removeImage');
+      expect(typeof client.buildImage).toBe('function');
+      expect(typeof client.tagImage).toBe('function');
+      expect(typeof client.pushImage).toBe('function');
+      expect(typeof client.removeImage).toBe('function');
     });
 
     test('should work without mutex when not enabled', async () => {
@@ -74,10 +74,10 @@ describe('DockerClient with Mutex', () => {
       });
 
       expect(client).toBeDefined();
-      expect(client).toHaveProperty('buildImage');
-      expect(client).toHaveProperty('tagImage');
-      expect(client).toHaveProperty('pushImage');
-      expect(client).toHaveProperty('removeImage');
+      expect(typeof client.buildImage).toBe('function');
+      expect(typeof client.tagImage).toBe('function');
+      expect(typeof client.pushImage).toBe('function');
+      expect(typeof client.removeImage).toBe('function');
     });
 
     test('should use default mutex config when not provided', async () => {
@@ -94,10 +94,10 @@ describe('DockerClient with Mutex', () => {
       const client = createDockerClient(logger);
 
       expect(client).toBeDefined();
-      expect(client).toHaveProperty('buildImage');
-      expect(client).toHaveProperty('tagImage');
-      expect(client).toHaveProperty('pushImage');
-      expect(client).toHaveProperty('removeImage');
+      expect(typeof client.buildImage).toBe('function');
+      expect(typeof client.tagImage).toBe('function');
+      expect(typeof client.pushImage).toBe('function');
+      expect(typeof client.removeImage).toBe('function');
     });
   });
 });

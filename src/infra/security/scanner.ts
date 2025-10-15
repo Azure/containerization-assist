@@ -128,16 +128,22 @@ function getSeverityFilter(minSeverity: string): string {
   return severityLevels[minSeverity as keyof typeof severityLevels] || 'CRITICAL,HIGH,MEDIUM,LOW';
 }
 
-function createTimeoutPromise(
-  timeout: number,
-): Promise<Result<{ stdout: string; stderr: string; exitCode: number }>> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      resolve(Failure(`Operation timed out after ${timeout}ms`));
-    }, timeout);
-    // Prevent this timer from keeping the Node.js process alive
-    timer.unref();
-  });
+function createTimeoutPromise(timeout: number): {
+  promise: Promise<Result<{ stdout: string; stderr: string; exitCode: number }>>;
+  timer: NodeJS.Timeout;
+} {
+  let timerRef: NodeJS.Timeout | undefined;
+  const promise = new Promise<Result<{ stdout: string; stderr: string; exitCode: number }>>(
+    (resolve) => {
+      timerRef = setTimeout(() => {
+        resolve(Failure(`Operation timed out after ${timeout}ms`));
+      }, timeout);
+      // Prevent this timer from keeping the Node.js process alive
+      timerRef.unref();
+    },
+  );
+  // Promise constructor is synchronous, so timerRef is definitely assigned
+  return { promise, timer: timerRef as NodeJS.Timeout };
 }
 
 /**
@@ -170,10 +176,14 @@ export async function scanImageVulnerabilities(
       timeout: options?.timeout || 120000,
     };
 
+    const timeoutInfo = createTimeoutPromise(options?.timeout || 120000);
     const result = await Promise.race([
       ctx.commandExecutor.execute('trivy', args, execOptions),
-      createTimeoutPromise(options?.timeout || 120000),
+      timeoutInfo.promise,
     ]);
+
+    // Clear the timeout to prevent memory leak
+    clearTimeout(timeoutInfo.timer);
 
     if (isFail(result)) {
       return Failure(`Security scan failed: ${result.error}`);
