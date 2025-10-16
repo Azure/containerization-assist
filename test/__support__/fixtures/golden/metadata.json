@@ -59,7 +59,7 @@
       "variants": ["security-focused", "minimal", "lts"],
       "fixtures": ["java-images", "node-images", "python-images"]
     },
-    "scan": {
+    "scan-image": {
       "description": "Security vulnerability scan results",
       "variants": ["clean", "low-severity", "high-severity", "critical"],
       "fixtures": ["image-clean", "image-vulnerable", "dockerfile-issues"]
@@ -83,7 +83,7 @@
   "workflows": {
     "containerization-full": {
       "description": "Complete containerization workflow",
-      "steps": ["analyze-repo", "generate-dockerfile", "build-image", "scan", "push-image"],
+      "steps": ["analyze-repo", "generate-dockerfile", "build-image", "scan-image", "push-image"],
       "fixtures": ["spring-boot-complete", "node-express-complete"]
     },
     "deployment-pipeline": {
@@ -93,7 +93,7 @@
     },
     "security-scanning": {
       "description": "Security-focused workflow",
-      "steps": ["scan", "fix-dockerfile", "build-image", "scan"],
+      "steps": ["scan-image", "fix-dockerfile", "build-image", "scan-image"],
       "fixtures": ["security-hardening", "vulnerability-remediation"]
     }
   },

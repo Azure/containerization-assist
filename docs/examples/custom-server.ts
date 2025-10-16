@@ -87,7 +87,7 @@ async function buildContainerizationServer() {
   server.registerContainerTool({ name: 'analyze-repo', description: 'Analyze repository structure' } as any);
   server.registerContainerTool({ name: 'generate-dockerfile', description: 'Generate Dockerfile' } as any, 'dockerfile_create');
   server.registerContainerTool({ name: 'build-image', description: 'Build Docker image' } as any, 'docker_build');
-  server.registerContainerTool({ name: 'scan', description: 'Security scan' } as any, 'security_scan');
+  server.registerContainerTool({ name: 'scan-image', description: 'Security scan' } as any, 'security_scan');
   server.registerContainerTool({ name: 'tag-image', description: 'Tag Docker image' } as any);
   server.registerContainerTool({ name: 'push-image', description: 'Push Docker image' } as any);
 

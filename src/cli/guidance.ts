@@ -47,7 +47,7 @@ const GUIDANCE_MESSAGES = {
       'Copy .env.example to .env: cp .env.example .env',
       'Validate configuration: --validate',
       'Check config file exists: --config <path>',
-      'Review configuration docs: docs/CONFIGURATION.md',
+      'Review configuration docs: README.md (Configuration section)',
     ],
   },
 };
@@ -60,8 +60,8 @@ const GENERAL_TROUBLESHOOTING = [
   'Validate config: containerization-assist-mcp --validate',
   'Check Docker: docker version',
   'Enable debug logging: --log-level debug --dev',
-  'Check system requirements: docs/REQUIREMENTS.md',
-  'Review troubleshooting guide: docs/TROUBLESHOOTING.md',
+  'Check system requirements: README.md (System Requirements section)',
+  'Review troubleshooting guide: README.md (Troubleshooting section)',
 ];
 
 /**

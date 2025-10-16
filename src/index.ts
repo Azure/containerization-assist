@@ -76,7 +76,7 @@ export {
   opsTool,
   prepareClusterTool,
   pushImageTool,
-  scanTool,
+  scanImageTool,
   tagImageTool,
   validateDockerfileTool,
   verifyDeployTool,

@@ -7,7 +7,7 @@ import generateK8sManifestsTool from './generate-k8s-manifests/tool';
 import opsTool from './ops/tool';
 import prepareClusterTool from './prepare-cluster/tool';
 import pushImageTool from './push-image/tool';
-import scanTool from './scan/tool';
+import scanImageTool from './scan-image/tool';
 import tagImageTool from './tag-image/tool';
 import validateDockerfileTool from './validate-dockerfile/tool';
 import verifyDeployTool from './verify-deployment/tool';
@@ -22,7 +22,7 @@ export const TOOL_NAME = {
   OPS: 'ops',
   PREPARE_CLUSTER: 'prepare-cluster',
   PUSH_IMAGE: 'push-image',
-  SCAN: 'scan',
+  SCAN_IMAGE: 'scan-image',
   TAG_IMAGE: 'tag-image',
   VALIDATE_DOCKERFILE: 'validate-dockerfile',
   VERIFY_DEPLOY: 'verify-deploy',
@@ -40,7 +40,7 @@ generateK8sManifestsTool.name = TOOL_NAME.GENERATE_K8S_MANIFESTS;
 opsTool.name = TOOL_NAME.OPS;
 prepareClusterTool.name = TOOL_NAME.PREPARE_CLUSTER;
 pushImageTool.name = TOOL_NAME.PUSH_IMAGE;
-scanTool.name = TOOL_NAME.SCAN;
+scanImageTool.name = TOOL_NAME.SCAN_IMAGE;
 tagImageTool.name = TOOL_NAME.TAG_IMAGE;
 validateDockerfileTool.name = TOOL_NAME.VALIDATE_DOCKERFILE;
 verifyDeployTool.name = TOOL_NAME.VERIFY_DEPLOY;
@@ -56,7 +56,7 @@ export type Tool = (
   | typeof opsTool
   | typeof prepareClusterTool
   | typeof pushImageTool
-  | typeof scanTool
+  | typeof scanImageTool
   | typeof tagImageTool
   | typeof validateDockerfileTool
   | typeof verifyDeployTool
@@ -78,7 +78,7 @@ export const ALL_TOOLS: readonly Tool[] = [
   opsTool,
   prepareClusterTool,
   pushImageTool,
-  scanTool,
+  scanImageTool,
   tagImageTool,
   verifyDeployTool,
 ] as const;
@@ -93,7 +93,7 @@ export {
   opsTool,
   prepareClusterTool,
   pushImageTool,
-  scanTool,
+  scanImageTool,
   tagImageTool,
   validateDockerfileTool,
   verifyDeployTool,
