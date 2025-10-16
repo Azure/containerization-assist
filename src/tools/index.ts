@@ -1,6 +1,5 @@
 import analyzeRepoTool from './analyze-repo/tool';
 import buildImageTool from './build-image/tool';
-import convertAcaToK8sTool from './convert-aca-to-k8s/tool';
 import deployTool from './deploy/tool';
 import fixDockerfileTool from './fix-dockerfile/tool';
 import generateDockerfileTool from './generate-dockerfile/tool';
@@ -17,7 +16,6 @@ import verifyDeployTool from './verify-deployment/tool';
 export const TOOL_NAME = {
   ANALYZE_REPO: 'analyze-repo',
   BUILD_IMAGE: 'build-image',
-  CONVERT_ACA_TO_K8S: 'convert-aca-to-k8s',
   DEPLOY: 'deploy',
   FIX_DOCKERFILE: 'fix-dockerfile',
   GENERATE_DOCKERFILE: 'generate-dockerfile',
@@ -37,7 +35,6 @@ export type ToolName = (typeof TOOL_NAME)[keyof typeof TOOL_NAME];
 // Ensure proper names on all tools
 analyzeRepoTool.name = TOOL_NAME.ANALYZE_REPO;
 buildImageTool.name = TOOL_NAME.BUILD_IMAGE;
-convertAcaToK8sTool.name = TOOL_NAME.CONVERT_ACA_TO_K8S;
 deployTool.name = TOOL_NAME.DEPLOY;
 fixDockerfileTool.name = TOOL_NAME.FIX_DOCKERFILE;
 generateDockerfileTool.name = TOOL_NAME.GENERATE_DOCKERFILE;
@@ -55,7 +52,6 @@ verifyDeployTool.name = TOOL_NAME.VERIFY_DEPLOY;
 export type Tool = (
   | typeof analyzeRepoTool
   | typeof buildImageTool
-  | typeof convertAcaToK8sTool
   | typeof deployTool
   | typeof fixDockerfileTool
   | typeof generateDockerfileTool
@@ -78,11 +74,9 @@ export const ALL_TOOLS: readonly Tool[] = [
   fixDockerfileTool,
   generateDockerfileTool,
   generateK8sManifestsTool,
-  resolveBaseImagesTool,
   validateDockerfileTool,
 
   // Operational/deterministic tools
-  convertAcaToK8sTool,
   opsTool,
   prepareClusterTool,
   pushImageTool,
@@ -98,7 +92,6 @@ export const ALL_TOOLS: readonly Tool[] = [
 export {
   analyzeRepoTool,
   buildImageTool,
-  convertAcaToK8sTool,
   deployTool,
   fixDockerfileTool,
   generateDockerfileTool,

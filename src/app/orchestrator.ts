@@ -370,7 +370,7 @@ const chainHintMap = new Map<ToolName, { success: string; failure: string }>([
   [
     TOOL_NAME.ANALYZE_REPO,
     {
-      success: `Repository analysis completed successfully. Continue by calling the ${TOOL_NAME.FIX_DOCKERFILE} or ${TOOL_NAME.RESOLVE_BASE_IMAGES} tools for recommendations.`,
+      success: `Repository analysis completed successfully. Continue by calling the ${TOOL_NAME.GENERATE_DOCKERFILE} or ${TOOL_NAME.FIX_DOCKERFILE} tools to create or fix your Dockerfile.`,
       failure: 'Repository analysis failed. Please check the logs for details.',
     },
   ],
@@ -409,13 +409,6 @@ const chainHintMap = new Map<ToolName, { success: string; failure: string }>([
     {
       success: `Dockerfile fixes applied successfully. Next: Call ${TOOL_NAME.BUILD_IMAGE} to test the fixed Dockerfile.`,
       failure: 'Dockerfile fix failed. Review validation errors and try manual fixes.',
-    },
-  ],
-  [
-    TOOL_NAME.CONVERT_ACA_TO_K8S,
-    {
-      success: `ACA manifests converted to Kubernetes successfully. Next: Call ${TOOL_NAME.DEPLOY} to deploy the manifests.`,
-      failure: 'Conversion failed. Verify ACA manifest syntax and try again.',
     },
   ],
   [

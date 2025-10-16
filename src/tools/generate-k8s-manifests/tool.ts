@@ -25,10 +25,12 @@ import {
 import { CATEGORY } from '@/knowledge/types';
 import { createKnowledgeTool, createSimpleCategorizer } from '../shared/knowledge-tool-pattern';
 import type { z } from 'zod';
+import yaml from 'js-yaml';
+import { extractErrorMessage } from '@/lib/error-utils';
 
 const name = 'generate-k8s-manifests';
 const description =
-  'Gather insights from knowledgebase and return requirements for Kubernetes/Helm/ACA/Kustomize manifest creation';
+  'Gather insights from knowledgebase and return requirements for Kubernetes/Helm/ACA/Kustomize manifest creation. Supports repository analysis or ACA manifest conversion.';
 const version = '2.0.0';
 
 // Manifest type to topic mapping
@@ -39,8 +41,77 @@ const MANIFEST_TYPE_TO_TOPIC = {
   kustomize: TOPICS.KUBERNETES,
 } as const;
 
+/**
+ * Parse ACA manifest from YAML or JSON string
+ */
+function parseAcaManifest(manifestStr: string): Record<string, unknown> {
+  try {
+    // Try YAML first (most common for manifests)
+    return yaml.load(manifestStr) as Record<string, unknown>;
+  } catch {
+    try {
+      // Fallback to JSON
+      return JSON.parse(manifestStr) as Record<string, unknown>;
+    } catch {
+      throw new Error('Invalid manifest format: must be valid YAML or JSON');
+    }
+  }
+}
+
+/**
+ * Analyze ACA manifest to extract key information
+ */
+function analyzeAcaManifest(acaManifest: Record<string, unknown>): {
+  containerApps: Array<{
+    name: string;
+    containers: number;
+    hasIngress: boolean;
+    hasScaling: boolean;
+    hasSecrets: boolean;
+  }>;
+  warnings: string[];
+} {
+  const warnings: string[] = [];
+  const containerApps: Array<{
+    name: string;
+    containers: number;
+    hasIngress: boolean;
+    hasScaling: boolean;
+    hasSecrets: boolean;
+  }> = [];
+
+  // Extract ACA properties
+  const properties = (acaManifest.properties || acaManifest) as Record<string, unknown>;
+  const configuration = (properties.configuration || {}) as Record<string, unknown>;
+  const template = (properties.template || {}) as Record<string, unknown>;
+  const containers = (template.containers || []) as Array<Record<string, unknown>>;
+  const scale = (template.scale || {}) as Record<string, unknown>;
+  const ingress = (configuration.ingress || {}) as Record<string, unknown>;
+  const secrets = (configuration.secrets || []) as Array<Record<string, unknown>>;
+
+  const appName = (acaManifest.name as string) || 'aca-app';
+
+  containerApps.push({
+    name: appName,
+    containers: containers.length,
+    hasIngress: Boolean(ingress.external || ingress.targetPort),
+    hasScaling: Boolean(scale.minReplicas || scale.maxReplicas),
+    hasSecrets: secrets.length > 0,
+  });
+
+  if (containers.length === 0) {
+    warnings.push('No containers found in ACA manifest');
+  }
+
+  if (!ingress.external && !ingress.targetPort) {
+    warnings.push('No ingress configuration found - Service may not be created');
+  }
+
+  return { containerApps, warnings };
+}
+
 // Define category types for better type safety
-type ManifestCategory = 'security' | 'resourceManagement' | 'bestPractices';
+type ManifestCategory = 'fieldMappings' | 'security' | 'resourceManagement' | 'bestPractices';
 
 // Create the tool runner using the shared pattern
 const runPattern = createKnowledgeTool<
@@ -51,7 +122,13 @@ const runPattern = createKnowledgeTool<
 >({
   name,
   query: {
-    topic: (input) => MANIFEST_TYPE_TO_TOPIC[input.manifestType],
+    topic: (input) => {
+      // Use ACA conversion topic if acaManifest is provided
+      if (input.acaManifest) {
+        return TOPICS.CONVERT_ACA_TO_K8S;
+      }
+      return MANIFEST_TYPE_TO_TOPIC[input.manifestType];
+    },
     category: CATEGORY.KUBERNETES,
     maxChars: 8000,
     maxSnippets: 20,
@@ -63,8 +140,15 @@ const runPattern = createKnowledgeTool<
     }),
   },
   categorization: {
-    categoryNames: ['security', 'resourceManagement', 'bestPractices'] as const,
+    categoryNames: ['fieldMappings', 'security', 'resourceManagement', 'bestPractices'] as const,
     categorize: createSimpleCategorizer<ManifestCategory>({
+      fieldMappings: (s) =>
+        Boolean(
+          s.tags?.includes('mapping') ||
+            s.tags?.includes('conversion') ||
+            s.text.toLowerCase().includes('map') ||
+            s.text.toLowerCase().includes('convert'),
+        ),
       security: (s) => s.category === 'security' || Boolean(s.tags?.includes('security')),
       resourceManagement: (s) =>
         Boolean(
@@ -90,6 +174,73 @@ const runPattern = createKnowledgeTool<
         matchScore: snippet.weight,
       }));
 
+      // Handle ACA conversion mode
+      if (input.acaManifest) {
+        const parsedManifest = parseAcaManifest(input.acaManifest);
+        const analysis = analyzeAcaManifest(parsedManifest);
+
+        const fieldMappings = (knowledge.categories.fieldMappings || []).map((snippet) => ({
+          id: snippet.id,
+          category: snippet.category || 'field-mapping',
+          recommendation: snippet.text,
+          ...(snippet.tags && { tags: snippet.tags }),
+          matchScore: snippet.weight,
+        }));
+
+        const securityMatches = (knowledge.categories.security || []).map((snippet) => ({
+          id: snippet.id,
+          category: snippet.category || 'security',
+          recommendation: snippet.text,
+          ...(snippet.tags && { tags: snippet.tags }),
+          matchScore: snippet.weight,
+        }));
+
+        const bestPracticeMatches = (knowledge.categories.bestPractices || [])
+          .filter((snippet) => {
+            const isInMappings = (knowledge.categories.fieldMappings || []).some(
+              (s) => s.id === snippet.id,
+            );
+            const isInSecurity = (knowledge.categories.security || []).some(
+              (s) => s.id === snippet.id,
+            );
+            return !isInMappings && !isInSecurity;
+          })
+          .map((snippet) => ({
+            id: snippet.id,
+            category: snippet.category || 'best-practice',
+            recommendation: snippet.text,
+            ...(snippet.tags && { tags: snippet.tags }),
+            matchScore: snippet.weight,
+          }));
+
+        const summary = `
+ACA to K8s Conversion Planning Summary:
+- Container Apps: ${analysis.containerApps.length}
+- Total Containers: ${analysis.containerApps.reduce((sum, app) => sum + app.containers, 0)}
+- Knowledge Matches: ${knowledgeMatches.length} recommendations found
+  - Field Mappings: ${fieldMappings.length}
+  - Security Considerations: ${securityMatches.length}
+  - Best Practices: ${bestPracticeMatches.length}
+- Warnings: ${analysis.warnings.length}
+
+Use this plan to guide the conversion from Azure Container Apps to Kubernetes manifests.
+        `.trim();
+
+        return {
+          acaAnalysis: analysis,
+          manifestType: 'kubernetes',
+          recommendations: {
+            fieldMappings,
+            securityConsiderations: securityMatches,
+            bestPractices: bestPracticeMatches,
+          },
+          knowledgeMatches,
+          confidence,
+          summary,
+        };
+      }
+
+      // Handle repository-based generation mode
       const securityMatches: ManifestRequirement[] = (knowledge.categories.security || []).map(
         (snippet) => ({
           id: snippet.id,
@@ -157,7 +308,7 @@ Next Step: Use generate-${nextStepTool} to create manifests using these recommen
       return {
         repositoryInfo: {
           name: input.name,
-          modulePath: input.path,
+          modulePath: input.modulePath,
           language: input.language,
           languageVersion: input.languageVersion,
           frameworks: input.frameworks,
@@ -185,10 +336,13 @@ async function handleGenerateK8sManifests(
   input: z.infer<typeof generateK8sManifestsSchema>,
   ctx: ToolContext,
 ): Promise<Result<ManifestPlan>> {
-  const path = input.path;
-
-  if (!path) {
-    return Failure('Path is required to generate manifest plan.');
+  // If acaManifest is provided, validate it can be parsed
+  if (input.acaManifest) {
+    try {
+      parseAcaManifest(input.acaManifest);
+    } catch (error) {
+      return Failure(`Invalid ACA manifest: ${extractErrorMessage(error)}`);
+    }
   }
 
   return runPattern(input, ctx);

@@ -33,6 +33,17 @@ function createMockLogger() {
   } as any;
 }
 
+// Mock the validation library to bypass path validation in tests
+jest.mock('../../../src/lib/validation', () => ({
+  validatePath: jest.fn().mockImplementation(async (pathStr: string, options: any) => {
+    // Always return success with the path for tests
+    return { ok: true, value: pathStr };
+  }),
+  validateImageName: jest.fn().mockImplementation((name: string) => ({ ok: true, value: name })),
+  validateK8sName: jest.fn().mockImplementation((name: string) => ({ ok: true, value: name })),
+  validateNamespace: jest.fn().mockImplementation((ns: string) => ({ ok: true, value: ns })),
+}));
+
 // Mock filesystem functions with proper structure
 jest.mock('node:fs', () => ({
   promises: {
@@ -138,7 +149,7 @@ CMD ["node", "index.js"]`;
 
     // Default mock implementations
     mockFs.access.mockResolvedValue(undefined);
-    mockFs.stat.mockResolvedValue({ isFile: () => true } as any);
+    mockFs.stat.mockResolvedValue({ isFile: () => true, isDirectory: () => false } as any);
     mockFs.readFile.mockResolvedValue(mockDockerfile);
     mockFs.writeFile.mockResolvedValue(undefined);
     mockSessionManager.update.mockResolvedValue({
@@ -234,7 +245,8 @@ CMD ["node", "index.js"]`;
 
   describe('Dockerfile Resolution', () => {
     it('should fail when Dockerfile does not exist', async () => {
-      mockFs.stat.mockRejectedValue(new Error('Dockerfile not found'));
+      // Mock stat to return that the file doesn't exist
+      mockFs.stat.mockRejectedValue(new Error('ENOENT: no such file or directory'));
 
       const result = await buildImage(config, createMockToolContext());
 
@@ -247,10 +259,9 @@ CMD ["node", "index.js"]`;
     it('should use dockerfilePath when provided', async () => {
       const customConfig = {
         ...config,
-        dockerfilePath: '/test/repo/custom/Dockerfile',
+        dockerfilePath: 'custom/Dockerfile',
       };
 
-      mockFs.stat.mockResolvedValue({ isFile: () => true } as any);
       mockFs.readFile.mockResolvedValue(mockDockerfile);
 
       const result = await buildImage(customConfig, createMockToolContext());
@@ -365,6 +376,7 @@ CMD ["node", "index.js"]`;
     });
 
     it('should return error when Docker build fails', async () => {
+      mockFs.readFile.mockResolvedValue(mockDockerfile);
       mockDockerClient.buildImage.mockResolvedValue(
         createFailureResult('Docker build failed: syntax error'),
       );
@@ -389,6 +401,7 @@ CMD ["node", "index.js"]`;
     });
 
     it('should handle Docker client errors', async () => {
+      mockFs.readFile.mockResolvedValue(mockDockerfile);
       mockDockerClient.buildImage.mockRejectedValue(new Error('Docker daemon not running'));
 
       const result = await buildImage(config, createMockToolContext());

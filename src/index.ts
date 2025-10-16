@@ -69,7 +69,6 @@ export {
   ALL_TOOLS,
   analyzeRepoTool,
   buildImageTool,
-  convertAcaToK8sTool,
   deployTool,
   fixDockerfileTool,
   generateDockerfileTool,

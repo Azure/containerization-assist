@@ -17,7 +17,6 @@ import type { Logger } from 'pino';
 const ALL_TOOLS = [
   'analyze-repo',
   'build-image',
-  'convert-aca-to-k8s',
   'deploy',
   'fix-dockerfile',
   'prepare-cluster',

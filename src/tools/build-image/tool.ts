@@ -19,6 +19,7 @@ import { promises as fs } from 'node:fs';
 import { createStandardProgress } from '@/mcp/progress-helper';
 import type { ToolContext } from '@/mcp/context';
 import { createDockerClient, type DockerBuildOptions } from '@/infra/docker/client';
+import { validatePath } from '@/lib/validation';
 
 import { type Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/error-utils';
@@ -117,13 +118,22 @@ async function handleBuildImage(
     platform,
   } = params;
 
-  // Normalize paths to handle Windows separators
-  const buildContext = normalizePath(rawBuildPath);
-  const dockerfilePath = rawDockerfilePath ? normalizePath(rawDockerfilePath) : undefined;
-
   try {
     // Progress: Validating build parameters and environment
     if (progress) await progress('VALIDATING');
+
+    // Validate build context path
+    const buildContextResult = await validatePath(rawBuildPath, {
+      mustExist: true,
+      mustBeDirectory: true,
+    });
+    if (!buildContextResult.ok) {
+      return buildContextResult;
+    }
+
+    // Normalize paths to handle Windows separators
+    const buildContext = normalizePath(buildContextResult.value);
+    const dockerfilePath = rawDockerfilePath ? normalizePath(rawDockerfilePath) : undefined;
 
     const startTime = Date.now();
 

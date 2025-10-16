@@ -9,6 +9,7 @@
 
 import { createDockerClient, type DockerClient } from '@/infra/docker/client';
 import { getToolLogger } from '@/lib/tool-helpers';
+import { validateImageName } from '@/lib/validation';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { tool } from '@/types/tool';
@@ -44,6 +45,12 @@ async function handlePushImage(
           'Provide the imageId of the Docker image to push. Use `docker images` to list available images.',
         ),
       );
+    }
+
+    // Validate image name format
+    const imageValidation = validateImageName(input.imageId);
+    if (!imageValidation.ok) {
+      return imageValidation;
     }
 
     // Use docker from context if provided (for testing), otherwise create new client
