@@ -10,7 +10,7 @@ import { validatePolicy } from '../src/config/policy-io.js';
 
 const policiesDir = path.join(process.cwd(), 'policies');
 
-async function validatePolicyFiles() {
+function validatePolicyFiles() {
   console.log('🔍 Validating policy files...\n');
 
   const files = fs
@@ -63,7 +63,9 @@ async function validatePolicyFiles() {
   }
 }
 
-validatePolicyFiles().catch((error) => {
+try {
+  validatePolicyFiles();
+} catch (error) {
   console.error('Fatal error:', error);
   process.exit(1);
-});
+}
