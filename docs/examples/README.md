@@ -14,6 +14,7 @@ This directory contains code examples demonstrating how to use the Containerizat
 - **[mcp-integration.ts](./mcp-integration.ts)** - Full MCP server integration example
 - **[custom-server.ts](./custom-server.ts)** - Custom MCP server with Container Assist tools
 - **[clean-api-example.ts](./clean-api-example.ts)** - Clean API patterns using Result types
+- **[app-mod-telemetry.ts](./app-mod-telemetry.ts)** - External telemetry integration pattern for wrapping tools with custom tracking
 
 ## Running the Examples
 

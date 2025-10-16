@@ -132,7 +132,7 @@ describe('tagImage', () => {
 
   describe('Successful Tagging Operations', () => {
     it('should successfully tag image with repository and tag', async () => {
-      const result = await tagImageTool.run(config, createMockToolContext());
+      const result = await tagImageTool.handler(config, createMockToolContext());
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -159,7 +159,7 @@ describe('tagImage', () => {
     it('should handle tag without explicit version (defaults to latest)', async () => {
       config.tag = 'myapp';
 
-      const result = await tagImageTool.run(config, createMockToolContext());
+      const result = await tagImageTool.handler(config, createMockToolContext());
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -197,7 +197,7 @@ describe('tagImage', () => {
       for (const testCase of testCases) {
         config.tag = testCase.input;
 
-        const result = await tagImageTool.run(config, createMockToolContext());
+        const result = await tagImageTool.handler(config, createMockToolContext());
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -217,7 +217,7 @@ describe('tagImage', () => {
     });
 
     it('should succeed with valid imageId', async () => {
-      const result = await tagImageTool.run(config, createMockToolContext());
+      const result = await tagImageTool.handler(config, createMockToolContext());
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -241,7 +241,7 @@ describe('tagImage', () => {
 
       for (const tag of validTags) {
         config.tag = tag;
-        const result = await tagImageTool.run(config, createMockToolContext());
+        const result = await tagImageTool.handler(config, createMockToolContext());
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -272,7 +272,7 @@ describe('tagImage', () => {
       for (const testCase of testCases) {
         config.tag = testCase.tag;
 
-        const result = await tagImageTool.run(config, createMockToolContext());
+        const result = await tagImageTool.handler(config, createMockToolContext());
 
         expect(result.ok).toBe(true);
         expect(mockDockerClient.tagImage).toHaveBeenCalledWith(
@@ -290,7 +290,7 @@ describe('tagImage', () => {
 
   describe('Error Handling', () => {
     it('should succeed with valid imageId', async () => {
-      const result = await tagImageTool.run(config, createMockToolContext());
+      const result = await tagImageTool.handler(config, createMockToolContext());
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -304,7 +304,7 @@ describe('tagImage', () => {
         imageId: undefined,
       };
 
-      const result = await tagImageTool.run(configWithoutImage, createMockToolContext());
+      const result = await tagImageTool.handler(configWithoutImage, createMockToolContext());
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -318,7 +318,7 @@ describe('tagImage', () => {
         tag: '',
       };
 
-      const result = await tagImageTool.run(configWithEmptyTag, createMockToolContext());
+      const result = await tagImageTool.handler(configWithEmptyTag, createMockToolContext());
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -331,7 +331,7 @@ describe('tagImage', () => {
         createFailureResult('Failed to create tag: image not found'),
       );
 
-      const result = await tagImageTool.run(config, createMockToolContext());
+      const result = await tagImageTool.handler(config, createMockToolContext());
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -344,7 +344,7 @@ describe('tagImage', () => {
         createFailureResult(null as any), // No error message
       );
 
-      const result = await tagImageTool.run(config, createMockToolContext());
+      const result = await tagImageTool.handler(config, createMockToolContext());
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -355,7 +355,7 @@ describe('tagImage', () => {
     it('should handle exceptions during tagging process', async () => {
       mockDockerClient.tagImage.mockRejectedValue(new Error('Docker daemon not responding'));
 
-      const result = await tagImageTool.run(config, createMockToolContext());
+      const result = await tagImageTool.handler(config, createMockToolContext());
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -366,7 +366,7 @@ describe('tagImage', () => {
     });
 
     it('should succeed with valid imageId and tag', async () => {
-      const result = await tagImageTool.run(config, createMockToolContext());
+      const result = await tagImageTool.handler(config, createMockToolContext());
 
       // Tool should succeed - orchestrator handles result storage
       expect(result.ok).toBe(true);
@@ -379,7 +379,7 @@ describe('tagImage', () => {
 
   describe('Session State Management', () => {
     it('should succeed with valid parameters', async () => {
-      const result = await tagImageTool.run(config, createMockToolContext());
+      const result = await tagImageTool.handler(config, createMockToolContext());
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -396,7 +396,7 @@ describe('tagImage', () => {
       ];
 
       for (const testConfig of configurations) {
-        const result = await tagImageTool.run(testConfig, createMockToolContext());
+        const result = await tagImageTool.handler(testConfig, createMockToolContext());
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -415,7 +415,7 @@ describe('tagImage', () => {
 
       for (const tag of tags) {
         config.tag = tag;
-        const result = await tagImageTool.run(config, createMockToolContext());
+        const result = await tagImageTool.handler(config, createMockToolContext());
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -443,12 +443,12 @@ describe('tagImage', () => {
       const importedTool = await import('../../../src/tools/tag-image/tool');
       const tagImageTool = importedTool.default;
 
-      // The tool is now an object with a run method
+      // The tool is now an object with a handler method
       expect(typeof tagImageTool).toBe('object');
-      expect(typeof tagImageTool.run).toBe('function');
+      expect(typeof tagImageTool.handler).toBe('function');
 
-      // The tool can be called via its run method
-      const result = await tagImageTool.run(config, createMockToolContext());
+      // The tool can be called via its handler method
+      const result = await tagImageTool.handler(config, createMockToolContext());
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.success).toBe(true);

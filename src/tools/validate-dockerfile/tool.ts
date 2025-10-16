@@ -7,7 +7,6 @@
 
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { MCPTool } from '@/types/tool';
 import { validateImageSchema, type ValidateImageResult } from './schema';
 import { promises as fs } from 'node:fs';
 import nodePath from 'node:path';
@@ -103,7 +102,7 @@ function validateImageAgainstRules(
   return { allowed, denied, matchedAllowRule, matchedDenyRule };
 }
 
-async function run(
+async function handleValidateDockerfile(
   input: z.infer<typeof validateImageSchema>,
   ctx: ToolContext,
 ): Promise<Result<ValidateImageResult>> {
@@ -220,7 +219,9 @@ async function run(
   return Success(result);
 }
 
-const tool: MCPTool<typeof validateImageSchema, ValidateImageResult> = {
+import { tool } from '@/types/tool';
+
+export default tool({
   name,
   description,
   category: 'docker',
@@ -231,7 +232,5 @@ const tool: MCPTool<typeof validateImageSchema, ValidateImageResult> = {
     samplingStrategy: 'none',
     enhancementCapabilities: [],
   },
-  run,
-};
-
-export default tool;
+  handler: handleValidateDockerfile,
+});

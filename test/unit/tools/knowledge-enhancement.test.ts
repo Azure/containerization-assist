@@ -220,7 +220,7 @@ spec:
 
   describe('analyze-repo', () => {
     it('should successfully analyze repository with pre-provided modules', async () => {
-      const result = await analyzeRepoTool.run(
+      const result = await analyzeRepoTool.handler(
         {
           repositoryPath: '/test/repo',
           modules: [
@@ -245,7 +245,7 @@ spec:
     });
 
     it('should analyze repository deterministically when modules not provided', async () => {
-      const result = await analyzeRepoTool.run(
+      const result = await analyzeRepoTool.handler(
         {
           repositoryPath: '/test/repo',
         } as any,
@@ -280,7 +280,7 @@ properties:
       external: true
       targetPort: 80
 `;
-      const result = await convertAcaToK8sTool.run(
+      const result = await convertAcaToK8sTool.handler(
         {
           acaManifest,
         },
