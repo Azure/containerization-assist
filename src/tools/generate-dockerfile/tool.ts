@@ -51,6 +51,7 @@ const runPattern = createKnowledgeTool<
       environment: input.environment || 'production',
       language: input.language || 'auto-detect',
       framework: input.framework,
+      detectedDependencies: input.detectedDependencies,
     }),
   },
   categorization: {

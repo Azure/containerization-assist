@@ -299,6 +299,7 @@ export interface KnowledgeSnippetOptions {
   category?: KnowledgeCategory;
   maxChars?: number;
   maxSnippets?: number;
+  detectedDependencies?: string[];
 }
 
 /**
@@ -317,14 +318,23 @@ export async function getKnowledgeSnippets(
     const { loadKnowledgeData } = await import('./loader');
     const knowledgeData = await loadKnowledgeData();
 
-    // Build query from topic and options
+    const queryTextParts: string[] = [topic];
+    if (options.detectedDependencies && options.detectedDependencies.length > 0) {
+      queryTextParts.push(...options.detectedDependencies);
+    }
+
+    const queryTags: string[] = [options.tool];
+    if (options.language) queryTags.push(options.language);
+    if (options.framework) queryTags.push(options.framework);
+    if (options.environment) queryTags.push(options.environment);
+
     const query: KnowledgeQuery = {
-      text: topic,
+      text: queryTextParts.join(' '),
       environment: options.environment,
       ...(options.language && { language: options.language }),
       ...(options.framework && { framework: options.framework }),
       ...(options.category && { category: options.category }),
-      tags: [options.tool, topic],
+      tags: queryTags,
       limit: options.maxSnippets || 10,
     };
 

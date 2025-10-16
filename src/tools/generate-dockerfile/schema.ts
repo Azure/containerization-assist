@@ -19,6 +19,12 @@ export const generateDockerfileSchema = z.object({
   language: z.string().optional().describe('Primary programming language (e.g., "java", "python")'),
   framework: z.string().optional().describe('Framework used (e.g., "spring", "django")'),
   environment: environment.describe('Target environment (production, development, etc.)'),
+  detectedDependencies: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Detected libraries/frameworks/features from repository analysis (e.g., ["redis", "ef-core", "signalr", "mongodb", "health-checks"]). This helps match relevant knowledge entries.',
+    ),
 });
 
 export type GenerateDockerfileParams = z.infer<typeof generateDockerfileSchema>;
