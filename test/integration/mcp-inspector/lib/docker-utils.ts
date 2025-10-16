@@ -4,9 +4,9 @@
  */
 
 import { spawn } from 'child_process';
-import { writeFile, unlink, mkdtemp } from 'fs/promises';
+import { writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
-import { tmpdir } from 'os';
+import tmp from 'tmp';
 import type { BuildResult } from '../../../../src/types/result-types.js';
 
 export interface BuildConfig {
@@ -55,6 +55,31 @@ export class DockerUtils {
   private tempFiles: Set<string> = new Set();
 
   /**
+   * Create a temporary directory asynchronously
+   */
+  private static async createTempDir(prefix: string): Promise<tmp.DirResult> {
+    return new Promise<tmp.DirResult>((resolve, reject) => {
+      tmp.dir({ prefix, unsafeCleanup: true, keep: false }, (err, name, removeCallback) => {
+        if (err) return reject(err);
+        resolve({ name, removeCallback } as tmp.DirResult);
+      });
+    });
+  }
+
+  /**
+   * Clean up temp directory safely
+   */
+  private static cleanupTempDir(tempDirResult: tmp.DirResult | null): void {
+    if (tempDirResult) {
+      try {
+        tempDirResult.removeCallback();
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  }
+
+  /**
    * Check if Docker is available in the environment
    */
   static async isDockerAvailable(): Promise<boolean> {
@@ -71,20 +96,21 @@ export class DockerUtils {
    */
   async buildImage(config: BuildConfig): Promise<DockerBuildResult> {
     const startTime = performance.now();
-    
+    let tempDirResult: tmp.DirResult | null = null;
+
     try {
       // Create temporary Dockerfile if needed
       let dockerfilePath: string;
       let dockerfileContent = config.dockerfile;
-      
+
       // Fix common test fixture issues
       if (dockerfileContent.includes('npm ci --only=production')) {
         dockerfileContent = dockerfileContent.replace('npm ci --only=production', 'npm install --production');
       }
-      
+
       if (dockerfileContent.includes('\n') || !dockerfileContent.startsWith('FROM')) {
-        const tempDir = await mkdtemp(join(tmpdir(), 'dockerfile-'));
-        dockerfilePath = join(tempDir, 'Dockerfile');
+        tempDirResult = await DockerUtils.createTempDir('dockerfile-');
+        dockerfilePath = join(tempDirResult.name, 'Dockerfile');
         await writeFile(dockerfilePath, dockerfileContent);
         this.tempFiles.add(dockerfilePath);
       } else {
@@ -151,6 +177,9 @@ export class DockerUtils {
         error: error instanceof Error ? error.message : String(error),
         duration
       };
+    } finally {
+      // Clean up temp directory
+      DockerUtils.cleanupTempDir(tempDirResult);
     }
   }
 

@@ -17,11 +17,13 @@ import type { DockerBuildOptions, DockerClient } from '../../../../src/infra/doc
 import { DockerTestCleaner, TEST_IMAGE_NAME } from '../../../__support__/utilities/docker-test-cleaner';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
+import { createTestTempDir } from '../../../__support__/utilities/tmp-helpers';
+import type { DirResult } from 'tmp';
 
 describe('Docker Client Error Handling Integration Tests', () => {
   let dockerClient: DockerClient;
-  let testDir: string;
+  let testDir: DirResult;
+  let cleanup: () => Promise<void>;
   let testCleaner: DockerTestCleaner;
   const logger = createLogger({ level: 'debug' });
   const testTimeout = 60000; // 60 seconds for Docker operations
@@ -32,7 +34,9 @@ describe('Docker Client Error Handling Integration Tests', () => {
     testCleaner = new DockerTestCleaner(logger, dockerClient, { verifyCleanup: true });
 
     // Create a temporary directory for test Dockerfiles
-    testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'docker-error-tests-'));
+    const result = createTestTempDir('docker-error-tests-');
+    testDir = result.dir;
+    cleanup = result.cleanup;
 
     // Wrap buildImage to track successful builds for cleanup
     const original = dockerClient.buildImage.bind(dockerClient);
@@ -56,13 +60,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
     await testCleaner.cleanup();
 
     // Clean up test directory
-    try {
-      await fs.rm(testDir, { recursive: true, force: true });
-      logger.debug({ testDir }, 'Cleaned up test directory');
-    } catch (error) {
-      logger.error({ error, testDir }, 'FAILED to clean up test directory');
-      // Don't throw here to avoid masking test results
-    }
+    await cleanup();
   });
 
   afterEach(async () => {
@@ -72,7 +70,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
 
   // Helper function to create test Dockerfile
   async function createTestDockerfile(content: string, filename = 'Dockerfile'): Promise<string> {
-    const dockerfilePath = path.join(testDir, filename);
+    const dockerfilePath = path.join(testDir.name, filename);
     await fs.writeFile(dockerfilePath, content, 'utf-8');
     return dockerfilePath;
   }
@@ -86,7 +84,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
 
       const invalidRegistryOptions: DockerBuildOptions = {
         dockerfile: 'Dockerfile.connectivity',
-        context: testDir,
+        context: testDir.name,
         t: TEST_IMAGE_NAME
       };
 
@@ -108,7 +106,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
 
       const connectionRefusedOptions: DockerBuildOptions = {
         dockerfile: 'Dockerfile.refused',
-        context: testDir,
+        context: testDir.name,
         t: TEST_IMAGE_NAME
       };
 
@@ -140,7 +138,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
 
       const authFailureOptions: DockerBuildOptions = {
         dockerfile: 'Dockerfile.auth',
-        context: testDir,
+        context: testDir.name,
         t: TEST_IMAGE_NAME
       };
 
@@ -164,7 +162,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
 
       const missingImageOptions: DockerBuildOptions = {
         dockerfile: 'Dockerfile.missing',
-        context: testDir,
+        context: testDir.name,
         t: TEST_IMAGE_NAME
       };
 
@@ -186,7 +184,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
 
       const nonExistentRepoOptions: DockerBuildOptions = {
         dockerfile: 'Dockerfile.nonexistent',
-        context: testDir,
+        context: testDir.name,
         t: TEST_IMAGE_NAME
       };
 
@@ -212,7 +210,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
 
       const serverErrorOptions: DockerBuildOptions = {
         dockerfile: 'Dockerfile.server',
-        context: testDir,
+        context: testDir.name,
         t: TEST_IMAGE_NAME
       };
 
@@ -236,7 +234,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
 
       const malformedDockerfileOptions: DockerBuildOptions = {
         dockerfile: 'Dockerfile.syntax',
-        context: testDir,
+        context: testDir.name,
         t: TEST_IMAGE_NAME
       };
 
@@ -258,7 +256,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
 
       const noFromOptions: DockerBuildOptions = {
         dockerfile: 'Dockerfile.nofrom',
-        context: testDir,
+        context: testDir.name,
         t: TEST_IMAGE_NAME
       };
 
@@ -278,7 +276,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
       // Use a valid context but reference a non-existent Dockerfile
       const invalidDockerfileOptions: DockerBuildOptions = {
         dockerfile: 'NonExistentDockerfile', // This doesn't exist in testDir
-        context: testDir,
+        context: testDir.name,
         t: TEST_IMAGE_NAME
       };
 
@@ -322,7 +320,7 @@ describe('Docker Client Error Handling Integration Tests', () => {
 
       const buildResult = await dockerClient.buildImage({
         dockerfile: 'Dockerfile.push',
-        context: testDir,
+        context: testDir.name,
         t: 'test-push-unauthorized'
       });
 
@@ -358,7 +356,7 @@ RUN exit 1
 
       const progressErrorOptions: DockerBuildOptions = {
         dockerfile: 'Dockerfile.progress',
-        context: testDir,
+        context: testDir.name,
         t: 'test-progress-error'
       };
 
@@ -382,7 +380,7 @@ RUN echo "After error"
 
       const stepErrorOptions: DockerBuildOptions = {
         dockerfile: 'Dockerfile.step',
-        context: testDir,
+        context: testDir.name,
         t: 'test-step-error'
       };
 
@@ -431,7 +429,7 @@ RUN echo "After error"
 
       const networkErrorOptions: DockerBuildOptions = {
         dockerfile: 'Dockerfile.actionable',
-        context: testDir,
+        context: testDir.name,
         t: 'test-actionable-error'
       };
 

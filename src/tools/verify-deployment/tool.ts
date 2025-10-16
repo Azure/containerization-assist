@@ -286,7 +286,6 @@ export default tool({
   schema: verifyDeploymentSchema,
   metadata: {
     knowledgeEnhanced: false,
-    enhancementCapabilities: [],
   },
   handler: handleVerifyDeployment,
 });

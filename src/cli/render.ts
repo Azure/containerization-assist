@@ -54,11 +54,15 @@ function outputTable(tools: Tool[], detailed: boolean = false): void {
 
     console.info(`│ ${name} │ ${category} │${ke}│`);
 
-    if (detailed && tool.metadata.enhancementCapabilities.length > 0) {
+    if (
+      detailed &&
+      tool.metadata.enhancementCapabilities &&
+      tool.metadata.enhancementCapabilities.length > 0
+    ) {
       const caps = tool.metadata.enhancementCapabilities.join(', ');
-      const wrappedCaps = wrapText(caps, nameWidth + categoryWidth + 9);
+      const wrappedCaps = wrapText(caps, nameWidth + categoryWidth + 6);
       for (const line of wrappedCaps) {
-        console.info(`│ ${line.padEnd(nameWidth + categoryWidth + 9)} │`);
+        console.info(`│ ${line.padEnd(nameWidth + categoryWidth + 6)} │`);
       }
     }
   }
@@ -68,14 +72,24 @@ function outputTable(tools: Tool[], detailed: boolean = false): void {
 }
 
 /**
+ * Escape and quote a CSV field value
+ */
+function escapeCSVField(value: string): string {
+  // Escape double quotes by doubling them, then wrap in quotes
+  const escaped = value.replace(/"/g, '""');
+  return `"${escaped}"`;
+}
+
+/**
  * Output tools in CSV format
  */
 function outputCSV(tools: Tool[]): void {
   console.info('Name,Category,Knowledge-Enhanced,Enhancement Capabilities');
   for (const tool of tools) {
-    const caps = tool.metadata.enhancementCapabilities.join(';');
+    const caps = tool.metadata.enhancementCapabilities?.join(';') ?? '';
+    const capsEscaped = escapeCSVField(caps);
     console.info(
-      `${tool.name},${tool.category || ''},${tool.metadata.knowledgeEnhanced},"${caps}"`,
+      `${tool.name},${tool.category || ''},${tool.metadata.knowledgeEnhanced},${capsEscaped}`,
     );
   }
 }

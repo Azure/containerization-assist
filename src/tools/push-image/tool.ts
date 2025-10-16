@@ -181,7 +181,6 @@ export default tool({
   schema: pushImageSchema,
   metadata: {
     knowledgeEnhanced: false,
-    enhancementCapabilities: [],
   },
   handler: handlePushImage,
 });

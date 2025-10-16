@@ -114,7 +114,6 @@ export default tool({
   schema: tagImageSchema,
   metadata: {
     knowledgeEnhanced: false,
-    enhancementCapabilities: [],
   },
   handler: handleTagImage,
 });
