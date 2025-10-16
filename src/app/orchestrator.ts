@@ -65,7 +65,7 @@ function calculatePolicyStrictness(policy: Policy): number {
 
   // Use max priority as the strictness metric
   // This ensures policies with the highest-priority rules take precedence
-  return Math.max(...policy.rules.map((r) => r.priority));
+  return policy.rules.reduce((max, r) => Math.max(max, r.priority), -Infinity);
 }
 
 /**
@@ -85,16 +85,10 @@ function mergePolicies(policies: Policy[]): Policy {
 
   if (sortedPolicies.length === 1) {
     const singlePolicy = sortedPolicies[0];
-    if (!singlePolicy) {
-      throw new Error('Unexpected: sorted policies array is corrupted');
-    }
     return singlePolicy;
   }
 
   const firstPolicy = sortedPolicies[0];
-  if (!firstPolicy) {
-    throw new Error('Unexpected: sorted policies array is corrupted');
-  }
 
   // Start with the first policy as base
   const merged: Policy = {
