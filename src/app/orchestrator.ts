@@ -45,7 +45,7 @@ function getDefaultPolicyPaths(): string[] {
     const files = fs.readdirSync(policiesDir);
     return files
       .filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'))
-      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true })) // Natural sort for consistency
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true })) // Alphabetical sort with numeric awareness for consistent policy load order
       .map((f) => path.join(policiesDir, f));
   } catch (error) {
     logger.warn(

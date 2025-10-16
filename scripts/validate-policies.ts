@@ -35,7 +35,7 @@ function validatePolicyFiles() {
       const result = validatePolicy(parsed);
 
       if (result.ok) {
-        console.log(`  ✅ Valid - ${result.value.rules?.length || 0} rules found`);
+        console.log(`  ✅ Valid - ${result.value.rules.length} rules found`);
         if (result.value.metadata?.name) {
           console.log(`     Name: ${result.value.metadata.name}`);
         }
