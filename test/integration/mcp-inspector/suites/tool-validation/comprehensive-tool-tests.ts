@@ -138,7 +138,7 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
         const start = performance.now();
         
         const result = await client.callTool({
-          name: 'scan',
+          name: 'scan-image',
           arguments: {
             sessionId: 'scan-test-123',
             imageId: 'node:18-alpine',

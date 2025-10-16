@@ -32,7 +32,7 @@ export const DEFAULT_TIMEOUTS = {
   dockerBuild: 300000, // 5 minutes
   kubernetes: 30000, // 30 seconds
   sampling: 30000, // 30 seconds
-  scan: 300000, // 5 minutes
+  'scan-image': 300000, // 5 minutes
   deployment: 180000, // 3 minutes
   deploymentPoll: 5000, // 5 seconds (between deployment status checks)
   verification: 60000, // 1 minute

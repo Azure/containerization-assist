@@ -67,8 +67,8 @@ async function handleScanImage(
   if (!params || typeof params !== 'object') {
     return Failure('Invalid parameters provided');
   }
-  const logger = getToolLogger(context, 'scan');
-  const timer = createToolTimer(logger, 'scan');
+  const logger = getToolLogger(context, 'scan-image');
+  const timer = createToolTimer(logger, 'scan-image');
 
   const { scanner = 'trivy', severity } = params;
 
@@ -244,7 +244,7 @@ export const scanImage = handleScanImage;
 import { tool } from '@/types/tool';
 
 export default tool({
-  name: 'scan',
+  name: 'scan-image',
   description:
     'Scan Docker images for security vulnerabilities with knowledge-based remediation guidance',
   category: 'security',

@@ -73,7 +73,7 @@ configureTools({ server });
 All AI-powered tools use deterministic sampling (`count: 1`) to ensure reproducible outputs. Each generation includes scoring metadata for quality validation.
 
 **Progress Notifications:**
-Long-running operations (build, deploy, scan) emit MCP notifications that clients can subscribe to for real-time progress updates.
+Long-running operations (build, deploy, scan-image) emit MCP notifications that clients can subscribe to for real-time progress updates.
 
 ### 2. Tool Orchestration
 

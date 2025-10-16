@@ -142,7 +142,7 @@ const TOOL_CATEGORIES: Record<string, ToolCategory> = {
   'analyze-repo': 'analysis',
 
   // Security tools
-  scan: 'security',
+  'scan-image': 'security',
 
   // Utility tools
   ops: 'utility',

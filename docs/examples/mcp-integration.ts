@@ -75,7 +75,7 @@ async function registerWithMappingExample() {
       'analyze-repo': 'project_analyze',
       'generate-dockerfile': 'dockerfile_create',
       'build-image': 'image_build',
-      'scan': 'security_scan',
+      'scan-image': 'security_scan',
       'deploy': 'app_deploy',
       'verify-deploy': 'deployment_check'
     }
@@ -88,7 +88,7 @@ async function registerWithMappingExample() {
     'analyze-repo': 'project_analyze',
     'generate-dockerfile': 'dockerfile_create',
     'build-image': 'image_build',
-    'scan': 'security_scan',
+    'scan-image': 'security_scan',
     'deploy': 'app_deploy',
     'verify-deploy': 'deployment_check'
   };

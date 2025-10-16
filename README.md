@@ -69,11 +69,11 @@ The easiest way to understand the containerization workflow is through an end-to
 
 This MCP server guides you through a complete containerization workflow for a single application. The journey follows this sequence:
 
-1. **Analyze** → Understand your application's language, framework, and dependencies
+1. **Analyze Repository** → Understand your application's language, framework, and dependencies
 2. **Generate Dockerfile** → Create an optimized, security-hardened container configuration
 3. **Build Image** → Compile your application into a Docker image
-4. **Scan** → Identify security vulnerabilities and get remediation guidance
-5. **Tag** → Apply appropriate version tags to your image
+4. **Scan Image** → Identify security vulnerabilities and get remediation guidance
+5. **Tag Image** → Apply appropriate version tags to your image
 6. **Generate K8s Manifests** → Create deployment configurations for Kubernetes
 7. **Prepare Cluster** → Set up namespace and prerequisites (if needed)
 8. **Deploy** → Deploy your application to Kubernetes
@@ -159,12 +159,42 @@ The server detects and supports monorepo structures with multiple independently 
 
 ## Available Tools
 
+The server provides 15 MCP tools organized by functionality:
+
+### Analysis & Planning
 | Tool | Description |
 |------|-------------|
-| `analyze-repo` | Analyze repository structure and detect language/framework |
-| `generate-dockerfile-plan` | Plan Dockerfile generation strategy |
-| `validate-dockerfile` | Validate Dockerfile syntax and best practices |
-| `generate-manifest-plan` | Plan Kubernetes manifest generation strategy |
+| `analyze-repo` | Analyze repository structure and detect technologies by parsing config files |
+| `resolve-base-images` | Query knowledge base for Docker base image recommendations |
+
+### Dockerfile Operations
+| Tool | Description |
+|------|-------------|
+| `generate-dockerfile` | Gather insights from knowledge base and return requirements for Dockerfile creation |
+| `validate-dockerfile` | Validate Dockerfile base images against allowlist/denylist patterns |
+| `fix-dockerfile` | Analyze Dockerfile for issues and return knowledge-based fix recommendations |
+
+### Image Operations
+| Tool | Description |
+|------|-------------|
+| `build-image` | Build Docker images from Dockerfiles with security analysis |
+| `scan-image` | Scan Docker images for security vulnerabilities with remediation guidance |
+| `tag-image` | Tag Docker images with version and registry information |
+| `push-image` | Push Docker images to a registry |
+
+### Kubernetes Operations
+| Tool | Description |
+|------|-------------|
+| `generate-k8s-manifests` | Gather insights and return requirements for Kubernetes/Helm/ACA/Kustomize manifest creation |
+| `prepare-cluster` | Prepare Kubernetes cluster for deployment |
+| `deploy` | Deploy applications to Kubernetes clusters |
+| `verify-deploy` | Verify Kubernetes deployment status |
+
+### Azure & Utilities
+| Tool | Description |
+|------|-------------|
+| `convert-aca-to-k8s` | Analyze Azure Container Apps manifest and return recommendations for Kubernetes conversion |
+| `ops` | Operational utilities for ping and server status |
 
 ## Supported Technologies
 
@@ -198,7 +228,7 @@ The following environment variables control server behavior:
 | `CONTAINERIZATION_ASSIST_TOOL_LOGS_DIR_PATH` | Directory path for tool execution logs (JSON format) | Disabled | No |
 
 **Progress Notifications:**
-Long-running operations (build, deploy, scan) emit real-time progress updates via MCP notifications. MCP clients can subscribe to these notifications to display progress to users.
+Long-running operations (build, deploy, scan-image) emit real-time progress updates via MCP notifications. MCP clients can subscribe to these notifications to display progress to users.
 
 **Deterministic AI Sampling:**
 All AI-powered tools use deterministic sampling with `count: 1` to ensure reproducible outputs. Each generation includes scoring metadata for quality validation and diagnostics.
