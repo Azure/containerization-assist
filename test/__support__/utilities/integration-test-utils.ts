@@ -4,9 +4,10 @@
  */
 
 import type { Logger } from 'pino';
-import { tmpdir } from 'os';
 import { join } from 'path';
 import { promises as fs } from 'fs';
+import tmp from 'tmp';
+import type { DirResult } from 'tmp';
 import { DetectionOptions, EnvironmentCapabilities, detectEnvironment } from './environment-detector';
 
 export interface IntegrationTestContext {
@@ -59,22 +60,75 @@ export function createTestLogger(prefix: string = 'integration-test'): Logger {
 }
 
 /**
- * Create a temporary directory for test context
+ * Create a temporary directory for test context (synchronous).
+ * @deprecated Use {@link createTestTempDir} from tmp-helpers.ts instead. This function is synchronous.
+ * @see createTestTempDir
+ * @param prefix - Prefix for the temporary directory name
+ * @returns The path to the temporary directory
+ * @remarks
+ * This function was changed from async to sync. For new code, use createTestTempDir which provides
+ * better cleanup management and returns a cleanup function.
+ */
+export function createTestContextSync(prefix: string = 'integration-test'): string {
+  const dir = tmp.dirSync({
+    prefix: `${prefix}-`,
+    unsafeCleanup: true,
+    keep: false,
+  });
+  return dir.name;
+}
+
+/**
+ * Create a temporary directory for test context (async).
+ * @deprecated Use {@link createTestTempDir} from tmp-helpers.ts instead.
+ * @see createTestTempDir
+ * @param prefix - Prefix for the temporary directory name
+ * @returns Promise resolving to the path to the temporary directory
+ * @remarks
+ * Preserved for backwards compatibility with code that was awaiting createTestContext.
  */
 export async function createTestContext(prefix: string = 'integration-test'): Promise<string> {
-  const contextDir = await fs.mkdtemp(join(tmpdir(), `${prefix}-`));
-  return contextDir;
+  return createTestContextSync(prefix);
 }
 
 /**
  * Cleanup test resources
+ * Now uses tmp module for automatic cleanup on process exit
  */
 export class IntegrationTestCleanup {
-  private tempDirs: string[] = [];
+  private tempDirs: DirResult[] = [];
   private cleanupTasks: (() => Promise<void>)[] = [];
 
-  addTempDir(dir: string): void {
+  /**
+   * Create and track a temporary directory
+   */
+  createTempDir(prefix: string): string {
+    const dir = tmp.dirSync({
+      prefix: `${prefix}-`,
+      unsafeCleanup: true,
+      keep: false,
+    });
     this.tempDirs.push(dir);
+    return dir.name;
+  }
+
+  /**
+   * Register an externally created directory for cleanup
+   * @deprecated Use createTempDir instead which creates and tracks the directory
+   * @param dir - Path to the directory to track for cleanup
+   */
+  addTempDir(dir: string): void {
+    // Create a DirResult-like object for externally created directories
+    const dirResult: DirResult = {
+      name: dir,
+      removeCallback: () => {
+        // Remove the directory recursively using fs.rm
+        return import('fs').then(fs =>
+          fs.promises.rm(dir, { recursive: true, force: true })
+        );
+      }
+    } as DirResult;
+    this.tempDirs.push(dirResult);
   }
 
   addCleanupTask(task: () => Promise<void>): void {
@@ -91,11 +145,12 @@ export class IntegrationTestCleanup {
       }
     }
 
+    // Clean temp directories using tmp module
     for (const dir of this.tempDirs) {
       try {
-        await fs.rm(dir, { recursive: true, force: true });
+        dir.removeCallback();
       } catch (error) {
-        console.warn(`Failed to cleanup directory ${dir}:`, error);
+        console.warn(`Failed to cleanup directory ${dir.name}:`, error);
       }
     }
 

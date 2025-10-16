@@ -53,14 +53,6 @@ export async function waitFor(
 }
 
 /**
- * Helper to create temporary directories for tests
- */
-export function createTempDir(): string {
-  const tmpDir = `/tmp/test-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-  return tmpDir;
-}
-
-/**
  * Helper to create mock performance metrics
  */
 export function createMockPerformanceMetrics() {
