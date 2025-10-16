@@ -24,7 +24,7 @@ import { createDockerClient } from '@/infra/docker/client';
 import analyzeRepoTool from '@/tools/analyze-repo/tool';
 import buildImageTool, { type BuildImageResult } from '@/tools/build-image/tool';
 import tagImageTool from '@/tools/tag-image/tool';
-import scanImageTool from '@/tools/scan/tool';
+import scanImageTool from '@/tools/scan-image/tool';
 
 import type { RepositoryAnalysis } from '@/tools/analyze-repo/schema';
 
