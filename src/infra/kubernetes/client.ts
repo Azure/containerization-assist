@@ -56,6 +56,9 @@ export interface KubernetesClientConfig {
   timeout?: number;
 }
 
+// Constants for deployment polling
+const DEPLOYMENT_POLL_INTERVAL_MS = 5000; // 5 seconds
+
 /**
  * Create a Kubernetes client with core operations
  *
@@ -117,7 +120,7 @@ export const createKubernetesClient = (
   const networkingApi = kc.makeApiClient(k8s.NetworkingV1Api);
   const batchApi = kc.makeApiClient(k8s.BatchV1Api);
   const rbacApi = kc.makeApiClient(k8s.RbacAuthorizationV1Api);
-  const objectApi = kc.makeApiClient(k8s.KubernetesObjectApi);
+  const objectApi = k8s.KubernetesObjectApi.makeApiClient(kc);
 
   return {
     /**
@@ -450,6 +453,15 @@ export const createKubernetesClient = (
         logger.info({ namespace }, 'Namespace created successfully');
         return Success(undefined);
       } catch (error) {
+        // Handle 409 Conflict (AlreadyExists) as success to maintain idempotency
+        if (error && typeof error === 'object' && 'response' in error) {
+          const response = (error as { response?: { statusCode?: number } }).response;
+          if (response?.statusCode === 409) {
+            logger.debug({ namespace }, 'Namespace already exists (created by another process)');
+            return Success(undefined);
+          }
+        }
+
         const guidance = extractK8sErrorGuidance(error, 'ensure namespace');
         const errorMessage = `Failed to ensure namespace exists: ${guidance.message}`;
 
@@ -478,7 +490,6 @@ export const createKubernetesClient = (
     ): Promise<Result<DeploymentResult>> {
       try {
         const startTime = Date.now();
-        const pollInterval = 5000; // 5 seconds
         const maxWaitTime = timeoutSeconds * 1000;
 
         logger.debug({ namespace, name, timeoutSeconds }, 'Waiting for deployment to be ready');
@@ -500,7 +511,7 @@ export const createKubernetesClient = (
           }
 
           // Wait before checking again
-          await new Promise((resolve) => setTimeout(resolve, pollInterval));
+          await new Promise((resolve) => setTimeout(resolve, DEPLOYMENT_POLL_INTERVAL_MS));
         }
 
         // Timeout reached

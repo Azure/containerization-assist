@@ -7,9 +7,7 @@
  * This is a deterministic operational tool with no AI calls.
  */
 
-import Docker from 'dockerode';
 import { createDockerClient, type DockerClient } from '@/infra/docker/client';
-import { createDockerRegistry, type RegistryConfig } from '@/infra/docker/registry';
 import { getToolLogger } from '@/lib/tool-helpers';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
@@ -76,28 +74,19 @@ async function handlePushImage(
       }
     }
 
-    // Handle registry authentication if credentials are provided
-    if (input.credentials) {
-      logger.info({ registry: input.registry }, 'Authenticating with registry');
+    // Build auth config if credentials are provided
+    let authConfig: { username: string; password: string; serveraddress: string } | undefined;
+    if (input.credentials && input.registry) {
+      logger.info({ registry: input.registry }, 'Preparing registry authentication');
 
-      // Create a Docker instance for the registry client
-      const docker = new Docker();
-      const registryClient = createDockerRegistry(docker, logger);
+      // Normalize registry URL for auth config
+      const serverAddress = input.registry.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
-      // Build registry config
-      const registryConfig: RegistryConfig = {
-        url: input.registry,
+      authConfig = {
         username: input.credentials.username,
         password: input.credentials.password,
+        serveraddress: serverAddress || 'https://index.docker.io/v1/',
       };
-
-      // Authenticate with the registry
-      const authResult = await registryClient.authenticate(registryConfig);
-      if (!authResult.ok) {
-        return Failure(`Registry authentication failed: ${authResult.error}`, authResult.guidance);
-      }
-
-      logger.info({ registry: input.registry }, 'Registry authentication successful');
     }
 
     // Tag image if registry was specified
@@ -116,8 +105,8 @@ async function handlePushImage(
       }
     }
 
-    // Push the image
-    const pushResult = await dockerClient.pushImage(repository, tag);
+    // Push the image with auth config if provided
+    const pushResult = await dockerClient.pushImage(repository, tag, authConfig);
     if (!pushResult.ok) {
       // Use the guidance from the Docker client if available
       return Failure(`Failed to push image: ${pushResult.error}`, pushResult.guidance);

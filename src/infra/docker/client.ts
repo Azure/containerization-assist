@@ -147,9 +147,14 @@ export interface DockerClient {
    * Pushes a Docker image to a registry.
    * @param repository - Repository name
    * @param tag - Tag to push
+   * @param authConfig - Optional authentication configuration for registry
    * @returns Result containing push details or error
    */
-  pushImage: (repository: string, tag: string) => Promise<Result<DockerPushResult>>;
+  pushImage: (
+    repository: string,
+    tag: string,
+    authConfig?: { username: string; password: string; serveraddress: string },
+  ) => Promise<Result<DockerPushResult>>;
 
   /**
    * Removes a Docker image.
@@ -390,10 +395,18 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
       }
     },
 
-    async pushImage(repository: string, tag: string): Promise<Result<DockerPushResult>> {
+    async pushImage(
+      repository: string,
+      tag: string,
+      authConfig?: { username: string; password: string; serveraddress: string },
+    ): Promise<Result<DockerPushResult>> {
       try {
         const image = docker.getImage(`${repository}:${tag}`);
-        const stream = await image.push({});
+        // When using the promise-based API, auth is passed as the third parameter
+        // with options as first and callback as second (undefined for promises)
+        const stream = authConfig
+          ? await image.push(undefined, undefined, authConfig)
+          : await image.push();
 
         let digest = '';
         let size: number | undefined;
@@ -648,7 +661,11 @@ function wrapWithMutex(
       );
     },
 
-    async pushImage(repository: string, tag: string): Promise<Result<DockerPushResult>> {
+    async pushImage(
+      repository: string,
+      tag: string,
+      authConfig?: { username: string; password: string; serveraddress: string },
+    ): Promise<Result<DockerPushResult>> {
       const lockKey = `docker:push:${repository}:${tag}`;
 
       logger.debug({ lockKey, repository, tag }, 'Acquiring push mutex');
@@ -658,7 +675,7 @@ function wrapWithMutex(
           lockKey,
           async () => {
             logger.debug({ lockKey }, 'Push mutex acquired');
-            const result = await baseClient.pushImage(repository, tag);
+            const result = await baseClient.pushImage(repository, tag, authConfig);
             logger.debug({ lockKey, success: result.ok }, 'Push completed');
             return result;
           },

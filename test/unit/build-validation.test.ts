@@ -167,10 +167,10 @@ describe('Build Output Validation', () => {
         expect(existsSync(aiDir)).toBe(true);
       });
 
-      it('should include prompt template files', () => {
-        // Check for prompt template module in AI directory
+      it('should include prompt engine files', () => {
+        // Check for prompt engine module in AI directory
         const expectedPromptFiles = [
-          'prompt-templates.js'
+          'prompt-engine.js'
         ];
 
         const files = readdirSync(aiDir).filter(item => {
@@ -190,12 +190,12 @@ describe('Build Output Validation', () => {
         expect(declarationFiles.length).toBeGreaterThan(0);
 
         // Check for specific declaration files
-        expect(declarationFiles).toContain('prompt-templates.d.ts');
+        expect(declarationFiles).toContain('prompt-engine.d.ts');
       });
 
       it('should include critical AI modules', () => {
         const criticalModules = [
-          join(aiDir, 'prompt-templates.js')
+          join(aiDir, 'prompt-engine.js')
         ];
 
         criticalModules.forEach(moduleFile => {
@@ -256,10 +256,10 @@ describe('Build Output Validation', () => {
         expect(existsSync(aiDir)).toBe(true);
       });
 
-      it('should include prompt template files', () => {
-        // Check for prompt template module in AI directory
+      it('should include prompt engine files', () => {
+        // Check for prompt engine module in AI directory
         const expectedPromptFiles = [
-          'prompt-templates.js'
+          'prompt-engine.js'
         ];
 
         const files = readdirSync(aiDir).filter(item => {
@@ -293,7 +293,7 @@ describe('Build Output Validation', () => {
       expect(esmAiCount).toBe(cjsAiCount);
       expect(esmAiCount).toBeGreaterThan(0);
 
-      // Should have at least prompt-templates
+      // Should have at least prompt-engine
       expect(esmAiCount).toBeGreaterThanOrEqual(1);
     });
 
@@ -333,9 +333,9 @@ describe('Build Output Validation', () => {
         expect(tsFiles.length).toBeGreaterThan(0);
 
         // Check for key modules
-        const hasTemplates = files.some(f => f.includes('prompt-templates'));
+        const hasEngine = files.some(f => f.includes('prompt-engine'));
 
-        expect(hasTemplates).toBe(true);
+        expect(hasEngine).toBe(true);
       }
     });
   });

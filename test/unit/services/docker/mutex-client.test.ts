@@ -55,6 +55,7 @@ describe('DockerClient with Mutex', () => {
     // Setup mock Docker instance
     mockDockerInstance = {
       getImage: jest.fn(),
+      inspectImage: jest.fn(),
       modem: {
         followProgress: jest.fn((stream, onFinished, onProgress) => {
           onFinished(null);
