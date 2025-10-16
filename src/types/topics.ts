@@ -14,9 +14,6 @@ export const TOPICS = {
   FIX_DOCKERFILE: 'fix_dockerfile',
   DOCKERFILE_REPAIR: 'dockerfile_repair',
 
-  // Base image resolution
-  RESOLVE_BASE_IMAGES: 'resolve_base_images',
-
   // Docker optimization
   DOCKER_OPTIMIZATION: 'docker_optimization',
 

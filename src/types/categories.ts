@@ -125,24 +125,19 @@ const TOOL_CATEGORIES: Record<string, ToolCategory> = {
   'generate-dockerfile': 'docker',
   'push-image': 'docker',
   'tag-image': 'docker',
-  'resolve-base-images': 'docker',
+  'validate-dockerfile': 'docker',
 
   // Kubernetes tools
   'generate-k8s-manifests': 'kubernetes',
   deploy: 'kubernetes',
   'prepare-cluster': 'kubernetes',
   'verify-deploy': 'kubernetes',
-  'generate-helm-charts': 'kubernetes',
-
-  // Azure-specific tools
-  'generate-aca-manifests': 'azure',
-  'convert-aca-to-k8s': 'azure',
 
   // Analysis tools
   'analyze-repo': 'analysis',
 
   // Security tools
-  scan: 'security',
+  'scan-image': 'security',
 
   // Utility tools
   ops: 'utility',

@@ -385,7 +385,7 @@ const chainHintMap = new Map<ToolName, { success: string; failure: string }>([
   [
     TOOL_NAME.BUILD_IMAGE,
     {
-      success: `Image built successfully. Next: Call ${TOOL_NAME.SCAN} to check for security vulnerabilities.`,
+      success: `Image built successfully. Next: Call ${TOOL_NAME.SCAN_IMAGE} to check for security vulnerabilities.`,
       failure: `Image build failed. Use ${TOOL_NAME.FIX_DOCKERFILE} to resolve issues, then retry ${TOOL_NAME.BUILD_IMAGE}.`,
     },
   ],
@@ -420,7 +420,7 @@ const chainHintMap = new Map<ToolName, { success: string; failure: string }>([
     },
   ],
   [
-    TOOL_NAME.SCAN,
+    TOOL_NAME.SCAN_IMAGE,
     {
       success: `Security scan passed! Proceed with ${TOOL_NAME.PUSH_IMAGE} to push to a registry, or continue with deployment preparation.`,
       failure: `Security scan found vulnerabilities. Use ${TOOL_NAME.FIX_DOCKERFILE} to address security issues in your base images and dependencies.`,

@@ -19,10 +19,14 @@ const ALL_TOOLS = [
   'build-image',
   'deploy',
   'fix-dockerfile',
+  'generate-dockerfile',
+  'generate-k8s-manifests',
+  'ops',
   'prepare-cluster',
   'push-image',
-  'scan',
+  'scan-image',
   'tag-image',
+  'validate-dockerfile',
   'verify-deployment',
 ] as const;
 
@@ -175,12 +179,7 @@ describe('Standardized Logging Regression Tests', () => {
   describe('Regression prevention', () => {
     it('should catch if a tool adds custom start logging', () => {
       // Custom patterns that would break consistency
-      const antiPatterns = [
-        'Begin processing',
-        'Initiating',
-        'Commencing',
-        'Now starting',
-      ];
+      const antiPatterns = ['Begin processing', 'Initiating', 'Commencing', 'Now starting'];
 
       antiPatterns.forEach((pattern) => {
         // These should NOT match the standard pattern
@@ -190,12 +189,7 @@ describe('Standardized Logging Regression Tests', () => {
     });
 
     it('should catch if a tool adds custom completion logging', () => {
-      const antiPatterns = [
-        'Finished',
-        'Done',
-        'Complete',
-        'Successfully completed',
-      ];
+      const antiPatterns = ['Finished', 'Done', 'Complete', 'Successfully completed'];
 
       antiPatterns.forEach((pattern) => {
         // These should NOT match the standard pattern
@@ -212,7 +206,7 @@ describe('Standardized Logging Regression Tests', () => {
         'deploy',
         'fix-dockerfile',
         'push-image',
-        'scan',
+        'scan-image',
         'tag-image',
         'verify-deployment',
       ];
@@ -229,7 +223,7 @@ describe('Standardized Logging Regression Tests', () => {
         'analyze-repo',
         'fix-dockerfile',
         'build-image',
-        'scan',
+        'scan-image',
         'tag-image',
         'push-image',
         'deploy',
@@ -240,7 +234,6 @@ describe('Standardized Logging Regression Tests', () => {
         expect(ALL_TOOLS).toContain(tool as any);
       });
     });
-
   });
 });
 

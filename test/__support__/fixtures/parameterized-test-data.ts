@@ -40,14 +40,14 @@ export class ParameterizedTestFactory {
       variant?: string;
       tags?: string[];
       environment?: Array<keyof Omit<EnvironmentCapabilities, 'platform'>>;
-    } = {}
+    } = {},
   ): Promise<TestScenario<TInput, TExpected>[]> {
     const { variant, tags = [], environment = [] } = options;
     const scenarios: TestScenario<TInput, TExpected>[] = [];
 
     for (const [fixtureName, input] of Object.entries(inputs)) {
       const expected = await loadGoldenFile<TExpected>(toolName, fixtureName, variant);
-      
+
       if (expected) {
         scenarios.push({
           name: `${toolName}-${fixtureName}${variant ? `-${variant}` : ''}`,
@@ -56,7 +56,7 @@ export class ParameterizedTestFactory {
           expected,
           tags: [toolName, fixtureName, ...tags],
           environment,
-          variant
+          variant,
         });
       }
     }
@@ -76,15 +76,15 @@ export class ParameterizedTestFactory {
       expected: TExpected;
       description?: string;
       tags?: string[];
-    }>
+    }>,
   ): TestScenario<TInput, TExpected>[] {
-    return variants.map(variant => ({
+    return variants.map((variant) => ({
       name: `${baseName}-${variant.name}`,
       description: variant.description || `${baseName} with ${variant.name} variant`,
       input: { ...baseInput, ...variant.input },
       expected: variant.expected,
       tags: [baseName, variant.name, ...(variant.tags || [])],
-      variant: variant.name
+      variant: variant.name,
     }));
   }
 
@@ -93,21 +93,21 @@ export class ParameterizedTestFactory {
    */
   static createEnvironmentConditional<TInput, TExpected>(
     scenarios: TestScenario<TInput, TExpected>[],
-    capabilities: EnvironmentCapabilities
+    capabilities: EnvironmentCapabilities,
   ): TestScenario<TInput, TExpected>[] {
-    return scenarios.map(scenario => {
+    return scenarios.map((scenario) => {
       if (!scenario.environment) {
         return scenario;
       }
 
       const missingCapabilities = scenario.environment.filter(
-        capability => !capabilities[capability].available
+        (capability) => !capabilities[capability].available,
       );
 
       if (missingCapabilities.length > 0) {
         return {
           ...scenario,
-          skip: `Missing required capabilities: ${missingCapabilities.join(', ')}`
+          skip: `Missing required capabilities: ${missingCapabilities.join(', ')}`,
         };
       }
 
@@ -124,69 +124,80 @@ export class CommonTestScenarios {
    * Analyze-repo tool scenarios
    */
   static async createAnalyzeRepoScenarios(): Promise<TestScenario<any, any>[]> {
-    return ParameterizedTestFactory.createFromGoldenFiles('analyze-repo', {
-      'java-spring-boot-maven': { 
-        projectPath: './test/__support__/fixtures/java-spring-boot-maven',
-        analysisType: 'full' 
+    return ParameterizedTestFactory.createFromGoldenFiles(
+      'analyze-repo',
+      {
+        'java-spring-boot-maven': {
+          projectPath: './test/__support__/fixtures/java-spring-boot-maven',
+          analysisType: 'full',
+        },
+        'node-express': {
+          projectPath: './test/__support__/fixtures/node-express',
+          analysisType: 'full',
+        },
+        'dotnet-webapi': {
+          projectPath: './test/__support__/fixtures/dotnet-webapi',
+          analysisType: 'full',
+        },
+        'python-flask': {
+          projectPath: './test/__support__/fixtures/python-flask',
+          analysisType: 'full',
+        },
       },
-      'node-express': { 
-        projectPath: './test/__support__/fixtures/node-express',
-        analysisType: 'full' 
+      {
+        tags: ['analysis', 'repository'],
+        environment: [], // No special environment requirements
       },
-      'dotnet-webapi': { 
-        projectPath: './test/__support__/fixtures/dotnet-webapi',
-        analysisType: 'full' 
-      },
-      'python-flask': { 
-        projectPath: './test/__support__/fixtures/python-flask',
-        analysisType: 'full' 
-      }
-    }, {
-      tags: ['analysis', 'repository'],
-      environment: [] // No special environment requirements
-    });
+    );
   }
 
   /**
    * Generate-dockerfile tool scenarios
    */
   static async createGenerateDockerfileScenarios(): Promise<TestScenario<any, any>[]> {
-    const basicScenarios = await ParameterizedTestFactory.createFromGoldenFiles('generate-dockerfile', {
-      'java-maven': { 
-        projectType: 'java',
-        buildTool: 'maven',
-        projectPath: './test/__support__/fixtures/java-spring-boot-maven'
+    const basicScenarios = await ParameterizedTestFactory.createFromGoldenFiles(
+      'generate-dockerfile',
+      {
+        'java-maven': {
+          projectType: 'java',
+          buildTool: 'maven',
+          projectPath: './test/__support__/fixtures/java-spring-boot-maven',
+        },
+        'node-npm': {
+          projectType: 'nodejs',
+          buildTool: 'npm',
+          projectPath: './test/__support__/fixtures/node-express',
+        },
+        'dotnet-core': {
+          projectType: 'dotnet',
+          buildTool: 'dotnet',
+          projectPath: './test/__support__/fixtures/dotnet-webapi',
+        },
       },
-      'node-npm': { 
-        projectType: 'nodejs',
-        buildTool: 'npm',
-        projectPath: './test/__support__/fixtures/node-express'
-      },
-      'dotnet-core': { 
-        projectType: 'dotnet',
-        buildTool: 'dotnet',
-        projectPath: './test/__support__/fixtures/dotnet-webapi'
-      }
-    });
+    );
 
     // Add security-hardened variants
-    const securityScenarios = await ParameterizedTestFactory.createFromGoldenFiles('generate-dockerfile', {
-      'java-maven': { 
-        projectType: 'java',
-        buildTool: 'maven',
-        projectPath: './test/__support__/fixtures/java-spring-boot-maven',
-        securityHardened: true
+    const securityScenarios = await ParameterizedTestFactory.createFromGoldenFiles(
+      'generate-dockerfile',
+      {
+        'java-maven': {
+          projectType: 'java',
+          buildTool: 'maven',
+          projectPath: './test/__support__/fixtures/java-spring-boot-maven',
+          securityHardened: true,
+        },
+        'node-npm': {
+          projectType: 'nodejs',
+          buildTool: 'npm',
+          projectPath: './test/__support__/fixtures/node-express',
+          securityHardened: true,
+        },
       },
-      'node-npm': { 
-        projectType: 'nodejs',
-        buildTool: 'npm',
-        projectPath: './test/__support__/fixtures/node-express',
-        securityHardened: true
-      }
-    }, {
-      variant: 'security-hardened',
-      tags: ['security', 'hardened']
-    });
+      {
+        variant: 'security-hardened',
+        tags: ['security', 'hardened'],
+      },
+    );
 
     return [...basicScenarios, ...securityScenarios];
   }
@@ -195,21 +206,25 @@ export class CommonTestScenarios {
    * Build-image tool scenarios
    */
   static async createBuildImageScenarios(): Promise<TestScenario<any, any>[]> {
-    return ParameterizedTestFactory.createFromGoldenFiles('build-image', {
-      'dockerfile-basic': {
-        dockerfilePath: './test/__support__/fixtures/dockerfiles/basic.Dockerfile',
-        context: './test/__support__/fixtures/java-spring-boot-maven',
-        imageTag: 'test-app:latest'
+    return ParameterizedTestFactory.createFromGoldenFiles(
+      'build-image',
+      {
+        'dockerfile-basic': {
+          dockerfilePath: './test/__support__/fixtures/dockerfiles/basic.Dockerfile',
+          context: './test/__support__/fixtures/java-spring-boot-maven',
+          imageTag: 'test-app:latest',
+        },
+        'dockerfile-multi-stage': {
+          dockerfilePath: './test/__support__/fixtures/dockerfiles/multi-stage.Dockerfile',
+          context: './test/__support__/fixtures/node-express',
+          imageTag: 'test-node:latest',
+        },
       },
-      'dockerfile-multi-stage': {
-        dockerfilePath: './test/__support__/fixtures/dockerfiles/multi-stage.Dockerfile',
-        context: './test/__support__/fixtures/node-express',
-        imageTag: 'test-node:latest'
-      }
-    }, {
-      tags: ['build', 'docker'],
-      environment: ['docker'] // Requires Docker
-    });
+      {
+        tags: ['build', 'docker'],
+        environment: ['docker'], // Requires Docker
+      },
+    );
   }
 
   /**
@@ -220,24 +235,24 @@ export class CommonTestScenarios {
       {
         name: 'clean-image',
         input: { imageId: 'alpine:3.18' },
-        expected: await loadGoldenFile('scan', 'image-clean'),
-        tags: ['security', 'clean']
+        expected: await loadGoldenFile('scan-image', 'image-clean'),
+        tags: ['security', 'clean'],
       },
       {
         name: 'vulnerable-image',
         input: { imageId: 'node:14' }, // Older version with known vulnerabilities
-        expected: await loadGoldenFile('scan', 'image-vulnerable'),
-        tags: ['security', 'vulnerable']
-      }
-    ].filter(s => s.expected); // Only include scenarios with golden files
+        expected: await loadGoldenFile('scan-image', 'image-vulnerable'),
+        tags: ['security', 'vulnerable'],
+      },
+    ].filter((s) => s.expected); // Only include scenarios with golden files
 
-    return scenarios.map(s => ({
+    return scenarios.map((s) => ({
       name: `scan-${s.name}`,
       description: `Security scan of ${s.input.imageId}`,
       input: s.input,
       expected: s.expected,
-      tags: ['scan', ...s.tags],
-      environment: ['trivy' as keyof Omit<EnvironmentCapabilities, 'platform'>]
+      tags: ['scan-image', ...s.tags],
+      environment: ['trivy' as keyof Omit<EnvironmentCapabilities, 'platform'>],
     }));
   }
 
@@ -245,24 +260,28 @@ export class CommonTestScenarios {
    * Generate-k8s-manifests tool scenarios
    */
   static async createGenerateK8sManifestsScenarios(): Promise<TestScenario<any, any>[]> {
-    return ParameterizedTestFactory.createFromGoldenFiles('generate-k8s-manifests', {
-      'web-app': {
-        appName: 'test-web-app',
-        imageTag: 'test-app:latest',
-        port: 8080,
-        environment: 'development'
+    return ParameterizedTestFactory.createFromGoldenFiles(
+      'generate-k8s-manifests',
+      {
+        'web-app': {
+          appName: 'test-web-app',
+          imageTag: 'test-app:latest',
+          port: 8080,
+          environment: 'development',
+        },
+        microservices: {
+          appName: 'test-microservice',
+          imageTag: 'test-service:latest',
+          port: 3000,
+          environment: 'production',
+          replicas: 3,
+        },
       },
-      'microservices': {
-        appName: 'test-microservice',
-        imageTag: 'test-service:latest',
-        port: 3000,
-        environment: 'production',
-        replicas: 3
-      }
-    }, {
-      tags: ['kubernetes', 'manifests'],
-      environment: [] // Can run without K8s cluster
-    });
+      {
+        tags: ['kubernetes', 'manifests'],
+        environment: [], // Can run without K8s cluster
+      },
+    );
   }
 }
 
@@ -275,8 +294,12 @@ export class ParameterizedTestRunner {
    */
   static runSuite<TInput, TExpected>(
     suite: TestSuite<TInput, TExpected>,
-    testFunction: (input: TInput, expected: TExpected, scenario: TestScenario<TInput, TExpected>) => Promise<void> | void,
-    capabilities?: EnvironmentCapabilities
+    testFunction: (
+      input: TInput,
+      expected: TExpected,
+      scenario: TestScenario<TInput, TExpected>,
+    ) => Promise<void> | void,
+    capabilities?: EnvironmentCapabilities,
   ): void {
     describe(suite.name, () => {
       if (suite.setup) {
@@ -287,21 +310,27 @@ export class ParameterizedTestRunner {
         afterAll(suite.teardown);
       }
 
-      const scenarios = capabilities 
+      const scenarios = capabilities
         ? ParameterizedTestFactory.createEnvironmentConditional(suite.scenarios, capabilities)
         : suite.scenarios;
 
-      scenarios.forEach(scenario => {
-        const testRunner = scenario.skip 
-          ? (typeof scenario.skip === 'string' ? test.skip : test.skip)
+      scenarios.forEach((scenario) => {
+        const testRunner = scenario.skip
+          ? typeof scenario.skip === 'string'
+            ? test.skip
+            : test.skip
           : test;
 
         const testName = scenario.description || scenario.name;
         const testTimeout = scenario.timeout;
 
-        testRunner(testName, async () => {
-          await testFunction(scenario.input, scenario.expected, scenario);
-        }, testTimeout);
+        testRunner(
+          testName,
+          async () => {
+            await testFunction(scenario.input, scenario.expected, scenario);
+          },
+          testTimeout,
+        );
 
         // Log skip reason if provided
         if (typeof scenario.skip === 'string') {
@@ -318,13 +347,13 @@ export class ParameterizedTestRunner {
     name: string,
     requirements: Array<keyof Omit<EnvironmentCapabilities, 'platform'>>,
     fn: () => void,
-    capabilities?: EnvironmentCapabilities
+    capabilities?: EnvironmentCapabilities,
   ): void {
     if (!capabilities) {
       // Runtime environment detection
       describe(name, () => {
         let envCapabilities: EnvironmentCapabilities;
-        
+
         beforeAll(async () => {
           const { detectEnvironment } = await import('../utilities/environment-detector');
           envCapabilities = await detectEnvironment({ timeout: 3000 });
@@ -332,11 +361,11 @@ export class ParameterizedTestRunner {
 
         const shouldSkip = () => {
           if (!envCapabilities) return true;
-          return requirements.some(req => !envCapabilities[req].available);
+          return requirements.some((req) => !envCapabilities[req].available);
         };
 
         test('environment requirements', () => {
-          const missing = requirements.filter(req => !envCapabilities[req].available);
+          const missing = requirements.filter((req) => !envCapabilities[req].available);
           if (missing.length > 0) {
             console.log(`Skipping ${name} - Missing: ${missing.join(', ')}`);
           }
@@ -349,8 +378,8 @@ export class ParameterizedTestRunner {
       });
     } else {
       // Use provided capabilities
-      const missing = requirements.filter(req => !capabilities[req].available);
-      
+      const missing = requirements.filter((req) => !capabilities[req].available);
+
       if (missing.length > 0) {
         console.log(`Skipping ${name} - Missing: ${missing.join(', ')}`);
         describe.skip(name, fn);

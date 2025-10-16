@@ -56,7 +56,7 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
       name: 'scan-threshold-gate',
       category: 'orchestrator',
       description: 'Verify scan phase gate blocks high-risk images',
-      tags: ['gates', 'security', 'scan'],
+      tags: ['gates', 'security', 'scan-image'],
       timeout: 60000,
       execute: async (): Promise<TestInfrastructureResult as TestResult> => {
         const start = performance.now();
@@ -102,7 +102,7 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
 
           // Try to scan the image
           const scanResult = await client.callTool({
-            name: 'scan',
+            name: 'scan-image',
             arguments: {
               sessionId,
               imageId: 'test-image:latest'

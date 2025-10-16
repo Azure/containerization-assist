@@ -43,8 +43,8 @@ jest.mock('../../../src/knowledge', () => ({
   ]),
 }));
 
-import { scanImage } from '../../../src/tools/scan/tool';
-import type { ScanImageParams } from '../../../src/tools/scan/schema';
+import { scanImage } from '../../../src/tools/scan-image/tool';
+import type { ScanImageParams } from '../../../src/tools/scan-image/schema';
 import { createLogger } from '../../../src/lib/logger';
 
 // Get the mocked instances after imports

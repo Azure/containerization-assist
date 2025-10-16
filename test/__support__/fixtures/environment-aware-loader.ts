@@ -47,7 +47,7 @@ export class EnvironmentAwareFixtureLoader {
       fallbackToMocks: true,
       cacheResults: true,
       timeout: 5000,
-      ...config
+      ...config,
     };
   }
 
@@ -61,14 +61,16 @@ export class EnvironmentAwareFixtureLoader {
 
     try {
       this.capabilities = await detectEnvironment({ timeout: this.config.timeout });
-      
+
       // Initialize fixture registry
       await fixtureRegistry.initialize();
-      
+
       this.initialized = true;
       return Success(this.capabilities);
     } catch (error) {
-      return Failure(`Failed to initialize environment-aware loader: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return Failure(
+        `Failed to initialize environment-aware loader: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 
@@ -78,7 +80,7 @@ export class EnvironmentAwareFixtureLoader {
   async loadProjectFixture(
     type: 'java' | 'node' | 'dotnet' | 'python',
     variant?: string,
-    options: FixtureLoadOptions = {}
+    options: FixtureLoadOptions = {},
   ): Promise<Result<ProjectFixture>> {
     await this.initialize();
 
@@ -91,7 +93,7 @@ export class EnvironmentAwareFixtureLoader {
       const fixtures = fixtureRegistry.find({
         type: 'project',
         category: type,
-        tags: variant ? [variant] : undefined
+        tags: variant ? [variant] : undefined,
       });
 
       if (fixtures.length === 0) {
@@ -100,7 +102,7 @@ export class EnvironmentAwareFixtureLoader {
 
       const fixture = fixtures[0]; // Use first match
       const result = await fixtureRegistry.load<ProjectFixture>(fixture.id);
-      
+
       if (!result.success) {
         return result;
       }
@@ -111,13 +113,15 @@ export class EnvironmentAwareFixtureLoader {
         metadata: {
           projectType: type,
           buildTool: this.inferBuildTool(type),
-          ...result.data.metadata
-        }
+          ...result.data.metadata,
+        },
       };
 
       return Success(enhanced);
     } catch (error) {
-      return Failure(`Failed to load project fixture: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return Failure(
+        `Failed to load project fixture: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 
@@ -126,7 +130,7 @@ export class EnvironmentAwareFixtureLoader {
    */
   async loadDockerFixture(
     fixtureName: string,
-    options: FixtureLoadOptions = {}
+    options: FixtureLoadOptions = {},
   ): Promise<Result<any>> {
     await this.initialize();
 
@@ -143,7 +147,7 @@ export class EnvironmentAwareFixtureLoader {
       // Load real Docker fixture (e.g., Dockerfile)
       const fixtures = fixtureRegistry.find({
         type: 'docker',
-        tags: [fixtureName]
+        tags: [fixtureName],
       });
 
       if (fixtures.length > 0) {
@@ -168,7 +172,7 @@ export class EnvironmentAwareFixtureLoader {
   async loadKubernetesFixture(
     fixtureName: string,
     environment: string = 'default',
-    options: FixtureLoadOptions = {}
+    options: FixtureLoadOptions = {},
   ): Promise<Result<any>> {
     await this.initialize();
 
@@ -184,7 +188,7 @@ export class EnvironmentAwareFixtureLoader {
       const fixtures = fixtureRegistry.find({
         type: 'k8s',
         category: environment,
-        tags: [fixtureName]
+        tags: [fixtureName],
       });
 
       if (fixtures.length > 0) {
@@ -199,7 +203,7 @@ export class EnvironmentAwareFixtureLoader {
       }
     } else {
       // Use mock Kubernetes
-      const clusterType = this.capabilities!.kubernetes.available 
+      const clusterType = this.capabilities!.kubernetes.available
         ? (this.capabilities!.kubernetes.type as any)
         : 'unavailable';
       return Success(unifiedMockFactory.createKubernetesMock(clusterType));
@@ -211,7 +215,7 @@ export class EnvironmentAwareFixtureLoader {
    */
   async loadSecurityFixture(
     scenario: 'clean' | 'vulnerable' | 'critical',
-    options: FixtureLoadOptions = {}
+    options: FixtureLoadOptions = {},
   ): Promise<Result<any>> {
     await this.initialize();
 
@@ -224,7 +228,10 @@ export class EnvironmentAwareFixtureLoader {
 
     if (useReal && this.capabilities!.trivy.available) {
       // Load real Trivy scan results (golden files)
-      const goldenFile = await goldenFileLoader.loadToolGoldenFile('scan', `image-${scenario}`);
+      const goldenFile = await goldenFileLoader.loadToolGoldenFile(
+        'scan-image',
+        `image-${scenario}`,
+      );
       if (goldenFile.success && goldenFile.data) {
         return Success(goldenFile.data);
       }
@@ -241,15 +248,13 @@ export class EnvironmentAwareFixtureLoader {
   async loadGoldenFile<T>(
     toolName: string,
     fixture: string,
-    options: FixtureLoadOptions = {}
+    options: FixtureLoadOptions = {},
   ): Promise<Result<T | null>> {
     await this.initialize();
 
     // Check if the tool requires specific environment capabilities
     const toolRequirements = this.getToolRequirements(toolName);
-    const canRunReal = toolRequirements.every(req => 
-      this.capabilities![req].available
-    );
+    const canRunReal = toolRequirements.every((req) => this.capabilities![req].available);
 
     if (canRunReal || options.forceReal) {
       // Load real golden file
@@ -294,40 +299,47 @@ export class EnvironmentAwareFixtureLoader {
   private shouldUseReal(
     service: keyof Omit<EnvironmentCapabilities, 'platform'>,
     forceReal?: boolean,
-    forceMock?: boolean
+    forceMock?: boolean,
   ): boolean {
     if (forceMock) return false;
     if (forceReal) return true;
 
     if (!this.capabilities) return false;
-    
+
     return this.config.preferReal && this.capabilities[service].available;
   }
 
   private inferBuildTool(projectType: string): string {
     switch (projectType) {
-      case 'java': return 'maven';
-      case 'node': return 'npm';
-      case 'dotnet': return 'dotnet';
-      case 'python': return 'pip';
-      default: return 'unknown';
+      case 'java':
+        return 'maven';
+      case 'node':
+        return 'npm';
+      case 'dotnet':
+        return 'dotnet';
+      case 'python':
+        return 'pip';
+      default:
+        return 'unknown';
     }
   }
 
-  private getToolRequirements(toolName: string): Array<keyof Omit<EnvironmentCapabilities, 'platform'>> {
+  private getToolRequirements(
+    toolName: string,
+  ): Array<keyof Omit<EnvironmentCapabilities, 'platform'>> {
     const requirements: Record<string, Array<keyof Omit<EnvironmentCapabilities, 'platform'>>> = {
       'build-image': ['docker'],
       'push-image': ['docker'],
       'tag-image': ['docker'],
-      'deploy': ['kubernetes'],
+      deploy: ['kubernetes'],
       'verify-deployment': ['kubernetes'],
       'prepare-cluster': ['kubernetes'],
-      'scan': ['trivy'],
+      'scan-image': ['trivy'],
       'generate-k8s-manifests': [], // Can run without cluster
       'analyze-repo': [], // No external requirements
       'generate-dockerfile': [], // No external requirements
       'fix-dockerfile': [], // No external requirements
-      'workflow': [], // Depends on constituent tools
+      workflow: [], // Depends on constituent tools
     };
 
     return requirements[toolName] || [];
@@ -335,10 +347,14 @@ export class EnvironmentAwareFixtureLoader {
 
   private mapScenarioToFindings(scenario: string): 'none' | 'low' | 'medium' | 'high' | 'critical' {
     switch (scenario) {
-      case 'clean': return 'none';
-      case 'vulnerable': return 'medium';
-      case 'critical': return 'critical';
-      default: return 'none';
+      case 'clean':
+        return 'none';
+      case 'vulnerable':
+        return 'medium';
+      case 'critical':
+        return 'critical';
+      default:
+        return 'none';
     }
   }
 
@@ -358,7 +374,7 @@ export class EnvironmentAwareFixtureLoader {
         success: true,
         logs: ['Mock build log'],
       }),
-      'scan': (f) => ({
+      'scan-image': (f) => ({
         summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0 },
         vulnerabilities: [],
       }),
@@ -379,7 +395,7 @@ export const environmentAwareLoader = new EnvironmentAwareFixtureLoader();
  */
 export async function loadProjectWithEnvironment(
   type: 'java' | 'node' | 'dotnet' | 'python',
-  variant?: string
+  variant?: string,
 ): Promise<ProjectFixture | null> {
   const result = await environmentAwareLoader.loadProjectFixture(type, variant);
   return result.success ? result.data : null;
@@ -387,7 +403,7 @@ export async function loadProjectWithEnvironment(
 
 export async function loadDockerWithEnvironment(
   fixtureName: string,
-  options?: FixtureLoadOptions
+  options?: FixtureLoadOptions,
 ): Promise<any> {
   const result = await environmentAwareLoader.loadDockerFixture(fixtureName, options);
   return result.success ? result.data : null;
@@ -396,8 +412,12 @@ export async function loadDockerWithEnvironment(
 export async function loadKubernetesWithEnvironment(
   fixtureName: string,
   environment?: string,
-  options?: FixtureLoadOptions
+  options?: FixtureLoadOptions,
 ): Promise<any> {
-  const result = await environmentAwareLoader.loadKubernetesFixture(fixtureName, environment, options);
+  const result = await environmentAwareLoader.loadKubernetesFixture(
+    fixtureName,
+    environment,
+    options,
+  );
   return result.success ? result.data : null;
 }

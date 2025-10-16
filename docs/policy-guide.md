@@ -200,8 +200,13 @@ export CONTAINERIZATION_ASSIST_POLICY_ENVIRONMENT=development
 Validate your policies before use:
 
 ```bash
-# Run validation via orchestrator (automatically validates on load)
-npm start -- --policy ./policies/my-policy.yaml --validate
+# Policies are automatically validated on load
+# Use the --validate flag to check configuration
+containerization-assist-mcp --validate
+
+# Or test with a specific policy
+export CONTAINERIZATION_ASSIST_POLICY_PATH=./policies/my-policy.yaml
+containerization-assist-mcp --validate
 ```
 
 Policies are validated against the schema on load. Invalid policies will be rejected with clear error messages.
