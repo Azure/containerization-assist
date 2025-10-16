@@ -91,7 +91,7 @@ export interface CommandExecutor {
   execute(
     command: string,
     args: string[],
-    options?: { timeout?: number },
+    options?: { timeout?: number; [key: string]: unknown },
   ): Promise<Result<{ stdout: string; stderr: string; exitCode: number }>>;
 }
 
@@ -132,7 +132,7 @@ function createTimeoutPromise(timeout: number): {
   promise: Promise<Result<{ stdout: string; stderr: string; exitCode: number }>>;
   timer: NodeJS.Timeout;
 } {
-  let timerRef: NodeJS.Timeout | undefined;
+  let timerRef!: NodeJS.Timeout;
   const promise = new Promise<Result<{ stdout: string; stderr: string; exitCode: number }>>(
     (resolve) => {
       timerRef = setTimeout(() => {
@@ -142,8 +142,7 @@ function createTimeoutPromise(timeout: number): {
       timerRef.unref();
     },
   );
-  // Promise constructor is synchronous, so timerRef is definitely assigned
-  return { promise, timer: timerRef as NodeJS.Timeout };
+  return { promise, timer: timerRef };
 }
 
 /**

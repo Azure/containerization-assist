@@ -332,7 +332,7 @@ describe('Telemetry Wrapper Pattern', () => {
 
       expect(toolCapabilities).toMatchObject({
         name: 'build-image',
-        knowledgeEnhanced: true,
+        knowledgeEnhanced: false,
       });
     });
   });
