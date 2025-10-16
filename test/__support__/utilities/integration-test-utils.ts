@@ -60,8 +60,14 @@ export function createTestLogger(prefix: string = 'integration-test'): Logger {
 }
 
 /**
- * Create a temporary directory for test context
- * @deprecated Use createTestTempDir() from tmp-helpers.ts instead
+ * Create a temporary directory for test context (synchronous).
+ * @deprecated Use {@link createTestTempDir} from tmp-helpers.ts instead. This function is synchronous.
+ * @see createTestTempDir
+ * @param prefix - Prefix for the temporary directory name
+ * @returns The path to the temporary directory
+ * @remarks
+ * This function was changed from async to sync. For new code, use createTestTempDir which provides
+ * better cleanup management and returns a cleanup function.
  */
 export function createTestContext(prefix: string = 'integration-test'): string {
   const dir = tmp.dirSync({

@@ -91,11 +91,12 @@ export class KubernetesUtils {
     const results: KubernetesValidationResult[] = [];
 
     for (const manifest of manifests) {
+      let tempDirResult: tmp.DirResult | null = null;
       try {
         // Create temporary file for manifest
-        const tempDirResult = tmp.dirSync({ prefix: 'k8s-manifest-', unsafeCleanup: true, keep: false });
+        tempDirResult = tmp.dirSync({ prefix: 'k8s-manifest-', unsafeCleanup: true, keep: false });
         const manifestPath = join(tempDirResult.name, `${manifest.kind}-${manifest.metadata.name}.yaml`);
-        
+
         await writeFile(manifestPath, this.manifestToYaml(manifest));
         this.tempFiles.add(manifestPath);
 
@@ -124,6 +125,12 @@ export class KubernetesUtils {
         }
 
         results.push(validation);
+
+        // Clean up temp directory for this manifest
+        if (tempDirResult) {
+          tempDirResult.removeCallback();
+          tempDirResult = null;
+        }
       } catch (error) {
         results.push({
           isValid: false,
@@ -131,6 +138,15 @@ export class KubernetesUtils {
           warnings: [],
           manifest
         });
+      } finally {
+        // Ensure cleanup even on error
+        if (tempDirResult) {
+          try {
+            tempDirResult.removeCallback();
+          } catch {
+            // Ignore cleanup errors
+          }
+        }
       }
     }
 
@@ -142,12 +158,13 @@ export class KubernetesUtils {
    */
   async dryRunDeploy(manifests: K8sManifest[], namespace = 'default'): Promise<KubernetesDeployResult> {
     const startTime = performance.now();
-    
+    let tempDirResult: tmp.DirResult | null = null;
+
     try {
       // Create temporary file with all manifests
-      const tempDirResult = tmp.dirSync({ prefix: 'k8s-deploy-', unsafeCleanup: true, keep: false });
+      tempDirResult = tmp.dirSync({ prefix: 'k8s-deploy-', unsafeCleanup: true, keep: false });
       const manifestsPath = join(tempDirResult.name, 'manifests.yaml');
-      
+
       const yamlContent = manifests.map(m => this.manifestToYaml(m)).join('---\n');
       await writeFile(manifestsPath, yamlContent);
       this.tempFiles.add(manifestsPath);
@@ -180,6 +197,15 @@ export class KubernetesUtils {
         error: error instanceof Error ? error.message : String(error),
         duration: performance.now() - startTime
       };
+    } finally {
+      // Clean up temp directory
+      if (tempDirResult) {
+        try {
+          tempDirResult.removeCallback();
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
     }
   }
 
@@ -214,15 +240,16 @@ export class KubernetesUtils {
    */
   async deploy(manifests: K8sManifest[], namespace = 'default', wait = false): Promise<KubernetesDeployResult> {
     const startTime = performance.now();
-    
+    let tempDirResult: tmp.DirResult | null = null;
+
     try {
       // Ensure namespace exists
       await this.ensureNamespace(namespace);
 
       // Create temporary file with all manifests
-      const tempDirResult = tmp.dirSync({ prefix: 'k8s-deploy-', unsafeCleanup: true, keep: false });
+      tempDirResult = tmp.dirSync({ prefix: 'k8s-deploy-', unsafeCleanup: true, keep: false });
       const manifestsPath = join(tempDirResult.name, 'manifests.yaml');
-      
+
       const yamlContent = manifests.map(m => this.manifestToYaml(m)).join('---\n');
       await writeFile(manifestsPath, yamlContent);
       this.tempFiles.add(manifestsPath);
@@ -268,6 +295,15 @@ export class KubernetesUtils {
         error: error instanceof Error ? error.message : String(error),
         duration: performance.now() - startTime
       };
+    } finally {
+      // Clean up temp directory
+      if (tempDirResult) {
+        try {
+          tempDirResult.removeCallback();
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
     }
   }
 

@@ -71,19 +71,20 @@ export class DockerUtils {
    */
   async buildImage(config: BuildConfig): Promise<DockerBuildResult> {
     const startTime = performance.now();
-    
+    let tempDirResult: tmp.DirResult | null = null;
+
     try {
       // Create temporary Dockerfile if needed
       let dockerfilePath: string;
       let dockerfileContent = config.dockerfile;
-      
+
       // Fix common test fixture issues
       if (dockerfileContent.includes('npm ci --only=production')) {
         dockerfileContent = dockerfileContent.replace('npm ci --only=production', 'npm install --production');
       }
-      
+
       if (dockerfileContent.includes('\n') || !dockerfileContent.startsWith('FROM')) {
-        const tempDirResult = tmp.dirSync({ prefix: 'dockerfile-', unsafeCleanup: true, keep: false });
+        tempDirResult = tmp.dirSync({ prefix: 'dockerfile-', unsafeCleanup: true, keep: false });
         dockerfilePath = join(tempDirResult.name, 'Dockerfile');
         await writeFile(dockerfilePath, dockerfileContent);
         this.tempFiles.add(dockerfilePath);
@@ -151,6 +152,15 @@ export class DockerUtils {
         error: error instanceof Error ? error.message : String(error),
         duration
       };
+    } finally {
+      // Clean up temp directory
+      if (tempDirResult) {
+        try {
+          tempDirResult.removeCallback();
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
     }
   }
 

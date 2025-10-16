@@ -6,7 +6,7 @@
  */
 
 import { execSync } from 'child_process';
-import { existsSync, rmSync, readFileSync } from 'fs';
+import { existsSync, rmSync, readFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { createTestTempDir } from '../__support__/utilities/tmp-helpers';
 import type { DirResult } from 'tmp';
@@ -84,7 +84,7 @@ describe('Package Integrity', () => {
 
     beforeAll(() => {
       installDir = join(testDir.name, 'install-test');
-      execSync(`mkdir -p "${installDir}"`, { stdio: 'pipe' });
+      mkdirSync(installDir, { recursive: true });
 
       // Create package.json
       execSync('npm init -y', { cwd: installDir, stdio: 'pipe' });
@@ -162,7 +162,7 @@ describe('Package Integrity', () => {
 
     beforeAll(() => {
       installDir = join(testDir.name, 'import-test');
-      execSync(`mkdir -p "${installDir}"`, { stdio: 'pipe' });
+      mkdirSync(installDir, { recursive: true });
 
       // Create package.json with type: module
       execSync('npm init -y', { cwd: installDir, stdio: 'pipe' });

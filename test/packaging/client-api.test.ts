@@ -6,7 +6,7 @@
  */
 
 import { execSync } from 'child_process';
-import { existsSync, rmSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, rmSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { createTestTempDir } from '../__support__/utilities/tmp-helpers';
 import type { DirResult } from 'tmp';
@@ -37,7 +37,7 @@ describe('Client API Compatibility', () => {
 
     // Set up client test environment
     clientTestDir = join(testDir.name, 'client');
-    execSync(`mkdir -p "${clientTestDir}"`, { stdio: 'pipe' });
+    mkdirSync(clientTestDir, { recursive: true });
 
     // Create package.json for client test
     const clientPackageJson = {

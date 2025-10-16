@@ -6,7 +6,7 @@
  */
 
 import { execSync, spawn } from 'child_process';
-import { existsSync, readFileSync, rmSync } from 'fs';
+import { existsSync, readFileSync, rmSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { createTestTempDir } from '../__support__/utilities/tmp-helpers';
 import type { DirResult } from 'tmp';
@@ -38,7 +38,7 @@ describe('CLI Functionality', () => {
 
     // Set up installation
     installDir = join(testDir.name, 'install');
-    execSync(`mkdir -p "${installDir}"`, { stdio: 'pipe' });
+    mkdirSync(installDir, { recursive: true });
     execSync('npm init -y', { cwd: installDir, stdio: 'pipe' });
     execSync(`npm install "${packageTarball}"`, {
       cwd: installDir,
