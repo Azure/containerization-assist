@@ -74,14 +74,13 @@ describe('Build Validation', () => {
     it('should have all tool files', () => {
       const tools = [
         'analyze-repo',
-        'build-image', 
+        'build-image',
         'deploy',
         'fix-dockerfile',
         'generate-helm-charts',
         'ops',
         'prepare-cluster',
         'push-image',
-        'resolve-base-images',
         'scan',
         'tag-image',
         'verify-deployment'

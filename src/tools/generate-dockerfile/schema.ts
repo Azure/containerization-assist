@@ -43,6 +43,60 @@ export interface DockerfileRequirement {
   matchScore: number;
 }
 
+/**
+ * Base image recommendation with details
+ */
+export interface BaseImageRecommendation {
+  /** Full image name (e.g., "node:20-alpine") */
+  image: string;
+  /** Category of the image */
+  category: 'official' | 'distroless' | 'security' | 'size';
+  /** Reason for recommendation */
+  reason: string;
+  /** Estimated size in MB (if known) */
+  size?: string | undefined;
+  /** Security rating (if applicable) */
+  securityRating?: 'high' | 'medium' | 'low' | undefined;
+  /** Tags applied to this recommendation */
+  tags?: string[] | undefined;
+  /** Match score from knowledge base */
+  matchScore: number;
+}
+
+/**
+ * Analysis of an existing Dockerfile
+ */
+export interface DockerfileAnalysis {
+  /** Base images found in the Dockerfile */
+  baseImages: string[];
+  /** Whether the Dockerfile uses multi-stage builds */
+  isMultistage: boolean;
+  /** Whether a HEALTHCHECK instruction exists */
+  hasHealthCheck: boolean;
+  /** Whether a non-root USER is set */
+  hasNonRootUser: boolean;
+  /** Total number of instructions */
+  instructionCount: number;
+  /** Complexity estimate based on structure */
+  complexity: 'simple' | 'moderate' | 'complex';
+  /** Security posture summary */
+  securityPosture: 'good' | 'needs-improvement' | 'poor';
+}
+
+/**
+ * Guidance for enhancing an existing Dockerfile
+ */
+export interface EnhancementGuidance {
+  /** Elements to preserve from the existing Dockerfile */
+  preserve: string[];
+  /** Areas that should be improved */
+  improve: string[];
+  /** Missing features that should be added */
+  addMissing: string[];
+  /** Recommended enhancement strategy */
+  strategy: 'minor-tweaks' | 'moderate-refactor' | 'major-overhaul';
+}
+
 export interface DockerfilePlan {
   repositoryInfo: ModuleInfo;
   recommendations: {
@@ -50,6 +104,7 @@ export interface DockerfilePlan {
       multistage: boolean;
       reason: string;
     };
+    baseImages: BaseImageRecommendation[];
     securityConsiderations: DockerfileRequirement[];
     optimizations: DockerfileRequirement[];
     bestPractices: DockerfileRequirement[];
@@ -57,4 +112,10 @@ export interface DockerfilePlan {
   knowledgeMatches: DockerfileRequirement[];
   confidence: number;
   summary: string;
+  existingDockerfile?: {
+    path: string;
+    content: string;
+    analysis: DockerfileAnalysis;
+    guidance: EnhancementGuidance;
+  };
 }

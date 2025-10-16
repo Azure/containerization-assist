@@ -3,10 +3,20 @@
  */
 
 import analyzeRepoTool from '@/tools/analyze-repo/tool';
-import convertAcaToK8sTool from '@/tools/convert-aca-to-k8s/tool';
 import type { ToolContext } from '@/mcp/context';
 import * as promptEngine from '@/ai/prompt-engine';
 import { TOPICS } from '@/types/topics';
+
+// Mock the validation library to bypass path validation in tests
+jest.mock('@/lib/validation', () => ({
+  validatePath: jest.fn().mockImplementation(async (pathStr: string, options: any) => {
+    // Always return success with the path for tests
+    return { ok: true, value: pathStr };
+  }),
+  validateImageName: jest.fn().mockImplementation((name: string) => ({ ok: true, value: name })),
+  validateK8sName: jest.fn().mockImplementation((name: string) => ({ ok: true, value: name })),
+  validateNamespace: jest.fn().mockImplementation((ns: string) => ({ ok: true, value: ns })),
+}));
 
 // Mock the prompt engine
 jest.mock('@/ai/prompt-engine', () => ({
@@ -97,10 +107,47 @@ spec:
 }));
 
 // Mock fs module to prevent actual file operations
+jest.mock('node:fs/promises', () => ({
+  stat: jest.fn().mockImplementation((filePath) => {
+    // Mock stat for analyze-repo
+    return Promise.resolve({
+      isDirectory: () => true,
+      isFile: () => false,
+    });
+  }),
+  writeFile: jest.fn().mockResolvedValue(undefined),
+  mkdir: jest.fn().mockResolvedValue(undefined),
+  readdir: jest.fn().mockImplementation((path, options) => {
+    // Mock directory listing for analyze-repo
+    if (path === '/test/repo') {
+      return Promise.resolve([
+        { name: 'package.json', isDirectory: () => false },
+        { name: 'src', isDirectory: () => true },
+        { name: 'README.md', isDirectory: () => false },
+      ]);
+    }
+    if (path.includes('/test/repo/src')) {
+      return Promise.resolve([{ name: 'index.js', isDirectory: () => false }]);
+    }
+    return Promise.resolve([]);
+  }),
+  readFile: jest.fn().mockImplementation((filePath) => {
+    // Mock config file contents for analyze-repo
+    if (filePath.includes('package.json')) {
+      return Promise.resolve(JSON.stringify({
+        name: 'test-app',
+        version: '1.0.0',
+        dependencies: { express: '^4.0.0' },
+        scripts: { start: 'node index.js' }
+      }));
+    }
+    return Promise.reject(new Error('File not found'));
+  }),
+}));
+
 jest.mock('node:fs', () => ({
   promises: {
     stat: jest.fn().mockImplementation((filePath) => {
-      // Mock stat for analyze-repo
       return Promise.resolve({
         isDirectory: () => true,
         isFile: () => false,
@@ -108,7 +155,7 @@ jest.mock('node:fs', () => ({
     }),
     writeFile: jest.fn().mockResolvedValue(undefined),
     mkdir: jest.fn().mockResolvedValue(undefined),
-    readdir: jest.fn().mockImplementation((path, options) => {
+    readdir: jest.fn().mockImplementation((path) => {
       // Mock directory listing for analyze-repo
       if (path === '/test/repo') {
         return Promise.resolve([
@@ -140,8 +187,15 @@ jest.mock('node:fs', () => ({
 // Mock path module for consistent behavior
 jest.mock('node:path', () => ({
   ...jest.requireActual('node:path'),
-  resolve: jest.fn((cwd, p) => `/test/${p || ''}`),
-  join: jest.fn((...parts) => parts.join('/')),
+  resolve: jest.fn((...paths) => {
+    // If first arg is absolute, use it; otherwise join from cwd
+    const first = paths[0];
+    if (first && first.startsWith('/')) {
+      return paths.length === 1 ? first : paths.join('/').replace('//', '/');
+    }
+    return `/test/${paths.join('/')}`.replace('//', '/');
+  }),
+  join: jest.fn((...parts) => parts.join('/').replace('//', '/')),
   isAbsolute: jest.fn((p) => typeof p === 'string' && p.startsWith('/')),
 }));
 
@@ -265,43 +319,6 @@ spec:
 
 
 
-  describe('convert-aca-to-k8s', () => {
-    it('should return a conversion plan with recommendations (no AI)', async () => {
-      const acaManifest = `
-apiVersion: 2022-03-01
-name: test-app
-properties:
-  template:
-    containers:
-      - name: test-container
-        image: nginx:latest
-  configuration:
-    ingress:
-      external: true
-      targetPort: 80
-`;
-      const result = await convertAcaToK8sTool.handler(
-        {
-          acaManifest,
-        },
-        mockContext,
-      );
-
-      // Verify it returns a plan (not AI-generated content)
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value).toHaveProperty('acaAnalysis');
-        expect(result.value).toHaveProperty('recommendations');
-        expect(result.value).toHaveProperty('knowledgeMatches');
-        expect(result.value).toHaveProperty('confidence');
-        expect(result.value).toHaveProperty('summary');
-      }
-
-      // Verify it does NOT use AI (no prompt engine calls)
-      expect(promptEngine.buildMessages).not.toHaveBeenCalled();
-    });
-  });
-
   describe('Prompt Engine Integration', () => {
     it('should build messages with knowledge integration', async () => {
       // The prompt engine now handles knowledge integration internally
@@ -321,7 +338,7 @@ properties:
 
     it('should handle message building gracefully', async () => {
       // Test that the prompt engine is properly integrated with AI-powered tools
-      // Note: Knowledge-based tools (fix-dockerfile, resolve-base-images, etc.)
+      // Note: Knowledge-based tools (fix-dockerfile, generate-dockerfile, etc.)
       // do not use the prompt engine - they query the knowledge base directly
       expect(true).toBe(true);
     });

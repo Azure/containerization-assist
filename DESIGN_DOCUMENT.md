@@ -53,7 +53,6 @@
 
 **Key Files**:
 - `prompt-engine.ts`: Core prompt building and message handling
-- `prompt-templates.ts`: Template definitions
 
 **Responsibilities**:
 - AI prompt generation
@@ -303,9 +302,9 @@ export const environment = {
 4. Register in `src/tools/index.ts`
 
 ### Adding New AI Prompts
-1. Add prompt templates in `src/ai/prompt-templates.ts`
-2. Use via prompt engine: `buildMessages()` function
-3. Optionally enhance with knowledge packs from `knowledge/packs/`
+1. Use the prompt engine: `buildMessages()` function from `src/ai/prompt-engine.ts`
+2. Leverage knowledge packs from `knowledge/packs/` for context-aware prompts
+3. For tool-specific prompts, use the knowledge-tool-pattern in `src/tools/shared/`
 
 ### Infrastructure Extensions
 1. Add new clients in `src/infra/`

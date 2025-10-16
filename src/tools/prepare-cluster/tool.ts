@@ -22,6 +22,7 @@
 
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
+import { validateNamespace } from '@/lib/validation';
 import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient, type K8sManifest } from '@/infra/kubernetes/client';
 import { getSystemInfo, getDownloadOS, getDownloadArch } from '@/lib/platform-utils';
@@ -348,6 +349,12 @@ async function handlePrepareCluster(
   const timer = createToolTimer(logger, 'prepare-cluster');
 
   const { environment = 'development', namespace = 'default' } = params;
+
+  // Validate namespace
+  const namespaceValidation = validateNamespace(namespace);
+  if (!namespaceValidation.ok) {
+    return namespaceValidation;
+  }
 
   const cluster = environment === 'development' ? 'kind' : 'default';
   const shouldCreateNamespace = environment === 'production';

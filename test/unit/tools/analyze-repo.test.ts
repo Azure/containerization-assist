@@ -3,12 +3,27 @@
  */
 
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
-import analyzeTool from '@/tools/analyze-repo/tool';
 import type { ToolContext } from '@/mcp/context';
 
-// Mock dependencies
+// Mock the validation library to bypass path validation in tests
+jest.mock('@/lib/validation', () => ({
+  validatePath: jest.fn().mockImplementation(async (pathStr: string, options: any) => {
+    // Always return success with the path for tests
+    return { ok: true, value: pathStr };
+  }),
+  validateImageName: jest.fn().mockImplementation((name: string) => ({ ok: true, value: name })),
+  validateK8sName: jest.fn().mockImplementation((name: string) => ({ ok: true, value: name })),
+  validateNamespace: jest.fn().mockImplementation((ns: string) => ({ ok: true, value: ns })),
+}));
+
+// Mock dependencies - fs/promises
+jest.mock('node:fs/promises', () => ({
+  stat: jest.fn(),
+  readdir: jest.fn(),
+  readFile: jest.fn(),
+}));
+
+// Mock node:fs to support 'import { promises as fs } from node:fs'
 jest.mock('node:fs', () => ({
   promises: {
     stat: jest.fn(),
@@ -16,6 +31,10 @@ jest.mock('node:fs', () => ({
     readFile: jest.fn(),
   },
 }));
+
+// Import the mocked fs after setting up the mock
+import { promises as fs } from 'node:fs';
+import analyzeTool from '@/tools/analyze-repo/tool';
 
 describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
   let mockContext: ToolContext;
@@ -35,22 +54,25 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
   describe('Deterministic parsing', () => {
     it('should parse Node.js project with package.json', async () => {
-      // Mock filesystem operations
-      (fs.stat as jest.Mock).mockResolvedValue({ isDirectory: () => true });
-      (fs.readdir as jest.Mock).mockImplementation((dirPath: string) => {
+      // Mock filesystem operations for both node:fs and node:fs/promises
+      const statMock = jest.fn().mockResolvedValue({
+        isDirectory: () => true,
+        isFile: () => false
+      });
+      const readdirMock = jest.fn().mockImplementation((dirPath: string) => {
         if (dirPath === '/test/repo') {
           return Promise.resolve([
-            { name: 'package.json', isDirectory: () => false },
-            { name: 'src', isDirectory: () => true },
-            { name: 'README.md', isDirectory: () => false },
+            { name: 'package.json', isDirectory: () => false, isFile: () => true },
+            { name: 'src', isDirectory: () => true, isFile: () => false },
+            { name: 'README.md', isDirectory: () => false, isFile: () => true },
           ]);
         }
         if (dirPath.includes('/test/repo/src')) {
-          return Promise.resolve([{ name: 'index.js', isDirectory: () => false }]);
+          return Promise.resolve([{ name: 'index.js', isDirectory: () => false, isFile: () => true }]);
         }
         return Promise.resolve([]);
       });
-      (fs.readFile as jest.Mock).mockImplementation((filePath: string) => {
+      const readFileMock = jest.fn().mockImplementation((filePath: string) => {
         if (filePath.includes('package.json')) {
           return Promise.resolve(JSON.stringify({
             name: 'test-app',
@@ -62,6 +84,10 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
         }
         return Promise.reject(new Error('File not found'));
       });
+
+      (fs.stat as jest.Mock).mockImplementation(statMock);
+      (fs.readdir as jest.Mock).mockImplementation(readdirMock);
+      (fs.readFile as jest.Mock).mockImplementation(readFileMock);
 
       const result = await analyzeTool.handler(
         {
@@ -83,17 +109,20 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
     });
 
     it('should parse Java Maven project with pom.xml', async () => {
-      (fs.stat as jest.Mock).mockResolvedValue({ isDirectory: () => true });
-      (fs.readdir as jest.Mock).mockImplementation((dirPath: string) => {
+      const statMock = jest.fn().mockResolvedValue({
+        isDirectory: () => true,
+        isFile: () => false
+      });
+      const readdirMock = jest.fn().mockImplementation((dirPath: string) => {
         if (dirPath === '/test/repo') {
           return Promise.resolve([
-            { name: 'pom.xml', isDirectory: () => false },
-            { name: 'src', isDirectory: () => true },
+            { name: 'pom.xml', isDirectory: () => false, isFile: () => true },
+            { name: 'src', isDirectory: () => true, isFile: () => false },
           ]);
         }
         return Promise.resolve([]);
       });
-      (fs.readFile as jest.Mock).mockImplementation((filePath: string) => {
+      const readFileMock = jest.fn().mockImplementation((filePath: string) => {
         if (filePath.includes('pom.xml')) {
           return Promise.resolve(`<?xml version="1.0"?>
 <project>
@@ -114,6 +143,10 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
         return Promise.reject(new Error('File not found'));
       });
 
+      (fs.stat as jest.Mock).mockImplementation(statMock);
+      (fs.readdir as jest.Mock).mockImplementation(readdirMock);
+      (fs.readFile as jest.Mock).mockImplementation(readFileMock);
+
       const result = await analyzeTool.handler(
         {
           repositoryPath: '/test/repo',
@@ -133,29 +166,32 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
     });
 
     it('should detect monorepo with multiple config files', async () => {
-      (fs.stat as jest.Mock).mockResolvedValue({ isDirectory: () => true });
-      (fs.readdir as jest.Mock).mockImplementation((dirPath: string) => {
+      const statMock = jest.fn().mockResolvedValue({
+        isDirectory: () => true,
+        isFile: () => false
+      });
+      const readdirMock = jest.fn().mockImplementation((dirPath: string) => {
         if (dirPath === '/test/repo') {
           return Promise.resolve([
-            { name: 'api', isDirectory: () => true },
-            { name: 'worker', isDirectory: () => true },
+            { name: 'api', isDirectory: () => true, isFile: () => false },
+            { name: 'worker', isDirectory: () => true, isFile: () => false },
           ]);
         }
         if (dirPath.includes('/test/repo/api')) {
           return Promise.resolve([
-            { name: 'package.json', isDirectory: () => false },
-            { name: 'src', isDirectory: () => true },
+            { name: 'package.json', isDirectory: () => false, isFile: () => true },
+            { name: 'src', isDirectory: () => true, isFile: () => false },
           ]);
         }
         if (dirPath.includes('/test/repo/worker')) {
           return Promise.resolve([
-            { name: 'package.json', isDirectory: () => false },
-            { name: 'src', isDirectory: () => true },
+            { name: 'package.json', isDirectory: () => false, isFile: () => true },
+            { name: 'src', isDirectory: () => true, isFile: () => false },
           ]);
         }
         return Promise.resolve([]);
       });
-      (fs.readFile as jest.Mock).mockImplementation((filePath: string) => {
+      const readFileMock = jest.fn().mockImplementation((filePath: string) => {
         if (filePath.includes('api/package.json')) {
           return Promise.resolve(JSON.stringify({
             name: 'api',
@@ -170,6 +206,10 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
         }
         return Promise.reject(new Error('File not found'));
       });
+
+      (fs.stat as jest.Mock).mockImplementation(statMock);
+      (fs.readdir as jest.Mock).mockImplementation(readdirMock);
+      (fs.readFile as jest.Mock).mockImplementation(readFileMock);
 
       const result = await analyzeTool.handler(
         {
@@ -188,7 +228,11 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
   describe('Legacy mode with pre-provided modules', () => {
     it('should use pre-provided modules without AI analysis', async () => {
-      (fs.stat as jest.Mock).mockResolvedValue({ isDirectory: () => true });
+      const statMock = jest.fn().mockResolvedValue({
+        isDirectory: () => true,
+        isFile: () => false
+      });
+      (fs.stat as jest.Mock).mockImplementation(statMock);
 
       const result = await analyzeTool.handler(
         {
@@ -212,7 +256,16 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
   describe('Error handling', () => {
     it('should fail if path is not a directory', async () => {
-      (fs.stat as jest.Mock).mockResolvedValue({ isDirectory: () => false });
+      // Mock validation to fail for this test
+      const { validatePath } = await import('@/lib/validation');
+      (validatePath as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        error: 'Path is not a directory: /test/file.txt',
+        guidance: {
+          message: 'Path is not a directory: /test/file.txt',
+          hint: 'The specified path exists but is a file, not a directory',
+        }
+      });
 
       const result = await analyzeTool.handler(
         {
@@ -228,13 +281,18 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
     });
 
     it('should fail if no modules detected in repository', async () => {
-      (fs.stat as jest.Mock).mockResolvedValue({ isDirectory: () => true });
-      (fs.readdir as jest.Mock).mockImplementation(() => {
+      const statMock = jest.fn().mockResolvedValue({
+        isDirectory: () => true,
+        isFile: () => false
+      });
+      const readdirMock = jest.fn().mockImplementation((dirPath: string) => {
         return Promise.resolve([
-          { name: 'README.md', isDirectory: () => false },
-          { name: 'LICENSE', isDirectory: () => false },
+          { name: 'README.md', isDirectory: () => false, isFile: () => true },
+          { name: 'LICENSE', isDirectory: () => false, isFile: () => true },
         ]);
       });
+      (fs.stat as jest.Mock).mockImplementation(statMock);
+      (fs.readdir as jest.Mock).mockImplementation(readdirMock);
 
       const result = await analyzeTool.handler(
         {
@@ -250,7 +308,16 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
     });
 
     it('should fail if repository does not exist', async () => {
-      (fs.stat as jest.Mock).mockRejectedValue(new Error('ENOENT: no such file'));
+      // Mock validation to fail for this test
+      const { validatePath } = await import('@/lib/validation');
+      (validatePath as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        error: 'Path does not exist: /nonexistent/repo',
+        guidance: {
+          message: 'Path does not exist: /nonexistent/repo',
+          hint: 'The specified path could not be found on the filesystem',
+        }
+      });
 
       const result = await analyzeTool.handler(
         {
@@ -261,7 +328,7 @@ describe('analyze-repo tool (v4.0.0 - deterministic)', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toContain('failed');
+        expect(result.error).toContain('Path does not exist');
       }
     });
   });

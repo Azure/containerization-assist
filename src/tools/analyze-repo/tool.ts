@@ -5,6 +5,7 @@ import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { tool } from '@/types/tool';
 import { getToolLogger } from '@/lib/tool-helpers';
+import { validatePath } from '@/lib/validation';
 import { analyzeRepoSchema, type RepositoryAnalysis, type ModuleInfo } from './schema';
 import {
   parsePackageJson,
@@ -189,24 +190,20 @@ async function handleAnalyzeRepo(
   ctx: ToolContext,
 ): Promise<Result<RepositoryAnalysis>> {
   const logger = getToolLogger(ctx, 'analyze-repo');
-  let repoPath = input.repositoryPath;
 
-  // Convert to absolute path if relative
-  if (!path.isAbsolute(repoPath)) {
-    repoPath = path.resolve(process.cwd(), repoPath);
+  // Validate and resolve repository path
+  const pathResult = await validatePath(input.repositoryPath, {
+    mustExist: true,
+    mustBeDirectory: true,
+  });
+
+  if (!pathResult.ok) {
+    return pathResult;
   }
 
-  try {
-    // Check if repository exists
-    const stats = await fs.stat(repoPath);
-    if (!stats.isDirectory()) {
-      return Failure(`Path is not a directory: ${repoPath}`, {
-        message: `Path is not a directory: ${repoPath}`,
-        hint: 'Provide a valid directory path',
-        resolution: 'Verify the path points to a repository directory',
-      });
-    }
+  const repoPath = pathResult.value;
 
+  try {
     // If modules are provided by user, use them
     if (input.modules && input.modules.length > 0) {
       const numberOfModules = input.modules.length;
