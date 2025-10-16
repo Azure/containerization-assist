@@ -80,12 +80,25 @@ async function handlePushImage(
       logger.info({ registry: input.registry }, 'Preparing registry authentication');
 
       // Normalize registry URL for auth config
-      const serverAddress = input.registry.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const registryHost = input.registry.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+      // Docker Hub requires canonical serveraddress to avoid auth failures
+      let serverAddress: string;
+      if (
+        registryHost === 'docker.io' ||
+        registryHost === 'index.docker.io' ||
+        registryHost === 'registry-1.docker.io' ||
+        registryHost === ''
+      ) {
+        serverAddress = 'https://index.docker.io/v1/';
+      } else {
+        serverAddress = registryHost;
+      }
 
       authConfig = {
         username: input.credentials.username,
         password: input.credentials.password,
-        serveraddress: serverAddress || 'https://index.docker.io/v1/',
+        serveraddress: serverAddress,
       };
     }
 
