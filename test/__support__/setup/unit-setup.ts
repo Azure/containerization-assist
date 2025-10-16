@@ -27,12 +27,12 @@ function createMockKubernetesClient() {
 }
 
 // Mock external dependencies by default for unit tests
-jest.mock('../../../src/lib/docker', () => ({
+jest.mock('../../../src/infra/docker/client', () => ({
   DockerClient: jest.fn(),
   createDockerClient: jest.fn(() => createMockDockerClient()),
 }));
 
-jest.mock('../../../src/lib/kubernetes', () => ({
+jest.mock('../../../src/infra/kubernetes/client', () => ({
   KubernetesClient: jest.fn(),
   createKubernetesClient: jest.fn(() => createMockKubernetesClient()),
 }));

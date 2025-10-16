@@ -13,9 +13,7 @@ import { extractErrorMessage } from '@/lib/error-utils';
 import { parseAIResponse } from '@/mcp/ai/response-parser';
 import { KnowledgeEnhancementResponseSchema } from '@/mcp/ai/schemas';
 import { scoreResponse } from '@/mcp/ai/quality';
-import { TOKEN_CONFIG } from '@/config/tokens';
-import { SCORING_CONFIG } from '@/config/scoring';
-import { SAMPLING_CONFIG } from '@/config/sampling';
+import { TOKEN_CONFIG, SCORING_CONFIG, SAMPLING_CONFIG } from '@/config';
 
 export interface KnowledgeEnhancementRequest {
   /** Content to enhance */

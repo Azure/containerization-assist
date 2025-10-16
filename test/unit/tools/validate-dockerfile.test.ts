@@ -4,15 +4,17 @@
  */
 
 import { jest } from '@jest/globals';
-import { appConfig } from '../../../src/config/app-config';
 
-jest.mock('../../../src/config/app-config', () => ({
-  appConfig: {
-    validation: {
-      imageAllowlist: [],
-      imageDenylist: [],
-    },
+// Create a mutable config object that tests can modify
+const mockConfig = {
+  validation: {
+    imageAllowlist: [] as string[],
+    imageDenylist: [] as string[],
   },
+};
+
+jest.mock('../../../src/config', () => ({
+  config: mockConfig,
 }));
 
 jest.mock('../../../src/lib/logger', () => ({
@@ -50,8 +52,8 @@ function createMockToolContext() {
 describe('validate-dockerfile tool', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    appConfig.validation.imageAllowlist = [];
-    appConfig.validation.imageDenylist = [];
+    mockConfig.validation.imageAllowlist = [];
+    mockConfig.validation.imageDenylist = [];
   });
 
   describe('validateImageAgainstRules logic', () => {
@@ -64,7 +66,7 @@ CMD ["npm", "start"]`;
 
     describe('allowlist behavior', () => {
       it('should allow images matching allowlist pattern', async () => {
-        appConfig.validation.imageAllowlist = ['^node:.*-alpine$'];
+        mockConfig.validation.imageAllowlist = ['^node:.*-alpine$'];
 
         const context = createMockToolContext();
         const result = await tool.handler(
@@ -84,7 +86,7 @@ CMD ["npm", "start"]`;
       });
 
       it('should reject images not matching allowlist in strict mode', async () => {
-        appConfig.validation.imageAllowlist = ['^alpine:.*'];
+        mockConfig.validation.imageAllowlist = ['^alpine:.*'];
 
         const context = createMockToolContext();
         const result = await tool.handler(
@@ -102,7 +104,7 @@ CMD ["npm", "start"]`;
       });
 
       it('should allow images not matching allowlist when strict mode is off', async () => {
-        appConfig.validation.imageAllowlist = ['^alpine:.*'];
+        mockConfig.validation.imageAllowlist = ['^alpine:.*'];
 
         const context = createMockToolContext();
         const result = await tool.handler(
@@ -119,7 +121,7 @@ CMD ["npm", "start"]`;
       });
 
       it('should match multiple allowlist patterns', async () => {
-        appConfig.validation.imageAllowlist = ['^python:.*', '^node:.*-alpine$', '^golang:.*'];
+        mockConfig.validation.imageAllowlist = ['^python:.*', '^node:.*-alpine$', '^golang:.*'];
 
         const context = createMockToolContext();
         const result = await tool.handler(
@@ -137,7 +139,7 @@ CMD ["npm", "start"]`;
 
     describe('denylist behavior', () => {
       it('should deny images matching denylist pattern', async () => {
-        appConfig.validation.imageDenylist = ['.*:latest$'];
+        mockConfig.validation.imageDenylist = ['.*:latest$'];
 
         const dockerfileWithLatest = `FROM node:latest
 CMD ["npm", "start"]`;
@@ -160,8 +162,8 @@ CMD ["npm", "start"]`;
       });
 
       it('should deny images even if they match allowlist', async () => {
-        appConfig.validation.imageAllowlist = ['^node:.*'];
-        appConfig.validation.imageDenylist = ['.*:latest$'];
+        mockConfig.validation.imageAllowlist = ['^node:.*'];
+        mockConfig.validation.imageDenylist = ['.*:latest$'];
 
         const dockerfileWithLatest = `FROM node:latest
 CMD ["npm", "start"]`;
@@ -181,7 +183,7 @@ CMD ["npm", "start"]`;
       });
 
       it('should match multiple denylist patterns', async () => {
-        appConfig.validation.imageDenylist = ['.*:latest$', '^ubuntu:18\\.04$', '.*-rc$'];
+        mockConfig.validation.imageDenylist = ['.*:latest$', '^ubuntu:18\\.04$', '.*-rc$'];
 
         const dockerfileWithRC = `FROM node:20-rc
 CMD ["npm", "start"]`;
@@ -200,7 +202,7 @@ CMD ["npm", "start"]`;
       });
 
       it('should allow images not matching any denylist pattern', async () => {
-        appConfig.validation.imageDenylist = ['.*:latest$', '^ubuntu:18\\.04$'];
+        mockConfig.validation.imageDenylist = ['.*:latest$', '^ubuntu:18\\.04$'];
 
         const context = createMockToolContext();
         const result = await tool.handler(
@@ -218,7 +220,7 @@ CMD ["npm", "start"]`;
 
     describe('complex regex patterns', () => {
       it('should support complex allowlist regex patterns', async () => {
-        appConfig.validation.imageAllowlist = [
+        mockConfig.validation.imageAllowlist = [
           '^(alpine|node|python):(\\d+\\.\\d+|\\d+-alpine)$',
         ];
 
@@ -243,7 +245,7 @@ CMD ["npm", "start"]`;
       });
 
       it('should support complex denylist regex patterns', async () => {
-        appConfig.validation.imageDenylist = [
+        mockConfig.validation.imageDenylist = [
           '.*:(latest|master|main|dev|development)$',
         ];
 
@@ -268,7 +270,7 @@ CMD ["npm", "start"]`;
 
     describe('multiple FROM statements', () => {
       it('should validate all base images in multi-stage builds', async () => {
-        appConfig.validation.imageAllowlist = ['^node:.*-alpine$', '^nginx:.*-alpine$'];
+        mockConfig.validation.imageAllowlist = ['^node:.*-alpine$', '^nginx:.*-alpine$'];
 
         const multiStageDockerfile = `FROM node:18-alpine AS builder
 WORKDIR /app
@@ -296,7 +298,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html`;
       });
 
       it('should report violations for any denied image in multi-stage builds', async () => {
-        appConfig.validation.imageDenylist = ['.*:latest$'];
+        mockConfig.validation.imageDenylist = ['.*:latest$'];
 
         const multiStageDockerfile = `FROM node:18-alpine AS builder
 WORKDIR /app
@@ -366,7 +368,7 @@ CMD ["npm", "start"]`;
       });
 
       it('should provide correct line numbers for violations', async () => {
-        appConfig.validation.imageDenylist = ['.*:latest$'];
+        mockConfig.validation.imageDenylist = ['.*:latest$'];
 
         const dockerfile = `# Comment
 FROM node:latest
@@ -388,8 +390,8 @@ WORKDIR /app`;
 
     describe('summary statistics', () => {
       it('should correctly count allowed, denied, and unknown images', async () => {
-        appConfig.validation.imageAllowlist = ['^node:.*'];
-        appConfig.validation.imageDenylist = ['.*:latest$'];
+        mockConfig.validation.imageAllowlist = ['^node:.*'];
+        mockConfig.validation.imageDenylist = ['.*:latest$'];
 
         const dockerfile = `FROM node:18-alpine
 FROM python:3.11
@@ -427,7 +429,7 @@ FROM node:latest`;
       });
 
       it('should suggest fix-dockerfile when validation fails', async () => {
-        appConfig.validation.imageDenylist = ['.*:latest$'];
+        mockConfig.validation.imageDenylist = ['.*:latest$'];
 
         const dockerfile = `FROM node:latest`;
 

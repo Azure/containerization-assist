@@ -60,7 +60,7 @@ const mockTimer = {
 };
 
 
-jest.mock('@/lib/kubernetes', () => ({
+jest.mock('@/infra/kubernetes/client', () => ({
   createKubernetesClient: jest.fn(() => mockK8sClient),
 }));
 

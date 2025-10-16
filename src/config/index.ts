@@ -1,13 +1,16 @@
 /**
  * Consolidated Configuration - Main Config
  *
- * Single source of configuration replacing 9 separate config files
- * Simple, focused configuration without complex validation overhead
+ * Single source of configuration replacing multiple separate config files.
+ * Simple, focused configuration without complex validation overhead.
  */
 import { autoDetectDockerSocket } from '@/infra/docker/socket-validation';
 
 // Export unified environment module
 export * from './environment';
+
+// Export consolidated constants
+export * from './constants';
 
 export const config = {
   server: {
@@ -38,6 +41,17 @@ export const config = {
       dirPath: logDir,
     };
   })(),
+
+  validation: {
+    imageAllowlist:
+      process.env.CONTAINERIZATION_ASSIST_IMAGE_ALLOWLIST?.split(',')
+        .map((s) => s.trim())
+        .filter(Boolean) || [],
+    imageDenylist:
+      process.env.CONTAINERIZATION_ASSIST_IMAGE_DENYLIST?.split(',')
+        .map((s) => s.trim())
+        .filter(Boolean) || [],
+  },
 } as const;
 
 // Export the type for use throughout the application

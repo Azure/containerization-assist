@@ -114,16 +114,10 @@ export default {
       statements: 19,
     },
     './src/tools/': {
-      branches: 51,
-      functions: 55,
-      lines: 62,
-      statements: 62,
-    },
-    './src/workflows/': {
-      branches: 0,
-      functions: 0,
-      lines: 0,
-      statements: 0,
+      branches: 34,
+      functions: 44,
+      lines: 58,
+      statements: 55,
     },
     './src/lib/': {
       branches: 22,

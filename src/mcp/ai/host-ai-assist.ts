@@ -8,7 +8,7 @@ import type { ToolContext } from '@/mcp/context';
 import { z, type ZodType } from 'zod';
 import { createSuggestionRegistry, type SuggestionGenerator } from './default-suggestions';
 import { extractJSON } from '@/mcp/ai-tool-factory';
-import { SCORING_CONFIG } from '@/config/scoring';
+import { SCORING_CONFIG } from '@/config';
 
 /**
  * AI parameter suggestion request
