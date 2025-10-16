@@ -139,27 +139,26 @@ Integration tests use fixtures from `test/__support__/fixtures/`:
 
 Tests may also create temporary fixtures dynamically using `createTestTempDir()`.
 
-## Known Issues
+## Known Limitations
 
-### ES Module Loading Issue
+### AI-Powered Tools
 
-Several integration tests are currently in the jest ignore list due to ES module loading issues with `@kubernetes/client-node`:
+Some tools require AI sampling (generate-dockerfile, generate-k8s-manifests). Tests for these tools may fail if:
+- No MCP server context is available
+- AI sampling is not properly configured
 
-- `test/integration/workflows/containerization-workflow.test.ts`
-- `test/integration/workflows/multi-module-workflow.test.ts`
-- `test/integration/docker-operations-integration.test.ts`
-- `test/integration/kubernetes-operations-integration.test.ts`
+**Current Test Strategy:**
+- Tests import tools directly without `createApp` to avoid Kubernetes client import issues
+- Tools that require AI are tested with graceful fallbacks
+- Multi-module workflow, Docker operations, and error handling tests pass fully
+- Full end-to-end workflows with AI can be tested via: `npm run smoke:journey`
 
-These tests:
-1. Are structurally complete and follow best practices
-2. Import tools which transitively import the Kubernetes client
-3. Hit a jest/ES module compatibility issue at runtime
-4. Can be run manually outside of jest or via end-to-end smoke tests
+### Environment Dependencies
 
-**Workarounds:**
-1. Run via smoke tests: `npm run smoke:journey`
-2. Run after fixing the @kubernetes/client-node ES module issue
-3. Tests are designed to gracefully skip when Docker/K8s not available
+Tests gracefully skip based on availability:
+- Docker operations skip if Docker daemon not available
+- Kubernetes operations skip if kubectl/cluster not configured
+- Vulnerability scanning skips if Trivy not installed
 
 ## Skipping Tests Based on Environment
 
