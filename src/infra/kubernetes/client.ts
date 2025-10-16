@@ -258,9 +258,15 @@ export const createKubernetesClient = (
       try {
         logger.debug({ manifest: manifest.kind, namespace }, 'Applying Kubernetes manifest');
 
-        // Ensure manifest has metadata object
-        if (!manifest.metadata) {
-          manifest.metadata = { name: '' };
+        // Validate manifest has metadata and a non-empty name
+        if (!manifest.metadata?.name || manifest.metadata.name.trim() === '') {
+          const errorMessage =
+            'Manifest is missing required metadata.name. Please supply a valid name.';
+          logger.error(
+            { manifest: manifest.kind, namespace, metadata: manifest.metadata },
+            errorMessage,
+          );
+          return Failure(errorMessage);
         }
 
         // Set namespace in metadata if not already set and not a cluster-scoped resource

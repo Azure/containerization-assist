@@ -91,8 +91,11 @@ async function handlePushImage(
 
       logger.info({ registry: input.registry }, 'Preparing registry authentication');
 
-      // Normalize registry URL for auth config
-      const registryHost = input.registry.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      // Normalize registry URL for auth config - strip protocol and trailing slash
+      let registryHost = input.registry.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+      // Strip /v1 or /v1/ suffix before comparison
+      registryHost = registryHost.replace(/\/v1\/?$/, '');
 
       // Docker Hub requires canonical serveraddress to avoid auth failures
       let serverAddress: string;

@@ -41,6 +41,7 @@ jobs:
             dist
             dist-cjs
             .tsbuildinfo
+            node_modules/.cache
           key: build-${{ runner.os }}-${{ hashFiles('src/**/*.ts', 'tsconfig*.json', 'package-lock.json') }}
           restore-keys: |
             build-${{ runner.os }}-

@@ -451,13 +451,14 @@ export function createMockDockerClient() {
   return {
     build: jest.fn().mockResolvedValue(createMockDockerBuildResult()),
     buildImage: jest.fn().mockResolvedValue(createMockDockerBuildResult()),
-    getImage: jest.fn().mockReturnValue({
-      inspect: jest.fn().mockResolvedValue({
+    getImage: jest.fn().mockResolvedValue({
+      ok: true,
+      value: {
         Id: 'sha256:mock-image-id',
         RepoTags: ['test:latest'],
         Size: 52428800,
         Created: Date.now() / 1000,
-      }),
+      },
     }),
     inspectImage: jest.fn().mockResolvedValue({
       ok: true,
