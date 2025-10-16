@@ -499,40 +499,38 @@ async function handleGenerateDockerfile(
     | undefined;
 
   try {
-    const stats = await fs.stat(dockerfilePath);
-    if (stats.isFile()) {
-      const content = await fs.readFile(dockerfilePath, 'utf-8');
+    // Try to read the Dockerfile directly (no race condition with separate stat check)
+    const content = await fs.readFile(dockerfilePath, 'utf-8');
 
-      // Analyze the existing Dockerfile
-      const analysis = analyzeDockerfile(content);
+    // Analyze the existing Dockerfile
+    const analysis = analyzeDockerfile(content);
 
-      // Generate preliminary guidance (will be refined with knowledge in buildPlan)
-      const guidance = generateEnhancementGuidance(analysis, {
-        securityConsiderations: [],
-        optimizations: [],
-        bestPractices: [],
-      });
+    // Generate preliminary guidance (will be refined with knowledge in buildPlan)
+    const guidance = generateEnhancementGuidance(analysis, {
+      securityConsiderations: [],
+      optimizations: [],
+      bestPractices: [],
+    });
 
-      existingDockerfile = {
+    existingDockerfile = {
+      path: dockerfilePath,
+      content,
+      analysis,
+      guidance,
+    };
+
+    ctx.logger.info(
+      {
         path: dockerfilePath,
-        content,
-        analysis,
-        guidance,
-      };
-
-      ctx.logger.info(
-        {
-          path: dockerfilePath,
-          size: content.length,
-          complexity: analysis.complexity,
-          security: analysis.securityPosture,
-          strategy: guidance.strategy,
-        },
-        'Found existing Dockerfile - will enhance rather than create from scratch',
-      );
-    }
+        size: content.length,
+        complexity: analysis.complexity,
+        security: analysis.securityPosture,
+        strategy: guidance.strategy,
+      },
+      'Found existing Dockerfile - will enhance rather than create from scratch',
+    );
   } catch (error) {
-    // Dockerfile doesn't exist - that's fine, we'll create a new one
+    // Dockerfile doesn't exist or can't be read - that's fine, we'll create a new one
     ctx.logger.info(
       { error, path: dockerfilePath },
       'No existing Dockerfile found - will create new one',
