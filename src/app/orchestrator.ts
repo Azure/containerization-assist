@@ -34,6 +34,7 @@ import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
  * Returns all .yaml files in the policies/ directory
  */
 function getDefaultPolicyPaths(): string[] {
+  const logger = createLogger({ name: 'policy-discovery' });
   try {
     const policiesDir = path.join(process.cwd(), 'policies');
 
@@ -44,25 +45,55 @@ function getDefaultPolicyPaths(): string[] {
     const files = fs.readdirSync(policiesDir);
     return files
       .filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'))
-      .sort() // Sort alphabetically for consistency
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true })) // Natural sort for consistency
       .map((f) => path.join(policiesDir, f));
-  } catch {
+  } catch (error) {
+    logger.warn(
+      { error, cwd: process.cwd() },
+      'Failed to read policies directory - using no default policies',
+    );
     return [];
   }
 }
 
 /**
+ * Calculate policy strictness score based on rule priorities
+ * Higher score = stricter policy (should override less strict ones)
+ */
+function calculatePolicyStrictness(policy: Policy): number {
+  if (policy.rules.length === 0) return 0;
+
+  // Use max priority as the strictness metric
+  // This ensures policies with the highest-priority rules take precedence
+  return Math.max(...policy.rules.map((r) => r.priority));
+}
+
+/**
  * Merge multiple policies into a single unified policy
- * Later policies override earlier ones for rules with the same ID
+ * Policies are merged in order of strictness (least strict first)
+ * so that stricter policies override less strict ones for rules with the same ID
  */
 function mergePolicies(policies: Policy[]): Policy {
-  const firstPolicy = policies[0];
-  if (!firstPolicy) {
+  if (policies.length === 0) {
     throw new Error('Cannot merge empty policy list');
   }
 
-  if (policies.length === 1) {
-    return firstPolicy;
+  // Sort policies by strictness (ascending) so stricter policies come last and override
+  const sortedPolicies = [...policies].sort(
+    (a, b) => calculatePolicyStrictness(a) - calculatePolicyStrictness(b),
+  );
+
+  if (sortedPolicies.length === 1) {
+    const singlePolicy = sortedPolicies[0];
+    if (!singlePolicy) {
+      throw new Error('Unexpected: sorted policies array is corrupted');
+    }
+    return singlePolicy;
+  }
+
+  const firstPolicy = sortedPolicies[0];
+  if (!firstPolicy) {
+    throw new Error('Unexpected: sorted policies array is corrupted');
   }
 
   // Start with the first policy as base
@@ -71,7 +102,7 @@ function mergePolicies(policies: Policy[]): Policy {
     metadata: {
       ...firstPolicy.metadata,
       name: 'Merged Policy',
-      description: `Combined policy from ${policies.length} sources`,
+      description: `Combined policy from ${sortedPolicies.length} sources`,
     },
     defaults: {},
     rules: [],
@@ -83,16 +114,17 @@ function mergePolicies(policies: Policy[]): Policy {
   }
 
   // Merge defaults (later policies override earlier ones)
-  for (const policy of policies) {
+  for (const policy of sortedPolicies) {
     if (policy.defaults) {
       merged.defaults = { ...merged.defaults, ...policy.defaults };
     }
   }
 
   // Merge rules using a Map to handle duplicates
+  // Rules from stricter policies (later in sorted list) override earlier ones
   const rulesMap = new Map<string, (typeof merged.rules)[0]>();
 
-  for (const policy of policies) {
+  for (const policy of sortedPolicies) {
     for (const rule of policy.rules) {
       rulesMap.set(rule.id, rule);
     }
@@ -167,6 +199,13 @@ export function createOrchestrator<T extends MCPTool<ZodTypeAny, any>>(options: 
           totalRules: policy.rules.length,
         },
         'Policies merged successfully',
+      );
+    } else {
+      logger.warn(
+        {
+          policyPathsAttempted: policyPaths.length,
+        },
+        'All policy files failed to load - orchestrator will run without policy enforcement',
       );
     }
   }
