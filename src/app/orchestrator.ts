@@ -85,10 +85,16 @@ function mergePolicies(policies: Policy[]): Policy {
 
   if (sortedPolicies.length === 1) {
     const singlePolicy = sortedPolicies[0];
+    if (!singlePolicy) {
+      throw new Error('Unexpected: sorted policies array is empty after validation');
+    }
     return singlePolicy;
   }
 
   const firstPolicy = sortedPolicies[0];
+  if (!firstPolicy) {
+    throw new Error('Unexpected: sorted policies array is empty after validation');
+  }
 
   // Start with the first policy as base
   const merged: Policy = {
