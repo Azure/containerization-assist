@@ -430,7 +430,7 @@ export class DockerRegistry {
 
       // For Docker Hub, use the public API
       // Check only the first path segment for a hostname pattern (dot or colon)
-      const firstSegment = repository.split('/')[0];
+      const firstSegment = repository.split('/')[0] ?? '';
       if (!/[.:]/.test(firstSegment)) {
         return this.listDockerHubTags(repository);
       }

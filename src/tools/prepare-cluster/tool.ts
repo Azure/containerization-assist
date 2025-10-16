@@ -28,7 +28,7 @@ import { getSystemInfo, getDownloadOS, getDownloadArch } from '@/lib/platform-ut
 import { downloadFile, makeExecutable, createTempFile, deleteTempFile } from '@/lib/file-utils';
 
 import type * as pino from 'pino';
-import { Success, Failure, type Result } from '@/types';
+import { Success, Failure, type Result, type ErrorGuidance } from '@/types';
 import { prepareClusterSchema, type PrepareClusterParams } from './schema';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -61,11 +61,11 @@ interface K8sClientAdapter {
   namespaceExists(namespace: string): Promise<boolean>;
   ensureNamespace(
     namespace: string,
-  ): Promise<{ success: boolean; error?: string; guidance?: unknown }>;
+  ): Promise<{ success: boolean; error?: string; guidance?: ErrorGuidance }>;
   applyManifest(
     manifest: Record<string, unknown>,
     namespace?: string,
-  ): Promise<{ success: boolean; error?: string; guidance?: unknown }>;
+  ): Promise<{ success: boolean; error?: string; guidance?: ErrorGuidance }>;
   checkIngressController(): Promise<boolean>;
   checkPermissions(namespace: string): Promise<boolean>;
 }
@@ -81,7 +81,11 @@ function createK8sClientAdapter(
       if (result.ok) {
         return { success: true };
       } else {
-        return { success: false, error: result.error, guidance: result.guidance };
+        return {
+          success: false,
+          error: result.error,
+          ...(result.guidance && { guidance: result.guidance }),
+        };
       }
     },
     applyManifest: async (manifest: Record<string, unknown>, namespace?: string) => {
@@ -89,7 +93,11 @@ function createK8sClientAdapter(
       if (result.ok) {
         return { success: true };
       } else {
-        return { success: false, error: result.error, guidance: result.guidance };
+        return {
+          success: false,
+          error: result.error,
+          ...(result.guidance && { guidance: result.guidance }),
+        };
       }
     },
     checkIngressController: () => k8sClient.checkIngressController(),
