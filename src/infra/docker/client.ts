@@ -402,11 +402,8 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
     ): Promise<Result<DockerPushResult>> {
       try {
         const image = docker.getImage(`${repository}:${tag}`);
-        // When using the promise-based API, auth is passed as the third parameter
-        // with options as first and callback as second (undefined for promises)
-        const stream = authConfig
-          ? await image.push(undefined, undefined, authConfig)
-          : await image.push();
+        // dockerode's Image.push expects auth config inside the first options object
+        const stream = await image.push(authConfig ? { authconfig: authConfig } : {});
 
         let digest = '';
         let size: number | undefined;
