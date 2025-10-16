@@ -60,6 +60,7 @@ const runPattern = createKnowledgeTool<
       environment: input.environment || 'production',
       language: input.language,
       framework: input.frameworks?.[0]?.name, // Use first framework if available
+      detectedDependencies: input.detectedDependencies,
     }),
   },
   categorization: {
