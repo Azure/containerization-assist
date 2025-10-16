@@ -451,9 +451,25 @@ export function createMockDockerClient() {
   return {
     build: jest.fn().mockResolvedValue(createMockDockerBuildResult()),
     buildImage: jest.fn().mockResolvedValue(createMockDockerBuildResult()),
+    getImage: jest.fn().mockReturnValue({
+      inspect: jest.fn().mockResolvedValue({
+        Id: 'sha256:mock-image-id',
+        RepoTags: ['test:latest'],
+        Size: 52428800,
+        Created: Date.now() / 1000,
+      }),
+    }),
+    inspectImage: jest.fn().mockResolvedValue({
+      Id: 'sha256:mock-image-id',
+      RepoTags: ['test:latest'],
+      Size: 52428800,
+      Created: Date.now() / 1000,
+    }),
     scan: jest.fn().mockResolvedValue(createMockScanResult()),
     push: jest.fn().mockResolvedValue(undefined),
     tag: jest.fn().mockResolvedValue(undefined),
+    tagImage: jest.fn().mockResolvedValue(undefined),
+    pushImage: jest.fn().mockResolvedValue(undefined),
     health: jest.fn().mockResolvedValue({ healthy: true, version: '20.10.17' }),
     initialize: jest.fn().mockResolvedValue(undefined),
   };
