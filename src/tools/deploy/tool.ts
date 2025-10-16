@@ -106,6 +106,8 @@ export interface DeployApplicationResult {
   };
 }
 
+// Define the result schema for type safety
+
 /**
  * Parse YAML/JSON manifest content with validation
  */
@@ -499,7 +501,6 @@ export default tool({
   schema: deployApplicationSchema,
   metadata: {
     knowledgeEnhanced: false,
-    enhancementCapabilities: [],
   },
   handler: handleDeploy,
 });

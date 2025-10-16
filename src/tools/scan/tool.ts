@@ -252,7 +252,6 @@ export default tool({
   schema: scanImageSchema,
   metadata: {
     knowledgeEnhanced: true,
-    enhancementCapabilities: ['vulnerability-analysis', 'security-recommendations'],
   },
   handler: handleScanImage,
 });

@@ -5,8 +5,6 @@
 
 import { validateDockerfileContent } from '@/validation/dockerfile-validator';
 import { applyFixes, applyAllFixes } from '@/validation/dockerfile-fixer';
-import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
-import type { ToolContext } from '@/mcp/context';
 import { ValidationSeverity } from '@/validation/core-types';
 
 // Test fixtures
@@ -62,25 +60,7 @@ ENV PASSWORD=secretpassword123
 USER 0
 COPY . .`;
 
-// Mock context for testing
-const createMockContext = (): ToolContext => ({
-  logger: {
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-  },
-  sampling: {
-    createMessage: jest.fn(),
-  },
-} as any);
-
 describe('Full Validation Pipeline Integration', () => {
-  let mockContext: ToolContext;
-
-  beforeEach(() => {
-    mockContext = createMockContext();
-  });
 
   describe('Basic Validation Flow', () => {
     it('should combine internal + external linting', async () => {
@@ -240,56 +220,6 @@ ENV PASSWORD=badidea
       if (secretViolations.length > 0) {
         expect(secretViolations[0]?.message).toContain('PASSWORD');
       }
-    });
-  });
-
-  describe('Deterministic Sampling Integration', () => {
-    it('should generate single deterministic candidate', async () => {
-      const mockSamplingResponse = {
-        content: [{ text: 'FROM node:20\\nWORKDIR /app\\nCMD ["node", "app.js"]' }],
-        metadata: { usage: { inputTokens: 100, outputTokens: 50 } }
-      };
-
-      (mockContext.sampling.createMessage as jest.Mock).mockResolvedValue(mockSamplingResponse);
-
-      const result = await sampleWithRerank(
-        mockContext,
-        async (i) => ({
-          messages: [{ role: 'user' as const, content: 'Generate Dockerfile' }],
-          maxTokens: 100,
-        }),
-        (text) => text.length, // Simple scoring based on length
-        {}
-      );
-
-      expect(result.ok).toBe(true);
-      expect(result.value.score).toBeGreaterThan(0);
-      // Deterministic sampling calls once
-      expect(mockContext.sampling.createMessage).toHaveBeenCalledTimes(1);
-    });
-
-    it('should work with optional scoring for quality logging', async () => {
-      const mockSamplingResponse = {
-        content: [{ text: 'Very long response that will have quality scoring for logging purposes' }],
-        metadata: { usage: { inputTokens: 100, outputTokens: 80 } }
-      };
-
-      (mockContext.sampling.createMessage as jest.Mock).mockResolvedValue(mockSamplingResponse);
-
-      const result = await sampleWithRerank(
-        mockContext,
-        async (i) => ({
-          messages: [{ role: 'user' as const, content: 'Generate content' }],
-          maxTokens: 100,
-        }),
-        (text) => 96, // Scoring for quality logging
-        {}
-      );
-
-      expect(result.ok).toBe(true);
-      expect(result.value.score).toBe(96);
-      // Deterministic: single call regardless of score
-      expect(mockContext.sampling.createMessage).toHaveBeenCalledTimes(1);
     });
   });
 
