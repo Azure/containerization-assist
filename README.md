@@ -159,13 +159,12 @@ The server detects and supports monorepo structures with multiple independently 
 
 ## Available Tools
 
-The server provides 15 MCP tools organized by functionality:
+The server provides 13 MCP tools organized by functionality:
 
 ### Analysis & Planning
 | Tool | Description |
 |------|-------------|
 | `analyze-repo` | Analyze repository structure and detect technologies by parsing config files |
-| `resolve-base-images` | Query knowledge base for Docker base image recommendations |
 
 ### Dockerfile Operations
 | Tool | Description |
@@ -190,10 +189,9 @@ The server provides 15 MCP tools organized by functionality:
 | `deploy` | Deploy applications to Kubernetes clusters |
 | `verify-deploy` | Verify Kubernetes deployment status |
 
-### Azure & Utilities
+### Utilities
 | Tool | Description |
 |------|-------------|
-| `convert-aca-to-k8s` | Analyze Azure Container Apps manifest and return recommendations for Kubernetes conversion |
 | `ops` | Operational utilities for ping and server status |
 
 ## Supported Technologies

@@ -19,11 +19,14 @@ const ALL_TOOLS = [
   'build-image',
   'deploy',
   'fix-dockerfile',
+  'generate-dockerfile',
+  'generate-k8s-manifests',
+  'ops',
   'prepare-cluster',
   'push-image',
-  'resolve-base-images',
   'scan-image',
   'tag-image',
+  'validate-dockerfile',
   'verify-deployment',
 ] as const;
 

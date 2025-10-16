@@ -77,13 +77,14 @@ describe('Build Validation', () => {
         'build-image',
         'deploy',
         'fix-dockerfile',
-        'generate-helm-charts',
+        'generate-dockerfile',
+        'generate-k8s-manifests',
         'ops',
         'prepare-cluster',
         'push-image',
-        'resolve-base-images',
         'scan-image',
         'tag-image',
+        'validate-dockerfile',
         'verify-deployment',
       ];
 

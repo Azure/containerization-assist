@@ -65,12 +65,11 @@ Examples:
   $ containerization-assist-mcp --health-check           Check system dependencies
   $ containerization-assist-mcp --validate               Validate configuration
 
-MCP Tools Available (15 total):
-  • Analysis: analyze-repo, resolve-base-images
+MCP Tools Available (13 total):
+  • Analysis: analyze-repo
   • Dockerfile: generate-dockerfile, validate-dockerfile, fix-dockerfile
   • Image: build-image, scan-image, tag-image, push-image
   • Kubernetes: generate-k8s-manifests, prepare-cluster, deploy, verify-deploy
-  • Azure: convert-aca-to-k8s
   • Utilities: ops
 
 For detailed documentation, see: README.md

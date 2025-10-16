@@ -1,7 +1,7 @@
 /**
  * Comprehensive Tool Validation Tests
  * MCP Inspector Testing Infrastructure
- * Tests all 14 MCP tools for functionality and performance
+ * Tests all 13 MCP tools for functionality and performance
  */
 
 import { TestCase, MCPTestRunner } from "../../infrastructure/test-runner".js';
@@ -10,65 +10,6 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
   const client = testRunner.getClient();
 
   const tests: TestCase[] = [
-    {
-      name: 'resolve-base-images-tool',
-      category: 'tool-validation',
-      description: 'Test resolve-base-images tool for language recommendations',
-      tags: ['tools', 'base-images', 'recommendations'],
-      timeout: 10000,
-      execute: async () => {
-        const start = performance.now();
-        
-        const result = await client.callTool({
-          name: 'resolve-base-images',
-          arguments: {
-            sessionId: 'resolve-test-123',
-            language: 'javascript',
-            framework: 'express'
-          }
-        });
-
-        const responseTime = performance.now() - start;
-
-        if (result.isError) {
-          return {
-            success: false,
-            duration: responseTime,
-            message: `Resolve base images failed: ${result.error?.message || 'Unknown error'}`
-          };
-        }
-
-        // Extract result content
-        let recommendations: any = {};
-        for (const content of result.content) {
-          if (content.type === 'text' && content.text) {
-            try {
-              const parsed = JSON.parse(content.text);
-              recommendations = { ...recommendations, ...parsed };
-            } catch {
-              recommendations.textContent = content.text;
-            }
-          }
-        }
-
-        const hasRecommendations = recommendations.recommended || recommendations.suggestions ||
-                                  recommendations.primaryImage || recommendations.textContent;
-
-        return {
-          success: !!hasRecommendations,
-          duration: responseTime,
-          message: hasRecommendations 
-            ? 'Base image resolution working correctly'
-            : 'No base image recommendations found',
-          details: recommendations,
-          performance: {
-            responseTime,
-            memoryUsage: 0,
-          }
-        };
-      }
-    },
-
     {
       name: 'build-image-tool',
       category: 'tool-validation',
