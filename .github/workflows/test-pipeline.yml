@@ -85,46 +85,78 @@ jobs:
       - name: Run quality gates
         id: quality
         run: |
-          # Run quality gates with JSON output (skip npm's 3 header lines)
-          UPDATE_BASELINES=true npm run quality:gates -- --json 2> quality-gates-stderr.txt | tail -n +4 > quality-gates.json || true
+          # Initialize default values
+          CURRENT_WARNINGS=0
+          BASELINE_WARNINGS=0
+          REDUCTION=0
+          PERCENTAGE="0"
+          UNUSED_EXPORTS=0
+          DEADCODE_BASELINE=0
+          DEADCODE_REDUCTION=0
+          GATES_PASSED=0
+          GATES_FAILED=0
+          GATES_WARNINGS=0
+          STATUS="⚠️ NEEDS ATTENTION"
+
+          # Run quality gates with JSON output
+          UPDATE_BASELINES=true npm run quality:gates -- --json > quality-gates-raw.txt 2>&1 || true
+
+          # Skip npm's header lines (first 3 lines) to get clean JSON
+          tail -n +4 quality-gates-raw.txt > quality-gates.json 2>/dev/null || echo "{}" > quality-gates.json
+
+          # Debug: show JSON file size and first few lines
+          echo "JSON file size: $(wc -c < quality-gates.json) bytes"
+          echo "First 5 lines of JSON:"
+          head -5 quality-gates.json
 
           # Check if JSON is valid
-          if ! jq empty quality-gates.json 2>/dev/null; then
-            echo "Warning: JSON output is invalid, falling back to text parsing"
-            cat quality-gates-stderr.txt
+          if jq empty quality-gates.json 2>/dev/null; then
+            echo "JSON is valid, parsing with jq"
+            # Parse JSON output with jq and ensure we get values
+            CURRENT_WARNINGS=$(jq -r '.currentWarnings // 0' quality-gates.json 2>/dev/null || echo "0")
+            BASELINE_WARNINGS=$(jq -r '.baselineWarnings // 0' quality-gates.json 2>/dev/null || echo "0")
+            REDUCTION=$(jq -r '.warningReduction // 0' quality-gates.json 2>/dev/null || echo "0")
+            PERCENTAGE=$(jq -r '.warningPercentage // "0"' quality-gates.json 2>/dev/null || echo "0")
+            UNUSED_EXPORTS=$(jq -r '.unusedExports // 0' quality-gates.json 2>/dev/null || echo "0")
+            DEADCODE_BASELINE=$(jq -r '.deadcodeBaseline // 0' quality-gates.json 2>/dev/null || echo "0")
+            DEADCODE_REDUCTION=$(jq -r '.deadcodeReduction // 0' quality-gates.json 2>/dev/null || echo "0")
+            GATES_PASSED=$(jq -r '.gatesPassed // 0' quality-gates.json 2>/dev/null || echo "0")
+            GATES_FAILED=$(jq -r '.gatesFailed // 0' quality-gates.json 2>/dev/null || echo "0")
+            GATES_WARNINGS=$(jq -r '.gatesWarnings // 0' quality-gates.json 2>/dev/null || echo "0")
+            STATUS=$(jq -r '.overallStatus // "⚠️ NEEDS ATTENTION"' quality-gates.json 2>/dev/null || echo "⚠️ NEEDS ATTENTION")
 
-            # Run again for text output
-            UPDATE_BASELINES=true npm run quality:gates > quality-gates.txt 2>&1 || true
+            echo "Parsed values: warnings=$CURRENT_WARNINGS, baseline=$BASELINE_WARNINGS, exports=$UNUSED_EXPORTS"
+          else
+            echo "JSON is invalid, falling back to text parsing"
+
+            # Use raw output for text parsing (already ran above)
+            cp quality-gates-raw.txt quality-gates.txt 2>/dev/null || true
+
+            # If raw output is empty, run again without JSON flag
+            if [ ! -s quality-gates.txt ]; then
+              echo "Running quality gates again for text output"
+              UPDATE_BASELINES=true npm run quality:gates > quality-gates.txt 2>&1 || true
+            fi
 
             # Fallback to text parsing
-            CURRENT_WARNINGS=$(grep "^ESLint Warnings:" quality-gates.txt | sed 's/ESLint Warnings: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
-            UNUSED_EXPORTS=$(grep "^Unused Exports:" quality-gates.txt | sed 's/Unused Exports: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
-            BASELINE_WARNINGS=$CURRENT_WARNINGS
-            REDUCTION=0
-            PERCENTAGE="0"
-            DEADCODE_BASELINE=$UNUSED_EXPORTS
-            DEADCODE_REDUCTION=0
-            GATES_PASSED=0
-            GATES_FAILED=0
-            GATES_WARNINGS=0
-            STATUS="⚠️ NEEDS ATTENTION"
-          else
-            # Parse JSON output with jq
-            CURRENT_WARNINGS=$(jq -r '.currentWarnings // 0' quality-gates.json)
-            BASELINE_WARNINGS=$(jq -r '.baselineWarnings // 0' quality-gates.json)
-            REDUCTION=$(jq -r '.warningReduction // 0' quality-gates.json)
-            PERCENTAGE=$(jq -r '.warningPercentage // "0"' quality-gates.json)
-            UNUSED_EXPORTS=$(jq -r '.unusedExports // 0' quality-gates.json)
-            DEADCODE_BASELINE=$(jq -r '.deadcodeBaseline // 0' quality-gates.json)
-            DEADCODE_REDUCTION=$(jq -r '.deadcodeReduction // 0' quality-gates.json)
-            GATES_PASSED=$(jq -r '.gatesPassed // 0' quality-gates.json)
-            GATES_FAILED=$(jq -r '.gatesFailed // 0' quality-gates.json)
-            GATES_WARNINGS=$(jq -r '.gatesWarnings // 0' quality-gates.json)
-            STATUS=$(jq -r '.overallStatus // "✅ PASSING"' quality-gates.json)
+            CURRENT_WARNINGS=$(grep "^ESLint Warnings:" quality-gates.txt 2>/dev/null | sed 's/ESLint Warnings: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
+            UNUSED_EXPORTS=$(grep "^Unused Exports:" quality-gates.txt 2>/dev/null | sed 's/Unused Exports: \([0-9][0-9]*\).*/\1/' | head -1 | tr -cd '0-9' || echo "0")
+            BASELINE_WARNINGS=${CURRENT_WARNINGS}
+            DEADCODE_BASELINE=${UNUSED_EXPORTS}
 
-            # Also save text output for debugging/artifacts
-            UPDATE_BASELINES=true npm run quality:gates > quality-gates.txt 2>&1 || true
+            echo "Text parsing values: warnings=$CURRENT_WARNINGS, exports=$UNUSED_EXPORTS"
           fi
+
+          # Ensure all values are numeric (validation)
+          CURRENT_WARNINGS=${CURRENT_WARNINGS:-0}
+          BASELINE_WARNINGS=${BASELINE_WARNINGS:-0}
+          REDUCTION=${REDUCTION:-0}
+          UNUSED_EXPORTS=${UNUSED_EXPORTS:-0}
+          DEADCODE_BASELINE=${DEADCODE_BASELINE:-0}
+          DEADCODE_REDUCTION=${DEADCODE_REDUCTION:-0}
+          GATES_PASSED=${GATES_PASSED:-0}
+          GATES_FAILED=${GATES_FAILED:-0}
+          GATES_WARNINGS=${GATES_WARNINGS:-0}
 
           # Set outputs
           echo "current_warnings=${CURRENT_WARNINGS}" >> $GITHUB_OUTPUT
@@ -138,6 +170,15 @@ jobs:
           echo "gates_failed=${GATES_FAILED}" >> $GITHUB_OUTPUT
           echo "gates_warnings=${GATES_WARNINGS}" >> $GITHUB_OUTPUT
           echo "overall_status=${STATUS}" >> $GITHUB_OUTPUT
+
+          echo "Set outputs completed"
+
+          # Ensure text output exists for artifacts
+          if [ ! -s quality-gates.txt ] && [ -f quality-gates-raw.txt ]; then
+            cp quality-gates-raw.txt quality-gates.txt
+          elif [ ! -s quality-gates.txt ]; then
+            echo "No quality gates output available" > quality-gates.txt
+          fi
 
       - name: Extract top warning types
         id: warnings
@@ -202,6 +243,7 @@ jobs:
           path: |
             quality-gates.json
             quality-gates.txt
+            quality-gates-raw.txt
             eslint-output.txt
             coverage/
           retention-days: 7

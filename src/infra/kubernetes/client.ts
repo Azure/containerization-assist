@@ -146,8 +146,7 @@ export const createKubernetesClient = (
     name: string,
   ): Promise<Result<DeploymentResult>> => {
     try {
-      const response = await k8sApi.readNamespacedDeployment({ name, namespace });
-      const deployment = response;
+      const deployment = await k8sApi.readNamespacedDeployment({ name, namespace });
 
       const status = {
         ready: (deployment.status?.readyReplicas || 0) === (deployment.spec?.replicas || 0),
