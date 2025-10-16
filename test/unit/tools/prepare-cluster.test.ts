@@ -146,7 +146,7 @@ describe('prepareCluster', () => {
     // Reset all mocks
     jest.clearAllMocks();
     mockSessionManager.update.mockResolvedValue(true);
-    mockK8sClient.ensureNamespace.mockResolvedValue(createSuccessResult({ created: true }));
+    mockK8sClient.ensureNamespace.mockResolvedValue({ success: true });
   });
 
   describe('Successful cluster preparation', () => {
@@ -195,7 +195,7 @@ describe('prepareCluster', () => {
       mockK8sClient.ping.mockResolvedValue(true);
       mockK8sClient.namespaceExists.mockResolvedValue(false);
       mockK8sClient.ensureNamespace.mockResolvedValue({
-        ok: false,
+        success: false,
         error: 'Failed to create namespace',
       });
 

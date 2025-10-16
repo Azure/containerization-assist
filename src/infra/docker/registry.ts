@@ -362,24 +362,25 @@ export class DockerRegistry {
   }
 
   /**
-   * Check if an image exists in the registry
+   * Check if an image exists locally in the Docker daemon
    *
-   * Queries the registry to verify if a specific image exists.
-   * Requires prior authentication for private registries.
+   * Checks if a specific image exists in the local Docker daemon cache.
+   * This does not query remote registries - it only checks locally pulled images.
+   * Use `docker pull` first if you need to verify remote image availability.
    *
    * @param imageName - Full image name (repository:tag or repository@digest)
-   * @returns Result with boolean indicating if image exists
+   * @returns Result with boolean indicating if image exists locally
    */
   async imageExists(imageName: string): Promise<Result<boolean>> {
     try {
       // Parse image name into components
       const { repository, reference } = this.parseImageName(imageName);
 
-      this.logger.debug({ repository, reference }, 'Checking if image exists');
+      this.logger.debug({ repository, reference }, 'Checking if image exists locally');
 
       try {
-        // Use Docker API to inspect the image
-        // This works for both local and remote images
+        // Use Docker API to inspect the image locally
+        // This only checks the local Docker daemon, not remote registries
         const image = this.docker.getImage(imageName);
         await image.inspect();
 
@@ -477,9 +478,23 @@ export class DockerRegistry {
    * Get registry API URL for health checks
    */
   private getRegistryApiUrl(registryUrl: string): string {
-    // For Docker Hub
-    if (registryUrl.includes('docker.io') || registryUrl.includes('index.docker.io')) {
-      return 'https://registry-1.docker.io/v2/';
+    // Safely check for Docker Hub by parsing the hostname
+    const normalizedUrl = registryUrl.startsWith('http') ? registryUrl : `https://${registryUrl}`;
+
+    try {
+      const url = new URL(normalizedUrl);
+      const hostname = url.hostname.toLowerCase();
+
+      // For Docker Hub - check exact hostname match
+      if (
+        hostname === 'docker.io' ||
+        hostname === 'index.docker.io' ||
+        hostname === 'registry-1.docker.io'
+      ) {
+        return 'https://registry-1.docker.io/v2/';
+      }
+    } catch {
+      // If URL parsing fails, fall through to generic handling
     }
 
     // For other registries, append /v2/ if not present
