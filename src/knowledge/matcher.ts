@@ -9,6 +9,7 @@ const logger = createLogger().child({ module: 'knowledge-matcher' });
 const SCORING = {
   CATEGORY: 20,
   PATTERN: 30,
+  TAG: 10,
   LANGUAGE: 15,
   FRAMEWORK: 10,
   ENVIRONMENT: 8,
@@ -108,6 +109,26 @@ const evaluatePatternMatch = (
       { entryId: entry.id, error: entry.compiledCache.compilationError },
       'Skipping entry with compilation error',
     );
+  }
+
+  return { score: 0, reasons: [] };
+};
+
+/**
+ * Evaluate tag match scoring
+ */
+const evaluateTagMatch = (
+  entry: LoadedEntry,
+  query: KnowledgeQuery,
+): { score: number; reasons: string[] } => {
+  if (!query.tags || !entry.tags) return { score: 0, reasons: [] };
+
+  const matchedTags = query.tags.filter((tag) => entry.tags?.includes(tag));
+  if (matchedTags.length > 0) {
+    return {
+      score: matchedTags.length * SCORING.TAG,
+      reasons: [`Tags: ${matchedTags.join(', ')}`],
+    };
   }
 
   return { score: 0, reasons: [] };
@@ -230,6 +251,7 @@ export const evaluateEntry = (entry: LoadedEntry, query: KnowledgeQuery): Knowle
       ? { score: SCORING.CATEGORY, reasons: [`Category: ${query.category}`] }
       : { score: 0, reasons: [] },
     evaluatePatternMatch(entry, query),
+    evaluateTagMatch(entry, query),
     evaluateLanguageMatch(entry, query),
     evaluateFrameworkMatch(entry, query),
     evaluateEnvironmentMatch(entry, query),
