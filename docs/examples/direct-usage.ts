@@ -5,7 +5,6 @@
 
 import {
   createApp,
-  type Tool
 } from 'containerization-assist-mcp';
 
 async function directUsageExample() {
@@ -83,12 +82,12 @@ function listAvailableTools() {
 
   // Group tools by category (basic grouping)
   const categories = {
-    analysis: tools.filter(t => t.name.includes('analyze') || t.name.includes('scan-image')),
+    analysis: tools.filter(t => t.name.includes('analyze') || t.name.includes('scan')),
     generation: tools.filter(t => t.name.includes('generate') || t.name.includes('create')),
     build: tools.filter(t => t.name.includes('build') || t.name.includes('tag') || t.name.includes('push')),
     deployment: tools.filter(t => t.name.includes('deploy') || t.name.includes('verify') || t.name.includes('prepare')),
     other: tools.filter(t =>
-      !t.name.includes('analyze') && !t.name.includes('scan-image') &&
+      !t.name.includes('analyze') && !t.name.includes('scan') &&
       !t.name.includes('generate') && !t.name.includes('create') &&
       !t.name.includes('build') && !t.name.includes('tag') && !t.name.includes('push') &&
       !t.name.includes('deploy') && !t.name.includes('verify') && !t.name.includes('prepare')
