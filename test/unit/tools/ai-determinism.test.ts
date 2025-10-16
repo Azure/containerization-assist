@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from '@jest/globals';
-import { SAMPLING_CONFIG } from '@/config/sampling';
+import { SAMPLING_CONFIG } from '@/config';
 
 describe('AI Determinism Configuration', () => {
   describe('Sampling Configuration Standards', () => {

@@ -9,8 +9,7 @@ import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import type { Logger } from '@/lib/logger';
 import { extractErrorMessage } from '@/lib/error-utils';
 import type { ToolContext } from '@/mcp/context';
-import { createKubernetesClient } from '@/lib/kubernetes';
-import type { K8sManifest } from '@/infra/kubernetes/client';
+import { createKubernetesClient, type K8sManifest } from '@/infra/kubernetes/client';
 
 import { Success, Failure, type Result, TOPICS } from '@/types';
 import { DEFAULT_TIMEOUTS } from '@/config/defaults';

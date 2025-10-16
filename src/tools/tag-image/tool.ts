@@ -9,7 +9,7 @@
 
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
-import { createDockerClient } from '@/lib/docker';
+import { createDockerClient } from '@/infra/docker/client';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { tool } from '@/types/tool';

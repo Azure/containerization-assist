@@ -12,7 +12,7 @@ import { promises as fs } from 'node:fs';
 import nodePath from 'node:path';
 import { DockerfileParser } from 'dockerfile-ast';
 import type { z } from 'zod';
-import { appConfig } from '@/config/app-config';
+import { config } from '@/config';
 
 const name = 'validate-dockerfile';
 const description = 'Validate Dockerfile base images against allowlist/denylist patterns';
@@ -123,8 +123,8 @@ async function handleValidateDockerfile(
     return Failure('Either path or dockerfile content is required');
   }
 
-  const allowlist = appConfig.validation.imageAllowlist;
-  const denylist = appConfig.validation.imageDenylist;
+  const allowlist = config.validation.imageAllowlist;
+  const denylist = config.validation.imageDenylist;
 
   ctx.logger.info(
     {

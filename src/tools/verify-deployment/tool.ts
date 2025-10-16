@@ -26,7 +26,7 @@
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
 import type { ToolContext } from '@/mcp/context';
-import { createKubernetesClient, KubernetesClient } from '@/lib/kubernetes';
+import { createKubernetesClient, type KubernetesClient } from '@/infra/kubernetes/client';
 
 import { DEFAULT_TIMEOUTS } from '@/config/defaults';
 import { Success, Failure, type Result } from '@/types';

@@ -139,28 +139,3 @@ describe('Configuration Types', () => {
   });
 });
 
-describe('App Configuration', () => {
-  describe('Module Structure', () => {
-    it('should have app config file', () => {
-      const appConfigPath = join(__dirname, '../../../src/config/app-config.ts');
-      const content = readFileSync(appConfigPath, 'utf-8');
-      
-      expect(content).toContain('export');
-    });
-
-    it('should contain application-level configuration', () => {
-      const appConfigPath = join(__dirname, '../../../src/config/app-config.ts');
-      const content = readFileSync(appConfigPath, 'utf-8');
-      
-      expect(typeof content).toBe('string');
-      expect(content.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('App Config Export', () => {
-    it('should export app configuration', async () => {
-      const appConfigModule = await import('../../../src/config/app-config');
-      expect(typeof appConfigModule).toBe('object');
-    });
-  });
-});

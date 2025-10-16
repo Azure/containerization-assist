@@ -13,8 +13,7 @@ import { ValidationReportResponseSchema } from '@/mcp/ai/schemas';
 import { scoreResponse } from '@/mcp/ai/quality';
 import { scoreToGrade } from '@/types/ai';
 import { toMCPMessages } from '@/mcp/ai/message-converter';
-import { TOKEN_CONFIG } from '@/config/tokens';
-import { SAMPLING_CONFIG } from '@/config/sampling';
+import { TOKEN_CONFIG, SAMPLING_CONFIG } from '@/config';
 import {
   ValidationReport,
   ValidationSeverity,
