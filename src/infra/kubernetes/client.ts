@@ -42,6 +42,7 @@ export interface KubernetesClient {
     namespace: string,
     name: string,
     timeoutSeconds: number,
+    pollIntervalMs?: number,
   ) => Promise<Result<DeploymentResult>>;
   ensureNamespace: (namespace: string) => Promise<Result<void>>;
   ping: () => Promise<boolean>;
@@ -120,12 +121,138 @@ export const createKubernetesClient = (
   const networkingApi = kc.makeApiClient(k8s.NetworkingV1Api);
   const batchApi = kc.makeApiClient(k8s.BatchV1Api);
   const rbacApi = kc.makeApiClient(k8s.RbacAuthorizationV1Api);
+  const authApi = kc.makeApiClient(k8s.AuthorizationV1Api);
   const objectApi = k8s.KubernetesObjectApi.makeApiClient(kc);
+
+  // Define helper functions that can be reused internally
+  const checkNamespaceExists = async (namespace: string): Promise<boolean> => {
+    try {
+      await coreApi.readNamespace({ name: namespace });
+      return true;
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'response' in error) {
+        const response = (error as { response?: { statusCode?: number } }).response;
+        if (response?.statusCode === 404) {
+          return false;
+        }
+      }
+      logger.warn({ namespace, error }, 'Error checking namespace');
+      return false;
+    }
+  };
+
+  const fetchDeploymentStatus = async (
+    namespace: string,
+    name: string,
+  ): Promise<Result<DeploymentResult>> => {
+    try {
+      const response = await k8sApi.readNamespacedDeployment({ name, namespace });
+      const deployment = response;
+
+      const status = {
+        ready: (deployment.status?.readyReplicas || 0) === (deployment.spec?.replicas || 0),
+        readyReplicas: deployment.status?.readyReplicas || 0,
+        totalReplicas: deployment.spec?.replicas || 0,
+      };
+
+      return Success(status);
+    } catch (error) {
+      const guidance = extractK8sErrorGuidance(error, 'get deployment status');
+      const errorMessage = `Failed to get deployment status: ${guidance.message}`;
+
+      logger.error(
+        {
+          error: errorMessage,
+          hint: guidance.hint,
+          resolution: guidance.resolution,
+          details: guidance.details,
+          namespace,
+          name,
+        },
+        'Get deployment status failed',
+      );
+
+      return Failure(errorMessage, guidance);
+    }
+  };
+
+  // Resource mapping for type-safe resource creation
+  // Use unknown to allow any K8s API client, with type assertions at call sites
+  type ResourceCreateConfig = {
+    api: unknown;
+    method: string;
+    namespaced: boolean;
+  };
+
+  const resourceCreateMap: Record<string, ResourceCreateConfig> = {
+    Namespace: { api: coreApi, method: 'createNamespace', namespaced: false },
+    Deployment: { api: k8sApi, method: 'createNamespacedDeployment', namespaced: true },
+    Service: { api: coreApi, method: 'createNamespacedService', namespaced: true },
+    ConfigMap: { api: coreApi, method: 'createNamespacedConfigMap', namespaced: true },
+    Secret: { api: coreApi, method: 'createNamespacedSecret', namespaced: true },
+    ServiceAccount: { api: coreApi, method: 'createNamespacedServiceAccount', namespaced: true },
+    Ingress: { api: networkingApi, method: 'createNamespacedIngress', namespaced: true },
+    StatefulSet: { api: k8sApi, method: 'createNamespacedStatefulSet', namespaced: true },
+    DaemonSet: { api: k8sApi, method: 'createNamespacedDaemonSet', namespaced: true },
+    Job: { api: batchApi, method: 'createNamespacedJob', namespaced: true },
+    CronJob: { api: batchApi, method: 'createNamespacedCronJob', namespaced: true },
+    Role: { api: rbacApi, method: 'createNamespacedRole', namespaced: true },
+    RoleBinding: { api: rbacApi, method: 'createNamespacedRoleBinding', namespaced: true },
+    ClusterRole: { api: rbacApi, method: 'createClusterRole', namespaced: false },
+    ClusterRoleBinding: { api: rbacApi, method: 'createClusterRoleBinding', namespaced: false },
+    PersistentVolumeClaim: {
+      api: coreApi,
+      method: 'createNamespacedPersistentVolumeClaim',
+      namespaced: true,
+    },
+    PersistentVolume: { api: coreApi, method: 'createPersistentVolume', namespaced: false },
+  };
+
+  /**
+   * Helper function to create Kubernetes resources using the resource mapping
+   */
+  const createResource = async (manifest: K8sManifest, namespace: string): Promise<void> => {
+    const kind = manifest.kind;
+    const config = resourceCreateMap[kind];
+
+    if (!config) {
+      // For unsupported resource types, use the generic KubernetesObjectApi
+      await objectApi.create(manifest as k8s.KubernetesObject);
+      return;
+    }
+
+    // Prepare the API call parameters
+    // Type assertion: api is a K8s API client with callable methods
+    const api = config.api as Record<string, (args: unknown) => Promise<unknown>>;
+    const method = api[config.method];
+
+    if (!method) {
+      throw new Error(`Method ${config.method} not found on API client`);
+    }
+
+    if (config.namespaced) {
+      await method({
+        namespace: manifest.metadata.namespace || namespace,
+        body: manifest,
+      });
+    } else {
+      await method({
+        body: manifest,
+      });
+    }
+  };
 
   return {
     /**
      * Apply Kubernetes manifest (supports all resource types)
-     * Uses generic KubernetesObjectApi for maximum compatibility
+     * Creates a new resource. If the resource already exists (409 error), the operation succeeds idempotently.
+     *
+     * Note: This is a simple create-or-ignore implementation. For true server-side apply with updates,
+     * consider using the idempotent-apply module which supports patch operations.
+     *
+     * @param manifest - Kubernetes resource manifest to apply
+     * @param namespace - Default namespace for namespaced resources (default: 'default')
+     * @returns Success if resource was created or already exists, Failure otherwise
      */
     async applyManifest(manifest: K8sManifest, namespace = 'default'): Promise<Result<void>> {
       try {
@@ -144,111 +271,8 @@ export const createKubernetesClient = (
           manifest.metadata.namespace = namespace;
         }
 
-        // Use specific API for common resources (more reliable)
-        switch (manifest.kind) {
-          case 'Namespace':
-            await coreApi.createNamespace({
-              body: manifest as unknown as k8s.V1Namespace,
-            });
-            break;
-          case 'Deployment':
-            await k8sApi.createNamespacedDeployment({
-              namespace: manifest.metadata.namespace || namespace,
-              body: manifest as unknown as k8s.V1Deployment,
-            });
-            break;
-          case 'Service':
-            await coreApi.createNamespacedService({
-              namespace: manifest.metadata.namespace || namespace,
-              body: manifest as unknown as k8s.V1Service,
-            });
-            break;
-          case 'ConfigMap':
-            await coreApi.createNamespacedConfigMap({
-              namespace: manifest.metadata.namespace || namespace,
-              body: manifest as unknown as k8s.V1ConfigMap,
-            });
-            break;
-          case 'Secret':
-            await coreApi.createNamespacedSecret({
-              namespace: manifest.metadata.namespace || namespace,
-              body: manifest as unknown as k8s.V1Secret,
-            });
-            break;
-          case 'ServiceAccount':
-            await coreApi.createNamespacedServiceAccount({
-              namespace: manifest.metadata.namespace || namespace,
-              body: manifest as unknown as k8s.V1ServiceAccount,
-            });
-            break;
-          case 'Ingress':
-            await networkingApi.createNamespacedIngress({
-              namespace: manifest.metadata.namespace || namespace,
-              body: manifest as unknown as k8s.V1Ingress,
-            });
-            break;
-          case 'StatefulSet':
-            await k8sApi.createNamespacedStatefulSet({
-              namespace: manifest.metadata.namespace || namespace,
-              body: manifest as unknown as k8s.V1StatefulSet,
-            });
-            break;
-          case 'DaemonSet':
-            await k8sApi.createNamespacedDaemonSet({
-              namespace: manifest.metadata.namespace || namespace,
-              body: manifest as unknown as k8s.V1DaemonSet,
-            });
-            break;
-          case 'Job':
-            await batchApi.createNamespacedJob({
-              namespace: manifest.metadata.namespace || namespace,
-              body: manifest as unknown as k8s.V1Job,
-            });
-            break;
-          case 'CronJob':
-            await batchApi.createNamespacedCronJob({
-              namespace: manifest.metadata.namespace || namespace,
-              body: manifest as unknown as k8s.V1CronJob,
-            });
-            break;
-          case 'Role':
-            await rbacApi.createNamespacedRole({
-              namespace: manifest.metadata.namespace || namespace,
-              body: manifest as unknown as k8s.V1Role,
-            });
-            break;
-          case 'RoleBinding':
-            await rbacApi.createNamespacedRoleBinding({
-              namespace: manifest.metadata.namespace || namespace,
-              body: manifest as unknown as k8s.V1RoleBinding,
-            });
-            break;
-          case 'ClusterRole':
-            await rbacApi.createClusterRole({
-              body: manifest as unknown as k8s.V1ClusterRole,
-            });
-            break;
-          case 'ClusterRoleBinding':
-            await rbacApi.createClusterRoleBinding({
-              body: manifest as unknown as k8s.V1ClusterRoleBinding,
-            });
-            break;
-          case 'PersistentVolumeClaim':
-            await coreApi.createNamespacedPersistentVolumeClaim({
-              namespace: manifest.metadata.namespace || namespace,
-              body: manifest as unknown as k8s.V1PersistentVolumeClaim,
-            });
-            break;
-          case 'PersistentVolume':
-            await coreApi.createPersistentVolume({
-              body: manifest as unknown as k8s.V1PersistentVolume,
-            });
-            break;
-          default:
-            // For other resource types, use the generic KubernetesObjectApi
-            await objectApi.create(manifest as k8s.KubernetesObject);
-            break;
-        }
+        // Create the resource using the helper function
+        await createResource(manifest, namespace);
 
         logger.info(
           { kind: manifest.kind, name: manifest.metadata?.name },
@@ -256,6 +280,18 @@ export const createKubernetesClient = (
         );
         return Success(undefined);
       } catch (error) {
+        // Handle 409 Conflict (AlreadyExists) as success to maintain idempotency
+        if (error && typeof error === 'object' && 'response' in error) {
+          const response = (error as { response?: { statusCode?: number } }).response;
+          if (response?.statusCode === 409) {
+            logger.debug(
+              { kind: manifest.kind, name: manifest.metadata?.name },
+              'Resource already exists (idempotent operation)',
+            );
+            return Success(undefined);
+          }
+        }
+
         const guidance = extractK8sErrorGuidance(error, 'apply manifest');
         const errorMessage = `Failed to apply manifest: ${guidance.message}`;
 
@@ -265,6 +301,9 @@ export const createKubernetesClient = (
             hint: guidance.hint,
             resolution: guidance.resolution,
             details: guidance.details,
+            kind: manifest.kind,
+            name: manifest.metadata?.name,
+            namespace: manifest.metadata?.namespace || namespace,
           },
           'Manifest apply failed',
         );
@@ -275,50 +314,21 @@ export const createKubernetesClient = (
 
     /**
      * Get deployment status
+     * Retrieves current status information for a deployment
+     *
+     * @param namespace - Kubernetes namespace containing the deployment
+     * @param name - Deployment name
+     * @returns Result with deployment readiness status and replica counts
      */
-    async getDeploymentStatus(
-      namespace: string,
-      name: string,
-    ): Promise<
-      Result<{
-        ready: boolean;
-        readyReplicas: number;
-        totalReplicas: number;
-      }>
-    > {
-      try {
-        const response = await k8sApi.readNamespacedDeployment({ name, namespace });
-        const deployment = response;
-
-        const status = {
-          ready: (deployment.status?.readyReplicas || 0) === (deployment.spec?.replicas || 0),
-          readyReplicas: deployment.status?.readyReplicas || 0,
-          totalReplicas: deployment.spec?.replicas || 0,
-        };
-
-        return Success(status);
-      } catch (error) {
-        const guidance = extractK8sErrorGuidance(error, 'get deployment status');
-        const errorMessage = `Failed to get deployment status: ${guidance.message}`;
-
-        logger.error(
-          {
-            error: errorMessage,
-            hint: guidance.hint,
-            resolution: guidance.resolution,
-            details: guidance.details,
-            namespace,
-            name,
-          },
-          'Get deployment status failed',
-        );
-
-        return Failure(errorMessage, guidance);
-      }
+    async getDeploymentStatus(namespace: string, name: string): Promise<Result<DeploymentResult>> {
+      return fetchDeploymentStatus(namespace, name);
     },
 
     /**
      * Check cluster connectivity with timeout
+     * Tests connection to the Kubernetes API server
+     *
+     * @returns true if cluster is reachable, false otherwise
      */
     async ping(): Promise<boolean> {
       try {
@@ -346,25 +356,21 @@ export const createKubernetesClient = (
 
     /**
      * Check if namespace exists
+     * Verifies if a namespace is present in the cluster
+     *
+     * @param namespace - Namespace name to check
+     * @returns true if namespace exists, false otherwise
      */
     async namespaceExists(namespace: string): Promise<boolean> {
-      try {
-        await coreApi.readNamespace({ name: namespace });
-        return true;
-      } catch (error: unknown) {
-        if (error && typeof error === 'object' && 'response' in error) {
-          const response = (error as { response?: { statusCode?: number } }).response;
-          if (response?.statusCode === 404) {
-            return false;
-          }
-        }
-        logger.warn({ namespace, error }, 'Error checking namespace');
-        return false;
-      }
+      return checkNamespaceExists(namespace);
     },
 
     /**
      * Check user permissions in namespace
+     * Verifies if the current user has permission to create deployments in the specified namespace
+     *
+     * @param namespace - Kubernetes namespace to check permissions for
+     * @returns true if user has permissions or if check fails (fail-open for single-user scenarios)
      */
     async checkPermissions(namespace: string): Promise<boolean> {
       try {
@@ -382,8 +388,6 @@ export const createKubernetesClient = (
           },
         };
 
-        // Use authorization API for SelfSubjectAccessReview
-        const authApi = kc.makeApiClient(k8s.AuthorizationV1Api);
         const response = await authApi.createSelfSubjectAccessReview({
           body: accessReview as k8s.V1SelfSubjectAccessReview,
         });
@@ -397,14 +401,20 @@ export const createKubernetesClient = (
 
     /**
      * Check if an ingress controller is installed
-     * Simplified for single-app scenarios - checks for IngressClass resources
+     * Verifies the cluster has an ingress controller available for routing external traffic
+     *
+     * @returns true if an ingress controller is detected, false otherwise
      */
     async checkIngressController(): Promise<boolean> {
       try {
         // Check for IngressClass resources as primary indicator
         const ingressClasses = await networkingApi.listIngressClass();
         if (ingressClasses.items.length > 0) {
-          logger.debug({ count: ingressClasses.items.length }, 'Found ingress classes');
+          const hasDefault = ingressClasses.items.some(
+            (ic) =>
+              ic.metadata?.annotations?.['ingressclass.kubernetes.io/is-default-class'] === 'true',
+          );
+          logger.debug({ count: ingressClasses.items.length, hasDefault }, 'Found ingress classes');
           return true;
         }
 
@@ -430,12 +440,16 @@ export const createKubernetesClient = (
 
     /**
      * Ensure namespace exists (idempotent)
-     * Creates the namespace if it doesn't exist, otherwise does nothing
+     * Creates the namespace if it doesn't exist, otherwise does nothing.
+     * Handles concurrent creation gracefully by treating 409 errors as success.
+     *
+     * @param namespace - Namespace name to create
+     * @returns Success if namespace exists or was created, Failure on errors
      */
     async ensureNamespace(namespace: string): Promise<Result<void>> {
       try {
         // Check if namespace already exists
-        const exists = await this.namespaceExists(namespace);
+        const exists = await checkNamespaceExists(namespace);
         if (exists) {
           logger.debug({ namespace }, 'Namespace already exists');
           return Success(undefined);
@@ -487,40 +501,53 @@ export const createKubernetesClient = (
 
     /**
      * Wait for deployment to be ready with polling
+     * Polls deployment status until it becomes ready or timeout is reached
+     *
+     * @param namespace - Kubernetes namespace containing the deployment
+     * @param name - Deployment name
+     * @param timeoutSeconds - Maximum wait time in seconds
+     * @param pollIntervalMs - Optional polling interval in milliseconds (default: 5000ms)
+     * @returns Result with deployment status on success, error on timeout or failure
      */
     async waitForDeploymentReady(
       namespace: string,
       name: string,
       timeoutSeconds: number,
+      pollIntervalMs?: number,
     ): Promise<Result<DeploymentResult>> {
       try {
+        const pollInterval = pollIntervalMs ?? DEPLOYMENT_POLL_INTERVAL_MS;
         const startTime = Date.now();
         const maxWaitTime = timeoutSeconds * 1000;
 
-        logger.debug({ namespace, name, timeoutSeconds }, 'Waiting for deployment to be ready');
+        logger.debug(
+          { namespace, name, timeoutSeconds, pollInterval },
+          'Waiting for deployment to be ready',
+        );
+
+        let lastStatusResult: Result<DeploymentResult> | undefined;
 
         while (Date.now() - startTime < maxWaitTime) {
-          const statusResult = await this.getDeploymentStatus(namespace, name);
+          lastStatusResult = await fetchDeploymentStatus(namespace, name);
 
-          if (statusResult.ok && statusResult.value?.ready) {
+          if (lastStatusResult.ok && lastStatusResult.value?.ready) {
             logger.info(
               {
                 namespace,
                 name,
-                readyReplicas: statusResult.value.readyReplicas,
+                readyReplicas: lastStatusResult.value.readyReplicas,
                 elapsedSeconds: Math.round((Date.now() - startTime) / 1000),
               },
               'Deployment is ready',
             );
-            return statusResult;
+            return lastStatusResult;
           }
 
           // Wait before checking again
-          await new Promise((resolve) => setTimeout(resolve, DEPLOYMENT_POLL_INTERVAL_MS));
+          await new Promise((resolve) => setTimeout(resolve, pollInterval));
         }
 
-        // Timeout reached
-        const finalStatus = await this.getDeploymentStatus(namespace, name);
+        // Timeout reached - use last status result to avoid redundant API call
         const errorMessage = `Deployment did not become ready within ${timeoutSeconds} seconds. Check pod status and logs to diagnose deployment issues.`;
 
         logger.error(
@@ -528,7 +555,7 @@ export const createKubernetesClient = (
             namespace,
             name,
             timeoutSeconds,
-            currentStatus: finalStatus.ok ? finalStatus.value : undefined,
+            currentStatus: lastStatusResult?.ok ? lastStatusResult.value : undefined,
           },
           errorMessage,
         );

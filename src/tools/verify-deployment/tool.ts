@@ -105,7 +105,7 @@ async function checkDeploymentHealth(
     readyReplicas: statusResult.ok ? (statusResult.value.readyReplicas ?? 0) : 0,
     totalReplicas: statusResult.ok ? (statusResult.value.totalReplicas ?? 1) : 1,
     status: 'unhealthy',
-    message: waitResult.ok ? 'Deployment not ready' : waitResult.error,
+    message: !waitResult.ok ? waitResult.error : 'Deployment not ready',
   };
 }
 

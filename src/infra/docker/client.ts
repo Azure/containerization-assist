@@ -201,6 +201,38 @@ function hashBuildContext(options: DockerBuildOptions): string {
  * Create base Docker client implementation
  */
 function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
+  // Helper function to fetch image info (used by both getImage and inspectImage)
+  const fetchImageInfo = async (id: string): Promise<Result<DockerImageInfo>> => {
+    try {
+      const image = docker.getImage(id);
+      const inspect = await image.inspect();
+
+      const imageInfo: DockerImageInfo = {
+        Id: inspect.Id,
+        RepoTags: inspect.RepoTags,
+        Size: inspect.Size,
+        Created: inspect.Created,
+      };
+
+      return Success(imageInfo);
+    } catch (error) {
+      const { message, details } = extractDockerErrorMessage(error);
+      const errorMessage = `Failed to get image: ${message}`;
+
+      logger.error(
+        {
+          error: errorMessage,
+          errorDetails: details,
+          originalError: error,
+          imageId: id,
+        },
+        'Docker get image failed',
+      );
+
+      return Failure(errorMessage);
+    }
+  };
+
   return {
     async buildImage(options: DockerBuildOptions): Promise<Result<DockerBuildResult>> {
       const buildLogs: string[] = [];
@@ -306,66 +338,12 @@ function createBaseDockerClient(docker: Docker, logger: Logger): DockerClient {
     },
 
     async getImage(id: string): Promise<Result<DockerImageInfo>> {
-      try {
-        const image = docker.getImage(id);
-        const inspect = await image.inspect();
-
-        const imageInfo: DockerImageInfo = {
-          Id: inspect.Id,
-          RepoTags: inspect.RepoTags,
-          Size: inspect.Size,
-          Created: inspect.Created,
-        };
-
-        return Success(imageInfo);
-      } catch (error) {
-        const { message, details } = extractDockerErrorMessage(error);
-        const errorMessage = `Failed to get image: ${message}`;
-
-        logger.error(
-          {
-            error: errorMessage,
-            errorDetails: details,
-            originalError: error,
-            imageId: id,
-          },
-          'Docker get image failed',
-        );
-
-        return Failure(errorMessage);
-      }
+      return fetchImageInfo(id);
     },
 
     async inspectImage(imageId: string): Promise<Result<DockerImageInfo>> {
-      // Alias for getImage - use the same implementation
-      try {
-        const image = docker.getImage(imageId);
-        const inspect = await image.inspect();
-
-        const imageInfo: DockerImageInfo = {
-          Id: inspect.Id,
-          RepoTags: inspect.RepoTags,
-          Size: inspect.Size,
-          Created: inspect.Created,
-        };
-
-        return Success(imageInfo);
-      } catch (error) {
-        const { message, details } = extractDockerErrorMessage(error);
-        const errorMessage = `Failed to inspect image: ${message}`;
-
-        logger.error(
-          {
-            error: errorMessage,
-            errorDetails: details,
-            originalError: error,
-            imageId,
-          },
-          'Docker inspect image failed',
-        );
-
-        return Failure(errorMessage);
-      }
+      // Alias for getImage - delegate to the same implementation
+      return fetchImageInfo(imageId);
     },
 
     async tagImage(imageId: string, repository: string, tag: string): Promise<Result<void>> {
