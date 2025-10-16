@@ -56,11 +56,10 @@ function getDefaultPolicyPaths(): string[] {
  * Later policies override earlier ones for rules with the same ID
  */
 function mergePolicies(policies: Policy[]): Policy {
-  if (policies.length === 0) {
+  const firstPolicy = policies[0];
+  if (!firstPolicy) {
     throw new Error('Cannot merge empty policy list');
   }
-
-  const firstPolicy = policies[0];
 
   if (policies.length === 1) {
     return firstPolicy;
