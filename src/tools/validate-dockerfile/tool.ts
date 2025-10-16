@@ -7,6 +7,7 @@
 
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
+import { getToolLogger } from '@/lib/tool-helpers';
 import { validateImageSchema, type ValidateImageResult } from './schema';
 import { promises as fs } from 'node:fs';
 import nodePath from 'node:path';
@@ -106,6 +107,7 @@ async function handleValidateDockerfile(
   input: z.infer<typeof validateImageSchema>,
   ctx: ToolContext,
 ): Promise<Result<ValidateImageResult>> {
+  const logger = getToolLogger(ctx, 'validate-dockerfile');
   const { path, dockerfile: inputDockerfile, strictMode = false } = input;
 
   let content = inputDockerfile || '';
@@ -126,7 +128,7 @@ async function handleValidateDockerfile(
   const allowlist = config.validation.imageAllowlist;
   const denylist = config.validation.imageDenylist;
 
-  ctx.logger.info(
+  logger.info(
     {
       allowlistCount: allowlist.length,
       denylistCount: denylist.length,
@@ -207,7 +209,7 @@ async function handleValidateDockerfile(
     workflowHints,
   };
 
-  ctx.logger.info(
+  logger.info(
     {
       totalImages: baseImages.length,
       passed,
@@ -229,7 +231,6 @@ export default tool({
   schema: validateImageSchema,
   metadata: {
     knowledgeEnhanced: false,
-    samplingStrategy: 'none',
     enhancementCapabilities: [],
   },
   handler: handleValidateDockerfile,

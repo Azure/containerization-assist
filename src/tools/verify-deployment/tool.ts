@@ -285,11 +285,11 @@ import { tool } from '@/types/tool';
 export default tool({
   name: 'verify-deploy',
   description: 'Verify Kubernetes deployment status',
+  category: 'kubernetes',
   version: '2.0.0',
   schema: verifyDeploymentSchema,
   metadata: {
     knowledgeEnhanced: false,
-    samplingStrategy: 'none',
     enhancementCapabilities: [],
   },
   handler: handleVerifyDeployment,

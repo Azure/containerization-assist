@@ -20,12 +20,12 @@ jest.mock('@/lib/logger', () => ({
 
 jest.mock('@/lib/tool-helpers', () => ({
   createToolTimer: jest.fn(() => mockTimer),
-  getToolLogger: jest.fn(() => ({
+  getToolLogger: jest.fn((context: any) => context.logger || {
     info: jest.fn(),
     error: jest.fn(),
     warn: jest.fn(),
     debug: jest.fn(),
-  })),
+  }),
 }));
 
 describe('opsTool', () => {

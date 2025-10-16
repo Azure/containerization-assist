@@ -12,11 +12,6 @@ import { createSecurityScanner } from '@/infra/security/scanner';
 import { Success, Failure, type Result } from '@/types';
 import { getKnowledgeForCategory } from '@/knowledge/index';
 import type { KnowledgeMatch } from '@/knowledge/types';
-import {
-  enhanceValidationWithAI,
-  ValidationSeverity,
-  type ValidationResult,
-} from '@/validation/ai-enhancement';
 import { scanImageSchema, type ScanImageParams } from './schema';
 
 interface DockerScanResult {
@@ -60,18 +55,6 @@ export interface ScanImageResult {
   };
   scanTime: string;
   passed: boolean;
-  aiSuggestions?: string[];
-  aiAnalysis?: {
-    assessment: string;
-    riskLevel: 'low' | 'medium' | 'high' | 'critical';
-    priorities: Array<{
-      area: string;
-      severity: string;
-      description: string;
-      impact: string;
-    }>;
-    confidence: number;
-  };
 }
 
 /**
@@ -205,101 +188,6 @@ async function handleScanImage(
       }
     }
 
-    // AI Enhancement Integration
-    let aiSuggestions: string[] | undefined;
-    let aiAnalysis: ScanImageResult['aiAnalysis'];
-
-    if (params.enableAISuggestions !== false && dockerScanResult.vulnerabilities) {
-      try {
-        logger.info('Starting AI-powered vulnerability analysis');
-
-        // Convert scan results to validation results format
-        const validationResults: ValidationResult[] = dockerScanResult.vulnerabilities.map(
-          (vuln) => ({
-            isValid: false,
-            errors: [`${vuln.severity} vulnerability in ${vuln.package}:${vuln.version}`],
-            warnings: vuln.description ? [vuln.description] : [],
-            ...(vuln.id && { ruleId: vuln.id }),
-            confidence: 0.9,
-            metadata: {
-              severity:
-                vuln.severity.toLowerCase() === 'high' || vuln.severity.toLowerCase() === 'critical'
-                  ? ValidationSeverity.ERROR
-                  : vuln.severity.toLowerCase() === 'medium'
-                    ? ValidationSeverity.WARNING
-                    : ValidationSeverity.INFO,
-              location: `${vuln.package}:${vuln.version}`,
-              aiEnhanced: true,
-            },
-          }),
-        );
-
-        // Create a comprehensive content string for AI analysis
-        const analysisContent = `
-Docker Image: ${imageId}
-Scanner: ${scanner}
-Total Vulnerabilities: ${dockerScanResult.summary?.total || 0}
-
-Critical: ${dockerScanResult.summary?.critical || 0}
-High: ${dockerScanResult.summary?.high || 0}
-Medium: ${dockerScanResult.summary?.medium || 0}
-Low: ${dockerScanResult.summary?.low || 0}
-
-Top Vulnerabilities:
-${dockerScanResult.vulnerabilities
-  .slice(0, 10)
-  .map(
-    (v) =>
-      `- ${v.package}:${v.version} (${v.severity}): ${v.description || 'No description'}${
-        v.fixedVersion ? ` [Fix: upgrade to ${v.fixedVersion}]` : ''
-      }`,
-  )
-  .join('\n')}
-        `.trim();
-
-        const enhancementOptions = params.aiEnhancementOptions || {
-          mode: 'suggestions',
-          focus: 'security',
-          confidence: 0.8,
-          maxSuggestions: 5,
-          includeExamples: true,
-        };
-
-        const enhancementResult = await enhanceValidationWithAI(
-          analysisContent,
-          validationResults,
-          context,
-          enhancementOptions,
-        );
-
-        if (enhancementResult.ok) {
-          aiSuggestions = enhancementResult.value.suggestions;
-          aiAnalysis = {
-            assessment: enhancementResult.value.analysis.assessment,
-            riskLevel: enhancementResult.value.analysis.riskLevel,
-            priorities: enhancementResult.value.analysis.priorities,
-            confidence: enhancementResult.value.confidence,
-          };
-
-          logger.info(
-            {
-              suggestionsCount: aiSuggestions.length,
-              riskLevel: aiAnalysis.riskLevel,
-              confidence: aiAnalysis.confidence,
-            },
-            'AI enhancement completed successfully',
-          );
-        } else {
-          logger.warn(
-            { error: enhancementResult.error },
-            'AI enhancement failed, continuing without AI suggestions',
-          );
-        }
-      } catch (error) {
-        logger.debug({ error }, 'Failed to get AI enhancement, continuing without AI suggestions');
-      }
-    }
-
     // Prepare the result
     const result: ScanImageResult = {
       success: true,
@@ -314,8 +202,6 @@ ${dockerScanResult.vulnerabilities
       },
       scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
       passed,
-      ...(aiSuggestions && aiSuggestions.length > 0 && { aiSuggestions }),
-      ...(aiAnalysis && { aiAnalysis }),
     };
 
     timer.end({
@@ -359,13 +245,14 @@ import { tool } from '@/types/tool';
 
 export default tool({
   name: 'scan',
-  description: 'Scan Docker images for security vulnerabilities',
+  description:
+    'Scan Docker images for security vulnerabilities with knowledge-based remediation guidance',
+  category: 'security',
   version: '2.0.0',
   schema: scanImageSchema,
   metadata: {
     knowledgeEnhanced: true,
-    samplingStrategy: 'single',
-    enhancementCapabilities: ['vulnerability-analysis', 'security-suggestions', 'risk-assessment'],
+    enhancementCapabilities: ['vulnerability-analysis', 'security-recommendations'],
   },
   handler: handleScanImage,
 });

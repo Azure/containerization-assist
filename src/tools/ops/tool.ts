@@ -7,7 +7,7 @@
 
 import * as os from 'os';
 import { extractErrorMessage } from '@/lib/error-utils';
-import { createToolTimer } from '@/lib/tool-helpers';
+import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { Success, Failure, type Result } from '@/types';
 import type { ToolContext } from '@/mcp/context';
 import { opsToolSchema } from './schema';
@@ -39,12 +39,13 @@ interface PingResult {
  * @public
  */
 export async function ping(config: PingConfig, context: ToolContext): Promise<Result<PingResult>> {
-  const timer = createToolTimer(context.logger, 'ops-ping');
+  const logger = getToolLogger(context, 'ops');
+  const timer = createToolTimer(logger, 'ops-ping');
 
   try {
     const { message = 'ping' } = config;
 
-    context.logger.info({ message }, 'Processing ping request');
+    logger.info({ message }, 'Processing ping request');
 
     const result: PingResult = {
       success: true,
@@ -67,7 +68,7 @@ export async function ping(config: PingConfig, context: ToolContext): Promise<Re
     return Success(result);
   } catch (error) {
     timer.error(error);
-    context.logger.error({ error }, 'Ping failed');
+    logger.error({ error }, 'Ping failed');
     return Failure(extractErrorMessage(error));
   }
 }
@@ -111,12 +112,13 @@ export async function serverStatus(
   config: ServerStatusConfig,
   context: ToolContext,
 ): Promise<Result<ServerStatusResult>> {
-  const timer = createToolTimer(context.logger, 'ops-server-status');
+  const logger = getToolLogger(context, 'ops');
+  const timer = createToolTimer(logger, 'ops-server-status');
 
   try {
     const { details = false } = config;
 
-    context.logger.info({ details }, 'Server status requested');
+    logger.info({ details }, 'Server status requested');
 
     const uptime = Math.floor(process.uptime());
     const version = '2.0.0';
@@ -156,7 +158,7 @@ export async function serverStatus(
       },
     };
 
-    context.logger.info(
+    logger.info(
       {
         uptime,
         memoryUsed: usedMem,
@@ -170,7 +172,7 @@ export async function serverStatus(
     return Success(status);
   } catch (error) {
     timer.error(error);
-    context.logger.error({ error }, 'Error collecting server status');
+    logger.error({ error }, 'Error collecting server status');
     return Failure(extractErrorMessage(error));
   }
 }
@@ -215,11 +217,11 @@ import { tool } from '@/types/tool';
 export default tool({
   name: 'ops',
   description: 'Operational utilities for ping and server status',
+  category: 'utility',
   version: '2.0.0',
   schema: opsToolSchema,
   metadata: {
     knowledgeEnhanced: false,
-    samplingStrategy: 'none',
     enhancementCapabilities: [],
   },
   handler: handleOps,

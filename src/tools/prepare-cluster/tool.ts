@@ -501,11 +501,11 @@ import { tool } from '@/types/tool';
 export default tool({
   name: 'prepare-cluster',
   description: 'Prepare Kubernetes cluster for deployment',
+  category: 'kubernetes',
   version: '2.0.0',
   schema: prepareClusterSchema,
   metadata: {
     knowledgeEnhanced: false,
-    samplingStrategy: 'none',
     enhancementCapabilities: [],
   },
   handler: handlePrepareCluster,

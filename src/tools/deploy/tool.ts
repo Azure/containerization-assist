@@ -1,7 +1,7 @@
 /**
  * Deploy Application Tool
  *
- * Deploys applications to Kubernetes clusters with AI-powered analysis
+ * Deploys applications to Kubernetes clusters
  */
 
 import * as yaml from 'js-yaml';
@@ -11,12 +11,9 @@ import { extractErrorMessage } from '@/lib/error-utils';
 import type { ToolContext } from '@/mcp/context';
 import { createKubernetesClient, type K8sManifest } from '@/infra/kubernetes/client';
 
-import { Success, Failure, type Result, TOPICS } from '@/types';
+import { Success, Failure, type Result } from '@/types';
 import { DEFAULT_TIMEOUTS } from '@/config/defaults';
 import { deployApplicationSchema, type DeployApplicationParams } from './schema';
-import { sampleWithRerank } from '@/mcp/ai/sampling-runner';
-import { buildMessages } from '@/ai/prompt-engine';
-import { toMCPMessages, type MCPMessage } from '@/mcp/ai/message-converter';
 
 // Type definitions for Kubernetes manifests
 interface KubernetesManifest {
@@ -86,14 +83,6 @@ const MANIFEST_ORDER = [
   'NetworkPolicy',
 ] as const;
 
-// Additional interface for AI deployment analysis
-export interface DeploymentAnalysis {
-  recommendations: string[];
-  optimizations: string[];
-  troubleshooting: string[];
-  confidence: number;
-}
-
 export interface DeployApplicationResult {
   success: boolean;
   namespace: string;
@@ -106,7 +95,6 @@ export interface DeployApplicationResult {
   }>;
   ready: boolean;
   replicas: number;
-  deploymentAnalysis?: DeploymentAnalysis;
   status?: {
     readyReplicas: number;
     totalReplicas: number;
@@ -116,200 +104,6 @@ export interface DeployApplicationResult {
       message: string;
     }>;
   };
-}
-
-// Define the result schema for type safety
-
-/**
- * Score deployment analysis based on content quality and relevance
- */
-function scoreDeploymentAnalysis(text: string): number {
-  let score = 0;
-
-  // Basic content quality (30 points)
-  if (text.length > 150) score += 10;
-  if (text.includes('\n')) score += 10;
-  if (!text.toLowerCase().includes('error')) score += 10;
-
-  // Deployment analysis indicators (40 points)
-  if (/deployment|pod|service|ingress/i.test(text)) score += 15;
-  if (/troubleshoot|debug|monitor|health/i.test(text)) score += 15;
-  if (/optimize|scale|resource|performance/i.test(text)) score += 10;
-
-  // Structure and actionability (30 points)
-  if (/\d+\.|-|\*/.test(text)) score += 10; // Has list structure
-  if (/check|verify|monitor|improve/i.test(text)) score += 10;
-  if (text.split('\n').length >= 4) score += 10; // Multi-line content
-
-  return Math.min(score, 100);
-}
-
-/**
- * Build deployment analysis prompt for AI enhancement
- */
-async function buildDeploymentAnalysisPrompt(
-  deploymentResult: DeployApplicationResult,
-  manifests: KubernetesManifest[],
-  deployedResources: Array<{ kind: string; name: string; namespace: string }>,
-  failedResources: Array<{ kind: string; name: string; error: string }>,
-): Promise<{ messages: MCPMessage[]; maxTokens: number }> {
-  const basePrompt = `You are a Kubernetes deployment expert. Analyze deployment results and provide specific recommendations.
-
-Focus on:
-1. Deployment health and readiness
-2. Resource optimization and scaling
-3. Troubleshooting common deployment issues
-4. Security and best practices
-5. Monitoring and observability
-
-Provide concrete, actionable recommendations.
-
-Analyze this Kubernetes deployment and provide optimization recommendations:
-
-**Deployment Summary:**
-- Name: ${deploymentResult.deploymentName}
-- Namespace: ${deploymentResult.namespace}
-- Ready: ${deploymentResult.ready}
-- Replicas: ${deploymentResult.replicas} (${deploymentResult.status?.readyReplicas}/${deploymentResult.status?.totalReplicas})
-- Endpoints: ${deploymentResult.endpoints.length}
-
-**Deployed Resources:**
-${deployedResources.map((r) => `- ${r.kind}: ${r.name}`).join('\n')}
-
-**Failed Resources:**
-${failedResources.length > 0 ? failedResources.map((r) => `- ${r.kind}: ${r.name} (${r.error})`).join('\n') : 'None'}
-
-**Manifest Types:**
-${manifests.map((m) => `- ${m.kind}: ${m.metadata?.name}`).join('\n')}
-
-Please provide:
-1. **Health Recommendations:** Ways to improve deployment health and reliability
-2. **Optimizations:** Performance and resource optimization suggestions
-3. **Troubleshooting:** Common issues and debugging steps
-4. **Best Practices:** Kubernetes deployment best practices to consider
-
-Format your response as clear, actionable recommendations.`;
-
-  const messages = await buildMessages({
-    basePrompt,
-    topic: TOPICS.KUBERNETES,
-    tool: 'deploy',
-    environment: 'kubernetes',
-  });
-
-  return { messages: toMCPMessages(messages).messages, maxTokens: 2048 };
-}
-
-/**
- * Generate AI-powered deployment analysis
- */
-async function generateDeploymentAnalysis(
-  deploymentResult: DeployApplicationResult,
-  manifests: KubernetesManifest[],
-  deployedResources: Array<{ kind: string; name: string; namespace: string }>,
-  failedResources: Array<{ kind: string; name: string; error: string }>,
-  ctx: ToolContext,
-): Promise<Result<DeploymentAnalysis>> {
-  try {
-    const analysisResult = await sampleWithRerank(
-      ctx,
-      async () =>
-        buildDeploymentAnalysisPrompt(
-          deploymentResult,
-          manifests,
-          deployedResources,
-          failedResources,
-        ),
-      scoreDeploymentAnalysis,
-      {},
-    );
-
-    if (!analysisResult.ok) {
-      return Failure(`Failed to generate deployment analysis: ${analysisResult.error}`);
-    }
-
-    const text = analysisResult.value.text;
-
-    // Parse the AI response to extract structured analysis
-    const recommendations: string[] = [];
-    const optimizations: string[] = [];
-    const troubleshooting: string[] = [];
-
-    const lines = text
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
-
-    let currentSection = '';
-    for (const line of lines) {
-      if (
-        line.includes('Health Recommendations') ||
-        line.includes('health') ||
-        line.includes('Health')
-      ) {
-        currentSection = 'health';
-        continue;
-      }
-      if (
-        line.includes('Optimizations') ||
-        line.includes('optimization') ||
-        line.includes('Optimization')
-      ) {
-        currentSection = 'optimization';
-        continue;
-      }
-      if (
-        line.includes('Troubleshooting') ||
-        line.includes('troubleshoot') ||
-        line.includes('Troubleshoot')
-      ) {
-        currentSection = 'troubleshooting';
-        continue;
-      }
-      if (line.includes('Best Practices') || line.includes('practices')) {
-        currentSection = 'practices';
-        continue;
-      }
-
-      if (line.startsWith('-') || line.startsWith('*') || line.match(/^\d+\./)) {
-        const cleanLine = line.replace(/^[-*\d.]\s*/, '');
-        if (cleanLine.length > 10) {
-          if (currentSection === 'health') {
-            recommendations.push(cleanLine);
-          } else if (currentSection === 'optimization') {
-            optimizations.push(cleanLine);
-          } else if (currentSection === 'troubleshooting') {
-            troubleshooting.push(cleanLine);
-          } else if (currentSection === 'practices') {
-            recommendations.push(`Best Practice: ${cleanLine}`);
-          } else {
-            recommendations.push(cleanLine);
-          }
-        }
-      }
-    }
-
-    // Add general recommendations if none found
-    if (recommendations.length === 0) {
-      recommendations.push('Monitor pod status and resource usage');
-      recommendations.push('Configure health checks for better reliability');
-    }
-
-    if (troubleshooting.length === 0) {
-      troubleshooting.push('Check pod logs if deployment is not ready');
-      troubleshooting.push('Verify resource limits and requests');
-      troubleshooting.push('Check service selectors match pod labels');
-    }
-
-    return Success({
-      recommendations,
-      optimizations,
-      troubleshooting,
-      confidence: analysisResult.value.score ?? 0,
-    });
-  } catch (error) {
-    return Failure(`Failed to generate deployment analysis: ${extractErrorMessage(error)}`);
-  }
 }
 
 /**
@@ -681,52 +475,6 @@ async function handleDeploy(
       });
     }
 
-    // Generate AI-powered deployment analysis
-    let deploymentAnalysis: DeploymentAnalysis | undefined;
-    try {
-      const analysisResult = await generateDeploymentAnalysis(
-        {
-          success: ready,
-          namespace,
-          deploymentName,
-          serviceName,
-          endpoints,
-          ready,
-          replicas: totalReplicas,
-          status: {
-            readyReplicas,
-            totalReplicas,
-            conditions: [
-              {
-                type: 'Available',
-                status: ready ? 'True' : 'False',
-                message: ready ? 'Deployment is available' : 'Deployment is pending',
-              },
-            ],
-          },
-        },
-        orderedManifests,
-        deployedResources,
-        failedResources,
-        context,
-      );
-
-      if (analysisResult.ok) {
-        deploymentAnalysis = analysisResult.value;
-        logger.info(
-          {
-            recommendations: deploymentAnalysis.recommendations.length,
-            confidence: deploymentAnalysis.confidence,
-          },
-          'Generated AI deployment analysis',
-        );
-      } else {
-        logger.warn({ error: analysisResult.error }, 'Failed to generate deployment analysis');
-      }
-    } catch (error) {
-      logger.warn({ error: extractErrorMessage(error) }, 'Error generating deployment analysis');
-    }
-
     // Prepare the result
     const result: DeployApplicationResult = {
       success: ready, // Success depends on deployment readiness
@@ -736,7 +484,6 @@ async function handleDeploy(
       endpoints,
       ready,
       replicas: totalReplicas,
-      ...(deploymentAnalysis && { deploymentAnalysis }),
       status: {
         readyReplicas,
         totalReplicas,
@@ -770,16 +517,12 @@ import { tool } from '@/types/tool';
 export default tool({
   name: 'deploy',
   description: 'Deploy applications to Kubernetes clusters',
+  category: 'kubernetes',
   version: '2.0.0',
   schema: deployApplicationSchema,
   metadata: {
-    knowledgeEnhanced: true,
-    samplingStrategy: 'single',
-    enhancementCapabilities: [
-      'deployment-analysis',
-      'troubleshooting',
-      'optimization-recommendations',
-    ],
+    knowledgeEnhanced: false,
+    enhancementCapabilities: [],
   },
   handler: handleDeploy,
 });

@@ -306,7 +306,6 @@ export default tool({
   schema: resolveBaseImagesSchema,
   metadata: {
     knowledgeEnhanced: true,
-    samplingStrategy: 'none',
     enhancementCapabilities: ['recommendations'],
   },
   handler: handleResolveBaseImages,

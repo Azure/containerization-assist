@@ -207,7 +207,6 @@ export default tool({
   schema: generateDockerfileSchema,
   metadata: {
     knowledgeEnhanced: true,
-    samplingStrategy: 'none',
     enhancementCapabilities: ['recommendations'],
   },
   handler: handleGenerateDockerfile,

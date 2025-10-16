@@ -5,6 +5,7 @@
 import { createLogger, createTimer, type Logger, type Timer } from './logger.js';
 import { logToolStart, logToolComplete, logToolFailure } from './runtime-logging.js';
 import type { ToolContext } from '@/mcp/context.js';
+import type { Result } from '@/types';
 
 /**
  * Gets or creates a logger for a tool.
@@ -105,4 +106,46 @@ export function createStandardizedToolTracker(
       logToolFailure(toolName, error, logger, context);
     },
   };
+}
+
+/**
+ * Executes a tool operation safely with automatic error handling, logging, and timing.
+ * This is a convenience wrapper that combines getToolLogger, createToolTimer,
+ * and error handling into a single function.
+ *
+ * @param toolName - Name of the tool for logging and error messages
+ * @param ctx - Tool context containing logger and other dependencies
+ * @param operation - The async operation to execute that returns a Result<T>
+ * @returns Result<T> from the operation, or Failure if an exception is thrown
+ *
+ * @example
+ * ```typescript
+ * async function run(input: z.infer<typeof schema>, ctx: ToolContext) {
+ *   return executeToolSafely('analyze-repo', ctx, async () => {
+ *     // ... implementation
+ *     return Success(result);
+ *   });
+ * }
+ * ```
+ */
+export async function executeToolSafely<T>(
+  toolName: string,
+  ctx: ToolContext,
+  operation: () => Promise<Result<T>>,
+): Promise<Result<T>> {
+  const logger = getToolLogger(ctx, toolName);
+  const timer = createToolTimer(logger, toolName);
+
+  try {
+    const result = await operation();
+    timer.end({ success: result.ok });
+    return result;
+  } catch (error) {
+    timer.error(error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return {
+      ok: false,
+      error: `${toolName} failed: ${errorMessage}`,
+    };
+  }
 }

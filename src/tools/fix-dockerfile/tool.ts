@@ -10,6 +10,7 @@
 
 import { Failure, type Result, Success, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
+import { getToolLogger } from '@/lib/tool-helpers';
 import {
   fixDockerfileSchema,
   type DockerfileFixPlan,
@@ -303,6 +304,7 @@ async function handleFixDockerfile(
   input: z.infer<typeof fixDockerfileSchema>,
   ctx: ToolContext,
 ): Promise<Result<DockerfileFixPlan>> {
+  const logger = getToolLogger(ctx, 'fix-dockerfile');
   let content = input.dockerfile || '';
 
   if (input.path) {
@@ -322,7 +324,7 @@ async function handleFixDockerfile(
     return Failure('Dockerfile content is empty. Provide valid Dockerfile content or path.');
   }
 
-  ctx.logger.info({ preview: content.substring(0, 100) }, 'Validating Dockerfile for issues');
+  logger.info({ preview: content.substring(0, 100) }, 'Validating Dockerfile for issues');
 
   const validationReport = await validateDockerfileContent(content, {
     enableExternalLinter: true,
@@ -341,7 +343,7 @@ async function handleFixDockerfile(
       };
     });
 
-  ctx.logger.info(
+  logger.info(
     {
       issueCount: validationIssues.length,
       score: validationReport.score,
@@ -398,7 +400,6 @@ export default tool({
   schema: fixDockerfileSchema,
   metadata: {
     knowledgeEnhanced: true,
-    samplingStrategy: 'none',
     enhancementCapabilities: ['validation', 'recommendations'],
   },
   handler: handleFixDockerfile,

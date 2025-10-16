@@ -307,7 +307,6 @@ export default tool({
   schema: convertAcaToK8sSchema,
   metadata: {
     knowledgeEnhanced: true,
-    samplingStrategy: 'none',
     enhancementCapabilities: ['recommendations'],
   },
   handler: handleConvertAcaToK8s,

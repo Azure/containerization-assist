@@ -24,7 +24,6 @@ import type { Logger } from 'pino';
 import type { MCPTool } from '@/types/tool';
 import { createStandardizedToolTracker } from '@/lib/tool-helpers';
 import { TOOL_NAME, ToolName } from '@/tools';
-import { checkSamplingAvailability, type SamplingCheckResult } from '@/mcp/sampling-check';
 import { logToolExecution, createToolLogEntry } from '@/lib/tool-logger';
 
 // ===== Types =====
@@ -301,15 +300,6 @@ async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
   });
   const tracker = createStandardizedToolTracker(tool.name, {}, logger);
 
-  // Check sampling availability for tools that use AI-driven sampling
-  let samplingCheckResult: SamplingCheckResult | undefined;
-
-  //Later on this can be cached in the session to avoid multiple checks
-  // Avoiding caching to reduce complexity for now
-  if (tool.metadata?.samplingStrategy === 'single') {
-    samplingCheckResult = await checkSamplingAvailability(toolContext);
-  }
-
   const startTime = Date.now();
   const logEntry = createToolLogEntry(tool.name, undefined, validatedParams);
 
@@ -332,14 +322,7 @@ async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
 
     // Add metadata to successful results
     if (result.ok) {
-      // Add sampling warning message if not available (only for sampling-enabled tools)
       let valueWithMessages = result.value;
-      if (samplingCheckResult && !samplingCheckResult.available && samplingCheckResult.message) {
-        valueWithMessages = {
-          ...result.value,
-          _samplingWarning: samplingCheckResult.message,
-        };
-      }
 
       if (env.config.chainHintsMode === 'enabled') {
         const hint = getChainHint(tool.name as ToolName, result.ok ? 'success' : 'failure');
