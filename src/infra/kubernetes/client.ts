@@ -131,6 +131,11 @@ export const createKubernetesClient = (
       try {
         logger.debug({ manifest: manifest.kind, namespace }, 'Applying Kubernetes manifest');
 
+        // Ensure manifest has metadata object
+        if (!manifest.metadata) {
+          manifest.metadata = { name: '' };
+        }
+
         // Set namespace in metadata if not already set and not a cluster-scoped resource
         const isClusterScoped = ['Namespace', 'ClusterRole', 'ClusterRoleBinding'].includes(
           manifest.kind || '',

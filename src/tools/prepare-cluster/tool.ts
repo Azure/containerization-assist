@@ -59,11 +59,13 @@ export interface PrepareClusterResult {
 interface K8sClientAdapter {
   ping(): Promise<boolean>;
   namespaceExists(namespace: string): Promise<boolean>;
-  ensureNamespace(namespace: string): Promise<{ success: boolean; error?: string }>;
+  ensureNamespace(
+    namespace: string,
+  ): Promise<{ success: boolean; error?: string; guidance?: unknown }>;
   applyManifest(
     manifest: Record<string, unknown>,
     namespace?: string,
-  ): Promise<{ success: boolean; error?: string }>;
+  ): Promise<{ success: boolean; error?: string; guidance?: unknown }>;
   checkIngressController(): Promise<boolean>;
   checkPermissions(namespace: string): Promise<boolean>;
 }
@@ -79,7 +81,7 @@ function createK8sClientAdapter(
       if (result.ok) {
         return { success: true };
       } else {
-        return { success: false, error: result.error };
+        return { success: false, error: result.error, guidance: result.guidance };
       }
     },
     applyManifest: async (manifest: Record<string, unknown>, namespace?: string) => {
@@ -87,7 +89,7 @@ function createK8sClientAdapter(
       if (result.ok) {
         return { success: true };
       } else {
-        return { success: false, error: result.error };
+        return { success: false, error: result.error, guidance: result.guidance };
       }
     },
     checkIngressController: () => k8sClient.checkIngressController(),

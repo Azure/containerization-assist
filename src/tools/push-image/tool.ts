@@ -77,6 +77,18 @@ async function handlePushImage(
     // Build auth config if credentials are provided
     let authConfig: { username: string; password: string; serveraddress: string } | undefined;
     if (input.credentials && input.registry) {
+      // Validate that both username and password are present
+      if (!input.credentials.username || !input.credentials.password) {
+        return Failure(
+          'Missing registry credentials',
+          createErrorGuidance(
+            'Both username and password are required for registry authentication',
+            'Registry credentials are incomplete',
+            'Provide both username and password in the credentials parameter',
+          ),
+        );
+      }
+
       logger.info({ registry: input.registry }, 'Preparing registry authentication');
 
       // Normalize registry URL for auth config
