@@ -22,7 +22,7 @@ export type {
 
 // Core types
 /** @public */
-export type { MCPTool, Result, Success, Failure } from './types/index.js';
+export type { MCPTool, Result, Success, Failure, ToolContext } from './types/index.js';
 
 // Export tool helper utilities
 export {

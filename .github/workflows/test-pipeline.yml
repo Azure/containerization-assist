@@ -53,6 +53,25 @@ jobs:
         id: typecheck
         run: npm run typecheck
 
+      - name: Validate examples compile
+        id: examples
+        run: |
+          echo "Validating TypeScript examples syntax..."
+          cd docs/examples
+          # Note: Examples use package self-reference which requires path mapping
+          # We validate syntax only to ensure examples remain valid TypeScript
+          # Filter out type errors (TS23xx, TS24xx) and module resolution errors
+          for file in *.ts; do
+            OUTPUT=$(npx tsc --noEmit --skipLibCheck --module ES2022 --target ES2022 --moduleResolution bundler "$file" 2>&1)
+            FILTERED=$(echo "$OUTPUT" | grep "error TS" | grep -v "Cannot find module" | grep -v "has no exported member" | grep -v "TS23[0-9][0-9]:" | grep -v "TS24[0-9][0-9]:" || true)
+            if [ -n "$FILTERED" ]; then
+              echo "❌ $file has compilation errors:"
+              echo "$FILTERED"
+              exit 1
+            fi
+          done
+          echo "✅ All examples have valid TypeScript syntax"
+
       - name: Run lint and cache output
         id: lint
         run: npm run lint 2>&1 | tee eslint-output.txt || true
