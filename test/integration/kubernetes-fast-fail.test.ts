@@ -12,6 +12,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import pino from 'pino';
 import { jest } from '@jest/globals';
+import { createTestTempDir } from '../__support__/utilities/tmp-helpers';
+import type { DirResult } from 'tmp';
 import { createKubernetesClient } from '@/infra/kubernetes/client';
 import { discoverAndValidateKubeconfig } from '@/infra/kubernetes/kubeconfig-discovery';
 
@@ -68,21 +70,19 @@ describe('Kubernetes fast-fail integration', () => {
   });
 
   describe('invalid kubeconfig scenarios', () => {
-    let tempDir: string;
+    let tempDir: DirResult;
+    let cleanup: () => Promise<void>;
     let tempKubeconfig: string;
 
     beforeEach(() => {
-      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kube-test-'));
-      tempKubeconfig = path.join(tempDir, 'config');
+      const result = createTestTempDir('kube-test-');
+      tempDir = result.dir;
+      cleanup = result.cleanup;
+      tempKubeconfig = path.join(tempDir.name, 'config');
     });
 
-    afterEach(() => {
-      if (fs.existsSync(tempKubeconfig)) {
-        fs.unlinkSync(tempKubeconfig);
-      }
-      if (fs.existsSync(tempDir)) {
-        fs.rmdirSync(tempDir);
-      }
+    afterEach(async () => {
+      await cleanup();
     });
 
     it('should fail fast with invalid YAML in kubeconfig', () => {
@@ -136,12 +136,15 @@ current-context: test-context
   });
 
   describe('unreachable cluster scenarios', () => {
-    let tempDir: string;
+    let tempDir: DirResult;
+    let cleanup: () => Promise<void>;
     let tempKubeconfig: string;
 
     beforeEach(() => {
-      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kube-test-'));
-      tempKubeconfig = path.join(tempDir, 'config');
+      const result = createTestTempDir('kube-test-');
+      tempDir = result.dir;
+      cleanup = result.cleanup;
+      tempKubeconfig = path.join(tempDir.name, 'config');
 
       // Create a valid kubeconfig pointing to unreachable server
       const config = `
@@ -167,13 +170,8 @@ current-context: test-context
       process.env.KUBECONFIG = tempKubeconfig;
     });
 
-    afterEach(() => {
-      if (fs.existsSync(tempKubeconfig)) {
-        fs.unlinkSync(tempKubeconfig);
-      }
-      if (fs.existsSync(tempDir)) {
-        fs.rmdirSync(tempDir);
-      }
+    afterEach(async () => {
+      await cleanup();
     });
 
     it('should detect unreachable cluster via ping', async () => {
@@ -223,15 +221,18 @@ current-context: test-context
   });
 
   describe('kubeconfig file permissions', () => {
-    let tempDir: string;
+    let tempDir: DirResult;
+    let cleanup: () => Promise<void>;
     let tempKubeconfig: string;
 
     beforeEach(() => {
-      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kube-test-'));
-      tempKubeconfig = path.join(tempDir, 'config');
+      const result = createTestTempDir('kube-test-');
+      tempDir = result.dir;
+      cleanup = result.cleanup;
+      tempKubeconfig = path.join(tempDir.name, 'config');
     });
 
-    afterEach(() => {
+    afterEach(async () => {
       if (fs.existsSync(tempKubeconfig)) {
         // Restore permissions before cleanup
         try {
@@ -239,11 +240,8 @@ current-context: test-context
         } catch (e) {
           // Ignore
         }
-        fs.unlinkSync(tempKubeconfig);
       }
-      if (fs.existsSync(tempDir)) {
-        fs.rmdirSync(tempDir);
-      }
+      await cleanup();
     });
 
     it('should fail fast when kubeconfig is not readable', () => {

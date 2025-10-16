@@ -2,12 +2,11 @@
  * Tests for test utilities
  */
 
-import { 
-  createMockLogger, 
-  createTempDir, 
-  measureTime, 
-  calculateStatistics, 
-  determinePerformanceStatus, 
+import {
+  createMockLogger,
+  measureTime,
+  calculateStatistics,
+  determinePerformanceStatus,
   createMockBenchmark,
   waitFor
 } from '../../__support__/utilities/test-helpers';
@@ -30,17 +29,6 @@ describe('Test Utilities', () => {
       
       expect(child.info).toBeDefined();
       expect(child.child).toBeDefined();
-    });
-  });
-
-  describe('createTempDir', () => {
-    it('should create unique temporary directory paths', () => {
-      const dir1 = createTempDir();
-      const dir2 = createTempDir();
-      
-      expect(dir1).toMatch(/^\/tmp\/test-\d+-\w+$/);
-      expect(dir2).toMatch(/^\/tmp\/test-\d+-\w+$/);
-      expect(dir1).not.toBe(dir2);
     });
   });
 
