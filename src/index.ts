@@ -58,3 +58,36 @@ export {
   mapError,
   withErrorContext,
 } from './lib/result-utils.js';
+
+// Tool creation helper for external consumers
+/** @public */
+export { tool } from './types/tool.js';
+
+// All tools with new interface
+/** @public */
+export {
+  ALL_TOOLS,
+  analyzeRepoTool,
+  buildImageTool,
+  convertAcaToK8sTool,
+  deployTool,
+  fixDockerfileTool,
+  generateDockerfileTool,
+  generateK8sManifestsTool,
+  opsTool,
+  prepareClusterTool,
+  pushImageTool,
+  resolveBaseImagesTool,
+  scanTool,
+  tagImageTool,
+  validateDockerfileTool,
+  verifyDeployTool,
+} from './tools/index.js';
+
+// Export utilities for external consumers (telemetry integration)
+/** @public */
+export { extractSchemaShape } from './lib/zod-utils.js';
+
+// Export Zod types for TypeScript consumers
+/** @public */
+export type { ZodRawShape } from 'zod';

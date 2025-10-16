@@ -154,7 +154,7 @@ async function checkEndpointHealth(url: string): Promise<boolean> {
 /**
  * Deployment verification implementation - direct execution without wrapper
  */
-async function verifyDeploymentImpl(
+async function handleVerifyDeployment(
   params: VerifyDeploymentParams,
   context: ToolContext,
 ): Promise<Result<VerifyDeploymentResult>> {
@@ -277,12 +277,12 @@ async function verifyDeploymentImpl(
 /**
  * Verify deployment tool
  */
-export const verifyDeployment = verifyDeploymentImpl;
+export const verifyDeployment = handleVerifyDeployment;
 
 // New Tool interface export
-import type { MCPTool } from '@/types/tool';
+import { tool } from '@/types/tool';
 
-const tool: MCPTool<typeof verifyDeploymentSchema, VerifyDeploymentResult> = {
+export default tool({
   name: 'verify-deploy',
   description: 'Verify Kubernetes deployment status',
   version: '2.0.0',
@@ -292,7 +292,5 @@ const tool: MCPTool<typeof verifyDeploymentSchema, VerifyDeploymentResult> = {
     samplingStrategy: 'none',
     enhancementCapabilities: [],
   },
-  run: verifyDeploymentImpl,
-};
-
-export default tool;
+  handler: handleVerifyDeployment,
+});

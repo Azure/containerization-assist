@@ -43,7 +43,7 @@ describe('opsTool', () => {
         message: 'test-ping',
       };
 
-      const result = await opsToolNew.run(config, { logger: mockLogger });
+      const result = await opsToolNew.handler(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -70,7 +70,7 @@ describe('opsTool', () => {
         operation: 'ping',
       };
 
-      const result = await opsToolNew.run(config, { logger: mockLogger });
+      const result = await opsToolNew.handler(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -85,7 +85,7 @@ describe('opsTool', () => {
         message: 'test-message',
       };
 
-      await opsToolNew.run(config, { logger: mockLogger });
+      await opsToolNew.handler(config, { logger: mockLogger });
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         { message: 'test-message' },
@@ -101,7 +101,7 @@ describe('opsTool', () => {
         details: true,
       };
 
-      const result = await opsToolNew.run(config, { logger: mockLogger });
+      const result = await opsToolNew.handler(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -138,7 +138,7 @@ describe('opsTool', () => {
         details: false,
       };
 
-      const result = await opsToolNew.run(config, { logger: mockLogger });
+      const result = await opsToolNew.handler(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       expect(mockLogger.info).toHaveBeenCalledWith({ details: false }, 'Server status requested');
@@ -149,7 +149,7 @@ describe('opsTool', () => {
         operation: 'status',
       };
 
-      await opsToolNew.run(config, { logger: mockLogger });
+      await opsToolNew.handler(config, { logger: mockLogger });
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -169,7 +169,7 @@ describe('opsTool', () => {
         operation: 'invalid',
       } as any;
 
-      const result = await opsToolNew.run(config, { logger: mockLogger });
+      const result = await opsToolNew.handler(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -184,7 +184,7 @@ describe('opsTool', () => {
         operation: 'ping',
       };
 
-      await opsToolNew.run(config, { logger: mockLogger });
+      await opsToolNew.handler(config, { logger: mockLogger });
 
       expect(mockTimer.end).toHaveBeenCalled();
     });
@@ -194,7 +194,7 @@ describe('opsTool', () => {
         operation: 'status',
       };
 
-      await opsToolNew.run(config, { logger: mockLogger });
+      await opsToolNew.handler(config, { logger: mockLogger });
 
       expect(mockTimer.end).toHaveBeenCalled();
     });

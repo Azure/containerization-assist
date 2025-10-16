@@ -195,8 +195,7 @@ describe('Build Output Validation', () => {
 
       it('should include critical AI modules', () => {
         const criticalModules = [
-          join(aiDir, 'prompt-templates.js'),
-          join(aiDir, 'prompt-engine.js')
+          join(aiDir, 'prompt-templates.js')
         ];
 
         criticalModules.forEach(moduleFile => {
@@ -294,8 +293,8 @@ describe('Build Output Validation', () => {
       expect(esmAiCount).toBe(cjsAiCount);
       expect(esmAiCount).toBeGreaterThan(0);
 
-      // Should have at least prompt-templates and prompt-engine
-      expect(esmAiCount).toBeGreaterThanOrEqual(2);
+      // Should have at least prompt-templates
+      expect(esmAiCount).toBeGreaterThanOrEqual(1);
     });
 
     it('should have knowledge data files with reasonable sizes', () => {

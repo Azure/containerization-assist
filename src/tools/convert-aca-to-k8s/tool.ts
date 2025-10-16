@@ -15,7 +15,6 @@
 
 import { Failure, type Result, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { MCPTool } from '@/types/tool';
 import { convertAcaToK8sSchema } from './schema';
 import { getToolLogger, createToolTimer } from '@/lib/tool-helpers';
 import { extractErrorMessage } from '@/lib/error-utils';
@@ -269,7 +268,7 @@ Use this plan to guide the conversion from Azure Container Apps to Kubernetes ma
 /**
  * Wrapper function to add validation and manifest parsing
  */
-async function run(
+async function handleConvertAcaToK8s(
   input: z.infer<typeof convertAcaToK8sSchema>,
   ctx: ToolContext,
 ): Promise<Result<AcaToK8sConversionPlan>> {
@@ -298,7 +297,9 @@ async function run(
   }
 }
 
-const tool: MCPTool<typeof convertAcaToK8sSchema, AcaToK8sConversionPlan> = {
+import { tool } from '@/types/tool';
+
+export default tool({
   name,
   description,
   category: 'azure',
@@ -309,7 +310,5 @@ const tool: MCPTool<typeof convertAcaToK8sSchema, AcaToK8sConversionPlan> = {
     samplingStrategy: 'none',
     enhancementCapabilities: ['recommendations'],
   },
-  run,
-};
-
-export default tool;
+  handler: handleConvertAcaToK8s,
+});

@@ -10,7 +10,6 @@
 
 import { Failure, type Result, Success, TOPICS } from '@/types';
 import type { ToolContext } from '@/mcp/context';
-import type { MCPTool } from '@/types/tool';
 import {
   fixDockerfileSchema,
   type DockerfileFixPlan,
@@ -300,7 +299,7 @@ Dockerfile Fix Planning Summary:
 /**
  * Main run function with validation preprocessing
  */
-async function run(
+async function handleFixDockerfile(
   input: z.infer<typeof fixDockerfileSchema>,
   ctx: ToolContext,
 ): Promise<Result<DockerfileFixPlan>> {
@@ -389,7 +388,9 @@ Dockerfile Fix Planning Summary:
   return runPattern(extendedInput, ctx);
 }
 
-const tool: MCPTool<typeof fixDockerfileSchema, DockerfileFixPlan> = {
+import { tool } from '@/types/tool';
+
+export default tool({
   name,
   description,
   category: 'docker',
@@ -400,7 +401,5 @@ const tool: MCPTool<typeof fixDockerfileSchema, DockerfileFixPlan> = {
     samplingStrategy: 'none',
     enhancementCapabilities: ['validation', 'recommendations'],
   },
-  run,
-};
-
-export default tool;
+  handler: handleFixDockerfile,
+});

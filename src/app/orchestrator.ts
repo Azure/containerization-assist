@@ -280,7 +280,7 @@ async function executeWithOrchestration<T extends MCPTool<ZodTypeAny, any>>(
 
   // Execute tool directly (single attempt)
   try {
-    const result = await tool.run(validatedParams, toolContext);
+    const result = await tool.handler(validatedParams, toolContext);
     const durationMs = Date.now() - startTime;
 
     logEntry.output = result.ok ? result.value : { error: result.error };

@@ -367,6 +367,90 @@ kubectl config view
 - **[Contributing Guidelines](./CONTRIBUTING.md)** - How to contribute
 - **[Examples](./docs/examples/)** - Code examples and usage patterns
 
+## External Telemetry Integration
+
+Container Assist tools expose a clean, idiomatic API for external telemetry wrapping. This enables teams to track tool usage, performance metrics, and user behavior without modifying the core tool implementations.
+
+### Tool Interface Properties
+
+Each tool exposes the following properties for telemetry integration:
+
+```typescript
+import { buildImageTool } from 'containerization-assist-mcp';
+
+// Access tool properties for telemetry
+const {
+  name,         // string: Tool identifier
+  description,  // string: Human-readable description
+  inputSchema,  // ZodRawShape: For MCP SDK registration
+  parse,        // (args: unknown) => TypedInput: Zod validation
+  handler,      // (input: TypedInput, context: ToolContext) => Promise<Result>
+  metadata      // ToolMetadata: Knowledge enhancement info
+} = buildImageTool;
+```
+
+### Telemetry Wrapper Pattern
+
+Wrap tools with your telemetry layer while maintaining type safety:
+
+```typescript
+import { Server as McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { buildImageTool } from 'containerization-assist-mcp';
+
+// Wrap with your telemetry
+server.tool(
+  buildImageTool.name,
+  buildImageTool.description,
+  buildImageTool.inputSchema,
+  async (args, extra) => {
+    const startTime = Date.now();
+
+    try {
+      // Step 1: Parse & validate with Zod
+      const typedInput = buildImageTool.parse(args);
+
+      // Step 2: Record telemetry with typed properties
+      recordTelemetry({
+        tool: buildImageTool.name,
+        parameters: typedInput,
+        timestamp: startTime
+      });
+
+      // Step 3: Execute tool handler
+      const result = await buildImageTool.handler(typedInput, context);
+
+      // Step 4: Record result metrics
+      recordResult({
+        tool: buildImageTool.name,
+        success: result.ok,
+        duration: Date.now() - startTime
+      });
+
+      return formatResponse(result);
+    } catch (error) {
+      recordError(error);
+      throw error;
+    }
+  }
+);
+```
+
+### Complete Example
+
+See [docs/examples/app-mod-telemetry.ts](./docs/examples/app-mod-telemetry.ts) for a complete example showing:
+- Full telemetry wrapper implementation
+- Error tracking and metrics collection
+- Type-safe parameter extraction
+- Integration with all Container Assist tools
+
+### Benefits
+
+- **Type Safety**: Parse method provides strongly-typed input for handlers
+- **Clean Separation**: Validation and execution are clearly separated
+- **Flexible Integration**: Wrap with any telemetry system (Application Insights, DataDog, etc.)
+- **No Modifications**: Zero changes needed to core tool implementations
+- **Metadata Access**: Tool capabilities and enhancement info available for categorization
+
 ## For Developers
 
 If you want to contribute or run from source:
