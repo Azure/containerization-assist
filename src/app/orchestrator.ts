@@ -61,9 +61,6 @@ function mergePolicies(policies: Policy[]): Policy {
   }
 
   const firstPolicy = policies[0];
-  if (!firstPolicy) {
-    throw new Error('Cannot merge empty policy list');
-  }
 
   if (policies.length === 1) {
     return firstPolicy;
